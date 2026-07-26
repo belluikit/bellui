@@ -1,0 +1,978 @@
+AG GRID REACT DATA GRID - COMPREHENSIVE FEATURE REFERENCE
+============================================================
+Research compiled from official AG Grid documentation.
+AG Grid has two editions: Community (free) and Enterprise (paid).
+Features marked [Enterprise] require a commercial license.
+
+
+================================================================================
+1. SPARKLINES [Enterprise]
+================================================================================
+
+Mini charts rendered inside grid cells for at-a-glance data visualization.
+Enabled via cellRenderer: 'agSparklineCellRenderer' on a column definition.
+Configuration is passed through cellRendererParams.sparklineOptions.
+
+1.1 Sparkline Types
+    - Line Sparkline (default when no type specified)
+    - Area Sparkline
+    - Bar Sparkline
+    - Column Sparkline
+
+1.2 Data Formats
+    - Array of numbers (basic)
+    - Custom data mapping via dedicated data options
+
+1.3 Line Sparkline Options
+    - stroke: line color (hex, rgb, rgba, CSS keyword)
+    - strokeWidth: line thickness in pixels
+    - Marker options:
+      - enabled: boolean toggle
+      - size: marker size in pixels (default 0, invisible)
+      - shape: e.g. 'circle', 'diamond'
+      - fill: marker fill color
+      - stroke: marker border color
+      - strokeWidth: marker border thickness
+      - itemStyler: callback for conditional styling (receives highlightState)
+    - Padding: top, right, bottom, left (all independent)
+    - Axis configuration (type, stroke, strokeWidth)
+    - Tooltip options
+    - Points of Interest via itemStyler
+
+1.4 Area Sparkline Options
+    - fill: area color between line and axis (supports rgba for transparency)
+    - stroke: line color
+    - strokeWidth: line thickness
+    - Marker options (same as line: enabled, size, shape, fill, stroke, strokeWidth, itemStyler)
+    - Axis options (type, stroke, strokeWidth; set strokeWidth:0 to hide)
+    - Padding: top, right, bottom, left
+    - Highlight styling (highlight.highlightedItem with fill, strokeWidth)
+    - Tooltip options
+    - Points of Interest via itemStyler
+
+1.5 Bar Sparkline Options
+    - direction: 'horizontal' or 'vertical'
+    - fill: bar color
+    - stroke: bar outline color
+    - strokeWidth: bar outline thickness (default 0, invisible)
+    - Highlight styling:
+      - highlight.highlightedItem.fill
+      - highlight.highlightedItem.stroke
+      - highlight.highlightedItem.strokeWidth
+    - Padding:
+      - paddingInner: spacing between bars (0-1 scale, category axis only)
+      - paddingOuter: edge spacing for first/last bars (0-1)
+      - Container padding: top, right, bottom, left
+    - Label options:
+      - enabled: boolean
+      - formatter: custom text transformation function
+      - fontWeight, fontStyle, fontSize, fontFamily, color
+      - placement: 'inside-start', 'inside-center', 'inside-end', 'outside-start', 'outside-end'
+    - Axis options:
+      - stroke, strokeWidth
+      - type: 'category'
+      - paddingInner, paddingOuter
+    - Domain scaling:
+      - min: lower boundary
+      - max: upper boundary
+      - Enables consistent comparison across sparklines
+    - Progress bar pattern (single-value array, min/max 0-100, conditional coloring)
+    - Tooltip options
+    - Points of Interest via itemStyler
+
+1.6 Column Sparkline Options
+    - Same core options as bar sparkline but renders vertically
+    - All bar customization options apply
+
+1.7 Common Sparkline Features
+    - Tooltip customization across all types
+    - Axis type configuration
+    - Crosshair options
+    - Highlight states (highlighted-item)
+    - itemStyler callbacks for conditional formatting per data point
+
+
+================================================================================
+2. COLUMN FEATURES
+================================================================================
+
+2.1 Column Definitions (ColDef)
+    - field: maps to row data property (supports dot notation for nested)
+    - headerName: display name (auto-derived from field via camelCase if omitted)
+    - headerValueGetter: dynamic header text callback
+    - headerTooltip: static tooltip string
+    - headerTooltipValueGetter: dynamic tooltip callback
+    - headerClass: CSS class for header
+    - headerStyle: inline style for header
+    - type: column type(s) - string or array of strings
+    - width: fixed pixel width
+    - minWidth: minimum width constraint
+    - maxWidth: maximum width constraint
+    - flex: proportional sizing (divides remaining space among flex columns)
+    - resizable: boolean (enabled by default)
+    - sortable: boolean (enabled by default)
+    - filter: filter type or boolean
+    - editable: boolean or callback for conditional editing
+    - cellRenderer: string, component, or inline function
+    - cellRendererParams: custom props for cell renderer
+    - cellRendererSelector: dynamic renderer selection per row
+    - valueGetter: custom value retrieval function/expression
+    - valueFormatter: display formatting function
+    - valueSetter: custom value write function
+    - valueParser: parse edited value back to data
+    - cellClass: CSS class for cells
+    - cellStyle: inline style for cells
+    - pinned: 'left' | 'right' | null
+    - lockPosition: 'left' | 'right' - prevents movement
+    - lockPinned: prevents pin/unpin via UI
+    - lockVisible: prevents hide/show via UI
+    - suppressMovable: prevents user column dragging
+    - suppressMenu: suppresses column menu
+    - columnGroupShow: 'open' | 'closed' | null
+    - tooltipField: field for tooltip text
+    - tooltipValueGetter: dynamic tooltip callback
+    - tooltipComponent: custom tooltip component
+    - colSpan: callback returning column span count
+    - spanRows: boolean or callback for row spanning
+    - rowDrag: boolean or callback enabling row drag handle
+    - checkboxSelection: boolean for selection checkbox
+    - cellDataType: data type hint ('text', 'number', 'boolean', 'date', etc.)
+    - aggFunc: aggregation function name or custom function
+    - enableValue: allow GUI-based aggregation config
+    - enableRowGroup: allow GUI-based grouping
+    - enablePivot: allow GUI-based pivoting
+    - pivot: boolean to use as pivot column
+    - rowGroup: boolean to use as group column
+    - sort: initial sort direction
+    - sortIndex: multi-sort order
+    - sortingOrder: custom sort cycle array
+    - comparator: custom sort comparison function
+    - suppressKeyboardEvent: block specific key actions
+    - autoHeight: auto-size row height based on content
+    - wrapText: enable text wrapping
+
+2.2 Default Column Definitions (defaultColDef)
+    - Shared properties applied to all columns
+    - Individual column definitions override defaults
+
+2.3 Column Types
+    - Reusable property collections defined via columnTypes
+    - Multiple types can be applied to a single column (array)
+    - Built-in types:
+      - rightAligned: applies right-aligned header and cell classes
+      - numericColumn: same as rightAligned
+
+2.4 Column Groups
+    - Created by adding children array to column definition
+    - Nested groups supported (unlimited depth)
+    - defaultColGroupDef: shared group properties
+    - columnGroupShow: 'open'/'closed'/null for expand/collapse visibility
+    - openByDefault: boolean for initial expansion state
+    - headerGroupComponent: custom group header component
+    - innerHeaderGroupComponent: custom group label only
+    - marryChildren: prevents columns from leaving group
+    - suppressStickyLabel: disable horizontal scroll persistence
+    - autoHeaderHeight: auto-adjust group header height
+    - wrapHeaderText: enable header text wrapping
+    - suppressSpanHeaderHeight: placeholder header cells
+    - hidePaddedHeaderRows: hide empty padding rows
+    - Group resizing distributes width equally among children
+    - Dynamic add/remove groups by updating definitions
+
+2.5 Column Sizing
+    - width: fixed pixel width (default 200px)
+    - minWidth / maxWidth: size constraints
+    - flex: proportional sizing
+    - resizable: per-column resize enable/disable
+    - Auto-size strategies:
+      - fitGridWidth: scale columns to fill grid width
+        - defaultMinWidth, columnLimits, suppressSizeToFit
+      - fitCellContents: resize based on cell content
+        - skipHeader, scaleUpToFitGridWidth, suppressAutoSize
+    - API methods:
+      - sizeColumnsToFit(): fit available width
+      - autoSizeColumns(colKeys): size by content
+      - autoSizeAllColumns(): size all by content
+    - Keyboard resizing: Alt + arrow keys
+    - Shift resizing: hold Shift to take from adjacent column
+    - colResizeDefault: 'shift' to reverse shift behavior
+    - animateColumnResizing: animated width transitions
+    - Group resize distributes equally to children
+
+2.6 Column Pinning
+    - pinned: 'left' | 'right' on column definition
+    - User-initiated: drag to grid edges or existing pinned area
+    - Column menu pin options [Enterprise]
+    - Viewport protection: pinned limited to gridSize - 50px
+    - processUnpinnedColumns: custom logic for space constraints
+    - lockPinned: prevent pin/unpin per column
+
+2.7 Column Moving / Reordering
+    - Drag-and-drop column headers
+    - Keyboard: Shift + Left/Right arrows
+    - API: moveColumns(keys, toIndex), moveColumnByIndex(from, to)
+    - getAllGridColumns(): get current order
+    - suppressColumnMoveAnimation: disable animation
+    - suppressDragLeaveHidesColumns: prevent accidental hide
+    - suppressMoveWhenColumnDragging: move only on release
+    - suppressMovable: per-column lock
+    - lockPosition: anchor to 'left' or 'right'
+    - lockVisible: prevent hide/show operations
+    - dragAndDropImageComponent: custom drag visual
+
+2.8 Column Spanning
+    - colSpan: callback returning number of columns to span
+    - Conditional spanning based on row data
+    - Constrained within grid regions (pinned/unpinned)
+    - Resizing spanned columns adjusts all affected cells
+    - Limitation: cell selection not fully compatible with spanning
+
+2.9 Column State
+    - applyColumnState: save/restore user-controlled properties
+    - Persists: sort, filter, width, pinned, visible, order
+    - Separate from column definitions (developer-controlled)
+
+2.10 Column Headers
+    - Custom header templates
+    - Inner header components
+    - Full custom header components
+    - Auto header height based on content
+    - Text orientation configuration
+    - Header tooltips (static and dynamic)
+    - Header styling (class and inline)
+    - Sort/filter/menu indicators in headers
+
+2.11 Data Type Inference
+    - Built-in cell data types: text, number, boolean, date, dateString, object
+    - Auto-inferred from row data
+    - Provides appropriate editors, filters, formatters per type
+
+
+================================================================================
+3. ROW FEATURES
+================================================================================
+
+3.1 Row Sorting
+    - Enabled by default on all columns
+    - sortable: boolean per column or via defaultColDef
+    - Sort directions: 'asc', 'desc', null (none)
+    - Default cycle: ascending -> descending -> none
+    - sortingOrder: custom cycle array per column (e.g. ['asc','desc'], ['desc','asc'])
+    - Absolute sorting: sort by magnitude ignoring sign
+    - Multi-column sort:
+      - Default: hold Shift + click
+      - multiSortKey: 'ctrl' to use Ctrl/Command instead
+      - suppressMultiSort: disable multi-sort
+      - alwaysMultiSort: always multi-sort without modifier key
+    - Custom comparator: function(valueA, valueB, nodeA, nodeB, isDescending)
+    - Initial sort: set sort property on column definition
+    - Sort animation: animateRows (enabled by default)
+    - postSortRows: callback for custom post-sort logic (e.g. pin specific rows to top)
+    - accentedSort: locale-aware sorting (slower performance)
+    - Column State API for save/restore sort state
+    - Sort indicators in column headers
+
+3.2 Row Selection
+    - Modes:
+      - singleRow: one row at a time
+      - multiRow: multiple rows
+    - Selection methods:
+      - Click interaction
+      - Keyboard: Space bar on focused row
+      - Programmatic API
+    - Checkbox selection via column definition
+    - Header checkbox for select-all
+    - Integration with Row Grouping [Enterprise]
+    - Integration with Tree Data [Enterprise]
+    - Integration with Server-Side Row Model [Enterprise]
+    - rowSelection grid property configuration
+
+3.3 Row Grouping [Enterprise]
+    - Activated via rowGroup: true on column definitions
+    - Multi-level grouping across multiple columns
+    - Display types (groupDisplayType):
+      - singleColumn: one auto-generated group column
+      - multipleColumns: group column per level
+      - groupRows: group rows inserted instead of columns
+      - custom: developer-provided group columns
+    - Expand/collapse controls:
+      - groupDefaultExpanded: 0 (none), -1 (all), or specific level
+      - isGroupOpenByDefault: per-group callback
+      - suppressGroupRowsSticky: prevent sticky group rows
+    - autoGroupColumnDef: customize auto-generated group column
+    - Group rendering:
+      - groupRowRenderer: custom cell renderer
+      - groupRowRendererParams: renderer parameters
+    - Hierarchy management:
+      - groupHideOpenParents: hide expanded parents
+      - groupHideColumnsUntilExpanded: progressive column reveal
+      - groupHideParentOfSingleChild: skip single-child groups
+      - showOpenedGroup: show parent values in non-group rows
+    - Order and sorting:
+      - initialGroupOrderComparator: default group sorting
+      - groupMaintainOrder: preserve order during non-group sort
+    - Data handling:
+      - groupAllowUnbalanced: handle null/undefined gracefully
+      - refreshAfterGroupEdit: re-evaluate after editing grouped columns
+    - Row Group Panel (drag-and-drop):
+      - rowGroupPanelShow: 'always', 'onlyWhenGrouping', 'never'
+      - rowGroupPanelSuppressSort: remove sort indicators
+      - groupLockGroupColumns: lock group column order
+      - suppressDragLeaveHidesColumns: keep columns visible
+      - suppressGroupChangesColumnVisibility: prevent visibility changes
+    - groupHierarchyConfig: custom hierarchy components
+    - State management integration
+
+3.4 Row Pinning
+    - enableRowPinning: true | 'top' | 'bottom'
+    - isRowPinned: callback returning 'top'/'bottom'/null
+    - pinnedTopRowData / pinnedBottomRowData: direct data arrays
+    - Context menu pin/unpin [Enterprise]
+    - isRowPinnable: callback to control which rows can be pinned
+    - Sorting and filtering applied to pinned rows (when using enableRowPinning)
+    - Row selection works with pinned rows
+    - Grand total row pinning (grandTotalRow: 'pinnedTop'/'pinnedBottom')
+    - pinnedRowBorder: theme parameter
+    - pinnedRowsChanged event
+    - State persistence integration
+
+3.5 Row Dragging
+    - rowDrag: boolean or callback on column definition
+    - Managed dragging (rowDragManaged): grid handles reorder
+    - Unmanaged dragging: application handles via events
+    - Tree data integration (managed and unmanaged)
+    - Cross-grid dragging: drag between two grids
+    - External drop zones: drag from grid to external target
+    - Requires RowDragModule
+
+3.6 Row Height
+    - rowHeight: fixed height for all rows (default 42px in Quartz theme)
+    - getRowHeight: dynamic per-row height callback
+    - rowNode.setRowHeight(height): set individual row height
+    - api.onRowHeightChanged(): recalculate after height changes
+    - api.resetRowHeights(): clear cache and recalculate all
+    - Auto height:
+      - autoHeight: true on column definition
+      - wrapText: true for multi-line text
+      - Largest autoHeight column determines row height
+      - Lazy calculation during scroll
+    - Text wrapping:
+      - white-space: normal (wrapping)
+      - white-space-collapse: preserve-breaks
+      - white-space: pre-line (wrap + preserve newlines)
+    - Not compatible with Viewport/Infinite row models
+
+3.7 Row Spanning
+    - enableCellSpan: true on grid options
+    - spanRows: true on column definition (auto-merge equal values)
+    - spanRows: callback({valueA, valueB}) for custom merge logic
+    - Integration with autoHeight and wrapText
+    - Last row in span gains additional height if needed
+
+3.8 Row Animation
+    - animateRows: boolean (enabled by default)
+    - Animated transitions after sort, filter, and other operations
+
+3.9 Row Models
+    - Client-Side (default): all data loaded in browser
+    - Server-Side [Enterprise]: lazy-loading from server
+    - Infinite: infinite scrolling with block loading
+    - Viewport: only visible rows loaded
+
+
+================================================================================
+4. CELL FEATURES
+================================================================================
+
+4.1 Cell Rendering
+    - Three methods for providing renderers:
+      - String reference (registered component name)
+      - Component reference (imported class/function)
+      - Inline component (anonymous JSX function)
+    - Built-in cell renderers:
+      - agGroupCellRenderer: expand/collapse for groups, master-detail, tree data
+      - Animated change cell renderers: animate on data update
+      - Checkbox cell renderer: boolean as checkbox (cellDataType: 'Boolean')
+    - cellRendererParams: custom props merged with grid props
+    - cellRendererSelector: dynamic renderer per row/node type
+    - Deferred rendering (deferRender: true): skeleton during fast scroll
+    - Lazy loading: React.lazy() with loadingCellRenderer
+    - getCellRendererInstances(params): access active instances
+    - suppressMouseEventHandling: prevent grid actions on mouse events
+    - Available props in renderer: value, valueFormatted, data, node, colDef, column,
+      eGridCell, api, context, getValue(), setValue(), formatValue(), refreshCell(),
+      registerRowDragger(), pinned state
+
+4.2 Cell Editing
+    - editable: boolean or callback for conditional editing
+    - Provided cell editors:
+      - Text Cell Editor
+      - Large Text Cell Editor
+      - Number Cell Editor
+      - Date Cell Editor
+      - Checkbox Cell Editor
+      - Select Cell Editor
+      - Rich Select Cell Editor [Enterprise]
+      - Formula Cell Editor [Enterprise]
+    - Cell data type auto-selects appropriate editor
+    - Editing events:
+      - cellEditingStarted / cellEditingStopped
+      - cellValueChanged (fires for edit, cut, paste, delete, fill, undo/redo)
+      - cellEditRequest (with readOnlyEdit mode)
+      - rowEditingStarted / rowEditingStopped (full row editing)
+      - rowValueChanged
+    - Full row editing mode
+    - Custom cell editor components
+    - Value parsers for data transformation on input
+    - Value setters for custom data write logic
+    - Validation mechanisms
+    - Batch editing
+    - Read-only edit mode (readOnlyEdit: true, fires events without modifying data)
+
+4.3 Cell Selection / Range Selection [Enterprise]
+    - cellSelection: true/object to enable
+    - Mouse selection: click-and-drag for range
+    - Ctrl+drag: add/remove ranges
+    - Shift+click: extend range
+    - Keyboard: Shift+arrow, Ctrl+Shift+arrow
+    - suppressMultiRanges: single range only
+    - enableHeaderHighlight: highlight headers for selected range
+    - enableColumnSelection: click headers to select columns
+    - Fill handle (handle option):
+      - Drag to fill cells with values
+      - Configurable via RangeHandleOptions/FillHandleOptions
+    - Copy down: Ctrl+D
+    - Bulk edit: Ctrl+Enter applies value to all selected cells
+    - Delete key clears all cells in range
+    - Events: cellSelectionDeleteStart, cellSelectionDeleteEnd
+
+4.4 Value Formatters
+    - valueFormatter: function or expression returning display string
+    - Receives params with value, data, node
+    - useValueFormatterForExport: boolean (default true)
+    - Applied to: copy/cut, fill handle, CSV export, Excel export
+    - Bypassed when custom handlers exist
+    - Auto-configured for cell data types
+
+4.5 Value Getters
+    - valueGetter: function or expression for custom value retrieval
+    - Must be pure functions (same data = same result)
+    - Can combine multiple fields or perform calculations
+    - Columns with valueGetter need explicit headerName
+    - Expression support (string expressions)
+    - Header value getters for dynamic column header text
+
+4.6 Tooltips
+    - tooltipField: simple field mapping
+    - tooltipValueGetter: dynamic content callback
+    - headerTooltip / headerTooltipValueGetter
+    - tooltipComponent / tooltipComponentParams: custom components
+    - tooltipShowMode: 'whenTruncated' (show only when text overflows)
+    - Timing:
+      - tooltipShowDelay (default 2000ms)
+      - tooltipSwitchShowDelay (default 200ms)
+      - tooltipHideDelay (default 10000ms)
+    - tooltipMouseTrack: tooltip follows cursor
+    - tooltipInteraction: keep tooltip on hover (allows text selection/clicks)
+    - enableBrowserTooltips: use native browser tooltips
+    - Blank value handling: suppresses undefined/null/empty
+    - Props: location, value, valueFormatted, colDef, column, rowIndex, node, data,
+      hideTooltipCallback, api, context
+
+
+================================================================================
+5. FILTERING
+================================================================================
+
+5.1 Column Filters
+    - Text Filter: string comparisons
+    - Number Filter: number comparisons
+    - BigInt Filter: bigint comparisons
+    - Date Filter: date comparisons
+    - Set Filter [Enterprise]: Excel-style value set filtering
+    - Multi Filter [Enterprise]: two filters combined
+    - Custom Filter Components
+    - Access via column menu or tool panel
+    - Row must pass all active column filters to display
+
+5.2 Floating Filters
+    - Inline filter inputs below column headers
+    - Quick access to filter without opening menu
+    - Configurable per column
+
+5.3 Quick Filter
+    - Free-text search across all columns
+    - Independent of column filters
+    - Applied grid-wide
+
+5.4 External Filter
+    - Application-defined filter logic
+    - Independent of column assignment
+    - Combined with column and quick filters
+
+5.5 Advanced Filter [Enterprise]
+    - Complex filter expressions
+    - Dedicated filter UI
+
+5.6 Filter API
+    - Programmatic filter control
+    - Get/set filter models
+    - Filter events
+
+5.7 Filter Conditions
+    - AND/OR logic between conditions
+    - Multiple conditions per column
+
+
+================================================================================
+6. DATA FEATURES
+================================================================================
+
+6.1 Aggregation [Enterprise]
+    - Built-in functions: sum, min, max, count, avg, first, last
+    - aggFunc on column definition
+    - initialAggFunc: set when creating new columns
+    - enableValue: allow GUI aggregation config
+    - allowedAggFuncs: restrict available functions
+    - defaultAggFunc: default when enabled via GUI
+    - suppressAggFuncInHeader: hide function name in header
+    - Custom aggregation functions via aggFuncs grid option
+    - Total rows:
+      - groupTotalRow: group-level totals
+      - grandTotalRow: grand total row
+    - Filtering integration:
+      - suppressAggFilteredOnly
+      - groupAggFiltering
+    - Editable aggregated values (cascade changes to children)
+    - rowNode.getAggregatedChildren(colKey): access contributing children
+    - aggregateOnlyChangedColumns: performance optimization
+
+6.2 Pivoting [Enterprise]
+    - pivotMode: true to enable infrastructure
+    - pivot: true on columns to use as pivot columns
+    - Requires row grouping and at least one aggregation column
+    - Pivot result columns auto-generated
+    - API: getPivotColumns, setPivotColumns, addPivotColumns, removePivotColumns
+    - getPivotResultColumn, setPivotResultColumns, getPivotResultColumns
+    - isPivotMode
+    - Pivot Panel (pivotPanelShow)
+    - Side Bar integration
+    - Edit pivot values with cascading updates
+    - State save/restore
+    - Incompatible with tree data
+
+6.3 Tree Data [Enterprise]
+    - treeData: true to enable
+    - getDataPath: callback defining hierarchy path
+    - treeDataChildrenField: field containing child arrays
+    - treeDataParentIdField: parent-child relationships via IDs
+    - treeDataDisplayType: 'auto' or 'custom'
+    - autoGroupColumnDef: customize group column
+    - groupDefaultExpanded: expansion levels (-1 for all)
+    - isGroupOpenByDefault: per-group callback
+    - suppressGroupRowsSticky: prevent sticky rows
+    - Two data supply methods: data paths and nested records
+
+6.4 Master-Detail [Enterprise]
+    - masterDetail: true to enable
+    - Parent grid (Master) with expandable child grids (Detail)
+    - isRowMaster: callback for conditional expansion
+    - detailCellRenderer: custom detail component
+    - detailCellRendererParams:
+      - detailGridOptions: full GridOptions for child grids
+      - getDetailRowData: async data callback
+      - refreshStrategy: 'rows', 'everything', 'nothing'
+    - Height management:
+      - detailRowHeight: fixed pixel height
+      - detailRowAutoHeight: dynamic sizing
+    - Lifecycle:
+      - keepDetailRows: preserve on collapse
+      - keepDetailRowsCount: max retained (default 10)
+    - Row model constraints:
+      - Master: Client-Side or Server-Side only
+      - Detail: any row model
+
+6.5 Server-Side Row Model [Enterprise]
+    - Lazy-loading of groups (load children on expand)
+    - Infinite scrolling (block-based data retrieval)
+    - Server-side filtering, sorting, grouping, pivoting
+    - Server-side aggregation
+    - Slice and dice (user-driven grouping/aggregation forwarded to server)
+    - Memory management (data purging for large datasets)
+    - Supports millions of records
+
+6.6 CSV Export
+    - Built-in (Community feature)
+    - API: exportDataAsCsv(), getDataAsCsv()
+    - suppressCsvExport to disable
+    - Configuration:
+      - columnSeparator (default ',')
+      - suppressQuotes
+      - fileName (default 'export.csv')
+      - allColumns: include hidden columns
+      - exportedRows: 'all' or 'filteredAndSorted'
+      - onlySelected: export selected only
+      - skipRowGroups, skipColumnHeaders, skipColumnGroupHeaders
+      - skipPinnedTop, skipPinnedBottom
+      - exportRowNumbers
+      - prependContent, appendContent, getCustomContentBelowRow
+      - columnKeys: specific columns
+    - Callbacks:
+      - processCellCallback, processHeaderCallback
+      - processGroupHeaderCallback, processRowGroupCallback
+      - shouldRowBeSkipped
+    - valueFrom: 'data', 'batch', 'edit'
+    - CSV injection protection (strip formula-triggering characters)
+
+6.7 Excel Export [Enterprise]
+    - API: exportDataAsExcel()
+    - No third-party libraries required
+    - Exports current column order, filters, sorting, grouping
+    - Customization:
+      - Styles (custom spreadsheet styling)
+      - Formulas (export value getters as Excel formulas)
+      - Extra content (non-grid content)
+      - Images (embedded images)
+      - Excel Tables (native filtering/sorting)
+      - Multiple sheets
+      - Row/column selection
+      - Freezing (header/column freeze)
+      - Data types (built-in Excel types)
+      - Hyperlinks
+      - Master-detail export
+      - Page setup (print configuration)
+      - Data protection (worksheet security, cell locking)
+    - Column width matches app at export time (min 75px)
+    - Value getters applied, cell renderers NOT used by default
+
+
+================================================================================
+7. INTERACTION FEATURES
+================================================================================
+
+7.1 Keyboard Navigation
+    - Arrow keys: move focus between cells
+    - Ctrl+Left/Right: jump to start/end
+    - Page Up/Down: scroll one page
+    - Home/End: first/last row
+    - F2 or Enter: activate cell edit
+    - Ctrl+Enter: apply value to selected range
+    - Space: toggle row selection
+    - Esc: cancel edit / close menu
+    - Header navigation:
+      - Shift+Left/Right: move columns
+      - Alt+Left/Right: resize columns
+      - Space: toggle header checkbox
+      - Enter: toggle sort
+      - Shift+Enter: multi-sort
+      - Alt+Down: open column menu
+      - Ctrl+Enter: open filter
+    - Column group headers:
+      - Enter: toggle expansion
+    - Floating filter navigation:
+      - Left/Right: move between filters
+      - Enter: focus filter input
+      - Esc: return to filter header
+    - Suppression:
+      - suppressCellFocus: disable cell focus
+      - suppressHeaderFocus: disable header focus
+    - Custom navigation callbacks:
+      - navigateToNextCell
+      - tabToNextCell
+      - navigateToNextHeader
+      - tabToNextHeader
+      - tabToNextGridContainer
+    - Event: cellKeyDown
+    - suppressKeyboardEvent per column
+    - suppressHeaderKeyboardEvent per column
+
+7.2 Context Menu [Enterprise]
+    - Right-click on cells
+    - Built-in items: copy, copyWithHeaders, copyWithGroupHeaders, cut, paste,
+      export (CSV/Excel sub-menu), chartRange, pivotChart, autoSizeAll,
+      expandAll, contractAll, resetColumns, pinRowSubMenu
+    - Custom menu items via MenuItemDef:
+      - Name, action, icon, cssClasses, tooltip
+      - Disabled state
+      - Checkbox support
+      - Sub-menu support
+      - Promise-based async loading
+    - Configuration:
+      - colDef.contextMenuItems (column level, takes priority)
+      - getContextMenuItems (grid level)
+    - suppressContextMenu: hide entirely
+    - allowContextMenuWithControlKey: override Ctrl+right-click
+    - API: showContextMenu(), hidePopupMenu()
+    - Event: contextMenuVisibleChanged
+    - popupParent for positioning in constrained spaces
+
+7.3 Clipboard [Enterprise]
+    - Copy (Ctrl+C):
+      - Single cell or range
+      - Tab-separated for Excel compatibility
+      - copyHeadersToClipboard: include headers
+      - processGroupHeaderForClipboard
+      - API: copySelectedRangeToClipboard, copySelectedRowsToClipboard
+    - Cut (Ctrl+X):
+      - Same as copy + data removal
+      - suppressCutToClipboard to disable
+    - Paste (Ctrl+V):
+      - Requires editable cells
+      - Behavior varies by selection type
+      - suppressClipboardPaste: disable grid-wide
+      - suppressPaste: per-column (boolean or function)
+    - Data processing callbacks:
+      - processCellForClipboard (export)
+      - processHeaderForClipboard
+      - processGroupHeaderForClipboard
+      - processCellFromClipboard (import)
+      - processDataFromClipboard (full control)
+    - clipboardDelimiter: custom separator (default tab)
+    - Read-only edit mode: fires events instead of modifying
+    - enableCellTextSelection: native browser text selection
+    - sendToClipboard: custom clipboard implementation
+    - Events: cutStart, cutEnd, pasteStart, pasteEnd, cellValueChanged
+
+7.4 Undo / Redo
+    - undoRedoCellEditing: enable
+    - undoRedoCellEditingLimit: max steps (default 10)
+    - Keyboard: Ctrl+Z (undo), Ctrl+Y or Ctrl+Shift+Z (redo)
+    - API: undoCellEditing(), redoCellEditing()
+    - API: getCurrentUndoSize(), getCurrentRedoSize()
+    - Captures: direct edit, copy/paste, fill handle, clipboard
+    - Events: undoStarted, undoEnded, redoStarted, redoEnded, cellValueChanged
+    - Stacks cleared by: data updates, sorting, filtering, grouping, reordering
+    - Complex objects: requires value parser, value setter, colDef.equals, immutability
+
+7.5 Row Dragging
+    - See section 3.5
+
+7.6 Touch Support
+    - Full touch device support
+    - Touch-friendly interactions
+
+
+================================================================================
+8. UI COMPONENTS & ACCESSORIES
+================================================================================
+
+8.1 Status Bar [Enterprise]
+    - Positioned below grid
+    - Built-in panels:
+      - agTotalRowCountComponent: total row count
+      - agTotalAndFilteredRowCountComponent: total + filtered count
+      - agFilteredRowCountComponent: filtered count only
+      - agSelectedRowCountComponent: selected row count
+      - agAggregationComponent: aggregations on selected ranges
+        - aggFuncs: 'count', 'sum', 'min', 'max', 'avg'
+    - Alignment: 'left', 'center', 'right' (default right)
+    - Unique keys for API access
+    - valueFormatter for custom number formatting
+    - Custom status panels
+    - API: getStatusPanel(key)
+    - Auto-hide when no data
+    - Requires StatusBarModule
+
+8.2 Tool Panels / Sidebar [Enterprise]
+    - Tabbed sidebar interface
+    - Built-in panels:
+      - Columns Tool Panel: aggregation, grouping, pivoting
+      - Filters Tool Panel: multi-column filtering
+      - New Filters Tool Panel: enhanced filter UX
+    - Custom tool panels
+    - API:
+      - openToolPanel(id)
+      - closeToolPanel()
+      - getOpenedToolPanel()
+      - isToolPanelShowing()
+      - refreshToolPanel()
+      - getToolPanelInstance(id)
+    - Events: toolPanelVisibleChanged, toolPanelSizeChanged
+    - Requires SideBarModule
+
+8.3 Overlays
+    - Loading overlay:
+      - Controlled via loading property (true/false/undefined)
+      - Auto-display until rowData/columnDefs provided
+      - Takes precedence over no-rows overlay
+    - No Rows overlay:
+      - Appears when rowData is empty array
+      - showNoRowsOverlay() / hideOverlay() API
+      - suppressNoRowsOverlay option
+    - Customization:
+      - overlayLoadingTemplate / loadingOverlayComponent
+      - overlayNoRowsTemplate / noRowsOverlayComponent
+      - Component params for both
+    - Modern API: overlayComponent, overlayComponentSelector, activeOverlay
+
+8.4 Pagination
+    - pagination: true to enable
+    - paginationPageSize: rows per page (default 100)
+    - paginationAutoPageSize: auto-fit available space
+    - paginationPageSizeSelector: boolean or number array for custom options
+    - suppressPaginationPanel: hide for custom implementation
+    - paginationPanelHeight: theme parameter
+    - paginationNumberFormatter: custom number display
+    - paginateChildRows: count all rows including expanded children
+    - Navigation API:
+      - paginationGoToPage(n)
+      - paginationGoToNextPage()
+      - paginationGoToPreviousPage()
+      - paginationGoToFirstPage()
+      - paginationGoToLastPage()
+    - Status API:
+      - paginationGetCurrentPage()
+      - paginationGetPageSize()
+      - paginationGetTotalPages()
+      - paginationIsLastPageFound()
+      - paginationGetRowCount()
+    - Event: paginationChanged
+    - Works with all row models
+    - Styling via .ag-paging-panel CSS class
+
+8.5 Integrated Charts [Enterprise]
+    - enableCharts: true to enable
+    - Built on AG Charts
+    - Chart types: Range Chart, Pivot Chart, Cross Filter Chart
+    - Dynamic updates: charts reflect grid sorting/filtering/data changes
+    - User-created charts via grid UI
+    - Application-created charts via API
+    - Chart menu, tool panels, container customization
+    - Chart events, time series, save/restore, image export
+
+
+================================================================================
+9. THEMING & STYLING
+================================================================================
+
+9.1 Built-in Themes
+    - Quartz: default, high contrast, generous padding, IBM Plex Sans
+    - Balham: traditional spreadsheet style
+    - Material: Google Material v2 design, Roboto font
+    - Alpine: legacy default
+
+9.2 Customization Approaches
+    - Color schemes: alternative color palettes
+    - Theme parameters: borders, compactness, fonts, spacing
+    - Theme parts: mix and match elements across themes
+    - Custom CSS: unlimited control
+
+9.3 Theme Features
+    - loadThemeGoogleFonts: auto-load fonts from Google CDN
+    - Dark mode support
+    - Theme distribution/sharing across projects
+    - Specialized styling for: headers, menus, popups, tool panels,
+      master detail, input widgets, selections
+
+
+================================================================================
+10. ACCESSIBILITY
+================================================================================
+
+- Standards: ADA, Section 508, WCAG 2.0 Level AA
+- High contrast theme for color deficiency
+- Full keyboard navigation (see section 7.1)
+- Screen reader support (JAWS, VoiceOver)
+- ARIA attributes:
+  - Structural: treegrid, grid, rowgroup, row, columnheader, gridcell,
+    tablist, tab, tree, treeitem, listbox, option
+  - Properties: aria-rowcount, aria-colcount, aria-rowindex, aria-colindex,
+    aria-multiselectable, aria-sort, aria-selected, aria-expanded,
+    aria-colspan, aria-hidden, aria-label, aria-labelledby, aria-describedby,
+    aria-setsize, aria-posinset, aria-checked, aria-level
+- ensureDomOrder: force consistent row/column ordering
+- suppressGroupRowsSticky: for better screen reader compat
+- suppressColumnVirtualisation / suppressRowVirtualisation
+- Pagination recommended for screen reader performance
+- Custom ARIA labels via localization
+- Known limitations: pinned row/column navigation, full-width rows,
+  grouped column announcements, state change detection
+
+
+================================================================================
+11. LOCALIZATION / INTERNATIONALIZATION
+================================================================================
+
+- localeText: key-value map for grid text customization
+- getLocaleText: callback for integration with app i18n systems
+- 35+ pre-built locales including:
+  Arabic, Chinese (Simplified/Traditional), Czech, Danish, Dutch, Finnish,
+  French, German, Greek, Hebrew, Hungarian, Italian, Japanese, Korean,
+  Norwegian, Persian, Polish, Portuguese (Brazil), Romanian, Slovak,
+  Spanish, Swedish, Turkish, Ukrainian, Urdu, Vietnamese, Bulgarian,
+  Croatian, and more
+- Default: American English
+- Missing values fall back to English
+- Dynamic variable insertion via ${variable} syntax
+- Grid must be recreated when switching locales
+- RTL (right-to-left) support
+
+
+================================================================================
+12. PERFORMANCE FEATURES
+================================================================================
+
+- DOM virtualization: only visible rows/columns rendered
+- suppressColumnVirtualisation / suppressRowVirtualisation overrides
+- Value caching
+- Row animation (configurable)
+- Optimized scrolling for massive datasets
+- Module system for minimizing bundle size
+- Selective module loading (e.g. AllCommunityModule or individual modules)
+- aggregateOnlyChangedColumns for efficient aggregation
+- Deferred cell rendering (skeleton during fast scroll)
+- Lazy loading with React.lazy()
+- Server-side operations for large datasets
+- Data purging for memory management
+
+
+================================================================================
+13. GRID API (Key Methods Summary)
+================================================================================
+
+- Grid lifecycle: destroy, setGridOption, updateGridOptions
+- Data: setRowData, applyTransaction, applyTransactionAsync, refreshCells
+- Columns: setColumnDefs, getColumnDefs, getColumn, getAllGridColumns
+- Column state: getColumnState, applyColumnState, resetColumnState
+- Column sizing: sizeColumnsToFit, autoSizeColumns, autoSizeAllColumns
+- Column moving: moveColumns, moveColumnByIndex
+- Sorting: via column state API
+- Filtering: setFilterModel, getFilterModel, onFilterChanged
+- Selection: getSelectedRows, getSelectedNodes, selectAll, deselectAll
+- Pagination: goToPage, nextPage, previousPage, firstPage, lastPage
+- Export: exportDataAsCsv, getDataAsCsv, exportDataAsExcel
+- Clipboard: copySelectedRangeToClipboard, copySelectedRowsToClipboard
+- Undo/Redo: undoCellEditing, redoCellEditing
+- Overlays: showLoadingOverlay, showNoRowsOverlay, hideOverlay
+- Menus: showContextMenu, hidePopupMenu
+- Panels: openToolPanel, closeToolPanel, getStatusPanel
+- Row nodes: getRowNode, forEachNode, getDisplayedRowAtIndex
+- Scrolling: ensureIndexVisible, ensureColumnVisible
+- Editing: startEditingCell, stopEditing
+- Refresh: refreshCells, redrawRows, refreshHeader
+- Charts: createRangeChart, createPivotChart [Enterprise]
+- Events: addEventListener, removeEventListener
+
+
+================================================================================
+14. EVENTS (Key Events Summary)
+================================================================================
+
+- Cell: cellClicked, cellDoubleClicked, cellFocused, cellKeyDown,
+  cellValueChanged, cellEditingStarted, cellEditingStopped, cellEditRequest
+- Row: rowClicked, rowDoubleClicked, rowSelected, rowValueChanged,
+  rowEditingStarted, rowEditingStopped, rowDragEnter, rowDragMove,
+  rowDragLeave, rowDragEnd
+- Column: columnResized, columnMoved, columnVisible, columnPinned,
+  columnValueChanged, columnGroupOpened, sortChanged, filterChanged
+- Grid: gridReady, gridSizeChanged, modelUpdated, firstDataRendered
+- Selection: selectionChanged, cellSelectionDeleteStart, cellSelectionDeleteEnd
+- Pagination: paginationChanged
+- Sorting: sortChanged
+- Filtering: filterChanged, filterOpened
+- Tool panels: toolPanelVisibleChanged, toolPanelSizeChanged
+- Context menu: contextMenuVisibleChanged
+- Clipboard: cutStart, cutEnd, pasteStart, pasteEnd
+- Undo/Redo: undoStarted, undoEnded, redoStarted, redoEnded
+- Pinning: pinnedRowsChanged
+- Drag: rowDragEnter, rowDragMove, rowDragLeave, rowDragEnd

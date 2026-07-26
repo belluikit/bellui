@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      update_golden:
+        description: "Regenerate golden masters on the canonical runner and upload them as an artifact"
+        type: boolean
+        default: false
+
+# Cancel superseded runs on the same ref. Combined with one matrix job per
+# distinct self-hosted runner, this keeps to one fycoder job per runner at a time.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-arm64
+            runner: linux_parallels
+            race: "-race"
+            canonical: false
+          - name: linux-amd64
+            runner: trader
+            race: "-race"
+            canonical: true        # golden image tests run here only
+          - name: windows-amd64
+            runner: windows_omen
+            race: ""               # avoid requiring a cgo C toolchain for -race
+            canonical: false
+          - name: windows-arm64
+            runner: windows_parallels
+            race: ""               # race detector unsupported on windows/arm64
+            canonical: false
+    runs-on: [self-hosted, "${{ matrix.runner }}"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Build
+        run: go build ./...
+      - name: Vet
+        run: go vet ./...
+      - name: Test
+        run: go test ${{ matrix.race }} -count=1 ./...
+      # Golden image tests render with the software painter and compare against
+      # committed masters. Software font rasterization is platform-specific, so
+      # they run on ONE canonical platform (linux/amd64) and skip elsewhere.
+      - name: Golden image tests
+        if: ${{ matrix.canonical }}
+        run: go test -run Golden -count=1 ./...
+        env:
+          FYCODER_GOLDEN: "1"
+      - name: Upload golden diffs on failure
+        if: ${{ matrix.canonical && failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-failed
+          path: testdata/failed/
+          if-no-files-found: ignore
+
+  # Manual: regenerate golden masters on the canonical runner and upload them as
+  # an artifact to download and commit. Run via the Actions tab with
+  # "update_golden" checked.
+  golden-update:
+    name: Regenerate golden masters
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.update_golden }}
+    runs-on: [self-hosted, trader]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Generate masters
+        run: go test -run Golden -count=1 ./...
+        env:
+          FYCODER_GOLDEN: "1"
+          UPDATE_TESTDATA: "1"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: golden-masters
+          path: testdata/*.png

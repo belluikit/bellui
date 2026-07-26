@@ -12,6 +12,9 @@ extension never widens the core toolkit's dependency graph:
 | [`x/dag`](dag) | Directed-acyclic-graph widgets | `trendvidia/fydag` (`dagwidget` + `dag`) |
 | [`x/editor`](editor) | Embeddable code editor (Bellui Editor) | `trendvidia/fycoder` |
 
-All four are currently **scaffolds** — see each module's README for the tracking
-issue. The `replace` directive pointing at the repo root is for local
-development; it is dropped when a module is first tagged and published.
+All four are **migrated and passing** (27 test packages between them). The
+`replace` directive pointing at the repo root is for local development; it is
+dropped when a module is first tagged and published.
+
+`x/dag` is a partial extraction — only `dagwidget` and its data dependency
+`dag`; see its README. The other three are whole-repo moves.

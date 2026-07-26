@@ -1,0 +1,59 @@
+name: a11y-uia
+
+# Live-verifies the DataGrid's Windows UIA accessibility tree (#15/#16).
+#
+# REQUIRES AN INTERACTIVE self-hosted runner (autologon console/RDP session) with
+# the `windows_parallels` label. UIA can only see a window in an interactive
+# desktop session; a runner installed as a Windows service (session 0) — which is
+# how the org's current windows_parallels runners are set up — will produce an
+# empty tree. Until such an interactive runner exists, verify manually in the
+# logged-on session per hack/a11yprobe/README.md. Manual dispatch only, so it
+# never hijacks the desktop on an unrelated push/PR.
+on:
+  workflow_dispatch:
+
+jobs:
+  uia:
+    runs-on: [self-hosted, windows_parallels]
+    env:
+      CGO_ENABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      # The fork's app-agnostic UIA client scripts ship inside the fyne module,
+      # so resolve the module's cache dir to invoke uiatree.ps1 from it.
+      - name: Resolve fyne module dir
+        id: fyne
+        shell: powershell
+        run: |
+          go mod download
+          $dir = (go list -m -f '{{.Dir}}' github.com/belluikit/bellui)
+          Write-Host "fyne module dir: $dir"
+          "dir=$dir" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Build probe (accessibility backend)
+        shell: powershell
+        working-directory: hack/a11yprobe
+        run: go build -tags accessibility -o a11yprobe.exe .
+
+      - name: UIA tree assertions (#15/#16)
+        shell: powershell
+        run: |
+          $tree = Join-Path '${{ steps.bellui.outputs.dir }}' 'hack\a11yprobe\windows\uiatree.ps1'
+          powershell -NoProfile -File hack\a11yprobe\windows\uia_assert.ps1 `
+            -ProbeExe (Resolve-Path hack\a11yprobe\a11yprobe.exe).Path `
+            -UiaTree $tree
+
+      # Same probe binary, launched with -checkbox by the script.
+      - name: UIA #31 assertions (checkbox cell + group ExpandCollapse action)
+        shell: powershell
+        run: |
+          $tree = Join-Path '${{ steps.bellui.outputs.dir }}' 'hack\a11yprobe\windows\uiatree.ps1'
+          powershell -NoProfile -File hack\a11yprobe\windows\uia_assert_31.ps1 `
+            -ProbeExe (Resolve-Path hack\a11yprobe\a11yprobe.exe).Path `
+            -UiaTree $tree

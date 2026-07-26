@@ -1,0 +1,7 @@
+demo
+
+# Local development against the unreleased fyne fork. go.mod pins a
+# pseudo-version of the fork commit (swap to the real tag once released);
+# go.work is a local convenience that points at a fork checkout.
+go.work
+go.work.sum
