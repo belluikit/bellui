@@ -54,8 +54,48 @@ These differ from the original plan; they are the decisions of record.
    would leave the compiled `rawDesc` encoding the old names).
 5. **Android dex** — regenerated after the Java class rename
    (`FyneFileProvider`→`BelluiFileProvider`).
-6. **`x/` umbrella** — `x/{charts,tables,dag,editor}` scaffolded as four separate
-   modules, each with its own `go.mod`, so the core dep graph stays lean.
+6. **`x/` umbrella** — `x/{charts,tables,dag,editor}` as four separate modules,
+   each with its own `go.mod`, so the core dep graph stays lean. All four are
+   **migrated**, not scaffolds — see below.
+
+### Extension libraries (`x/`)
+
+The four extension repos were consolidated into the umbrella (epic #732).
+27 test packages pass between them.
+
+| Module | From | Kind of move |
+|---|---|---|
+| `x/tables` | `trendvidia/fytables` | whole repo |
+| `x/editor` | `trendvidia/fycoder` | whole repo ("Bellui Editor") |
+| `x/dag` | `trendvidia/fydag` | **partial** — `dagwidget` + `dag` only |
+| `x/charts` | `trendvidia/fycharts` | whole repo + **API port** |
+
+**Three were mechanical, one was not.** `fytables`, `fycoder` and `fydag`
+already targeted the fork's modern `geo`/`event`/`core` API, so they needed only
+import rewrites. `fycharts` targeted **upstream `fyne.io/fyne` v2.5.4** — the old
+monolithic API — and needed a real port:
+
+* `fyne.Position`/`Size`/`NewPos`/`NewSize` → `geo.*`
+* `fyne.CanvasObject`/`Widget`/`WidgetRenderer` → `core.*`
+* `fyne.DragEvent`/`Key*`/`PointEvent`/`Scrollable`/`Tappable`/… → `event.*`
+* `desktop.Hoverable` → `event.Hoverable`, an **interface change** not a rename:
+  `MouseIn`/`MouseMoved`/`MouseOut(*desktop.MouseEvent)` became
+  `HoverIn`/`HoverMoved`/`HoverOut(*event.HoverEvent)`. Safe here because every
+  call site only read `e.Position`, which `HoverEvent` carries via its embedded
+  `PointEvent`. `desktop.Mouseable`'s `MouseDown`/`MouseUp` were deliberately
+  left alone.
+* `w.ShowAndRun()` → `bellui.ShowAndRun(w)` (now a standalone function)
+* `theme.ForegroundColor()` → `theme.Color(theme.ColorNameForeground)` (this one
+  also hit `x/tables`)
+
+**`x/dag` is a deliberate partial extraction.** The epic called `dag` a
+"pure-data leaf", but `dag/proto.go` and `dag/serial.go` imported fydag's
+generated gRPC package. Those two files (and their tests) stayed with the PoC,
+which keeps grpc/protobuf out of a widget module — `dagwidget` used only the
+graph types, never the serialization. The trade-off is that `MarshalGraph`,
+`UnmarshalGraph`, `GraphToProto` and `GraphFromProto` are **not** part of
+`x/dag`; consumers needing persistence encode the exported `dag` types
+themselves. `trendvidia/fydag` remains a working PoC.
 
 ### Forked dependencies (moved to `belluikit`)
 

@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>fycoder — wasm runtime spike</title>
+  <style>
+    html, body { margin: 0; padding: 0; }
+    /* Fyne's glfw-js creates the canvas and sizes it to the viewport;
+       we just stop the page from scrolling around it. Do NOT set a
+       body background — let the Fyne theme paint the canvas. */
+    body { overflow: hidden; }
+    #action { font: 14px/1.6 system-ui, sans-serif; color: #888; padding: 16px; }
+  </style>
+</head>
+<!-- Structure mirrors the trendvidia/fyne web template: a #main host that is
+     cleared once the app starts, and the #dummyEntry input the wasm driver
+     (internal/driver/glfw/device_wasm.go) looks up by id for keyboard/IME
+     focus. Omitting #dummyEntry breaks text input — exactly what this spike
+     needs to test. -->
+<body scroll="no" style="overflow: hidden">
+  <div id="main"><div id="action">Loading…</div></div>
+  <input id="dummyEntry" style="position: absolute; left: 0; top: -100pt; z-index: -10; font-size: 32pt;" />
+
+  <script src="wasm_exec.js"></script>
+  <script>
+    (function () {
+      const action = document.getElementById("action");
+      const main = document.getElementById("main");
+
+      function webglSupported() {
+        try {
+          const c = document.createElement("canvas");
+          return !!window.WebGLRenderingContext &&
+            (c.getContext("webgl") || c.getContext("experimental-webgl"));
+        } catch (e) { return false; }
+      }
+
+      if (!webglSupported()) { action.textContent = "WebGL is not supported in this browser."; return; }
+      if (!window.WebAssembly) { action.textContent = "WebAssembly is not supported in this browser."; return; }
+
+      // Safari has no instantiateStreaming — polyfill via ArrayBuffer, which
+      // also sidesteps servers that don't send Content-Type: application/wasm.
+      if (!WebAssembly.instantiateStreaming) {
+        WebAssembly.instantiateStreaming = async (resp, importObject) => {
+          const source = await (await resp).arrayBuffer();
+          return await WebAssembly.instantiate(source, importObject);
+        };
+      }
+
+      const go = new Go();
+      action.textContent = "Downloading WebAssembly…";
+      WebAssembly.instantiateStreaming(fetch("editor.wasm"), go.importObject)
+        .then((result) => { main.innerHTML = ""; go.run(result.instance); })
+        .catch((err) => { action.textContent = "Failed to load wasm: " + err; console.error(err); });
+    })();
+  </script>
+</body>
+</html>
