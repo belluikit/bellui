@@ -10,10 +10,12 @@ require (
 	github.com/belluikit/typesetting v0.3.6
 	// WebGPU rendering backend (#198), now the default painter: the impl in
 	// internal/painter/webgpu builds under `//go:build !gl`, so plain `go mod tidy`
-	// keeps it and GL is the opt-in fallback via `-tags gl`. belluikit/webgpu forks
-	// cogentcore/webgpu to add the js setScissorRect/setStencilReference wrappers the
-	// wasm backend needs (#206).
-	github.com/belluikit/webgpu v1.0.9-0.20260726224456-2cefb7d0922b
+	// keeps it and GL is the opt-in fallback via `-tags gl`. As of v1.1.0
+	// belluikit/webgpu forks oliverbestmann/webgpu (the maintained continuation of
+	// the cogentcore/webgpu lineage) purely to add two platform slices upstream
+	// does not ship: the arm64 iOS Simulator archive and a windows/arm64 GNU-ABI
+	// rebuild (#1).
+	github.com/belluikit/webgpu v1.1.0
 	github.com/fredbi/uri v1.1.1
 	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-gl/gl v0.0.0-20231021071112-07e5d0ea2e71
@@ -42,7 +44,7 @@ require (
 
 require (
 	github.com/belluikit/webgpu/libs-ios v0.0.0-20260726222126-17584e286157 // indirect
-	github.com/belluikit/webgpu/libs-windows v0.0.0-20260726222138-3367d15e87e4 // indirect
+	github.com/belluikit/webgpu/libs-windows v0.0.0-20260726232427-992fb7d0a5a4 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-gl/glfw/v3.4/glfw v0.1.0-pre.1.0.20260628091122-0bd588dc30cf // indirect
 	github.com/hack-pad/safejs v0.1.0 // indirect
