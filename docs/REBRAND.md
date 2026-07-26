@@ -217,33 +217,24 @@ grep -rl "trendvidia/fyne" . --include='*.go'       # must be empty
 
 ## Remaining work
 
-* ~~Publish the dependency repos~~ — **done.** All seven are published under
-  `belluikit` with `main` as the rebranded line and a single version tag each
-  (`systray v1.12.0`, `glfw v1.9.0`, `webgpu v1.0.8`, `typesetting v0.3.6`,
-  `render v0.2.4`, `gl-js v0.2.1`, `glfw-js v1.0.4`). Every `replace` directive
-  is gone from the root module and resolution is verified against the published
-  modules. Note the tags were **recreated on the rebrand commits** — the tags
-  inherited from upstream point at pre-rename code whose `go.mod` still declares
-  the old module path, so only the retagged refs were pushed.
-* **`cmd/bellui` still replaces the root module** (`=> ../../`) because bellui
-  itself is untagged. Drop it at the first bellui tag; CI already adds it
-  dynamically (`cli_tests.yml`).
-* **DECIDE: repo visibility.** All eight `belluikit/*` repos are **private**,
-  whereas every `trendvidia/*` fork they replaced was **public**. Consequences:
-  `go get github.com/belluikit/bellui` fails for anyone without org access; every
-  consumer and CI job needs `GOPRIVATE=github.com/belluikit/*` plus git
-  credentials (SSH, or a token with `insteadOf`); and the README's claim of
-  "public; no special build flags" is no longer true. Either make them public to
-  match the old setup, or accept the private posture and document the required
-  `GOPRIVATE` + auth for consumers.
-* **Retire srwiley entirely** — `belluikit/render` is all that still holds
-  `srwiley/{oksvg,rasterx}`. It cannot import `internal/{oksvg,rasterx}` (Go's
-  internal rule scopes those to this module), so this means vendoring inside
-  `render` or absorbing `render` here — it is only 4 Go files and 2 import
-  lines.
-* **Downstream repos** — fycharts#2, fytables#75, fycoder#170, fydag#5, goed#95,
-  appviewer#145, gallery#20.
-* **`.github/workflows/add-to-project.yml`** — still points at the pre-rebrand
-  project boards and needs the `ADD_TO_PROJECT_PAT` secret provisioned.
-* **Release-train automation** (trendvidia/fyne#731) — auto-bump PRs into
-  consuming repos on each Bellui tag.
+Tracked as issues; nothing here lives only in prose.
+
+| Item | Issue |
+|---|---|
+| webgpu upstream (`cogentcore`) self-declared frozen | belluikit/bellui#1 |
+| `add-to-project.yml` points at pre-rebrand boards | belluikit/bellui#2 |
+| `x/dag` lost graph serialization to the PoC | belluikit/bellui#3 |
+| Repo visibility decision after the soak | belluikit/bellui#4 |
+| `fyplayer`/`fydag` still on the old toolkit | belluikit/bellui#5 |
+| `bellui.io` has no content — dead doc links | belluikit/bellui#6 |
+| Gallery: restore DAG Editor + Media Player pages | belluikit/gallery#1 |
+| goed → Bellui Studio | trendvidia/goed#95 |
+| appviewer → Bellui Player | trendvidia/appviewer#145 |
+| Release-train automation | trendvidia/fyne#731 |
+
+## Released
+
+**v1.0.0-rc.1** (2026-07-26) — `github.com/belluikit/bellui`, plus
+`x/{tables,editor,dag,charts}` at `x/<name>/v1.0.0-rc.1`. Release candidate
+while the rebrand soaks. **Zero `replace` directives** in any module; every one
+resolves from published tags.
