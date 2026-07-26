@@ -1,0 +1,28 @@
+<canvas padded size="800x600">
+	<content>
+		<rectangle fillColor="rgba(0,150,150,255)" pos="4,4" size="792x592"/>
+	</content>
+	<overlay>
+		<widget pos="2,3" size="796x595" type="*widget.OverlayContainer">
+			<widget pos="13,45" size="89x68" type="*widget.PopUpMenu">
+				<widget size="89x68" type="*widget.Shadow">
+					<boxShadow blurRadius="6" color="shadow" cornerRadius="4" offsetY="2" size="89x68"/>
+				</widget>
+				<widget size="89x68" type="*widget.Scroll">
+					<widget size="89x68" type="*widget.menuBox">
+						<rectangle fillColor="rgba(42,42,42,255)" radius="4" size="89x68"/>
+						<container size="89x68">
+							<widget size="89x32" type="*widget.menuItem">
+								<text pos="8,8" size="73x16">Option A</text>
+							</widget>
+							<widget pos="0,36" size="89x32" type="*widget.menuItem">
+								<text pos="8,8" size="53x16">Option B</text>
+								<image pos="69,6" rsc="menuExpandIcon" size="iconInlineSize" themed="foreground"/>
+							</widget>
+						</container>
+					</widget>
+				</widget>
+			</widget>
+		</widget>
+	</overlay>
+</canvas>

@@ -1,0 +1,6 @@
+details {
+  name = "clipimageprobe"
+  id = "io.bellui.clipimageprobe"
+  version = "1.0.0"
+  build = 2
+}

@@ -1,0 +1,62 @@
+<canvas padded size="185x120">
+	<content>
+		<widget pos="4,4" size="177x112" type="*widget.Form">
+			<container size="177x112">
+				<container size="177x68">
+					<container size="48x32">
+						<text alignment="trailing" bold pos="8,8" size="32x16">test1</text>
+					</container>
+					<widget pos="52,0" size="125x32" type="*widget.Entry">
+						<rectangle fillColor="inputBackground" pos="2,2" radius="4" size="121x28"/>
+						<widget pos="2,2" size="121x28" type="*widget.Scroll">
+							<widget size="121x28" type="*widget.entryContent">
+								<widget size="121x28" type="*widget.RichText">
+									<text color="placeholder" pos="8,6" size="0x16"></text>
+								</widget>
+								<widget size="121x28" type="*widget.RichText">
+									<text pos="8,6" size="0x16"></text>
+								</widget>
+							</widget>
+						</widget>
+						<rectangle pos="1,1" radius="4" size="123x29" strokeColor="inputBorder" strokeWidth="2"/>
+					</widget>
+					<container pos="0,36" size="48x32">
+						<text alignment="trailing" bold pos="8,8" size="32x16">test2</text>
+					</container>
+					<widget pos="52,36" size="125x32" type="*widget.Entry">
+						<rectangle fillColor="inputBackground" pos="2,2" radius="4" size="121x28"/>
+						<widget pos="2,2" size="121x28" type="*widget.Scroll">
+							<widget size="121x28" type="*widget.entryContent">
+								<widget size="121x28" type="*widget.RichText">
+									<text color="placeholder" pos="8,6" size="0x16"></text>
+								</widget>
+								<widget size="121x28" type="*widget.RichText">
+									<text pos="8,6" size="0x16"></text>
+								</widget>
+							</widget>
+						</widget>
+						<rectangle pos="1,1" radius="4" size="123x29" strokeColor="inputBorder" strokeWidth="2"/>
+					</widget>
+				</container>
+				<container pos="0,72" size="177x40">
+					<container pos="4,0" size="173x40">
+						<widget size="84x40" type="*widget.Button">
+							<rectangle fillColor="rgba(64,53,80,255)" radius="20" size="84x40"/>
+							<widget pos="32,11" size="43x20" type="*widget.RichText">
+								<text alignment="center" bold color="rgba(224,208,240,255)" size="43x16">Cancel</text>
+							</widget>
+							<image fillMode="contain" pos="8,10" rsc="cancelIcon" size="iconInlineSize" themed="foreground"/>
+						</widget>
+						<widget pos="88,0" size="84x40" type="*widget.Button">
+							<rectangle fillColor="primary" radius="20" size="84x40"/>
+							<widget pos="32,11" size="44x20" type="*widget.RichText">
+								<text alignment="center" bold color="foregroundOnPrimary" size="44x16">Submit</text>
+							</widget>
+							<image fillMode="contain" pos="8,10" rsc="confirmIcon" size="iconInlineSize" themed="foregroundOnPrimary"/>
+						</widget>
+					</container>
+				</container>
+			</container>
+		</widget>
+	</content>
+</canvas>

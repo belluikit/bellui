@@ -1,0 +1,378 @@
+package commands
+
+import (
+	"image"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/josephspurrier/goversioninfo"
+	"github.com/stretchr/testify/assert"
+
+	"github.com/belluikit/bellui/cmd/bellui/internal/metadata"
+)
+
+func Test_calculateExeName(t *testing.T) {
+	modulesApp := calculateExeName("testdata/modules_app", "windows")
+	assert.Equal(t, "module.exe", modulesApp)
+
+	modulesShortName := calculateExeName("testdata/short_module", "linux")
+	assert.Equal(t, "app", modulesShortName)
+
+	nonModulesApp := calculateExeName("testdata", "linux")
+	assert.Equal(t, "testdata", nonModulesApp)
+}
+
+func Test_fixedVersionInfo(t *testing.T) {
+	tests := []struct {
+		ver   string
+		fixed goversioninfo.FileVersion
+	}{
+		{"", goversioninfo.FileVersion{Major: 0, Minor: 0, Patch: 0, Build: 1}},
+		{"1.1.1.1", goversioninfo.FileVersion{Major: 1, Minor: 1, Patch: 1, Build: 1}},
+		{"2.2.2", goversioninfo.FileVersion{Major: 2, Minor: 2, Patch: 2, Build: 1}},
+		{"3.3.3.3.3", goversioninfo.FileVersion{Major: 3, Minor: 3, Patch: 3, Build: 3}},
+		{"4.4.4-dev", goversioninfo.FileVersion{Major: 4, Minor: 4, Patch: 4, Build: 1}},
+		// semver build metadata is ignored
+		{"5.5.5+5", goversioninfo.FileVersion{Major: 5, Minor: 5, Patch: 5, Build: 1}},
+		// not valid semver: must have patch version for pre-release to be valid
+		{"6.6-foo+6", goversioninfo.FileVersion{Major: 6, Minor: 6, Patch: 0, Build: 1}},
+		// not valid semver: max three version components
+		{"7.7.7.7-foo", goversioninfo.FileVersion{Major: 7, Minor: 7, Patch: 7, Build: 7}},
+	}
+
+	for _, tt := range tests {
+		parsed := fixedVersionInfo(tt.ver)
+		assert.Equal(t, tt.fixed, parsed)
+	}
+}
+
+func Test_stripPreReleaseAndBuildInfo(t *testing.T) {
+	tests := []struct {
+		have string
+		want string
+	}{
+		{"", ""},
+		{"1", "1"},
+		{"2-", "2"},
+		{"3-+", "3"},
+		{"4-foo", "4"},
+		{"5-foo+bar", "5"},
+		{"6+foo+bar", "6"},
+		{"7+foo-bar", "7"},
+	}
+	for _, test := range tests {
+		assert.Equal(t, test.want, stripPreReleaseAndBuildInfo(test.have))
+	}
+}
+
+func Test_isValidVersion(t *testing.T) {
+	cases := []struct {
+		in   string
+		want bool
+	}{
+		{"1.2.3", true},
+		{"1.2.3-alpha", true},
+		{"1.2.3-beta.5", true},
+		{"1", true},   // not semver, but required for backwards compatibility
+		{"1.2", true}, // not semver, but required for backwards compatibility
+
+		{"1.2.3.4", false},
+		{"", false},
+		{"1.2-alpha3", false},
+		{"pre1", false},
+		{"1..2", false},
+		{"1.xy", false},
+		{"1.2.xy", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.in, func(t *testing.T) {
+			got := isValidVersion(tc.in)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func Test_combinedVersion(t *testing.T) {
+	tests := []struct {
+		ver   string
+		build int
+		comb  string
+	}{
+		{"1.2.3", 4, "1.2.3.4"},
+		{"1.2", 4, "1.2.0.4"},
+		{"1", 4, "1.0.0.4"},
+	}
+
+	for _, tt := range tests {
+		p := &Packager{appData: &appData{AppVersion: tt.ver, AppBuild: tt.build}}
+		comb := p.combinedVersion()
+		assert.Equal(t, tt.comb, comb)
+	}
+}
+
+func Test_processMacOSIcon(t *testing.T) {
+	f, err := os.Open("testdata/icon.png")
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	defer f.Close()
+	icon, _, err := image.Decode(f)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	processed := processMacOSIcon(icon)
+
+	assert.Equal(t, 1024, processed.Bounds().Dx())
+	assert.Equal(t, 1024, processed.Bounds().Dy())
+	_, _, _, a := processed.At(3, 3).RGBA() // border
+	assert.Equal(t, uint32(0), a)
+	_, _, _, a = processed.At(125, 125).RGBA() // inside cut out corner
+	assert.Equal(t, uint32(0), a)
+	_, _, _, a = processed.At(900, 900).RGBA()
+	assert.Equal(t, uint32(0), a)
+	_, _, _, a = processed.At(1020, 1020).RGBA()
+	assert.Equal(t, uint32(0), a)
+}
+
+func Test_MergeMetadata(t *testing.T) {
+	p := &Packager{appData: &appData{}}
+	p.AppVersion = "v0.1"
+	data := &metadata.BelluiApp{
+		Details: metadata.AppDetails{
+			Icon:    "test.png",
+			Build:   3,
+			Version: "v0.0.1",
+		},
+	}
+
+	p.appData.mergeMetadata(data)
+	assert.Equal(t, "v0.1", p.AppVersion)
+	assert.Equal(t, 3, p.AppBuild)
+	assert.Equal(t, "test.png", p.icon)
+}
+
+func Test_validateAppID(t *testing.T) {
+	id, err := validateAppID("myApp", "windows", "myApp", false)
+	assert.NoError(t, err)
+	assert.Equal(t, "myApp", id)
+
+	id, err = validateAppID("", "darwin", "myApp", true)
+	assert.NoError(t, err)
+	assert.Equal(t, "com.example.myApp", id) // this was in for compatibility
+
+	id, err = validateAppID("com.myApp", "darwin", "myApp", true)
+	assert.NoError(t, err)
+	assert.Equal(t, "com.myApp", id)
+
+	_, err = validateAppID("", "ios", "myApp", false)
+	assert.Error(t, err)
+
+	_, err = validateAppID("myApp", "ios", "myApp", false)
+	assert.Error(t, err)
+
+	id, err = validateAppID("com.myApp", "android", "myApp", true)
+	assert.NoError(t, err)
+	assert.Equal(t, "com.myApp", id)
+
+	_, err = validateAppID("myApp", "android", "myApp", true)
+	assert.Error(t, err)
+
+	_, err = validateAppID("com._server.myApp", "android", "myApp", true)
+	assert.Error(t, err)
+
+	_, err = validateAppID("com.5server.myApp", "android", "myApp", true)
+	assert.Error(t, err)
+
+	_, err = validateAppID("0com.server.myApp", "android", "myApp", true)
+	assert.Error(t, err)
+
+	_, err = validateAppID("......", "android", "myApp", true)
+	assert.NoError(t, err)
+
+	_, err = validateAppID(".....myApp", "android", "myApp", true)
+	assert.NoError(t, err)
+}
+
+func Test_buildPackageWasm(t *testing.T) {
+	expected := []mockRunner{
+		{
+			expectedValue: expectedValue{args: []string{"mod", "edit", "-json"}},
+			mockReturn: mockReturn{
+				ret: []byte("{ \"Module\": { \"Path\": \"github.com/belluikit/bellui\"} }"),
+			},
+		},
+		{
+			expectedValue: expectedValue{
+				args:  []string{"build", "-trimpath", "-ldflags", "-s -w", "-tags", "release"},
+				env:   []string{"GOARCH=wasm", "GOOS=js", "CGO_ENABLED=0"},
+				osEnv: true,
+				dir:   "myTest",
+			},
+			mockReturn: mockReturn{
+				ret: []byte(""),
+			},
+		},
+	}
+
+	p := &Packager{
+		appData: &appData{},
+		os:      "wasm",
+		srcDir:  "myTest",
+		release: true,
+	}
+	wasmBuildTest := &testCommandRuns{runs: expected, t: t}
+	files, err := p.buildPackage(wasmBuildTest, []string{})
+	assert.NoError(t, err)
+	assert.NotNil(t, files)
+	assert.Equal(t, 1, len(files))
+}
+
+func Test_PackageWasm(t *testing.T) {
+	expected := []mockRunner{
+		{
+			expectedValue: expectedValue{args: []string{"mod", "edit", "-json"}},
+			mockReturn: mockReturn{
+				ret: []byte("{ \"Module\": { \"Path\": \"github.com/belluikit/bellui\"} }"),
+			},
+		},
+		{
+			expectedValue: expectedValue{
+				args:  []string{"build", "-o", "myTest.wasm"},
+				env:   []string{"GOARCH=wasm", "GOOS=js", "CGO_ENABLED=0"},
+				osEnv: true,
+				dir:   "myTest",
+			},
+			mockReturn: mockReturn{
+				ret: []byte(""),
+			},
+		},
+	}
+
+	p := &Packager{
+		appData: &appData{
+			Name: "myTest",
+			icon: "myTest.png",
+		},
+		os:     "wasm",
+		srcDir: "myTest",
+		dir:    "myTestTarget",
+		exe:    "myTest.wasm",
+	}
+	wasmBuildTest := &testCommandRuns{runs: expected, t: t}
+
+	util = mockUtil{}
+
+	utilIsMobileMock = func(_ string) bool {
+		return false
+	}
+
+	expectedEnsureSubDirRuns := mockEnsureSubDirRuns{
+		expected: []mockEnsureSubDir{
+			{"myTestTarget", "wasm", "myTestTarget/wasm"},
+		},
+	}
+	utilEnsureSubDirMock = func(parent, name string) string {
+		return expectedEnsureSubDirRuns.verifyExpectation(t, parent, name)
+	}
+
+	goroot, err := GOROOT()
+	assert.NoError(t, err)
+
+	// Handle lookup for wasm_exec.js from lib folder in Go 1.24 and newer:
+	wasmExecJSPath := filepath.Join(goroot, "lib", "wasm", "wasm_exec.js")
+	_, err = os.Stat(wasmExecJSPath)
+	execJSLibExists := err == nil || !os.IsNotExist(err)
+
+	expectedExistRuns := mockExistRuns{
+		expected: []mockExist{
+			{"myTest.wasm", false},
+			{"myTest.wasm", true},
+			{wasmExecJSPath, execJSLibExists},
+		},
+	}
+	utilExistsMock = func(path string) bool {
+		return expectedExistRuns.verifyExpectation(t, path)
+	}
+
+	expectedWriteFileRuns := mockWriteFileRuns{
+		expected: []mockWriteFile{
+			{filepath.Join("myTestTarget", "wasm", "index.html"), nil},
+			{filepath.Join("myTestTarget", "wasm", "spinner_light.gif"), nil},
+			{filepath.Join("myTestTarget", "wasm", "spinner_dark.gif"), nil},
+			{filepath.Join("myTestTarget", "wasm", "light.css"), nil},
+			{filepath.Join("myTestTarget", "wasm", "dark.css"), nil},
+			{filepath.Join("myTestTarget", "wasm", "bellui-sw.js"), nil},
+			{filepath.Join("myTestTarget", "wasm", "webgl-debug.js"), nil},
+		},
+	}
+	utilWriteFileMock = func(target string, _ []byte) error {
+		return expectedWriteFileRuns.verifyExpectation(t, target)
+	}
+
+	if !execJSLibExists { // Expect location from Go < 1.24 to have been copied:
+		wasmExecJSPath = filepath.Join(goroot, "misc", "wasm", "wasm_exec.js")
+	}
+
+	expectedCopyFileRuns := mockCopyFileRuns{
+		expected: []mockCopyFile{
+			{source: "myTest.png", target: filepath.Join("myTestTarget", "wasm", "icon.png")},
+			{source: wasmExecJSPath, target: filepath.Join("myTestTarget", "wasm", "wasm_exec.js")},
+			{source: "myTest.wasm", target: filepath.Join("myTestTarget", "wasm", "myTest.wasm")},
+		},
+	}
+	utilCopyFileMock = func(source, target string) error {
+		return expectedCopyFileRuns.verifyExpectation(t, false, source, target)
+	}
+
+	err = p.doPackage(wasmBuildTest)
+	assert.NoError(t, err)
+	wasmBuildTest.verifyExpectation()
+	expectedTotalCount(t, len(expectedEnsureSubDirRuns.expected), expectedEnsureSubDirRuns.current)
+	expectedTotalCount(t, len(expectedExistRuns.expected), expectedExistRuns.current)
+	expectedTotalCount(t, len(expectedWriteFileRuns.expected), expectedWriteFileRuns.current)
+	expectedTotalCount(t, len(expectedCopyFileRuns.expected), expectedCopyFileRuns.current)
+}
+
+func Test_PowerShellArguments(t *testing.T) {
+	tests := []struct {
+		expected string
+		args     []string
+	}{
+		{"\"/c\",'mkdir \"C:\\Program Files\\toto\"'", []string{"mkdir", "C:\\Program Files\\toto"}},
+		{"\"/c\",'copy \"C:\\Program Files\\toto\\titi.txt\" \"C:\\Program Files\\toto\\tata.txt\"'", []string{"copy", "C:\\Program Files\\toto\\titi.txt", "C:\\Program Files\\toto\\tata.txt"}},
+	}
+
+	for _, test := range tests {
+		result := escapePowerShellArguments(test.args...)
+		assert.Equal(t, test.expected, result)
+	}
+}
+
+func Test_hasGoCode(t *testing.T) {
+	dir := t.TempDir()
+	assert.False(t, hasGoCode(dir))
+
+	f, err := os.Create(filepath.Join(dir, "one.txt"))
+	assert.NoError(t, err)
+	_, err = f.Write([]byte("something\n"))
+	assert.NoError(t, err)
+	assert.NoError(t, f.Close())
+	assert.False(t, hasGoCode(dir))
+
+	f, err = os.Create(filepath.Join(dir, "two.go"))
+	assert.NoError(t, err)
+	_, err = f.Write([]byte("package " + dir + "\n// example"))
+	assert.NoError(t, err)
+	assert.NoError(t, f.Close())
+
+	f, err = os.Create(filepath.Join(dir, "three.go"))
+	assert.NoError(t, err)
+	_, err = f.Write([]byte("package " + dir + "\n// example"))
+	assert.NoError(t, err)
+	assert.NoError(t, f.Close())
+
+	assert.True(t, hasGoCode(dir))
+}

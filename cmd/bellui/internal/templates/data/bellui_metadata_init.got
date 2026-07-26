@@ -1,0 +1,32 @@
+package main
+
+import (
+	"github.com/belluikit/bellui"
+	"github.com/belluikit/bellui/app"
+)
+
+func init() {
+	app.SetMetadata(bellui.AppMetadata{
+		ID: "{{.AppID}}",
+		Name: "{{.Name}}",
+		Version: "{{.AppVersion}}",
+		Build: {{.AppBuild}},
+		Icon: {{.ResGoString}},
+		{{if .VersionAtLeast2_3}}
+		Release: {{.Release}},
+		Custom: map[string]string{
+			{{range $key, $value := .CustomMetadata}}
+			"{{$key}}": "{{$value}}",
+			{{end}}
+		},
+		{{end}}
+		{{if .VersionAtLeast2_6}}
+		Migrations: map[string]bool{
+        	{{range $key, $value := .Migrations}}
+        	"{{$key}}": {{$value}},
+        	{{end}}
+        },
+		{{end}}
+	})
+}
+

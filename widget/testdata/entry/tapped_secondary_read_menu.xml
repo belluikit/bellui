@@ -1,0 +1,38 @@
+<canvas padded size="150x200">
+	<content>
+		<widget pos="10,10" size="120x32" type="*widget.Entry">
+			<rectangle fillColor="inputBackground" pos="2,2" radius="4" size="116x28"/>
+			<widget pos="2,2" size="116x28" type="*widget.entryContent">
+				<widget size="116x28" type="*widget.RichText">
+					<text color="disabled" pos="8,6" size="0x16"></text>
+				</widget>
+				<widget size="116x28" type="*widget.RichText">
+					<text color="disabled" pos="8,6" size="0x16"></text>
+				</widget>
+			</widget>
+			<rectangle pos="1,1" radius="4" size="117x29" strokeColor="disabled" strokeWidth="2"/>
+		</widget>
+	</content>
+	<overlay>
+		<widget pos="2,3" size="146x195" type="*widget.OverlayContainer">
+			<widget pos="28,17" size="72x68" type="*widget.PopUpMenu">
+				<widget size="72x68" type="*widget.Shadow">
+					<boxShadow blurRadius="6" color="shadow" cornerRadius="4" offsetY="2" size="72x68"/>
+				</widget>
+				<widget size="72x68" type="*widget.Scroll">
+					<widget size="72x68" type="*widget.menuBox">
+						<rectangle fillColor="rgba(42,42,42,255)" radius="4" size="72x68"/>
+						<container size="72x68">
+							<widget size="72x32" type="*widget.menuItem">
+								<text pos="8,8" size="56x16">Copy</text>
+							</widget>
+							<widget pos="0,36" size="72x32" type="*widget.menuItem">
+								<text pos="8,8" size="56x16">Select all</text>
+							</widget>
+						</container>
+					</widget>
+				</widget>
+			</widget>
+		</widget>
+	</overlay>
+</canvas>

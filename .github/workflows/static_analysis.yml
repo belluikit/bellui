@@ -1,0 +1,115 @@
+name: Static Analysis
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  # cancel superseded runs on PR/feature branches, but never on main
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+env:
+  CC: "clang"
+  CGO_LDFLAGS: "-fuse-ld=lld"
+
+jobs:
+  static_analysis:
+    runs-on: [self-hosted, Linux, ARM64]
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+          # Full history + all branches so `buf breaking` can resolve the
+          # origin/main baseline (the proto breaking-change check below).
+          fetch-depth: 0
+      - name: Assert go-plus toolchain
+        run: |
+          go version
+          go version | grep -q '(plus)' || { echo "::error::runner go is not the go-plus fork"; exit 1; }
+
+
+      - name: Get dependencies
+        run: |
+          flock /tmp/bellui-ci-apt.lock sudo apt-get -o DPkg::Lock::Timeout=600 update
+          flock /tmp/bellui-ci-apt.lock sudo apt-get -o DPkg::Lock::Timeout=600 install --no-install-recommends clang lld libegl1-mesa-dev libgl1-mesa-dev libgles2-mesa-dev libx11-dev xorg-dev xvfb language-pack-en
+
+      - name: Set environment variable LANG
+        run: export LANG=en_EN.UTF-8
+
+      - name: Install analysis tools
+        run: |
+          go install mvdan.cc/gofumpt@latest
+          go install golang.org/x/tools/cmd/goimports@latest
+          go install github.com/fzipp/gocyclo/cmd/gocyclo@latest
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+          go install lucor.dev/lian@latest
+
+      - name: Install proto toolchain
+        # buf drives generation via buf.yaml/buf.gen.yaml and invokes
+        # protoc-gen-go directly, so no protoc binary is needed. Pin
+        # protoc-gen-go to the version the committed .pb.go was generated with
+        # so the up-to-date check below is reproducible.
+        run: |
+          go install github.com/bufbuild/buf/cmd/buf@v1.45.0
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.5
+
+      - name: Put go-installed tools on PATH
+        # `go install` drops binaries in $(go env GOPATH)/bin, which is not on
+        # the self-hosted runner's PATH by default (GitHub-hosted runners add it,
+        # ours don't). Export it so buf/gofumpt/staticcheck/gocyclo/lian below
+        # are found instead of failing with "command not found".
+        run: echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Lint protobuf
+        run: buf lint
+
+      - name: Check protobuf breaking changes (advisory)
+        # Non-blocking (#930): these protos back on-disk .pxf stores, so a
+        # wire-incompatible change (reused field number, changed type) silently
+        # corrupts saved settings/preferences. Surface it in the PR log without
+        # hard-failing intended schema evolution. WIRE-level rules (buf.yaml).
+        # origin/main is available because checkout uses fetch-depth: 0.
+        continue-on-error: true
+        run: buf breaking --against '.git#ref=origin/main'
+
+      - name: Check generated protobuf is up to date
+        # Regenerating must leave the tree clean; a stale .pb.go fails the build
+        # (the same guard other codegen benefits from). See hack/genproto.sh.
+        run: |
+          sh hack/genproto.sh
+          if ! git diff --exit-code -- '*.pb.go'; then
+            echo "::error::Generated protobuf is out of date. Run 'go generate ./...' (or sh hack/genproto.sh) and commit the result." >&2
+            exit 1
+          fi
+
+      - name: Vet
+        # Analyse both backends: the default WebGPU build and the GL fallback
+        # (-tags gl). WebGPU vet compiles the wgpu-native cgo (headers ship in the
+        # belluikit/webgpu module); no GPU needed since vet does not link/run.
+        run: |
+          go vet ./...
+          go vet -tags gl ./...
+
+      - name: Formatting
+        run: |
+          gofumpt -d -e .
+          test -z "$(goimports -e -d . | tee /dev/stderr)"
+
+      # Temporary ceiling: 10 pre-existing functions sit between 30 and 45
+      # (see ROADMAP "Build & CI"). Ratchet back down to 30 after the
+      # complexity refactor pass.
+      - name: Gocyclo
+        run: gocyclo -over 30 .
+
+      - name: Staticcheck
+        run: |
+          staticcheck ./...
+          staticcheck -tags gl ./...
+
+      - name: Check license of dependencies
+        run: lian -d --allowed="Apache-2.0, BSD-2-Clause, BSD-3-Clause, MIT, ISC"

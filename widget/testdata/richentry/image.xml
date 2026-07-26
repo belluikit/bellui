@@ -1,0 +1,20 @@
+<canvas size="120x90">
+	<content>
+		<widget size="120x90" type="*widget.RichEntry">
+			<rectangle fillColor="inputBackground" pos="2,2" radius="4" size="116x86"/>
+			<widget size="120x90" type="*widget.selectable">
+			</widget>
+			<widget size="120x90" type="*widget.RichText">
+				<text pos="8,8" size="20x16">top</text>
+				<text pos="8,24" size="0x16"></text>
+				<widget pos="8,40" size="104x4" type="*widget.richImage">
+					<container size="104x4">
+						<image fillMode="original" img size="4x4"/>
+					</container>
+				</widget>
+				<text pos="8,48" size="23x16">end</text>
+			</widget>
+			<rectangle pos="1,1" radius="4" size="117x87" strokeColor="inputBorder" strokeWidth="2"/>
+		</widget>
+	</content>
+</canvas>

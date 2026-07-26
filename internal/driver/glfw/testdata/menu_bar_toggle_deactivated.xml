@@ -1,0 +1,22 @@
+<canvas size="300x300">
+	<content>
+		<container size="300x300">
+			<widget size="300x24" type="*glfw.MenuBar">
+				<widget size="300x24" type="*widget.Shadow">
+					<boxShadow blurRadius="6" color="shadow" cornerRadius="4" offsetY="2" size="300x24"/>
+				</widget>
+				<widget size="0x0" type="*glfw.menuBarUnderlay">
+				</widget>
+				<rectangle fillColor="background" size="300x24"/>
+				<container pos="8,0" size="284x24">
+					<widget size="37x24" type="*glfw.menuBarItem">
+						<text pos="8,4" size="21x16">File</text>
+					</widget>
+					<widget pos="41,0" size="39x24" type="*glfw.menuBarItem">
+						<text pos="8,4" size="23x16">Edit</text>
+					</widget>
+				</container>
+			</widget>
+		</container>
+	</content>
+</canvas>

@@ -1,0 +1,35 @@
+<canvas size="89x120">
+	<content>
+		<widget size="89x120" type="*widget.OverlayContainer">
+			<widget size="85x115" type="*widget.Menu">
+				<widget size="85x115" type="*widget.Shadow">
+					<boxShadow blurRadius="6" color="shadow" cornerRadius="4" offsetY="2" size="85x115"/>
+				</widget>
+				<widget size="85x115" type="*widget.Scroll">
+					<widget size="85x115" type="*widget.menuBox">
+						<rectangle fillColor="rgba(42,42,42,255)" radius="4" size="85x115"/>
+						<container size="85x115">
+							<widget size="85x32" type="*widget.menuItem">
+								<text pos="8,8" size="69x16">Foo</text>
+							</widget>
+							<widget pos="0,36" size="85x1" type="*widget.Separator">
+								<rectangle fillColor="background" size="85x1"/>
+							</widget>
+							<widget pos="0,41" size="85x32" type="*widget.menuItem">
+								<text pos="36,8" size="21x16">Bar</text>
+								<image pos="65,6" rsc="menuExpandIcon" size="iconInlineSize" themed="foreground"/>
+								<image pos="8,6" rsc="account.svg" size="iconInlineSize" themed="foreground"/>
+							</widget>
+							<widget pos="0,77" size="85x1" type="*widget.Separator">
+								<rectangle fillColor="background" size="85x1"/>
+							</widget>
+							<widget pos="0,82" size="85x32" type="*widget.menuItem">
+								<text pos="8,8" size="69x16">Baz</text>
+							</widget>
+						</container>
+					</widget>
+				</widget>
+			</widget>
+		</widget>
+	</content>
+</canvas>

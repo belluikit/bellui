@@ -1,0 +1,18 @@
+details {
+  name = "shareprobe"
+  id = "io.bellui.shareprobe"
+  version = "1.0.0"
+  build = 5
+  file_associations = [
+    {
+      extensions = [
+        "txt"
+      ]
+      mime_type = "text/plain"
+      description = "Text Document"
+    }
+  ]
+  url_schemes = [
+    "shareprobe"
+  ]
+}

@@ -1,0 +1,23 @@
+<canvas padded size="68x40">
+	<content>
+		<widget pos="4,4" size="60x32" type="*widget.Entry">
+			<rectangle fillColor="inputBackground" pos="2,2" radius="4" size="56x28"/>
+			<widget pos="2,2" size="24x28" type="*widget.Scroll">
+				<widget size="67x28" type="*widget.entryContent">
+					<widget size="67x28" type="*widget.RichText">
+						<text pos="8,6" size="51x16">success</text>
+					</widget>
+				</widget>
+				<widget pos="0,12" size="24x16" type="*widget.scrollBarArea">
+					<widget size="12x16" type="*widget.scrollBar">
+						<rectangle fillColor="scrollbar" pos="0,13" radius="3" size="12x3"/>
+					</widget>
+				</widget>
+			</widget>
+			<rectangle pos="1,1" radius="4" size="57x29" strokeColor="inputBorder" strokeWidth="2"/>
+			<widget pos="32,8" size="20x20" type="*widget.validationStatus">
+				<image rsc="confirmIcon" size="iconInlineSize" themed="foreground"/>
+			</widget>
+		</widget>
+	</content>
+</canvas>

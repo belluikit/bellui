@@ -1,0 +1,31 @@
+<canvas size="500x150">
+	<content>
+		<widget size="500x150" type="*container.DocTabs">
+			<container size="500x40">
+				<widget size="460x40" type="*widget.Scroll">
+					<container size="460x40">
+						<widget size="150x40" type="*container.tabButton">
+							<text bold color="primary" pos="8,8" size="134x24">New longer text 1</text>
+						</widget>
+						<widget pos="154,0" size="79x40" type="*container.tabButton">
+							<text bold pos="8,8" size="63x24">New 2</text>
+						</widget>
+					</container>
+				</widget>
+				<container pos="464,0" size="36x40">
+					<widget size="36x40" type="*widget.Button">
+						<rectangle fillColor="rgba(64,53,80,255)" radius="20" size="36x40"/>
+						<image fillMode="contain" pos="8,10" rsc="more-horizontal.svg" size="iconInlineSize" themed="foreground"/>
+					</widget>
+				</container>
+			</container>
+			<rectangle fillColor="shadow" pos="0,40" size="500x4"/>
+			<rectangle fillColor="primary" pos="0,40" radius="4" size="150x4"/>
+			<widget pos="0,44" size="500x106" type="*widget.Label">
+				<widget size="500x106" type="*widget.RichText">
+					<text pos="8,8" size="34x16">Text1</text>
+				</widget>
+			</widget>
+		</widget>
+	</content>
+</canvas>

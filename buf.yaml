@@ -1,0 +1,24 @@
+version: v2
+modules:
+  - path: internal
+lint:
+  use:
+    - STANDARD
+  except:
+    # Our .proto files are colocated with the Go package that consumes them
+    # (e.g. internal/metadata/belluiapppb/belluiapp.proto for package belluiapppb),
+    # following Go's directory convention rather than the proto-registry layout
+    # STANDARD expects (bellui/metadata/v1/...). These are internal, unpublished
+    # wire schemas, so the Go-package colocation is deliberate; exempt just this
+    # rule and keep the rest of STANDARD enforced.
+    - PACKAGE_DIRECTORY_MATCH
+breaking:
+  # WIRE-level, not FILE: these protos back on-disk .pxf stores (settings,
+  # preferences, app manifests), so what matters is binary wire compatibility —
+  # a reused field number or changed type silently corrupts saved data, while a
+  # source-level change FILE flags (moving a message, renaming a field) does
+  # not. CI runs this advisory/non-blocking (see static_analysis.yml, #930):
+  # it surfaces wire breaks in the PR without hard-failing intended schema
+  # evolution. Run locally with `buf breaking --against '.git#ref=origin/trendvidia'`.
+  use:
+    - WIRE

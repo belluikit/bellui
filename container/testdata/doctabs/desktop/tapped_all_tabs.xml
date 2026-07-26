@@ -1,0 +1,86 @@
+<canvas size="300x100">
+	<content>
+		<widget size="300x100" type="*container.DocTabs">
+			<container size="300x40">
+				<widget size="220x40" type="*widget.Scroll">
+					<container pos="-108,0" size="328x40">
+						<widget size="75x40" type="*container.tabButton">
+							<text bold pos="8,8" size="59x24">Test1</text>
+						</widget>
+						<widget pos="79,0" size="75x40" type="*container.tabButton">
+							<text bold pos="8,8" size="59x24">Test2</text>
+						</widget>
+						<widget pos="159,0" size="75x40" type="*container.tabButton">
+							<text bold pos="8,8" size="59x24">Test3</text>
+						</widget>
+						<widget pos="238,0" size="90x40" type="*container.tabButton">
+							<text bold color="primary" pos="8,8" size="74x24">Another</text>
+						</widget>
+					</container>
+					<widget size="0x40" type="*widget.Shadow">
+						<linearGradient angle="270" size="8x40" startColor="shadow"/>
+					</widget>
+					<widget pos="0,24" size="220x16" type="*widget.scrollBarArea">
+						<widget pos="72,0" size="147x16" type="*widget.scrollBar">
+							<rectangle fillColor="scrollbar" pos="0,13" radius="3" size="147x3"/>
+						</widget>
+					</widget>
+				</widget>
+				<container pos="224,0" size="76x40">
+					<widget size="36x40" type="*widget.Button">
+						<rectangle fillColor="rgba(64,53,80,255)" radius="20" size="36x40"/>
+						<image fillMode="contain" pos="8,10" rsc="contentAddIcon" size="iconInlineSize" themed="foreground"/>
+					</widget>
+					<widget pos="40,0" size="36x40" type="*widget.Button">
+						<rectangle fillColor="rgba(64,53,80,255)" radius="20" size="36x40"/>
+						<image fillMode="contain" pos="8,10" rsc="more-horizontal.svg" size="iconInlineSize" themed="foreground"/>
+					</widget>
+				</container>
+			</container>
+			<rectangle fillColor="shadow" pos="0,40" size="300x4"/>
+			<rectangle fillColor="primary" pos="129,40" radius="4" size="90x4"/>
+			<widget pos="0,44" size="300x56" type="*widget.Label">
+				<widget size="300x56" type="*widget.RichText">
+					<text pos="8,8" size="75x16">Another Tab</text>
+				</widget>
+			</widget>
+		</widget>
+	</content>
+	<overlay>
+		<widget pos="2,3" size="296x95" type="*widget.OverlayContainer">
+			<widget pos="202,0" size="93x98" type="*widget.PopUpMenu">
+				<widget size="93x98" type="*widget.Shadow">
+					<boxShadow blurRadius="6" color="shadow" cornerRadius="4" offsetY="2" size="93x98"/>
+				</widget>
+				<widget size="93x98" type="*widget.Scroll">
+					<widget size="93x141" type="*widget.menuBox">
+						<rectangle fillColor="rgba(42,42,42,255)" radius="4" size="93x141"/>
+						<container size="93x141">
+							<widget size="93x32" type="*widget.menuItem">
+								<text pos="36,8" size="49x16">Test1</text>
+							</widget>
+							<widget pos="0,36" size="93x32" type="*widget.menuItem">
+								<text pos="36,8" size="49x16">Test2</text>
+							</widget>
+							<widget pos="0,72" size="93x32" type="*widget.menuItem">
+								<text pos="36,8" size="49x16">Test3</text>
+							</widget>
+							<widget pos="0,109" size="93x32" type="*widget.menuItem">
+								<text pos="36,8" size="49x16">Another</text>
+								<image pos="8,6" rsc="confirmIcon" size="iconInlineSize" themed="foreground"/>
+							</widget>
+						</container>
+					</widget>
+					<widget pos="0,98" size="93x0" type="*widget.Shadow">
+						<linearGradient endColor="shadow" pos="0,-8" size="93x8"/>
+					</widget>
+					<widget pos="77,0" size="16x98" type="*widget.scrollBarArea">
+						<widget size="16x67" type="*widget.scrollBar">
+							<rectangle fillColor="scrollbar" pos="13,0" radius="3" size="3x67"/>
+						</widget>
+					</widget>
+				</widget>
+			</widget>
+		</widget>
+	</overlay>
+</canvas>

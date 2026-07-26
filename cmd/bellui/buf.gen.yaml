@@ -1,0 +1,10 @@
+# Code generation for the manifest.pxf metadata schema. `managed` is disabled so
+# the proto's explicit go_package is honored and the .pb.go lands next to its
+# .proto (paths=source_relative). Run `buf generate` (or `go generate ./...`).
+version: v2
+managed:
+  enabled: false
+plugins:
+  - local: protoc-gen-go
+    out: internal/metadata/belluiapppb
+    opt: paths=source_relative

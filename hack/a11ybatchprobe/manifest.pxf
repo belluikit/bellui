@@ -1,0 +1,6 @@
+details {
+  name = "a11ybatchprobe"
+  id = "io.bellui.a11ybatchprobe"
+  version = "1.0.0"
+  build = 2
+}

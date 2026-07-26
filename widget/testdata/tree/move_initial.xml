@@ -1,0 +1,30 @@
+<canvas padded size="220x220">
+	<content>
+		<widget pos="4,4" size="212x212" type="*widget.Tree">
+			<widget size="212x212" type="*widget.Scroll">
+				<widget size="212x212" type="*widget.treeContent">
+					<widget size="212x32" type="*widget.branch">
+						<widget pos="28,0" size="184x32" type="*widget.Label">
+							<widget size="184x32" type="*widget.RichText">
+								<text pos="8,8" size="20x16">foo</text>
+							</widget>
+						</widget>
+						<widget pos="4,0" size="20x32" type="*widget.branchIcon">
+							<image fillMode="contain" rsc="moveDownIcon" size="20x32" themed="foreground"/>
+						</widget>
+					</widget>
+					<widget pos="0,33" size="212x1" type="*widget.Separator">
+						<rectangle fillColor="background" size="212x1"/>
+					</widget>
+					<widget pos="0,36" size="212x32" type="*widget.leaf">
+						<widget pos="52,0" size="160x32" type="*widget.Label">
+							<widget size="160x32" type="*widget.RichText">
+								<text pos="8,8" size="41x16">foobar</text>
+							</widget>
+						</widget>
+					</widget>
+				</widget>
+			</widget>
+		</widget>
+	</content>
+</canvas>

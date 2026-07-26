@@ -1,0 +1,217 @@
+//go:build wasm || js
+
+package dialog
+
+import (
+	"bytes"
+	"fmt"
+	"strings"
+	"syscall/js"
+
+	"github.com/belluikit/bellui"
+	"github.com/belluikit/bellui/core"
+	"github.com/belluikit/bellui/storage"
+)
+
+func (f *fileDialog) loadPlaces() []core.CanvasObject {
+	return nil
+}
+
+// fileOpenOSOverride presents a browser file picker (<input type="file">) for
+// the open case. Directory selection has no portable <input> equivalent, so it
+// falls back to the canvas dialog (returns false) rather than doing nothing.
+func fileOpenOSOverride(f *FileDialog) bool {
+	if f.isDirectory() {
+		return false
+	}
+	if f.multiSelect {
+		return false // multi-select falls back to the canvas dialog on web (#716)
+	}
+
+	cb, ok := f.callback.(func(bellui.URIReadCloser, error))
+	if !ok {
+		return false
+	}
+	showBrowserOpenPicker(acceptForFilter(f.filter), cb)
+	return true
+}
+
+// fileSaveOSOverride hands the app a writer whose contents are offered to the
+// browser as a download when it is closed. The File System Access API's
+// showSaveFilePicker is not universally available (absent in Firefox/Safari),
+// so the download path is used for portability across Chrome + Firefox.
+func fileSaveOSOverride(f *FileDialog) bool {
+	cb, ok := f.callback.(func(bellui.URIWriteCloser, error))
+	if !ok {
+		return false
+	}
+
+	name := f.initialFileName
+	if name == "" {
+		name = "download"
+	}
+	cb(newDownloadWriteCloser(name), nil)
+	return true
+}
+
+func (f *fileDialog) getPlaces() []favoriteItem {
+	return []favoriteItem{}
+}
+
+func getFavoriteLocation(homeURI bellui.URI, name string) (bellui.URI, error) {
+	return nil, nil
+}
+
+// acceptForFilter renders a bellui file filter as an HTML input "accept"
+// attribute value. Extension filters keep their leading dot; MIME filters pass
+// through verbatim. Other filters yield "" (accept anything).
+func acceptForFilter(f storage.FileFilter) string {
+	switch filter := f.(type) {
+	case *storage.ExtensionFileFilter:
+		parts := make([]string, 0, len(filter.Extensions))
+		for _, e := range filter.Extensions {
+			if !strings.HasPrefix(e, ".") {
+				e = "." + e
+			}
+			parts = append(parts, e)
+		}
+		return strings.Join(parts, ",")
+	case *storage.MimeTypeFileFilter:
+		return strings.Join(filter.MimeTypes, ",")
+	}
+	return ""
+}
+
+// showBrowserOpenPicker creates a hidden <input type="file">, wires change and
+// cancel handlers, and clicks it. The click must happen within the user
+// activation of the gesture that opened the dialog for the browser to allow it.
+func showBrowserOpenPicker(accept string, cb func(bellui.URIReadCloser, error)) {
+	doc := js.Global().Get("document")
+	input := doc.Call("createElement", "input")
+	input.Set("type", "file")
+	if accept != "" {
+		input.Set("accept", accept)
+	}
+	input.Get("style").Set("display", "none")
+
+	var changeFn, cancelFn js.Func
+	done := false
+	finish := func(r bellui.URIReadCloser, err error) {
+		if done {
+			return
+		}
+		done = true
+		changeFn.Release()
+		cancelFn.Release()
+		if body := doc.Get("body"); body.Truthy() {
+			body.Call("removeChild", input)
+		}
+		bellui.Do(func() { cb(r, err) })
+	}
+
+	changeFn = js.FuncOf(func(this js.Value, args []js.Value) any {
+		files := input.Get("files")
+		if !files.Truthy() || files.Get("length").Int() == 0 {
+			finish(nil, nil)
+			return nil
+		}
+		file := files.Index(0)
+		readBrowserFile(file, func(data []byte, err error) {
+			if err != nil {
+				finish(nil, err)
+				return
+			}
+			finish(newBytesReadCloser(file.Get("name").String(), data), nil)
+		})
+		return nil
+	})
+	// Newer browsers fire "cancel" when the picker is dismissed with no file.
+	cancelFn = js.FuncOf(func(this js.Value, args []js.Value) any {
+		finish(nil, nil)
+		return nil
+	})
+
+	input.Call("addEventListener", "change", changeFn)
+	input.Call("addEventListener", "cancel", cancelFn)
+	doc.Get("body").Call("appendChild", input)
+	input.Call("click")
+}
+
+// readBrowserFile reads a JS File object's bytes via its arrayBuffer() promise
+// and delivers them (or an error) to cb.
+func readBrowserFile(file js.Value, cb func([]byte, error)) {
+	var thenFn, catchFn js.Func
+	release := func() {
+		thenFn.Release()
+		catchFn.Release()
+	}
+	thenFn = js.FuncOf(func(this js.Value, args []js.Value) any {
+		arr := js.Global().Get("Uint8Array").New(args[0])
+		data := make([]byte, arr.Get("length").Int())
+		js.CopyBytesToGo(data, arr)
+		release()
+		cb(data, nil)
+		return nil
+	})
+	catchFn = js.FuncOf(func(this js.Value, args []js.Value) any {
+		release()
+		cb(nil, fmt.Errorf("failed to read file: %s", args[0].Call("toString").String()))
+		return nil
+	})
+	file.Call("arrayBuffer").Call("then", thenFn).Call("catch", catchFn)
+}
+
+// bytesReadCloser is an in-memory bellui.URIReadCloser over a selected file's
+// bytes. The URI is synthetic (the file name) — web sandboxing does not expose
+// a real path — and is only an identifier; the data is already in hand.
+type bytesReadCloser struct {
+	*bytes.Reader
+	uri bellui.URI
+}
+
+func newBytesReadCloser(name string, data []byte) *bytesReadCloser {
+	return &bytesReadCloser{Reader: bytes.NewReader(data), uri: storage.NewFileURI(name)}
+}
+
+func (b *bytesReadCloser) Close() error    { return nil }
+func (b *bytesReadCloser) URI() bellui.URI { return b.uri }
+
+// downloadWriteCloser buffers writes and, on Close, offers the contents to the
+// browser as a download named after the requested file.
+type downloadWriteCloser struct {
+	buf  bytes.Buffer
+	name string
+	uri  bellui.URI
+}
+
+func newDownloadWriteCloser(name string) *downloadWriteCloser {
+	return &downloadWriteCloser{name: name, uri: storage.NewFileURI(name)}
+}
+
+func (d *downloadWriteCloser) Write(p []byte) (int, error) { return d.buf.Write(p) }
+func (d *downloadWriteCloser) URI() bellui.URI             { return d.uri }
+
+func (d *downloadWriteCloser) Close() error {
+	triggerBrowserDownload(d.name, d.buf.Bytes())
+	return nil
+}
+
+// triggerBrowserDownload creates a Blob from data and clicks a transient anchor
+// with a download attribute, then revokes the object URL.
+func triggerBrowserDownload(name string, data []byte) {
+	arr := js.Global().Get("Uint8Array").New(len(data))
+	js.CopyBytesToJS(arr, data)
+	blob := js.Global().Get("Blob").New([]any{arr},
+		map[string]any{"type": "application/octet-stream"})
+	url := js.Global().Get("URL").Call("createObjectURL", blob)
+
+	doc := js.Global().Get("document")
+	a := doc.Call("createElement", "a")
+	a.Set("href", url)
+	a.Set("download", name)
+	a.Get("style").Set("display", "none")
+	doc.Get("body").Call("appendChild", a)
+	a.Call("click")
+	doc.Get("body").Call("removeChild", a)
+	js.Global().Get("URL").Call("revokeObjectURL", url)
+}

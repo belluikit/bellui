@@ -1,0 +1,46 @@
+name: Web Tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  # cancel superseded runs on PR/feature branches, but never on main
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  web_tests:
+    runs-on: [self-hosted, Linux, ARM64]
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Assert go-plus toolchain
+        run: |
+          go version
+          go version | grep -q '(plus)' || { echo "::error::runner go is not the go-plus fork"; exit 1; }
+
+
+      # WebGPU (browser WebGPU) is the default wasm backend (Phase 5, #204); the
+      # WebGL gl-js path is the fallback behind -tags gl. Build both. wasm has no
+      # cgo, so no wgpu-native libs are needed here; osusergo avoids the wasm
+      # os/user dependency on the default build.
+      - name: Build WebAssembly binary (WebGPU, default)
+        env:
+          GOOS: js
+          GOARCH: wasm
+        working-directory: cmd/bellui_settings
+        run: go build -tags osusergo
+
+      - name: Build WebAssembly binary (WebGL fallback)
+        env:
+          GOOS: js
+          GOARCH: wasm
+        working-directory: cmd/bellui_settings
+        run: go build -tags gl

@@ -1,0 +1,43 @@
+<canvas size="150x150">
+	<content>
+		<widget size="150x150" type="*container.DocTabs">
+			<container size="150x40">
+				<widget size="70x40" type="*widget.Scroll">
+					<container size="155x40">
+						<widget size="75x40" type="*container.tabButton">
+							<text bold color="primary" pos="8,8" size="59x24">Test1</text>
+						</widget>
+						<widget pos="79,0" size="75x40" type="*container.tabButton">
+							<text bold pos="8,8" size="59x24">Test2</text>
+						</widget>
+					</container>
+					<widget pos="70,0" size="0x40" type="*widget.Shadow">
+						<linearGradient angle="270" endColor="shadow" pos="-8,0" size="8x40"/>
+					</widget>
+					<widget pos="0,24" size="70x16" type="*widget.scrollBarArea">
+						<widget size="35x16" type="*widget.scrollBar">
+							<rectangle fillColor="scrollbar" pos="0,13" radius="3" size="35x3"/>
+						</widget>
+					</widget>
+				</widget>
+				<container pos="74,0" size="76x40">
+					<widget size="36x40" type="*widget.Button">
+						<rectangle fillColor="rgba(64,53,80,255)" radius="20" size="36x40"/>
+						<image fillMode="contain" pos="8,10" rsc="contentAddIcon" size="iconInlineSize" themed="foreground"/>
+					</widget>
+					<widget pos="40,0" size="36x40" type="*widget.Button">
+						<rectangle fillColor="rgba(76,65,92,255)" radius="20" size="36x40"/>
+						<image fillMode="contain" pos="8,10" rsc="more-horizontal.svg" size="iconInlineSize" themed="foreground"/>
+					</widget>
+				</container>
+			</container>
+			<rectangle fillColor="shadow" pos="0,40" size="150x4"/>
+			<rectangle fillColor="primary" pos="0,40" radius="4" size="70x4"/>
+			<widget pos="0,44" size="150x106" type="*widget.Label">
+				<widget size="150x106" type="*widget.RichText">
+					<text pos="8,8" size="34x16">Text1</text>
+				</widget>
+			</widget>
+		</widget>
+	</content>
+</canvas>

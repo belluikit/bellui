@@ -1,0 +1,404 @@
+package widget_test
+
+import (
+	"fmt"
+	"testing"
+	"time"
+
+	"github.com/belluikit/bellui"
+	"github.com/belluikit/bellui/canvas"
+	"github.com/belluikit/bellui/container"
+	"github.com/belluikit/bellui/core"
+	"github.com/belluikit/bellui/data/binding"
+	"github.com/belluikit/bellui/event"
+	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/layout"
+	"github.com/belluikit/bellui/test"
+	"github.com/belluikit/bellui/theme"
+	"github.com/belluikit/bellui/widget"
+
+	"github.com/stretchr/testify/assert"
+)
+
+var treeData = map[string][]string{
+	"":    {"foo"},
+	"foo": {"foobar"},
+}
+
+func TestNewTreeWithData(t *testing.T) {
+	data := binding.NewStringTree()
+	for i := 0; i < 1000; i++ {
+		data.Append("", fmt.Sprintf("%d", i), fmt.Sprintf("Test Item %d", i))
+	}
+
+	for i := 0; i < 10; i++ {
+		data.Append("1", fmt.Sprintf("%d", 1000+i), fmt.Sprintf("Child Item %d", i))
+	}
+
+	tree := widget.NewTreeWithData(
+		data,
+		func(bool) core.CanvasObject {
+			return widget.NewLabel("Template Object")
+		},
+		func(data binding.DataItem, _ bool, item core.CanvasObject) {
+			item.(*widget.Label).Bind(data.(binding.String))
+		},
+	)
+
+	template := widget.NewLabel("Template Object")
+
+	assert.Len(t, tree.ChildUIDs(""), 1000)
+	assert.Len(t, tree.ChildUIDs("1"), 10)
+	assert.GreaterOrEqual(t, tree.MinSize().Width, template.MinSize().Width)
+}
+
+func TestTree_OpenClose(t *testing.T) {
+	t.Run("Exists", func(t *testing.T) {
+		tree := widget.NewTreeWithStrings(treeData)
+
+		closed := make(chan string, 1)
+		opened := make(chan string, 1)
+		tree.OnBranchClosed = func(uid widget.TreeNodeID) {
+			closed <- uid
+		}
+		tree.OnBranchOpened = func(uid widget.TreeNodeID) {
+			opened <- uid
+		}
+
+		assert.False(t, tree.IsBranchOpen("foo"))
+
+		tree.OpenBranch("foo")
+		assert.True(t, tree.IsBranchOpen("foo"))
+
+		select {
+		case s := <-opened:
+			assert.Equal(t, "foo", s)
+		case <-time.After(1 * time.Second):
+			assert.Fail(t, "Branch should have been opened")
+		}
+
+		tree.CloseBranch("foo")
+		assert.False(t, tree.IsBranchOpen("foo"))
+
+		select {
+		case s := <-closed:
+			assert.Equal(t, "foo", s)
+		case <-time.After(1 * time.Second):
+			assert.Fail(t, "Branch should have been closed")
+		}
+
+		tree.ToggleBranch("foo")
+		assert.True(t, tree.IsBranchOpen("foo"))
+
+		select {
+		case s := <-opened:
+			assert.Equal(t, "foo", s)
+		case <-time.After(1 * time.Second):
+			assert.Fail(t, "Branch should have been opened")
+		}
+
+		tree.ToggleBranch("foo")
+		assert.False(t, tree.IsBranchOpen("foo"))
+
+		select {
+		case s := <-closed:
+			assert.Equal(t, "foo", s)
+		case <-time.After(1 * time.Second):
+			assert.Fail(t, "Branch should have been closed")
+		}
+	})
+	t.Run("Missing", func(t *testing.T) {
+		tree := widget.NewTreeWithStrings(treeData)
+
+		assert.False(t, tree.IsBranchOpen("foo"))
+
+		tree.OpenBranch("bar")
+		assert.False(t, tree.IsBranchOpen("foo"))
+
+		tree.CloseBranch("bar")
+		assert.False(t, tree.IsBranchOpen("foo"))
+
+		tree.ToggleBranch("bar")
+		assert.False(t, tree.IsBranchOpen("foo"))
+
+		tree.ToggleBranch("bar")
+		assert.False(t, tree.IsBranchOpen("foo"))
+	})
+}
+
+func TestTree_OpenCloseAll(t *testing.T) {
+	data := map[string][]string{
+		"":     {"foo0", "foo1", "foo2"},
+		"foo0": {"foobar0"},
+		"foo1": {"foobar1"},
+		"foo2": {"foobar2"},
+	}
+	tree := widget.NewTreeWithStrings(data)
+
+	tree.OpenAllBranches()
+	assert.True(t, tree.IsBranchOpen("foo0"))
+	assert.True(t, tree.IsBranchOpen("foo1"))
+	assert.True(t, tree.IsBranchOpen("foo2"))
+
+	tree.CloseAllBranches()
+	assert.False(t, tree.IsBranchOpen("foo0"))
+	assert.False(t, tree.IsBranchOpen("foo1"))
+	assert.False(t, tree.IsBranchOpen("foo2"))
+}
+
+func TestTree_Layout(t *testing.T) {
+	test.NewApp()
+
+	for name, tt := range map[string]struct {
+		items    map[string][]string
+		selected widget.TreeNodeID
+		opened   []widget.TreeNodeID
+	}{
+		"single_leaf": {
+			items: map[string][]string{
+				"": {"11111"},
+			},
+		},
+		"single_leaf_selected": {
+			items: map[string][]string{
+				"": {"11111"},
+			},
+			selected: "11111",
+		},
+		"single_branch": {
+			items: map[string][]string{
+				"":  {"A"},
+				"A": {"11111"},
+			},
+		},
+		"single_branch_selected": {
+			items: map[string][]string{
+				"":  {"A"},
+				"A": {"11111"},
+			},
+			selected: "A",
+		},
+		"single_branch_opened": {
+			items: map[string][]string{
+				"":  {"A"},
+				"A": {"11111"},
+			},
+			opened: []string{"A"},
+		},
+		"single_branch_opened_selected": {
+			items: map[string][]string{
+				"":  {"A"},
+				"A": {"11111"},
+			},
+			opened:   []string{"A"},
+			selected: "A",
+		},
+		"single_branch_opened_leaf_selected": {
+			items: map[string][]string{
+				"":  {"A"},
+				"A": {"11111"},
+			},
+			opened:   []string{"A"},
+			selected: "11111",
+		},
+		"multiple": {
+			items: map[string][]string{
+				"":  {"A", "B", "44444444444444444444"},
+				"A": {"11111"},
+				"B": {"2222222222"},
+			},
+		},
+		"multiple_selected": {
+			items: map[string][]string{
+				"":  {"A", "B", "44444444444444444444"},
+				"A": {"11111"},
+				"B": {"2222222222"},
+			},
+			selected: "44444444444444444444",
+		},
+		"multiple_leaf": {
+			items: map[string][]string{
+				"": {"11111", "2222222222", "333333333333333", "44444444444444444444"},
+			},
+		},
+		"multiple_leaf_selected": {
+			items: map[string][]string{
+				"": {"11111", "2222222222", "333333333333333", "44444444444444444444"},
+			},
+			selected: "2222222222",
+		},
+		"multiple_branch": {
+			items: map[string][]string{
+				"":  {"A", "B"},
+				"A": {"11111"},
+				"B": {"2222222222", "C"},
+				"C": {"333333333333333"},
+			},
+		},
+		"multiple_branch_selected": {
+			items: map[string][]string{
+				"":  {"A", "B"},
+				"A": {"11111"},
+				"B": {"2222222222", "C"},
+				"C": {"333333333333333"},
+			},
+			selected: "B",
+		},
+		"multiple_branch_opened": {
+			items: map[string][]string{
+				"":  {"A", "B"},
+				"A": {"11111"},
+				"B": {"2222222222", "C"},
+				"C": {"333333333333333"},
+			},
+			opened: []string{"A", "B", "C"},
+		},
+		"multiple_branch_opened_selected": {
+			items: map[string][]string{
+				"":  {"A", "B"},
+				"A": {"11111"},
+				"B": {"2222222222", "C"},
+				"C": {"333333333333333"},
+			},
+			opened:   []string{"A", "B", "C"},
+			selected: "B",
+		},
+		"multiple_branch_opened_leaf_selected": {
+			items: map[string][]string{
+				"":  {"A", "B"},
+				"A": {"11111"},
+				"B": {"2222222222", "C"},
+				"C": {"333333333333333"},
+			},
+			opened:   []string{"A", "B", "C"},
+			selected: "2222222222",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			tree := widget.NewTreeWithStrings(tt.items)
+			for _, o := range tt.opened {
+				tree.OpenBranch(o)
+			}
+			tree.Select(tt.selected)
+
+			window := test.NewWindow(tree)
+			defer window.Close()
+			window.Resize(geo.NewSize(200, 300))
+
+			tree.Refresh() // Force layout
+
+			test.AssertRendersToMarkup(t, "tree/layout_"+name+".xml", window.Canvas())
+		})
+	}
+}
+
+func TestTree_ChangeTheme(t *testing.T) {
+	test.NewTempApp(t)
+
+	tree := widget.NewTreeWithStrings(treeData)
+	tree.OpenBranch("foo")
+
+	window := test.NewWindow(tree)
+	defer window.Close()
+	window.SetPadded(false)
+	window.Resize(geo.NewSize(220, 220))
+
+	tree.Refresh() // Force layout
+
+	test.AssertImageMatches(t, "tree/theme_initial.png", window.Canvas().Capture())
+
+	test.WithTestTheme(t, func() {
+		tree.Refresh()
+		time.Sleep(100 * time.Millisecond)
+		test.AssertImageMatches(t, "tree/theme_changed.png", window.Canvas().Capture())
+	})
+}
+
+func TestTree_OverrideTheme(t *testing.T) {
+	test.NewTempApp(t)
+
+	tree := widget.NewTreeWithStrings(treeData)
+	tree.OpenBranch("foo")
+
+	window := test.NewWindow(tree)
+	defer window.Close()
+	window.SetPadded(false)
+	window.Resize(geo.NewSize(220, 220))
+	test.ApplyTheme(t, test.NewTheme())
+
+	normal := test.Theme()
+	bg := canvas.NewRectangle(normal.Color(theme.ColorNameBackground, theme.VariantDark))
+	window.SetContent(&bellui.Container{
+		Layout:  layout.NewStackLayout(),
+		Objects: []core.CanvasObject{bg, container.NewThemeOverride(tree, normal)},
+	})
+	test.AssertImageMatches(t, "tree/theme_initial.png", window.Canvas().Capture())
+}
+
+func TestTree_Move(t *testing.T) {
+	test.NewTempApp(t)
+
+	tree := widget.NewTreeWithStrings(treeData)
+	tree.OpenBranch("foo")
+
+	window := test.NewWindow(tree)
+	defer window.Close()
+	window.Resize(geo.NewSize(220, 220))
+
+	tree.Refresh() // Force layout
+
+	test.AssertRendersToMarkup(t, "tree/move_initial.xml", window.Canvas())
+
+	tree.Move(geo.NewPos(20, 20))
+	test.AssertRendersToMarkup(t, "tree/move_moved.xml", window.Canvas())
+}
+
+func TestTree_Refresh(t *testing.T) {
+	test.NewTempApp(t)
+	test.ApplyTheme(t, test.Theme())
+
+	value := "Foo Leaf"
+	tree := widget.NewTreeWithStrings(treeData)
+	tree.UpdateNode = func(uid widget.TreeNodeID, branch bool, node core.CanvasObject) {
+		if uid == "foobar" {
+			node.(*widget.Label).SetText(value)
+			assert.False(t, branch)
+		} else {
+			node.(*widget.Label).SetText(uid)
+			assert.True(t, branch)
+		}
+	}
+	tree.OpenBranch("foo")
+
+	window := test.NewWindow(tree)
+	defer window.Close()
+	window.Resize(geo.NewSize(220, 220))
+
+	test.AssertImageMatches(t, "tree/refresh_initial.png", window.Canvas().Capture())
+
+	value = "Replaced"
+	tree.Refresh()
+
+	test.AssertImageMatches(t, "tree/refresh_replaced.png", window.Canvas().Capture())
+}
+
+func TestTree_FocusItem(t *testing.T) {
+	test.NewTempApp(t)
+
+	data := map[string][]string{
+		"": {"foo0", "foo1", "foo2"},
+	}
+
+	tree := widget.NewTreeWithStrings(data)
+	tree.OpenBranch("foo")
+
+	window := test.NewWindow(tree)
+	defer window.Close()
+	window.Resize(geo.NewSize(220, 220))
+	window.Canvas().Focus(tree)
+
+	tree.TypedKey(&event.KeyEvent{Name: event.KeyDown})
+	tree.TypedKey(&event.KeyEvent{Name: event.KeyDown})
+
+	test.AssertImageMatches(t, "tree/tree_focus_item.png", window.Canvas().Capture())
+}

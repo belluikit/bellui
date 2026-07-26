@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package bellui.settings.v1;
+
+option go_package = "github.com/belluikit/bellui/internal/settings/settingspb;settingspb";
+
+// Settings is the wire schema for the global bellui settings store, encoded in the
+// textual PXF format (settings.pxf, replacing the legacy settings.json). It
+// mirrors app.SettingsSchema field-for-field. See app/settings_pxf.go for the
+// conversion to and from that struct.
+message Settings {
+  string theme = 1;
+  float scale = 2;
+  string primary_color = 3;
+  string cloud_name = 4;
+  string cloud_config = 5;
+  bool disable_animations = 6;
+}

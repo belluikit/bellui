@@ -1,0 +1,6 @@
+details {
+  name = "richentryprobe"
+  id = "com.trendvidia.richentryprobe"
+  version = "1.0.0"
+  build = 1
+}
