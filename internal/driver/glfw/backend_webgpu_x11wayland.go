@@ -18,7 +18,7 @@ import (
 func webgpuSurfaceDescriptor(w *window) *wgpu.SurfaceDescriptor {
 	if build.IsWayland {
 		return &wgpu.SurfaceDescriptor{
-			WaylandSurface: &wgpu.SurfaceDescriptorFromWaylandSurface{
+			WaylandSurface: &wgpu.SurfaceSourceWaylandSurface{
 				Display: unsafe.Pointer(glfw.GetWaylandDisplay()),
 				Surface: unsafe.Pointer(w.viewport.GetWaylandWindow()),
 			},
@@ -26,7 +26,7 @@ func webgpuSurfaceDescriptor(w *window) *wgpu.SurfaceDescriptor {
 	}
 
 	return &wgpu.SurfaceDescriptor{
-		XlibWindow: &wgpu.SurfaceDescriptorFromXlibWindow{
+		XlibWindow: &wgpu.SurfaceSourceXlibWindow{
 			Display: unsafe.Pointer(glfw.GetX11Display()),
 			Window:  uint32(w.viewport.GetX11Window()),
 		},
