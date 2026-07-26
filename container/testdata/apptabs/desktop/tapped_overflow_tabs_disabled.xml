@@ -1,0 +1,49 @@
+<canvas size="200x100">
+	<content>
+		<widget size="200x100" type="*container.AppTabs">
+			<container size="200x40">
+				<container size="160x40">
+					<widget size="51x40" type="*container.tabButton">
+						<text alignment="center" bold color="primary" pos="8,8" size="35x24">Test1</text>
+					</widget>
+					<widget pos="55,0" size="51x40" type="*container.tabButton">
+						<text alignment="center" bold pos="8,8" size="35x24">Test2</text>
+					</widget>
+				</container>
+				<widget pos="164,0" size="36x40" type="*widget.Button">
+					<rectangle fillColor="rgba(64,53,80,255)" radius="20" size="36x40"/>
+					<image fillMode="contain" pos="8,10" rsc="more-horizontal.svg" size="iconInlineSize" themed="foreground"/>
+				</widget>
+			</container>
+			<rectangle fillColor="shadow" pos="0,40" size="200x4"/>
+			<rectangle fillColor="primary" pos="0,40" radius="4" size="51x4"/>
+			<widget pos="0,44" size="200x56" type="*widget.Label">
+				<widget size="200x56" type="*widget.RichText">
+					<text pos="8,8" size="37x16">Text 1</text>
+				</widget>
+			</widget>
+		</widget>
+	</content>
+	<overlay>
+		<widget pos="2,3" size="196x95" type="*widget.OverlayContainer">
+			<widget pos="145,26" size="50x68" type="*widget.PopUpMenu">
+				<widget size="50x68" type="*widget.Shadow">
+					<boxShadow blurRadius="6" color="shadow" cornerRadius="4" offsetY="2" size="50x68"/>
+				</widget>
+				<widget size="50x68" type="*widget.Scroll">
+					<widget size="50x68" type="*widget.menuBox">
+						<rectangle fillColor="rgba(42,42,42,255)" radius="4" size="50x68"/>
+						<container size="50x68">
+							<widget size="50x32" type="*widget.menuItem">
+								<text color="disabled" pos="8,8" size="34x16">Test3</text>
+							</widget>
+							<widget pos="0,36" size="50x32" type="*widget.menuItem">
+								<text pos="8,8" size="34x16">Test4</text>
+							</widget>
+						</container>
+					</widget>
+				</widget>
+			</widget>
+		</widget>
+	</overlay>
+</canvas>

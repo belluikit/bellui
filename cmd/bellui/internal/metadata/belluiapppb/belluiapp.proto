@@ -1,0 +1,83 @@
+syntax = "proto3";
+
+package bellui.metadata.v1;
+
+option go_package = "github.com/belluikit/bellui/cmd/bellui/internal/metadata/belluiapppb;belluiapppb";
+
+// BelluiApp is the wire schema for the manifest.pxf application metadata file.
+// It mirrors the metadata.BelluiApp Go struct field-for-field so the two can be
+// converted losslessly (see convert.go).
+message BelluiApp {
+  string website = 1;
+  string description = 2;
+  AppDetails details = 3;
+  AdaptiveIcon adaptive_icon = 4;
+  map<string, string> development = 5;
+  map<string, string> release = 6;
+  AppSource source = 7;
+  CanOpen can_open = 8;
+  LinuxAndBSD linux_and_bsd = 9;
+  repeated string languages = 10;
+  map<string, bool> migrations = 11;
+}
+
+// AppDetails describes the build information.
+message AppDetails {
+  string icon = 1;
+  string name = 2;
+  string id = 3;
+  string version = 4;
+  int32 build = 5;
+  repeated FileAssociation file_associations = 6;
+  repeated string url_schemes = 7;
+
+  // IOSUsageDescriptions maps iOS Info.plist usage-description keys (e.g.
+  // "NSCameraUsageDescription") to the human-readable purpose string shown in
+  // the system permission prompt. The packaging tool injects each entry into
+  // the generated Info.plist for `bellui package -os ios`; iOS refuses to prompt
+  // (and rejects the app) for a permission whose usage string is missing. A
+  // raw-key map keeps the schema future-proof as Apple adds new keys.
+  map<string, string> ios_usage_descriptions = 8;
+
+  // AssociatedDomains declares the domains this app is associated with, without
+  // the "applinks:" prefix (e.g. "example.com"). The packaging tool emits an
+  // Associated Domains entitlement (com.apple.developer.associated-domains =
+  // applinks:<domain>) on iOS so tapped https://<domain>/… links (Universal
+  // Links) route to the app via application:continueUserActivity: (fyne#622),
+  // and the matching intent-filter autoVerify on Android.
+  repeated string associated_domains = 9;
+}
+
+// FileAssociation declares a single document type the application can open.
+message FileAssociation {
+  repeated string extensions = 1;
+  string mime_type = 2;
+  string description = 3;
+  string role = 4;
+  string icon = 5;
+}
+
+message AdaptiveIcon {
+  string foreground = 1;
+  string background = 2;
+  string monochrome = 3;
+}
+
+message AppSource {
+  string repo = 1;
+  string dir = 2;
+}
+
+// LinuxAndBSD describes specific metadata for desktop files on Linux and BSD.
+message LinuxAndBSD {
+  string generic_name = 1;
+  repeated string categories = 2;
+  string comment = 3;
+  repeated string keywords = 4;
+  string exec_params = 5;
+}
+
+// CanOpen represents a selection of file types (mime etc) that this application can open.
+message CanOpen {
+  string mime_types = 1;
+}

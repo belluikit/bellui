@@ -1,0 +1,139 @@
+name: CLI Tests
+
+# The bellui CLI is a nested module (cmd/bellui, github.com/belluikit/bellui/cmd/bellui)
+# so it is NOT covered by the library module's `./...` in the other workflows.
+# This workflow builds/tests it. The nested module `require`s the (private)
+# toolkit module, which CI can't fetch (no git auth). Each job adds an ephemeral
+# `replace` to the local checkout (go mod edit -replace .../bellui=../..) so the
+# CLI builds against the toolkit code in THIS PR — always current, no token, no
+# version-pin coupling. The committed go.mod keeps its version pin, so
+# `go install .../bellui/cmd/bellui@…` still works for consumers.
+
+on:
+  push:
+    paths:
+      - "cmd/bellui/**"
+      - "internal/driver/mobile/app/*.java"
+      - ".github/workflows/cli_tests.yml"
+  pull_request:
+    paths:
+      - "cmd/bellui/**"
+      - "internal/driver/mobile/app/*.java"
+      - ".github/workflows/cli_tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  cli_tests:
+    runs-on: ${{ matrix.runs-on }}
+    # Per-OS default shell so the go steps below never fall back to pwsh
+    # (PowerShell 7), which the Windows runner service can't resolve. Windows
+    # PowerShell 5.1 ('powershell') is always present.
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: linux
+            runs-on: [self-hosted, Linux, ARM64]
+            shell: bash
+          - os: macos
+            runs-on: [self-hosted, macOS, ARM64]
+            shell: bash
+          - os: windows
+            runs-on: [self-hosted, X64, Windows]
+            shell: powershell
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Assert go-plus toolchain (Linux/macOS)
+        if: ${{ runner.os != 'Windows' }}
+        run: |
+          go version
+          go version | grep -q '(plus)' || { echo "::error::runner go is not the go-plus fork"; exit 1; }
+      - name: Assert go-plus toolchain (Windows)
+        if: ${{ runner.os == 'Windows' }}
+        shell: powershell
+        run: |
+          go version
+          if (-not (go version | Select-String '\(plus\)')) { Write-Error 'runner go is not the go-plus fork'; exit 1 }
+      - name: Resolve the toolkit from this checkout
+        working-directory: cmd/bellui
+        run: go mod edit -replace github.com/belluikit/bellui=../..
+      - name: Build
+        working-directory: cmd/bellui
+        run: go build ./...
+      - name: Vet
+        working-directory: cmd/bellui
+        run: go vet ./...
+      - name: Tests
+        working-directory: cmd/bellui
+        run: go test -race -tags ci ./...
+
+  cli_static_analysis:
+    runs-on: [self-hosted, Linux, ARM64]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Assert go-plus toolchain
+        run: |
+          go version
+          go version | grep -q '(plus)' || { echo "::error::runner go is not the go-plus fork"; exit 1; }
+      - name: Resolve the toolkit from this checkout
+        working-directory: cmd/bellui
+        run: go mod edit -replace github.com/belluikit/bellui=../..
+      - name: Install analysis tools
+        run: |
+          go install mvdan.cc/gofumpt@latest
+          go install golang.org/x/tools/cmd/goimports@latest
+          go install github.com/fzipp/gocyclo/cmd/gocyclo@latest
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+      - name: Put go-installed tools on PATH
+        # $(go env GOPATH)/bin is not on the self-hosted runner's PATH by
+        # default, so the go-installed tools below would be "command not found".
+        run: echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+      - name: Formatting
+        working-directory: cmd/bellui
+        run: |
+          gofumpt -d -e .
+          test -z "$(goimports -e -d . | tee /dev/stderr)"
+      - name: Gocyclo
+        working-directory: cmd/bellui
+        run: gocyclo -over 30 .
+      - name: Staticcheck
+        working-directory: cmd/bellui
+        run: staticcheck ./...
+
+  # Anti-coupling gate: the CLI's embedded Android dex is compiled from the
+  # toolkit's GoNativeActivity.java. A strict byte-diff regen check is not used
+  # because dex/javac output is not reproducible across toolchain versions (it
+  # would false-fail on every PR). Instead, enforce the discipline that a change
+  # to the native Java must land WITH a regenerated dex.go in the same PR — the
+  # co-located workflow that replaced the old cross-repo split. (Regen with:
+  # `cd cmd/bellui/internal/mobile && go generate`, Android SDK on PATH.)
+  dex_regenerated_with_java:
+    if: github.event_name == 'pull_request'
+    runs-on: [self-hosted, Linux, ARM64]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Java change requires a dex regen
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          changed=$(git diff --name-only "$BASE" "$HEAD")
+          java=$(echo "$changed" | grep -c '^internal/driver/mobile/app/GoNativeActivity\.java$' || true)
+          dex=$(echo "$changed" | grep -c '^cmd/bellui/internal/mobile/dex\.go$' || true)
+          if [ "$java" -gt 0 ] && [ "$dex" -eq 0 ]; then
+            echo "::error::GoNativeActivity.java changed but cmd/bellui/internal/mobile/dex.go did not. Regenerate the embedded dex ('cd cmd/bellui/internal/mobile && go generate') and commit it in this PR." >&2
+            exit 1
+          fi
+          echo "ok: Java=$java dex=$dex"

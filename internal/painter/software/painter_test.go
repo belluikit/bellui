@@ -1,0 +1,642 @@
+package software_test
+
+import (
+	"image"
+	"image/color"
+	"testing"
+
+	"github.com/belluikit/bellui/canvas"
+	"github.com/belluikit/bellui/container"
+	"github.com/belluikit/bellui/event"
+	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/painter/software"
+	internalTest "github.com/belluikit/bellui/internal/test"
+	"github.com/belluikit/bellui/test"
+	"github.com/belluikit/bellui/theme"
+	"github.com/belluikit/bellui/widget"
+)
+
+func makeTestImage(w, h int) image.Image {
+	return internalTest.NewCheckedImage(w, h, w, h)
+}
+
+func TestPainter_paintArc(t *testing.T) {
+	test.ApplyTheme(t, test.Theme())
+	obj := canvas.NewArc(0, 360, 0.0, color.Black)
+
+	c := test.NewCanvas()
+	c.SetPadded(true)
+	c.SetContent(obj)
+	c.Resize(geo.NewSize(70+2*theme.Padding(), 70+2*theme.Padding()))
+	p := software.NewPainter()
+
+	test.AssertImageMatches(t, "draw_arc_full.png", p.Paint(c))
+
+	obj.CutoutRatio = 0.43
+	test.AssertImageMatches(t, "draw_arc_full_inner_radius.png", p.Paint(c))
+
+	obj.StartAngle = 0
+	obj.EndAngle = 0
+	test.AssertImageMatches(t, "draw_arc_empty.png", p.Paint(c))
+
+	obj.StartAngle = -80
+	obj.EndAngle = 95
+	test.AssertImageMatches(t, "draw_arc_-80_95.png", p.Paint(c))
+
+	obj.StartAngle = 180
+	obj.EndAngle = 0
+	test.AssertImageMatches(t, "draw_arc_180_0.png", p.Paint(c))
+
+	obj.CutoutRatio = 0.14
+	obj.StartAngle = 115
+	obj.EndAngle = 130
+	test.AssertImageMatches(t, "draw_arc_115_130.png", p.Paint(c))
+
+	obj.CutoutRatio = -0.5 // out of range, should be treated as 0
+	obj.StartAngle = 0
+	obj.EndAngle = -230
+	test.AssertImageMatches(t, "draw_arc_0_-230.png", p.Paint(c))
+
+	obj.StartAngle = -180
+	obj.EndAngle = 0
+	test.AssertImageMatches(t, "draw_arc_-180_0.png", p.Paint(c))
+
+	obj.StrokeColor = color.White
+	obj.StrokeWidth = 2
+	test.AssertImageMatches(t, "draw_arc_-180_0_stroke.png", p.Paint(c))
+
+	obj.CutoutRatio = 1.5 // out of range, should be treated as 1
+	test.AssertImageMatches(t, "draw_arc_-180_0_stroke_fully_cutout.png", p.Paint(c))
+
+	obj.CutoutRatio = 1.0
+	obj.StrokeWidth = 0
+	test.AssertImageMatches(t, "draw_arc_empty.png", p.Paint(c))
+}
+
+func TestPainter_paintCircle(t *testing.T) {
+	test.ApplyTheme(t, test.Theme())
+	obj := canvas.NewCircle(color.Black)
+
+	c := test.NewCanvas()
+	c.SetPadded(true)
+	c.SetContent(obj)
+	c.Resize(geo.NewSize(70+2*theme.Padding(), 70+2*theme.Padding()))
+	p := software.NewPainter()
+
+	test.AssertImageMatches(t, "draw_circle.png", p.Paint(c))
+}
+
+func TestPainter_paintCircleStroke(t *testing.T) {
+	test.ApplyTheme(t, test.Theme())
+	obj := canvas.NewCircle(color.White)
+	obj.StrokeColor = color.Black
+	obj.StrokeWidth = 4
+
+	c := test.NewCanvas()
+	c.SetPadded(true)
+	c.SetContent(obj)
+	c.Resize(geo.NewSize(70+2*theme.Padding(), 70+2*theme.Padding()))
+	p := software.NewPainter()
+
+	test.AssertImageMatches(t, "draw_circle_stroke.png", p.Paint(c))
+}
+
+func TestPainter_paintGradient_clipped(t *testing.T) {
+	test.ApplyTheme(t, test.Theme())
+	g := canvas.NewRadialGradient(color.NRGBA{R: 200, A: 255}, color.NRGBA{B: 200, A: 255})
+	g.SetMinSize(geo.NewSize(100, 100))
+	scroll := container.NewScroll(g)
+	scroll.Move(geo.NewPos(10, 10))
+	scroll.Resize(geo.NewSize(50, 50))
+	scroll.Scrolled(&event.ScrollEvent{Scrolled: geo.NewDelta(-30, -30)})
+	cont := container.NewWithoutLayout(scroll)
+	c := test.NewCanvas()
+	c.SetPadded(false)
+	c.SetContent(cont)
+	c.Resize(geo.NewSize(70, 70))
+	p := software.NewPainter()
+
+	test.AssertImageMatches(t, "draw_gradient_clipped.png", p.Paint(c))
+}
+
+func TestPainter_paintImage(t *testing.T) {
+	img := canvas.NewImageFromImage(makeTestImage(3, 3))
+
+	c := test.NewCanvas()
+	c.SetPadded(false)
+	c.SetContent(img)
+	c.Resize(geo.NewSize(50, 50))
+	p := software.NewPainter()
+
+	target := p.Paint(c)
+	test.AssertImageMatches(t, "draw_image_default.png", target)
+}
+
+func TestPainter_paintImageAlpha(t *testing.T) {
+	img := canvas.NewImageFromImage(makeTestImage(3, 3))
+	img.Translucency = 0.5
+
+	c := test.NewCanvas()
+	c.SetPadded(false)
+	c.SetContent(img)
+	c.Resize(geo.NewSize(50, 50))
+	p := software.NewPainter()
+
+	target := p.Paint(c)
+	test.AssertImageMatches(t, "draw_image_alpha.png", target)
+}
+
+func TestPainter_paintImage_clipped(t *testing.T) {
+	test.ApplyTheme(t, test.Theme())
+	img := canvas.NewImageFromImage(makeTestImage(5, 5))
+	img.ScaleMode = canvas.ImageScalePixels
+	img.SetMinSize(geo.NewSize(100, 100))
+	scroll := container.NewScroll(img)
+	scroll.Move(geo.NewPos(10, 10))
+	scroll.Resize(geo.NewSize(50, 50))
+	scroll.Scrolled(&event.ScrollEvent{Scrolled: geo.NewDelta(-15, -15)})
+	cont := container.NewWithoutLayout(scroll)
+	c := test.NewCanvas()
+	c.SetPadded(false)
+	c.SetContent(cont)
+	c.Resize(geo.NewSize(70, 70))
+	p := software.NewPainter()
+
+	test.AssertImageMatches(t, "draw_image_clipped.png", p.Paint(c))
+}
+
+func TestPainter_paintImage_scalePixels(t *testing.T) {
+	img := canvas.NewImageFromImage(makeTestImage(3, 3))
+	img.ScaleMode = canvas.ImageScalePixels
+
+	c := test.NewCanvas()
+	c.SetPadded(false)
+	c.SetContent(img)
+	c.Resize(geo.NewSize(50, 50))
+	p := software.NewPainter()
+
+	target := p.Paint(c)
+	test.AssertImageMatches(t, "draw_image_ImageScalePixels.png", target)
+}
+
+func TestPainter_paintImage_scaleSmooth(t *testing.T) {
+	img := canvas.NewImageFromImage(makeTestImage(3, 3))
+	img.ScaleMode = canvas.ImageScaleSmooth
+
+	c := test.NewCanvas()
+	c.SetPadded(false)
+	c.SetContent(img)
+	c.Resize(geo.NewSize(50, 50))
+	p := software.NewPainter()
+
+	target := p.Paint(c)
+	test.AssertImageMatches(t, "draw_image_ImageScaleSmooth.png", target)
+}
+
+func TestPainter_paintImage_scaleFastest(t *testing.T) {
+	img := canvas.NewImageFromImage(makeTestImage(3, 3))
+	img.ScaleMode = canvas.ImageScaleFastest
+
+	c := test.NewCanvas()
+	c.SetPadded(false)
+	c.SetContent(img)
+	c.Resize(geo.NewSize(50, 50))
+	p := software.NewPainter()
+
+	target := p.Paint(c)
+	test.AssertImageMatches(t, "draw_image_ImageScaleFastest.png", target)
+}
+
+func TestPainter_paintImage_stretchX(t *testing.T) {
+	c := test.NewCanvas()
+	c.SetPadded(false)
+	c.SetContent(canvas.NewImageFromImage(makeTestImage(3, 3)))
+	c.Resize(geo.NewSize(100, 50))
+	p := software.NewPainter()
+
+	target := p.Paint(c)
+	test.AssertImageMatches(t, "draw_image_stretchx.png", target)
+}
+
+func TestPainter_paintImage_stretchY(t *testing.T) {
+	c := test.NewCanvas()
+	c.SetPadded(false)
+	c.SetContent(canvas.NewImageFromImage(makeTestImage(3, 3)))
+	c.Resize(geo.NewSize(50, 100))
+	p := software.NewPainter()
+
+	target := p.Paint(c)
+	test.AssertImageMatches(t, "draw_image_stretchy.png", target)
+}
+
+func TestPainter_paintImage_contain(t *testing.T) {
+	img := canvas.NewImageFromImage(makeTestImage(3, 3))
+	img.FillMode = canvas.ImageFillContain
+	img.ScaleMode = canvas.ImageScalePixels
+
+	c := test.NewCanvas()
+	c.SetPadded(false)
+	c.SetContent(img)
+	c.Resize(geo.NewSize(50, 50))
+	p := software.NewPainter()
+
+	target := p.Paint(c)
+	test.AssertImageMatches(t, "draw_image_contain.png", target)
+}
+
+func TestPainter_paintImage_containX(t *testing.T) {
+	test.ApplyTheme(t, test.Theme())
+	img := canvas.NewImageFromImage(makeTestImage(3, 4))
+	img.FillMode = canvas.ImageFillContain
+	img.ScaleMode = canvas.ImageScalePixels
+
+	c := test.NewCanvas()
+	c.SetPadded(false)
+	c.SetContent(img)
+	c.Resize(geo.NewSize(100, 50))
+	p := software.NewPainter()
+
+	target := p.Paint(c)
+	test.AssertImageMatches(t, "draw_image_containx.png", target)
+}
+
+func TestPainter_paintImage_containY(t *testing.T) {
+	test.ApplyTheme(t, test.Theme())
+	img := canvas.NewImageFromImage(makeTestImage(4, 3))
+	img.FillMode = canvas.ImageFillContain
+	img.ScaleMode = canvas.ImageScalePixels
+
+	c := test.NewCanvas()
+	c.SetPadded(false)
+	c.SetContent(img)
+	c.Resize(geo.NewSize(50, 100))
+	p := software.NewPainter()
+
+	target := p.Paint(c)
+	test.AssertImageMatches(t, "draw_image_containy.png", target)
+}
+
+func TestPainter_paintImage_cover(t *testing.T) {
+	img := canvas.NewImageFromImage(makeTestImage(50, 50))
+	img.FillMode = canvas.ImageFillCover
+	img.ScaleMode = canvas.ImageScalePixels
+
+	c := test.NewCanvas()
+	c.SetPadded(false)
+	c.SetContent(img)
+	c.Resize(geo.NewSize(250, 375))
+	p := software.NewPainter()
+
+	target := p.Paint(c)
+	test.AssertImageMatches(t, "draw_image_cover_vertical.png", target)
+
+	c.Resize(geo.NewSize(375, 250))
+
+	target = p.Paint(c)
+	test.AssertImageMatches(t, "draw_image_cover_horizontal.png", target)
+}
+
+func TestPainter_paintLine(t *testing.T) {
+	test.ApplyTheme(t, test.Theme())
+	obj := canvas.NewLine(color.Black)
+	obj.StrokeWidth = 6
+
+	c := test.NewCanvas()
+	c.SetPadded(true)
+	c.SetContent(obj)
+	c.Resize(geo.NewSize(70+2*theme.Padding(), 70+2*theme.Padding()))
+	p := software.NewPainter()
+
+	test.AssertImageMatches(t, "draw_line.png", p.Paint(c))
+}
+
+func TestPainter_paintLine_thin(t *testing.T) {
+	c := test.NewCanvas()
+	lines := [5]*canvas.Line{}
+	sws := []float32{4, 2, 1, 0.5, 0.3}
+	for i, sw := range sws {
+		lines[i] = canvas.NewLine(color.RGBA{255, 0, 0, 255})
+		lines[i].StrokeWidth = sw
+		x := float32(i * 20)
+		lines[i].Position1 = geo.NewPos(x, 10)
+		lines[i].Position2 = geo.NewPos(x+15, 10)
+	}
+	c.SetContent(container.NewWithoutLayout(lines[0], lines[1], lines[2], lines[3], lines[4]))
+	c.Resize(geo.NewSize(109, 28))
+
+	p := software.NewPainter()
+	test.AssertImageMatches(t, "draw_line_thin.png", p.Paint(c))
+}
+
+func TestPainter_paintPolygon(t *testing.T) {
+	test.ApplyTheme(t, test.Theme())
+	obj := canvas.NewPolygon(3, color.Black)
+
+	c := test.NewCanvas()
+	c.SetPadded(true)
+	c.SetContent(obj)
+	c.Resize(geo.NewSize(150+2*theme.Padding(), 150+2*theme.Padding()))
+	p := software.NewPainter()
+
+	test.AssertImageMatches(t, "draw_polygon_3.png", p.Paint(c))
+
+	obj.Sides = 4
+	test.AssertImageMatches(t, "draw_polygon_4.png", p.Paint(c))
+
+	obj.Angle = 35
+	test.AssertImageMatches(t, "draw_polygon_4_rotate_35.png", p.Paint(c))
+
+	obj.Angle = -120
+	obj.Sides = 5
+	test.AssertImageMatches(t, "draw_polygon_5_rotate_-120.png", p.Paint(c))
+
+	obj.CornerRadius = 10
+	obj.Angle = 0
+	obj.Sides = 6
+	test.AssertImageMatches(t, "draw_polygon_6_rounded.png", p.Paint(c))
+
+	obj.StrokeColor = color.RGBA{R: 0xFF, G: 0x33, B: 0x33, A: 0xFF}
+	obj.StrokeWidth = 5
+	obj.Angle = 360
+	test.AssertImageMatches(t, "draw_polygon_6_rounded_stroke.png", p.Paint(c))
+}
+
+// TestPainter_paintPathZeroSize covers #1011: a canvas.Path whose segments use
+// absolute coordinates but whose object is never Resized (Size 0x0 — the pattern
+// a widget renderer drawing in canvas space uses) must still rasterize. Before
+// the fix the software painter derived its raster rect from Size() alone, so the
+// stroke was clipped to an empty rect and drew nothing (the GL painter, which
+// draws paths in full path-local space, rendered it fine).
+func TestPainter_paintPathZeroSize(t *testing.T) {
+	test.ApplyTheme(t, test.Theme())
+
+	red := color.RGBA{R: 0xFF, A: 0xFF}
+	path := canvas.NewPath(func(p *canvas.Path) {
+		p.MoveTo(10, 10)
+		p.LineTo(60, 60)
+	})
+	path.StrokeColor = red
+	path.StrokeWidth = 3
+	// NewWithoutLayout does not resize its children, so the path keeps its
+	// default zero Size while its segments span (10,10)-(60,60).
+
+	c := test.NewCanvas()
+	c.SetContent(container.NewWithoutLayout(path))
+	c.Resize(geo.NewSize(80, 80))
+	if path.Size() != (geo.Size{}) {
+		t.Fatalf("expected path to keep zero size, got %v", path.Size())
+	}
+
+	img := software.NewPainter().Paint(c)
+
+	// A point on the (10,10)-(60,60) diagonal must carry the stroke color.
+	r, _, _, a := img.At(35, 35).RGBA()
+	if a == 0 || r>>8 < 0x80 {
+		t.Fatalf("expected stroke drawn at midpoint of zero-sized path, got %v", img.At(35, 35))
+	}
+}
+
+// TestPainter_paintPathNegativeCoords covers #1013: a canvas.Path whose segments
+// reach into negative path-local coordinates (above/left of the object origin)
+// must still rasterize. Before the fix the software raster started at path-local
+// 0, so negative coordinates were clipped; the GL/WebGPU painters render them.
+func TestPainter_paintPathNegativeCoords(t *testing.T) {
+	test.ApplyTheme(t, test.Theme())
+
+	red := color.RGBA{R: 0xFF, A: 0xFF}
+	path := canvas.NewPath(func(p *canvas.Path) {
+		p.MoveTo(-20, -20)
+		p.LineTo(20, 20)
+	})
+	path.StrokeColor = red
+	path.StrokeWidth = 3
+	path.Move(geo.NewPos(30, 30)) // path-local (-20,-20)-(20,20) → canvas (10,10)-(50,50)
+
+	c := test.NewCanvas()
+	c.SetContent(container.NewWithoutLayout(path))
+	c.Resize(geo.NewSize(80, 80))
+
+	img := software.NewPainter().Paint(c)
+
+	// The line's midpoint (path-local origin) lands at canvas (30,30).
+	r, _, _, a := img.At(30, 30).RGBA()
+	if a == 0 || r>>8 < 0x80 {
+		t.Fatalf("expected stroke drawn for negative-coordinate path, got %v", img.At(30, 30))
+	}
+	// And a point in the negative quadrant (path-local (-10,-10) → canvas (20,20)).
+	r, _, _, a = img.At(20, 20).RGBA()
+	if a == 0 || r>>8 < 0x80 {
+		t.Fatalf("expected stroke drawn at negative-coordinate segment, got %v", img.At(20, 20))
+	}
+}
+
+func TestPainter_paintRaster(t *testing.T) {
+	img := canvas.NewRasterWithPixels(func(x, y, w, h int) color.Color {
+		x = x / 5
+		y = y / 5
+		if x%2 == y%2 {
+			return color.White
+		}
+		return color.Black
+	})
+
+	c := test.NewCanvas()
+	c.SetPadded(false)
+	c.SetContent(img)
+	c.Resize(geo.NewSize(50, 50))
+	p := software.NewPainter()
+
+	target := p.Paint(c)
+	test.AssertImageMatches(t, "draw_raster.png", target)
+}
+
+func TestPainter_paintRaster_scaled(t *testing.T) {
+	img := canvas.NewRasterWithPixels(func(x, y, w, h int) color.Color {
+		x = x / 5
+		y = y / 5
+		if x%2 == y%2 {
+			return color.White
+		}
+		return color.Black
+	})
+
+	c := test.NewCanvas()
+	c.SetPadded(false)
+	c.SetContent(img)
+	c.SetScale(5.0)
+	c.Resize(geo.NewSize(5, 5))
+	p := software.NewPainter()
+
+	target := p.Paint(c)
+	test.AssertImageMatches(t, "draw_raster_scale.png", target)
+}
+
+func TestPainter_paintRectangle_clipped(t *testing.T) {
+	test.ApplyTheme(t, test.Theme())
+	red1 := canvas.NewRectangle(color.NRGBA{R: 200, A: 255})
+	red1.SetMinSize(geo.NewSize(20, 20))
+	red2 := canvas.NewRectangle(color.NRGBA{R: 150, A: 255})
+	red2.SetMinSize(geo.NewSize(20, 20))
+	red3 := canvas.NewRectangle(color.NRGBA{R: 100, A: 255})
+	red3.SetMinSize(geo.NewSize(20, 20))
+	reds := container.NewHBox(red1, red2, red3)
+	green1 := canvas.NewRectangle(color.NRGBA{G: 200, A: 255})
+	green1.SetMinSize(geo.NewSize(20, 20))
+	green2 := canvas.NewRectangle(color.NRGBA{G: 150, A: 255})
+	green2.SetMinSize(geo.NewSize(20, 20))
+	green3 := canvas.NewRectangle(color.NRGBA{G: 100, A: 255})
+	green3.SetMinSize(geo.NewSize(20, 20))
+	greens := container.NewHBox(green1, green2, green3)
+	blue1 := canvas.NewRectangle(color.NRGBA{B: 200, A: 255})
+	blue1.SetMinSize(geo.NewSize(20, 20))
+	blue2 := canvas.NewRectangle(color.NRGBA{B: 150, A: 255})
+	blue2.SetMinSize(geo.NewSize(20, 20))
+	blue3 := canvas.NewRectangle(color.NRGBA{B: 100, A: 255})
+	blue3.SetMinSize(geo.NewSize(20, 20))
+	blues := container.NewHBox(blue1, blue2, blue3)
+	box := container.NewVBox(reds, greens, blues)
+	scroll := container.NewScroll(box)
+	scroll.Move(geo.NewPos(10, 10))
+	scroll.Resize(geo.NewSize(50, 50))
+	scroll.Scrolled(&event.ScrollEvent{Scrolled: geo.NewDelta(-10, -10)})
+	cont := container.NewWithoutLayout(scroll)
+	c := test.NewCanvas()
+	c.SetPadded(false)
+	c.SetContent(cont)
+	c.Resize(geo.NewSize(70, 70))
+	p := software.NewPainter()
+
+	test.AssertImageMatches(t, "draw_rect_clipped.png", p.Paint(c))
+}
+
+func TestPainter_paintRectangle_stroke(t *testing.T) {
+	test.ApplyTheme(t, test.Theme())
+	obj := canvas.NewRectangle(color.Black)
+	obj.StrokeWidth = 5
+	obj.StrokeColor = &color.RGBA{R: 0xFF, G: 0x33, B: 0x33, A: 0xFF}
+
+	c := test.NewCanvas()
+	c.SetPadded(true)
+	c.SetContent(obj)
+	c.Resize(geo.NewSize(70+2*theme.Padding(), 70+2*theme.Padding()))
+	p := software.NewPainter()
+
+	test.AssertImageMatches(t, "draw_rectangle_stroke.png", p.Paint(c))
+
+	obj.Aspect = 2
+	test.AssertImageMatches(t, "draw_rectangle_stroke_wide.png", p.Paint(c))
+	obj.Aspect = 0.5
+	test.AssertImageMatches(t, "draw_rectangle_stroke_narrow.png", p.Paint(c))
+	obj.CornerRadius = canvas.RadiusMaximum
+	test.AssertImageMatches(t, "draw_rectangle_stroke_narrow_radius_maximum.png", p.Paint(c))
+}
+
+func TestPainter_paintRectangle_perCornerRadius(t *testing.T) {
+	test.ApplyTheme(t, test.Theme())
+	obj := canvas.NewRectangle(color.Black)
+	obj.StrokeWidth = 5
+	obj.StrokeColor = &color.RGBA{R: 0xFF, G: 0x33, B: 0x33, A: 0xFF}
+
+	obj.CornerRadius = 35
+	obj.TopRightCornerRadius = 2
+	obj.TopLeftCornerRadius = 8
+	obj.BottomLeftCornerRadius = 14
+	obj.BottomRightCornerRadius = 20
+
+	c := test.NewCanvas()
+	c.SetPadded(true)
+	c.SetContent(obj)
+	c.Resize(geo.NewSize(70+2*theme.Padding(), 70+2*theme.Padding()))
+	p := software.NewPainter()
+
+	test.AssertImageMatches(t, "draw_rectangle_per_corner_radius.png", p.Paint(c))
+
+	obj.Aspect = 2
+	test.AssertImageMatches(t, "draw_rectangle_per_corner_radius_wide.png", p.Paint(c))
+	obj.Aspect = 0.5
+	test.AssertImageMatches(t, "draw_rectangle_per_corner_radius_narrow.png", p.Paint(c))
+
+	obj.TopLeftCornerRadius = 0
+	obj.Aspect = 0
+	test.AssertImageMatches(t, "draw_rectangle_per_corner_radius_base.png", p.Paint(c))
+
+	// additional test for zero stroke width and base corner radius to check all per-corner values are effective
+	obj.CornerRadius = 0
+	obj.StrokeWidth = 0
+	test.AssertImageMatches(t, "draw_rectangle_per_corner_radius_zero_base.png", p.Paint(c))
+}
+
+func TestPainter_paintText_clipped(t *testing.T) {
+	test.ApplyTheme(t, test.Theme())
+	scroll := container.NewScroll(widget.NewLabel("some text\nis here\nand here"))
+	scroll.Move(geo.NewPos(10, 10))
+	scroll.Resize(geo.NewSize(50, 50))
+	scroll.Scrolled(&event.ScrollEvent{Scrolled: geo.NewDelta(-10, -10)})
+	cont := container.NewWithoutLayout(scroll)
+	c := test.NewCanvas()
+	c.SetPadded(false)
+	c.SetContent(cont)
+	c.Resize(geo.NewSize(70, 70))
+	p := software.NewPainter()
+
+	test.AssertImageMatches(t, "draw_text_clipped.png", p.Paint(c))
+}
+
+func TestPainter_paintText_boldItalicClip(t *testing.T) {
+	test.ApplyTheme(t, test.Theme())
+	text := canvas.NewText("Dd", theme.Color(theme.ColorNameForeground))
+	text.TextStyle.Bold = true
+	text.TextStyle.Italic = true
+	text.TextSize = 42
+	c := test.NewCanvas()
+	c.SetPadded(false)
+	c.SetContent(text)
+	c.Resize(geo.NewSize(70, text.MinSize().Height))
+	p := software.NewPainter()
+
+	test.AssertImageMatches(t, "draw_text_bolditalic.png", p.Paint(c))
+}
+
+func TestPainter_paintText_strikethrough(t *testing.T) {
+	test.ApplyTheme(t, test.Theme())
+	text := canvas.NewText("Struck", theme.Color(theme.ColorNameForeground))
+	text.TextStyle.Strikethrough = true
+	text.TextSize = 42
+	c := test.NewCanvas()
+	c.SetPadded(false)
+	c.SetContent(text)
+	c.Resize(geo.NewSize(160, text.MinSize().Height))
+	p := software.NewPainter()
+
+	test.AssertImageMatches(t, "draw_text_strikethrough.png", p.Paint(c))
+}
+
+func TestPainter_paintText_underlineStrikethrough(t *testing.T) {
+	test.ApplyTheme(t, test.Theme())
+	text := canvas.NewText("Both", theme.Color(theme.ColorNameForeground))
+	text.TextStyle.Underline = true
+	text.TextStyle.Strikethrough = true
+	text.TextSize = 42
+	c := test.NewCanvas()
+	c.SetPadded(false)
+	c.SetContent(text)
+	c.Resize(geo.NewSize(120, text.MinSize().Height))
+	p := software.NewPainter()
+
+	test.AssertImageMatches(t, "draw_text_underline_strikethrough.png", p.Paint(c))
+}
+
+func TestPainter_paintText_scale2(t *testing.T) {
+	test.ApplyTheme(t, test.Theme())
+	text := canvas.NewText("scale2", theme.Color(theme.ColorNameForeground))
+	text.TextSize = 18
+	c := test.NewCanvas()
+	c.SetPadded(false)
+	c.SetContent(text)
+	c.Resize(geo.NewSize(70, text.MinSize().Height))
+
+	c.SetScale(2)
+	p := software.NewPainter()
+
+	test.AssertImageMatches(t, "draw_text_scale2.png", p.Paint(c))
+}

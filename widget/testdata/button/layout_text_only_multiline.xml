@@ -1,0 +1,11 @@
+<canvas padded size="150x200">
+	<content>
+		<widget pos="4,4" size="142x192" type="*widget.Button">
+			<rectangle fillColor="rgba(64,53,80,255)" radius="20" size="142x192"/>
+			<widget pos="53,79" size="34x32" type="*widget.RichText">
+				<text alignment="center" bold color="rgba(224,208,240,255)" pos="3,0" size="27x16">Test</text>
+				<text alignment="center" bold color="rgba(224,208,240,255)" pos="0,16" size="34x16">Line2</text>
+			</widget>
+		</widget>
+	</content>
+</canvas>

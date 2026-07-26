@@ -1,0 +1,203 @@
+package commands
+
+import (
+	"bytes"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+
+	"github.com/belluikit/bellui/cmd/bellui/internal/metadata"
+	"github.com/belluikit/bellui/cmd/bellui/internal/templates"
+)
+
+type unixData struct {
+	Name           string
+	AppID          string
+	Exec           string
+	Icon           string
+	Local          string
+	GenericName    string
+	Categories     string
+	Comment        string
+	Keywords       string
+	ExecParams     string
+	MimeTypes      string
+	StartupWMClass string
+
+	SourceRepo, SourceDir string
+}
+
+func (p *Packager) packageUNIX() error {
+	var prefixDir string
+	local := "local/"
+	dirName := filepath.Base(p.exe)
+
+	outDir := p.dir
+	if !p.install {
+		outDir = util.EnsureSubDir(util.EnsureSubDir(p.dir, "tmp-pkg"), dirName)
+	}
+
+	if _, err := os.Stat(filepath.Join("/", "usr", "local")); os.IsNotExist(err) {
+		prefixDir = util.EnsureSubDir(outDir, "usr")
+		local = ""
+	} else {
+		prefixDir = util.EnsureSubDir(util.EnsureSubDir(outDir, "usr"), "local")
+	}
+
+	shareDir := util.EnsureSubDir(prefixDir, "share")
+
+	binDir := util.EnsureSubDir(prefixDir, "bin")
+	binName := filepath.Join(binDir, filepath.Base(p.exe))
+	err := util.CopyExeFile(p.exe, binName)
+	if err != nil {
+		return fmt.Errorf("failed to copy application binary file: %w", err)
+	}
+
+	appIDOrName := p.AppID
+	if appIDOrName == "" {
+		appIDOrName = p.Name
+	}
+
+	iconDir := util.EnsureSubDir(shareDir, "pixmaps")
+	iconName := appIDOrName + filepath.Ext(p.icon)
+	iconPath := filepath.Join(iconDir, iconName)
+	err = util.CopyFile(p.icon, iconPath)
+	if err != nil {
+		return fmt.Errorf("failed to copy icon: %w", err)
+	}
+
+	// Build the MimeType= list from the legacy CanOpen block, the file
+	// associations and one x-scheme-handler entry per registered URL scheme.
+	var mimeList []string
+	if p.CanOpen != nil && p.CanOpen.MimeTypes != "" {
+		mimeList = append(mimeList, splitDesktopFileList(p.CanOpen.MimeTypes)...)
+	}
+	mimeList = append(mimeList, p.fileMimeTypes()...)
+	for _, scheme := range p.URLSchemes {
+		mimeList = append(mimeList, "x-scheme-handler/"+scheme)
+	}
+	mimes := formatDesktopFileList(dedupeStrings(mimeList))
+
+	openWith := ""
+	if len(mimeList) > 0 {
+		openWith = " %F"
+	}
+	if len(p.URLSchemes) > 0 {
+		// %U passes URLs (including file:// for opened documents) so a single
+		// exec line serves both file associations and scheme handlers.
+		openWith = " %U"
+	}
+
+	appsDir := util.EnsureSubDir(shareDir, "applications")
+	desktop := filepath.Join(appsDir, appIDOrName+".desktop")
+	deskFile, err := os.Create(desktop)
+	if err != nil {
+		return fmt.Errorf("failed to create desktop file: %w", err)
+	}
+
+	defer deskFile.Close()
+
+	linuxBSD := metadata.LinuxAndBSD{}
+	if p.linuxAndBSDMetadata != nil {
+		linuxBSD = *p.linuxAndBSDMetadata
+	}
+	tplData := unixData{
+		Name:           p.Name,
+		AppID:          p.AppID,
+		Exec:           filepath.Base(p.exe) + openWith,
+		Icon:           appIDOrName,
+		Local:          local,
+		GenericName:    linuxBSD.GenericName,
+		Keywords:       formatDesktopFileList(linuxBSD.Keywords),
+		Comment:        linuxBSD.Comment,
+		Categories:     formatDesktopFileList(linuxBSD.Categories),
+		ExecParams:     linuxBSD.ExecParams,
+		MimeTypes:      mimes,
+		StartupWMClass: p.Name,
+	}
+
+	if p.sourceMetadata != nil {
+		tplData.SourceRepo = p.sourceMetadata.Repo
+		tplData.SourceDir = p.sourceMetadata.Dir
+	}
+
+	err = templates.DesktopFileUNIX.Execute(deskFile, tplData)
+	if err != nil {
+		return fmt.Errorf("failed to write desktop entry string: %w", err)
+	}
+
+	if p.install {
+		return nil
+	}
+
+	parent := filepath.Dir(outDir)
+	defer os.RemoveAll(parent)
+
+	makefile, _ := os.Create(filepath.Join(outDir, "Makefile"))
+	tplData.Icon += ".png"
+	err = templates.MakefileUNIX.Execute(makefile, tplData)
+	if err != nil {
+		return fmt.Errorf("failed to write Makefile string: %w", err)
+	}
+
+	tarCmdArgs := []string{"-Jcf", filepath.Join(p.dir, p.Name+".tar.xz")}
+	if p.os == "openbsd" {
+		tarCmdArgs = []string{"-zcf", filepath.Join(p.dir, p.Name+".tar.gz")}
+	}
+
+	// Compatibility mode for old bellui-cross versions using images with new CLI
+	// versions resulting in a tar archive prefix of "./appname/" instead of "./".
+	// This is to allow producing a final set of compatible images before
+	// switching to a new namespace and merging bellui-cross into bellui-tools as
+	// one of the supported commands.
+	if belluiCrossCompat {
+		tarCmdArgs = append(tarCmdArgs, "-C", outDir, "Makefile", "usr")
+	} else {
+		tarCmdArgs = append(tarCmdArgs, "-C", parent, dirName)
+	}
+
+	var buf bytes.Buffer
+	tarCmd := exec.Command("tar", tarCmdArgs...)
+	tarCmd.Stderr = &buf
+	if err = tarCmd.Run(); err != nil {
+		return fmt.Errorf("failed to create archive with tar: %s - %w", buf.String(), err)
+	}
+
+	return nil
+}
+
+func formatDesktopFileList(items []string) string {
+	if len(items) == 0 {
+		return ""
+	}
+
+	return strings.Join(items, ";") + ";"
+}
+
+// splitDesktopFileList splits a semicolon-separated desktop-file list into its
+// non-empty entries, tolerating a trailing separator.
+func splitDesktopFileList(list string) []string {
+	var items []string
+	for _, item := range strings.Split(list, ";") {
+		if item = strings.TrimSpace(item); item != "" {
+			items = append(items, item)
+		}
+	}
+	return items
+}
+
+// dedupeStrings returns items with duplicates removed, preserving first-seen order.
+func dedupeStrings(items []string) []string {
+	seen := make(map[string]bool, len(items))
+	out := items[:0:0]
+	for _, item := range items {
+		if seen[item] {
+			continue
+		}
+		seen[item] = true
+		out = append(out, item)
+	}
+	return out
+}

@@ -1,0 +1,6 @@
+details {
+  name = "notifyprobe"
+  id = "io.bellui.notifyprobe"
+  version = "1.0.0"
+  build = 4
+}

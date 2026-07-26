@@ -1,0 +1,16 @@
+<canvas size="192x52">
+	<content>
+		<widget size="192x52" type="*widget.RichEntry">
+			<rectangle fillColor="inputBackground" pos="2,2" radius="4" size="188x48"/>
+			<widget size="192x52" type="*widget.selectable">
+				<rectangle fillColor="selection" pos="7,8" size="33x16"/>
+			</widget>
+			<widget size="192x52" type="*widget.RichText">
+				<text pos="8,8" size="35x16">Hello </text>
+				<text bold pos="43,8" size="132x16">World</text>
+			</widget>
+			<rectangle fillColor="primary" pos="39,8" size="2x16"/>
+			<rectangle pos="1,1" radius="4" size="189x49" strokeColor="primary" strokeWidth="2"/>
+		</widget>
+	</content>
+</canvas>

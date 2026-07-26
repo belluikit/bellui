@@ -1,0 +1,79 @@
+<canvas size="500x300">
+	<content>
+		<rectangle size="500x300"/>
+	</content>
+	<overlay>
+		<widget pos="2,3" size="496x295" type="*widget.OverlayContainer">
+			<widget pos="410,10" size="64x110" type="*widget.Menu">
+				<widget size="64x110" type="*widget.Shadow">
+					<boxShadow blurRadius="6" color="shadow" cornerRadius="4" offsetY="2" size="64x110"/>
+				</widget>
+				<widget size="64x110" type="*widget.Scroll">
+					<widget size="64x110" type="*widget.menuBox">
+						<rectangle fillColor="rgba(42,42,42,255)" radius="4" size="64x110"/>
+						<container size="64x110">
+							<widget size="64x32" type="*widget.menuItem">
+								<text pos="8,8" size="48x16">A</text>
+							</widget>
+							<widget pos="0,36" size="64x1" type="*widget.Separator">
+								<rectangle fillColor="background" size="64x1"/>
+							</widget>
+							<widget pos="0,41" size="64x32" type="*widget.menuItem">
+								<text pos="8,8" size="48x16">B (long)</text>
+							</widget>
+							<widget pos="0,77" size="64x32" type="*widget.menuItem">
+								<text pos="8,8" size="28x16">C</text>
+								<image pos="44,6" rsc="menuExpandIcon" size="iconInlineSize" themed="foreground"/>
+							</widget>
+						</container>
+					</widget>
+				</widget>
+				<widget pos="-195,77" size="195x105" type="*widget.Menu">
+					<widget size="195x105" type="*widget.Shadow">
+						<boxShadow blurRadius="6" color="shadow" cornerRadius="4" offsetY="2" size="195x105"/>
+					</widget>
+					<widget size="195x105" type="*widget.Scroll">
+						<widget size="195x105" type="*widget.menuBox">
+							<rectangle fillColor="rgba(42,42,42,255)" radius="4" size="195x105"/>
+							<container size="195x105">
+								<widget size="195x32" type="*widget.menuItem">
+									<text pos="36,8" size="151x16">subitem A</text>
+									<image pos="8,6" rsc="confirmIcon" size="iconInlineSize" themed="foreground"/>
+								</widget>
+								<widget pos="0,36" size="195x32" type="*widget.menuItem">
+									<text pos="64,8" size="123x16">subitem B</text>
+									<image pos="36,6" rsc="infoIcon" size="iconInlineSize" themed="foreground"/>
+									<image pos="8,6" rsc="confirmIcon" size="iconInlineSize" themed="foreground"/>
+								</widget>
+								<widget pos="0,72" size="195x32" type="*widget.menuItem">
+									<text pos="64,8" size="103x16">subitem C (long)</text>
+									<image pos="175,6" rsc="menuExpandIcon" size="iconInlineSize" themed="foreground"/>
+									<image pos="36,6" rsc="menuIcon" size="iconInlineSize" themed="foreground"/>
+								</widget>
+							</container>
+						</widget>
+					</widget>
+					<widget pos="-170,72" size="170x68" type="*widget.Menu">
+						<widget size="170x68" type="*widget.Shadow">
+							<boxShadow blurRadius="6" color="shadow" cornerRadius="4" offsetY="2" size="170x68"/>
+						</widget>
+						<widget size="170x68" type="*widget.Scroll">
+							<widget size="170x68" type="*widget.menuBox">
+								<rectangle fillColor="rgba(42,42,42,255)" radius="4" size="170x68"/>
+								<container size="170x68">
+									<widget size="170x32" type="*widget.menuItem">
+										<text pos="36,8" size="126x16">subsubitem A (long)</text>
+										<image pos="8,6" rsc="fileIcon" size="iconInlineSize" themed="foreground"/>
+									</widget>
+									<widget pos="0,36" size="170x32" type="*widget.menuItem">
+										<text pos="8,8" size="154x16">subsubitem B</text>
+									</widget>
+								</container>
+							</widget>
+						</widget>
+					</widget>
+				</widget>
+			</widget>
+		</widget>
+	</overlay>
+</canvas>

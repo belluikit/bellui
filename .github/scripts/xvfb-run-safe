@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Race-free xvfb-run replacement (#868).
+#
+# `xvfb-run -a` allocates the display number by scanning /tmp/.X*-lock files
+# and then starting Xvfb — a check-then-act race. On a box running several
+# self-hosted runners, two concurrent jobs can pick the same display: one Xvfb
+# wins the bind and the loser's tests silently connect to the WINNER's server,
+# where they see a foreign window's geometry (the "expected 200x150, actual
+# 167x33" surface-capture failures, and the nightly TestMenuBar flakes).
+#
+# Xvfb's -displayfd has the server itself pick a free display atomically and
+# report it back — the mechanism behind modern xvfb-run's `-d`, which the
+# runner boxes' older xvfb-run lacks. Screen geometry matches xvfb-run's
+# default so test behavior is unchanged.
+set -euo pipefail
+
+tmp=$(mktemp -d)
+xpid=""
+cleanup() {
+	[ -n "$xpid" ] && kill "$xpid" 2>/dev/null
+	rm -rf "$tmp"
+}
+trap cleanup EXIT
+
+mkfifo "$tmp/displayfd"
+# Server chatter (xkbcomp warnings etc.) goes to a file, like xvfb-run's
+# --error-file, so it never interleaves with the wrapped command's output.
+Xvfb -displayfd 3 -screen 0 1280x1024x24 -nolisten tcp \
+	3>"$tmp/displayfd" >"$tmp/xvfb.log" 2>&1 &
+xpid=$!
+
+if ! read -t 15 -r display <"$tmp/displayfd"; then
+	echo "xvfb-run-safe: Xvfb did not report a display within 15s" >&2
+	exit 1
+fi
+
+DISPLAY=":$display" "$@"

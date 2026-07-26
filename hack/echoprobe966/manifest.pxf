@@ -1,0 +1,6 @@
+details {
+  name = "echoprobe966"
+  id = "io.bellui.echoprobe966"
+  version = "1.0.0"
+  build = 2
+}

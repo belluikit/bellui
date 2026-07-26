@@ -1,0 +1,95 @@
+<canvas size="81x36">
+	<content>
+		<widget size="81x36" type="*widget.TextGrid">
+			<widget size="81x36" type="*widget.textGridContent">
+				<widget size="81x18" type="*widget.textGridRow">
+					<rectangle size="9x18"/>
+					<text monospace size="0x0">S</text>
+					<line pos="0,18" size="9x0"/>
+					<rectangle pos="9,0" size="9x18"/>
+					<text monospace pos="9,0" size="0x0">o</text>
+					<line pos="9,18" size="9x0"/>
+					<rectangle pos="18,0" size="9x18"/>
+					<text monospace pos="18,0" size="0x0">m</text>
+					<line pos="18,18" size="9x0"/>
+					<rectangle pos="27,0" size="9x18"/>
+					<text monospace pos="27,0" size="0x0">e</text>
+					<line pos="27,18" size="9x0"/>
+					<rectangle pos="36,0" size="9x18"/>
+					<text monospace pos="36,0" size="0x0">t</text>
+					<line pos="36,18" size="9x0"/>
+					<rectangle pos="45,0" size="9x18"/>
+					<text monospace pos="45,0" size="0x0">h</text>
+					<line pos="45,18" size="9x0"/>
+					<rectangle pos="54,0" size="9x18"/>
+					<text monospace pos="54,0" size="0x0">i</text>
+					<line pos="54,18" size="9x0"/>
+					<rectangle pos="63,0" size="9x18"/>
+					<text monospace pos="63,0" size="0x0">n</text>
+					<line pos="63,18" size="9x0"/>
+					<rectangle pos="72,0" size="9x18"/>
+					<text monospace pos="72,0" size="0x0">g</text>
+					<line pos="72,18" size="9x0"/>
+				</widget>
+				<widget pos="0,18" size="81x18" type="*widget.textGridRow">
+					<rectangle size="9x18"/>
+					<text monospace size="0x0">E</text>
+					<line pos="0,18" size="9x0"/>
+					<rectangle pos="9,0" size="9x18"/>
+					<text monospace pos="9,0" size="0x0">l</text>
+					<line pos="9,18" size="9x0"/>
+					<rectangle pos="18,0" size="9x18"/>
+					<text monospace pos="18,0" size="0x0">s</text>
+					<line pos="18,18" size="9x0"/>
+					<rectangle pos="27,0" size="9x18"/>
+					<text monospace pos="27,0" size="0x0">e</text>
+					<line pos="27,18" size="9x0"/>
+					<rectangle pos="36,0" size="9x18"/>
+					<text monospace pos="36,0" size="0x0"> </text>
+					<line pos="36,18" size="9x0"/>
+					<rectangle pos="45,0" size="9x18"/>
+					<text monospace pos="45,0" size="0x0"> </text>
+					<line pos="45,18" size="9x0"/>
+					<rectangle pos="54,0" size="9x18"/>
+					<text monospace pos="54,0" size="0x0"> </text>
+					<line pos="54,18" size="9x0"/>
+					<rectangle pos="63,0" size="9x18"/>
+					<text monospace pos="63,0" size="0x0"> </text>
+					<line pos="63,18" size="9x0"/>
+					<rectangle pos="72,0" size="9x18"/>
+					<text monospace pos="72,0" size="0x0"> </text>
+					<line pos="72,18" size="9x0"/>
+				</widget>
+				<widget pos="0,36" size="81x18" type="*widget.textGridRow">
+					<rectangle size="9x18"/>
+					<text monospace size="0x0"> </text>
+					<line pos="0,18" size="9x0"/>
+					<rectangle pos="9,0" size="9x18"/>
+					<text monospace pos="9,0" size="0x0"> </text>
+					<line pos="9,18" size="9x0"/>
+					<rectangle pos="18,0" size="9x18"/>
+					<text monospace pos="18,0" size="0x0"> </text>
+					<line pos="18,18" size="9x0"/>
+					<rectangle pos="27,0" size="9x18"/>
+					<text monospace pos="27,0" size="0x0"> </text>
+					<line pos="27,18" size="9x0"/>
+					<rectangle pos="36,0" size="9x18"/>
+					<text monospace pos="36,0" size="0x0"> </text>
+					<line pos="36,18" size="9x0"/>
+					<rectangle pos="45,0" size="9x18"/>
+					<text monospace pos="45,0" size="0x0"> </text>
+					<line pos="45,18" size="9x0"/>
+					<rectangle pos="54,0" size="9x18"/>
+					<text monospace pos="54,0" size="0x0"> </text>
+					<line pos="54,18" size="9x0"/>
+					<rectangle pos="63,0" size="9x18"/>
+					<text monospace pos="63,0" size="0x0"> </text>
+					<line pos="63,18" size="9x0"/>
+					<rectangle pos="72,0" size="9x18"/>
+					<text monospace pos="72,0" size="0x0"> </text>
+					<line pos="72,18" size="9x0"/>
+				</widget>
+			</widget>
+		</widget>
+	</content>
+</canvas>

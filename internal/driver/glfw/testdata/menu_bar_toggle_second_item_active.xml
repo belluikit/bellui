@@ -1,0 +1,41 @@
+<canvas size="300x300">
+	<content>
+		<container size="300x300">
+			<widget size="300x24" type="*glfw.MenuBar">
+				<widget size="300x24" type="*widget.Shadow">
+					<boxShadow blurRadius="6" color="shadow" cornerRadius="4" offsetY="2" size="300x24"/>
+				</widget>
+				<widget size="300x300" type="*glfw.menuBarUnderlay">
+				</widget>
+				<rectangle fillColor="background" size="300x24"/>
+				<container pos="8,0" size="284x24">
+					<widget size="37x24" type="*glfw.menuBarItem">
+						<text pos="8,4" size="21x16">File</text>
+					</widget>
+					<widget pos="41,0" size="39x24" type="*glfw.menuBarItem">
+						<rectangle fillColor="focus" radius="4" size="39x24"/>
+						<text pos="8,4" size="23x16">Edit</text>
+					</widget>
+				</container>
+				<widget pos="49,24" size="51x68" type="*widget.Menu">
+					<widget size="51x68" type="*widget.Shadow">
+						<boxShadow blurRadius="6" color="shadow" cornerRadius="4" offsetY="2" size="51x68"/>
+					</widget>
+					<widget size="51x68" type="*widget.Scroll">
+						<widget size="51x68" type="*widget.menuBox">
+							<rectangle fillColor="rgba(42,42,42,255)" radius="4" size="51x68"/>
+							<container size="51x68">
+								<widget size="51x32" type="*widget.menuItem">
+									<text pos="8,8" size="35x16">Copy</text>
+								</widget>
+								<widget pos="0,36" size="51x32" type="*widget.menuItem">
+									<text pos="8,8" size="35x16">Paste</text>
+								</widget>
+							</container>
+						</widget>
+					</widget>
+				</widget>
+			</widget>
+		</container>
+	</content>
+</canvas>

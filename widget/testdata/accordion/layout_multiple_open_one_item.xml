@@ -1,0 +1,15 @@
+<canvas padded size="63x48">
+	<content>
+		<container pos="4,4" size="55x40">
+			<widget size="55x40" type="*widget.Accordion">
+				<widget size="55x40" type="*widget.Button">
+					<rectangle fillColor="rgba(64,53,80,255)" radius="20" size="55x40"/>
+					<widget pos="32,11" size="9x20" type="*widget.RichText">
+						<text alignment="center" bold color="rgba(224,208,240,255)" size="9x16">A</text>
+					</widget>
+					<image fillMode="contain" pos="8,10" rsc="menuDropDownIcon" size="iconInlineSize" themed="foreground"/>
+				</widget>
+			</widget>
+		</container>
+	</content>
+</canvas>

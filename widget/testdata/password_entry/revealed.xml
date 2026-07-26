@@ -1,0 +1,22 @@
+<canvas padded size="150x100">
+	<content>
+		<widget pos="10,10" size="130x37" type="*widget.Entry">
+			<rectangle fillColor="inputBackground" pos="2,2" radius="4" size="126x33"/>
+			<rectangle pos="1,1" radius="4" size="127x34" strokeColor="primary" strokeWidth="2"/>
+			<widget pos="0,2" size="94x33" type="*widget.Scroll">
+				<widget size="94x33" type="*widget.entryContent">
+					<widget size="0x0" type="*widget.selectable">
+						<rectangle fillColor="selection" pos="7,6" size="45x21"/>
+					</widget>
+					<widget size="94x33" type="*widget.RichText">
+						<text pos="8,6" size="44x21">Secret</text>
+					</widget>
+					<rectangle fillColor="primary" pos="51,6" size="2x21"/>
+				</widget>
+			</widget>
+			<widget pos="92,2" size="36x33" type="*widget.passwordRevealer">
+				<image pos="8,6" rsc="visibilityIcon" size="iconInlineSize" themed="foreground"/>
+			</widget>
+		</widget>
+	</content>
+</canvas>

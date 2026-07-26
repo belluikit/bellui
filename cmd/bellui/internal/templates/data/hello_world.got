@@ -1,0 +1,25 @@
+package main
+
+import (
+	"embed"
+
+	"github.com/belluikit/bellui"
+	"github.com/belluikit/bellui/app"
+	"github.com/belluikit/bellui/lang"
+	"github.com/belluikit/bellui/widget"
+)
+
+//go:embed translations/*.json
+var translationsFS embed.FS
+
+func main() {
+	a := app.NewWithID({{ printf "%q" .Details.ID }})
+	w := a.NewWindow({{ printf "%q" .Details.Name }})
+
+	if err := lang.AddTranslationsFS(translationsFS, "translations"); err != nil {
+		bellui.LogError("failed to load translations", err)
+	}
+
+	w.SetContent(widget.NewLabel(lang.L("Hello World!")))
+	w.ShowAndRun()
+}

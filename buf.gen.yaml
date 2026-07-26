@@ -1,0 +1,12 @@
+# Don't run `buf generate` directly — use `go generate ./...` or
+# `sh hack/genproto.sh`, which also runs gofumpt on the output. buf's
+# protoc-gen-go groups imports differently from gofumpt (the repo's formatter,
+# enforced in CI), so the generated .pb.go must be re-formatted afterwards.
+version: v2
+plugins:
+  - local: protoc-gen-go
+    # The buf module root is internal/ (see buf.yaml), so protoc-gen-go's
+    # source_relative paths are relative to it; out: internal reconstructs the
+    # in-tree location (e.g. internal/settings/settingspb/settings.pb.go).
+    out: internal
+    opt: paths=source_relative

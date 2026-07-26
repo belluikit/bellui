@@ -1,0 +1,128 @@
+<canvas padded size="180x180">
+	<content>
+		<widget pos="4,4" size="172x172" type="*widget.Table">
+			<widget size="172x0" type="*widget.clip">
+				<container size="0x0">
+				</container>
+			</widget>
+			<widget size="0x172" type="*widget.clip">
+				<container size="0x0">
+				</container>
+			</widget>
+			<widget size="0x0" type="*widget.clip">
+				<container size="0x0">
+				</container>
+			</widget>
+			<widget size="172x172" type="*widget.clip">
+				<container size="0x0">
+					<rectangle fillColor="rgba(64,53,80,255)" pos="0,36" radius="4" size="88x32"/>
+					<widget pos="90,0" size="1x172" type="*widget.Separator">
+						<rectangle fillColor="background" size="1x172"/>
+					</widget>
+					<widget pos="0,33" size="172x1" type="*widget.Separator">
+						<rectangle fillColor="background" size="172x1"/>
+					</widget>
+					<widget pos="0,70" size="172x1" type="*widget.Separator">
+						<rectangle fillColor="background" size="172x1"/>
+					</widget>
+					<widget pos="0,106" size="172x1" type="*widget.Separator">
+						<rectangle fillColor="background" size="172x1"/>
+					</widget>
+					<widget pos="0,143" size="172x1" type="*widget.Separator">
+						<rectangle fillColor="background" size="172x1"/>
+					</widget>
+				</container>
+			</widget>
+			<widget size="172x172" type="*widget.Scroll">
+				<widget size="459x178" type="*widget.tableCells">
+					<widget size="88x32" type="*widget.tableCellHost">
+						<widget size="88x32" type="*widget.Label">
+							<widget size="88x32" type="*widget.RichText">
+								<text pos="8,8" size="48x16">Cell 0, 0</text>
+							</widget>
+						</widget>
+					</widget>
+					<widget pos="92,0" size="88x32" type="*widget.tableCellHost">
+						<widget size="88x32" type="*widget.Label">
+							<widget size="88x32" type="*widget.RichText">
+								<text pos="8,8" size="48x16">Cell 0, 1</text>
+							</widget>
+						</widget>
+					</widget>
+					<widget pos="0,36" size="88x32" type="*widget.tableCellHost">
+						<widget size="88x32" type="*widget.Label">
+							<widget size="88x32" type="*widget.RichText">
+								<text pos="8,8" size="48x16">Cell 1, 0</text>
+							</widget>
+						</widget>
+					</widget>
+					<widget pos="92,36" size="88x32" type="*widget.tableCellHost">
+						<widget size="88x32" type="*widget.Label">
+							<widget size="88x32" type="*widget.RichText">
+								<text pos="8,8" size="48x16">Cell 1, 1</text>
+							</widget>
+						</widget>
+					</widget>
+					<widget pos="0,72" size="88x32" type="*widget.tableCellHost">
+						<widget size="88x32" type="*widget.Label">
+							<widget size="88x32" type="*widget.RichText">
+								<text pos="8,8" size="48x16">Cell 2, 0</text>
+							</widget>
+						</widget>
+					</widget>
+					<widget pos="92,72" size="88x32" type="*widget.tableCellHost">
+						<widget size="88x32" type="*widget.Label">
+							<widget size="88x32" type="*widget.RichText">
+								<text pos="8,8" size="48x16">Cell 2, 1</text>
+							</widget>
+						</widget>
+					</widget>
+					<widget pos="0,109" size="88x32" type="*widget.tableCellHost">
+						<widget size="88x32" type="*widget.Label">
+							<widget size="88x32" type="*widget.RichText">
+								<text pos="8,8" size="48x16">Cell 3, 0</text>
+							</widget>
+						</widget>
+					</widget>
+					<widget pos="92,109" size="88x32" type="*widget.tableCellHost">
+						<widget size="88x32" type="*widget.Label">
+							<widget size="88x32" type="*widget.RichText">
+								<text pos="8,8" size="48x16">Cell 3, 1</text>
+							</widget>
+						</widget>
+					</widget>
+					<widget pos="0,145" size="88x32" type="*widget.tableCellHost">
+						<widget size="88x32" type="*widget.Label">
+							<widget size="88x32" type="*widget.RichText">
+								<text pos="8,8" size="48x16">Cell 4, 0</text>
+							</widget>
+						</widget>
+					</widget>
+					<widget pos="92,145" size="88x32" type="*widget.tableCellHost">
+						<widget size="88x32" type="*widget.Label">
+							<widget size="88x32" type="*widget.RichText">
+								<text pos="8,8" size="48x16">Cell 4, 1</text>
+							</widget>
+						</widget>
+					</widget>
+				</widget>
+				<widget pos="0,172" size="172x0" type="*widget.Shadow">
+					<linearGradient endColor="shadow" pos="0,-8" size="172x8"/>
+				</widget>
+				<widget pos="172,0" size="0x172" type="*widget.Shadow">
+					<linearGradient angle="270" endColor="shadow" pos="-8,0" size="8x172"/>
+				</widget>
+				<widget pos="156,0" size="16x172" type="*widget.scrollBarArea">
+					<widget size="16x166" type="*widget.scrollBar">
+						<rectangle fillColor="scrollbar" pos="13,0" radius="3" size="3x166"/>
+					</widget>
+				</widget>
+				<widget pos="0,156" size="172x16" type="*widget.scrollBarArea">
+					<widget size="64x16" type="*widget.scrollBar">
+						<rectangle fillColor="scrollbar" pos="0,13" radius="3" size="64x3"/>
+					</widget>
+				</widget>
+			</widget>
+		</widget>
+	</content>
+</canvas>

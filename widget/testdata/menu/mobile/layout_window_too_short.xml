@@ -1,0 +1,42 @@
+<canvas size="100x50">
+	<content>
+		<rectangle size="100x50"/>
+	</content>
+	<overlay>
+		<widget pos="2,3" size="96x45" type="*widget.OverlayContainer">
+			<widget pos="10,10" size="64x35" type="*widget.Menu">
+				<widget size="64x35" type="*widget.Shadow">
+					<boxShadow blurRadius="6" color="shadow" cornerRadius="4" offsetY="2" size="64x35"/>
+				</widget>
+				<widget size="64x35" type="*widget.Scroll">
+					<widget size="64x110" type="*widget.menuBox">
+						<rectangle fillColor="rgba(42,42,42,255)" radius="4" size="64x110"/>
+						<container size="64x110">
+							<widget size="64x32" type="*widget.menuItem">
+								<text pos="8,8" size="48x16">A</text>
+							</widget>
+							<widget pos="0,36" size="64x1" type="*widget.Separator">
+								<rectangle fillColor="background" size="64x1"/>
+							</widget>
+							<widget pos="0,41" size="64x32" type="*widget.menuItem">
+								<text pos="8,8" size="48x16">B (long)</text>
+							</widget>
+							<widget pos="0,77" size="64x32" type="*widget.menuItem">
+								<text pos="8,8" size="28x16">C</text>
+								<image pos="44,6" rsc="menuExpandIcon" size="iconInlineSize" themed="foreground"/>
+							</widget>
+						</container>
+					</widget>
+					<widget pos="0,35" size="64x0" type="*widget.Shadow">
+						<linearGradient endColor="shadow" pos="0,-8" size="64x8"/>
+					</widget>
+					<widget pos="48,0" size="16x35" type="*widget.scrollBarArea">
+						<widget size="16x17" type="*widget.scrollBar">
+							<rectangle fillColor="scrollbar" pos="13,0" radius="3" size="3x17"/>
+						</widget>
+					</widget>
+				</widget>
+			</widget>
+		</widget>
+	</overlay>
+</canvas>

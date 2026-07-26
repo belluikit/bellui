@@ -1,0 +1,10 @@
+details {
+  icon = "../../theme/icons/bellui.png"
+  name = "Bellui Settings"
+  id = "io.bellui.settings"
+  version = "2.6.0"
+  build = 2
+}
+migrations = {
+  belluiDo: true
+}

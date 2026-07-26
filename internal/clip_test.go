@@ -1,0 +1,61 @@
+package internal
+
+import (
+	"testing"
+
+	"github.com/belluikit/bellui/geo"
+	"github.com/stretchr/testify/assert"
+)
+
+func TestClipStack_Intersect(t *testing.T) {
+	p1 := geo.NewPos(5, 25)
+	s1 := geo.NewSize(100, 100)
+	c := &ClipStack{
+		clips: []*ClipItem{
+			{p1, s1},
+		},
+	}
+
+	p2 := geo.NewPos(25, 0)
+	s2 := geo.NewSize(50, 50)
+	i := c.Push(p2, s2)
+
+	assert.Equal(t, geo.NewPos(25, 25), i.pos)
+	assert.Equal(t, geo.NewSize(50, 25), i.size)
+	assert.Len(t, c.clips, 2)
+
+	_ = c.Pop()
+	p2 = geo.NewPos(50, 50)
+	s2 = geo.NewSize(150, 50)
+	i = c.Push(p2, s2)
+
+	assert.Equal(t, geo.NewPos(50, 50), i.pos)
+	assert.Equal(t, geo.NewSize(55, 50), i.size)
+	assert.Len(t, c.clips, 2)
+}
+
+func TestClipStack_Pop(t *testing.T) {
+	p := geo.NewPos(5, 5)
+	s := geo.NewSize(100, 100)
+	c := &ClipStack{
+		clips: []*ClipItem{
+			{p, s},
+		},
+	}
+
+	i := c.Pop()
+	assert.Equal(t, p, i.pos)
+	assert.Equal(t, s, i.size)
+	assert.Empty(t, c.clips)
+}
+
+func TestClipStack_Push(t *testing.T) {
+	c := &ClipStack{}
+	p := geo.NewPos(5, 5)
+	s := geo.NewSize(100, 100)
+
+	i := c.Push(p, s)
+	assert.Equal(t, p, i.pos)
+	assert.Equal(t, s, i.size)
+	assert.Len(t, c.clips, 1)
+}

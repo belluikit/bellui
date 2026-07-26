@@ -1,0 +1,52 @@
+module github.com/belluikit/bellui
+
+go 1.25.0
+
+require (
+	github.com/BurntSushi/toml v1.5.0 // indirect
+	github.com/belluikit/gl-js v0.2.1
+	github.com/belluikit/glfw v1.9.0
+	github.com/belluikit/render v0.2.4
+	github.com/belluikit/systray v1.12.0
+	github.com/belluikit/typesetting v0.3.6
+	// WebGPU rendering backend (#198), now the default painter: the impl in
+	// internal/painter/webgpu builds under `//go:build !gl`, so plain `go mod tidy`
+	// keeps it and GL is the opt-in fallback via `-tags gl`. belluikit/webgpu forks
+	// cogentcore/webgpu to add the js setScissorRect/setStencilReference wrappers the
+	// wasm backend needs (#206).
+	github.com/belluikit/webgpu v1.0.8
+	github.com/fredbi/uri v1.1.1
+	github.com/fsnotify/fsnotify v1.9.0
+	github.com/go-gl/gl v0.0.0-20231021071112-07e5d0ea2e71
+	github.com/godbus/dbus/v5 v5.2.2
+	github.com/hack-pad/go-indexeddb v0.3.2
+	github.com/jeandeaual/go-locale v0.0.0-20250612000132-0ef82f21eade
+	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
+	github.com/nicksnyder/go-i18n/v2 v2.5.1
+	github.com/rymdport/portal v0.4.2
+	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect
+	github.com/stretchr/testify v1.11.1
+	github.com/yuin/goldmark v1.7.8
+	golang.org/x/image v0.44.0
+	golang.org/x/net v0.57.0
+	golang.org/x/sys v0.47.0
+	golang.org/x/text v0.40.0
+)
+
+require (
+	github.com/Microsoft/go-winio v0.6.2
+	github.com/belluikit/glfw-js v1.0.4
+	github.com/jsummers/gobmp v0.0.0-20230614200233-a9de23ed2e25
+	github.com/trendvidia/protowire-go v1.2.2
+	google.golang.org/protobuf v1.36.11
+)
+
+require (
+	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/go-gl/glfw/v3.4/glfw v0.1.0-pre.1 // indirect
+	github.com/hack-pad/safejs v0.1.0 // indirect
+	github.com/kr/text v0.2.0 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
+)

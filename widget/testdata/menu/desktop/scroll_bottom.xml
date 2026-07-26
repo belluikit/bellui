@@ -1,0 +1,47 @@
+<canvas size="104x105">
+	<content>
+		<rectangle size="104x105"/>
+	</content>
+	<overlay>
+		<widget pos="2,3" size="100x100" type="*widget.OverlayContainer">
+			<widget pos="10,10" size="25x90" type="*widget.Menu">
+				<widget size="25x90" type="*widget.Shadow">
+					<boxShadow blurRadius="6" color="shadow" cornerRadius="4" offsetY="2" size="25x90"/>
+				</widget>
+				<widget size="25x90" type="*widget.Scroll">
+					<widget pos="0,-124" size="25x214" type="*widget.menuBox">
+						<rectangle fillColor="rgba(42,42,42,255)" radius="4" size="25x214"/>
+						<container size="25x214">
+							<widget size="25x32" type="*widget.menuItem">
+								<text pos="8,8" size="9x16">A</text>
+							</widget>
+							<widget pos="0,36" size="25x32" type="*widget.menuItem">
+								<text pos="8,8" size="9x16">B</text>
+							</widget>
+							<widget pos="0,72" size="25x32" type="*widget.menuItem">
+								<text pos="8,8" size="9x16">C</text>
+							</widget>
+							<widget pos="0,109" size="25x32" type="*widget.menuItem">
+								<text pos="8,8" size="9x16">D</text>
+							</widget>
+							<widget pos="0,145" size="25x32" type="*widget.menuItem">
+								<text pos="8,8" size="9x16">E</text>
+							</widget>
+							<widget pos="0,182" size="25x32" type="*widget.menuItem">
+								<text pos="8,8" size="9x16">F</text>
+							</widget>
+						</container>
+					</widget>
+					<widget size="25x0" type="*widget.Shadow">
+						<linearGradient size="25x8" startColor="shadow"/>
+					</widget>
+					<widget pos="9,0" size="16x90" type="*widget.scrollBarArea">
+						<widget pos="0,45" size="16x45" type="*widget.scrollBar">
+							<rectangle fillColor="scrollbar" pos="13,0" radius="3" size="3x45"/>
+						</widget>
+					</widget>
+				</widget>
+			</widget>
+		</widget>
+	</overlay>
+</canvas>

@@ -1,0 +1,6 @@
+details {
+  name = "analyticsprobe"
+  id = "io.bellui.analyticsprobe"
+  version = "1.0.0"
+  build = 3
+}

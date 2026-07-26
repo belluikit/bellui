@@ -1,0 +1,50 @@
+values = {
+  keyBool: {
+    bool_value = true
+  }
+  keyBoolList: {
+    bool_list {
+      values = [
+        true,
+        false,
+        true
+      ]
+    }
+  }
+  keyFloat: {
+    float_value = 3.5
+  }
+  keyFloatList: {
+    float_list {
+      values = [
+        1.5,
+        2.5,
+        3.5
+      ]
+    }
+  }
+  keyInt: {
+    int_value = 42
+  }
+  keyIntList: {
+    int_list {
+      values = [
+        1,
+        2,
+        3
+      ]
+    }
+  }
+  keyString: {
+    string_value = "hello world"
+  }
+  keyStringList: {
+    string_list {
+      values = [
+        "a",
+        "b",
+        "c"
+      ]
+    }
+  }
+}

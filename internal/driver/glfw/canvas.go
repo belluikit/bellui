@@ -1,0 +1,717 @@
+package glfw
+
+import (
+	"image"
+	"math"
+
+	"github.com/belluikit/bellui"
+	"github.com/belluikit/bellui/canvas"
+	"github.com/belluikit/bellui/container"
+	"github.com/belluikit/bellui/core"
+	"github.com/belluikit/bellui/event"
+	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal"
+	"github.com/belluikit/bellui/internal/app"
+	"github.com/belluikit/bellui/internal/build"
+	"github.com/belluikit/bellui/internal/driver"
+	"github.com/belluikit/bellui/internal/driver/common"
+	"github.com/belluikit/bellui/internal/gpu"
+	"github.com/belluikit/bellui/internal/scale"
+	"github.com/belluikit/bellui/internal/uidir"
+	"github.com/belluikit/bellui/theme"
+	"github.com/belluikit/bellui/widget"
+)
+
+// Declare conformity with Canvas interface
+var _ core.Canvas = (*glCanvas)(nil)
+
+type glCanvas struct {
+	common.Canvas
+
+	content        core.CanvasObject
+	menu           core.CanvasObject
+	padded         bool
+	selectableMode bellui.SelectableMode
+	size           geo.Size
+
+	onTypedRune func(rune)
+	onTypedKey  func(*event.KeyEvent)
+	onKeyDown   func(*event.KeyEvent)
+	onKeyUp     func(*event.KeyEvent)
+	// shortcut    bellui.ShortcutHandler
+
+	scale, detectedScale, texScale float32
+
+	context         driver.WithContext
+	webExtraWindows *container.MultipleWindows
+}
+
+func (c *glCanvas) Capture() image.Image {
+	var img image.Image
+	w := c.context.(*window)
+
+	// Capture must contain overlays and menus (#473). Both painters scrape
+	// rendered frames rather than re-rendering for capture, and on a static
+	// scene no frame may have rendered since the request — the WebGPU
+	// fallback then reads the persistent canvas FBO, which excludes the
+	// overlay and menu passes. So force a fresh full paint and read that
+	// exact frame, per backend.
+	if ec, ok := c.Painter().(interface{ EnableCapture() }); ok {
+		// WebGPU: arm the per-frame capture copy, then repaint — EndFrame
+		// copies the presented surface texture, which Capture reads back.
+		ec.EnableCapture()
+		c.SetDirty()
+		w.driver.repaintWindow(w)
+		w.RunWithContext(func() {
+			img = c.Painter().Capture(c)
+		})
+		return img
+	}
+
+	// GL: paint into the back buffer and read it before any swap — reading
+	// the front buffer races the presentation pipeline and can return a
+	// stale frame.
+	w.RunWithContext(func() {
+		if bc, ok := c.Painter().(interface {
+			CaptureBack(core.Canvas) image.Image
+		}); ok {
+			updateGLContext(w)
+			c.paint(c.Size())
+			img = bc.CaptureBack(c)
+		} else {
+			img = c.Painter().Capture(c)
+		}
+	})
+	// The pre-capture paint consumed the dirty state without presenting;
+	// mark the canvas dirty again so the regular draw loop presents the
+	// (visually identical) frame normally.
+	c.SetDirty()
+	return img
+}
+
+func (c *glCanvas) Content() core.CanvasObject {
+	return c.content
+}
+
+func (c *glCanvas) DismissMenu() bool {
+	if c.menu != nil && c.menu.(*MenuBar).IsActive() {
+		c.menu.(*MenuBar).Toggle()
+		return true
+	}
+	return false
+}
+
+func (c *glCanvas) InteractiveArea() (geo.Position, geo.Size) {
+	return geo.Position{}, c.Size()
+}
+
+func (c *glCanvas) MinSize() geo.Size {
+	return c.canvasSize(c.content.MinSize())
+}
+
+func (c *glCanvas) OnKeyDown() func(*event.KeyEvent) {
+	return c.onKeyDown
+}
+
+func (c *glCanvas) OnKeyUp() func(*event.KeyEvent) {
+	return c.onKeyUp
+}
+
+func (c *glCanvas) OnTypedKey() func(*event.KeyEvent) {
+	return c.onTypedKey
+}
+
+func (c *glCanvas) OnTypedRune() func(rune) {
+	return c.onTypedRune
+}
+
+func (c *glCanvas) Padded() bool {
+	return c.padded
+}
+
+func (c *glCanvas) SelectableMode() bellui.SelectableMode {
+	return c.selectableMode
+}
+
+func (c *glCanvas) SetSelectableMode(mode bellui.SelectableMode) {
+	c.selectableMode = mode
+}
+
+func (c *glCanvas) PixelCoordinateForPosition(pos geo.Position) (int, int) {
+	multiple := c.scale * c.texScale
+	scaleInt := func(x float32) int {
+		return int(math.Round(float64(x * multiple)))
+	}
+
+	return scaleInt(pos.X), scaleInt(pos.Y)
+}
+
+func (c *glCanvas) Resize(size geo.Size) {
+	// This might not be the ideal solution, but it effectively avoid the first frame to be blurry due to the
+	// rounding of the size to the loower integer when scale == 1. It does not affect the other cases as far as we tested.
+	// This can easily be seen with a simple hello-world app and a scale == 1 as the text will happear blurry without the following line.
+	nearestSize := geo.NewSize(float32(math.Ceil(float64(size.Width))), float32(math.Ceil(float64(size.Height))))
+
+	c.size = nearestSize
+
+	if c.webExtraWindows != nil {
+		c.webExtraWindows.Resize(size)
+	}
+	for _, overlay := range c.Overlays().List() {
+		if p, ok := overlay.(*widget.PopUp); ok {
+			// TODO: remove this when #707 is being addressed.
+			// “Notifies” the PopUp of the canvas size change.
+			p.Refresh()
+		} else {
+			overlay.Resize(nearestSize)
+		}
+	}
+
+	content := c.content
+	contentSize := c.contentSize(nearestSize)
+	contentPos := c.contentPos()
+	menu := c.menu
+	menuHeight := c.menuHeight()
+
+	content.Resize(contentSize)
+	content.Move(contentPos)
+
+	if menu != nil {
+		menu.Refresh()
+		menu.Resize(geo.NewSize(nearestSize.Width, menuHeight))
+	}
+}
+
+func (c *glCanvas) Scale() float32 {
+	return c.scale
+}
+
+func (c *glCanvas) SetContent(content core.CanvasObject) {
+	content.Resize(content.MinSize()) // give it the space it wants then calculate the real min
+
+	// the pass above makes some layouts wide enough to wrap, so we ask again what the true min is.
+	newSize := c.size.Max(c.canvasSize(content.MinSize()))
+
+	c.setContent(content)
+
+	c.Resize(newSize)
+	c.SetDirty()
+}
+
+func (c *glCanvas) SetOnKeyDown(typed func(*event.KeyEvent)) {
+	c.onKeyDown = typed
+}
+
+func (c *glCanvas) SetOnKeyUp(typed func(*event.KeyEvent)) {
+	c.onKeyUp = typed
+}
+
+func (c *glCanvas) SetOnTypedKey(typed func(*event.KeyEvent)) {
+	c.onTypedKey = typed
+}
+
+func (c *glCanvas) SetOnTypedRune(typed func(rune)) {
+	c.onTypedRune = typed
+}
+
+func (c *glCanvas) SetPadded(padded bool) {
+	c.padded = padded
+
+	c.content.Move(c.contentPos())
+}
+
+func (c *glCanvas) reloadScale() {
+	w := c.context.(*window)
+	windowVisible := w.visible
+	if !windowVisible {
+		return
+	}
+
+	c.scale = w.calculatedScale()
+	c.SetDirty()
+
+	// Invalidate all boundary FBOs since pixel dimensions change with scale.
+	if bp, ok := c.Painter().(gpu.BoundaryPainter); ok {
+		bp.InvalidateAllBoundaries()
+	}
+
+	c.context.RescaleContext()
+}
+
+func (c *glCanvas) Size() geo.Size {
+	return c.size
+}
+
+func (c *glCanvas) ToggleMenu() {
+	if c.menu != nil {
+		c.menu.(*MenuBar).Toggle()
+	}
+}
+
+func (c *glCanvas) buildMenu(w *window, m *bellui.MainMenu) {
+	c.setMenuOverlay(nil)
+	if m == nil {
+		return
+	}
+	if build.HasNativeMenu {
+		setupNativeMenu(w, m)
+	} else {
+		c.setMenuOverlay(buildMenuOverlay(m, w))
+	}
+}
+
+// canvasSize computes the needed canvas size for the given content size
+func (c *glCanvas) canvasSize(contentSize geo.Size) geo.Size {
+	canvasSize := contentSize.Add(geo.NewSize(0, c.menuHeight()))
+	if c.Padded() {
+		return canvasSize.Add(geo.NewSquareSize(theme.Padding() * 2))
+	}
+	return canvasSize
+}
+
+func (c *glCanvas) contentPos() geo.Position {
+	contentPos := geo.NewPos(0, c.menuHeight())
+	if c.Padded() {
+		return contentPos.Add(geo.NewSquareOffsetPos(theme.Padding()))
+	}
+	return contentPos
+}
+
+func (c *glCanvas) contentSize(canvasSize geo.Size) geo.Size {
+	contentSize := geo.NewSize(canvasSize.Width, canvasSize.Height-c.menuHeight())
+	if c.Padded() {
+		return contentSize.Subtract(geo.NewSquareSize(theme.Padding() * 2))
+	}
+	return contentSize
+}
+
+func (c *glCanvas) menuHeight() float32 {
+	if c.menu == nil {
+		return 0 // no menu or native menu -> does not consume space on the canvas
+	}
+
+	return c.menu.MinSize().Height
+}
+
+func (c *glCanvas) overlayChanged() {
+	c.SetDirty()
+}
+
+// boundaryEntry tracks state for a RepaintBoundary during the paint walk.
+type boundaryEntry struct {
+	obj                    core.CanvasObject
+	state                  gpu.BoundaryFBO
+	wasDirty               bool
+	invWT                  geo.Matrix   // inverse of boundary's worldTransform
+	origin                 geo.Position // boundary's canvas position
+	size                   geo.Size     // boundary's logical size
+	canvasPixW, canvasPixH int          // for restoring viewport
+}
+
+// clearCanvasFBO prepares the bound canvas FBO for this frame and returns the
+// dirty region to redraw. Tag off (or first frame): full clear, no region. Tag
+// on: clear just the changed region, or full-clear when it covers most of the
+// canvas; an empty region (nothing changed) draws nothing and re-presents the
+// retained FBO.
+// clampRegionToCanvas intersects a dirty region with the canvas [0,0]-(size)
+// box, returning a zero-size region when it falls entirely outside.
+func clampRegionToCanvas(pos geo.Position, sz geo.Size, size geo.Size) (geo.Position, geo.Size) {
+	maxX, maxY := pos.X+sz.Width, pos.Y+sz.Height
+	if pos.X < 0 {
+		pos.X = 0
+	}
+	if pos.Y < 0 {
+		pos.Y = 0
+	}
+	if maxX > size.Width {
+		maxX = size.Width
+	}
+	if maxY > size.Height {
+		maxY = size.Height
+	}
+	if maxX <= pos.X || maxY <= pos.Y {
+		return pos, geo.Size{}
+	}
+	return pos, geo.NewSize(maxX-pos.X, maxY-pos.Y)
+}
+
+func (c *glCanvas) clearCanvasFBO(drp gpu.DirtyRegionPainter, size geo.Size) (partial bool, drPos geo.Position, drSize geo.Size) {
+	if build.PartialRepaint && !drp.CanvasFBONeedsFullClear() {
+		pos, sz, set := c.PartialDirtyRegion()
+		// A refreshed object can sit (partly) outside the canvas — e.g. content
+		// scrolled out of a container. Clamp the dirty region to the canvas so the
+		// region clip stays in bounds; if nothing on-canvas changed, retain.
+		pos, sz = clampRegionToCanvas(pos, sz, size)
+		set = set && sz.Width > 0 && sz.Height > 0
+		switch {
+		case !set:
+			return true, geo.Position{}, geo.Size{}
+		case common.RegionCoversCanvas(sz, size):
+			c.Painter().Clear()
+			return false, geo.Position{}, geo.Size{}
+		default:
+			// Clear just the dirty region; the surrounding canvas FBO is retained.
+			// The region clip stays active through the content walk (see paint) so
+			// redrawn objects that overlap the region — notably full-canvas
+			// backgrounds — don't paint over the retained pixels of culled siblings.
+			c.Painter().StartClipping(pos, sz)
+			c.Painter().Clear()
+			return true, pos, sz
+		}
+	}
+	c.Painter().Clear()
+	drp.MarkCanvasFBOCleared()
+	return false, geo.Position{}, geo.Size{}
+}
+
+func (c *glCanvas) paint(size geo.Size) {
+	clips := &internal.ClipStack{}
+	if c.Content() == nil {
+		return
+	}
+
+	// --- Canvas FBO setup ---
+	drp, hasDRP := c.Painter().(gpu.DirtyRegionPainter)
+
+	canvasPixW := int(float32(scale.ToScreenCoordinate(c, size.Width)) * c.texScale)
+	canvasPixH := int(float32(scale.ToScreenCoordinate(c, size.Height)) * c.texScale)
+
+	// partialRepaint and drPos/drSize drive shouldSkipForDirtyRegion below.
+	partialRepaint := false
+	var drPos geo.Position
+	var drSize geo.Size
+
+	if hasDRP {
+		drp.EnsureCanvasFBO(canvasPixW, canvasPixH)
+		drp.BindCanvasFBO()
+		// Default (partialrepaint tag off): full clear + redraw every frame. The
+		// dirty-region partial path is opt-in because it cannot be exercised by
+		// the software-painter golden suite and must be validated on-device.
+		partialRepaint, drPos, drSize = c.clearCanvasFBO(drp, size)
+	} else {
+		c.Painter().SetOutputSize(canvasPixW, canvasPixH)
+		c.Painter().Clear()
+	}
+
+	// Check if the painter supports boundary FBO caching.
+	bp, hasBoundary := c.Painter().(gpu.BoundaryPainter)
+
+	walk := &glPaintWalk{
+		c:              c,
+		clips:          clips,
+		size:           size,
+		bp:             bp,
+		hasBoundary:    hasBoundary,
+		partialRepaint: partialRepaint,
+		drPos:          drPos,
+		drSize:         drSize,
+		canvasPixW:     canvasPixW,
+		canvasPixH:     canvasPixH,
+	}
+
+	// Scope the whole paint pass to this canvas' direction so paint-time
+	// alignment and text base direction match the layout pass (a no-op for the
+	// default DirectionAuto, which defers to the global setting). Restore
+	// truncates the stack back to its pre-walk depth even if a paint panic
+	// unwinds past the per-node PushDirectionScope/PopDirectionScope Pops below.
+	defer uidir.Restore(uidir.Mark())
+	uidir.Push(c.Direction())
+	defer uidir.Pop(c.Direction())
+
+	// Paint content into the FBO (or default framebuffer if no FBO).
+	//
+	// For a partial repaint, the dirty-region clip established by clearCanvasFBO
+	// stays active through the whole content walk: object culling alone is not
+	// enough, because a redrawn object that overlaps the dirty region (e.g. a
+	// full-canvas background) would otherwise paint over the retained pixels of
+	// culled siblings outside the region. Seed the clip stack with the dirty region
+	// so nested clips intersect with it and restore to it (not full) on exit.
+	dirtyClip := partialRepaint && drSize.Width > 0 && drSize.Height > 0
+	if dirtyClip {
+		clips.Push(drPos, drSize)
+	}
+	c.WalkContentTrees(walk.draw, walk.afterDraw)
+	if dirtyClip {
+		c.Painter().StopClipping()
+		clips.Pop()
+	}
+
+	// Blit canvas FBO to the default framebuffer, then paint overlays
+	// directly on top so they aren't trapped inside the FBO.
+	if hasDRP {
+		drp.UnbindAndBlitCanvasFBO(canvasPixW, canvasPixH)
+	}
+	c.WalkOverlayTrees(walk.draw, walk.afterDraw)
+
+	c.RebuildSpatialIndex()
+}
+
+// glPaintWalk bundles the mutable and captured state for a single paint pass so
+// the before/after-children callbacks can live as methods instead of closures.
+type glPaintWalk struct {
+	c     *glCanvas
+	clips *internal.ClipStack
+	size  geo.Size
+
+	bp          gpu.BoundaryPainter
+	hasBoundary bool
+
+	partialRepaint bool
+	drPos          geo.Position
+	drSize         geo.Size
+
+	canvasPixW, canvasPixH int
+
+	// bStack is the boundary stack for RepaintBoundary FBO management.
+	bStack []boundaryEntry
+}
+
+// insideCleanBoundary reports whether we are inside a clean (non-dirty) boundary.
+func (w *glPaintWalk) insideCleanBoundary() bool {
+	return len(w.bStack) > 0 && !w.bStack[len(w.bStack)-1].wasDirty
+}
+
+// activeBoundary returns the active boundary entry (topmost dirty boundary), or nil.
+func (w *glPaintWalk) activeBoundary() *boundaryEntry {
+	if len(w.bStack) == 0 {
+		return nil
+	}
+	return &w.bStack[len(w.bStack)-1]
+}
+
+// shouldSkipForDirtyRegion wraps the common.dirtyRect check with the
+// partialRepaint guard so callers just ask "should I skip this object?".
+func (w *glPaintWalk) shouldSkipForDirtyRegion(pos geo.Position, objSize geo.Size) bool {
+	return w.partialRepaint && !common.RectsOverlap(pos, objSize, w.drPos, w.drSize)
+}
+
+// enterBoundary handles a RepaintBoundary node on the way down. It reports
+// whether the node was a boundary (in which case the boundary widget itself is
+// not painted).
+func (w *glPaintWalk) enterBoundary(node *common.RenderCacheNode, pos geo.Position) bool {
+	obj := node.Obj()
+	if !w.hasBoundary || !node.IsBoundary() {
+		return false
+	}
+
+	objSize := obj.Size()
+	pixW := int(float32(scale.ToScreenCoordinate(w.c, objSize.Width)) * w.c.texScale)
+	pixH := int(float32(scale.ToScreenCoordinate(w.c, objSize.Height)) * w.c.texScale)
+
+	if pixW > 0 && pixH > 0 {
+		if w.bp.IsBoundaryClean(obj) {
+			// Clean boundary: push skip entry, children will be skipped.
+			cleanState := w.bp.EnsureBoundaryFBO(obj, pixW, pixH, objSize)
+
+			// If doing partial repaint and the boundary doesn't
+			// intersect the dirty region, skip the blit too.
+			w.bStack = append(w.bStack, boundaryEntry{
+				obj:      obj,
+				state:    cleanState,
+				wasDirty: false,
+				origin:   pos,
+				size:     objSize,
+			})
+			return true
+		}
+
+		// Dirty boundary: create/get FBO, bind it, render subtree into it.
+		state := w.bp.EnsureBoundaryFBO(obj, pixW, pixH, objSize)
+		w.bp.BindBoundaryFBO(state)
+
+		invWT, ok := node.WorldTransform().Inverse()
+		if !ok {
+			invWT = geo.Identity()
+		}
+
+		w.bStack = append(w.bStack, boundaryEntry{
+			obj:        obj,
+			state:      state,
+			wasDirty:   true,
+			invWT:      invWT,
+			origin:     pos,
+			size:       objSize,
+			canvasPixW: w.canvasPixW,
+			canvasPixH: w.canvasPixH,
+		})
+	}
+	// Don't paint the boundary widget itself — it's just a container.
+	return true
+}
+
+func (w *glPaintWalk) draw(node *common.RenderCacheNode, pos geo.Position) {
+	obj := node.Obj()
+
+	// Scope the subtree's paint to a container DirectionScope's direction, the
+	// paint-time mirror of the EnsureMinSize layout hook. Done before any early
+	// return so it always pairs with the pop in afterDraw (walkTree invokes both
+	// callbacks for every node regardless of boundary/dirty-region skips).
+	driver.PushDirectionScope(obj)
+
+	// --- RepaintBoundary handling ---
+	if w.enterBoundary(node, pos) {
+		return
+	}
+
+	// If inside a clean boundary, skip all draw calls.
+	if w.insideCleanBoundary() {
+		return
+	}
+
+	// Determine effective pos, frame, and transform for rendering.
+	paintPos := pos
+	paintFrame := w.size
+	paintTransform := node.WorldTransform()
+	if ab := w.activeBoundary(); ab != nil && ab.wasDirty {
+		// Inside a dirty boundary: adjust coordinates to FBO space.
+		paintPos = geo.NewPos(pos.X-ab.origin.X, pos.Y-ab.origin.Y)
+		paintFrame = ab.size
+		paintTransform = ab.invWT.Multiply(node.WorldTransform())
+	}
+
+	// Establish this object's clips BEFORE the dirty-region cull check, so a
+	// clip-owner (scroll/ClipToBounds/Card) that is itself outside the dirty region
+	// still constrains its descendants. Otherwise a culled clip-owner skips its clip
+	// push while its children — which may extend into the dirty region — get drawn
+	// unclipped, leaking content past the viewport (#333). The clip is intersected
+	// with the seeded dirty-region clip, so a clip-owner outside the region yields an
+	// empty clip and its children draw nothing.
+	if driver.IsClip(obj) {
+		inner := w.clips.Push(paintPos, obj.Size())
+		w.c.Painter().StartClipping(inner.Rect())
+	}
+	if isRounded, radius := driver.IsRoundedClip(obj); isRounded {
+		w.c.Painter().StartRoundedClipping(paintPos, obj.Size(), radius)
+	}
+	if clipPathObj, ok := driver.IsPathClip(obj); ok {
+		if clipPath, is := clipPathObj.(*canvas.Path); is {
+			w.c.Painter().StartPathClipping(clipPath, paintPos, obj.Size())
+		}
+	}
+
+	// Dirty-region culling: skip the object's own draw calls when it is entirely
+	// outside the dirty region. Only applies when not inside a boundary FBO
+	// (boundary FBOs manage their own dirty state). Clips were already established
+	// above so descendants stay correctly clipped; afterDraw tears them down.
+	if w.activeBoundary() == nil && w.shouldSkipForDirtyRegion(pos, obj.Size()) {
+		return
+	}
+
+	// MD3 disabled state: reduce opacity for disabled widget subtrees.
+	if d, ok := obj.(core.Disableable); ok && d.Disabled() {
+		w.c.Painter().SetGroupOpacity(0.38)
+	}
+	w.c.Painter().SetTransform(paintTransform)
+	if paintFrame.Width <= 0 || paintFrame.Height <= 0 {
+		return
+	}
+	w.c.Painter().Paint(obj, paintPos, paintFrame)
+}
+
+// exitBoundary handles a RepaintBoundary node on the way up. It reports whether
+// the node closed the topmost boundary entry.
+func (w *glPaintWalk) exitBoundary(node *common.RenderCacheNode, pos geo.Position) bool {
+	obj := node.Obj()
+	if !(w.hasBoundary && node.IsBoundary() && len(w.bStack) > 0 && w.bStack[len(w.bStack)-1].obj == obj) {
+		return false
+	}
+
+	entry := w.bStack[len(w.bStack)-1]
+	w.bStack = w.bStack[:len(w.bStack)-1]
+
+	if entry.wasDirty && entry.state != nil {
+		// Finished rendering subtree into FBO. Unbind and mark clean.
+		w.bp.UnbindBoundaryFBO(entry.canvasPixW, entry.canvasPixH)
+		entry.state.SetDirty(false)
+	}
+
+	// Blit the boundary's cached FBO texture at its canvas position,
+	// unless doing partial repaint and boundary is outside dirty region.
+	if !w.shouldSkipForDirtyRegion(pos, entry.size) {
+		w.bp.BlitBoundaryTexture(entry.state, pos, w.size)
+	}
+	return true
+}
+
+func (w *glPaintWalk) afterDraw(node *common.RenderCacheNode, pos geo.Position) {
+	obj := node.Obj()
+
+	// Pop the DirectionScope pushed in draw (before any early return, to pair).
+	driver.PopDirectionScope(obj)
+
+	// --- RepaintBoundary exit handling ---
+	if w.exitBoundary(node, pos) {
+		return
+	}
+
+	// If inside a clean boundary, skip afterPaint too.
+	if w.insideCleanBoundary() {
+		return
+	}
+
+	culled := w.activeBoundary() == nil && w.shouldSkipForDirtyRegion(pos, node.Obj().Size())
+
+	// Group opacity is only set for objects that actually drew (not culled), so
+	// only clear it then.
+	if !culled {
+		if d, ok := obj.(core.Disableable); ok && d.Disabled() {
+			w.c.Painter().ClearGroupOpacity()
+		}
+	}
+
+	// Tear down clips even when the object was culled: draw establishes them
+	// unconditionally for clip-owners so descendants stay clipped (#333), so the
+	// push/pop must stay paired regardless of culling.
+	if isRounded, _ := driver.IsRoundedClip(obj); isRounded {
+		w.c.Painter().StopRoundedClipping()
+	}
+	if _, ok := driver.IsPathClip(obj); ok {
+		w.c.Painter().StopPathClipping()
+	}
+	if driver.IsClip(obj) {
+		w.clips.Pop()
+		if top := w.clips.Top(); top != nil {
+			w.c.Painter().StartClipping(top.Rect())
+		} else {
+			w.c.Painter().StopClipping()
+		}
+	}
+
+	if !culled && build.Mode == bellui.BuildDebug {
+		w.c.DrawDebugOverlay(obj, pos, w.size)
+	}
+}
+
+func (c *glCanvas) setContent(content core.CanvasObject) {
+	c.content = content
+	c.SetContentTreeAndFocusMgr(content)
+}
+
+func (c *glCanvas) setMenuOverlay(b core.CanvasObject) {
+	c.menu = b
+	c.SetMenuTreeAndFocusMgr(b)
+
+	if c.menu != nil && !c.size.IsZero() {
+		c.content.Resize(c.contentSize(c.size))
+		c.content.Move(c.contentPos())
+
+		c.menu.Refresh()
+		c.menu.Resize(geo.NewSize(c.size.Width, c.menu.MinSize().Height))
+	}
+}
+
+func (c *glCanvas) applyThemeOutOfTreeObjects() {
+	if c.menu != nil {
+		app.ApplyThemeTo(c.menu, c) // Ensure our menu gets the theme change message as it's out-of-tree
+	}
+
+	c.SetPadded(c.padded) // refresh the padding for potential theme differences
+}
+
+func newCanvas() *glCanvas {
+	c := &glCanvas{scale: 1.0, texScale: 1.0, padded: true}
+	connectKeyboard(c)
+	c.Initialize(c, c.overlayChanged)
+	c.setContent(&canvas.Rectangle{FillColor: theme.Color(theme.ColorNameBackground)})
+	return c
+}

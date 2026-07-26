@@ -1,0 +1,81 @@
+name: Mobile Tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  # cancel superseded runs on PR/feature branches, but never on main
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+env:
+  CC: "clang"
+  CGO_LDFLAGS: "-fuse-ld=lld"
+
+jobs:
+  mobile_tests:
+    runs-on: [self-hosted, Linux, ARM64]
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Assert go-plus toolchain
+        run: |
+          go version
+          go version | grep -q '(plus)' || { echo "::error::runner go is not the go-plus fork"; exit 1; }
+
+
+      - name: Get dependencies
+        run: |
+          flock /tmp/bellui-ci-apt.lock sudo apt-get -o DPkg::Lock::Timeout=600 update
+          flock /tmp/bellui-ci-apt.lock sudo apt-get -o DPkg::Lock::Timeout=600 install --no-install-recommends clang lld libegl1-mesa-dev libgles2-mesa-dev libx11-dev xorg-dev
+
+      # WebGPU is the default mobile backend (Phase 5, #204); GLES is the fallback
+      # behind -tags gl. This comprehensive leg exercises the GLES fallback path.
+      - name: Tests (GLES fallback)
+        # -a (auto-servernum) so parallel self-hosted runners on one box don't
+        # collide on Xvfb display :99.
+        run: ./.github/scripts/xvfb-run-safe go test -race -tags gl,mobile,ci,migrated_belluido ./...
+
+      - name: Partial-repaint (opt-in) build + region logic
+        run: |
+          # The dirty-region partial-repaint optimisation is gated behind the
+          # partialrepaint build tag (default off). Verify it still compiles for
+          # both desktop and mobile and that the region computation is correct.
+          # The GL paint path itself cannot run headless, so on-device testing
+          # via the gallery app is still required before relying on it. Pinned to
+          # the GL backend because the driver-level feature is backend-agnostic;
+          # the webgpu default is covered by the WebGPU mobile build step below.
+          go build -tags gl,partialrepaint ./...
+          go vet -tags gl,mobile,partialrepaint ./internal/driver/mobile/ ./internal/driver/common/
+          ./.github/scripts/xvfb-run-safe go test -tags gl,partialrepaint,ci,migrated_belluido ./internal/driver/common/
+
+      # Mobile accessibility backends (#488): the shared flatten layer and its
+      # tests compile in the host slice under -tags accessibility, mirroring
+      # the desktop legs in platform_tests. The android/ios cgo bridges need a
+      # device toolchain (NDK / Xcode) and are cross-compile-verified locally.
+      - name: Accessibility tagged tests
+        run: ./.github/scripts/xvfb-run-safe go test -race -tags accessibility,gl,mobile,ci,migrated_belluido ./internal/driver/mobile/ ./internal/accessibility/...
+
+      - name: Compile (GLES fallback)
+        working-directory: cmd/bellui_settings
+        run: go build -tags gl,mobile
+
+      # WebGPU mobile backend (default): wgpu-native via Vulkan (Android) / Metal
+      # (iOS). Builds the whole tree: now that internal/painter/gl carries the GL
+      # build constraint (#251), ./... no longer compiles the unused GL gomobile
+      # painter under -tags mobile, so the full module is clean on the webgpu
+      # default. Clean CGO env for the wgpu-native link; the host (linux) slice
+      # uses the stub surface descriptor.
+      - name: WebGPU mobile build (default)
+        env:
+          CGO_LDFLAGS: ""
+          CGO_CFLAGS: ""
+        run: |
+          go build -tags mobile ./...
+          go build -tags mobile ./cmd/bellui_settings
