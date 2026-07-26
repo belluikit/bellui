@@ -185,7 +185,7 @@ func webgpuSurfaceDescriptor(w *window) *wgpu.SurfaceDescriptor {
 		iosWindowLayers[w] = unsafe.Pointer(layer)
 	}
 	return &wgpu.SurfaceDescriptor{
-		MetalLayer: &wgpu.SurfaceDescriptorFromMetalLayer{Layer: unsafe.Pointer(layer)},
+		MetalLayer: &wgpu.SurfaceSourceMetalLayer{Layer: unsafe.Pointer(layer)},
 	}
 }
 

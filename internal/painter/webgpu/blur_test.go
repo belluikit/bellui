@@ -38,7 +38,7 @@ func TestBlurSpreadReadback(t *testing.T) {
 	const format = wgpu.TextureFormatRGBA8Unorm
 
 	// Source texture: left half opaque red (premultiplied), right half transparent.
-	srcTex, err := device.CreateTexture(&wgpu.TextureDescriptor{
+	srcTex, err := device.TryCreateTexture(&wgpu.TextureDescriptor{
 		Label:         "blur-src",
 		Size:          wgpu.Extent3D{Width: dim, Height: dim, DepthOrArrayLayers: 1},
 		MipLevelCount: 1, SampleCount: 1, Dimension: wgpu.TextureDimension2D,
@@ -56,15 +56,15 @@ func TestBlurSpreadReadback(t *testing.T) {
 		}
 	}
 	queue.WriteTexture(srcTex.AsImageCopy(), pix,
-		&wgpu.TextureDataLayout{BytesPerRow: bytesPerRow, RowsPerImage: dim},
+		&wgpu.TexelCopyBufferLayout{BytesPerRow: bytesPerRow, RowsPerImage: dim},
 		&wgpu.Extent3D{Width: dim, Height: dim, DepthOrArrayLayers: 1})
-	srcView, err := srcTex.CreateView(nil)
+	srcView, err := srcTex.TryCreateView(nil)
 	if err != nil {
 		t.Fatalf("src view: %v", err)
 	}
 	defer srcView.Release()
 
-	sampler, err := device.CreateSampler(&wgpu.SamplerDescriptor{
+	sampler, err := device.TryCreateSampler(&wgpu.SamplerDescriptor{
 		AddressModeU: wgpu.AddressModeClampToEdge, AddressModeV: wgpu.AddressModeClampToEdge,
 		AddressModeW: wgpu.AddressModeClampToEdge, MagFilter: wgpu.FilterModeLinear,
 		MinFilter: wgpu.FilterModeLinear, MipmapFilter: wgpu.MipmapFilterModeNearest,
@@ -75,7 +75,7 @@ func TestBlurSpreadReadback(t *testing.T) {
 	}
 	defer sampler.Release()
 
-	dstTex, err := device.CreateTexture(&wgpu.TextureDescriptor{
+	dstTex, err := device.TryCreateTexture(&wgpu.TextureDescriptor{
 		Label:         "blur-dst",
 		Size:          wgpu.Extent3D{Width: dim, Height: dim, DepthOrArrayLayers: 1},
 		MipLevelCount: 1, SampleCount: 1, Dimension: wgpu.TextureDimension2D,
@@ -85,21 +85,21 @@ func TestBlurSpreadReadback(t *testing.T) {
 		t.Fatalf("dst texture: %v", err)
 	}
 	defer dstTex.Release()
-	dstView, err := dstTex.CreateView(nil)
+	dstView, err := dstTex.TryCreateView(nil)
 	if err != nil {
 		t.Fatalf("dst view: %v", err)
 	}
 	defer dstView.Release()
 
 	desc, _ := DescriptorFor("blur")
-	mod, err := device.CreateShaderModule(&wgpu.ShaderModuleDescriptor{
-		Label: "blur.wgsl", WGSLDescriptor: &wgpu.ShaderModuleWGSLDescriptor{Code: string(ShaderSource("blur"))},
+	mod, err := device.TryCreateShaderModule(&wgpu.ShaderModuleDescriptor{
+		Label: "blur.wgsl", WGSLSource: &wgpu.ShaderSourceWGSL{Code: string(ShaderSource("blur"))},
 	})
 	if err != nil {
 		t.Fatalf("shader module: %v", err)
 	}
 	defer mod.Release()
-	pipe, err := device.CreateRenderPipeline(&wgpu.RenderPipelineDescriptor{
+	pipe, err := device.TryCreateRenderPipeline(&wgpu.RenderPipelineDescriptor{
 		Vertex: wgpu.VertexState{Module: mod, EntryPoint: VertexEntry, Buffers: []wgpu.VertexBufferLayout{vertexBufferLayout(desc.Vertex)}},
 		Fragment: &wgpu.FragmentState{Module: mod, EntryPoint: BlurFragmentEntryH, Targets: []wgpu.ColorTargetState{{
 			Format: format, Blend: blendState(BlendPremul), WriteMask: wgpu.ColorWriteMaskAll,
@@ -119,14 +119,14 @@ func TestBlurSpreadReadback(t *testing.T) {
 		1, -1, 0, 1, 1,
 		1, 1, 0, 1, 0,
 	}
-	vbuf, err := device.CreateBufferInit(&wgpu.BufferInitDescriptor{Contents: wgpu.ToBytes(verts), Usage: wgpu.BufferUsageVertex})
+	vbuf, err := device.TryCreateBufferInit(&wgpu.BufferInitDescriptor{Contents: wgpu.ToBytes(verts), Usage: wgpu.BufferUsageVertex})
 	if err != nil {
 		t.Fatalf("vertex buffer: %v", err)
 	}
 	defer vbuf.Release()
 
 	u := BlurUniforms{Resolution: [2]float32{dim, dim}, BlurRadius: 8}
-	ubuf, err := device.CreateBufferInit(&wgpu.BufferInitDescriptor{Contents: uniformBytes(&u), Usage: wgpu.BufferUsageUniform})
+	ubuf, err := device.TryCreateBufferInit(&wgpu.BufferInitDescriptor{Contents: uniformBytes(&u), Usage: wgpu.BufferUsageUniform})
 	if err != nil {
 		t.Fatalf("uniform buffer: %v", err)
 	}
@@ -134,7 +134,7 @@ func TestBlurSpreadReadback(t *testing.T) {
 
 	layout := pipe.GetBindGroupLayout(0)
 	defer layout.Release()
-	bg, err := device.CreateBindGroup(&wgpu.BindGroupDescriptor{
+	bg, err := device.TryCreateBindGroup(&wgpu.BindGroupDescriptor{
 		Layout: layout,
 		Entries: []wgpu.BindGroupEntry{
 			{Binding: 0, Buffer: ubuf, Size: uint64(len(uniformBytes(&u)))},
@@ -147,13 +147,13 @@ func TestBlurSpreadReadback(t *testing.T) {
 	}
 	defer bg.Release()
 
-	readBuf, err := device.CreateBuffer(&wgpu.BufferDescriptor{Size: bytesPerRow * dim, Usage: wgpu.BufferUsageCopyDst | wgpu.BufferUsageMapRead})
+	readBuf, err := device.TryCreateBuffer(&wgpu.BufferDescriptor{Size: bytesPerRow * dim, Usage: wgpu.BufferUsageCopyDst | wgpu.BufferUsageMapRead})
 	if err != nil {
 		t.Fatalf("readback buffer: %v", err)
 	}
 	defer readBuf.Release()
 
-	enc, err := device.CreateCommandEncoder(nil)
+	enc, err := device.TryCreateCommandEncoder(nil)
 	if err != nil {
 		t.Fatalf("encoder: %v", err)
 	}
@@ -170,11 +170,11 @@ func TestBlurSpreadReadback(t *testing.T) {
 	pass.Release()
 
 	enc.CopyTextureToBuffer(
-		&wgpu.ImageCopyTexture{Texture: dstTex},
-		&wgpu.ImageCopyBuffer{Buffer: readBuf, Layout: wgpu.TextureDataLayout{BytesPerRow: bytesPerRow, RowsPerImage: dim}},
+		&wgpu.TexelCopyTextureInfo{Texture: dstTex},
+		&wgpu.TexelCopyBufferInfo{Buffer: readBuf, Layout: wgpu.TexelCopyBufferLayout{BytesPerRow: bytesPerRow, RowsPerImage: dim}},
 		&wgpu.Extent3D{Width: dim, Height: dim, DepthOrArrayLayers: 1},
 	)
-	cmd, err := enc.Finish(nil)
+	cmd, err := enc.TryFinish(nil)
 	if err != nil {
 		t.Fatalf("finish: %v", err)
 	}
@@ -182,12 +182,12 @@ func TestBlurSpreadReadback(t *testing.T) {
 	cmd.Release()
 	enc.Release()
 
-	var status wgpu.BufferMapAsyncStatus
-	if err := readBuf.MapAsync(wgpu.MapModeRead, 0, bytesPerRow*dim, func(s wgpu.BufferMapAsyncStatus) { status = s }); err != nil {
+	var status wgpu.MapAsyncStatus
+	if err := readBuf.TryMapAsync(wgpu.MapModeRead, 0, bytesPerRow*dim, func(s wgpu.MapAsyncStatus) { status = s }); err != nil {
 		t.Fatalf("map async: %v", err)
 	}
 	device.Poll(true, nil)
-	if status != wgpu.BufferMapAsyncStatusSuccess {
+	if status != wgpu.MapAsyncStatusSuccess {
 		t.Fatalf("buffer map status: %v", status)
 	}
 	data := readBuf.GetMappedRange(0, uint(bytesPerRow*dim))

@@ -39,7 +39,7 @@ func TestOffscreenRenderReadback(t *testing.T) {
 	defer queue.Release()
 
 	const format = wgpu.TextureFormatRGBA8Unorm
-	tex, err := device.CreateTexture(&wgpu.TextureDescriptor{
+	tex, err := device.TryCreateTexture(&wgpu.TextureDescriptor{
 		Label:         "offscreen",
 		Size:          wgpu.Extent3D{Width: dim, Height: dim, DepthOrArrayLayers: 1},
 		MipLevelCount: 1,
@@ -52,7 +52,7 @@ func TestOffscreenRenderReadback(t *testing.T) {
 		t.Fatalf("create texture: %v", err)
 	}
 	defer tex.Release()
-	view, err := tex.CreateView(nil)
+	view, err := tex.TryCreateView(nil)
 	if err != nil {
 		t.Fatalf("create view: %v", err)
 	}
@@ -60,15 +60,15 @@ func TestOffscreenRenderReadback(t *testing.T) {
 
 	// Build the path pipeline from the embedded shader + neutral descriptor.
 	desc, _ := DescriptorFor("path")
-	mod, err := device.CreateShaderModule(&wgpu.ShaderModuleDescriptor{
-		Label:          "path.wgsl",
-		WGSLDescriptor: &wgpu.ShaderModuleWGSLDescriptor{Code: string(ShaderSource("path"))},
+	mod, err := device.TryCreateShaderModule(&wgpu.ShaderModuleDescriptor{
+		Label:      "path.wgsl",
+		WGSLSource: &wgpu.ShaderSourceWGSL{Code: string(ShaderSource("path"))},
 	})
 	if err != nil {
 		t.Fatalf("shader module: %v", err)
 	}
 	defer mod.Release()
-	pipe, err := device.CreateRenderPipeline(&wgpu.RenderPipelineDescriptor{
+	pipe, err := device.TryCreateRenderPipeline(&wgpu.RenderPipelineDescriptor{
 		Vertex: wgpu.VertexState{
 			Module: mod, EntryPoint: VertexEntry,
 			Buffers: []wgpu.VertexBufferLayout{vertexBufferLayout(desc.Vertex)},
@@ -91,14 +91,14 @@ func TestOffscreenRenderReadback(t *testing.T) {
 		3, -1, 1,
 		-1, 3, 1,
 	}
-	vbuf, err := device.CreateBufferInit(&wgpu.BufferInitDescriptor{Contents: wgpu.ToBytes(verts), Usage: wgpu.BufferUsageVertex})
+	vbuf, err := device.TryCreateBufferInit(&wgpu.BufferInitDescriptor{Contents: wgpu.ToBytes(verts), Usage: wgpu.BufferUsageVertex})
 	if err != nil {
 		t.Fatalf("vertex buffer: %v", err)
 	}
 	defer vbuf.Release()
 
 	u := PathUniforms{FillColor: [4]float32{1, 0, 0, 1}} // red
-	ubuf, err := device.CreateBufferInit(&wgpu.BufferInitDescriptor{Contents: uniformBytes(&u), Usage: wgpu.BufferUsageUniform})
+	ubuf, err := device.TryCreateBufferInit(&wgpu.BufferInitDescriptor{Contents: uniformBytes(&u), Usage: wgpu.BufferUsageUniform})
 	if err != nil {
 		t.Fatalf("uniform buffer: %v", err)
 	}
@@ -106,7 +106,7 @@ func TestOffscreenRenderReadback(t *testing.T) {
 
 	layout := pipe.GetBindGroupLayout(0)
 	defer layout.Release()
-	bg, err := device.CreateBindGroup(&wgpu.BindGroupDescriptor{
+	bg, err := device.TryCreateBindGroup(&wgpu.BindGroupDescriptor{
 		Layout:  layout,
 		Entries: []wgpu.BindGroupEntry{{Binding: 0, Buffer: ubuf, Size: uint64(len(uniformBytes(&u)))}},
 	})
@@ -115,7 +115,7 @@ func TestOffscreenRenderReadback(t *testing.T) {
 	}
 	defer bg.Release()
 
-	readBuf, err := device.CreateBuffer(&wgpu.BufferDescriptor{
+	readBuf, err := device.TryCreateBuffer(&wgpu.BufferDescriptor{
 		Size:  bytesPerRow * dim,
 		Usage: wgpu.BufferUsageCopyDst | wgpu.BufferUsageMapRead,
 	})
@@ -124,7 +124,7 @@ func TestOffscreenRenderReadback(t *testing.T) {
 	}
 	defer readBuf.Release()
 
-	enc, err := device.CreateCommandEncoder(nil)
+	enc, err := device.TryCreateCommandEncoder(nil)
 	if err != nil {
 		t.Fatalf("encoder: %v", err)
 	}
@@ -142,11 +142,11 @@ func TestOffscreenRenderReadback(t *testing.T) {
 	pass.Release()
 
 	enc.CopyTextureToBuffer(
-		&wgpu.ImageCopyTexture{Texture: tex},
-		&wgpu.ImageCopyBuffer{Buffer: readBuf, Layout: wgpu.TextureDataLayout{BytesPerRow: bytesPerRow, RowsPerImage: dim}},
+		&wgpu.TexelCopyTextureInfo{Texture: tex},
+		&wgpu.TexelCopyBufferInfo{Buffer: readBuf, Layout: wgpu.TexelCopyBufferLayout{BytesPerRow: bytesPerRow, RowsPerImage: dim}},
 		&wgpu.Extent3D{Width: dim, Height: dim, DepthOrArrayLayers: 1},
 	)
-	cmd, err := enc.Finish(nil)
+	cmd, err := enc.TryFinish(nil)
 	if err != nil {
 		t.Fatalf("finish: %v", err)
 	}
@@ -154,13 +154,13 @@ func TestOffscreenRenderReadback(t *testing.T) {
 	cmd.Release()
 	enc.Release()
 
-	var mapStatus wgpu.BufferMapAsyncStatus
-	err = readBuf.MapAsync(wgpu.MapModeRead, 0, bytesPerRow*dim, func(s wgpu.BufferMapAsyncStatus) { mapStatus = s })
+	var mapStatus wgpu.MapAsyncStatus
+	err = readBuf.TryMapAsync(wgpu.MapModeRead, 0, bytesPerRow*dim, func(s wgpu.MapAsyncStatus) { mapStatus = s })
 	if err != nil {
 		t.Fatalf("map async: %v", err)
 	}
 	device.Poll(true, nil)
-	if mapStatus != wgpu.BufferMapAsyncStatusSuccess {
+	if mapStatus != wgpu.MapAsyncStatusSuccess {
 		t.Fatalf("buffer map status: %v", mapStatus)
 	}
 	data := readBuf.GetMappedRange(0, uint(bytesPerRow*dim))
@@ -200,7 +200,7 @@ func TestRippleRenderReadback(t *testing.T) {
 	defer queue.Release()
 
 	const format = wgpu.TextureFormatRGBA8Unorm
-	tex, err := device.CreateTexture(&wgpu.TextureDescriptor{
+	tex, err := device.TryCreateTexture(&wgpu.TextureDescriptor{
 		Label:         "offscreen",
 		Size:          wgpu.Extent3D{Width: dim, Height: dim, DepthOrArrayLayers: 1},
 		MipLevelCount: 1,
@@ -213,22 +213,22 @@ func TestRippleRenderReadback(t *testing.T) {
 		t.Fatalf("create texture: %v", err)
 	}
 	defer tex.Release()
-	view, err := tex.CreateView(nil)
+	view, err := tex.TryCreateView(nil)
 	if err != nil {
 		t.Fatalf("create view: %v", err)
 	}
 	defer view.Release()
 
 	desc, _ := DescriptorFor("ripple")
-	mod, err := device.CreateShaderModule(&wgpu.ShaderModuleDescriptor{
-		Label:          "ripple.wgsl",
-		WGSLDescriptor: &wgpu.ShaderModuleWGSLDescriptor{Code: string(ShaderSource("ripple"))},
+	mod, err := device.TryCreateShaderModule(&wgpu.ShaderModuleDescriptor{
+		Label:      "ripple.wgsl",
+		WGSLSource: &wgpu.ShaderSourceWGSL{Code: string(ShaderSource("ripple"))},
 	})
 	if err != nil {
 		t.Fatalf("shader module: %v", err)
 	}
 	defer mod.Release()
-	pipe, err := device.CreateRenderPipeline(&wgpu.RenderPipelineDescriptor{
+	pipe, err := device.TryCreateRenderPipeline(&wgpu.RenderPipelineDescriptor{
 		Vertex: wgpu.VertexState{
 			Module: mod, EntryPoint: VertexEntry,
 			Buffers: []wgpu.VertexBufferLayout{vertexBufferLayout(desc.Vertex)},
@@ -252,7 +252,7 @@ func TestRippleRenderReadback(t *testing.T) {
 		0, 0, -1, 1,
 		0, 0, 1, 1,
 	}
-	vbuf, err := device.CreateBufferInit(&wgpu.BufferInitDescriptor{Contents: wgpu.ToBytes(verts), Usage: wgpu.BufferUsageVertex})
+	vbuf, err := device.TryCreateBufferInit(&wgpu.BufferInitDescriptor{Contents: wgpu.ToBytes(verts), Usage: wgpu.BufferUsageVertex})
 	if err != nil {
 		t.Fatalf("vertex buffer: %v", err)
 	}
@@ -271,7 +271,7 @@ func TestRippleRenderReadback(t *testing.T) {
 		RippleColor:  [4]float32{1, 0, 0, 1},
 		InvTransform: Mat3ToStd140(geo.Identity().ToGL()),
 	}
-	ubuf, err := device.CreateBufferInit(&wgpu.BufferInitDescriptor{Contents: uniformBytes(&u), Usage: wgpu.BufferUsageUniform})
+	ubuf, err := device.TryCreateBufferInit(&wgpu.BufferInitDescriptor{Contents: uniformBytes(&u), Usage: wgpu.BufferUsageUniform})
 	if err != nil {
 		t.Fatalf("uniform buffer: %v", err)
 	}
@@ -279,7 +279,7 @@ func TestRippleRenderReadback(t *testing.T) {
 
 	layout := pipe.GetBindGroupLayout(0)
 	defer layout.Release()
-	bg, err := device.CreateBindGroup(&wgpu.BindGroupDescriptor{
+	bg, err := device.TryCreateBindGroup(&wgpu.BindGroupDescriptor{
 		Layout:  layout,
 		Entries: []wgpu.BindGroupEntry{{Binding: 0, Buffer: ubuf, Size: uint64(len(uniformBytes(&u)))}},
 	})
@@ -288,7 +288,7 @@ func TestRippleRenderReadback(t *testing.T) {
 	}
 	defer bg.Release()
 
-	readBuf, err := device.CreateBuffer(&wgpu.BufferDescriptor{
+	readBuf, err := device.TryCreateBuffer(&wgpu.BufferDescriptor{
 		Size:  bytesPerRow * dim,
 		Usage: wgpu.BufferUsageCopyDst | wgpu.BufferUsageMapRead,
 	})
@@ -297,7 +297,7 @@ func TestRippleRenderReadback(t *testing.T) {
 	}
 	defer readBuf.Release()
 
-	enc, err := device.CreateCommandEncoder(nil)
+	enc, err := device.TryCreateCommandEncoder(nil)
 	if err != nil {
 		t.Fatalf("encoder: %v", err)
 	}
@@ -315,11 +315,11 @@ func TestRippleRenderReadback(t *testing.T) {
 	pass.Release()
 
 	enc.CopyTextureToBuffer(
-		&wgpu.ImageCopyTexture{Texture: tex},
-		&wgpu.ImageCopyBuffer{Buffer: readBuf, Layout: wgpu.TextureDataLayout{BytesPerRow: bytesPerRow, RowsPerImage: dim}},
+		&wgpu.TexelCopyTextureInfo{Texture: tex},
+		&wgpu.TexelCopyBufferInfo{Buffer: readBuf, Layout: wgpu.TexelCopyBufferLayout{BytesPerRow: bytesPerRow, RowsPerImage: dim}},
 		&wgpu.Extent3D{Width: dim, Height: dim, DepthOrArrayLayers: 1},
 	)
-	cmd, err := enc.Finish(nil)
+	cmd, err := enc.TryFinish(nil)
 	if err != nil {
 		t.Fatalf("finish: %v", err)
 	}
@@ -327,13 +327,13 @@ func TestRippleRenderReadback(t *testing.T) {
 	cmd.Release()
 	enc.Release()
 
-	var mapStatus wgpu.BufferMapAsyncStatus
-	err = readBuf.MapAsync(wgpu.MapModeRead, 0, bytesPerRow*dim, func(s wgpu.BufferMapAsyncStatus) { mapStatus = s })
+	var mapStatus wgpu.MapAsyncStatus
+	err = readBuf.TryMapAsync(wgpu.MapModeRead, 0, bytesPerRow*dim, func(s wgpu.MapAsyncStatus) { mapStatus = s })
 	if err != nil {
 		t.Fatalf("map async: %v", err)
 	}
 	device.Poll(true, nil)
-	if mapStatus != wgpu.BufferMapAsyncStatusSuccess {
+	if mapStatus != wgpu.MapAsyncStatusSuccess {
 		t.Fatalf("buffer map status: %v", mapStatus)
 	}
 	data := readBuf.GetMappedRange(0, uint(bytesPerRow*dim))
@@ -378,7 +378,7 @@ func runStencilReadback(t *testing.T, maskMode, fillMode StencilMode, ref uint32
 	defer queue.Release()
 
 	const format = wgpu.TextureFormatRGBA8Unorm
-	colorTex, err := device.CreateTexture(&wgpu.TextureDescriptor{
+	colorTex, err := device.TryCreateTexture(&wgpu.TextureDescriptor{
 		Label:         "offscreen",
 		Size:          wgpu.Extent3D{Width: dim, Height: dim, DepthOrArrayLayers: 1},
 		MipLevelCount: 1, SampleCount: 1, Dimension: wgpu.TextureDimension2D,
@@ -388,13 +388,13 @@ func runStencilReadback(t *testing.T, maskMode, fillMode StencilMode, ref uint32
 		t.Fatalf("color texture: %v", err)
 	}
 	defer colorTex.Release()
-	colorView, err := colorTex.CreateView(nil)
+	colorView, err := colorTex.TryCreateView(nil)
 	if err != nil {
 		t.Fatalf("color view: %v", err)
 	}
 	defer colorView.Release()
 
-	depthTex, err := device.CreateTexture(&wgpu.TextureDescriptor{
+	depthTex, err := device.TryCreateTexture(&wgpu.TextureDescriptor{
 		Label:         "depth-stencil",
 		Size:          wgpu.Extent3D{Width: dim, Height: dim, DepthOrArrayLayers: 1},
 		MipLevelCount: 1, SampleCount: 1, Dimension: wgpu.TextureDimension2D,
@@ -404,15 +404,15 @@ func runStencilReadback(t *testing.T, maskMode, fillMode StencilMode, ref uint32
 		t.Fatalf("depth texture: %v", err)
 	}
 	defer depthTex.Release()
-	depthView, err := depthTex.CreateView(nil)
+	depthView, err := depthTex.TryCreateView(nil)
 	if err != nil {
 		t.Fatalf("depth view: %v", err)
 	}
 	defer depthView.Release()
 
 	desc, _ := DescriptorFor("path")
-	mod, err := device.CreateShaderModule(&wgpu.ShaderModuleDescriptor{
-		Label: "path.wgsl", WGSLDescriptor: &wgpu.ShaderModuleWGSLDescriptor{Code: string(ShaderSource("path"))},
+	mod, err := device.TryCreateShaderModule(&wgpu.ShaderModuleDescriptor{
+		Label: "path.wgsl", WGSLSource: &wgpu.ShaderSourceWGSL{Code: string(ShaderSource("path"))},
 	})
 	if err != nil {
 		t.Fatalf("shader module: %v", err)
@@ -420,7 +420,7 @@ func runStencilReadback(t *testing.T, maskMode, fillMode StencilMode, ref uint32
 	defer mod.Release()
 
 	buildPipe := func(mode StencilMode) *wgpu.RenderPipeline {
-		pipe, err := device.CreateRenderPipeline(&wgpu.RenderPipelineDescriptor{
+		pipe, err := device.TryCreateRenderPipeline(&wgpu.RenderPipelineDescriptor{
 			Vertex: wgpu.VertexState{Module: mod, EntryPoint: VertexEntry, Buffers: []wgpu.VertexBufferLayout{vertexBufferLayout(desc.Vertex)}},
 			Fragment: &wgpu.FragmentState{Module: mod, EntryPoint: FragmentEntry, Targets: []wgpu.ColorTargetState{{
 				Format: format, Blend: blendState(BlendOver), WriteMask: colorWriteMask(mode),
@@ -445,22 +445,22 @@ func runStencilReadback(t *testing.T, maskMode, fillMode StencilMode, ref uint32
 		-0.5, -0.5, 1, 0.5, 0.5, 1, -0.5, 0.5, 1,
 	}
 	fillVerts := []float32{-1, -1, 1, 3, -1, 1, -1, 3, 1}
-	maskVB, _ := device.CreateBufferInit(&wgpu.BufferInitDescriptor{Contents: wgpu.ToBytes(maskVerts), Usage: wgpu.BufferUsageVertex})
+	maskVB, _ := device.TryCreateBufferInit(&wgpu.BufferInitDescriptor{Contents: wgpu.ToBytes(maskVerts), Usage: wgpu.BufferUsageVertex})
 	defer maskVB.Release()
-	fillVB, _ := device.CreateBufferInit(&wgpu.BufferInitDescriptor{Contents: wgpu.ToBytes(fillVerts), Usage: wgpu.BufferUsageVertex})
+	fillVB, _ := device.TryCreateBufferInit(&wgpu.BufferInitDescriptor{Contents: wgpu.ToBytes(fillVerts), Usage: wgpu.BufferUsageVertex})
 	defer fillVB.Release()
 
 	maskU := PathUniforms{}
 	fillU := PathUniforms{FillColor: [4]float32{1, 0, 0, 1}}
-	maskUB, _ := device.CreateBufferInit(&wgpu.BufferInitDescriptor{Contents: uniformBytes(&maskU), Usage: wgpu.BufferUsageUniform})
+	maskUB, _ := device.TryCreateBufferInit(&wgpu.BufferInitDescriptor{Contents: uniformBytes(&maskU), Usage: wgpu.BufferUsageUniform})
 	defer maskUB.Release()
-	fillUB, _ := device.CreateBufferInit(&wgpu.BufferInitDescriptor{Contents: uniformBytes(&fillU), Usage: wgpu.BufferUsageUniform})
+	fillUB, _ := device.TryCreateBufferInit(&wgpu.BufferInitDescriptor{Contents: uniformBytes(&fillU), Usage: wgpu.BufferUsageUniform})
 	defer fillUB.Release()
 
 	bind := func(pipe *wgpu.RenderPipeline, ub *wgpu.Buffer, sz int) *wgpu.BindGroup {
 		layout := pipe.GetBindGroupLayout(0)
 		defer layout.Release()
-		bg, err := device.CreateBindGroup(&wgpu.BindGroupDescriptor{Layout: layout, Entries: []wgpu.BindGroupEntry{{Binding: 0, Buffer: ub, Size: uint64(sz)}}})
+		bg, err := device.TryCreateBindGroup(&wgpu.BindGroupDescriptor{Layout: layout, Entries: []wgpu.BindGroupEntry{{Binding: 0, Buffer: ub, Size: uint64(sz)}}})
 		if err != nil {
 			t.Fatalf("bind group: %v", err)
 		}
@@ -471,10 +471,10 @@ func runStencilReadback(t *testing.T, maskMode, fillMode StencilMode, ref uint32
 	fillBG := bind(fillPipe, fillUB, len(uniformBytes(&fillU)))
 	defer fillBG.Release()
 
-	readBuf, _ := device.CreateBuffer(&wgpu.BufferDescriptor{Size: bytesPerRow * dim, Usage: wgpu.BufferUsageCopyDst | wgpu.BufferUsageMapRead})
+	readBuf, _ := device.TryCreateBuffer(&wgpu.BufferDescriptor{Size: bytesPerRow * dim, Usage: wgpu.BufferUsageCopyDst | wgpu.BufferUsageMapRead})
 	defer readBuf.Release()
 
-	enc, _ := device.CreateCommandEncoder(nil)
+	enc, _ := device.TryCreateCommandEncoder(nil)
 	pass := enc.BeginRenderPass(&wgpu.RenderPassDescriptor{
 		ColorAttachments: []wgpu.RenderPassColorAttachment{{View: colorView, LoadOp: wgpu.LoadOpClear, StoreOp: wgpu.StoreOpStore, ClearValue: wgpu.Color{}}},
 		DepthStencilAttachment: &wgpu.RenderPassDepthStencilAttachment{
@@ -496,11 +496,11 @@ func runStencilReadback(t *testing.T, maskMode, fillMode StencilMode, ref uint32
 	pass.Release()
 
 	enc.CopyTextureToBuffer(
-		&wgpu.ImageCopyTexture{Texture: colorTex},
-		&wgpu.ImageCopyBuffer{Buffer: readBuf, Layout: wgpu.TextureDataLayout{BytesPerRow: bytesPerRow, RowsPerImage: dim}},
+		&wgpu.TexelCopyTextureInfo{Texture: colorTex},
+		&wgpu.TexelCopyBufferInfo{Buffer: readBuf, Layout: wgpu.TexelCopyBufferLayout{BytesPerRow: bytesPerRow, RowsPerImage: dim}},
 		&wgpu.Extent3D{Width: dim, Height: dim, DepthOrArrayLayers: 1},
 	)
-	cmd, err := enc.Finish(nil)
+	cmd, err := enc.TryFinish(nil)
 	if err != nil {
 		t.Fatalf("finish: %v", err)
 	}
@@ -508,12 +508,12 @@ func runStencilReadback(t *testing.T, maskMode, fillMode StencilMode, ref uint32
 	cmd.Release()
 	enc.Release()
 
-	var status wgpu.BufferMapAsyncStatus
-	if err := readBuf.MapAsync(wgpu.MapModeRead, 0, bytesPerRow*dim, func(s wgpu.BufferMapAsyncStatus) { status = s }); err != nil {
+	var status wgpu.MapAsyncStatus
+	if err := readBuf.TryMapAsync(wgpu.MapModeRead, 0, bytesPerRow*dim, func(s wgpu.MapAsyncStatus) { status = s }); err != nil {
 		t.Fatalf("map async: %v", err)
 	}
 	device.Poll(true, nil)
-	if status != wgpu.BufferMapAsyncStatusSuccess {
+	if status != wgpu.MapAsyncStatusSuccess {
 		t.Fatalf("buffer map status: %v", status)
 	}
 	data := readBuf.GetMappedRange(0, uint(bytesPerRow*dim))
@@ -556,7 +556,7 @@ func TestScene3DRenderReadback(t *testing.T) {
 	defer queue.Release()
 
 	const format = wgpu.TextureFormatRGBA8Unorm
-	colorTex, err := device.CreateTexture(&wgpu.TextureDescriptor{
+	colorTex, err := device.TryCreateTexture(&wgpu.TextureDescriptor{
 		Label:         "offscreen",
 		Size:          wgpu.Extent3D{Width: dim, Height: dim, DepthOrArrayLayers: 1},
 		MipLevelCount: 1, SampleCount: 1, Dimension: wgpu.TextureDimension2D,
@@ -566,13 +566,13 @@ func TestScene3DRenderReadback(t *testing.T) {
 		t.Fatalf("color texture: %v", err)
 	}
 	defer colorTex.Release()
-	colorView, err := colorTex.CreateView(nil)
+	colorView, err := colorTex.TryCreateView(nil)
 	if err != nil {
 		t.Fatalf("color view: %v", err)
 	}
 	defer colorView.Release()
 
-	depthTex, err := device.CreateTexture(&wgpu.TextureDescriptor{
+	depthTex, err := device.TryCreateTexture(&wgpu.TextureDescriptor{
 		Label:         "depth-stencil",
 		Size:          wgpu.Extent3D{Width: dim, Height: dim, DepthOrArrayLayers: 1},
 		MipLevelCount: 1, SampleCount: 1, Dimension: wgpu.TextureDimension2D,
@@ -582,21 +582,21 @@ func TestScene3DRenderReadback(t *testing.T) {
 		t.Fatalf("depth texture: %v", err)
 	}
 	defer depthTex.Release()
-	depthView, err := depthTex.CreateView(nil)
+	depthView, err := depthTex.TryCreateView(nil)
 	if err != nil {
 		t.Fatalf("depth view: %v", err)
 	}
 	defer depthView.Release()
 
 	desc, _ := DescriptorFor("scene3d")
-	mod, err := device.CreateShaderModule(&wgpu.ShaderModuleDescriptor{
-		Label: "scene3d.wgsl", WGSLDescriptor: &wgpu.ShaderModuleWGSLDescriptor{Code: string(ShaderSource("scene3d"))},
+	mod, err := device.TryCreateShaderModule(&wgpu.ShaderModuleDescriptor{
+		Label: "scene3d.wgsl", WGSLSource: &wgpu.ShaderSourceWGSL{Code: string(ShaderSource("scene3d"))},
 	})
 	if err != nil {
 		t.Fatalf("shader module: %v", err)
 	}
 	defer mod.Release()
-	pipe, err := device.CreateRenderPipeline(&wgpu.RenderPipelineDescriptor{
+	pipe, err := device.TryCreateRenderPipeline(&wgpu.RenderPipelineDescriptor{
 		Vertex: wgpu.VertexState{Module: mod, EntryPoint: VertexEntry, Buffers: []wgpu.VertexBufferLayout{vertexBufferLayout(desc.Vertex)}},
 		Fragment: &wgpu.FragmentState{Module: mod, EntryPoint: FragmentEntry, Targets: []wgpu.ColorTargetState{{
 			Format: format, Blend: blendState(BlendReplace), WriteMask: wgpu.ColorWriteMaskAll,
@@ -637,14 +637,14 @@ func TestScene3DRenderReadback(t *testing.T) {
 	if len(verts) != 60 {
 		t.Fatalf("verts = %d floats, want 60 (2 faces)", len(verts))
 	}
-	vbuf, err := device.CreateBufferInit(&wgpu.BufferInitDescriptor{Contents: wgpu.ToBytes(verts), Usage: wgpu.BufferUsageVertex})
+	vbuf, err := device.TryCreateBufferInit(&wgpu.BufferInitDescriptor{Contents: wgpu.ToBytes(verts), Usage: wgpu.BufferUsageVertex})
 	if err != nil {
 		t.Fatalf("vertex buffer: %v", err)
 	}
 	defer vbuf.Release()
 
 	u := sceneUniforms(scene, dim, dim)
-	ubuf, err := device.CreateBufferInit(&wgpu.BufferInitDescriptor{Contents: uniformBytes(&u), Usage: wgpu.BufferUsageUniform})
+	ubuf, err := device.TryCreateBufferInit(&wgpu.BufferInitDescriptor{Contents: uniformBytes(&u), Usage: wgpu.BufferUsageUniform})
 	if err != nil {
 		t.Fatalf("uniform buffer: %v", err)
 	}
@@ -652,7 +652,7 @@ func TestScene3DRenderReadback(t *testing.T) {
 
 	layout := pipe.GetBindGroupLayout(0)
 	defer layout.Release()
-	bg, err := device.CreateBindGroup(&wgpu.BindGroupDescriptor{
+	bg, err := device.TryCreateBindGroup(&wgpu.BindGroupDescriptor{
 		Layout: layout, Entries: []wgpu.BindGroupEntry{{Binding: 0, Buffer: ubuf, Size: uint64(len(uniformBytes(&u)))}},
 	})
 	if err != nil {
@@ -660,13 +660,13 @@ func TestScene3DRenderReadback(t *testing.T) {
 	}
 	defer bg.Release()
 
-	readBuf, err := device.CreateBuffer(&wgpu.BufferDescriptor{Size: bytesPerRow * dim, Usage: wgpu.BufferUsageCopyDst | wgpu.BufferUsageMapRead})
+	readBuf, err := device.TryCreateBuffer(&wgpu.BufferDescriptor{Size: bytesPerRow * dim, Usage: wgpu.BufferUsageCopyDst | wgpu.BufferUsageMapRead})
 	if err != nil {
 		t.Fatalf("readback buffer: %v", err)
 	}
 	defer readBuf.Release()
 
-	enc, err := device.CreateCommandEncoder(nil)
+	enc, err := device.TryCreateCommandEncoder(nil)
 	if err != nil {
 		t.Fatalf("encoder: %v", err)
 	}
@@ -686,11 +686,11 @@ func TestScene3DRenderReadback(t *testing.T) {
 	pass.Release()
 
 	enc.CopyTextureToBuffer(
-		&wgpu.ImageCopyTexture{Texture: colorTex},
-		&wgpu.ImageCopyBuffer{Buffer: readBuf, Layout: wgpu.TextureDataLayout{BytesPerRow: bytesPerRow, RowsPerImage: dim}},
+		&wgpu.TexelCopyTextureInfo{Texture: colorTex},
+		&wgpu.TexelCopyBufferInfo{Buffer: readBuf, Layout: wgpu.TexelCopyBufferLayout{BytesPerRow: bytesPerRow, RowsPerImage: dim}},
 		&wgpu.Extent3D{Width: dim, Height: dim, DepthOrArrayLayers: 1},
 	)
-	cmd, err := enc.Finish(nil)
+	cmd, err := enc.TryFinish(nil)
 	if err != nil {
 		t.Fatalf("finish: %v", err)
 	}
@@ -698,12 +698,12 @@ func TestScene3DRenderReadback(t *testing.T) {
 	cmd.Release()
 	enc.Release()
 
-	var status wgpu.BufferMapAsyncStatus
-	if err := readBuf.MapAsync(wgpu.MapModeRead, 0, bytesPerRow*dim, func(s wgpu.BufferMapAsyncStatus) { status = s }); err != nil {
+	var status wgpu.MapAsyncStatus
+	if err := readBuf.TryMapAsync(wgpu.MapModeRead, 0, bytesPerRow*dim, func(s wgpu.MapAsyncStatus) { status = s }); err != nil {
 		t.Fatalf("map async: %v", err)
 	}
 	device.Poll(true, nil)
-	if status != wgpu.BufferMapAsyncStatusSuccess {
+	if status != wgpu.MapAsyncStatusSuccess {
 		t.Fatalf("buffer map status: %v", status)
 	}
 	data := readBuf.GetMappedRange(0, uint(bytesPerRow*dim))
@@ -756,14 +756,14 @@ func runSceneStencilIsolation(t *testing.T, dedicated bool) (center, corner [4]b
 
 	const format = wgpu.TextureFormatRGBA8Unorm
 	mkTex := func(label string, f wgpu.TextureFormat, usage wgpu.TextureUsage) (*wgpu.Texture, *wgpu.TextureView) {
-		tex, err := device.CreateTexture(&wgpu.TextureDescriptor{
+		tex, err := device.TryCreateTexture(&wgpu.TextureDescriptor{
 			Label: label, Size: wgpu.Extent3D{Width: dim, Height: dim, DepthOrArrayLayers: 1},
 			MipLevelCount: 1, SampleCount: 1, Dimension: wgpu.TextureDimension2D, Format: f, Usage: usage,
 		})
 		if err != nil {
 			t.Fatalf("%s texture: %v", label, err)
 		}
-		view, err := tex.CreateView(nil)
+		view, err := tex.TryCreateView(nil)
 		if err != nil {
 			t.Fatalf("%s view: %v", label, err)
 		}
@@ -786,8 +786,8 @@ func runSceneStencilIsolation(t *testing.T, dedicated bool) (center, corner [4]b
 	}
 
 	desc, _ := DescriptorFor("path")
-	mod, err := device.CreateShaderModule(&wgpu.ShaderModuleDescriptor{
-		Label: "path.wgsl", WGSLDescriptor: &wgpu.ShaderModuleWGSLDescriptor{Code: string(ShaderSource("path"))},
+	mod, err := device.TryCreateShaderModule(&wgpu.ShaderModuleDescriptor{
+		Label: "path.wgsl", WGSLSource: &wgpu.ShaderSourceWGSL{Code: string(ShaderSource("path"))},
 	})
 	if err != nil {
 		t.Fatalf("shader module: %v", err)
@@ -795,7 +795,7 @@ func runSceneStencilIsolation(t *testing.T, dedicated bool) (center, corner [4]b
 	defer mod.Release()
 
 	buildPipe := func(mode StencilMode, depth bool) *wgpu.RenderPipeline {
-		pipe, err := device.CreateRenderPipeline(&wgpu.RenderPipelineDescriptor{
+		pipe, err := device.TryCreateRenderPipeline(&wgpu.RenderPipelineDescriptor{
 			Vertex:       wgpu.VertexState{Module: mod, EntryPoint: VertexEntry, Buffers: []wgpu.VertexBufferLayout{vertexBufferLayout(desc.Vertex)}},
 			Fragment:     &wgpu.FragmentState{Module: mod, EntryPoint: FragmentEntry, Targets: []wgpu.ColorTargetState{{Format: format, Blend: blendState(BlendOver), WriteMask: colorWriteMask(mode)}}},
 			Primitive:    wgpu.PrimitiveState{Topology: wgpuTopology(desc.Topology), FrontFace: wgpu.FrontFaceCCW, CullMode: wgpu.CullModeNone},
@@ -820,7 +820,7 @@ func runSceneStencilIsolation(t *testing.T, dedicated bool) (center, corner [4]b
 	}
 	fullVerts := []float32{-1, -1, 1, 3, -1, 1, -1, 3, 1}
 	mkVB := func(v []float32) *wgpu.Buffer {
-		b, err := device.CreateBufferInit(&wgpu.BufferInitDescriptor{Contents: wgpu.ToBytes(v), Usage: wgpu.BufferUsageVertex})
+		b, err := device.TryCreateBufferInit(&wgpu.BufferInitDescriptor{Contents: wgpu.ToBytes(v), Usage: wgpu.BufferUsageVertex})
 		if err != nil {
 			t.Fatalf("vertex buffer: %v", err)
 		}
@@ -832,7 +832,7 @@ func runSceneStencilIsolation(t *testing.T, dedicated bool) (center, corner [4]b
 	defer fullVB.Release()
 
 	mkUB := func(u PathUniforms) *wgpu.Buffer {
-		b, err := device.CreateBufferInit(&wgpu.BufferInitDescriptor{Contents: uniformBytes(&u), Usage: wgpu.BufferUsageUniform})
+		b, err := device.TryCreateBufferInit(&wgpu.BufferInitDescriptor{Contents: uniformBytes(&u), Usage: wgpu.BufferUsageUniform})
 		if err != nil {
 			t.Fatalf("uniform buffer: %v", err)
 		}
@@ -849,7 +849,7 @@ func runSceneStencilIsolation(t *testing.T, dedicated bool) (center, corner [4]b
 	mkBG := func(pipe *wgpu.RenderPipeline, ub *wgpu.Buffer) *wgpu.BindGroup {
 		layout := pipe.GetBindGroupLayout(0)
 		defer layout.Release()
-		bg, err := device.CreateBindGroup(&wgpu.BindGroupDescriptor{Layout: layout, Entries: []wgpu.BindGroupEntry{{Binding: 0, Buffer: ub, Size: uint64(uSize)}}})
+		bg, err := device.TryCreateBindGroup(&wgpu.BindGroupDescriptor{Layout: layout, Entries: []wgpu.BindGroupEntry{{Binding: 0, Buffer: ub, Size: uint64(uSize)}}})
 		if err != nil {
 			t.Fatalf("bind group: %v", err)
 		}
@@ -862,7 +862,7 @@ func runSceneStencilIsolation(t *testing.T, dedicated bool) (center, corner [4]b
 	defer sceneBG.Release()
 	defer fillBG.Release()
 
-	readBuf, _ := device.CreateBuffer(&wgpu.BufferDescriptor{Size: bytesPerRow * dim, Usage: wgpu.BufferUsageCopyDst | wgpu.BufferUsageMapRead})
+	readBuf, _ := device.TryCreateBuffer(&wgpu.BufferDescriptor{Size: bytesPerRow * dim, Usage: wgpu.BufferUsageCopyDst | wgpu.BufferUsageMapRead})
 	defer readBuf.Release()
 
 	depthAtt := func(view *wgpu.TextureView, load wgpu.LoadOp) *wgpu.RenderPassDepthStencilAttachment {
@@ -876,7 +876,7 @@ func runSceneStencilIsolation(t *testing.T, dedicated bool) (center, corner [4]b
 		return []wgpu.RenderPassColorAttachment{{View: colorView, LoadOp: load, StoreOp: wgpu.StoreOpStore, ClearValue: wgpu.Color{}}}
 	}
 
-	enc, _ := device.CreateCommandEncoder(nil)
+	enc, _ := device.TryCreateCommandEncoder(nil)
 
 	// Pass A — canvas: stamp the clip mask into the shared depth-stencil.
 	passA := enc.BeginRenderPass(&wgpu.RenderPassDescriptor{ColorAttachments: colorAtt(wgpu.LoadOpClear), DepthStencilAttachment: depthAtt(sharedView, wgpu.LoadOpClear)})
@@ -908,11 +908,11 @@ func runSceneStencilIsolation(t *testing.T, dedicated bool) (center, corner [4]b
 	passC.Release()
 
 	enc.CopyTextureToBuffer(
-		&wgpu.ImageCopyTexture{Texture: colorTex},
-		&wgpu.ImageCopyBuffer{Buffer: readBuf, Layout: wgpu.TextureDataLayout{BytesPerRow: bytesPerRow, RowsPerImage: dim}},
+		&wgpu.TexelCopyTextureInfo{Texture: colorTex},
+		&wgpu.TexelCopyBufferInfo{Buffer: readBuf, Layout: wgpu.TexelCopyBufferLayout{BytesPerRow: bytesPerRow, RowsPerImage: dim}},
 		&wgpu.Extent3D{Width: dim, Height: dim, DepthOrArrayLayers: 1},
 	)
-	cmd, err := enc.Finish(nil)
+	cmd, err := enc.TryFinish(nil)
 	if err != nil {
 		t.Fatalf("finish: %v", err)
 	}
@@ -920,12 +920,12 @@ func runSceneStencilIsolation(t *testing.T, dedicated bool) (center, corner [4]b
 	cmd.Release()
 	enc.Release()
 
-	var status wgpu.BufferMapAsyncStatus
-	if err := readBuf.MapAsync(wgpu.MapModeRead, 0, bytesPerRow*dim, func(s wgpu.BufferMapAsyncStatus) { status = s }); err != nil {
+	var status wgpu.MapAsyncStatus
+	if err := readBuf.TryMapAsync(wgpu.MapModeRead, 0, bytesPerRow*dim, func(s wgpu.MapAsyncStatus) { status = s }); err != nil {
 		t.Fatalf("map async: %v", err)
 	}
 	device.Poll(true, nil)
-	if status != wgpu.BufferMapAsyncStatusSuccess {
+	if status != wgpu.MapAsyncStatusSuccess {
 		t.Fatalf("buffer map status: %v", status)
 	}
 	data := readBuf.GetMappedRange(0, uint(bytesPerRow*dim))

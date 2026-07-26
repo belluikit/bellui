@@ -34,7 +34,7 @@ func TestLoadOpRetainsAcrossSubmits(t *testing.T) {
 	defer queue.Release()
 
 	const format = wgpu.TextureFormatRGBA8Unorm
-	tex, err := device.CreateTexture(&wgpu.TextureDescriptor{
+	tex, err := device.TryCreateTexture(&wgpu.TextureDescriptor{
 		Label:         "retain",
 		Size:          wgpu.Extent3D{Width: dim, Height: dim, DepthOrArrayLayers: 1},
 		MipLevelCount: 1, SampleCount: 1, Dimension: wgpu.TextureDimension2D,
@@ -44,14 +44,14 @@ func TestLoadOpRetainsAcrossSubmits(t *testing.T) {
 		t.Fatalf("texture: %v", err)
 	}
 	defer tex.Release()
-	view, err := tex.CreateView(nil)
+	view, err := tex.TryCreateView(nil)
 	if err != nil {
 		t.Fatalf("view: %v", err)
 	}
 	defer view.Release()
 
 	// Submit 1: clear to red, store.
-	enc1, _ := device.CreateCommandEncoder(nil)
+	enc1, _ := device.TryCreateCommandEncoder(nil)
 	p1 := enc1.BeginRenderPass(&wgpu.RenderPassDescriptor{
 		ColorAttachments: []wgpu.RenderPassColorAttachment{{
 			View: view, LoadOp: wgpu.LoadOpClear, StoreOp: wgpu.StoreOpStore,
@@ -60,7 +60,7 @@ func TestLoadOpRetainsAcrossSubmits(t *testing.T) {
 	})
 	p1.End()
 	p1.Release()
-	cmd1, err := enc1.Finish(nil)
+	cmd1, err := enc1.TryFinish(nil)
 	if err != nil {
 		t.Fatalf("finish1: %v", err)
 	}
@@ -70,7 +70,7 @@ func TestLoadOpRetainsAcrossSubmits(t *testing.T) {
 	device.Poll(true, nil)
 
 	// Submit 2: LoadOp=Load, draw nothing, store.
-	enc2, _ := device.CreateCommandEncoder(nil)
+	enc2, _ := device.TryCreateCommandEncoder(nil)
 	p2 := enc2.BeginRenderPass(&wgpu.RenderPassDescriptor{
 		ColorAttachments: []wgpu.RenderPassColorAttachment{{
 			View: view, LoadOp: wgpu.LoadOpLoad, StoreOp: wgpu.StoreOpStore,
@@ -79,14 +79,14 @@ func TestLoadOpRetainsAcrossSubmits(t *testing.T) {
 	p2.End()
 	p2.Release()
 
-	readBuf, _ := device.CreateBuffer(&wgpu.BufferDescriptor{Size: bytesPerRow * dim, Usage: wgpu.BufferUsageCopyDst | wgpu.BufferUsageMapRead})
+	readBuf, _ := device.TryCreateBuffer(&wgpu.BufferDescriptor{Size: bytesPerRow * dim, Usage: wgpu.BufferUsageCopyDst | wgpu.BufferUsageMapRead})
 	defer readBuf.Release()
 	enc2.CopyTextureToBuffer(
-		&wgpu.ImageCopyTexture{Texture: tex},
-		&wgpu.ImageCopyBuffer{Buffer: readBuf, Layout: wgpu.TextureDataLayout{BytesPerRow: bytesPerRow, RowsPerImage: dim}},
+		&wgpu.TexelCopyTextureInfo{Texture: tex},
+		&wgpu.TexelCopyBufferInfo{Buffer: readBuf, Layout: wgpu.TexelCopyBufferLayout{BytesPerRow: bytesPerRow, RowsPerImage: dim}},
 		&wgpu.Extent3D{Width: dim, Height: dim, DepthOrArrayLayers: 1},
 	)
-	cmd2, err := enc2.Finish(nil)
+	cmd2, err := enc2.TryFinish(nil)
 	if err != nil {
 		t.Fatalf("finish2: %v", err)
 	}
@@ -94,12 +94,12 @@ func TestLoadOpRetainsAcrossSubmits(t *testing.T) {
 	cmd2.Release()
 	enc2.Release()
 
-	var status wgpu.BufferMapAsyncStatus
-	if err := readBuf.MapAsync(wgpu.MapModeRead, 0, bytesPerRow*dim, func(s wgpu.BufferMapAsyncStatus) { status = s }); err != nil {
+	var status wgpu.MapAsyncStatus
+	if err := readBuf.TryMapAsync(wgpu.MapModeRead, 0, bytesPerRow*dim, func(s wgpu.MapAsyncStatus) { status = s }); err != nil {
 		t.Fatalf("map: %v", err)
 	}
 	device.Poll(true, nil)
-	if status != wgpu.BufferMapAsyncStatusSuccess {
+	if status != wgpu.MapAsyncStatusSuccess {
 		t.Fatalf("map status: %v", status)
 	}
 	data := readBuf.GetMappedRange(0, uint(bytesPerRow*dim))
