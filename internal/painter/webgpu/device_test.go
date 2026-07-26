@@ -237,13 +237,13 @@ func TestChooseInstanceBackends(t *testing.T) {
 		nil_ bool // expect a nil descriptor (all backends)
 	}{
 		{spec: "", nil_: true},
-		{spec: "dx12", want: wgpu.InstanceBackendDX12},
-		{spec: "d3d12", want: wgpu.InstanceBackendDX12},
-		{spec: " DX12 ", want: wgpu.InstanceBackendDX12},
-		{spec: "vulkan|dx12", want: wgpu.InstanceBackendVulkan | wgpu.InstanceBackendDX12},
-		{spec: "primary", want: wgpu.InstanceBackendPrimary},
+		{spec: "dx12", want: instanceBackendDX12},
+		{spec: "d3d12", want: instanceBackendDX12},
+		{spec: " DX12 ", want: instanceBackendDX12},
+		{spec: "vulkan|dx12", want: instanceBackendVulkan | instanceBackendDX12},
+		{spec: "primary", want: instanceBackendPrimary},
 		{spec: "all", want: 0}, // All == 0
-		{spec: "bogus|dx12", want: wgpu.InstanceBackendDX12},
+		{spec: "bogus|dx12", want: instanceBackendDX12},
 	}
 	for _, tc := range cases {
 		t.Run(tc.spec, func(t *testing.T) {

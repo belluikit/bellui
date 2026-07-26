@@ -14,7 +14,7 @@ import (
 // host — verify on Windows.
 func webgpuSurfaceDescriptor(w *window) *wgpu.SurfaceDescriptor {
 	return &wgpu.SurfaceDescriptor{
-		WindowsHWND: &wgpu.SurfaceDescriptorFromWindowsHWND{
+		WindowsHWND: &wgpu.SurfaceSourceWindowsHWND{
 			Hinstance: nil,
 			Hwnd:      unsafe.Pointer(w.viewport.GetWin32Window()),
 		},

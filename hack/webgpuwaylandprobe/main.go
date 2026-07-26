@@ -2,7 +2,7 @@
 // and renders to a native Wayland surface (#608, a #542 follow-up).
 //
 // The WebGPU backend's Wayland surface descriptor
-// (SurfaceDescriptorFromWaylandSurface, backend_webgpu_x11wayland.go, gated on
+// (SurfaceSourceWaylandSurface, backend_webgpu_x11wayland.go, gated on
 // build.IsWayland) is compile-checked in CI but never runtime-exercised there —
 // CI runs under Xvfb (X11). This probe forces the Wayland platform and draws a
 // distinctive frame so a screenshot proves a frame reached the compositor.
