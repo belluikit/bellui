@@ -14,7 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/belluikit/render"
+	"github.com/belluikit/bellui/internal/render"
 	"github.com/belluikit/typesetting/di"
 	"github.com/belluikit/typesetting/font"
 	"github.com/belluikit/typesetting/fontscan"

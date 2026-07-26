@@ -152,23 +152,15 @@ Three former external dependencies now live in `internal/`, each with a
 | `internal/ico` | `fyne-io/image/ico` | 391 | Only `ico` was used; the module's other package (`xpm`, 1,269 LOC) was dead weight. Windows `.ico` is a frozen format. **Ships two licenses** — `LICENSE-reader` (Apache-2.0) and `LICENSE-writer` (BSD, Go Authors); do not consolidate. |
 | `internal/rasterx` | `srwiley/rasterx` | 3,258 | Upstream dormant since 2022-07-30. Depends only on `golang.org/x/image`, already required — so vendoring adds no modules. |
 | `internal/oksvg` | `fyne-io/oksvg` | 2,236 | **Forced by rasterx**: `SvgIcon.Draw` is typed against `*rasterx.Dasher`, so oksvg had to follow rasterx across the module boundary or reference an incompatible type. |
+| `internal/render` | `belluikit/render` | 501 | **The last holder of srwiley.** A separate module cannot import `internal/{oksvg,rasterx}` (Go's internal rule), so the choice was duplicating ~5.5k LOC inside `render` or bringing `render` here. It has one consumer using one symbol, so absorbing won. |
 
-**What this did and did not achieve.** Direct requires dropped 33 → 31, two fork
-repos are no longer needed, and the code we call is now ours to patch. The build
-module graph is **unchanged at 33**, because `belluikit/render` — which
-`internal/painter` imports for text — still requires `srwiley/oksvg` and
-`srwiley/rasterx`:
+**srwiley is fully retired.** `go list -deps` and `go.sum` both contain zero
+`srwiley` references, and zero `fyne-io`/`fyne.io` references. Build modules
+dropped 33 → 30. The graph is now belluikit forks + `trendvidia/protowire-go` +
+ordinary third-party libraries.
 
-```
-$ go mod why github.com/srwiley/rasterx
-github.com/belluikit/bellui/internal/painter
-github.com/belluikit/render
-github.com/srwiley/rasterx
-```
-
-Fully retiring srwiley therefore needs `belluikit/render` (a fork we own)
-repointed at these vendored packages — or its SVG/raster use removed. Until
-then srwiley remains as an `// indirect` entry.
+`belluikit/render` is consequently unused by bellui and frozen unless another
+consumer appears.
 
 **Rejected: `tdewolff/canvas`.** Evaluated as a replacement and declined — its
 core package itself depends on `srwiley/rasterx` and `srwiley/scanx`, so it
