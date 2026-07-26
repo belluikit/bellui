@@ -104,7 +104,7 @@ unchanged except the module path; each keeps an `upstream` git remote for syncin
 
 | Module | Ver | Import lines | Role | Upstream |
 |---|---|---|---|---|
-| `belluikit/webgpu` | v1.0.8 | 31 | **default painter** (`//go:build !gl`) | `cogentcore/webgpu` |
+| `belluikit/webgpu` | v1.1.0 | 31 | **default painter** (`//go:build !gl`) | `oliverbestmann/webgpu` |
 | `belluikit/glfw` | v1.9.0 | 27 | desktop windowing — IME/preedit, parent/modal, clipboard MIME | `go-gl/glfw` + vendored GLFW 3.4 |
 | `belluikit/typesetting` | v0.3.6 | 24 | shaping (HarfBuzz), font scanning | `go-text/typesetting` |
 | `trendvidia/protowire-go` | v1.2.2 | 6 | PXF encoding — manifests, prefs, settings | own |
@@ -128,13 +128,25 @@ Rehoming it under `belluikit` would misrepresent it as a UI component and orphan
 it from its spec repo. It is a normal published dependency here — no `replace`,
 no fork.
 
-**Upstream health note — `webgpu`.** Its README carries an inherited notice that
-the upstream (`cogentcore/webgpu`) is frozen and points at
-`oliverbestmann/webgpu` as the maintained fork. Lineage:
+**Base switch — `webgpu` (resolved, #1).** The fork was rebased from
+`cogentcore/webgpu` onto `oliverbestmann/webgpu` in v1.1.0. Lineage:
 `rajveermalviya/go-webgpu` (archived) → `cogentcore/webgpu` (self-declared
-frozen; still pushed 2026-06) → `oliverbestmann/webgpu` (active, small). This
-sits under the **default** rendering path, so it is worth tracking — no action
-taken.
+frozen) → `oliverbestmann/webgpu`. The deciding evidence was that
+`cogentcore/core` — the project behind our old base — has itself moved there, so
+that repo is the live continuation rather than a small unrelated fork.
+
+It brought wgpu-native v22.1.0.5 → v29.0.1.1, generated cgo wrappers (fewer
+allocations per call), and all four js/wasm patches this fork carried already
+upstream. The static libraries now live in per-OS modules on their own branches,
+so a consumer downloads one platform's slice instead of a 126 MB module zip.
+
+Two slices upstream does not ship stay forked, on `libs-ios` and `libs-windows`
+branches of our repo: the **arm64 iOS Simulator** archive (Go builds device and
+Simulator both as `GOOS=ios/GOARCH=arm64`, so the device slice cannot link a
+Simulator binary — gated behind the `iossimulator` tag) and a **windows/arm64
+GNU-ABI** rebuild (upstream ships MSVC only, whose C++ EH llvm-mingw cannot
+link). Everything else is consumed from upstream unchanged, so upstream fixes
+arrive by version bump rather than by merge.
 
 **Retiring srwiley.** `render` is the last holder of `srwiley/{oksvg,rasterx}`.
 Note it cannot simply import `internal/{oksvg,rasterx}` — Go's internal rule
@@ -221,7 +233,6 @@ Tracked as issues; nothing here lives only in prose.
 
 | Item | Issue |
 |---|---|
-| webgpu upstream (`cogentcore`) self-declared frozen | belluikit/bellui#1 |
 | `add-to-project.yml` points at pre-rebrand boards | belluikit/bellui#2 |
 | `x/dag` lost graph serialization to the PoC | belluikit/bellui#3 |
 | Repo visibility decision after the soak | belluikit/bellui#4 |
