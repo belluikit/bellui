@@ -14,6 +14,12 @@ github.com/belluikit/typesetting v0.3.6 h1:M27Rx+fhz1IV2n6Tei3fNhs/Oe9gGAnq3QMrB
 github.com/belluikit/typesetting v0.3.6/go.mod h1:vOvJAyUaoKpOpxqHeDglX6xNuG1zv2C3IOG3yEnHuLQ=
 github.com/belluikit/webgpu v1.0.8 h1:RNubaiuV3XYw/tLDkZUnKSNJGmsOvxpVYQ5XtzLEzmo=
 github.com/belluikit/webgpu v1.0.8/go.mod h1:l2MC0JBcJB4rA93lMMvI+FgF4DwIrrDY+6tDq5ma8PY=
+github.com/belluikit/webgpu v1.0.9-0.20260726224456-2cefb7d0922b h1:3gocvonpGG9APifn9cxVL8xsoxFCsmn96VpT9XPg/0o=
+github.com/belluikit/webgpu v1.0.9-0.20260726224456-2cefb7d0922b/go.mod h1:VRipvqw/ZYh9DFx/Rfn0RR05+2eKPAKL3UdNSpFfCYU=
+github.com/belluikit/webgpu/libs-ios v0.0.0-20260726222126-17584e286157 h1:Vp4rSd70cvpgKZH3NwwxUvDG78tsz9BQGH3wIrkTSSQ=
+github.com/belluikit/webgpu/libs-ios v0.0.0-20260726222126-17584e286157/go.mod h1:yrEzBQdYpTQ+Sk5dpDqlU53RuGve5Ear/COGcYePzZY=
+github.com/belluikit/webgpu/libs-windows v0.0.0-20260726222138-3367d15e87e4 h1:ZbPQJQjQh7pjsZQtF6dcbQkT1EIW96d4O+KbPi84d04=
+github.com/belluikit/webgpu/libs-windows v0.0.0-20260726222138-3367d15e87e4/go.mod h1:wnqokPIT0O/r2eXZcG1uG17ou3REkcdLLxeFVGtO/8U=
 github.com/bufbuild/protocompile v0.14.1 h1:iA73zAf/fyljNjQKwYzUHD6AD4R8KMasmwa/FBatYVw=
 github.com/bufbuild/protocompile v0.14.1/go.mod h1:ppVdAIhbr2H8asPk6k4pY7t9zB1OU5DoEw9xY/FUi1c=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
@@ -29,6 +35,8 @@ github.com/go-gl/gl v0.0.0-20231021071112-07e5d0ea2e71 h1:5BVwOaUSBTlVZowGO6VZGw
 github.com/go-gl/gl v0.0.0-20231021071112-07e5d0ea2e71/go.mod h1:9YTyiznxEY1fVinfM7RvRcjRHbw2xLBJ3AAGIT0I4Nw=
 github.com/go-gl/glfw/v3.4/glfw v0.1.0-pre.1 h1:nIVzcwqIaO1mK8LFr0fGkKpgQD4wJDDHRyv4t5k40Ps=
 github.com/go-gl/glfw/v3.4/glfw v0.1.0-pre.1/go.mod h1:T5Dn0JwIJOX1euPZ/iT4tq6nFYtmukjcYa7937HuYK8=
+github.com/go-gl/glfw/v3.4/glfw v0.1.0-pre.1.0.20260628091122-0bd588dc30cf h1:F3qluraUahVF1QyZcPaeqavaUMr65eQnR4AH4VmDojc=
+github.com/go-gl/glfw/v3.4/glfw v0.1.0-pre.1.0.20260628091122-0bd588dc30cf/go.mod h1:T5Dn0JwIJOX1euPZ/iT4tq6nFYtmukjcYa7937HuYK8=
 github.com/go-text/typesetting-utils v0.0.0-20260419141703-4ffe8874dabc h1:8FGo2It5K75XkavhTiCKExUfVaVDS1feBnLCru5qeoY=
 github.com/go-text/typesetting-utils v0.0.0-20260419141703-4ffe8874dabc/go.mod h1:3/62I4La/HBRX9TcTpBj4eipLiwzf+vhI+7whTc9V7o=
 github.com/godbus/dbus/v5 v5.2.2 h1:TUR3TgtSVDmjiXOgAAyaZbYmIeP3DPkld3jgKGV8mXQ=
@@ -54,6 +62,12 @@ github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646 h1:zYyBkD/k9seD2A7fsi6
 github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646/go.mod h1:jpp1/29i3P1S/RLdc7JQKbRpFeM1dOBd8T9ki5s+AY8=
 github.com/nicksnyder/go-i18n/v2 v2.5.1 h1:IxtPxYsR9Gp60cGXjfuR/llTqV8aYMsC472zD0D1vHk=
 github.com/nicksnyder/go-i18n/v2 v2.5.1/go.mod h1:DrhgsSDZxoAfvVrBVLXoxZn/pN5TXqaDbq7ju94viiQ=
+github.com/oliverbestmann/webgpu/libs-android v0.0.0-20260628152806-6b27e30a172e h1:FX62Djj//RQiIrjnyo7oxhQJ4rdNlbzvLiICxTbE4z4=
+github.com/oliverbestmann/webgpu/libs-android v0.0.0-20260628152806-6b27e30a172e/go.mod h1:tczQXCdsoFy+FTJVsZSve/vF8cmWEkxhvjcyY2Rujp8=
+github.com/oliverbestmann/webgpu/libs-darwin v0.0.0-20260628152755-66a5dfa57f8d h1:DX7hw4Pmr73MNVEtOmEq4+nKH+rd8fSdL1a5PLHrqrE=
+github.com/oliverbestmann/webgpu/libs-darwin v0.0.0-20260628152755-66a5dfa57f8d/go.mod h1:XoHM/ZcjQqJQyEfQjU0ScDkxvQRWfZLxKP8IrEz4xyo=
+github.com/oliverbestmann/webgpu/libs-linux v0.0.0-20260628152803-421b8a341d08 h1:bavZLYYgFIMOW3fMpta6CDWU/MfStheT17txHkKqui0=
+github.com/oliverbestmann/webgpu/libs-linux v0.0.0-20260628152803-421b8a341d08/go.mod h1:SOeo2YWe2UxWxOeAHyZtwaSXkBbP78cGnm7I+6lIWV0=
 github.com/pkg/profile v1.7.0 h1:hnbDkaNWPCLMO9wGLdBFTIZvzDrDfBM2072E1S9gJkA=
 github.com/pkg/profile v1.7.0/go.mod h1:8Uer0jas47ZQMJ7VD+OHknK4YDY07LPUC6dEvqDjvNo=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
