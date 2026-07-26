@@ -1,0 +1,54 @@
+<canvas size="61x120">
+	<content>
+		<widget size="61x120" type="*widget.OverlayContainer">
+			<widget size="57x115" type="*widget.Menu">
+				<widget size="57x115" type="*widget.Shadow">
+					<boxShadow blurRadius="6" color="shadow" cornerRadius="4" offsetY="2" size="57x115"/>
+				</widget>
+				<widget size="57x115" type="*widget.Scroll">
+					<widget size="57x115" type="*widget.menuBox">
+						<rectangle fillColor="rgba(42,42,42,255)" radius="4" size="57x115"/>
+						<container size="57x115">
+							<widget size="57x32" type="*widget.menuItem">
+								<text pos="8,8" size="41x16">Foo</text>
+							</widget>
+							<widget pos="0,36" size="57x1" type="*widget.Separator">
+								<rectangle fillColor="background" size="57x1"/>
+							</widget>
+							<widget pos="0,41" size="57x32" type="*widget.menuItem">
+								<rectangle fillColor="rgba(255,255,255,30)" radius="4" size="57x32"/>
+								<text pos="8,8" size="21x16">Bar</text>
+								<image pos="37,6" rsc="menuExpandIcon" size="iconInlineSize" themed="foreground"/>
+							</widget>
+							<widget pos="0,77" size="57x1" type="*widget.Separator">
+								<rectangle fillColor="background" size="57x1"/>
+							</widget>
+							<widget pos="0,82" size="57x32" type="*widget.menuItem">
+								<text pos="8,8" size="41x16">Baz</text>
+							</widget>
+						</container>
+					</widget>
+				</widget>
+				<widget pos="14,41" size="49x68" type="*widget.Menu">
+					<widget size="49x68" type="*widget.Shadow">
+						<boxShadow blurRadius="6" color="shadow" cornerRadius="4" offsetY="2" size="49x68"/>
+					</widget>
+					<widget size="49x68" type="*widget.Scroll">
+						<widget size="49x68" type="*widget.menuBox">
+							<rectangle fillColor="rgba(42,42,42,255)" radius="4" size="49x68"/>
+							<container size="49x68">
+								<widget size="49x32" type="*widget.menuItem">
+									<rectangle fillColor="rgba(255,255,255,30)" radius="4" size="49x32"/>
+									<text pos="8,8" size="33x16">SubA</text>
+								</widget>
+								<widget pos="0,36" size="49x32" type="*widget.menuItem">
+									<text pos="8,8" size="33x16">SubB</text>
+								</widget>
+							</container>
+						</widget>
+					</widget>
+				</widget>
+			</widget>
+		</widget>
+	</content>
+</canvas>

@@ -1,0 +1,6 @@
+details {
+  name = "ring1107probe"
+  id = "com.trendvidia.ring1107probe"
+  version = "1.0.0"
+  build = 28
+}

@@ -1,0 +1,20 @@
+<canvas padded size="156x200">
+	<content>
+		<container pos="4,4" size="148x192">
+			<widget pos="-4,79" size="156x32" type="*widget.RadioGroup">
+				<widget size="78x32" type="*widget.radioItem">
+					<circle pos="2,2" size="28x28"/>
+					<image pos="6,6" rsc="radioButtonFillIcon" size="iconInlineSize" themed="surfaceContainerHighest"/>
+					<image pos="6,6" rsc="radioButtonIcon" size="iconInlineSize" themed="outline"/>
+					<text pos="32,0" size="78x32">Foo</text>
+				</widget>
+				<widget pos="78,0" size="78x32" type="*widget.radioItem">
+					<circle pos="2,2" size="28x28"/>
+					<image pos="6,6" rsc="radioButtonFillIcon" size="iconInlineSize" themed="surfaceContainerHighest"/>
+					<image pos="6,6" rsc="radioButtonIcon" size="iconInlineSize" themed="outline"/>
+					<text pos="32,0" size="78x32">Barley</text>
+				</widget>
+			</widget>
+		</container>
+	</content>
+</canvas>

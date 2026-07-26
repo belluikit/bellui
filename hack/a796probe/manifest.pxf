@@ -1,0 +1,6 @@
+details {
+  name = "a796probe"
+  id = "io.bellui.a796probe"
+  version = "1.0.0"
+  build = 9
+}

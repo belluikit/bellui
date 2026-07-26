@@ -1,0 +1,120 @@
+package layout_test
+
+import (
+	"image/color"
+	"testing"
+
+	"github.com/belluikit/bellui"
+	"github.com/belluikit/bellui/canvas"
+	"github.com/belluikit/bellui/container"
+	"github.com/belluikit/bellui/core"
+	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/layout"
+	"github.com/belluikit/bellui/theme"
+
+	"github.com/stretchr/testify/assert"
+)
+
+func TestGridLayout(t *testing.T) {
+	gridSize := geo.NewSize(100+theme.Padding(), 100+theme.Padding())
+	cellSize := geo.NewSize(50, 50)
+
+	obj1 := canvas.NewRectangle(color.NRGBA{0, 0, 0, 0})
+	obj2 := canvas.NewRectangle(color.NRGBA{0, 0, 0, 0})
+	obj3 := canvas.NewRectangle(color.NRGBA{0, 0, 0, 0})
+
+	container := &bellui.Container{
+		Objects: []core.CanvasObject{obj1, obj2, obj3},
+	}
+	container.Resize(gridSize)
+
+	layout.NewGridLayout(2).Layout(container.Objects, gridSize)
+
+	assert.Equal(t, obj1.Size(), cellSize)
+	cell2Pos := geo.NewPos(50+theme.Padding(), 0)
+	assert.Equal(t, cell2Pos, obj2.Position())
+	cell3Pos := geo.NewPos(0, 50+theme.Padding())
+	assert.Equal(t, cell3Pos, obj3.Position())
+}
+
+func TestGridLayoutRounding(t *testing.T) {
+	gridSize := geo.NewSize(99+theme.Padding()*2, 50)
+
+	obj1 := canvas.NewRectangle(color.NRGBA{0, 0, 0, 0})
+	obj2 := canvas.NewRectangle(color.NRGBA{0, 0, 0, 0})
+	obj3 := canvas.NewRectangle(color.NRGBA{0, 0, 0, 0})
+
+	container := &bellui.Container{
+		Objects: []core.CanvasObject{obj1, obj2, obj3},
+	}
+	container.Resize(gridSize)
+
+	layout.NewGridLayout(3).Layout(container.Objects, gridSize)
+
+	assert.Equal(t, geo.NewPos(0, 0), obj1.Position())
+	assert.Equal(t, geo.NewSize(33, 50), obj1.Size())
+	assert.Equal(t, geo.NewPos(33+theme.Padding(), 0), obj2.Position())
+	assert.Equal(t, geo.NewSize(33, 50), obj2.Size())
+	assert.Equal(t, geo.NewPos(66+theme.Padding()*2, 0), obj3.Position())
+	assert.Equal(t, geo.NewSize(33, 50), obj3.Size())
+}
+
+func TestGridLayout_Vertical(t *testing.T) {
+	gridSize := geo.NewSize(100+theme.Padding(), 100+theme.Padding())
+	cellSize := geo.NewSize(50, 50)
+
+	obj1 := canvas.NewRectangle(color.NRGBA{0, 0, 0, 0})
+	obj2 := canvas.NewRectangle(color.NRGBA{0, 0, 0, 0})
+	obj3 := canvas.NewRectangle(color.NRGBA{0, 0, 0, 0})
+
+	container := &bellui.Container{
+		Objects: []core.CanvasObject{obj1, obj2, obj3},
+	}
+	container.Resize(gridSize)
+
+	layout.NewGridLayoutWithRows(2).Layout(container.Objects, gridSize)
+
+	assert.Equal(t, obj1.Size(), cellSize)
+	cell2Pos := geo.NewPos(0, 50+theme.Padding())
+	assert.Equal(t, cell2Pos, obj2.Position())
+	cell3Pos := geo.NewPos(50+theme.Padding(), 0)
+	assert.Equal(t, cell3Pos, obj3.Position())
+}
+
+func TestGridLayout_MinSize(t *testing.T) {
+	text1 := canvas.NewText("Large Text", color.NRGBA{0xff, 0, 0, 0})
+	text2 := canvas.NewText("small", color.NRGBA{0xff, 0, 0, 0})
+	minSize := text1.MinSize().Add(geo.NewSize(0, text2.MinSize().Height+theme.Padding()))
+
+	container := container.NewWithoutLayout(text1, text2)
+	layoutMin := layout.NewGridLayout(1).MinSize(container.Objects)
+
+	assert.Equal(t, minSize, layoutMin)
+}
+
+func TestGridLayout_MinSize_Vertical(t *testing.T) {
+	text1 := canvas.NewText("Text", color.NRGBA{0xff, 0, 0, 0})
+	text2 := canvas.NewText("Text", color.NRGBA{0xff, 0, 0, 0})
+	minSize := text1.MinSize().Add(geo.NewSize(text2.MinSize().Width+theme.Padding(), 0))
+
+	container := container.NewWithoutLayout(text1, text2)
+	layoutMin := layout.NewGridLayoutWithRows(1).MinSize(container.Objects)
+
+	assert.Equal(t, minSize, layoutMin)
+}
+
+func TestGridLayout_MinSize_HiddenItem(t *testing.T) {
+	text1 := canvas.NewText("Large Text", color.NRGBA{0xff, 0, 0, 0})
+	text2 := canvas.NewText("hidden", color.NRGBA{0xff, 0, 0, 0})
+	text2.Hide()
+	text3 := canvas.NewText("small", color.NRGBA{0xff, 0, 0, 0})
+	minSize := text1.MinSize().Add(geo.NewSize(0, text3.MinSize().Height+theme.Padding()))
+
+	container := container.NewWithoutLayout(text1, text2, text3)
+	layoutMin := layout.NewGridLayout(1).MinSize(container.Objects)
+	assert.Equal(t, minSize, layoutMin)
+
+	// someone set to 0 rows/cols
+	layoutMin = layout.NewGridLayout(0).MinSize(container.Objects)
+	assert.Equal(t, minSize, layoutMin)
+}

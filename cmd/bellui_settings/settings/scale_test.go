@@ -1,0 +1,44 @@
+package settings
+
+import (
+	"testing"
+
+	"github.com/belluikit/bellui/canvas"
+	"github.com/belluikit/bellui/test"
+	"github.com/belluikit/bellui/theme"
+	"github.com/belluikit/bellui/widget"
+	"github.com/stretchr/testify/assert"
+)
+
+func TestChooseScale(t *testing.T) {
+	s := &Settings{}
+	s.belluiSettings.Scale = 1.0
+	buttons := s.makeScaleButtons()
+
+	test.Tap(buttons[0].(*widget.Button))
+	assert.Equal(t, float32(0.5), s.belluiSettings.Scale)
+	assert.Equal(t, widget.HighImportance, buttons[0].(*widget.Button).Importance)
+	assert.Equal(t, widget.MediumImportance, buttons[2].(*widget.Button).Importance)
+}
+
+func TestMakeScaleButtons(t *testing.T) {
+	s := &Settings{}
+	s.belluiSettings.Scale = 1.0
+	buttons := s.makeScaleButtons()
+
+	assert.Equal(t, 5, len(buttons))
+	assert.Equal(t, widget.MediumImportance, buttons[0].(*widget.Button).Importance)
+	assert.Equal(t, widget.HighImportance, buttons[2].(*widget.Button).Importance)
+}
+
+func TestMakeScalePreviews(t *testing.T) {
+	s := &Settings{}
+	s.belluiSettings.Scale = 1.0
+	previews := s.makeScalePreviews(1.0)
+
+	assert.Equal(t, 5, len(previews))
+	assert.Equal(t, theme.TextSize(), previews[2].(*canvas.Text).TextSize)
+
+	s.appliedScale(1.5)
+	assert.Equal(t, theme.TextSize()/1.5, previews[2].(*canvas.Text).TextSize)
+}

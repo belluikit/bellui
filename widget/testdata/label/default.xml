@@ -1,0 +1,9 @@
+<canvas size="48x32">
+	<content>
+		<widget size="48x32" type="*widget.Label">
+			<widget size="48x32" type="*widget.RichText">
+				<text pos="8,8" size="32x16">Hello</text>
+			</widget>
+		</widget>
+	</content>
+</canvas>

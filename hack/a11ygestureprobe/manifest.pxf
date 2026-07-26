@@ -1,0 +1,6 @@
+details {
+  name = "a11ygestureprobe"
+  id = "io.bellui.a11ygestureprobe"
+  version = "1.0.0"
+  build = 2
+}

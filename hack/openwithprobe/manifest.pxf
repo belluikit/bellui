@@ -1,0 +1,18 @@
+details {
+  name = "openwithprobe"
+  id = "com.trendvidia.openwithprobe"
+  version = "1.0.0"
+  build = 5
+  url_schemes = [
+    "belluiopen"
+  ]
+  file_associations = [
+    {
+      extensions = [
+        "txt"
+      ]
+      mime_type = "text/plain"
+      description = "Text Document"
+    }
+  ]
+}

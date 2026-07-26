@@ -1,0 +1,44 @@
+<canvas padded size="150x200">
+	<content>
+		<widget pos="10,10" size="130x32" type="*widget.SelectEntry">
+			<rectangle fillColor="inputBackground" pos="2,2" radius="4" size="126x28"/>
+			<widget pos="2,2" size="90x28" type="*widget.Scroll">
+				<widget size="90x28" type="*widget.entryContent">
+					<widget size="90x28" type="*widget.RichText">
+						<text pos="8,6" size="8x16">B</text>
+					</widget>
+				</widget>
+			</widget>
+			<rectangle pos="1,1" radius="4" size="127x29" strokeColor="inputBorder" strokeWidth="2"/>
+			<widget pos="92,2" size="36x28" type="*widget.Button">
+				<rectangle fillColor="rgba(64,53,80,255)" radius="20" size="36x28"/>
+				<image fillMode="contain" pos="8,4" rsc="menuDropDownIcon" size="iconInlineSize" themed="foreground"/>
+			</widget>
+		</widget>
+	</content>
+	<overlay>
+		<widget pos="2,3" size="146x195" type="*widget.OverlayContainer">
+			<widget pos="8,37" size="130x105" type="*widget.PopUpMenu">
+				<widget size="130x105" type="*widget.Shadow">
+					<boxShadow blurRadius="6" color="shadow" cornerRadius="4" offsetY="2" size="130x105"/>
+				</widget>
+				<widget size="130x105" type="*widget.Scroll">
+					<widget size="130x105" type="*widget.menuBox">
+						<rectangle fillColor="rgba(42,42,42,255)" radius="4" size="130x105"/>
+						<container size="130x105">
+							<widget size="130x32" type="*widget.menuItem">
+								<text pos="8,8" size="114x16">A</text>
+							</widget>
+							<widget pos="0,36" size="130x32" type="*widget.menuItem">
+								<text pos="8,8" size="114x16">B</text>
+							</widget>
+							<widget pos="0,72" size="130x32" type="*widget.menuItem">
+								<text pos="8,8" size="114x16">C</text>
+							</widget>
+						</container>
+					</widget>
+				</widget>
+			</widget>
+		</widget>
+	</overlay>
+</canvas>

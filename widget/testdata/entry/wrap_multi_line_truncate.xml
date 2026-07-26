@@ -1,0 +1,24 @@
+<canvas padded size="150x200">
+	<content>
+		<widget pos="10,10" size="120x100" type="*widget.Entry">
+			<rectangle fillColor="inputBackground" pos="2,2" radius="4" size="116x96"/>
+			<widget pos="2,2" size="116x96" type="*widget.Scroll">
+				<widget size="281x96" type="*widget.entryContent">
+					<widget size="281x96" type="*widget.RichText">
+						<text pos="8,6" size="265x16">A long text on short words w/o NLs or LFs.</text>
+					</widget>
+					<rectangle fillColor="primary" pos="7,6" size="2x16"/>
+				</widget>
+				<widget pos="116,0" size="0x96" type="*widget.Shadow">
+					<linearGradient angle="270" endColor="shadow" pos="-8,0" size="8x96"/>
+				</widget>
+				<widget pos="0,80" size="116x16" type="*widget.scrollBarArea">
+					<widget size="48x16" type="*widget.scrollBar">
+						<rectangle fillColor="scrollbar" pos="0,13" radius="3" size="48x3"/>
+					</widget>
+				</widget>
+			</widget>
+			<rectangle pos="1,1" radius="4" size="117x97" strokeColor="primary" strokeWidth="2"/>
+		</widget>
+	</content>
+</canvas>

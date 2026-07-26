@@ -1,0 +1,9 @@
+<canvas size="50x50">
+	<content>
+		<container size="50x50">
+			<container size="50x50">
+				<rectangle fillColor="rgba(255,0,0,255)" size="50x50"/>
+			</container>
+		</container>
+	</content>
+</canvas>

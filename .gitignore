@@ -1,0 +1,48 @@
+### Binaries and project specific files
+cmd/bellui/bellui
+cmd/bellui_settings/bellui_settings
+bellui-cross
+*.exe
+*.apk
+*.app
+*.tar.xz
+*.zip
+
+### Tests
+**/testdata/failed
+
+### Go
+# Output of the coverage tool
+*.out
+
+### macOS
+# General
+.DS_Store
+
+# Thumbnails
+._*
+
+### JetBrains
+.idea
+
+### VSCode
+.vscode
+
+### Vim
+# Swap
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-v][a-z]
+[._]sw[a-p]
+
+# Session
+Session.vim
+
+# Temporary
+.netrwhist
+*~
+# Auto-generated tag files
+tags
+# Persistent undo
+[._]*.un~
+hack/*/*.app/

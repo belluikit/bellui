@@ -1,0 +1,27 @@
+[Desktop Entry]
+Type=Application
+Name={{.Name}}
+{{- if ne .GenericName ""}}
+GenericName={{.GenericName}}{{end}}
+Exec={{.Exec}} {{- .ExecParams}}
+Icon={{.Icon}}
+{{- if ne .Comment ""}}
+Comment={{.Comment}}{{end}}
+{{- if ne .Categories ""}}
+Categories={{.Categories}}{{end}}
+Keywords={{if ne .Keywords ""}}{{.Keywords}}{{else}}bellui;{{end}}
+{{if or (ne .MimeTypes "") (ne .MimeTypes "") -}}
+MimeType={{.MimeTypes}}
+
+{{end -}}
+
+{{if or (ne .SourceRepo "") (ne .SourceDir "") -}}
+[X-Bellui Source]
+Repo={{.SourceRepo}}
+Dir={{.SourceDir}}
+
+{{end -}}
+{{if ne .StartupWMClass "" -}}
+StartupWMClass={{.StartupWMClass}}
+
+{{end -}}

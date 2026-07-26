@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package bellui.preferences.v1;
+
+option go_package = "github.com/belluikit/bellui/internal/preferences/prefspb;prefspb";
+
+// Preferences is the wire schema for the per-app preferences store, encoded in
+// the textual PXF format (replacing the legacy preferences.json). Each entry maps
+// a preference key to a typed Value. See app/preferences_pxf.go for the conversion
+// to and from the in-memory map[string]any.
+message Preferences {
+  map<string, Value> values = 1;
+}
+
+// Value is a single typed preference value. The set of kinds mirrors the
+// bellui.PreferenceType constraint (bool | int | float64 | string, plus lists), so
+// int and float preferences round-trip distinctly instead of collapsing to a JSON
+// number the way the legacy JSON store did.
+message Value {
+  oneof kind {
+    bool bool_value = 1;
+    int64 int_value = 2;
+    double float_value = 3;
+    string string_value = 4;
+    BoolList bool_list = 5;
+    IntList int_list = 6;
+    FloatList float_list = 7;
+    StringList string_list = 8;
+  }
+}
+
+message BoolList {
+  repeated bool values = 1;
+}
+
+message IntList {
+  repeated int64 values = 1;
+}
+
+message FloatList {
+  repeated double values = 1;
+}
+
+message StringList {
+  repeated string values = 1;
+}

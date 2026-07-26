@@ -1,0 +1,20 @@
+website = "https://apps.bellui.io"
+details {
+  icon = "https://conf.bellui.io/assets/img/bellui.png"
+  name = "Bellui App"
+  id = "io.bellui.bellui"
+  version = "1.0.0"
+  build = 1
+}
+development = {
+  InDevelopmentOnly: "Value4"
+  Test: "Value2"
+}
+release = {
+  InReleaseOnly: "Value3"
+  Test: "Value1"
+}
+source {
+  repo = "https://github.com/belluikit/bellui"
+  dir = "internal/metadata/testdata"
+}

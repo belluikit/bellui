@@ -1,0 +1,49 @@
+<manifest
+	xmlns:android="http://schemas.android.com/apk/res/android"
+	package="{{.JavaPkgPath}}"
+	android:versionCode="{{.Build}}"
+	android:versionName="{{.Version}}">
+
+	<application android:label="{{.Name}}" android:debuggable="{{.Debug}}"
+				 {{if .AdaptiveIcon}}android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round"{{end}}>
+	<activity android:name="org.golang.app.GoNativeActivity"
+		android:label="{{.Name}}"
+		android:configChanges="orientation|keyboardHidden|uiMode"
+		android:exported="true"
+		android:theme="@android:style/Theme">
+		<meta-data android:name="android.app.lib_name" android:value="{{.LibName}}" />
+		<intent-filter>
+			<action android:name="android.intent.action.MAIN" />
+			<category android:name="android.intent.category.LAUNCHER" />
+		</intent-filter>
+		{{- range .URLSchemes}}
+		<intent-filter>
+			<action android:name="android.intent.action.VIEW" />
+			<category android:name="android.intent.category.DEFAULT" />
+			<category android:name="android.intent.category.BROWSABLE" />
+			<data android:scheme="{{.}}" />
+		</intent-filter>
+		{{- end}}
+		{{- range .MimeTypes}}
+		<intent-filter>
+			<action android:name="android.intent.action.VIEW" />
+			<category android:name="android.intent.category.DEFAULT" />
+			<data android:mimeType="{{.}}" />
+		</intent-filter>
+		{{- end}}
+	</activity>
+
+	<receiver android:name="org.golang.app.BelluiNotificationReceiver"
+			  android:exported="false" />
+
+	<provider android:name="org.golang.app.BelluiFileProvider"
+			  android:authorities="{{.JavaPkgPath}}.fileprovider"
+			  android:exported="false"
+			  android:grantUriPermissions="true" />
+	</application>
+
+	<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+	<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+	<uses-permission android:name="android.permission.INTERNET" />
+	<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+</manifest>

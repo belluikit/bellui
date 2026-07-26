@@ -1,0 +1,198 @@
+<canvas padded size="200x400">
+	<content>
+		<widget pos="4,4" size="192x392" type="*widget.List">
+			<widget size="192x392" type="*widget.Scroll">
+				<container size="192x36402">
+					<widget size="192x32" type="*widget.listItem">
+						<container size="192x32">
+							<widget size="20x32" type="*widget.Icon">
+								<image fillMode="contain" rsc="documentIcon" size="20x32" themed="foreground"/>
+							</widget>
+							<widget pos="24,0" size="168x32" type="*widget.Label">
+								<widget size="168x32" type="*widget.RichText">
+									<text pos="8,8" size="69x16">Test Item 0</text>
+								</widget>
+							</widget>
+						</container>
+					</widget>
+					<widget pos="0,36" size="192x32" type="*widget.listItem">
+						<container size="192x32">
+							<widget size="20x32" type="*widget.Icon">
+								<image fillMode="contain" rsc="documentIcon" size="20x32" themed="foreground"/>
+							</widget>
+							<widget pos="24,0" size="168x32" type="*widget.Label">
+								<widget size="168x32" type="*widget.RichText">
+									<text pos="8,8" size="69x16">Test Item 1</text>
+								</widget>
+							</widget>
+						</container>
+					</widget>
+					<widget pos="0,72" size="192x32" type="*widget.listItem">
+						<container size="192x32">
+							<widget size="20x32" type="*widget.Icon">
+								<image fillMode="contain" rsc="documentIcon" size="20x32" themed="foreground"/>
+							</widget>
+							<widget pos="24,0" size="168x32" type="*widget.Label">
+								<widget size="168x32" type="*widget.RichText">
+									<text pos="8,8" size="69x16">Test Item 2</text>
+								</widget>
+							</widget>
+						</container>
+					</widget>
+					<widget pos="0,109" size="192x32" type="*widget.listItem">
+						<container size="192x32">
+							<widget size="20x32" type="*widget.Icon">
+								<image fillMode="contain" rsc="documentIcon" size="20x32" themed="foreground"/>
+							</widget>
+							<widget pos="24,0" size="168x32" type="*widget.Label">
+								<widget size="168x32" type="*widget.RichText">
+									<text pos="8,8" size="69x16">Test Item 3</text>
+								</widget>
+							</widget>
+						</container>
+					</widget>
+					<widget pos="0,145" size="192x32" type="*widget.listItem">
+						<container size="192x32">
+							<widget size="20x32" type="*widget.Icon">
+								<image fillMode="contain" rsc="documentIcon" size="20x32" themed="foreground"/>
+							</widget>
+							<widget pos="24,0" size="168x32" type="*widget.Label">
+								<widget size="168x32" type="*widget.RichText">
+									<text pos="8,8" size="69x16">Test Item 4</text>
+								</widget>
+							</widget>
+						</container>
+					</widget>
+					<widget pos="0,182" size="192x32" type="*widget.listItem">
+						<container size="192x32">
+							<widget size="20x32" type="*widget.Icon">
+								<image fillMode="contain" rsc="documentIcon" size="20x32" themed="foreground"/>
+							</widget>
+							<widget pos="24,0" size="168x32" type="*widget.Label">
+								<widget size="168x32" type="*widget.RichText">
+									<text pos="8,8" size="69x16">Test Item 5</text>
+								</widget>
+							</widget>
+						</container>
+					</widget>
+					<widget pos="0,218" size="192x32" type="*widget.listItem">
+						<container size="192x32">
+							<widget size="20x32" type="*widget.Icon">
+								<image fillMode="contain" rsc="documentIcon" size="20x32" themed="foreground"/>
+							</widget>
+							<widget pos="24,0" size="168x32" type="*widget.Label">
+								<widget size="168x32" type="*widget.RichText">
+									<text pos="8,8" size="69x16">Test Item 6</text>
+								</widget>
+							</widget>
+						</container>
+					</widget>
+					<widget pos="0,254" size="192x32" type="*widget.listItem">
+						<container size="192x32">
+							<widget size="20x32" type="*widget.Icon">
+								<image fillMode="contain" rsc="documentIcon" size="20x32" themed="foreground"/>
+							</widget>
+							<widget pos="24,0" size="168x32" type="*widget.Label">
+								<widget size="168x32" type="*widget.RichText">
+									<text pos="8,8" size="69x16">Test Item 7</text>
+								</widget>
+							</widget>
+						</container>
+					</widget>
+					<widget pos="0,291" size="192x32" type="*widget.listItem">
+						<container size="192x32">
+							<widget size="20x32" type="*widget.Icon">
+								<image fillMode="contain" rsc="documentIcon" size="20x32" themed="foreground"/>
+							</widget>
+							<widget pos="24,0" size="168x32" type="*widget.Label">
+								<widget size="168x32" type="*widget.RichText">
+									<text pos="8,8" size="69x16">Test Item 8</text>
+								</widget>
+							</widget>
+						</container>
+					</widget>
+					<widget pos="0,327" size="192x32" type="*widget.listItem">
+						<container size="192x32">
+							<widget size="20x32" type="*widget.Icon">
+								<image fillMode="contain" rsc="documentIcon" size="20x32" themed="foreground"/>
+							</widget>
+							<widget pos="24,0" size="168x32" type="*widget.Label">
+								<widget size="168x32" type="*widget.RichText">
+									<text pos="8,8" size="69x16">Test Item 9</text>
+								</widget>
+							</widget>
+						</container>
+					</widget>
+					<widget pos="0,364" size="192x32" type="*widget.listItem">
+						<container size="192x32">
+							<widget size="20x32" type="*widget.Icon">
+								<image fillMode="contain" rsc="documentIcon" size="20x32" themed="foreground"/>
+							</widget>
+							<widget pos="24,0" size="168x32" type="*widget.Label">
+								<widget size="168x32" type="*widget.RichText">
+									<text pos="8,8" size="77x16">Test Item 10</text>
+								</widget>
+							</widget>
+						</container>
+					</widget>
+					<widget pos="0,400" size="192x32" type="*widget.listItem">
+						<container size="192x32">
+							<widget size="20x32" type="*widget.Icon">
+								<image fillMode="contain" rsc="documentIcon" size="20x32" themed="foreground"/>
+							</widget>
+							<widget pos="24,0" size="168x32" type="*widget.Label">
+								<widget size="168x32" type="*widget.RichText">
+									<text pos="8,8" size="77x16">Test Item 11</text>
+								</widget>
+							</widget>
+						</container>
+					</widget>
+					<widget size="0x0" type="*widget.Separator">
+						<rectangle fillColor="background" size="0x0"/>
+					</widget>
+					<widget pos="0,33" size="192x1" type="*widget.Separator">
+						<rectangle fillColor="background" size="192x1"/>
+					</widget>
+					<widget pos="0,70" size="192x1" type="*widget.Separator">
+						<rectangle fillColor="background" size="192x1"/>
+					</widget>
+					<widget pos="0,106" size="192x1" type="*widget.Separator">
+						<rectangle fillColor="background" size="192x1"/>
+					</widget>
+					<widget pos="0,143" size="192x1" type="*widget.Separator">
+						<rectangle fillColor="background" size="192x1"/>
+					</widget>
+					<widget pos="0,179" size="192x1" type="*widget.Separator">
+						<rectangle fillColor="background" size="192x1"/>
+					</widget>
+					<widget pos="0,215" size="192x1" type="*widget.Separator">
+						<rectangle fillColor="background" size="192x1"/>
+					</widget>
+					<widget pos="0,252" size="192x1" type="*widget.Separator">
+						<rectangle fillColor="background" size="192x1"/>
+					</widget>
+					<widget pos="0,288" size="192x1" type="*widget.Separator">
+						<rectangle fillColor="background" size="192x1"/>
+					</widget>
+					<widget pos="0,325" size="192x1" type="*widget.Separator">
+						<rectangle fillColor="background" size="192x1"/>
+					</widget>
+					<widget pos="0,361" size="192x1" type="*widget.Separator">
+						<rectangle fillColor="background" size="192x1"/>
+					</widget>
+					<widget pos="0,397" size="192x1" type="*widget.Separator">
+						<rectangle fillColor="background" size="192x1"/>
+					</widget>
+				</container>
+				<widget pos="0,392" size="192x0" type="*widget.Shadow">
+					<linearGradient endColor="shadow" pos="0,-8" size="192x8"/>
+				</widget>
+				<widget pos="176,0" size="16x392" type="*widget.scrollBarArea">
+					<widget size="16x48" type="*widget.scrollBar">
+						<rectangle fillColor="scrollbar" pos="13,0" radius="3" size="3x48"/>
+					</widget>
+				</widget>
+			</widget>
+		</widget>
+	</content>
+</canvas>

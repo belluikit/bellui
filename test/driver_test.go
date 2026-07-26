@@ -1,0 +1,130 @@
+package test
+
+import (
+	"image/color"
+	"strconv"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+
+	"github.com/belluikit/bellui"
+	belluicanvas "github.com/belluikit/bellui/canvas"
+	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/widget"
+)
+
+func Test_driver_AbsolutePositionForObject(t *testing.T) {
+	d := &driver{}
+	w := d.CreateWindow("Test Window")
+	o := belluicanvas.NewRectangle(color.Black)
+	w.SetContent(o)
+	w.Resize(geo.NewSize(320, 200))
+
+	t.Run("for padded window", func(t *testing.T) {
+		w.SetPadded(true)
+		assert.Equal(t, geo.NewPos(2, 1), d.AbsolutePositionForObject(o), "safe area offset (2,3) is subtracted")
+	})
+
+	t.Run("for non-padded window", func(t *testing.T) {
+		w.SetPadded(false)
+		assert.Equal(t, geo.NewPos(-2, -3), d.AbsolutePositionForObject(o), "safe area offset (2,3) is subtracted")
+	})
+}
+
+func TestDriver_CreateWindow(t *testing.T) {
+	d := &driver{}
+	w := d.CreateWindow("Test Window")
+
+	assert.Equal(t, "Test Window", w.Title())
+}
+
+// A background goroutine updating a widget through bellui.Do while the test
+// reads it through bellui.DoAndWait must be race-free: the test driver
+// serializes all Do callbacks under a mutex, establishing the same
+// happens-before edges the real drivers provide (issue #480).
+func TestDriver_DoFromGoroutineSerialized(t *testing.T) {
+	NewTempApp(t)
+
+	label := widget.NewLabel("start")
+	final := "updated " + strconv.Itoa(99)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := 0; i < 100; i++ {
+			text := "updated " + strconv.Itoa(i)
+			bellui.Do(func() {
+				label.SetText(text)
+			})
+		}
+	}()
+
+	got := ""
+	deadline := time.Now().Add(10 * time.Second)
+	for got != final && time.Now().Before(deadline) {
+		bellui.DoAndWait(func() {
+			got = label.Text
+		})
+	}
+	<-done
+
+	assert.Equal(t, final, got)
+}
+
+func TestDriver_DoFromGoroutineNested(t *testing.T) {
+	NewTempApp(t)
+
+	ran := false
+	bellui.DoAndWait(func() {
+		// a nested call from within a running callback must not deadlock
+		bellui.Do(func() {
+			ran = true
+		})
+	})
+
+	assert.True(t, ran)
+}
+
+// A goroutine leaked from (or still in flight at the end of) a previous test
+// keeps calling bellui.Do against the previous test app's driver while the next
+// test's work runs on a fresh driver instance. The Do mutex is package-level,
+// shared across driver instances, so those callbacks are still serialized and
+// carry happens-before edges (#1049).
+func TestDriver_DoFromGoroutineSerializedAcrossInstances(t *testing.T) {
+	d1 := NewDriver()
+	d2 := NewDriver()
+
+	var active, overlaps atomic.Int32
+	shared := 0 // plain int: -race verifies the cross-instance happens-before edges
+	body := func() {
+		if active.Add(1) > 1 {
+			overlaps.Add(1)
+		}
+		shared++
+		time.Sleep(100 * time.Microsecond)
+		active.Add(-1)
+	}
+
+	const calls = 20
+	var wg sync.WaitGroup
+	for i := 0; i < calls; i++ {
+		d := bellui.Driver(d1)
+		if i%2 == 1 {
+			d = d2
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			d.DoFromGoroutine(body, true)
+		}()
+	}
+	wg.Wait()
+
+	assert.Zero(t, overlaps.Load(), "Do callbacks through different driver instances must not run concurrently")
+	bellui.Driver(d1).DoFromGoroutine(func() {
+		assert.Equal(t, calls, shared)
+	}, true)
+}

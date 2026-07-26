@@ -1,0 +1,35 @@
+<canvas padded size="200x150">
+	<content>
+		<container pos="4,4" size="192x142">
+			<widget pos="32,54" size="126x32" type="*widget.Select">
+				<rectangle fillColor="rgba(120,120,120,255)" radius="4" size="126x32"/>
+				<rectangle size="126x32"/>
+				<widget pos="4,4" size="94x24" type="*widget.RichText">
+					<text alignment="center" pos="10,4" size="74x16">(Select one)</text>
+				</widget>
+				<widget pos="98,6" size="20x20" type="*widget.Icon">
+					<image fillMode="contain" rsc="menuDropDownIcon" size="iconInlineSize" themed="foreground"/>
+				</widget>
+			</widget>
+		</container>
+	</content>
+	<overlay>
+		<widget pos="2,3" size="196x145" type="*widget.OverlayContainer">
+			<widget pos="34,86" size="126x32" type="*widget.PopUpMenu">
+				<widget size="126x32" type="*widget.Shadow">
+					<boxShadow blurRadius="6" color="shadow" cornerRadius="4" offsetY="2" size="126x32"/>
+				</widget>
+				<widget size="126x32" type="*widget.Scroll">
+					<widget size="126x32" type="*widget.menuBox">
+						<rectangle fillColor="rgba(42,42,42,255)" radius="4" size="126x32"/>
+						<container size="126x32">
+							<widget size="126x32" type="*widget.menuItem">
+								<text alignment="center" pos="8,8" size="110x16">Hi</text>
+							</widget>
+						</container>
+					</widget>
+				</widget>
+			</widget>
+		</widget>
+	</overlay>
+</canvas>

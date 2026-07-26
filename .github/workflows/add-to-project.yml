@@ -1,0 +1,31 @@
+name: Add to AppViewer Platform project
+
+# Free-plan replacement for the built-in "Auto-add to project" workflow
+# (Team/Enterprise only): any issue labeled design-tool or ota is added to the
+# platform project. Adding an existing item is a no-op, so re-labeling is
+# harmless.
+#
+# REBRAND TODO: the project-url values below still point at the pre-rebrand
+# boards owned by the `trendvidia` user, and the ADD_TO_PROJECT_PAT secret is
+# not yet provisioned on this repo — so this workflow will fail until the
+# belluikit boards exist and the URLs/secret are repointed.
+
+on:
+  issues:
+    types: [opened, labeled, reopened]
+
+jobs:
+  add-to-project:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/add-to-project@v1.0.2
+        with:
+          project-url: https://github.com/users/trendvidia/projects/1
+          github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
+          labeled: design-tool, ota
+          label-operator: OR
+      # Every bellui issue also lands in the Bellui Backlog project (no label filter).
+      - uses: actions/add-to-project@v1.0.2
+        with:
+          project-url: https://github.com/users/trendvidia/projects/2
+          github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}

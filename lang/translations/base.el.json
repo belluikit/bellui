@@ -1,0 +1,101 @@
+{
+    "AM": "AM",
+    "Advanced": "Προχωρημένες",
+    "Cancel": "Ακύρωση",
+    "Confirm": "Επιβεβαίωση",
+    "Copy": "Αντιγραφή",
+    "Create Folder": "Δημιουργία Φακέλου",
+    "Cut": "Αποκοπή",
+    "Date": "Ημερομηνία",
+    "Enter filename": "Εισαγωγή ονόματος αρχείου",
+    "Error": "Σφάλμα",
+    "Favourites": "Αγαπημένα",
+    "File": "Αρχείο",
+    "Folder": "Φάκελος",
+    "New Folder": "Νέος Φάκελος",
+    "No": "Όχι",
+    "OK": "ΟΚ",
+    "Open": "Άνοιγμα",
+    "PM": "PM",
+    "Paste": "Επικόλληση",
+    "Quit": "Έξοδος",
+    "Redo": "Επανάληψη",
+    "Save": "Αποθήκευση",
+    "Select all": "Επιλογή όλων",
+    "Select time": "Επιλογή ώρας",
+    "Show Hidden Files": "Εμφάνιση Κρυμμένων Αρχείων",
+    "Time": "Ώρα",
+    "Undo": "Αναίρεση",
+    "Yes": "Ναι",
+    "april": "Απρίλιος",
+    "august": "Αύγουστος",
+    "december": "Δεκέμβριος",
+    "february": "Φεβρουάριος",
+    "file.name": {
+        "other": "Όνομα"
+    },
+    "file.parent": {
+        "other": "Γονέας"
+    },
+    "friday": "Παρασκευή",
+    "friday.narrow": "Π",
+    "friday.short": "Παρ",
+    "january": "Ιανουάριος",
+    "july": "Ιούλιος",
+    "june": "Ιούνιος",
+    "list.end": "{0} και {1}",
+    "list.middle": "{0}, {1}",
+    "list.start": "{0}, {1}",
+    "list.two": "{0} και {1}",
+    "march": "Μάρτιος",
+    "may": "Μάιος",
+    "monday": "Δευτέρα",
+    "monday.narrow": "Δ",
+    "monday.short": "Δευ",
+    "november": "Νοέμβριος",
+    "october": "Οκτώβριος",
+    "saturday": "Σαββάτο",
+    "saturday.narrow": "Σ",
+    "saturday.short": "Σαβ",
+    "september": "Σεπτέμβριος",
+    "sunday": "Κυριακή",
+    "sunday.narrow": "Κ",
+    "sunday.short": "Κυρ",
+    "thursday": "Πέμπτη",
+    "thursday.narrow": "Π",
+    "thursday.short": "Πεμ",
+    "tuesday": "Τρίτη",
+    "tuesday.narrow": "Τ",
+    "tuesday.short": "Τρι",
+    "unit.foot": {
+        "one": "{{.Value}} πδ",
+        "other": "{{.Value}} πδ"
+    },
+    "unit.gram": {
+        "one": "{{.Value}} γρ.",
+        "other": "{{.Value}} γρ."
+    },
+    "unit.kilogram": {
+        "one": "{{.Value}} κιλό",
+        "other": "{{.Value}} κιλά"
+    },
+    "unit.kilometer": {
+        "one": "{{.Value}} χλμ.",
+        "other": "{{.Value}} χλμ."
+    },
+    "unit.meter": {
+        "one": "{{.Value}} μ.",
+        "other": "{{.Value}} μ."
+    },
+    "unit.mile": {
+        "one": "{{.Value}} μίλ.",
+        "other": "{{.Value}} μίλ."
+    },
+    "unit.pound": {
+        "one": "{{.Value}} λβ",
+        "other": "{{.Value}} λβ"
+    },
+    "wednesday": "Τετάρτη",
+    "wednesday.narrow": "Τ",
+    "wednesday.short": "Τερ"
+}

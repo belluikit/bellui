@@ -1,0 +1,18 @@
+<canvas padded size="200x200">
+	<content>
+		<rectangle pos="4,4" size="192x192"/>
+	</content>
+	<overlay>
+		<widget size="200x200" type="*widget.PopUp">
+			<widget size="37x40" type="*widget.Shadow">
+				<boxShadow blurRadius="12" color="shadow" cornerRadius="4" offsetY="4" size="37x40"/>
+			</widget>
+			<rectangle fillColor="rgba(26,26,26,255)" radius="16" size="37x40"/>
+			<widget pos="4,4" size="29x32" type="*widget.Label">
+				<widget size="29x32" type="*widget.RichText">
+					<text pos="8,8" size="13x16">Hi</text>
+				</widget>
+			</widget>
+		</widget>
+	</overlay>
+</canvas>

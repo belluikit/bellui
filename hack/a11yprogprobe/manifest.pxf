@@ -1,0 +1,6 @@
+details {
+  name = "a11yprogprobe"
+  id = "io.bellui.a11yprogprobe"
+  version = "1.0.0"
+  build = 2
+}

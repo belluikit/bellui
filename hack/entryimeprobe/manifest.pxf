@@ -1,0 +1,6 @@
+details {
+  name = "entryimeprobe"
+  id = "io.bellui.entryimeprobe"
+  version = "1.0.0"
+  build = 12
+}
