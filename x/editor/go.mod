@@ -3,13 +3,12 @@ module github.com/belluikit/bellui/x/editor
 go 1.25.0
 
 require (
-	github.com/belluikit/bellui v0.0.0
+	github.com/belluikit/bellui v1.0.0-rc.1
 	github.com/stretchr/testify v1.11.1
 )
 
 require (
 	github.com/belluikit/gl-js v0.2.1 // indirect
-	github.com/belluikit/render v0.2.4 // indirect
 	github.com/belluikit/typesetting v0.3.6 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fredbi/uri v1.1.1 // indirect
@@ -20,8 +19,6 @@ require (
 	github.com/jeandeaual/go-locale v0.0.0-20250612000132-0ef82f21eade // indirect
 	github.com/nicksnyder/go-i18n/v2 v2.5.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c // indirect
-	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect
 	github.com/yuin/goldmark v1.7.8 // indirect
 	golang.org/x/image v0.44.0 // indirect
 	golang.org/x/net v0.57.0 // indirect
@@ -29,5 +26,3 @@ require (
 	golang.org/x/text v0.40.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/belluikit/bellui => ../..

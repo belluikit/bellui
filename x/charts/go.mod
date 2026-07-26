@@ -2,14 +2,13 @@ module github.com/belluikit/bellui/x/charts
 
 go 1.25.0
 
-require github.com/belluikit/bellui v0.0.0
+require github.com/belluikit/bellui v1.0.0-rc.1
 
 require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/belluikit/gl-js v0.2.1 // indirect
 	github.com/belluikit/glfw v1.9.0 // indirect
 	github.com/belluikit/glfw-js v1.0.4 // indirect
-	github.com/belluikit/render v0.2.4 // indirect
 	github.com/belluikit/systray v1.12.0 // indirect
 	github.com/belluikit/typesetting v0.3.6 // indirect
 	github.com/belluikit/webgpu v1.0.8 // indirect
@@ -27,8 +26,6 @@ require (
 	github.com/nicksnyder/go-i18n/v2 v2.5.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rymdport/portal v0.4.2 // indirect
-	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c // indirect
-	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/trendvidia/protowire-go v1.2.2 // indirect
 	github.com/yuin/goldmark v1.7.8 // indirect
@@ -39,5 +36,3 @@ require (
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/belluikit/bellui => ../..
