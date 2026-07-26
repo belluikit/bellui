@@ -11,6 +11,42 @@ This file lists the main changes with each version of the Fyne toolkit.
 Entries up to 2.7.3 are inherited from upstream Fyne; later entries describe
 the trendvidia fork (github.com/trendvidia/fyne).
 
+## v1.0.0-rc.1 — 2026-07-26
+
+First release under the **Bellui** name and the `github.com/belluikit/bellui`
+module path. This is the ecosystem rebrand cutover (trendvidia/fyne#730, epic
+#732); the toolkit's own features are unchanged from the `v3.0.0-rc` line of the
+`trendvidia/fyne` fork, which is preserved frozen as the history reference.
+
+Release-candidate while the rebrand soaks.
+
+### Changed
+
+* Module path `github.com/trendvidia/fyne/v3` → `github.com/belluikit/bellui`
+  (no major suffix — a new module path under a new brand restarts the version
+  line). Package `fyne` → `bellui`.
+* CLI `fyne` → `bellui`; environment variables `FYNE_*` → `BELLUI_*`. Hard
+  cutover, no back-compat fallbacks. App metadata was already `manifest.pxf`.
+* Dependencies: the seven toolkit-specific forks moved to `belluikit`
+  (`systray`, `glfw`, `glfw-js`, `gl-js`, `webgpu`, `typesetting`, `render`).
+  `github.com/trendvidia/protowire-go` deliberately stayed put — it is a
+  standalone public library, not a fork of ours.
+* `github.com/srwiley/{oksvg,rasterx}`, `github.com/fyne-io/image/ico` and
+  `belluikit/render` are now vendored under `internal/`. **The build graph and
+  `go.sum` contain zero `srwiley` and zero `fyne-io`/`fyne.io` references**;
+  build modules dropped from 33 to 30.
+
+### Added
+
+* `x/` umbrella: `x/{tables,editor,dag,charts}`, each its own module, migrated
+  from `trendvidia/{fytables,fycoder,fydag,fycharts}`.
+
+### Notes
+
+* The `belluikit/*` repositories are **private** during the rebrand soak.
+  Building outside the org requires `GOPRIVATE=github.com/belluikit/*` and git
+  credentials.
+
 ## Unreleased
 
 ### Fixed
