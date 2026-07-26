@@ -4,10 +4,12 @@ As of the Phase 5 migration (#204), **WebGPU is the default GPU rendering backen
 on every platform this fork targets. The legacy OpenGL / OpenGL&nbsp;ES / WebGL
 backend is still fully supported and is selected with the **`gl`** build tag.
 
-WebGPU is implemented on top of [`cogentcore/webgpu`](https://github.com/cogentcore/webgpu)
+WebGPU is implemented on top of [`oliverbestmann/webgpu`](https://github.com/oliverbestmann/webgpu)
 (forked as `github.com/belluikit/webgpu`), which binds the native
 [`wgpu-native`](https://github.com/gfx-rs/wgpu-native) on desktop/mobile and the
-browser's WebGPU via `syscall/js` on the web.
+browser's WebGPU via `syscall/js` on the web. The fork was rebased onto that base
+in v1.1.0, from the frozen `cogentcore/webgpu` it started on; our fork now carries
+only two platform slices upstream does not ship — see `docs/REBRAND.md`.
 
 ## Why
 
