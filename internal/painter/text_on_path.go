@@ -4,7 +4,7 @@ import (
 	"image"
 	"math"
 
-	"github.com/belluikit/render"
+	"github.com/belluikit/bellui/internal/render"
 	"github.com/belluikit/typesetting/shaping"
 	"golang.org/x/image/draw"
 	"golang.org/x/image/math/f64"
