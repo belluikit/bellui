@@ -30,6 +30,10 @@ func (g *LineNumberGutter) minDigits() int {
 	return 3
 }
 
+// GutterColumn implements [GutterColumnProvider]: line numbers sit between the
+// markers and the fold control.
+func (g *LineNumberGutter) GutterColumn() GutterColumn { return GutterColumnLineNumber }
+
 // Width implements [GutterProvider].
 func (g *LineNumberGutter) Width(totalRows int, textSize float32) float32 {
 	digits := len(fmt.Sprint(totalRows))
