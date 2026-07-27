@@ -11,6 +11,57 @@ This file lists the main changes with each version of the Fyne toolkit.
 Entries up to 2.7.3 are inherited from upstream Fyne; later entries describe
 the trendvidia fork (github.com/trendvidia/fyne).
 
+## v1.0.0-rc.3 — 2026-07-27
+
+An `x/editor` fix release. The core toolkit is unchanged from v1.0.0-rc.2; the
+core module is re-tagged only to keep it in lockstep with the `x/` umbrella
+modules, which pin it. All three fixes came from using the editor, and each
+carries a regression test that fails on the previous release.
+
+### Fixed
+
+* **`x/editor`: line numbers detached from the content below a collapsed fold**
+  ([#29](https://github.com/belluikit/bellui/issues/29),
+  [#32](https://github.com/belluikit/bellui/pull/32)). The gutter rows drawn
+  past the end of the document — the phantom numbers that keep the gutter
+  spanning the full editor height on a short document — were positioned from the
+  row *index* (`topOffset + row*stride`). A collapsed fold removes height
+  without removing rows, so anything folded left those numbers hanging below the
+  text with a gap the size of the folded region. Both the gutter and the
+  decorator overlay now continue from where the laid-out content actually ends.
+* **`x/editor`: gutter markers pushed the line numbers away from the code**
+  ([#30](https://github.com/belluikit/bellui/issues/30)). `CompositeGutter`
+  rendered its providers strictly in the order passed, so the common
+  `[numbers, diagnostics, breakpoints]` composition drew a strip of unrelated
+  markers between a number and its line. Providers now declare a column via the
+  new `GutterColumnProvider` and the composite arranges them —
+  `[markers][line numbers][fold]` — whatever order the host passes. Providers
+  sharing a column keep their relative order; a provider that declares nothing
+  counts as a marker, so a host's own provider stays on the leading edge;
+  `NewCompositeGutterInOrder` opts out for a bespoke layout. `Width`, `Render`,
+  the column hit-test (`TappedAtX`, including the #109 margin-tap fallback) and
+  `breakpointProvider` all walk the arranged order. **This changes rendering and
+  gutter tap x-positions for existing hosts with no call-site change** — the
+  point of the fix, but hosts should re-check any coordinates they assumed.
+* **`x/editor`: the completion popup ignored the editor's bottom edge**
+  ([#31](https://github.com/belluikit/bellui/issues/31)).
+  `widget.CompletionPopup.ShowAtCaret` picks its side against the *canvas*, so an
+  editor that does not reach the bottom of its window opened the list downwards
+  past its own bottom edge, over whatever sat beneath it. `popoverPositionIn`
+  now separates the side choice (the editor viewport) from the clamp (the
+  canvas), and the editor places the popup itself; the hover and signature cards
+  use the same seam. The deliberate overflow of #19 survives: a list taller than
+  a compact editor still opens downwards into the surrounding window rather than
+  being squeezed above the caret.
+
+### CI
+
+* The macOS WebGPU runner fails `TestWindowedSurfaceCapture` whenever its
+  display is asleep — `CGDisplayCopyDisplayMode` returns NULL, so no real
+  surface exists and the capture reads back black
+  ([#33](https://github.com/belluikit/bellui/issues/33)). Diagnosed and worked
+  around per run; the durable wrapper is still to do.
+
 ## v1.0.0-rc.2 — 2026-07-27
 
 Second release candidate of the rebrand soak. The substance is the WebGPU
