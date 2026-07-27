@@ -104,15 +104,20 @@ jobs:
       # code — no function we own exceeds it today, so this is a real gate, not
       # a rubber stamp (several sit at exactly 30).
       #
-      # Two exclusions, both about scope rather than tolerance. gocyclo takes a
-      # filesystem path, so unlike `go vet ./...` and `staticcheck ./...` — which
-      # stop at the module boundary — it descends into everything under the
-      # working tree:
+      # Two exclusions. gocyclo takes a filesystem path, so unlike
+      # `go vet ./...` and `staticcheck ./...` — which stop at the module
+      # boundary — it descends into everything under the working tree:
       #
-      #   internal/{oksvg,rasterx,render}  vendored third-party (srwiley; see each
-      #                                    dir's PROVENANCE.md + LICENSE). Holding
-      #                                    upstream code to our complexity budget
-      #                                    would only make future syncs painful.
+      #   internal/{oksvg,rasterx,render}  absorbed srwiley code. Their PROVENANCE.md
+      #                                    says to treat it as owned and patch in
+      #                                    place, which is what happened for gofumpt
+      #                                    and staticcheck — so this is NOT a
+      #                                    "third-party, hands off" exemption. It is
+      #                                    three genuinely complex functions
+      #                                    (readStyleAttr 47, addSeg 44, strokeEdge
+      #                                    43) whose refactor is real, risky work in
+      #                                    a 2-D rasterizer, deferred to #18 rather
+      #                                    than done alongside CI plumbing.
       #   x/                               separate Go modules. They need their own
       #                                    gocyclo step alongside their own build,
       #                                    test and vet — tracked in #13. Silently
