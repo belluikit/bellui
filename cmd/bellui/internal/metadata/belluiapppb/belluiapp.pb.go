@@ -737,6 +737,7 @@ var (
 		nil,                     // 10: bellui.metadata.v1.AppDetails.IosUsageDescriptionsEntry
 	}
 )
+
 var file_belluiapp_proto_depIdxs = []int32{
 	1,  // 0: bellui.metadata.v1.BelluiApp.details:type_name -> bellui.metadata.v1.AppDetails
 	3,  // 1: bellui.metadata.v1.BelluiApp.adaptive_icon:type_name -> bellui.metadata.v1.AdaptiveIcon
