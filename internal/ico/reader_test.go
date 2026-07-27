@@ -22,8 +22,12 @@ func TestDecodeAll(t *testing.T) {
 		images, err := ico.DecodeAll(rd)
 		rd.Close()
 
-		// Specific Testfile with no images should error
-		if f == "testdata/DFONT.ico" {
+		// Specific Testfile with no images should error. Match on the base
+		// name: filepath.Glob returns OS-separated paths, so on Windows f is
+		// "testdata\DFONT.ico" and a comparison against a forward-slash literal
+		// never fires — the file then falls through to the NoError assertion
+		// below and fails.
+		if filepath.Base(f) == "DFONT.ico" {
 			assert.Error(err, ico.ErrorNoEntries)
 			continue
 		}
