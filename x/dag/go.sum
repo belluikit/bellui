@@ -2,6 +2,8 @@ github.com/BurntSushi/toml v1.5.0 h1:W5quZX/G/csjUnuI8SUYlsHs9M38FC7znL0lIO+DvMg
 github.com/BurntSushi/toml v1.5.0/go.mod h1:ukJfTF/6rtPPRCnwkur4qwRxa8vTRFBF0uk2lLoLwho=
 github.com/belluikit/bellui v1.0.0-rc.1 h1:UmHbNiE0HrezVMSXqOJTVecJlSMXnVwKhzcJhhQs+Vw=
 github.com/belluikit/bellui v1.0.0-rc.1/go.mod h1:HQVmKCC/FPSIst8dSfCRL52DTmNhysAd2cYtIRt53iI=
+github.com/belluikit/bellui v1.0.0-rc.2 h1:kPIQLbmfLOt+RwAXoakO2uu+w5KXLwrka42YcuOEdJc=
+github.com/belluikit/bellui v1.0.0-rc.2/go.mod h1:7giSovCCsBEYuvgBroKCJN3aKT0af+fQJlGPPz2x76g=
 github.com/belluikit/gl-js v0.2.1 h1:DWtRW7ztetpAfztJ3msW9YWFWVaydmMlfT2sa6GrAEY=
 github.com/belluikit/gl-js v0.2.1/go.mod h1:2/qoK/hK1zTuTBiZ7DYdMS6vapNN3KoYhAfpUb2vh1k=
 github.com/belluikit/typesetting v0.3.6 h1:M27Rx+fhz1IV2n6Tei3fNhs/Oe9gGAnq3QMrBpAqisY=
