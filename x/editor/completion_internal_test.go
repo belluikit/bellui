@@ -2,8 +2,12 @@ package editor
 
 import (
 	"context"
+	"image/color"
 	"strings"
 	"testing"
+
+	"github.com/belluikit/bellui/canvas"
+	"github.com/belluikit/bellui/container"
 
 	"github.com/belluikit/bellui/driver/desktop"
 	"github.com/belluikit/bellui/event"
@@ -645,5 +649,75 @@ func TestOffsetRowColRoundTrip(t *testing.T) {
 		if r, c := offsetToRowCol(text, off); r != tc.row || c != tc.col {
 			t.Errorf("(%d,%d) → off %d → (%d,%d)", tc.row, tc.col, off, r, c)
 		}
+	}
+}
+
+// TestCompletion_FlipsAboveAtEditorBottom covers the editor-boundary flip: an
+// editor that does not reach the bottom of its window still has canvas room
+// below it, so the popup's own canvas-keyed flip would open the list downwards
+// past the editor's bottom edge, over whatever sits beneath. Anchored on the
+// last visible line, it must open ABOVE the current line instead.
+func TestCompletion_FlipsAboveAtEditorBottom(t *testing.T) {
+	test.NewTempApp(t)
+	e := NewEditor()
+	e.SetText(strings.Repeat("word\n", 40))
+	e.SetCompletionProvider(&WordListCompletionProvider{
+		Words: []string{"alpha", "alpine", "amber", "anchor", "ankle", "answer", "antler", "anvil"},
+	})
+
+	// The editor occupies the top third of a tall window: plenty of canvas below
+	// it, none of it the editor's.
+	filler := canvas.NewRectangle(color.NRGBA{A: 255})
+	filler.SetMinSize(geo.NewSize(0, 400))
+	w := test.NewWindow(container.NewBorder(nil, filler, nil, nil, e))
+	t.Cleanup(w.Close)
+	w.Resize(geo.NewSize(400, 600))
+
+	// Put the caret on the last row the editor shows, then type a prefix.
+	rows := int(e.entry.Size().Height / e.gutterW.stride)
+	e.SetCursorPos(rows-1, 0)
+	typeRunes(e, "an")
+
+	if !e.completion.visible() {
+		t.Fatal("completion popup should be visible after typing 'an'")
+	}
+	anchor := e.PositionAt(e.completion.anchorRow, e.completion.anchorCol)
+	r := e.completion.rect
+	if r.IsZero() {
+		t.Fatal("popup reported no placement")
+	}
+	if r.Pos.Y+r.Size.Height > anchor.Pos.Y+0.5 {
+		t.Errorf("popup should sit above the anchor line near the editor's bottom edge: "+
+			"popup %v, anchor %v, editor height %v", r, anchor, e.entry.Size().Height)
+	}
+}
+
+// TestCompletion_OverflowsCompactEditor keeps the deliberate escape hatch from
+// #19: a list taller than a compact editor has room on NEITHER side, so it still
+// opens downwards and spills into the surrounding window rather than being
+// squeezed above the caret.
+func TestCompletion_OverflowsCompactEditor(t *testing.T) {
+	test.NewTempApp(t)
+	e := NewEditor()
+	e.MinRows = 3
+	e.SetText("word\nword\nword\n")
+	e.SetCompletionProvider(&WordListCompletionProvider{
+		Words: []string{"alpha", "alpine", "amber", "anchor", "ankle", "answer", "antler", "anvil"},
+	})
+
+	filler := canvas.NewRectangle(color.NRGBA{A: 255})
+	filler.SetMinSize(geo.NewSize(0, 400))
+	w := test.NewWindow(container.NewBorder(nil, filler, nil, nil, e))
+	t.Cleanup(w.Close)
+	w.Resize(geo.NewSize(400, 600))
+
+	e.SetCursorPos(1, 0)
+	typeRunes(e, "an")
+	if !e.completion.visible() {
+		t.Fatal("completion popup should be visible after typing 'an'")
+	}
+	anchor := e.PositionAt(e.completion.anchorRow, e.completion.anchorCol)
+	if r := e.completion.rect; r.Pos.Y < anchor.Pos.Y {
+		t.Errorf("a list taller than a compact editor should still open downwards, got %v vs anchor %v", r, anchor)
 	}
 }
