@@ -2,8 +2,8 @@ github.com/BurntSushi/toml v1.5.0 h1:W5quZX/G/csjUnuI8SUYlsHs9M38FC7znL0lIO+DvMg
 github.com/BurntSushi/toml v1.5.0/go.mod h1:ukJfTF/6rtPPRCnwkur4qwRxa8vTRFBF0uk2lLoLwho=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=
 github.com/Microsoft/go-winio v0.6.2/go.mod h1:yd8OoFMLzJbo9gZq8j5qaps8bJ9aShtEA8Ipt1oGCvU=
-github.com/belluikit/bellui v1.0.0-rc.2 h1:kPIQLbmfLOt+RwAXoakO2uu+w5KXLwrka42YcuOEdJc=
-github.com/belluikit/bellui v1.0.0-rc.2/go.mod h1:7giSovCCsBEYuvgBroKCJN3aKT0af+fQJlGPPz2x76g=
+github.com/belluikit/bellui v1.0.0-rc.3 h1:D1HvoyP5p6ONDK8jz4kDxBd4Phl/QcrgrOubWlMZInI=
+github.com/belluikit/bellui v1.0.0-rc.3/go.mod h1:7giSovCCsBEYuvgBroKCJN3aKT0af+fQJlGPPz2x76g=
 github.com/belluikit/gl-js v0.2.1 h1:DWtRW7ztetpAfztJ3msW9YWFWVaydmMlfT2sa6GrAEY=
 github.com/belluikit/gl-js v0.2.1/go.mod h1:2/qoK/hK1zTuTBiZ7DYdMS6vapNN3KoYhAfpUb2vh1k=
 github.com/belluikit/glfw v1.9.0 h1:h6P1w4qrxrlnlbNqIWX3GleLxmCsVghGe1UuJ+U4L5o=
