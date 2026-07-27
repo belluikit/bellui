@@ -34,8 +34,11 @@ goimports -e -d .
 go vet ./...
 staticcheck ./...
 
-# Cyclomatic complexity (max 30)
-gocyclo -over 30 .
+# Cyclomatic complexity (max 30). Vendored third-party (internal/oksvg,
+# internal/rasterx, internal/render) and the x/ submodules are scoped out —
+# gocyclo walks the filesystem, so unlike `go vet`/`staticcheck` it would
+# otherwise descend into code this module does not own. See #13, #18.
+gocyclo -over 30 -ignore 'internal/oksvg|internal/rasterx|internal/render|^x/' .
 ```
 
 ### Code Generation
