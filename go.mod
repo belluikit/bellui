@@ -43,8 +43,8 @@ require (
 )
 
 require (
-	github.com/belluikit/webgpu/libs-ios v0.0.0-20260726222126-17584e286157 // indirect
-	github.com/belluikit/webgpu/libs-windows v0.0.0-20260726232427-992fb7d0a5a4 // indirect
+	github.com/belluikit/webgpu/libs-ios v0.0.0-20260727093643-fcde44a448a6 // indirect
+	github.com/belluikit/webgpu/libs-windows v0.0.0-20260727093645-6b8e55d25f27 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-gl/glfw/v3.4/glfw v0.1.0-pre.1.0.20260628091122-0bd588dc30cf // indirect
 	github.com/hack-pad/safejs v0.1.0 // indirect
