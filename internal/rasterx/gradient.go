@@ -229,7 +229,7 @@ func (g *Gradient) GetColorFunctionUS(opacity float64, objMatrix Matrix2D) inter
 			// point of line from center to focus and circle as per SVG specs.
 			nfx, nfy, intersects := RayCircleIntersectionF(fx, fy, cx, cy, cx, cy, 1.0-epsilonF)
 			fx, fy = nfx, nfy
-			if intersects == false {
+			if !intersects {
 				return color.RGBA{255, 255, 0, 255} // should not happen
 			}
 		}
@@ -240,7 +240,7 @@ func (g *Gradient) GetColorFunctionUS(opacity float64, objMatrix Matrix2D) inter
 				ey := y / ry
 
 				t1x, t1y, intersects := RayCircleIntersectionF(ex, ey, fx, fy, cx, cy, 1.0)
-				if intersects == false { // In this case, use the last stop color
+				if !intersects { // In this case, use the last stop color
 					s := g.Stops[len(g.Stops)-1]
 					return ApplyOpacity(s.StopColor, s.Opacity*opacity)
 				}
@@ -260,7 +260,7 @@ func (g *Gradient) GetColorFunctionUS(opacity float64, objMatrix Matrix2D) inter
 			ey := y / ry
 
 			t1x, t1y, intersects := RayCircleIntersectionF(ex, ey, fx, fy, cx, cy, 1.0)
-			if intersects == false { // In this case, use the last stop color
+			if !intersects { // In this case, use the last stop color
 				s := g.Stops[len(g.Stops)-1]
 				return ApplyOpacity(s.StopColor, s.Opacity*opacity)
 			}
