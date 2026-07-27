@@ -123,6 +123,10 @@ func (g *DiagnosticGutter) dotScale() float32 {
 	return 0.6
 }
 
+// GutterColumn implements [GutterColumnProvider]: diagnostics are a leading
+// marker column, like breakpoints.
+func (g *DiagnosticGutter) GutterColumn() GutterColumn { return GutterColumnMarker }
+
 // Width implements [GutterProvider]. The marker column is sized to fit a dot
 // with padding, matching the breakpoint column.
 func (g *DiagnosticGutter) Width(_ int, textSize float32) float32 {
