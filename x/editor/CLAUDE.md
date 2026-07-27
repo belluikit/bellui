@@ -19,7 +19,7 @@ Tests that call Bellui APIs (MeasureText, widget constructors) require `test.New
 Composable code editor widget for Bellui. Three independent, pluggable axes:
 
 - **`Highlighter`** (`style.go`) — per-line syntax highlighting via `StyleRun` tokens. Stateful across lines (state flows line-to-line for multi-line strings/comments).
-- **`GutterProvider`** (`gutter.go`) — renders the area left of text. `InteractiveGutter` adds click handling. `CompositeGutter` stacks multiple providers side-by-side.
+- **`GutterProvider`** (`gutter.go`) — renders the area left of text. `InteractiveGutter` adds click handling. `CompositeGutter` stacks multiple providers side by side, arranged by the column each declares via `GutterColumnProvider` — markers (breakpoints, diagnostics, undeclared host providers) on the leading edge, then the line numbers, then the fold control beside the text — regardless of the order they were passed. `NewCompositeGutterInOrder` opts out and renders them verbatim. Column hit-testing (`TappedAtX`) walks the same arranged order.
 - **`RowDecorator`** (`decorator.go`) — row-level background/overlay effects (current line highlight, search matches).
 
 ### Editor composition
