@@ -487,7 +487,7 @@ func doShapes(t *testing.T, f Scanner, fa Adder, fname string, img image.Image) 
 	f.Draw()
 	f.Clear()
 
-	f.SetClip(image.ZR)
+	f.SetClip(image.Rectangle{})
 
 	f.SetColor(colornames.Firebrick)
 	AddRect(370, 370, 400, 500, 15, fa)
@@ -575,7 +575,7 @@ func TestGradient(t *testing.T) {
 	p.AddTo(offsetPath)
 	f.Draw()
 	f.Clear()
-	scannerGV.SetClip(image.ZR)
+	scannerGV.SetClip(image.Rectangle{})
 	offsetPath.M = Identity.Translate(180, 340)
 	p.AddTo(offsetPath)
 	f.Draw()
