@@ -135,5 +135,19 @@ jobs:
           staticcheck ./...
           staticcheck -tags gl ./...
 
+      # The --excluded list is upstream's three prebuilt wgpu-native library
+      # modules. They ship compiled artifacts and carry no licence file of their
+      # own — an upstream gap, not ours: oliverbestmann's libs-* branches have
+      # none either. Our two forked equivalents (libs-ios, libs-windows) DO now
+      # carry the wgpu-native dual notice (MIT OR Apache-2.0), so they are
+      # scanned normally rather than excluded.
+      #
+      # The artifacts are builds of gfx-rs/wgpu-native, whose Cargo.toml declares
+      # `license = "MIT OR Apache-2.0"` — so this is a missing FILE, not an
+      # unknown or incompatible licence. Exclusions pin repo@version and must be
+      # refreshed on every bump; drop them once upstream ships licence files.
+      # See #21.
       - name: Check license of dependencies
-        run: lian -d --allowed="Apache-2.0, BSD-2-Clause, BSD-3-Clause, MIT, ISC"
+        run: |
+          lian -d --allowed="Apache-2.0, BSD-2-Clause, BSD-3-Clause, MIT, ISC" \
+            --excluded="github.com/oliverbestmann/webgpu/libs-android@v0.0.0-20260628152806-6b27e30a172e,github.com/oliverbestmann/webgpu/libs-darwin@v0.0.0-20260628152755-66a5dfa57f8d,github.com/oliverbestmann/webgpu/libs-linux@v0.0.0-20260628152803-421b8a341d08"
