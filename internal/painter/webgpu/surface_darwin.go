@@ -39,6 +39,6 @@ func SurfaceDescriptorForWindow(w *glfw.Window) *wgpu.SurfaceDescriptor {
 	nsWindow := w.GetCocoaWindow() // unsafe.Pointer to NSWindow
 	layer := C.metalLayerFromNSWindow(unsafe.Pointer(nsWindow))
 	return &wgpu.SurfaceDescriptor{
-		MetalLayer: &wgpu.SurfaceDescriptorFromMetalLayer{Layer: unsafe.Pointer(layer)},
+		MetalLayer: &wgpu.SurfaceSourceMetalLayer{Layer: unsafe.Pointer(layer)},
 	}
 }

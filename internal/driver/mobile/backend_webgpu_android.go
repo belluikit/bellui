@@ -17,7 +17,7 @@ func (d *driver) renderReady(w *window) bool { return w != nil && w.handle != 0 
 // ANativeWindow* that gomobile delivered through paint.Event.Window.
 func webgpuSurfaceDescriptor(w *window) *wgpu.SurfaceDescriptor {
 	return &wgpu.SurfaceDescriptor{
-		AndroidNativeWindow: &wgpu.SurfaceDescriptorFromAndroidNativeWindow{
+		AndroidNativeWindow: &wgpu.SurfaceSourceAndroidNativeWindow{
 			Window: unsafe.Pointer(w.handle), //nolint:govet // ANativeWindow*, not a Go pointer
 		},
 	}
