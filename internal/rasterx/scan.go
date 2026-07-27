@@ -76,7 +76,7 @@ func (s *ScannerGV) SetColor(clr interface{}) {
 	switch c := clr.(type) {
 	case color.Color:
 		s.clipImage.ColorFuncImage.Uniform.C = c
-		if s.clipImage.clip == image.ZR {
+		if s.clipImage.clip == (image.Rectangle{}) {
 			s.Source = &s.clipImage.ColorFuncImage.Uniform
 		} else {
 			s.clipImage.ColorFuncImage.colorFunc = func(x, y int) color.Color {
@@ -86,7 +86,7 @@ func (s *ScannerGV) SetColor(clr interface{}) {
 		}
 	case ColorFunc:
 		s.clipImage.ColorFuncImage.colorFunc = c
-		if s.clipImage.clip == image.ZR {
+		if s.clipImage.clip == (image.Rectangle{}) {
 			s.Source = &s.clipImage.ColorFuncImage
 		} else {
 			s.Source = s.clipImage
