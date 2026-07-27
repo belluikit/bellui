@@ -241,8 +241,18 @@ jobs:
         run: go test -count=1 ./internal/painter/webgpu/...
 
       # Real-window present + Canvas().Capture() coverage on D3D12 (#329);
-      # self-skips if no window/adapter. The x64 runner is an interactive
-      # session.
+      # self-skips if no window/adapter.
+      #
+      # NOTE: this runner is NOT an interactive session — the service runs as
+      # NT AUTHORITY\NETWORK SERVICE in session 0, on a window station with no
+      # display surfaces (`Service-0x0-…$`, WSF_VISIBLE clear). GLFW still hands
+      # out a window handle there, so the test's window != nil guard does not
+      # fire and D3D12 really is exercised; it presents to a swapchain no one
+      # can see. That works on the current wgpu (verified green), but it is
+      # coverage of a degraded environment: a session-0 CreateSwapChainForHwnd
+      # can answer DXGI_ERROR_NOT_CURRENTLY_AVAILABLE, which wgpu-native turns
+      # into a fatal panic rather than a returnable error (#20). Restoring a
+      # real desktop session for this step is tracked in #20.
       - name: WebGPU windowed present + Capture (D3D12, x64)
         shell: bash
         env:

@@ -69,6 +69,43 @@ func logSurfaceFormats(where string, formats []wgpu.TextureFormat, chosen wgpu.T
 	bellui.LogError(fmt.Sprintf("webgpu %s: advertised=%v chosen=%v%s", where, formats, chosen, tag), nil)
 }
 
+// surfaceConfig builds the surface configuration from the capabilities the
+// surface advertises for the chosen adapter, or reports an error when those
+// capabilities are degenerate.
+//
+// Empty capability lists mean the surface cannot present on this adapter at all
+// (wgpu-native answers a surface it cannot serve with all-empty lists rather
+// than an error). Indexing them regardless — the shape this code had until #20 —
+// panics on AlphaModes[0]; and configuring a surface wgpu has already declared
+// unusable trades that Go panic for an unrecoverable one, since wgpu-native
+// routes every wgpuSurfaceConfigure failure through handle_error_fatal: a Rust
+// panic that unwinds into cgo and kills the process (exception 0x20474343, the
+// mingw foreign-exception code — not the access violation it resembles). There
+// is no error to catch on the far side of Configure, so the only defence is to
+// not call it with something already known to be unusable.
+func surfaceConfig(caps wgpu.SurfaceCapabilities, width, height int, where string) (*wgpu.SurfaceConfiguration, error) {
+	if len(caps.Formats) == 0 || len(caps.AlphaModes) == 0 {
+		return nil, fmt.Errorf("%s: surface advertises no usable capabilities (formats=%d alpha modes=%d) — "+
+			"it cannot present on this adapter", where, len(caps.Formats), len(caps.AlphaModes))
+	}
+	format := chooseSurfaceFormat(caps.Formats)
+	logSurfaceFormats(where, caps.Formats, format)
+	return &wgpu.SurfaceConfiguration{
+		Usage:       wgpu.TextureUsageRenderAttachment | wgpu.TextureUsageCopySrc, // CopySrc enables Capture
+		Format:      format,
+		Width:       uint32(width),
+		Height:      uint32(height),
+		PresentMode: choosePresentMode(caps.PresentModes),
+		AlphaMode:   caps.AlphaModes[0],
+	}, nil
+}
+
+// capturePixelsSwapped reports whether a readback of a surface in this format
+// arrives as BGRA and so needs its red and blue channels swapped.
+func capturePixelsSwapped(format wgpu.TextureFormat) bool {
+	return format == wgpu.TextureFormatBGRA8Unorm || format == wgpu.TextureFormatBGRA8UnormSrgb
+}
+
 // Device owns the WebGPU instance/adapter/device/queue/surface and the caches
 // (shader modules, pipelines) shared by the painter. It is the WebGPU analogue
 // of the GL painter's per-platform context plus its ProgramState set, built
@@ -367,17 +404,11 @@ func NewDevice(sd *wgpu.SurfaceDescriptor, width, height int) (d *Device, err er
 	d.initGPUProfiling() // BELLUI_GPU_PROFILE, #336
 
 	caps := d.surface.GetCapabilities(d.adapter)
-	format := chooseSurfaceFormat(caps.Formats)
-	logSurfaceFormats("surface configure", caps.Formats, format)
-	d.config = &wgpu.SurfaceConfiguration{
-		Usage:       wgpu.TextureUsageRenderAttachment | wgpu.TextureUsageCopySrc, // CopySrc enables Capture
-		Format:      format,
-		Width:       uint32(width),
-		Height:      uint32(height),
-		PresentMode: choosePresentMode(caps.PresentModes),
-		AlphaMode:   caps.AlphaModes[0],
+	d.config, err = surfaceConfig(caps, width, height, "surface configure")
+	if err != nil {
+		return d, err
 	}
-	d.captureSwap = format == wgpu.TextureFormatBGRA8Unorm || format == wgpu.TextureFormatBGRA8UnormSrgb
+	d.captureSwap = capturePixelsSwapped(d.config.Format)
 	d.surface.Configure(d.adapter, d.device, d.config)
 
 	d.sampler, err = d.device.CreateSampler(&wgpu.SamplerDescriptor{
@@ -506,11 +537,17 @@ func (d *Device) RecreateSurface(sd *wgpu.SurfaceDescriptor) {
 	// Re-derive format/alpha from the new surface's caps (same adapter, so
 	// normally identical to before) and reconfigure at the current size.
 	caps := d.surface.GetCapabilities(d.adapter)
-	format := chooseSurfaceFormat(caps.Formats)
-	logSurfaceFormats("surface recreate", caps.Formats, format)
-	d.config.Format = format
-	d.config.AlphaMode = caps.AlphaModes[0]
-	d.captureSwap = format == wgpu.TextureFormatBGRA8Unorm || format == wgpu.TextureFormatBGRA8UnormSrgb
+	cfg, err := surfaceConfig(caps, int(d.config.Width), int(d.config.Height), "surface recreate")
+	if err != nil {
+		// The new native window cannot present on this adapter. Leave the surface
+		// unconfigured rather than configuring one wgpu has declared unusable —
+		// that is fatal inside wgpu-native (#20). Frames then fail to acquire and
+		// are skipped until a later RecreateSurface brings a usable window.
+		bellui.LogError("webgpu: keeping the surface unconfigured", err)
+		return
+	}
+	d.config = cfg
+	d.captureSwap = capturePixelsSwapped(cfg.Format)
 	d.surface.Configure(d.adapter, d.device, d.config)
 }
 
