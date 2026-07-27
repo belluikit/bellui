@@ -6,10 +6,10 @@ import (
 	"math"
 	"sort"
 
+	"github.com/belluikit/bellui/internal/rasterx"
 	"github.com/belluikit/typesetting/font"
 	"github.com/belluikit/typesetting/font/opentype"
 	"github.com/belluikit/typesetting/shaping"
-	"github.com/belluikit/bellui/internal/rasterx"
 	"golang.org/x/image/math/fixed"
 )
 
