@@ -20,7 +20,7 @@ jobs:
       fail-fast: false
       matrix:
         go-version: ["stable"]
-        platform: [linux, macos]
+        platform: [linux, linux-x64, macos]
         include:
           - platform: linux
             runs-on: [self-hosted, Linux, ARM64]
@@ -32,9 +32,24 @@ jobs:
             # Go link, no GPU) and holds the coverage gate; the webgpu_tests job
             # below covers the default WebGPU backend on a GPU.
             tags: gl,ci,migrated_belluido
+            coverage: true
+          # Same suite on x86_64. Every other Linux leg in this repo is ARM64, so
+          # nothing was catching amd64-specific breakage: assembly and SIMD paths
+          # (the vectorized newline scan in internal/textbuf), cgo struct layout
+          # and alignment against the X11/Wayland/GL headers, and unsafe pointer
+          # arithmetic all differ by arch. Pure Go link, no GPU — the GPU legs
+          # stay on the two machines that have one.
+          - platform: linux-x64
+            runs-on: [self-hosted, Linux, X64]
+            runner: ./.github/scripts/xvfb-run-safe
+            tags: gl,ci,migrated_belluido
+            # The ARM64 leg owns the coverage gate; running it twice would just
+            # spend minutes to assert the same number.
+            coverage: false
           - platform: macos
             runs-on: [self-hosted, macOS, ARM64]
             tags: gl,no_glfw,ci,migrated_belluido
+            coverage: false
 
     steps:
       - uses: actions/checkout@v5
@@ -108,7 +123,7 @@ jobs:
           set -e
           coverage=`go tool cover -func coverage.out | grep total | tr -s '\t' | cut -f 3 | grep -o '[^%]*'`
           if (( $(echo "$coverage < 62" | bc) )); then echo "Test coverage lowered"; exit 1; fi
-        if: ${{ runner.os == 'Linux' && matrix.go-version == 'stable' }}
+        if: ${{ matrix.coverage && matrix.go-version == 'stable' }}
 
 
   # WebGPU is the default backend (Phase 5, #204). This job builds the default
@@ -226,11 +241,80 @@ jobs:
         run: go test -count=1 ./internal/painter/webgpu/...
 
       # Real-window present + Canvas().Capture() coverage on D3D12 (#329);
-      # self-skips if no window/adapter. The x64 runner is an interactive
-      # session.
+      # self-skips if no window/adapter.
+      #
+      # NOTE: this runner is NOT an interactive session — the service runs as
+      # NT AUTHORITY\NETWORK SERVICE in session 0, on a window station with no
+      # display surfaces (`Service-0x0-…$`, WSF_VISIBLE clear). GLFW still hands
+      # out a window handle there, so the test's window != nil guard does not
+      # fire and D3D12 really is exercised; it presents to a swapchain no one
+      # can see. That works on the current wgpu (verified green), but it is
+      # coverage of a degraded environment: a session-0 CreateSwapChainForHwnd
+      # can answer DXGI_ERROR_NOT_CURRENTLY_AVAILABLE, which wgpu-native turns
+      # into a fatal panic rather than a returnable error (#20). Restoring a
+      # real desktop session for this step is tracked in #20.
       - name: WebGPU windowed present + Capture (D3D12, x64)
         shell: bash
         env:
           CGO_LDFLAGS: ""
           CGO_CFLAGS: ""
         run: go test -run TestWindowedSurfaceCapture -count=1 -timeout 120s ./internal/driver/glfw/
+
+
+  # Windows on ARM64, the second mingw flavor. The x64 runner builds the UIA cgo
+  # bridge with winlibs gcc; this one uses llvm-mingw clang, and the two disagree
+  # often enough to matter — the hand-written COM vtable slot offsets in
+  # internal/driver/glfw/accessibility_windows.c are laid out against
+  # uiautomationcore.h, and pointer-width-independent struct packing is exactly
+  # the kind of thing only a second compiler catches. Deliberately a separate job
+  # rather than a matrix leg on windows_tests: matrixing would rename that job's
+  # check to `windows_tests (x64)` and silently drop it from any branch
+  # protection rule referencing the old name.
+  windows_arm64_tests:
+    runs-on: [self-hosted, ARM64, Windows]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Assert go-plus toolchain
+        shell: powershell
+        run: |
+          go version
+          if (-not (go version | Select-String '\(plus\)')) { Write-Error 'runner go is not the go-plus fork'; exit 1 }
+
+      # No -race anywhere in this job: the race detector has no windows/arm64
+      # support (`go build -race` fails outright with "-race is not supported on
+      # windows/arm64"), so race coverage stays the x64 runner's job.
+      - name: Tests (GL fallback)
+        shell: bash
+        run: |
+          # internal/driver/mobile is excluded on this arch only: its package
+          # init downloads an ANGLE prebuilt keyed on GOARCH, and Google never
+          # published a windows/arm64 one, so gl.NewContext() panics before any
+          # test runs. Upstream gomobile code, works on amd64 — see #17.
+          # Same collapsed-package-list guard as the x64 leg (#565).
+          pkgs=$(go list -tags gl,ci,no_glfw,migrated_belluido ./... | grep -v '/internal/driver/mobile$' || true)
+          n=$(printf '%s\n' "$pkgs" | grep -c . || true)
+          echo "Resolved ${n} packages to test"
+          if [ "${n}" -lt 50 ]; then
+            echo "::error::go list resolved only ${n} packages — refusing to green-light a near-empty test run (#565)"
+            exit 1
+          fi
+          go test -tags gl,ci,no_glfw,migrated_belluido ${pkgs}
+
+      # The reason this job exists: compile and run the UIA bridge under
+      # llvm-mingw.
+      - name: Accessibility tagged tests
+        shell: bash
+        run: go test -tags accessibility,gl,ci,no_glfw,migrated_belluido ./internal/accessibility/... ./core/... ./internal/driver/glfw/
+
+      # Build-only. wgpu-native ships a windows/arm64 slice, so this guards the
+      # link; the GPU test steps the x64 job runs are deliberately omitted until
+      # a D3D12 adapter is confirmed usable under the Parallels virtual GPU —
+      # see #15.
+      - name: WebGPU build (D3D12)
+        shell: bash
+        env:
+          CGO_LDFLAGS: ""
+          CGO_CFLAGS: ""
+        run: go build ./...

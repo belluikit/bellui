@@ -1,0 +1,128 @@
+syntax = "proto3";
+
+package bellui.dag.v1;
+
+option go_package = "github.com/belluikit/bellui/x/dag/dag/dagpb;dagpb";
+
+import "google/protobuf/struct.proto";
+
+// This file is the wire schema for the dag graph model, encoded in the textual
+// PXF format by dag.MarshalGraph. It carries messages only — no services — so
+// the generated bindings need google.golang.org/protobuf alone and x/dag stays
+// free of grpc.
+//
+// Field numbers are inherited verbatim from the fydag PoC schema this model was
+// extracted from (trendvidia/fydag proto/fydag/fydag.proto), so payloads stay
+// wire-compatible with graphs written by the PoC. The proto *package* name is
+// bellui-owned and deliberately different: an app that links both this module
+// and fydag's generated package must not register two messages under the same
+// fully-qualified name.
+
+// PortDirection says whether a port consumes or produces.
+enum PortDirection {
+  PORT_DIRECTION_UNSPECIFIED = 0;
+  PORT_DIRECTION_INPUT = 1;
+  PORT_DIRECTION_OUTPUT = 2;
+}
+
+// Port is a connection point on a node.
+message Port {
+  string name = 1;
+  PortDirection direction = 2;
+  string type_tag = 3;
+}
+
+// PortID uniquely identifies a port within a graph.
+message PortID {
+  string node_id = 1;
+  string name = 2;
+}
+
+// Node is a vertex in the DAG.
+message Node {
+  string id = 1;
+  string label = 2;
+  string type_tag = 3;
+  repeated Port inputs = 4;
+  repeated Port outputs = 5;
+  float position_x = 6;
+  float position_y = 7;
+  google.protobuf.Struct metadata = 8;
+  // User-set card size; zero means auto-size.
+  float size_w = 9;
+  float size_h = 10;
+}
+
+// Edge is a directed connection from an output port to an input port.
+message Edge {
+  string id = 1;
+  PortID source = 2;
+  PortID target = 3;
+}
+
+// Group is a flat (non-nesting) container of nodes.
+message Group {
+  string id = 1;
+  string label = 2;
+  // Node IDs; a node belongs to at most one group.
+  repeated string members = 3;
+  float position_x = 4;
+  float position_y = 5;
+  float size_w = 6;
+  float size_h = 7;
+  bool collapsed = 8;
+  // Optional "#rrggbb" tint; empty means theme default.
+  string color = 9;
+}
+
+// GroupEdge is an editor-level dependency: everything in source precedes
+// everything in target.
+message GroupEdge {
+  string id = 1;
+  string source = 2;  // group ID
+  string target = 3;  // group ID
+}
+
+// LinkEdge is an editor-level, port-less relation between two nodes. It carries
+// no dataflow semantics — cycles and parallel edges are legal.
+message LinkEdge {
+  string id = 1;
+  string source = 2;  // node ID
+  string target = 3;  // node ID
+  string label = 4;
+}
+
+// AnchorKind says what an annotation is attached to.
+enum AnchorKind {
+  ANCHOR_KIND_UNSPECIFIED = 0;  // floating
+  ANCHOR_KIND_NODE = 1;
+  ANCHOR_KIND_EDGE = 2;
+  ANCHOR_KIND_GROUP = 3;
+  ANCHOR_KIND_LINK_EDGE = 4;
+}
+
+// Annotation is a documentation text box, floating or anchored to a node, edge,
+// group, or link edge.
+message Annotation {
+  string id = 1;
+  string text = 2;
+  float position_x = 3;
+  float position_y = 4;
+  float size_w = 5;
+  float size_h = 6;
+  AnchorKind anchor_kind = 7;
+  string anchor_id = 8;
+}
+
+// Graph is the top-level DAG container.
+message Graph {
+  string id = 1;
+  string name = 2;
+  repeated Node nodes = 3;
+  repeated Edge edges = 4;
+  google.protobuf.Struct metadata = 5;
+  repeated Group groups = 6;
+  repeated GroupEdge group_edges = 7;
+  repeated Annotation annotations = 8;
+  repeated LinkEdge link_edges = 9;
+}
