@@ -1734,7 +1734,20 @@ func (d *Device) EndFrame() error {
 		d.frameView.Release()
 		d.frameView = nil
 	}
-	d.frameTex = nil
+	// Release the presented surface texture, don't just drop the handle.
+	// Present hands the image back to the compositor, but the texture acquired
+	// by BeginFrame still holds a reference to the swapchain's back buffer, and
+	// an outstanding back-buffer reference is exactly what DXGI's ResizeBuffers
+	// refuses: DXGI_ERROR_INVALID_CALL, which wgpu reports as "window is in
+	// use" and wgpu-native turns into a fatal panic, aborting the process on
+	// the first window resize (#20). Mirrors wgpu-native's own present sequence
+	// (release the view, then the texture) and what DiscardFrame already does
+	// on the abandon path; the wgpu refcount keeps the native image alive until
+	// the GPU is finished with it.
+	if d.frameTex != nil {
+		d.frameTex.Release()
+		d.frameTex = nil
+	}
 	return nil
 }
 
