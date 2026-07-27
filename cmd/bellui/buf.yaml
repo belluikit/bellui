@@ -5,7 +5,16 @@ lint:
   use:
     - STANDARD
   except:
-    - PACKAGE_VERSION_SUFFIX
+    # Like the root module, the .proto is colocated with the Go package that
+    # consumes it (internal/metadata/belluiapppb/belluiapp.proto for package
+    # belluiapppb) rather than laid out as bellui/metadata/v1/... — a deliberate
+    # Go-directory convention for an unpublished wire schema. Exempt just this
+    # rule and keep the rest of STANDARD enforced. (PACKAGE_VERSION_SUFFIX used
+    # to be excepted here instead; the package is bellui.metadata.v1, which
+    # satisfies that rule, so the exception was inert and the one rule the
+    # layout actually breaks went unexcepted — invisible while CI only ran
+    # `buf lint` at the repo root. See #13.)
+    - PACKAGE_DIRECTORY_MATCH
 breaking:
   use:
     - FILE

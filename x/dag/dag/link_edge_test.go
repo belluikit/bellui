@@ -118,6 +118,31 @@ func TestAnnotationLinkEdgeAnchorValidation(t *testing.T) {
 
 // TestLinkEdgePXFRoundtrip exercises the full save/load path (PXF bytes, not
 // just proto structs) with bidirectional link edges — the acceptance case.
+func TestLinkEdgePXFRoundtrip(t *testing.T) {
+	g := linkedPairGraph(t)
+	g.AddLinkEdge(&LinkEdge{ID: "l1", Source: "a", Target: "b", Label: "navigates to"})
+	g.AddLinkEdge(&LinkEdge{ID: "l2", Source: "b", Target: "a"})
+
+	data, err := MarshalGraph(g)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g2, err := UnmarshalGraph(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(g2.LinkEdges) != 2 {
+		t.Fatalf("link edge count after PXF round trip: %d", len(g2.LinkEdges))
+	}
+	if le := g2.LinkEdges["l1"]; le == nil || le.Source != "a" || le.Target != "b" || le.Label != "navigates to" {
+		t.Fatalf("l1 mismatch: %+v", le)
+	}
+}
+
+// TestLinkEdgesExemptFromCycleChecks locks in the invariant that link edges
+// never participate in the augmented precedence graph: opposite-direction
+// link edges coexist with data-flow edges, don't block AddEdge, and don't
+// affect TopologicalOrder.
 func TestLinkEdgesExemptFromCycleChecks(t *testing.T) {
 	g := linkedPairGraph(t)
 	g.AddLinkEdge(&LinkEdge{ID: "l1", Source: "a", Target: "b"})
