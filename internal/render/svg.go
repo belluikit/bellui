@@ -6,10 +6,10 @@ import (
 	"image/draw"
 	"io"
 
-	"github.com/belluikit/typesetting/font"
-	"github.com/belluikit/typesetting/shaping"
 	"github.com/belluikit/bellui/internal/oksvg"
 	"github.com/belluikit/bellui/internal/rasterx"
+	"github.com/belluikit/typesetting/font"
+	"github.com/belluikit/typesetting/shaping"
 )
 
 func (r *Renderer) drawSVG(g shaping.Glyph, svg font.GlyphSVG, img draw.Image, x, y float32) error {
