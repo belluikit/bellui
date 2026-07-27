@@ -2,7 +2,7 @@ module github.com/belluikit/bellui/x/tables
 
 go 1.25.0
 
-require github.com/belluikit/bellui v1.0.0-rc.1
+require github.com/belluikit/bellui v1.0.0-rc.2
 
 require (
 	github.com/belluikit/gl-js v0.2.1 // indirect
