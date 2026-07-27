@@ -459,14 +459,13 @@ func (r *Stroker) strokeEdge(p C2Point, crossProd fixed.Int26_6) {
 	}
 	r.JoinGap(ra, p.P, p.TNorm, p.LNorm)
 	ra.Line(s2)
-	return
 }
 
 // Stop a stroked line. The line will close
 // is isClosed is true. Otherwise end caps will
 // be drawn at both ends.
 func (r *Stroker) Stop(isClosed bool) {
-	if r.inStroke == false {
+	if !r.inStroke {
 		return
 	}
 	rf := &r.Filler
@@ -635,7 +634,7 @@ func (r *Stroker) CalcEndCurvature(p0, p1, p2, q0, q1, q2 fixed.Point26_6,
 }
 
 func (r *Stroker) joinF() {
-	if r.inStroke == false {
+	if !r.inStroke {
 		r.inStroke = true
 		r.firstP = r.trailPoint
 	} else {
