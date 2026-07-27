@@ -15,7 +15,7 @@ import (
 // verify on Linux/X11.
 func webgpuSurfaceDescriptor(w *window) *wgpu.SurfaceDescriptor {
 	return &wgpu.SurfaceDescriptor{
-		XlibWindow: &wgpu.SurfaceDescriptorFromXlibWindow{
+		XlibWindow: &wgpu.SurfaceSourceXlibWindow{
 			Display: unsafe.Pointer(glfw.GetX11Display()),
 			Window:  uint32(w.viewport.GetX11Window()),
 		},

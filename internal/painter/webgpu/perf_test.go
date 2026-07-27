@@ -68,11 +68,11 @@ func BenchmarkDrawBufferAllocPerDraw(b *testing.B) {
 	vb := wgpu.ToBytes(benchVerts)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		vbuf, err := device.CreateBufferInit(&wgpu.BufferInitDescriptor{Contents: vb, Usage: wgpu.BufferUsageVertex})
+		vbuf, err := device.TryCreateBufferInit(&wgpu.BufferInitDescriptor{Contents: vb, Usage: wgpu.BufferUsageVertex})
 		if err != nil {
 			b.Fatal(err)
 		}
-		ubuf, err := device.CreateBufferInit(&wgpu.BufferInitDescriptor{Contents: benchUniform, Usage: wgpu.BufferUsageUniform})
+		ubuf, err := device.TryCreateBufferInit(&wgpu.BufferInitDescriptor{Contents: benchUniform, Usage: wgpu.BufferUsageUniform})
 		if err != nil {
 			vbuf.Release()
 			b.Fatal(err)
@@ -88,7 +88,7 @@ func BenchmarkDrawBufferAllocPerDraw(b *testing.B) {
 // entire cost goes to ~zero for an unchanged draw.
 func BenchmarkBindGroupCreatePerDraw(b *testing.B) {
 	device, _ := benchRawDevice(b)
-	bgl, err := device.CreateBindGroupLayout(&wgpu.BindGroupLayoutDescriptor{
+	bgl, err := device.TryCreateBindGroupLayout(&wgpu.BindGroupLayoutDescriptor{
 		Entries: []wgpu.BindGroupLayoutEntry{{
 			Binding:    0,
 			Visibility: wgpu.ShaderStageVertex | wgpu.ShaderStageFragment,
@@ -99,7 +99,7 @@ func BenchmarkBindGroupCreatePerDraw(b *testing.B) {
 		b.Fatal(err)
 	}
 	defer bgl.Release()
-	ubuf, err := device.CreateBuffer(&wgpu.BufferDescriptor{Size: 256, Usage: wgpu.BufferUsageUniform})
+	ubuf, err := device.TryCreateBuffer(&wgpu.BufferDescriptor{Size: 256, Usage: wgpu.BufferUsageUniform})
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -107,7 +107,7 @@ func BenchmarkBindGroupCreatePerDraw(b *testing.B) {
 	entries := []wgpu.BindGroupEntry{{Binding: 0, Buffer: ubuf, Offset: 0, Size: 256}}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		bg, err := device.CreateBindGroup(&wgpu.BindGroupDescriptor{Layout: bgl, Entries: entries})
+		bg, err := device.TryCreateBindGroup(&wgpu.BindGroupDescriptor{Layout: bgl, Entries: entries})
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -120,12 +120,12 @@ func BenchmarkBindGroupCreatePerDraw(b *testing.B) {
 func BenchmarkDrawBufferReuse(b *testing.B) {
 	device, queue := benchRawDevice(b)
 	vb := wgpu.ToBytes(benchVerts)
-	vbuf, err := device.CreateBuffer(&wgpu.BufferDescriptor{Size: uint64(roundUpBuffer(len(vb))), Usage: wgpu.BufferUsageVertex | wgpu.BufferUsageCopyDst})
+	vbuf, err := device.TryCreateBuffer(&wgpu.BufferDescriptor{Size: uint64(roundUpBuffer(len(vb))), Usage: wgpu.BufferUsageVertex | wgpu.BufferUsageCopyDst})
 	if err != nil {
 		b.Fatal(err)
 	}
 	defer vbuf.Release()
-	ubuf, err := device.CreateBuffer(&wgpu.BufferDescriptor{Size: uint64(roundUpBuffer(len(benchUniform))), Usage: wgpu.BufferUsageUniform | wgpu.BufferUsageCopyDst})
+	ubuf, err := device.TryCreateBuffer(&wgpu.BufferDescriptor{Size: uint64(roundUpBuffer(len(benchUniform))), Usage: wgpu.BufferUsageUniform | wgpu.BufferUsageCopyDst})
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -146,12 +146,12 @@ const drawsPerFrame = 200
 func BenchmarkWriteBufferPerDraw(b *testing.B) {
 	device, queue := benchRawDevice(b)
 	vb := wgpu.ToBytes(benchVerts)
-	vbuf, err := device.CreateBuffer(&wgpu.BufferDescriptor{Size: uint64(roundUpBuffer(len(vb))), Usage: wgpu.BufferUsageVertex | wgpu.BufferUsageCopyDst})
+	vbuf, err := device.TryCreateBuffer(&wgpu.BufferDescriptor{Size: uint64(roundUpBuffer(len(vb))), Usage: wgpu.BufferUsageVertex | wgpu.BufferUsageCopyDst})
 	if err != nil {
 		b.Fatal(err)
 	}
 	defer vbuf.Release()
-	ubuf, err := device.CreateBuffer(&wgpu.BufferDescriptor{Size: uint64(roundUpBuffer(uniformBlockStride)), Usage: wgpu.BufferUsageUniform | wgpu.BufferUsageCopyDst})
+	ubuf, err := device.TryCreateBuffer(&wgpu.BufferDescriptor{Size: uint64(roundUpBuffer(uniformBlockStride)), Usage: wgpu.BufferUsageUniform | wgpu.BufferUsageCopyDst})
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -174,12 +174,12 @@ func BenchmarkWriteBufferArena(b *testing.B) {
 	vb := wgpu.ToBytes(benchVerts)
 	vArena := make([]byte, 0, drawsPerFrame*len(vb))
 	uArena := make([]byte, 0, drawsPerFrame*uniformBlockStride)
-	vbuf, err := device.CreateBuffer(&wgpu.BufferDescriptor{Size: uint64(roundUpBuffer(drawsPerFrame * len(vb))), Usage: wgpu.BufferUsageVertex | wgpu.BufferUsageCopyDst})
+	vbuf, err := device.TryCreateBuffer(&wgpu.BufferDescriptor{Size: uint64(roundUpBuffer(drawsPerFrame * len(vb))), Usage: wgpu.BufferUsageVertex | wgpu.BufferUsageCopyDst})
 	if err != nil {
 		b.Fatal(err)
 	}
 	defer vbuf.Release()
-	ubuf, err := device.CreateBuffer(&wgpu.BufferDescriptor{Size: uint64(roundUpBuffer(drawsPerFrame * uniformBlockStride)), Usage: wgpu.BufferUsageUniform | wgpu.BufferUsageCopyDst})
+	ubuf, err := device.TryCreateBuffer(&wgpu.BufferDescriptor{Size: uint64(roundUpBuffer(drawsPerFrame * uniformBlockStride)), Usage: wgpu.BufferUsageUniform | wgpu.BufferUsageCopyDst})
 	if err != nil {
 		b.Fatal(err)
 	}

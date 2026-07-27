@@ -14,7 +14,7 @@ import (
 // this (macOS) host — verify on Linux/Wayland.
 func webgpuSurfaceDescriptor(w *window) *wgpu.SurfaceDescriptor {
 	return &wgpu.SurfaceDescriptor{
-		WaylandSurface: &wgpu.SurfaceDescriptorFromWaylandSurface{
+		WaylandSurface: &wgpu.SurfaceSourceWaylandSurface{
 			Display: unsafe.Pointer(glfw.GetWaylandDisplay()),
 			Surface: unsafe.Pointer(w.viewport.GetWaylandWindow()),
 		},
