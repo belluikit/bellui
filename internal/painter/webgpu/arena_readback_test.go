@@ -38,7 +38,7 @@ func TestArenaDynamicOffsetReadback(t *testing.T) {
 	defer queue.Release()
 
 	const format = wgpu.TextureFormatRGBA8Unorm
-	tex, err := device.CreateTexture(&wgpu.TextureDescriptor{
+	tex, err := device.TryCreateTexture(&wgpu.TextureDescriptor{
 		Label:         "offscreen",
 		Size:          wgpu.Extent3D{Width: dim, Height: dim, DepthOrArrayLayers: 1},
 		MipLevelCount: 1,
@@ -51,7 +51,7 @@ func TestArenaDynamicOffsetReadback(t *testing.T) {
 		t.Fatalf("create texture: %v", err)
 	}
 	defer tex.Release()
-	view, err := tex.CreateView(nil)
+	view, err := tex.TryCreateView(nil)
 	if err != nil {
 		t.Fatalf("create view: %v", err)
 	}
@@ -60,7 +60,7 @@ func TestArenaDynamicOffsetReadback(t *testing.T) {
 	// Explicit bind-group + pipeline layout with the uniform binding marked
 	// hasDynamicOffset — the same shape buildLayouts() builds for non-textured
 	// shaders, and the prerequisite for the arena's dynamic uniform offsets.
-	bgl, err := device.CreateBindGroupLayout(&wgpu.BindGroupLayoutDescriptor{
+	bgl, err := device.TryCreateBindGroupLayout(&wgpu.BindGroupLayoutDescriptor{
 		Entries: []wgpu.BindGroupLayoutEntry{{
 			Binding:    0,
 			Visibility: wgpu.ShaderStageVertex | wgpu.ShaderStageFragment,
@@ -71,7 +71,7 @@ func TestArenaDynamicOffsetReadback(t *testing.T) {
 		t.Fatalf("bind-group layout: %v", err)
 	}
 	defer bgl.Release()
-	pl, err := device.CreatePipelineLayout(&wgpu.PipelineLayoutDescriptor{
+	pl, err := device.TryCreatePipelineLayout(&wgpu.PipelineLayoutDescriptor{
 		BindGroupLayouts: []*wgpu.BindGroupLayout{bgl},
 	})
 	if err != nil {
@@ -80,15 +80,15 @@ func TestArenaDynamicOffsetReadback(t *testing.T) {
 	defer pl.Release()
 
 	desc, _ := DescriptorFor("path")
-	mod, err := device.CreateShaderModule(&wgpu.ShaderModuleDescriptor{
-		Label:          "path.wgsl",
-		WGSLDescriptor: &wgpu.ShaderModuleWGSLDescriptor{Code: string(ShaderSource("path"))},
+	mod, err := device.TryCreateShaderModule(&wgpu.ShaderModuleDescriptor{
+		Label:      "path.wgsl",
+		WGSLSource: &wgpu.ShaderSourceWGSL{Code: string(ShaderSource("path"))},
 	})
 	if err != nil {
 		t.Fatalf("shader module: %v", err)
 	}
 	defer mod.Release()
-	pipe, err := device.CreateRenderPipeline(&wgpu.RenderPipelineDescriptor{
+	pipe, err := device.TryCreateRenderPipeline(&wgpu.RenderPipelineDescriptor{
 		Layout: pl,
 		Vertex: wgpu.VertexState{
 			Module: mod, EntryPoint: VertexEntry,
@@ -112,7 +112,7 @@ func TestArenaDynamicOffsetReadback(t *testing.T) {
 	tri := []float32{-1, -1, 1, 3, -1, 1, -1, 3, 1}
 	va.addVertices(wgpu.ToBytes(tri))
 	tri1Off := va.addVertices(wgpu.ToBytes(tri))
-	vbuf, err := device.CreateBufferInit(&wgpu.BufferInitDescriptor{Contents: va.vtx, Usage: wgpu.BufferUsageVertex})
+	vbuf, err := device.TryCreateBufferInit(&wgpu.BufferInitDescriptor{Contents: va.vtx, Usage: wgpu.BufferUsageVertex})
 	if err != nil {
 		t.Fatalf("vertex buffer: %v", err)
 	}
@@ -127,13 +127,13 @@ func TestArenaDynamicOffsetReadback(t *testing.T) {
 	if greenOff != uniformBlockStride {
 		t.Fatalf("green dynamic offset = %d, want %d", greenOff, uniformBlockStride)
 	}
-	ubuf, err := device.CreateBufferInit(&wgpu.BufferInitDescriptor{Contents: ua.uni, Usage: wgpu.BufferUsageUniform})
+	ubuf, err := device.TryCreateBufferInit(&wgpu.BufferInitDescriptor{Contents: ua.uni, Usage: wgpu.BufferUsageUniform})
 	if err != nil {
 		t.Fatalf("uniform buffer: %v", err)
 	}
 	defer ubuf.Release()
 
-	bg, err := device.CreateBindGroup(&wgpu.BindGroupDescriptor{
+	bg, err := device.TryCreateBindGroup(&wgpu.BindGroupDescriptor{
 		Layout:  bgl,
 		Entries: []wgpu.BindGroupEntry{{Binding: 0, Buffer: ubuf, Offset: 0, Size: uniformBlockStride}},
 	})
@@ -142,7 +142,7 @@ func TestArenaDynamicOffsetReadback(t *testing.T) {
 	}
 	defer bg.Release()
 
-	readBuf, err := device.CreateBuffer(&wgpu.BufferDescriptor{
+	readBuf, err := device.TryCreateBuffer(&wgpu.BufferDescriptor{
 		Size:  bytesPerRow * dim,
 		Usage: wgpu.BufferUsageCopyDst | wgpu.BufferUsageMapRead,
 	})
@@ -151,7 +151,7 @@ func TestArenaDynamicOffsetReadback(t *testing.T) {
 	}
 	defer readBuf.Release()
 
-	enc, err := device.CreateCommandEncoder(nil)
+	enc, err := device.TryCreateCommandEncoder(nil)
 	if err != nil {
 		t.Fatalf("encoder: %v", err)
 	}
@@ -171,11 +171,11 @@ func TestArenaDynamicOffsetReadback(t *testing.T) {
 	pass.Release()
 
 	enc.CopyTextureToBuffer(
-		&wgpu.ImageCopyTexture{Texture: tex},
-		&wgpu.ImageCopyBuffer{Buffer: readBuf, Layout: wgpu.TextureDataLayout{BytesPerRow: bytesPerRow, RowsPerImage: dim}},
+		&wgpu.TexelCopyTextureInfo{Texture: tex},
+		&wgpu.TexelCopyBufferInfo{Buffer: readBuf, Layout: wgpu.TexelCopyBufferLayout{BytesPerRow: bytesPerRow, RowsPerImage: dim}},
 		&wgpu.Extent3D{Width: dim, Height: dim, DepthOrArrayLayers: 1},
 	)
-	cmd, err := enc.Finish(nil)
+	cmd, err := enc.TryFinish(nil)
 	if err != nil {
 		t.Fatalf("finish: %v", err)
 	}
@@ -183,12 +183,12 @@ func TestArenaDynamicOffsetReadback(t *testing.T) {
 	cmd.Release()
 	enc.Release()
 
-	var mapStatus wgpu.BufferMapAsyncStatus
-	if err = readBuf.MapAsync(wgpu.MapModeRead, 0, bytesPerRow*dim, func(s wgpu.BufferMapAsyncStatus) { mapStatus = s }); err != nil {
+	var mapStatus wgpu.MapAsyncStatus
+	if err = readBuf.TryMapAsync(wgpu.MapModeRead, 0, bytesPerRow*dim, func(s wgpu.MapAsyncStatus) { mapStatus = s }); err != nil {
 		t.Fatalf("map async: %v", err)
 	}
 	device.Poll(true, nil)
-	if mapStatus != wgpu.BufferMapAsyncStatusSuccess {
+	if mapStatus != wgpu.MapAsyncStatusSuccess {
 		t.Fatalf("buffer map status: %v", mapStatus)
 	}
 	data := readBuf.GetMappedRange(0, uint(bytesPerRow*dim))

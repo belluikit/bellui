@@ -11,13 +11,13 @@ import (
 )
 
 // TestClassifyAcquire locks the BeginFrame surface-acquire recovery table (#385):
-// Outdated → reconfigure+retry, Lost/DeviceLost/OutOfMemory → fatal (log+skip),
-// everything else (Timeout, an unexpected Success, wrapping, or a non-status error)
+// Outdated → reconfigure+retry, Lost/Error → fatal (log+skip), everything else
+// (Timeout, Occluded, an unexpected Success, wrapping, or a non-status error)
 // → plain skip. The real reconfigure round-trip is box-only (lavapipe); this covers
 // the branch selection without a GPU.
 func TestClassifyAcquire(t *testing.T) {
 	statusErr := func(s wgpu.SurfaceGetCurrentTextureStatus) error {
-		return &wgpu.SurfaceStatusError{Status: s}
+		return &SurfaceStatusError{Status: s}
 	}
 	cases := []struct {
 		name string
@@ -26,10 +26,10 @@ func TestClassifyAcquire(t *testing.T) {
 	}{
 		{"outdated → reconfigure", statusErr(wgpu.SurfaceGetCurrentTextureStatusOutdated), acquireReconfig},
 		{"timeout → skip", statusErr(wgpu.SurfaceGetCurrentTextureStatusTimeout), acquireSkip},
+		{"occluded → skip", statusErr(wgpu.SurfaceGetCurrentTextureStatusOccluded), acquireSkip},
 		{"lost → fatal", statusErr(wgpu.SurfaceGetCurrentTextureStatusLost), acquireFatal},
-		{"device-lost → fatal", statusErr(wgpu.SurfaceGetCurrentTextureStatusDeviceLost), acquireFatal},
-		{"out-of-memory → fatal", statusErr(wgpu.SurfaceGetCurrentTextureStatusOutOfMemory), acquireFatal},
-		{"unexpected success → skip", statusErr(wgpu.SurfaceGetCurrentTextureStatusSuccess), acquireSkip},
+		{"error → fatal", statusErr(wgpu.SurfaceGetCurrentTextureStatusError), acquireFatal},
+		{"unexpected success → skip", statusErr(wgpu.SurfaceGetCurrentTextureStatusSuccessOptimal), acquireSkip},
 		{"wrapped outdated → reconfigure", fmt.Errorf("acquire: %w", statusErr(wgpu.SurfaceGetCurrentTextureStatusOutdated)), acquireReconfig},
 		{"non-status error → skip", errors.New("validation failure"), acquireSkip},
 	}

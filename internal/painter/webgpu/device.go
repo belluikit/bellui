@@ -330,9 +330,24 @@ type DrawCall struct {
 // CreateInstance — not a returnable error — the backend set must be narrowed
 // here, up-front; it cannot be recovered from after the call.
 //
-// Backend names: all, primary, secondary, vulkan, gl, metal, dx12, dx11
-// (d3d12/d3d11 accepted as aliases). Note wgpu encodes "All" as 0, so combining
-// "all" with another backend is meaningless — pass "all" alone (or unset).
+// Backend names: all, primary, secondary, vulkan, gl, metal, dx12 (d3d12
+// accepted as an alias). Note wgpu encodes "All" as 0, so combining "all" with
+// another backend is meaningless — pass "all" alone (or unset). DX11 was dropped
+// by wgpu-native and is no longer selectable.
+//
+// The bit values mirror WGPUInstanceBackend_* in wgpu.h; the Go bindings only
+// export the "All" (zero) member, so the individual flags are spelled out here.
+const (
+	instanceBackendVulkan  wgpu.InstanceBackend = 1 << 0
+	instanceBackendGL      wgpu.InstanceBackend = 1 << 1
+	instanceBackendMetal   wgpu.InstanceBackend = 1 << 2
+	instanceBackendDX12    wgpu.InstanceBackend = 1 << 3
+	instanceBackendBrowser wgpu.InstanceBackend = 1 << 5
+
+	instanceBackendPrimary   = instanceBackendVulkan | instanceBackendMetal | instanceBackendDX12 | instanceBackendBrowser
+	instanceBackendSecondary = instanceBackendGL
+)
+
 func chooseInstanceBackends() *wgpu.InstanceDescriptor {
 	spec := strings.TrimSpace(os.Getenv("BELLUI_WEBGPU_BACKENDS"))
 	if spec == "" {
@@ -344,19 +359,17 @@ func chooseInstanceBackends() *wgpu.InstanceDescriptor {
 		case "", "all":
 			// All == 0; contributes nothing to the mask.
 		case "primary":
-			backends |= wgpu.InstanceBackendPrimary
+			backends |= instanceBackendPrimary
 		case "secondary":
-			backends |= wgpu.InstanceBackendSecondary
+			backends |= instanceBackendSecondary
 		case "vulkan":
-			backends |= wgpu.InstanceBackendVulkan
+			backends |= instanceBackendVulkan
 		case "gl":
-			backends |= wgpu.InstanceBackendGL
+			backends |= instanceBackendGL
 		case "metal":
-			backends |= wgpu.InstanceBackendMetal
+			backends |= instanceBackendMetal
 		case "dx12", "d3d12":
-			backends |= wgpu.InstanceBackendDX12
-		case "dx11", "d3d11":
-			backends |= wgpu.InstanceBackendDX11
+			backends |= instanceBackendDX12
 		default:
 			bellui.LogError(fmt.Sprintf("webgpu: ignoring unknown BELLUI_WEBGPU_BACKENDS entry %q", name), nil)
 		}
@@ -393,7 +406,7 @@ func NewDevice(sd *wgpu.SurfaceDescriptor, width, height int) (d *Device, err er
 	}
 	if os.Getenv("BELLUI_WEBGPU_DEBUG") != "" {
 		info := d.adapter.GetInfo()
-		bellui.LogError(fmt.Sprintf("webgpu adapter: name=%q backend=%v type=%v", info.Name, info.BackendType, info.AdapterType), nil)
+		bellui.LogError(fmt.Sprintf("webgpu adapter: name=%q backend=%v type=%v", info.Device, info.BackendType, info.AdapterType), nil)
 	}
 
 	d.device, err = d.adapter.RequestDevice(nil)
@@ -409,9 +422,9 @@ func NewDevice(sd *wgpu.SurfaceDescriptor, width, height int) (d *Device, err er
 		return d, err
 	}
 	d.captureSwap = capturePixelsSwapped(d.config.Format)
-	d.surface.Configure(d.adapter, d.device, d.config)
+	d.surface.Configure(d.device, d.config)
 
-	d.sampler, err = d.device.CreateSampler(&wgpu.SamplerDescriptor{
+	d.sampler, err = d.device.TryCreateSampler(&wgpu.SamplerDescriptor{
 		Label:         "linear-clamp",
 		AddressModeU:  wgpu.AddressModeClampToEdge,
 		AddressModeV:  wgpu.AddressModeClampToEdge,
@@ -514,7 +527,7 @@ func (d *Device) Resize(width, height int) {
 	}
 	d.config.Width = uint32(width)
 	d.config.Height = uint32(height)
-	d.surface.Configure(d.adapter, d.device, d.config)
+	d.surface.Configure(d.device, d.config)
 	// Drop cached depth-stencil attachments; they are recreated on demand at the
 	// new size (and any boundary FBOs are reallocated on resize too).
 	d.releaseDepthStencils()
@@ -548,7 +561,7 @@ func (d *Device) RecreateSurface(sd *wgpu.SurfaceDescriptor) {
 	}
 	d.config = cfg
 	d.captureSwap = capturePixelsSwapped(cfg.Format)
-	d.surface.Configure(d.adapter, d.device, d.config)
+	d.surface.Configure(d.device, d.config)
 }
 
 // ReleaseSurface drops this device's presentation surface without tearing down
@@ -584,9 +597,9 @@ func (d *Device) shaderModule(name string) (*wgpu.ShaderModule, error) {
 	if src == nil {
 		return nil, fmt.Errorf("unknown shader %q", name)
 	}
-	m, err := d.device.CreateShaderModule(&wgpu.ShaderModuleDescriptor{
-		Label:          name + ".wgsl",
-		WGSLDescriptor: &wgpu.ShaderModuleWGSLDescriptor{Code: string(src)},
+	m, err := d.device.TryCreateShaderModule(&wgpu.ShaderModuleDescriptor{
+		Label:      name + ".wgsl",
+		WGSLSource: &wgpu.ShaderSourceWGSL{Code: string(src)},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create shader module %q: %w", name, err)
@@ -614,7 +627,7 @@ func (d *Device) buildPipeline(key PipelineKey) (*wgpu.RenderPipeline, error) {
 		layout = d.plTextured
 	}
 
-	return d.device.CreateRenderPipeline(&wgpu.RenderPipelineDescriptor{
+	return d.device.TryCreateRenderPipeline(&wgpu.RenderPipelineDescriptor{
 		Label:  key.Shader + ":" + key.Fragment,
 		Layout: layout,
 		Vertex: wgpu.VertexState{
@@ -684,13 +697,23 @@ func depthStencilState(mode StencilMode, depth bool) *wgpu.DepthStencilState {
 	}
 	return &wgpu.DepthStencilState{
 		Format:            depthStencilFormat,
-		DepthWriteEnabled: depth,
+		DepthWriteEnabled: optionalBool(depth),
 		DepthCompare:      depthCompare,
 		StencilFront:      front,
 		StencilBack:       back,
 		StencilReadMask:   0xFF,
 		StencilWriteMask:  writeMask,
 	}
+}
+
+// optionalBool converts a Go bool to the tri-state the depth/stencil descriptor
+// takes (the third state, Undefined, means "leave it to the pipeline default" and
+// is never what we want here).
+func optionalBool(b bool) wgpu.OptionalBool {
+	if b {
+		return wgpu.OptionalBoolTrue
+	}
+	return wgpu.OptionalBoolFalse
 }
 
 // colorWriteMask masks color off for the stencil-write modes (which only stamp
@@ -831,13 +854,13 @@ func (d *Device) buildLayouts() error {
 		},
 	}
 	var err error
-	if d.bglUniform, err = d.device.CreateBindGroupLayout(&wgpu.BindGroupLayoutDescriptor{
+	if d.bglUniform, err = d.device.TryCreateBindGroupLayout(&wgpu.BindGroupLayoutDescriptor{
 		Label:   "uniform-dyn",
 		Entries: []wgpu.BindGroupLayoutEntry{uniformEntry},
 	}); err != nil {
 		return fmt.Errorf("uniform bind-group layout: %w", err)
 	}
-	if d.bglTextured, err = d.device.CreateBindGroupLayout(&wgpu.BindGroupLayoutDescriptor{
+	if d.bglTextured, err = d.device.TryCreateBindGroupLayout(&wgpu.BindGroupLayoutDescriptor{
 		Label: "uniform-dyn+tex",
 		Entries: []wgpu.BindGroupLayoutEntry{
 			uniformEntry,
@@ -852,13 +875,13 @@ func (d *Device) buildLayouts() error {
 	}); err != nil {
 		return fmt.Errorf("textured bind-group layout: %w", err)
 	}
-	if d.plUniform, err = d.device.CreatePipelineLayout(&wgpu.PipelineLayoutDescriptor{
+	if d.plUniform, err = d.device.TryCreatePipelineLayout(&wgpu.PipelineLayoutDescriptor{
 		Label:            "pl-uniform",
 		BindGroupLayouts: []*wgpu.BindGroupLayout{d.bglUniform},
 	}); err != nil {
 		return fmt.Errorf("uniform pipeline layout: %w", err)
 	}
-	if d.plTextured, err = d.device.CreatePipelineLayout(&wgpu.PipelineLayoutDescriptor{
+	if d.plTextured, err = d.device.TryCreatePipelineLayout(&wgpu.PipelineLayoutDescriptor{
 		Label:            "pl-textured",
 		BindGroupLayouts: []*wgpu.BindGroupLayout{d.bglTextured},
 	}); err != nil {
@@ -880,7 +903,7 @@ func (d *Device) ensureArenas() error {
 			d.vtxArena.Release()
 		}
 		size := roundUpBuffer(d.arenaMaxVtx)
-		buf, err := d.device.CreateBuffer(&wgpu.BufferDescriptor{
+		buf, err := d.device.TryCreateBuffer(&wgpu.BufferDescriptor{
 			Size:  uint64(size),
 			Usage: wgpu.BufferUsageVertex | wgpu.BufferUsageCopyDst,
 		})
@@ -895,7 +918,7 @@ func (d *Device) ensureArenas() error {
 			d.uniArena.Release()
 		}
 		size := roundUpBuffer(d.arenaMaxUni)
-		buf, err := d.device.CreateBuffer(&wgpu.BufferDescriptor{
+		buf, err := d.device.TryCreateBuffer(&wgpu.BufferDescriptor{
 			Size:  uint64(size),
 			Usage: wgpu.BufferUsageUniform | wgpu.BufferUsageCopyDst,
 		})
@@ -907,7 +930,7 @@ func (d *Device) ensureArenas() error {
 	}
 
 	if d.arenaBindUniform == nil && d.uniArena != nil {
-		bg, err := d.device.CreateBindGroup(&wgpu.BindGroupDescriptor{
+		bg, err := d.device.TryCreateBindGroup(&wgpu.BindGroupDescriptor{
 			Layout:  d.bglUniform,
 			Entries: []wgpu.BindGroupEntry{{Binding: 0, Buffer: d.uniArena, Offset: 0, Size: uniformBlockStride}},
 		})
@@ -951,7 +974,7 @@ func (d *Device) nextTexBind(view *wgpu.TextureView) (*wgpu.BindGroup, error) {
 	} else {
 		d.texBinds = append(d.texBinds, &texBind{})
 	}
-	bg, err := d.device.CreateBindGroup(&wgpu.BindGroupDescriptor{
+	bg, err := d.device.TryCreateBindGroup(&wgpu.BindGroupDescriptor{
 		Layout: d.bglTextured,
 		Entries: []wgpu.BindGroupEntry{
 			{Binding: 0, Buffer: d.uniArena, Offset: 0, Size: uniformBlockStride},
@@ -1027,7 +1050,7 @@ func (d *Device) Record(dc DrawCall) error {
 // submitted. The arena grows for the next frame from the high-water mark raised
 // in Record, so this path is only hit on the warmup / growth frame.
 func (d *Device) recordOverflow(dc DrawCall, pipe *wgpu.RenderPipeline, vbytes []byte) error {
-	vbuf, err := d.device.CreateBufferInit(&wgpu.BufferInitDescriptor{Contents: vbytes, Usage: wgpu.BufferUsageVertex})
+	vbuf, err := d.device.TryCreateBufferInit(&wgpu.BufferInitDescriptor{Contents: vbytes, Usage: wgpu.BufferUsageVertex})
 	if err != nil {
 		return err
 	}
@@ -1035,7 +1058,7 @@ func (d *Device) recordOverflow(dc DrawCall, pipe *wgpu.RenderPipeline, vbytes [
 
 	ublock := make([]byte, uniformBlockStride)
 	copy(ublock, dc.Uniform)
-	ubuf, err := d.device.CreateBufferInit(&wgpu.BufferInitDescriptor{Contents: ublock, Usage: wgpu.BufferUsageUniform})
+	ubuf, err := d.device.TryCreateBufferInit(&wgpu.BufferInitDescriptor{Contents: ublock, Usage: wgpu.BufferUsageUniform})
 	if err != nil {
 		return err
 	}
@@ -1051,7 +1074,7 @@ func (d *Device) recordOverflow(dc DrawCall, pipe *wgpu.RenderPipeline, vbytes [
 			wgpu.BindGroupEntry{Binding: 2, Sampler: d.sampler},
 		)
 	}
-	bind, err := d.device.CreateBindGroup(&wgpu.BindGroupDescriptor{Layout: layout, Entries: entries})
+	bind, err := d.device.TryCreateBindGroup(&wgpu.BindGroupDescriptor{Layout: layout, Entries: entries})
 	if err != nil {
 		return err
 	}
@@ -1094,7 +1117,7 @@ func (d *Device) CreateImageTexture(img image.Image) (*Texture, error) {
 		return nil, fmt.Errorf("empty image")
 	}
 	extent := wgpu.Extent3D{Width: uint32(w), Height: uint32(h), DepthOrArrayLayers: 1}
-	tex, err := d.device.CreateTexture(&wgpu.TextureDescriptor{
+	tex, err := d.device.TryCreateTexture(&wgpu.TextureDescriptor{
 		Label:         "image",
 		Size:          extent,
 		MipLevelCount: 1,
@@ -1106,12 +1129,12 @@ func (d *Device) CreateImageTexture(img image.Image) (*Texture, error) {
 	if err != nil {
 		return nil, err
 	}
-	d.queue.WriteTexture(tex.AsImageCopy(), pix, &wgpu.TextureDataLayout{
+	d.queue.WriteTexture(tex.AsImageCopy(), pix, &wgpu.TexelCopyBufferLayout{
 		Offset:       0,
 		BytesPerRow:  uint32(stride),
 		RowsPerImage: uint32(h),
 	}, &extent)
-	view, err := tex.CreateView(nil)
+	view, err := tex.TryCreateView(nil)
 	if err != nil {
 		tex.Release()
 		return nil, err
@@ -1127,7 +1150,7 @@ func (d *Device) CreateRenderTexture(w, h int) (*Texture, error) {
 	if w <= 0 || h <= 0 {
 		return nil, fmt.Errorf("invalid render texture size %dx%d", w, h)
 	}
-	tex, err := d.device.CreateTexture(&wgpu.TextureDescriptor{
+	tex, err := d.device.TryCreateTexture(&wgpu.TextureDescriptor{
 		Label:         "render-target",
 		Size:          wgpu.Extent3D{Width: uint32(w), Height: uint32(h), DepthOrArrayLayers: 1},
 		MipLevelCount: 1,
@@ -1140,7 +1163,7 @@ func (d *Device) CreateRenderTexture(w, h int) (*Texture, error) {
 	if err != nil {
 		return nil, err
 	}
-	view, err := tex.CreateView(nil)
+	view, err := tex.TryCreateView(nil)
 	if err != nil {
 		tex.Release()
 		return nil, err
@@ -1189,7 +1212,7 @@ func (d *Device) CopyActiveTargetRegion(x, y, w, h int) (*Texture, int, int, err
 		return nil, 0, 0, fmt.Errorf("capture region outside target")
 	}
 	extent := wgpu.Extent3D{Width: uint32(w), Height: uint32(h), DepthOrArrayLayers: 1}
-	dst, err := d.device.CreateTexture(&wgpu.TextureDescriptor{
+	dst, err := d.device.TryCreateTexture(&wgpu.TextureDescriptor{
 		Label:         "backdrop-capture",
 		Size:          extent,
 		MipLevelCount: 1,
@@ -1201,7 +1224,7 @@ func (d *Device) CopyActiveTargetRegion(x, y, w, h int) (*Texture, int, int, err
 	if err != nil {
 		return nil, 0, 0, err
 	}
-	view, err := dst.CreateView(nil)
+	view, err := dst.TryCreateView(nil)
 	if err != nil {
 		dst.Release()
 		return nil, 0, 0, err
@@ -1209,8 +1232,8 @@ func (d *Device) CopyActiveTargetRegion(x, y, w, h int) (*Texture, int, int, err
 
 	d.endPass()
 	d.encoder.CopyTextureToTexture(
-		&wgpu.ImageCopyTexture{Texture: t.tex, Origin: wgpu.Origin3D{X: uint32(x), Y: uint32(y)}},
-		&wgpu.ImageCopyTexture{Texture: dst},
+		&wgpu.TexelCopyTextureInfo{Texture: t.tex, Origin: wgpu.Origin3D{X: uint32(x), Y: uint32(y)}},
+		&wgpu.TexelCopyTextureInfo{Texture: dst},
 		&extent,
 	)
 	d.beginTopPass()
@@ -1354,19 +1377,47 @@ const (
 	acquireFatal                         // unrecoverable this frame — log then skip (Lost/DeviceLost/OutOfMemory)
 )
 
-// classifyAcquire maps a GetCurrentTexture error to the recovery action. A typed
-// *wgpu.SurfaceStatusError carries the concrete status; anything else (e.g. a
+// SurfaceStatusError carries a non-success surface-acquire status as an error.
+// The bindings report the status in the returned SurfaceTexture rather than as an
+// error, so acquireSurfaceTexture converts it here — keeping the classification
+// below a pure function over an error, as the recovery path and its tests expect.
+type SurfaceStatusError struct {
+	Status wgpu.SurfaceGetCurrentTextureStatus
+}
+
+func (e *SurfaceStatusError) Error() string {
+	return "surface acquire status: " + e.Status.String()
+}
+
+// acquireSurfaceTexture wraps TryGetCurrentTexture so a non-success status (and a
+// success status with no texture) surfaces as a *SurfaceStatusError.
+func (d *Device) acquireSurfaceTexture() (*wgpu.Texture, error) {
+	st, err := d.surface.TryGetCurrentTexture()
+	if err != nil {
+		return nil, err
+	}
+	// SuccessSuboptimal still hands back a usable texture — render it and let the
+	// next Outdated (or a resize) drive the reconfigure.
+	if tex, ok := st.Get(); ok && tex != nil {
+		return tex, nil
+	}
+	return nil, &SurfaceStatusError{Status: st.Status}
+}
+
+// classifyAcquire maps a surface-acquire error to the recovery action. A typed
+// *SurfaceStatusError carries the concrete status; anything else (e.g. a
 // validation error, or a nil-but-unexpected case) degrades to a plain skip. Pure
 // and side-effect free so the branch table is unit-testable without a GPU (#385).
 func classifyAcquire(err error) acquireAction {
-	var se *wgpu.SurfaceStatusError
+	var se *SurfaceStatusError
 	if errors.As(err, &se) {
 		switch se.Status {
 		case wgpu.SurfaceGetCurrentTextureStatusOutdated:
 			return acquireReconfig
 		case wgpu.SurfaceGetCurrentTextureStatusLost,
-			wgpu.SurfaceGetCurrentTextureStatusDeviceLost,
-			wgpu.SurfaceGetCurrentTextureStatusOutOfMemory:
+			wgpu.SurfaceGetCurrentTextureStatusError:
+			// Lost/Error are the unrecoverable cases; wgpu-native folded the old
+			// DeviceLost and OutOfMemory statuses into Error.
 			return acquireFatal
 		}
 	}
@@ -1385,7 +1436,7 @@ func (d *Device) BeginFrame(clear wgpu.Color) error {
 	if err := d.ensureArenas(); err != nil {
 		return err
 	}
-	st, err := d.surface.GetCurrentTexture()
+	st, err := d.acquireSurfaceTexture()
 	if err != nil {
 		switch classifyAcquire(err) {
 		case acquireReconfig:
@@ -1395,9 +1446,9 @@ func (d *Device) BeginFrame(clear wgpu.Color) error {
 			// dropping until some other event reconfigures (#385). Mirrors Resize's
 			// reconfigure + depth-stencil drop; BeginFrame below re-sizes the render
 			// target from the freshly acquired texture, so no size bookkeeping is needed.
-			d.surface.Configure(d.adapter, d.device, d.config)
+			d.surface.Configure(d.device, d.config)
 			d.releaseDepthStencils()
-			st, err = d.surface.GetCurrentTexture()
+			st, err = d.acquireSurfaceTexture()
 			if err != nil {
 				return err // retry failed — skip this frame, try again next
 			}
@@ -1409,7 +1460,7 @@ func (d *Device) BeginFrame(clear wgpu.Color) error {
 		}
 	}
 	d.frameTex = st
-	view, err := st.CreateView(nil)
+	view, err := st.TryCreateView(nil)
 	if err != nil {
 		// frameTex was acquired; drop it so its SurfaceOutput can't block a later
 		// surface reconfigure (#337).
@@ -1418,7 +1469,7 @@ func (d *Device) BeginFrame(clear wgpu.Color) error {
 	}
 	d.frameView = view
 
-	d.encoder, err = d.device.CreateCommandEncoder(nil)
+	d.encoder, err = d.device.TryCreateCommandEncoder(nil)
 	if err != nil {
 		d.DiscardFrame()
 		return err
@@ -1509,7 +1560,7 @@ func (d *Device) newDepthStencil(w, h int) *depthStencil {
 	if w <= 0 || h <= 0 {
 		return nil
 	}
-	tex, err := d.device.CreateTexture(&wgpu.TextureDescriptor{
+	tex, err := d.device.TryCreateTexture(&wgpu.TextureDescriptor{
 		Label:         "depth-stencil",
 		Size:          wgpu.Extent3D{Width: uint32(w), Height: uint32(h), DepthOrArrayLayers: 1},
 		MipLevelCount: 1,
@@ -1521,7 +1572,7 @@ func (d *Device) newDepthStencil(w, h int) *depthStencil {
 	if err != nil {
 		return nil
 	}
-	view, err := tex.CreateView(nil)
+	view, err := tex.TryCreateView(nil)
 	if err != nil {
 		tex.Release()
 		return nil
@@ -1619,8 +1670,8 @@ func (d *Device) EndFrame() error {
 	// Capture has been requested, so frames cost nothing extra until then (#219).
 	if d.captureRequested && d.ensureCaptureTex() {
 		d.encoder.CopyTextureToTexture(
-			&wgpu.ImageCopyTexture{Texture: d.frameTex},
-			&wgpu.ImageCopyTexture{Texture: d.captureTex},
+			&wgpu.TexelCopyTextureInfo{Texture: d.frameTex},
+			&wgpu.TexelCopyTextureInfo{Texture: d.captureTex},
 			&wgpu.Extent3D{Width: uint32(d.captureW), Height: uint32(d.captureH), DepthOrArrayLayers: 1},
 		)
 	}
@@ -1643,7 +1694,7 @@ func (d *Device) EndFrame() error {
 	d.arenaMaxVtx = max(d.arenaMaxVtx, d.frameDemandVtx)
 	d.arenaMaxUni = max(d.arenaMaxUni, d.frameDemandUni)
 
-	cmd, err := d.encoder.Finish(nil)
+	cmd, err := d.encoder.TryFinish(nil)
 	if err != nil {
 		return err
 	}
@@ -1683,7 +1734,20 @@ func (d *Device) EndFrame() error {
 		d.frameView.Release()
 		d.frameView = nil
 	}
-	d.frameTex = nil
+	// Release the presented surface texture, don't just drop the handle.
+	// Present hands the image back to the compositor, but the texture acquired
+	// by BeginFrame still holds a reference to the swapchain's back buffer, and
+	// an outstanding back-buffer reference is exactly what DXGI's ResizeBuffers
+	// refuses: DXGI_ERROR_INVALID_CALL, which wgpu reports as "window is in
+	// use" and wgpu-native turns into a fatal panic, aborting the process on
+	// the first window resize (#20). Mirrors wgpu-native's own present sequence
+	// (release the view, then the texture) and what DiscardFrame already does
+	// on the abandon path; the wgpu refcount keeps the native image alive until
+	// the GPU is finished with it.
+	if d.frameTex != nil {
+		d.frameTex.Release()
+		d.frameTex = nil
+	}
 	return nil
 }
 
@@ -1701,7 +1765,7 @@ func (d *Device) ensureCaptureTex() bool {
 		d.captureTex.Release()
 		d.captureTex = nil
 	}
-	tex, err := d.device.CreateTexture(&wgpu.TextureDescriptor{
+	tex, err := d.device.TryCreateTexture(&wgpu.TextureDescriptor{
 		Label:         "capture",
 		Size:          wgpu.Extent3D{Width: uint32(w), Height: uint32(h), DepthOrArrayLayers: 1},
 		MipLevelCount: 1,
@@ -1747,7 +1811,7 @@ func (d *Device) CaptureTexture(tex *wgpu.Texture, w, h int) *image.RGBA {
 func (d *Device) captureTextureToImage(srcTex *wgpu.Texture, w, h int) *image.RGBA {
 	// CopyTextureToBuffer requires bytesPerRow to be a multiple of 256.
 	bytesPerRow := ((w*4 + 255) / 256) * 256
-	buf, err := d.device.CreateBuffer(&wgpu.BufferDescriptor{
+	buf, err := d.device.TryCreateBuffer(&wgpu.BufferDescriptor{
 		Size:  uint64(bytesPerRow * h),
 		Usage: wgpu.BufferUsageCopyDst | wgpu.BufferUsageMapRead,
 	})
@@ -1756,16 +1820,16 @@ func (d *Device) captureTextureToImage(srcTex *wgpu.Texture, w, h int) *image.RG
 	}
 	defer buf.Release()
 
-	enc, err := d.device.CreateCommandEncoder(nil)
+	enc, err := d.device.TryCreateCommandEncoder(nil)
 	if err != nil {
 		return nil
 	}
 	enc.CopyTextureToBuffer(
-		&wgpu.ImageCopyTexture{Texture: srcTex},
-		&wgpu.ImageCopyBuffer{Buffer: buf, Layout: wgpu.TextureDataLayout{BytesPerRow: uint32(bytesPerRow), RowsPerImage: uint32(h)}},
+		&wgpu.TexelCopyTextureInfo{Texture: srcTex},
+		&wgpu.TexelCopyBufferInfo{Buffer: buf, Layout: wgpu.TexelCopyBufferLayout{BytesPerRow: uint32(bytesPerRow), RowsPerImage: uint32(h)}},
 		&wgpu.Extent3D{Width: uint32(w), Height: uint32(h), DepthOrArrayLayers: 1},
 	)
-	cmd, err := enc.Finish(nil)
+	cmd, err := enc.TryFinish(nil)
 	if err != nil {
 		enc.Release()
 		return nil
@@ -1774,12 +1838,12 @@ func (d *Device) captureTextureToImage(srcTex *wgpu.Texture, w, h int) *image.RG
 	cmd.Release()
 	enc.Release()
 
-	var status wgpu.BufferMapAsyncStatus
-	if err := buf.MapAsync(wgpu.MapModeRead, 0, uint64(bytesPerRow*h), func(s wgpu.BufferMapAsyncStatus) { status = s }); err != nil {
+	var status wgpu.MapAsyncStatus
+	if err := buf.TryMapAsync(wgpu.MapModeRead, 0, uint64(bytesPerRow*h), func(s wgpu.MapAsyncStatus) { status = s }); err != nil {
 		return nil
 	}
 	d.device.Poll(true, nil)
-	if status != wgpu.BufferMapAsyncStatusSuccess {
+	if status != wgpu.MapAsyncStatusSuccess {
 		return nil
 	}
 	data := buf.GetMappedRange(0, uint(bytesPerRow*h))
