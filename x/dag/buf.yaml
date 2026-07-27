@@ -1,0 +1,19 @@
+version: v2
+modules:
+  - path: dag/dagpb
+lint:
+  use:
+    - STANDARD
+  except:
+    # Like the root module, the .proto is colocated with the Go package that
+    # consumes it (dag/dagpb/dag.proto for package dagpb) rather than laid out
+    # as bellui/dag/v1/... — a deliberate Go-directory convention for an
+    # unpublished wire schema. Exempt just this rule, keep the rest of STANDARD.
+    - PACKAGE_DIRECTORY_MATCH
+breaking:
+  # WIRE, not FILE: this schema backs on-disk .pxf graph files, so binary wire
+  # compatibility is what matters — a reused field number or changed type
+  # silently corrupts saved graphs, while a source-level move or rename does
+  # not. Run locally with `buf breaking --against '.git#ref=origin/main'`.
+  use:
+    - WIRE

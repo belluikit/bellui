@@ -1,0 +1,15 @@
+# Code generation for the dag graph wire schema. `managed` is disabled so the
+# proto's explicit go_package is honored and the .pb.go lands next to its .proto
+# (paths=source_relative). Only protoc-gen-go runs — the schema carries no
+# services, which is what keeps x/dag free of grpc.
+#
+# Don't run `buf generate` directly — use `sh hack/genproto.sh` from the repo
+# root, which also runs gofumpt on the output (buf's protoc-gen-go groups
+# imports differently from gofumpt, the repo's CI-enforced formatter).
+version: v2
+managed:
+  enabled: false
+plugins:
+  - local: protoc-gen-go
+    out: dag/dagpb
+    opt: paths=source_relative
