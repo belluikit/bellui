@@ -243,16 +243,19 @@ jobs:
       # Real-window present + Canvas().Capture() coverage on D3D12 (#329);
       # self-skips if no window/adapter.
       #
-      # NOTE: this runner is NOT an interactive session — the service runs as
-      # NT AUTHORITY\NETWORK SERVICE in session 0, on a window station with no
-      # display surfaces (`Service-0x0-…$`, WSF_VISIBLE clear). GLFW still hands
-      # out a window handle there, so the test's window != nil guard does not
-      # fire and D3D12 really is exercised; it presents to a swapchain no one
-      # can see. That works on the current wgpu (verified green), but it is
-      # coverage of a degraded environment: a session-0 CreateSwapChainForHwnd
-      # can answer DXGI_ERROR_NOT_CURRENTLY_AVAILABLE, which wgpu-native turns
-      # into a fatal panic rather than a returnable error (#20). Restoring a
-      # real desktop session for this step is tracked in #20.
+      # This step needs a real desktop session, so the bellui-omen runner is the
+      # one runner in the fleet NOT installed as a service: it runs from a
+      # logon-triggered scheduled task in the logged-on session (WinSta0), as an
+      # ordinary user rather than NT AUTHORITY\NETWORK SERVICE. A service lives
+      # in session 0, whose window station has no display surfaces, and there
+      # D3D12's CreateSwapChainForHwnd answers DXGI_ERROR_NOT_CURRENTLY_AVAILABLE
+      # — which wgpu-native turns into a fatal panic, not a returnable error, so
+      # the step aborts rather than skipping (#20, #25). GLFW still hands out a
+      # window handle in session 0, so the test's window != nil guard cannot
+      # catch that on its own.
+      #
+      # If this step starts failing at checkout or aborting in wgpuSurfaceConfigure,
+      # suspect the runner: it is offline whenever nobody is logged on to the box.
       - name: WebGPU windowed present + Capture (D3D12, x64)
         shell: bash
         env:
