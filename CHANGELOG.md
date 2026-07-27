@@ -11,6 +11,70 @@ This file lists the main changes with each version of the Fyne toolkit.
 Entries up to 2.7.3 are inherited from upstream Fyne; later entries describe
 the trendvidia fork (github.com/trendvidia/fyne).
 
+## v1.0.0-rc.2 — 2026-07-27
+
+Second release candidate of the rebrand soak. The substance is the WebGPU
+bindings rebase: the previous binding lineage declared itself frozen
+([#1](https://github.com/belluikit/bellui/issues/1)), so the fork now tracks a
+maintained one, which also moves the toolkit onto a much newer `wgpu-native`.
+Everything else is the fallout from that and the CI work needed to catch it.
+
+### Changed
+
+* WebGPU bindings rebased from `cogentcore/webgpu` onto `oliverbestmann/webgpu`
+  via `github.com/belluikit/webgpu` v1.0.8 → **v1.1.0**, carrying `wgpu-native`
+  v22.1.0.5 → **v29.0.1.1**
+  ([#8](https://github.com/belluikit/bellui/pull/8),
+  [#1](https://github.com/belluikit/bellui/issues/1)). The painter is ported to
+  the new API surface (fallible `TryCreate*` constructors, `ShaderSourceWGSL`,
+  tri-state depth-write, two-argument `Surface.Configure`, `TexelCopyTextureInfo`).
+  No public Bellui API changes.
+* `BELLUI_WEBGPU_BACKENDS` no longer accepts `dx11`/`d3d11` — wgpu-native
+  dropped the D3D11 backend. `dx12`/`d3d12`, `vulkan`, `metal`, `gl`, `primary`,
+  `secondary` and `all` are unchanged.
+
+### Added
+
+* `x/dag`: graph serialization restored without pulling gRPC into the build
+  graph ([#3](https://github.com/belluikit/bellui/issues/3),
+  [#14](https://github.com/belluikit/bellui/pull/14)).
+
+### Fixed
+
+* **WebGPU on Windows/D3D12: a fatal abort on every window resize**
+  ([#20](https://github.com/belluikit/bellui/issues/20)). The surface texture
+  acquired each frame holds a reference to a swapchain back buffer, and the
+  present path dropped the handle without releasing it; DXGI's `ResizeBuffers`
+  rejects an outstanding back-buffer reference, and wgpu-native turns that
+  refusal into a Rust panic across cgo — killing the process rather than
+  returning an error. The present path now releases the texture, matching what
+  the discard path always did. Verified on a real desktop session (RTX 2070
+  SUPER); this is only correct with the rebased bindings, which balance the
+  device reference on acquire.
+* WebGPU: a surface advertising no usable capabilities is no longer configured
+  ([#20](https://github.com/belluikit/bellui/issues/20)). Both call sites
+  indexed `caps.AlphaModes[0]` unguarded, so a surface that cannot present on
+  the adapter produced a Go index panic on the way into an unrecoverable
+  wgpu-native one. `NewDevice` now reports it (the painter logs and leaves the
+  window unpainted) and `RecreateSurface` leaves the surface unconfigured.
+* `internal/rasterx` cleared under staticcheck; `internal/render` import
+  grouping and an `internal/ico` test path assumption fixed — the analyzer half
+  of the house-style pass over the newly vendored code.
+
+### CI
+
+* New test legs: Linux x86_64 and Windows ARM64
+  ([#16](https://github.com/belluikit/bellui/pull/16)).
+* `gocyclo` scoped to first-party main-module code, so it stops descending into
+  vendored third-party and the `x/` submodules
+  ([#13](https://github.com/belluikit/bellui/issues/13),
+  [#18](https://github.com/belluikit/bellui/issues/18)).
+* The Windows x64 runner now runs in a real desktop session instead of as a
+  session-0 service ([#25](https://github.com/belluikit/bellui/issues/25)). A
+  service's window station has no display surfaces, so D3D12 cannot create a
+  swapchain there — which is why the windowed present/capture coverage of #329
+  could not run on it under the new bindings.
+
 ## v1.0.0-rc.1 — 2026-07-26
 
 First release under the **Bellui** name and the `github.com/belluikit/bellui`
