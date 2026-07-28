@@ -31,6 +31,7 @@ const Supported = true
 type webView struct {
 	handle unsafe.Pointer
 	token  uint64
+	url    string
 }
 
 // Script messages arrive from ObjC carrying a token rather than a Go pointer,
