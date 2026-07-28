@@ -86,6 +86,34 @@ func (r *chartRenderer) Layout(size geo.Size) {
 	r.fullRebuild(size)
 }
 
+// seriesRenderContext builds the context every series renderer receives, so the
+// wiring common to all three render sites — the object pool, the animation
+// state and the asynchronous-repaint seam — is declared once.
+func (r *chartRenderer) seriesRenderContext(s series.Series, coordSys coord.System, plotRect coord.Rect,
+	c color.Color, idx int, animActive bool, animProgress float32,
+) series.RenderContext {
+	return series.RenderContext{
+		Series:       s,
+		Coord:        coordSys,
+		Viewport:     plotRect,
+		Color:        c,
+		SeriesIndex:  idx,
+		Animate:      animActive,
+		AnimProgress: animProgress,
+		Pool:         r.pool,
+		Invalidate:   r.invalidate,
+	}
+}
+
+// invalidate requests a full re-render from off the render goroutine. It is
+// handed to series renderers as RenderContext.Invalidate so an asynchronous
+// loader (the choropleth's GeoJSON fetch) can draw its data as soon as it
+// arrives, rather than waiting for an unrelated refresh.
+func (r *chartRenderer) invalidate() {
+	c := r.chart
+	bellui.Do(func() { c.refreshDirty(dirtyFull) })
+}
+
 func (r *chartRenderer) MinSize() geo.Size {
 	return geo.NewSize(200, 150)
 }
@@ -635,17 +663,8 @@ func (r *chartRenderer) renderCartesian(
 		if renderer == nil {
 			continue
 		}
-		ctx := series.RenderContext{
-			Series:       s,
-			Coord:        coordSys,
-			Viewport:     plotRect,
-			Color:        c,
-			SeriesIndex:  idx,
-			Animate:      animActive,
-			AnimProgress: animProgress,
-			StackOffsets: stackOffsets,
-			Pool:         r.pool,
-		}
+		ctx := r.seriesRenderContext(s, coordSys, plotRect, c, idx, animActive, animProgress)
+		ctx.StackOffsets = stackOffsets
 		objects = append(objects, renderer.Render(ctx)...)
 
 		// Update stack offsets after rendering (for stacked bar/line)
@@ -714,16 +733,7 @@ func (r *chartRenderer) renderSelfLayout(
 			}
 		}
 
-		ctx := series.RenderContext{
-			Series:       s,
-			Coord:        coordSys,
-			Viewport:     plotRect,
-			Color:        c,
-			SeriesIndex:  idx,
-			Animate:      animActive,
-			AnimProgress: animProgress,
-			Pool:         r.pool,
-		}
+		ctx := r.seriesRenderContext(s, coordSys, plotRect, c, idx, animActive, animProgress)
 		rendered := renderer.Render(ctx)
 		objects = append(objects, rendered...)
 
@@ -801,16 +811,7 @@ func (r *chartRenderer) render3DSeries(
 		if renderer == nil {
 			continue
 		}
-		ctx := series.RenderContext{
-			Series:       s,
-			Coord:        noneCoord,
-			Viewport:     plotRect,
-			Color:        c,
-			SeriesIndex:  idx,
-			Animate:      animActive,
-			AnimProgress: animProgress,
-			Pool:         r.pool,
-		}
+		ctx := r.seriesRenderContext(s, noneCoord, plotRect, c, idx, animActive, animProgress)
 		rendered := renderer.Render(ctx)
 		objects = append(objects, rendered...)
 
