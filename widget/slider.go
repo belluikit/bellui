@@ -42,6 +42,26 @@ type Slider struct {
 	// Since: 2.4
 	OnChangeEnded func(float64) `json:"-"`
 
+	// OnHover is called with the value under the pointer as it moves across the
+	// slider, without changing the slider's own value. It is the seam a media
+	// scrubber uses to preview the frame at a position before committing a seek.
+	// Not called while the slider is disabled.
+	//
+	// The reported value is continuous — it is NOT snapped to Step, since a
+	// preview wants the true pointer position and a consumer that wants the
+	// snapped value can round it, while the reverse is not recoverable.
+	//
+	// Since: 1.0
+	OnHover func(float64) `json:"-"`
+
+	// OnHoverEnd is called when the pointer leaves the slider, so anything shown
+	// in response to OnHover can be taken down again. It fires even when the
+	// slider has been disabled mid-hover, so a consumer is never left displaying
+	// a stale preview.
+	//
+	// Since: 1.0
+	OnHoverEnd func() `json:"-"`
+
 	// ShowValueIndicator displays a popup above the thumb with the current
 	// value while dragging.
 	ShowValueIndicator bool
@@ -55,6 +75,7 @@ type Slider struct {
 	focused        bool
 	disabled       bool // don't use DisableableWidget so we can put Since comments on funcs
 	pendingChange  bool // true if value changed since last OnChangeEnded
+	dragging       bool // true between Dragged and DragEnd
 	valueIndicator *PopUp
 }
 
@@ -137,10 +158,29 @@ func (s *Slider) Bind(data binding.Float) {
 
 // DragEnd is called when the drag ends.
 func (s *Slider) DragEnd() {
+	// Cleared unconditionally, and before the callback: a drag that never moved
+	// the value past one Step fires no OnChangeEnded (fireChangeEnded returns
+	// early without pendingChange), so a consumer inferring drag state from the
+	// callback pair would latch on forever. Dragging() must not have that hole.
+	s.dragging = false
 	if !s.disabled {
 		s.fireChangeEnded()
 	}
 	s.hideValueIndicator()
+}
+
+// Dragging reports whether the user is currently dragging the slider's thumb,
+// between the first Dragged event and DragEnd.
+//
+// This is the authoritative signal a media scrubber needs in order to suppress
+// its own periodic position updates while the user is scrubbing — otherwise the
+// thumb jumps back under the pointer on every tick. Inferring it from
+// OnChanged/OnChangeEnded instead is unreliable: a press and release that does
+// not move the value fires neither callback.
+//
+// Since: 1.0
+func (s *Slider) Dragging() bool {
+	return s.dragging
 }
 
 // Dragged is called when a drag event occurs.
@@ -148,6 +188,7 @@ func (s *Slider) Dragged(e *event.DragEvent) {
 	if s.disabled {
 		return
 	}
+	s.dragging = true
 	ratio := s.getRatio(&e.PointEvent)
 	lastValue := s.Value
 
@@ -303,17 +344,22 @@ func (s *Slider) FocusLost() {
 // HoverIn is called when a desktop pointer enters the widget.
 //
 // Since: 2.4
-func (s *Slider) HoverIn(_ *event.HoverEvent) {
+func (s *Slider) HoverIn(e *event.HoverEvent) {
 	s.hovered = true
 	if !s.disabled {
 		s.Refresh()
+		s.fireHover(e)
 	}
 }
 
 // HoverMoved is called when a desktop pointer hovers over the widget.
 //
 // Since: 2.4
-func (s *Slider) HoverMoved(_ *event.HoverEvent) {
+func (s *Slider) HoverMoved(e *event.HoverEvent) {
+	if s.disabled {
+		return
+	}
+	s.fireHover(e)
 }
 
 // HoverOut is called when a desktop pointer exits the widget
@@ -323,6 +369,11 @@ func (s *Slider) HoverOut() {
 	s.hovered = false
 	if !s.disabled {
 		s.Refresh()
+	}
+	// Fired even when disabled: a slider disabled mid-hover must not leave the
+	// consumer showing a preview it can never take down.
+	if s.OnHoverEnd != nil {
+		s.OnHoverEnd()
 	}
 }
 
@@ -439,6 +490,12 @@ func (s *Slider) updateValue(ratio float64) {
 
 // SetValue updates the value of the slider and clamps the value to be within the range.
 // It is safe to call from any goroutine.
+//
+// The change is reported as though the user made it: both OnChanged and
+// OnChangeEnded fire. That is deliberate — the arrow keys and the screen-reader
+// increment/decrement actions route through here and must notify the app. For
+// programmatic updates that should not look like user interaction, such as a
+// media player advancing a position bar, use [Slider.SetValueSilently].
 func (s *Slider) SetValue(value float64) {
 	onMain(func() {
 		if s.Value == value {
@@ -450,6 +507,43 @@ func (s *Slider) SetValue(value float64) {
 		s.positionChanged(lastValue, s.Value)
 		s.fireChangeEnded()
 	})
+}
+
+// SetValueSilently updates the value and redraws, without firing OnChanged or
+// OnChangeEnded. It is safe to call from any goroutine.
+//
+// This is the path for updates the user did not cause — a player advancing its
+// position bar many times a second cannot use [Slider.SetValue], because every
+// call would be indistinguishable from the user seeking.
+//
+// Because a bound data source is written through OnChanged (see [Slider.Bind]),
+// a silent update does NOT propagate to bound data. It is intended for
+// display-only updates of an unbound slider; use [Slider.SetValue] to move a
+// bound one.
+//
+// Since: 1.0
+func (s *Slider) SetValueSilently(value float64) {
+	onMain(func() {
+		if s.Value == value {
+			return
+		}
+		s.Value = value
+		s.clampValueToRange()
+		s.Refresh()
+	})
+}
+
+// valueAt maps a pointer position to the value at that point, without snapping
+// to Step. Used for hover reporting, which wants the true pointer position.
+func (s *Slider) valueAt(e *event.PointEvent) float64 {
+	return s.Min + s.getRatio(e)*(s.Max-s.Min)
+}
+
+func (s *Slider) fireHover(e *event.HoverEvent) {
+	if s.OnHover == nil {
+		return
+	}
+	s.OnHover(s.valueAt(&e.PointEvent))
 }
 
 // MinSize returns the size that this widget should not shrink below
