@@ -44,43 +44,69 @@ func (f *Feature) ID() string {
 }
 
 // Geometry holds the shape data.
+//
+// Coordinates are decoded once, when the document is parsed, rather than on
+// every call to [Geometry.Polygons]. They used to be kept as a json.RawMessage
+// and re-unmarshalled per call, which meant the choropleth re-parsed the whole
+// coordinate payload on every rasterisation -- about half the cost of the first
+// paint of a new view on a country-sized data set (belluikit/bellui#40). It also
+// retained a second copy of every coordinate as raw JSON for the life of the
+// collection, which is now dropped.
 type Geometry struct {
-	Type        string          `json:"type"`
-	Coordinates json.RawMessage `json:"coordinates"`
+	Type string `json:"type"`
+
+	rings [][][2]float64
+	err   error
 }
 
-// Polygons returns the polygon rings for this geometry.
-// For Polygon: returns one polygon (outer ring + holes).
-// For MultiPolygon: returns multiple polygons.
-func (g *Geometry) Polygons() ([][][2]float64, error) {
-	switch g.Type {
+// UnmarshalJSON decodes the geometry, resolving its coordinates into rings up
+// front. A geometry whose coordinates are malformed does not fail the whole
+// document: the error is recorded and reported by [Geometry.Polygons], so one
+// bad feature is skipped rather than costing the caller every other feature.
+func (g *Geometry) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		Type        string          `json:"type"`
+		Coordinates json.RawMessage `json:"coordinates"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	g.Type, g.rings, g.err = raw.Type, nil, nil
+	switch raw.Type {
 	case "Polygon":
 		var rings [][][2]float64
-		if err := json.Unmarshal(g.Coordinates, &rings); err != nil {
-			return nil, fmt.Errorf("parse Polygon: %w", err)
+		if err := json.Unmarshal(raw.Coordinates, &rings); err != nil {
+			g.err = fmt.Errorf("parse Polygon: %w", err)
+			return nil
 		}
-		// Return outer ring only (index 0)
 		if len(rings) > 0 {
-			return [][][2]float64{rings[0]}, nil
+			g.rings = [][][2]float64{rings[0]} // outer ring only
 		}
-		return nil, nil
 
 	case "MultiPolygon":
 		var multiRings [][][][2]float64
-		if err := json.Unmarshal(g.Coordinates, &multiRings); err != nil {
-			return nil, fmt.Errorf("parse MultiPolygon: %w", err)
+		if err := json.Unmarshal(raw.Coordinates, &multiRings); err != nil {
+			g.err = fmt.Errorf("parse MultiPolygon: %w", err)
+			return nil
 		}
-		var result [][][2]float64
 		for _, poly := range multiRings {
 			if len(poly) > 0 {
-				result = append(result, poly[0]) // outer ring only
+				g.rings = append(g.rings, poly[0]) // outer ring only
 			}
 		}
-		return result, nil
-
-	default:
-		return nil, nil // Skip non-polygon geometries
 	}
+	// Non-polygon geometries are skipped, with no rings and no error.
+	return nil
+}
+
+// Polygons returns the outer ring of each polygon in this geometry: one for a
+// Polygon, one per member for a MultiPolygon, none for any other type.
+//
+// The returned slice is the geometry's own storage and is shared by every
+// caller -- it must not be modified. Callers may read it concurrently.
+func (g *Geometry) Polygons() ([][][2]float64, error) {
+	return g.rings, g.err
 }
 
 // Parse reads GeoJSON bytes into a FeatureCollection.

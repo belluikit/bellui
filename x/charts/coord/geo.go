@@ -26,22 +26,55 @@ func (g *GeoCoord) Bounds() Rect          { return g.bounds }
 func (g *GeoCoord) XScale() axis.Scale    { return nil }
 func (g *GeoCoord) YScale() axis.Scale    { return nil }
 
-// DataToPixel maps (longitude, latitude) to pixel position within the viewport.
-func (g *GeoCoord) DataToPixel(lon, lat float64) geo.Position {
-	// World pixel coordinates at this zoom level
+// Projection is an immutable snapshot of a [GeoCoord]'s view — its zoom, centre
+// and viewport resolved into the constants every point of a projection shares.
+//
+// It exists for two reasons. It hoists the zoom scale and the centre pixel
+// (a Pow, and a Log/Tan/Cos triple) out of the per-point path, where projecting
+// a country-sized data set recomputed them hundreds of thousands of times. And
+// because it is a value that copies the state it needs, work projecting against
+// it does not read the shared GeoCoord — which [GeoCoord.SetBounds] mutates on
+// every render — so a projection may be used from another goroutine.
+type Projection struct {
+	scale            float64
+	cx, cy           float64
+	originX, originY float32
+}
+
+// Projection captures the current view. Take one snapshot and project many
+// points against it rather than calling [GeoCoord.DataToPixel] per point.
+func (g *GeoCoord) Projection() Projection {
 	scale := math.Pow(2, float64(g.Zoom)) * 256
-	wx := (lon + 180) / 360 * scale
-	wy := (1 - math.Log(math.Tan(lat*math.Pi/180)+1/math.Cos(lat*math.Pi/180))/math.Pi) / 2 * scale
+	return Projection{
+		scale:   scale,
+		cx:      (g.CenterLon + 180) / 360 * scale,
+		cy:      mercatorY(g.CenterLat) * scale,
+		originX: g.bounds.X + g.bounds.W/2,
+		originY: g.bounds.Y + g.bounds.H/2,
+	}
+}
 
-	// Center pixel
-	cx := (g.CenterLon + 180) / 360 * scale
-	cy := (1 - math.Log(math.Tan(g.CenterLat*math.Pi/180)+1/math.Cos(g.CenterLat*math.Pi/180))/math.Pi) / 2 * scale
+// DataToPixel maps (longitude, latitude) to a pixel position within the
+// viewport the projection was taken for.
+func (p Projection) DataToPixel(lon, lat float64) geo.Position {
+	wx := (lon + 180) / 360 * p.scale
+	wy := mercatorY(lat) * p.scale
+	return geo.NewPos(p.originX+float32(wx-p.cx), p.originY+float32(wy-p.cy))
+}
 
-	// Offset from center, mapped to viewport
-	px := g.bounds.X + g.bounds.W/2 + float32(wx-cx)
-	py := g.bounds.Y + g.bounds.H/2 + float32(wy-cy)
+// mercatorY is the Web Mercator northing of a latitude, normalised to [0, 1].
+func mercatorY(lat float64) float64 {
+	rad := lat * math.Pi / 180
+	return (1 - math.Log(math.Tan(rad)+1/math.Cos(rad))/math.Pi) / 2
+}
 
-	return geo.NewPos(px, py)
+// DataToPixel maps (longitude, latitude) to pixel position within the viewport.
+//
+// Projecting many points is much cheaper through a single
+// [GeoCoord.Projection] snapshot, which shares the per-view constants this
+// recomputes on every call.
+func (g *GeoCoord) DataToPixel(lon, lat float64) geo.Position {
+	return g.Projection().DataToPixel(lon, lat)
 }
 
 // PixelToData maps a pixel position back to (longitude, latitude).
