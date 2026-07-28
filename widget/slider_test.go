@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/belluikit/bellui"
+	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/data/binding"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
@@ -11,6 +12,7 @@ import (
 	"github.com/belluikit/bellui/theme"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewSliderWithData(t *testing.T) {
@@ -371,4 +373,172 @@ func TestSlider_Disabled(t *testing.T) {
 
 	slider.Dragged(drag)
 	assert.Equal(t, 1, changes)
+}
+
+func TestSlider_Dragging(t *testing.T) {
+	slider := NewSlider(0, 2)
+	slider.Resize(slider.MinSize())
+	assert.False(t, slider.Dragging(), "a fresh slider is not being dragged")
+
+	drag := &event.DragEvent{}
+	drag.PointEvent.Position = geo.NewPos(25, 2)
+	slider.Dragged(drag)
+	assert.True(t, slider.Dragging())
+
+	drag.PointEvent.Position = geo.NewPos(50, 2)
+	slider.Dragged(drag)
+	assert.True(t, slider.Dragging(), "still dragging across moves")
+
+	slider.DragEnd()
+	assert.False(t, slider.Dragging())
+}
+
+// The failure mode Dragging() exists to close: a press and release that never
+// moves the value past one Step fires neither OnChanged nor OnChangeEnded, so a
+// consumer inferring drag state from that pair would latch on forever.
+func TestSlider_Dragging_ClearsWhenNoCallbacksFire(t *testing.T) {
+	slider := NewSlider(0, 2)
+	slider.Resize(slider.MinSize())
+
+	changed, ended := 0, 0
+	slider.OnChanged = func(float64) { changed++ }
+	slider.OnChangeEnded = func(float64) { ended++ }
+
+	drag := &event.DragEvent{}
+	drag.PointEvent.Position = geo.NewPos(0, 2) // value stays at Min
+	slider.Dragged(drag)
+	assert.True(t, slider.Dragging())
+	slider.DragEnd()
+
+	assert.Equal(t, 0, changed, "no value change, so no OnChanged")
+	assert.Equal(t, 0, ended, "and therefore no OnChangeEnded either")
+	assert.False(t, slider.Dragging(), "drag state must still have cleared")
+}
+
+func TestSlider_Dragging_IgnoredWhenDisabled(t *testing.T) {
+	slider := NewSlider(0, 2)
+	slider.Resize(slider.MinSize())
+	slider.Disable()
+
+	drag := &event.DragEvent{}
+	drag.PointEvent.Position = geo.NewPos(25, 2)
+	slider.Dragged(drag)
+	assert.False(t, slider.Dragging(), "a disabled slider cannot be dragged")
+}
+
+func TestSlider_SetValueSilently(t *testing.T) {
+	slider := NewSlider(0, 10)
+	slider.Step = 1
+
+	changed, ended := 0, 0
+	slider.OnChanged = func(float64) { changed++ }
+	slider.OnChangeEnded = func(float64) { ended++ }
+
+	slider.SetValueSilently(4)
+	assert.Equal(t, 4.0, slider.Value, "the value still updates")
+	assert.Equal(t, 0, changed, "OnChanged must not fire for a programmatic set")
+	assert.Equal(t, 0, ended, "nor OnChangeEnded")
+
+	// Contrast: SetValue is the user-intent path and still reports.
+	slider.SetValue(6)
+	assert.Equal(t, 6.0, slider.Value)
+	assert.Equal(t, 1, changed)
+	assert.Equal(t, 1, ended)
+}
+
+func TestSlider_SetValueSilently_Clamps(t *testing.T) {
+	slider := NewSlider(0, 10)
+	slider.Step = 1
+
+	slider.SetValueSilently(99)
+	assert.Equal(t, 10.0, slider.Value)
+
+	slider.SetValueSilently(-99)
+	assert.Equal(t, 0.0, slider.Value)
+}
+
+func TestSlider_OnHover(t *testing.T) {
+	slider := NewSlider(0, 100)
+	slider.Step = 1
+	slider.Resize(geo.NewSize(200, 20))
+
+	var values []float64
+	slider.OnHover = func(v float64) { values = append(values, v) }
+	ends := 0
+	slider.OnHoverEnd = func() { ends++ }
+
+	hover := func(x float32) *event.HoverEvent {
+		e := &event.HoverEvent{}
+		e.PointEvent.Position = geo.NewPos(x, 10)
+		return e
+	}
+
+	slider.HoverIn(hover(20))
+	slider.HoverMoved(hover(150))
+	require.Len(t, values, 2, "entering and moving both report a position")
+	assert.Less(t, values[0], values[1], "further right is a larger value")
+	assert.GreaterOrEqual(t, values[0], 0.0)
+	assert.LessOrEqual(t, values[1], 100.0)
+
+	assert.Equal(t, 0.0, slider.Value, "hovering must not change the value")
+
+	slider.HoverOut()
+	assert.Equal(t, 1, ends)
+}
+
+func TestSlider_OnHover_NotWhileDisabled(t *testing.T) {
+	slider := NewSlider(0, 100)
+	slider.Resize(geo.NewSize(200, 20))
+	slider.Disable()
+
+	hovers, ends := 0, 0
+	slider.OnHover = func(float64) { hovers++ }
+	slider.OnHoverEnd = func() { ends++ }
+
+	e := &event.HoverEvent{}
+	e.PointEvent.Position = geo.NewPos(100, 10)
+	slider.HoverIn(e)
+	slider.HoverMoved(e)
+	assert.Equal(t, 0, hovers, "a disabled slider reports no hover position")
+
+	// HoverEnd still fires, so a slider disabled mid-hover cannot leave a
+	// consumer showing a preview it can never take down.
+	slider.HoverOut()
+	assert.Equal(t, 1, ends)
+}
+
+// The screen-reader increment/decrement actions are user interaction and must
+// notify the app — previously asserted only to move the value, not to report it.
+func TestSlider_PerformAccessibleAction_ReportsChange(t *testing.T) {
+	slider := NewSlider(0, 10)
+	slider.Step = 1
+	slider.SetValueSilently(5)
+
+	changed, ended := 0, 0
+	slider.OnChanged = func(float64) { changed++ }
+	slider.OnChangeEnded = func(float64) { ended++ }
+
+	slider.PerformAccessibleAction(core.ActionIncrement)
+	assert.Equal(t, 6.0, slider.Value)
+	assert.Equal(t, 1, changed)
+	assert.Equal(t, 1, ended)
+
+	slider.PerformAccessibleAction(core.ActionDecrement)
+	assert.Equal(t, 5.0, slider.Value)
+	assert.Equal(t, 2, changed)
+	assert.Equal(t, 2, ended)
+}
+
+// Arrow keys are user interaction too; OnChanged was covered, OnChangeEnded was not.
+func TestSlider_TypedKey_ReportsChangeEnded(t *testing.T) {
+	slider := NewSlider(0, 10)
+	slider.Step = 1
+	slider.SetValueSilently(5)
+
+	ended := 0
+	slider.OnChangeEnded = func(float64) { ended++ }
+
+	slider.TypedKey(&event.KeyEvent{Name: event.KeyRight})
+	assert.Equal(t, 6.0, slider.Value)
+	assert.Equal(t, 1, ended)
 }
