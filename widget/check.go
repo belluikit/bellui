@@ -35,6 +35,13 @@ type Check struct {
 
 	OnChanged func(bool) `json:"-"`
 
+	// onChangedInternal is the data-binding write-back. It is deliberately not
+	// the public OnChanged field: Bind used to claim that field, so binding and
+	// an app handler silently destroyed each other in both directions.
+	// It runs before OnChanged so a handler reading the bound source never
+	// sees a stale value.
+	onChangedInternal func(bool)
+
 	focused bool
 	hovered bool
 
@@ -68,12 +75,15 @@ func NewCheckWithData(label string, data binding.Bool) *Check {
 // The current value will be displayed and any changes in the data will cause the widget to update.
 // User interactions with this Check will set the value into the data source.
 //
+// The public [Check.OnChanged] field is left alone: binding and an app change
+// handler coexist, and OnChanged may be assigned before or after Bind.
+//
 // Since: 2.0
 func (c *Check) Bind(data binding.Bool) {
 	c.binder.SetCallback(c.updateFromData)
 	c.binder.Bind(data)
 
-	c.OnChanged = func(_ bool) {
+	c.onChangedInternal = func(_ bool) {
 		c.binder.CallWithData(c.writeData)
 	}
 }
@@ -122,6 +132,9 @@ func (c *Check) SetChecked(checked bool) {
 
 		c.Partial = false
 		c.Checked = checked
+		if c.onChangedInternal != nil {
+			c.onChangedInternal(checked)
+		}
 		if c.OnChanged != nil {
 			c.OnChanged(checked)
 		}
@@ -275,9 +288,12 @@ func (c *Check) SetText(text string) {
 // Unbind disconnects any configured data source from this Check.
 // The current value will remain at the last value of the data source.
 //
+// Any [Check.OnChanged] handler the app installed is left in place -- Unbind
+// only clears the write-back it installed itself.
+//
 // Since: 2.0
 func (c *Check) Unbind() {
-	c.OnChanged = nil
+	c.onChangedInternal = nil
 	c.binder.Unbind()
 }
 

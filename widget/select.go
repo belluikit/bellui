@@ -40,6 +40,13 @@ type Select struct {
 	PlaceHolder string
 	OnChanged   func(string) `json:"-"`
 
+	// onChangedInternal is the data-binding write-back. It is deliberately not
+	// the public OnChanged field: Bind used to claim that field, so binding and
+	// an app handler silently destroyed each other in both directions.
+	// It runs before OnChanged so a handler reading the bound source never
+	// sees a stale value.
+	onChangedInternal func(string)
+
 	binder basicBinder
 
 	focused bool
@@ -93,12 +100,15 @@ func (s *Select) AccessibleState() core.AccessibleState {
 // The current value will be displayed and any changes in the data will cause the widget
 // to update.
 //
+// The public [Select.OnChanged] field is left alone: binding and an app change
+// handler coexist, and OnChanged may be assigned before or after Bind.
+//
 // Since: 2.6
 func (s *Select) Bind(data binding.String) {
 	s.binder.SetCallback(s.updateFromData)
 	s.binder.Bind(data)
 
-	s.OnChanged = func(_ string) {
+	s.onChangedInternal = func(_ string) {
 		s.binder.CallWithData(s.writeData)
 	}
 }
@@ -309,9 +319,12 @@ func (s *Select) TypedRune(_ rune) {
 // Unbind disconnects any configured data source from this Select.
 // The current value will remain at the last value of the data source.
 //
+// Any [Select.OnChanged] handler the app installed is left in place -- Unbind
+// only clears the write-back it installed itself.
+//
 // Since: 2.6
 func (s *Select) Unbind() {
-	s.OnChanged = nil
+	s.onChangedInternal = nil
 	s.binder.Unbind()
 }
 
@@ -371,12 +384,21 @@ func (s *Select) updateFromData(data binding.DataItem) {
 	if err != nil {
 		return
 	}
+	if val == s.Selected {
+		// SetSelected has no equality guard of its own (unlike Check.SetChecked),
+		// so without this the write-back's own notification re-enters and reports
+		// a single change twice.
+		return
+	}
 	s.SetSelected(val)
 }
 
 func (s *Select) updateSelected(text string) {
 	s.Selected = text
 
+	if s.onChangedInternal != nil {
+		s.onChangedInternal(s.Selected)
+	}
 	if s.OnChanged != nil {
 		s.OnChanged(s.Selected)
 	}
