@@ -26,6 +26,11 @@
 // bellui button, and the page's own button posts a message that a bellui
 // Label displays.
 //
+// Focus, by eye: type in the Entry, click into the page (the Entry's caret
+// stops — bellui has released the focus), then click back in the Entry and
+// type again (the keys reach it, not the page). "Focus the web view" does the
+// same move programmatically, and Tab never lands on the web view.
+//
 // -auto measures those claims instead of asserting them by eye:
 //
 //	go run ./hack/webviewprobe -auto
@@ -44,12 +49,12 @@
 //   - HIDE — Hide() removes the native view and Show() restores it.
 //   - RESIZE — after a window resize the view is still on its widget and
 //     still clipped.
-//   - FOCUS — handing OS focus to the web engine leaves bellui still
-//     believing its Entry is focused. This one is a finding, not a pass:
-//     focus arbitration is unsolved and a shipped host has to bridge it.
+//   - FOCUS — the #59 bridge in both directions: handing the OS focus to the
+//     web engine releases bellui's focused Entry, and focusing the Entry
+//     again pulls the keyboard back out of the web engine.
 //   - BRIDGE — a bellui widget restyles the live page (Go to JS) and the page
-//     posts a message back (JS to Go). The hole punch constrains compositing
-//     and input focus, not data flow.
+//     posts a message back (JS to Go). The hole punch constrains what can be
+//     drawn over the view and who owns the keyboard, not data flow.
 //   - COST — how many per-frame geometry evaluations actually reached the
 //     platform.
 //
@@ -150,12 +155,22 @@ func main() {
 	evalBtn := widget.NewButton("Recolour page from bellui", func() {
 		view.Eval("document.body.style.background='rgb(0,160,255)'")
 	})
+	// The programmatic way into the native view — the host is not a Tab stop
+	// (#59), so this is how an app puts the keyboard in the page.
+	focusBtn := widget.NewButton("Focus the web view", func() {
+		host.FocusNativeView()
+	})
+
+	// Who holds the keyboard right now, updated from the host's own view of
+	// the OS responder chain.
+	focusState := widget.NewLabel("keyboard: bellui")
 
 	controls := container.NewVBox(
 		widget.NewLabel("NativeViewHost spike"),
-		popupBtn, hideBtn, loadBtn, evalBtn,
+		popupBtn, hideBtn, loadBtn, evalBtn, focusBtn,
 		widget.NewSeparator(),
 		entry,
+		focusState,
 		fromPage,
 		stats,
 	)
@@ -171,6 +186,12 @@ func main() {
 		Tick: func(float32) {
 			s, ap := host.SyncStats()
 			stats.SetText(fmt.Sprintf("syncs %d / applies %d", s, ap))
+
+			who := "bellui"
+			if host.NativeViewFocused() {
+				who = "web view (OS)"
+			}
+			focusState.SetText("keyboard: " + who)
 		},
 	}
 	tick.Start()
@@ -487,10 +508,12 @@ func (p *probe) measureResize() {
 	p.fail("            FAIL — the native view drifted from its widget")
 }
 
-// measureFocus is a finding, not a pass. Keyboard focus belongs to the OS
-// responder chain, which bellui's canvas focus knows nothing about: focus a
-// bellui Entry, hand OS focus to the web view (what a click inside it does),
-// and see whether bellui notices. It does not.
+// measureFocus exercises the focus bridge (#59) in both directions. Keyboard
+// focus belongs to the OS responder chain, which bellui's canvas focus knows
+// nothing about, so the host polls the backend and keeps the two in step:
+// focus a bellui Entry, hand the OS focus to the web view (what a click
+// inside the page does), and see bellui let go — then focus the Entry again
+// and see the web engine give the keyboard back.
 func (p *probe) measureFocus() {
 	fmt.Printf("\n[FOCUS]     bellui Entry vs. the web engine\n")
 	bellui.DoAndWait(func() {
@@ -500,34 +523,59 @@ func (p *probe) measureFocus() {
 	})
 	time.Sleep(500 * time.Millisecond)
 
-	var before, after, took, has bool
+	var before, took bool
 	bellui.DoAndWait(func() { before = p.w.Canvas().Focused() == p.entry })
+
+	// Native -> bellui. TakeFocus is called on the backend rather than through
+	// the host, so the host is told nothing — exactly as when the user clicks
+	// into the page, and the per-frame sync is the only thing that can notice.
 	bellui.DoAndWait(func() { took = p.view.TakeFocus() })
-	time.Sleep(500 * time.Millisecond)
+	time.Sleep(700 * time.Millisecond)
+
+	var nativeHas, hostKnows, belluiReleased bool
 	bellui.DoAndWait(func() {
-		has = p.view.HasFocus()
-		after = p.w.Canvas().Focused() == p.entry
+		nativeHas = p.view.HasFocus()
+		hostKnows = p.host.NativeViewFocused()
+		belluiReleased = p.w.Canvas().Focused() == nil
 	})
 
-	fmt.Printf("            bellui Entry focused before  : %v\n", before)
-	fmt.Printf("            web view took OS focus       : %v\n", took)
-	fmt.Printf("            web view holds OS focus      : %v\n", has)
-	fmt.Printf("            bellui still thinks Entry is focused : %v\n", after)
+	// bellui -> native. Focusing a bellui widget has to pull the OS focus back
+	// out of the web engine, or the keystrokes the Entry is drawing itself
+	// ready for would go on reaching the page.
+	bellui.DoAndWait(func() { p.w.Canvas().Focus(p.entry) })
+	time.Sleep(700 * time.Millisecond)
+
+	var belluiFocused, nativeReleased bool
+	bellui.DoAndWait(func() {
+		belluiFocused = p.w.Canvas().Focused() == p.entry
+		nativeReleased = !p.view.HasFocus() && !p.host.NativeViewFocused()
+	})
+
+	fmt.Printf("            bellui Entry focused before            : %v\n", before)
+	fmt.Printf("            web view took OS focus                 : %v\n", took)
+	fmt.Printf("            web view holds OS focus                : %v\n", nativeHas)
+	fmt.Printf("            host noticed the native focus          : %v\n", hostKnows)
+	fmt.Printf("            bellui released its own focus          : %v\n", belluiReleased)
+	fmt.Printf("            bellui took the focus back             : %v\n", belluiFocused)
+	fmt.Printf("            web view gave the OS focus back        : %v\n", nativeReleased)
+
 	switch {
-	case has && after:
-		fmt.Println("            FINDING — focus is split: keystrokes and IME go to the web")
-		fmt.Println("            engine while bellui still draws a focused, blinking Entry.")
-		fmt.Println("            A shipped host must bridge the OS responder chain to")
-		fmt.Println("            Canvas.Unfocus, and back again. Not solved by this spike.")
-	case !took:
-		fmt.Println("            INCONCLUSIVE — the window refused the responder change")
+	case !before || !took:
+		fmt.Println("            INCONCLUSIVE — the focus did not start where the")
+		fmt.Println("            measurement needs it (window not key?)")
+	case nativeHas && hostKnows && belluiReleased && belluiFocused && nativeReleased:
+		fmt.Println("            CONFIRMED — bellui and the OS agree on focus in both")
+		fmt.Println("            directions: clicking into the page releases the bellui")
+		fmt.Println("            Entry, and focusing the Entry takes the keyboard back.")
 	default:
-		fmt.Println("            bellui and the OS agree on focus")
+		p.fail("            FAIL — focus is split: keystrokes and IME reach one control\n" +
+			"            while bellui draws another as focused")
 	}
 }
 
-// measureBridge proves the hole punch constrains compositing and input focus,
-// not data flow: bellui drives the page, and the page calls back into bellui.
+// measureBridge proves the hole punch constrains what can be drawn over the
+// view and who owns the keyboard, not data flow: bellui drives the page, and
+// the page calls back into bellui.
 func (p *probe) measureBridge() {
 	fmt.Printf("\n[BRIDGE]    bellui logic <-> page logic\n")
 	p.measureEvalToPage()
