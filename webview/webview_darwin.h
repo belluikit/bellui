@@ -3,7 +3,7 @@
 #import <stdbool.h>
 #import <stdint.h>
 
-// WKWebView bridge for widget.NativeViewHost on macOS (#45).
+// WKWebView bridge for widget.NativeViewHost on macOS (#45, #66).
 //
 // Shape: a flipped, layer-backed clip NSView is added as a subview of the
 // GLFW window's contentView, and the WKWebView lives inside it. The clip view
@@ -19,16 +19,35 @@
 // contentView of the given NSWindow, and returns an opaque handle. It returns
 // NULL when the window has no content view.
 //
-// token identifies the Go-side WebView in the message registry: script
-// messages posted by the page are delivered back to Go carrying it.
-void *belluiWebViewCreate(uintptr_t nsWindow, uint64_t token);
+// token identifies the Go-side WebView in the callback registry: script
+// messages, evaluation results, load state changes and navigation decisions
+// are all delivered back to Go carrying it.
+//
+// bridgeScript is the page-side bridge, injected at document start. When it
+// is NULL or empty NO script message handler and NO user script are
+// installed, so a page has no channel to bellui at all — which is the
+// guarantee behind webview.WebView.EnableBridge being opt-in.
+void *belluiWebViewCreate(uintptr_t nsWindow, uint64_t token, const char *bridgeScript);
 
-// belluiWebViewEval runs JavaScript in the page, discarding the result.
-void belluiWebViewEval(void *handle, const char *js);
+// belluiWebViewEval runs JavaScript in the page. When wantResult is false the
+// result is discarded; otherwise the value (encoded as JSON) or the error is
+// reported to Go through belluiWebViewEvalDone carrying callID.
+void belluiWebViewEval(void *handle, const char *js, uint64_t callID, bool wantResult);
 
 // belluiWebViewLoadURL navigates the view to url. A url that does not parse
 // is ignored.
 void belluiWebViewLoadURL(void *handle, const char *url);
+
+// belluiWebViewLoadHTML displays html directly, resolving relative references
+// against baseURL. An empty or unparseable baseURL leaves the content with an
+// opaque origin.
+void belluiWebViewLoadHTML(void *handle, const char *html, const char *baseURL);
+
+// belluiWebViewNav performs one history or load-control operation, matching
+// the navOp constants in platform.go: 0 canGoBack, 1 goBack, 2 canGoForward,
+// 3 goForward, 4 reload, 5 stopLoading. Queries report their answer, commands
+// report whether they were carried out.
+bool belluiWebViewNav(void *handle, int op);
 
 // belluiWebViewSetGeometry places the clip view and the web view inside it.
 // All coordinates are in AppKit points with a top-left origin, relative to
