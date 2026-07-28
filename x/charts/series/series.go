@@ -108,6 +108,12 @@ type RenderContext struct {
 	// Pool provides reusable canvas objects to reduce GC pressure.
 	// Nil means allocate normally. Set by the chart renderer.
 	Pool *pool.ObjectPool
+
+	// Invalidate requests another full render of the chart. Renderers that load
+	// data asynchronously (the choropleth's GeoJSON) hand it to their loader so
+	// the arriving data is drawn, instead of waiting for an unrelated refresh.
+	// It is safe to call from any goroutine and may be nil.
+	Invalidate func()
 }
 
 // Renderer produces canvas objects for a single series.
