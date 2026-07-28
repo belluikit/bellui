@@ -1056,3 +1056,61 @@ func TestInterfaceCompliance(t *testing.T) {
 	var _ core.AccessibleStateful = (*Entry)(nil)
 	var _ core.AccessibleStateful = (*Select)(nil)
 }
+
+// --- Disabled state (derived from core.Disableable) ---
+
+// A disabled widget must never be announced as actionable, whether or not it
+// implements core.AccessibleStateful — core.SnapshotAccessible derives the bit
+// from core.Disableable. See #52.
+func TestDisableable_SnapshotReportsStateDisabled(t *testing.T) {
+	test.NewTempApp(t)
+
+	for _, tt := range []struct {
+		name string
+		obj  core.CanvasObject
+	}{
+		{"Button", NewButton("go", func() {})},
+		{"FAB", NewFAB(nil, func() {})},
+		{"IconButton", NewIconButton(nil, func() {})},
+		{"SplitButton", NewSplitButton("go", func() {}, nil)},
+		{"RadioGroup", NewRadioGroup([]string{"a", "b"}, nil)},
+		{"SpinBox", NewSpinBox(0, 10, 1)},
+		{"Slider", NewSlider(0, 10)},
+		{"Check", NewCheck("go", nil)},
+		{"Entry", NewEntry()},
+		{"Select", NewSelect([]string{"a", "b"}, nil)},
+		{"Switch", NewSwitch(nil)},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			d, ok := tt.obj.(core.Disableable)
+			assert.True(t, ok, "widget under test must be core.Disableable")
+
+			node, ok := core.SnapshotAccessible(tt.obj)
+			assert.True(t, ok, "widget under test must be core.Accessible")
+			assert.False(t, node.State.Has(core.StateDisabled), "enabled widget must not report StateDisabled")
+
+			d.Disable()
+			node, _ = core.SnapshotAccessible(tt.obj)
+			assert.True(t, d.Disabled())
+			assert.True(t, node.State.Has(core.StateDisabled), "disabled widget must report StateDisabled")
+
+			d.Enable()
+			node, _ = core.SnapshotAccessible(tt.obj)
+			assert.False(t, node.State.Has(core.StateDisabled), "re-enabled widget must not report StateDisabled")
+		})
+	}
+}
+
+// Deriving the bit must not clobber the other state a widget reports itself.
+func TestDisableable_DerivedStateComposesWithAccessibleState(t *testing.T) {
+	test.NewTempApp(t)
+
+	c := NewCheck("go", nil)
+	c.SetChecked(true)
+	c.Disable()
+
+	node, ok := core.SnapshotAccessible(c)
+	assert.True(t, ok)
+	assert.True(t, node.State.Has(core.StateChecked))
+	assert.True(t, node.State.Has(core.StateDisabled))
+}
