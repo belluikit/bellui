@@ -4,7 +4,10 @@ package webview
 
 /*
 #cgo CFLAGS: -x objective-c
-#cgo LDFLAGS: -framework Cocoa -framework WebKit
+// QuartzCore is needed for CALayer, which the clip view uses for its native
+// masksToBounds clipping. It happened to be linked in by another package
+// until this one was built on its own.
+#cgo LDFLAGS: -framework Cocoa -framework WebKit -framework QuartzCore
 #include <stdlib.h>
 #include "webview_darwin.h"
 */
@@ -26,19 +29,19 @@ import (
 const Supported = true
 
 // webView holds the macOS platform state: an opaque handle to the flipped,
-// layer-backed clip view that owns the WKWebView, plus the registry token the
-// page's script messages come back with.
+// layer-backed clip view that owns the WKWebView, plus the registry token
+// every callback from the engine comes back with.
 type webView struct {
 	handle unsafe.Pointer
 	token  uint64
 	url    string
 }
 
-// Script messages arrive from ObjC carrying a token rather than a Go pointer,
-// which cgo would not allow us to hand out. The registry resolves it back.
-// Messages are delivered on the main thread — the same thread the bellui main
+// Callbacks arrive from ObjC carrying a token rather than a Go pointer, which
+// cgo would not allow us to hand out. The registry resolves it back.
+// Everything is delivered on the main thread — the same thread the bellui main
 // goroutine sits on inside the GLFW event loop — but the registry is still
-// mutex-guarded because Attach and Destroy may race a late message.
+// mutex-guarded because Attach and Destroy may race a late callback.
 var (
 	registryMu   sync.Mutex
 	registry     = map[uint64]*WebView{}
@@ -53,19 +56,49 @@ func (w *WebView) init() {
 	registry[w.token] = w
 }
 
-//export belluiWebViewMessage
-func belluiWebViewMessage(token C.uint64_t, body *C.char) {
+func lookup(token C.uint64_t) *WebView {
 	registryMu.Lock()
-	w := registry[uint64(token)]
-	registryMu.Unlock()
-	if w == nil || w.OnMessage == nil {
-		return
-	}
-	w.OnMessage(C.GoString(body))
+	defer registryMu.Unlock()
+	return registry[uint64(token)]
 }
 
-// Attach creates the WKWebView inside the window's native content view.
-func (w *WebView) Attach(win bellui.Window) error {
+//export belluiWebViewMessage
+func belluiWebViewMessage(token C.uint64_t, origin, body *C.char) {
+	if w := lookup(token); w != nil {
+		w.deliverMessage(C.GoString(origin), C.GoString(body))
+	}
+}
+
+//export belluiWebViewEvalDone
+func belluiWebViewEvalDone(token C.uint64_t, callID C.uint64_t, result, errMsg *C.char) {
+	if w := lookup(token); w != nil {
+		w.deliverEvalResult(uint64(callID), C.GoString(result), C.GoString(errMsg))
+	}
+}
+
+//export belluiWebViewLoad
+func belluiWebViewLoad(token C.uint64_t, state C.int, url, errMsg *C.char) {
+	if w := lookup(token); w != nil {
+		w.deliverLoad(LoadState(state), C.GoString(url), C.GoString(errMsg))
+	}
+}
+
+//export belluiWebViewNavigate
+func belluiWebViewNavigate(token C.uint64_t, url *C.char, kind C.int, mainFrame, newWindow C.bool) C.bool {
+	w := lookup(token)
+	if w == nil {
+		return C.bool(true)
+	}
+	return C.bool(w.decideNavigation(NavigationRequest{
+		URL:       C.GoString(url),
+		Kind:      NavigationKind(kind),
+		MainFrame: bool(mainFrame),
+		NewWindow: bool(newWindow),
+	}))
+}
+
+// attachRaw creates the WKWebView inside the window's native content view.
+func (w *WebView) attachRaw(win bellui.Window) error {
 	native, ok := win.(driver.NativeWindow)
 	if !ok {
 		return errors.New("webview: window does not expose a native handle")
@@ -81,26 +114,52 @@ func (w *WebView) Attach(win bellui.Window) error {
 		return errors.New("webview: no NSWindow for this bellui window")
 	}
 
-	w.handle = C.belluiWebViewCreate(C.uintptr_t(nsWindow), C.uint64_t(w.token))
+	// The bridge is part of the configuration, so this is the one moment it
+	// can be installed — and an empty script means WebKit is handed no script
+	// message handler and no user script at all.
+	script := w.bridgeScript("window.webkit.messageHandlers.bellui.postMessage(s);")
+	cScript := C.CString(script)
+	defer C.free(unsafe.Pointer(cScript))
+
+	w.handle = C.belluiWebViewCreate(C.uintptr_t(nsWindow), C.uint64_t(w.token), cScript)
 	if w.handle == nil {
 		return errors.New("webview: NSWindow has no content view")
-	}
-	if w.url != "" {
-		w.LoadURL(w.url)
 	}
 	return nil
 }
 
-// LoadURL navigates the view. It is a no-op until the view is attached, in
-// which case the URL is remembered and loaded on attach.
-func (w *WebView) LoadURL(url string) {
-	w.url = url
-	if w.handle == nil {
-		return
-	}
+func (w *WebView) attachedRaw() bool { return w.handle != nil }
+
+func (w *WebView) loadURLRaw(url string) {
 	c := C.CString(url)
 	defer C.free(unsafe.Pointer(c))
 	C.belluiWebViewLoadURL(w.handle, c)
+}
+
+func (w *WebView) loadHTMLRaw(html, baseURL string) {
+	cHTML, cBase := C.CString(html), C.CString(baseURL)
+	defer C.free(unsafe.Pointer(cHTML))
+	defer C.free(unsafe.Pointer(cBase))
+	C.belluiWebViewLoadHTML(w.handle, cHTML, cBase)
+}
+
+func (w *WebView) navRaw(op navOp) bool {
+	if w.handle == nil {
+		return false
+	}
+	return bool(C.belluiWebViewNav(w.handle, C.int(op)))
+}
+
+func (w *WebView) evalRaw(js string) {
+	c := C.CString(js)
+	defer C.free(unsafe.Pointer(c))
+	C.belluiWebViewEval(w.handle, c, 0, C.bool(false))
+}
+
+func (w *WebView) evalResultRaw(js string, callID uint64) {
+	c := C.CString(js)
+	defer C.free(unsafe.Pointer(c))
+	C.belluiWebViewEval(w.handle, c, C.uint64_t(callID), C.bool(true))
 }
 
 // SetGeometry places the clip view and the web view inside it. Bellui
@@ -162,21 +221,8 @@ func (w *WebView) HasFocus() bool {
 	return bool(C.belluiWebViewHasFocus(w.handle))
 }
 
-// Eval runs JavaScript inside the page, discarding its result. Together with
-// [WebView.OnMessage] it is the two-way channel between bellui logic and page
-// logic: the hole punch limits what can be drawn over the view, not what can
-// be exchanged with it.
-func (w *WebView) Eval(js string) {
-	if w.handle == nil {
-		return
-	}
-	c := C.CString(js)
-	defer C.free(unsafe.Pointer(c))
-	C.belluiWebViewEval(w.handle, c)
-}
-
-// Destroy removes the native view from the window and releases it.
-func (w *WebView) Destroy() {
+// destroyRaw removes the native view from the window and releases it.
+func (w *WebView) destroyRaw() {
 	registryMu.Lock()
 	delete(registry, w.token)
 	registryMu.Unlock()
