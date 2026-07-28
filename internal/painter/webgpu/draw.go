@@ -34,7 +34,7 @@ func (p *painter) drawObject(o core.CanvasObject, pos geo.Position, frame geo.Si
 	case *canvas.Image:
 		p.drawTexture(img2obj(obj), p.rasterizeImage, pos, obj.Size(), frame, obj.FillMode, float32(obj.Alpha()))
 	case *canvas.Raster:
-		p.drawTexture(obj, p.rasterizeRaster, pos, obj.Size(), frame, canvas.ImageFillStretch, 1.0)
+		p.drawRaster(obj, pos, frame)
 	case *canvas.Rectangle:
 		p.drawRectangle(obj, pos, frame)
 	case *canvas.Text:
@@ -805,11 +805,22 @@ func (p *painter) rasterizeImage(o core.CanvasObject) image.Image {
 	return paint.PaintImage(img, p.canvas, w, h)
 }
 
+// drawRaster draws a raster, first refreshing the cached texture in place when
+// the raster is streaming (ports the GL painter's drawRaster).
+func (p *painter) drawRaster(rast *canvas.Raster, pos geo.Position, frame geo.Size) {
+	if rast.Streaming {
+		p.updateStreamingTexture(rast)
+	}
+	p.drawTexture(rast, p.rasterizeRaster, pos, rast.Size(), frame, canvas.ImageFillStretch, 1.0)
+}
+
 func (p *painter) rasterizeRaster(o core.CanvasObject) image.Image {
 	rast := o.(*canvas.Raster)
 	w := int(p.textureScale(rast.Size().Width))
 	h := int(p.textureScale(rast.Size().Height))
-	return rast.Generator(w, h)
+	// PixelImage prefers SetPixels data and tolerates a nil Generator, which a
+	// purely streamed raster has by design (#34).
+	return rast.PixelImage(w, h)
 }
 
 func (p *painter) rasterizeLinearGradient(o core.CanvasObject) image.Image {

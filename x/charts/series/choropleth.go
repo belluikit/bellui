@@ -1,12 +1,12 @@
 package series
 
 import (
+	"encoding/binary"
+	"hash/fnv"
 	"image"
 	"image/color"
-	"io"
 	"log"
 	"math"
-	"net/http"
 	"sync"
 
 	"github.com/belluikit/bellui/canvas"
@@ -28,6 +28,13 @@ type ChoroplethSeries struct {
 
 	MapCenter [2]float64
 	MapZoom   float32
+
+	// raster caches the last rasterised image so a repaint blits instead of
+	// walking every feature again. Lazily created on the render goroutine.
+	raster *choroplethRaster
+	// inline caches the parse of GeoJSON, which would otherwise re-run on
+	// every render (~155 ms for the 14 MB country data set).
+	inline *inlineGeoJSON
 }
 
 func (s *ChoroplethSeries) SeriesType() Type { return TypeChoropleth }
@@ -37,12 +44,6 @@ func (s *ChoroplethSeries) sealed()          {}
 func init() {
 	RegisterRenderer(TypeChoropleth, func() Renderer { return &choroplethRenderer{} })
 }
-
-// Cached GeoJSON downloads
-var (
-	geojsonCache   = make(map[string]*geojson.FeatureCollection)
-	geojsonCacheMu sync.Mutex
-)
 
 type choroplethRenderer struct{}
 
@@ -57,8 +58,9 @@ func (r *choroplethRenderer) Render(ctx RenderContext) []core.CanvasObject {
 		return nil
 	}
 
-	// Get GeoJSON data
-	fc := r.getGeoJSON(cs)
+	// Get GeoJSON data. A URL-backed collection loads in the background and is
+	// nil until it arrives, at which point ctx.Invalidate repaints the chart.
+	fc := r.getGeoJSON(cs, ctx.Invalidate)
 	if fc == nil || len(fc.Features) == 0 {
 		return nil
 	}
@@ -92,8 +94,20 @@ func (r *choroplethRenderer) Render(ctx RenderContext) []core.CanvasObject {
 		stops = defaultChoroplethStops()
 	}
 
-	// Render as a single raster
-	raster := canvas.NewRaster(func(w, h int) image.Image {
+	if cs.raster == nil {
+		cs.raster = &choroplethRaster{}
+	}
+	key := choroplethKey{
+		vp:       vp,
+		lon:      gc.CenterLon,
+		lat:      gc.CenterLat,
+		zoom:     gc.Zoom,
+		dMin:     dMin,
+		dMax:     dMax,
+		dataHash: hashRegionData(cs.RegionData),
+		stopHash: hashColorStops(stops),
+	}
+	rasterize := func(w, h int) image.Image {
 		img := image.NewNRGBA(image.Rect(0, 0, w, h))
 
 		scaleX := float64(w) / float64(vp.W)
@@ -145,6 +159,15 @@ func (r *choroplethRenderer) Render(ctx RenderContext) []core.CanvasObject {
 		}
 
 		return img
+	}
+
+	// The generator walks every feature, ring and point, which measured 226 ms
+	// per repaint on the country data set — and nothing about it changes
+	// between repaints of the same view (#35). Serve a cached image whenever the
+	// projection and the data are unchanged.
+	cache := cs.raster
+	raster := canvas.NewRaster(func(w, h int) image.Image {
+		return cache.image(key, fc, w, h, rasterize)
 	})
 
 	raster.Move(geo.NewPos(vp.X, vp.Y))
@@ -154,54 +177,99 @@ func (r *choroplethRenderer) Render(ctx RenderContext) []core.CanvasObject {
 	return []core.CanvasObject{raster}
 }
 
-func (r *choroplethRenderer) getGeoJSON(cs *ChoroplethSeries) *geojson.FeatureCollection {
-	// Inline GeoJSON
+// getGeoJSON resolves the series' boundary data. Inline GeoJSON is parsed on
+// the spot; a URL is fetched in the background (see geojson_loader.go) and
+// returns nil until it lands, whereupon onLoaded repaints the chart.
+func (r *choroplethRenderer) getGeoJSON(cs *ChoroplethSeries, onLoaded func()) *geojson.FeatureCollection {
 	if len(cs.GeoJSON) > 0 {
+		if cs.inline != nil && sameBytes(cs.inline.src, cs.GeoJSON) {
+			return cs.inline.fc
+		}
 		fc, err := geojson.Parse(cs.GeoJSON)
 		if err != nil {
 			log.Printf("fycharts: choropleth inline GeoJSON parse error: %v", err)
 			return nil
 		}
+		cs.inline = &inlineGeoJSON{src: cs.GeoJSON, fc: fc}
 		return fc
 	}
+	return geoJSONCache.Get(cs.GeoJSONURL, onLoaded)
+}
 
-	// URL-based with caching
-	if cs.GeoJSONURL == "" {
-		return nil
+// inlineGeoJSON pairs a parsed collection with the buffer it came from.
+type inlineGeoJSON struct {
+	src []byte
+	fc  *geojson.FeatureCollection
+}
+
+// sameBytes reports whether two slices share a backing array and length, i.e.
+// are the same document. Assigning a new slice to ChoroplethSeries.GeoJSON
+// invalidates the parse; mutating one in place does not.
+func sameBytes(a, b []byte) bool {
+	return len(a) == len(b) && (len(a) == 0 || &a[0] == &b[0])
+}
+
+// choroplethKey identifies a rasterised view: the projection it was drawn for
+// plus a digest of the data that coloured it. Two renders with equal keys (and
+// the same feature collection) produce byte-identical images.
+type choroplethKey struct {
+	vp         coord.Rect
+	lon, lat   float64
+	zoom       float32
+	dMin, dMax float64
+	dataHash   uint64
+	stopHash   uint64
+}
+
+// choroplethRaster memoises one rasterised image per series.
+type choroplethRaster struct {
+	mu   sync.Mutex
+	key  choroplethKey
+	fc   *geojson.FeatureCollection
+	w, h int
+	img  image.Image
+}
+
+// image returns the cached image when key, feature collection and pixel size
+// all match the last rasterisation, and otherwise rebuilds and stores it.
+func (c *choroplethRaster) image(key choroplethKey, fc *geojson.FeatureCollection, w, h int,
+	build func(w, h int) image.Image,
+) image.Image {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.img != nil && c.fc == fc && c.w == w && c.h == h && c.key == key {
+		return c.img
 	}
 
-	geojsonCacheMu.Lock()
-	if fc, ok := geojsonCache[cs.GeoJSONURL]; ok {
-		geojsonCacheMu.Unlock()
-		return fc
+	img := build(w, h)
+	c.key, c.fc, c.w, c.h, c.img = key, fc, w, h, img
+	return img
+}
+
+// hashRegionData digests a region→value map order-independently, so a repaint
+// with unchanged data always produces the same digest despite Go's randomised
+// map iteration. Region counts are in the hundreds, so this is far cheaper than
+// the rasterisation it guards.
+func hashRegionData(data map[string]float64) uint64 {
+	var sum uint64
+	for name, v := range data {
+		h := fnv.New64a()
+		h.Write([]byte(name))
+		binary.Write(h, binary.LittleEndian, v)
+		sum += h.Sum64() // commutative: independent of iteration order
 	}
-	geojsonCacheMu.Unlock()
+	return sum ^ uint64(len(data))
+}
 
-	// Synchronous download (first render only; cached after)
-	resp, err := http.Get(cs.GeoJSONURL)
-	if err != nil {
-		log.Printf("fycharts: choropleth GeoJSON HTTP GET failed for %s: %v", cs.GeoJSONURL, err)
-		return nil
+func hashColorStops(stops []HeatmapColorStop) uint64 {
+	h := fnv.New64a()
+	for _, s := range stops {
+		binary.Write(h, binary.LittleEndian, s.Position)
+		r, g, b, a := s.Color.RGBA()
+		binary.Write(h, binary.LittleEndian, [4]uint32{r, g, b, a})
 	}
-	defer resp.Body.Close()
-
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		log.Printf("fycharts: choropleth GeoJSON ReadAll failed for %s: %v", cs.GeoJSONURL, err)
-		return nil
-	}
-
-	fc, err := geojson.Parse(data)
-	if err != nil {
-		log.Printf("fycharts: choropleth GeoJSON parse error for %s: %v", cs.GeoJSONURL, err)
-		return nil
-	}
-
-	geojsonCacheMu.Lock()
-	geojsonCache[cs.GeoJSONURL] = fc
-	geojsonCacheMu.Unlock()
-
-	return fc
+	return h.Sum64()
 }
 
 func defaultChoroplethStops() []HeatmapColorStop {

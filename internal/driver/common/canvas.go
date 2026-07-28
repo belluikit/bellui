@@ -676,7 +676,8 @@ func (c *Canvas) focusManager() *app.FocusManager {
 }
 
 func (c *Canvas) freeObject(object core.CanvasObject) {
-	// Streaming rasters keep their GL texture alive for in-place updates.
+	// Streaming rasters keep their GPU texture alive for in-place updates; the
+	// GL and WebGPU painters both refresh it from drawRaster (#34).
 	if rast, ok := object.(*canvas.Raster); ok && rast.Streaming {
 		return
 	}
