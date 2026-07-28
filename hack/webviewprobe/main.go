@@ -202,347 +202,408 @@ func showOverlapPopup(c core.Canvas, host *widget.NativeViewHost) *widget.PopUp 
 
 // ---- automated measurement ----
 
+// probe carries the shared state of an -auto run: the objects under test, the
+// capture directory, the baseline captures every later measurement compares
+// against, and whether anything has failed to confirm.
+type probe struct {
+	a      bellui.App
+	w      bellui.Window
+	host   *widget.NativeViewHost
+	view   *webview.WebView
+	scroll *container.Scroll
+	entry  *widget.Entry
+
+	dir      string
+	baseShot image.Image // screen, before anything was changed
+	baseCap  image.Image // bellui surface, same moment
+	hostRect geo.Rectangle
+	failed   bool
+}
+
 func runAuto(a bellui.App, w bellui.Window, host *widget.NativeViewHost, view *webview.WebView, scroll *container.Scroll, entry *widget.Entry) {
 	defer func() { bellui.Do(func() { a.Quit() }) }()
 
 	time.Sleep(3 * time.Second) // window maps, WKWebView loads and paints
 
-	dir := *dumpDir
-	if dir == "" {
-		d, err := os.MkdirTemp("", "webviewprobe")
-		if err != nil {
-			fmt.Println("FAIL: temp dir:", err)
-			os.Exit(1)
-		}
-		dir = d
-		defer os.RemoveAll(dir)
-	} else {
-		_ = os.MkdirAll(dir, 0o755)
-		fmt.Println("captures will be written to", dir)
+	p := &probe{a: a, w: w, host: host, view: view, scroll: scroll, entry: entry}
+	p.dir = captureDir()
+	if *dumpDir == "" {
+		defer os.RemoveAll(p.dir)
 	}
 
 	fmt.Println("== #45 spike measurements: NativeViewHost + WKWebView on macOS ==")
 
-	shot, err := screenshot(w, filepath.Join(dir, "a.png"))
+	p.baseline()
+	p.measureHole()
+	p.measureOcclusion()
+	p.measureClip()
+	p.measureScrollOut()
+	p.measureHideShow()
+	p.measureResize()
+	p.measureFocus()
+	p.measureBridge()
+	p.measureTeardown()
+	p.reportCost()
+
+	fmt.Println()
+	if p.failed {
+		fmt.Println("RESULT: at least one measurement did not confirm — see above")
+		os.Exit(1)
+	}
+	fmt.Println("RESULT: all measurements confirmed the documented hole-punch behaviour")
+}
+
+func captureDir() string {
+	if *dumpDir != "" {
+		_ = os.MkdirAll(*dumpDir, 0o755)
+		fmt.Println("captures will be written to", *dumpDir)
+		return *dumpDir
+	}
+	d, err := os.MkdirTemp("", "webviewprobe")
+	if err != nil {
+		fmt.Println("FAIL: temp dir:", err)
+		os.Exit(1)
+	}
+	return d
+}
+
+// fail records a measurement that did not confirm, and reports why.
+func (p *probe) fail(format string, args ...any) {
+	fmt.Printf(format+"\n", args...)
+	p.failed = true
+}
+
+// shot captures the screen; a failure is fatal to the measurement that asked
+// for it, so callers check the nil return.
+func (p *probe) shot(name string) image.Image {
+	img, err := screenshot(p.w, filepath.Join(p.dir, name))
+	if err != nil {
+		p.fail("            SKIP — screen capture failed: %v", err)
+		return nil
+	}
+	return img
+}
+
+// rectOf reads an object's canvas rectangle on the main goroutine.
+func (p *probe) rectOf(obj core.CanvasObject) geo.Rectangle {
+	var r geo.Rectangle
+	bellui.DoAndWait(func() { r = objectCanvasRect(obj) })
+	return r
+}
+
+// canvasRect is the whole window content area.
+func (p *probe) canvasRect() geo.Rectangle {
+	var r geo.Rectangle
+	bellui.DoAndWait(func() { r = geo.Rectangle{Size: p.w.Canvas().Size()} })
+	return r
+}
+
+// webIn reports the share of img inside r that is the page's magenta field.
+func (p *probe) webIn(img image.Image, r geo.Rectangle) float64 {
+	return fractionWeb(img, mapRect(img, p.w, r))
+}
+
+func (p *probe) scrollTo(y float32) {
+	bellui.DoAndWait(func() {
+		p.scroll.Offset = geo.NewPos(0, y)
+		p.scroll.Refresh()
+	})
+	time.Sleep(1200 * time.Millisecond)
+}
+
+// baseline takes the two captures every later measurement compares against.
+// Without them there is nothing to measure, so a failure here is fatal.
+func (p *probe) baseline() {
+	img, err := screenshot(p.w, filepath.Join(p.dir, "a.png"))
 	if err != nil {
 		fmt.Println("SKIP: screencapture unavailable —", err)
 		fmt.Println("      grant Screen Recording to this terminal and re-run")
 		os.Exit(1)
 	}
-	cap1 := belluiCapture(w)
+	cap1 := belluiCapture(p.w)
 	if cap1 == nil {
 		fmt.Println("FAIL: Canvas.Capture returned nil")
 		os.Exit(1)
 	}
 	if *dumpDir != "" {
-		savePNG(filepath.Join(dir, "canvas-a.png"), cap1)
-		fmt.Printf("            [dbg] screenshot bounds %v, canvas capture bounds %v\n",
-			shot.Bounds(), cap1.Bounds())
+		savePNG(filepath.Join(p.dir, "canvas-a.png"), cap1)
 	}
+	p.baseShot, p.baseCap = img, cap1
+	p.hostRect = p.rectOf(p.host)
+}
 
-	failed := false
-	var hostRect geo.Rectangle
-	bellui.DoAndWait(func() { hostRect = objectCanvasRect(host) })
-
-	// 1. THE HOLE. Bellui's own capture of the host rectangle should hold no
-	// web content; the screen should be almost entirely web content.
-	inCapture := fractionWeb(cap1, mapRect(cap1, w, hostRect))
-	onScreen := fractionWeb(shot, mapRect(shot, w, hostRect))
+// measureHole is the core claim: bellui's own capture of the host rectangle
+// holds no web content, while the screen there is almost entirely web content.
+func (p *probe) measureHole() {
+	inCapture := p.webIn(p.baseCap, p.hostRect)
+	onScreen := p.webIn(p.baseShot, p.hostRect)
 	fmt.Printf("\n[HOLE]      web-page pixels in the host rectangle\n")
 	fmt.Printf("            Canvas.Capture : %5.1f%%\n", inCapture*100)
 	fmt.Printf("            screen         : %5.1f%%\n", onScreen*100)
 	switch {
 	case onScreen < 0.5:
-		fmt.Println("            INCONCLUSIVE — the web view is not on screen; is the window covered?")
-		failed = true
+		p.fail("            INCONCLUSIVE — the web view is not on screen; is the window covered?")
 	case inCapture > 0.02:
-		fmt.Println("            UNEXPECTED — bellui captured the web content (compositing?!)")
-		failed = true
+		p.fail("            UNEXPECTED — bellui captured the web content (compositing?!)")
 	default:
 		fmt.Println("            CONFIRMED — Capture() sees a hole; screenshots never contain web content")
 	}
+}
 
-	// 2. OCCLUSION. A bellui popup over the host is in bellui's surface but
-	// not on screen where it overlaps the native view.
+// measureOcclusion shows a bellui popup over the host. The honest test is
+// differential: the popup must change bellui's own surface in the overlap (it
+// drew it) and must NOT change the screen there (the native view is on top).
+// Asking whether the capture holds "web pixels" would prove nothing — bellui
+// never draws them.
+func (p *probe) measureOcclusion() {
+	fmt.Printf("\n[OCCLUSION] a bellui popup overlapping the host\n")
+
 	var pop *widget.PopUp
-	bellui.DoAndWait(func() { pop = showOverlapPopup(w.Canvas(), host) })
+	bellui.DoAndWait(func() { pop = showOverlapPopup(p.w.Canvas(), p.host) })
 	time.Sleep(1500 * time.Millisecond)
+	defer bellui.DoAndWait(func() {
+		p.w.Canvas().Overlays().Remove(p.w.Canvas().Overlays().Top())
+	})
 
 	// A shown PopUp's own rectangle is the full-canvas overlay container; the
 	// visible body is its Content. Read it only after the popup has been laid
 	// out — ShowAtPosition records a position, it does not place the content.
-	var popRect geo.Rectangle
-	bellui.DoAndWait(func() { popRect = objectCanvasRect(pop.Content) })
+	popRect := p.rectOf(pop.Content)
 
-	shot2, err2 := screenshot(w, filepath.Join(dir, "b.png"))
-	cap2 := belluiCapture(w)
-	fmt.Printf("\n[OCCLUSION] a bellui popup overlapping the host\n")
-	if err2 != nil || cap2 == nil {
-		fmt.Println("            SKIP — capture failed")
-		failed = true
-	} else if overlap, ok := intersect(popRect, hostRect); !ok {
-		fmt.Printf("            SKIP — popup %v did not overlap the host %v\n", popRect, hostRect)
-		failed = true
-	} else {
-		if *dumpDir != "" {
-			savePNG(filepath.Join(dir, "canvas-b.png"), cap2)
-		}
-		// The honest test is differential: showing the popup must change
-		// bellui's own surface in the overlap (it drew it) and must NOT change
-		// the screen there (the native view is on top). Asking whether the
-		// capture holds "web pixels" proves nothing — bellui never draws them.
-		capChanged := fractionChanged(cap1, cap2, mapRect(cap2, w, overlap))
-		scrChanged := fractionChanged(shot, shot2, mapRect(shot2, w, overlap))
-		scrWeb := fractionWeb(shot2, mapRect(shot2, w, overlap))
-		fmt.Printf("            pixels the popup changed, inside the overlap\n")
-		fmt.Printf("            Canvas.Capture : %5.1f%%  (bellui drew it)\n", capChanged*100)
-		fmt.Printf("            screen         : %5.1f%%  (nothing changed on screen)\n", scrChanged*100)
-		fmt.Printf("            still web pixels on screen : %5.1f%%\n", scrWeb*100)
-		switch {
-		case capChanged < 0.05:
-			fmt.Println("            INCONCLUSIVE — bellui did not draw a popup in the overlap")
-			failed = true
-		case scrChanged < 0.05 && scrWeb > 0.5:
-			fmt.Println("            CONFIRMED — bellui overlays are occluded by the native view")
-		default:
-			fmt.Println("            UNEXPECTED — the popup reached the screen over the native view")
-		}
+	shot2 := p.shot("b.png")
+	cap2 := belluiCapture(p.w)
+	if shot2 == nil || cap2 == nil {
+		p.fail("            SKIP — capture failed")
+		return
 	}
-	bellui.DoAndWait(func() { w.Canvas().Overlays().Remove(w.Canvas().Overlays().Top()) })
+	overlap, ok := intersect(popRect, p.hostRect)
+	if !ok {
+		p.fail("            SKIP — popup %v did not overlap the host %v", popRect, p.hostRect)
+		return
+	}
+	if *dumpDir != "" {
+		savePNG(filepath.Join(p.dir, "canvas-b.png"), cap2)
+	}
 
-	// 3. CLIPPING. Scroll the host under the viewport edge: no web content may
-	// appear outside the scroll's own rectangle.
-	bellui.DoAndWait(func() {
-		scroll.Offset = geo.NewPos(0, 90)
-		scroll.Refresh()
-	})
-	time.Sleep(1200 * time.Millisecond)
+	capChanged := fractionChanged(p.baseCap, cap2, mapRect(cap2, p.w, overlap))
+	scrChanged := fractionChanged(p.baseShot, shot2, mapRect(shot2, p.w, overlap))
+	scrWeb := p.webIn(shot2, overlap)
+	fmt.Printf("            pixels the popup changed, inside the overlap\n")
+	fmt.Printf("            Canvas.Capture : %5.1f%%  (bellui drew it)\n", capChanged*100)
+	fmt.Printf("            screen         : %5.1f%%  (nothing changed on screen)\n", scrChanged*100)
+	fmt.Printf("            still web pixels on screen : %5.1f%%\n", scrWeb*100)
+	switch {
+	case capChanged < 0.05:
+		p.fail("            INCONCLUSIVE — bellui did not draw a popup in the overlap")
+	case scrChanged < 0.05 && scrWeb > 0.5:
+		fmt.Println("            CONFIRMED — bellui overlays are occluded by the native view")
+	default:
+		p.fail("            UNEXPECTED — the popup reached the screen over the native view")
+	}
+}
 
-	shot3, err3 := screenshot(w, filepath.Join(dir, "c.png"))
+// measureClip scrolls the host under the viewport edge: no web content may
+// appear outside the scroll's own rectangle.
+func (p *probe) measureClip() {
+	p.scrollTo(90)
 	fmt.Printf("\n[CLIP]      web pixels outside the scroll viewport, host half-scrolled\n")
-	if err3 != nil {
-		fmt.Println("            SKIP — capture failed")
-	} else {
-		var scrollRect geo.Rectangle
-		bellui.DoAndWait(func() { scrollRect = objectCanvasRect(scroll) })
-		outside := fractionWeb(shot3, mapRect(shot3, w, aboveOf(scrollRect)))
-		fmt.Printf("            above the viewport : %5.1f%%\n", outside*100)
-		if outside < 0.01 {
-			fmt.Println("            CONFIRMED — the native clip view masks it to the scroll bounds")
-		} else {
-			fmt.Println("            FAIL — web content is overflowing the scroll")
-			failed = true
-		}
-	}
 
-	// 4. SCROLLED FULLY OUT.
-	bellui.DoAndWait(func() {
-		scroll.Offset = geo.NewPos(0, 1200)
-		scroll.Refresh()
-	})
-	time.Sleep(1200 * time.Millisecond)
-	shot4, err4 := screenshot(w, filepath.Join(dir, "d.png"))
+	img := p.shot("c.png")
+	if img == nil {
+		return
+	}
+	outside := p.webIn(img, aboveOf(p.rectOf(p.scroll)))
+	fmt.Printf("            above the viewport : %5.1f%%\n", outside*100)
+	if outside < 0.01 {
+		fmt.Println("            CONFIRMED — the native clip view masks it to the scroll bounds")
+		return
+	}
+	p.fail("            FAIL — web content is overflowing the scroll")
+}
+
+func (p *probe) measureScrollOut() {
+	p.scrollTo(1200)
 	fmt.Printf("\n[SCROLLOUT] host scrolled entirely past the viewport\n")
-	if err4 != nil {
-		fmt.Println("            SKIP — capture failed")
-	} else {
-		var full geo.Rectangle
-		bellui.DoAndWait(func() { full = geo.Rectangle{Size: w.Canvas().Size()} })
-		anyWeb := fractionWeb(shot4, mapRect(shot4, w, full))
-		fmt.Printf("            web pixels anywhere in the window : %5.1f%%\n", anyWeb*100)
-		if anyWeb < 0.01 {
-			fmt.Println("            CONFIRMED — the host hides the native view when it leaves the viewport")
-		} else {
-			fmt.Println("            FAIL — the native view is still visible")
-			failed = true
-		}
+
+	img := p.shot("d.png")
+	if img == nil {
+		return
 	}
+	anyWeb := p.webIn(img, p.canvasRect())
+	fmt.Printf("            web pixels anywhere in the window : %5.1f%%\n", anyWeb*100)
+	if anyWeb < 0.01 {
+		fmt.Println("            CONFIRMED — the host hides the native view when it leaves the viewport")
+		return
+	}
+	p.fail("            FAIL — the native view is still visible")
+}
 
-	// 5. HIDE / SHOW.
-	bellui.DoAndWait(func() {
-		scroll.Offset = geo.NewPos(0, 0)
-		scroll.Refresh()
-	})
-	time.Sleep(800 * time.Millisecond)
-
+func (p *probe) measureHideShow() {
+	p.scrollTo(0)
 	fmt.Printf("\n[HIDE]      Hide() then Show() on the host\n")
-	bellui.DoAndWait(func() { host.Hide() })
-	time.Sleep(900 * time.Millisecond)
-	hidden, errH := screenshot(w, filepath.Join(dir, "e-hidden.png"))
 
-	bellui.DoAndWait(func() { host.Show() })
+	bellui.DoAndWait(func() { p.host.Hide() })
 	time.Sleep(900 * time.Millisecond)
-	reshown, errS := screenshot(w, filepath.Join(dir, "f-shown.png"))
+	hidden := p.shot("e-hidden.png")
 
-	if errH != nil || errS != nil {
-		fmt.Println("            SKIP — capture failed")
-		failed = true
-	} else {
-		var full geo.Rectangle
-		bellui.DoAndWait(func() { full = geo.Rectangle{Size: w.Canvas().Size()} })
-		whileHidden := fractionWeb(hidden, mapRect(hidden, w, full))
-		afterShow := fractionWeb(reshown, mapRect(reshown, w, full))
-		fmt.Printf("            web pixels while hidden : %5.1f%%\n", whileHidden*100)
-		fmt.Printf("            web pixels after Show   : %5.1f%%\n", afterShow*100)
-		if whileHidden < 0.01 && afterShow > 0.05 {
-			fmt.Println("            CONFIRMED — Hide removes the native view, Show restores it")
-		} else {
-			fmt.Println("            FAIL — Hide/Show did not round-trip")
-			failed = true
-		}
+	bellui.DoAndWait(func() { p.host.Show() })
+	time.Sleep(900 * time.Millisecond)
+	reshown := p.shot("f-shown.png")
+
+	if hidden == nil || reshown == nil {
+		return
 	}
+	full := p.canvasRect()
+	whileHidden := p.webIn(hidden, full)
+	afterShow := p.webIn(reshown, full)
+	fmt.Printf("            web pixels while hidden : %5.1f%%\n", whileHidden*100)
+	fmt.Printf("            web pixels after Show   : %5.1f%%\n", afterShow*100)
+	if whileHidden < 0.01 && afterShow > 0.05 {
+		fmt.Println("            CONFIRMED — Hide removes the native view, Show restores it")
+		return
+	}
+	p.fail("            FAIL — Hide/Show did not round-trip")
+}
 
-	// 6. RESIZE. The native view must stay glued to its widget, and must not
-	// spill outside the host rectangle after the window changes size.
+// measureResize checks the native view stays glued to its widget, and does not
+// spill outside it, after the window changes size.
+func (p *probe) measureResize() {
 	fmt.Printf("\n[RESIZE]    window resized while the host is shown\n")
-	bellui.DoAndWait(func() { w.Resize(geo.NewSize(760, 520)) })
+	bellui.DoAndWait(func() { p.w.Resize(geo.NewSize(760, 520)) })
 	time.Sleep(1200 * time.Millisecond)
 
-	resized, errR := screenshot(w, filepath.Join(dir, "g-resized.png"))
-	if errR != nil {
-		fmt.Println("            SKIP — capture failed")
-		failed = true
-	} else {
-		var newHost, viewport geo.Rectangle
-		bellui.DoAndWait(func() {
-			newHost = objectCanvasRect(host)
-			viewport = objectCanvasRect(scroll)
-		})
-		inside := fractionWeb(resized, mapRect(resized, w, newHost))
-		outsideBand := fractionWeb(resized, mapRect(resized, w, leftOf(viewport)))
-		fmt.Printf("            web pixels inside the host rect : %5.1f%%\n", inside*100)
-		fmt.Printf("            web pixels left of the viewport : %5.1f%%\n", outsideBand*100)
-		if inside > 0.5 && outsideBand < 0.01 {
-			fmt.Println("            CONFIRMED — the native view tracked the resize and stayed clipped")
-		} else {
-			fmt.Println("            FAIL — the native view drifted from its widget")
-			failed = true
-		}
+	img := p.shot("g-resized.png")
+	if img == nil {
+		return
 	}
+	inside := p.webIn(img, p.rectOf(p.host))
+	outsideBand := p.webIn(img, leftOf(p.rectOf(p.scroll)))
+	fmt.Printf("            web pixels inside the host rect : %5.1f%%\n", inside*100)
+	fmt.Printf("            web pixels left of the viewport : %5.1f%%\n", outsideBand*100)
+	if inside > 0.5 && outsideBand < 0.01 {
+		fmt.Println("            CONFIRMED — the native view tracked the resize and stayed clipped")
+		return
+	}
+	p.fail("            FAIL — the native view drifted from its widget")
+}
 
-	// 7. FOCUS ARBITRATION. Keyboard focus belongs to the OS responder chain,
-	// which bellui's canvas focus knows nothing about. Focus a bellui Entry,
-	// then hand the OS focus to the web view (what a click inside it does)
-	// and see whether bellui notices.
+// measureFocus is a finding, not a pass. Keyboard focus belongs to the OS
+// responder chain, which bellui's canvas focus knows nothing about: focus a
+// bellui Entry, hand OS focus to the web view (what a click inside it does),
+// and see whether bellui notices. It does not.
+func (p *probe) measureFocus() {
 	fmt.Printf("\n[FOCUS]     bellui Entry vs. the web engine\n")
 	bellui.DoAndWait(func() {
-		scroll.Offset = geo.NewPos(0, 0)
-		scroll.Refresh()
-		w.Canvas().Focus(entry)
+		p.scroll.Offset = geo.NewPos(0, 0)
+		p.scroll.Refresh()
+		p.w.Canvas().Focus(p.entry)
 	})
 	time.Sleep(500 * time.Millisecond)
 
-	var belluiFocusedBefore, belluiFocusedAfter bool
-	var webTook, webHas bool
-	bellui.DoAndWait(func() { belluiFocusedBefore = w.Canvas().Focused() == entry })
-	bellui.DoAndWait(func() { webTook = view.TakeFocus() })
+	var before, after, took, has bool
+	bellui.DoAndWait(func() { before = p.w.Canvas().Focused() == p.entry })
+	bellui.DoAndWait(func() { took = p.view.TakeFocus() })
 	time.Sleep(500 * time.Millisecond)
 	bellui.DoAndWait(func() {
-		webHas = view.HasFocus()
-		belluiFocusedAfter = w.Canvas().Focused() == entry
+		has = p.view.HasFocus()
+		after = p.w.Canvas().Focused() == p.entry
 	})
 
-	fmt.Printf("            bellui Entry focused before  : %v\n", belluiFocusedBefore)
-	fmt.Printf("            web view took OS focus       : %v\n", webTook)
-	fmt.Printf("            web view holds OS focus      : %v\n", webHas)
-	fmt.Printf("            bellui still thinks Entry is focused : %v\n", belluiFocusedAfter)
-	if webHas && belluiFocusedAfter {
+	fmt.Printf("            bellui Entry focused before  : %v\n", before)
+	fmt.Printf("            web view took OS focus       : %v\n", took)
+	fmt.Printf("            web view holds OS focus      : %v\n", has)
+	fmt.Printf("            bellui still thinks Entry is focused : %v\n", after)
+	switch {
+	case has && after:
 		fmt.Println("            FINDING — focus is split: keystrokes and IME go to the web")
 		fmt.Println("            engine while bellui still draws a focused, blinking Entry.")
 		fmt.Println("            A shipped host must bridge the OS responder chain to")
 		fmt.Println("            Canvas.Unfocus, and back again. Not solved by this spike.")
-	} else if !webTook {
+	case !took:
 		fmt.Println("            INCONCLUSIVE — the window refused the responder change")
-	} else {
+	default:
 		fmt.Println("            bellui and the OS agree on focus")
 	}
+}
 
-	// 7b. TWO-WAY BRIDGE. The hole punch constrains compositing and input
-	// focus; it does not constrain data flow. Prove both directions.
+// measureBridge proves the hole punch constrains compositing and input focus,
+// not data flow: bellui drives the page, and the page calls back into bellui.
+func (p *probe) measureBridge() {
 	fmt.Printf("\n[BRIDGE]    bellui logic <-> page logic\n")
+	p.measureEvalToPage()
+	p.measureMessageToBellui()
+}
 
-	// Go -> JS: recolour the page from bellui, and confirm on screen that the
-	// page actually changed (not merely that the call returned).
+// measureEvalToPage confirms on screen that the page actually changed, rather
+// than merely that the Eval call returned.
+func (p *probe) measureEvalToPage() {
 	bellui.DoAndWait(func() {
-		view.Eval("document.body.style.background='rgb(0,160,255)'")
+		p.view.Eval("document.body.style.background='rgb(0,160,255)'")
 	})
 	time.Sleep(1200 * time.Millisecond)
 
-	recoloured, errB := screenshot(w, filepath.Join(dir, "i-eval.png"))
-	if errB != nil {
-		fmt.Println("            SKIP — capture failed")
-		failed = true
-	} else {
-		var r geo.Rectangle
-		bellui.DoAndWait(func() { r = objectCanvasRect(host) })
-		magenta := fractionWeb(recoloured, mapRect(recoloured, w, r))
-		blue := fractionBlue(recoloured, mapRect(recoloured, w, r))
-		fmt.Printf("            Go -> JS : page now %5.1f%% blue, %5.1f%% magenta\n", blue*100, magenta*100)
-		if blue > 0.5 && magenta < 0.05 {
-			fmt.Println("                       CONFIRMED — a bellui widget restyled the live page")
-		} else {
-			fmt.Println("                       FAIL — Eval did not reach the page")
-			failed = true
-		}
+	img := p.shot("i-eval.png")
+	if img == nil {
+		return
 	}
+	r := p.rectOf(p.host)
+	magenta := p.webIn(img, r)
+	blue := fractionBlue(img, mapRect(img, p.w, r))
+	fmt.Printf("            Go -> JS : page now %5.1f%% blue, %5.1f%% magenta\n", blue*100, magenta*100)
+	if blue > 0.5 && magenta < 0.05 {
+		fmt.Println("                       CONFIRMED — a bellui widget restyled the live page")
+		return
+	}
+	p.fail("                       FAIL — Eval did not reach the page")
+}
 
-	// JS -> Go: have the page post a message and confirm Go received it.
-	gotMsg := make(chan string, 1)
+func (p *probe) measureMessageToBellui() {
+	got := make(chan string, 1)
 	bellui.DoAndWait(func() {
-		view.OnMessage = func(m string) {
+		p.view.OnMessage = func(m string) {
 			select {
-			case gotMsg <- m:
+			case got <- m:
 			default:
 			}
 		}
-		view.Eval("window.webkit.messageHandlers.bellui.postMessage('hello from the page')")
+		p.view.Eval("window.webkit.messageHandlers.bellui.postMessage('hello from the page')")
 	})
 	select {
-	case m := <-gotMsg:
+	case m := <-got:
 		fmt.Printf("            JS -> Go : received %q on the main goroutine\n", m)
 		fmt.Println("                       CONFIRMED — page logic reached bellui logic")
 	case <-time.After(3 * time.Second):
-		fmt.Println("            JS -> Go : FAIL — no message arrived within 3s")
-		failed = true
+		p.fail("            JS -> Go : FAIL — no message arrived within 3s")
 	}
+}
 
-	// 8. TEARDOWN. Replacing the window content destroys the host's renderer,
-	// which is the path that must remove and release the native view. Doing it
-	// while the engine is live is the case that would crash if the ordering
-	// were wrong.
+// measureTeardown replaces the window content, which destroys the host's
+// renderer — the path that must remove and release the native view. Doing it
+// while the engine is live is the case that would crash if the ordering were
+// wrong.
+func (p *probe) measureTeardown() {
 	fmt.Printf("\n[TEARDOWN]  host removed from the tree while the engine is live\n")
-	bellui.DoAndWait(func() { w.SetContent(widget.NewLabel("host removed")) })
+	bellui.DoAndWait(func() { p.w.SetContent(widget.NewLabel("host removed")) })
 	time.Sleep(1200 * time.Millisecond)
 
-	torn, errT := screenshot(w, filepath.Join(dir, "h-torndown.png"))
-	if errT != nil {
-		fmt.Println("            SKIP — capture failed")
-		failed = true
-	} else {
-		var full geo.Rectangle
-		bellui.DoAndWait(func() { full = geo.Rectangle{Size: w.Canvas().Size()} })
-		left := fractionWeb(torn, mapRect(torn, w, full))
-		fmt.Printf("            web pixels left in the window : %5.1f%%\n", left*100)
-		if left < 0.01 {
-			fmt.Println("            CONFIRMED — the native view was removed, process still alive")
-		} else {
-			fmt.Println("            FAIL — the native view outlived its host")
-			failed = true
-		}
+	img := p.shot("h-torndown.png")
+	if img == nil {
+		return
 	}
+	left := p.webIn(img, p.canvasRect())
+	fmt.Printf("            web pixels left in the window : %5.1f%%\n", left*100)
+	if left < 0.01 {
+		fmt.Println("            CONFIRMED — the native view was removed, process still alive")
+		return
+	}
+	p.fail("            FAIL — the native view outlived its host")
+}
 
-	// 9. COST.
-	s, ap := host.SyncStats()
+func (p *probe) reportCost() {
+	s, ap := p.host.SyncStats()
 	fmt.Printf("\n[COST]      per-frame geometry sync\n")
 	fmt.Printf("            evaluations %d, backend calls %d (%.1f%% reached the platform)\n",
 		s, ap, pct(ap, s))
-
-	fmt.Println()
-	if failed {
-		fmt.Println("RESULT: at least one measurement did not confirm — see above")
-		os.Exit(1)
-	}
-	fmt.Println("RESULT: all measurements confirmed the documented hole-punch behaviour")
 }
 
 // screenshot grabs the window's content area with macOS screencapture, which
