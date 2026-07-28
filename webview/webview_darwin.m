@@ -168,12 +168,36 @@ bool belluiWebViewHasFocus(void *handle) {
     return [(NSView *)responder isDescendantOf:[clip webView]] ? true : false;
 }
 
+bool belluiWebViewResignFocus(void *handle) {
+    if (!handle) {
+        return false;
+    }
+    if (!belluiWebViewHasFocus(handle)) {
+        return true; // nothing of ours to give back
+    }
+    BelluiWebViewClip *clip = (BelluiWebViewClip *)handle;
+    NSWindow *window = [clip window];
+
+    // The focus has to land on the GLFW content view specifically, not merely
+    // leave the web view: GLFW installs its key handling there, so making the
+    // *window* the first responder would route keystrokes to nothing at all.
+    NSView *content = [window contentView];
+    if (content && [window makeFirstResponder:content]) {
+        return true;
+    }
+    return [window makeFirstResponder:nil] ? true : false;
+}
+
 void belluiWebViewDestroy(void *handle) {
     if (!handle) {
         return;
     }
     BelluiWebViewClip *clip = (BelluiWebViewClip *)handle;
     WKWebView *web = [clip webView];
+
+    // Hand the keyboard focus back before the view goes away, so a window
+    // outliving the web view is not left with a dead first responder.
+    belluiWebViewResignFocus(handle);
 
     // Stop the engine before tearing the view down, so an in-flight load
     // cannot call back into a half-released view.
