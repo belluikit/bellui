@@ -380,3 +380,215 @@ func TestRangeSlider_Vertical_Inverted(t *testing.T) {
 	assert.Equal(t, 100.0, s.HighValue)
 	assert.Equal(t, 20.0, s.LowValue)
 }
+
+// --- Disabled state (#51) ---
+
+func TestRangeSlider_Disable(t *testing.T) {
+	test.NewTempApp(t)
+	s := widget.NewRangeSlider(0, 100)
+	assert.False(t, s.Disabled())
+
+	s.Disable()
+	assert.True(t, s.Disabled())
+
+	s.Enable()
+	assert.False(t, s.Disabled())
+}
+
+func TestRangeSlider_Disabled_IgnoresPointer(t *testing.T) {
+	test.NewTempApp(t)
+	s := widget.NewRangeSlider(0, 100)
+	s.SetValuesSilently(20, 80)
+	sizedRangeSlider(t, s, 400, 60)
+	mid := s.Size().Height / 2
+
+	changed, ended := 0, 0
+	s.OnChanged = func(float64, float64) { changed++ }
+	s.OnChangeEnded = func(float64, float64) { ended++ }
+	s.Disable()
+
+	s.Tapped(tapAt(s.Size().Width*0.5, mid))
+	assert.Equal(t, 20.0, s.LowValue, "a tap must not move a disabled thumb")
+	assert.Equal(t, 80.0, s.HighValue)
+
+	s.Dragged(&event.DragEvent{PointEvent: *tapAt(s.Size().Width*0.5, mid)})
+	s.DragEnd()
+	assert.Equal(t, 20.0, s.LowValue, "a drag must not move a disabled thumb")
+	assert.Equal(t, 80.0, s.HighValue)
+	assert.False(t, s.Dragging(), "a disabled slider never enters a drag")
+
+	assert.Zero(t, changed)
+	assert.Zero(t, ended)
+}
+
+func TestRangeSlider_Disabled_IgnoresKeyboard(t *testing.T) {
+	test.NewTempApp(t)
+	s := widget.NewRangeSlider(0, 100)
+	s.Step = 10
+	s.SetValuesSilently(20, 80)
+	s.Disable()
+
+	changed := 0
+	s.OnChanged = func(float64, float64) { changed++ }
+
+	s.TypedKey(&event.KeyEvent{Name: event.KeyRight})
+	s.TypedKey(&event.KeyEvent{Name: event.KeyLeft})
+	assert.Equal(t, 20.0, s.LowValue)
+	assert.Equal(t, 80.0, s.HighValue)
+	assert.Zero(t, changed)
+}
+
+// OnHover is suppressed while disabled, but OnHoverEnd still fires so a
+// consumer disabled mid-hover is never left showing a preview it cannot take
+// down -- the same rule Slider follows.
+func TestRangeSlider_Disabled_HoverEndStillFires(t *testing.T) {
+	test.NewTempApp(t)
+	s := widget.NewRangeSlider(0, 100)
+	sizedRangeSlider(t, s, 400, 60)
+	mid := s.Size().Height / 2
+
+	var hovers []float64
+	s.OnHover = func(v float64) { hovers = append(hovers, v) }
+	ends := 0
+	s.OnHoverEnd = func() { ends++ }
+
+	s.HoverIn(&event.HoverEvent{PointEvent: *tapAt(s.Size().Width*0.5, mid)})
+	require.Len(t, hovers, 1)
+
+	s.Disable()
+	s.HoverMoved(&event.HoverEvent{PointEvent: *tapAt(s.Size().Width*0.75, mid)})
+	assert.Len(t, hovers, 1, "a disabled slider reports no hover position")
+
+	s.HoverOut()
+	assert.Equal(t, 1, ends, "OnHoverEnd fires even when disabled mid-hover")
+}
+
+// --- Keyboard (#51) ---
+
+func TestRangeSlider_TypedKey_MovesFocusedThumb(t *testing.T) {
+	test.NewTempApp(t)
+	s := widget.NewRangeSlider(0, 100)
+	s.Step = 10
+	s.SetValuesSilently(20, 80)
+
+	assert.False(t, s.FocusedHigh(), "the low thumb is focused by default")
+
+	s.TypedKey(&event.KeyEvent{Name: event.KeyRight})
+	assert.Equal(t, 30.0, s.LowValue)
+	assert.Equal(t, 80.0, s.HighValue, "the unfocused thumb stays put")
+
+	s.TypedKey(&event.KeyEvent{Name: event.KeyLeft})
+	assert.Equal(t, 20.0, s.LowValue)
+
+	// The cross-axis arrows switch which thumb the arrows move.
+	s.TypedKey(&event.KeyEvent{Name: event.KeyUp})
+	assert.True(t, s.FocusedHigh())
+
+	s.TypedKey(&event.KeyEvent{Name: event.KeyRight})
+	assert.Equal(t, 20.0, s.LowValue)
+	assert.Equal(t, 90.0, s.HighValue)
+
+	s.TypedKey(&event.KeyEvent{Name: event.KeyDown})
+	assert.False(t, s.FocusedHigh())
+}
+
+func TestRangeSlider_TypedKey_Vertical(t *testing.T) {
+	test.NewTempApp(t)
+	s := widget.NewRangeSlider(0, 100)
+	s.Orientation = widget.Vertical
+	s.Step = 10
+	s.SetValuesSilently(20, 80)
+
+	// Up/Down adjust along the slider's own axis when vertical.
+	s.TypedKey(&event.KeyEvent{Name: event.KeyUp})
+	assert.Equal(t, 30.0, s.LowValue)
+	s.TypedKey(&event.KeyEvent{Name: event.KeyDown})
+	assert.Equal(t, 20.0, s.LowValue)
+
+	// Left/Right switch thumbs when vertical.
+	s.TypedKey(&event.KeyEvent{Name: event.KeyRight})
+	assert.True(t, s.FocusedHigh())
+	s.TypedKey(&event.KeyEvent{Name: event.KeyLeft})
+	assert.False(t, s.FocusedHigh())
+}
+
+// A keyboard adjustment is a complete interaction, so it commits.
+func TestRangeSlider_TypedKey_FiresBothCallbacks(t *testing.T) {
+	test.NewTempApp(t)
+	s := widget.NewRangeSlider(0, 100)
+	s.Step = 10
+	s.SetValuesSilently(20, 80)
+
+	changed, ended := 0, 0
+	s.OnChanged = func(float64, float64) { changed++ }
+	s.OnChangeEnded = func(float64, float64) { ended++ }
+
+	s.TypedKey(&event.KeyEvent{Name: event.KeyRight})
+	assert.Equal(t, 1, changed)
+	assert.Equal(t, 1, ended)
+
+	// A key that cannot move the thumb any further reports nothing.
+	s.SetValuesSilently(0, 100)
+	changed, ended = 0, 0
+	s.TypedKey(&event.KeyEvent{Name: event.KeyLeft})
+	assert.Zero(t, changed)
+	assert.Zero(t, ended)
+}
+
+// Without an explicit Step the arrows still work, stepping a hundredth of the
+// range -- the same fallback the screen-reader increment uses.
+func TestRangeSlider_TypedKey_NoStep(t *testing.T) {
+	test.NewTempApp(t)
+	s := widget.NewRangeSlider(0, 100)
+	s.SetValuesSilently(20, 80)
+
+	s.TypedKey(&event.KeyEvent{Name: event.KeyRight})
+	assert.Equal(t, 21.0, s.LowValue)
+}
+
+// The focused thumb follows the pointer, so arrows continue where a drag or tap
+// left off.
+func TestRangeSlider_FocusedThumbFollowsPointer(t *testing.T) {
+	test.NewTempApp(t)
+	s := widget.NewRangeSlider(0, 100)
+	s.Step = 10
+	s.SetValuesSilently(20, 80)
+	sizedRangeSlider(t, s, 400, 60)
+	mid := s.Size().Height / 2
+
+	s.Tapped(tapAt(s.Size().Width*0.9, mid))
+	assert.True(t, s.FocusedHigh(), "tapping near the high thumb focuses it")
+
+	s.Tapped(tapAt(s.Size().Width*0.05, mid))
+	assert.False(t, s.FocusedHigh(), "tapping near the low thumb focuses it")
+
+	s.Dragged(&event.DragEvent{PointEvent: *tapAt(s.Size().Width*0.95, mid)})
+	s.DragEnd()
+	assert.True(t, s.FocusedHigh(), "dragging the high thumb focuses it")
+}
+
+func TestRangeSlider_SetFocusedHigh(t *testing.T) {
+	test.NewTempApp(t)
+	s := widget.NewRangeSlider(0, 100)
+	s.Step = 10
+	s.SetValuesSilently(20, 80)
+
+	s.SetFocusedHigh(true)
+	assert.True(t, s.FocusedHigh())
+
+	s.TypedKey(&event.KeyEvent{Name: event.KeyRight})
+	assert.Equal(t, 90.0, s.HighValue)
+	assert.Equal(t, 20.0, s.LowValue)
+}
+
+func TestRangeSlider_Focusable(t *testing.T) {
+	test.NewTempApp(t)
+	s := widget.NewRangeSlider(0, 100)
+	sizedRangeSlider(t, s, 400, 60)
+
+	s.FocusGained()
+	s.FocusLost()
+	s.TypedRune('a') // must not panic or move anything
+	assert.Equal(t, 0.0, s.LowValue)
+	assert.Equal(t, 100.0, s.HighValue)
+}
