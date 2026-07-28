@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/belluikit/bellui"
-	"github.com/fsnotify/fsnotify"
+	"github.com/belluikit/fsnotify"
 )
 
 func watchFileAddTarget(watcher *fsnotify.Watcher, path string) {

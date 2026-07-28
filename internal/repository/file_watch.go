@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/fsnotify/fsnotify"
+	"github.com/belluikit/fsnotify"
 
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/storage/repository"
@@ -173,15 +173,17 @@ func (r *FileRepository) closeWatcher() {
 	// drains and exits, and Close returns (#663). The same rule now covers
 	// Add/Remove in WatchURI and its cancel (#957).
 	//
-	// The wait is bounded: fsnotify's Windows reader can miss Close's IOCP
-	// wakeup entirely (captured on the windows/arm64 CI VM: Close parked on
-	// its reply while the reader sat in GetQueuedCompletionStatus forever —
-	// the completion packet was posted but never woke the thread, #963).
-	// Once Close has marked the watcher closed there is no public way to
-	// poke the reader again, so after the timeout Destroy proceeds: the
-	// subscriptions are detached and their goroutines exit below; the
-	// watcher's reader goroutine and OS handles leak until process exit,
-	// which beats wedging the caller for good.
+	// The wait stays bounded as a backstop. It was load-bearing against a
+	// Windows-backend defect where Close could park on its reply forever while
+	// the reader sat in GetQueuedCompletionStatus — the completion packet was
+	// posted but the reader had already swallowed the handshake token in
+	// sendError (#963, and #68 for the diagnosis). That is fixed in
+	// github.com/belluikit/fsnotify, along with the double CloseHandle that
+	// provoked it, so this timeout should now never fire; hack/winwatchprobe
+	// measures exactly that. If it ever does fire, Destroy still proceeds: the
+	// subscriptions are detached and their goroutines exit below, and the
+	// watcher's reader goroutine and OS handles leak until process exit, which
+	// beats wedging the caller for good.
 	closed := make(chan struct{})
 	go func() {
 		_ = w.Close()
