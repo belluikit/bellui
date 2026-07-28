@@ -320,6 +320,31 @@ func TestRangeSliderThumb_DefaultStep(t *testing.T) {
 	assert.Equal(t, 21.0, s.LowValue)
 }
 
+// A screen-reader adjustment is a complete interaction, so it reports the
+// change as settled — previously asserted only to move a thumb, not to report it.
+func TestRangeSliderThumb_ReportsChange(t *testing.T) {
+	s := NewRangeSlider(0, 100)
+	s.Step = 5
+	s.SetValuesSilently(20, 80)
+	low := &rangeSliderThumb{slider: s, high: false}
+
+	changed, ended := 0, 0
+	s.OnChanged = func(float64, float64) { changed++ }
+	s.OnChangeEnded = func(float64, float64) { ended++ }
+
+	low.PerformAccessibleAction(core.ActionIncrement)
+	assert.Equal(t, 25.0, s.LowValue)
+	assert.Equal(t, 1, changed)
+	assert.Equal(t, 1, ended)
+
+	// An adjustment blocked by the other thumb moves nothing and reports nothing.
+	s.SetValuesSilently(80, 80)
+	low.PerformAccessibleAction(core.ActionIncrement)
+	assert.Equal(t, 80.0, s.LowValue)
+	assert.Equal(t, 1, changed)
+	assert.Equal(t, 1, ended)
+}
+
 func TestRangeSliderThumb_RangeAndValue(t *testing.T) {
 	s := NewRangeSlider(0, 100)
 	s.SetValues(20, 80)
