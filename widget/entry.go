@@ -130,7 +130,12 @@ type Entry struct {
 
 	// Set a validator that this entry will check against
 	// Since: 1.4
-	Validator           bellui.StringValidator `json:"-"`
+	Validator bellui.StringValidator `json:"-"`
+	// validatorInternal is the data-binding conversion check. It is deliberately
+	// not the public Validator field: Bind used to claim that field, silently
+	// dropping the app's validation rule, and Unbind then left the widget with
+	// no validator at all. See [Entry.validate] for how the two compose.
+	validatorInternal   bellui.StringValidator
 	validationStatus    *validationStatus
 	onValidationChanged func(error)
 	validationError     error
@@ -700,12 +705,18 @@ func (e *Entry) ReplaceAccessibleSelection(text string) {
 // The current value will be displayed and any changes in the data will cause the widget to update.
 // User interactions with this Entry will set the value into the data source.
 //
+// The public [Entry.Validator] field is left alone: the data-binding conversion
+// check is composed with it rather than replacing it, so binding a validated
+// Entry keeps the app's rule and Validator may be assigned before or after Bind.
+// A conversion error wins over the app's rule -- text that cannot be written to
+// the bound source is invalid whatever the app's rule says about it.
+//
 // Since: 2.0
 func (e *Entry) Bind(data binding.String) {
 	e.binder.SetCallback(e.updateFromData)
 	e.binder.Bind(data)
 
-	e.Validator = func(string) error {
+	e.validatorInternal = func(string) error {
 		return e.conversionError
 	}
 }
@@ -2651,9 +2662,12 @@ func (e *Entry) AddShortcut(shortcut core.Shortcut, handler func(core.Shortcut))
 // Unbind disconnects any configured data source from this Entry.
 // The current value will remain at the last value of the data source.
 //
+// Any [Entry.Validator] the app installed is left in place -- Unbind only drops
+// the data-binding conversion check it installed itself.
+//
 // Since: 2.0
 func (e *Entry) Unbind() {
-	e.Validator = nil
+	e.validatorInternal = nil
 	e.binder.Unbind()
 }
 
@@ -3950,7 +3964,7 @@ func (r *entryRenderer) trailingInset() float32 {
 		xInset = r.entry.ActionItem.MinSize().Width
 	}
 
-	if r.entry.Validator != nil && !r.entry.ValidateWithBorder {
+	if r.entry.hasValidator() && !r.entry.ValidateWithBorder {
 		iconSpace := th.Size(theme.SizeNameInlineIcon) + th.Size(theme.SizeNameLineSpacing)
 		if r.entry.ActionItem == nil {
 			xInset = iconSpace + th.Size(theme.SizeNameInnerPadding)
@@ -3996,7 +4010,7 @@ func (r *entryRenderer) Layout(size geo.Size) {
 	}
 
 	validatorIconSize := geo.NewSize(0, 0)
-	if r.entry.Validator != nil || r.entry.AlwaysShowValidationError {
+	if r.entry.hasValidator() || r.entry.AlwaysShowValidationError {
 		validatorIconSize = geo.NewSquareSize(iconSize)
 
 		r.ensureValidationSetup()
@@ -4103,7 +4117,7 @@ func (r *entryRenderer) MinSize() geo.Size {
 	if r.entry.ActionItem != nil {
 		minSize.Width += iconSpace
 	}
-	if r.entry.Validator != nil && !r.entry.ValidateWithBorder {
+	if r.entry.hasValidator() && !r.entry.ValidateWithBorder {
 		minSize.Width += iconSpace
 	}
 	if r.entry.Icon != nil {
@@ -4232,7 +4246,7 @@ func (r *entryRenderer) refreshBoxAndBorder(th bellui.Theme, v bellui.ThemeVaria
 
 // refreshValidationStyle applies validation-driven border or status styling.
 func (r *entryRenderer) refreshValidationStyle(th bellui.Theme, v bellui.ThemeVariant) {
-	if r.entry.Validator == nil && !r.entry.AlwaysShowValidationError {
+	if !r.entry.hasValidator() && !r.entry.AlwaysShowValidationError {
 		if r.entry.validationStatus != nil {
 			r.entry.validationStatus.Hide()
 		}

@@ -301,6 +301,14 @@ Native-parity touch selection UX for `widget.Entry` on mobile (Android/iOS/embed
 
 `widget.RangeSlider` has the same three gaps plus no `OnChangeEnded` at all — tracked separately as #46.
 
+### Bind Never Claims a Public Callback Field (#47, #49)
+Several `Bind` implementations used to install the data write-back by **assigning a public callback field**, so binding and an app handler silently destroyed each other in both directions — and the `*WithData` constructors made the likelier direction (assign the field after the constructor bound for you) completely unsignalled. Fixed fork-wide in `Slider` (#47) and `Check`/`Select`/`Entry` (#49); the rule is now a convention: **a binder gets its own unexported hook, and `Unbind` clears only that hook** rather than nilling a field the app may own.
+- `Check`/`Select` — unexported `onChangedInternal`, invoked from `SetChecked`/`updateSelected` **before** the public `OnChanged` (so a handler reading the bound source never sees a stale value). `Unbind` clears only `onChangedInternal`. `Slider` is the same shape via `positionChanged`.
+- `Entry` — the write-back was never on `Validator`; what `Bind` claimed was the **conversion-error report**, which is worse than the `OnChanged` cases because validation is a correctness feature: binding a validated Entry silently dropped the app's rule and `Unbind` left the widget with none. Now an unexported `validatorInternal` is **composed** with the public `Validator` by `Entry.runValidator`, with `Entry.hasValidator()` the "is this entry validated" predicate every call site uses (`Validate`, `validate`, `SetValidationError`, the renderer's icon-space reservation and border styling, `Form`). **Composition rule: a conversion error wins** — text that cannot be written to the bound source is invalid whatever the app's rule says. This also fixes the constructor-installed validators of `NumericEntry`, `SearchField`, `DateEntry` and `DateTimeEntry`, which used to be destroyed the moment the widget was bound.
+- Fixed alongside in `Select` (#49): `SetSelected` has no equality guard of its own (unlike `Check.SetChecked`, whose guard is why it never showed), so the write-back's own binding notification re-entered `updateFromData` and reported **one change twice** — invisible while `Bind` owned `OnChanged`, user-visible the moment an app handler could survive. `updateFromData` now returns early when the incoming value already matches `Selected`.
+
+`Label.Bind` and `ProgressBar.Bind` install no callback at all and were always clean.
+
 ### NumericEntry Widget
 `widget.NumericEntry` and `widget.NewNumericEntry()` — Entry that only accepts numeric input. Right-aligned by default. Rejects non-numeric keystrokes at input time and filters paste content. `NewIntegerEntry()` for integer-only input.
 - `AllowFloat` (default true) — permits decimal point
