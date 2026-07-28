@@ -290,10 +290,12 @@ func drawRaster(c core.Canvas, rast *canvas.Raster, pos geo.Position, base *imag
 	if pix == nil {
 		return
 	}
+	// Translucency fades the raster, exactly as it does a canvas.Image (#38).
+	alpha := rast.Alpha()
 	if pix.Bounds().Bounds().Dx() != width || pix.Bounds().Dy() != height {
-		drawPixels(scaledX, scaledY, width, height, rast.ScaleMode, base, pix, clip, 1.0, 0.0)
+		drawPixels(scaledX, scaledY, width, height, rast.ScaleMode, base, pix, clip, alpha, 0.0)
 	} else {
-		drawTex(scaledX, scaledY, width, height, base, pix, clip, 1.0)
+		drawTex(scaledX, scaledY, width, height, base, pix, clip, alpha)
 	}
 }
 
