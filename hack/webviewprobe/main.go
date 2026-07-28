@@ -1,5 +1,6 @@
 // Command webviewprobe is the live-verify probe for the native-view-embedding
-// spike (#45): widget.NativeViewHost hosting a real WKWebView on macOS.
+// spike (#45) and the bridge and navigation API designed on top of it (#66):
+// widget.NativeViewHost hosting a real WKWebView on macOS.
 //
 //	go run ./hack/webviewprobe
 //
@@ -23,8 +24,14 @@
 //     it is the limitation the spike exists to price.
 //
 // Two-way logic, by eye: "Recolour page from bellui" drives the page from a
-// bellui button, and the page's own button posts a message that a bellui
-// Label displays.
+// bellui button, "Call the page's greet()" asks the page a question and shows
+// its answer, and "Post to the page" pushes a notification the page renders.
+// The page's own buttons post a message a bellui Label displays, and call a
+// Go handler whose answer the page renders.
+//
+// Navigation, by eye: load the second page, walk back and forward through the
+// history while the load state label follows along, and press "Try a blocked
+// navigation" to watch the policy hook refuse one — the page does not move.
 //
 // Focus, by eye: type in the Entry, click into the page (the Entry's caret
 // stops — bellui has released the focus), then click back in the Entry and
@@ -52,9 +59,18 @@
 //   - FOCUS — the #59 bridge in both directions: handing the OS focus to the
 //     web engine releases bellui's focused Entry, and focusing the Entry
 //     again pulls the keyboard back out of the web engine.
-//   - BRIDGE — a bellui widget restyles the live page (Go to JS) and the page
-//     posts a message back (JS to Go). The hole punch constrains what can be
-//     drawn over the view and who owns the keyboard, not data flow.
+//   - BRIDGE — the whole #66 channel: a bellui widget restyles the live page,
+//     an eval reports its value and its errors, the page posts a message back,
+//     a correlated call round-trips with a hostile argument carried as data,
+//     and a call nothing can answer fails instead of hanging. The hole punch
+//     constrains what can be drawn over the view and who owns the keyboard,
+//     not data flow.
+//   - NAV — session history, load state reporting, and a navigation the
+//     policy hook refuses: it never starts, and it is reported as cancelled.
+//   - TRUST — the bridge is opt-in. A second view attached with the bridge off
+//     has no window.bellui and no message handler at all, and a page loaded
+//     from a genuinely different origin (a local HTTP server) is dropped
+//     before any handler runs.
 //   - COST — how many per-frame geometry evaluations actually reached the
 //     platform.
 //
@@ -66,14 +82,21 @@
 package main
 
 import (
+	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"image"
 	"image/color"
 	"image/png"
+	"io"
+	"log"
+	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/belluikit/bellui"
@@ -92,14 +115,34 @@ import (
 // content on screen here?" is answerable by looking at pixel colour alone.
 // Colours are written as rgb() rather than hex: a '#' would terminate the
 // data URL, and percent-escaping it is not decoded inside the body.
+//
+// The script is the page's half of the #66 bridge: it registers a function
+// bellui can call, and calls one of bellui's.
 const page = `data:text/html,` +
 	`<html><body style="margin:0;background:rgb(255,0,170);font:600 44px -apple-system;color:rgb(255,255,255)">` +
 	`<div style="padding:24px">WEBVIEW</div>` +
 	`<div style="padding:24px;font-size:22px">native WKWebView, not drawn by bellui</div>` +
-	`<div style="padding:0 24px"><button id="ping" style="font-size:20px;padding:8px 16px" ` +
-	`onclick="window.webkit.messageHandlers.bellui.postMessage('ping from the page')">` +
-	`send a message to bellui</button></div>` +
+	`<div style="padding:0 24px">` +
+	`<button style="font-size:20px;padding:8px 16px" onclick="bellui.post('ping from the page')">post</button> ` +
+	`<button style="font-size:20px;padding:8px 16px" onclick="ask()">call bellui.version</button>` +
+	`</div>` +
+	`<div id="out" style="padding:24px;font-size:22px"></div>` +
+	`<script>` +
+	`bellui.handle('greet', function (arg) { return 'hello ' + arg.name; });` +
+	`bellui.onMessage = function (m) { document.getElementById('out').textContent = 'bellui posted: ' + m; };` +
+	`function ask() {` +
+	`  bellui.call('version', null).then(function (v) {` +
+	`    document.getElementById('out').textContent = 'bellui says: ' + v;` +
+	`  }, function (e) { document.getElementById('out').textContent = 'rejected: ' + e.message; });` +
+	`}` +
+	`</script>` +
 	`</body></html>`
+
+// page2 is a second document, used to give the view a session history to
+// navigate. Its green is far from both the magenta of page and the blue that
+// the Eval measurement paints.
+const page2 = `<html><body style="margin:0;background:rgb(0,190,90);font:600 44px -apple-system">` +
+	`<div style="padding:24px">SECOND PAGE</div></body></html>`
 
 var dumpDir = flag.String("dump", "", "write the -auto captures to this directory for inspection")
 
@@ -117,6 +160,15 @@ func main() {
 	host, view := webview.NewHost(page)
 	host.SetMinSize(geo.NewSize(420, 260))
 
+	// The bridge is opt-in and has to be enabled before the view attaches. The
+	// probe's page is a data: URL, so its origin is opaque — trusting exactly
+	// that is what a local, app-supplied document needs, and nothing else the
+	// view could be navigated to would pass.
+	view.EnableBridge(webview.TrustOrigins(webview.OriginOpaque))
+	view.Handle("version", func(webview.Message) (any, error) {
+		return "bellui " + bellui.CurrentApp().UniqueID(), nil
+	})
+
 	// Sized siblings above and below give the scroll real travel, so the host
 	// can be moved under the viewport edge and fully out of it.
 	spacerAbove := tallBox("scroll down — the web view follows", 140)
@@ -132,7 +184,31 @@ func main() {
 
 	// JS -> Go. Set before the host is laid out, so no early message is lost.
 	fromPage := widget.NewLabel("(no message from the page yet)")
-	view.OnMessage = func(msg string) { fromPage.SetText("page said: " + msg) }
+	view.OnMessage = func(m webview.Message) {
+		var text string
+		if err := m.Decode(&text); err != nil {
+			text = string(m.Payload)
+		}
+		fromPage.SetText("page said: " + text + "  [" + m.Origin + "]")
+	}
+
+	// Navigation state, so the back/forward controls and the load reporting
+	// are usable by eye as well as by measurement.
+	loadState := widget.NewLabel("load: idle")
+	view.OnLoadChanged = func(ev webview.LoadEvent) {
+		text := "load: " + ev.State.String() + " " + ev.URL
+		if ev.Err != nil {
+			text = "load: " + ev.State.String() + " — " + ev.Err.Error()
+		}
+		loadState.SetText(truncate(text, 60))
+	}
+	// A page may not navigate itself away from what the app loaded.
+	view.OnNavigate = func(req webview.NavigationRequest) bool {
+		allow := !strings.Contains(req.URL, "blocked")
+		log.Printf("navigate %s %s (main=%v new-window=%v) -> allow=%v",
+			req.Kind, truncate(req.URL, 60), req.MainFrame, req.NewWindow, allow)
+		return allow
+	}
 
 	var popup *widget.PopUp
 	popupBtn := widget.NewButton("Popup over web view", func() {
@@ -151,9 +227,31 @@ func main() {
 	loadBtn := widget.NewButton("Load example.com", func() {
 		view.LoadURL("https://example.com")
 	})
+	secondBtn := widget.NewButton("Load second page", func() {
+		view.LoadHTML(page2, "")
+	})
+	backBtn := widget.NewButton("Back", func() { view.GoBack() })
+	forwardBtn := widget.NewButton("Forward", func() { view.GoForward() })
+	blockedBtn := widget.NewButton("Try a blocked navigation", func() {
+		view.Eval("location.href='https://blocked.example/'")
+	})
 	// Go -> JS: a bellui widget drives the page.
 	evalBtn := widget.NewButton("Recolour page from bellui", func() {
 		view.Eval("document.body.style.background='rgb(0,160,255)'")
+	})
+	// Go -> JS with a value passed as data, and an answer coming back.
+	greetBtn := widget.NewButton("Call the page's greet()", func() {
+		view.Call("greet", map[string]string{"name": `Ada "); alert(1); ("`},
+			func(res json.RawMessage, err error) {
+				if err != nil {
+					fromPage.SetText("call failed: " + err.Error())
+					return
+				}
+				fromPage.SetText("greet returned: " + string(res))
+			})
+	})
+	postBtn := widget.NewButton("Post to the page", func() {
+		view.Post("hello from bellui")
 	})
 	// The programmatic way into the native view — the host is not a Tab stop
 	// (#59), so this is how an app puts the keyboard in the page.
@@ -167,7 +265,14 @@ func main() {
 
 	controls := container.NewVBox(
 		widget.NewLabel("NativeViewHost spike"),
-		popupBtn, hideBtn, loadBtn, evalBtn, focusBtn,
+		popupBtn, hideBtn, focusBtn,
+		widget.NewSeparator(),
+		widget.NewLabel("navigation (#66)"),
+		loadBtn, secondBtn, container.NewHBox(backBtn, forwardBtn), blockedBtn,
+		loadState,
+		widget.NewSeparator(),
+		widget.NewLabel("bridge (#66)"),
+		evalBtn, greetBtn, postBtn,
 		widget.NewSeparator(),
 		entry,
 		focusState,
@@ -239,6 +344,12 @@ type probe struct {
 	baseCap  image.Image // bellui surface, same moment
 	hostRect geo.Rectangle
 	failed   bool
+
+	// addr is a local HTTP server standing in for "somewhere else on the
+	// web", so the probe still needs no network. Session history and the
+	// origin gate both need real navigations between real origins; a data:
+	// URL has no origin and loadHTMLString builds no back-forward list.
+	addr string
 }
 
 func runAuto(a bellui.App, w bellui.Window, host *widget.NativeViewHost, view *webview.WebView, scroll *container.Scroll, entry *widget.Entry) {
@@ -252,7 +363,14 @@ func runAuto(a bellui.App, w bellui.Window, host *widget.NativeViewHost, view *w
 		defer os.RemoveAll(p.dir)
 	}
 
-	fmt.Println("== #45 spike measurements: NativeViewHost + WKWebView on macOS ==")
+	fmt.Println("== #45/#66 measurements: NativeViewHost + WKWebView on macOS ==")
+
+	if srv, addr, err := serveProbePages(); err == nil {
+		p.addr = addr
+		defer srv.Close()
+	} else {
+		fmt.Println("SKIP: no local origin —", err)
+	}
 
 	p.baseline()
 	p.measureHole()
@@ -263,6 +381,8 @@ func runAuto(a bellui.App, w bellui.Window, host *widget.NativeViewHost, view *w
 	p.measureResize()
 	p.measureFocus()
 	p.measureBridge()
+	p.measureNavigation()
+	p.measureTrust()
 	p.measureTeardown()
 	p.reportCost()
 
@@ -579,7 +699,10 @@ func (p *probe) measureFocus() {
 func (p *probe) measureBridge() {
 	fmt.Printf("\n[BRIDGE]    bellui logic <-> page logic\n")
 	p.measureEvalToPage()
+	p.measureEvalResult()
 	p.measureMessageToBellui()
+	p.measureCallToPage()
+	p.measureCallRejection()
 }
 
 // measureEvalToPage confirms on screen that the page actually changed, rather
@@ -606,23 +729,395 @@ func (p *probe) measureEvalToPage() {
 }
 
 func (p *probe) measureMessageToBellui() {
-	got := make(chan string, 1)
+	got := make(chan webview.Message, 1)
 	bellui.DoAndWait(func() {
-		p.view.OnMessage = func(m string) {
+		p.view.OnMessage = func(m webview.Message) {
 			select {
 			case got <- m:
 			default:
 			}
 		}
-		p.view.Eval("window.webkit.messageHandlers.bellui.postMessage('hello from the page')")
+		p.view.Eval("bellui.post('hello from the page')")
 	})
 	select {
 	case m := <-got:
-		fmt.Printf("            JS -> Go : received %q on the main goroutine\n", m)
+		fmt.Printf("            JS -> Go : received %s from origin %q\n", m.Payload, m.Origin)
+		if m.Origin != webview.OriginOpaque {
+			p.fail("                       FAIL — a data: URL must report an opaque origin")
+			return
+		}
 		fmt.Println("                       CONFIRMED — page logic reached bellui logic")
 	case <-time.After(3 * time.Second):
 		p.fail("            JS -> Go : FAIL — no message arrived within 3s")
 	}
+}
+
+// measureEvalResult closes the #66 gap that started this: evaluateJavaScript
+// has always had a completion handler, and the spike discarded it.
+func (p *probe) measureEvalResult() {
+	value := p.evalResult(`(function(){ return {title: document.title, n: 20 + 22}; })()`)
+	fmt.Printf("            Go -> JS result : %s\n", value)
+	if !strings.Contains(value, `"n":42`) {
+		p.fail("                       FAIL — the script's value did not come back")
+		return
+	}
+
+	// An error has to arrive as an error, not as a missing answer.
+	failure := p.evalError("nosuchfunction()")
+	fmt.Printf("            Go -> JS error  : %s\n", truncate(failure, 60))
+	if failure == "" {
+		p.fail("                       FAIL — a throwing script reported no error")
+		return
+	}
+	fmt.Println("                       CONFIRMED — results and errors both come back")
+}
+
+// measureCallToPage exercises the correlated request/response direction, with
+// an argument that would be an injection if it were spliced into source.
+func (p *probe) measureCallToPage() {
+	const hostile = `Ada "); alert(1); ("`
+
+	type outcome struct {
+		res json.RawMessage
+		err error
+	}
+	done := make(chan outcome, 1)
+	bellui.DoAndWait(func() {
+		p.view.Call("greet", map[string]string{"name": hostile}, func(res json.RawMessage, err error) {
+			done <- outcome{res, err}
+		})
+	})
+
+	select {
+	case got := <-done:
+		if got.err != nil {
+			p.fail("            Go -> JS call : FAIL — %v", got.err)
+			return
+		}
+		fmt.Printf("            Go -> JS call : page returned %s\n", got.res)
+		var text string
+		if err := json.Unmarshal(got.res, &text); err != nil || text != "hello "+hostile {
+			p.fail("                       FAIL — the argument did not arrive intact as data")
+			return
+		}
+		// If the argument had been concatenated into source, the page would
+		// have executed it instead of storing it.
+		if p.evalResult("typeof window.__pwned") != `"undefined"` {
+			p.fail("                       FAIL — the argument was evaluated as source")
+			return
+		}
+		fmt.Println("                       CONFIRMED — correlated round trip, argument passed as data")
+	case <-time.After(3 * time.Second):
+		p.fail("            Go -> JS call : FAIL — no reply within 3s")
+	}
+}
+
+// measureCallRejection checks the other half of the correlation contract: a
+// call that cannot be answered fails rather than hanging forever.
+func (p *probe) measureCallRejection() {
+	done := make(chan error, 1)
+	bellui.DoAndWait(func() {
+		p.view.Call("nosuchhandler", nil, func(_ json.RawMessage, err error) { done <- err })
+	})
+	select {
+	case err := <-done:
+		if err == nil {
+			p.fail("            Go -> JS miss : FAIL — a missing page handler reported success")
+			return
+		}
+		fmt.Printf("            Go -> JS miss : %s\n", truncate(err.Error(), 60))
+		fmt.Println("                       CONFIRMED — an unanswerable call fails, it does not hang")
+	case <-time.After(3 * time.Second):
+		p.fail("            Go -> JS miss : FAIL — a missing page handler hung the call")
+	}
+}
+
+// measureTrust is the security claim of #66: the bridge is opt-in, and a view
+// attached without it has no channel at all — not a channel that is ignored.
+func (p *probe) measureTrust() {
+	fmt.Printf("\n[TRUST]     the bridge is opt-in, and gated by origin\n")
+
+	// The probe's own view has the bridge on, so window.bellui exists there.
+	withBridge := p.evalResult("typeof window.bellui")
+	fmt.Printf("            bridge enabled  : typeof window.bellui = %s\n", withBridge)
+
+	// A second view, attached to the same window with the bridge left off. It
+	// is never given geometry, so it stays hidden behind the hole punch.
+	quiet := webview.New("")
+	var attachErr error
+	bellui.DoAndWait(func() {
+		attachErr = quiet.Attach(p.w)
+		if attachErr == nil {
+			quiet.LoadHTML(page2, "")
+		}
+	})
+	if attachErr != nil {
+		p.fail("            SKIP — could not attach the control view: %v", attachErr)
+		return
+	}
+	defer bellui.DoAndWait(quiet.Destroy)
+	time.Sleep(1200 * time.Millisecond)
+
+	withoutBridge := evalResultOn(quiet, "typeof window.bellui")
+	handlers := evalResultOn(quiet, "typeof (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.bellui)")
+	fmt.Printf("            bridge off      : typeof window.bellui = %s\n", withoutBridge)
+	fmt.Printf("                              message handler      = %s\n", handlers)
+
+	if withBridge != `"object"` {
+		p.fail("            FAIL — the enabled bridge did not reach the page")
+		return
+	}
+	if withoutBridge != `"undefined"` || handlers != `"undefined"` {
+		p.fail("            FAIL — a view with the bridge off still has a channel to bellui")
+		return
+	}
+
+	p.measureOriginGate()
+}
+
+// measureOriginGate navigates the view to a genuinely different origin — a
+// local HTTP server, so the probe still needs no network — and confirms that
+// its messages are dropped. The view trusts only the opaque origin of the
+// document the app itself loaded, which is the case that matters: a page the
+// user reached by following a link must not inherit the app's handlers.
+func (p *probe) measureOriginGate() {
+	if p.addr == "" {
+		p.fail("            SKIP — no local origin to load from")
+		return
+	}
+
+	delivered := make(chan webview.Message, 1)
+	answered := make(chan bool, 1)
+	bellui.DoAndWait(func() {
+		p.view.OnMessage = func(m webview.Message) { delivered <- m }
+		p.view.Handle("version", func(webview.Message) (any, error) {
+			answered <- true
+			return "leaked", nil
+		})
+		p.view.LoadURL("http://" + p.addr + "/hostile")
+	})
+	time.Sleep(2500 * time.Millisecond)
+
+	var landed string
+	bellui.DoAndWait(func() { landed = p.view.URL() })
+	if !strings.Contains(landed, "/hostile") {
+		fmt.Printf("            SKIP — the view did not reach the local origin (on %s)\n", truncate(landed, 40))
+		fmt.Println("            the opt-in half above still confirmed")
+		return
+	}
+	fmt.Printf("            second origin   : loaded %s\n", truncate(landed, 40))
+
+	select {
+	case m := <-delivered:
+		p.fail("            FAIL — an untrusted origin (%s) reached OnMessage with %s", m.Origin, m.Payload)
+	case <-answered:
+		p.fail("            FAIL — an untrusted origin reached a registered handler")
+	case <-time.After(1500 * time.Millisecond):
+		fmt.Println("            CONFIRMED — no bridge without EnableBridge, and a page from an")
+		fmt.Println("            untrusted origin is dropped before any handler runs")
+	}
+}
+
+// serveProbePages stands in for "somewhere else on the web" without needing a
+// network: a real origin, distinct from the opaque one of the document the app
+// loaded. /a and /b are ordinary pages, there to give the view a session
+// history; /hostile immediately tries to use the bridge in both directions,
+// standing in for a page the app did not write.
+func serveProbePages() (*http.Server, string, error) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return nil, "", err
+	}
+
+	pages := map[string]string{
+		"/a": `<html><body style="margin:0;background:rgb(0,190,90)"><h1>PAGE A</h1></body></html>`,
+		"/b": `<html><body style="margin:0;background:rgb(190,140,0)"><h1>PAGE B</h1></body></html>`,
+		"/hostile": `<html><body style="margin:0;background:rgb(90,90,90)"><h1>UNTRUSTED</h1>
+<script>
+if (window.bellui) {
+  bellui.post("I should never arrive");
+  bellui.call("version", null);
+}
+</script>
+</body></html>`,
+	}
+	srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, ok := pages[r.URL.Path]
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = io.WriteString(w, body)
+	})}
+	go func() { _ = srv.Serve(ln) }()
+	return srv, ln.Addr().String(), nil
+}
+
+// measureNavigation covers the second half of #66: history, load reporting and
+// the policy hook that can refuse a navigation before it starts.
+func (p *probe) measureNavigation() {
+	fmt.Printf("\n[NAV]       history, load state and the policy hook\n")
+
+	if p.addr == "" {
+		p.fail("            SKIP — no local origin to navigate between")
+		return
+	}
+
+	events := make(chan webview.LoadEvent, 32)
+	bellui.DoAndWait(func() {
+		p.view.OnLoadChanged = func(ev webview.LoadEvent) { events <- ev }
+	})
+
+	// Two real navigations, so there is a session history to walk. LoadHTML
+	// is deliberately not used here: WebKit builds no back-forward entry for
+	// loadHTMLString with no base URL, which is a platform property rather
+	// than something this API can paper over.
+	base := "http://" + p.addr
+	bellui.DoAndWait(func() { p.view.LoadURL(base + "/a") })
+	loading := waitForState(events, webview.LoadStateLoading, 3*time.Second)
+	complete := waitForState(events, webview.LoadStateComplete, 5*time.Second)
+	bellui.DoAndWait(func() { p.view.LoadURL(base + "/b") })
+	waitForState(events, webview.LoadStateComplete, 5*time.Second)
+	fmt.Printf("            load reported   : loading=%v complete=%v\n", loading, complete)
+
+	var canBack, wentBack, canForward, landedBack bool
+	bellui.DoAndWait(func() { canBack = p.view.CanGoBack() })
+	bellui.DoAndWait(func() { wentBack = p.view.GoBack() })
+	backComplete := waitForState(events, webview.LoadStateComplete, 5*time.Second)
+	bellui.DoAndWait(func() {
+		canForward = p.view.CanGoForward()
+		landedBack = strings.HasSuffix(p.view.URL(), "/a")
+	})
+	fmt.Printf("            history         : canGoBack=%v goBack=%v landed-on-/a=%v canGoForward=%v\n",
+		canBack, wentBack, landedBack, canForward)
+	backComplete = backComplete && landedBack
+
+	// The policy hook. The page tries to navigate itself somewhere the app has
+	// decided it may not go; the navigation must never start, and the refusal
+	// must be reported as a cancellation rather than looking like a network
+	// failure or like nothing at all.
+	asked := make(chan webview.NavigationRequest, 8)
+	bellui.DoAndWait(func() {
+		p.view.OnNavigate = func(req webview.NavigationRequest) bool {
+			asked <- req
+			return !strings.Contains(req.URL, "blocked")
+		}
+		p.view.Eval("location.href='https://blocked.example/'")
+	})
+
+	var req webview.NavigationRequest
+	var sawRequest bool
+	select {
+	case req = <-asked:
+		sawRequest = true
+	case <-time.After(3 * time.Second):
+	}
+	cancelled := waitForCancel(events, 3*time.Second)
+
+	var finalURL string
+	bellui.DoAndWait(func() { finalURL = p.view.URL() })
+	fmt.Printf("            policy hook     : consulted=%v url=%s main=%v kind=%v\n",
+		sawRequest, truncate(req.URL, 40), req.MainFrame, req.Kind)
+	fmt.Printf("            refusal         : reported as cancelled=%v, still on %s\n",
+		cancelled, truncate(finalURL, 40))
+
+	switch {
+	case !loading || !complete:
+		p.fail("            FAIL — a load produced no state changes")
+	case !canBack || !wentBack || !backComplete || !canForward:
+		p.fail("            FAIL — session history is not navigable")
+	case !sawRequest:
+		p.fail("            FAIL — the policy hook was never consulted")
+	case strings.Contains(finalURL, "blocked"):
+		p.fail("            FAIL — a refused navigation happened anyway")
+	case !cancelled:
+		p.fail("            FAIL — a refused navigation was not reported")
+	default:
+		fmt.Println("            CONFIRMED — history works, loads are reported, and a refused")
+		fmt.Println("            navigation never starts and says so")
+	}
+
+	bellui.DoAndWait(func() {
+		p.view.OnNavigate = nil
+		p.view.OnLoadChanged = nil
+	})
+}
+
+// evalResult runs js and returns its JSON value, or "" if it failed.
+func (p *probe) evalResult(js string) string {
+	return evalResultOn(p.view, js)
+}
+
+// evalError runs js and returns the error message it produced, or "".
+func (p *probe) evalError(js string) string {
+	done := make(chan error, 1)
+	bellui.DoAndWait(func() {
+		p.view.EvalResult(js, func(_ json.RawMessage, err error) { done <- err })
+	})
+	select {
+	case err := <-done:
+		if err == nil {
+			return ""
+		}
+		return err.Error()
+	case <-time.After(3 * time.Second):
+		return ""
+	}
+}
+
+func evalResultOn(view *webview.WebView, js string) string {
+	done := make(chan string, 1)
+	bellui.DoAndWait(func() {
+		view.EvalResult(js, func(res json.RawMessage, err error) {
+			if err != nil {
+				done <- ""
+				return
+			}
+			done <- string(res)
+		})
+	})
+	select {
+	case s := <-done:
+		return s
+	case <-time.After(3 * time.Second):
+		return ""
+	}
+}
+
+func waitForState(events chan webview.LoadEvent, want webview.LoadState, timeout time.Duration) bool {
+	deadline := time.After(timeout)
+	for {
+		select {
+		case ev := <-events:
+			if ev.State == want {
+				return true
+			}
+		case <-deadline:
+			return false
+		}
+	}
+}
+
+func waitForCancel(events chan webview.LoadEvent, timeout time.Duration) bool {
+	deadline := time.After(timeout)
+	for {
+		select {
+		case ev := <-events:
+			if errors.Is(ev.Err, webview.ErrNavigationCancelled) {
+				return true
+			}
+		case <-deadline:
+			return false
+		}
+	}
+}
+
+func truncate(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "…"
 }
 
 // measureTeardown replaces the window content, which destroys the host's
