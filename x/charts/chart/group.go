@@ -26,6 +26,14 @@ type ChartGroup struct {
 
 	panes       []Pane
 	syncEnabled bool // whether to sync zoom/crosshair across panes
+
+	// syncing guards the hover fan-out against re-entry. Driving a pane's hover
+	// state makes that pane emit its own hover event, which reaches this group
+	// again; without the guard the panes echo each other forever and the app
+	// hangs (#36). It is the structural counterpart of the zoom path's FromUser
+	// check. Group listeners only ever run on the render goroutine, so a plain
+	// bool is enough — no lock.
+	syncing bool
 }
 
 var _ core.Widget = (*ChartGroup)(nil)
@@ -77,9 +85,11 @@ func (g *ChartGroup) wireZoomSync(sourceIdx int) {
 func (g *ChartGroup) wireHoverSync(sourceIdx int) {
 	source := g.panes[sourceIdx].Chart
 	source.Events.On(interact.EventHover, func(evt interface{}) {
-		if !g.syncEnabled {
+		if !g.syncEnabled || g.syncing {
 			return
 		}
+		g.syncing = true
+		defer func() { g.syncing = false }()
 		e := evt.(interact.DataPointEvent)
 		for j, p := range g.panes {
 			if j == sourceIdx {
@@ -93,9 +103,11 @@ func (g *ChartGroup) wireHoverSync(sourceIdx int) {
 		}
 	})
 	source.Events.On(interact.EventMouseOut, func(_ interface{}) {
-		if !g.syncEnabled {
+		if !g.syncEnabled || g.syncing {
 			return
 		}
+		g.syncing = true
+		defer func() { g.syncing = false }()
 		for j, p := range g.panes {
 			if j == sourceIdx {
 				continue
