@@ -107,13 +107,21 @@ func (r *choroplethRenderer) Render(ctx RenderContext) []core.CanvasObject {
 		dataHash: hashRegionData(cs.RegionData),
 		stopHash: hashColorStops(stops),
 	}
+	// Snapshot the projection once. Every point of every ring shares these
+	// constants, and the snapshot does not read the shared GeoCoord that
+	// SetBounds mutates on the next render.
+	proj := gc.Projection()
+
 	rasterize := func(w, h int) image.Image {
 		img := image.NewNRGBA(image.Rect(0, 0, w, h))
 
 		scaleX := float64(w) / float64(vp.W)
 		scaleY := float64(h) / float64(vp.H)
+		pixels := make([][2]int, 0, 256) // reused across rings
+		var rast geojson.Rasterizer      // ditto for the scanline buffers
 
-		for _, feature := range fc.Features {
+		for i := range fc.Features {
+			feature := &fc.Features[i]
 			name := feature.Name()
 			id := feature.ID()
 
@@ -146,15 +154,15 @@ func (r *choroplethRenderer) Render(ctx RenderContext) []core.CanvasObject {
 			}
 
 			for _, ring := range polygons {
-				pixels := make([][2]int, len(ring))
-				for i, pt := range ring {
-					pos := gc.DataToPixel(pt[0], pt[1])
-					pixels[i] = [2]int{
+				pixels = pixels[:0]
+				for _, pt := range ring {
+					pos := proj.DataToPixel(pt[0], pt[1])
+					pixels = append(pixels, [2]int{
 						int(float64(pos.X-vp.X) * scaleX),
 						int(float64(pos.Y-vp.Y) * scaleY),
-					}
+					})
 				}
-				geojson.RasterizePolygon(img, pixels, fillColor)
+				rast.Polygon(img, pixels, fillColor)
 			}
 		}
 
