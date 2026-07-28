@@ -74,3 +74,29 @@ func TestPainter_paintEmptyRaster(t *testing.T) {
 	require.NotPanics(t, func() { img = software.NewPainter().Paint(c) })
 	assert.NotNil(t, img)
 }
+
+// Raster.Translucency fades the raster, exactly as it does a canvas.Image. The
+// GL painter always honoured it; the software and WebGPU painters passed a
+// hard-coded opaque alpha (#38).
+func TestPainter_paintRasterTranslucency(t *testing.T) {
+	render := func(translucency float64) color.RGBA {
+		obj := canvas.NewRaster(nil)
+		obj.Streaming = true
+		obj.Translucency = translucency
+		obj.SetPixels(streamPixels(10, 10, color.RGBA{R: 255, A: 255}), 10, 10)
+
+		c := test.NewCanvas()
+		c.SetContent(obj)
+		c.Resize(geo.NewSize(10, 10))
+		return color.RGBAModel.Convert(software.NewPainter().Paint(c).At(5, 5)).(color.RGBA)
+	}
+
+	opaque := render(0)
+	require.Equal(t, uint8(255), opaque.A, "an opaque raster must stay opaque")
+
+	faded := render(0.5)
+	assert.Less(t, faded.A, opaque.A, "Translucency 0.5 must fade the raster")
+
+	clear := render(1)
+	assert.Less(t, clear.A, faded.A, "Translucency 1.0 must fade it further still")
+}

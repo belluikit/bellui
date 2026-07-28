@@ -28,6 +28,11 @@ type Cache struct {
 	mu        sync.Mutex
 	maxTiles  int
 	tileCount int
+
+	// listeners are the per-consumer repaint callbacks. A cache is shared by
+	// URL across every map using that tile server, while the repaint seam is
+	// per chart, so arrival has to fan out rather than notify a single owner.
+	listeners map[any]func()
 }
 
 // NewCache creates a tile cache with the given base URL and a callback
@@ -40,6 +45,49 @@ func NewCache(baseURL string, onLoaded func()) *Cache {
 		baseURL:  baseURL,
 		onLoaded: onLoaded,
 		maxTiles: 256,
+	}
+}
+
+// SetListener registers fn to be called after each tile finishes downloading,
+// replacing any previous registration for key; a nil fn removes it. Callbacks
+// run on the downloading goroutine, so they must be safe off the render
+// goroutine — pass something that marshals back, like RenderContext.Invalidate.
+func (c *Cache) SetListener(key any, fn func()) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if fn == nil {
+		delete(c.listeners, key)
+		return
+	}
+	if c.listeners == nil {
+		c.listeners = map[any]func(){}
+	}
+	c.listeners[key] = fn
+}
+
+// HasListener reports whether key currently has a registration. Consumers use
+// it to check that a one-shot registration has been consumed.
+func (c *Cache) HasListener(key any) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	_, ok := c.listeners[key]
+	return ok
+}
+
+// notifyLoaded tells every registered consumer that the tile set has changed.
+func (c *Cache) notifyLoaded() {
+	c.mu.Lock()
+	fns := make([]func(), 0, len(c.listeners)+1)
+	if c.onLoaded != nil {
+		fns = append(fns, c.onLoaded)
+	}
+	for _, fn := range c.listeners {
+		fns = append(fns, fn)
+	}
+	c.mu.Unlock()
+
+	for _, fn := range fns {
+		fn()
 	}
 }
 
@@ -59,6 +107,12 @@ func (c *Cache) Get(tc coord.TileCoord) *image.NRGBA {
 	// Start async download
 	go c.download(tc)
 	return nil
+}
+
+// Seed inserts a tile directly, bypassing the network. Intended for tests and
+// benchmarks that need a populated cache.
+func (c *Cache) Seed(tc coord.TileCoord, img *image.NRGBA) {
+	c.cache.Store(tc, img)
 }
 
 // Prefetch starts downloading tiles that aren't cached yet.
@@ -117,9 +171,7 @@ func (c *Cache) download(tc coord.TileCoord) {
 	c.mu.Unlock()
 
 	// Notify that a tile loaded
-	if c.onLoaded != nil {
-		c.onLoaded()
-	}
+	c.notifyLoaded()
 }
 
 func (c *Cache) tileURL(tc coord.TileCoord) string {
