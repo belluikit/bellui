@@ -70,13 +70,17 @@ type Slider struct {
 	// Only visible when Step > 0.
 	ShowTickMarks bool
 
-	binder         basicBinder
-	hovered        bool
-	focused        bool
-	disabled       bool // don't use DisableableWidget so we can put Since comments on funcs
-	pendingChange  bool // true if value changed since last OnChangeEnded
-	dragging       bool // true between Dragged and DragEnd
-	valueIndicator *PopUp
+	binder basicBinder
+	// onChangedInternal is the binding write-back installed by Bind. It is a
+	// private hook rather than the public OnChanged field so that binding and
+	// an app's own handler compose instead of silently discarding each other.
+	onChangedInternal func(float64)
+	hovered           bool
+	focused           bool
+	disabled          bool // don't use DisableableWidget so we can put Since comments on funcs
+	pendingChange     bool // true if value changed since last OnChangeEnded
+	dragging          bool // true between Dragged and DragEnd
+	valueIndicator    *PopUp
 }
 
 // NewSlider returns a basic slider.
@@ -146,12 +150,16 @@ func (s *Slider) PerformAccessibleAction(name string) {
 // The current value will be displayed and any changes in the data will cause the widget to update.
 // User interactions with this Slider will set the value into the data source.
 //
+// Binding does not claim [Slider.OnChanged]: the write-back rides a private
+// hook, so an app handler set before or after Bind keeps working and the data
+// source keeps tracking the widget either way.
+//
 // Since: 2.0
 func (s *Slider) Bind(data binding.Float) {
 	s.binder.SetCallback(s.updateFromData)
 	s.binder.Bind(data)
 
-	s.OnChanged = func(_ float64) {
+	s.onChangedInternal = func(_ float64) {
 		s.binder.CallWithData(s.writeData)
 	}
 }
@@ -306,6 +314,11 @@ func (s *Slider) positionChanged(lastValue, currentValue float64) {
 	s.Refresh()
 
 	s.pendingChange = true
+	// The bound data source is written first, so an OnChanged handler that reads
+	// it does not see a stale value.
+	if s.onChangedInternal != nil {
+		s.onChangedInternal(s.Value)
+	}
 	if s.OnChanged != nil {
 		s.OnChanged(s.Value)
 	}
@@ -516,10 +529,10 @@ func (s *Slider) SetValue(value float64) {
 // position bar many times a second cannot use [Slider.SetValue], because every
 // call would be indistinguishable from the user seeking.
 //
-// Because a bound data source is written through OnChanged (see [Slider.Bind]),
-// a silent update does NOT propagate to bound data. It is intended for
-// display-only updates of an unbound slider; use [Slider.SetValue] to move a
-// bound one.
+// Because a bound data source is written on the same change notification the
+// callbacks ride (see [Slider.Bind]), a silent update does NOT propagate to
+// bound data. It is intended for display-only updates of an unbound slider; use
+// [Slider.SetValue] to move a bound one.
 //
 // Since: 1.0
 func (s *Slider) SetValueSilently(value float64) {
@@ -655,9 +668,12 @@ func (s *Slider) writeData(data binding.DataItem) {
 // Unbind disconnects any configured data source from this Slider.
 // The current value will remain at the last value of the data source.
 //
+// Only the write-back hook Bind installed is removed; [Slider.OnChanged]
+// belongs to the app and is left alone.
+//
 // Since: 2.0
 func (s *Slider) Unbind() {
-	s.OnChanged = nil
+	s.onChangedInternal = nil
 	s.binder.Unbind()
 }
 
