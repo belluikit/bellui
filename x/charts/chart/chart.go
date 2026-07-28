@@ -517,11 +517,21 @@ func (c *Chart) HoverMoved(e *event.HoverEvent) {
 }
 
 // MouseOut is called when the cursor leaves the chart widget.
+//
+// It is idempotent: the chart repaints and emits [interact.EventMouseOut] only
+// when the call actually cleared a visible tooltip. An "out" for a chart that
+// was not showing anything carries no information, and emitting it anyway is
+// what let a [ChartGroup]'s hover sync echo between panes forever — A's out
+// calls B.HoverOut, which emits, which calls A.HoverOut, … (#36).
 func (c *Chart) HoverOut() {
 	c.mu.Lock()
 	if c.tooltipState.Pinned {
 		c.mu.Unlock()
 		return
+	}
+	if !c.tooltipState.Visible && c.tooltipState.Hits == nil {
+		c.mu.Unlock()
+		return // nothing was hovered: no state change, nothing to announce
 	}
 	c.tooltipState.Visible = false
 	c.tooltipState.Hits = nil
