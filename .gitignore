@@ -12,6 +12,9 @@ bellui-cross
 **/testdata/failed
 
 ### Go
+# Compiled test binaries and profiling output (go test -c, -cpuprofile)
+*.test
+*.prof
 # Output of the coverage tool
 *.out
 
