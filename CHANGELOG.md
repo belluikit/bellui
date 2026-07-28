@@ -11,6 +11,45 @@ This file lists the main changes with each version of the Fyne toolkit.
 Entries up to 2.7.3 are inherited from upstream Fyne; later entries describe
 the trendvidia fork (github.com/trendvidia/fyne).
 
+## v1.0.0-rc.4 — 2026-07-27
+
+An `x/charts` fix release, cut promptly because the defect it carries **freezes
+the application**. The core toolkit is unchanged from v1.0.0-rc.2; the core
+module is re-tagged only to keep it in lockstep with the `x/` umbrella modules,
+which pin it.
+
+### Fixed
+
+* **`x/charts`: a `ChartGroup`'s hover sync recursed forever, hanging the app**
+  ([#36](https://github.com/belluikit/bellui/issues/36),
+  [#37](https://github.com/belluikit/bellui/pull/37)). `wireHoverSync`
+  registers, for every pane, an `EventMouseOut` listener that calls `HoverOut()`
+  on every *other* pane — and `Chart.HoverOut()` re-emitted `EventMouseOut`
+  unconditionally, even when nothing was hovered. Two panes were enough: A's
+  mouse-out drove B, B emitted, which drove A, which emitted, without end. Go
+  grows the goroutine stack rather than overflowing quickly, so it presented as
+  a hang rather than a crash — reproduced in the gallery by leaving a chart on
+  the Geo tab, and by switching from Geo to Financial (the tab change moves the
+  pointer out of a chart), and diagnosed from a `sample(1)` of the wedged
+  process. Two guards now break the cycle: `HoverOut` is idempotent (it
+  repaints and emits only when it actually cleared a visible tooltip), and the
+  group's hover fan-out takes a re-entrancy flag — the structural counterpart of
+  the zoom path's `FromUser` check, which already guarded the same hazard one
+  function above. Anyone on v1.0.0-rc.3 with a multi-pane `ChartGroup` is
+  exposed and should upgrade.
+
+### Known issues
+
+* `x/charts`: the Geo/choropleth chart downloads and parses a 14 MB GeoJSON
+  synchronously on the render goroutine (no timeout, failures not negatively
+  cached) and re-rasterises the whole country set on every repaint — 226 ms per
+  repaint against 15 ms for an ordinary chart, measured with the software
+  painter ([#35](https://github.com/belluikit/bellui/issues/35)). Slow, but not
+  the freeze above.
+* `canvas.Raster` streaming is GL-only: on the default WebGPU painter a nil
+  `Generator` segfaults and a `Streaming` raster's texture is never refreshed
+  ([#34](https://github.com/belluikit/bellui/issues/34)).
+
 ## v1.0.0-rc.3 — 2026-07-27
 
 An `x/editor` fix release. The core toolkit is unchanged from v1.0.0-rc.2; the
