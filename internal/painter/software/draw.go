@@ -284,7 +284,12 @@ func drawRaster(c core.Canvas, rast *canvas.Raster, pos geo.Position, base *imag
 	height := scale.ToScreenCoordinate(c, bounds.Height)
 	scaledX, scaledY := scale.ToScreenCoordinate(c, pos.X), scale.ToScreenCoordinate(c, pos.Y)
 
-	pix := rast.Generator(width, height)
+	// PixelImage prefers SetPixels data and tolerates a nil Generator; a raster
+	// with neither has no content to draw yet.
+	pix := rast.PixelImage(width, height)
+	if pix == nil {
+		return
+	}
 	if pix.Bounds().Bounds().Dx() != width || pix.Bounds().Dy() != height {
 		drawPixels(scaledX, scaledY, width, height, rast.ScaleMode, base, pix, clip, 1.0, 0.0)
 	} else {
