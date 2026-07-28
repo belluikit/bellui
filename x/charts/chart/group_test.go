@@ -3,6 +3,7 @@ package chart
 import (
 	"testing"
 
+	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/test"
 
@@ -149,5 +150,67 @@ func TestChartGroup_DefaultHeight(t *testing.T) {
 	priceSize := price.Size()
 	if priceSize.Height != 200 {
 		t.Errorf("expected equal split height 200, got %v", priceSize.Height)
+	}
+}
+
+// TestChartGroup_HoverOutDoesNotRecurse covers #36: the group's mouse-out
+// listener drives HoverOut on every other pane, and Chart.HoverOut re-emits
+// EventMouseOut, so before the fix pane A's mouse-out called B, which called A,
+// which called B … until the app hung (a real beachball, caught with sample(1)
+// on the gallery). Without the fix this test does not fail politely — it
+// recurses until the goroutine stack limit kills the test binary.
+func TestChartGroup_HoverOutDoesNotRecurse(t *testing.T) {
+	_ = test.NewApp()
+
+	price := makeTestChart("price", []float64{10, 20, 30})
+	volume := makeTestChart("volume", []float64{100, 200, 300})
+
+	var priceOuts, volumeOuts int
+	price.Events.On(interact.EventMouseOut, func(interface{}) { priceOuts++ })
+	volume.Events.On(interact.EventMouseOut, func(interface{}) { volumeOuts++ })
+
+	g := NewChartGroup(Pane{Chart: price, Height: 1}, Pane{Chart: volume, Height: 1})
+	g.Resize(geo.NewSize(800, 400))
+	g.CreateRenderer().Layout(geo.NewSize(800, 400))
+
+	// Make both panes actually hovered, so HoverOut has state to clear and does
+	// emit — the condition under which the echo used to run away.
+	price.HoverMoved(&event.HoverEvent{PointEvent: event.PointEvent{Position: geo.NewPos(400, 150)}})
+	volume.HoverMoved(&event.HoverEvent{PointEvent: event.PointEvent{Position: geo.NewPos(400, 150)}})
+	priceOuts, volumeOuts = 0, 0
+
+	price.HoverOut() // returning at all is the assertion
+
+	if priceOuts > 1 {
+		t.Errorf("price emitted %d mouse-out events, want at most 1 — the group is echoing", priceOuts)
+	}
+	if volumeOuts > 1 {
+		t.Errorf("volume emitted %d mouse-out events, want at most 1 — the group is echoing", volumeOuts)
+	}
+}
+
+// TestChart_HoverOutIdempotent covers the other half of #36: an "out" for a
+// chart that was never hovered changes nothing, so it must not announce itself.
+func TestChart_HoverOutIdempotent(t *testing.T) {
+	_ = test.NewApp()
+
+	c := makeTestChart("price", []float64{10, 20, 30})
+	c.Resize(geo.NewSize(400, 200))
+
+	var outs int
+	c.Events.On(interact.EventMouseOut, func(interface{}) { outs++ })
+
+	c.HoverOut()
+	c.HoverOut()
+	if outs != 0 {
+		t.Errorf("HoverOut on a chart that was never hovered emitted %d events, want 0", outs)
+	}
+
+	c.HoverMoved(&event.HoverEvent{PointEvent: event.PointEvent{Position: geo.NewPos(200, 100)}})
+	c.HoverOut()
+	first := outs
+	c.HoverOut() // already cleared: must stay quiet
+	if outs != first {
+		t.Errorf("a repeated HoverOut emitted again (%d → %d)", first, outs)
 	}
 }
