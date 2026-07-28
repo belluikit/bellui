@@ -17,10 +17,12 @@ import (
 )
 
 var (
-	_ event.Draggable = (*RangeSlider)(nil)
-	_ event.Tappable  = (*RangeSlider)(nil)
-	_ event.Hoverable = (*RangeSlider)(nil)
-	_ core.Accessible = (*RangeSlider)(nil)
+	_ event.Draggable  = (*RangeSlider)(nil)
+	_ event.Tappable   = (*RangeSlider)(nil)
+	_ event.Hoverable  = (*RangeSlider)(nil)
+	_ event.Focusable  = (*RangeSlider)(nil)
+	_ core.Disableable = (*RangeSlider)(nil)
+	_ core.Accessible  = (*RangeSlider)(nil)
 )
 
 // AccessibleRole returns [core.RoleGroup]: a range slider is a container of two
@@ -48,9 +50,14 @@ func (s *RangeSlider) a11yStep() float64 {
 }
 
 // adjustThumb moves the low or high thumb by delta, clamping to the range and
-// keeping the low thumb at or below the high thumb. A screen-reader adjustment
-// is a complete interaction, so it reports both OnChanged and OnChangeEnded.
+// keeping the low thumb at or below the high thumb. A screen-reader or keyboard
+// adjustment is a complete interaction, so it reports both OnChanged and
+// OnChangeEnded.
 func (s *RangeSlider) adjustThumb(high bool, delta float64) {
+	if s.disabled {
+		return
+	}
+
 	lastLow, lastHigh := s.LowValue, s.HighValue
 	if high {
 		s.HighValue = s.clamp(s.HighValue + delta)
@@ -87,6 +94,7 @@ var (
 	_ core.Accessible         = (*rangeSliderThumb)(nil)
 	_ core.AccessibleValuer   = (*rangeSliderThumb)(nil)
 	_ core.AccessibleActioner = (*rangeSliderThumb)(nil)
+	_ core.AccessibleStateful = (*rangeSliderThumb)(nil)
 )
 
 // AccessibleRole returns [core.RoleSlider]: each thumb is its own slider.
@@ -119,7 +127,19 @@ func (t *rangeSliderThumb) AccessibleActions() []core.AccessibleAction {
 	}
 }
 
-// PerformAccessibleAction adjusts this thumb by one step.
+// AccessibleState reports the parent slider's disabled state. The proxy is not
+// itself a [core.Disableable], so it cannot inherit the bit structurally the way
+// the RangeSlider group node does — and it is the proxies, not the group, that
+// screen readers present as the adjustable controls.
+func (t *rangeSliderThumb) AccessibleState() core.AccessibleState {
+	if t.slider.Disabled() {
+		return core.StateDisabled
+	}
+	return 0
+}
+
+// PerformAccessibleAction adjusts this thumb by one step. adjustThumb ignores
+// the call when the parent slider is disabled.
 func (t *rangeSliderThumb) PerformAccessibleAction(name string) {
 	switch name {
 	case core.ActionIncrement:
@@ -188,9 +208,17 @@ type RangeSlider struct {
 	OnHoverEnd func() `json:"-"`
 
 	hovered       bool
+	focused       bool
+	disabled      bool
 	draggingHigh  bool // true if dragging the high thumb
 	dragging      bool
 	pendingChange bool // true if a thumb moved since the last OnChangeEnded
+
+	// focusedHigh selects which thumb the arrow keys move while the widget holds
+	// keyboard focus. A two-thumb control needs this where Slider does not; it
+	// follows the thumb the pointer last acted on, so arrows continue where a
+	// drag or tap left off.
+	focusedHigh bool
 }
 
 // NewRangeSlider creates a range slider with the given bounds.
@@ -203,6 +231,35 @@ func NewRangeSlider(min, max float64) *RangeSlider {
 	}
 	s.ExtendBaseWidget(s)
 	return s
+}
+
+// Disable makes the range slider read-only: drags, taps, arrow keys and
+// screen-reader adjustments no longer move either thumb, and the thumbs and
+// active track are painted in the disabled colour.
+//
+// Since: 1.0
+func (s *RangeSlider) Disable() {
+	if !s.disabled {
+		defer s.Refresh()
+	}
+	s.disabled = true
+}
+
+// Enable reverses [RangeSlider.Disable].
+//
+// Since: 1.0
+func (s *RangeSlider) Enable() {
+	if s.disabled {
+		defer s.Refresh()
+	}
+	s.disabled = false
+}
+
+// Disabled reports whether the range slider is currently disabled.
+//
+// Since: 1.0
+func (s *RangeSlider) Disabled() bool {
+	return s.disabled
 }
 
 // SetValues updates both thumb positions, clamping each into [Min, Max],
@@ -277,6 +334,10 @@ func (s *RangeSlider) fireChangeEnded() {
 }
 
 func (s *RangeSlider) Dragged(e *event.DragEvent) {
+	if s.disabled {
+		return
+	}
+
 	ratio := s.getRatio(&e.PointEvent)
 	val := s.Min + ratio*(s.Max-s.Min)
 
@@ -286,6 +347,8 @@ func (s *RangeSlider) Dragged(e *event.DragEvent) {
 		distHigh := math.Abs(val - s.HighValue)
 		s.draggingHigh = distHigh <= distLow
 		s.dragging = true
+		// Arrow keys continue on the thumb the pointer grabbed.
+		s.focusedHigh = s.draggingHigh
 	}
 
 	lastLow, lastHigh := s.LowValue, s.HighValue
@@ -338,6 +401,14 @@ func (s *RangeSlider) DraggingHigh() bool {
 }
 
 func (s *RangeSlider) Tapped(e *event.PointEvent) {
+	if s.disabled {
+		return
+	}
+
+	if !s.focused {
+		focusIfNotMobile(s.super())
+	}
+
 	ratio := s.getRatio(e)
 	val := s.Min + ratio*(s.Max-s.Min)
 
@@ -346,8 +417,10 @@ func (s *RangeSlider) Tapped(e *event.PointEvent) {
 	distHigh := math.Abs(val - s.HighValue)
 	if distHigh <= distLow {
 		s.HighValue = s.clamp(val)
+		s.focusedHigh = true
 	} else {
 		s.LowValue = s.clamp(val)
+		s.focusedHigh = false
 	}
 	if s.LowValue > s.HighValue {
 		s.LowValue, s.HighValue = s.HighValue, s.LowValue
@@ -360,18 +433,127 @@ func (s *RangeSlider) Tapped(e *event.PointEvent) {
 
 func (s *RangeSlider) HoverIn(e *event.HoverEvent) {
 	s.hovered = true
+	if s.disabled {
+		return
+	}
 	s.Refresh()
 	s.fireHover(e)
 }
 
-func (s *RangeSlider) HoverMoved(e *event.HoverEvent) { s.fireHover(e) }
+func (s *RangeSlider) HoverMoved(e *event.HoverEvent) {
+	if s.disabled {
+		return
+	}
+	s.fireHover(e)
+}
 
 func (s *RangeSlider) HoverOut() {
 	s.hovered = false
-	s.Refresh()
+	if !s.disabled {
+		s.Refresh()
+	}
+	// Fired even when disabled, for the reason documented on [Slider.HoverOut]:
+	// a slider disabled mid-hover must not leave the consumer showing a preview
+	// it can never take down.
 	if s.OnHoverEnd != nil {
 		s.OnHoverEnd()
 	}
+}
+
+// FocusGained is called when this widget gains keyboard focus.
+//
+// Since: 1.0
+func (s *RangeSlider) FocusGained() {
+	s.focused = true
+	if !s.disabled {
+		s.Refresh()
+	}
+}
+
+// FocusLost is called when this widget loses keyboard focus.
+//
+// Since: 1.0
+func (s *RangeSlider) FocusLost() {
+	s.focused = false
+	if !s.disabled {
+		s.Refresh()
+	}
+}
+
+// TypedRune is called when this widget receives a character event. A range
+// slider has nothing to do with typed text.
+//
+// Since: 1.0
+func (s *RangeSlider) TypedRune(_ rune) {}
+
+// TypedKey adjusts the range from the keyboard.
+//
+// The arrows along the slider's own axis — Left/Right when horizontal, Up/Down
+// when vertical — move the focused thumb by one step. The arrows across that
+// axis switch which thumb is focused: a two-thumb control needs a switch that
+// [Slider] does not, and the cross-axis arrows are the only keys free to carry
+// it (Tab must keep moving focus out of the widget, and Home/End are left for a
+// future jump-to-extreme). The focused thumb also follows the last drag or tap,
+// so in practice the switch is rarely needed.
+//
+// The step is [RangeSlider.Step] when set, falling back to a hundredth of the
+// range, so the arrows still work on a slider with no explicit Step.
+//
+// Since: 1.0
+func (s *RangeSlider) TypedKey(key *event.KeyEvent) {
+	if s.disabled {
+		return
+	}
+
+	step := s.a11yStep()
+	if s.Orientation == Vertical {
+		switch key.Name {
+		case event.KeyUp:
+			s.adjustThumb(s.focusedHigh, step)
+		case event.KeyDown:
+			s.adjustThumb(s.focusedHigh, -step)
+		case event.KeyLeft:
+			s.setFocusedThumb(false)
+		case event.KeyRight:
+			s.setFocusedThumb(true)
+		}
+		return
+	}
+
+	switch key.Name {
+	case event.KeyRight:
+		s.adjustThumb(s.focusedHigh, step)
+	case event.KeyLeft:
+		s.adjustThumb(s.focusedHigh, -step)
+	case event.KeyDown:
+		s.setFocusedThumb(false)
+	case event.KeyUp:
+		s.setFocusedThumb(true)
+	}
+}
+
+// FocusedHigh reports which thumb the arrow keys currently move: true for the
+// high thumb, false for the low one. It follows the thumb the pointer last
+// acted on and is changed from the keyboard by the cross-axis arrows.
+//
+// Since: 1.0
+func (s *RangeSlider) FocusedHigh() bool {
+	return s.focusedHigh
+}
+
+// SetFocusedHigh selects which thumb the arrow keys move.
+//
+// Since: 1.0
+func (s *RangeSlider) SetFocusedHigh(high bool) {
+	onMain(func() { s.setFocusedThumb(high) })
+}
+
+func (s *RangeSlider) setFocusedThumb(high bool) {
+	if s.focusedHigh == high {
+		return
+	}
+	s.focusedHigh = high
+	s.Refresh()
 }
 
 // valueAt maps a pointer position to the value under it, clamped to the range
@@ -401,6 +583,7 @@ func (s *RangeSlider) CreateRenderer() core.WidgetRenderer {
 
 	track := canvas.NewRectangle(th.Color(theme.ColorNameInputBackground, v))
 	active := canvas.NewRectangle(th.Color(theme.ColorNamePrimary, v))
+	focusIndicator := &canvas.Circle{FillColor: color.Transparent}
 	lowThumb := &canvas.Circle{FillColor: th.Color(theme.ColorNameForeground, v)}
 	highThumb := &canvas.Circle{FillColor: th.Color(theme.ColorNameForeground, v)}
 
@@ -409,16 +592,17 @@ func (s *RangeSlider) CreateRenderer() core.WidgetRenderer {
 	highProxy := &rangeSliderThumb{slider: s, high: true}
 	highProxy.ExtendBaseWidget(highProxy)
 
-	objects := []core.CanvasObject{track, active, lowThumb, highThumb, lowProxy, highProxy}
+	objects := []core.CanvasObject{track, active, focusIndicator, lowThumb, highThumb, lowProxy, highProxy}
 	r := &rangeSliderRenderer{
-		BaseRenderer: internalWidget.NewBaseRenderer(objects),
-		track:        track,
-		active:       active,
-		lowThumb:     lowThumb,
-		highThumb:    highThumb,
-		lowProxy:     lowProxy,
-		highProxy:    highProxy,
-		slider:       s,
+		BaseRenderer:   internalWidget.NewBaseRenderer(objects),
+		track:          track,
+		active:         active,
+		focusIndicator: focusIndicator,
+		lowThumb:       lowThumb,
+		highThumb:      highThumb,
+		lowProxy:       lowProxy,
+		highProxy:      highProxy,
+		slider:         s,
 	}
 	r.Refresh()
 	return r
@@ -467,6 +651,9 @@ type rangeSliderRenderer struct {
 	internalWidget.BaseRenderer
 	track, active       *canvas.Rectangle
 	lowThumb, highThumb *canvas.Circle
+	// focusIndicator is drawn behind whichever thumb the arrow keys move, so a
+	// keyboard user can see which of the two they are adjusting.
+	focusIndicator *canvas.Circle
 	// Accessibility-only proxies positioned over each thumb (#810).
 	lowProxy, highProxy *rangeSliderThumb
 	slider              *RangeSlider
@@ -538,6 +725,16 @@ func (r *rangeSliderRenderer) Layout(size geo.Size) {
 	r.lowProxy.Resize(r.lowThumb.Size())
 	r.highProxy.Move(r.highThumb.Position())
 	r.highProxy.Resize(r.highThumb.Size())
+
+	// Centre the focus ring on the thumb the arrow keys move.
+	focusThumb := r.lowThumb
+	if r.slider.focusedHigh {
+		focusThumb = r.highThumb
+	}
+	indicatorSize := geo.NewSquareSize(inlineIconSize + innerPadding)
+	delta := (indicatorSize.Width - diameter) / 2
+	r.focusIndicator.Resize(indicatorSize)
+	r.focusIndicator.Move(focusThumb.Position().SubtractXY(delta, delta))
 }
 
 func (r *rangeSliderRenderer) Refresh() {
@@ -547,16 +744,38 @@ func (r *rangeSliderRenderer) Refresh() {
 
 	r.track.FillColor = th.Color(theme.ColorNameInputBackground, v)
 	if style == internaltheme.RenderStyleModern {
-		r.active.FillColor = th.Color(theme.ColorNamePrimary, v)
 		radius := th.Size(theme.SizeNameInputBorder) * 2
 		r.track.CornerRadius = radius
 		r.active.CornerRadius = radius
-	} else {
-		r.active.FillColor = th.Color(theme.ColorNameForeground, v)
 	}
 
-	r.lowThumb.FillColor = th.Color(theme.ColorNameForeground, v)
-	r.highThumb.FillColor = th.Color(theme.ColorNameForeground, v)
+	if r.slider.disabled {
+		disabled := th.Color(theme.ColorNameDisabled, v)
+		r.lowThumb.FillColor = disabled
+		r.highThumb.FillColor = disabled
+		r.active.FillColor = disabled
+	} else {
+		fg := th.Color(theme.ColorNameForeground, v)
+		r.lowThumb.FillColor = fg
+		r.highThumb.FillColor = fg
+		if style == internaltheme.RenderStyleModern {
+			r.active.FillColor = th.Color(theme.ColorNamePrimary, v)
+		} else {
+			r.active.FillColor = fg
+		}
+	}
+
+	switch {
+	case r.slider.disabled:
+		r.focusIndicator.FillColor = color.Transparent
+	case r.slider.focused:
+		r.focusIndicator.FillColor = th.Color(theme.ColorNameFocus, v)
+	case r.slider.hovered:
+		r.focusIndicator.FillColor = th.Color(theme.ColorNameHover, v)
+	default:
+		r.focusIndicator.FillColor = color.Transparent
+	}
+	r.focusIndicator.Refresh()
 
 	r.Layout(r.slider.Size())
 	canvas.Refresh(r.slider.super())
