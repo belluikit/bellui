@@ -3,7 +3,7 @@ module github.com/belluikit/bellui/x/dag
 go 1.25.0
 
 require (
-	github.com/belluikit/bellui v1.0.0-rc.3
+	github.com/belluikit/bellui v1.0.0-rc.4
 	github.com/trendvidia/protowire-go v1.2.2
 	google.golang.org/protobuf v1.36.11
 )
