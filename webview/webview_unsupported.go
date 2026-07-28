@@ -3,8 +3,6 @@
 package webview
 
 import (
-	"errors"
-
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/geo"
 )
@@ -25,13 +23,27 @@ type webView struct {
 
 func (w *WebView) init() {}
 
-// Attach reports that this platform has no web engine binding.
-func (w *WebView) Attach(bellui.Window) error {
-	return errors.New("webview: not supported on this platform")
+// attachRaw reports that this platform has no web engine binding. The whole
+// public surface stays callable: bridge and eval calls report
+// [ErrNotAttached] through their callbacks rather than hanging, and the
+// fire-and-forget ones do nothing.
+func (w *WebView) attachRaw(bellui.Window) error {
+	return ErrNotAttached
 }
 
-// LoadURL records the URL; nothing loads it on this platform.
-func (w *WebView) LoadURL(url string) { w.url = url }
+func (w *WebView) destroyRaw() {}
+
+func (w *WebView) attachedRaw() bool { return false }
+
+func (w *WebView) evalRaw(string) {}
+
+func (w *WebView) evalResultRaw(string, uint64) {}
+
+func (w *WebView) loadURLRaw(string) {}
+
+func (w *WebView) loadHTMLRaw(string, string) {}
+
+func (w *WebView) navRaw(navOp) bool { return false }
 
 // SetGeometry is a no-op without a platform view.
 func (w *WebView) SetGeometry(rect, clip geo.Rectangle, scale float32) {}
@@ -48,9 +60,3 @@ func (w *WebView) ResignFocus() bool { return true }
 
 // HasFocus is always false without a platform view.
 func (w *WebView) HasFocus() bool { return false }
-
-// Eval is a no-op without a platform view.
-func (w *WebView) Eval(js string) {}
-
-// Destroy is a no-op without a platform view.
-func (w *WebView) Destroy() {}
