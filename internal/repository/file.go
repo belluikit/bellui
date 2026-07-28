@@ -13,7 +13,7 @@ import (
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/storage"
 	"github.com/belluikit/bellui/storage/repository"
-	"github.com/fsnotify/fsnotify"
+	"github.com/belluikit/fsnotify"
 )
 
 // declare conformance with repository types
