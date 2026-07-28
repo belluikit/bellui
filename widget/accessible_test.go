@@ -313,6 +313,44 @@ func TestRangeSliderThumb_ClampsToOtherThumb(t *testing.T) {
 	assert.Equal(t, 60.0, s.HighValue)
 }
 
+// A disabled RangeSlider must reach a screen reader. The thumb proxies are the
+// nodes a screen reader presents as adjustable, and they are not themselves
+// core.Disableable, so they report the parent's state explicitly rather than
+// inheriting it structurally the way the RangeSlider group node does (#52).
+func TestRangeSliderThumb_AccessibleState_Disabled(t *testing.T) {
+	s := NewRangeSlider(0, 100)
+	low := &rangeSliderThumb{slider: s, high: false}
+	high := &rangeSliderThumb{slider: s, high: true}
+
+	assert.False(t, low.AccessibleState().Has(core.StateDisabled))
+	assert.False(t, high.AccessibleState().Has(core.StateDisabled))
+
+	s.Disable()
+	assert.True(t, low.AccessibleState().Has(core.StateDisabled))
+	assert.True(t, high.AccessibleState().Has(core.StateDisabled))
+
+	s.Enable()
+	assert.False(t, low.AccessibleState().Has(core.StateDisabled))
+}
+
+// The action stays declared while disabled (like Button's press action), but
+// performing it must not move a thumb.
+func TestRangeSliderThumb_Disabled_ActionDoesNothing(t *testing.T) {
+	s := NewRangeSlider(0, 100)
+	s.Step = 10
+	s.SetValuesSilently(20, 80)
+	s.Disable()
+
+	changed := 0
+	s.OnChanged = func(float64, float64) { changed++ }
+
+	(&rangeSliderThumb{slider: s, high: false}).PerformAccessibleAction(core.ActionIncrement)
+	(&rangeSliderThumb{slider: s, high: true}).PerformAccessibleAction(core.ActionDecrement)
+	assert.Equal(t, 20.0, s.LowValue)
+	assert.Equal(t, 80.0, s.HighValue)
+	assert.Zero(t, changed)
+}
+
 func TestRangeSliderThumb_DefaultStep(t *testing.T) {
 	s := NewRangeSlider(0, 100) // Step unset -> a11yStep is (max-min)/100 = 1
 	s.SetValues(20, 80)
@@ -1050,6 +1088,7 @@ func TestInterfaceCompliance(t *testing.T) {
 	// A RangeSlider is a group; its two thumb proxies are the adjustable sliders.
 	var _ core.AccessibleValuer = (*rangeSliderThumb)(nil)
 	var _ core.AccessibleActioner = (*rangeSliderThumb)(nil)
+	var _ core.AccessibleStateful = (*rangeSliderThumb)(nil)
 
 	var _ core.AccessibleStateful = (*Check)(nil)
 	var _ core.AccessibleStateful = (*Switch)(nil)
@@ -1076,6 +1115,7 @@ func TestDisableable_SnapshotReportsStateDisabled(t *testing.T) {
 		{"RadioGroup", NewRadioGroup([]string{"a", "b"}, nil)},
 		{"SpinBox", NewSpinBox(0, 10, 1)},
 		{"Slider", NewSlider(0, 10)},
+		{"RangeSlider", NewRangeSlider(0, 10)},
 		{"Check", NewCheck("go", nil)},
 		{"Entry", NewEntry()},
 		{"Select", NewSelect([]string{"a", "b"}, nil)},
