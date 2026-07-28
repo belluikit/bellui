@@ -55,6 +55,70 @@ func TestSlider_Binding(t *testing.T) {
 	assert.Equal(t, 5.0, s.Value)
 }
 
+// Bind used to implement its write-back by assigning the public OnChanged
+// field, so an app handler set before Bind was silently discarded (#47).
+func TestSlider_Bind_KeepsOnChangedSetBefore(t *testing.T) {
+	s := NewSlider(0, 10)
+	s.Step = 1
+
+	handled := 0
+	s.OnChanged = func(float64) { handled++ }
+
+	val := binding.NewFloat()
+	s.Bind(val)
+	waitForBinding()
+
+	s.SetValue(4)
+	waitForBinding()
+
+	assert.Equal(t, 1, handled, "the handler set before Bind still fires")
+	f, err := val.Get()
+	assert.NoError(t, err)
+	assert.Equal(t, 4.0, f, "and the binding write-back still lands")
+}
+
+// The other direction, and the likelier one to hit: NewSliderWithData binds for
+// you, so nothing signals that OnChanged is already spoken for. Assigning it
+// used to discard the write-back and the data source quietly stopped tracking.
+func TestSlider_Bind_KeepsWriteBackWhenOnChangedSetAfter(t *testing.T) {
+	val := binding.NewFloat()
+	s := NewSliderWithData(0, 10, val)
+	waitForBinding()
+	s.Step = 1
+
+	handled := 0
+	s.OnChanged = func(float64) { handled++ }
+
+	s.SetValue(6)
+	waitForBinding()
+
+	assert.Equal(t, 1, handled)
+	f, err := val.Get()
+	assert.NoError(t, err)
+	assert.Equal(t, 6.0, f, "the data source keeps tracking the widget")
+}
+
+func TestSlider_Unbind_KeepsOnChanged(t *testing.T) {
+	s := NewSlider(0, 10)
+	s.Step = 1
+
+	handled := 0
+	s.OnChanged = func(float64) { handled++ }
+
+	val := binding.NewFloat()
+	s.Bind(val)
+	waitForBinding()
+
+	s.Unbind()
+	waitForBinding()
+
+	s.SetValue(3)
+	assert.Equal(t, 1, handled, "Unbind removes only the hook Bind installed")
+	f, err := val.Get()
+	assert.NoError(t, err)
+	assert.Equal(t, 0.0, f, "but the data source is no longer written")
+}
+
 func TestSlider_Clamp(t *testing.T) {
 	s := &Slider{Min: 0, Max: 1, Step: 0.001}
 	s.Value = 0.959
