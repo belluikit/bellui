@@ -40,8 +40,8 @@ type WebView struct {
 	// before the host is laid out) so no early message is missed.
 	//
 	// With [WebView.Eval] going the other way, bellui logic and page logic can
-	// drive each other freely. The hole punch constrains compositing and input
-	// focus — it does not constrain data flow.
+	// drive each other freely. The hole punch constrains what can be drawn over
+	// the view and who owns the keyboard — it does not constrain data flow.
 	OnMessage func(string)
 }
 
@@ -71,5 +71,9 @@ func (w *WebView) URL() string {
 	return w.url
 }
 
-// Assert the platform implementation satisfies the host's backend contract.
-var _ widget.NativeView = (*WebView)(nil)
+// Assert the platform implementation satisfies the host's backend contract,
+// including the optional focus capability the host bridges to canvas focus.
+var (
+	_ widget.NativeView        = (*WebView)(nil)
+	_ widget.NativeViewFocuser = (*WebView)(nil)
+)

@@ -20,6 +20,16 @@ func (benchNativeView) SetGeometry(_, _ geo.Rectangle, _ float32) {}
 func (benchNativeView) SetVisible(bool)                           {}
 func (benchNativeView) Destroy()                                  {}
 
+// benchFocusNativeView adds the optional focus capability, so a benchmark can
+// price what the focus bridge adds to the same per-frame sync (#59). Its
+// answers are constant: what is being measured is the host's side of the
+// poll, since the platform side is one responder-chain query.
+type benchFocusNativeView struct{ benchNativeView }
+
+func (benchFocusNativeView) TakeFocus() bool   { return false }
+func (benchFocusNativeView) ResignFocus() bool { return true }
+func (benchFocusNativeView) HasFocus() bool    { return false }
+
 // BenchmarkNativeViewHostSyncDepth measures one per-frame sync — the visible
 // tree walk, absolute-position and clip-bounds resolution a NativeViewHost
 // runs every frame while shown (#45).
@@ -30,7 +40,7 @@ func (benchNativeView) Destroy()                                  {}
 func BenchmarkNativeViewHostSyncDepth(b *testing.B) {
 	for _, depth := range []int{1, 8, 32, 128} {
 		b.Run(fmt.Sprintf("depth=%d", depth), func(b *testing.B) {
-			h, cleanup := benchHost(b, depth)
+			h, cleanup := benchHost(b, depth, benchNativeView{})
 			defer cleanup()
 
 			b.ReportAllocs()
@@ -46,7 +56,7 @@ func BenchmarkNativeViewHostSyncDepth(b *testing.B) {
 // frame, so every sync reaches the backend instead of being filtered out by
 // the unchanged-geometry check.
 func BenchmarkNativeViewHostSyncMoving(b *testing.B) {
-	h, cleanup := benchHost(b, 8)
+	h, cleanup := benchHost(b, 8, benchNativeView{})
 	defer cleanup()
 
 	b.ReportAllocs()
@@ -57,14 +67,28 @@ func BenchmarkNativeViewHostSyncMoving(b *testing.B) {
 	}
 }
 
+// BenchmarkNativeViewHostSyncFocus is the same sync with a backend that can
+// hold the OS keyboard focus, so the focus bridge's per-frame poll (#59) is
+// priced against the depth=8 case above rather than assumed to be free.
+func BenchmarkNativeViewHostSyncFocus(b *testing.B) {
+	h, cleanup := benchHost(b, 8, benchFocusNativeView{})
+	defer cleanup()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		h.sync()
+	}
+}
+
 // benchHost puts a host inside depth nested containers inside a scroll — the
 // representative shape, since a clipping ancestor is what makes the clip
 // resolution do real work — and returns it laid out on a window.
-func benchHost(b *testing.B, depth int) (*NativeViewHost, func()) {
+func benchHost(b *testing.B, depth int, view NativeView) (*NativeViewHost, func()) {
 	b.Helper()
 	test.NewApp()
 
-	h := NewNativeViewHost(benchNativeView{})
+	h := NewNativeViewHost(view)
 	h.SetMinSize(geo.NewSize(200, 200))
 	h.Resize(geo.NewSize(200, 200))
 

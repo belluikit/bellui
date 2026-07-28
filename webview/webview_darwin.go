@@ -132,14 +132,25 @@ func (w *WebView) SetVisible(visible bool) {
 //
 // Keyboard focus is arbitrated by the OS, not by bellui: while the web view
 // holds it, keystrokes and input-method composition go to the web engine and
-// bellui's canvas receives nothing — even though a focused [widget.Entry]
-// still believes it is focused and keeps drawing its caret. See
-// [WebView.HasFocus].
+// bellui's canvas receives nothing. A hosted web view is kept in step with
+// bellui's own focus by [widget.NativeViewHost], which drives these three
+// methods; call them directly only on an unhosted view.
 func (w *WebView) TakeFocus() bool {
 	if w.handle == nil {
 		return false
 	}
 	return bool(C.belluiWebViewTakeFocus(w.handle))
+}
+
+// ResignFocus hands the keyboard focus back to bellui's own surface, so that
+// keys and input-method composition reach the canvas again. It reports
+// whether the window accepted the change; a view that does not hold the focus
+// reports success and changes nothing.
+func (w *WebView) ResignFocus() bool {
+	if w.handle == nil {
+		return false
+	}
+	return bool(C.belluiWebViewResignFocus(w.handle))
 }
 
 // HasFocus reports whether the web engine currently holds the window's
