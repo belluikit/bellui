@@ -8,6 +8,7 @@ import (
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/container"
+	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/test"
 	"github.com/belluikit/bellui/widget"
@@ -45,6 +46,192 @@ func (s *stubNativeView) SetVisible(v bool) {
 }
 
 func (s *stubNativeView) Destroy() { s.destroyed++ }
+
+// stubFocusNativeView adds the optional focus capability, standing in for a
+// platform view that can hold the OS keyboard focus (#59). osFocus is the
+// responder chain: a test sets it directly to play the part of the user
+// clicking into the platform view, which bellui never sees.
+type stubFocusNativeView struct {
+	stubNativeView
+
+	osFocus      bool
+	takes        int
+	resigns      int
+	refuseResign bool
+}
+
+func (s *stubFocusNativeView) TakeFocus() bool {
+	s.takes++
+	s.osFocus = true
+	return true
+}
+
+func (s *stubFocusNativeView) ResignFocus() bool {
+	s.resigns++
+	if s.refuseResign {
+		return false
+	}
+	s.osFocus = false
+	return true
+}
+
+func (s *stubFocusNativeView) HasFocus() bool { return s.osFocus }
+
+// focusHost lays out a host beside an Entry, which is the arrangement the
+// focus bridge exists for: two things that can hold the keyboard, one owned
+// by bellui and one owned by the OS.
+func focusHost(t *testing.T) (*widget.NativeViewHost, *stubFocusNativeView, *widget.Entry, bellui.Window) {
+	t.Helper()
+	test.NewTempApp(t)
+
+	v := &stubFocusNativeView{}
+	h := widget.NewNativeViewHost(v)
+	h.SetMinSize(geo.NewSize(200, 100))
+	entry := widget.NewEntry()
+
+	w := test.NewTempWindow(t, container.NewVBox(entry, h))
+	w.Resize(geo.NewSize(400, 300))
+	return h, v, entry, w
+}
+
+func TestNativeViewHost_NativeFocusClearsCanvasFocus(t *testing.T) {
+	h, v, entry, w := focusHost(t)
+
+	w.Canvas().Focus(entry)
+	assert.Equal(t, entry, w.Canvas().Focused())
+	assert.False(t, h.NativeViewFocused())
+
+	// The user clicks into the platform view: the OS moves the keyboard focus
+	// and bellui is told nothing, so the next frame's sync is what notices.
+	v.osFocus = true
+	h.Refresh()
+
+	assert.True(t, h.NativeViewFocused())
+	assert.Nil(t, w.Canvas().Focused(),
+		"bellui stops drawing a focused widget once the keys go to the OS view")
+
+	// Steady state: the bridge does not keep taking the focus back and forth.
+	h.Refresh()
+	h.Refresh()
+	assert.Zero(t, v.resigns)
+	assert.True(t, v.osFocus)
+}
+
+func TestNativeViewHost_CanvasFocusResignsNativeFocus(t *testing.T) {
+	h, v, entry, w := focusHost(t)
+
+	v.osFocus = true
+	h.Refresh()
+	assert.True(t, h.NativeViewFocused())
+
+	// Now bellui focuses one of its own widgets — a tap on the Entry, or an
+	// app calling Focus. The platform view has to let the keyboard go.
+	w.Canvas().Focus(entry)
+	h.Refresh()
+
+	assert.Equal(t, 1, v.resigns)
+	assert.False(t, v.osFocus, "the OS focus is back on bellui's surface")
+	assert.False(t, h.NativeViewFocused())
+	assert.Equal(t, entry, w.Canvas().Focused(), "the bellui widget keeps the focus it took")
+}
+
+// TestNativeViewHost_RefusedResignKeepsTrying guards the one state the bridge
+// must not lie about: a platform that refuses to give the focus back leaves
+// it where it is, and the host keeps reporting that.
+func TestNativeViewHost_RefusedResignKeepsTrying(t *testing.T) {
+	h, v, entry, w := focusHost(t)
+
+	v.osFocus = true
+	h.Refresh()
+
+	v.refuseResign = true
+	w.Canvas().Focus(entry)
+	h.Refresh()
+	assert.True(t, h.NativeViewFocused(), "a refused resign is not reported as done")
+
+	before := v.resigns
+	h.Refresh()
+	assert.Greater(t, v.resigns, before, "the bridge asks again on the next frame")
+
+	v.refuseResign = false
+	h.Refresh()
+	assert.False(t, h.NativeViewFocused())
+}
+
+func TestNativeViewHost_FocusNativeView(t *testing.T) {
+	h, v, entry, w := focusHost(t)
+
+	w.Canvas().Focus(entry)
+	assert.True(t, h.FocusNativeView())
+
+	assert.Equal(t, 1, v.takes)
+	assert.True(t, h.NativeViewFocused())
+	assert.Nil(t, w.Canvas().Focused(), "the canvas focus is cleared without waiting for a frame")
+
+	h.Refresh() // the poll agrees with what FocusNativeView already recorded
+	assert.True(t, h.NativeViewFocused())
+	assert.Zero(t, v.resigns)
+}
+
+func TestNativeViewHost_HidingResignsNativeFocus(t *testing.T) {
+	h, v, _, _ := focusHost(t)
+
+	v.osFocus = true
+	h.Refresh()
+	assert.True(t, h.NativeViewFocused())
+
+	h.Hide()
+	assert.Equal(t, 1, v.resigns, "a hidden view must not keep swallowing keystrokes")
+	assert.False(t, v.osFocus)
+	assert.False(t, h.NativeViewFocused())
+}
+
+func TestNativeViewHost_DestroyResignsNativeFocus(t *testing.T) {
+	h, v, _, _ := focusHost(t)
+
+	v.osFocus = true
+	h.Refresh()
+
+	test.TempWidgetRenderer(t, h).Destroy()
+	assert.Equal(t, 1, v.resigns)
+	assert.False(t, h.NativeViewFocused())
+}
+
+// TestNativeViewHost_NoFocusCapability is the degrade path: a backend that
+// cannot take the keyboard — a video surface, a map — is simply left out of
+// the bridge, and bellui's own focus is untouched.
+func TestNativeViewHost_NoFocusCapability(t *testing.T) {
+	test.NewTempApp(t)
+
+	v := &stubNativeView{}
+	h := widget.NewNativeViewHost(v)
+	h.SetMinSize(geo.NewSize(200, 100))
+	entry := widget.NewEntry()
+	w := test.NewTempWindow(t, container.NewVBox(entry, h))
+	w.Resize(geo.NewSize(400, 300))
+
+	w.Canvas().Focus(entry)
+	assert.False(t, h.FocusNativeView(), "there is no platform focus to take")
+	assert.False(t, h.NativeViewFocused())
+
+	h.Refresh()
+	assert.Equal(t, entry, w.Canvas().Focused(), "the bellui widget keeps the focus")
+}
+
+// TestNativeViewHost_NotATabStop records the #59 decision: the host stays out
+// of the Tab ring, because bellui never sees the Tab key once the platform
+// view holds the OS focus and so could not move the focus back out — a
+// keyboard trap is worse than not being reachable by Tab.
+func TestNativeViewHost_NotATabStop(t *testing.T) {
+	h, _, entry, w := focusHost(t)
+
+	_, focusable := any(h).(event.Focusable)
+	assert.False(t, focusable, "a NativeViewHost is deliberately not Focusable")
+
+	w.Canvas().Focus(entry)
+	w.Canvas().FocusNext()
+	assert.NotEqual(t, any(h), any(w.Canvas().Focused()), "Tab does not land on the host")
+}
 
 // hostInWindow puts a sized host on a real test window, which is what gives
 // it a canvas, an absolute position and a driver to resolve them.
