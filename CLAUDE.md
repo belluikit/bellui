@@ -293,6 +293,14 @@ Native-parity touch selection UX for `widget.Entry` on mobile (Android/iOS/embed
 ### Entry Alignment
 `Entry.Alignment` — sets horizontal text alignment (`bellui.TextAlignLeading`, `TextAlignCenter`, `TextAlignTrailing`). Applied to both text and placeholder. Default is leading (left).
 
+### Slider — Media-Scrubber Seams (#44)
+`widget.Slider` conflated *who* changed the value with *that* it changed, which a settings control never notices but a media scrubber cannot work around cleanly. Three additions, all backwards compatible:
+- **`Dragging() bool`** — authoritative drag state, so a player can suppress its periodic position updates while the user scrubs (otherwise the thumb snaps back under the pointer every tick). Inferring it from `OnChanged`/`OnChangeEnded` has a real hole: `DragEnd` → `fireChangeEnded` returns early unless `pendingChange`, which `positionChanged` only sets past an `almostEqual` check — so **a press-and-release that doesn't move the value past one `Step` fires neither callback**, latching an inferring consumer on forever. `dragging` is therefore cleared in `DragEnd` *unconditionally and before* the callback.
+- **`SetValueSilently(v)`** — programmatic updates that don't look like user interaction. `SetValue` deliberately still fires both callbacks: the arrow keys (`TypedKey`) and the screen-reader increment/decrement (`PerformAccessibleAction`) route through it, so making it silent would have quietly broken keyboard and a11y notification. Because `Bind` implements its data write *by installing an `OnChanged` handler*, a silent set does **not** propagate to bound data — documented on the method; use `SetValue` for a bound slider.
+- **`OnHover func(float64)` / `OnHoverEnd func()`** — `HoverMoved` used to discard its event entirely. The reported value is **continuous, not snapped to `Step`** (a scrub preview wants the true pointer position; rounding is recoverable, un-rounding isn't). `OnHoverEnd` fires **even when disabled mid-hover**, so a consumer is never left showing a preview it can't take down.
+
+`widget.RangeSlider` has the same three gaps plus no `OnChangeEnded` at all — tracked separately as #46.
+
 ### NumericEntry Widget
 `widget.NumericEntry` and `widget.NewNumericEntry()` — Entry that only accepts numeric input. Right-aligned by default. Rejects non-numeric keystrokes at input time and filters paste content. `NewIntegerEntry()` for integer-only input.
 - `AllowFloat` (default true) — permits decimal point
