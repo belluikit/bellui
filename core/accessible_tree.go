@@ -88,6 +88,10 @@ type AccessibleNode struct {
 // The optional interfaces ([AccessibleDescriber], [AccessibleValuer],
 // [AccessibleStateful], [AccessibleActioner]) are queried the same way
 // [WalkAccessibleTree] does for each visited node.
+//
+// [StateDisabled] is additionally derived from [Disableable]: an object
+// reporting Disabled() gets the bit whether or not it implements
+// [AccessibleStateful], so a disabled widget is never announced as actionable.
 func SnapshotAccessible(obj CanvasObject) (node AccessibleNode, ok bool) {
 	if _, isAccessible := obj.(Accessible); !isAccessible {
 		return AccessibleNode{}, false
@@ -124,6 +128,13 @@ func buildNode(obj CanvasObject) AccessibleNode {
 	}
 	if s, ok := obj.(AccessibleStateful); ok {
 		node.State = s.AccessibleState()
+	}
+	// [Disableable] is authoritative for the disabled bit, so it is consulted
+	// structurally rather than left to each widget to re-declare through
+	// [AccessibleStateful]. OR-ing (rather than replacing) keeps whatever else
+	// a widget reported about itself.
+	if d, ok := obj.(Disableable); ok && d.Disabled() {
+		node.State |= StateDisabled
 	}
 	if a, ok := obj.(AccessibleActioner); ok {
 		node.Actions = a.AccessibleActions()
