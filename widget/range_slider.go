@@ -48,8 +48,10 @@ func (s *RangeSlider) a11yStep() float64 {
 }
 
 // adjustThumb moves the low or high thumb by delta, clamping to the range and
-// keeping the low thumb at or below the high thumb.
+// keeping the low thumb at or below the high thumb. A screen-reader adjustment
+// is a complete interaction, so it reports both OnChanged and OnChangeEnded.
 func (s *RangeSlider) adjustThumb(high bool, delta float64) {
+	lastLow, lastHigh := s.LowValue, s.HighValue
 	if high {
 		s.HighValue = s.clamp(s.HighValue + delta)
 		if s.HighValue < s.LowValue {
@@ -61,10 +63,8 @@ func (s *RangeSlider) adjustThumb(high bool, delta float64) {
 			s.LowValue = s.HighValue
 		}
 	}
-	if s.OnChanged != nil {
-		s.OnChanged(s.LowValue, s.HighValue)
-	}
-	s.Refresh()
+	s.valuesChanged(lastLow, lastHigh)
+	s.fireChangeEnded()
 }
 
 // rangeSliderThumb is an accessibility-only proxy for one thumb of a
@@ -156,9 +156,41 @@ type RangeSlider struct {
 	Orientation Orientation
 	OnChanged   func(low, high float64) `json:"-"`
 
-	hovered      bool
-	draggingHigh bool // true if dragging the high thumb
-	dragging     bool
+	// OnChangeEnded is called once a change to the range has settled: the end of
+	// a drag that moved a thumb, a tap, a screen-reader adjustment, or a call to
+	// [RangeSlider.SetValues]. It is the commit signal a trim control (video
+	// in/out points) acts on, as distinct from the stream of in-drag OnChanged
+	// updates.
+	//
+	// It only fires when a thumb actually moved, so a press and release that
+	// changed nothing reports neither callback — use [RangeSlider.Dragging] to
+	// track drag state rather than inferring it from the callback pair.
+	//
+	// Since: 1.0
+	OnChangeEnded func(low, high float64) `json:"-"`
+
+	// OnHover is called with the value under the pointer as it moves across the
+	// slider, without moving either thumb. It is the seam a media scrubber uses
+	// to preview the frame at a position before committing a seek.
+	//
+	// The reported value is continuous — it is NOT snapped to Step, since a
+	// preview wants the true pointer position and a consumer that wants the
+	// snapped value can round it, while the reverse is not recoverable. It is
+	// clamped to [Min, Max].
+	//
+	// Since: 1.0
+	OnHover func(float64) `json:"-"`
+
+	// OnHoverEnd is called when the pointer leaves the slider, so anything shown
+	// in response to OnHover can be taken down again.
+	//
+	// Since: 1.0
+	OnHoverEnd func() `json:"-"`
+
+	hovered       bool
+	draggingHigh  bool // true if dragging the high thumb
+	dragging      bool
+	pendingChange bool // true if a thumb moved since the last OnChangeEnded
 }
 
 // NewRangeSlider creates a range slider with the given bounds.
@@ -173,14 +205,75 @@ func NewRangeSlider(min, max float64) *RangeSlider {
 	return s
 }
 
-// SetValues updates both thumb positions.
+// SetValues updates both thumb positions, clamping each into [Min, Max],
+// snapping to Step and swapping them if they arrive the wrong way round.
+// It is safe to call from any goroutine.
+//
+// The change is reported as though the user made it: both OnChanged and
+// OnChangeEnded fire, matching [Slider.SetValue]. For programmatic updates that
+// should not look like user interaction — a player advancing a preview range
+// many times a second — use [RangeSlider.SetValuesSilently].
 func (s *RangeSlider) SetValues(low, high float64) {
+	onMain(func() {
+		lastLow, lastHigh := s.LowValue, s.HighValue
+		s.assignValues(low, high)
+		s.valuesChanged(lastLow, lastHigh)
+		s.fireChangeEnded()
+	})
+}
+
+// SetValuesSilently updates both thumb positions and redraws, without firing
+// OnChanged or OnChangeEnded. It is safe to call from any goroutine.
+//
+// This is the path for updates the user did not cause, where every
+// [RangeSlider.SetValues] call would otherwise be indistinguishable from the
+// user dragging a thumb.
+//
+// Since: 1.0
+func (s *RangeSlider) SetValuesSilently(low, high float64) {
+	onMain(func() {
+		lastLow, lastHigh := s.LowValue, s.HighValue
+		s.assignValues(low, high)
+		if lastLow == s.LowValue && lastHigh == s.HighValue {
+			return
+		}
+		s.Refresh()
+	})
+}
+
+// assignValues stores an ordered, clamped pair without reporting the change.
+func (s *RangeSlider) assignValues(low, high float64) {
 	if low > high {
 		low, high = high, low
 	}
-	s.LowValue = math.Max(s.Min, math.Min(low, s.Max))
-	s.HighValue = math.Max(s.Min, math.Min(high, s.Max))
+	s.LowValue = s.clamp(low)
+	s.HighValue = s.clamp(high)
+}
+
+// valuesChanged reports a move away from the given previous values. It fires
+// nothing when neither thumb actually moved, so a drag that stays put — or a
+// programmatic set to the values already held — is not reported as a change.
+func (s *RangeSlider) valuesChanged(lastLow, lastHigh float64) {
+	if lastLow == s.LowValue && lastHigh == s.HighValue {
+		return
+	}
+
 	s.Refresh()
+
+	s.pendingChange = true
+	if s.OnChanged != nil {
+		s.OnChanged(s.LowValue, s.HighValue)
+	}
+}
+
+func (s *RangeSlider) fireChangeEnded() {
+	if !s.pendingChange {
+		return
+	}
+	s.pendingChange = false
+	if s.OnChangeEnded != nil {
+		s.OnChangeEnded(s.LowValue, s.HighValue)
+	}
 }
 
 func (s *RangeSlider) Dragged(e *event.DragEvent) {
@@ -195,6 +288,7 @@ func (s *RangeSlider) Dragged(e *event.DragEvent) {
 		s.dragging = true
 	}
 
+	lastLow, lastHigh := s.LowValue, s.HighValue
 	if s.draggingHigh {
 		s.HighValue = s.clamp(val)
 		if s.HighValue < s.LowValue {
@@ -207,20 +301,47 @@ func (s *RangeSlider) Dragged(e *event.DragEvent) {
 		}
 	}
 
-	if s.OnChanged != nil {
-		s.OnChanged(s.LowValue, s.HighValue)
-	}
-	s.Refresh()
+	s.valuesChanged(lastLow, lastHigh)
 }
 
 func (s *RangeSlider) DragEnd() {
+	// Cleared unconditionally, and before the callback, for the reason
+	// documented on [Slider.DragEnd]: a drag that never moved a thumb fires no
+	// OnChangeEnded, so a consumer inferring drag state from the callback pair
+	// would latch on forever. Dragging() must not have that hole.
 	s.dragging = false
+	s.fireChangeEnded()
+}
+
+// Dragging reports whether the user is currently dragging one of the thumbs,
+// between the first Dragged event and DragEnd.
+//
+// This is the authoritative signal a media scrubber needs in order to suppress
+// its own periodic position updates while the user is scrubbing — otherwise a
+// thumb jumps back under the pointer on every tick. Inferring it from
+// OnChanged/OnChangeEnded instead is unreliable: a press and release that does
+// not move a thumb fires neither callback.
+//
+// Since: 1.0
+func (s *RangeSlider) Dragging() bool {
+	return s.dragging
+}
+
+// DraggingHigh reports which thumb an in-progress drag is moving: true for the
+// high thumb, false for the low one. It is only meaningful while
+// [RangeSlider.Dragging] reports true — afterwards it retains the thumb the
+// last drag moved.
+//
+// Since: 1.0
+func (s *RangeSlider) DraggingHigh() bool {
+	return s.draggingHigh
 }
 
 func (s *RangeSlider) Tapped(e *event.PointEvent) {
 	ratio := s.getRatio(e)
 	val := s.Min + ratio*(s.Max-s.Min)
 
+	lastLow, lastHigh := s.LowValue, s.HighValue
 	distLow := math.Abs(val - s.LowValue)
 	distHigh := math.Abs(val - s.HighValue)
 	if distHigh <= distLow {
@@ -232,15 +353,41 @@ func (s *RangeSlider) Tapped(e *event.PointEvent) {
 		s.LowValue, s.HighValue = s.HighValue, s.LowValue
 	}
 
-	if s.OnChanged != nil {
-		s.OnChanged(s.LowValue, s.HighValue)
-	}
-	s.Refresh()
+	// A tap is a complete interaction, so it commits immediately.
+	s.valuesChanged(lastLow, lastHigh)
+	s.fireChangeEnded()
 }
 
-func (s *RangeSlider) HoverIn(*event.HoverEvent)    { s.hovered = true; s.Refresh() }
-func (s *RangeSlider) HoverMoved(*event.HoverEvent) {}
-func (s *RangeSlider) HoverOut()                    { s.hovered = false; s.Refresh() }
+func (s *RangeSlider) HoverIn(e *event.HoverEvent) {
+	s.hovered = true
+	s.Refresh()
+	s.fireHover(e)
+}
+
+func (s *RangeSlider) HoverMoved(e *event.HoverEvent) { s.fireHover(e) }
+
+func (s *RangeSlider) HoverOut() {
+	s.hovered = false
+	s.Refresh()
+	if s.OnHoverEnd != nil {
+		s.OnHoverEnd()
+	}
+}
+
+// valueAt maps a pointer position to the value under it, clamped to the range
+// but not snapped to Step. Used for hover reporting, which wants the true
+// pointer position.
+func (s *RangeSlider) valueAt(e *event.PointEvent) float64 {
+	val := s.Min + s.getRatio(e)*(s.Max-s.Min)
+	return math.Max(s.Min, math.Min(s.Max, val))
+}
+
+func (s *RangeSlider) fireHover(e *event.HoverEvent) {
+	if s.OnHover == nil {
+		return
+	}
+	s.OnHover(s.valueAt(&e.PointEvent))
+}
 
 func (s *RangeSlider) MinSize() geo.Size {
 	s.ExtendBaseWidget(s)
