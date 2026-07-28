@@ -49,3 +49,45 @@ func TestGeoCoord_VisibleTiles(t *testing.T) {
 		}
 	}
 }
+
+// A Projection snapshot must place points exactly where GeoCoord.DataToPixel
+// does -- it only hoists the constants they share out of the per-point path
+// (belluikit/bellui#40).
+func TestGeoCoord_ProjectionMatchesDataToPixel(t *testing.T) {
+	for _, g := range []*GeoCoord{
+		NewGeoCoord(0, 0, 2),
+		NewGeoCoord(-73.9, 40.7, 5),
+		NewGeoCoord(139.7, 35.7, 0.5),
+	} {
+		g.SetBounds(Rect{X: 10, Y: 20, W: 900, H: 600})
+		p := g.Projection()
+
+		for _, pt := range [][2]float64{
+			{0, 0}, {-180, 0}, {180, 0}, {-73.9, 40.7}, {139.7, -35.7}, {12.5, 78.2},
+		} {
+			want := g.DataToPixel(pt[0], pt[1])
+			got := p.DataToPixel(pt[0], pt[1])
+			if got != want {
+				t.Errorf("centre (%v,%v) zoom %v, point %v: projection gave %v, DataToPixel gave %v",
+					g.CenterLon, g.CenterLat, g.Zoom, pt, got, want)
+			}
+		}
+	}
+}
+
+// The snapshot is a value: it must keep projecting for the view it was taken
+// for even after the shared GeoCoord is re-pointed, which is what makes it safe
+// to project against off the render goroutine.
+func TestGeoCoord_ProjectionIsASnapshot(t *testing.T) {
+	g := NewGeoCoord(0, 0, 2)
+	g.SetBounds(Rect{X: 0, Y: 0, W: 900, H: 600})
+	p := g.Projection()
+	want := p.DataToPixel(30, 45)
+
+	g.SetBounds(Rect{X: 100, Y: 100, W: 400, H: 400})
+	g.CenterLon, g.CenterLat, g.Zoom = 120, -20, 7
+
+	if got := p.DataToPixel(30, 45); got != want {
+		t.Errorf("projection followed the mutated GeoCoord: got %v, want %v", got, want)
+	}
+}
