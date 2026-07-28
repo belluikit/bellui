@@ -41,6 +41,32 @@ import (
 // bellui can draw the content itself, draw it — a real widget composites,
 // captures, clips and mirrors for free.
 //
+// # Keyboard focus
+//
+// Keyboard focus is arbitrated by the platform's own responder chain, which
+// bellui's canvas focus knows nothing about, so a host whose backend
+// implements [NativeViewFocuser] bridges the two (#59):
+//
+//   - When the platform view takes the OS focus — which is what a click
+//     inside it does — the host clears the canvas focus, so no bellui widget
+//     is left drawing a caret while the keystrokes go to the OS view.
+//   - When bellui focuses one of its own widgets while the platform view
+//     still holds the OS focus, the host makes the platform view resign it,
+//     so the OS routes keys and IME composition back to bellui.
+//
+// The bridge rides the same per-frame sync as the geometry (see Lifecycle),
+// polling the backend rather than requiring every platform to grow a
+// focus-change notification; a backend that does not implement
+// [NativeViewFocuser] simply has no bridge, and focus behaves as it did
+// before.
+//
+// A NativeViewHost is deliberately *not* a Tab stop. Once the platform view
+// holds the OS focus bellui never sees the Tab key, so it could not move the
+// focus back out — putting the host in the Tab ring would create a keyboard
+// trap (WCAG 2.1.2 No Keyboard Trap), which is worse than not being reachable
+// by Tab at all. Focus reaches the platform view by clicking into it, or
+// programmatically through [NativeViewHost.FocusNativeView].
+//
 // # Lifecycle
 //
 // The host attaches its [NativeView] once it is laid out on a canvas, then
@@ -63,6 +89,12 @@ type NativeViewHost struct {
 	attached bool
 	shown    bool
 	anim     *bellui.Animation
+
+	// nativeFocus is the host's view of the platform responder chain: true
+	// while the OS keyboard focus is inside the platform view. It is the state
+	// the focus bridge compares each frame's poll against, and the invariant
+	// it maintains is that while it is true the canvas focus is nil.
+	nativeFocus bool
 
 	min                geo.Size
 	lastRect, lastClip geo.Rectangle
@@ -106,6 +138,36 @@ type NativeView interface {
 	// be safe to call more than once, and safe to call without a preceding
 	// successful Attach.
 	Destroy()
+}
+
+// NativeViewFocuser is the optional capability of a [NativeView] whose
+// platform view can hold the OS keyboard focus. A [NativeViewHost] whose
+// backend implements it bridges the platform responder chain to canvas focus
+// in both directions (#59); a backend without it — a video surface or a map
+// that never wants the keyboard — is left alone.
+//
+// The three methods are the whole contract: the host polls HasFocus on the
+// per-frame sync it already runs, so a backend needs no focus-change
+// notification of its own. Every method is called on the main goroutine.
+//
+// Since: 2.19
+type NativeViewFocuser interface {
+	NativeView
+
+	// TakeFocus asks the platform view to become the OS keyboard focus, as a
+	// click inside it would, and reports whether the platform accepted.
+	TakeFocus() bool
+
+	// ResignFocus gives the OS keyboard focus back to bellui's own surface,
+	// so that keys and input-method composition reach the canvas again. It
+	// reports whether the platform accepted; a backend that does not hold the
+	// focus should report success and do nothing.
+	ResignFocus() bool
+
+	// HasFocus reports whether the platform view currently holds the OS
+	// keyboard focus, meaning bellui is receiving no key events. It is called
+	// once per frame while the view is shown, so it must be cheap.
+	HasFocus() bool
 }
 
 var _ core.Widget = (*NativeViewHost)(nil)
@@ -175,6 +237,37 @@ func (h *NativeViewHost) Refresh() {
 // View returns the platform view this host drives.
 func (h *NativeViewHost) View() NativeView {
 	return h.view
+}
+
+// FocusNativeView hands the OS keyboard focus to the platform view, the way a
+// click inside it would, and clears the canvas focus so no bellui widget is
+// left drawing itself focused. It reports whether the platform accepted.
+//
+// It is the programmatic way into a native view: the host is deliberately not
+// a Tab stop (see [NativeViewHost]), so an app that wants the keyboard to
+// start in the embedded content calls this. It reports false for a backend
+// that does not implement [NativeViewFocuser], or one that has not attached.
+func (h *NativeViewHost) FocusNativeView() bool {
+	f, ok := h.focuser()
+	if !ok {
+		return false
+	}
+	if !f.TakeFocus() {
+		return false
+	}
+	h.nativeFocus = true
+	if c := h.canvas(); c != nil {
+		c.Unfocus()
+	}
+	return true
+}
+
+// NativeViewFocused reports whether the OS keyboard focus is inside the
+// platform view, meaning keys and input-method composition are going to it
+// rather than to bellui. It reports false for a backend that cannot take
+// focus.
+func (h *NativeViewHost) NativeViewFocused() bool {
+	return h.nativeFocus
 }
 
 // SyncStats reports how many per-frame geometry evaluations have run and how
@@ -249,6 +342,80 @@ func (h *NativeViewHost) sync() {
 		h.view.SetGeometry(rect, vis, scale)
 	}
 	h.setShown(true)
+	h.syncFocus(c)
+}
+
+// syncFocus bridges the platform responder chain to canvas focus, on the same
+// per-frame pass as the geometry (#59). Polling is what makes the bridge
+// portable: a backend answers one cheap question instead of every platform
+// growing a focus-change notification of its own.
+//
+// The two directions are told apart by an invariant rather than by timing: a
+// native gain always clears the canvas focus, so "the platform view holds the
+// OS focus *and* bellui has a focused widget" can only mean bellui took the
+// focus for itself since the last frame.
+func (h *NativeViewHost) syncFocus(c core.Canvas) {
+	f, ok := h.focuser()
+	if !ok {
+		return
+	}
+
+	has := f.HasFocus()
+	if has != h.nativeFocus {
+		h.nativeFocus = has
+		if has {
+			// Native -> bellui. The user clicked into the platform view (or it
+			// claimed the focus itself); stop bellui drawing a focused widget
+			// whose keystrokes are going somewhere else.
+			c.Unfocus()
+		}
+		// A native loss the host did not ask for needs nothing: the canvas
+		// focus is already nil, and whatever took the focus owns it now.
+		return
+	}
+	if !has || c.Focused() == nil {
+		return
+	}
+
+	// Bellui -> native. Hand the OS focus back, or the platform view would go
+	// on receiving the keys the focused bellui widget is drawing itself ready
+	// for.
+	if f.ResignFocus() {
+		h.nativeFocus = false
+	}
+}
+
+// focuser reports the backend's focus capability, if it has one. It also
+// gates on the view having attached: a platform view that does not exist can
+// hold no focus, and asking it would reach a nil handle.
+func (h *NativeViewHost) focuser() (NativeViewFocuser, bool) {
+	if h.win == nil {
+		return nil, false
+	}
+	f, ok := h.view.(NativeViewFocuser)
+	return f, ok
+}
+
+// resignNativeFocus takes the OS focus back from the platform view for states
+// in which it must not keep it — being hidden, or torn down — where leaving
+// it there would send keystrokes to a view the user can no longer see.
+func (h *NativeViewHost) resignNativeFocus() {
+	if !h.nativeFocus {
+		return
+	}
+	h.nativeFocus = false
+	if f, ok := h.focuser(); ok {
+		f.ResignFocus()
+	}
+}
+
+// canvas resolves the canvas this host is laid out on, or nil.
+func (h *NativeViewHost) canvas() core.Canvas {
+	app := bellui.CurrentApp()
+	if app == nil || app.Driver() == nil {
+		return nil
+	}
+	return app.Driver().CanvasForObject(h)
 }
 
 // attach creates the platform view the first time the host reaches a canvas,
@@ -294,6 +461,12 @@ func (h *NativeViewHost) setShown(shown bool) {
 		return
 	}
 	h.shown = shown
+	if !shown {
+		// Give the OS focus up before disappearing, while the platform view is
+		// still there to hand it over: a hidden view holding the keyboard focus
+		// would swallow every keystroke with nothing on screen to show for it.
+		h.resignNativeFocus()
+	}
 	h.view.SetVisible(shown)
 }
 
@@ -338,6 +511,7 @@ func (h *NativeViewHost) stopSync() {
 // which the toolkit calls when the host leaves the tree or its window closes.
 func (h *NativeViewHost) destroy() {
 	h.stopSync()
+	h.resignNativeFocus()
 	if h.view != nil {
 		h.view.Destroy()
 	}
