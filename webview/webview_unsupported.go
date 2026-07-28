@@ -17,8 +17,11 @@ import (
 // Since: 2.19
 const Supported = false
 
-// webView carries no platform state on an unsupported target.
-type webView struct{}
+// webView carries no platform view on an unsupported target, only the URL it
+// was asked for — which is state the shared WebView reads back through URL().
+type webView struct {
+	url string
+}
 
 func (w *WebView) init() {}
 
