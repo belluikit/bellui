@@ -811,7 +811,7 @@ func (p *painter) drawRaster(rast *canvas.Raster, pos geo.Position, frame geo.Si
 	if rast.Streaming {
 		p.updateStreamingTexture(rast)
 	}
-	p.drawTexture(rast, p.rasterizeRaster, pos, rast.Size(), frame, canvas.ImageFillStretch, 1.0)
+	p.drawTexture(rast, p.rasterizeRaster, pos, rast.Size(), frame, canvas.ImageFillStretch, float32(rast.Alpha()))
 }
 
 func (p *painter) rasterizeRaster(o core.CanvasObject) image.Image {
