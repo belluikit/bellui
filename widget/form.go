@@ -329,7 +329,7 @@ func (f *Form) setUpValidation(widget core.CanvasObject, i int) {
 			e.onFocusChanged = func(bool) {
 				updateValidation(e.validationError)
 			}
-			if e.Validator != nil && f.Items[i].invalid {
+			if e.hasValidator() && f.Items[i].invalid {
 				// set initial state error to guarantee next error (if triggers) is always different
 				e.SetValidationError(errFormItemInitialState)
 			}

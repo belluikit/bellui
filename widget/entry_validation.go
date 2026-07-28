@@ -12,24 +12,46 @@ import (
 
 var _ bellui.Validatable = (*Entry)(nil)
 
+// hasValidator reports whether any validation rule applies -- the app's public
+// [Entry.Validator], the data-binding conversion check installed by
+// [Entry.Bind], or both.
+func (e *Entry) hasValidator() bool {
+	return e.Validator != nil || e.validatorInternal != nil
+}
+
+// runValidator composes the data-binding conversion check with the app's
+// Validator. A conversion error wins: text that cannot be written to the bound
+// source is invalid whatever the app's rule says about it.
+func (e *Entry) runValidator(text string) error {
+	if e.validatorInternal != nil {
+		if err := e.validatorInternal(text); err != nil {
+			return err
+		}
+	}
+	if e.Validator != nil {
+		return e.Validator(text)
+	}
+	return nil
+}
+
 // Validate validates the current text in the widget.
 func (e *Entry) Validate() error {
-	if e.Validator == nil {
+	if !e.hasValidator() {
 		return nil
 	}
 
-	err := e.Validator(e.Text)
+	err := e.runValidator(e.Text)
 	e.SetValidationError(err)
 	return err
 }
 
 // validate works like Validate but only updates the internal state and does not refresh.
 func (e *Entry) validate() {
-	if e.Validator == nil {
+	if !e.hasValidator() {
 		return
 	}
 
-	err := e.Validator(e.Text)
+	err := e.runValidator(e.Text)
 	e.setValidationError(err)
 }
 
@@ -41,7 +63,7 @@ func (e *Entry) SetOnValidationChanged(callback func(error)) {
 
 // SetValidationError manually updates the validation status until the next input change.
 func (e *Entry) SetValidationError(err error) {
-	if e.Validator == nil && !e.AlwaysShowValidationError {
+	if !e.hasValidator() && !e.AlwaysShowValidationError {
 		return
 	}
 
@@ -124,7 +146,7 @@ func (r *validationStatusRenderer) Refresh() {
 		return
 	}
 
-	if r.entry.validationError == nil && r.entry.Text != "" && r.entry.Validator != nil {
+	if r.entry.validationError == nil && r.entry.Text != "" && r.entry.hasValidator() {
 		r.icon.Resource = th.Icon(theme.IconNameConfirm)
 		r.icon.Show()
 	} else if r.entry.validationError != nil && !r.entry.focused && (r.entry.dirty || r.entry.AlwaysShowValidationError) {
