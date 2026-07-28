@@ -4,6 +4,7 @@ go 1.25.0
 
 require (
 	github.com/BurntSushi/toml v1.5.0 // indirect
+	github.com/belluikit/fsnotify v1.9.1
 	github.com/belluikit/gl-js v0.2.1
 	github.com/belluikit/glfw v1.9.0
 	github.com/belluikit/systray v1.12.0
@@ -17,7 +18,6 @@ require (
 	// rebuild (#1).
 	github.com/belluikit/webgpu v1.1.0
 	github.com/fredbi/uri v1.1.1
-	github.com/fsnotify/fsnotify v1.9.0
 	github.com/go-gl/gl v0.0.0-20231021071112-07e5d0ea2e71
 	github.com/godbus/dbus/v5 v5.2.2
 	github.com/hack-pad/go-indexeddb v0.3.2
