@@ -43,8 +43,6 @@ type WebView struct {
 	// drive each other freely. The hole punch constrains compositing and input
 	// focus — it does not constrain data flow.
 	OnMessage func(string)
-
-	url string
 }
 
 // New returns a web view that will load url once it is attached to a window.
@@ -52,7 +50,8 @@ type WebView struct {
 //
 // Since: 2.19
 func New(url string) *WebView {
-	w := &WebView{url: url}
+	w := &WebView{}
+	w.url = url
 	w.init()
 	return w
 }
@@ -66,7 +65,8 @@ func NewHost(url string) (*widget.NativeViewHost, *WebView) {
 	return widget.NewNativeViewHost(w), w
 }
 
-// URL returns the URL the view was last asked to load.
+// URL returns the URL the view was last asked to load. It is stored with the
+// platform state, since a backend loads it as soon as it attaches.
 func (w *WebView) URL() string {
 	return w.url
 }
