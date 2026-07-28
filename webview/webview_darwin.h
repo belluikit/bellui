@@ -46,6 +46,12 @@ void belluiWebViewSetVisible(void *handle, bool visible);
 // accepted the change.
 bool belluiWebViewTakeFocus(void *handle);
 
+// belluiWebViewResignFocus hands the window's first responder back to the
+// GLFW content view, so keystrokes reach bellui again. It returns whether the
+// window accepted the change; a web view that does not hold the focus is left
+// alone and reports success.
+bool belluiWebViewResignFocus(void *handle);
+
 // belluiWebViewHasFocus reports whether the web view (or any view inside it)
 // is currently the window's first responder — i.e. whether keystrokes are
 // going to the web engine rather than to bellui.

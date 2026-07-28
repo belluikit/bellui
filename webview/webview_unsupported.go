@@ -42,6 +42,10 @@ func (w *WebView) SetVisible(visible bool) {}
 // TakeFocus cannot give focus to an engine that does not exist.
 func (w *WebView) TakeFocus() bool { return false }
 
+// ResignFocus has no focus to give back; it reports success so a host's focus
+// bridge treats it as already resigned.
+func (w *WebView) ResignFocus() bool { return true }
+
 // HasFocus is always false without a platform view.
 func (w *WebView) HasFocus() bool { return false }
 
