@@ -156,11 +156,22 @@ func (p *painter) newGlRasterTexture(obj core.CanvasObject) Texture {
 	width := p.textureScale(rast.Size().Width)
 	height := p.textureScale(rast.Size().Height)
 
-	tex := p.imgToTexture(rast.Generator(int(width), int(height)), rast.ScaleMode)
+	// PixelImage prefers SetPixels data and tolerates a nil Generator, so a
+	// raster driven purely by streaming has content on its very first paint.
+	img := rast.PixelImage(int(width), int(height))
+	if img == nil {
+		return noTexture
+	}
+	tex := p.imgToTexture(img, rast.ScaleMode)
 	if rast.Streaming {
+		// Record the dimensions actually uploaded, not the widget's: streamed
+		// video frames are commonly a different size from the widget, and
+		// updateStreamingTexture compares against these to decide whether an
+		// in-place upload is still valid.
+		bounds := img.Bounds()
 		rast.StreamMu.Lock()
-		rast.StreamTexW = int(width)
-		rast.StreamTexH = int(height)
+		rast.StreamTexW = bounds.Dx()
+		rast.StreamTexH = bounds.Dy()
 		rast.StreamMu.Unlock()
 	}
 	return tex

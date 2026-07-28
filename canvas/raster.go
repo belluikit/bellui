@@ -26,9 +26,12 @@ type Raster struct {
 	// Since: 1.4.1
 	ScaleMode ImageScale
 
-	// Streaming enables in-place texture updates via TexSubImage2D.
-	// When true, Refresh() reuses the existing GL texture instead of
-	// deleting and recreating it on every frame. Ideal for video playback.
+	// Streaming enables in-place texture updates.
+	// When true, Refresh() reuses the existing GPU texture — uploading only the
+	// new pixels — instead of deleting and recreating it on every frame. Ideal
+	// for video playback. Honoured by the GL and WebGPU painters; the software
+	// painter re-draws the current pixels each paint, so Streaming is a no-op
+	// there rather than a behaviour change.
 	Streaming bool
 
 	// StreamMu protects the streaming pixel fields (StreamPix, StreamPixW,
@@ -36,7 +39,7 @@ type Raster struct {
 	// SetPixels (user goroutine) and the GL painter thread.
 	StreamMu sync.Mutex
 
-	// StreamPix holds raw RGBA pixel data set via SetPixels.
+	// StreamPix holds raw premultiplied-RGBA pixel data set via SetPixels.
 	// Read by the painter; do not set directly — use SetPixels.
 	StreamPix []byte
 	// StreamPixW and StreamPixH are the dimensions of StreamPix data.
@@ -88,10 +91,14 @@ func (r *Raster) Refresh() {
 }
 
 // SetPixels updates the raster's pixel data directly with raw RGBA bytes.
-// The provided data must be RGBA format with 4 bytes per pixel, and
+// The provided data must be premultiplied RGBA with 4 bytes per pixel, and
 // width*height*4 must equal len(pix). This is the fastest path for
 // video frame updates when Streaming is true. It automatically calls
 // Refresh to trigger a repaint.
+//
+// A raster driven purely by SetPixels needs no Generator: every painter reads
+// the supplied pixels in preference to it. Until the first SetPixels call such
+// a raster simply has no content and draws nothing.
 func (r *Raster) SetPixels(pix []byte, width, height int) {
 	r.StreamMu.Lock()
 	r.StreamPix = pix
@@ -99,6 +106,33 @@ func (r *Raster) SetPixels(pix []byte, width, height int) {
 	r.StreamPixH = height
 	r.StreamMu.Unlock()
 	Refresh(r)
+}
+
+// PixelImage returns the raster's current content at the requested size: the
+// data supplied by [Raster.SetPixels] when there is any, otherwise the output
+// of Generator. It returns nil when the raster has neither, so painters can
+// skip an empty raster instead of dereferencing a nil Generator.
+//
+// The pixel data is copied, so the caller may keep the result after the next
+// SetPixels call. Painters with an in-place upload path should read StreamPix
+// under StreamMu directly rather than pay for that copy every frame.
+//
+// Since: 1.0
+func (r *Raster) PixelImage(w, h int) image.Image {
+	r.StreamMu.Lock()
+	pix, pixW, pixH := r.StreamPix, r.StreamPixW, r.StreamPixH
+	if pixW > 0 && pixH > 0 && len(pix) >= pixW*pixH*4 {
+		img := image.NewRGBA(image.Rect(0, 0, pixW, pixH))
+		copy(img.Pix, pix)
+		r.StreamMu.Unlock()
+		return img
+	}
+	r.StreamMu.Unlock()
+
+	if r.Generator == nil {
+		return nil
+	}
+	return r.Generator(w, h)
 }
 
 // NewRaster returns a new Image instance that is rendered dynamically using

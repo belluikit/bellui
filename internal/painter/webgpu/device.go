@@ -268,10 +268,17 @@ func (ds *depthStencil) Release() {
 type Texture struct {
 	tex  *wgpu.Texture
 	view *wgpu.TextureView
+	// w and h are the allocated pixel dimensions, kept so a caller doing
+	// in-place updates (streaming rasters, #34) can tell a same-size refresh
+	// from one that needs a fresh allocation.
+	w, h int
 }
 
 // View returns the texture view for use as a DrawCall.TexView.
 func (t *Texture) View() *wgpu.TextureView { return t.view }
+
+// Size reports the texture's allocated pixel dimensions.
+func (t *Texture) Size() (w, h int) { return t.w, t.h }
 
 // Release frees the texture and its view.
 func (t *Texture) Release() {
@@ -1139,7 +1146,50 @@ func (d *Device) CreateImageTexture(img image.Image) (*Texture, error) {
 		tex.Release()
 		return nil, err
 	}
-	return &Texture{tex: tex, view: view}, nil
+	return &Texture{tex: tex, view: view, w: w, h: h}, nil
+}
+
+// WriteTexturePixels re-uploads premultiplied 8-bit RGBA pixels into an existing
+// texture, the WebGPU counterpart of GL's TexSubImage2D. The dimensions must
+// match the texture's allocation — a size change needs a fresh texture, which
+// the caller detects via Texture.Size. Used by streaming rasters (#34) so video
+// frames update in place instead of reallocating a texture every frame.
+func (d *Device) WriteTexturePixels(t *Texture, pix []byte, w, h int) error {
+	if err := validateTextureWrite(t, pix, w, h); err != nil {
+		return err
+	}
+	if d == nil || d.queue == nil {
+		return fmt.Errorf("no device queue to write with")
+	}
+	extent := wgpu.Extent3D{Width: uint32(w), Height: uint32(h), DepthOrArrayLayers: 1}
+	d.queue.WriteTexture(t.tex.AsImageCopy(), pix[:w*h*4], &wgpu.TexelCopyBufferLayout{
+		Offset:       0,
+		BytesPerRow:  uint32(w * 4),
+		RowsPerImage: uint32(h),
+	}, &extent)
+	return nil
+}
+
+// validateTextureWrite reports whether pix can be uploaded into t as w×h
+// premultiplied RGBA. Kept separate from the GPU call so the guards can be
+// exercised without a device.
+func validateTextureWrite(t *Texture, pix []byte, w, h int) error {
+	if t == nil {
+		return fmt.Errorf("no texture to write")
+	}
+	if w <= 0 || h <= 0 {
+		return fmt.Errorf("invalid pixel size %dx%d", w, h)
+	}
+	if t.w != w || t.h != h {
+		return fmt.Errorf("size mismatch: texture is %dx%d, pixels are %dx%d", t.w, t.h, w, h)
+	}
+	if need := w * h * 4; len(pix) < need {
+		return fmt.Errorf("short pixel buffer: have %d bytes, need %d", len(pix), need)
+	}
+	if t.tex == nil {
+		return fmt.Errorf("texture has no GPU handle")
+	}
+	return nil
 }
 
 // CreateRenderTexture creates an off-screen color target (e.g. a RepaintBoundary
@@ -1168,7 +1218,7 @@ func (d *Device) CreateRenderTexture(w, h int) (*Texture, error) {
 		tex.Release()
 		return nil, err
 	}
-	return &Texture{tex: tex, view: view}, nil
+	return &Texture{tex: tex, view: view, w: w, h: h}, nil
 }
 
 // ReleaseTextureAfterFrame defers a transient texture's release until the frame
@@ -1238,7 +1288,7 @@ func (d *Device) CopyActiveTargetRegion(x, y, w, h int) (*Texture, int, int, err
 	)
 	d.beginTopPass()
 
-	return &Texture{tex: dst, view: view}, w, h, nil
+	return &Texture{tex: dst, view: view, w: w, h: h}, w, h, nil
 }
 
 // PushTarget / PopTarget expose the render-target stack to the painter's
