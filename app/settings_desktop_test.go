@@ -1,4 +1,7 @@
-//go:build !android && !ios && !mobile
+// Mirrors settings_desktop.go's own constraint — it is `!wasm` too, so without
+// that term this test file joined the wasm test build and referenced symbols
+// (ensureDirExists, the file-backed settings watcher) that do not exist there (#77).
+//go:build !android && !ios && !mobile && !wasm
 
 package app
 
