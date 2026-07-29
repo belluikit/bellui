@@ -88,9 +88,30 @@ seconds, via either export callback. The legacy `webkit_web_view_backend_new` +
 `wpe_view_backend_exportable_fdo` path is still declared and undeprecated in
 2.48.3, so this is unexplained rather than expected.
 
-So the honest state is: **architecture (B) is proven, and the export kind on a
-current WPE is unknown.** Answering it needs the probe ported to whatever 2.48+
-expects — most likely the newer WPE Platform API (`WPEDisplay`/`WPEView`).
+That port was then done — `wpe_platform_probe.c`, against the WPE Platform API
+(`WPEDisplay`/`WPEView`/`WPEBuffer`) that 2.44+ development moved to. It works
+where the legacy path did not: frames arrive, delivered through the view class's
+`render_buffer` vfunc, which the probe chains in front of.
+
+**It answers the export question structurally, and the answer does not depend on
+the GPU.** `WPEDisplayHeadless` reports **no DRM device**
+(`wpe_display_get_drm_device` is NULL), and a display with no DRM device cannot
+allocate dma-bufs — so headless can only ever hand over SHM, by construction.
+Confirmed on WPE WebKit **2.52.5**, the current release. The earlier SHM results
+were therefore never evidence about GPU capability at all.
+
+Zero-copy needs one of the other display backends. WPE ships four —
+`wpe-platform-2.0`, `wpe-platform-drm-2.0`, `wpe-platform-headless-2.0`,
+`wpe-platform-wayland-2.0` — and only the DRM and Wayland ones can carry
+dma-bufs. DRM means taking DRM master (exclusive display control, so not
+something an app shares with a running desktop); Wayland means negotiating
+`linux-dmabuf` with an existing compositor.
+
+**The consequence for bellui is the useful part**: a WPE integration would get
+zero-copy only while running under a dma-buf-capable Wayland compositor, and
+would silently fall back to CPU copies on X11 or anywhere the negotiation fails
+— performance depending on the user's session type at runtime. That is the same
+silent-degradation shape that ruled out X11-only reparenting in #542.
 
 ## Distro availability, which bears on the licensing argument
 
@@ -101,6 +122,10 @@ supplies* rather than something bellui vendors. That holds unevenly:
 |---|---|
 | Ubuntu | **22.04 only** (2.36) — dropped from 24.04 onward |
 | Debian | bookworm 2.38.6, trixie 2.48.3, sid 2.52.5 |
-| Arch | 2.52.5 |
+| Arch | 2.52.5, **and the only one of the three that enables the Platform API** |
 
-Ubuntu, the most common Linux desktop, has shipped no WPE since 22.04.
+Ubuntu, the most common Linux desktop, has shipped no WPE since 22.04. Debian
+packages WPE at 2.48/2.52 but builds it **without** `ENABLE_WPE_PLATFORM`, so
+the API that current WPE development targets is absent there too — verified by
+searching the full include tree of `libwpewebkit-2.0-dev` on both trixie and
+sid. Of the distros checked, only Arch ships it.
