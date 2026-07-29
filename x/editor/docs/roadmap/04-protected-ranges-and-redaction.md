@@ -43,7 +43,7 @@ blocker, and a post-edit `onDidChangeContent` undo of any mutation that slipped
 through (paste, drag-drop, find-replace). It also renders **opaque redaction
 bars** over secret spans with a reveal/re-mask toggle (`secret-decorations.ts`).
 
-In Monaco those layers are bolted on from outside the editor. In Fyne the only
+In Monaco those layers are bolted on from outside the editor. In Bellui the only
 robust place to *reject* an edit is inside the `Entry` itself (fork F3) — an
 external observer can only undo after the fact, which flickers and races. So
 Phase 4 is split: the fork enforces, fycoder models and renders.
@@ -88,7 +88,7 @@ func (e *Editor) SetRedactionMode(RedactionMode)
 ### 3. Change classification helper (port of `secret-changes.ts`)
 pxfed diffs the open-time secret snapshot against the current buffer to
 classify each secret as modified/added/removed and drive a save-confirm modal.
-This is pure range/text logic with no Fyne dependency — port it as a small
+This is pure range/text logic with no Bellui dependency — port it as a small
 helper so any host gets it:
 ```go
 func ClassifySpanChanges(original, current string, spans []TextRange) []SpanChange

@@ -70,7 +70,7 @@ cost scales with viewport, not document size.
 
 ## Coordination notes
 
-- The fork is shared with appviewer and other trendvidia Fyne apps; additive,
+- The fork is shared with appviewer and other trendvidia Bellui apps; additive,
   backward-compatible changes only. New fields default to today's behavior.
 - Mirror the existing fycoder convention: "extra fields activate as the fork
   adds support" (see `CLAUDE.md`). fycoder can land the *consuming* API behind
@@ -92,7 +92,7 @@ cost scales with viewport, not document size.
 > **Pre-release pin (2026-06-26):** F3 + F4 are merged on `trendvidia/fyne` `main`
 > but **not in any release tag** — the latest, v2.9.0, was cut before they
 > landed. Rather than wait, fycoder's `go.mod` pins a **pseudo-version of the fork
-> commit** (`github.com/belluikit/bellui v2.9.1-0.…`), so Phase 4 (and, when
+> commit** (`github.com/trendvidia/fyne/v2 v2.9.1-0.…`), so Phase 4 (and, when
 > built, Phase 5) consume F3/F4 today. The project has **no CI**, so changes are
 > validated locally (`GOWORK=off go build/vet/test ./...` resolves the pin via the
 > Go proxy). **Swap the pin for the real tag (e.g. v2.10.0) with a one-line go.mod

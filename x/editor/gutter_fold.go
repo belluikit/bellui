@@ -45,10 +45,6 @@ func (g *FoldGutter) scale() float32 {
 	return 0.5
 }
 
-// GutterColumn implements [GutterColumnProvider]: the fold control is the
-// trailing column, drawn immediately beside the text.
-func (g *FoldGutter) GutterColumn() GutterColumn { return GutterColumnFold }
-
 // Width implements [GutterProvider]. The column fits a chevron with padding.
 func (g *FoldGutter) Width(_ int, textSize float32) float32 {
 	return textSize * g.scale() * 2.4

@@ -195,30 +195,27 @@ func (r *decoratorOverlayRenderer) renderRows() {
 		rowCount = len(rowYPos)
 	}
 
-	// next is the content-space Y the following row starts at, so rows the Entry
-	// has not laid out yet continue from where the laid-out content ends rather
-	// than from topOffset + row*stride, which ignores collapsed folds (the gutter
-	// carries the same invariant — see gutterWidgetRenderer.Refresh).
-	next := topPad
 	for row := 0; row < rowCount; row++ {
-		y, rh := next, stride
+		var y, rh float32
 		if row < len(rowYPos) && row < len(rowH) {
-			y, rh = rowYPos[row], rowH[row]
+			y = rowYPos[row] - d.scrollY
+			rh = rowH[row]
+		} else {
+			y = topPad + float32(row)*stride - d.scrollY
+			rh = stride
 		}
-		next = y + rh
 		// Folded-away rows collapse to zero height; skip them so a row decoration
 		// isn't emitted as a degenerate zero-height rect at the fold point.
 		if rh <= 0 {
 			continue
 		}
-		vy := y - d.scrollY
-		if vy+rh < 0 {
+		if y+rh < 0 {
 			continue
 		}
-		if vy > size.Height {
+		if y > size.Height {
 			break
 		}
-		r.emitRowDecorations(d, row, vy, rh, size.Width)
+		r.emitRowDecorations(d, row, y, rh, size.Width)
 	}
 }
 

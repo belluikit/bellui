@@ -6,7 +6,7 @@ exploratory target, not on the pxfed-parity critical path.
 
 **Tracking:** [trendvidia/fyne#95](https://github.com/trendvidia/fyne/issues/95)
 (umbrella — "make the WebGL backend render a real UI") ·
-[trendvidia/gl-js#1](https://github.com/belluikit/gl-js/pull/1)
+[trendvidia/gl-js#1](https://github.com/trendvidia/gl-js/pull/1)
 (fix for blocker #1) · harness: [`examples/wasm`](../../examples/wasm).
 
 This document records whether — and how — a pxfed-class app built on fycoder
@@ -26,11 +26,11 @@ disappears.
 
 ## Evidence (from the trendvidia tree, at time of writing)
 
-- **Fyne's fork already targets WASM** — `internal/driver/glfw/device_wasm.go`,
+- **Bellui's fork already targets WASM** — `internal/driver/glfw/device_wasm.go`,
   `app/app_wasm.go`, `app/preferences_wasm.go`; deps include `fyne-io/gl-js`
   (WebGL canvas), `hack-pad/go-indexeddb`, `hack-pad/safejs`. Preferences
   already persist to `localStorage` under WASM.
-- **fycoder is pure Go + Fyne** — no cgo, no syscalls; it compiles for `js/wasm`
+- **fycoder is pure Go + Bellui** — no cgo, no syscalls; it compiles for `js/wasm`
   as-is (modulo the input-layer caveat below).
 - **protolsp has no cgo and no sqlite**, and `internal/server/` is a
   library-shaped handler set (callable in-process, not only as a binary).
@@ -58,8 +58,8 @@ results, recorded here so they aren't lost:
   the window is created — then it crashes:
   ```
   panic: runtime error: index out of range [0] with length 0
-    github.com/belluikit/gl-js.sliceToBytes  (gl_webgl_convertions_wasm.go:17)
-    github.com/belluikit/gl-js.TexImage2D    (gl_webgl_wasm.go:553)
+    github.com/fyne-io/gl-js.sliceToBytes  (gl_webgl_convertions_wasm.go:17)
+    github.com/fyne-io/gl-js.TexImage2D    (gl_webgl_wasm.go:553)
     .../internal/painter/gl.(*painter).EnsureCanvasFBO  (canvas_fbo.go:58)
   ```
   **Root cause (typed-nil-in-interface):** `EnsureCanvasFBO` allocates the
@@ -79,9 +79,9 @@ results, recorded here so they aren't lost:
 
   **Remaining step (separate repo):** `trendvidia/fyne` v2.8.3 currently
   requires *upstream* `fyne-io/gl-js v0.2.0` with **no `replace`**, so stock
-  Fyne apps don't pick up the fork. Once gl-js#1 merges + tags, the fyne fork
-  needs `replace github.com/belluikit/gl-js => github.com/belluikit/gl-js vX`
-  for any Fyne app to render under wasm without each consumer adding the replace
+  Bellui apps don't pick up the fork. Once gl-js#1 merges + tags, the fyne fork
+  needs `replace github.com/fyne-io/gl-js => github.com/trendvidia/gl-js vX`
+  for any Bellui app to render under wasm without each consumer adding the replace
   itself. Until then, each app's main module carries the `replace` (as the
   harness does).
 
@@ -128,16 +128,16 @@ the rendering layer. Corrected picture from the spike:
   checklist) can only be assessed once the UI actually paints.
 
 This is the spike's most important result: **the editor is ready for the web;
-the Fyne fork's WebGL backend is the real, larger blocker.**
+the Bellui fork's WebGL backend is the real, larger blocker.**
 
 ## Two viable architectures
 
 ### Path A — fat client (everything in the WASM binary)
-Fyne UI + fycoder + protolsp (handlers called in-process) + sops-age + keygen,
+Bellui UI + fycoder + protolsp (handlers called in-process) + sops-age + keygen,
 all compiled into one `js/wasm` binary. Serverless; works offline.
 
 ### Path B — thin client (UI in WASM, protolsp hosted over WebSocket)
-Browser runs only the Fyne/fycoder UI and talks to a hosted protolsp over the
+Browser runs only the Bellui/fycoder UI and talks to a hosted protolsp over the
 **already-existing** WebSocket/Connect transport. Keeps the messy parts
 (buf, KMS, filesystem) server-side. Needs a backend; not offline.
 
@@ -150,16 +150,16 @@ Browser runs only the Fyne/fycoder UI and talks to a hosted protolsp over the
 | **sops KMS** | AWS/GCP KMS SDKs won't run under WASM | Age-only in the browser (covers pxfed's actual use), or KMS server-side (Path B). |
 | **`fsnotify` watching** | no-op in browser | disable or poll. |
 | **Networking / CORS** | registry + any fetch must be CORS-permitted | Go's `net/http` transparently uses `fetch()` under WASM; needs CORS headers or a proxy. Ops, not code. |
-| **Binary size** | Fyne + protolsp + protocompile → ~30–60 MB WASM; TinyGo is **not** viable (Fyne needs full reflection/runtime) | Brotli/gzip, lazy-load, loading UX. |
+| **Binary size** | Bellui + protolsp + protocompile → ~30–60 MB WASM; TinyGo is **not** viable (Bellui needs full reflection/runtime) | Brotli/gzip, lazy-load, loading UX. |
 
 ## What fycoder specifically owes this target
 
 Most blockers above are the **host's** problem (fs, subprocesses, transport).
 fycoder's own responsibility is narrow but critical: **the editor widget must be
-usable under `js/wasm`.** That is entirely about Fyne's web input layer, and it
+usable under `js/wasm`.** That is entirely about Bellui's web input layer, and it
 is the decisive risk:
 
-- **IME composition** — CJK and dead-key input via Fyne-WASM is less mature than
+- **IME composition** — CJK and dead-key input via Bellui-WASM is less mature than
   desktop. This directly intersects [Phase 4](04-protected-ranges-and-redaction.md):
   the protected-range edit-guard must reject composition commits, and the WASM
   IME path must deliver the events for that to work.
@@ -194,8 +194,8 @@ Before committing to either path, **compile today's bare fycoder `Editor` to
 4. the Cmd+F / Cmd+S shortcuts.
 
 This single experiment de-risks the web target more than any further analysis:
-if Fyne-WASM's input layer clears that bar, both paths are mostly host
-plumbing; if it doesn't, the web target waits on upstream Fyne work regardless
+if Bellui-WASM's input layer clears that bar, both paths are mostly host
+plumbing; if it doesn't, the web target waits on upstream Bellui work regardless
 of how complete the editor core becomes.
 
 ## Spike results — F1–F5 browser-verify (2026-07-01) ✅

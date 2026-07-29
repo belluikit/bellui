@@ -1,9 +1,6 @@
 package render
 
 import (
-	"fmt"
-
-	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
@@ -212,20 +209,11 @@ func (r *pinnedCellsRenderer) refresh(size geo.Size) {
 		rowBg.Resize(geo.NewSize(size.Width, visH))
 		objects = append(objects, rowBg)
 
-		// Group row
+		// Group row: no cells in the pinned band. The label and accessible node
+		// are drawn once at the DataGrid level by the GroupRowOverlay spanning
+		// all bands — a per-band copy here would collide with the main copy at
+		// the band boundary, since canvas.Text does not clip (#110).
 		if grid.IsGroupRow(row) {
-			key, childCount, expanded, depth := grid.GroupRowInfo(row)
-			icon := "▼"
-			if !expanded {
-				icon = "▶"
-			}
-			label := canvas.NewText(fmt.Sprintf("%s %s (%d)", icon, key, childCount), tc.GroupRowFg)
-			label.TextStyle = bellui.TextStyle{Bold: true}
-			label.TextSize = 12
-			indent := float32(depth) * 20
-			label.Move(geo.NewPos(indent+4, visY+2))
-			label.Resize(geo.NewSize(size.Width-indent-8, visH-4))
-			objects = append(objects, label)
 			continue
 		}
 

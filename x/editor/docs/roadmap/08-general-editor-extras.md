@@ -5,7 +5,7 @@ Phases 1–7 · **Status:** stretch. **pxfed does not require any of this.** The
 are the Monaco features a *general-purpose* code editor is expected to have but
 which pxfed's config/secret-editing workflow doesn't exercise. Pursue only if
 fycoder is being positioned as a standalone VS Code-class editor for the wider
-Fyne ecosystem.
+Bellui ecosystem.
 
 This phase exists mainly to **document the Monaco gap explicitly** rather than
 leave it implicit. Treat each area as an independently schedulable mini-project;
@@ -72,7 +72,7 @@ Monaco comparison; they belong here as explicit, separately-funded tracks:
   to migrate Monarch → `tmLanguage`). True highlighting parity means a TextMate
   grammar runner feeding `StyleRun`s. **Size: L.** Independent of LSP.
 - **Accessibility.** Monaco has a mature screen-reader / ARIA mode and a deep
-  command + keybinding system. Matching it depends substantially on the Fyne
+  command + keybinding system. Matching it depends substantially on the Bellui
   fork's accessibility baseline. **Size: L+, partly upstream.**
 
 ## Acceptance criteria

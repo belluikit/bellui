@@ -79,7 +79,7 @@ type Options struct {
 	ItemStyler func(index int, value float64) color.Color
 }
 
-// Sparkline is a Fyne widget that renders a mini chart inside a cell.
+// Sparkline is a Bellui widget that renders a mini chart inside a cell.
 type Sparkline struct {
 	widget.BaseWidget
 

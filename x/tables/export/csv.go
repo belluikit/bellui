@@ -13,6 +13,11 @@ type Column struct {
 	Field       string
 	ValueGetter func(rowData any) any
 	Formatter   func(value any) string
+
+	// Type declares the column's field type for typed exports.
+	// Required by PXF for every column without a Formatter; the
+	// untyped exporters (CSV, TSV, Excel, PDF) ignore it.
+	Type FieldType
 }
 
 // DataAccess provides the data to export.
@@ -109,4 +114,24 @@ func formatAny(v any) string {
 		return ""
 	}
 	return fmt.Sprint(v)
+}
+
+// cellValue extracts the raw cell value for a column from a row.
+func cellValue(col Column, rowData any) any {
+	if col.ValueGetter != nil {
+		return col.ValueGetter(rowData)
+	}
+	if m, ok := rowData.(map[string]any); ok {
+		return m[col.Field]
+	}
+	return nil
+}
+
+// cellString extracts and formats the cell value for a column.
+func cellString(col Column, rowData any) string {
+	value := cellValue(col, rowData)
+	if col.Formatter != nil {
+		return col.Formatter(value)
+	}
+	return formatAny(value)
 }
