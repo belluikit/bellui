@@ -27,7 +27,7 @@ jobs:
       - name: Assert go-plus toolchain
         run: |
           go version
-          go version | grep -q '(plus)' || { echo "::error::runner go is not the go-plus fork"; exit 1; }
+          go version | grep -qE '\(plus[ )]' || { echo "::error::runner go is not the go-plus fork"; exit 1; }
 
 
       - name: Get dependencies
