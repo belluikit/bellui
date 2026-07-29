@@ -43,14 +43,24 @@ entries that verify against nothing. It contains zero `trendvidia` lines.
 ## Two things this move is not
 
 **The FFmpeg binding advanced two minor versions.** `fyplayer` pinned
-`trendvidia/goffmpeg v0.2.0`; `belluikit/goffmpeg` publishes only `v0.4.0` (its
-tree is `trendvidia/goffmpeg@v0.4.0`, verified identical modulo the module
-path), which pulls `goffmpeg-libs` `v0.1.0` → `v0.3.0`. The delta is additive
+`trendvidia/goffmpeg v0.2.0`; `belluikit/goffmpeg` publishes only `v0.4.0`,
+which pulls `goffmpeg-libs` `v0.1.0` → `v0.3.0`. The delta is additive
 on the surface this module uses — `Open`, `OpenReader`, `IDecoder`,
 `VideoInfo`, `AudioInfo`, `MediaType*` are unchanged — and brings an FFmpeg
 bump past the upstream v4l2 fix plus a v4l2 buffer-unmap leak fix. It is called
 out because "mechanical rewrite" does not cover a dependency bump, not because
 anything here had to adapt to it.
+
+This is a version bump, not a fork divergence: `belluikit/goffmpeg` is in sync
+with its source. `v0.4.0` is an annotated tag whose commit is
+`trendvidia/goffmpeg`'s `origin/main` exactly (`c897242`, zero commits after
+it), and 175 of the 179 files match after the module-path rewrite. The four
+that do not are `go.mod`, a regenerated `go.sum`, and two files —
+`.github/workflows/build.yml` and `.gitignore` — that still name
+`trendvidia/goffmpeg-libs` where `go.mod` requires the `belluikit` one. That
+last pair is a defect in `goffmpeg`'s own build workflow, not in the path this
+module consumes: `x/mmedia` resolves the published modules, which is what the
+verification below exercises.
 
 `goffmpeg-libs` is also why this module declares `go 1.26.2` while its `x/`
 siblings declare `1.25.0`.
