@@ -270,7 +270,7 @@ Tracked as issues; nothing here lives only in prose.
 | The `x/` modules have no CI — `x/mmedia` needs a both-painters leg | belluikit/bellui#13 |
 | `bellui.io` has no content — dead doc links | belluikit/bellui#6 |
 | Gallery: restore DAG Editor + Media Player pages | belluikit/gallery#1 |
-| goed → Bellui Studio | trendvidia/goed#95 |
+| ~~goed → Bellui Studio~~ — **DONE**, belluikit/studio | trendvidia/goed#95 |
 | appviewer → Bellui Player | trendvidia/appviewer#145 |
 | Release-train automation | trendvidia/fyne#731 |
 
