@@ -37,6 +37,10 @@ import android.view.inputmethod.ExtractedTextRequest;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputMethodManager;
 import android.view.KeyEvent;
+import android.webkit.WebResourceError;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.TextView;
@@ -3788,5 +3792,476 @@ public class GoNativeActivity extends NativeActivity {
             }
             return super.dispatchHoverEvent(event);
         }
+    }
+
+    // ---- Native web view hosting (webview package, #63) ----
+    //
+    // android.webkit.WebView hosted over the GL surface for
+    // widget.NativeViewHost. The Java half necessarily lives here, in the dex
+    // every app ships, because a WebView needs real Java subclasses
+    // (WebViewClient, WebChromeClient) and a @JavascriptInterface-annotated
+    // object — none of which can be created from JNI. The Go half stays an
+    // optional import, so an app that embeds no web content links no Go code
+    // for it; these methods simply go unused, and the native up-calls they
+    // would make are never bound.
+    //
+    // Threading: every entry point below is called from a JNI thread and posts
+    // to the UI thread with runOnUiThread, which preserves order — so a create
+    // posted before a load runs before it, and no operation needs to block.
+    // Queries that must answer synchronously (canGoBack, hasFocus) read a
+    // shadow copy kept up to date on the UI thread instead of round-tripping,
+    // which is what keeps them off the deadlock path (#973).
+
+    private static final java.util.HashMap<Integer, BelluiWebViewHost> mWebViews =
+            new java.util.HashMap<Integer, BelluiWebViewHost>();
+    private static int mWebViewNextId = 1;
+
+    // Load states, matching webview.LoadState in navigation.go.
+    private static final int WEBVIEW_LOAD_LOADING = 1;
+    private static final int WEBVIEW_LOAD_COMPLETE = 2;
+    private static final int WEBVIEW_LOAD_FAILED = 3;
+
+    // Navigation kinds, matching webview.NavigationKind in navigation.go.
+    private static final int WEBVIEW_NAV_OTHER = 0;
+    private static final int WEBVIEW_NAV_LINK = 1;
+
+    // Operations, matching webview.navOp in platform.go.
+    private static final int WEBVIEW_OP_CAN_GO_BACK = 0;
+    private static final int WEBVIEW_OP_GO_BACK = 1;
+    private static final int WEBVIEW_OP_CAN_GO_FORWARD = 2;
+    private static final int WEBVIEW_OP_GO_FORWARD = 3;
+    private static final int WEBVIEW_OP_RELOAD = 4;
+    private static final int WEBVIEW_OP_STOP_LOADING = 5;
+
+    private static native void webviewMessage(long token, String origin, String body);
+
+    private static native void webviewEvalDone(long token, long callID, String result, String err);
+
+    private static native void webviewLoad(long token, int state, String url, String err);
+
+    // webviewNavigate is answered synchronously because WebViewClient is: the
+    // engine is blocked on the decision. The Go side hops to the main
+    // goroutine and waits, so OnNavigate must return promptly — which is
+    // already its documented contract.
+    private static native boolean webviewNavigate(long token, String url, int kind,
+            boolean mainFrame, boolean newWindow);
+
+    // BelluiWebViewHost is the hole punch: a clipping FrameLayout carrying the
+    // host's clip rectangle, with the WebView inside it carrying the host's own
+    // rectangle. Without the clipping parent a web view inside a
+    // container.Scroll would overflow the scroll's edge.
+    private static final class BelluiWebViewHost {
+        final long token;
+        FrameLayout clip;
+        WebView web;
+
+        // Shadow state, written on the UI thread and read from JNI threads, so
+        // a synchronous query never has to block on the UI thread.
+        volatile boolean canGoBack;
+        volatile boolean canGoForward;
+        volatile boolean hasFocus;
+
+        BelluiWebViewHost(long token) {
+            this.token = token;
+        }
+
+        void syncHistory() {
+            if (web != null) {
+                canGoBack = web.canGoBack();
+                canGoForward = web.canGoForward();
+            }
+        }
+    }
+
+    static int webviewCreate(final long token, final String bridgeScript) {
+        final int id;
+        synchronized (mWebViews) {
+            id = mWebViewNextId++;
+        }
+        final GoNativeActivity activity = goNativeActivity;
+        if (activity == null) {
+            return 0;
+        }
+        activity.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                activity.doWebviewCreate(id, token, bridgeScript);
+            }
+        });
+        return id;
+    }
+
+    void doWebviewCreate(int id, long token, String bridgeScript) {
+        final BelluiWebViewHost host = new BelluiWebViewHost(token);
+
+        host.clip = new FrameLayout(this);
+        host.clip.setClipChildren(true);
+        host.clip.setClipToPadding(true);
+        host.clip.setVisibility(View.GONE); // shown once the host reports geometry
+
+        final WebView web = new WebView(this);
+        host.web = web;
+        web.getSettings().setJavaScriptEnabled(true);
+        web.getSettings().setDomStorageEnabled(true);
+
+        // The bridge is installed here or not at all: with no script the page
+        // has neither window.bellui nor an object to post to, which is the
+        // guarantee behind webview.WebView.EnableBridge being opt-in.
+        final String shim = bridgeScript;
+        if (shim != null && shim.length() > 0) {
+            web.addJavascriptInterface(new BelluiWebViewBridge(token), "belluiHost");
+        }
+
+        web.setWebViewClient(new WebViewClient() {
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                int kind = request.isRedirect() ? WEBVIEW_NAV_OTHER : WEBVIEW_NAV_LINK;
+                boolean allow = webviewNavigate(token, request.getUrl().toString(), kind,
+                        request.isForMainFrame(), false);
+                return !allow; // true means "handled by the app", i.e. cancelled
+            }
+
+            @Override
+            public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                // Android offers no document-start user script, so the shim is
+                // injected as early as a WebView allows. A page's own first
+                // lines can therefore run before window.bellui exists — the
+                // documented narrow race, also noted on the Go side.
+                if (shim != null && shim.length() > 0) {
+                    view.evaluateJavascript(shim, null);
+                }
+                webviewLoad(token, WEBVIEW_LOAD_LOADING, url, "");
+            }
+
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                if (shim != null && shim.length() > 0) {
+                    view.evaluateJavascript(shim, null); // idempotent; covers a missed start
+                }
+                BelluiWebViewHost h = webviewHost(mWebViewIdOf(token));
+                if (h != null) {
+                    h.syncHistory();
+                }
+                webviewLoad(token, WEBVIEW_LOAD_COMPLETE, url, "");
+            }
+
+            @Override
+            public void onReceivedError(WebView view, WebResourceRequest request,
+                    WebResourceError error) {
+                if (!request.isForMainFrame()) {
+                    return; // sub-resource failures are not the view's load state
+                }
+                webviewLoad(token, WEBVIEW_LOAD_FAILED, request.getUrl().toString(),
+                        String.valueOf(error.getDescription()));
+            }
+        });
+
+        web.setOnFocusChangeListener(new View.OnFocusChangeListener() {
+            @Override
+            public void onFocusChange(View v, boolean focused) {
+                host.hasFocus = focused;
+            }
+        });
+
+        host.clip.addView(web, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT));
+
+        // Added to the decor view, the same hosting shape as the accessibility
+        // host (#1104), so it sits above everything bellui draws — the
+        // documented "nothing draws above this" property of the hole punch.
+        ViewGroup decorView = (ViewGroup) getWindow().getDecorView();
+        decorView.addView(host.clip, new FrameLayout.LayoutParams(0, 0));
+
+        synchronized (mWebViews) {
+            mWebViews.put(Integer.valueOf(id), host);
+        }
+    }
+
+    private static BelluiWebViewHost webviewHost(int id) {
+        synchronized (mWebViews) {
+            return mWebViews.get(Integer.valueOf(id));
+        }
+    }
+
+    private static int mWebViewIdOf(long token) {
+        synchronized (mWebViews) {
+            for (java.util.Map.Entry<Integer, BelluiWebViewHost> e : mWebViews.entrySet()) {
+                if (e.getValue().token == token) {
+                    return e.getKey().intValue();
+                }
+            }
+        }
+        return 0;
+    }
+
+    // BelluiWebViewBridge is the page-side transport of the JS bridge. The shim
+    // calls belluiHost.post(s); the origin is taken from the WebView's own
+    // current URL rather than from anything the message claims, so the Go
+    // side's OriginPolicy is deciding about the page that actually sent it.
+    private static final class BelluiWebViewBridge {
+        private final long token;
+
+        BelluiWebViewBridge(long token) {
+            this.token = token;
+        }
+
+        @android.webkit.JavascriptInterface
+        public void post(String body, String origin) {
+            webviewMessage(token, origin == null ? "null" : origin, body);
+        }
+    }
+
+    static void webviewDestroy(final int id) {
+        final GoNativeActivity activity = goNativeActivity;
+        if (activity == null) {
+            return;
+        }
+        activity.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                BelluiWebViewHost host;
+                synchronized (mWebViews) {
+                    host = mWebViews.remove(Integer.valueOf(id));
+                }
+                if (host == null) {
+                    return; // already destroyed
+                }
+                if (host.web != null) {
+                    // Stop the engine and clear its clients before tearing the
+                    // view down, so nothing already in flight reports through a
+                    // token the Go side has just dropped.
+                    host.web.setWebViewClient(new WebViewClient());
+                    host.web.stopLoading();
+                    host.web.loadUrl("about:blank");
+                    host.clip.removeView(host.web);
+                    host.web.destroy();
+                    host.web = null;
+                }
+                ViewParent parent = host.clip.getParent();
+                if (parent instanceof ViewGroup) {
+                    ((ViewGroup) parent).removeView(host.clip);
+                }
+                host.clip = null;
+            }
+        });
+    }
+
+    static void webviewSetGeometry(final int id,
+            final int clipX, final int clipY, final int clipW, final int clipH,
+            final int viewX, final int viewY, final int viewW, final int viewH) {
+        final GoNativeActivity activity = goNativeActivity;
+        if (activity == null) {
+            return;
+        }
+        activity.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                BelluiWebViewHost host = webviewHost(id);
+                if (host == null || host.clip == null) {
+                    return;
+                }
+                FrameLayout.LayoutParams clipParams =
+                        (FrameLayout.LayoutParams) host.clip.getLayoutParams();
+                clipParams.width = clipW;
+                clipParams.height = clipH;
+                clipParams.leftMargin = clipX;
+                clipParams.topMargin = clipY;
+                clipParams.gravity = Gravity.TOP | Gravity.LEFT;
+                host.clip.setLayoutParams(clipParams);
+
+                if (host.web != null) {
+                    FrameLayout.LayoutParams webParams =
+                            (FrameLayout.LayoutParams) host.web.getLayoutParams();
+                    webParams.width = viewW;
+                    webParams.height = viewH;
+                    // Placed relative to the clip, so whatever falls outside it
+                    // is masked by the parent rather than drawn.
+                    webParams.leftMargin = viewX - clipX;
+                    webParams.topMargin = viewY - clipY;
+                    webParams.gravity = Gravity.TOP | Gravity.LEFT;
+                    host.web.setLayoutParams(webParams);
+                }
+            }
+        });
+    }
+
+    static void webviewSetVisible(final int id, final boolean visible) {
+        final GoNativeActivity activity = goNativeActivity;
+        if (activity == null) {
+            return;
+        }
+        activity.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                BelluiWebViewHost host = webviewHost(id);
+                if (host != null && host.clip != null) {
+                    host.clip.setVisibility(visible ? View.VISIBLE : View.GONE);
+                }
+            }
+        });
+    }
+
+    static void webviewLoadURL(final int id, final String url) {
+        final GoNativeActivity activity = goNativeActivity;
+        if (activity == null) {
+            return;
+        }
+        activity.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                BelluiWebViewHost host = webviewHost(id);
+                if (host != null && host.web != null) {
+                    host.web.loadUrl(url);
+                }
+            }
+        });
+    }
+
+    static void webviewLoadHTML(final int id, final String html, final String baseURL) {
+        final GoNativeActivity activity = goNativeActivity;
+        if (activity == null) {
+            return;
+        }
+        activity.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                BelluiWebViewHost host = webviewHost(id);
+                if (host != null && host.web != null) {
+                    host.web.loadDataWithBaseURL(
+                            baseURL == null || baseURL.length() == 0 ? null : baseURL,
+                            html, "text/html", "UTF-8", null);
+                }
+            }
+        });
+    }
+
+    static void webviewEval(final int id, final String js, final long callID,
+            final boolean wantResult) {
+        final GoNativeActivity activity = goNativeActivity;
+        if (activity == null) {
+            return;
+        }
+        activity.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                final BelluiWebViewHost host = webviewHost(id);
+                if (host == null || host.web == null) {
+                    if (wantResult) {
+                        webviewEvalDone(0, callID, "", "webview: not attached to a window");
+                    }
+                    return;
+                }
+                if (!wantResult) {
+                    host.web.evaluateJavascript(js, null);
+                    return;
+                }
+                host.web.evaluateJavascript(js, new android.webkit.ValueCallback<String>() {
+                    @Override
+                    public void onReceiveValue(String value) {
+                        // evaluateJavascript already hands back a JSON encoding
+                        // of the value, which is exactly the eval contract; it
+                        // has no channel for a thrown exception, so a script
+                        // that throws reports null rather than an error.
+                        webviewEvalDone(host.token, callID,
+                                value == null ? "null" : value, "");
+                    }
+                });
+            }
+        });
+    }
+
+    // webviewNav answers the queries from shadow state and posts the commands,
+    // so nothing here blocks a JNI thread on the UI thread.
+    static boolean webviewNav(final int id, final int op) {
+        final BelluiWebViewHost host = webviewHost(id);
+        if (host == null) {
+            return false;
+        }
+        switch (op) {
+        case WEBVIEW_OP_CAN_GO_BACK:
+            return host.canGoBack;
+        case WEBVIEW_OP_CAN_GO_FORWARD:
+            return host.canGoForward;
+        case WEBVIEW_OP_GO_BACK:
+            if (!host.canGoBack) {
+                return false;
+            }
+            break;
+        case WEBVIEW_OP_GO_FORWARD:
+            if (!host.canGoForward) {
+                return false;
+            }
+            break;
+        default:
+            break;
+        }
+
+        final GoNativeActivity activity = goNativeActivity;
+        if (activity == null) {
+            return false;
+        }
+        activity.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                BelluiWebViewHost h = webviewHost(id);
+                if (h == null || h.web == null) {
+                    return;
+                }
+                switch (op) {
+                case WEBVIEW_OP_GO_BACK:
+                    h.web.goBack();
+                    break;
+                case WEBVIEW_OP_GO_FORWARD:
+                    h.web.goForward();
+                    break;
+                case WEBVIEW_OP_RELOAD:
+                    h.web.reload();
+                    break;
+                case WEBVIEW_OP_STOP_LOADING:
+                    h.web.stopLoading();
+                    break;
+                }
+                h.syncHistory();
+            }
+        });
+        return true;
+    }
+
+    static boolean webviewHasFocus(final int id) {
+        BelluiWebViewHost host = webviewHost(id);
+        return host != null && host.hasFocus;
+    }
+
+    static boolean webviewSetFocus(final int id, final boolean take) {
+        final GoNativeActivity activity = goNativeActivity;
+        if (activity == null) {
+            return false;
+        }
+        final BelluiWebViewHost host = webviewHost(id);
+        if (host == null) {
+            return false;
+        }
+        if (!take && !host.hasFocus) {
+            return true; // nothing of ours to give back
+        }
+        activity.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                BelluiWebViewHost h = webviewHost(id);
+                if (h == null || h.web == null) {
+                    return;
+                }
+                if (take) {
+                    h.web.setFocusableInTouchMode(true);
+                    h.web.requestFocus();
+                } else {
+                    h.web.clearFocus();
+                    // Nothing is focused in its place: bellui's own keyboard
+                    // input goes through the shadow EditText, which claims
+                    // focus only while an entry is focused.
+                }
+            }
+        });
+        return true;
     }
 }
