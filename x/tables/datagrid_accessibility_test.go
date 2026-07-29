@@ -60,8 +60,10 @@ func TestDataGrid_AccessibleCellText_MatchesRenderedFormat(t *testing.T) {
 func TestDataGrid_AccessibleCellText_ValueFormatterWins(t *testing.T) {
 	data := []map[string]any{{"n": 1000}}
 	g := newTestGrid(t, data, []*ColumnDef{
-		{ColID: "n", Field: "n", Type: ColumnNumber,
-			ValueFormatter: func(v any) string { return "custom" }},
+		{
+			ColID: "n", Field: "n", Type: ColumnNumber,
+			ValueFormatter: func(v any) string { return "custom" },
+		},
 	})
 	if got := g.AccessibleCellText(0, 0); got != "custom" {
 		t.Errorf("AccessibleCellText = %q, want %q (ValueFormatter)", got, "custom")
