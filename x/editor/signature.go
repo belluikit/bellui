@@ -271,7 +271,7 @@ type signatureController struct {
 	content *bellui.Container
 
 	arrows *bellui.Container // overload control (▲ N/M ▾), shown when >1 signature
-	count  *canvas.Text    // "N/M" overload counter
+	count  *canvas.Text      // "N/M" overload counter
 
 	help *SignatureHelp // the help currently displayed
 	sig  int            // index into help.Signatures currently shown
@@ -386,7 +386,8 @@ func (s *signatureController) render() {
 	if act == "" {
 		segs = append(segs, &widget.TextSegment{Text: sig.Label, Style: widget.RichTextStyle{Inline: true}})
 	} else {
-		segs = append(segs,
+		segs = append(
+			segs,
 			&widget.TextSegment{Text: pre, Style: widget.RichTextStyle{Inline: true}},
 			&widget.TextSegment{Text: act, Style: widget.RichTextStyle{
 				Inline:    true,

@@ -126,10 +126,10 @@ type Editor struct {
 	decOverlay  *decoratorOverlay
 	find        *findBar
 	searchSpans *SearchMatchSpanDecorator // span-level find-match highlights
-	topBar      *bellui.Container           // find bar wrapper (shown/hidden)
-	hbox        *bellui.Container           // gutter + entry layout
-	root        *bellui.Container           // topBar + hbox
-	floatLayer  *bellui.Container           // floats popovers over the text
+	topBar      *bellui.Container         // find bar wrapper (shown/hidden)
+	hbox        *bellui.Container         // gutter + entry layout
+	root        *bellui.Container         // topBar + hbox
+	floatLayer  *bellui.Container         // floats popovers over the text
 
 	// activePopovers holds the currently shown popovers. At most one is
 	// interactive (completion or hover); a non-interactive companion (the
