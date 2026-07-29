@@ -245,7 +245,8 @@ func (r *dataGridRenderer) rebuildObjects() {
 		r.objects = append(r.objects, r.floatingFilterRow)
 	}
 
-	r.objects = append(r.objects,
+	r.objects = append(
+		r.objects,
 		r.pinnedLeftCells,
 		g.scrollContent.Scroll,
 		r.pinnedRightCells,

@@ -379,8 +379,10 @@ func sigCardText(e *Editor) string {
 func TestSignature_PlaintextDocumentation(t *testing.T) {
 	test.NewTempApp(t)
 	e := editorWithSignatures(t, map[string]SignatureInformation{
-		"f": {Label: "f(a)", Documentation: "see _ref_",
-			Parameters: []ParameterInformation{{Label: "a"}}},
+		"f": {
+			Label: "f(a)", Documentation: "see _ref_",
+			Parameters: []ParameterInformation{{Label: "a"}},
+		},
 	})
 	typeRunes(e, "f(")
 	if !e.signature.visible() {
@@ -394,8 +396,10 @@ func TestSignature_PlaintextDocumentation(t *testing.T) {
 func TestSignature_MarkdownDocumentation(t *testing.T) {
 	test.NewTempApp(t)
 	e := editorWithSignatures(t, map[string]SignatureInformation{
-		"f": {Label: "f(a)", Documentation: "see _ref_", DocumentationMarkdown: true,
-			Parameters: []ParameterInformation{{Label: "a"}}},
+		"f": {
+			Label: "f(a)", Documentation: "see _ref_", DocumentationMarkdown: true,
+			Parameters: []ParameterInformation{{Label: "a"}},
+		},
 	})
 	typeRunes(e, "f(")
 	if !e.signature.visible() {

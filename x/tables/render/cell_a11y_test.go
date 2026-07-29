@@ -64,9 +64,11 @@ func (f *fakeGrid) IsFocused(row, col int) bool  { return f.focused[cellKey{row,
 func (f *fakeGrid) SelectCell(row, col int) {
 	f.selectedCells = append(f.selectedCells, cellKey{row, col})
 }
+
 func (f *fakeGrid) AccessibleCellText(row, col int) string {
 	return fmt.Sprintf("r%dc%d", row, col)
 }
+
 func (f *fakeGrid) AccessibleCellIdentity(row, col int) any {
 	return [2]int{row, col} // the fake has no source mapping; key by (row,col)
 }
@@ -76,6 +78,7 @@ func (f *fakeGrid) GroupRowInfo(row int) (string, int, bool, int) {
 	gi := f.groupRows[row]
 	return gi.key, gi.count, gi.expanded, gi.depth
 }
+
 func (f *fakeGrid) ToggleGroup(groupKey string)                { f.toggled = append(f.toggled, groupKey) }
 func (f *fakeGrid) IsAlternateRow(row int) bool                { return false }
 func (f *fakeGrid) ShowCheckboxColumn() bool                   { return f.checkbox }
@@ -86,14 +89,17 @@ func (f *fakeGrid) PinnedColumnTypeName(displayCol int) string { return "text" }
 func (f *fakeGrid) PinnedCreateCell(displayCol int) core.CanvasObject {
 	return canvas.NewText("", nil)
 }
+
 func (f *fakeGrid) PinnedUpdateCell(row, displayCol int, c core.CanvasObject) {
 	if t, ok := c.(*canvas.Text); ok {
 		t.Text = f.AccessibleCellText(row, displayCol)
 	}
 }
+
 func (f *fakeGrid) HeaderColumnWidths() []float32 {
 	return repeat(100, f.pinnedLeft+f.cols+f.pinnedRt)
 }
+
 func (f *fakeGrid) DetailToggleWidth() float32 {
 	if f.masterActive {
 		return 18
@@ -116,6 +122,7 @@ func (f *fakeGrid) IsTreeRow(row int) bool { return f.treeActive }
 func (f *fakeGrid) TreeRowInfo(row int) (int, bool, bool) {
 	return f.treeDepth[row], f.treeParent[row], f.treeExpanded[row]
 }
+
 func (f *fakeGrid) TreeFirstColIndent(row int) float32 {
 	if !f.treeActive {
 		return 0
