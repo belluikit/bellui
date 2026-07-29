@@ -1,4 +1,4 @@
-//go:build linux
+//go:build linux && wpe
 
 // Minimal offscreen WPE WebKit driver for the #60 spike.
 //
