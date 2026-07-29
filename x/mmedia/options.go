@@ -1,0 +1,83 @@
+package mmedia
+
+import "time"
+
+// Option configures a player.
+type Option func(*options)
+
+type options struct {
+	autoPlay bool
+	loop     bool
+	volume   float64
+	downmix  bool // if true, multichannel audio is downmixed to stereo
+	onEnd    func()
+	onError  func(error)
+	onTime   func(current, total time.Duration)
+}
+
+// buildOptions applies the functional options over the defaults.
+func buildOptions(opts []Option) *options {
+	o := defaultOptions()
+	for _, opt := range opts {
+		opt(o)
+	}
+	return o
+}
+
+func defaultOptions() *options {
+	return &options{
+		volume: 1.0,
+	}
+}
+
+// WithAutoPlay starts playback immediately after opening media.
+func WithAutoPlay() Option {
+	return func(o *options) {
+		o.autoPlay = true
+	}
+}
+
+// WithLoop enables looping playback.
+func WithLoop() Option {
+	return func(o *options) {
+		o.loop = true
+	}
+}
+
+// WithVolume sets the initial playback volume (0.0 to 1.0).
+func WithVolume(v float64) Option {
+	return func(o *options) {
+		o.volume = v
+	}
+}
+
+// WithOnEnd sets a callback for when playback ends.
+func WithOnEnd(f func()) Option {
+	return func(o *options) {
+		o.onEnd = f
+	}
+}
+
+// WithOnError sets a callback for playback errors.
+func WithOnError(f func(error)) Option {
+	return func(o *options) {
+		o.onError = f
+	}
+}
+
+// WithOnTimeUpdate sets a callback for periodic time updates.
+func WithOnTimeUpdate(f func(current, total time.Duration)) Option {
+	return func(o *options) {
+		o.onTime = f
+	}
+}
+
+// WithDownmix forces multichannel audio (5.1/7.1) to be downmixed to stereo.
+// Without this option the stream's native channel layout is passed through,
+// provided the audio device accepts it — the device is opened once per process,
+// so a later stream is downmixed to whatever the first one established.
+func WithDownmix() Option {
+	return func(o *options) {
+		o.downmix = true
+	}
+}
