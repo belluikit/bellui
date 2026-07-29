@@ -15,6 +15,64 @@
 // the host inert (it occupies its space and draws nothing) rather than
 // panicking, so a cross-platform app compiles and runs everywhere.
 //
+// # Platforms
+//
+//	macOS      WKWebView, hosted in the GLFW content view
+//	iOS        WKWebView, hosted in the app window beside the GLKView
+//	Android    android.webkit.WebView, hosted on the decor view
+//	Web        an <iframe> positioned over the canvas
+//	Windows    not yet — WebView2 is tracked in #65
+//	Linux      no built-in backend, by decision — see below
+//
+// Every backend here uses the platform's **own** engine, so no web engine is
+// bundled into a bellui binary on any platform and security updates stay with
+// the OS vendor. Linux is the one target with no engine that can be used that
+// way, which is why it has none: WebKitGTK is LGPL (outside this project's
+// allowed dependency set) and needs a GTK main loop, and WPE — measured in
+// #60 — is unbundled, ABI-coupled to the distro, absent from Ubuntu since
+// 22.04, and would be zero-copy only under Wayland. CEF has no distro
+// packaging at all and no stable ABI, so it cannot be a system dependency
+// either.
+//
+// # Supplying a Linux backend yourself
+//
+// "No built-in backend" is not the same as "impossible". [widget.NativeView]
+// is a public interface with no unexported methods, so an application — or a
+// third-party module — can implement one and host it with
+// [widget.NewNativeViewHost], with no change to bellui:
+//
+//	view := mycef.New(...)          // implements widget.NativeView
+//	host := widget.NewNativeViewHost(view)
+//
+// That is the right home for an engine the toolkit will not carry. Whoever
+// supplies it pins their own engine version, owns their own update cadence,
+// and ships it inside their own Flatpak/AppImage/tarball — which is how
+// Chromium-embedding applications distribute anyway. bellui stays free of the
+// binary size and of the obligation to rebuild on every engine CVE.
+//
+// Such a backend must satisfy the whole [widget.NativeView] contract —
+// including a native clip in SetGeometry, or the view will overflow an
+// enclosing [container.Scroll] — and should implement
+// [widget.NativeViewFocuser] as well, or bellui's focus and the OS keyboard
+// focus will drift apart. This package is not involved: it binds the
+// platform engines listed above, and a supplied backend is used through the
+// host directly.
+//
+// Each platform bends the API where its engine does. Every such difference is
+// documented on the backend that has it, and the ones worth knowing before
+// choosing a design are:
+//
+//   - On the web target the bridge, [WebView.Eval] and [WebView.Call] reach
+//     same-origin content only, [WebView.OnNavigate] sees only the
+//     navigations this package starts, and [WebView.CanGoBack] always reports
+//     false. All three are browser policy for framed content.
+//   - On the web target and Android the page-side bridge is injected when the
+//     document loads rather than before it runs, so a page's own first lines
+//     may not see window.bellui. [WebView.LoadHTML] on the web target is the
+//     exception: the shim travels in the content itself.
+//   - On Android a script that throws reports a null result rather than an
+//     error, because evaluateJavascript has no channel for an exception.
+//
 // # Talking to the page
 //
 // Two channels connect bellui logic and page logic, and the hole punch
