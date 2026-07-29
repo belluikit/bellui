@@ -1,0 +1,41 @@
+# Compiled binaries. Demo and example programs are built on demand, never
+# committed — the repo previously carried ~100 MB of them.
+demo-*
+example-*
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Local multi-module workspace: points at a sibling goffmpeg checkout, so it is
+# machine-specific and must never be committed.
+go.work
+go.work.sum
+
+# Go build and coverage artifacts
+/vendor/
+coverage.txt
+coverage.html
+*.prof
+
+# Local media used for manual testing. The fixtures under
+# internal/source/testdata are committed on purpose, so that whole tree is
+# re-included — a per-extension exception is too easy to get wrong. The HLS
+# segments were silently excluded by the *.ts rule until CI served the playlist
+# and 404'd every segment.
+*.mp4
+*.mkv
+*.webm
+*.mp3
+*.flac
+*.wav
+*.ts
+!internal/source/testdata/**
+
+# Editor and OS noise
+.DS_Store
+.idea/
+.vscode/
+*.swp
