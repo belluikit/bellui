@@ -40,6 +40,13 @@ import (
 // single helper for that reason, and handler objects are resolved through the
 // registry rather than by casting, so a stale callback finds nothing instead of
 // reading freed memory.
+//
+// They are also compatible with -race, whose checkptr only rejects a computed
+// pointer that lands *inside the Go heap* without a tracked original — which an
+// engine-owned address never is. What checkptr does refuse is a Go pointer
+// handed to one of these uintptr parameters and converted back, so the
+// decisions worth testing are separated from the ABI shims that receive them
+// (see comHandlerQueryInterface).
 
 // HRESULTs. A COM method reports one as a signed 32-bit code and a failure is
 // simply a negative one, which is why E_POINTER appears twice: once as the
@@ -382,19 +389,43 @@ func comHandlerAt(this uintptr) *comHandler {
 	return liveHandlers[this]
 }
 
+// comHandlerQueryInterface is the ABI shim: it gives the addresses the engine
+// passed their real types and hands the decision to queryInterface.
+//
+// The split is what makes the decision testable. Handing a Go pointer to a
+// uintptr parameter and converting it back inside is a round trip the race
+// detector's checkptr refuses — correctly, since it cannot see that the two
+// ends are the same allocation — so a test that drove this signature directly
+// would abort under -race even though the production caller (whose addresses
+// are the engine's, outside the Go heap) is fine.
 func comHandlerQueryInterface(this, riid, ppv uintptr) uintptr {
-	h := comHandlerAt(this)
-	if ppv == 0 || h == nil {
+	if ppv == 0 {
 		return hrPointer
 	}
+	var id *windows.GUID
 	if riid != 0 {
-		if id := (*windows.GUID)(unsafe.Pointer(riid)); *id == iidIUnknown || *id == *h.iid {
-			atomic.AddInt32(&h.refs, 1)
-			*(*uintptr)(unsafe.Pointer(ppv)) = this
-			return sOK
-		}
+		id = (*windows.GUID)(unsafe.Pointer(riid))
 	}
-	*(*uintptr)(unsafe.Pointer(ppv)) = 0
+	return queryInterface(comHandlerAt(this), this, id, (*uintptr)(unsafe.Pointer(ppv)))
+}
+
+// queryInterface answers for IUnknown and for the one interface this handler
+// was created as, and refuses everything else — so the engine never receives
+// the object under an interface it does not implement.
+func queryInterface(h *comHandler, this uintptr, riid *windows.GUID, ppv *uintptr) uintptr {
+	if ppv == nil {
+		return hrPointer
+	}
+	if h == nil {
+		*ppv = 0
+		return hrPointer
+	}
+	if riid != nil && (*riid == iidIUnknown || *riid == *h.iid) {
+		atomic.AddInt32(&h.refs, 1)
+		*ppv = this
+		return sOK
+	}
+	*ppv = 0
 	return hrNoInterface
 }
 
