@@ -1,3 +1,11 @@
+// These tests drive the on-disk preferences store — saveToFile/loadFromFile,
+// storagePath and atomicFileWriter all live in `!wasm` files (preferences_nonweb.go,
+// preferences_other.go), because wasm persists through localStorage instead
+// (preferences_wasm.go). Without this tag the untagged test file joined the wasm
+// test build and referenced symbols that do not exist there (#77). Portable
+// preferences tests belong in preferences_common_test.go, which stays untagged.
+//go:build !wasm
+
 package app
 
 import (
@@ -176,17 +184,4 @@ func TestPreferences_Load(t *testing.T) {
 	assert.Equal(t, true, bellui.PrefOr(p, "keyBool", false))
 	assert.Equal(t, []bool{true, false, true}, bellui.PrefOr(p, "keyBoolList", []bool{}))
 	assert.Empty(t, bellui.PrefOr(p, "keyEmptyList", []string{}))
-}
-
-func TestPreferences_EmptyLoad(t *testing.T) {
-	p := newPreferences(&belluiApp{uniqueID: ""})
-
-	count := 0
-	p.ReadValues(func(v map[string]any) {
-		for range v {
-			count++
-		}
-	})
-
-	assert.Zero(t, count)
 }
