@@ -1,4 +1,4 @@
-//go:build linux
+//go:build linux && wpe
 
 // Command wpeprobe is the #60 spike: can Linux host web content as a *texture*
 // bellui composites, instead of as the hole punch every other platform uses?
