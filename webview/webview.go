@@ -15,6 +15,33 @@
 // the host inert (it occupies its space and draws nothing) rather than
 // panicking, so a cross-platform app compiles and runs everywhere.
 //
+// # Platforms
+//
+//	macOS      WKWebView, hosted in the GLFW content view
+//	iOS        WKWebView, hosted in the app window beside the GLKView
+//	Android    android.webkit.WebView, hosted on the decor view
+//	Web        an <iframe> positioned over the canvas
+//	Windows    not yet — WebView2 is tracked in #65
+//	Linux      not supported, and not a bug to be fixed: the engine that
+//	           could be embedded is LGPL, which is outside this project's
+//	           allowed dependency set, and Wayland has no cross-toolkit
+//	           embedding primitive. See #60 for the alternatives weighed.
+//
+// Each platform bends the API where its engine does. Every such difference is
+// documented on the backend that has it, and the ones worth knowing before
+// choosing a design are:
+//
+//   - On the web target the bridge, [WebView.Eval] and [WebView.Call] reach
+//     same-origin content only, [WebView.OnNavigate] sees only the
+//     navigations this package starts, and [WebView.CanGoBack] always reports
+//     false. All three are browser policy for framed content.
+//   - On the web target and Android the page-side bridge is injected when the
+//     document loads rather than before it runs, so a page's own first lines
+//     may not see window.bellui. [WebView.LoadHTML] on the web target is the
+//     exception: the shim travels in the content itself.
+//   - On Android a script that throws reports a null result rather than an
+//     error, because evaluateJavascript has no channel for an exception.
+//
 // # Talking to the page
 //
 // Two channels connect bellui logic and page logic, and the hole punch
