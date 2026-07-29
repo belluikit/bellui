@@ -34,12 +34,15 @@ type Diagnostic struct {
 // SetDiagnostics replaces the editor's diagnostic set, refreshing the squiggle
 // overlay and firing the [Editor.OnDiagnosticsChanged] callback. It is
 // idempotent and cheap to call on every publish-diagnostics notification;
-// passing nil (or an empty slice) clears all diagnostics.
+// passing nil (or an empty slice) clears all diagnostics. When the diagnostic
+// picture changes it is also announced to a running screen reader (see
+// announceDiagnostics), so call it on the main goroutine.
 func (e *Editor) SetDiagnostics(diags []Diagnostic) {
 	e.diagnostics.diags = diags
 	e.diagGutter.SetDiagnostics(diags)
 	e.RefreshDecorators()
 	e.RefreshGutter()
+	e.announceDiagnostics(diags)
 	if e.onDiagnosticsChanged != nil {
 		e.onDiagnosticsChanged(diags)
 	}

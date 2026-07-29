@@ -6,7 +6,7 @@ import (
 )
 
 // RendererFactory creates and updates cell CanvasObjects for a column type.
-// This follows Fyne's CreateCell/UpdateCell callback pattern.
+// This follows Bellui's CreateCell/UpdateCell callback pattern.
 type RendererFactory interface {
 	// CreateCell returns a new template CanvasObject for a cell.
 	// The object will be recycled via the cell pool.

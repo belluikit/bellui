@@ -3,16 +3,16 @@
 ## Vision — the end goal
 
 fycoder today is a **composable syntax-highlighting code editor widget** for
-Fyne. The goal of this roadmap is to grow it into a **complete, LSP-capable
+Bellui. The goal of this roadmap is to grow it into a **complete, LSP-capable
 editor core** — capable enough to be the editor at the heart of a production
 IDE such as [**pxfed**](https://github.com/trendvidia/pxfed), the PXF desktop
 editor, so pxfed can replace its current **Electron + React + Monaco** renderer
-with a native **Fyne / Go** stack built on fycoder (and rendered through the
+with a native **Bellui / Go** stack built on fycoder (and rendered through the
 [appviewer](https://github.com/trendvidia/appviewer) engine).
 
 "Monaco-parity for pxfed" is the concrete bar. pxfed leans on
 Monaco + `monaco-languageclient` for a specific, enumerable set of features.
-fycoder must surface each of them natively in Fyne:
+fycoder must surface each of them natively in Bellui:
 
 | pxfed needs (today via Monaco) | fycoder phase |
 |---|---|
@@ -44,7 +44,7 @@ fycoder must surface each of them natively in Fyne:
    tracked separately in
    [00-fyne-fork-dependencies.md](docs/roadmap/00-fyne-fork-dependencies.md).
 4. **Every phase ships value standalone.** A general-purpose code editor (Zed /
-   VS Code-like for any Fyne app) benefits from each phase independently of
+   VS Code-like for any Bellui app) benefits from each phase independently of
    pxfed. pxfed is the forcing function, not the only consumer.
 
 ## Current baseline (Milestone 0 — shipped)
@@ -92,7 +92,7 @@ The three biggest structural gaps between this and an IDE core:
 | **5** | [Folding & large files](docs/roadmap/05-folding-and-large-files.md) | Fold regions + gutter UI + auto-fold; windowed rendering for big docs | Fork: row hiding in `Entry` | **XL** | ✅ **complete** ([fyne#150](https://github.com/trendvidia/fyne/issues/150)) — `FoldRegion` model + `SetFoldRegions`/`Fold`/`Unfold`/`FoldedRanges`/`AutoFold`, `FoldGutter` chevrons via `CompositeGutter`, collapsed-region placeholder overlay, all on fork F4 `Entry.HiddenRanges`. Gutter + decorator overlay now viewport-windowed (`Editor.rowWindow`, O(viewport) not O(document)) so the external render cycle on a 50k-line file drops from ~15ms → ~0.05ms/frame; guarded by a large-file benchmark + budget test. (The Entry's own per-keystroke relayout stays O(document) in the fork — a separate F5 follow-up, unaffected by folding.) Pins fyne **v2.11.0** |
 | **6** | [Document model & view-state](docs/roadmap/06-document-model-and-viewstate.md) | Versioned document, incremental edits, per-document view-state for tab hosts | Phases 1–5 | **M** | — |
 | **7** | [LSP integration layer](docs/roadmap/07-lsp-integration-layer.md) | Optional `fycoder/lsp` bridging a language server to all hooks above | Phases 1–6 | **L** | — |
-| **0** | [Fyne fork dependencies](docs/roadmap/00-fyne-fork-dependencies.md) | Cross-cutting `trendvidia/fyne` `Entry` work that phases 1/4/5 require | — | runs in parallel | F1+F2 ✅ (fyne v2.9.0); F3+F4 ✅ (fyne **v2.10.0**, consumed via [#101](https://github.com/belluikit/bellui/x/editor/pull/101)) |
+| **0** | [Bellui fork dependencies](docs/roadmap/00-fyne-fork-dependencies.md) | Cross-cutting `trendvidia/fyne` `Entry` work that phases 1/4/5 require | — | runs in parallel | F1+F2 ✅ (fyne v2.9.0); F3+F4 ✅ (fyne **v2.10.0**, consumed via [#101](https://github.com/belluikit/bellui/x/editor/pull/101)) |
 
 Size key: **S** ≈ days · **M** ≈ 1–2 wk · **L** ≈ 3–5 wk · **XL** ≈ 6 wk+
 (single-engineer, including tests + gallery demo).
@@ -104,7 +104,7 @@ Phases 1–7 reach parity with the slice of Monaco that **pxfed** uses. Monaco t
 general-purpose, VS Code-class editor. **pxfed needs none of them** — they are
 listed so the Monaco gap is documented explicitly rather than implied, and
 should be pursued only if fycoder is positioned as a standalone editor for the
-wider Fyne ecosystem.
+wider Bellui ecosystem.
 
 | Phase | Title | Headline capability | Depends on | Size |
 |------|-------|---------------------|------------|------|
@@ -120,7 +120,7 @@ self-contained and largely independent of the LSP work.
 - **[Phase 10 — WASM / web target](docs/roadmap/10-wasm-web-target.md)** — a
   feasibility analysis of running a fycoder-based, pxfed-class app in the
   browser via `GOOS=js`. Verdict: possible (the native-Go stack is what makes it
-  possible), gated chiefly on Fyne-WASM's text-input layer. fycoder's own
+  possible), gated chiefly on Bellui-WASM's text-input layer. fycoder's own
   obligation is narrow — the editor must be usable under `js/wasm` — and is best
   de-risked with the one-day spike described there before committing.
 
@@ -160,7 +160,7 @@ track   └─ Phase 4 (protected ranges) ─┘            Phase 5 (folding) �
 Reaching the end goal — fycoder as a drop-in IDE editor core with pxfed parity —
 is roughly **4–6 engineer-months** for fycoder + its fork dependencies,
 sequenced as above. That is the editor-core portion of the larger
-"rebuild pxfed on Fyne" effort; the protolsp server, sops, age keygen, and
+"rebuild pxfed on Bellui" effort; the protolsp server, sops, age keygen, and
 Connect-RPC services are reused as-is and are out of scope for this repo.
 
 The single largest line items are **Phase 5 (folding + large-file

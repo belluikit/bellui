@@ -63,7 +63,7 @@ func (r *dataGridRenderer) Layout(size geo.Size) {
 }
 
 // doLayout positions all children for the given size. Called from both
-// Layout() (normal Fyne lifecycle) and relayoutChildren() (during resize drags).
+// Layout() (normal Bellui lifecycle) and relayoutChildren() (during resize drags).
 func (r *dataGridRenderer) doLayout(size geo.Size) {
 	if size.Width <= 0 || size.Height <= 0 {
 		return
@@ -152,11 +152,20 @@ func (r *dataGridRenderer) doLayout(size geo.Size) {
 		r.pinnedRightCells.Hide()
 	}
 
+	// Group-header overlay — spans the full body width, above every cell band,
+	// so each group row's label and accessible node cover pinned-left through
+	// pinned-right in one place (#110, #111).
+	g.groupRowOverlay.Move(geo.NewPos(0, yOffset))
+	g.groupRowOverlay.Resize(geo.NewSize(size.Width, contentH))
+
 	// Status bar
 	if r.statusBar != nil {
 		r.statusBar.Move(geo.NewPos(0, size.Height-statusBarH))
 		r.statusBar.Resize(geo.NewSize(size.Width, statusBarH))
 	}
+
+	// Inline cell editor — overlaid on the editing cell.
+	g.layoutEditOverlay(size)
 
 	// Loading overlay
 	if g.loadingOverlay != nil && g.loadingOverlay.Visible() {
@@ -170,6 +179,7 @@ func (r *dataGridRenderer) doLayout(size geo.Size) {
 	g.headerWidget.Refresh()
 	g.pinnedLeftCells.Refresh()
 	g.pinnedRightCells.Refresh()
+	g.groupRowOverlay.Refresh()
 }
 
 func (r *dataGridRenderer) MinSize() geo.Size {
@@ -235,15 +245,23 @@ func (r *dataGridRenderer) rebuildObjects() {
 		r.objects = append(r.objects, r.floatingFilterRow)
 	}
 
-	r.objects = append(
-		r.objects,
+	r.objects = append(r.objects,
 		r.pinnedLeftCells,
 		g.scrollContent.Scroll,
 		r.pinnedRightCells,
+		// Above every cell band: group-header rows render once here, spanning
+		// pinned-left through pinned-right.
+		g.groupRowOverlay,
 	)
 
 	if r.statusBar != nil {
 		r.objects = append(r.objects, r.statusBar)
+	}
+
+	// The inline editor draws above all cell bands (it overlays the editing
+	// cell, which may sit in a pinned band).
+	if g.editWidget != nil {
+		r.objects = append(r.objects, g.editWidget)
 	}
 
 	if g.loadingOverlay != nil {

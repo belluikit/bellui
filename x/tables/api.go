@@ -59,9 +59,11 @@ func (a *GridAPI) GetSelectedRows() []int {
 
 // --- Navigation ---
 
-// ScrollToRow scrolls so the given row is visible.
+// ScrollToRow scrolls so the given display row is visible. It moves only the
+// vertical axis (see DataGrid.ScrollToRow), leaving the horizontal offset
+// where the user put it.
 func (a *GridAPI) ScrollToRow(row int) {
-	a.grid.scrollToCell(CellID{Row: row, Col: 0})
+	a.grid.ScrollToRow(row)
 }
 
 // ScrollToCell scrolls so the given cell is visible.
@@ -161,6 +163,12 @@ func (a *GridAPI) StartEditing(id CellID) {
 // StopEditing cancels any active edit.
 func (a *GridAPI) StopEditing() {
 	a.grid.StopEditing()
+}
+
+// CommitEditing commits any active edit, writing the editor's value back to
+// the row.
+func (a *GridAPI) CommitEditing() {
+	a.grid.CommitEditing()
 }
 
 // Undo reverts the last cell edit.
@@ -485,10 +493,9 @@ func (a *GridAPI) SetGridState(state *GridState) {
 
 // --- Export ---
 
-// ExportCSV writes the current grid data (after filters/sort) as CSV.
-func (a *GridAPI) ExportCSV(w io.Writer) error {
-	g := a.grid
-	layout := g.visibleLayout()
+// exportColumns builds the export column list from the visible layout.
+func (a *GridAPI) exportColumns() []export.Column {
+	layout := a.grid.visibleLayout()
 	cols := make([]export.Column, len(layout.all))
 	for i, rc := range layout.all {
 		cols[i] = export.Column{
@@ -496,41 +503,73 @@ func (a *GridAPI) ExportCSV(w io.Writer) error {
 			Field:       rc.def.Field,
 			ValueGetter: rc.def.valueGetter(),
 			Formatter:   rc.def.ValueFormatter,
+			Type:        exportFieldType(rc.def),
 		}
 	}
-	return export.CSV(w, cols, &gridDataAccess{grid: g})
+	return cols
+}
+
+// exportFieldType resolves a column's declared field type for typed
+// exports: an explicit ExportType wins (including over ValueFormatter
+// — the formatter stays a display concern, PXF exports the raw typed
+// value), an undeclared ValueFormatter column is string, and the
+// unambiguous ColumnTypes map directly. ColumnNumber and ColumnCustom
+// stay unspecified — export.PXF rejects them rather than inferring a
+// type from cell values.
+func exportFieldType(def *ColumnDef) export.FieldType {
+	if def.ExportType != export.FieldUnspecified {
+		return def.ExportType
+	}
+	if def.ValueFormatter != nil {
+		return export.FieldString
+	}
+	switch def.Type {
+	case ColumnText:
+		return export.FieldString
+	case ColumnBoolean:
+		return export.FieldBool
+	case ColumnDate:
+		return export.FieldTimestamp
+	}
+	return export.FieldUnspecified
+}
+
+// ExportCSV writes the current grid data (after filters/sort) as CSV.
+func (a *GridAPI) ExportCSV(w io.Writer) error {
+	return export.CSV(w, a.exportColumns(), &gridDataAccess{grid: a.grid})
 }
 
 // ExportTSV writes the current grid data as tab-separated values.
 func (a *GridAPI) ExportTSV(w io.Writer) error {
-	g := a.grid
-	layout := g.visibleLayout()
-	cols := make([]export.Column, len(layout.all))
-	for i, rc := range layout.all {
-		cols[i] = export.Column{
-			Header:      rc.def.Header(),
-			Field:       rc.def.Field,
-			ValueGetter: rc.def.valueGetter(),
-			Formatter:   rc.def.ValueFormatter,
-		}
-	}
-	return export.TSV(w, cols, &gridDataAccess{grid: g})
+	return export.TSV(w, a.exportColumns(), &gridDataAccess{grid: a.grid})
 }
 
 // ExportExcel writes the current grid data as an Excel (.xlsx) file.
 func (a *GridAPI) ExportExcel(w io.Writer) error {
-	g := a.grid
-	layout := g.visibleLayout()
-	cols := make([]export.Column, len(layout.all))
-	for i, rc := range layout.all {
-		cols[i] = export.Column{
-			Header:      rc.def.Header(),
-			Field:       rc.def.Field,
-			ValueGetter: rc.def.valueGetter(),
-			Formatter:   rc.def.ValueFormatter,
-		}
-	}
-	return export.Excel(w, cols, &gridDataAccess{grid: g})
+	return export.Excel(w, a.exportColumns(), &gridDataAccess{grid: a.grid})
+}
+
+// ExportPDF writes the current grid data as a paginated PDF report:
+// column headers repeated on every page, columns scaled to fit the
+// page, page numbers, and an optional title block. Pass the result to
+// the OS PDF viewer (e.g. via bellui.OpenURL on a file:// URL) to print.
+func (a *GridAPI) ExportPDF(w io.Writer, opts export.PDFOptions) error {
+	return export.PDF(w, a.exportColumns(), &gridDataAccess{grid: a.grid}, opts)
+}
+
+// ExportPXF writes the current grid data as a self-describing PXF
+// document: an embedded @proto schema (protowire draft §3.4.5)
+// followed by a @dataset directive (draft §3.4.4). msgType is the
+// fully qualified protobuf message type the rows bind to; the visible
+// column Field names become its field names, with field types taken
+// from each column's declaration — ColumnDef.ExportType, or the
+// unambiguous ColumnType/ValueFormatter mappings (see
+// ColumnDef.ExportType). Types are never inferred from cell values:
+// a ColumnNumber or ColumnCustom column without an ExportType fails
+// the export, as does a cell value that does not match its column's
+// declared type (see export.PXF).
+func (a *GridAPI) ExportPXF(w io.Writer, msgType string) error {
+	return export.PXF(w, msgType, a.exportColumns(), &gridDataAccess{grid: a.grid})
 }
 
 // gridDataAccess adapts DataGrid to export.DataAccess.

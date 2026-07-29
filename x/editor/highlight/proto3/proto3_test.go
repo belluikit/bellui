@@ -279,3 +279,71 @@ func TestRoundTripPreservesText(t *testing.T) {
 		t.Errorf("final state = %d, want normal", state)
 	}
 }
+
+func TestDeclaredAnnotationUseSite(t *testing.T) {
+	h := New()
+	h.SetDeclaredNames(editor.DeclaredNames{Annotations: []string{"deprecated", "myAnno"}})
+
+	// A declared annotation colors as an annotation.
+	runs, _ := h.Highlight("@myAnno message Foo {", 0)
+	if r := runFor(runs, "@myAnno"); r == nil || r.ColorName != editor.ColorNameSyntaxAnnotation {
+		t.Errorf("@myAnno = %v, want annotation color", r)
+	}
+
+	// An undeclared @ident is not colored as an annotation.
+	runs, _ = h.Highlight("@notReal x = 1;", 0)
+	if r := runFor(runs, "@notReal"); r == nil || r.ColorName == editor.ColorNameSyntaxAnnotation {
+		t.Errorf("@notReal should not be annotation-colored, got %v", r)
+	}
+}
+
+func TestDeclaredTypeAndFunctionReferences(t *testing.T) {
+	h := New()
+	h.SetDeclaredNames(editor.DeclaredNames{
+		Types:     []string{"Widget"},
+		Functions: []string{"compute"},
+	})
+
+	// A bare reference to a declared type colors as a type.
+	runs, _ := h.Highlight("Widget field = 1;", 0)
+	if r := runFor(runs, "Widget"); r == nil || r.ColorName != editor.ColorNameSyntaxType {
+		t.Errorf("Widget = %v, want type color", r)
+	}
+
+	// A bare reference to a declared function colors as a function.
+	runs, _ = h.Highlight("call compute here", 0)
+	if r := runFor(runs, "compute"); r == nil || r.ColorName != editor.ColorNameSyntaxFunction {
+		t.Errorf("compute = %v, want function color", r)
+	}
+
+	// An undeclared identifier stays default.
+	runs, _ = h.Highlight("Unknown field = 1;", 0)
+	if r := runFor(runs, "Unknown"); r == nil || r.ColorName == editor.ColorNameSyntaxType {
+		t.Errorf("Unknown should not be type-colored, got %v", r)
+	}
+}
+
+func TestDeclaredNamesNeverOverrideKeywords(t *testing.T) {
+	h := New()
+	// Even if the workspace (perversely) declares a keyword/scalar name, the
+	// static rules win.
+	h.SetDeclaredNames(editor.DeclaredNames{Types: []string{"message", "string"}})
+	runs, _ := h.Highlight("message Foo {", 0)
+	if runs[0].ColorName != editor.ColorNameSyntaxKeyword {
+		t.Errorf("message = %q, want keyword", runs[0].ColorName)
+	}
+	runs, _ = h.Highlight("string name = 1;", 0)
+	if runs[0].ColorName != editor.ColorNameSyntaxType {
+		t.Errorf("string scalar = %q, want type (scalar), not clobbered", runs[0].ColorName)
+	}
+}
+
+func TestDeclaredNamesClearedByZeroValue(t *testing.T) {
+	h := New()
+	h.SetDeclaredNames(editor.DeclaredNames{Types: []string{"Widget"}})
+	h.SetDeclaredNames(editor.DeclaredNames{}) // clear
+	runs, _ := h.Highlight("Widget field = 1;", 0)
+	if r := runFor(runs, "Widget"); r == nil || r.ColorName == editor.ColorNameSyntaxType {
+		t.Errorf("after clear, Widget should be default, got %v", r)
+	}
+}

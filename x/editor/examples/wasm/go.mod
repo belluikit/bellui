@@ -1,4 +1,4 @@
-// Separate module so the runtime-spike harness can pull the full Fyne app
+// Separate module so the runtime-spike harness can pull the full Bellui app
 // stack without adding those deps to the fycoder library's go.mod.
 // The replace points at the repo root, so it always builds against the
 // working-tree fycoder, not a published version.
@@ -8,11 +8,11 @@ go 1.25.0
 
 require (
 	github.com/belluikit/bellui/x/editor v0.0.0
-	github.com/belluikit/bellui v2.15.3
+	github.com/trendvidia/fyne/v2 v2.15.3
 )
 
 require (
-	github.com/belluikit/systray v1.12.0 // indirect
+	bellui.io/systray v1.12.0 // indirect
 	github.com/BurntSushi/toml v1.5.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fredbi/uri v1.1.1 // indirect
@@ -33,12 +33,12 @@ require (
 	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c // indirect
 	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
-	github.com/belluikit/gl-js v0.2.1 // indirect
-	github.com/belluikit/glfw v1.0.1 // indirect
-	github.com/belluikit/glfw-js v1.0.3 // indirect
-	github.com/belluikit/render v0.2.3 // indirect
-	github.com/belluikit/typesetting v0.3.5 // indirect
-	github.com/belluikit/webgpu v1.0.6 // indirect
+	github.com/trendvidia/gl-js v0.2.1 // indirect
+	github.com/trendvidia/glfw v1.0.1 // indirect
+	github.com/trendvidia/glfw-js v1.0.3 // indirect
+	github.com/trendvidia/render v0.2.3 // indirect
+	github.com/trendvidia/typesetting v0.3.5 // indirect
+	github.com/trendvidia/webgpu v1.0.6 // indirect
 	github.com/yuin/goldmark v1.7.8 // indirect
 	golang.org/x/image v0.41.0 // indirect
 	golang.org/x/net v0.55.0 // indirect
@@ -54,4 +54,4 @@ replace github.com/belluikit/bellui/x/editor => ../..
 // trendvidia/gl-js fork (renamed module path) that returns js.Null() for
 // empty slices — fix merged in trendvidia/gl-js#1, released as v0.2.1.
 // Remove this once trendvidia/fyne itself replaces gl-js with the fixed fork.
-replace github.com/belluikit/gl-js => github.com/belluikit/gl-js v0.2.1
+replace github.com/fyne-io/gl-js => github.com/trendvidia/gl-js v0.2.1

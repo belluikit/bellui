@@ -26,7 +26,7 @@
 
 .PARAMETER UiaTree
   Path to the fork's uiatree.ps1 (resolve via
-  `go list -m -f '{{.Dir}}' github.com/belluikit/bellui` + hack/a11yprobe/windows).
+  `go list -m -f '{{.Dir}}' github.com/trendvidia/fyne/v2` + hack/a11yprobe/windows).
 
 .PARAMETER SettleSeconds
   Seconds to wait for GPU init + window/UIA registration before dumping.

@@ -28,16 +28,34 @@ const (
 
 // Highlighter provides PXF syntax highlighting.
 // It implements [editor.Highlighter].
-type Highlighter struct{}
+type Highlighter struct {
+	// declared holds the workspace-supplied names consulted for schema-informed
+	// coloring; a zero value (all-nil sets) reduces to the static behavior.
+	declared editor.DeclaredNameSets
+}
 
 // New creates a PXF highlighter.
 func New() *Highlighter {
 	return &Highlighter{}
 }
 
+// SetDeclaredNames seeds the highlighter with the workspace's declared RFC-001
+// names (see [editor.DeclaredNames]). It colors an @name use site as an
+// annotation when name is a declared annotation, and a bare identifier as a
+// type when it names a declared type — on top of the static rules, which always
+// win. The set is line-based and stale between analyze passes, so refresh it on
+// the analyze-completion path and call [editor.Editor.RefreshHighlighter]
+// after. Passing a zero [editor.DeclaredNames] clears the workspace names.
+//
+// PXF is a value-encoding format, so declared functions have no use site here
+// and [editor.DeclaredNames.Functions] is ignored.
+func (h *Highlighter) SetDeclaredNames(names editor.DeclaredNames) {
+	h.declared = names.Sets()
+}
+
 // Highlight implements [editor.Highlighter].
 func (h *Highlighter) Highlight(line string, state int) ([]editor.StyleRun, int) {
-	toks, newState := tokenizeLine(line, state)
+	toks, newState := h.tokenizeLine(line, state)
 
 	// Detect light/dark variant for color selection.
 	isLight := false
@@ -72,19 +90,20 @@ func (h *Highlighter) Highlight(line string, state int) ([]editor.StyleRun, int)
 type tokenKind int
 
 const (
-	tokDefault   tokenKind = iota
-	tokComment             // # ... or // ... or /* ... */
-	tokString              // "..." or """...""" or b"..."
-	tokNumber              // 42, 3.14
-	tokKeyword             // true, false, structural blocks
-	tokDirective           // @type
-	tokEnum                // ALL_CAPS identifiers
-	tokOperator            // = :
-	tokTimestamp           // 2024-01-15T10:30:00Z
-	tokDuration            // 1h30m, 30s
-	tokPunct               // { } [ ] ,
-	tokField               // field names (identifier before = or :)
-	tokType                // PascalCase type names (after type =)
+	tokDefault    tokenKind = iota
+	tokComment              // # ... or // ... or /* ... */
+	tokString               // "..." or """...""" or b"..."
+	tokNumber               // 42, 3.14
+	tokKeyword              // true, false, structural blocks
+	tokDirective            // @type
+	tokEnum                 // ALL_CAPS identifiers
+	tokOperator             // = :
+	tokTimestamp            // 2024-01-15T10:30:00Z
+	tokDuration             // 1h30m, 30s
+	tokPunct                // { } [ ] ,
+	tokField                // field names (identifier before = or :)
+	tokType                 // PascalCase type names (after type =), or declared type
+	tokAnnotation           // @name naming a declared annotation
 )
 
 type token struct {
@@ -110,6 +129,8 @@ func (t token) colorName() bellui.ThemeColorName {
 		return editor.ColorNameSyntaxFunction
 	case tokType:
 		return editor.ColorNameSyntaxType
+	case tokAnnotation:
+		return editor.ColorNameSyntaxAnnotation
 	default:
 		return theme.ColorNameForeground
 	}
@@ -117,18 +138,19 @@ func (t token) colorName() bellui.ThemeColorName {
 
 // lightColors provides high-contrast syntax colors for light backgrounds.
 var lightColors = map[tokenKind]color.Color{
-	tokComment:   color.NRGBA{R: 0x6A, G: 0x73, B: 0x7D, A: 0xFF}, // slate grey
-	tokString:    color.NRGBA{R: 0x03, G: 0x2F, B: 0x62, A: 0xFF}, // dark blue
-	tokNumber:    color.NRGBA{R: 0x00, G: 0x5C, B: 0xC5, A: 0xFF}, // blue
-	tokTimestamp: color.NRGBA{R: 0x00, G: 0x5C, B: 0xC5, A: 0xFF}, // blue
-	tokDuration:  color.NRGBA{R: 0x00, G: 0x5C, B: 0xC5, A: 0xFF}, // blue
-	tokKeyword:   color.NRGBA{R: 0xAF, G: 0x00, B: 0xDB, A: 0xFF}, // purple
-	tokDirective: color.NRGBA{R: 0xAF, G: 0x00, B: 0xDB, A: 0xFF}, // purple
-	tokEnum:      color.NRGBA{R: 0x00, G: 0x6B, B: 0x75, A: 0xFF}, // teal
-	tokOperator:  color.NRGBA{R: 0xD6, G: 0x33, B: 0x84, A: 0xFF}, // magenta
-	tokPunct:     color.NRGBA{R: 0x0B, G: 0x7B, B: 0x00, A: 0xFF}, // green
-	tokField:     color.NRGBA{R: 0x6F, G: 0x42, B: 0x00, A: 0xFF}, // dark amber
-	tokType:      color.NRGBA{R: 0x00, G: 0x6B, B: 0x75, A: 0xFF}, // teal
+	tokComment:    color.NRGBA{R: 0x6A, G: 0x73, B: 0x7D, A: 0xFF}, // slate grey
+	tokString:     color.NRGBA{R: 0x03, G: 0x2F, B: 0x62, A: 0xFF}, // dark blue
+	tokNumber:     color.NRGBA{R: 0x00, G: 0x5C, B: 0xC5, A: 0xFF}, // blue
+	tokTimestamp:  color.NRGBA{R: 0x00, G: 0x5C, B: 0xC5, A: 0xFF}, // blue
+	tokDuration:   color.NRGBA{R: 0x00, G: 0x5C, B: 0xC5, A: 0xFF}, // blue
+	tokKeyword:    color.NRGBA{R: 0xAF, G: 0x00, B: 0xDB, A: 0xFF}, // purple
+	tokDirective:  color.NRGBA{R: 0xAF, G: 0x00, B: 0xDB, A: 0xFF}, // purple
+	tokEnum:       color.NRGBA{R: 0x00, G: 0x6B, B: 0x75, A: 0xFF}, // teal
+	tokOperator:   color.NRGBA{R: 0xD6, G: 0x33, B: 0x84, A: 0xFF}, // magenta
+	tokPunct:      color.NRGBA{R: 0x0B, G: 0x7B, B: 0x00, A: 0xFF}, // green
+	tokField:      color.NRGBA{R: 0x6F, G: 0x42, B: 0x00, A: 0xFF}, // dark amber
+	tokType:       color.NRGBA{R: 0x00, G: 0x6B, B: 0x75, A: 0xFF}, // teal
+	tokAnnotation: color.NRGBA{R: 0xB0, G: 0x54, B: 0x00, A: 0xFF}, // burnt orange
 }
 
 // lightColor returns a direct foreground color for light theme.
@@ -143,7 +165,7 @@ func lightColor(kind tokenKind) color.Color {
 // Tokenizer
 // ----------------------------------------------------------------------------
 
-func tokenizeLine(line string, state int) ([]token, int) {
+func (h *Highlighter) tokenizeLine(line string, state int) ([]token, int) {
 	var tokens []token
 	runes := []rune(line)
 	i := 0
@@ -211,13 +233,19 @@ func tokenizeLine(line string, state int) ([]token, int) {
 			}
 		}
 
-		// Directive: @type (or @<identifier>)
+		// Directive or annotation use site: @type / @<identifier>. An @name that
+		// names a workspace-declared annotation is coloured as an annotation;
+		// every other @ident keeps the built-in directive color.
 		if r == '@' {
 			j := i + 1
-			for j < len(runes) && (unicode.IsLetter(runes[j]) || unicode.IsDigit(runes[j]) || runes[j] == '_') {
+			for j < len(runes) && (unicode.IsLetter(runes[j]) || unicode.IsDigit(runes[j]) || runes[j] == '_' || runes[j] == '.') {
 				j++
 			}
-			tokens = append(tokens, token{kind: tokDirective, text: string(runes[i:j])})
+			kind := tokDirective
+			if h.declared.Annotations[string(runes[i+1:j])] {
+				kind = tokAnnotation
+			}
+			tokens = append(tokens, token{kind: kind, text: string(runes[i:j])})
 			i = j
 			continue
 		}
@@ -316,6 +344,11 @@ func tokenizeLine(line string, state int) ([]token, int) {
 							kind = tokKeyword
 						}
 					}
+				}
+				// A bare reference to a workspace-declared type (when it wasn't
+				// resolved as a field/block above).
+				if kind == tokDefault && h.declared.Types[word] {
+					kind = tokType
 				}
 			}
 

@@ -271,7 +271,7 @@ type signatureController struct {
 	content *bellui.Container
 
 	arrows *bellui.Container // overload control (▲ N/M ▾), shown when >1 signature
-	count  *canvas.Text      // "N/M" overload counter
+	count  *canvas.Text    // "N/M" overload counter
 
 	help *SignatureHelp // the help currently displayed
 	sig  int            // index into help.Signatures currently shown
@@ -386,8 +386,7 @@ func (s *signatureController) render() {
 	if act == "" {
 		segs = append(segs, &widget.TextSegment{Text: sig.Label, Style: widget.RichTextStyle{Inline: true}})
 	} else {
-		segs = append(
-			segs,
+		segs = append(segs,
 			&widget.TextSegment{Text: pre, Style: widget.RichTextStyle{Inline: true}},
 			&widget.TextSegment{Text: act, Style: widget.RichTextStyle{
 				Inline:    true,
@@ -498,7 +497,7 @@ func (s *signatureController) dismiss() {
 // sigArrow is a small clickable icon used for the overload control. It
 // implements Tappable but deliberately not Focusable: tapping it cycles
 // overloads without taking keyboard focus from the Entry — the Entry sits under
-// the popover, so Fyne keeps it focused and the card stays open.
+// the popover, so Bellui keeps it focused and the card stays open.
 type sigArrow struct {
 	widget.BaseWidget
 	icon  *widget.Icon

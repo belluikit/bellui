@@ -10,7 +10,7 @@ import (
 	"github.com/belluikit/bellui/widget"
 )
 
-// gutterWidget is an internal Fyne widget that renders gutter content.
+// gutterWidget is an internal Bellui widget that renders gutter content.
 // It lives outside the text scroll viewport and only scrolls vertically,
 // keeping line numbers and markers pinned when the text scrolls horizontally.
 type gutterWidget struct {
@@ -203,10 +203,6 @@ func (r *gutterWidgetRenderer) Refresh() {
 	r.bg.Resize(size)
 	r.objects = append(r.objects, r.bg)
 
-	if stride <= 0 {
-		return // no usable row metrics yet; a later Refresh draws the rows
-	}
-
 	// Large-document fast path: iterate only the rows in the viewport band,
 	// computed analytically in O(viewport) — never touching an O(document)
 	// RowPositions() array.
@@ -230,6 +226,7 @@ func (r *gutterWidgetRenderer) Refresh() {
 	// Exact path (small documents): pull the full row positions from the Entry
 	// (may be nil before first layout) and fill any blank space below the content
 	// with stride-based phantom rows so the gutter spans the whole editor height.
+	topPad := g.topOffset
 	var rowYPos, rowH []float32
 	if g.getRowPositions != nil {
 		rowYPos, rowH = g.getRowPositions()
@@ -239,50 +236,37 @@ func (r *gutterWidgetRenderer) Refresh() {
 	if len(rowYPos) > 0 {
 		contentRows = len(rowYPos)
 	}
-
-	// next tracks the content-space Y the row after the one just emitted starts
-	// at, so the phantom rows below the document continue from where the laid-out
-	// content actually ENDS. Deriving them from the row index instead (topOffset +
-	// row*stride) ignores collapsed folds, which shorten the content without
-	// changing row indices — the numbers below a fold then float away from the
-	// text with a gap the size of the folded region.
-	next := g.topOffset
-	for row := 0; row < contentRows; row++ {
-		y, rh := next, stride
-		if row < len(rowYPos) && row < len(rowH) {
-			y, rh = rowYPos[row], rowH[row]
+	visibleRows := contentRows
+	if stride > 0 {
+		fitRows := int((size.Height-topPad)/stride) + 1
+		if fitRows > visibleRows {
+			visibleRows = fitRows
 		}
-		next = y + rh
+	}
+
+	for row := 0; row < visibleRows; row++ {
+		var y, rh float32
+		if row < len(rowYPos) && row < len(rowH) {
+			y = rowYPos[row] - g.scrollY
+			rh = rowH[row]
+		} else {
+			y = topPad + float32(row)*stride - g.scrollY
+			rh = stride
+		}
 		// Skip folded-away rows: a hidden row collapses to zero height and shares
 		// the next visible row's Y, so drawing its line number here stacks the
 		// hidden numbers into a smudge at the fold point (#116 follow-up).
 		if rh <= 0 {
 			continue
 		}
-		vy := y - g.scrollY
 		// Skip rows fully above the visible area.
-		if vy+rh < 0 {
+		if y+rh < 0 {
 			continue
 		}
-		if vy > size.Height {
-			return // nothing further down can be visible
+		if y > size.Height {
+			break
 		}
-		r.emitRow(g, row, vy, rh, gutterW, textSize)
-	}
-
-	// Phantom rows: continue the numbering below the last content row so the
-	// gutter spans the whole editor height rather than stopping at a short (or
-	// folded) document.
-	for row := contentRows; ; row++ {
-		vy := next - g.scrollY
-		if vy > size.Height {
-			return
-		}
-		next += stride
-		if vy+stride < 0 {
-			continue
-		}
-		r.emitRow(g, row, vy, stride, gutterW, textSize)
+		r.emitRow(g, row, y, rh, gutterW, textSize)
 	}
 }
 

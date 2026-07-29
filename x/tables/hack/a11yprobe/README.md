@@ -53,7 +53,7 @@ with `/it`, or by hand over RDP).
 ```powershell
 cd hack\a11yprobe
 go build -tags accessibility -o a11yprobe.exe .          # activates the UIA backend
-$fyne = go list -m -f '{{.Dir}}' github.com/belluikit/bellui
+$fyne = go list -m -f '{{.Dir}}' github.com/trendvidia/fyne/v2
 powershell -ExecutionPolicy Bypass -File windows\uia_assert.ps1 `
   -ProbeExe .\a11yprobe.exe `
   -UiaTree (Join-Path $fyne 'hack\a11yprobe\windows\uiatree.ps1')
@@ -169,7 +169,7 @@ merges NVDA's spoken utterances into a transcript:
 ```powershell
 # one-time: portable NVDA (any recent build)
 nvda_2026.1.1.exe --create-portable-silent --portable-path C:\nvda_portable --minimal
-$fyne = go list -m -f '{{.Dir}}' github.com/belluikit/bellui
+$fyne = go list -m -f '{{.Dir}}' github.com/trendvidia/fyne/v2
 powershell -ExecutionPolicy Bypass -File windows\nvda_capture.ps1 `
   -NvdaExe C:\nvda_portable\nvda.exe -ProbeExe .\a11yprobe.exe `
   -PluginSrc (Join-Path $fyne 'hack\a11yprobe\windows\speechcapture')

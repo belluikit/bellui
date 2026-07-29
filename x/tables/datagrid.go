@@ -21,19 +21,21 @@ const noCellMatch = math.MaxInt
 
 // Compile-time interface checks.
 var (
-	_ core.Widget                     = (*DataGrid)(nil)
-	_ core.Accessible                 = (*DataGrid)(nil)
-	_ core.AccessibleGridDimensioner  = (*DataGrid)(nil)
-	_ core.AccessibleActiveDescendant = (*DataGrid)(nil) // #42: cursor cell as AT-focused descendant (fyne#688)
-	_ event.Focusable                 = (*DataGrid)(nil)
-	_ event.Tappable                  = (*DataGrid)(nil)
-	_ event.DoubleTappable            = (*DataGrid)(nil)
-	_ event.SecondaryTappable         = (*DataGrid)(nil)
-	_ event.Draggable                 = (*DataGrid)(nil)
-	_ bellui.Shortcutable             = (*DataGrid)(nil)
-	_ event.Hoverable                 = (*DataGrid)(nil)
-	_ desktop.Mouseable               = (*DataGrid)(nil)
-	_ desktop.Cursorable              = (*DataGrid)(nil)
+	_ core.Widget                        = (*DataGrid)(nil)
+	_ core.Accessible                    = (*DataGrid)(nil)
+	_ core.AccessibleGridDimensioner     = (*DataGrid)(nil)
+	_ core.AccessibleActiveDescendant    = (*DataGrid)(nil) // #42: cursor cell as AT-focused descendant (fyne#688)
+	_ core.AccessibleVirtualCellRealizer = (*DataGrid)(nil) // #78: navigate off-viewport cells (fyne#637)
+	_ core.AccessibleScrollIntoView      = (*DataGrid)(nil) // #78: bring an off-viewport cell into view (fyne#637)
+	_ event.Focusable                    = (*DataGrid)(nil)
+	_ event.Tappable                     = (*DataGrid)(nil)
+	_ event.DoubleTappable               = (*DataGrid)(nil)
+	_ event.SecondaryTappable            = (*DataGrid)(nil)
+	_ event.Draggable                    = (*DataGrid)(nil)
+	_ bellui.Shortcutable                  = (*DataGrid)(nil)
+	_ event.Hoverable                    = (*DataGrid)(nil)
+	_ desktop.Mouseable                  = (*DataGrid)(nil)
+	_ desktop.Cursorable                 = (*DataGrid)(nil)
 )
 
 // DataGrid is the main data table widget. It provides virtual scrolling for
@@ -74,10 +76,21 @@ type DataGrid struct {
 	// body cell. The header keeps its built-in column menu. The PointEvent lets
 	// callers position a popup at e.AbsolutePosition (e.g. widget.ShowPopUpMenuAtPosition).
 	OnCellSecondaryTapped func(id CellID, e *event.PointEvent)
-	OnSortChanged         func(model []SortItem)
-	OnFilterChanged       func()
-	OnCellValueChanged    func(id CellID, oldValue, newValue any)
-	OnRowMoved            func(fromSourceRow, toSourceRow int)
+	// OnCellContextMenu is the keyboard analog of OnCellSecondaryTapped: it
+	// fires when the Menu (application) key or Shift+F10 is pressed with a
+	// focused cell, after the cell has been scrolled into view and selected —
+	// the same select-then-fire order as the pointer path. id is the focused
+	// cell in display coordinates, the same form OnCellSecondaryTapped
+	// delivers (SourceRow maps it to the stable source row). anchor is the
+	// cell's bottom-left in window-absolute coordinates — the grid's
+	// driver-reported absolute position plus the cell's widget-local rect,
+	// the same space as event.PointEvent.AbsolutePosition — so it passes
+	// straight through to widget.ShowPopUpMenuAtPosition.
+	OnCellContextMenu  func(id CellID, anchor geo.Position)
+	OnSortChanged      func(model []SortItem)
+	OnFilterChanged    func()
+	OnCellValueChanged func(id CellID, oldValue, newValue any)
+	OnRowMoved         func(fromSourceRow, toSourceRow int)
 
 	// MasterDetail configures expandable detail rows.
 	MasterDetail MasterDetailConfig
@@ -96,6 +109,7 @@ type DataGrid struct {
 	scrollContent     *render.ScrollContainer
 	pinnedLeftCells   *render.PinnedCellsWidget
 	pinnedRightCells  *render.PinnedCellsWidget
+	groupRowOverlay   *render.GroupRowOverlay
 	floatingFilterRow *render.FloatingFilterRow // set by the renderer when floating filters are enabled
 	gridTheme         *gridTheme.GridTheme
 
@@ -126,6 +140,7 @@ type DataGrid struct {
 	// Editing state
 	editingCell  *CellID
 	editWidget   core.CanvasObject
+	editFactory  cell.EditorFactory
 	editOldValue any
 	undoStack    []undoEntry
 	undoPos      int // points to next undo slot
@@ -214,6 +229,7 @@ func (g *DataGrid) init() {
 	g.headerWidget = render.NewHeaderWidget(g, g.viewport)
 	g.pinnedLeftCells = render.NewPinnedCellsWidget(g, render.PinnedLeft, g.pool, g.viewport)
 	g.pinnedRightCells = render.NewPinnedCellsWidget(g, render.PinnedRight, g.pool, g.viewport)
+	g.groupRowOverlay = render.NewGroupRowOverlay(g, g.viewport)
 	g.scrollContent = render.NewScrollContainer(g.cellsWidget)
 	g.scrollContent.SetOnScrolled(g.onScrolled)
 
@@ -415,6 +431,14 @@ func (g *DataGrid) onScrolled(pos geo.Position) {
 	// Sync pinned cells vertical scroll
 	g.pinnedLeftCells.SetOffsetY(pos.Y)
 	g.pinnedRightCells.SetOffsetY(pos.Y)
+
+	// The group-header overlay shares the body's vertical scroll (it is fixed
+	// horizontally — its labels span the full row across all bands).
+	g.groupRowOverlay.SetOffsetY(pos.Y)
+
+	// The inline editor overlay is anchored to its cell, so it must translate
+	// with the new offset (and hide when the cell leaves the body).
+	g.layoutEditOverlay(g.Size())
 }
 
 // CreateRenderer returns the DataGrid's renderer.
@@ -564,6 +588,20 @@ func (g *DataGrid) SelectCell(row, col int) {
 		col = 0
 	}
 	g.selectCell(CellID{Row: row, Col: col})
+}
+
+// ScrollToRow scrolls vertically so the given display row is inside the
+// viewport, without changing selection, focus, or the horizontal offset.
+// SelectCell moves the selection but never the viewport; pair it with
+// ScrollToRow (and DisplayRow, when starting from a source index) to reveal a
+// programmatically selected row. An out-of-range row is ignored.
+func (g *DataGrid) ScrollToRow(displayRow int) {
+	if displayRow < 0 || displayRow >= g.RowCount() {
+		return
+	}
+	// Col -1 never maps into the main band, so scrollToCell moves only the
+	// vertical axis.
+	g.scrollToCell(CellID{Row: displayRow, Col: -1})
 }
 
 func (g *DataGrid) IsHovered(row, col int) bool {
@@ -779,6 +817,14 @@ func (g *DataGrid) SortState(col int) render.SortIndicator {
 		}
 	}
 	return render.SortIndicatorNone
+}
+
+// ColumnSortable reports whether a header tap on the column at the given
+// absolute display index would sort it — the same gate OnHeaderTapped applies.
+// It backs the header cell's accessible "press" (sort) action.
+func (g *DataGrid) ColumnSortable(col int) bool {
+	rc := g.visibleCol(col)
+	return rc != nil && rc.def.isSortable(g.DefaultColDef)
 }
 
 func (g *DataGrid) OnHeaderTapped(col int, modifier event.KeyModifier) {
@@ -1264,6 +1310,153 @@ func (g *DataGrid) AccessibleActiveDescendant() any {
 	return g.AccessibleCellIdentity(g.currentFocus.Row, g.currentFocus.Col)
 }
 
+// AccessibleRealizeCell builds the semantic node for a single cell the screen
+// reader has navigated to that is NOT in the realized viewport window, without
+// materializing the rows between (core.AccessibleVirtualCellRealizer, fyne#637).
+// The grid virtualizes — only visible cells exist as real hosts — so this is the
+// only way assistive tech reaches a cell in a million-row grid past the viewport.
+//
+// row and col are display coordinates in the current presentation order — the
+// same space as AccessibleGridDimensions and every realized cell's
+// AccessibleCellPosition (checkbox-selection column inserted at slot
+// PinnedLeftCount; see render cellHost.AccessibleCellPosition). ok is false for
+// an out-of-range coordinate. The returned node carries the same role, full
+// label, selection/focus state and source-keyed identity a realized host would,
+// so the AT reads an off-screen cell identically to an on-screen one and its
+// cursor tracks the record across sort/scroll/filter. Reading has no visible
+// side effect; the explicit bring-into-view path is AccessibleScrollCellIntoView.
+func (g *DataGrid) AccessibleRealizeCell(row, col int) (core.AccessibleVirtualNode, bool) {
+	rows, cols := g.AccessibleGridDimensions()
+	if row < 0 || row >= rows || col < 0 || col >= cols {
+		return core.AccessibleVirtualNode{}, false
+	}
+	layoutCol := g.layoutColForDisplay(col)
+
+	var st core.AccessibleState
+	if g.IsSelected(row, layoutCol) {
+		st |= core.StateSelected
+	}
+	if g.IsFocused(row, layoutCol) {
+		st |= core.StateFocused
+	}
+
+	pos, size := g.cellRealizeRect(row, layoutCol)
+	return core.AccessibleVirtualNode{
+		AccessibleNode: core.AccessibleNode{
+			Role:            core.RoleTableCell,
+			Label:           g.AccessibleCellText(row, layoutCol),
+			State:           st,
+			Actions:         []core.AccessibleAction{{Name: core.ActionSelect, Description: "Select this cell"}},
+			HasCellPosition: true,
+			CellRow:         row,
+			CellCol:         col,
+		},
+		Pos:  pos,
+		Size: size,
+		ID:   g.AccessibleCellIdentity(row, layoutCol),
+	}, true
+}
+
+// AccessibleScrollCellIntoView scrolls the grid so the cell at the given display
+// (row, col) becomes visible and realized (core.AccessibleScrollIntoView,
+// fyne#637) — the explicit realize/activate path, kept separate from the read
+// path so merely announcing an off-screen cell does not move the viewport. Once
+// on-screen the cell exists as a real host, so its "select" action then routes
+// normally. Out-of-range coordinates are ignored. Called on the main goroutine.
+func (g *DataGrid) AccessibleScrollCellIntoView(row, col int) {
+	rows, cols := g.AccessibleGridDimensions()
+	if row < 0 || row >= rows || col < 0 || col >= cols {
+		return
+	}
+	g.scrollToCell(CellID{Row: row, Col: g.layoutColForDisplay(col)})
+}
+
+// layoutColForDisplay maps an absolute display column — the coordinate space
+// assistive tech navigates, with the checkbox-selection column inserted at slot
+// PinnedLeftCount — back to the layout column index that AccessibleCellText /
+// AccessibleCellIdentity / IsSelected / IsFocused use (an index into
+// visibleLayout().all, or -1 for the checkbox column). It is the exact inverse of
+// render cellHost.AccessibleCellPosition, so an off-viewport realized cell reads
+// against the same data an on-screen host would. Callers pass an in-range col.
+func (g *DataGrid) layoutColForDisplay(displayCol int) int {
+	if !g.ShowCheckboxColumn() {
+		return displayCol
+	}
+	p := g.PinnedLeftCount()
+	switch {
+	case displayCol == p:
+		return -1 // the checkbox column occupies the slot right of pinned-left
+	case displayCol > p:
+		return displayCol - 1 // main + pinned-right shift one place right of it
+	default:
+		return displayCol // pinned-left columns keep their index
+	}
+}
+
+// cellRealizeRect returns an off-viewport cell's rectangle relative to the grid
+// origin in the current scroll state. A realized cell is always outside the
+// viewport, so the meaningful axis is vertical: the row's live y (offset- and
+// header-adjusted) places it clearly above or below the visible band, which is
+// what a screen reader's spatial model expects. Horizontal geometry is exact for
+// a main (horizontally-scrolling) column and a left-edge placeholder for the
+// always-visible pinned-left / checkbox columns — precise where it matters and
+// immaterial for an off-screen cell, whose exact bring-into-view is
+// AccessibleScrollCellIntoView.
+func (g *DataGrid) cellRealizeRect(row, layoutCol int) (geo.Position, geo.Size) {
+	y, h := g.viewport.RowY(row)
+	pos := geo.NewPos(0, g.HeaderHeight()+y-g.offset.Y)
+	size := geo.NewSize(0, h)
+	if mainCol := layoutCol - g.PinnedLeftCount(); mainCol >= 0 && mainCol < g.ColumnCount() {
+		x, w := g.viewport.ColX(mainCol)
+		pos.X = x - g.offset.X
+		size.Width = w
+	}
+	return pos, size
+}
+
+// cellWidgetRect returns an on-screen cell's rectangle in widget-local
+// coordinates in the current scroll state — the exact inverse of the pointer
+// hit-test (cellAtPosition / columnAtX), band-aware where cellRealizeRect is
+// deliberately approximate: pinned-left fixed at the left edge, the main band
+// anchored at mainX and scrolled by offset.X, pinned-right a fixed overlay at
+// pinnedRightX. It anchors the keyboard context-menu path, which scrolls the
+// cell into view first, so exact geometry matters. id is in display
+// coordinates (Col an absolute index into visibleLayout().all, like
+// currentFocus); callers pass an in-range id.
+func (g *DataGrid) cellWidgetRect(id CellID) (geo.Position, geo.Size) {
+	y, h := g.viewport.RowY(id.Row)
+	pos := geo.NewPos(0, g.HeaderHeight()+y-g.offset.Y)
+	size := geo.NewSize(0, h)
+
+	layout := g.visibleLayout()
+	pad := g.cellPadding()
+	mainX, pinnedRightX, _ := g.hitRegions()
+	switch nLeft := len(layout.pinnedLeft); {
+	case id.Col < nLeft:
+		// Fixed pinned-left band at [0, mainX).
+		pos.X, size.Width = colSpanIn(layout.pinnedLeft, id.Col, pad)
+	case id.Col < nLeft+len(layout.main):
+		// Main band: drawn at mainX, scrolled by offset.X.
+		x, w := g.viewport.ColX(id.Col - nLeft)
+		pos.X, size.Width = mainX+x-g.offset.X, w
+	default:
+		// Fixed pinned-right overlay at pinnedRightX.
+		x, w := colSpanIn(layout.pinnedRight, id.Col-nLeft-len(layout.main), pad)
+		pos.X, size.Width = pinnedRightX+x, w
+	}
+	return pos, size
+}
+
+// colSpanIn is the forward complement of colIndexIn: the band-local x and
+// width of cols[i], measured from the band's left edge with the same
+// width+padding accumulation. Callers pass an in-range i.
+func colSpanIn(cols []*resolvedColumn, i int, pad float32) (x, width float32) {
+	for j := 0; j < i; j++ {
+		x += cols[j].width + pad
+	}
+	return x, cols[i].width
+}
+
 func (g *DataGrid) Tapped(e *event.PointEvent) {
 	if row := g.detailToggleAt(e.Position); row >= 0 {
 		g.ToggleDetail(row)
@@ -1459,6 +1652,32 @@ func (g *DataGrid) activateFocusedRow() {
 	}
 }
 
+// contextMenuFocusedCell is the keyboard path to the cell context menu (Menu
+// key / Shift+F10, issue #101): it scrolls the focused cell into view (à la
+// AccessibleScrollCellIntoView, so the anchor geometry is on-screen), selects
+// it exactly like the pointer path — TappedSecondary selects before firing,
+// and still selects when the callback is nil — then fires OnCellContextMenu
+// with the cell's display-space id (the same form TappedSecondary delivers)
+// anchored at its window-absolute bottom-left. A cleared cursor (its row was
+// filtered out) is a no-op, matching the other Enter/Space/F2 focus verbs.
+func (g *DataGrid) contextMenuFocusedCell() {
+	id := g.currentFocus
+	if id.Row < 0 || id.Col < 0 || id.Row >= g.RowCount() || id.Col >= g.HeaderColumnCount() {
+		return
+	}
+	// ScrollTo dispatches the offset update synchronously (render
+	// ScrollContainer.ScrollTo), so cellWidgetRect below sees the post-scroll
+	// geometry.
+	g.scrollToCell(id)
+	g.selectCell(id)
+	if g.OnCellContextMenu == nil {
+		return
+	}
+	pos, size := g.cellWidgetRect(id)
+	abs := bellui.CurrentApp().Driver().AbsolutePositionForObject(g)
+	g.OnCellContextMenu(id, abs.Add(geo.NewPos(pos.X, pos.Y+size.Height)))
+}
+
 func (g *DataGrid) TypedKey(e *event.KeyEvent) {
 	rows := g.RowCount()
 	// The keyboard cursor lives in absolute display-column space (matching mouse
@@ -1493,7 +1712,10 @@ func (g *DataGrid) TypedKey(e *event.KeyEvent) {
 		return
 	case event.KeyReturn:
 		if g.IsEditing() {
-			return // Entry handles submit
+			// Commit the active edit. (A focused Entry editor consumes the key
+			// itself and commits via OnSubmitted instead.)
+			g.CommitEditing()
+			return
 		}
 		if focusCleared {
 			return
@@ -1563,6 +1785,16 @@ func (g *DataGrid) TypedKey(e *event.KeyEvent) {
 			return
 		}
 		g.StartEditing(g.currentFocus)
+		return
+	case desktop.KeyMenu:
+		g.contextMenuFocusedCell()
+		return
+	case event.KeyF10:
+		// Only the Shift+F10 chord opens the context menu; plain F10 falls
+		// out unhandled like any other unrecognized key.
+		if e.Modifier&event.KeyModifierShift != 0 {
+			g.contextMenuFocusedCell()
+		}
 		return
 	default:
 		return
@@ -1636,6 +1868,21 @@ func (g *DataGrid) DragEnd() {
 	g.dragCol = -1
 	g.resizeCol = -1
 	g.nearResizeBorder = false
+}
+
+// Scrolled implements event.Scrollable by forwarding the delta to the grid's
+// internal scroll container, clamped exactly like a wheel event over the body.
+//
+// The grid scrolls through a container.Scroll *inside* its own subtree, which
+// the a11y walker's ancestor-only stack never sees — so without this, the
+// grid's virtual and realized-off-viewport cell nodes carry no scroll target
+// and assistive-tech scroll gestures (VoiceOver three-finger scroll, TalkBack
+// two-finger scroll) are inert over the grid (#82). Implementing Scrolled
+// gives the grid itself the scroll-handling identity the walker keys on; the
+// forwarded delta lands on the same path as a wheel event, so the offset,
+// viewport, header, and pinned bands all stay in sync via onScrolled.
+func (g *DataGrid) Scrolled(ev *event.ScrollEvent) {
+	g.scrollContent.Scroll.Scrolled(ev)
 }
 
 func (g *DataGrid) MouseDown(e *desktop.MouseEvent) {
@@ -1838,6 +2085,16 @@ func (g *DataGrid) sourceRow(displayRow int) int {
 // RowData(id.Row) would read the wrong row once the grid is sorted or filtered.
 func (g *DataGrid) SourceRow(displayRow int) int {
 	return g.sourceRow(displayRow)
+}
+
+// DisplayRow maps a stable source-row index — the indexing OnSelectionChanged,
+// OnRowActivated and RowData use — to the display row currently showing it, or
+// -1 if that source row is not in the active view (filtered out, or on another
+// page). It is the inverse of SourceRow: use it to select or reveal a row
+// tracked by source index after sort/filter/paginate permute the view, since
+// SelectCell and ScrollToRow take display rows.
+func (g *DataGrid) DisplayRow(sourceRow int) int {
+	return g.displayRowForSource(sourceRow)
 }
 
 // DisplayRowData returns the underlying row data shown at the given display-space

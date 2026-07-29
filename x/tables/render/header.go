@@ -29,6 +29,10 @@ type HeaderAccess interface {
 	ColumnHeader(col int) string
 	HeaderHeight() float32
 	SortState(col int) SortIndicator
+	// ColumnSortable reports whether a header tap on the column at the given
+	// absolute display index would sort it. It gates the header cell's
+	// accessible "press" action (headerCellA11y).
+	ColumnSortable(col int) bool
 	IsFilterActive(col int) bool
 	OnHeaderTapped(col int, modifier event.KeyModifier)
 	OnResizeDragStart(col int, startX float32)
@@ -136,8 +140,9 @@ type headerRenderer struct {
 	bg         *canvas.Rectangle
 	labels     []*canvas.Text
 	dividers   []*canvas.Line
-	sortArrows []*canvas.Text   // "▲" or "▼" indicators
-	filterDots []*canvas.Circle // small dot when filter active
+	sortArrows []*canvas.Text    // "▲" or "▼" indicators
+	filterDots []*canvas.Circle  // small dot when filter active
+	a11y       []*headerCellA11y // invisible accessible node per column (#109)
 
 	// bands places the columns in the body's three bands and clips the scrolling
 	// main band so its canvas objects cannot render outside [mainX, mainRight)
@@ -211,6 +216,11 @@ func (r *headerRenderer) rebuild(size geo.Size) {
 		r.dividers = append(r.dividers, l)
 	}
 
+	// Ensure enough accessible header nodes
+	for len(r.a11y) < colCount {
+		r.a11y = append(r.a11y, newHeaderCellA11y(grid))
+	}
+
 	sortIndicatorW := float32(14)
 	filterDotR := float32(3)
 
@@ -270,6 +280,17 @@ func (r *headerRenderer) rebuild(size geo.Size) {
 		div.Position1 = geo.NewPos(x+w, 0)
 		div.Position2 = geo.NewPos(x+w, headerH)
 		dst = append(dst, div)
+
+		// Accessible header node (semantics only, invisible) covering the
+		// column's header cell, so assistive tech can read the column title
+		// and sort a sortable column (#109). Placed per band like the visuals:
+		// a main-band node lives inside the clip, so it scrolls and clips with
+		// its column; pinned-band nodes stay fixed.
+		node := r.a11y[i]
+		node.set(i, grid.ColumnHeader(i), sortState, grid.ColumnSortable(i))
+		node.Move(geo.NewPos(x, 0))
+		node.Resize(geo.NewSize(w, headerH))
+		dst = append(dst, node)
 		return dst
 	}
 

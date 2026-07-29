@@ -11,6 +11,61 @@ This file lists the main changes with each version of the Fyne toolkit.
 Entries up to 2.7.3 are inherited from upstream Fyne; later entries describe
 the trendvidia fork (github.com/trendvidia/fyne).
 
+## v1.0.0-rc.5 — 2026-07-29
+
+**`x/editor` and `x/tables` were consolidated from the wrong source and are
+re-cut here.** Anyone on rc.1–rc.4 using either module is on stale code and
+should upgrade; `x/tables` users are the exposed ones, by a wide margin. The
+core toolkit is unchanged from v1.0.0-rc.2 and is re-tagged only to stay in
+lockstep with the `x/` modules, which pin it. `x/charts` and `x/dag` are
+unchanged and correct.
+
+### Fixed
+
+* **`x/editor` and `x/tables` were cut from each source repo's `chore/fyne-v3`
+  branch instead of `main`** ([#85](https://github.com/belluikit/bellui/issues/85)).
+  Those branches were abandoned duplicates: the real fyne-v3 migration had
+  merged to `main` weeks earlier (`fytables` PR #79, `fycoder` #172) and
+  development continued there, leaving each branch parked at its old fork point
+  with one stale re-do commit on top. `x/tables` shipped **50 commits** behind
+  its source and `x/editor` **14**.
+
+  Re-cut from `origin/main`, recorded per module in `PROVENANCE.md` as
+  `<repo>@<ref>@<sha>`:
+
+  | Module | Was | Now |
+  |---|---|---|
+  | `x/editor` | `chore/fyne-v3`, ≈ `fycoder` v0.6.1-rc.1 | `main` @ `c766960` = **v0.12.0** |
+  | `x/tables` | `chore/fyne-v3`, ≈ `fytables` v0.3.0-rc.2 | `main` @ `bb45169` = **v0.14.0** |
+
+  `x/tables` regains two real defect fixes — `ColumnDef.Field` now resolves
+  against struct rows and honours the dot notation it has always documented
+  (`fytables` #84) — plus `event.Scrollable`, so AT scroll gestures page the
+  grid (#82); `DisplayRow`/`ScrollToRow`, `CommitEditing`,
+  `OnCellContextMenu`, `ColumnDef.CanEdit`/`.Editor`; and the `export/pdf` and
+  `export/pxf` exporters, which were absent from the published module
+  altogether. `x/editor` regains LSP semantic-token highlighting
+  (`SemanticToken`, `SetSemanticTokens`) and `accessibility.go`
+  (`SetAccessibilityLabel`, exposing the editor as a text area).
+
+  Neither module's API changed relative to its source; the rewrites were
+  mechanical. No new external dependency was added.
+
+### Note
+
+This shipped green and stayed undetected for four release candidates because a
+stale branch still compiles — the consuming project (Bellui Player) built,
+tested and released against it without a failure, since every API it *called*
+still existed (belluikit/player#4). Nothing in the pipeline asks whether a
+consolidated source was the newest code, only whether it builds. The
+countermeasure is the `PROVENANCE.md` record plus the pre-flight check now
+documented in `docs/REBRAND.md` in belluikit/player.
+
+`x/charts` and `x/dag` came through the original consolidation correctly —
+`fycharts`'s branch happened to sit at its tip, and `fydag` had no such branch
+to mispick. Their provenance is still unrecorded and should be established
+(#85).
+
 ## v1.0.0-rc.4 — 2026-07-27
 
 An `x/charts` fix release, cut promptly because the defect it carries **freezes

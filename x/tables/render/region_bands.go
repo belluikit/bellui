@@ -37,7 +37,7 @@ type placeColumnFunc func(absCol int, x, w float32, dst []core.CanvasObject) []c
 // call layout from that renderer's rebuild.
 type regionBands struct {
 	mainBand *bellui.Container // clip-local content of the scrolling main band
-	mainClip *container.Clip   // clips the main band to [mainX, mainRight)
+	mainClip *container.Clip // clips the main band to [mainX, mainRight)
 }
 
 // layout places every visible column into its band via place and returns the

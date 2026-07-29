@@ -29,7 +29,7 @@ func (d *DiffEditor) NextChange() / PrevChange()
 ### 2. Diff computation
 A line-level diff (Myers or histogram) with **intra-line (character-level)**
 refinement so changed regions within a line are highlighted precisely. Pure Go,
-no Fyne dependency, independently unit-testable — keep it in a `diff` sub-package
+no Bellui dependency, independently unit-testable — keep it in a `diff` sub-package
 so it's reusable and fast to test.
 
 ### 3. Rendering
