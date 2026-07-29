@@ -50,14 +50,17 @@ func TestComHandler_ReferenceCountGovernsLifetime(t *testing.T) {
 // was created as, and refuse everything else: handing the engine this object
 // under an interface it does not implement would have it call through a vtable
 // that is not there.
+//
+// The decision is driven through queryInterface rather than the ABI shim over
+// it, because handing Go pointers to that shim's uintptr parameters is a round
+// trip the race detector's checkptr refuses — see comHandlerQueryInterface.
 func TestComHandler_QueryInterface(t *testing.T) {
 	h := newHandler(handlerNavCompleted, &iidNavigationCompleted, 1, 0)
 	defer h.release()
 
 	query := func(iid windows.GUID) (uintptr, uintptr) {
 		var out uintptr
-		hr := comHandlerQueryInterface(h.ptr(), uintptr(unsafe.Pointer(&iid)), uintptr(unsafe.Pointer(&out)))
-		return hr, out
+		return queryInterface(h, h.ptr(), &iid, &out), out
 	}
 
 	hr, out := query(iidIUnknown)
@@ -73,6 +76,12 @@ func TestComHandler_QueryInterface(t *testing.T) {
 	hr, out = query(iidWebMessageReceived)
 	assert.Equal(t, uintptr(hrNoInterface), hr)
 	assert.Equal(t, uintptr(0), out, "a refused query must not leave a pointer behind")
+
+	// A callback that arrives after its object is gone must not be answered
+	// with a pointer to nothing.
+	var out2 uintptr
+	assert.Equal(t, uintptr(hrPointer), queryInterface(nil, 0, &iidIUnknown, &out2))
+	assert.Equal(t, uintptr(0), out2)
 }
 
 // Callbacks can arrive after the object they name is gone — the engine holds
