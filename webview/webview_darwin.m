@@ -469,6 +469,7 @@ void belluiWebViewDestroy(void *handle) {
     [web stopLoading];
     [web removeFromSuperview];
     [clip setWebView:nil];
+    [web release]; // balances the +1 from alloc; addSubview's went with removeFromSuperview
     [[clip navDelegate] release];
     [clip setNavDelegate:nil];
     [clip removeFromSuperview];
