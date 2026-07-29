@@ -58,7 +58,6 @@ func NewVideoPlayerURL(url string, opts ...Option) (*VideoPlayer, error) {
 // newVideoPlayerFromPipeline wires a widget around an already-built pipeline,
 // shared by the reader and URL constructors.
 func newVideoPlayerFromPipeline(pipe *pipeline.Pipeline, o *options) (*VideoPlayer, error) {
-
 	vp := &VideoPlayer{
 		pipe:    pipe,
 		opts:    o,

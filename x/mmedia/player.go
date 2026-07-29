@@ -63,7 +63,6 @@ func NewMediaPlayerURL(url string, opts ...Option) (*MediaPlayer, error) {
 // newMediaPlayerFromPipeline wires a widget around an already-built pipeline,
 // shared by the reader and URL constructors.
 func newMediaPlayerFromPipeline(pipe *pipeline.Pipeline, o *options) (*MediaPlayer, error) {
-
 	mp := &MediaPlayer{
 		pipe:     pipe,
 		opts:     o,
