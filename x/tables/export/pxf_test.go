@@ -59,9 +59,12 @@ message User {
 func TestPXF_TypedLiterals(t *testing.T) {
 	ts := time.Date(2026, 5, 11, 10, 0, 0, 0, time.UTC)
 	cols := []Column{
-		{Field: "s", Type: FieldString}, {Field: "i", Type: FieldInt64},
-		{Field: "f", Type: FieldDouble}, {Field: "b", Type: FieldBool},
-		{Field: "t", Type: FieldTimestamp}, {Field: "d", Type: FieldDuration},
+		{Field: "s", Type: FieldString},
+		{Field: "i", Type: FieldInt64},
+		{Field: "f", Type: FieldDouble},
+		{Field: "b", Type: FieldBool},
+		{Field: "t", Type: FieldTimestamp},
+		{Field: "d", Type: FieldDuration},
 		{Field: "raw", Type: FieldBytes},
 	}
 	data := sliceData{{
@@ -314,10 +317,14 @@ func schemaPart(t *testing.T, out string) string {
 
 func TestPXF_DeclaredSchema(t *testing.T) {
 	cols := []Column{
-		{Field: "s", Type: FieldString}, {Field: "i", Type: FieldInt64},
-		{Field: "u", Type: FieldUint64}, {Field: "f", Type: FieldDouble},
-		{Field: "b", Type: FieldBool}, {Field: "t", Type: FieldTimestamp},
-		{Field: "d", Type: FieldDuration}, {Field: "raw", Type: FieldBytes},
+		{Field: "s", Type: FieldString},
+		{Field: "i", Type: FieldInt64},
+		{Field: "u", Type: FieldUint64},
+		{Field: "f", Type: FieldDouble},
+		{Field: "b", Type: FieldBool},
+		{Field: "t", Type: FieldTimestamp},
+		{Field: "d", Type: FieldDuration},
+		{Field: "raw", Type: FieldBytes},
 	}
 	// No rows at all: the schema (including well-known-type imports)
 	// comes entirely from the declarations.
