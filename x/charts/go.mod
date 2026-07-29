@@ -2,10 +2,11 @@ module github.com/belluikit/bellui/x/charts
 
 go 1.25.0
 
-require github.com/belluikit/bellui v1.0.0-rc.4
+require github.com/belluikit/bellui v1.0.0-rc.5
 
 require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
+	github.com/belluikit/fsnotify v1.9.1 // indirect
 	github.com/belluikit/gl-js v0.2.1 // indirect
 	github.com/belluikit/glfw v1.9.0 // indirect
 	github.com/belluikit/glfw-js v1.0.4 // indirect
@@ -16,7 +17,6 @@ require (
 	github.com/belluikit/webgpu/libs-windows v0.0.0-20260727093645-6b8e55d25f27 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fredbi/uri v1.1.1 // indirect
-	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/go-gl/gl v0.0.0-20231021071112-07e5d0ea2e71 // indirect
 	github.com/go-gl/glfw/v3.4/glfw v0.1.0-pre.1.0.20260628091122-0bd588dc30cf // indirect
 	github.com/godbus/dbus/v5 v5.2.2 // indirect
