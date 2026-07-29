@@ -1,4 +1,4 @@
-//go:build !wasm && !darwin && !ios && !android
+//go:build !wasm && !darwin && !ios && !android && !windows
 
 package webview
 
@@ -8,11 +8,10 @@ import (
 )
 
 // Supported reports whether this platform has a web engine binding. macOS,
-// iOS, Android and the web target bind one; this file covers everything else
-// — Windows until WebView2 lands (#65), and Linux, where the decision is that
-// there will not be one (#60: the embeddable engine is LGPL, outside the
-// allowed dependency set, and Wayland has no cross-toolkit embedding
-// primitive).
+// iOS, Android, Windows and the web target bind one; this file covers
+// everything else — most importantly Linux, where the decision is that there
+// will not be one (#60: the embeddable engine is LGPL, outside the allowed
+// dependency set, and Wayland has no cross-toolkit embedding primitive).
 //
 // A target here reports false and leaves the host inert rather than failing to
 // compile, so a cross-platform app builds everywhere and degrades to an empty
