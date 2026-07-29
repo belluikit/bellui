@@ -1,6 +1,7 @@
 // Command webviewprobe is the live-verify probe for the native-view-embedding
 // spike (#45) and the bridge and navigation API designed on top of it (#66):
-// widget.NativeViewHost hosting a real WKWebView on macOS.
+// widget.NativeViewHost hosting the platform's real web engine — a WKWebView on
+// macOS, a WebView2 on Windows (#65).
 //
 //	go run ./hack/webviewprobe
 //
@@ -43,9 +44,10 @@
 //	go run ./hack/webviewprobe -auto
 //
 // The trick is to capture the same window twice — once through bellui
-// (Canvas.Capture, which reads bellui's GPU surface) and once through macOS
-// screencapture (which reads the real composited screen) — and compare. The
-// difference between the two *is* the hole. It reports:
+// (Canvas.Capture, which reads bellui's GPU surface) and once through the OS
+// (which reads the real composited screen) — and compare. The difference
+// between the two *is* the hole. Only that second capture is per-platform (see
+// capture.go). It reports:
 //
 //   - HOLE — the host's rectangle is web content on screen and empty widget
 //     in Canvas.Capture.
@@ -76,9 +78,12 @@
 //
 // -dump <dir> keeps every capture for inspection.
 //
-// -auto needs Screen Recording permission for the terminal running it
-// (System Settings > Privacy & Security > Screen Recording); without it
-// screencapture returns a blank or desktop-only image and the probe says so.
+// -auto needs to be able to read the screen. On macOS that means Screen
+// Recording permission for the terminal running it (System Settings > Privacy
+// & Security > Screen Recording); on Windows it means an interactive session,
+// not the session-0 window station an SSH command lands in (#487's trap —
+// schtasks /IT is the way out). Without it the capture comes back blank and the
+// probe says so rather than measuring bellui's surface against itself.
 package main
 
 import (
@@ -94,7 +99,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -104,7 +108,6 @@ import (
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/core"
-	"github.com/belluikit/bellui/driver/desktop"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/webview"
 	"github.com/belluikit/bellui/widget"
@@ -1147,43 +1150,6 @@ func (p *probe) reportCost() {
 	fmt.Printf("\n[COST]      per-frame geometry sync\n")
 	fmt.Printf("            evaluations %d, backend calls %d (%.1f%% reached the platform)\n",
 		s, ap, pct(ap, s))
-}
-
-// screenshot grabs the window's content area with macOS screencapture, which
-// (unlike Canvas.Capture) reads the real composited screen and therefore does
-// include the native view.
-func screenshot(w bellui.Window, path string) (image.Image, error) {
-	var x, y int
-	var size geo.Size
-	var scale float32
-	bellui.DoAndWait(func() {
-		if pw, ok := w.(desktop.PositionableWindow); ok {
-			x, y = pw.Position()
-		}
-		size = w.Canvas().Size()
-		scale = w.Canvas().Scale()
-	})
-	if size.IsZero() {
-		return nil, fmt.Errorf("window has no size yet")
-	}
-
-	region := fmt.Sprintf("%d,%d,%d,%d", x, y, int(size.Width*scale), int(size.Height*scale))
-	if *dumpDir != "" {
-		fmt.Printf("            [dbg] window pos (%d,%d) canvas %v scale %.2f -> region %s\n",
-			x, y, size, scale, region)
-	}
-	out, err := exec.Command("screencapture", "-x", "-R", region, path).CombinedOutput()
-	if err != nil {
-		return nil, fmt.Errorf("screencapture: %v (%s)", err, out)
-	}
-
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	img, _, err := image.Decode(f)
-	return img, err
 }
 
 func savePNG(path string, img image.Image) {

@@ -20,13 +20,16 @@
 //	macOS      WKWebView, hosted in the GLFW content view
 //	iOS        WKWebView, hosted in the app window beside the GLKView
 //	Android    android.webkit.WebView, hosted on the decor view
+//	Windows    WebView2, hosted in a child window of the app window
 //	Web        an <iframe> positioned over the canvas
-//	Windows    not yet — WebView2 is tracked in #65
 //	Linux      no built-in backend, by decision — see below
 //
 // Every backend here uses the platform's **own** engine, so no web engine is
 // bundled into a bellui binary on any platform and security updates stay with
-// the OS vendor. Linux is the one target with no engine that can be used that
+// the OS vendor. Windows is the one platform where that engine is a separate
+// component rather than part of the OS — see [ErrRuntimeMissing].
+//
+// Linux is the one target with no engine that can be used that
 // way, which is why it has none: WebKitGTK is LGPL (outside this project's
 // allowed dependency set) and needs a GTK main loop, and WPE — measured in
 // #60 — is unbundled, ABI-coupled to the distro, absent from Ubuntu since
@@ -70,8 +73,18 @@
 //     document loads rather than before it runs, so a page's own first lines
 //     may not see window.bellui. [WebView.LoadHTML] on the web target is the
 //     exception: the shim travels in the content itself.
-//   - On Android a script that throws reports a null result rather than an
-//     error, because evaluateJavascript has no channel for an exception.
+//   - On Android and Windows a script that throws reports a null result rather
+//     than an error, because neither evaluateJavascript nor ExecuteScript has a
+//     channel for an exception. A [WebView.Call] made against a page with no
+//     shim therefore stays pending on those two until the view is destroyed,
+//     instead of failing at once.
+//   - On Windows [WebView.LoadHTML] ignores its baseURL: NavigateToString is
+//     the whole of WebView2's literal-content API and takes no base, so the
+//     content's relative references do not resolve and its origin is always
+//     [OriginOpaque].
+//   - On Windows a navigation the user started is reported as
+//     [NavigationLinkClicked] whatever they did to start it, including
+//     submitting a form: WebView2 reports that the user initiated it, not how.
 //
 // # Talking to the page
 //
@@ -107,10 +120,29 @@ package webview
 
 import (
 	"encoding/json"
+	"errors"
 
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/widget"
 )
+
+// ErrRuntimeMissing is reported by [WebView.Attach] on Windows when the
+// WebView2 runtime is not installed, or is older than this package requires.
+//
+// Windows is the one supported platform whose web engine is a separate
+// component rather than part of the OS. The Evergreen Runtime ships with
+// Windows 11 and with Microsoft Edge, and most Microsoft applications install
+// it, but a Windows Server or LTSC image may not have one — so an app that
+// must work everywhere should ship the Evergreen Bootstrapper alongside it
+// (https://developer.microsoft.com/microsoft-edge/webview2/), or handle this
+// error and offer the content another way. Attach failing leaves the host
+// inert, exactly as on a platform with no binding at all.
+//
+// It is declared on every platform so that a cross-platform app can test for
+// it with [errors.Is] without a build tag; no other platform reports it.
+//
+// Since: 2.19
+var ErrRuntimeMissing = errors.New("webview: no WebView2 runtime is installed")
 
 // WebView is a platform web engine hosted in a bellui layout. Create one with
 // [New] and place it with [NewHost] (or hand it to
