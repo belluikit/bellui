@@ -89,14 +89,29 @@ monolithic API — and needed a real port:
 * `theme.ForegroundColor()` → `theme.Color(theme.ColorNameForeground)` (this one
   also hit `x/tables`)
 
-**`x/dag` is a deliberate partial extraction.** The epic called `dag` a
-"pure-data leaf", but `dag/proto.go` and `dag/serial.go` imported fydag's
-generated gRPC package. Those two files (and their tests) stayed with the PoC,
-which keeps grpc/protobuf out of a widget module — `dagwidget` used only the
-graph types, never the serialization. The trade-off is that `MarshalGraph`,
-`UnmarshalGraph`, `GraphToProto` and `GraphFromProto` are **not** part of
-`x/dag`; consumers needing persistence encode the exported `dag` types
-themselves. `trendvidia/fydag` remains a working PoC.
+**`x/dag` is a partial extraction whose one gap has since been closed.** The
+epic called `dag` a "pure-data leaf", but `dag/proto.go` and `dag/serial.go`
+imported fydag's generated gRPC package, because fydag's graph messages live in
+one monolithic `.proto` alongside its services. Bringing them would have put
+grpc into a widget module, so at consolidation those two files stayed with the
+PoC and `MarshalGraph`, `UnmarshalGraph`, `GraphToProto` and `GraphFromProto`
+were not part of `x/dag`.
+
+**Restored in `ecb7626` (belluikit/bellui#3), and this is the shipped state.**
+The data-model messages were carved out into `x/dag/dag/dagpb` — messages only,
+no services — so the generated bindings need `google.golang.org/protobuf`
+alone, and `MarshalGraph` rides the same PXF codec the toolkit already uses for
+settings, preferences and manifests. Both were existing bellui dependencies, so
+the grpc objection was met rather than traded away: `go list -deps ./...` in
+that module reports **zero** grpc packages. Field numbers are inherited verbatim
+from the fydag schema, so payloads stay wire-compatible with graphs the PoC
+wrote; the proto package deliberately differs (`bellui.dag.v1` vs `fydag`),
+because an application linking both would otherwise register two messages under
+one fully-qualified name and protobuf-go panics at init.
+
+So the extraction is still partial in scope — `x/dag` is `dagwidget` + `dag`,
+not all of fydag — but nothing of the graph model is missing from it.
+`trendvidia/fydag` remains a working PoC.
 
 **`x/mmedia` was mechanical in its code but not in its dependencies.**
 `fyplayer` already targeted the fork's modern API, so the Go rewrite was the
@@ -250,7 +265,6 @@ Tracked as issues; nothing here lives only in prose.
 | Item | Issue |
 |---|---|
 | `add-to-project.yml` points at pre-rebrand boards | belluikit/bellui#2 |
-| `x/dag` lost graph serialization to the PoC | belluikit/bellui#3 |
 | Repo visibility decision after the soak | belluikit/bellui#4 |
 | `fydag` still on the old toolkit (`fyplayer` is now `x/mmedia`) | belluikit/bellui#5 |
 | The `x/` modules have no CI — `x/mmedia` needs a both-painters leg | belluikit/bellui#13 |
