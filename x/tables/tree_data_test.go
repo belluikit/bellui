@@ -252,7 +252,7 @@ func TestTreeData_ExpansionSurvivesSort(t *testing.T) {
 	g.API().SetSort(SortItem{ColID: "name", Direction: SortDescending})
 
 	// Find Root A's new display row and confirm it is still expanded with children.
-	var rootA = -1
+	rootA := -1
 	for i := 0; i < g.RowCount(); i++ {
 		if nameAt(g, i) == "Root A" {
 			rootA = i

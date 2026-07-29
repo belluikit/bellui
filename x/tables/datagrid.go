@@ -32,7 +32,7 @@ var (
 	_ event.DoubleTappable               = (*DataGrid)(nil)
 	_ event.SecondaryTappable            = (*DataGrid)(nil)
 	_ event.Draggable                    = (*DataGrid)(nil)
-	_ bellui.Shortcutable                  = (*DataGrid)(nil)
+	_ bellui.Shortcutable                = (*DataGrid)(nil)
 	_ event.Hoverable                    = (*DataGrid)(nil)
 	_ desktop.Mouseable                  = (*DataGrid)(nil)
 	_ desktop.Cursorable                 = (*DataGrid)(nil)
