@@ -1,5 +1,12 @@
 # wpeprobe — the #60 Linux web-view spike
 
+> **Outcome: WPE is rejected for desktop (#60).** Not on size — on operational
+> risk: 112 unbundled dependencies whose ABI we do not control, absent from
+> Ubuntu since 22.04, zero-copy conditional on the user running Wayland, and a
+> version-fragile integration. This harness is kept as the evidence for that
+> decision and as a way to re-measure, not as a recommended path. If desktop web
+> embedding is ever pursued, CEF is the candidate to evaluate — see #60.
+
 Measures whether Linux can host web content as a **texture bellui composites**
 rather than as the hole punch every other platform uses.
 
@@ -111,7 +118,8 @@ something an app shares with a running desktop); Wayland means negotiating
 zero-copy only while running under a dma-buf-capable Wayland compositor, and
 would silently fall back to CPU copies on X11 or anywhere the negotiation fails
 — performance depending on the user's session type at runtime. That is the same
-silent-degradation shape that ruled out X11-only reparenting in #542.
+silent-degradation shape that ruled out X11-only reparenting in #542, and it is
+one of the reasons WPE was rejected.
 
 ## Distro availability, which bears on the licensing argument
 
@@ -129,3 +137,17 @@ packages WPE at 2.48/2.52 but builds it **without** `ENABLE_WPE_PLATFORM`, so
 the API that current WPE development targets is absent there too — verified by
 searching the full include tree of `libwpewebkit-2.0-dev` on both trixie and
 sid. Of the distros checked, only Arch ships it.
+
+## Why the size argument was the wrong axis
+
+`libWPEWebKit-2.0.so` measures **128 MB** — the same order of magnitude as the
+~150–250 MB that got CEF rejected in #45. The two figures are not comparable
+anyway: WPE's excludes its 112-dependency closure, CEF's is nearly
+self-contained.
+
+So the real trade is **self-contained-and-portable versus
+unbundled-and-distro-coupled**. Unbundling is simultaneously why WPE is compact
+and why it is ABI-fragile and missing from Ubuntu — the same decision seen from
+two sides. Packaging WPE ourselves would mean bundling those dependencies,
+converging on CEF's footprint while remaining LGPL, Linux-only, and ours to
+rebuild on every WebKit CVE.
