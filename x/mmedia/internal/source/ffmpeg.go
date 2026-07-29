@@ -65,6 +65,7 @@ func (s *FFmpegSource) VideoSize() (int, int) {
 	}
 	return s.vInfo.Width, s.vInfo.Height
 }
+
 func (s *FFmpegSource) Duration() time.Duration {
 	return time.Duration(s.dec.Duration() * float64(time.Second))
 }
