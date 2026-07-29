@@ -97,7 +97,7 @@ grpc into a widget module, so at consolidation those two files stayed with the
 PoC and `MarshalGraph`, `UnmarshalGraph`, `GraphToProto` and `GraphFromProto`
 were not part of `x/dag`.
 
-**Restored in `ecb7626` (belluikit/bellui#3), and this is the shipped state.**
+**Restored in `9b23bc7` (belluikit/bellui#3), and this is the shipped state.**
 The data-model messages were carved out into `x/dag/dag/dagpb` — messages only,
 no services — so the generated bindings need `google.golang.org/protobuf`
 alone, and `MarshalGraph` rides the same PXF codec the toolkit already uses for
