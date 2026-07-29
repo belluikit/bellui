@@ -54,7 +54,6 @@ func NewAudioPlayerURL(url string, opts ...Option) (*AudioPlayer, error) {
 // newAudioPlayerFromPipeline wires a widget around an already-built pipeline,
 // shared by the reader and URL constructors.
 func newAudioPlayerFromPipeline(pipe *pipeline.Pipeline, o *options) (*AudioPlayer, error) {
-
 	ap := &AudioPlayer{
 		pipe: pipe,
 		opts: o,
