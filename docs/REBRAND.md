@@ -18,7 +18,7 @@ release-train [trendvidia/fyne#731](https://github.com/trendvidia/fyne/issues/73
 | GitHub org | `belluikit` |
 | Flagship IDE (`goed`) | **Bellui Studio** — `studio.bellui.com` — *authoring* |
 | Runtime (`appviewer`) | **Bellui Player** — PXF → live UI — *Studio authors, Player runs* |
-| Extension libraries | **Bellui X** — `belluikit/bellui/x/{charts,tables,dag,editor}` |
+| Extension libraries | **Bellui X** — `belluikit/bellui/x/{charts,tables,dag,editor,mmedia}` |
 
 > **Naming guard:** the IDE is **Bellui Studio**, *not* `bellui.App`. `bellui.App`
 > is the core interface type — reusing it as a product name collides with the
@@ -54,14 +54,14 @@ These differ from the original plan; they are the decisions of record.
    would leave the compiled `rawDesc` encoding the old names).
 5. **Android dex** — regenerated after the Java class rename
    (`FyneFileProvider`→`BelluiFileProvider`).
-6. **`x/` umbrella** — `x/{charts,tables,dag,editor}` as four separate modules,
-   each with its own `go.mod`, so the core dep graph stays lean. All four are
-   **migrated**, not scaffolds — see below.
+6. **`x/` umbrella** — `x/{charts,tables,dag,editor,mmedia}` as separate
+   modules, each with its own `go.mod`, so the core dep graph stays lean. All
+   are **migrated**, not scaffolds — see below.
 
 ### Extension libraries (`x/`)
 
-The four extension repos were consolidated into the umbrella (epic #732).
-27 test packages pass between them.
+The extension repos were consolidated into the umbrella (epic #732).
+32 test packages pass between them.
 
 | Module | From | Kind of move |
 |---|---|---|
@@ -69,6 +69,7 @@ The four extension repos were consolidated into the umbrella (epic #732).
 | `x/editor` | `trendvidia/fycoder` | whole repo ("Bellui Editor") |
 | `x/dag` | `trendvidia/fydag` | **partial** — `dagwidget` + `dag` only |
 | `x/charts` | `trendvidia/fycharts` | whole repo + **API port** |
+| `x/mmedia` | `trendvidia/fyplayer` | whole repo + **dependency bump** |
 
 **Three were mechanical, one was not.** `fytables`, `fycoder` and `fydag`
 already targeted the fork's modern `geo`/`event`/`core` API, so they needed only
@@ -96,6 +97,21 @@ graph types, never the serialization. The trade-off is that `MarshalGraph`,
 `UnmarshalGraph`, `GraphToProto` and `GraphFromProto` are **not** part of
 `x/dag`; consumers needing persistence encode the exported `dag` types
 themselves. `trendvidia/fydag` remains a working PoC.
+
+**`x/mmedia` was mechanical in its code but not in its dependencies.**
+`fyplayer` already targeted the fork's modern API, so the Go rewrite was the
+usual path/package/qualifier set — all 32 files reproduce byte-for-byte from
+the source under it. What it could not keep was its FFmpeg pin: it required
+`trendvidia/goffmpeg v0.2.0`, and `belluikit/goffmpeg` publishes only `v0.4.0`
+(the same tree, re-homed), which pulls `goffmpeg-libs` `v0.1.0` → `v0.3.0` and
+forces the module to declare `go 1.26.2` rather than the `1.25.0` its siblings
+use. The bump is additive on the surface `mmedia` touches; it is recorded
+because a version change is not a rename.
+
+The source was `origin/main` @ `57fd6fb`, which **carries no tag** — three
+commits past `v0.3.0`. `fyplayer` also has a `chore/fyne-v3` branch, the same
+decoy name that shipped `x/tables` and `x/editor` stale, but here it is fully
+merged and the pre-flight check said so before anything was copied.
 
 ### Forked dependencies (moved to `belluikit`)
 
@@ -236,7 +252,8 @@ Tracked as issues; nothing here lives only in prose.
 | `add-to-project.yml` points at pre-rebrand boards | belluikit/bellui#2 |
 | `x/dag` lost graph serialization to the PoC | belluikit/bellui#3 |
 | Repo visibility decision after the soak | belluikit/bellui#4 |
-| `fyplayer`/`fydag` still on the old toolkit | belluikit/bellui#5 |
+| `fydag` still on the old toolkit (`fyplayer` is now `x/mmedia`) | belluikit/bellui#5 |
+| The `x/` modules have no CI — `x/mmedia` needs a both-painters leg | belluikit/bellui#13 |
 | `bellui.io` has no content — dead doc links | belluikit/bellui#6 |
 | Gallery: restore DAG Editor + Media Player pages | belluikit/gallery#1 |
 | goed → Bellui Studio | trendvidia/goed#95 |

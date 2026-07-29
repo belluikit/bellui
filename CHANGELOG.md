@@ -11,6 +11,24 @@ This file lists the main changes with each version of the Fyne toolkit.
 Entries up to 2.7.3 are inherited from upstream Fyne; later entries describe
 the trendvidia fork (github.com/trendvidia/fyne).
 
+## Unreleased
+
+### Added
+
+* **`x/mmedia` — media playback widgets, consolidated from
+  `trendvidia/fyplayer`.** `MediaPlayer`, `VideoPlayer`, `AudioPlayer`,
+  `SubtitleOverlay` and `TransportControls`, decoding through
+  `belluikit/goffmpeg`. Both the `io.Reader` and the URL constructor forms are
+  present, so HLS, RTSP and RTMP work — a playlist read as a byte stream is
+  only text. The fifth `x/` module; not yet tagged.
+
+  Two things to know before depending on it. It moves the FFmpeg binding from
+  `goffmpeg v0.2.0` to `v0.4.0` (and `goffmpeg-libs` `v0.1.0` → `v0.3.0`),
+  additive on the API it uses but a real version change; and it declares
+  `go 1.26.2` rather than the `1.25.0` its siblings use, because
+  `goffmpeg-libs` requires it. Source ref, rewrite set and verification are in
+  `x/mmedia/PROVENANCE.md`.
+
 ## v1.0.0-rc.5 — 2026-07-29
 
 **`x/editor` and `x/tables` were consolidated from the wrong source and are
