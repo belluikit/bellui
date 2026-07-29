@@ -1706,6 +1706,20 @@ UIView *belluiKeyboardInputView(void) {
     return appDelegate.controller.inputView;
 }
 
+// belluiAppWindow exposes the application's UIWindow to the native-view
+// embedding backends (webview/webview_ios.m, #64), which host their platform
+// view as a sibling of the GLKView in this window.
+//
+// It exists because the iOS window's RunNative hands out only an
+// UnknownContext — unlike macOS, which passes the NSWindow — so a backend has
+// no other way to reach the hosting window. Reaching it through this accessor
+// keeps that a detail of the driver rather than new public API in the driver
+// package for one consumer.
+UIWindow *belluiAppWindow(void) {
+    GoAppAppDelegate *appDelegate = (GoAppAppDelegate *)[[UIApplication sharedApplication] delegate];
+    return appDelegate.window;
+}
+
 // belluiTextEditingA11yElement returns the accessibility element that stands in for
 // the focused entry while VoiceOver edits it (#1124): the input view itself, which
 // is BOTH the first responder and the VoiceOver-focused element — the same-object
