@@ -62,3 +62,42 @@ full-window web content.
 `belluiWpeExportKind` is the measurement that matters: rerun on a newer WPE or a
 Mesa-only GPU and it reports `2` (EGLImage) if the zero-copy path has become
 reachable, at which point stage 2 is worth building.
+
+## What the SHM result does and does not establish
+
+It was measured on a machine whose **only** GPU is NVIDIA, running **WPE WebKit
+2.36 (2022)**. Both are confounds:
+
+- The WebProcess's client-side EGL is Mesa, and Mesa has no hardware driver for
+  that card, so a Mesa EGL client there has no hardware path at all and swrast
+  is the only possible outcome. The EGL device reporting vendor `Mesa Project`
+  on that box is llvmpipe — software — not a Mesa-driven GPU.
+- 2.36 is roughly sixteen releases behind current (2.52.5), and the fdo export
+  path was reworked in between.
+
+A follow-up attempt on genuinely Mesa-accelerated hardware (virtio-gpu/virgl)
+with **WPE 2.48.3** from Debian trixie, in a container with the render node
+passed through, got as far as: all dma-buf EGL extensions present, WebProcess
+confirmed to `execve`, view given
+`wpe_view_activity_state_visible|focused|in_window` (which newer WebKit needs or
+it will not paint at all) — and then **produced no frames whatsoever** over 90
+seconds, via either export callback. The legacy `webkit_web_view_backend_new` +
+`wpe_view_backend_exportable_fdo` path is still declared and undeprecated in
+2.48.3, so this is unexplained rather than expected.
+
+So the honest state is: **architecture (B) is proven, and the export kind on a
+current WPE is unknown.** Answering it needs the probe ported to whatever 2.48+
+expects — most likely the newer WPE Platform API (`WPEDisplay`/`WPEView`).
+
+## Distro availability, which bears on the licensing argument
+
+The case for WPE rested on WPE WebKit being a *system shared library the user
+supplies* rather than something bellui vendors. That holds unevenly:
+
+| distro | WPE WebKit |
+|---|---|
+| Ubuntu | **22.04 only** (2.36) — dropped from 24.04 onward |
+| Debian | bookworm 2.38.6, trixie 2.48.3, sid 2.52.5 |
+| Arch | 2.52.5 |
+
+Ubuntu, the most common Linux desktop, has shipped no WPE since 22.04.
