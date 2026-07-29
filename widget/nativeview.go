@@ -300,13 +300,18 @@ func (h *NativeViewHost) sync() {
 		return
 	}
 
-	// AncestorsOfObject walks the *visible* tree, so a false ok covers the
+	// GeometryForObject walks the *visible* tree, so a false ok covers the
 	// host being hidden, an ancestor being hidden, and the host having been
 	// removed from the tree — all of which must hide the native view. These
 	// are the only states the ticker stops in: each of them is reached, and
 	// left again, through a widget-level event (Show, Move, Refresh) that
 	// re-enters sync and re-arms it.
-	if _, ok := driver.AncestorsOfObject(c, h); !ok {
+	//
+	// One walk answers all three questions this path used to ask separately
+	// (in the tree? where? clipped by what?), which matters because it runs
+	// every frame for every hosted view.
+	pos, clip, clipped, ok := driver.GeometryForObject(c, h)
+	if !ok {
 		h.detached()
 		return
 	}
@@ -320,8 +325,7 @@ func (h *NativeViewHost) sync() {
 		return
 	}
 
-	rect := geo.Rectangle{Pos: d.AbsolutePositionForObject(h), Size: h.Size()}
-	clip, clipped := driver.ClipBoundsForObject(c, h)
+	rect := geo.Rectangle{Pos: pos, Size: h.Size()}
 	if !clipped {
 		clip = geo.Rectangle{Size: c.Size()}
 	}

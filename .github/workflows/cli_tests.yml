@@ -54,7 +54,7 @@ jobs:
         if: ${{ runner.os != 'Windows' }}
         run: |
           go version
-          go version | grep -q '(plus)' || { echo "::error::runner go is not the go-plus fork"; exit 1; }
+          go version | grep -qE '\(plus[ )]' || { echo "::error::runner go is not the go-plus fork"; exit 1; }
       - name: Assert go-plus toolchain (Windows)
         if: ${{ runner.os == 'Windows' }}
         shell: powershell
@@ -83,7 +83,7 @@ jobs:
       - name: Assert go-plus toolchain
         run: |
           go version
-          go version | grep -q '(plus)' || { echo "::error::runner go is not the go-plus fork"; exit 1; }
+          go version | grep -qE '\(plus[ )]' || { echo "::error::runner go is not the go-plus fork"; exit 1; }
       - name: Resolve the toolkit from this checkout
         working-directory: cmd/bellui
         run: go mod edit -replace github.com/belluikit/bellui=../..
