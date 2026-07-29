@@ -33,8 +33,10 @@ func TestPDF_ValidStructure(t *testing.T) {
 	if !strings.HasSuffix(out, "%%EOF\n") {
 		t.Errorf("missing EOF marker, got %q", out[len(out)-20:])
 	}
-	for _, want := range []string{"/Type /Catalog", "/Type /Pages", "/Type /Page ",
-		"/BaseFont /Helvetica", "/BaseFont /Helvetica-Bold", "xref", "trailer", "startxref"} {
+	for _, want := range []string{
+		"/Type /Catalog", "/Type /Pages", "/Type /Page ",
+		"/BaseFont /Helvetica", "/BaseFont /Helvetica-Bold", "xref", "trailer", "startxref",
+	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("output missing %q", want)
 		}

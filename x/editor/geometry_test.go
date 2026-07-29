@@ -88,8 +88,10 @@ func TestEditor_StaticSpanDecorator_Renders(t *testing.T) {
 	e := editor.NewEditor()
 	e.SpanDecorators = []editor.SpanDecorator{
 		&editor.StaticSpanDecorator{SpansList: []editor.DecoratedSpan{
-			{Range: editor.TextRange{StartRow: 0, StartCol: 0, EndRow: 0, EndCol: 5},
-				Kind: editor.SpanUnderline, UnderlineStyle: editor.UnderlineWavy},
+			{
+				Range: editor.TextRange{StartRow: 0, StartCol: 0, EndRow: 0, EndCol: 5},
+				Kind:  editor.SpanUnderline, UnderlineStyle: editor.UnderlineWavy,
+			},
 		}},
 	}
 	e.SetText("error here")
