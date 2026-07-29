@@ -1,4 +1,4 @@
-//go:build !wasm && !darwin && !ios
+//go:build !wasm && !darwin && !ios && !android
 
 package webview
 
