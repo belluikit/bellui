@@ -16,9 +16,9 @@ and holds nothing `main` lacks.
 
 ## What changed
 
-Mechanical rewrites only. Every one of the 32 Go files is reproduced
-byte-for-byte by applying this set to the source, and the `internal/source`
-test media and `.gitignore` are byte-identical:
+Mechanical rewrites only. **28 of the 32 Go files are reproduced byte-for-byte**
+by applying this set to the source, and the `internal/source` test media and
+`.gitignore` are byte-identical:
 
 | From | To |
 |---|---|
@@ -35,6 +35,26 @@ No API changed. The internal packages (`audio`, `pipeline`, `source`,
 `videosurface_test.go` quotes a toolkit panic string in a comment; it was
 updated with the rest of the prose and still matches `app.go` verbatim
 ("Attempt to access current Bellui app when none is started").
+
+**The other four files carry one further change: `gofumpt -w`.** `fyplayer`
+gated on `gofmt` only, so its tree was never gofumpt-clean; bellui's
+`static_analysis` runs `gofumpt -d -e .` over the whole working tree, x/
+modules included, and that command exits 1 on any finding. Leaving these as
+found would have kept the gate red. The edit is whitespace and nothing else — a
+leading blank line removed after the opening brace of
+`new{Audio,Media,Video}PlayerFromPipeline`, and a blank line added between
+`FFmpegSource.VideoSize` and `Duration`:
+
+| File | Change |
+|---|---|
+| `audioplayer.go` | −1 blank line |
+| `player.go` | −1 blank line |
+| `videoplayer.go` | −1 blank line |
+| `internal/source/ffmpeg.go` | +1 blank line |
+
+`git diff -w` against the rewritten source is empty for all four, so the
+byte-for-byte guarantee above still holds up to whitespace across the whole
+module.
 
 `go.sum` was **regenerated, never substituted** — its hashes are keyed by
 module path, so rewriting `trendvidia`→`belluikit` inside it would produce
