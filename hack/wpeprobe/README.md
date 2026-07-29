@@ -9,6 +9,9 @@ bellui draws can appear above the web content, `Canvas.Capture` sees a hole, and
 the render pipeline does not reach it. WPE WebKit is the WebKit port built for
 embedding into someone else's renderer, so on paper Linux could avoid all three.
 
+Behind the `wpe` build tag, so `go build ./...` on a machine without the WPE
+development packages — which is every CI runner — does not try to compile it.
+
 ## Setup
 
 Needs a Linux box with a GPU. Verified on Ubuntu 22.04.5 with an NVIDIA RTX 2070
@@ -19,8 +22,8 @@ sudo apt-get install -y \
   libwpe-1.0-dev libwpebackend-fdo-1.0-dev libwpewebkit-1.0-dev \
   libegl1-mesa-dev libgl1-mesa-dev libwayland-dev pkg-config build-essential
 
-go run ./hack/wpeprobe            # report
-go run ./hack/wpeprobe -dump out  # also write the captured PNG
+go run -tags wpe ./hack/wpeprobe            # report
+go run -tags wpe ./hack/wpeprobe -dump out  # also write the captured PNG
 ```
 
 Two things that are easy to lose an hour to:
