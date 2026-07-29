@@ -15,7 +15,6 @@ import "C"
 
 import (
 	"errors"
-	"sync"
 	"unsafe"
 
 	"github.com/belluikit/bellui"
@@ -37,29 +36,12 @@ type webView struct {
 	url    string
 }
 
-// Callbacks arrive from ObjC carrying a token rather than a Go pointer, which
-// cgo would not allow us to hand out. The registry resolves it back.
-// Everything is delivered on the main thread — the same thread the bellui main
-// goroutine sits on inside the GLFW event loop — but the registry is still
-// mutex-guarded because Attach and Destroy may race a late callback.
-var (
-	registryMu   sync.Mutex
-	registry     = map[uint64]*WebView{}
-	registryNext uint64
-)
-
 func (w *WebView) init() {
-	registryMu.Lock()
-	defer registryMu.Unlock()
-	registryNext++
-	w.token = registryNext
-	registry[w.token] = w
+	w.token = registerView(w)
 }
 
 func lookup(token C.uint64_t) *WebView {
-	registryMu.Lock()
-	defer registryMu.Unlock()
-	return registry[uint64(token)]
+	return lookupView(uint64(token))
 }
 
 //export belluiWebViewMessage
@@ -223,9 +205,7 @@ func (w *WebView) HasFocus() bool {
 
 // destroyRaw removes the native view from the window and releases it.
 func (w *WebView) destroyRaw() {
-	registryMu.Lock()
-	delete(registry, w.token)
-	registryMu.Unlock()
+	forgetView(w.token)
 
 	if w.handle == nil {
 		return
