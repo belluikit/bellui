@@ -15,10 +15,25 @@ the trendvidia fork (github.com/trendvidia/fyne).
 
 **`x/editor` and `x/tables` were consolidated from the wrong source and are
 re-cut here.** Anyone on rc.1–rc.4 using either module is on stale code and
-should upgrade; `x/tables` users are the exposed ones, by a wide margin. The
-core toolkit is unchanged from v1.0.0-rc.2 and is re-tagged only to stay in
-lockstep with the `x/` modules, which pin it. `x/charts` and `x/dag` are
-unchanged and correct.
+should upgrade; `x/tables` users are the exposed ones, by a wide margin.
+`x/charts` and `x/dag` are unchanged and correct.
+
+**Unlike rc.3 and rc.4, this is not an `x/`-only release.** It is cut from
+`main`, which has moved substantially since rc.4 was tagged on 2026-07-27 — 38
+core commits, including the whole `webview` subsystem (macOS, iOS, Android,
+wasm and Windows/WebView2 backends), `NativeViewHost`, the single-tree-walk
+`nativeview` refactor, the fsnotify fork switch, and a reworked `RangeSlider`
+with a disabled state and keyboard operation. Consumers should expect real
+behaviour and rendering changes, not just an `x/` bump: the `RangeSlider` rework
+alone changes rendered markup, so any golden/master files covering it need
+regenerating.
+
+Note that parts of the webview work have open issues at the time of tagging —
+[#79](https://github.com/belluikit/bellui/issues/79) (wasm test leg),
+[#82](https://github.com/belluikit/bellui/issues/82) (WebView2 not yet verified
+on a real GPU session), [#83](https://github.com/belluikit/bellui/issues/83)
+(a `Call` against a page with no shim stays pending). Weigh that before
+adopting rc.5 for anything but the `x/` fix.
 
 ### Fixed
 
