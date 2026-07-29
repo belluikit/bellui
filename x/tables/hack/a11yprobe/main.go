@@ -148,6 +148,10 @@ var masterDetail = flag.Bool("masterdetail", false,
 
 func main() {
 	flag.Parse()
+	// The app must exist before the grid: DataGrid's render pipeline resolves
+	// theme colors on configuration refreshes (render.ResolveThemeColors →
+	// bellui.CurrentApp().Settings()), which nil-panics pre-app under fyne v3.
+	a := app.New()
 	data := makeData()
 	if *tree {
 		data = makeTreeData()
@@ -219,7 +223,6 @@ func main() {
 		grid.API().SelectRow(4)
 	}
 
-	a := app.New()
 	w := a.NewWindow("fytables a11y probe")
 	w.SetContent(grid)
 	w.Resize(geo.NewSize(760, 460))

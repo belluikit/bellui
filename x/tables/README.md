@@ -1,6 +1,6 @@
-# Bellui X — tables
+# fytables
 
-An AG Grid-equivalent data table widget for the [Fyne](https://bellui.io) GUI framework.
+An AG Grid-equivalent data table widget for the [Bellui](https://bellui.io) GUI framework.
 
 fytables provides a high-performance, feature-rich data grid with virtual scrolling, column sorting/filtering, cell editing, sparklines, column pinning/grouping, row grouping with aggregation, pagination, pivot tables, and more.
 
@@ -44,7 +44,7 @@ Four chart types rendered in cells via `canvas.Raster`:
 Options: stroke/fill colors, markers (circle/square/diamond), axis line, domain scaling, highlight on hover with tooltip, per-point ItemStyler, raster caching.
 
 ### Visual
-- **Theme-aware** - All colors from Fyne theme; works in light and dark modes
+- **Theme-aware** - All colors from Bellui theme; works in light and dark modes
 - **Density modes** - Compact, Comfortable, Spacious
 - **Row alternation** - Alternating row background colors
 - **Text truncation** - Ellipsis with full-text tooltip on hover
@@ -56,6 +56,8 @@ Options: stroke/fill colors, markers (circle/square/diamond), axis line, domain 
 - **CSV** - Standard CSV with headers
 - **TSV** - Tab-separated values
 - **Excel** - Zero-dependency .xlsx via OOXML zip format
+- **PDF** - Zero-dependency paginated report: repeated headers per page, fit-to-width columns, title block, page numbers, streaming with a row cap (hand off to the OS viewer for printing)
+- **PXF** - Typed rows via the protowire `@dataset` directive (draft §3.4.4) — the schema-backed CSV replacement
 
 ## Quick Start
 
@@ -63,8 +65,8 @@ Options: stroke/fill colors, markers (circle/square/diamond), axis line, domain 
 package main
 
 import (
-    "github.com/belluikit/bellui"
-    "github.com/belluikit/bellui/app"
+    "bellui.io/fyne/v2"
+    "bellui.io/fyne/v2/app"
     "github.com/belluikit/bellui/x/tables"
 )
 
@@ -135,6 +137,8 @@ api.SizeColumnsToFit()
 var buf bytes.Buffer
 api.ExportCSV(&buf)
 api.ExportExcel(&buf)
+api.ExportPDF(&buf, export.PDFOptions{Title: "Trades", Landscape: true})
+api.ExportPXF(&buf, "trades.v1.Trade")
 
 // State
 state := api.GetGridState()
@@ -171,13 +175,13 @@ github.com/belluikit/bellui/x/tables/
 │                      Paginate, Pivot, Tree)
 ├── filter/          - Filter implementations (Text, Number, Date, Set)
 ├── sparkline/       - In-cell charts (Line, Area, Bar, Column)
-├── export/          - CSV, TSV, Excel exporters
+├── export/          - CSV, TSV, Excel, PDF, PXF exporters
 ├── theme/           - Grid-specific theme (colors, sizes, density modes)
 └── (demo lives in the gallery app: ../gallery, "Data Grid" page)
 ```
 
 **Key design decisions:**
-- Callback-based API following Fyne conventions (`Length`, `RowData`, `OnSelected`)
+- Callback-based API following Bellui conventions (`Length`, `RowData`, `OnSelected`)
 - Per-column-type cell pools for efficient recycling
 - `canvas.Raster` for sparklines (single texture per cell, not 50+ Line objects)
 - Pipeline architecture: Source -> Filter -> Sort -> Pivot -> Group -> Paginate

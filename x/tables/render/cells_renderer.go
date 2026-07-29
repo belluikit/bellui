@@ -1,10 +1,8 @@
 package render
 
 import (
-	"fmt"
 	"image/color"
 
-	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
@@ -42,10 +40,8 @@ type CellsRenderer struct {
 	// pinned cells and each content stays 1:1 with its host.
 	hostPool map[string][]*cellHost
 
-	rowBgs      []*canvas.Rectangle
-	groupLabels []*groupRowWidget
-	groupA11y   []*groupRowA11y
-	checkboxes  []*widget.Check
+	rowBgs     []*canvas.Rectangle
+	checkboxes []*widget.Check
 	// checkboxHosts wraps each pooled select checkbox in a cellHost so assistive
 	// tech sees a RoleTableCell (at absolute column 0) carrying the row's
 	// selection state, with the interactive widget.Check reachable inside it.
@@ -55,122 +51,6 @@ type CellsRenderer struct {
 	masterA11y    []*masterRowA11y
 	treeChevrons  []*canvas.Text
 	treeA11y      []*treeRowA11y
-}
-
-type groupRowWidget struct {
-	bg      *canvas.Rectangle
-	icon    *canvas.Text
-	label   *canvas.Text
-	objects []core.CanvasObject
-}
-
-func newGroupRowWidget(tc ThemeColors) *groupRowWidget {
-	bg := canvas.NewRectangle(tc.GroupRowBg)
-	icon := canvas.NewText("▼", tc.GroupRowFg)
-	icon.TextSize = 11
-	label := canvas.NewText("", tc.GroupRowFg)
-	label.TextStyle = bellui.TextStyle{Bold: true}
-	label.TextSize = 13
-	return &groupRowWidget{bg: bg, icon: icon, label: label, objects: []core.CanvasObject{bg, icon, label}}
-}
-
-func (g *groupRowWidget) update(key string, childCount int, expanded bool, depth int, pos geo.Position, size geo.Size, tc ThemeColors) {
-	indent := float32(depth) * 20
-	g.bg.FillColor = tc.GroupRowBg
-	g.bg.Move(pos)
-	g.bg.Resize(size)
-	if expanded {
-		g.icon.Text = "▼"
-	} else {
-		g.icon.Text = "▶"
-	}
-	g.icon.Color = tc.GroupRowFg
-	g.icon.Move(geo.NewPos(pos.X+indent+4, pos.Y+2))
-	g.icon.Resize(geo.NewSize(14, size.Height-4))
-	g.label.Text = fmt.Sprintf("%s (%d)", key, childCount)
-	g.label.Color = tc.GroupRowFg
-	g.label.Move(geo.NewPos(pos.X+indent+20, pos.Y+2))
-	g.label.Resize(geo.NewSize(size.Width-indent-24, size.Height-4))
-}
-
-// groupRowA11y is an invisible accessible node overlaid on a group-header row so
-// assistive tech announces it as a RoleTableRow carrying the group label and its
-// expanded/collapsed state. The row's visuals are drawn separately as raw canvas
-// objects (groupRowWidget); this widget contributes only semantics. It is not
-// Tappable/Hoverable, so the DataGrid's geometry hit-testing still handles the
-// toggle.
-type groupRowA11y struct {
-	widget.BaseWidget
-	grid     GridAccess
-	key      string
-	label    string
-	expanded bool
-}
-
-var (
-	_ core.Accessible         = (*groupRowA11y)(nil)
-	_ core.AccessibleStateful = (*groupRowA11y)(nil)
-	_ core.AccessibleActioner = (*groupRowA11y)(nil)
-)
-
-func newGroupRowA11y(grid GridAccess) *groupRowA11y {
-	g := &groupRowA11y{grid: grid}
-	g.ExtendBaseWidget(g)
-	return g
-}
-
-func (g *groupRowA11y) set(key string, childCount int, expanded bool) {
-	g.key = key
-	g.label = fmt.Sprintf("%s (%d)", key, childCount)
-	g.expanded = expanded
-}
-
-func (g *groupRowA11y) CreateRenderer() core.WidgetRenderer {
-	g.ExtendBaseWidget(g)
-	// A transparent rectangle gives the node bounds without drawing anything.
-	return widget.NewSimpleRenderer(canvas.NewRectangle(color.Transparent))
-}
-
-func (g *groupRowA11y) AccessibleRole() core.AccessibleRole { return core.RoleTableRow }
-func (g *groupRowA11y) AccessibleLabel() string             { return g.label }
-
-// AccessibleState reports StateExpanded when the group is open (there is no
-// distinct "collapsed" state — its absence means collapsed).
-func (g *groupRowA11y) AccessibleState() core.AccessibleState {
-	if g.expanded {
-		return core.StateExpanded
-	}
-	return 0
-}
-
-// AccessibleActions exposes the one relevant expand/collapse action for the
-// group's current state, so the UIA ExpandCollapse pattern's Expand()/Collapse()
-// map onto it (mirroring how a tree branch advertises its actions).
-func (g *groupRowA11y) AccessibleActions() []core.AccessibleAction {
-	if g.expanded {
-		return []core.AccessibleAction{{Name: core.ActionCollapse, Description: "Collapse group"}}
-	}
-	return []core.AccessibleAction{{Name: core.ActionExpand, Description: "Expand group"}}
-}
-
-// PerformAccessibleAction toggles the group when the requested action matches
-// its current state, routing through the same ToggleGroup path a pointer tap on
-// the group header uses. It is a no-op when the group is already in the target
-// state (expand while expanded, collapse while collapsed).
-func (g *groupRowA11y) PerformAccessibleAction(name string) {
-	if g.grid == nil {
-		return
-	}
-	switch name {
-	case core.ActionExpand:
-		if !g.expanded {
-			g.grid.ToggleGroup(g.key)
-		}
-	case core.ActionCollapse:
-		if g.expanded {
-			g.grid.ToggleGroup(g.key)
-		}
-	}
 }
 
 // masterRowA11y is an invisible accessible node overlaid on a master row's
@@ -412,7 +292,6 @@ func (r *CellsRenderer) refreshCells() {
 	newVisible := make(map[cellKey]core.CanvasObject, estCells)
 	objects := make([]core.CanvasObject, 0, estCells+64)
 
-	groupIdx := 0
 	bgIdx := 0
 	cbIdx := 0
 	detailIdx := 0
@@ -471,23 +350,10 @@ func (r *CellsRenderer) refreshCells() {
 			}
 		}
 
-		// Group header row
+		// Group header row: no cells. Its visuals and accessible RoleTableRow
+		// node are drawn once at the DataGrid level by the GroupRowOverlay,
+		// spanning the full row across every band (#110, #111).
 		if grid.IsGroupRow(row) {
-			if groupIdx >= len(r.groupLabels) {
-				r.groupLabels = append(r.groupLabels, newGroupRowWidget(tc))
-				r.groupA11y = append(r.groupA11y, newGroupRowA11y(grid))
-			}
-			gw := r.groupLabels[groupIdx]
-			ga := r.groupA11y[groupIdx]
-			groupIdx++
-			key, childCount, expanded, depth := grid.GroupRowInfo(row)
-			gw.update(key, childCount, expanded, depth, geo.NewPos(0, y), geo.NewSize(totalW, cellH), tc)
-			objects = append(objects, gw.objects...)
-			// Accessible RoleTableRow overlay (semantics only, invisible).
-			ga.set(key, childCount, expanded)
-			ga.Move(geo.NewPos(0, y))
-			ga.Resize(geo.NewSize(totalW, rowH))
-			objects = append(objects, ga)
 			continue
 		}
 

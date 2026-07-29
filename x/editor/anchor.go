@@ -158,6 +158,11 @@ func (e *Editor) trackAnchors(newText string) {
 			e.fold.apply() // re-derive HiddenRanges from the shifted regions
 		}
 	}
+	// Semantic-token overlay (#179): shift the published tokens so the foreground
+	// follows the text until the host republishes on the next analyze pass.
+	if e.semantic != nil && e.semantic.shift(oldText, newText) {
+		e.entry.Refresh()
+	}
 }
 
 // shiftFoldRegions shifts each fold region's Range through the edit, preserving

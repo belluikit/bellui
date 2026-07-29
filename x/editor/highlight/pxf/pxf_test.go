@@ -479,3 +479,56 @@ func TestRunsCoverFullLine(t *testing.T) {
 		}
 	}
 }
+
+func findRun(runs []editor.StyleRun, text string) *editor.StyleRun {
+	for i := range runs {
+		if runs[i].Text == text {
+			return &runs[i]
+		}
+	}
+	return nil
+}
+
+func TestDeclaredAnnotationDirective(t *testing.T) {
+	h := New()
+	h.SetDeclaredNames(editor.DeclaredNames{Annotations: []string{"myAnno"}})
+
+	// A declared annotation use site colors as an annotation.
+	runs, _ := h.Highlight("@myAnno", 0)
+	if r := findRun(runs, "@myAnno"); r == nil || r.ColorName != editor.ColorNameSyntaxAnnotation {
+		t.Errorf("@myAnno = %v, want annotation color", r)
+	}
+
+	// An undeclared @ident keeps the built-in directive color (unchanged).
+	runs, _ = h.Highlight("@type", 0)
+	if r := findRun(runs, "@type"); r == nil || r.ColorName != editor.ColorNameSyntaxKeyword {
+		t.Errorf("@type = %v, want directive/keyword color", r)
+	}
+}
+
+func TestDeclaredTypeReference(t *testing.T) {
+	h := New()
+	h.SetDeclaredNames(editor.DeclaredNames{Types: []string{"Widget"}})
+
+	// A bare reference to a declared type colors as a type.
+	runs, _ := h.Highlight("Widget", 0)
+	if r := findRun(runs, "Widget"); r == nil || r.ColorName != editor.ColorNameSyntaxType {
+		t.Errorf("Widget = %v, want type color", r)
+	}
+
+	// A field name (identifier before '=') is unaffected — the static rule wins.
+	runs, _ = h.Highlight("Widget = 1", 0)
+	if r := findRun(runs, "Widget"); r == nil || r.ColorName != editor.ColorNameSyntaxFunction {
+		t.Errorf("Widget as a field should stay field-colored, got %v", r)
+	}
+}
+
+func TestPxfDeclaredNamesCleared(t *testing.T) {
+	h := New()
+	h.SetDeclaredNames(editor.DeclaredNames{Annotations: []string{"myAnno"}})
+	h.SetDeclaredNames(editor.DeclaredNames{}) // clear
+	runs, _ := h.Highlight("@myAnno", 0)
+	if r := findRun(runs, "@myAnno"); r == nil || r.ColorName == editor.ColorNameSyntaxAnnotation {
+		t.Errorf("after clear, @myAnno should not be annotation-colored, got %v", r)
+	}
+}

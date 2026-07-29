@@ -153,7 +153,7 @@ mouse, that:
 - renders over the editor without stealing text focus unless it needs keys.
 
 This is internal plumbing reused by all three surfaces below. Likely backed by
-Fyne's `widget.PopUp`/canvas overlay, wrapped for position tracking.
+Bellui's `widget.PopUp`/canvas overlay, wrapped for position tracking.
 
 ### 2. Completion
 ```go
@@ -191,7 +191,7 @@ func (e *Editor) SetHoverProvider(p HoverProvider)
 ```
 Behavior: on mouse dwell over a position (and on keyboard "show hover"), query
 the provider, render markdown in a popover; dismiss on move-away. Reuses a
-markdown renderer (Fyne `widget.RichText` from markdown, already in the dep
+markdown renderer (Bellui `widget.RichText` from markdown, already in the dep
 tree via goldmark).
 
 ### 4. Signature help *(stretch within this phase)*

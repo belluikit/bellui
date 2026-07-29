@@ -54,16 +54,35 @@ var declKeywords = map[string]bool{
 
 // Highlighter provides Protocol Buffers syntax highlighting.
 // It implements [editor.Highlighter].
-type Highlighter struct{}
+type Highlighter struct {
+	// declared holds the workspace-supplied names consulted for schema-informed
+	// coloring; a zero value (all-nil sets) reduces to the static behavior.
+	declared editor.DeclaredNameSets
+}
 
 // New creates a proto highlighter.
 func New() *Highlighter {
 	return &Highlighter{}
 }
 
+// SetDeclaredNames seeds the highlighter with the workspace's declared RFC-001
+// names (see [editor.DeclaredNames]). It colors:
+//
+//   - an @name use site as an annotation when name is a declared annotation,
+//   - a bare identifier as a type when it names a declared type, and
+//   - a bare identifier as a function when it names a declared function,
+//
+// on top of the static keyword/scalar/declaration rules, which always win. The
+// set is line-based and stale between analyze passes, so refresh it on the
+// analyze-completion path and call [editor.Editor.RefreshHighlighter] after.
+// Passing a zero [editor.DeclaredNames] clears the workspace names.
+func (h *Highlighter) SetDeclaredNames(names editor.DeclaredNames) {
+	h.declared = names.Sets()
+}
+
 // Highlight implements [editor.Highlighter].
 func (h *Highlighter) Highlight(line string, state int) ([]editor.StyleRun, int) {
-	toks, newState := tokenizeLine(line, state)
+	toks, newState := h.tokenizeLine(line, state)
 
 	runs := make([]editor.StyleRun, len(toks))
 	for i, tok := range toks {
@@ -79,15 +98,16 @@ func (h *Highlighter) Highlight(line string, state int) ([]editor.StyleRun, int)
 type tokenKind int
 
 const (
-	tokDefault  tokenKind = iota
-	tokKeyword            // message, rpc, repeated, ...
-	tokType               // int32, string, or a declared type name
-	tokConstant           // true, false, max, inf, nan
-	tokString             // "..." or '...'
-	tokComment            // // ... or /* ... */
-	tokNumber             // 42, 0xFF, 3.14
-	tokOperator           // =, <, >, ...
-	tokFunction           // rpc method name: name(
+	tokDefault    tokenKind = iota
+	tokKeyword              // message, rpc, repeated, ...
+	tokType                 // int32, string, or a declared type name
+	tokConstant             // true, false, max, inf, nan
+	tokString               // "..." or '...'
+	tokComment              // // ... or /* ... */
+	tokNumber               // 42, 0xFF, 3.14
+	tokOperator             // =, <, >, ...
+	tokFunction             // rpc method name: name(, or a declared function
+	tokAnnotation           // @name naming a declared annotation
 )
 
 type token struct {
@@ -111,6 +131,8 @@ func (t token) colorName() bellui.ThemeColorName {
 		return editor.ColorNameSyntaxNumber
 	case tokFunction:
 		return editor.ColorNameSyntaxFunction
+	case tokAnnotation:
+		return editor.ColorNameSyntaxAnnotation
 	case tokOperator:
 		return editor.ColorNameSyntaxOperator
 	default:
@@ -122,7 +144,7 @@ func isOperator(r rune) bool {
 	return strings.ContainsRune("=<>+-;,.(){}[]", r)
 }
 
-func tokenizeLine(line string, state int) ([]token, int) {
+func (h *Highlighter) tokenizeLine(line string, state int) ([]token, int) {
 	var tokens []token
 	runes := []rune(line)
 	i := 0
@@ -213,6 +235,25 @@ func tokenizeLine(line string, state int) ([]token, int) {
 			continue
 		}
 
+		// Annotation use site: @name. Coloured as an annotation only when name is
+		// a workspace-declared annotation; otherwise emitted as a plain token so
+		// an arbitrary @ident is not mistaken for one.
+		if r == '@' {
+			j := i + 1
+			for j < len(runes) && (unicode.IsLetter(runes[j]) || unicode.IsDigit(runes[j]) || runes[j] == '_' || runes[j] == '.') {
+				j++
+			}
+			name := string(runes[i+1 : j])
+			kind := tokDefault
+			if h.declared.Annotations[name] {
+				kind = tokAnnotation
+			}
+			tokens = append(tokens, token{kind: kind, text: string(runes[i:j])})
+			i = j
+			prevWord = ""
+			continue
+		}
+
 		// Identifiers and keywords.
 		if unicode.IsLetter(r) || r == '_' {
 			j := i
@@ -222,10 +263,17 @@ func tokenizeLine(line string, state int) ([]token, int) {
 			word := string(runes[i:j])
 			kind := classifyWord(word)
 			if kind == tokDefault {
-				if declKeywords[prevWord] {
+				switch {
+				case declKeywords[prevWord]:
 					// The name declared by message/enum/service/oneof/extend.
 					kind = tokType
-				} else {
+				case h.declared.Types[word]:
+					// A bare reference to a workspace-declared type.
+					kind = tokType
+				case h.declared.Functions[word]:
+					// A bare reference to a workspace-declared function.
+					kind = tokFunction
+				default:
 					// An rpc method name: ident followed by '('.
 					k := j
 					for k < len(runes) && runes[k] == ' ' {

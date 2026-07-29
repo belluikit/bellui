@@ -326,12 +326,6 @@ func (c *completionController) show() {
 	if !c.ensureUI() {
 		return
 	}
-	if len(c.shown) == 0 {
-		// Placing the popup is the editor's job now (see placement), so the
-		// empty-list guard ShowAtCaret applied internally is ours too.
-		c.dismiss()
-		return
-	}
 	limit := maxVisibleCompletions
 	if c.e.MaxCompletionRows > 0 {
 		limit = c.e.MaxCompletionRows
@@ -355,50 +349,37 @@ func (c *completionController) show() {
 		c.acceptItem(shown, i, row, col)
 	}
 
-	// Size before placing: the flip decision needs the popup's final height, and
-	// a live SetItems changes it (ShowAtCaret did the same resize internally).
-	c.popup.Resize(c.popup.MinSize())
-
-	pos, ok := c.placement()
+	anchor, ok := c.caretAnchor()
 	if !ok {
 		c.dismiss()
 		return
 	}
 	if c.visible() {
-		c.popup.Move(pos)
+		c.popup.Reposition(anchor)
 	} else {
 		// One interactive surface at a time: an open hover card yields, as it
 		// did when completion shared the float-layer popover class.
 		c.e.dismissInteractivePopovers()
-		c.popup.Move(pos)
-		c.popup.Show()
+		c.popup.ShowAtCaret(anchor)
 	}
 }
 
-// placement returns the popup's canvas-space position for the current session
-// anchor. ok is false when the anchor is scrolled out of view or the editor is
-// not on a canvas yet.
-//
-// The editor places the popup itself rather than handing the caret rectangle to
-// [widget.CompletionPopup.ShowAtCaret]: the popup's own below/above flip is
-// keyed on the CANVAS edge, so an editor that does not reach the bottom of its
-// window would open the list downwards past its own bottom edge, over whatever
-// sits below it. Running the editor's [popoverPositionIn] instead keys the flip
-// on the editor viewport (like the hover and signature cards) while leaving the
-// hard clamp to the popup's own canvas-bounded Move — so a list taller than a
-// compact editor still overflows into the window rather than being squeezed.
-func (c *completionController) placement() (geo.Position, bool) {
-	anchor := c.e.PositionAt(c.anchorRow, c.anchorCol)
-	if anchor.IsZero() {
-		return geo.Position{}, false
+// caretAnchor returns the canvas-space cell rectangle of the session anchor —
+// the coordinate space [widget.CompletionPopup.ShowAtCaret] expects. ok is
+// false when the anchor is scrolled out of view or the editor is not on a
+// canvas yet.
+func (c *completionController) caretAnchor() (geo.Rectangle, bool) {
+	r := c.e.PositionAt(c.anchorRow, c.anchorCol)
+	if r.IsZero() {
+		return geo.Rectangle{}, false
 	}
 	app := bellui.CurrentApp()
 	if app == nil || app.Driver() == nil {
-		return geo.Position{}, false
+		return geo.Rectangle{}, false
 	}
-	bounds := c.e.popoverBounds()
-	pos, _ := popoverPositionIn(anchor, c.popup.MinSize(), bounds, c.e.popoverFlipBounds(bounds), false)
-	return pos.Add(app.Driver().AbsolutePositionForObject(c.e.entry)), true
+	off := app.Driver().AbsolutePositionForObject(c.e.entry)
+	r.Pos = r.Pos.Add(off)
+	return r, true
 }
 
 // reposition re-anchors a visible popup after a scroll or resize, dismissing
@@ -408,12 +389,12 @@ func (c *completionController) reposition() {
 	if !c.visible() {
 		return
 	}
-	pos, ok := c.placement()
+	anchor, ok := c.caretAnchor()
 	if !ok {
 		c.dismiss()
 		return
 	}
-	c.popup.Move(pos)
+	c.popup.Reposition(anchor)
 }
 
 // ensureUI lazily builds the fork completion popup on the editor's canvas. It
