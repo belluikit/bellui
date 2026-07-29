@@ -18,7 +18,7 @@ import (
 	"github.com/belluikit/bellui/widget"
 )
 
-// Editor is a composable code editor widget for Fyne applications.
+// Editor is a composable code editor widget for Bellui applications.
 //
 // It provides pluggable syntax highlighting via [Highlighter], a customizable
 // gutter via [GutterProvider], row-level decorations via [RowDecorator], and
@@ -126,10 +126,10 @@ type Editor struct {
 	decOverlay  *decoratorOverlay
 	find        *findBar
 	searchSpans *SearchMatchSpanDecorator // span-level find-match highlights
-	topBar      *bellui.Container         // find bar wrapper (shown/hidden)
-	hbox        *bellui.Container         // gutter + entry layout
-	root        *bellui.Container         // topBar + hbox
-	floatLayer  *bellui.Container         // floats popovers over the text
+	topBar      *bellui.Container           // find bar wrapper (shown/hidden)
+	hbox        *bellui.Container           // gutter + entry layout
+	root        *bellui.Container           // topBar + hbox
+	floatLayer  *bellui.Container           // floats popovers over the text
 
 	// activePopovers holds the currently shown popovers. At most one is
 	// interactive (completion or hover); a non-interactive companion (the
@@ -145,6 +145,12 @@ type Editor struct {
 	diagGutter           *DiagnosticGutter        // gutter markers, fed from SetDiagnostics
 	onDiagnosticsChanged func([]Diagnostic)       // problems-panel sync hook (nil-safe)
 
+	// lastDiagSummary gates the screen-reader diagnostics announcement to
+	// actual changes ("" = never announced / no diagnostics); announce is the
+	// live-region seam, nil = bellui.AnnounceToScreenReader (test hook).
+	lastDiagSummary string
+	announce        func(text string, assertive bool)
+
 	link                *linkController      // Cmd/Ctrl-hover link affordance (nil-safe)
 	linkDeco            *StaticSpanDecorator // underlines the navigable symbol
 	linkModWatchStop    func()               // removes the driver modifier listener (#155)
@@ -155,6 +161,8 @@ type Editor struct {
 
 	fold       *foldController // code folding via entry.HiddenRanges + placeholder overlay
 	foldGutter *FoldGutter     // internal fold-chevron gutter, wired to fold state
+
+	semantic *semanticOverlay // whole-document foreground overlay via entry.StyleOverlayForRow (#175)
 
 	chordPending bool        // Ctrl/Cmd+K seen, awaiting the chord's second key
 	chordTimer   *time.Timer // resets chordPending if the second key never comes
@@ -365,6 +373,13 @@ func NewEditor() *Editor {
 	// its foldable/collapsed queries and toggle so a host can compose it directly.
 	e.fold = newFoldController(e)
 	e.foldGutter = newFoldGutter(e.fold.foldableAtHeader, e.fold.collapsedAtHeader, e.fold.toggle)
+
+	// Whole-document foreground overlay for LSP semantic tokens (#175), inert
+	// until SetSemanticTokens publishes any. It composites over the line
+	// Highlighter via the fork's pull-based StyleOverlayForRow, so wiring it
+	// unconditionally costs nothing until tokens exist.
+	e.semantic = newSemanticOverlay()
+	e.entry.StyleOverlayForRow = e.semantic.runsForRow
 
 	// Completion controller (inert until SetCompletionProvider installs one).
 	e.completion = newCompletionController(e)
@@ -735,7 +750,7 @@ func (e *Editor) applyHighlighter() {
 		runs, newState := h.Highlight(line, state)
 		// Convert editor.StyleRun to widget.StyleRun.
 		// Resolve ColorName to a direct ForegroundColor via themeColor()
-		// because Fyne's theme doesn't know fycoder's custom color names.
+		// because Bellui's theme doesn't know fycoder's custom color names.
 		wRuns := make([]widget.StyleRun, len(runs))
 		for i, r := range runs {
 			var fg color.Color
@@ -839,7 +854,7 @@ func (e *Editor) rebuildHbox() {
 	center := container.NewStack(objs...)
 
 	if e.gutterW != nil {
-		// Clip the gutter content (Fyne doesn't clip widget bounds),
+		// Clip the gutter content (Bellui doesn't clip widget bounds),
 		// then pad to match the Entry's inputBorder viewport offset.
 		// Clipping inside padding ensures line numbers at negative Y
 		// or beyond the viewport height are hidden.
@@ -1019,10 +1034,9 @@ func (e *Editor) repositionPopover() {
 // set, and never refreshes the float layer itself (see repositionPopover).
 func (e *Editor) layoutPopovers() (changed bool) {
 	bounds := e.popoverBounds()
-	flip := e.popoverFlipBounds(bounds)
 	for _, p := range e.activePopovers {
 		anchor := e.PositionAt(p.anchorRow, p.anchorCol)
-		p.resizeAndPlace(anchor, bounds, flip)
+		p.resizeAndPlace(anchor, bounds)
 	}
 	if inter, comp := e.interactivePopover(), e.companionPopover(); inter != nil && comp != nil && inter.overlaps(comp) {
 		return e.removePopover(comp)
@@ -1137,26 +1151,6 @@ func (e *Editor) popoverBounds() geo.Rectangle {
 		bounds = intersectRect(bounds, clipLocal)
 	}
 	return bounds
-}
-
-// popoverFlipBounds returns the region a popover prefers to stay inside when it
-// picks its side of the anchor line: the editor's own text viewport, in the same
-// editor-local space as [Editor.popoverBounds] (which it is intersected with, so
-// a host clip still applies).
-//
-// The distinction matters near the editor's bottom edge. Clamping is the
-// canvas's job — a popover may deliberately overflow a compact editor (#19) —
-// but the below/above choice must be the editor's, or a completion list opened
-// on the last visible line hangs off the widget instead of flipping above the
-// current line. When the popover fits on neither side of the anchor within this
-// region, [popoverPositionIn] falls back to the side with more room, so the
-// overflow behaviour of a compact editor is unchanged.
-func (e *Editor) popoverFlipBounds(bounds geo.Rectangle) geo.Rectangle {
-	viewport := geo.Rectangle{Size: e.entry.Size()}
-	if viewport.Size.Height <= 0 || viewport.Size.Width <= 0 {
-		return bounds
-	}
-	return intersectRect(bounds, viewport)
 }
 
 // intersectRect returns the overlap of a and b. With no overlap the result has

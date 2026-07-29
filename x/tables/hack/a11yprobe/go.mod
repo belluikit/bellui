@@ -7,12 +7,12 @@ module github.com/belluikit/bellui/x/tables/hack/a11yprobe
 go 1.25.0
 
 require (
-	github.com/belluikit/bellui v2.19.0-rc.1
+	github.com/belluikit/bellui v3.0.0-rc.8
 	github.com/belluikit/bellui/x/tables v0.0.0
 )
 
 require (
-	github.com/belluikit/systray v1.12.0 // indirect
+	bellui.io/systray v1.12.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fredbi/uri v1.1.1 // indirect
@@ -33,18 +33,18 @@ require (
 	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c // indirect
 	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
-	github.com/belluikit/gl-js v0.2.1 // indirect
-	github.com/belluikit/glfw v1.5.0 // indirect
-	github.com/belluikit/glfw-js v1.0.3 // indirect
-	github.com/trendvidia/protowire-go v1.1.1 // indirect
-	github.com/belluikit/render v0.2.3 // indirect
-	github.com/belluikit/typesetting v0.3.5 // indirect
-	github.com/belluikit/webgpu v1.0.7 // indirect
+	github.com/trendvidia/gl-js v0.2.1 // indirect
+	github.com/trendvidia/glfw v1.9.0 // indirect
+	github.com/trendvidia/glfw-js v1.0.3 // indirect
+	github.com/trendvidia/protowire-go v1.2.2 // indirect
+	github.com/trendvidia/render v0.2.4 // indirect
+	github.com/trendvidia/typesetting v0.3.6 // indirect
+	github.com/trendvidia/webgpu v1.0.8 // indirect
 	github.com/yuin/goldmark v1.7.8 // indirect
-	golang.org/x/image v0.41.0 // indirect
-	golang.org/x/net v0.55.0 // indirect
-	golang.org/x/sys v0.45.0 // indirect
-	golang.org/x/text v0.37.0 // indirect
+	golang.org/x/image v0.44.0 // indirect
+	golang.org/x/net v0.57.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/text v0.40.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

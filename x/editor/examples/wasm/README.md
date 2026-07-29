@@ -8,14 +8,14 @@ and is the acceptance harness for the F1–F5 browser-verify
 [#150](https://github.com/trendvidia/fyne/issues/150)).
 
 **Why this exists:** compilation to WASM is already proven. What a compiler
-*cannot* tell us is whether Fyne's **web layer** carries a real code editor —
+*cannot* tell us is whether Bellui's **web layer** carries a real code editor —
 IME composition, clipboard, large-file virtualisation, code folding, protected
 ranges, and secret redaction. Those need a browser. This harness makes each
 check one click, on both the **WebGPU** default and the **`-tags gl`** WebGL
 fallback.
 
 This is a **separate Go module** (its own `go.mod`, with `replace` pointing at
-the repo root) so pulling the full Fyne app stack does not add those deps to the
+the repo root) so pulling the full Bellui app stack does not add those deps to the
 fycoder library's `go.mod`. `go build ./...` at the repo root does not descend
 into it.
 
@@ -86,7 +86,7 @@ Record results back in the Phase 10 doc / on #376.
 ## Troubleshooting
 
 - **Black screen / no UI, but `editor.wasm` returned 200.** The page is
-  missing the structure the Fyne wasm driver expects — most importantly the
+  missing the structure the Bellui wasm driver expects — most importantly the
   `<input id="dummyEntry">` element. Use the `index.html` shipped here; a bare
   loader page will run the binary but render nothing usable.
 - **Renderer fix is wired in via `replace`.** Upstream `fyne-io/gl-js@v0.2.0`

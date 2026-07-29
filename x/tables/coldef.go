@@ -1,14 +1,21 @@
 package tables
 
 import (
+	"reflect"
+	"strings"
+
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/x/tables/cell"
+	"github.com/belluikit/bellui/x/tables/export"
 )
 
 // ColumnDef defines the configuration for a single column in the data grid.
 type ColumnDef struct {
 	// Field is the key used to extract the value from row data.
-	// Supports dot notation for nested fields (e.g. "address.city").
+	// Supports dot notation for nested fields (e.g. "address.city"),
+	// walking string-keyed maps and exported struct fields (through any
+	// pointers) one segment at a time. A map row holding the whole dotted
+	// string as a literal key resolves to that entry instead.
 	Field string
 
 	// HeaderName is the display text shown in the column header.
@@ -20,6 +27,18 @@ type ColumnDef struct {
 
 	// Type determines the default renderer, editor, filter, and comparator.
 	Type ColumnType
+
+	// ExportType declares the column's field type for typed exports
+	// (PXF). When set, it wins — including over ValueFormatter, which
+	// stays a display/CSV concern while PXF exports the raw typed
+	// value. When unset, the unambiguous ColumnTypes map directly:
+	// ColumnText to export.FieldString, ColumnBoolean to
+	// export.FieldBool, ColumnDate to export.FieldTimestamp, and any
+	// column with a ValueFormatter to export.FieldString (formatted
+	// cells export as strings). ColumnNumber and ColumnCustom have no
+	// unambiguous field type — PXF export fails for them unless
+	// ExportType is set; types are never inferred from values.
+	ExportType export.FieldType
 
 	// Width is the fixed width in pixels. Zero means use default or Flex.
 	Width float32
@@ -54,6 +73,18 @@ type ColumnDef struct {
 
 	// CellRenderer overrides the default cell renderer for this column.
 	CellRenderer cell.RendererFactory
+
+	// Editor overrides the inline cell editor for this column (e.g.
+	// cell.NewSelectEditor for a dropdown of candidate values). If nil, a
+	// plain text Entry is used.
+	Editor cell.EditorFactory
+
+	// CanEdit gates editing per cell. On an editable column, a non-nil
+	// CanEdit is consulted with the row's data before an editor is created;
+	// returning false refuses the edit and no editor appears. It further
+	// restricts Editable — it cannot make a non-editable column editable.
+	// Nil means the column's Editable setting alone decides.
+	CanEdit func(rowData any) bool
 
 	// Comparator provides a custom sort comparator.
 	// Returns negative if a < b, zero if equal, positive if a > b.
@@ -162,12 +193,68 @@ func (c *ColumnDef) valueGetter() func(any) any {
 	}
 }
 
+// defaultFieldAccess resolves ColumnDef.Field against a row. Dot notation
+// walks nested values one segment at a time (e.g. "address.city"), except
+// that a map row holding the whole dotted field as a literal key resolves to
+// that entry. Each segment resolves a map key for string-keyed map values or
+// an exported struct field (through any pointers) otherwise. Any segment that
+// fails to resolve — non-map/struct value, missing key, missing/unexported
+// field, nil pointer — yields nil, and display/sort/filter treat the cell as
+// empty; set ColumnDef.ValueGetter for rows that need custom access.
 func defaultFieldAccess(rowData any, field string) any {
-	if m, ok := rowData.(map[string]any); ok {
-		return m[field]
+	if strings.Contains(field, ".") {
+		if m, ok := rowData.(map[string]any); ok {
+			if v, ok := m[field]; ok {
+				return v
+			}
+		}
+		if m, ok := rowData.(map[string]string); ok {
+			if v, ok := m[field]; ok {
+				return v
+			}
+		}
 	}
-	if m, ok := rowData.(map[string]string); ok {
-		return m[field]
+	value := rowData
+	for field != "" {
+		var segment string
+		segment, field, _ = strings.Cut(field, ".")
+		value = fieldSegment(value, segment)
+		if value == nil {
+			return nil
+		}
+	}
+	return value
+}
+
+// fieldSegment resolves one dot-notation segment against a value: a map key
+// for string-keyed maps, an exported struct field (through any pointers)
+// otherwise, nil when neither applies.
+func fieldSegment(value any, name string) any {
+	if m, ok := value.(map[string]any); ok {
+		return m[name]
+	}
+	if m, ok := value.(map[string]string); ok {
+		return m[name]
+	}
+	v := reflect.ValueOf(value)
+	for v.Kind() == reflect.Pointer {
+		if v.IsNil() {
+			return nil
+		}
+		v = v.Elem()
+	}
+	switch v.Kind() {
+	case reflect.Struct:
+		if f := v.FieldByName(name); f.IsValid() && f.CanInterface() {
+			return f.Interface()
+		}
+	case reflect.Map:
+		if v.Type().Key().Kind() == reflect.String {
+			key := reflect.ValueOf(name).Convert(v.Type().Key())
+			if e := v.MapIndex(key); e.IsValid() {
+				return e.Interface()
+			}
+		}
 	}
 	return nil
 }

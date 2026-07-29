@@ -117,10 +117,8 @@ func TestHover_DiagnosticMessageRendersVerbatim(t *testing.T) {
 	test.NewTempApp(t)
 	e := renderedPopoverEditor(t, "foobar baz")
 	e.SetDiagnostics([]Diagnostic{
-		{
-			Range:    TextRange{StartRow: 0, StartCol: 0, EndRow: 0, EndCol: 6},
-			Severity: SeverityError, Message: "use _ptr_ not *x*", Source: "lint",
-		},
+		{Range: TextRange{StartRow: 0, StartCol: 0, EndRow: 0, EndCol: 6},
+			Severity: SeverityError, Message: "use _ptr_ not *x*", Source: "lint"},
 	})
 
 	e.hover.triggerAt(cellCenter(e, 0, 2))

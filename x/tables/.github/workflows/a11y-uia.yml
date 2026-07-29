@@ -32,7 +32,7 @@ jobs:
         shell: powershell
         run: |
           go mod download
-          $dir = (go list -m -f '{{.Dir}}' github.com/belluikit/bellui)
+          $dir = (go list -m -f '{{.Dir}}' github.com/trendvidia/fyne/v2)
           Write-Host "fyne module dir: $dir"
           "dir=$dir" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 

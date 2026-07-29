@@ -38,6 +38,12 @@ const (
 	// ColorNameSyntaxType colors type names.
 	ColorNameSyntaxType bellui.ThemeColorName = "editor.syntax.type"
 
+	// ColorNameSyntaxAnnotation colors annotation / decorator constructs: an
+	// RFC-001 @annotation use site naming a workspace-declared annotation (see
+	// [DeclaredNames]), and the default for the "decorator", "annotation" and
+	// "macro" semantic token types (see [Editor.SetSemanticTokens]).
+	ColorNameSyntaxAnnotation bellui.ThemeColorName = "editor.syntax.annotation"
+
 	// ColorNameGutterText colors line numbers and other gutter text.
 	ColorNameGutterText bellui.ThemeColorName = "editor.gutter.text"
 
@@ -80,6 +86,7 @@ var defaultDarkColors = map[bellui.ThemeColorName]color.Color{
 	ColorNameSyntaxFunction:   color.NRGBA{R: 0xA6, G: 0xE2, B: 0x2E, A: 0xFF}, // bright green
 	ColorNameSyntaxOperator:   color.NRGBA{R: 0xD0, G: 0xD0, B: 0xD0, A: 0xFF}, // light grey
 	ColorNameSyntaxType:       color.NRGBA{R: 0x66, G: 0xD9, B: 0xEF, A: 0xFF}, // cyan
+	ColorNameSyntaxAnnotation: color.NRGBA{R: 0xFD, G: 0x97, B: 0x1F, A: 0xFF}, // orange
 	ColorNameGutterText:       color.NRGBA{R: 0x90, G: 0x90, B: 0x90, A: 0xFF}, // grey
 	ColorNameGutterBackground: color.Transparent,
 
@@ -104,6 +111,7 @@ var defaultLightColors = map[bellui.ThemeColorName]color.Color{
 	ColorNameSyntaxFunction:   color.NRGBA{R: 0x6F, G: 0x42, B: 0x00, A: 0xFF}, // dark amber
 	ColorNameSyntaxOperator:   color.NRGBA{R: 0x24, G: 0x29, B: 0x2E, A: 0xFF}, // near-black
 	ColorNameSyntaxType:       color.NRGBA{R: 0x00, G: 0x6B, B: 0x75, A: 0xFF}, // teal
+	ColorNameSyntaxAnnotation: color.NRGBA{R: 0xB0, G: 0x54, B: 0x00, A: 0xFF}, // burnt orange
 	ColorNameGutterText:       color.NRGBA{R: 0x6E, G: 0x76, B: 0x81, A: 0xFF}, // grey
 	ColorNameGutterBackground: color.Transparent,
 
@@ -134,7 +142,7 @@ func defaultColors() map[bellui.ThemeColorName]color.Color {
 // the theme foreground color.
 func themeColor(name bellui.ThemeColorName) color.Color {
 	// Always prefer our own variant-aware defaults for fycoder-specific names.
-	// The app theme's fallback for unknown names is unreliable (Fyne returns
+	// The app theme's fallback for unknown names is unreliable (Bellui returns
 	// a catch-all color like blue instead of transparent).
 	defaults := defaultColors()
 	if def, ok := defaults[name]; ok {

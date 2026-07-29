@@ -36,7 +36,7 @@ type SpanChange struct {
 
 // ClassifySpanChanges diffs an open-time snapshot of span values (name → value)
 // against the current document, reading each current span's value out of the
-// current text. It is a pure helper with no Fyne dependency — a port of pxfed's
+// current text. It is a pure helper with no Bellui dependency — a port of pxfed's
 // secret-changes.ts, hoisted here so any host gets the save-confirm diff for
 // free.
 //

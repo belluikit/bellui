@@ -19,7 +19,7 @@ func TestFindBarUpdateMatches(t *testing.T) {
 	)
 
 	// Set query text directly on the internal field (avoids Entry.SetText
-	// which requires a running Fyne app).
+	// which requires a running Bellui app).
 	fb.entry.Text = ""
 	fb.updateMatches()
 	if fb.matches.Len() != 0 {

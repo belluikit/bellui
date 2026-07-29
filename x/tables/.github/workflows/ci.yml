@@ -1,0 +1,46 @@
+name: ci
+
+# Runs on the self-hosted macOS runner with the pre-installed go-plus fork
+# (dogfooding). The runner resolves the pinned github.com/trendvidia/fyne fork
+# via its own git credentials, so — unlike the old hosted, gofmt-only job
+# (#103) — we can build and test here.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: [self-hosted, macOS, ARM64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assert go-plus toolchain
+        run: |
+          go version
+          go version | grep -q '(plus)' || { echo "::error::runner go is not the go-plus fork"; exit 1; }
+
+      - name: Configure private module access
+        run: go env -w GOPRIVATE=github.com/trendvidia/*
+
+      - name: gofmt
+        run: |
+          dirty=$(gofmt -l .)
+          if [ -n "$dirty" ]; then
+            echo "gofmt violations:" >&2
+            echo "$dirty" >&2
+            gofmt -d .
+            exit 1
+          fi
+
+      - name: build
+        run: go build ./...
+
+      - name: vet
+        run: go vet ./...
+
+      - name: test
+        run: go test -race -count=1 ./...

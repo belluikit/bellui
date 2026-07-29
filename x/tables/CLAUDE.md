@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-fytables is an AG Grid-equivalent data table widget for the Fyne GUI framework (Go). It provides a high-performance, virtual-scrolling data grid with sorting, filtering, cell editing, sparklines, column pinning/grouping, row grouping, aggregation, pagination, pivot tables, tree data, and export.
+fytables is an AG Grid-equivalent data table widget for the Bellui GUI framework (Go). It provides a high-performance, virtual-scrolling data grid with sorting, filtering, cell editing, sparklines, column pinning/grouping, row grouping, aggregation, pagination, pivot tables, tree data, and export.
 
 ## Build & Test
 
@@ -20,7 +20,7 @@ go run ../gallery   # demo lives in the gallery app
 go test -bench=. ./render/
 ```
 
-The module builds against the pinned Fyne fork release (`github.com/belluikit/bellui` in `go.mod`, currently `v2.17.0`) resolved from the module cache. There is **no** `go.work` and no `replace` directive — a local checkout of the fork at `../fyne` is *not* consumed by default. To build fytables against local fork changes (e.g. new a11y interfaces), add a `replace github.com/belluikit/bellui => ../fyne` to `go.mod` or create a `go.work` spanning both modules, then bump the pinned version once the fork change is released.
+The module builds against the pinned Bellui fork release (`github.com/belluikit/bellui` in `go.mod`, currently `v3.0.0-rc.2`) resolved from the module cache. The parent workspace `../go.work` spans fytables but does **not** `use` the fork checkout at `../fyne`, and there is no `replace` directive — local fork changes are *not* consumed by default. To build fytables against local fork changes (e.g. new a11y interfaces), add `./fyne` to `../go.work` (or a `replace github.com/belluikit/bellui => ../fyne` to `go.mod`), then bump the pinned version once the fork change is released.
 
 ## Architecture
 
@@ -31,7 +31,7 @@ The module builds against the pinned Fyne fork release (`github.com/belluikit/be
 - **`pipeline/`**: Data transformation chain. `Pipeline` orchestrates: Source -> Filter -> Sort -> Pivot -> Group -> Paginate. `RowIndex` maps display rows to source rows.
 - **`filter/`**: Filter implementations (Text, Number, Date, Set).
 - **`sparkline/`**: In-cell chart widget using `canvas.Raster`.
-- **`export/`**: CSV, TSV, Excel (.xlsx) exporters.
+- **`export/`**: CSV, TSV, Excel (.xlsx), paginated PDF report, and PXF `@dataset` exporters. PDF and Excel are dependency-free (hand-written minimal PDF/OOXML). PDF streams page-by-page with a default 10k row cap.
 - **`theme/`**: Grid-specific theme with density modes.
 
 ### Key Patterns
@@ -60,11 +60,11 @@ The module builds against the pinned Fyne fork release (`github.com/belluikit/be
 - `BaseWidget.Resize(sameSize)` is a no-op — won't trigger `Layout()`. Use `Refresh()` which calls `doLayout()`.
 - Pinned-right columns are overlaid on the scroll area. The viewport's effective width is reduced by `pinnedRightW` so cells don't render behind the overlay.
 - `resolveColumns()` rebuilds from `ColumnDefs` — preserves widths via ID-keyed map.
-- The Fyne fork has a fix in `widget/richtext.go`: `insertAt()` and `deleteFromTo()` increment `rowBoundsVersion` to invalidate stale row bounds cache.
+- The Bellui fork has a fix in `widget/richtext.go`: `insertAt()` and `deleteFromTo()` increment `rowBoundsVersion` to invalidate stale row bounds cache.
 
 ## Conventions
 
 - All colors come from `render.ResolveThemeColors()`, never hardcoded
 - Cell `UpdateCell()` must set alignment/style every time (cells recycle across types)
-- Tests use `test.NewTempApp(t)` for Fyne widget tests
+- Tests use `test.NewTempApp(t)` for Bellui widget tests
 - Pipeline transforms run in order: Filter -> Sort -> Pivot -> Group -> Paginate

@@ -12,14 +12,14 @@ go vet ./...                            # static analysis
 go run ../gallery                        # demo lives in the gallery app ("Code Editor" page)
 ```
 
-Tests that call Fyne APIs (MeasureText, widget constructors) require `test.NewTempApp(t)` at the start of the test function.
+Tests that call Bellui APIs (MeasureText, widget constructors) require `test.NewTempApp(t)` at the start of the test function.
 
 ## Architecture
 
-Composable code editor widget for Fyne. Three independent, pluggable axes:
+Composable code editor widget for Bellui. Three independent, pluggable axes:
 
 - **`Highlighter`** (`style.go`) — per-line syntax highlighting via `StyleRun` tokens. Stateful across lines (state flows line-to-line for multi-line strings/comments).
-- **`GutterProvider`** (`gutter.go`) — renders the area left of text. `InteractiveGutter` adds click handling. `CompositeGutter` stacks multiple providers side by side, arranged by the column each declares via `GutterColumnProvider` — markers (breakpoints, diagnostics, undeclared host providers) on the leading edge, then the line numbers, then the fold control beside the text — regardless of the order they were passed. `NewCompositeGutterInOrder` opts out and renders them verbatim. Column hit-testing (`TappedAtX`) walks the same arranged order.
+- **`GutterProvider`** (`gutter.go`) — renders the area left of text. `InteractiveGutter` adds click handling. `CompositeGutter` stacks multiple providers side-by-side.
 - **`RowDecorator`** (`decorator.go`) — row-level background/overlay effects (current line highlight, search matches).
 
 ### Editor composition
@@ -37,7 +37,7 @@ Key design: the **gutter is a separate widget** outside the Entry's scroll viewp
 
 `syncExternalWidgets()` pushes Entry's text and `RowMetrics()` (topOffset, stride) to the gutter widget and decorator overlay on every text change and scroll event. `RowMetrics()` returns cached row geometry from the Entry's internal RichText after layout, with a theme-derived fallback before the first layout pass.
 
-### Fyne fork dependency
+### Bellui fork dependency
 
 Depends on `trendvidia/fyne` (local replace in go.mod). The fork adds three fields to `widget.Entry`:
 - `OnScrolled` — fires on scroll offset changes

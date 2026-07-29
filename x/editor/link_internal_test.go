@@ -32,7 +32,7 @@ func TestNavigation_CmdClickFiresHook(t *testing.T) {
 	test.NewTempApp(t)
 	e := renderedPopoverEditor(t, "foobar baz\nqux")
 
-	gotRow, gotCol, calls := -1, -1, 0
+	var gotRow, gotCol, calls = -1, -1, 0
 	e.OnRequestNavigation(func(row, col int) {
 		gotRow, gotCol, calls = row, col, calls+1
 	})
@@ -171,7 +171,7 @@ func TestGoToDefinition_AtCursorFiresAtSymbolStart(t *testing.T) {
 		Text:      func() string { return e.Text() },
 	})
 
-	gotRow, gotCol, calls := -1, -1, 0
+	var gotRow, gotCol, calls = -1, -1, 0
 	e.OnRequestNavigation(func(row, col int) { gotRow, gotCol, calls = row, col, calls+1 })
 
 	e.SetCursorPos(0, 3) // mid-"foobar"
@@ -209,7 +209,7 @@ func TestGoToDefinition_NoProviderFiresAtCaret(t *testing.T) {
 	test.NewTempApp(t)
 	e := renderedPopoverEditor(t, "foobar baz")
 
-	gotRow, gotCol, calls := -1, -1, 0
+	var gotRow, gotCol, calls = -1, -1, 0
 	e.OnRequestNavigation(func(row, col int) { gotRow, gotCol, calls = row, col, calls+1 })
 
 	e.SetCursorPos(0, 8)
