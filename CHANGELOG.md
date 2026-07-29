@@ -76,10 +76,15 @@ consolidated source was the newest code, only whether it builds. The
 countermeasure is the `PROVENANCE.md` record plus the pre-flight check now
 documented in `docs/REBRAND.md` in belluikit/player.
 
-`x/charts` and `x/dag` came through the original consolidation correctly —
-`fycharts`'s branch happened to sit at its tip, and `fydag` had no such branch
-to mispick. Their provenance is still unrecorded and should be established
-(#85).
+`x/charts` and `x/dag` came through the original consolidation correctly, but by
+coincidence rather than by process: all four modules were cut the same wrong
+way, and those two happened to sit on branches within a commit or two of their
+tips. Their provenance is still unrecorded and should be established (#85).
+
+All five `chore/fyne-v3` branches — `fytables`, `fycoder`, `fycharts`, `fydag`
+and `extensions` — have since been deleted, each after confirming its PR was
+merged and its remaining commits only re-applied the same import rewrite on a
+stale base.
 
 ## v1.0.0-rc.4 — 2026-07-27
 
