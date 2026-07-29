@@ -1,3 +1,11 @@
+// The canvas file browser is exercised here against a real testdata directory —
+// storage.ListerForURI, os paths and hideFile, which has no wasm definition at
+// all (file_unix.go is `!wasm && !js`, file_wasm.go defines none). A browser has
+// no filesystem to browse: the web target uses an <input type=file> instead
+// (file_wasm.go), so this suite is desktop/mobile-only rather than something to
+// stub out (#77).
+//go:build !wasm
+
 package dialog
 
 import (
