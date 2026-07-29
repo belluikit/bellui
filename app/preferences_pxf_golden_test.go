@@ -1,3 +1,10 @@
+// The fixture is loaded through the real on-disk path (`!wasm`: loadFromFile),
+// deliberately, so the format sniff that runs on app start is exercised — and a
+// browser has no testdata directory to read it from anyway (#77). The format's
+// marshal/unmarshal round-trip is covered platform-independently in
+// preferences_pxf_test.go.
+//go:build !wasm
+
 package app
 
 import (
