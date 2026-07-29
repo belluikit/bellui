@@ -155,7 +155,8 @@ func TestDataGrid_ExportPXF(t *testing.T) {
 func TestDataGrid_ExportPXFExportTypeOverridesFormatter(t *testing.T) {
 	data := []map[string]any{{"price": 42.5}}
 	g := newTestGrid(t, data, []*ColumnDef{
-		{Field: "price", HeaderName: "Price", Type: ColumnNumber,
+		{
+			Field: "price", HeaderName: "Price", Type: ColumnNumber,
 			ExportType:     export.FieldDouble,
 			ValueFormatter: func(v any) string { return "$42.50" },
 		},
