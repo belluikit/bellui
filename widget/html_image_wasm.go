@@ -1,4 +1,7 @@
-//go:build !ci && (!android || !ios || !mobile) && wasm
+// The `ci` tag must NOT gate this file: its counterpart html_image_notweb.go is
+// `!wasm`, so excluding this one under `wasm && ci` leaves parseHTMLImage
+// undefined and breaks the wasm test build (#73).
+//go:build (!android || !ios || !mobile) && wasm
 
 package widget
 
