@@ -44,3 +44,19 @@ jobs:
           GOARCH: wasm
         working-directory: cmd/bellui_settings
         run: go build -tags gl
+
+      # Real-DOM execution leg (#73). wasmbrowsertest runs the test binary in
+      # headless Chromium, so the wasm webview backend is exercised against an
+      # actual iframe/postMessage surface rather than only type-checked. Needs
+      # `chromium` on PATH (snap on the Ubuntu runner). Scope is deliberately
+      # ./webview/ for now: the other packages' wasm test builds are not yet
+      # green (see #77), and each package costs a browser launch.
+      - name: Install wasmbrowsertest
+        run: go install github.com/agnivade/wasmbrowsertest@v0.11.0
+
+      - name: Test WebAssembly (headless Chromium)
+        env:
+          GOOS: js
+          GOARCH: wasm
+          CGO_ENABLED: "0"
+        run: go test -tags ci -exec="$(go env GOPATH)/bin/wasmbrowsertest" ./webview/

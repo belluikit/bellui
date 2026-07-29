@@ -25,6 +25,13 @@ func watchTheme(_ *settings) {
 	// no-op
 }
 
+// stopWatchingTheme is only otherwise defined by app_wasm.go, which is `!ci` —
+// so without this the `wasm && ci` build has no definition for settings_wasm.go
+// (tagged plain `wasm`) to call (#73).
+func stopWatchingTheme() {
+	// no-op
+}
+
 func (a *belluiApp) registerRepositories() {
 	// no-op
 }
