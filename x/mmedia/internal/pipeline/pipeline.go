@@ -155,20 +155,14 @@ func NewPipelineURL(url string, cfg ...Config) (*Pipeline, error) {
 	return newPipelineForSource(src, firstConfig(cfg)), nil
 }
 
-// NewPipelineDevice creates a playback pipeline over a live capture device.
-// format, url and options are the per-platform libavdevice contract; see
-// source.NewFFmpegSourceDevice, and the public capture entry points for the
-// resolution of platform naming.
+// There is deliberately no NewPipelineDevice alongside these. Opening a capture
+// device is not one call: the per-platform selector rules and the framerate
+// fallback (#95) both live above this package, and a device switch (#96) has to
+// build the source on its own anyway so it can hand it to SwapSource. The
+// capture entry points open a source.Source and pass it to NewPipelineForSource.
 //
 // The resulting pipeline reports IsLive: Seek is refused, and the end of the
 // stream is reported through OnError rather than OnEnd.
-func NewPipelineDevice(format, url, options string, cfg ...Config) (*Pipeline, error) {
-	src, err := source.NewFFmpegSourceDevice(format, url, options)
-	if err != nil {
-		return nil, err
-	}
-	return newPipelineForSource(src, firstConfig(cfg)), nil
-}
 
 // Config tunes playback behaviour that cannot be inferred from the media.
 type Config struct {
@@ -187,25 +181,10 @@ func firstConfig(cfg []Config) Config {
 // newPipelineForSource assembles a pipeline around an already-created source.
 func newPipelineForSource(src source.Source, cfg Config) *Pipeline {
 	p := &Pipeline{
-		src:   src,
-		clock: NewClock(),
-	}
-
-	p.state = NewStateMachine(nil)
-
-	p.hasVideo = src.HasVideo()
-	p.hasAudio = src.HasAudio()
-	p.duration = src.Duration()
-
-	// Live capture is an asserted capability, so a source that does not implement
-	// it — including the test stubs — is finite, which is the previous behaviour.
-	if ls, ok := src.(source.LiveSource); ok {
-		p.live = ls.IsLive()
-	}
-
-	if p.hasVideo {
-		p.videoWidth, p.videoHeight = src.VideoSize()
-		p.framerate = src.Framerate()
+		clock:    NewClock(),
+		state:    NewStateMachine(nil),
+		hasVideo: src.HasVideo(),
+		hasAudio: src.HasAudio(),
 	}
 
 	if p.hasAudio {
@@ -215,38 +194,64 @@ func newPipelineForSource(src source.Source, cfg Config) *Pipeline {
 			want = 2
 		}
 		p.audioOutput = audio.NewOutput(src.SampleRate(), want)
+	}
 
-		// The device may not grant it: oto's context is created once per
-		// process, so an earlier stream can already have fixed the channel
-		// count. Whatever it settled on is what we must feed it, so push that
-		// back down to the decoder and let swresample do the mixing.
+	p.adoptSource(src)
+	return p
+}
+
+// NewPipelineForSource assembles a pipeline around an already-created source.
+//
+// It is what the capture entry points use: they have to build the source
+// themselves, because opening a device is where the per-platform selector rules
+// and the framerate fallback live, and neither belongs down here.
+func NewPipelineForSource(src source.Source, cfg ...Config) *Pipeline {
+	return newPipelineForSource(src, firstConfig(cfg))
+}
+
+// adoptSource makes src the pipeline's source: it takes the geometry, timing
+// and audio configuration from it, sizes the frame pool to match, and wires the
+// decode callbacks.
+//
+// Shared by construction and SwapSource, which is the point — a swapped-in
+// source must end up configured exactly as one passed to the constructor would,
+// and two copies of this would drift. hasVideo/hasAudio are deliberately *not*
+// set here: they are fixed at construction, because the widget above was built
+// around them, and SwapSource refuses a source that would change them.
+func (p *Pipeline) adoptSource(src source.Source) {
+	p.src = src
+	p.duration = src.Duration()
+
+	// Live capture is an asserted capability, so a source that does not implement
+	// it — including the test stubs — is finite, which is the previous behaviour.
+	p.live = false
+	if ls, ok := src.(source.LiveSource); ok {
+		p.live = ls.IsLive()
+	}
+
+	if p.hasVideo {
+		w, h := src.VideoSize()
+		p.framerate = src.Framerate()
+		// Only rebuild the pool when the geometry actually moved. A swap between
+		// two cameras of the same resolution — the common case — then costs
+		// nothing, which matters when the pool is as large as it is (#110).
+		if w != p.videoWidth || h != p.videoHeight || p.frameQueue == nil {
+			p.videoWidth, p.videoHeight = w, h
+			p.allocFramePool(w, h)
+		}
+	}
+
+	if p.hasAudio {
+		// The audio device is opened once per process and its channel count is
+		// fixed for the life of it, so a new source is asked for exactly what the
+		// device already plays and swresample does the mixing. Only the sample
+		// rate is negotiable, via the resampler.
 		if got := p.audioOutput.Channels(); got != src.Channels() {
 			if err := src.SetAudioChannels(got); err != nil && p.onError != nil {
 				p.onError(fmt.Errorf("audio channel negotiation to %d: %w", got, err))
 			}
 		}
-
-		// Configure resampler in case the oto context was initialized at a
-		// different rate (oto only initializes once per process).
 		p.audioOutput.SetSourceSampleRate(src.SampleRate())
-	}
-
-	// Pre-allocate frame pool: all RGBA buffers created once at startup.
-	// Frames cycle: frameRecycle → decode → frameQueue → display → frameRecycle.
-	if p.hasVideo {
-		const bufSize = 120
-		w, h := p.videoWidth, p.videoHeight
-		if w <= 0 {
-			w = 640
-		}
-		if h <= 0 {
-			h = 360
-		}
-		p.frameQueue = make(chan timedFrame, bufSize)
-		p.frameRecycle = make(chan *image.RGBA, bufSize+2)
-		for i := 0; i < bufSize+2; i++ {
-			p.frameRecycle <- image.NewRGBA(image.Rect(0, 0, w, h))
-		}
 	}
 
 	// Wire up source callbacks.
@@ -276,8 +281,35 @@ func newPipelineForSource(src source.Source, cfg Config) *Pipeline {
 		p.audioOutput.WriteSamples(data)
 		p.clock.SetAudioTime(p.audioOutput.PlaybackPosition())
 	})
+}
 
-	return p
+// allocFramePool builds the decode-ahead buffer: all RGBA frames are allocated
+// once, then cycle frameRecycle → decode → frameQueue → display → frameRecycle,
+// so steady-state playback allocates nothing.
+//
+// The old pool is dropped before the new one is built rather than after. The
+// pool is sized in frames rather than bytes, so at 1080p it is around a
+// gigabyte (#110); holding two of them across a device switch would double
+// that at exactly the moment the user is watching.
+func (p *Pipeline) allocFramePool(w, h int) {
+	const bufSize = 120
+	if w <= 0 {
+		w = 640
+	}
+	if h <= 0 {
+		h = 360
+	}
+
+	p.frameQueue = nil
+	p.frameRecycle = nil
+	p.pendingFrame = nil
+	p.framePending = false
+
+	p.frameQueue = make(chan timedFrame, bufSize)
+	p.frameRecycle = make(chan *image.RGBA, bufSize+2)
+	for i := 0; i < bufSize+2; i++ {
+		p.frameRecycle <- image.NewRGBA(image.Rect(0, 0, w, h))
+	}
 }
 
 // SetOnFrame sets the callback for new video frames.
@@ -405,11 +437,25 @@ func (p *Pipeline) resume() {
 
 // Stop stops playback and resets position.
 func (p *Pipeline) Stop() {
+	if !p.halt() {
+		return
+	}
+	p.src.Rewind()
+}
+
+// halt brings the pipeline to rest — decode and display goroutines joined,
+// frames returned to the pool, clock and audio device reset — without touching
+// the source. It reports whether there was anything to stop.
+//
+// Split out of Stop because the two callers want different things done to the
+// source afterwards: Stop rewinds it (and, for a capture, that releases the
+// camera), while SwapSource is about to close it and replace it entirely.
+func (p *Pipeline) halt() bool {
 	p.mu.Lock()
 
 	if p.state.IsStopped() {
 		p.mu.Unlock()
-		return
+		return false
 	}
 
 	p.state.Set(StateStopped)
@@ -440,8 +486,93 @@ func (p *Pipeline) Stop() {
 	if p.hasAudio {
 		p.audioOutput.Stop()
 	}
+	return true
+}
 
-	p.src.Rewind()
+// ErrSwapMedia reports that a source offered to SwapSource does not carry the
+// same kinds of media as the one it would replace.
+//
+// It is a refusal rather than a best effort on purpose. The widget above the
+// pipeline was built around the answers to HasVideo and HasAudio — a video
+// surface or an "Audio Only" label, an audio output device or none — and none of
+// that can be rebuilt from down here. Swapping a camera for a microphone would
+// leave a player rendering a surface nothing writes to.
+var ErrSwapMedia = errors.New("mmedia: the replacement source does not carry the same media")
+
+// SwapSource replaces the pipeline's source in place, keeping everything built
+// around it: the widget, the video surface, the audio device and the transport.
+//
+// This exists because the alternative does not work. Rebuilding the player to
+// change camera flickers, loses layout and drops focus, so the switch has to
+// happen inside the live pipeline: goroutines joined, frames returned to the
+// pool, old source closed, new one adopted, clock restarted. Playback resumes
+// only if it was running, so swapping while paused leaves it paused.
+//
+// The caller opens the new source, and must do so *before* calling this, which
+// is what makes a failed switch survivable: an open that fails never reaches
+// here and the pipeline keeps the source it has. If this returns an error the
+// source passed in was not adopted and the caller still owns it.
+//
+// Three things are deliberately retaken rather than carried across:
+//
+//   - The clock restarts at zero. A capture device stamps frames with absolute
+//     host time, and the new device's origin is its own; FFmpegSource rebases on
+//     its first frame, which it can only do against a clock that starts where it
+//     expects.
+//   - The frame pool is rebuilt when the geometry moves, and only then.
+//   - The sample rate is renegotiated. The channel count is not: the audio
+//     device is opened once per process and cannot change, so the new source is
+//     asked for what the device already plays.
+//
+// Playback counters are left running. They measure the session rather than the
+// device, the same way they survive a seek.
+func (p *Pipeline) SwapSource(src source.Source) error {
+	if src == nil {
+		return fmt.Errorf("%w: no source given", ErrSwapMedia)
+	}
+	// Validated before anything is torn down, so a refused swap is not merely
+	// survivable but invisible: playback never stops.
+	if src.HasVideo() != p.hasVideo || src.HasAudio() != p.hasAudio {
+		return fmt.Errorf("%w: this pipeline carries %s and the replacement carries %s",
+			ErrSwapMedia, describeMedia(p.hasVideo, p.hasAudio),
+			describeMedia(src.HasVideo(), src.HasAudio()))
+	}
+
+	// Paused counts as running: the user switching camera mid-pause expects to
+	// still be paused afterwards, not stopped.
+	resume := p.state.IsPlaying()
+	wasPaused := p.state.IsPaused()
+
+	p.halt()
+
+	old := p.src
+	p.adoptSource(src)
+	if old != nil {
+		old.Close()
+	}
+
+	switch {
+	case resume:
+		p.Play()
+	case wasPaused:
+		p.Play()
+		p.Pause()
+	}
+	return nil
+}
+
+// describeMedia names a video/audio combination for ErrSwapMedia.
+func describeMedia(video, audio bool) string {
+	switch {
+	case video && audio:
+		return "video and audio"
+	case video:
+		return "video only"
+	case audio:
+		return "audio only"
+	default:
+		return "neither video nor audio"
+	}
 }
 
 // IsLive reports whether the source is an open-ended capture rather than a

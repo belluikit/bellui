@@ -10,7 +10,17 @@ import (
 	"github.com/belluikit/goffmpeg"
 
 	"github.com/belluikit/bellui/x/mmedia/internal/pipeline"
+	"github.com/belluikit/bellui/x/mmedia/internal/source"
 )
+
+// captureBinding is what a capture player remembers about the device it opened,
+// so SetCaptureDevice can resolve a new selector the same way and reopen with
+// the same device options. A player built from a file, reader or url has none.
+type captureBinding struct {
+	format  string
+	url     string
+	options string
+}
 
 // ErrNoCaptureDevice reports that the platform enumerated no device able to
 // provide video. It is distinct from an enumeration failure: the list was
@@ -72,13 +82,106 @@ func VideoCaptureDevices() ([]CaptureDevice, error) {
 	if err != nil {
 		return nil, err
 	}
+	return videoOnly(all), nil
+}
+
+// defaultProbeDepth is how far ProbeCaptureDevices scans when a caller asks a
+// picker to find cameras without naming a bound. Four covers a laptop's
+// built-in camera plus a few externals, and costs four device opens.
+const defaultProbeDepth = 4
+
+// ProbeCaptureDevices discovers cameras on a platform that cannot enumerate
+// them, by opening indices 0, 1, 2 … up to max and reporting which answered.
+//
+// On a platform that *can* enumerate this defers to VideoCaptureDevices and
+// opens nothing: real names beat synthesised ones, and there is no reason to pay
+// for a probe when the list is free. macOS/avfoundation is the case this exists
+// for — it has no enumeration callback at all, so a picker there has nothing to
+// populate from, and index is the only selector the format accepts.
+//
+// This is an explicit call rather than something a widget does implicitly,
+// because of what it costs:
+//
+//   - Every index is a real device open. It takes roughly a second and it turns
+//     the camera indicator on. Never call this from a repaint, a layout pass or
+//     anything that runs more than once; cache the result.
+//   - A device already in use does not answer. Opening a camera another
+//     application holds fails, so an in-use device is reported as absent — and
+//     that includes one this process has open. A picker that wants to keep
+//     showing the camera currently being displayed has to remember it itself;
+//     CaptureSelect.SetCurrent is that.
+//   - A probed device has no name. Name carries the positional selector and
+//     Description is synthesised ("Camera 0"), because the platform never told
+//     us anything better. Index 0 is marked Default, matching the documented
+//     avfoundation default.
+//
+// Indices are probed independently rather than stopping at the first gap, so a
+// device list with a hole in it still reports what is past it.
+//
+// Two limits are worth stating plainly, because both were seen on hardware while
+// this was written and neither can be fixed from here:
+//
+//   - Not everything that opens is a camera. avfoundation's positional list
+//     continues past the cameras into screen-capture inputs, and an open
+//     succeeds for those exactly as it does for a camera — on the machine this
+//     was developed on, "Camera 2" was the 3840x2160 display. Nothing in the
+//     open tells the two apart, so an application showing this list should say
+//     "found by scanning" rather than "cameras". Distinguishing them needs the
+//     device kind from the backend: belluikit/goffmpeg#5.
+//   - An index is not a stable identifier. Across two runs minutes apart, the
+//     device at index 0 changed from a 1920x1080 camera to a 4096x2160 one —
+//     which is what a Continuity Camera appearing does. Treat a probed selector
+//     as valid for this session, not as something to persist and reopen later.
+//
+// Neither is a reason to avoid probing on macOS; there is no alternative there.
+// They are reasons not to present its results as more than they are.
+func ProbeCaptureDevices(max int) ([]CaptureDevice, error) {
+	if max <= 0 {
+		return nil, fmt.Errorf("mmedia: ProbeCaptureDevices needs a positive bound, got %d", max)
+	}
+	format := captureFormat()
+
+	// Prefer real enumeration wherever it exists. Only ErrDeviceListUnsupported
+	// means "this format cannot list" — every other failure is a genuine error
+	// and probing past it would bury the cause.
+	devs, err := captureDevices(format)
+	if err == nil {
+		return videoOnly(devs), nil
+	}
+	if !errors.Is(err, goffmpeg.ErrDeviceListUnsupported) {
+		return nil, err
+	}
+
+	found := make([]CaptureDevice, 0, max)
+	for i := 0; i < max; i++ {
+		url := strconv.Itoa(i)
+		src, err := openCaptureSource(format, url, "")
+		if err != nil {
+			continue
+		}
+		src.Close()
+		found = append(found, CaptureDevice{
+			Name:        url,
+			Description: fmt.Sprintf("Camera %d", i),
+			Default:     i == 0,
+			HasVideo:    true,
+		})
+	}
+	if len(found) == 0 {
+		return nil, ErrNoCaptureDevice
+	}
+	return found, nil
+}
+
+// videoOnly filters an enumerated list down to the cameras a picker wants.
+func videoOnly(all []CaptureDevice) []CaptureDevice {
 	out := make([]CaptureDevice, 0, len(all))
 	for _, d := range all {
 		if d.HasVideo {
 			out = append(out, d)
 		}
 	}
-	return out, nil
+	return out
 }
 
 // NewCapturePlayer opens a live capture device — a camera — as a player, with the
@@ -95,7 +198,7 @@ func VideoCaptureDevices() ([]CaptureDevice, error) {
 // there is no way to ask for "whatever the device offers" — the open is retried
 // at a few common rates. Naming a framerate through WithCaptureOptions turns
 // that off and the single explicit attempt is reported as it happens; see
-// openCaptureDevice for why the ladder exists at all.
+// openCaptureWithFallback for why the ladder exists at all.
 //
 // The resulting player is live: Duration is 0, the seek bar is disabled and shows
 // "live", Seek does nothing, and WithLoop is inert. A device that stops producing
@@ -132,11 +235,30 @@ func NewCapturePlayerIndex(index int, opts ...Option) (*MediaPlayer, error) {
 
 func newCapturePlayer(format, url string, opts []Option) (*MediaPlayer, error) {
 	o := buildOptions(opts)
-	pipe, err := openCaptureDevice(format, url, o.captureOptions, o.downmix)
+	src, err := openCaptureSource(format, url, o.captureOptions)
 	if err != nil {
 		return nil, err
 	}
-	return newMediaPlayerFromPipeline(pipe, o)
+	mp, err := newMediaPlayerFromPipeline(
+		pipeline.NewPipelineForSource(src, pipeline.Config{Downmix: o.downmix}), o,
+	)
+	if err != nil {
+		return nil, err
+	}
+	// Remembered so SetCaptureDevice can resolve a new selector against the same
+	// format and reopen with the same device options.
+	mp.capture = &captureBinding{format: format, url: url, options: o.captureOptions}
+	return mp, nil
+}
+
+// openCaptureSource opens a capture device as a source, through the framerate
+// fallback. This is the form SetCaptureDevice needs: a swap replaces the source
+// inside a running pipeline rather than building a new one.
+func openCaptureSource(format, url, options string) (source.Source, error) {
+	return openCaptureWithFallback(format, url, options,
+		func(attempt string) (source.Source, error) {
+			return source.NewFFmpegSourceDevice(format, url, attempt)
+		})
 }
 
 // captureFramerateLadder is the framerates a zero-config open falls back
@@ -149,8 +271,12 @@ func newCapturePlayer(format, url string, opts []Option) (*MediaPlayer, error) {
 // matches none of those is one the caller has to configure explicitly.
 var captureFramerateLadder = []string{"60", "30", "25"}
 
-// openCaptureDevice opens a capture device, retrying at a few common
+// openCaptureWithFallback opens a capture device, retrying at a few common
 // framerates when the caller named none and the device refused the default.
+//
+// Generic over what an open produces because there are two callers that need
+// the same policy over different results: a player is built from a whole
+// pipeline, and a device switch replaces only the source inside a running one.
 //
 // The retry is not speculative tidiness. libavdevice's framerate is an
 // AVOption with a *default*, not an absent value: avfoundation declares
@@ -177,21 +303,22 @@ var captureFramerateLadder = []string{"60", "30", "25"}
 // pixel format (yuv420p) is not supported by the input device. […] Overriding
 // selected pixel format to use uyvy422 instead") rather than failing, so there
 // is nothing to recover from. Verified on the same camera that reproduces #95.
-func openCaptureDevice(format, url, options string, downmix bool) (*pipeline.Pipeline, error) {
+func openCaptureWithFallback[T any](format, url, options string,
+	open func(attempt string) (T, error),
+) (T, error) {
 	attempts := captureAttempts(options)
 
 	var first error
 	for _, attempt := range attempts {
-		// The rung that succeeds is the one the source keeps: NewPipelineDevice
-		// hands `attempt` to source.NewFFmpegSourceDevice, whose reopen closure
-		// captures it. So the Stop/Play release-and-reacquire cycle reuses the
-		// configuration that worked rather than falling back through the ladder
-		// again — and, more to the point, rather than reacquiring with the
-		// default rate this device already refused.
-		pipe, err := pipeline.NewPipelineDevice(format, url, attempt,
-			pipeline.Config{Downmix: downmix})
+		// The rung that succeeds is the one the source keeps: the attempt string
+		// reaches source.NewFFmpegSourceDevice, whose reopen closure captures it.
+		// So the Stop/Play release-and-reacquire cycle reuses the configuration
+		// that worked rather than falling back through the ladder again — and,
+		// more to the point, rather than reacquiring with the default rate this
+		// device already refused.
+		opened, err := open(attempt)
 		if err == nil {
-			return pipe, nil
+			return opened, nil
 		}
 		// The first failure is the one worth reporting: it is the open the
 		// caller actually asked for, and the rest are our guesses at a fix.
@@ -199,7 +326,8 @@ func openCaptureDevice(format, url, options string, downmix bool) (*pipeline.Pip
 			first = err
 		}
 	}
-	return nil, captureOpenError(format, url, attempts, first)
+	var zero T
+	return zero, captureOpenError(format, url, attempts, first)
 }
 
 // captureAttempts is the ordered list of libavdevice option strings to try for
