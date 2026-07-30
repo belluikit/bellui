@@ -19,9 +19,16 @@ go test -race -tags ci -run TestButtonMinSize ./widget/
 
 # Run tests for a specific package
 go test -race -tags ci ./container/...
+
+# The x/ submodules are separate Go modules, so the command above does not
+# reach them. Test one from its own directory.
+cd x/mmedia && go test -race -tags gl,ci ./...
 ```
 
-CI requires minimum 62% test coverage.
+CI requires minimum 62% test coverage on the main module. The `x/` submodules
+are covered by `x_tests.yml`, which builds/vets/tests each of them against the
+toolkit code in the checkout (an ephemeral `replace`, never committed) and holds
+a **per-module** coverage floor — they do not inherit the 62%. See #91, #13.
 
 ### Static Analysis
 
