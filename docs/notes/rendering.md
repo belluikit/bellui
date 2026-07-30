@@ -1,0 +1,31 @@
+# Rendering & Canvas
+
+Fork-specific detail moved out of `CLAUDE.md` (see its **Fork Features** index).
+Everything below is verbatim; issue numbers refer to the Bellui Backlog.
+
+### Text-Along-Path
+`canvas.TextOnPath` and `canvas.NewTextOnPath(text, color, buildPath)` — renders text along an arbitrary path with per-glyph positioning and rotation. Path construction via `MoveTo`/`LineTo`/`QuadTo`/`CubicTo`/`Close` (same API as `canvas.Path`). Arc-length parameterized glyph placement via `PathSampler`. Configurable `Offset` (starting distance along path) and `BaselineShift` (perpendicular offset from path). Per-glyph rendering: each glyph is shaped via HarfBuzz, rendered to a temp image, then affine-transformed (rotated + translated) onto the output. GL and software painter support.
+
+### Per-Character Styled Text
+`canvas.StyledText` and `canvas.NewStyledText(runs, defaultColor)` — multi-styled inline text at the canvas level. `TextRun` struct with independent `Text`, `Color`, `TextSize`, `TextStyle`, and `FontSource` per run. Zero-value fields inherit from `StyledText` defaults. Single-line primitive (wrapping is left to `widget.RichText`). Shared baseline across runs (max ascent). GL and software painter support.
+
+### Streaming Rasters — Video Frame Upload (#34)
+`canvas.Raster.Streaming` + `SetPixels(pix, w, h)` is the video-playback path: the painter keeps the raster's GPU texture alive across frames (`internal/driver/common.Canvas.freeObject` deliberately skips streaming rasters) and re-uploads only the pixels. It used to be **GL-only**, which on the default WebGPU desktop build meant a nil-`Generator` raster — the documented SetPixels-only usage — **segfaulted on first paint**, and supplying a `Generator` to dodge that left the image **frozen on frame 1** (the texture was cached forever). Both are fixed:
+- **`Raster.PixelImage(w, h) image.Image`** (`canvas/raster.go`) is the single pixel source every painter reads: SetPixels data when present (copied, so a caller may reuse its frame buffer), else `Generator`, else **nil** — so a raster with neither is skipped rather than dereferenced. The GL (`newGlRasterTexture`), WebGPU (`rasterizeRaster`) and software (`drawRaster`) paths all route through it; a nil return means "no content this frame".
+- **WebGPU honours streaming**: `Device.WriteTexturePixels` is the `TexSubImage2D` counterpart (`queue.WriteTexture`), `Texture` now carries its allocated `w,h` (`Texture.Size()`) so a same-size frame updates **in place** and a size change drops the texture (`dropTexture` → `ReleaseTextureAfterFrame`, so draws already recorded this frame stay valid) for `getTexture` to reallocate. `painter.drawRaster` calls `updateStreamingTexture` before drawing, mirroring the GL painter. SetPixels data uploads **without a copy**, under `StreamMu`; the Generator path rasterizes outside the lock.
+- GL fix alongside: `newGlRasterTexture` recorded `StreamTexW/H` from the *widget's* size, so a video whose frame size differed from the widget ping-ponged between delete and recreate and never updated in place. It now records the dimensions actually uploaded.
+- **`Translucency` now applies to rasters on every painter (#38)**: the GL painter always passed `Raster.Alpha()`, but the WebGPU *and* software painters passed a hard-coded opaque `1.0`, so `Raster.Translucency` silently did nothing on the default desktop build and in every software-rendered test. Both now pass `Alpha()`, matching `canvas.Image`.
+- **Verify**: `hack/rasterstream` (`-auto` captures the canvas twice and reports per-raster changed-pixel counts — 0 = frozen — then compares an opaque square against a `Translucency: 0.5` one). Confirmed on-GPU under both painters, and confirmed to reproduce the original segfault, the freeze and the ignored translucency when the fixes are stashed.
+
+### Rendering Engine Enhancements
+- **Shader-based ripple** (`canvas.Ripple`) — radial touch feedback with SDF-based rounded-corner clipping. Custom GLSL shader.
+- **FBO support** — Framebuffer Objects for off-screen rendering. `CreateFramebuffer`, `BindFramebuffer`, etc.
+- **Gaussian blur shadows** (`canvas.BoxShadow`) — 9-tap separable blur via FBO ping-pong. Replaces gradient-strip shadows for `ShadowAround`.
+- **Backdrop blur** (`canvas.BackdropBlur`) — Frosted glass effect. Reads framebuffer pixels, blurs, composites. Opt-in, GPU readback is expensive.
+- **Stencil clipping** — `StartRoundedClipping`/`StopRoundedClipping` on Painter. Auto-detected via `RoundedClipCornerRadius()` on renderers. Card content clips to rounded corners.
+- **Container opacity** — `SetGroupOpacity`/`ClearGroupOpacity`. Disabled widgets render at 38% opacity automatically.
+- **Multi-stop gradients** — `GradientStop` type with `Position` (0-1). `LinearGradient.Stops` and `RadialGradient.Stops` fields.
+- **RepaintBoundary** (`container.RepaintBoundary`) — FBO-cached subtree isolation. Wrapping a subtree in `NewRepaintBoundary(content)` renders it into an off-screen framebuffer. When the subtree is unchanged, it blits the cached texture as a single quad instead of walking/drawing every object. Dirty propagation: `Refresh()` on any descendant marks only the nearest ancestor boundary's FBO as dirty. Supports GLFW and mobile drivers. Scale changes invalidate all boundary FBOs.
+- **Dirty-region culling** — Persistent full-canvas FBO (`DirtyRegionPainter` interface on GL painter) retains frame content across double-buffer swaps. When widgets refresh, the dirty region (union of refreshed objects' bounds) is scissor-cleared and only overlapping objects get draw calls. Objects outside the dirty region are skipped entirely. Falls back to full repaint on resize, scale change, or overlay/content changes.
+- **GPU-accelerated 3D** — `canvas.Scene3D` rendered via GL pipeline in the GL painter. Meshes expanded to interleaved VBOs (position + normal + per-face color, stride 10 floats). Dedicated `scene3d.vert`/`scene3d.frag` shaders with MVP transform and Phong-style ambient+diffuse lighting. Rendered to FBO with depth texture attachment for hardware z-buffering. FBO color texture cached via existing texture pipeline — only re-rendered on `Refresh()`. Software `Scene3D.Render()` path preserved for the software painter. `canvas.PerspectiveMatrix()` and `canvas.LookAtMatrix()` exported.
+
