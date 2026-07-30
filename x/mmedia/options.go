@@ -55,6 +55,11 @@ func WithLoop() Option {
 // when opening a capture device, for example "framerate=30,pixel_format=nv12".
 // The accepted keys are the device format's own, and differ per platform.
 //
+// Naming a framerate here also opts out of the fallback a zero-config open
+// performs: the rate given is tried once and its failure is reported, rather
+// than being quietly replaced by one the device happens to accept. Leave it out
+// unless the device needs a specific rate.
+//
 // It is ignored by the file, reader and url constructors, which have no device to
 // configure.
 func WithCaptureOptions(deviceOptions string) Option {
