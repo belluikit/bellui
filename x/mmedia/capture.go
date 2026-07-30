@@ -90,6 +90,13 @@ func VideoCaptureDevices() ([]CaptureDevice, error) {
 // DirectShow name needs a "video=" prefix, which is added if absent, and a
 // friendly name under v4l2 is resolved to its /dev/video node by enumeration.
 //
+// If the device refuses the framerate FFmpeg asks for by default — a camera
+// whose only mode is 1080p60 does, since libavdevice's default is 29.97 and
+// there is no way to ask for "whatever the device offers" — the open is retried
+// at a few common rates. Naming a framerate through WithCaptureOptions turns
+// that off and the single explicit attempt is reported as it happens; see
+// openCaptureDevice for why the ladder exists at all.
+//
 // The resulting player is live: Duration is 0, the seek bar is disabled and shows
 // "live", Seek does nothing, and WithLoop is inert. A device that stops producing
 // media — unplugged, or claimed by another application — is reported through
@@ -125,12 +132,143 @@ func NewCapturePlayerIndex(index int, opts ...Option) (*MediaPlayer, error) {
 
 func newCapturePlayer(format, url string, opts []Option) (*MediaPlayer, error) {
 	o := buildOptions(opts)
-	pipe, err := pipeline.NewPipelineDevice(format, url, o.captureOptions,
-		pipeline.Config{Downmix: o.downmix})
+	pipe, err := openCaptureDevice(format, url, o.captureOptions, o.downmix)
 	if err != nil {
-		return nil, fmt.Errorf("mmedia: opening capture device %q via %s: %w", url, format, err)
+		return nil, err
 	}
 	return newMediaPlayerFromPipeline(pipe, o)
+}
+
+// captureFramerateLadder is the framerates a zero-config open falls back
+// through when the device refuses FFmpeg's own default. See captureAttempts.
+//
+// Short on purpose. Every rung is a real device open — it lights the camera
+// indicator and costs a few hundred milliseconds — so a long ladder would turn
+// a fast, clear failure into a slow one. 60 and 30 are the rates a fixed-mode
+// camera actually offers, and 25 covers PAL-region hardware; a device that
+// matches none of those is one the caller has to configure explicitly.
+var captureFramerateLadder = []string{"60", "30", "25"}
+
+// openCaptureDevice opens a capture device, retrying at a few common
+// framerates when the caller named none and the device refused the default.
+//
+// The retry is not speculative tidiness. libavdevice's framerate is an
+// AVOption with a *default*, not an absent value: avfoundation declares
+// {.str = "ntsc"}, so every open asks for 29.97 whether or not anyone said so,
+// and a camera whose only mode is 1920x1080@60 rejects the open outright —
+// which is the whole of #95. Confirmed against goffmpeg v0.4.0: its
+// decoder_open_device parses only the options string we hand it and adds
+// nothing, so the rate is FFmpeg's choice rather than the binding's.
+//
+// "Just do not set a framerate" is therefore not available. There is no way to
+// unset an AVOption default, and the obvious spelling is rejected before it
+// reaches the device: framerate=0 fails in av_parse_video_rate, which requires
+// a positive rate ("Unable to parse \"framerate\" option value \"0\" as video
+// rate"). Retrying is the remedy that exists.
+//
+// goffmpeg reports every failure as an opaque -1 with no sentinel, so there is
+// nothing to test for and the ladder is walked on any error. A device that is
+// simply absent therefore costs four failed opens rather than one — about a
+// second, and each fails as fast as the first, which is a fair price for a path
+// that until now just did not work.
+//
+// pixel_format has the same shape of default and deliberately gets no ladder:
+// avfoundation warns and substitutes one the device does support ("Selected
+// pixel format (yuv420p) is not supported by the input device. […] Overriding
+// selected pixel format to use uyvy422 instead") rather than failing, so there
+// is nothing to recover from. Verified on the same camera that reproduces #95.
+func openCaptureDevice(format, url, options string, downmix bool) (*pipeline.Pipeline, error) {
+	attempts := captureAttempts(options)
+
+	var first error
+	for _, attempt := range attempts {
+		// The rung that succeeds is the one the source keeps: NewPipelineDevice
+		// hands `attempt` to source.NewFFmpegSourceDevice, whose reopen closure
+		// captures it. So the Stop/Play release-and-reacquire cycle reuses the
+		// configuration that worked rather than falling back through the ladder
+		// again — and, more to the point, rather than reacquiring with the
+		// default rate this device already refused.
+		pipe, err := pipeline.NewPipelineDevice(format, url, attempt,
+			pipeline.Config{Downmix: downmix})
+		if err == nil {
+			return pipe, nil
+		}
+		// The first failure is the one worth reporting: it is the open the
+		// caller actually asked for, and the rest are our guesses at a fix.
+		if first == nil {
+			first = err
+		}
+	}
+	return nil, captureOpenError(format, url, attempts, first)
+}
+
+// captureAttempts is the ordered list of libavdevice option strings to try for
+// one capture open. It is the whole of the fallback policy, kept as a pure
+// function so the decision is testable without a camera.
+//
+// The caller's own options always go first, so a device that works answers on
+// the first open and nothing below ever runs. A caller who named a framerate
+// gets that one attempt and no more: overriding an explicit choice would hide
+// the very failure they need to see, and "framerate=30 did not work so we
+// silently gave you 60" is not a contract worth having.
+func captureAttempts(options string) []string {
+	attempts := []string{options}
+	if hasDeviceOption(options, "framerate") {
+		return attempts
+	}
+	for _, rate := range captureFramerateLadder {
+		attempts = append(attempts, joinDeviceOptions(options, "framerate="+rate))
+	}
+	return attempts
+}
+
+// hasDeviceOption reports whether a libavdevice option string sets key.
+//
+// The parse mirrors av_dict_parse_string's, which is what actually consumes
+// this string: split on commas, then on the first "=". There is no escaping in
+// that format, so neither is there any here.
+func hasDeviceOption(options, key string) bool {
+	for _, pair := range strings.Split(options, ",") {
+		k, _, found := strings.Cut(pair, "=")
+		if !found {
+			continue
+		}
+		if strings.EqualFold(strings.TrimSpace(k), key) {
+			return true
+		}
+	}
+	return false
+}
+
+// joinDeviceOptions appends one "key=value" to an option string, which may be
+// empty.
+func joinDeviceOptions(options, pair string) string {
+	if options == "" {
+		return pair
+	}
+	return options + "," + pair
+}
+
+// captureOpenError reports a failed open, naming what was tried.
+//
+// The information a user needs — "supported modes: 1920x1080@60" — is printed
+// by FFmpeg to its own log and is not reachable from here: goffmpeg exposes
+// neither the log nor the device's mode list, so an application sees only -1.
+// Listing the attempts is what can honestly be said from this side, and it at
+// least tells an app which framerates are already ruled out. Capturing the real
+// mode list is belluikit/goffmpeg#5.
+func captureOpenError(format, url string, attempts []string, err error) error {
+	base := fmt.Errorf("mmedia: opening capture device %q via %s: %w", url, format, err)
+	if len(attempts) < 2 {
+		return base
+	}
+	tried := make([]string, 0, len(attempts)-1)
+	for _, a := range attempts[1:] {
+		tried = append(tried, strconv.Quote(a))
+	}
+	return fmt.Errorf("%w (also tried %s; if the device needs a rate none of "+
+		"those cover, pass it with WithCaptureOptions)",
+		base, strings.Join(tried, ", "))
 }
 
 // CaptureFormat reports the libavdevice input format this platform captures
