@@ -68,6 +68,42 @@ func newVideoSurface(width, height int) *videoSurface {
 	return s
 }
 
+// resize rebuilds the pixel buffers for a new frame geometry, which a capture
+// device switch can bring: the replacement camera is under no obligation to
+// match the previous one's resolution.
+//
+// Both buffers are replaced rather than one, and the raster is repointed at the
+// fresh one immediately. Leaving the painter holding a buffer of the old size
+// while WriteFrame filled a new one would draw a torn frame at best; leaving the
+// buffers at the old size would truncate a larger frame in the copy, or leave a
+// tail of the previous camera's pixels below a smaller one.
+//
+// A no-op when the geometry has not moved, which is the common case for a switch
+// between two cameras of the same resolution.
+func (s *videoSurface) resize(width, height int) {
+	if width <= 0 || height <= 0 {
+		return
+	}
+
+	s.mu.Lock()
+	if width == s.width && height == s.height {
+		s.mu.Unlock()
+		return
+	}
+	s.width, s.height = width, height
+	for i := range s.buf {
+		s.buf[i] = make([]byte, width*height*4)
+	}
+	s.cur, s.next = 0, 1
+	first := s.buf[0]
+	s.mu.Unlock()
+
+	// Hand the painter a correctly sized buffer before the next frame arrives.
+	// It is blank, so the switch shows one empty frame rather than a garbled
+	// one — the streaming raster drops its texture on a size change anyway.
+	s.publish(first)
+}
+
 // generate returns an image over the most recently written frame. It is called
 // on the paint thread; double buffering keeps it off whichever buffer
 // WriteFrame is filling. The requested size is ignored — the frame is returned
