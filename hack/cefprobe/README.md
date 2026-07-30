@@ -7,8 +7,10 @@
 > frame budget, against the 17–59% `hack/wpeprobe` measured for WPE.
 > `on_accelerated_paint` delivers a **single-plane BGRA_8888 dma-buf** with
 > `DRM_FORMAT_MOD_LINEAR` and a per-frame fd; details and the two conditions it
-> needs are below. Zero-copy is *reachable*; the wgpu-import half of R1 (#60) is
-> still open.
+> needs are below. Note this is **not zero-copy** — CEF's contract requires
+> copying the frame into a texture you own, inside the callback (see below) — so
+> the prize is a GPU-side blit instead of a CPU roundtrip, not the elimination of
+> a copy. The import half (belluikit/bellui#113) is still open.
 
 Direct successor to `hack/wpeprobe`. That probe established the architecture and
 then rejected WPE as the *engine* — 112 unbundled dependencies, absent from
@@ -59,13 +61,25 @@ caveats kept honest: the swizzle belongs in the shader rather than in Go, and
 CEF hands over dirty rects that this path throws away — a full-frame upload
 where a caret blink should cost a few thousand pixels (belluikit/bellui#99).
 
-**Zero-copy is reachable, and the machine turns out to be up to it.** With a
+**The GPU frame path works, and the machine turns out to be up to it.** With a
 live X session on the box (a `startx` gnome-shell on tty1 is enough — see the
 recorded prerequisite below), CEF's `on_accelerated_paint` delivers a
 **single-plane BGRA_8888 dma-buf** with `DRM_FORMAT_MOD_LINEAR` and a per-frame
 file descriptor. Byte-identical output across six consecutive runs, no
-retry-flake. The wgpu-import half of R1 is still open, but the CEF half — "can
-this backend hand us a dma-buf at all" — is now yes.
+retry-flake, independently reproduced 3/3 afterwards. The import half is still
+open, but the CEF half — "can this backend hand us a dma-buf at all" — is now
+yes.
+
+**It is not zero-copy, and calling it that misprices the work.** #60, this
+README and the plan all used that word before the contract was read closely.
+`cef_accelerated_paint_info_t` says the resource "cannot be cached and cannot be
+accessed outside of this callback. It should be reopened each time this callback
+is executed and **the contents should be copied to a texture owned by the client
+application**". So the shippable shape is: import the dma-buf and blit it into
+our own texture, synchronously, inside the callback, every frame. That is still
+worth having — it trades a CPU copy plus a PCIe upload for a GPU-side blit — but
+the copy does not go away, which matters when the CPU path already fits in 11%
+of a frame budget.
 
 That result is **conditional on two things**, either of which absent gives the
 "never fires" outcome the earlier spike reported:
@@ -102,12 +116,11 @@ delivers them here. Concrete numbers from the probe:
     format    1 (CEF_COLOR_TYPE_BGRA_8888)
 ```
 
-The wgpu-import half of R1 remains open and is explicitly not a blocker for
-shipping (#60). A downstream question this spike does not answer, but the
-`cef_accelerated_paint_info_t` header calls out: "Resources will be released
-to the underlying pool for reuse when the callback returns from client code" —
-so the fd is only valid inside the callback; a Vulkan/wgpu importer has to
-dup-and-fence-signal synchronously to hold the frame beyond that.
+The import half is belluikit/bellui#113, and is explicitly not a blocker for
+shipping (#60). The binding constraint is the fd lifetime quoted above: it is
+valid only inside the callback, so an importer has to do its work synchronously
+there rather than handing the frame to another goroutine or deferring it to the
+next paint.
 
 ### Prerequisite for the accel path on this box
 
