@@ -166,6 +166,23 @@ static void CEF_CALLBACK ls_on_after_created(struct _cef_life_span_handler_t *se
   (void)self;
   g_browser = browser;
   browser->base.add_ref(&browser->base);
+
+  // A windowless browser has no window whose visibility CEF can observe, so it
+  // has to be told — and until it is, whether a first frame ever arrives is a
+  // race. Without this the probe produced frames on roughly two runs in three,
+  // with identical logs either way, which is the worst possible failure shape.
+  //
+  // The same call is what a real backend drives from Show/Hide and from
+  // scrolling out of a clipping ancestor (belluikit/bellui#105); set_focus is
+  // the seam the #59 focus bridge lands on. invalidate asks for the first
+  // paint rather than waiting for the page to dirty itself.
+  cef_browser_host_t *host = browser->get_host(browser);
+  if (host != NULL) {
+    host->was_hidden(host, 0);
+    host->set_focus(host, 1);
+    host->invalidate(host, PET_VIEW);
+    host->base.release(&host->base);
+  }
 }
 
 static void CEF_CALLBACK ls_on_before_close(struct _cef_life_span_handler_t *self,
