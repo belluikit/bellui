@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-fytables is an AG Grid-equivalent data table widget for the Bellui GUI framework (Go). It provides a high-performance, virtual-scrolling data grid with sorting, filtering, cell editing, sparklines, column pinning/grouping, row grouping, aggregation, pagination, pivot tables, tree data, and export.
+`x/tables` (module `github.com/belluikit/bellui/x/tables`, historically "fytables") is an AG Grid-equivalent data table widget for the Bellui GUI framework (Go). It provides a high-performance, virtual-scrolling data grid with sorting, filtering, cell editing, sparklines, column pinning/grouping, row grouping, aggregation, pagination, pivot tables, tree data, and export.
 
 ## Build & Test
 
@@ -13,19 +13,25 @@ go build ./...
 # Run all tests
 go test ./...
 
-# Run demo app
-go run ../gallery   # demo lives in the gallery app
-
 # Run benchmarks
 go test -bench=. ./render/
+
+# Run the demo — it lives in the separate gallery repo, cloned beside bellui
+cd ../../../gallery && go run .
 ```
 
-The module builds against the pinned Bellui fork release (`github.com/belluikit/bellui` in `go.mod`, currently `v3.0.0-rc.2`) resolved from the module cache. The parent workspace `../go.work` spans fytables but does **not** `use` the fork checkout at `../fyne`, and there is no `replace` directive — local fork changes are *not* consumed by default. To build fytables against local fork changes (e.g. new a11y interfaces), add `./fyne` to `../go.work` (or a `replace github.com/belluikit/bellui => ../fyne` to `go.mod`), then bump the pinned version once the fork change is released.
+**Own module, pinned to a released bellui.** This directory is a nested module inside the bellui repo, and its `go.mod` pins `github.com/belluikit/bellui v1.0.0-rc.5` — resolved from the module cache, **not** from the enclosing checkout. There is **no `go.work` anywhere** in the repo and no `replace` directive, so local edits to the surrounding bellui tree are *not* picked up by default. To build against local bellui changes (e.g. a new a11y interface), add `replace github.com/belluikit/bellui => ../..` to this `go.mod`, then bump the pin once the change is released and drop the replace.
+
+The demo consumes `x/tables` as a *published* module too (`gallery/go.mod` requires `github.com/belluikit/bellui/x/tables`), so local grid changes need the same treatment there — a `replace github.com/belluikit/bellui/x/tables => <path>/bellui/x/tables` in the gallery module.
+
+Two consequences of being a nested module, both of which have bitten:
+- `go build ./...` / `go vet ./...` / `staticcheck` run from the bellui repo root **do not descend into this module**, and neither does any CI leg. Breakage here is invisible until someone builds this directory directly.
+- The same is true one level deeper: `hack/a11yprobe/` is its own module again. Its `go.mod` sat unbuildable for weeks after the fyne→bellui rename (an invalid `v3.0.0-rc.8` pin plus `bellui.io/systray`, `fyne-io/*`, `srwiley/*` and `trendvidia/*` requirements). After any rename, grep `--include=go.mod` for stale module paths across the whole tree.
 
 ## Architecture
 
 ### Package Structure
-- **Root** (`fytables`): `DataGrid` widget, `ColumnDef`, `GridAPI`, options, state, event handlers
+- **Root** (package `tables`): `DataGrid` widget, `ColumnDef`, `GridAPI`, options, state, event handlers
 - **`cell/`**: Cell renderers (`TextRenderer`, `NumberRenderer`, `BooleanRenderer`, `DateRenderer`) and editors. All use `canvas.Text` (not `widget.Label`) because canvas primitives render correctly in renderer `Objects()` slices.
 - **`render/`**: Virtual rendering engine. `Viewport` computes visible ranges. `CellPool` recycles cells. `CellsWidget`/`CellsRenderer` render main columns. `PinnedCellsWidget` renders pinned columns. `HeaderWidget` renders column headers with sort/filter indicators.
 - **`pipeline/`**: Data transformation chain. `Pipeline` orchestrates: Source -> Filter -> Sort -> Pivot -> Group -> Paginate. `RowIndex` maps display rows to source rows.
@@ -60,7 +66,7 @@ The module builds against the pinned Bellui fork release (`github.com/belluikit/
 - `BaseWidget.Resize(sameSize)` is a no-op — won't trigger `Layout()`. Use `Refresh()` which calls `doLayout()`.
 - Pinned-right columns are overlaid on the scroll area. The viewport's effective width is reduced by `pinnedRightW` so cells don't render behind the overlay.
 - `resolveColumns()` rebuilds from `ColumnDefs` — preserves widths via ID-keyed map.
-- The Bellui fork has a fix in `widget/richtext.go`: `insertAt()` and `deleteFromTo()` increment `rowBoundsVersion` to invalidate stale row bounds cache.
+- Bellui's `widget/richtext.go` relies on `insertAt()` and `deleteFromTo()` incrementing `rowBoundsVersion` (at the end of each function) to invalidate the stale row-bounds cache. The lazy single-segment edit path bumps it too, via `lazySpliceText` in `widget/richtext_lazy.go`.
 
 ## Conventions
 
