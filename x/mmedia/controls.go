@@ -29,6 +29,17 @@ type TransportControls struct {
 	OnSeek   func(time.Duration)
 	OnVolume func(float64)
 
+	// OnScrub is called with the position under the pointer as it moves across
+	// the seek bar, and OnScrubEnd when it leaves. Neither is a seek: they exist
+	// so a player can show what is at that position before the user commits to
+	// going there.
+	//
+	// They fire on hover rather than on drag, which is what makes a preview
+	// worth having — the point is to look before committing. Dragging reports
+	// through OnChanged/OnChangeEnded as before.
+	OnScrub    func(time.Duration)
+	OnScrubEnd func()
+
 	playBtn   *widget.Button
 	stopBtn   *widget.Button
 	muteBtn   *widget.Button
@@ -38,6 +49,15 @@ type TransportControls struct {
 
 	duration time.Duration
 	playing  bool
+
+	// preview is the object floated above the seek bar while scrubbing, and
+	// previewSize the space to give it. previewAt is the hovered fraction, which
+	// is where along the bar it sits. Installed by SetScrubPreview; nil until
+	// then, and the layout below simply has nothing to place.
+	preview      core.CanvasObject
+	previewSize  geo.Size
+	previewAt    float64
+	previewShown bool
 
 	// muted tracks the toggle state; preMute remembers the level to restore,
 	// so unmuting returns to the previous volume rather than to full.
@@ -83,6 +103,8 @@ func NewTransportControls() *TransportControls {
 			tc.OnSeek(time.Duration(v * float64(tc.duration)))
 		}
 	}
+	tc.seekBar.OnHover = tc.scrubTo
+	tc.seekBar.OnHoverEnd = tc.endScrub
 
 	tc.muteBtn = widget.NewButtonWithIcon("", theme.VolumeUpIcon(), func() {
 		if tc.muted {
@@ -156,6 +178,75 @@ func (tc *TransportControls) SetTime(current, total time.Duration) {
 	tc.seekBar.SetValueSilently(float64(current) / float64(total))
 }
 
+// scrubTo reports the position under the pointer and moves the preview to it.
+//
+// Hovering a disabled seek bar reports nothing: a live source has no timeline,
+// so there is no position under the pointer to preview, and the bar is disabled
+// for exactly that reason.
+func (tc *TransportControls) scrubTo(v float64) {
+	if tc.duration <= 0 || tc.seekBar.Disabled() {
+		return
+	}
+	tc.previewAt = clampUnit(v)
+	if tc.preview != nil && !tc.previewShown {
+		tc.previewShown = true
+		tc.preview.Show()
+	}
+	if tc.OnScrub != nil {
+		tc.OnScrub(time.Duration(tc.previewAt * float64(tc.duration)))
+	}
+	if tc.preview != nil {
+		tc.Refresh()
+	}
+}
+
+// endScrub takes the preview down again. It fires even when the pointer leaves
+// mid-drag, which is why hiding is driven from here rather than from a drag end.
+func (tc *TransportControls) endScrub() {
+	if tc.preview != nil && tc.previewShown {
+		tc.previewShown = false
+		tc.preview.Hide()
+		tc.Refresh()
+	}
+	if tc.OnScrubEnd != nil {
+		tc.OnScrubEnd()
+	}
+}
+
+// SetScrubPreview installs the object to float above the seek bar while the
+// pointer is over it, sized to size.
+//
+// The controls own the placement rather than the player, because the seek bar's
+// geometry is theirs: the preview has to sit over the position under the
+// pointer, and only the layout that placed the bar knows where that is.
+//
+// Pass a nil object to remove it.
+func (tc *TransportControls) SetScrubPreview(obj core.CanvasObject, size geo.Size) {
+	tc.preview = obj
+	tc.previewSize = size
+	switch {
+	case obj == nil:
+		tc.previewShown = false
+	case !tc.previewShown:
+		obj.Hide()
+	}
+	// Deliberately not hiding an already-shown preview: this is also how a
+	// resize arrives, when the first decoded frame replaces the placeholder's
+	// guessed aspect ratio, and that happens mid-hover.
+	tc.Refresh()
+}
+
+func clampUnit(v float64) float64 {
+	switch {
+	case v < 0:
+		return 0
+	case v > 1:
+		return 1
+	default:
+		return v
+	}
+}
+
 // previewTime shows where a scrub would land, without seeking there.
 func (tc *TransportControls) previewTime(v float64) {
 	if tc.duration <= 0 {
@@ -215,6 +306,10 @@ func (tc *TransportControls) Reset() {
 	tc.timeLabel.SetText(fmt.Sprintf("%s / %s", formatDuration(0), formatDuration(tc.duration)))
 }
 
+// scrubPreviewGap is the space between the top of the controls and the bottom
+// of the preview.
+const scrubPreviewGap = 6
+
 // CreateRenderer returns the Bellui renderer for this widget.
 func (tc *TransportControls) CreateRenderer() core.WidgetRenderer {
 	// An HBox sizes children to their MinSize, which leaves a slider barely
@@ -233,8 +328,71 @@ func (tc *TransportControls) CreateRenderer() core.WidgetRenderer {
 		volumeContainer,
 		tc.seekBar,
 	)
+	if tc.preview == nil {
+		return widget.NewSimpleRenderer(bar)
+	}
 
-	return widget.NewSimpleRenderer(bar)
+	// The bar keeps its own Border layout untouched; the preview is placed by a
+	// wrapper around it, so nothing about the existing controls moves.
+	return widget.NewSimpleRenderer(
+		container.New(&scrubPreviewLayout{controls: tc}, bar, tc.preview),
+	)
+}
+
+// scrubPreviewLayout gives the bar the whole widget and floats the preview
+// above it, centred on the position under the pointer.
+//
+// The preview is placed at a *negative* Y, so it is drawn outside the controls
+// and over the video. A plain bellui.Container does not clip its children, so
+// that renders; what it does require is that the controls are painted after the
+// video, which is why the player orders them that way. It also has to be a
+// non-interactive object — an image, not a widget that wants the pointer — or it
+// would take the hover that is driving it and the preview would flicker itself
+// out of existence.
+type scrubPreviewLayout struct {
+	controls *TransportControls
+}
+
+func (l *scrubPreviewLayout) Layout(objects []core.CanvasObject, size geo.Size) {
+	if len(objects) < 2 {
+		return
+	}
+	bar, preview := objects[0], objects[1]
+	bar.Resize(size)
+	bar.Move(geo.NewPos(0, 0))
+
+	tc := l.controls
+	if !tc.previewShown {
+		return
+	}
+
+	pw, ph := tc.previewSize.Width, tc.previewSize.Height
+	// The seek bar sits inside the bar's own Border layout, and the bar is at
+	// the origin of this container, so the slider's position is already in these
+	// coordinates.
+	track := tc.seekBar.Size().Width
+	x := tc.seekBar.Position().X + float32(tc.previewAt)*track - pw/2
+	// Kept inside the widget: a preview half off the window is worse than one
+	// no longer exactly over the thumb.
+	if maxX := size.Width - pw; x > maxX {
+		x = maxX
+	}
+	if x < 0 {
+		x = 0
+	}
+
+	preview.Resize(geo.NewSize(pw, ph))
+	preview.Move(geo.NewPos(x, -ph-scrubPreviewGap))
+}
+
+// MinSize reports the bar's own minimum. The preview deliberately contributes
+// nothing: it is drawn above the controls, not inside them, so reserving space
+// for it would leave a permanent gap for something usually not there.
+func (l *scrubPreviewLayout) MinSize(objects []core.CanvasObject) geo.Size {
+	if len(objects) == 0 {
+		return geo.Size{}
+	}
+	return objects[0].MinSize()
 }
 
 // MinSize returns the minimum size of the controls.
