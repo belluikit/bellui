@@ -1,6 +1,7 @@
 package mmedia
 
 import (
+	"errors"
 	"runtime"
 	"strings"
 	"testing"
@@ -162,5 +163,112 @@ func TestWithCaptureOptionsIsRecorded(t *testing.T) {
 	o := buildOptions([]Option{WithCaptureOptions("framerate=30,pixel_format=nv12")})
 	if !strings.Contains(o.captureOptions, "framerate=30") {
 		t.Errorf("captureOptions = %q, want the forwarded device options", o.captureOptions)
+	}
+}
+
+// TestCaptureAttempts covers the whole of the framerate fallback policy (#95).
+// It is a pure function precisely so this needs no camera: the decision is which
+// opens to try and in what order, and that is what is asserted.
+func TestCaptureAttempts(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		options string
+		want    []string
+	}{
+		{
+			// The zero-config case the issue is about. The first attempt is the
+			// caller's own (empty) options, so a device that accepts FFmpeg's
+			// default still opens on the first try and pays nothing.
+			name:    "no options falls back through the ladder",
+			options: "",
+			want:    []string{"", "framerate=60", "framerate=30", "framerate=25"},
+		},
+		{
+			// An explicit rate is honoured exactly once. Retrying would replace a
+			// deliberate choice with a guess and hide the failure the caller needs.
+			name:    "an explicit framerate is tried once and not overridden",
+			options: "framerate=30",
+			want:    []string{"framerate=30"},
+		},
+		{
+			name:    "an explicit framerate anywhere in the list still counts",
+			options: "pixel_format=nv12,framerate=24",
+			want:    []string{"pixel_format=nv12,framerate=24"},
+		},
+		{
+			// Other device options are preserved on every rung: falling back on
+			// the framerate must not drop the pixel format with it.
+			name:    "other options are carried onto every rung",
+			options: "pixel_format=nv12",
+			want: []string{
+				"pixel_format=nv12",
+				"pixel_format=nv12,framerate=60",
+				"pixel_format=nv12,framerate=30",
+				"pixel_format=nv12,framerate=25",
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := captureAttempts(tc.options)
+			if len(got) != len(tc.want) {
+				t.Fatalf("captureAttempts(%q) = %q, want %q", tc.options, got, tc.want)
+			}
+			for i := range got {
+				if got[i] != tc.want[i] {
+					t.Errorf("attempt %d = %q, want %q", i, got[i], tc.want[i])
+				}
+			}
+		})
+	}
+}
+
+// TestHasDeviceOption pins the parse the fallback keys off. It mirrors
+// av_dict_parse_string, which is what actually consumes the string.
+func TestHasDeviceOption(t *testing.T) {
+	for _, tc := range []struct {
+		options string
+		key     string
+		want    bool
+	}{
+		{"", "framerate", false},
+		{"framerate=30", "framerate", true},
+		{"pixel_format=nv12", "framerate", false},
+		{"pixel_format=nv12,framerate=30", "framerate", true},
+		{" framerate = 30 ", "framerate", true},
+		{"FrameRate=30", "framerate", true},
+		// A bare word sets nothing: with no "=" there is no value, and FFmpeg
+		// would not read it as one either.
+		{"framerate", "framerate", false},
+		// The key must match whole, not as a prefix or suffix of another.
+		{"max_framerate=30", "framerate", false},
+	} {
+		if got := hasDeviceOption(tc.options, tc.key); got != tc.want {
+			t.Errorf("hasDeviceOption(%q, %q) = %v, want %v", tc.options, tc.key, got, tc.want)
+		}
+	}
+}
+
+// TestCaptureOpenErrorNamesTheAttempts checks the failure an application
+// actually sees. FFmpeg prints the device's supported modes to its own log and
+// goffmpeg does not expose it (belluikit/goffmpeg#5), so naming the rates
+// already ruled out is the most this side can honestly say.
+func TestCaptureOpenErrorNamesTheAttempts(t *testing.T) {
+	cause := errors.New(`failed to open device "avfoundation" "0": -1`)
+
+	err := captureOpenError(formatAVFoundation, "0", captureAttempts(""), cause)
+	if !errors.Is(err, cause) {
+		t.Error("the underlying open failure must stay unwrapped-to")
+	}
+	for _, want := range []string{"framerate=60", "framerate=30", "framerate=25", "WithCaptureOptions"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not mention %q", err, want)
+		}
+	}
+
+	// A caller who named a rate made one attempt, so there is no ladder to
+	// report and the error stays the plain one.
+	single := captureOpenError(formatAVFoundation, "0", captureAttempts("framerate=30"), cause)
+	if strings.Contains(single.Error(), "also tried") {
+		t.Errorf("error %q lists fallbacks that were never attempted", single)
 	}
 }
