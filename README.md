@@ -7,8 +7,9 @@ Bellui began as a fork of the [Fyne](https://fyne.io) toolkit and diverges
 substantially from it; it is not intended to merge back. Highlights: a Material Design 3 theme system and component set, a
 reworked package architecture (`geo`/`event`/`core` as the source of truth for
 fundamental types), goroutine-safe widget APIs, and a GL rendering engine with
-canvas FBO, shadows, stencil clipping, and 3D support. See `CLAUDE.md` and
-`ROADMAP.md` for details. Module path: `github.com/belluikit/bellui`
+canvas FBO, shadows, stencil clipping, and 3D support. See `CLAUDE.md`,
+`docs/notes/` (per-area design detail) and `ROADMAP.md` for details.
+Module path: `github.com/belluikit/bellui`
 
 > **Access note:** the `belluikit/*` dependency repos are currently **private**.
 > Building outside the org needs `GOPRIVATE=github.com/belluikit/*` and git
