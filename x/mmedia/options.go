@@ -16,6 +16,10 @@ type options struct {
 	// captureOptions is forwarded to libavdevice when opening a capture device;
 	// it has no meaning for file or url playback.
 	captureOptions string
+	// scrubPreview asks for a preview frame while the seek bar is hovered. It
+	// needs a second decoder, so it is only honourable for a source FFmpeg can
+	// reopen; see WithScrubPreview.
+	scrubPreview bool
 }
 
 // buildOptions applies the functional options over the defaults.
@@ -65,6 +69,32 @@ func WithLoop() Option {
 func WithCaptureOptions(deviceOptions string) Option {
 	return func(o *options) {
 		o.captureOptions = deviceOptions
+	}
+}
+
+// WithScrubPreview shows the frame under the pointer while the seek bar is
+// hovered, in a thumbnail floated above it.
+//
+// It needs a second decoder over the same media — the preview cannot share the
+// playback one without moving the playback position — so the media has to be
+// something FFmpeg can open twice. That means a path or a URL:
+// NewMediaPlayerURL, NewVideoPlayerURL, or NewMediaPlayer handed an *os.File
+// whose name is still reachable.
+//
+// Passing it to a constructor that cannot honour it is an error rather than a
+// quiet no-op, so a caller finds out at the point of asking rather than by
+// noticing nothing happens. A reader-backed player is the case: there is no
+// second reader to give the preview decoder.
+//
+// A live source gets no preview either, but that is not an error — a camera has
+// no timeline to preview along, the seek bar is disabled for the same reason,
+// and a player can reasonably be written to handle both kinds of media.
+//
+// The second decoder is opened lazily, on the first hover: a preview that is
+// never used costs no file handle and, for a network URL, no connection.
+func WithScrubPreview() Option {
+	return func(o *options) {
+		o.scrubPreview = true
 	}
 }
 

@@ -3,6 +3,7 @@ package mmedia
 import (
 	"errors"
 	"io"
+	"os"
 	"sync"
 	"time"
 
@@ -29,6 +30,10 @@ type MediaPlayer struct {
 	opts     *options
 	loop     bool
 
+	// preview is the scrub thumbnail, and its second decoder. nil unless
+	// WithScrubPreview was given and this source can have one.
+	preview *scrubPreview
+
 	// capture is set only for a player opened on a capture device, and is what
 	// SetCaptureDevice needs to reopen on another one. Guarded by mu.
 	capture *captureBinding
@@ -40,13 +45,39 @@ type MediaPlayer struct {
 // NewMediaPlayer creates a new media player widget from an io.Reader.
 // The container and codecs are probed automatically. A reader that also
 // implements io.Seeker supports seeking; a plain stream is forward-only.
+// A scrub preview (WithScrubPreview) needs a source FFmpeg can open twice, so it
+// works here only when r is an *os.File whose name is still reachable. Any other
+// reader is an error rather than a silent absence of preview.
 func NewMediaPlayer(r io.Reader, opts ...Option) (*MediaPlayer, error) {
 	o := buildOptions(opts)
 	pipe, err := pipeline.NewPipeline(r, pipeline.Config{Downmix: o.downmix})
 	if err != nil {
 		return nil, err
 	}
-	return newMediaPlayerFromPipeline(pipe, o)
+	return newMediaPlayerFromPipeline(pipe, o, reopenableURL(r))
+}
+
+// reopenableURL is the path a preview decoder could open a second time, or "" if
+// this reader has none.
+//
+// Only an *os.File has one, and only while its name still resolves — an
+// unlinked file or an inherited descriptor does not, which is the same case
+// pipeline.NewPipeline falls back to the reader path for. Checking with Stat
+// here means WithScrubPreview reports the problem at construction rather than
+// leaving a preview that silently never draws.
+func reopenableURL(r io.Reader) string {
+	f, ok := r.(*os.File)
+	if !ok {
+		return ""
+	}
+	name := f.Name()
+	if name == "" {
+		return ""
+	}
+	if _, err := os.Stat(name); err != nil {
+		return ""
+	}
+	return name
 }
 
 // NewMediaPlayerURL plays from a file path or network URL, letting FFmpeg own
@@ -63,12 +94,15 @@ func NewMediaPlayerURL(url string, opts ...Option) (*MediaPlayer, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newMediaPlayerFromPipeline(pipe, o)
+	return newMediaPlayerFromPipeline(pipe, o, url)
 }
 
 // newMediaPlayerFromPipeline wires a widget around an already-built pipeline,
-// shared by the reader and URL constructors.
-func newMediaPlayerFromPipeline(pipe *pipeline.Pipeline, o *options) (*MediaPlayer, error) {
+// shared by the reader, URL and capture constructors.
+//
+// previewURL is what a scrub preview would open a second time, or "" when this
+// source has nothing to reopen.
+func newMediaPlayerFromPipeline(pipe *pipeline.Pipeline, o *options, previewURL string) (*MediaPlayer, error) {
 	mp := &MediaPlayer{
 		pipe:     pipe,
 		opts:     o,
@@ -101,8 +135,23 @@ func newMediaPlayerFromPipeline(pipe *pipeline.Pipeline, o *options) (*MediaPlay
 	mp.controls.OnStop = func() { mp.Stop() }
 	mp.controls.OnSeek = func(pos time.Duration) { mp.Seek(pos) }
 	mp.controls.OnVolume = func(v float64) { mp.SetVolume(v) }
+	// Tell the transport the duration up front. It otherwise learns it from the
+	// first playback time tick, which leaves the seek bar enabled but inert
+	// before anything has played: both OnChangeEnded and the scrub preview
+	// convert a fraction through tc.duration and do nothing while it is zero.
+	// Scrubbing a file that has not been started yet is exactly what a preview
+	// is for, so it cannot wait for the first tick.
+	//
+	// Before SetSeekable, so a live source ends on that call's "live" marker
+	// rather than on the elapsed-time form SetTime writes for a zero duration.
+	mp.controls.SetTime(0, pipe.Duration())
 	// A source with no duration is live: nothing to seek within.
 	mp.controls.SetSeekable(pipe.Duration() > 0)
+
+	if err := mp.enableScrubPreview(previewURL); err != nil {
+		pipe.Close()
+		return nil, err
+	}
 
 	// Wire up pipeline callbacks.
 	if mp.hasVideo {
@@ -223,6 +272,46 @@ func (mp *MediaPlayer) SetLoop(loop bool) {
 	mp.loop = loop
 }
 
+// ErrNoScrubPreviewSource reports WithScrubPreview asked of a player whose media
+// cannot be opened a second time.
+//
+// An error rather than a quiet absence of preview: a caller who asked for one
+// should find out at the point of asking, not by noticing that hovering does
+// nothing. See WithScrubPreview for which sources can have one.
+var ErrNoScrubPreviewSource = errors.New(
+	"mmedia: scrub preview needs a path or url the media can be reopened from; " +
+		"this player was built on a reader that cannot be",
+)
+
+// enableScrubPreview installs the preview if one was asked for and this source
+// can have one.
+func (mp *MediaPlayer) enableScrubPreview(url string) error {
+	if !mp.opts.scrubPreview || !mp.hasVideo {
+		return nil
+	}
+	// A live capture has no timeline to preview along and its seek bar is
+	// disabled, so there is nothing to do and nothing to complain about — a
+	// player written to show either a file or a camera can pass the option
+	// unconditionally.
+	if mp.pipe.IsLive() || mp.pipe.Duration() <= 0 {
+		return nil
+	}
+	if url == "" {
+		return ErrNoScrubPreviewSource
+	}
+
+	mp.preview = newScrubPreview(url)
+	mp.preview.onResize = func(size geo.Size) {
+		mp.controls.SetScrubPreview(mp.preview.object(), size)
+	}
+	mp.controls.SetScrubPreview(mp.preview.object(), mp.preview.size())
+	mp.controls.OnScrub = func(at time.Duration) {
+		mp.preview.setTime(at)
+		mp.preview.request(at)
+	}
+	return nil
+}
+
 // ErrNotACapturePlayer reports SetCaptureDevice called on a player that is
 // showing a file, a reader or a url. There is no device to switch away from,
 // and silently doing nothing would leave a picker looking as though it worked.
@@ -326,8 +415,11 @@ func (mp *MediaPlayer) Stats() PlaybackStats {
 	return mp.pipe.Stats()
 }
 
-// Close releases all resources.
+// Close releases all resources, including the scrub preview's second decoder.
 func (mp *MediaPlayer) Close() {
+	if mp.preview != nil {
+		mp.preview.close()
+	}
 	mp.pipe.Close()
 }
 
@@ -338,10 +430,14 @@ func (mp *MediaPlayer) CreateRenderer() core.WidgetRenderer {
 		// Raster always stretches, so the aspect ratio is preserved by the
 		// layout instead of by a fill mode.
 		video := container.New(mp.aspect, mp.surface.Object())
+		// Controls last, so they paint over the video. BorderLayout does not care
+		// about the order, but the painter does — and the scrub preview is drawn
+		// above the controls' own bounds, over the video, so it would be hidden
+		// underneath if the video came second.
 		content = container.New(
 			layout.NewBorderLayout(nil, mp.controls, nil, nil),
-			mp.controls,
 			video,
+			mp.controls,
 		)
 	} else {
 		label := widget.NewLabel("Audio Only")
