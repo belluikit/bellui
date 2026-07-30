@@ -1,0 +1,150 @@
+# Widgets, Events & Layouts
+
+Fork-specific detail moved out of `CLAUDE.md` (see its **Fork Features** index).
+Everything below is verbatim; issue numbers refer to the Bellui Backlog.
+
+### Event System Enhancements
+**HoverEvent + Hoverable** (`event/event.go`): `event.HoverEvent` (position-only, no button/modifier) replaces `desktop.MouseEvent` for hover. `event.Hoverable` interface with `HoverIn(*HoverEvent)`, `HoverMoved(*HoverEvent)`, `HoverOut()`. Deprecated aliases in `driver/desktop/mouse.go`. Cross-platform (not desktop-only).
+
+**ScrollEvent.Source** (`event/event.go`): `ScrollSource` enum distinguishes `ScrollSourceMouseWheel`, `ScrollSourceTouchpad`, `ScrollSourceTouch`. GLFW sets `ScrollSourceMouseWheel`. Zero value `ScrollSourceUnknown` preserves backward compatibility.
+
+**KeyEvent.Modifier** (`event/event.go`, #1042): `event.KeyEvent` carries a `Modifier event.KeyModifier` bitmask (Shift/Control/Alt/Super) so `TypedKey`/`Canvas.SetOnTypedKey` handlers can tell e.g. Shift+F11 from F11 without a shortcut registration. Zero value = no modifiers (backward compatible). Populated by the glfw driver (desktop + wasm, from the native mods argument), the mobile driver (gomobile `key.Modifiers`, hardware keyboards) and the embedded driver via the new `embedded.KeyEvent.Modifiers` field (which also made Shift+Tab focus-previous work there). Desktop routing is unchanged: Control/Alt/Super combos still go to the shortcut system before `TypedKey` (only unmodified and Shift-modified keys reach it); `desktop.Keyable` `KeyDown`/`KeyUp` see every combination with the modifier set. Complementary to the window-wide `desktop.KeyModifierDriver.CurrentKeyModifiers()` query.
+
+**LongPressable** (`event/event.go`): `LongPressable` interface with `LongPressed(*PointEvent)`. Touch handler (`internal/driver/common/touch.go`) tries `LongPressable` first on hold ≥300ms, falls back to `SecondaryTappable`. Desktop right-click always calls `TappedSecondary` (unchanged). `test.LongPress()`/`LongPressAt()` helpers in `test/test.go`.
+
+### Scroll Event Propagation
+Nested scrollable containers now propagate scroll events to parent scrollables when the inner container reaches its boundary. Implemented via `ScrollConsumer` interface (`internal/driver/util.go`) and `TryScrolled()` on `widget.Scroll`. The GLFW driver iterates scrollables deepest-first.
+
+### Scrollbar Space Reservation
+`widget.Scroll.ReserveBarSpace` (default `true`) reduces content width when a vertical scrollbar is active, preventing the scrollbar from overlapping content and fixing text wrapping at the right edge.
+
+### Date Picker Widget
+`widget.DatePicker` and `widget.NewDatePicker()` — calendar-style date picker with month navigation, locale-aware day headers and week-start day. `ShowDatePicker()` displays it as a modal popup with OK/Cancel buttons.
+
+### Date Entry Widget
+`widget.DateEntry` and `widget.NewDateEntry()` — date input field combining text entry with a calendar popup for date selection. Validates typed dates against locale format (CLDR region-based patterns). `SetDate(time.Time)` / `Date() (time.Time, error)` for programmatic access. Calendar ActionItem button opens a DatePicker popup. Placeholder shows the locale date pattern.
+
+
+### Time Picker Widget
+`widget.TimePicker` and `widget.NewTimePicker()` — MD3 clock-dial time picker: tap/drag on the dial sets the value; the header hour/minute displays and (12h mode) AM/PM toggles are internal accessible widgets (`timePickerButton`, #543) that receive their own taps. Keyboard: the picker is Focusable — Left/Right move between header fields, Up/Down adjust (hour/minute wrap, AM/PM toggles), Enter/Space activates. Direct digit entry (#549): typing digits into the focused hour/minute field accumulates up to two digits with **deterministic** auto-advance (no wall-clock timer) — a first digit that can't be a valid tens prefix (e.g. hour "7" in 24h) commits immediately as `07` and moves the cursor to minutes; otherwise it buffers to await a second digit; two digits form the value, clamped to `00–23`/`00–59` (12h hours to `1–12` against the current meridiem); `A`/`P` set the meridiem in 12h mode; Escape clears a partial entry (`fireChanged` fires once per commit; buffer cleared on cursor move / Escape / commit). Supports 24-hour (`Use24Hour: true`) and 12-hour mode. `ShowTimePicker()` displays a time picker as a modal popup with OK/Cancel buttons. `NewAutoTimePicker()` / `ShowAutoTimePicker()` auto-detect 12h/24h from the current locale via `lang.Prefers24HourClock()`.
+
+### DateTime Picker Widget
+`widget.DateTimePicker` and `widget.NewDateTimePicker()` — combines Calendar + TimePicker for selecting both date and time. `ShowDateTimePicker()` for modal popup use. `NewAutoDateTimePicker()` / `ShowAutoDateTimePicker()` auto-detect 12h/24h from locale. `widget.DateTimeEntry` and `widget.NewDateTimeEntry()` — text entry with DateTimePicker popup, locale-aware format validation (date + time), auto-detects 24h mode from locale. `SetDateTime(time.Time)` / `DateTime() (time.Time, error)` for programmatic access.
+
+### Context Menu Widget
+`widget.ContextMenu` and `widget.NewContextMenu()` — decorator/wrapper that adds right-click popup menu to any CanvasObject. Accepts `[]*bellui.MenuItem` or a `*bellui.Menu` (via `NewContextMenuWithMenu`). Delegates all normal interactions (tap, hover) to the wrapped content.
+
+### Completion Popup Widget
+`widget.CompletionPopup` and `widget.NewCompletionPopup(canvas, items)` — a lightweight, **application-driven** completion/suggestion popup. The host app supplies `[]CompletionItem{Text, Detail, Icon}` (autocomplete, history, snippets, language-server completions) and the popup renders them anchored at a caret rectangle via `ShowAtCaret(rect)`. **This is distinct from the platform IME candidate window**, which the OS owns and positions itself (desktop GLFW only delivers the preedit string, never candidate words) — `CompletionPopup` complements it for app-level suggestions, it does not replace it. Styled deliberately not to compete with the app: **no shadow**, subtle `SizeNameShapeExtraSmall` corners, thin `OutlineVariant` border over a `SurfaceContainer` fill. Each row shows its text with an optional **trailing info icon** (shown when `Detail` is set), which **mirrors to the leading edge under RTL**; optional leading kind-icon per item; optional bold **title** header (`SetTitle`). Placement is **below the caret, flipping above when cramped**, so it never covers the line being edited. Keyboard (↑/↓/Enter/Tab/Esc), hover and tap select; `OnSelected func(index, item)` fires on accept. The active row's `Detail` is revealed in a small inverted tooltip after a short delay, anchored at its info icon, on both hover and keyboard selection (#362). **Documentation side-panel (#435):** `CompletionItem.Documentation` (+ `DocumentationMarkdown`) — when any item carries documentation, a scrollable `RichText` panel (width 320, clamped to half the canvas) appears beside the list on the trailing side (leading under RTL, `OutlineVariant` divider), follows the selection on both keyboard and hover (`refreshDoc`, re-rendered only when the selected index changes), scrolls back to top per item, and `PageUp`/`PageDown` page it while the list keeps focus (consumed only when the panel is visible — otherwise still forwarded to the host Entry). The panel **subsumes the `Detail` tooltip** (suppressed while any item has docs); `rowAt` is x-aware so panel taps/hovers don't select rows. **Companion anchoring (#437):** `Position()`/`Size()` are the final post-flip/post-clamp canvas rectangle, and `OnMoved func(geo.Rectangle)` reports it (deduped) on show, live `SetItems` resize and every placement change while shown; on hide it fires once with the **zero rectangle** so a host-owned companion (e.g. a signature-help card) dismisses even on Escape/outside-tap. Reports are gated by an internal `shown` flag — a fresh `BaseWidget` claims `Visible()` before its first `Show`, which would otherwise leak `ShowAtCaret`'s pre-placement `Resize`. **Bounded height (#436):** `MaxVisibleRows` (0 → default 8) caps how many rows are visible; longer lists scroll behind the window (flat-renderer windowing via a `top` first-visible-row offset — no `container.Scroll`): Up/Down keep the selection in view (incl. wrap-around), the wheel/trackpad scrolls via `Scrolled` (sub-row deltas banked in `scrollAccum`), a thin `ColorNameScrollBar` indicator strip tracks the position (trailing edge, mirrors under RTL), and `rowAt`/`infoIconRect`/`layoutSelection` are all window-offset-aware (an off-window selected row simply hides its highlight; the detail tooltip is dropped when its row scrolls away). `MinSize` reports the capped height, so `ShowAtCaret`'s below/above flip accounts for it automatically. `Entry` integration: `Entry.ShowCompletion(title, items)` / `HideCompletion()` (anchored via the caret rect from `Entry.PreeditCursorRectangle()`) with an `Entry.OnCompletionSelected func(CompletionItem)` callback. **Live filtering (#361):** because bellui routes keyboard to the top overlay, the popup is the focused overlay while open but **forwards typed runes and editing keys back to the host `Entry`** (handling only ↑/↓/Enter/Tab/Esc itself), so the user keeps typing into the Entry — driving its `OnChanged` to re-filter and re-`ShowCompletion` — while the caret stays put. (#130-adjacent.) **Host-driven mode (#442/#472):** `KeepHostFocus` (set before `Show`) replaces the forwarding model for editor hosts (fycoder): keyboard focus never moves — the popup's `OverlayContainer` is `FocusTransparent` (the canvas keeps routing keys/runes/shortcuts to the focused host as if the popup weren't open) and the host offers navigation keys via `HandleKey(*event.KeyEvent) bool` (arrows/Enter/Tab/Escape → consumed). The overlay is also `TapThrough` (#472): the desktop driver dismisses it at *press* time when a click lands outside the popup content and lets the same click re-resolve against the layer beneath (`window.dismissTapThroughOverlay`), so one click both closes the popup and places the caret in the editor; default overlays still swallow the outside tap.
+
+### Paned Container
+`container.Paned`, `container.NewHPaned()`, `container.NewVPaned()` — multi-panel resizable container with draggable dividers. Supports N panels (unlike Split which is limited to 2). Panels have proportional weights (`SetWeight(index, weight)`). Dynamic `AddPanel()` / `RemovePanel()`.
+
+### Scroll Indicator Widget
+`widget.ScrollIndicator` and `widget.NewScrollIndicator()` — compact visual minimap showing the current viewport position within a Scroll container's content. Automatically syncs via the Scroll's `OnScrolled` callback (chains existing callbacks).
+
+### Label Truncation Tooltip
+`Label.ShowTooltipWhenTruncated` — when `true` and `Truncation` is set, the label shows a hover tooltip with the full text only when the text is actually truncated (i.e. the label's width is smaller than the text's natural width). The tooltip appears after a 500ms delay and disappears on mouse out.
+
+### ShrinkLayout
+`layout.NewShrinkLayout()` — a layout that reports MinSize (0, 0) while positioning all children at full container size. Useful when a resizable parent (Split, Scroll, AppTabs) must shrink below the natural minimum size of its content.
+
+### Entry Alignment
+`Entry.Alignment` — sets horizontal text alignment (`bellui.TextAlignLeading`, `TextAlignCenter`, `TextAlignTrailing`). Applied to both text and placeholder. Default is leading (left).
+
+### Slider — Media-Scrubber Seams (#44)
+`widget.Slider` conflated *who* changed the value with *that* it changed, which a settings control never notices but a media scrubber cannot work around cleanly. Three additions, all backwards compatible:
+- **`Dragging() bool`** — authoritative drag state, so a player can suppress its periodic position updates while the user scrubs (otherwise the thumb snaps back under the pointer every tick). Inferring it from `OnChanged`/`OnChangeEnded` has a real hole: `DragEnd` → `fireChangeEnded` returns early unless `pendingChange`, which `positionChanged` only sets past an `almostEqual` check — so **a press-and-release that doesn't move the value past one `Step` fires neither callback**, latching an inferring consumer on forever. `dragging` is therefore cleared in `DragEnd` *unconditionally and before* the callback.
+- **`SetValueSilently(v)`** — programmatic updates that don't look like user interaction. `SetValue` deliberately still fires both callbacks: the arrow keys (`TypedKey`) and the screen-reader increment/decrement (`PerformAccessibleAction`) route through it, so making it silent would have quietly broken keyboard and a11y notification. A silent set does **not** propagate to bound data (the write-back rides the same change notification the callbacks do) — documented on the method; use `SetValue` for a bound slider.
+- **`OnHover func(float64)` / `OnHoverEnd func()`** — `HoverMoved` used to discard its event entirely. The reported value is **continuous, not snapped to `Step`** (a scrub preview wants the true pointer position; rounding is recoverable, un-rounding isn't). `OnHoverEnd` fires **even when disabled mid-hover**, so a consumer is never left showing a preview it can't take down.
+
+**`Bind` no longer claims `OnChanged` (#47).** It used to implement the data write-back by *assigning the public `OnChanged` field*, so binding and an app handler silently destroyed each other in both directions — and `NewSliderWithData` made the likelier direction (assign `OnChanged` after the constructor bound for you) completely unsignalled. The write-back now rides an unexported `onChangedInternal` hook invoked from `positionChanged` **before** `OnChanged` (so a handler reading the bound source never sees a stale value), and `Unbind` clears only that hook rather than nilling the app's field. `Check`/`Select` (`OnChanged`) and `Entry` (`Validator`) still have the same pattern — **#49**.
+
+**`widget.RangeSlider` parity (#46)** — the same seams, deliberately reading the same way as `Slider`:
+- `Dragging() bool` (cleared unconditionally in `DragEnd`, same hole) plus `DraggingHigh() bool`, since which thumb is being dragged was already tracked internally and a trim control needs it.
+- `OnChangeEnded func(low, high float64)` — there was no commit signal at all. Fires from `DragEnd`, `Tapped`, a screen-reader `adjustThumb` and `SetValues`, gated on a `pendingChange` flag exactly like `Slider`.
+- `OnChanged` is now **gated on a thumb actually moving** — it used to fire on every `Dragged`/`Tapped` regardless. This is what makes the `Dragging()` hole above real on `RangeSlider` too, and what makes `OnChangeEnded` meaningful.
+- **`SetValues` now fires** `OnChanged` + `OnChangeEnded`, with `SetValuesSilently` as the quiet counterpart — resolving the #46 complaint that the two widgets had *opposite* programmatic-set rules. The plain setter reports, the `*Silently` one doesn't; that is now the fork-wide convention for both. `SetValues` also snaps to `Step` via the shared `clamp` (it previously only clamped to `Min`/`Max`), so a reported programmatic value lands in the same value space a drag produces.
+- `OnHover func(float64)` / `OnHoverEnd func()` — continuous, clamped to `[Min, Max]` (`RangeSlider.getRatio`, unlike `Slider`'s, doesn't clamp; the drag path launders it through `clamp` but hover reporting can't).
+
+**`RangeSlider` disabled state + keyboard (#51)** — the parity sweep for #46 found `RangeSlider` was drag/tap/hover only: it could not be disabled at all (no field, no methods, no guards, no disabled colours) and **could not be operated from the keyboard at all** (not `Focusable`, no `TypedKey`), which is an accessibility floor rather than a nicety — #810's thumb proxies already gave screen-reader users working increment/decrement, so it was sighted keyboard-only users who had no path.
+- `Disable()`/`Enable()`/`Disabled()` with guards on `Dragged`, `DragEnd`, `Tapped`, `TypedKey`, `HoverIn`/`HoverMoved` and `adjustThumb` (the one funnel both the keyboard and the screen-reader actions go through, so guarding it covers both). `OnHoverEnd` **does** fire when disabled mid-hover, same rule as `Slider`. The renderer paints thumbs + active track in `ColorNameDisabled` and hides the focus/hover ring.
+- **Focusable, one tab stop.** The arrows along the slider's own axis (Left/Right horizontal, Up/Down vertical) move the **focused thumb**; the **cross-axis** arrows switch which thumb that is. That is the decision #51 left open: `Tab` must keep moving focus *out* of the widget and `Home`/`End` are reserved for a future jump-to-extreme, so the cross-axis arrows are the only keys free to carry the switch — and they are otherwise dead on a single-axis control. `focusedHigh` also follows the thumb the pointer last dragged or tapped, so in practice the switch is rarely reached; `FocusedHigh()`/`SetFocusedHigh()` expose it. The step is `Step` when set, falling back to `a11yStep()` (a hundredth of the range), so unlike `Slider` — whose arrows are dead when `Step` is unset — the keys always do something.
+- A11y: the **thumb proxies** report `StateDisabled` via their own `AccessibleState()`, because they are not themselves `core.Disableable` and so cannot inherit the bit structurally the way the `RangeSlider` group node does under #52. The proxies are what a screen reader presents as adjustable, so that is where the state has to land.
+
+### Bind Never Claims a Public Callback Field (#47, #49)
+Several `Bind` implementations used to install the data write-back by **assigning a public callback field**, so binding and an app handler silently destroyed each other in both directions — and the `*WithData` constructors made the likelier direction (assign the field after the constructor bound for you) completely unsignalled. Fixed fork-wide in `Slider` (#47) and `Check`/`Select`/`Entry` (#49); the rule is now a convention: **a binder gets its own unexported hook, and `Unbind` clears only that hook** rather than nilling a field the app may own.
+- `Check`/`Select` — unexported `onChangedInternal`, invoked from `SetChecked`/`updateSelected` **before** the public `OnChanged` (so a handler reading the bound source never sees a stale value). `Unbind` clears only `onChangedInternal`. `Slider` is the same shape via `positionChanged`.
+- `Entry` — the write-back was never on `Validator`; what `Bind` claimed was the **conversion-error report**, which is worse than the `OnChanged` cases because validation is a correctness feature: binding a validated Entry silently dropped the app's rule and `Unbind` left the widget with none. Now an unexported `validatorInternal` is **composed** with the public `Validator` by `Entry.runValidator`, with `Entry.hasValidator()` the "is this entry validated" predicate every call site uses (`Validate`, `validate`, `SetValidationError`, the renderer's icon-space reservation and border styling, `Form`). **Composition rule: a conversion error wins** — text that cannot be written to the bound source is invalid whatever the app's rule says. This also fixes the constructor-installed validators of `NumericEntry`, `SearchField`, `DateEntry` and `DateTimeEntry`, which used to be destroyed the moment the widget was bound.
+- Fixed alongside in `Select` (#49): `SetSelected` has no equality guard of its own (unlike `Check.SetChecked`, whose guard is why it never showed), so the write-back's own binding notification re-entered `updateFromData` and reported **one change twice** — invisible while `Bind` owned `OnChanged`, user-visible the moment an app handler could survive. `updateFromData` now returns early when the incoming value already matches `Selected`.
+
+`Label.Bind` and `ProgressBar.Bind` install no callback at all and were always clean.
+
+### NumericEntry Widget
+`widget.NumericEntry` and `widget.NewNumericEntry()` — Entry that only accepts numeric input. Right-aligned by default. Rejects non-numeric keystrokes at input time and filters paste content. `NewIntegerEntry()` for integer-only input.
+- `AllowFloat` (default true) — permits decimal point
+- `AllowNegative` (default true) — permits minus sign
+- `Min`, `Max *float64` — optional bounds, validated automatically
+- `OnValueChanged func(float64)` — called when text is a valid number
+- `Value() (float64, error)` — returns current numeric value
+- `SetValue(float64)` — sets text to formatted number
+- `SetBounds(min, max)` — sets both bounds (use `math.Inf` to clear)
+
+### New Widgets
+- `widget.SearchField` — Entry with search icon, clear button, and `OnSearched` callback
+- `widget.SpinBox` — numeric input with +/- buttons, min/max/step clamping, keyboard arrows
+- `widget.StatusBar` — bottom bar with Label/Spacer/Separator items (follows Toolbar pattern). `StatusBarLabel` truncates with an ellipsis by default (#1041): the bar's MinSize never tracks message length (a long error/path can't relayout the window), and the bar's row layout (`statusBarItemsLayout`) makes truncating text sections width-flexible — natural width when the bar has room, proportional shrink when not; spacers still absorb the rest. `NoTruncate` opts a section back into text-tracked sizing.
+- `widget.Tooltip` — wrapper/decorator that shows hover text via PopUp after delay
+- `widget.Toast` / `ShowToast()` — transient notification with auto-dismiss, importance-driven colors. Toast and Snackbar overlays are **input-pass-through** (#569): their `PopUp` reports `PassesInputThrough()`, so taps/scrolls/typing aimed at the UI beneath work as if the notification were not there (MD3: transient surfaces never block), while content taps (Snackbar action) still land. The hit-test walk (`internal/driver.FindObjectAtPositionMatching`) takes the whole overlay *list* and walks it top-down — pass-through overlays fall through to the next overlay; the first solid overlay stays a modal barrier — and `internal.OverlayStack.TopFocusManager` skips pass-through overlays so they never own the keyboard. The #472 `OverlayContainer.TapThrough` press-time dismissal is also honored by the mobile driver now (`TouchHandler.TapDown`), not just glfw; both drivers match the seam structurally via `TapThroughDismiss(pos) bool`.
+- `widget.TwoStateToolbarAction` — ToolbarItem toggling between two icons (play/pause, show/hide); `NewTwoStateToolbarAction(offIcon, onIcon, onActivated)`, `On()`/`SetOn` (callback fires only on actual state change)
+
+### MD3 Component Widgets
+Full Material Design 3 component coverage (36 components):
+
+**Actions:**
+- `widget.Button` — 5 MD3 styles via `ButtonStyle`: `ButtonStyleFilled`, `ButtonStyleFilledTonal`, `ButtonStyleElevated`, `ButtonStyleOutlined`, `ButtonStyleText`. Pill-shaped (height/2 radius), 40dp min height. Shader-based radial ripple on tap.
+- `widget.FAB` — Floating Action Button. `NewFAB(icon, tapped)` for standard (56dp circle), `NewExtendedFAB(text, icon, tapped)` for pill with label. 4 styles: `FABStylePrimary`, `Surface`, `Secondary`, `Tertiary`.
+- `widget.IconButton` — Icon-only button. 4 styles: `IconButtonStyleStandard`, `Filled`, `FilledTonal`, `Outlined`. 40dp circle, 24dp icon.
+- `widget.SegmentedButton` — Toggle group of 2-5 segments. `NewSegmentedButton(items, changed)`. Per-corner radius (pill outer ends, flat inner edges). Selected = SecondaryContainer fill.
+- `widget.ButtonGroup` — Connected group of buttons sharing visual space. `NewButtonGroup(buttons...)`.
+- `widget.SplitButton` — Primary action + dropdown arrow menu. `NewSplitButton(text, tapped, menuItems)`. Pill shape with divider.
+- `widget.FABMenu` — Speed-dial expandable FAB. `NewFABMenu(icon, items)`. Shows mini-FABs vertically on tap.
+
+**Communication:**
+- `widget.Badge` — Notification dot or count indicator. `NewBadge(content)` for dot, `NewBadgeWithCount(content, count)` for numbered. Error color, positioned at content's top-right.
+- `widget.Snackbar` — Bottom message with optional action. `ShowSnackbar(text, actionText, action, canvas)`. Auto-dismisses after 4s. Slides up from bottom.
+- `widget.LoadingIndicator` — Skeleton placeholder. `NewLoadingIndicator(shape)`. 3 shapes: `LoadingShapeRect`, `Circle`, `Text`. Animated opacity pulse.
+
+**Containment:**
+- `widget.Card` — 3 styles via `CardStyle`: `CardStyleElevated` (shadow+fill), `CardStyleFilled` (no shadow), `CardStyleOutlined` (border). Stencil-based rounded clipping for content.
+- `widget.Carousel` — Horizontally-scrolling showcase. `NewCarousel(items...)`. Prev/next buttons, dot indicators.
+- `widget.BottomSheet` — Modal/standard sheet from bottom. `ShowBottomSheet(content, canvas)`. Drag handle, 28dp corner radius. Slide-up animation.
+- `widget.SideSheet` — Right-anchored panel. `ShowSideSheet(content, canvas)`. 400dp max width. Slide-in animation.
+
+**Inputs:**
+- `widget.Switch` — MD3 toggle with sliding thumb. `NewSwitch(changed)`. Animated thumb slide (200ms). On=Primary track, Off=outlined track.
+- `widget.Chip` — 4 styles: `ChipStyleAssist`, `Filter`, `Input`, `Suggestion`. `NewChip(text, tapped)`, `NewFilterChip(text, changed)`. Pill shape, 32dp height.
+- `widget.Entry` — 2 styles via `EntryStyle`: `EntryStyleFilled` (default), `EntryStyleOutlined` (transparent bg, always-visible border).
+- `widget.RangeSlider` — Two-thumb slider. `NewRangeSlider(min, max)`. `LowValue`/`HighValue`, smart thumb detection.
+
+**Navigation:**
+- `widget.NavigationBar` — Bottom nav (3-5 items). `NewNavigationBar(items, changed)`. 80dp height, SecondaryContainer indicator.
+- `widget.NavigationRail` — Side nav (3-7 items). `NewNavigationRail(items, changed)`. 80dp width, optional labels.
+- `widget.NavigationDrawer` — Slide-out side panel. `NewNavigationDrawer(items, changed)`. 360dp width, modal/standard, supports dividers.
+- `widget.TopAppBar` — Header bar. `NewTopAppBar(title, navIcon, navAction)`. 64dp, navigation icon + action icons.
+- `widget.BottomAppBar` — Bottom toolbar. `NewBottomAppBar(actions, fab)`. 80dp, action icons + optional FAB.
+
+
+### Animated GIF Widget (bellui-x port, #443)
+`widget.AnimatedGif` — animated GIF playback; `NewAnimatedGif(bellui.URI)` / `NewAnimatedGifFromResource`, `Start()`/`Stop()`, `SetMinSize`. Frames are driven by a repeat-forever `bellui.Animation` ticker on the main goroutine (no goroutine/locks, the #417 prefill pattern), honoring GIF disposal methods and loop count (`-1` once / `0` forever / `n` → n+1 passes). Lifecycle: renderer `Destroy()` stops the ticker, `CreateRenderer` re-arms a playing gif on re-show (PR #423 pattern); falling far behind (long eviction) resyncs to now instead of replaying the backlog. `Load`/`LoadResource` stop playback first. wasm/mobile cadence verify tracked in #452.
+
+### File Tree Widget (bellui-x port, #445)
+`widget.FileTree` / `NewFileTree(root bellui.URI)` — filesystem browser built on `Tree` (callback model; deliberately not `TreeView`). Directory listings run **async off the main goroutine** with a localized "Loading..." placeholder row; `Refresh()` marks listings stale but keeps current children visible until fresh results land (no placeholder flash); closing a branch marks it stale for re-list on reopen. Fields: `Filter storage.FileFilter` (directories always kept, unlike bellui-x), `ShowHidden` (default false, via `storage.IsHidden`), `ShowRootPath`, `Sorter func(bellui.URI, bellui.URI) bool` (Filter/Sorter run on a background goroutine — keep them pure). `MapURI(uid, target)` mappings survive Refresh (map to nil to remove). Tests use the `listSynchronously` seam (the test driver runs `bellui.Do` inline on the calling goroutine, so async listings race there). FS-watch is a follow-up (#454).
+
+
+### Responsive Layout (bellui-x-inspired, #444)
+`layout.NewResponsiveLayout(objects...)` + `layout.Responsive(obj, ratios...)` — bootstrap-style adaptive rows: each child declares a width ratio (0–1] per size class, rows wrap when ratios would exceed 1 (float epsilon absorbs thirds), members get the row height, ratios summing to 1 fill the row exactly. Size classes default to the **MD3 window size classes in dp** (compact <600, medium <840, expanded <1200, large <1600, extra-large) via `DefaultResponsiveBreakpoints`; set `ResponsiveLayout.Breakpoints` for a custom table (e.g. Bootstrap `{576, 768, 992, 1200}`). Missing ratios inherit the previous class. The class derives from the **container** width (not the window), so a subtree inside Split/Paned adapts to its pane. Rows mirror under RTL (`MirrorChildren`). The `Responsive` wrapper is a plain stack-layout `*bellui.Container` whose ratio config rides in its layout (`responsiveStack`; layout package cannot import widget) — **never a type embedding `bellui.Container`**: the object-tree walker (`internal/driver.walkObjectTree`, behind painting/hit-testing/a11y/markup) and the test markup renderer match `*bellui.Container` by exact type, so an embedder's children lay out but are silently never painted or hit-testable (#767, latent since #450). The rule generalizes to any custom container-like CanvasObject in the fork: use a plain `*bellui.Container` (config in the Layout or a lookaside) or a real `core.Widget` with a renderer.
+
+### About Dialog (#446)
+`dialog.NewAbout(content string, links []*widget.Hyperlink, a bellui.App, w bellui.Window)` / `NewAboutWindow(content, links, a)` + `ShowAbout`/`ShowAboutWindow` — MD3-native about box from `App.Metadata()`: centered icon (96dp), name in `TypographyHeadlineSmall`, version in `TypographyBodyMedium` (each omitted when the metadata field is empty), scrollable RichText markdown content (`AllowRemoteContent` stays false — app-supplied markdown is treated as untrusted per #285), dot-separated links footer, localized "About <Name>" title. Static composition; the bellui-x parallax underlay is an optional follow-up (#453).
+

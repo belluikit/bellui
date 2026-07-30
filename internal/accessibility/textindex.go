@@ -51,7 +51,7 @@ var textIndexCache TextIndex
 // content — runtime string equality has no same-pointer fast path, so a
 // plain == would byte-compare the whole document on every query. The rope
 // behind Entry memoizes its string and returns the same object until the
-// next splice (see the CLAUDE.md identity contract), so the burst of
+// next splice (see the docs/notes/text.md identity contract), so the burst of
 // queries between two edits costs one O(n) build; a fresh-but-equal string
 // (e.g. a password mask rebuilt per call) safely re-indexes.
 func IndexText(text string) *TextIndex {
