@@ -203,3 +203,86 @@ func TestVideoSurfaceGeneratorSeesLatestFrame(t *testing.T) {
 		}
 	}
 }
+
+// TestVideoSurfaceResizeTakesTheNewGeometry covers a capture device switch to a
+// camera of a different resolution (#96). Buffers left at the old size would
+// truncate a larger frame in the copy, and the generator would keep describing
+// the old rectangle over the new pixels.
+func TestVideoSurfaceResizeTakesTheNewGeometry(t *testing.T) {
+	s := newVideoSurface(2, 2)
+	small := image.NewRGBA(image.Rect(0, 0, 2, 2))
+	for i := range small.Pix {
+		small.Pix[i] = 0xAA
+	}
+	s.WriteFrame(small)
+
+	s.resize(4, 3)
+
+	if len(s.buf[0]) != 4*3*4 || len(s.buf[1]) != 4*3*4 {
+		t.Fatalf("buffer sizes = %d/%d, want %d for 4x3 RGBA",
+			len(s.buf[0]), len(s.buf[1]), 4*3*4)
+	}
+	// Both buffers are replaced, so nothing of the previous camera survives into
+	// a frame from the new one.
+	for i, b := range s.buf {
+		for _, px := range b {
+			if px != 0 {
+				t.Fatalf("buffer %d still holds pixels from the previous geometry", i)
+			}
+		}
+	}
+
+	large := image.NewRGBA(image.Rect(0, 0, 4, 3))
+	for i := range large.Pix {
+		large.Pix[i] = 0x5C
+	}
+	s.WriteFrame(large)
+
+	img := s.raster.Generator(4, 3)
+	rgba, ok := img.(*image.RGBA)
+	if !ok {
+		t.Fatalf("got %T, want *image.RGBA", img)
+	}
+	if got := rgba.Bounds(); got.Dx() != 4 || got.Dy() != 3 {
+		t.Errorf("generator bounds = %v, want 4x3", got)
+	}
+	if rgba.Stride != 4*4 {
+		t.Errorf("stride = %d, want %d — a stale stride shears the image", rgba.Stride, 4*4)
+	}
+	// The last row proves the whole frame arrived rather than being truncated
+	// against a buffer sized for 2x2.
+	if last := rgba.Pix[len(rgba.Pix)-1]; last != 0x5C {
+		t.Errorf("last pixel = %#x, want the new frame throughout", last)
+	}
+}
+
+// TestVideoSurfaceResizeIsANoOpAtTheSameSize: two cameras of the same
+// resolution are the common switch, and it should cost nothing.
+func TestVideoSurfaceResizeIsANoOpAtTheSameSize(t *testing.T) {
+	s := newVideoSurface(2, 2)
+	frame := image.NewRGBA(image.Rect(0, 0, 2, 2))
+	for i := range frame.Pix {
+		frame.Pix[i] = 0x3B
+	}
+	s.WriteFrame(frame)
+
+	s.resize(2, 2)
+
+	if got := s.raster.Generator(2, 2).(*image.RGBA).Pix[0]; got != 0x3B {
+		t.Errorf("pixel = %#x after a same-size resize, want the frame kept", got)
+	}
+}
+
+// TestVideoSurfaceResizeRejectsDegenerateSizes: a decoder that has not settled
+// its geometry reports zeroes, and honouring that would leave a surface with no
+// buffers at all.
+func TestVideoSurfaceResizeRejectsDegenerateSizes(t *testing.T) {
+	s := newVideoSurface(2, 2)
+	for _, wh := range [][2]int{{0, 4}, {4, 0}, {-1, 4}} {
+		s.resize(wh[0], wh[1])
+		if s.width != 2 || s.height != 2 {
+			t.Fatalf("resize(%d, %d) changed the geometry to %dx%d",
+				wh[0], wh[1], s.width, s.height)
+		}
+	}
+}
