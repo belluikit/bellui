@@ -43,6 +43,7 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"time"
 	"unsafe"
@@ -138,6 +139,22 @@ func belluiCefAccelPaint(planeCount, fd C.int, stride C.uint, modifier C.ulonglo
 }
 
 func main() {
+	// CEF's browser UI thread is whichever thread called cef_initialize, and
+	// every subsequent call — cef_do_message_loop_work above all — has to come
+	// from that same thread. Go does not promise that: the main goroutine may be
+	// rescheduled onto another OS thread at any preemption point, and this
+	// probe's pump loop sleeps on every iteration, which is exactly such a
+	// point.
+	//
+	// Without this lock the probe delivered a first frame on roughly one run in
+	// three, with byte-identical logs whether it worked or not. It reads like a
+	// CEF or GPU problem and is neither.
+	//
+	// bellui's own main loop already runs locked to the main thread, which is
+	// why the backend (belluikit/bellui#105) inherits this for free — but only
+	// as long as every CEF call goes through bellui.Do rather than a goroutine.
+	runtime.LockOSThread()
+
 	flag.Parse()
 
 	// Default to wherever setup.sh staged the payload, for both of the ways

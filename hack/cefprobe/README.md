@@ -63,7 +63,7 @@ Answering it needs a real X11 or Wayland session on hardware with a working EGL
 display — and then the separate question of whether wgpu can import a dma-buf at
 all, which is risk R1 on #60 and explicitly not a blocker for shipping.
 
-## Three traps, all of which cost real time
+## Four traps, all of which cost real time
 
 Recorded because `belluikit/gocef` (belluikit/bellui#103) will hit each one
 again, and none of them fails in a way that names the actual problem.
@@ -86,9 +86,30 @@ again, and none of them fails in a way that names the actual problem.
   part of the runtime that is not where the rest of the resources are. Omitting
   them gives `Error loading V8 startup snapshot file`, twice, then a core dump.
 
+- **Every CEF call must come from the thread that called `cef_initialize`, and
+  Go does not give you that for free.** The main goroutine can be rescheduled
+  onto another OS thread at any preemption point, and a pump loop that sleeps
+  between `cef_do_message_loop_work()` calls is nothing but preemption points.
+  Without `runtime.LockOSThread()` this probe delivered a first frame on roughly
+  one run in three, with **byte-identical logs whether it worked or not** — it
+  reads like a GPU or CEF fault and is neither. bellui's main loop is already
+  locked to the main thread, so the backend inherits this, but only for calls
+  that actually go through `bellui.Do`.
+
 A fourth, smaller one: `helper.c` lives in its own directory because cgo
 compiles every `.c` file in a package directory, so a second `main()` beside
 `main.go` fails the link.
+
+### A false lead, recorded so it is not chased again
+
+While the thread bug was still unfound, `--disable-gpu --disable-gpu-compositing`
+appeared to fix frame delivery — it took the success rate from about one run in
+three to two in three, which is exactly the kind of evidence that convinces. It
+does nothing. With the thread locked, frames arrive on every run with **no GPU
+switches at all** (6/6, then repeatedly since). Neither is `was_hidden(false)` +
+`set_focus(true)` + `invalidate(PET_VIEW)` load-bearing here, though those calls
+are kept because they are what a real backend must drive from Show/Hide, from
+scrolling out of a clipping ancestor, and from the #59 focus bridge.
 
 ## Layout
 
