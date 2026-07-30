@@ -19,6 +19,22 @@ type FFmpegSource struct {
 	hasVideo bool
 	hasAudio bool
 
+	// live marks an open-ended capture device, which has no duration, no
+	// timeline to seek within, and no end it is supposed to reach.
+	live bool
+	// reopen reacquires a released capture device. Set only for a live source;
+	// see Rewind for why a device is released rather than held.
+	reopen func() (goffmpeg.IDecoder, error)
+	// err records why the source stopped, for ErrorSource.
+	err error
+	// stalledSince is when a live capture last started producing nothing; zero
+	// while it is healthy. See tolerateStall.
+	stalledSince time.Time
+	// ptsOrigin is the first presentation timestamp seen from a live capture,
+	// subtracted from the rest. See presentationTime.
+	ptsOrigin time.Duration
+	ptsBased  bool
+
 	videoCallback VideoCallback
 	audioCallback AudioCallback
 	ended         bool
@@ -66,7 +82,20 @@ func (s *FFmpegSource) VideoSize() (int, int) {
 	return s.vInfo.Width, s.vInfo.Height
 }
 
+// IsLive implements LiveSource. A device source answers true; a file or stream
+// opened by url or reader answers false.
+func (s *FFmpegSource) IsLive() bool { return s.live }
+
+// Err implements ErrorSource, reporting why the source stopped producing media.
+func (s *FFmpegSource) Err() error { return s.err }
+
 func (s *FFmpegSource) Duration() time.Duration {
+	// A capture device has no duration, and after Rewind released it there is no
+	// decoder to ask. Both answer zero, which is also the signal the transport
+	// controls key their live presentation off.
+	if s.live || s.dec == nil {
+		return 0
+	}
 	return time.Duration(s.dec.Duration() * float64(time.Second))
 }
 
@@ -98,7 +127,7 @@ func (s *FFmpegSource) SetAudioCallback(f AudioCallback) { s.audioCallback = f }
 // the mix, so a 5.1 source folded to stereo gets proper downmix coefficients
 // rather than dropped channels.
 func (s *FFmpegSource) SetAudioChannels(n int) error {
-	if !s.hasAudio {
+	if !s.hasAudio || s.dec == nil {
 		return nil
 	}
 	if err := s.dec.SetAudioChannels(n); err != nil {
@@ -117,13 +146,24 @@ func (s *FFmpegSource) Decode(_ time.Duration) {
 	if s.ended {
 		return
 	}
+	if !s.acquire() {
+		return
+	}
 
 	for {
 		mt, err := s.dec.Next()
 		if err != nil {
+			if s.live && s.tolerateStall(err) {
+				return
+			}
+			s.err = err
 			s.ended = true
 			return
 		}
+		// A successful read clears any stall in progress, so a device that
+		// hiccups and recovers does not carry an error forward.
+		s.stalledSince = time.Time{}
+		s.err = nil
 
 		switch mt {
 		case goffmpeg.MediaTypeVideo:
@@ -132,8 +172,7 @@ func (s *FFmpegSource) Decode(_ time.Duration) {
 				if err := s.dec.GetRGBA(rgba); err == nil {
 					// Position is the decoded frame's own PTS, set by the
 					// bridge from best_effort_timestamp.
-					pts := time.Duration(s.dec.Position() * float64(time.Second))
-					s.videoCallback(rgba, pts)
+					s.videoCallback(rgba, s.presentationTime(s.dec.Position()))
 				}
 			}
 			return // one video frame per call
@@ -154,7 +193,126 @@ func (s *FFmpegSource) Decode(_ time.Duration) {
 	}
 }
 
+// presentationTime converts a decoder position into the presentation timestamp
+// the pipeline paces against, rebasing a live capture onto zero.
+//
+// A capture device stamps frames with absolute host time rather than from the
+// start of a stream: a macOS camera reports around 4365842s — the machine's
+// uptime, some 50 days — for its very first frame, with correct 16ms deltas after
+// it. The pipeline holds each frame until its timestamp comes due on a clock that
+// starts at zero, so passing those through stalls display for as long as the
+// machine has been up: frames decode until the queue fills and then nothing is
+// ever shown. Measured with hack/captureprobe -raw.
+//
+// Rebasing on the first frame keeps the inter-frame deltas, which is what the A/V
+// sync actually needs, while starting where the clock does. The origin is retaken
+// after a release, since a reacquired device resumes from absolute time while the
+// pipeline clock has been reset.
+func (s *FFmpegSource) presentationTime(pos float64) time.Duration {
+	pts := time.Duration(pos * float64(time.Second))
+	if !s.live {
+		return pts
+	}
+	if !s.ptsBased {
+		s.ptsOrigin = pts
+		s.ptsBased = true
+	}
+	return pts - s.ptsOrigin
+}
+
+// liveStallTimeout is how long a live capture may produce nothing before the
+// source is declared ended. Long enough to cover a slow camera starting up —
+// avfoundation in particular takes a moment — and short enough that a device
+// which really has gone away is reported rather than waited on forever.
+const liveStallTimeout = 5 * time.Second
+
+// liveRetryPause keeps a stalled live source from spinning the decode-ahead loop
+// at full speed on a device that simply has no frame ready yet.
+const liveRetryPause = 5 * time.Millisecond
+
+// tolerateStall decides whether a failed read from a live capture is a hiccup or
+// the end of it, reporting true to retry.
+//
+// A non-blocking capture device reports "no packet available yet" as an ordinary
+// read error: av_read_frame returns EAGAIN. For a file that would mean the stream
+// is over, but for a camera it means only that the next frame has not arrived.
+// Treating the first one as terminal ends capture within milliseconds of starting
+// it — measured on macOS/avfoundation, which stalls after about two frames.
+//
+// The bridge already retries EAGAIN from avcodec_receive_frame but not from
+// av_read_frame, and goffmpeg surfaces the result as an opaque "decoder error:
+// <n>" with no sentinel to match on, so there is nothing reliable to test for
+// here. Rather than parse that text, every live read failure is treated as
+// retryable and time decides: a camera that has produced nothing for
+// liveStallTimeout is genuinely gone, which is what the pipeline reports through
+// ErrCaptureStopped.
+func (s *FFmpegSource) tolerateStall(err error) bool {
+	now := time.Now()
+	if s.stalledSince.IsZero() {
+		s.stalledSince = now
+	}
+	if now.Sub(s.stalledSince) >= liveStallTimeout {
+		return false
+	}
+	s.err = err
+	time.Sleep(liveRetryPause)
+	return true
+}
+
+// acquire makes sure there is a decoder to read from, reacquiring a capture
+// device that Rewind released. It reports whether decoding can proceed; a
+// failure to reacquire is terminal and is recorded for ErrorSource, since the
+// pipeline surfaces it as a lost device rather than as an end of stream.
+func (s *FFmpegSource) acquire() bool {
+	if s.dec != nil {
+		return true
+	}
+	if s.reopen == nil {
+		s.ended = true
+		return false
+	}
+	dec, err := s.reopen()
+	if err != nil {
+		s.err = err
+		s.ended = true
+		return false
+	}
+	s.dec = dec
+	// A reacquired device is not required to come back with the geometry it had.
+	// Refresh what the decoder reports so frames are allocated at the size it is
+	// actually producing; the streaming raster handles a size change by dropping
+	// its texture, and hasVideo/hasAudio stay as first negotiated because the
+	// pipeline was assembled around them.
+	s.vInfo, s.aInfo = dec.VideoInfo(), dec.AudioInfo()
+	return true
+}
+
+// release closes the current decoder but leaves the source usable: the next
+// Decode reacquires it through acquire.
+func (s *FFmpegSource) release() {
+	if s.dec != nil {
+		s.dec.Close()
+		s.dec = nil
+	}
+	s.ended = false
+	s.err = nil
+	s.stalledSince = time.Time{}
+	// A reacquired device resumes stamping from absolute time while the pipeline
+	// clock restarts at zero, so the rebase origin has to be taken again.
+	s.ptsBased = false
+}
+
+// Seek moves to the given position. A live capture has no timeline to move
+// within — av_seek_frame on a device is undefined rather than merely wasteful —
+// so this is a no-op for one. The transport controls disable the seek bar for a
+// live source as well; this is the floor under that.
 func (s *FFmpegSource) Seek(pos time.Duration) {
+	if s.live {
+		return
+	}
+	if s.dec == nil {
+		return
+	}
 	if err := s.dec.Seek(pos.Seconds()); err != nil {
 		return
 	}
@@ -178,13 +336,29 @@ func (s *FFmpegSource) Seek(pos time.Duration) {
 	}
 }
 
+// Rewind returns a finite source to its start.
+//
+// A capture device has no start to return to, so it is released instead. The
+// pipeline calls this from Stop, and holding a camera open after the user pressed
+// stop — with its indicator light on, and with the device unavailable to every
+// other application — would be the wrong reading of the word. The next Decode
+// reacquires it, so Stop followed by Play works as it does for a file.
 func (s *FFmpegSource) Rewind() {
+	if s.live {
+		s.release()
+		return
+	}
 	s.Seek(0)
 }
+
 func (s *FFmpegSource) HasEnded() bool { return s.ended }
 
 func (s *FFmpegSource) Close() {
 	if s.dec != nil {
 		s.dec.Close()
+		s.dec = nil
 	}
+	// Close is final, unlike release: nothing should reacquire the device after
+	// the caller has finished with the source.
+	s.reopen = nil
 }
