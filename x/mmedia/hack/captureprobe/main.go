@@ -34,6 +34,11 @@
 //   - macOS/avfoundation cannot enumerate at all: -list reports
 //     ErrDeviceListUnsupported, which means "cannot list", not "no camera".
 //     Selection there is positional, which is what -index is for.
+//   - -raw failing while -auto passes is expected, not a contradiction. -raw
+//     calls goffmpeg.OpenDevice directly and gets FFmpeg's default framerate,
+//     which a fixed-mode camera refuses (#95); -auto goes through x/mmedia,
+//     which retries at 60/30/25 when the caller named no rate. That difference
+//     is the point of -raw — it places a failure on one side of the boundary.
 //   - Linux: a UVC camera exposes a metadata node beside its real one. Opening
 //     the wrong node blocks indefinitely rather than failing, which is why
 //     device choice filters on HasMedia.
