@@ -18,6 +18,10 @@
 // data — HLS, RTSP, RTMP — or that needs range-request seeking within a network
 // stream.
 //
+// [WithScrubPreview] shows the frame under the pointer while the seek bar is
+// hovered, so a viewer can see where a seek would land before committing to it.
+// It needs a source FFmpeg can open twice, which the URL and path forms are.
+//
 // [NewCapturePlayer] opens a camera instead of a recording, with the same widget
 // and controls around it. [CaptureSelect] is the picker for choosing between
 // cameras, and [MediaPlayer.SetCaptureDevice] switches one for another inside
