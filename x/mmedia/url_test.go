@@ -172,10 +172,13 @@ func TestSeekBarDisabledForLiveSource(t *testing.T) {
 		t.Errorf("time label = %q, want %q", tc.timeLabel.Text, "live")
 	}
 
-	// A live source still reports elapsed time; it just has no total.
+	// A live source still reports elapsed time; it just has no total. The marker
+	// is kept in front of it: SetTime runs every tick, so writing the elapsed
+	// time alone meant "live" vanished the instant playback started and was only
+	// ever visible in the pre-roll.
 	tc.SetTime(42*time.Second, 0)
-	if got, want := tc.timeLabel.Text, "00:42"; got != want {
-		t.Errorf("time label = %q, want %q (elapsed only)", got, want)
+	if got, want := tc.timeLabel.Text, "live · 00:42"; got != want {
+		t.Errorf("time label = %q, want %q (marker plus elapsed)", got, want)
 	}
 	if tc.seekBar.Value != 0 {
 		t.Error("a live source must not move the seek bar")
