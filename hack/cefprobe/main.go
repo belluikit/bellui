@@ -67,13 +67,14 @@ var (
 )
 
 var (
-	url    = flag.String("url", probePage, "page to load")
-	viewW  = flag.Int("w", 800, "view width in pixels")
-	viewH  = flag.Int("h", 600, "view height in pixels")
-	cefDir = flag.String("cef", "", "directory holding libcef.so and Resources (default: ./cefroot)")
-	dump   = flag.String("dump", "", "directory to write captured PNGs to")
-	extra  = flag.String("switches", "", "extra Chromium switches, space separated")
-	accel  = flag.Bool("accel", true, "also probe on_accelerated_paint (shared textures)")
+	url       = flag.String("url", probePage, "page to load")
+	viewW     = flag.Int("w", 800, "view width in pixels")
+	viewH     = flag.Int("h", 600, "view height in pixels")
+	cefDir    = flag.String("cef", "", "directory holding libcef.so and Resources (default: ./cefroot)")
+	dump      = flag.String("dump", "", "directory to write captured PNGs to")
+	extra     = flag.String("switches", "", "extra Chromium switches, space separated")
+	accel     = flag.Bool("accel", true, "also probe on_accelerated_paint (shared textures)")
+	accelOnly = flag.Bool("accel-only", false, "skip the CPU phase and start CEF with shared textures from the start (cef_initialize can only be called once per process, so the two-phase flow needs -accel=false in the first run and -accel-only in a second run)")
 )
 
 // frames carries what the paint callbacks report. CEF calls them on the thread
@@ -182,6 +183,11 @@ func main() {
 	fmt.Printf("  payload   %s\n", dir)
 	fmt.Printf("  view      %dx%d\n", *viewW, *viewH)
 
+	if *accelOnly {
+		probeAcceleratedFresh(dir)
+		return
+	}
+
 	if !start(dir, false) {
 		os.Exit(1)
 	}
@@ -200,7 +206,10 @@ func main() {
 	C.belluiCefShutdown()
 
 	if *accel {
-		probeAccelerated(dir)
+		fmt.Printf("\n[accel] on_accelerated_paint (shared_texture_enabled = 1)\n")
+		fmt.Println("  skipped: run again with -accel-only in a fresh process.")
+		fmt.Println("  cef_initialize is once-per-process, so accel and the CPU phase")
+		fmt.Println("  can't share a run; this default flow only covers the CPU path.")
 	}
 }
 
@@ -343,21 +352,35 @@ func reportPopups() {
 	}
 }
 
-// probeAccelerated restarts CEF asking for shared textures, which is the whole
-// zero-copy question. On Linux the info carries dma-buf fds; whether those can
-// be imported into the WebGPU painter is a separate matter (risk R1 on #60),
-// but they have to exist first.
-func probeAccelerated(dir string) {
-	fmt.Printf("\n[accel] on_accelerated_paint (shared_texture_enabled = 1)\n")
-
-	frames.Lock()
-	frames.accelOK = false
-	frames.serial = 0
-	frames.Unlock()
-
+// probeAcceleratedFresh starts CEF for the *first time* with shared textures
+// enabled and waits for on_accelerated_paint. cef_initialize can only be called
+// once per process, so probing accel needs a separate probe invocation from the
+// CPU phase.
+//
+// This machine (Ubuntu 22.04.5, NVIDIA RTX 2070 SUPER, driver 595.84) needs two
+// things for a dma-buf frame to arrive:
+//
+//  1. A live X11 (or Wayland) session — even with --ozone-platform=headless,
+//     Chromium's compositor initializes ANGLE before Vulkan takes over, and
+//     ANGLE's EGL backend requires an X display. Without it the GPU process
+//     exits with "Could not open the default X display", which is what the
+//     original probe hit.
+//  2. --enable-features=Vulkan --use-vulkan=native — Chromium's *native* Vulkan
+//     renderer, distinct from --use-angle=vulkan (ruled out on #102). ANGLE-on-GL
+//     is the default with the NVIDIA proprietary driver, and its shared-image
+//     path fails FBO creation with GL_FRAMEBUFFER_UNSUPPORTED (0x8CDD), so
+//     Skia's shared surface never materializes and no frame lands on either
+//     callback. Native Vulkan bypasses that path and hands over dma-buf fds.
+//
+// ANGLE cannot use NVIDIA's GLES driver at all — it errors out with "Intel or
+// NVIDIA OpenGL ES drivers are not supported", so --use-angle=gles is a dead
+// end here. The GL and GL-EGL backends both hit the framebuffer-incomplete
+// wall. --use-cmd-decoder=validating is silently ignored on this platform.
+func probeAcceleratedFresh(dir string) {
+	fmt.Printf("\n[accel] on_accelerated_paint (shared_texture_enabled = 1, single-init)\n")
 	if !start(dir, true) {
-		fmt.Println("  FAIL: could not restart CEF with shared textures")
-		return
+		fmt.Println("  FAIL: could not start CEF with shared textures")
+		os.Exit(1)
 	}
 	defer C.belluiCefShutdown()
 
@@ -365,23 +388,54 @@ func probeAccelerated(dir string) {
 	for time.Now().Before(deadline) {
 		C.belluiCefWork()
 		frames.Lock()
-		ok, rep := frames.accelOK, frames.accel
+		ok, rep, cpu, serial := frames.accelOK, frames.accel, frames.serial > 0 && frames.w > 0, frames.serial
 		frames.Unlock()
 		if ok {
 			fmt.Printf("  PASS: dma-buf frame delivered\n")
 			fmt.Printf("    planes    %d\n", rep.planeCount)
 			fmt.Printf("    fd        %d\n", rep.fd)
-			fmt.Printf("    stride    %d\n", rep.stride)
-			fmt.Printf("    modifier  0x%x\n", rep.modifier)
-			fmt.Printf("    format    %d\n", rep.format)
+			fmt.Printf("    stride    %d bytes\n", rep.stride)
+			fmt.Printf("    modifier  0x%x (%s)\n", rep.modifier, modifierName(rep.modifier))
+			fmt.Printf("    format    %d (%s)\n", rep.format, colorTypeName(rep.format))
 			fmt.Println("  zero-copy is reachable in principle; importing into the WebGPU")
 			fmt.Println("  painter is the open question (risk R1 on #60).")
 			return
 		}
+		if cpu {
+			// on_paint firing despite shared_texture_enabled=1 means CEF quietly
+			// fell back to CPU compositing — usually because ANGLE could not
+			// build a renderable FBO for the shared image.
+			fmt.Printf("  FAIL: on_paint fired (serial=%d) but on_accelerated_paint did not.\n", serial)
+			fmt.Println("  CEF fell back to CPU compositing despite shared_texture_enabled=1.")
+			fmt.Println("  On NVIDIA proprietary this is the ANGLE-on-GL path failing FBO")
+			fmt.Println("  creation — pass --switches=\"--enable-features=Vulkan --use-vulkan=native\".")
+			return
+		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	fmt.Println("  no accelerated frame within 20s — the CPU path is the shippable one.")
-	fmt.Println("  (headless with no GPU process falls back to on_paint by design.)")
+	fmt.Println("  no accelerated frame within 20s — nothing came through either path.")
+	fmt.Println("  on NVIDIA proprietary the ANGLE-on-GL shared-image path fails")
+	fmt.Println("  FBO creation; pass --switches=\"--enable-features=Vulkan --use-vulkan=native\".")
+}
+
+func colorTypeName(format int) string {
+	switch format {
+	case 0:
+		return "CEF_COLOR_TYPE_RGBA_8888"
+	case 1:
+		return "CEF_COLOR_TYPE_BGRA_8888"
+	default:
+		return "unknown"
+	}
+}
+
+func modifierName(mod uint64) string {
+	// DRM_FORMAT_MOD_LINEAR is the only one worth naming for the report; the
+	// tiled/compressed modifiers are a wider table we do not need here.
+	if mod == 0 {
+		return "DRM_FORMAT_MOD_LINEAR"
+	}
+	return "vendor-specific"
 }
 
 // waitForFrame pumps CEF until a frame lands.

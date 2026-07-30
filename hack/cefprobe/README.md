@@ -1,11 +1,14 @@
 # cefprobe — the #60 Linux web-view spike, with CEF
 
-> **Outcome: the architecture works, and the CPU path is shippable.** Web content
+> **Outcome: the architecture works, the CPU path is shippable, and — as of
+> 2026-07-30 — the dma-buf path answers YES on this machine.** Web content
 > composited *inside* bellui's canvas across **96.8%** of the surface with bellui
 > drawing over it, at **1.9 ms per frame extrapolated to 1080p** — 11–12% of a
-> frame budget, against the 17–59% `hack/wpeprobe` measured for WPE. The
-> zero-copy question is **unanswered**, for a reason that is about this machine
-> rather than about CEF: see below.
+> frame budget, against the 17–59% `hack/wpeprobe` measured for WPE.
+> `on_accelerated_paint` delivers a **single-plane BGRA_8888 dma-buf** with
+> `DRM_FORMAT_MOD_LINEAR` and a per-frame fd; details and the two conditions it
+> needs are below. Zero-copy is *reachable*; the wgpu-import half of R1 (#60) is
+> still open.
 
 Direct successor to `hack/wpeprobe`. That probe established the architecture and
 then rejected WPE as the *engine* — 112 unbundled dependencies, absent from
@@ -19,13 +22,21 @@ Behind the `cef` build tag, so `go build ./...` on a machine with no CEF payload
 
 ## Setup
 
-Needs Linux. Verified on Ubuntu 22.04.5, kernel 6.8, x86_64, with an NVIDIA
-RTX 2070 SUPER, over SSH with no desktop session.
+Needs Linux. The CPU path is verified on Ubuntu 22.04.5, kernel 6.8, x86_64,
+with an NVIDIA RTX 2070 SUPER, over SSH with no desktop session. The
+accelerated path additionally needs a live X11 or Wayland session on the box
+(see the [accel] section below).
 
 ```sh
 ./hack/cefprobe/setup.sh              # fetch, verify, strip, lay out (~10 min first time)
-go run -tags cef ./hack/cefprobe -dump out
+go run -tags cef ./hack/cefprobe -dump out                                              # CPU phase
+go run -tags cef ./hack/cefprobe -accel-only \
+    -switches="--enable-features=Vulkan --use-vulkan=native"                            # accel phase
 ```
+
+`cef_initialize` is once-per-process, so the two phases have to run in separate
+invocations. Without `-accel-only` the default flow runs the CPU phase and
+prints a note pointing at the second command.
 
 `setup.sh` pins CEF **151.3.12 / Chromium 151.0.7922.47** and verifies the
 archive's SHA-1 before using it. It strips `libcef.so` from **1.36 GB to
@@ -48,22 +59,72 @@ caveats kept honest: the swizzle belongs in the shader rather than in Go, and
 CEF hands over dirty rects that this path throws away — a full-frame upload
 where a caret blink should cost a few thousand pixels (belluikit/bellui#99).
 
-**Zero-copy is unanswered here, and the reason is the machine.** The GPU process
-exits during initialization — `Could not open the default X display`, then
-`Exiting GPU process due to errors during initialization` — so
-`on_accelerated_paint` never fires and CEF correctly falls back to `on_paint`.
-Tried and did not help: `--use-angle=vulkan`, `--disable-gpu-sandbox`,
-`--in-process-gpu`, and `xvfb-run` (a virtual display has no GPU).
+**Zero-copy is reachable, and the machine turns out to be up to it.** With a
+live X session on the box (a `startx` gnome-shell on tty1 is enough — see the
+recorded prerequisite below), CEF's `on_accelerated_paint` delivers a
+**single-plane BGRA_8888 dma-buf** with `DRM_FORMAT_MOD_LINEAR` and a per-frame
+file descriptor. Byte-identical output across six consecutive runs, no
+retry-flake. The wgpu-import half of R1 is still open, but the CEF half — "can
+this backend hand us a dma-buf at all" — is now yes.
+
+That result is **conditional on two things**, either of which absent gives the
+"never fires" outcome the earlier spike reported:
+
+1. **A live display session.** Chromium's compositor initializes ANGLE before
+   Vulkan takes over, and ANGLE's EGL backend on Linux requires an X (or
+   Wayland) display — even under `--ozone-platform=headless`. Without a session
+   the GPU process still exits with `Could not open the default X display` and
+   nothing paints. Not solvable from switches on this stack; `xvfb-run` gives a
+   display but no GPU.
+2. **`--enable-features=Vulkan --use-vulkan=native`** — Chromium's *native*
+   Vulkan renderer, distinct from `--use-angle=vulkan` (still ruled out; goes
+   through ANGLE). With the default ANGLE-on-GL backend the NVIDIA proprietary
+   driver hits `GL_FRAMEBUFFER_UNSUPPORTED` (`0x8CDD`) in ANGLE's
+   `FramebufferGL.cpp:1340 (checkStatus)` and Skia reports
+   `Unable to initialize SkSurface` — no frame lands on either callback.
+   ANGLE-on-GLES is not an option: it errors out with "Intel or NVIDIA OpenGL
+   ES drivers are not supported". `--use-cmd-decoder=validating` is silently
+   ignored. Native Vulkan is what bypasses the ANGLE FBO path and lets the
+   shared image be backed by a native pixmap (dma-buf).
 
 This is **not** the structural dead end WPE hit. `WPEDisplayHeadless` exposes no
 DRM device, so it could only *ever* hand over SHM, by construction. CEF's
 `cef_accelerated_paint_info_t` carries dma-buf fds per plane and the code path
-exists; what is missing is a display session with GPU access on this box.
-Answering it needs a real X11 or Wayland session on hardware with a working EGL
-display — and then the separate question of whether wgpu can import a dma-buf at
-all, which is risk R1 on #60 and explicitly not a blocker for shipping.
+delivers them here. Concrete numbers from the probe:
 
-## Four traps, all of which cost real time
+```
+[accel] on_accelerated_paint (shared_texture_enabled = 1, single-init)
+  PASS: dma-buf frame delivered
+    planes    1
+    fd        125
+    stride    3328 bytes                   # = 832 pixels * 4bpp, 32-pixel alignment for an 800px view
+    modifier  0x0 (DRM_FORMAT_MOD_LINEAR)
+    format    1 (CEF_COLOR_TYPE_BGRA_8888)
+```
+
+The wgpu-import half of R1 remains open and is explicitly not a blocker for
+shipping (#60). A downstream question this spike does not answer, but the
+`cef_accelerated_paint_info_t` header calls out: "Resources will be released
+to the underlying pool for reuse when the callback returns from client code" —
+so the fd is only valid inside the callback; a Vulkan/wgpu importer has to
+dup-and-fence-signal synchronously to hold the frame beyond that.
+
+### Prerequisite for the accel path on this box
+
+The box hosts CI runners and is dual-boot; the display session that made the
+result reproducible is:
+
+- User `bene` logged into tty1
+- `startx`-style Xorg + `gnome-session-binary` + `gnome-shell` running there
+- `DISPLAY=:0`, `XAUTHORITY=/home/bene/.Xauthority`, X access via
+  `SI:localuser:bene`
+
+Any SSH shell that inherits `DISPLAY` (or that `export DISPLAY=:0` and can read
+the same Xauthority) can reach it. No systemwide change was made; the session
+is `bene`'s tty1 login and can be undone with `pkill gnome-session-binary` +
+`pkill Xorg`.
+
+## Six traps, all of which cost real time
 
 Recorded because `belluikit/gocef` (belluikit/bellui#103) will hit each one
 again, and none of them fails in a way that names the actual problem.
@@ -96,9 +157,28 @@ again, and none of them fails in a way that names the actual problem.
   locked to the main thread, so the backend inherits this, but only for calls
   that actually go through `bellui.Do`.
 
-A fourth, smaller one: `helper.c` lives in its own directory because cgo
-compiles every `.c` file in a package directory, so a second `main()` beside
-`main.go` fails the link.
+- **`cef_initialize` is once-per-process, and there is no way around it.** The
+  first version of the accel probe called `cef_shutdown` then re-initialized
+  with `shared_texture_enabled=1` in the same process. That path dumps core on
+  the second `cef_initialize` — not on `cef_shutdown`, which succeeds — and
+  gives no diagnostic. The probe now runs the two phases as separate processes
+  (`./cefprobe` for CPU, `./cefprobe -accel-only …` for accel) and this trap
+  goes away. Any real backend has to pick one browser lifetime per process; the
+  original CEF documentation says as much but its C API surface makes it look
+  like a retry is possible.
+- **`--use-angle=<X>` doesn't cover NVIDIA the way it looks like it does.**
+  ANGLE's Linux backends are `gl`, `gl-egl`, `gles`, `vulkan`, `swiftshader`.
+  On NVIDIA proprietary: `gles` errors out with "Intel or NVIDIA OpenGL ES
+  drivers are not supported" (hardcoded rejection); `gl`/`gl-egl` build a
+  context but their shared-image FBOs are `GL_FRAMEBUFFER_UNSUPPORTED`;
+  `vulkan` goes through ANGLE-over-Vulkan and hits the same SkSurface init
+  failure. Only Chromium's *native* Vulkan renderer
+  (`--enable-features=Vulkan --use-vulkan=native`) works, and that is easy to
+  miss because the switch shape looks redundant with `--use-angle=vulkan`.
+
+A smaller one: `helper.c` lives in its own directory because cgo compiles every
+`.c` file in a package directory, so a second `main()` beside `main.go` fails
+the link.
 
 ### A false lead, recorded so it is not chased again
 
@@ -115,7 +195,7 @@ scrolling out of a clipping ancestor, and from the #59 focus bridge.
 
 | | |
 |---|---|
-| `main.go` | the probe: composite proof, frame cost, popup count, accelerated-paint attempt |
+| `main.go` | the probe: composite proof, frame cost, popup count, accelerated-paint attempt (`-accel-only`) |
 | `cef.c` / `cef.h` | the C shim — dlopen'd CEF C API, handler structs, the version handshake |
 | `helper/helper.c` | the subprocess helper (`cef_execute_process`), in its own directory |
 | `setup.sh` | fetch, verify, strip and lay out the pinned payload |
