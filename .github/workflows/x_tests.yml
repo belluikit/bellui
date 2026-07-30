@@ -1,0 +1,166 @@
+name: X Submodule Tests
+
+# The x/ umbrella modules (x/charts, x/dag, x/editor, x/mmedia, x/tables) are
+# each their own Go module, so the `./...` every other workflow runs from the
+# repository root stops at their boundary — `go build`, `go vet` and `go test`
+# are all package-based. Until this workflow existed nothing in CI built,
+# vetted or tested them: x/mmedia alone had five test packages that passed
+# locally and were never run again, and a compile error anywhere in x/ reached
+# main unnoticed (#91, #13).
+#
+# Deliberately NOT path-filtered on `x/**`. These modules are graded against
+# the toolkit code in *this* checkout (see "Resolve the toolkit from this
+# checkout"), so a change anywhere in the parent module can break them — which
+# is most of what this job is worth. cli_tests.yml can afford a path filter
+# because a CLI break is only a CLI break; here the cross-module edge is the
+# point.
+#
+# Still not covered here, and still tracked in #13: staticcheck, gocyclo and
+# `buf lint` for x/. Those carry real violations today (up to 67 gocyclo in
+# x/editor, see #18), so adding them now would gate on pre-existing debt
+# instead of on this PR. They are scoped out, not forgiven.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  # cancel superseded runs on PR/feature branches, but never on main
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  x_tests:
+    runs-on: ${{ matrix.runs-on }}
+    env:
+      # The module list, in one place: every step below iterates it.
+      X_MODULES: "charts dag editor mmedia tables"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux and macOS are the useful minimum. x/mmedia links FFmpeg
+          # through goffmpeg, which dlopens the prebuilt goffmpeg-libs slice
+          # for the target, so the leg is not free on every runner — these two
+          # are the platforms whose slices this fork actually exercises. A
+          # Windows leg is worth adding once dshow capture has been verified on
+          # hardware (nothing in the current tests needs a camera, but the
+          # device-selector code is the part a Windows leg would be for).
+          - platform: linux
+            runs-on: [self-hosted, Linux, ARM64]
+            # -a (auto-servernum) so parallel self-hosted runners on one box
+            # don't collide on Xvfb display :99.
+            runner: ./.github/scripts/xvfb-run-safe
+            # -tags gl: the pure-Go GL fallback, so this needs no GPU and no
+            # wgpu-native link. Mirrors the comprehensive leg in
+            # platform_tests.yml.
+            tags: gl,ci
+            coverage: true
+          - platform: macos
+            runs-on: [self-hosted, macOS, ARM64]
+            runner: ""
+            tags: gl,no_glfw,ci
+            # The Linux leg owns the coverage gate; running it twice would just
+            # spend minutes to assert the same numbers.
+            coverage: false
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Assert go-plus toolchain
+        run: |
+          go version
+          go version | grep -qE '\(plus[ )]' || { echo "::error::runner go is not the go-plus fork"; exit 1; }
+
+      - name: Get dependencies
+        run: |
+          flock /tmp/bellui-ci-apt.lock sudo apt-get -o DPkg::Lock::Timeout=600 update
+          flock /tmp/bellui-ci-apt.lock sudo apt-get -o DPkg::Lock::Timeout=600 install --no-install-recommends bc clang lld libgl1-mesa-dev libwayland-dev libx11-dev libxkbcommon-dev xorg-dev xvfb language-pack-en
+          echo "CC=clang" >> "$GITHUB_ENV"
+          echo "CGO_LDFLAGS=-fuse-ld=lld" >> "$GITHUB_ENV"
+        if: ${{ runner.os == 'Linux' }}
+
+      - name: Set environment variable LANG
+        run: export LANG=en_EN.UTF-8
+        if: ${{ runner.os == 'Linux' }}
+
+      # Every x/ module `require`s a *released* toolkit (v1.0.0-rc.5), not the
+      # working tree. Left alone, this leg would grade them against code that is
+      # weeks old and could not catch a parent-module break at all — the second
+      # of the two consequences #91 spells out. An ephemeral replace, never
+      # committed, points them at this checkout, exactly as cli_tests.yml does
+      # for cmd/bellui. The committed pin stays put so `go get` still resolves
+      # for consumers.
+      #
+      # The flip side is real and is not covered here: nothing now tests an x/
+      # module against the release it actually pins, so a fix that needs both
+      # sides still has to be sequenced through a release. That is a property of
+      # the pin, not of this job.
+      - name: Resolve the toolkit from this checkout
+        run: |
+          set -e
+          for m in $X_MODULES; do
+            (cd "x/$m" && go mod edit -replace github.com/belluikit/bellui=../..)
+          done
+          git diff --stat -- 'x/*/go.mod'
+
+      - name: Build, vet and test each x/ module
+        run: |
+          set -e
+          runner=""
+          if [ -n "${{ matrix.runner }}" ]; then runner="$PWD/${{ matrix.runner }}"; fi
+          for m in $X_MODULES; do
+            echo "::group::x/$m"
+            (
+              set -e
+              cd "x/$m"
+              go build ./...
+              go vet ./...
+              $runner go test -race -tags "${{ matrix.tags }}" \
+                -covermode=atomic -coverprofile=coverage.out ./...
+            )
+            echo "::endgroup::"
+          done
+
+      # Per-module floors rather than the main module's 62%, which none of these
+      # would have any reason to meet: they are five unrelated bodies of code
+      # that happen to share a directory, and x/editor sits near 90% while
+      # x/mmedia — half of it FFmpeg and audio-device plumbing that cannot run
+      # unattended — sits near 54%. One number across all five would either
+      # rubber-stamp the high ones or block the low ones from merging anything.
+      #
+      # Each floor is set a couple of points under the figure the module
+      # reported when this landed (charts 56.1, dag 68.7, editor 88.5,
+      # mmedia 54.2, tables 69.0), measured on macOS/arm64. The slack absorbs
+      # arch and platform variance — there is almost no GOOS-conditional code in
+      # x/, so it should be small — and the gate is a ratchet against
+      # regression, not a target. Raise a floor when a module clears it durably.
+      - name: Coverage floors
+        if: ${{ matrix.coverage }}
+        run: |
+          set -e
+          fail=0
+          for m in $X_MODULES; do
+            case "$m" in
+              charts) floor=54 ;;
+              dag)    floor=66 ;;
+              editor) floor=86 ;;
+              mmedia) floor=52 ;;
+              tables) floor=67 ;;
+              *) echo "::error::no coverage floor recorded for x/$m — add one here"; exit 1 ;;
+            esac
+            cov=$(cd "x/$m" && go tool cover -func coverage.out | grep total | tr -s '\t' | cut -f 3 | tr -d '%')
+            printf 'x/%-7s %6s%%  (floor %s%%)\n' "$m" "$cov" "$floor"
+            if (( $(echo "$cov < $floor" | bc) )); then
+              echo "::error::x/$m test coverage ${cov}% is below its floor of ${floor}%"
+              fail=1
+            fi
+          done
+          exit $fail
