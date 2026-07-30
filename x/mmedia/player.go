@@ -128,6 +128,13 @@ func newMediaPlayerFromPipeline(pipe *pipeline.Pipeline, o *options) (*MediaPlay
 	})
 
 	pipe.SetOnError(func(err error) {
+		// A live capture reports a lost device here rather than through OnEnd, so
+		// this is the only place the transport learns that playback stopped.
+		if pipe.IsLive() {
+			bellui.Do(func() {
+				mp.controls.SetPlaying(false)
+			})
+		}
 		if o.onError != nil {
 			o.onError(err)
 		}

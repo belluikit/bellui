@@ -13,6 +13,9 @@ type options struct {
 	onEnd    func()
 	onError  func(error)
 	onTime   func(current, total time.Duration)
+	// captureOptions is forwarded to libavdevice when opening a capture device;
+	// it has no meaning for file or url playback.
+	captureOptions string
 }
 
 // buildOptions applies the functional options over the defaults.
@@ -38,9 +41,25 @@ func WithAutoPlay() Option {
 }
 
 // WithLoop enables looping playback.
+//
+// It has no effect on a capture player: a camera has no end to loop back from,
+// and the end of a live stream is reported as an error rather than as completed
+// playback.
 func WithLoop() Option {
 	return func(o *options) {
 		o.loop = true
+	}
+}
+
+// WithCaptureOptions forwards a comma-separated "key=value" list to libavdevice
+// when opening a capture device, for example "framerate=30,pixel_format=nv12".
+// The accepted keys are the device format's own, and differ per platform.
+//
+// It is ignored by the file, reader and url constructors, which have no device to
+// configure.
+func WithCaptureOptions(deviceOptions string) Option {
+	return func(o *options) {
+		o.captureOptions = deviceOptions
 	}
 }
 
