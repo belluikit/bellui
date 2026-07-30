@@ -14,6 +14,10 @@ import (
 // volumeBarWidth is the on-screen width of the volume slider.
 const volumeBarWidth = 120
 
+// liveLabel marks a source with no duration, where a position fraction is
+// meaningless. SetTime keeps it in front of the elapsed time.
+const liveLabel = "live"
+
 // TransportControls provides play/pause, seek, mute, volume, and time display
 // controls.
 type TransportControls struct {
@@ -65,7 +69,16 @@ func NewTransportControls() *TransportControls {
 
 	tc.seekBar = widget.NewSlider(0, 1)
 	tc.seekBar.Step = 0.001
+	// Dragging only previews. OnChanged fires on every drag increment, and with
+	// Step = 0.001 one gesture across a long video produces hundreds of them —
+	// each a full seek, which decodes and discards frames up to the target while
+	// holding the pipeline's decode lock. The label moves here; the seek waits.
 	tc.seekBar.OnChanged = func(v float64) {
+		tc.previewTime(v)
+	}
+	// OnChangeEnded fires once, on DragEnd or Tapped, so a whole gesture costs
+	// exactly one seek.
+	tc.seekBar.OnChangeEnded = func(v float64) {
 		if tc.OnSeek != nil && tc.duration > 0 {
 			tc.OnSeek(time.Duration(v * float64(tc.duration)))
 		}
@@ -115,35 +128,57 @@ func (tc *TransportControls) SetPlaying(playing bool) {
 	}
 }
 
-// SetTime updates the time display and seek bar position.
+// SetTime updates the time display and seek bar position. It runs from the
+// pipeline's ticker, several times a second.
+//
+// While the user is scrubbing it updates neither: moving the thumb would pull it
+// out from under the pointer, and rewriting the label would erase the scrub
+// preview. The duration is still recorded, since the seek on release converts
+// through it.
 func (tc *TransportControls) SetTime(current, total time.Duration) {
-	if total <= 0 {
-		// Live source: elapsed time is meaningful, a position fraction is not.
-		tc.timeLabel.SetText(formatDuration(current))
+	if total > 0 {
+		tc.duration = total
+	}
+	if tc.seekBar.Dragging() {
 		return
 	}
-	tc.duration = total
-	tc.timeLabel.SetText(fmt.Sprintf("%s / %s", formatDuration(current), formatDuration(total)))
-	if total > 0 {
-		tc.seekBar.Value = float64(current) / float64(total)
-		tc.seekBar.Refresh()
+
+	if total <= 0 {
+		// Live source: elapsed time is meaningful, a position fraction is not.
+		// The marker SetSeekable put here is kept alongside it — this runs every
+		// tick, so writing the elapsed time alone would erase it immediately.
+		tc.timeLabel.SetText(liveLabel + " · " + formatDuration(current))
+		return
 	}
+	tc.timeLabel.SetText(fmt.Sprintf("%s / %s", formatDuration(current), formatDuration(total)))
+	// Silently: this is the player advancing its own position bar, not the user
+	// seeking, and SetValue would be indistinguishable from the latter.
+	tc.seekBar.SetValueSilently(float64(current) / float64(total))
+}
+
+// previewTime shows where a scrub would land, without seeking there.
+func (tc *TransportControls) previewTime(v float64) {
+	if tc.duration <= 0 {
+		return
+	}
+	at := time.Duration(v * float64(tc.duration))
+	tc.timeLabel.SetText(fmt.Sprintf("%s / %s", formatDuration(at), formatDuration(tc.duration)))
 }
 
 // SetVolume updates the volume slider position without firing OnVolume.
 func (tc *TransportControls) SetVolume(v float64) {
-	tc.volumeBar.Value = v
-	tc.volumeBar.Refresh()
+	tc.volumeBar.SetValueSilently(v)
 	tc.setMuted(v <= 0)
 	if v > 0 {
 		tc.preMute = v
 	}
 }
 
-// applyVolume moves the slider and notifies, used by the mute toggle.
+// applyVolume moves the slider and notifies, used by the mute toggle. The move
+// itself is silent and OnVolume is called directly: the notification belongs to
+// the button press, not to the slider having been repositioned.
 func (tc *TransportControls) applyVolume(v float64) {
-	tc.volumeBar.Value = v
-	tc.volumeBar.Refresh()
+	tc.volumeBar.SetValueSilently(v)
 	tc.setMuted(v <= 0)
 	if tc.OnVolume != nil {
 		tc.OnVolume(v)
@@ -169,15 +204,14 @@ func (tc *TransportControls) SetSeekable(seekable bool) {
 		return
 	}
 	tc.seekBar.Disable()
-	tc.timeLabel.SetText("live")
+	tc.timeLabel.SetText(liveLabel)
 }
 
 // Reset returns the seek bar and time display to the start. Stopping halts the
 // pipeline's time updates, so without this the bar keeps the position it had
 // when playback stopped.
 func (tc *TransportControls) Reset() {
-	tc.seekBar.Value = 0
-	tc.seekBar.Refresh()
+	tc.seekBar.SetValueSilently(0)
 	tc.timeLabel.SetText(fmt.Sprintf("%s / %s", formatDuration(0), formatDuration(tc.duration)))
 }
 
