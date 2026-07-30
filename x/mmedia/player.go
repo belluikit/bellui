@@ -1,6 +1,7 @@
 package mmedia
 
 import (
+	"errors"
 	"io"
 	"sync"
 	"time"
@@ -23,9 +24,14 @@ type MediaPlayer struct {
 	mu       sync.Mutex
 	pipe     *pipeline.Pipeline
 	surface  *videoSurface
+	aspect   *aspectLayout
 	controls *TransportControls
 	opts     *options
 	loop     bool
+
+	// capture is set only for a player opened on a capture device, and is what
+	// SetCaptureDevice needs to reopen on another one. Guarded by mu.
+	capture *captureBinding
 
 	hasVideo bool
 	minSize  geo.Size
@@ -83,6 +89,10 @@ func newMediaPlayerFromPipeline(pipe *pipeline.Pipeline, o *options) (*MediaPlay
 	// in place rather than rebuilding it every frame.
 	vw, vh := pipe.VideoSize()
 	mp.surface = newVideoSurface(vw, vh)
+	// Held as a field rather than built inside CreateRenderer: a capture device
+	// switch can change the video geometry, and the letterboxing has to follow
+	// it without rebuilding the widget tree.
+	mp.aspect = &aspectLayout{width: vw, height: vh}
 
 	// Create transport controls.
 	mp.controls = NewTransportControls()
@@ -213,6 +223,100 @@ func (mp *MediaPlayer) SetLoop(loop bool) {
 	mp.loop = loop
 }
 
+// ErrNotACapturePlayer reports SetCaptureDevice called on a player that is
+// showing a file, a reader or a url. There is no device to switch away from,
+// and silently doing nothing would leave a picker looking as though it worked.
+var ErrNotACapturePlayer = errors.New("mmedia: this player was not opened on a capture device")
+
+// SetCaptureDevice switches a capture player to another camera without
+// rebuilding it, so the widget keeps its place, its size and its focus.
+//
+// device follows NewCapturePlayer's rules: a device name, a positional index as
+// a string on macOS, or "" for the platform default. Switching to the device
+// already showing is a no-op and reports no error.
+//
+// A failure leaves the player on the device it has, still running. The new
+// device is opened before the old one is released, which is what makes that
+// possible — and is also why switching to a camera some other application holds
+// fails cleanly rather than losing the one being shown. The cost is that the two
+// devices are briefly open together; every platform here allows that for two
+// *different* devices, and the same-device case is the no-op above.
+//
+// This blocks for as long as the device takes to open and the pipeline takes to
+// come to rest — comfortably long enough to be visible if it runs on the main
+// goroutine, so call it from a goroutine. It is safe to do so: the widget
+// updates it makes are marshalled back. CaptureSelect already does this.
+func (mp *MediaPlayer) SetCaptureDevice(device string) error {
+	mp.mu.Lock()
+	defer mp.mu.Unlock()
+
+	if mp.capture == nil {
+		return ErrNotACapturePlayer
+	}
+	url, err := resolveCaptureDevice(mp.capture.format, device)
+	if err != nil {
+		return err
+	}
+	if url == mp.capture.url {
+		return nil
+	}
+
+	src, err := openCaptureSource(mp.capture.format, url, mp.capture.options)
+	if err != nil {
+		return err
+	}
+	if err := mp.pipe.SwapSource(src); err != nil {
+		// The pipeline refused it, so nothing else will ever close it. Releasing
+		// here is the difference between a rejected switch and a leaked camera.
+		src.Close()
+		return err
+	}
+
+	mp.capture.url = url
+	mp.applyVideoGeometry()
+	return nil
+}
+
+// CaptureDevice reports the selector of the device this player is showing, or
+// "" if it was not opened on one.
+func (mp *MediaPlayer) CaptureDevice() string {
+	mp.mu.Lock()
+	defer mp.mu.Unlock()
+	if mp.capture == nil {
+		return ""
+	}
+	return mp.capture.url
+}
+
+// applyVideoGeometry resizes the video surface and the letterboxing to whatever
+// the pipeline is now producing.
+//
+// A new camera is under no obligation to match the old one's resolution, and
+// two things downstream are sized from it: the surface's pixel buffers, which
+// would otherwise truncate or leave a stale tail of the previous frame, and the
+// aspect layout, which would otherwise letterbox to the wrong ratio. Both are
+// mutated in place — rebuilding them would mean rebuilding the widget tree,
+// which is the flicker this whole path exists to avoid.
+//
+// Called with mp.mu held, from whichever goroutine drove the switch; the widget
+// work inside hops to the main goroutine on its own.
+func (mp *MediaPlayer) applyVideoGeometry() {
+	if !mp.hasVideo {
+		return
+	}
+	w, h := mp.pipe.VideoSize()
+	if w <= 0 || h <= 0 {
+		return
+	}
+	mp.minSize = geo.NewSize(float32(w), float32(h)+48)
+	mp.surface.resize(w, h)
+
+	bellui.Do(func() {
+		mp.aspect.width, mp.aspect.height = w, h
+		mp.Refresh()
+	})
+}
+
 // PlaybackStats holds real-time performance metrics.
 type PlaybackStats = pipeline.PlaybackStats
 
@@ -231,10 +335,9 @@ func (mp *MediaPlayer) Close() {
 func (mp *MediaPlayer) CreateRenderer() core.WidgetRenderer {
 	var content *bellui.Container
 	if mp.hasVideo {
-		vw, vh := mp.pipe.VideoSize()
 		// Raster always stretches, so the aspect ratio is preserved by the
 		// layout instead of by a fill mode.
-		video := container.New(&aspectLayout{width: vw, height: vh}, mp.surface.Object())
+		video := container.New(mp.aspect, mp.surface.Object())
 		content = container.New(
 			layout.NewBorderLayout(nil, mp.controls, nil, nil),
 			mp.controls,

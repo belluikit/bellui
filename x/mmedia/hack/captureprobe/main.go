@@ -14,6 +14,9 @@
 //	go run . -index 1
 //	go run . -auto                  # scripted: report and exit, no interaction
 //	go run . -options framerate=30,pixel_format=nv12
+//	go run . -scan 4                # probe for cameras by opening indices (#96)
+//	go run . -picker                # the CaptureSelect widget, switching live
+//	go run . -auto -switchto 1      # scripted device switch on real hardware (#96)
 //
 // What -auto checks, and what each answer means:
 //
@@ -24,6 +27,14 @@
 //     av_seek_frame
 //   - Stop then Play            Stop releases the device (camera light out,
 //     other apps can claim it) and Play reacquires it
+//   - switching to the same     a no-op, reported as success, nothing torn down
+//     device
+//   - switching to a device     fails, and leaves the player capturing from the
+//     that cannot be opened     device it already had (#96)
+//
+// -picker is the part unit tests cannot reach: two cameras, a dropdown, and the
+// video surface following a resolution change without the widget being rebuilt.
+// It needs a machine with more than one camera to be worth anything.
 //
 // Platform notes worth knowing before reading a failure as a bug:
 //
@@ -42,6 +53,13 @@
 //   - Linux: a UVC camera exposes a metadata node beside its real one. Opening
 //     the wrong node blocks indefinitely rather than failing, which is why
 //     device choice filters on HasMedia.
+//   - -scan reports what opened, not what is a camera. On macOS the positional
+//     list runs past the cameras into screen-capture inputs, so an entry whose
+//     geometry matches the display probably is the display. Seen here: index 2
+//     at 3840x2160 against a 3840x2160 screen. See ProbeCaptureDevices.
+//   - An index is not stable. On this machine index 0 changed device between two
+//     runs minutes apart, which is what a Continuity Camera joining the list
+//     does. Re-scan rather than remembering a number.
 package main
 
 import (
@@ -49,6 +67,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"runtime"
 	"strconv"
 	"sync/atomic"
 	"time"
@@ -65,18 +84,32 @@ import (
 
 func main() {
 	var (
-		list    = flag.Bool("list", false, "enumerate capture devices and exit")
-		device  = flag.String("device", "", "device name (empty = platform default)")
-		index   = flag.Int("index", -1, "open the nth video device instead of -device")
-		auto    = flag.Bool("auto", false, "scripted run: report and exit")
-		options = flag.String("options", "", "libavdevice options, e.g. framerate=30")
-		dwell   = flag.Duration("dwell", 3*time.Second, "how long -auto captures for")
-		raw     = flag.Bool("raw", false, "bypass the pipeline: open via goffmpeg and report what the device declares")
+		list     = flag.Bool("list", false, "enumerate capture devices and exit")
+		device   = flag.String("device", "", "device name (empty = platform default)")
+		index    = flag.Int("index", -1, "open the nth video device instead of -device")
+		auto     = flag.Bool("auto", false, "scripted run: report and exit")
+		options  = flag.String("options", "", "libavdevice options, e.g. framerate=30")
+		dwell    = flag.Duration("dwell", 3*time.Second, "how long -auto captures for")
+		raw      = flag.Bool("raw", false, "bypass the pipeline: open via goffmpeg and report what the device declares")
+		scan     = flag.Int("scan", 0, "probe this many device indices and exit (#96); each is a real device open")
+		picker   = flag.Bool("picker", false, "show the CaptureSelect widget over a live player and switch devices")
+		switchTo = flag.String("switchto", "",
+			"selector of a second device for -auto to switch to mid-run, exercising SwapSource on real hardware (#96)")
 	)
 	flag.Parse()
 
 	if *list {
 		listDevices()
+		return
+	}
+	if *scan > 0 {
+		if !scanDevices(*scan) {
+			os.Exit(1)
+		}
+		return
+	}
+	if *picker {
+		pickerRun(*device, *index, *options)
 		return
 	}
 	if *raw {
@@ -86,7 +119,7 @@ func main() {
 		return
 	}
 	if *auto {
-		if !autoRun(*device, *index, *options, *dwell) {
+		if !autoRun(*device, *index, *options, *dwell, *switchTo) {
 			os.Exit(1)
 		}
 		return
@@ -127,7 +160,92 @@ func listDevices() {
 	}
 }
 
-func autoRun(device string, index int, options string, dwell time.Duration) bool {
+// scanDevices exercises ProbeCaptureDevices, which on macOS is the only route to
+// a camera list at all. Standalone rather than folded into -auto: a probe cannot
+// open a device another application holds, so running it while this probe has a
+// camera live would report that camera as absent — which is exactly the caveat
+// worth seeing rather than being surprised by.
+func scanDevices(max int) bool {
+	fmt.Printf("[SCAN] probing %d index/indices — each is a real device open and lights the indicator\n", max)
+	start := time.Now()
+	devs, err := mmedia.ProbeCaptureDevices(max)
+	elapsed := time.Since(start)
+	if err != nil {
+		fmt.Printf("[SCAN] FAILED after %v: %v\n", elapsed.Round(time.Millisecond), err)
+		return false
+	}
+	fmt.Printf("[SCAN] %d device(s) in %v:\n", len(devs), elapsed.Round(time.Millisecond))
+	for _, d := range devs {
+		def := ""
+		if d.Default {
+			def = "  (default)"
+		}
+		fmt.Printf("  %-20s selector=%-10s%s\n", d.Label(), d.Name, def)
+	}
+	return true
+}
+
+// pickerRun is the interactive half of #96: a CaptureSelect over a live player,
+// switching device without the widget being rebuilt. Worth running on a machine
+// with two cameras of different resolutions, which is where the surface resize
+// and the letterboxing change are actually visible.
+func pickerRun(device string, index int, options string) {
+	a := app.New()
+	w := a.NewWindow("captureprobe — device picker")
+
+	status := widget.NewLabel("opening…")
+	p, err := openCounting(device, index, options, new(atomic.Int64), new(atomic.Value))
+	if err != nil {
+		w.SetContent(container.NewVBox(
+			widget.NewLabel("could not open the capture device:"),
+			widget.NewLabel(err.Error()),
+		))
+		w.Resize(geo.NewSize(560, 160))
+		bellui.ShowAndRun(w)
+		return
+	}
+	defer p.Close()
+
+	describe := func() string {
+		vw, vh := p.VideoSize()
+		return fmt.Sprintf("device=%q  %dx%d  playing=%v", p.CaptureDevice(), vw, vh, p.IsPlaying())
+	}
+	status.SetText(describe())
+
+	sel := mmedia.NewCaptureSelect(nil)
+	sel.OnChosen = func(d mmedia.CaptureDevice) {
+		// SetCaptureDevice blocks on a device open and on the pipeline coming to
+		// rest, so it must not run on the main goroutine — which is exactly the
+		// discipline an application has to follow, so the probe follows it too.
+		go func() {
+			start := time.Now()
+			err := p.SetCaptureDevice(d.Name)
+			took := time.Since(start).Round(time.Millisecond)
+			bellui.Do(func() {
+				if err != nil {
+					status.SetText(fmt.Sprintf("switch to %q failed after %v: %v — %s",
+						d.Name, took, err, describe()))
+					return
+				}
+				sel.SetCurrent(d)
+				status.SetText(fmt.Sprintf("switched in %v — %s", took, describe()))
+			})
+		}()
+	}
+	// Keep the camera already in use listed: a probe cannot reopen it, so
+	// without this it would vanish from its own picker on the first scan.
+	sel.SetCurrent(mmedia.CaptureDevice{
+		Name: p.CaptureDevice(), Description: "in use: " + p.CaptureDevice(), HasVideo: true,
+	})
+
+	w.SetContent(container.NewBorder(
+		container.NewVBox(sel, status), nil, nil, nil, p,
+	))
+	w.Resize(geo.NewSize(760, 680))
+	bellui.ShowAndRun(w)
+}
+
+func autoRun(device string, index int, options string, dwell time.Duration, switchTo string) bool {
 	a := app.New()
 	w := a.NewWindow("captureprobe")
 
@@ -195,6 +313,68 @@ func autoRun(device string, index int, options string, dwell time.Duration) bool
 
 		if err, _ := captureErr.Load().(error); err != nil {
 			report(false, "reacquire reported: %v", err)
+		}
+
+		// Device switching (#96). A machine with one camera cannot show a real
+		// switch, but it can show the two properties that matter most when one
+		// goes wrong: the no-op, and that a failed switch is survivable.
+		held := p.CaptureDevice()
+		if err := p.SetCaptureDevice(held); err != nil {
+			report(false, "switching to the device already in use: %v", err)
+		} else {
+			report(p.CaptureDevice() == held,
+				"switching to the device already in use is a no-op (still %q)", p.CaptureDevice())
+		}
+
+		beforeSwitch := frames.Load()
+		missing := "no-such-camera-9"
+		if runtime.GOOS == "darwin" {
+			// avfoundation takes a positional selector, so an index past the end
+			// is the way to name a device that cannot be opened.
+			missing = "99"
+		}
+		switchErr := p.SetCaptureDevice(missing)
+		report(switchErr != nil, "switching to an unopenable device fails rather than succeeding quietly")
+		report(p.CaptureDevice() == held,
+			"a failed switch left the player on its previous device (%q)", p.CaptureDevice())
+		time.Sleep(time.Second)
+		report(frames.Load() > beforeSwitch,
+			"the player is still capturing after a failed switch: %d more frame update(s)",
+			frames.Load()-beforeSwitch)
+		if switchErr != nil {
+			fmt.Printf("[INFO] the failure reported: %v\n", switchErr)
+		}
+
+		// A real switch, if the operator named a second device. This is the one
+		// check that needs hardware nothing can stand in for: the pipeline
+		// exchanging its source while the widget above it stays put.
+		if switchTo != "" {
+			wasW, wasH := p.VideoSize()
+			atSwitch := frames.Load()
+			start := time.Now()
+			err := p.SetCaptureDevice(switchTo)
+			took := time.Since(start).Round(time.Millisecond)
+
+			if err != nil {
+				report(false, "switching to %q: %v", switchTo, err)
+			} else {
+				report(p.CaptureDevice() == switchTo,
+					"switched to %q in %v (now %q)", switchTo, took, p.CaptureDevice())
+
+				nowW, nowH := p.VideoSize()
+				fmt.Printf("[INFO] geometry %dx%d -> %dx%d\n", wasW, wasH, nowW, nowH)
+				report(nowW > 0 && nowH > 0, "the new device reported a usable geometry")
+
+				time.Sleep(2 * time.Second)
+				report(frames.Load() > atSwitch,
+					"the new device is producing frames: %d update(s) since the switch",
+					frames.Load()-atSwitch)
+				report(p.IsPlaying(), "playback resumed on the new device without a restart")
+
+				if e, _ := captureErr.Load().(error); e != nil {
+					report(false, "the switched-to device reported: %v", e)
+				}
+			}
 		}
 
 		fmt.Println("[AUTO] done")

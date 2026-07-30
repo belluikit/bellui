@@ -18,6 +18,11 @@
 // data — HLS, RTSP, RTMP — or that needs range-request seeking within a network
 // stream.
 //
+// [NewCapturePlayer] opens a camera instead of a recording, with the same widget
+// and controls around it. [CaptureSelect] is the picker for choosing between
+// cameras, and [MediaPlayer.SetCaptureDevice] switches one for another inside
+// the running player rather than rebuilding it.
+//
 // [NewVideoPlayer] and [NewAudioPlayer] expose the single-medium widgets, and
 // [NewSubtitleOverlay] renders SRT or WebVTT tracks over a player;
 // [MediaPlayerWithSubtitles] wires the two together so the overlay follows
