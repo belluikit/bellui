@@ -17,6 +17,10 @@ type fakeDecoder struct {
 	nexts    int
 	duration float64
 	nextErr  error
+	// leadingAudio is how many audio packets Next yields before the first video
+	// frame, so a reader that assumes the first packet after a seek is video can
+	// be caught. Interleaved containers make that the common case, not an edge.
+	leadingAudio int
 }
 
 func (f *fakeDecoder) VideoInfo() goffmpeg.VideoInfo {
@@ -34,6 +38,10 @@ func (f *fakeDecoder) Next() (goffmpeg.MediaType, error) {
 	f.nexts++
 	if f.nextErr != nil {
 		return goffmpeg.MediaTypeNone, f.nextErr
+	}
+	if f.leadingAudio > 0 {
+		f.leadingAudio--
+		return goffmpeg.MediaTypeAudio, nil
 	}
 	return goffmpeg.MediaTypeVideo, nil
 }
