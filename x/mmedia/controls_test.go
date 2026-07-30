@@ -4,8 +4,125 @@ import (
 	"testing"
 	"time"
 
+	"github.com/belluikit/bellui/event"
+	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/theme"
 )
+
+// dragSeekBarToEnd drives a real drag gesture rather than calling the callbacks
+// directly, so the Dragging() guard is exercised the way the driver drives it.
+// The position is mapped through the slider's own ratio calculation, where any x
+// beyond the right-hand end offset lands on 1.0 — so this needs no knowledge of
+// the theme's padding.
+func dragSeekBarToEnd(tc *TransportControls) {
+	tc.seekBar.Resize(geo.NewSize(200, tc.seekBar.MinSize().Height))
+	tc.seekBar.Dragged(&event.DragEvent{
+		PointEvent: event.PointEvent{Position: geo.NewPos(1000, 0)},
+	})
+}
+
+// TestSeekBarDragIssuesOneSeekOnRelease covers the first half of the reported
+// bug: OnChanged fires on every drag increment, and each one used to run a full
+// seek — av_seek_frame plus decode-and-discard to the target, hundreds deep
+// behind a single gesture.
+func TestSeekBarDragIssuesOneSeekOnRelease(t *testing.T) {
+	tc := NewTransportControls()
+	var seeks []time.Duration
+	tc.OnSeek = func(pos time.Duration) { seeks = append(seeks, pos) }
+	tc.SetTime(0, time.Minute)
+
+	dragSeekBarToEnd(tc)
+	if len(seeks) != 0 {
+		t.Fatalf("dragging issued %d seek(s), want none until release: %v", len(seeks), seeks)
+	}
+	if !tc.seekBar.Dragging() {
+		t.Fatal("precondition: slider should report itself as dragging")
+	}
+	// The label previews the target while the drag is in flight.
+	if got, want := tc.timeLabel.Text, "01:00 / 01:00"; got != want {
+		t.Errorf("preview label = %q, want %q", got, want)
+	}
+
+	tc.seekBar.DragEnd()
+	if len(seeks) != 1 {
+		t.Fatalf("release issued %d seek(s), want exactly 1: %v", len(seeks), seeks)
+	}
+	if seeks[0] != time.Minute {
+		t.Errorf("seek target = %v, want %v", seeks[0], time.Minute)
+	}
+}
+
+// TestSeekBarHoldsThumbWhileDragging covers the second half: SetTime runs from
+// the pipeline ticker several times a second and used to overwrite whatever the
+// user had dragged to, so the thumb jumped out from under the pointer.
+func TestSeekBarHoldsThumbWhileDragging(t *testing.T) {
+	tc := NewTransportControls()
+	tc.SetTime(0, time.Minute)
+	dragSeekBarToEnd(tc)
+
+	dragged := tc.seekBar.Value
+	tc.SetTime(15*time.Second, time.Minute) // a tick arriving mid-gesture
+
+	if tc.seekBar.Value != dragged {
+		t.Errorf("thumb moved to %v mid-drag, want it held at %v", tc.seekBar.Value, dragged)
+	}
+	if got, want := tc.timeLabel.Text, "01:00 / 01:00"; got != want {
+		t.Errorf("label = %q mid-drag, want the preview %q to survive the tick", got, want)
+	}
+}
+
+// TestSeekBarResumesAfterRelease checks the guard actually clears — Dragging()
+// is cleared in DragEnd before OnChangeEnded runs, so ticks must land again
+// immediately afterwards.
+func TestSeekBarResumesAfterRelease(t *testing.T) {
+	tc := NewTransportControls()
+	tc.SetTime(0, time.Minute)
+	dragSeekBarToEnd(tc)
+	tc.seekBar.DragEnd()
+
+	tc.SetTime(30*time.Second, time.Minute)
+	if got, want := tc.seekBar.Value, 0.5; got != want {
+		t.Errorf("thumb = %v after release, want ticks to move it to %v", got, want)
+	}
+	if got, want := tc.timeLabel.Text, "00:30 / 01:00"; got != want {
+		t.Errorf("label = %q after release, want %q", got, want)
+	}
+}
+
+// TestSeekBarTapSeeksOnce guards the other gesture that commits: a tap fires
+// OnChanged and OnChangeEnded together, and must still produce one seek.
+func TestSeekBarTapSeeksOnce(t *testing.T) {
+	tc := NewTransportControls()
+	var seeks []time.Duration
+	tc.OnSeek = func(pos time.Duration) { seeks = append(seeks, pos) }
+	tc.SetTime(0, time.Minute)
+
+	tc.seekBar.Resize(geo.NewSize(200, tc.seekBar.MinSize().Height))
+	tc.seekBar.Tapped(&event.PointEvent{Position: geo.NewPos(1000, 0)})
+
+	if len(seeks) != 1 {
+		t.Fatalf("tap issued %d seek(s), want exactly 1: %v", len(seeks), seeks)
+	}
+	if seeks[0] != time.Minute {
+		t.Errorf("seek target = %v, want %v", seeks[0], time.Minute)
+	}
+}
+
+// TestLiveLabelSurvivesTimeUpdates covers the adjacent defect: SetSeekable put
+// "live" in the label, and the next tick replaced it with a bare elapsed time,
+// so the marker was never visible in practice.
+func TestLiveLabelSurvivesTimeUpdates(t *testing.T) {
+	tc := NewTransportControls()
+	tc.SetSeekable(false)
+	if got, want := tc.timeLabel.Text, "live"; got != want {
+		t.Fatalf("label = %q after SetSeekable(false), want %q", got, want)
+	}
+
+	tc.SetTime(7*time.Second, 0)
+	if got, want := tc.timeLabel.Text, "live · 00:07"; got != want {
+		t.Errorf("label = %q after a tick, want %q", got, want)
+	}
+}
 
 // TestMuteButtonTogglesVolume covers the reported bug: the speaker was a
 // static widget.NewIcon, so there was no mute control at all.
