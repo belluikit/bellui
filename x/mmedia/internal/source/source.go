@@ -47,3 +47,28 @@ type Source interface {
 	// Close releases resources.
 	Close()
 }
+
+// LiveSource is an optional capability, asserted rather than required: a source
+// that is an open-ended capture — a camera, a microphone, a live stream — rather
+// than a finite recording. A source that does not implement it is finite.
+//
+// It exists because a live source breaks two assumptions the rest of the
+// pipeline makes about a file. Duration is 0 and Seek has no timeline to move
+// within; and the stream is not supposed to run out, so reaching the end of one
+// means the device was lost rather than that playback completed.
+type LiveSource interface {
+	Source
+
+	// IsLive reports whether this source is an open-ended capture.
+	IsLive() bool
+}
+
+// ErrorSource is an optional capability: a source that can say why it stopped
+// producing media. The pipeline uses it to report a lost capture device with its
+// actual cause — "device in use by another application" is the common one, and
+// is worth a great deal more to a caller than a generic failure.
+type ErrorSource interface {
+	// Err returns the error that stopped the source, or nil if it stopped
+	// cleanly or is still running.
+	Err() error
+}

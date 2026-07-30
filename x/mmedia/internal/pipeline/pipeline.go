@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"errors"
 	"fmt"
 	"image"
 	"io"
@@ -57,6 +58,9 @@ type Pipeline struct {
 
 	hasVideo bool
 	hasAudio bool
+	// live marks an open-ended capture source: no duration, no seeking, and no
+	// end of stream that means playback finished.
+	live bool
 
 	onFrame OnFrameFunc
 	onTime  OnTimeFunc
@@ -151,6 +155,21 @@ func NewPipelineURL(url string, cfg ...Config) (*Pipeline, error) {
 	return newPipelineForSource(src, firstConfig(cfg)), nil
 }
 
+// NewPipelineDevice creates a playback pipeline over a live capture device.
+// format, url and options are the per-platform libavdevice contract; see
+// source.NewFFmpegSourceDevice, and the public capture entry points for the
+// resolution of platform naming.
+//
+// The resulting pipeline reports IsLive: Seek is refused, and the end of the
+// stream is reported through OnError rather than OnEnd.
+func NewPipelineDevice(format, url, options string, cfg ...Config) (*Pipeline, error) {
+	src, err := source.NewFFmpegSourceDevice(format, url, options)
+	if err != nil {
+		return nil, err
+	}
+	return newPipelineForSource(src, firstConfig(cfg)), nil
+}
+
 // Config tunes playback behaviour that cannot be inferred from the media.
 type Config struct {
 	// Downmix folds multichannel audio (5.1/7.1) to stereo. When false the
@@ -177,6 +196,12 @@ func newPipelineForSource(src source.Source, cfg Config) *Pipeline {
 	p.hasVideo = src.HasVideo()
 	p.hasAudio = src.HasAudio()
 	p.duration = src.Duration()
+
+	// Live capture is an asserted capability, so a source that does not implement
+	// it — including the test stubs — is finite, which is the previous behaviour.
+	if ls, ok := src.(source.LiveSource); ok {
+		p.live = ls.IsLive()
+	}
 
 	if p.hasVideo {
 		p.videoWidth, p.videoHeight = src.VideoSize()
@@ -323,7 +348,11 @@ func (p *Pipeline) Play() {
 	// interleave audio with video stall the decoder on the audio-ahead
 	// limit instead of reaching the frame target, so stop waiting as soon
 	// as that limit is hit.
-	if p.hasVideo && p.frameQueue != nil {
+	//
+	// A live capture is deliberately excluded: it produces frames only in real
+	// time, so waiting for a second of them buys no smoothness and costs a second
+	// of latency on a feed whose whole value is being current.
+	if p.hasVideo && p.frameQueue != nil && !p.live {
 		target := 30               // buffer ~1 second before starting display
 		for i := 0; i < 200; i++ { // up to ~2s max wait
 			if len(p.frameQueue) >= target || p.audioAheadFull() {
@@ -415,8 +444,56 @@ func (p *Pipeline) Stop() {
 	p.src.Rewind()
 }
 
-// Seek seeks to the given position.
+// IsLive reports whether the source is an open-ended capture rather than a
+// finite recording. A live pipeline reports a zero Duration, refuses Seek, and
+// reports the end of its stream through OnError instead of OnEnd.
+func (p *Pipeline) IsLive() bool { return p.live }
+
+// ErrCaptureStopped reports that a live capture stopped producing media without
+// the source being able to say why. A cause, where the source has one — the
+// common case being a device already in use by another application — is wrapped
+// instead.
+var ErrCaptureStopped = errors.New("mmedia: capture device stopped producing media")
+
+// reportEnd signals that the source ran out, from whichever loop noticed first.
+//
+// For a finite source that is completion, which is OnEnd — the callback that
+// drives looping and end-of-playback UI. A live source is not supposed to
+// finish, so reaching its end means the device was lost or could not be
+// reacquired; that is reported through OnError, and OnEnd deliberately does not
+// fire, which is also what makes WithLoop inert for a capture rather than
+// spinning on a device that is gone.
+func (p *Pipeline) reportEnd() {
+	p.state.Set(StateStopped)
+	if p.live {
+		if p.onError != nil {
+			p.onError(p.captureError())
+		}
+		return
+	}
+	if p.onEnd != nil {
+		p.onEnd()
+	}
+}
+
+// captureError prefers the source's own reason over the generic one.
+func (p *Pipeline) captureError() error {
+	if es, ok := p.src.(source.ErrorSource); ok {
+		if err := es.Err(); err != nil {
+			return fmt.Errorf("%w: %w", ErrCaptureStopped, err)
+		}
+	}
+	return ErrCaptureStopped
+}
+
+// Seek seeks to the given position. A live capture has no timeline to move
+// within, so this is refused for one rather than passed down to an undefined
+// av_seek_frame on a device.
 func (p *Pipeline) Seek(pos time.Duration) {
+	if p.live {
+		return
+	}
+
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -580,10 +657,7 @@ func (p *Pipeline) decodeAhead(stop <-chan struct{}) {
 				}
 				time.Sleep(20 * time.Millisecond)
 			}
-			p.state.Set(StateStopped)
-			if p.onEnd != nil {
-				p.onEnd()
-			}
+			p.reportEnd()
 			return
 		}
 
@@ -621,10 +695,7 @@ func (p *Pipeline) displayLoop(stop <-chan struct{}) {
 
 		case tf := <-p.frameQueue:
 			if tf.img == nil {
-				p.state.Set(StateStopped)
-				if p.onEnd != nil {
-					p.onEnd()
-				}
+				p.reportEnd()
 				return
 			}
 
