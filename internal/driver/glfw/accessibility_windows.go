@@ -391,7 +391,7 @@ func (w *window) applyWinA11yProps(ref C.WinAccessibilityElementRef, n *accessib
 
 // a11yTextVersion derives a cheap content-version stamp for a text element.
 // For regular widgets the rope behind Entry memoizes its string and returns
-// the same object until the next splice (the CLAUDE.md identity contract),
+// the same object until the next splice (the docs/notes/text.md identity contract),
 // so the string data pointer changes exactly when the content does. Password
 // fields rebuild their mask on every call, so the pointer is useless there;
 // the mask length is the best O(1) proxy (its content is uniform anyway).
