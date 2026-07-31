@@ -22,6 +22,10 @@
 // gocef-libs release):
 //
 //	BELLUI_CEF_DIR=/path/to/payload go run ./hack/cefhostprobe
+//
+// With -profile it instead runs one leg of the #125 persistence matrix —
+// write / read / read-empty paired invocations proving profile state does
+// (or, in-memory, does not) survive into a new process; see the flag docs.
 package main
 
 import (
@@ -33,6 +37,8 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -85,6 +91,20 @@ if (window.bellui) {
 
 var (
 	dump = flag.String("dump", "", "directory to write captured PNGs to")
+
+	// The #125 persistence matrix. Cross-process persistence needs two
+	// processes (CEF initializes once per process), so it runs as paired
+	// invocations against the same fixed-port origin:
+	//
+	//	cefhostprobe -profile write      -profile-dir /tmp/p   # then:
+	//	cefhostprobe -profile read       -profile-dir /tmp/p   # survived?
+	//	cefhostprobe -profile write                            # in-memory, then:
+	//	cefhostprobe -profile read-empty                       # discarded?
+	profileMode = flag.String("profile", "", "persistence check step: write, read, or read-empty")
+	profileDir  = flag.String("profile-dir", "", "profile directory for -profile; empty opts into in-memory")
+	profilePort = flag.Int("profile-port", 38913, "fixed local port, so both runs share one origin")
+	settle      = flag.Duration("settle", 35*time.Second, "how long the write step pumps before exiting: Chromium commits cookies to the profile on a ~30s cadence and there is no bound flush call yet (#134 — measured: at 2s the cookie is lost, localStorage survives)")
+
 	pass = 0
 	fail = 0
 )
@@ -104,6 +124,15 @@ func main() {
 		os.Setenv("BELLUI_CEF_SWITCHES", strings.TrimSpace(
 			os.Getenv("BELLUI_CEF_SWITCHES")+" --ozone-platform=headless",
 		))
+	}
+
+	if *profileMode != "" {
+		runProfileStep()
+		fmt.Printf("\n== %d checks: %d PASS, %d FAIL ==\n", pass+fail, pass, fail)
+		if fail > 0 {
+			os.Exit(1)
+		}
+		return
 	}
 
 	fmt.Println("== #105: the composited CEF host, end to end ==")
@@ -244,6 +273,97 @@ func main() {
 	if fail > 0 {
 		os.Exit(1)
 	}
+}
+
+// runProfileStep is one leg of the #125 persistence matrix: it applies the
+// profile knob, loads a page from a fixed-port local origin, and writes or
+// reads state depending on -profile. localStorage and a max-age cookie are
+// both exercised — the cookie is the login-flow claim #125 was filed for, and
+// the two live in different stores (a leveldb area, the cookie SQLite) with
+// different commit cadences, so each is its own evidence.
+func runProfileStep() {
+	fmt.Printf("== #125: profile persistence, step %q ==\n", *profileMode)
+
+	if *profileDir != "" {
+		if err := webview.SetCEFProfileDir(*profileDir); err != nil {
+			check(false, fmt.Sprintf("SetCEFProfileDir: %v", err))
+			return
+		}
+		fmt.Println("  profile   persistent at", *profileDir)
+	} else {
+		if err := webview.SetCEFProfileInMemory(); err != nil {
+			check(false, fmt.Sprintf("SetCEFProfileInMemory: %v", err))
+			return
+		}
+		fmt.Println("  profile   in-memory")
+	}
+
+	// A real HTTP origin, because data: URLs are opaque and opaque origins
+	// have no localStorage or cookies at all. The port is fixed so the write
+	// and read processes see the same origin.
+	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", *profilePort))
+	if err != nil {
+		check(false, fmt.Sprintf("listen on the fixed probe port: %v", err))
+		return
+	}
+	go http.Serve(ln, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		fmt.Fprint(w, `<!doctype html><body style="margin:0;background:#ff00aa">probe</body>`)
+	}))
+
+	host, view := webview.NewHost(fmt.Sprintf("http://127.0.0.1:%d/", *profilePort))
+	loaded := false
+	view.OnLoadChanged = func(ev webview.LoadEvent) {
+		if ev.State == webview.LoadStateComplete {
+			loaded = true
+		}
+	}
+
+	win := test.NewApp().NewWindow("cefhostprobe-profile")
+	win.SetContent(container.NewWithoutLayout(host))
+	win.Resize(geo.NewSize(400, 300))
+	host.Resize(geo.NewSize(400, 300))
+
+	if !pump(30*time.Second, func() bool { return loaded }) {
+		check(false, "the probe page loaded")
+		return
+	}
+
+	switch *profileMode {
+	case "write":
+		res, err := evalResult(view, `(function () {
+			localStorage.setItem('belluiprobe', '42');
+			document.cookie = 'belluiprobe=42; max-age=31536000';
+			return localStorage.getItem('belluiprobe');
+		})()`)
+		check(err == nil && string(res) == `"42"`,
+			fmt.Sprintf("the page stored localStorage and a persistent cookie (got %s, err %v)", res, err))
+		fmt.Printf("  settling %s so both stores commit to the profile before exit\n", *settle)
+		pump(*settle, nil)
+
+	case "read":
+		res, err := evalResult(view, `localStorage.getItem('belluiprobe')`)
+		check(err == nil && string(res) == `"42"`,
+			fmt.Sprintf("localStorage survived into a new process (got %s, err %v)", res, err))
+		res, err = evalResult(view, `document.cookie`)
+		check(err == nil && strings.Contains(string(res), "belluiprobe=42"),
+			fmt.Sprintf("the cookie survived into a new process (got %s, err %v)", res, err))
+
+	case "read-empty":
+		res, err := evalResult(view, `localStorage.getItem('belluiprobe')`)
+		check(err == nil && string(res) == "null",
+			fmt.Sprintf("the in-memory profile kept nothing across processes (got %s, err %v)", res, err))
+		res, err = evalResult(view, `document.cookie`)
+		check(err == nil && !strings.Contains(string(res), "belluiprobe"),
+			fmt.Sprintf("no cookie leaked across in-memory processes (got %s, err %v)", res, err))
+
+	default:
+		check(false, fmt.Sprintf("unknown -profile step %q (want write, read or read-empty)", *profileMode))
+		return
+	}
+
+	view.Destroy()
+	pump(2*time.Second, nil)
 }
 
 // evalResult runs js and waits for its result, pumping CEF meanwhile.

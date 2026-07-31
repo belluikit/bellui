@@ -61,13 +61,18 @@ func ensureCEFRuntime() error {
 		return fmt.Errorf("%w: %v", ErrRuntimeMissing, err)
 	}
 
+	// The profile choice (#125): persistent by default under the app's
+	// storage root, in-memory as the explicit opt-out — see cefprofile.go.
+	// Locked from here on even if Initialize fails, since a failure is
+	// permanent for the process and a later "successful" Set would be a lie.
+	cache, root := resolveCEFProfile()
+	cefProfile.locked = true
+
 	err = gocef.Initialize(gocef.Config{
-		Dir:        dir,
-		HelperPath: filepath.Join(dir, "cef_helper"),
-		// An empty cache path keeps the profile in memory, discarded on exit.
-		// Cookie/localStorage persistence is an app decision this backend has
-		// no opinion on yet; see the package doc when it grows one.
-		CachePath: "",
+		Dir:           dir,
+		HelperPath:    filepath.Join(dir, "cef_helper"),
+		CachePath:     cache,
+		RootCachePath: root,
 		// Diagnostic and deployment seams, matching BELLUI_CEF_DIR's shape:
 		// extra Chromium switches (a display-less probe run needs
 		// --ozone-platform=headless), and Chromium's own log for a browser
