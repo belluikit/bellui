@@ -51,6 +51,9 @@ const char*   test_NSMenuItem_keyEquivalent(const void*);
 unsigned long test_NSMenuItem_keyEquivalentModifierMask(const void*);
 const void*   test_NSMenuItem_submenu(const void*);
 const char*   test_NSMenuItem_title(const void*);
+NSInteger     test_NSObject_retainCount(const void*);
+void          test_popAutoreleasePool(void);
+void          test_pushAutoreleasePool(void);
 */
 import "C"
 
@@ -401,6 +404,14 @@ func testNSMenuRemoveItemAtIndex(m unsafe.Pointer, i int) {
 func testNSMenuTitle(m unsafe.Pointer) string {
 	return C.GoString(C.test_NSMenu_title(m))
 }
+
+func testNSObjectRetainCount(o unsafe.Pointer) int {
+	return int(C.test_NSObject_retainCount(o))
+}
+
+func testPopAutoreleasePool() { C.test_popAutoreleasePool() }
+
+func testPushAutoreleasePool() { C.test_pushAutoreleasePool() }
 
 func testNSMenuItemIsSeparatorItem(i unsafe.Pointer) bool {
 	return bool(C.test_NSMenuItem_isSeparatorItem(i))

@@ -443,3 +443,55 @@ func resetMainMenu() {
 		i--
 	}
 }
+
+// TestDarwinMenu_separatorOwnedLikeOtherItems pins that a separator carries the
+// same strong references as any other item bellui installs: one from the NSMenu
+// it was added to, one from belluiLiveMenuObjects.
+//
+// insertDarwinMenuItem releases every item once after handing it to the menu,
+// which balances the alloc in the ordinary branch — but +separatorItem returns
+// an object the caller does not own, so that release used to be one too many.
+// The separator then outlived its own refcount: the next resetDarwinMenu drops
+// the live-objects array, the separator deallocates while its NSMenu still
+// lists it, and the menu's own dealloc messages the freed item —
+// objc_msgSend on garbage from inside -[NSMenu dealloc], reached through the
+// autorelease-pool drain in _glfwPollEventsCocoa. That crash needs a second
+// menu generation to appear, which is why an app only hits it when it replaces
+// its main menu (belluikit/studio#5).
+func TestDarwinMenu_separatorOwnedLikeOtherItems(t *testing.T) {
+	setExceptionCallback(func(msg string) { t.Error("Obj-C exception:", msg) })
+	defer setExceptionCallback(nil)
+
+	runOnMain(func() {
+		resetMainMenu()
+	})
+	w := createWindow("Test")
+
+	mainMenu := bellui.NewMainMenu(bellui.NewMenu(
+		"File",
+		bellui.NewMenuItem("New", func() {}),
+		bellui.NewMenuItemSeparator(),
+		bellui.NewMenuItem("Open", func() {}),
+	))
+	// Bracketed by a pool so the separator's own pending autorelease is
+	// settled before the counts are read.
+	runOnMain(func() {
+		testPushAutoreleasePool()
+		setupNativeMenu(w.window, mainMenu)
+		testPopAutoreleasePool()
+	})
+
+	file := testNSMenuItemSubmenu(testNSMenuItemAtIndex(testDarwinMainMenu(), 1))
+	sep := testNSMenuItemAtIndex(file, 1)
+	if !testNSMenuItemIsSeparatorItem(sep) {
+		t.Fatalf("item 1 of the File menu is not the separator")
+	}
+
+	// Compared against a sibling rather than a literal, so the assertion
+	// survives any future change to how many references bellui holds.
+	want := testNSObjectRetainCount(testNSMenuItemAtIndex(file, 0))
+	if got := testNSObjectRetainCount(sep); got != want {
+		t.Errorf("separator retain count = %d, want %d (as for a normal item) — "+
+			"an over-released separator deallocates under its own NSMenu", got, want)
+	}
+}
