@@ -95,6 +95,35 @@ jobs:
           go vet ./...
           go vet -tags gl ./...
 
+      # The Linux webview backend bundles CEF (#60, #105) — the one documented
+      # exception to "every backend uses the platform's own engine". This gate
+      # keeps the exception exactly that wide: no other target's webview build
+      # may grow a dependency on the CEF binding (#106). It has to be a
+      # go-list check rather than a build failure, because belluikit/gocef
+      # compiles everywhere by design (its unsupported stub) — a stray import
+      # would break nothing and ship a pointless dependency silently.
+      #
+      # `go list -e` because several targets cannot fully build ./webview
+      # without their platform toolchain; the encoding/json grep asserts the
+      # listing still produced a real import graph (the portable files always
+      # carry it), and the Linux positive control keeps the gate from going
+      # vacuous if the module path ever changes.
+      - name: Webview isolation (no CEF off Linux)
+        run: |
+          for target in "darwin arm64" "windows amd64" "js wasm" "android arm64" "ios arm64"; do
+            set -- $target
+            deps=$(GOOS=$1 GOARCH=$2 CGO_ENABLED=0 go list -e -deps ./webview/)
+            echo "$deps" | grep -q '^encoding/json$' || { echo "::error::go list for $1/$2 produced no usable import graph"; exit 1; }
+            if echo "$deps" | grep -q 'belluikit/gocef'; then
+              echo "::error::the $1/$2 webview build depends on belluikit/gocef — CEF must stay Linux-only"
+              exit 1
+            fi
+            echo "$1/$2: clean"
+          done
+          CGO_ENABLED=1 GOOS=linux go list -deps ./webview/ | grep -q 'belluikit/gocef' \
+            || { echo "::error::the Linux webview build no longer depends on belluikit/gocef — this gate is checking nothing"; exit 1; }
+          echo "linux: gocef present (positive control)"
+
       - name: Formatting
         run: |
           gofumpt -d -e .
