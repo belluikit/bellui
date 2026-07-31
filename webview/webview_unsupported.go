@@ -1,4 +1,4 @@
-//go:build !wasm && !darwin && !ios && !android && !windows
+//go:build !wasm && !darwin && !ios && !android && !windows && (!linux || !cgo)
 
 package webview
 
@@ -8,10 +8,10 @@ import (
 )
 
 // Supported reports whether this platform has a web engine binding. macOS,
-// iOS, Android, Windows and the web target bind one; this file covers
-// everything else — most importantly Linux, where the decision is that there
-// will not be one (#60: the embeddable engine is LGPL, outside the allowed
-// dependency set, and Wayland has no cross-toolkit embedding primitive).
+// iOS, Android, Windows, the web target and Linux (with cgo; see
+// webview_linux.go) bind one; this file covers everything else — the BSDs,
+// and a Linux build with CGO_ENABLED=0, which cannot reach CEF's C API and
+// degrades exactly like a platform with no engine at all.
 //
 // A target here reports false and leaves the host inert rather than failing to
 // compile, so a cross-platform app builds everywhere and degrades to an empty
