@@ -126,23 +126,32 @@ import (
 	"github.com/belluikit/bellui/widget"
 )
 
-// ErrRuntimeMissing is reported by [WebView.Attach] on Windows when the
-// WebView2 runtime is not installed, or is older than this package requires.
+// ErrRuntimeMissing is reported by [WebView.Attach] when the platform's web
+// engine exists as a separate component and that component is not there. Two
+// platforms report it, for different reasons:
 //
-// Windows is the one supported platform whose web engine is a separate
-// component rather than part of the OS. The Evergreen Runtime ships with
-// Windows 11 and with Microsoft Edge, and most Microsoft applications install
-// it, but a Windows Server or LTSC image may not have one — so an app that
-// must work everywhere should ship the Evergreen Bootstrapper alongside it
-// (https://developer.microsoft.com/microsoft-edge/webview2/), or handle this
-// error and offer the content another way. Attach failing leaves the host
-// inert, exactly as on a platform with no binding at all.
+//   - On Windows it means no WebView2 Evergreen Runtime is installed, or the
+//     installed one is older than this package requires. The runtime ships
+//     with Windows 11 and with Microsoft Edge, but a Windows Server or LTSC
+//     image may not have one — an app that must work everywhere should ship
+//     the Evergreen Bootstrapper alongside it
+//     (https://developer.microsoft.com/microsoft-edge/webview2/).
+//   - On Linux it means no bundled CEF payload was found. CEF is not a
+//     system component on any distribution — it travels with the application
+//     (`bellui package` lays it out; BELLUI_CEF_DIR overrides the search),
+//     so this is the error an unpackaged binary reports on a machine that
+//     never received the payload.
+//
+// Either way Attach failing leaves the host inert — it occupies its space
+// and draws nothing — exactly as on a platform with no binding at all, so
+// handling the error is a chance to offer the content another way, not a
+// requirement for the app to keep running.
 //
 // It is declared on every platform so that a cross-platform app can test for
 // it with [errors.Is] without a build tag; no other platform reports it.
 //
 // Since: 2.19
-var ErrRuntimeMissing = errors.New("webview: no WebView2 runtime is installed")
+var ErrRuntimeMissing = errors.New("webview: the web engine runtime is not installed")
 
 // WebView is a platform web engine hosted in a bellui layout. Create one with
 // [New] and place it with [NewHost] (or hand it to
@@ -197,15 +206,6 @@ func New(url string) *WebView {
 	w.url = url
 	w.init()
 	return w
-}
-
-// NewHost returns a [widget.NativeViewHost] embedding a new web view for url.
-// It is the one-call form of wrapping [New] in a host.
-//
-// Since: 2.19
-func NewHost(url string) (*widget.NativeViewHost, *WebView) {
-	w := New(url)
-	return widget.NewNativeViewHost(w), w
 }
 
 // URL returns the URL the view was last asked to load. It is stored with the
