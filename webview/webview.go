@@ -1,12 +1,17 @@
-// Package webview embeds the platform's own web engine in a bellui layout.
+// Package webview embeds a web engine in a bellui layout.
 //
-// It is the first consumer of [widget.NativeViewHost] and inherits every one
-// of that host's limitations — most importantly that the web content is an
-// OS view drawn *over* bellui's surface, so nothing bellui draws can appear
-// above it and [core.Canvas.Capture] does not see it. Read the
-// [widget.NativeViewHost] documentation before using this package.
+// It spans two hosting models, chosen per platform by [NewHost]. On macOS,
+// iOS, Android, Windows and the web target the engine is an OS view drawn
+// *over* bellui's surface through [widget.NativeViewHost], with every one of
+// that host's documented limitations — nothing bellui draws can appear above
+// the content, and [core.Canvas.Capture] does not see it; read the
+// [widget.NativeViewHost] documentation before designing around those
+// targets. On Linux the engine (CEF) renders offscreen and the content is
+// composited *inside* bellui's canvas: overlays, dialogs and menus draw
+// above it, Capture sees it, clipping and opacity apply, and the host is a
+// Tab stop, because bellui owns the keyboard rather than the OS.
 //
-// The package is an optional import: the platform web engine is only linked
+// The package is an optional import: the web engine binding is only linked
 // into binaries that import it, so an app that embeds no web content pays
 // nothing.
 //
@@ -22,44 +27,45 @@
 //	Android    android.webkit.WebView, hosted on the decor view
 //	Windows    WebView2, hosted in a child window of the app window
 //	Web        an <iframe> positioned over the canvas
-//	Linux      no built-in backend, by decision — see below
+//	Linux      CEF, bundled by the app, rendered offscreen and composited
 //
-// Every backend here uses the platform's **own** engine, so no web engine is
-// bundled into a bellui binary on any platform and security updates stay with
-// the OS vendor. Windows is the one platform where that engine is a separate
-// component rather than part of the OS — see [ErrRuntimeMissing].
+// Every backend except Linux uses the platform's **own** engine, so no web
+// engine is bundled into those binaries and security updates stay with the
+// OS vendor; Windows's engine is a separate OS component rather than part of
+// the OS image — see [ErrRuntimeMissing].
 //
-// Linux is the one target with no engine that can be used that
-// way, which is why it has none: WebKitGTK is LGPL (outside this project's
-// allowed dependency set) and needs a GTK main loop, and WPE — measured in
-// #60 — is unbundled, ABI-coupled to the distro, absent from Ubuntu since
-// 22.04, and would be zero-copy only under Wayland. CEF has no distro
-// packaging at all and no stable ABI, so it cannot be a system dependency
-// either.
+// Linux is the deliberate exception to that policy, because it is the one
+// target with no engine an app can lean on: WebKitGTK is LGPL (outside this
+// project's allowed dependency set) and needs a GTK main loop, WPE — measured
+// in #60 — is unbundled, ABI-coupled to the distro and absent from Ubuntu
+// since 22.04, and no distribution packages CEF. So on Linux **the
+// application bundles the engine**: `bellui package` lays the pinned CEF
+// payload out beside the binary, this package finds it at run time
+// (BELLUI_CEF_DIR overrides the search), and a binary running without it
+// reports [ErrRuntimeMissing] and degrades to an inert host. The app owner
+// accepts the payload size and the Chromium update cadence — that trade was
+// made knowingly (#60, #105), and what it buys is the composited model
+// described above.
 //
 // # Supplying a Linux backend yourself
 //
-// "No built-in backend" is not the same as "impossible". [widget.NativeView]
-// is a public interface with no unexported methods, so an application — or a
-// third-party module — can implement one and host it with
-// [widget.NewNativeViewHost], with no change to bellui:
+// The built-in backend is not the only option. [widget.NativeView] is a
+// public interface with no unexported methods, so an application — or a
+// third-party module — that wants a different engine can implement one and
+// host it with [widget.NewNativeViewHost], with no change to bellui:
 //
-//	view := mycef.New(...)          // implements widget.NativeView
+//	view := myengine.New(...)       // implements widget.NativeView
 //	host := widget.NewNativeViewHost(view)
 //
-// That is the right home for an engine the toolkit will not carry. Whoever
-// supplies it pins their own engine version, owns their own update cadence,
-// and ships it inside their own Flatpak/AppImage/tarball — which is how
-// Chromium-embedding applications distribute anyway. bellui stays free of the
-// binary size and of the obligation to rebuild on every engine CVE.
-//
-// Such a backend must satisfy the whole [widget.NativeView] contract —
-// including a native clip in SetGeometry, or the view will overflow an
-// enclosing [container.Scroll] — and should implement
-// [widget.NativeViewFocuser] as well, or bellui's focus and the OS keyboard
-// focus will drift apart. This package is not involved: it binds the
-// platform engines listed above, and a supplied backend is used through the
-// host directly.
+// Whoever supplies it pins their own engine version, owns their own update
+// cadence, and ships it in their own Flatpak/AppImage/tarball. Such a
+// backend must satisfy the whole [widget.NativeView] contract — including a
+// native clip in SetGeometry, or the view will overflow an enclosing
+// [container.Scroll] — and should implement [widget.NativeViewFocuser] as
+// well, or bellui's focus and the OS keyboard focus will drift apart. This
+// package is not involved: a supplied backend is used through the host
+// directly, and being window-hosted it carries the hole punch's limitations,
+// not the composited model's.
 //
 // Each platform bends the API where its engine does. Every such difference is
 // documented on the backend that has it, and the ones worth knowing before
@@ -78,19 +84,25 @@
 //     channel for an exception. A [WebView.Call] made against a page with no
 //     shim therefore stays pending on those two until the view is destroyed,
 //     instead of failing at once.
-//   - On Windows [WebView.LoadHTML] ignores its baseURL: NavigateToString is
-//     the whole of WebView2's literal-content API and takes no base, so the
-//     content's relative references do not resolve and its origin is always
-//     [OriginOpaque].
+//   - On Windows and Linux [WebView.LoadHTML] ignores its baseURL — WebView2's
+//     NavigateToString takes no base, and CEF has no literal-content API at
+//     all so the content travels as a data: URL — so the content's relative
+//     references do not resolve and its origin is always [OriginOpaque].
 //   - On Windows a navigation the user started is reported as
 //     [NavigationLinkClicked] whatever they did to start it, including
 //     submitting a form: WebView2 reports that the user initiated it, not how.
+//   - On Linux the host is a Tab stop, but the page's *own* Tab order is not
+//     keyboard-reachable — the canvas consumes Tab for focus traversal before
+//     the page sees it (#126) — and IME composition is not yet forwarded, so
+//     CJK text cannot be typed into the page (#121). Both are properties of
+//     bellui owning the keyboard, which is also what makes the host
+//     focusable at all.
 //
 // # Talking to the page
 //
-// Two channels connect bellui logic and page logic, and the hole punch
-// constrains neither: it limits what can be drawn over the view and who owns
-// the keyboard, not what can be exchanged with it.
+// Two channels connect bellui logic and page logic, and neither hosting
+// model constrains them: the models differ in what can be drawn over the
+// view and who owns the keyboard, not in what can be exchanged with it.
 //
 //   - [WebView.Eval] and friends run JavaScript in the page, optionally
 //     reporting its result.
