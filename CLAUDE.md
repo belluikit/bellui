@@ -215,10 +215,14 @@ changing it**; the list below is only an index.
   Announcements via `bellui.AnnounceToScreenReader`. Verify with `hack/a11yprobe`.
 - **Native view embedding** — `docs/notes/native-embedding.md`
   `widget.NativeViewHost` is a **hole punch**: bellui draws nothing there, so every overlay,
-  dialog and popup is occluded and `Canvas.Capture` sees a hole. Optional `webview` package
-  with macOS/iOS/Android/Windows/wasm backends and an origin-gated bridge. Deliberately not
-  a Tab stop (WCAG 2.1.2 keyboard trap). **No Linux backend, by decision** — WPE rejected;
-  CEF is the only candidate if ever revisited.
+  dialog and popup is occluded and `Canvas.Capture` sees a hole; deliberately not a Tab stop
+  (WCAG 2.1.2 keyboard trap). Optional `webview` package with an origin-gated bridge and six
+  backends: macOS/iOS/Android/Windows/wasm ride the hole punch on the platform's own engine,
+  while **Linux is CEF, rendered offscreen and composited** (#60 reversed via its own trigger,
+  #105) — overlays, capture and clipping work there and the host IS a Tab stop, but the app
+  **bundles the engine** (`belluikit/gocef` + `gocef-libs`, dlopen'd; `ErrRuntimeMissing`
+  when absent). The WPE rejection stands. `webview.NewHost` returns the portable
+  `*webview.Host` spanning both models.
 - **DevTools & analytics** — `docs/notes/devtools.md`
   `dev/inspector` — opt-in, read-only widget-tree inspector in its own window with pick mode.
   `analytics` — opt-in, consent-first event package (starts **disabled**, generates no device
