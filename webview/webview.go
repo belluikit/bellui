@@ -47,6 +47,14 @@
 // made knowingly (#60, #105), and what it buys is the composited model
 // described above.
 //
+// The browsing profile — cookies, localStorage, the HTTP cache — persists by
+// default at "webview-cef" under the app's [bellui.Storage] root, matching
+// what every other backend's engine does in its own platform-managed
+// location, so a login survives a restart everywhere. [SetCEFProfileDir]
+// moves it; [SetCEFProfileInMemory] opts out and discards it on exit. Both
+// must run before the first [WebView.Attach], which is when the engine
+// initializes, once per process.
+//
 // # Supplying a Linux backend yourself
 //
 // The built-in backend is not the only option. [widget.NativeView] is a
