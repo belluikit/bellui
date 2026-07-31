@@ -103,7 +103,7 @@ var (
 	profileMode = flag.String("profile", "", "persistence check step: write, read, or read-empty")
 	profileDir  = flag.String("profile-dir", "", "profile directory for -profile; empty opts into in-memory")
 	profilePort = flag.Int("profile-port", 38913, "fixed local port, so both runs share one origin")
-	settle      = flag.Duration("settle", 35*time.Second, "how long the write step pumps before exiting: Chromium commits cookies to the profile on a ~30s cadence and there is no bound flush call")
+	settle      = flag.Duration("settle", 35*time.Second, "how long the write step pumps before exiting: Chromium commits cookies to the profile on a ~30s cadence and there is no bound flush call yet (#134 — measured: at 2s the cookie is lost, localStorage survives)")
 
 	pass = 0
 	fail = 0
