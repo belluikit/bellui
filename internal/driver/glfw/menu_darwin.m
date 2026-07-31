@@ -246,7 +246,10 @@ const void* insertDarwinMenuItem(const void* m, const char* label, const char* k
     }
 
     if (isSeparator) {
-        item = [NSMenuItem separatorItem];
+        // +separatorItem returns an autoreleased item we do NOT own, so it is
+        // retained here to match the alloc'd branch's +1 — the release below
+        // is unconditional.
+        item = [[NSMenuItem separatorItem] retain];
     } else {
         item = [[NSMenuItem alloc]
             initWithTitle:[NSString stringWithUTF8String:label]
@@ -398,4 +401,27 @@ const void* test_NSMenuItem_submenu(const void* i) {
 const char* test_NSMenuItem_title(const void* i) {
     NSMenuItem* item = (NSMenuItem*)i;
     return [[item title] UTF8String];
+}
+
+// test_NSObject_retainCount reports an object's strong-reference count, so a
+// test can pin bellui's ownership of a menu object rather than waiting for an
+// over-release to surface as a use-after-free in the event loop
+// (belluikit/studio#5).
+NSInteger test_NSObject_retainCount(const void* o) {
+    return [(id)o retainCount];
+}
+
+// test_popAutoreleasePool / test_pushAutoreleasePool bracket a menu build so a
+// test can drain the pending autoreleases it produced (+separatorItem's, among
+// others) before reading a retain count — otherwise an undrained pool release
+// shows up as an extra reference and masks what bellui actually owns.
+static NSAutoreleasePool *belluiTestPool = nil;
+
+void test_popAutoreleasePool(void) {
+    [belluiTestPool release];
+    belluiTestPool = nil;
+}
+
+void test_pushAutoreleasePool(void) {
+    belluiTestPool = [[NSAutoreleasePool alloc] init];
 }
