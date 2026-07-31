@@ -47,7 +47,7 @@ jobs:
             runs-on: [self-hosted, X64, Windows]
             shell: powershell
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           persist-credentials: false
       - name: Assert go-plus toolchain (Linux/macOS)
@@ -77,7 +77,7 @@ jobs:
   cli_static_analysis:
     runs-on: [self-hosted, Linux, ARM64]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           persist-credentials: false
       - name: Assert go-plus toolchain
@@ -120,7 +120,7 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: [self-hosted, Linux, ARM64]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           persist-credentials: false
           fetch-depth: 0
