@@ -318,7 +318,7 @@ func tallBox(label string, h float32) core.CanvasObject {
 
 // showOverlapPopup opens a bellui popup centred on the host, so half of it
 // overlaps the web view. On screen the overlapping half is occluded.
-func showOverlapPopup(c core.Canvas, host *widget.NativeViewHost) *widget.PopUp {
+func showOverlapPopup(c core.Canvas, host *webview.Host) *widget.PopUp {
 	body := container.NewVBox(
 		widget.NewLabel("BELLUI POPUP"),
 		widget.NewLabel("the half over the web view is occluded"),
@@ -337,7 +337,7 @@ func showOverlapPopup(c core.Canvas, host *widget.NativeViewHost) *widget.PopUp 
 type probe struct {
 	a      bellui.App
 	w      bellui.Window
-	host   *widget.NativeViewHost
+	host   *webview.Host
 	view   *webview.WebView
 	scroll *container.Scroll
 	entry  *widget.Entry
@@ -355,7 +355,7 @@ type probe struct {
 	addr string
 }
 
-func runAuto(a bellui.App, w bellui.Window, host *widget.NativeViewHost, view *webview.WebView, scroll *container.Scroll, entry *widget.Entry) {
+func runAuto(a bellui.App, w bellui.Window, host *webview.Host, view *webview.WebView, scroll *container.Scroll, entry *widget.Entry) {
 	defer func() { bellui.Do(func() { a.Quit() }) }()
 
 	time.Sleep(3 * time.Second) // window maps, WKWebView loads and paints
