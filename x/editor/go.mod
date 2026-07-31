@@ -3,7 +3,7 @@ module github.com/belluikit/bellui/x/editor
 go 1.25.0
 
 require (
-	github.com/belluikit/bellui v1.0.0-rc.5
+	github.com/belluikit/bellui v1.0.0-rc.6
 	github.com/stretchr/testify v1.11.1
 )
 
