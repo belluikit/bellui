@@ -31,12 +31,19 @@ type Host struct {
 // *widget.NativeViewHost on the hole-punch platforms, the composited
 // offscreen host on Linux.
 type hostImpl interface {
-	core.CanvasObject
-
 	focusNative() bool
 	nativeFocused() bool
 	setMinSize(geo.Size)
 	syncStats() (syncs, applies uint64)
+
+	// object is the CanvasObject placed in the render tree. It must be the
+	// hosting widget ITSELF, never an adapter wrapping it: NativeViewHost's
+	// per-frame sync finds itself in the tree by identity (CanvasForObject,
+	// driver.GeometryForObject), and a wrapper in the tree means those
+	// lookups compare the inner widget against the wrapper and never match —
+	// the host then never attaches, on every hole-punch platform, silently.
+	// #82's interactive pass caught exactly that; the renderer test locks it.
+	object() core.CanvasObject
 }
 
 var _ core.Widget = (*Host)(nil)
@@ -52,10 +59,11 @@ func NewHost(url string) (*Host, *WebView) {
 	return h, w
 }
 
-// CreateRenderer returns a renderer showing the platform hosting widget.
+// CreateRenderer returns a renderer showing the platform hosting widget —
+// the widget itself, by identity, per the hostImpl.object contract.
 func (h *Host) CreateRenderer() core.WidgetRenderer {
 	h.ExtendBaseWidget(h)
-	return widget.NewSimpleRenderer(h.impl)
+	return widget.NewSimpleRenderer(h.impl.object())
 }
 
 // WebView returns the view this host places.
