@@ -52,3 +52,6 @@ hack/*/*.app/
 
 # probe build droppings
 /webviewprobe
+
+# probe app bundles
+hack/*/[a-z]*.app/
