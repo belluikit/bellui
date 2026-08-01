@@ -72,7 +72,7 @@ func main() {
 	}
 
 	host.SetMinSize(geo.NewSize(300, 380))
-	tall := container.NewVBox(host, widget.NewLabel("below the web view — scroll me"))
+	tall := container.NewVBox(host, widget.NewLabel("below the web view — only this strip scrolls by touch; the web area above owns its own touches (hole punch)"))
 	scroll := container.NewScroll(tall)
 	scroll.SetMinSize(geo.NewSize(320, 300))
 
