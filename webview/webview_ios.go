@@ -40,39 +40,66 @@ func lookup(token C.uint64_t) *WebView {
 	return lookupView(uint64(token))
 }
 
+// The callbacks below arrive on the UIKit main thread — which on this driver
+// is NOT the bellui main goroutine (the app loop runs on its own thread) — so
+// each delivery is queued onto the bellui goroutine with bellui.Do, after
+// copying the C strings, whose memory dies when the callback returns. Only
+// the navigation decision waits (bellui.DoAndWait): WebKit is blocked on the
+// answer, which is safe because the ObjC side never blocks the other way
+// (every UIKit call over there is dispatch_async).
+
 //export belluiWebViewMessage
 func belluiWebViewMessage(token C.uint64_t, origin, body *C.char) {
-	if w := lookup(token); w != nil {
-		w.deliverMessage(C.GoString(origin), C.GoString(body))
-	}
+	tok, o, b := uint64(token), C.GoString(origin), C.GoString(body)
+	bellui.Do(func() {
+		if w := lookupView(tok); w != nil {
+			w.deliverMessage(o, b)
+		}
+	})
 }
 
 //export belluiWebViewEvalDone
 func belluiWebViewEvalDone(token C.uint64_t, callID C.uint64_t, result, errMsg *C.char) {
-	if w := lookup(token); w != nil {
-		w.deliverEvalResult(uint64(callID), C.GoString(result), C.GoString(errMsg))
-	}
+	tok, id, res, msg := uint64(token), uint64(callID), C.GoString(result), C.GoString(errMsg)
+	bellui.Do(func() {
+		if w := lookupView(tok); w != nil {
+			w.deliverEvalResult(id, res, msg)
+		}
+	})
 }
 
 //export belluiWebViewLoad
 func belluiWebViewLoad(token C.uint64_t, state C.int, url, errMsg *C.char) {
-	if w := lookup(token); w != nil {
-		w.deliverLoad(LoadState(state), C.GoString(url), C.GoString(errMsg))
-	}
+	tok, st, u, msg := uint64(token), LoadState(state), C.GoString(url), C.GoString(errMsg)
+	bellui.Do(func() {
+		if w := lookupView(tok); w != nil {
+			w.deliverLoad(st, u, msg)
+		}
+	})
 }
 
 //export belluiWebViewNavigate
-func belluiWebViewNavigate(token C.uint64_t, url *C.char, kind C.int, mainFrame, newWindow C.bool) C.bool {
-	w := lookup(token)
-	if w == nil {
-		return C.bool(true)
-	}
-	return C.bool(w.decideNavigation(NavigationRequest{
+func belluiWebViewNavigate(token C.uint64_t, url *C.char, kind C.int, mainFrame, newWindow C.bool, decision C.uintptr_t) {
+	// Never wait here: this runs on the UIKit main thread, and the driver
+	// dispatch_syncs onto that thread from the bellui goroutine — waiting for
+	// the goroutine from here is the deadlock #75 measured (the app froze on
+	// its first page load). WebKit allows the decision to arrive later, so it
+	// is queued, decided on the bellui goroutine, and handed back through
+	// belluiWebViewNavigateDecided on the main queue.
+	req := NavigationRequest{
 		URL:       C.GoString(url),
 		Kind:      NavigationKind(kind),
 		MainFrame: bool(mainFrame),
 		NewWindow: bool(newWindow),
-	}))
+	}
+	tok := uint64(token)
+	bellui.Do(func() {
+		allow := true
+		if w := lookupView(tok); w != nil {
+			allow = w.decideNavigation(req)
+		}
+		C.belluiWebViewNavigateDecided(decision, C.bool(allow))
+	})
 }
 
 // attachRaw creates the WKWebView in the application's window.
