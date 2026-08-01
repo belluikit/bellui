@@ -3879,6 +3879,12 @@ public class GoNativeActivity extends NativeActivity {
         // lets touches outside it fall through to bellui.
         android.view.WindowManager.LayoutParams lp;
 
+        // Where the user last tapped, clip-local — replayed into the panel
+        // once it holds window focus, because Chromium only raises the
+        // keyboard for a fresh user gesture on an editor (see the touch
+        // listener in doWebviewCreate).
+        float lastTapX, lastTapY;
+
         // Shadow state, written on the UI thread and read from JNI threads, so
         // a synchronous query never has to block on the UI thread.
         volatile boolean canGoBack;
@@ -3998,20 +4004,29 @@ public class GoNativeActivity extends NativeActivity {
             @Override
             public boolean onTouch(View v, android.view.MotionEvent ev) {
                 if (ev.getAction() == android.view.MotionEvent.ACTION_DOWN) {
+                    // Promote as early as possible: window focus needs to be
+                    // the panel's BEFORE an editor-focusing gesture, or
+                    // Chromium treats the gesture as spent and refuses to
+                    // raise the keyboard (external showSoftInput cannot
+                    // override that policy).
+                    host.lastTapX = ev.getX();
+                    host.lastTapY = ev.getY();
                     webviewPanelFocusable(host, true);
-                    // The same tap that flips the window focusable is the one
-                    // the WebView uses to ask for the IME — and that request
-                    // races the flag taking effect, so it is usually dropped
-                    // (#76: "focus there does not bring the keyboard"). Nudge
-                    // the IME once window focus has actually landed.
+                }
+                if (ev.getAction() == android.view.MotionEvent.ACTION_UP) {
+                    // If the focus grant lost the race against this gesture,
+                    // the editor is focused but the keyboard never came —
+                    // replay the tap into the now-focused window, where it
+                    // counts as the fresh gesture Chromium wants. No-op when
+                    // the keyboard is already up.
                     host.clip.postDelayed(new Runnable() {
                         @Override
-                        public void run() { webviewNudgeIME(host); }
-                    }, 150);
+                        public void run() { webviewReplayTapForIME(host); }
+                    }, 250);
                     host.clip.postDelayed(new Runnable() {
                         @Override
-                        public void run() { webviewNudgeIME(host); }
-                    }, 500);
+                        public void run() { webviewReplayTapForIME(host); }
+                    }, 800);
                 }
                 return false; // the WebView still handles the touch itself
             }
@@ -4062,6 +4077,43 @@ public class GoNativeActivity extends NativeActivity {
         }
         host.lp.token = token;
         activity.getWindowManager().addView(host.clip, host.lp);
+        // Added — and kept — NOT_FOCUSABLE until a tap in the web area asks
+        // for promotion: an attached sub-window that is focusable HOLDS the
+        // app's window focus outright on this platform (taps on the activity
+        // never demote it — #76 measured bellui's keyboard starving the
+        // moment the panel was left focusable while idle). The flags are the
+        // arbiter, so they are driven by the two explicit signals: a web-area
+        // tap promotes, the focus bridge's resign demotes.
+    }
+
+    // webviewReplayTapForIME re-delivers the user's last tap to the web view
+    // after the panel window gained focus, if the keyboard has not appeared.
+    // Chromium raises the IME only for a fresh user gesture on an editor;
+    // when the original gesture raced the window-focus grant it is spent, so
+    // an equivalent gesture is synthesized at the same spot — inside a
+    // focused window this time. UI thread only.
+    static void webviewReplayTapForIME(BelluiWebViewHost host) {
+        if (host == null || host.clip == null || host.web == null
+                || host.clip.getParent() == null || !host.clip.hasWindowFocus()) {
+            return;
+        }
+        if (android.os.Build.VERSION.SDK_INT >= 30) {
+            android.view.WindowInsets insets = host.clip.getRootWindowInsets();
+            if (insets != null && insets.isVisible(android.view.WindowInsets.Type.ime())) {
+                return; // the keyboard made it after all
+            }
+        }
+        long now = android.os.SystemClock.uptimeMillis();
+        float x = host.lastTapX - host.web.getLeft();
+        float y = host.lastTapY - host.web.getTop();
+        android.view.MotionEvent down = android.view.MotionEvent.obtain(
+                now, now, android.view.MotionEvent.ACTION_DOWN, x, y, 0);
+        android.view.MotionEvent up = android.view.MotionEvent.obtain(
+                now, now + 30, android.view.MotionEvent.ACTION_UP, x, y, 0);
+        host.web.dispatchTouchEvent(down);
+        host.web.dispatchTouchEvent(up);
+        down.recycle();
+        up.recycle();
     }
 
     // webviewNudgeIME asks the IME to show for the web view's focused editor,
@@ -4070,7 +4122,18 @@ public class GoNativeActivity extends NativeActivity {
     // this a no-op.
     static void webviewNudgeIME(BelluiWebViewHost host) {
         GoNativeActivity activity = goNativeActivity;
-        if (activity == null || host == null || host.web == null || !host.web.hasFocus()) {
+        if (activity == null || host == null || host.web == null) {
+            return;
+        }
+        // The re-add detached and re-attached the view, which clears its VIEW
+        // focus (the page's DOM editor focus survives in the renderer);
+        // re-assert it so Chromium's ImeAdapter has focused-view + focused-
+        // window and hoists the keyboard for the focused editor.
+        if (!host.web.hasFocus()) {
+            host.web.setFocusableInTouchMode(true);
+            host.web.requestFocus();
+        }
+        if (!host.web.hasFocus()) {
             return;
         }
         android.view.inputmethod.InputMethodManager imm =
@@ -4086,8 +4149,10 @@ public class GoNativeActivity extends NativeActivity {
     static boolean webviewAnyPanelFocused() {
         synchronized (mWebViews) {
             for (BelluiWebViewHost h : mWebViews.values()) {
-                if (h.lp != null && (h.lp.flags
-                        & android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE) == 0) {
+                // Window focus, not the focusable flag: the panel is normally
+                // focusable while idle, and gating the driver's hide on the
+                // flag would stop bellui's own entries hiding their keyboard.
+                if (h.clip != null && h.clip.hasWindowFocus()) {
                     return true;
                 }
             }
@@ -4095,16 +4160,12 @@ public class GoNativeActivity extends NativeActivity {
         return false;
     }
 
-    // webviewPanelFocusable moves real window focus between the panel and the
-    // activity — Chromium's WebView refuses to start its IME machinery
-    // without window focus, so no flag trickery substitutes (#76 measured
-    // both: ALT_FOCUSABLE_IM summons nothing, and an in-place flag update on
-    // this OEM never transfers focus, leaving the keyboard dead unless the
-    // activity had it open already). Taking focus therefore RE-ADDS the
-    // window with the focusable flags — window addition always re-evaluates
-    // focus, and the topmost focusable window wins. Giving it back is the
-    // easy direction: turning NOT_FOCUSABLE on drops focus to the activity
-    // immediately. UI thread only.
+    // webviewPanelFocusable is the whole focus arbiter: an attached
+    // sub-window that is focusable holds the app's window focus outright
+    // (taps on the activity never demote it), so promoting the panel gives
+    // the web editor the keyboard and demoting it gives the keyboard back to
+    // bellui. Driven by exactly two signals — a web-area tap promotes, the
+    // focus bridge's resign demotes. UI thread only.
     static void webviewPanelFocusable(BelluiWebViewHost host, boolean focusable) {
         GoNativeActivity activity = goNativeActivity;
         if (activity == null || host == null || host.lp == null || host.clip == null
@@ -4118,11 +4179,13 @@ public class GoNativeActivity extends NativeActivity {
         }
         if (focusable) {
             host.lp.flags &= ~android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
-            activity.getWindowManager().removeView(host.clip);
-            activity.getWindowManager().addView(host.clip, host.lp);
+            activity.getWindowManager().updateViewLayout(host.clip, host.lp);
         } else {
             host.lp.flags |= android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
             activity.getWindowManager().updateViewLayout(host.clip, host.lp);
+            // No sneaky re-promotion afterwards: a focusable panel holds the
+            // app's window focus outright, so restoring it here would starve
+            // bellui's own keyboard again. The next web-area tap promotes.
         }
     }
 
