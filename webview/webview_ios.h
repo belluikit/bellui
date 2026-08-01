@@ -88,3 +88,10 @@ bool belluiWebViewHasFocus(void *handle);
 // belluiWebViewDestroy removes the views from the window and releases them.
 // Passing NULL, or the same handle twice, is safe.
 void belluiWebViewDestroy(void *handle);
+
+// belluiWebViewNavigateDecided answers a navigation-policy request that
+// belluiWebViewNavigate carried to Go. decision is the WebKit handler block
+// the ObjC side copied and holds until exactly this call; allow is the app's
+// verdict. Called from the bellui goroutine; the handler is invoked on the
+// main queue.
+void belluiWebViewNavigateDecided(uintptr_t decision, bool allow);

@@ -5,11 +5,15 @@
 
 #import "webview_ios.h"
 
-// Implemented in Go (webview_ios.go), all called on the main thread.
+// Implemented in Go (webview_ios.go). All are called on the UIKit main
+// thread — which on this driver is NOT the bellui main goroutine (the app
+// loop runs on its own thread, darwin_ios.go) — so the Go side queues each
+// delivery onto the bellui goroutine; only the navigation decision waits.
 extern void belluiWebViewMessage(uint64_t token, char *origin, char *body);
 extern void belluiWebViewEvalDone(uint64_t token, uint64_t callID, char *result, char *errMsg);
 extern void belluiWebViewLoad(uint64_t token, int state, char *url, char *errMsg);
-extern bool belluiWebViewNavigate(uint64_t token, char *url, int kind, bool mainFrame, bool newWindow);
+extern void belluiWebViewNavigate(uint64_t token, char *url, int kind, bool mainFrame,
+                                  bool newWindow, uintptr_t decision);
 
 // Implemented in internal/driver/mobile/app/darwin_ios.m. The iOS window's
 // RunNative hands out only an UnknownContext, so this accessor is how a native
@@ -144,8 +148,26 @@ static UIView *belluiFindFirstResponder(UIView *view) {
 // BelluiWebViewDelegate turns WebKit's navigation callbacks into the two
 // portable seams: a policy decision the app can veto, and a load state the app
 // can watch.
+@class BelluiWebViewClip;
+
+// BelluiWebViewHandle is what crosses the cgo boundary: a plain NSObject that
+// can be allocated on the bellui goroutine's thread, holding the UIKit pieces
+// that may only be touched on the main thread, plus atomic shadows for the
+// queries the Go side asks synchronously. See the threading-model comment at
+// its @implementation below.
+@interface BelluiWebViewHandle : NSObject
+@property(retain) BelluiWebViewClip *clip; // set on main once built
+@property(assign) uint64_t token;
+@property(assign) BOOL shadowFocus;
+@property(assign) BOOL shadowCanGoBack;
+@property(assign) BOOL shadowCanGoForward;
+@end
+
 @interface BelluiWebViewDelegate : NSObject <WKNavigationDelegate, WKUIDelegate>
 @property(assign) uint64_t token;
+// Back-pointer to the handle whose shadows the load callbacks refresh; assign,
+// so the reference cycle handle->clip->delegate->handle never forms.
+@property(assign) BelluiWebViewHandle *handle;
 @end
 
 @implementation BelluiWebViewDelegate
@@ -180,15 +202,32 @@ static UIView *belluiFindFirstResponder(UIView *view) {
     bool mainFrame = newWindow ? true : [target isMainFrame];
 
     NSString *url = [[[action request] URL] absoluteString];
-    bool allow = belluiWebViewNavigate(self.token, cStr(url), kind, mainFrame, newWindow);
-    decisionHandler(allow ? WKNavigationActionPolicyAllow : WKNavigationActionPolicyCancel);
+
+    // The answer comes from app code on the bellui goroutine, which must not
+    // be waited for from this thread: the driver dispatch_syncs onto the main
+    // queue from that goroutine, so blocking here completes a deadlock cycle
+    // (#75 froze the whole app on the first page load this way). WebKit
+    // explicitly allows the decision handler to be called later — so the
+    // request crosses to Go carrying the copied handler, and the decision
+    // comes back through belluiWebViewNavigateDecided below.
+    void (^held)(WKNavigationActionPolicy) = [decisionHandler copy];
+    belluiWebViewNavigate(self.token, cStr(url), kind, mainFrame, newWindow, (uintptr_t)held);
+}
+
+- (void)refreshNav:(WKWebView *)webView {
+    // Runs on the main thread (WebKit delivers here); keeps the atomic
+    // shadows the bellui goroutine reads synchronously in belluiWebViewNav.
+    [[self handle] setShadowCanGoBack:[webView canGoBack]];
+    [[self handle] setShadowCanGoForward:[webView canGoForward]];
 }
 
 - (void)webView:(WKWebView *)webView didStartProvisionalNavigation:(WKNavigation *)navigation {
+    [self refreshNav:webView];
     belluiWebViewLoad(self.token, belluiLoadLoading, cStr([[webView URL] absoluteString]), (char *)"");
 }
 
 - (void)webView:(WKWebView *)webView didFinishNavigation:(WKNavigation *)navigation {
+    [self refreshNav:webView];
     belluiWebViewLoad(self.token, belluiLoadComplete, cStr([[webView URL] absoluteString]), (char *)"");
 }
 
@@ -197,6 +236,7 @@ static UIView *belluiFindFirstResponder(UIView *view) {
 // stopped (StopLoading, or a denied OnNavigate), and the Go side already
 // reported them — reporting again would deliver the same cancel twice.
 - (void)reportFailure:(NSError *)error forView:(WKWebView *)webView {
+    [self refreshNav:webView];
     if ([[error domain] isEqualToString:NSURLErrorDomain] && [error code] == NSURLErrorCancelled) {
         return;
     }
@@ -235,6 +275,17 @@ static UIView *belluiFindFirstResponder(UIView *view) {
 
 @end
 
+// belluiWebViewNavigateDecided delivers the Go side's navigation verdict back
+// to the WebKit decision handler held above, on the main thread, exactly
+// once. The block was copied with +1; invoking releases it here.
+void belluiWebViewNavigateDecided(uintptr_t decision, bool allow) {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        void (^handler)(WKNavigationActionPolicy) = (void (^)(WKNavigationActionPolicy))decision;
+        handler(allow ? WKNavigationActionPolicyAllow : WKNavigationActionPolicyCancel);
+        [handler release];
+    });
+}
+
 // BelluiWebViewClip is the hole-punch container: a plain UIView whose
 // clipsToBounds turns the host's bellui clip bounds into a real clip, so a web
 // view inside a container.Scroll is cut off at the scroll's edge instead of
@@ -248,107 +299,189 @@ static UIView *belluiFindFirstResponder(UIView *view) {
 @implementation BelluiWebViewClip
 @end
 
-void *belluiWebViewCreate(uint64_t token, const char *bridgeScript) {
+// BelluiWebViewHandle is what crosses the cgo boundary: a plain NSObject that
+// can be allocated on the bellui goroutine's thread, holding the UIKit pieces
+// that may only be touched on the main thread, plus atomic shadows for the
+// queries the Go side asks synchronously.
+//
+// # Threading model (the #75 lesson)
+//
+// On this driver the bellui main goroutine is NOT the UIKit main thread — the
+// app loop runs on its own thread (darwin_ios.go). UIKit tolerates no
+// off-main mutation, so every entry point below that changes UIKit state does
+// its work in a dispatch_async block on the main queue. The queue is serial,
+// so creation is always fully applied before any later operation's block
+// runs, and geometry, visibility and navigation stay ordered exactly as the
+// Go side issued them — the Android backend's runOnUiThread discipline,
+// spoken in GCD.
+//
+// Synchronous questions (HasFocus, CanGoBack/Forward) are answered from the
+// atomic shadow properties, refreshed on the main thread by the delegate's
+// load callbacks and by the per-frame geometry sync. dispatch_sync is
+// deliberately never used: the navigation policy hook blocks the main thread
+// on the bellui goroutine (the one documented waiter), and a single
+// dispatch_sync in the other direction would complete the deadlock cycle.
+@implementation BelluiWebViewHandle
+@end
+
+// belluiRefreshShadows re-reads the queryable state on the main thread.
+static void belluiRefreshShadows(BelluiWebViewHandle *h) {
+    BelluiWebViewClip *clip = [h clip];
+    WKWebView *web = [clip webView];
+    if (!web) {
+        [h setShadowFocus:NO];
+        [h setShadowCanGoBack:NO];
+        [h setShadowCanGoForward:NO];
+        return;
+    }
+    [h setShadowFocus:belluiFindFirstResponder(web) != nil];
+    [h setShadowCanGoBack:[web canGoBack]];
+    [h setShadowCanGoForward:[web canGoForward]];
+}
+
+// belluiWebViewEnsureHosted parents the clip into the app window as soon as
+// one exists. Main thread only. Creation must not require the window: the
+// host attaches on the FIRST layout pass, which can run before the UIWindow
+// is up (#75 measured the whole backend inert because of it), and the host's
+// Attach is deliberately once-only. Geometry arrives every frame, so hosting
+// retries here until the window appears — usually the very next frame.
+static void belluiWebViewEnsureHosted(BelluiWebViewClip *clip) {
+    if (!clip || [clip superview] != nil) {
+        return;
+    }
     UIWindow *window = belluiAppWindow();
     if (!window) {
-        return NULL;
+        return;
     }
-
-    BelluiWebViewClip *clip = [[BelluiWebViewClip alloc] initWithFrame:CGRectZero];
-    [clip setClipsToBounds:YES];
-    [clip setHidden:YES]; // shown once the host reports real geometry
-
-    WKWebViewConfiguration *config = [[WKWebViewConfiguration alloc] init];
-
-    // The bridge is installed here or not at all: with no script, the page has
-    // neither window.bellui nor a message handler to post to, which is the
-    // guarantee behind EnableBridge being opt-in.
-    if (bridgeScript && bridgeScript[0] != '\0') {
-        BelluiWebViewBridge *bridge = [[BelluiWebViewBridge alloc] init];
-        [bridge setToken:token];
-        [[config userContentController] addScriptMessageHandler:bridge name:@"bellui"];
-        [bridge release]; // the controller retains it
-
-        WKUserScript *script =
-            [[WKUserScript alloc] initWithSource:[NSString stringWithUTF8String:bridgeScript]
-                                   injectionTime:WKUserScriptInjectionTimeAtDocumentStart
-                                forMainFrameOnly:NO];
-        [[config userContentController] addUserScript:script];
-        [script release];
-    }
-
-    WKWebView *web = [[WKWebView alloc] initWithFrame:CGRectZero configuration:config];
-    [config release];
-
-    BelluiWebViewDelegate *delegate = [[BelluiWebViewDelegate alloc] init];
-    [delegate setToken:token];
-    [web setNavigationDelegate:delegate]; // weak, so the clip owns the +1
-    [web setUIDelegate:delegate];
-
-    [clip addSubview:web];
-    [clip setWebView:web];
-    [clip setNavDelegate:delegate];
-    [clip setToken:token];
-
     // Added to the WINDOW, as a sibling of the GLKView, never as its subview.
     // A view hosted inside the GLKView entangles with its CAMetalLayer and
     // stalls rendering — the #1124 lesson from BelluiTextInputView, which is
-    // hosted here for the same reason. addSubview: retains the clip; it keeps
-    // the +1 from alloc until belluiWebViewDestroy releases it.
+    // hosted here for the same reason.
     [window addSubview:clip];
-    return clip;
+}
+
+void *belluiWebViewCreate(uint64_t token, const char *bridgeScript) {
+    BelluiWebViewHandle *h = [[BelluiWebViewHandle alloc] init]; // +1, Destroy releases
+    [h setToken:token];
+
+    // The C string dies when this call returns; the block below runs later.
+    NSString *script = nil;
+    if (bridgeScript && bridgeScript[0] != '\0') {
+        script = [NSString stringWithUTF8String:bridgeScript];
+    }
+
+    dispatch_async(dispatch_get_main_queue(), ^{
+        BelluiWebViewClip *clip = [[BelluiWebViewClip alloc] initWithFrame:CGRectZero];
+        [clip setClipsToBounds:YES];
+        [clip setHidden:YES]; // shown once the host reports real geometry
+
+        WKWebViewConfiguration *config = [[WKWebViewConfiguration alloc] init];
+
+        // The bridge is installed here or not at all: with no script, the page
+        // has neither window.bellui nor a message handler to post to, which is
+        // the guarantee behind EnableBridge being opt-in.
+        if (script) {
+            BelluiWebViewBridge *bridge = [[BelluiWebViewBridge alloc] init];
+            [bridge setToken:token];
+            [[config userContentController] addScriptMessageHandler:bridge name:@"bellui"];
+            [bridge release]; // the controller retains it
+
+            WKUserScript *user =
+                [[WKUserScript alloc] initWithSource:script
+                                       injectionTime:WKUserScriptInjectionTimeAtDocumentStart
+                                    forMainFrameOnly:NO];
+            [[config userContentController] addUserScript:user];
+            [user release];
+        }
+
+        WKWebView *web = [[WKWebView alloc] initWithFrame:CGRectZero configuration:config];
+        [config release];
+
+        BelluiWebViewDelegate *delegate = [[BelluiWebViewDelegate alloc] init];
+        [delegate setToken:token];
+        [delegate setHandle:h];
+        [web setNavigationDelegate:delegate]; // weak, so the clip owns the +1
+        [web setUIDelegate:delegate];
+
+        [clip addSubview:web];
+        [clip setWebView:web];
+        [clip setNavDelegate:delegate];
+        [clip setToken:token];
+
+        [h setClip:clip]; // retained by the property
+        [clip release];   // the handle owns it now
+
+        belluiWebViewEnsureHosted(clip);
+    });
+    return h;
 }
 
 void belluiWebViewLoadURL(void *handle, const char *url) {
     if (!handle || !url) {
         return;
     }
-    BelluiWebViewClip *clip = (BelluiWebViewClip *)handle;
+    BelluiWebViewHandle *h = (BelluiWebViewHandle *)handle;
     NSString *str = [NSString stringWithUTF8String:url];
-    NSURL *target = [NSURL URLWithString:str];
-    if (!target || ![target scheme]) {
-        return;
-    }
-    if ([[target scheme] isEqualToString:@"file"]) {
-        [[clip webView] loadFileURL:target allowingReadAccessToURL:[target URLByDeletingLastPathComponent]];
-        return;
-    }
-    [[clip webView] loadRequest:[NSURLRequest requestWithURL:target]];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        WKWebView *web = [[h clip] webView];
+        NSURL *target = [NSURL URLWithString:str];
+        if (!web || !target || ![target scheme]) {
+            return;
+        }
+        if ([[target scheme] isEqualToString:@"file"]) {
+            [web loadFileURL:target allowingReadAccessToURL:[target URLByDeletingLastPathComponent]];
+            return;
+        }
+        [web loadRequest:[NSURLRequest requestWithURL:target]];
+    });
 }
 
 void belluiWebViewLoadHTML(void *handle, const char *html, const char *baseURL) {
     if (!handle || !html) {
         return;
     }
-    BelluiWebViewClip *clip = (BelluiWebViewClip *)handle;
-    NSURL *base = nil;
+    BelluiWebViewHandle *h = (BelluiWebViewHandle *)handle;
+    NSString *content = [NSString stringWithUTF8String:html];
+    NSString *base = nil;
     if (baseURL && baseURL[0] != '\0') {
-        base = [NSURL URLWithString:[NSString stringWithUTF8String:baseURL]];
+        base = [NSString stringWithUTF8String:baseURL];
     }
-    [[clip webView] loadHTMLString:[NSString stringWithUTF8String:html] baseURL:base];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        WKWebView *web = [[h clip] webView];
+        if (!web) {
+            return;
+        }
+        [web loadHTMLString:content baseURL:(base ? [NSURL URLWithString:base] : nil)];
+    });
 }
 
 bool belluiWebViewNav(void *handle, int op) {
     if (!handle) {
         return false;
     }
-    WKWebView *web = [(BelluiWebViewClip *)handle webView];
-    if (!web) {
-        return false;
-    }
+    BelluiWebViewHandle *h = (BelluiWebViewHandle *)handle;
     switch (op) {
     case belluiOpCanGoBack:
-        return [web canGoBack] ? true : false;
-    case belluiOpGoBack:
-        return [web goBack] != nil;
+        return [h shadowCanGoBack];
     case belluiOpCanGoForward:
-        return [web canGoForward] ? true : false;
+        return [h shadowCanGoForward];
+    case belluiOpGoBack:
+        if (![h shadowCanGoBack]) {
+            return false;
+        }
+        dispatch_async(dispatch_get_main_queue(), ^{ [[[h clip] webView] goBack]; });
+        return true;
     case belluiOpGoForward:
-        return [web goForward] != nil;
+        if (![h shadowCanGoForward]) {
+            return false;
+        }
+        dispatch_async(dispatch_get_main_queue(), ^{ [[[h clip] webView] goForward]; });
+        return true;
     case belluiOpReload:
-        return [web reload] != nil;
+        dispatch_async(dispatch_get_main_queue(), ^{ [[[h clip] webView] reload]; });
+        return true;
     case belluiOpStopLoading:
-        [web stopLoading];
+        dispatch_async(dispatch_get_main_queue(), ^{ [[[h clip] webView] stopLoading]; });
         return true;
     }
     return false;
@@ -358,33 +491,41 @@ void belluiWebViewEval(void *handle, const char *js, uint64_t callID, bool wantR
     if (!handle || !js) {
         return;
     }
-    BelluiWebViewClip *clip = (BelluiWebViewClip *)handle;
+    BelluiWebViewHandle *h = (BelluiWebViewHandle *)handle;
     NSString *source = [NSString stringWithUTF8String:js];
-    if (!wantResult) {
-        [[clip webView] evaluateJavaScript:source completionHandler:nil];
-        return;
-    }
-
-    // The completion handler runs on the main thread, and carries only scalars
-    // plus the token, so a result arriving after the view was destroyed simply
-    // finds no registry entry on the Go side.
-    uint64_t token = [clip token];
-    [[clip webView] evaluateJavaScript:source
-                     completionHandler:^(id value, NSError *error) {
-                         if (error) {
-                             // localizedDescription is only ever "A JavaScript
-                             // exception occurred"; the message the script
-                             // actually threw is in the userInfo, and is the
-                             // only part worth reporting to the app.
-                             NSString *msg = [[error userInfo] objectForKey:@"WKJavaScriptExceptionMessage"];
-                             if (!msg || [msg length] == 0) {
-                                 msg = [error localizedDescription];
-                             }
-                             belluiWebViewEvalDone(token, callID, (char *)"", cStr(msg));
-                             return;
-                         }
-                         belluiWebViewEvalDone(token, callID, cStr(belluiJSONOf(value)), (char *)"");
-                     }];
+    uint64_t token = [h token];
+    dispatch_async(dispatch_get_main_queue(), ^{
+        WKWebView *web = [[h clip] webView];
+        if (!web) {
+            if (wantResult) {
+                belluiWebViewEvalDone(token, callID, (char *)"", (char *)"webview: no engine");
+            }
+            return;
+        }
+        if (!wantResult) {
+            [web evaluateJavaScript:source completionHandler:nil];
+            return;
+        }
+        // The completion handler runs on the main thread, and carries only
+        // scalars plus the token, so a result arriving after the view was
+        // destroyed simply finds no registry entry on the Go side.
+        [web evaluateJavaScript:source
+              completionHandler:^(id value, NSError *error) {
+                  if (error) {
+                      // localizedDescription is only ever "A JavaScript
+                      // exception occurred"; the message the script actually
+                      // threw is in the userInfo, and is the only part worth
+                      // reporting to the app.
+                      NSString *msg = [[error userInfo] objectForKey:@"WKJavaScriptExceptionMessage"];
+                      if (!msg || [msg length] == 0) {
+                          msg = [error localizedDescription];
+                      }
+                      belluiWebViewEvalDone(token, callID, (char *)"", cStr(msg));
+                      return;
+                  }
+                  belluiWebViewEvalDone(token, callID, cStr(belluiJSONOf(value)), (char *)"");
+              }];
+    });
 }
 
 void belluiWebViewSetGeometry(void *handle,
@@ -393,95 +534,122 @@ void belluiWebViewSetGeometry(void *handle,
     if (!handle) {
         return;
     }
-    BelluiWebViewClip *clip = (BelluiWebViewClip *)handle;
+    BelluiWebViewHandle *h = (BelluiWebViewHandle *)handle;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        BelluiWebViewClip *clip = [h clip];
+        if (!clip) {
+            return;
+        }
+        belluiWebViewEnsureHosted(clip);
 
-    // UIKit already uses a top-left origin, so unlike the macOS bridge the
-    // incoming rectangles are used as they arrive.
-    [clip setFrame:CGRectMake(clipX, clipY, clipW, clipH)];
-    [[clip webView] setFrame:CGRectMake(viewX - clipX, viewY - clipY, viewW, viewH)];
+        // UIKit already uses a top-left origin, so unlike the macOS bridge the
+        // incoming rectangles are used as they arrive.
+        [clip setFrame:CGRectMake(clipX, clipY, clipW, clipH)];
+        [[clip webView] setFrame:CGRectMake(viewX - clipX, viewY - clipY, viewW, viewH)];
+    });
 }
 
 void belluiWebViewSetVisible(void *handle, bool visible) {
     if (!handle) {
         return;
     }
-    [(BelluiWebViewClip *)handle setHidden:!visible];
+    BelluiWebViewHandle *h = (BelluiWebViewHandle *)handle;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        BelluiWebViewClip *clip = [h clip];
+        if (!clip) {
+            return;
+        }
+        belluiWebViewEnsureHosted(clip);
+        [clip setHidden:!visible];
+    });
 }
 
 bool belluiWebViewHasFocus(void *handle) {
     if (!handle) {
         return false;
     }
-    BelluiWebViewClip *clip = (BelluiWebViewClip *)handle;
-    WKWebView *web = [clip webView];
-    if (!web) {
-        return false;
-    }
-    return belluiFindFirstResponder(web) != nil;
+    BelluiWebViewHandle *h = (BelluiWebViewHandle *)handle;
+    // The host polls this every frame, which makes the poll itself the
+    // refresh heartbeat: answer from the shadow (one frame stale at worst)
+    // and queue a main-thread re-read for the next poll. Hanging the refresh
+    // on SetGeometry does not work — geometry is only pushed when it CHANGES,
+    // so the shadow would freeze the moment the layout settles (#75 measured
+    // the focus bridge dead because of exactly that).
+    dispatch_async(dispatch_get_main_queue(), ^{ belluiRefreshShadows(h); });
+    return [h shadowFocus];
 }
 
 bool belluiWebViewTakeFocus(void *handle) {
     if (!handle) {
         return false;
     }
-    BelluiWebViewClip *clip = (BelluiWebViewClip *)handle;
-    WKWebView *web = [clip webView];
-    if (!web) {
+    BelluiWebViewHandle *h = (BelluiWebViewHandle *)handle;
+    if (![h clip]) {
         return false;
     }
-    [web becomeFirstResponder];
-    return belluiWebViewHasFocus(handle);
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [[[h clip] webView] becomeFirstResponder];
+        belluiRefreshShadows(h);
+    });
+    // Optimistic, like the Android backend's shadow state: the poll corrects
+    // the host within a frame if the platform refused.
+    return true;
 }
 
 bool belluiWebViewResignFocus(void *handle) {
     if (!handle) {
         return false;
     }
-    if (!belluiWebViewHasFocus(handle)) {
-        return true; // nothing of ours to give back
-    }
-    BelluiWebViewClip *clip = (BelluiWebViewClip *)handle;
-
-    // Resign whichever view inside the web view actually holds it — WKWebView
-    // installs its own content view, so resigning the WKWebView itself is not
-    // always enough.
-    UIView *responder = belluiFindFirstResponder([clip webView]);
-    if (responder) {
-        [responder resignFirstResponder];
-    }
-
-    // Deliberately nothing is made first responder in its place. On macOS the
-    // focus has to land on the GLFW content view or keystrokes reach nothing,
-    // but on iOS there is no key-handling view to hand it to: bellui's own
-    // keyboard input goes through BelluiTextInputView, which claims the
-    // responder only while an entry is focused. Claiming it here would raise
-    // the software keyboard with nothing being edited.
-    return !belluiWebViewHasFocus(handle);
+    BelluiWebViewHandle *h = (BelluiWebViewHandle *)handle;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        // Resign whichever view inside the web view actually holds it —
+        // WKWebView installs its own content view, so resigning the WKWebView
+        // itself is not always enough.
+        UIView *responder = belluiFindFirstResponder([[h clip] webView]);
+        if (responder) {
+            [responder resignFirstResponder];
+        }
+        // Deliberately nothing is made first responder in its place. On macOS
+        // the focus has to land on the GLFW content view or keystrokes reach
+        // nothing, but on iOS there is no key-handling view to hand it to:
+        // bellui's own keyboard input goes through BelluiTextInputView, which
+        // claims the responder only while an entry is focused. Claiming it
+        // here would raise the software keyboard with nothing being edited.
+        belluiRefreshShadows(h);
+    });
+    return true;
 }
 
 void belluiWebViewDestroy(void *handle) {
     if (!handle) {
         return;
     }
-    BelluiWebViewClip *clip = (BelluiWebViewClip *)handle;
-    WKWebView *web = [clip webView];
+    BelluiWebViewHandle *h = (BelluiWebViewHandle *)handle;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        BelluiWebViewClip *clip = [h clip];
+        WKWebView *web = [clip webView];
 
-    // Hand the keyboard focus back before the view goes away, so the window is
-    // not left with a dead first responder.
-    belluiWebViewResignFocus(handle);
+        // Hand the keyboard focus back before the view goes away, so the
+        // window is not left with a dead first responder.
+        UIView *responder = belluiFindFirstResponder(web);
+        if (responder) {
+            [responder resignFirstResponder];
+        }
 
-    // Stop the engine before tearing the view down, so an in-flight load
-    // cannot call back into a half-released view — and clear the delegates
-    // first, so nothing that is already in flight reports through a token the
-    // Go side has just dropped.
-    [web setNavigationDelegate:nil];
-    [web setUIDelegate:nil];
-    [web stopLoading];
-    [web removeFromSuperview];
-    [clip setWebView:nil];
-    [web release]; // balances the +1 from alloc; addSubview's went with removeFromSuperview
-    [[clip navDelegate] release];
-    [clip setNavDelegate:nil];
-    [clip removeFromSuperview];
-    [clip release];
+        // Stop the engine before tearing the view down, so an in-flight load
+        // cannot call back into a half-released view — and clear the
+        // delegates first, so nothing already in flight reports through a
+        // token the Go side has just dropped.
+        [web setNavigationDelegate:nil];
+        [web setUIDelegate:nil];
+        [web stopLoading];
+        [web removeFromSuperview];
+        [clip setWebView:nil];
+        [web release]; // balances the +1 from alloc; addSubview's went with removeFromSuperview
+        [[clip navDelegate] release];
+        [clip setNavDelegate:nil];
+        [clip removeFromSuperview];
+        [h setClip:nil];  // releases the handle's retain
+        [h release];      // balances belluiWebViewCreate's alloc
+    });
 }
