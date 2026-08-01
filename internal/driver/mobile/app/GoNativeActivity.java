@@ -472,6 +472,14 @@ public class GoNativeActivity extends NativeActivity {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
+                // While a webview panel holds the keyboard, this hide is not
+                // ours to make: the driver decides for bellui's own entries
+                // only, and stomping the web view's IME made the keyboard
+                // vanish mid-typing (#76). The panel gives the keyboard back
+                // through the focus bridge, which flips it non-focusable.
+                if (webviewAnyPanelFocused()) {
+                    return;
+                }
                 composing = false;
                 composingText = "";
                 // The applied-state cache is what doShowKeyboard's idempotence
@@ -552,6 +560,14 @@ public class GoNativeActivity extends NativeActivity {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
+                // While a webview panel holds the keyboard, this hide is not
+                // ours to make: the driver decides for bellui's own entries
+                // only, and stomping the web view's IME made the keyboard
+                // vanish mid-typing (#76). The panel gives the keyboard back
+                // through the focus bridge, which flips it non-focusable.
+                if (webviewAnyPanelFocused()) {
+                    return;
+                }
                 composing = false;
                 composingText = "";
                 clearRecentBufferStates();
@@ -3854,6 +3870,14 @@ public class GoNativeActivity extends NativeActivity {
         final long token;
         FrameLayout clip;
         WebView web;
+        // The clip is hosted in its own panel WINDOW, not in the activity's
+        // view hierarchy: a NativeActivity takes the window surface for GL,
+        // so decor-view children are laid out and receive input but are never
+        // drawn (#76 measured a WebView that answered taps and ran scripts
+        // while completely invisible). A TYPE_APPLICATION_PANEL sub-window
+        // has its own surface above the activity's; FLAG_NOT_TOUCH_MODAL
+        // lets touches outside it fall through to bellui.
+        android.view.WindowManager.LayoutParams lp;
 
         // Shadow state, written on the UI thread and read from JNI threads, so
         // a synchronous query never has to block on the UI thread.
@@ -3966,14 +3990,139 @@ public class GoNativeActivity extends NativeActivity {
         host.clip.addView(web, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT));
 
-        // Added to the decor view, the same hosting shape as the accessibility
-        // host (#1104), so it sits above everything bellui draws — the
-        // documented "nothing draws above this" property of the hole punch.
-        ViewGroup decorView = (ViewGroup) getWindow().getDecorView();
-        decorView.addView(host.clip, new FrameLayout.LayoutParams(0, 0));
+        // Touching the web area is what asks for the keyboard: the panel
+        // window starts NOT_FOCUSABLE so bellui keeps receiving keys, and a
+        // touch inside flips it focusable before the WebView handles the
+        // event — the overlay dance every view-over-NativeActivity does.
+        host.clip.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View v, android.view.MotionEvent ev) {
+                if (ev.getAction() == android.view.MotionEvent.ACTION_DOWN) {
+                    webviewPanelFocusable(host, true);
+                    // The same tap that flips the window focusable is the one
+                    // the WebView uses to ask for the IME — and that request
+                    // races the flag taking effect, so it is usually dropped
+                    // (#76: "focus there does not bring the keyboard"). Nudge
+                    // the IME once window focus has actually landed.
+                    host.clip.postDelayed(new Runnable() {
+                        @Override
+                        public void run() { webviewNudgeIME(host); }
+                    }, 150);
+                    host.clip.postDelayed(new Runnable() {
+                        @Override
+                        public void run() { webviewNudgeIME(host); }
+                    }, 500);
+                }
+                return false; // the WebView still handles the touch itself
+            }
+        });
+
+        // Hosted in a panel sub-window of the activity (own surface, drawn
+        // above the GL frame) — see the comment on BelluiWebViewHost.lp for
+        // why the decor view cannot host a visible view here.
+        host.lp = new android.view.WindowManager.LayoutParams(
+                0, 0,
+                android.view.WindowManager.LayoutParams.TYPE_APPLICATION_PANEL,
+                android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                        | android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
+                        | android.view.WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                android.graphics.PixelFormat.TRANSLUCENT);
+        host.lp.gravity = Gravity.TOP | Gravity.LEFT;
+        // The panel must not dodge the IME on its own: when the keyboard
+        // opens for the web view's editor, the window manager would pan the
+        // whole panel up while bellui's per-frame geometry sync keeps putting
+        // it back — a visible tug-of-war (#76: "something keeps repositioning
+        // the webview"). bellui owns this window's position, exclusively;
+        // keyboard avoidance is the layout's job like for any other widget.
+        host.lp.softInputMode =
+                android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING;
+        host.clip.setVisibility(View.GONE); // shown once real geometry arrives
+        // NOT added here: the first attach can run before the activity's
+        // window token exists (BadTokenException — the same startup race the
+        // iOS backend had). webviewEnsureHosted adopts the panel as soon as
+        // the token appears, retried from the per-frame focus poll.
+        webviewEnsureHosted(host);
 
         synchronized (mWebViews) {
             mWebViews.put(Integer.valueOf(id), host);
+        }
+    }
+
+    // webviewEnsureHosted adds the panel window once the activity's window
+    // token exists. UI thread only; safe to call repeatedly.
+    static void webviewEnsureHosted(BelluiWebViewHost host) {
+        GoNativeActivity activity = goNativeActivity;
+        if (activity == null || host == null || host.clip == null || host.lp == null
+                || host.clip.getParent() != null) {
+            return;
+        }
+        android.os.IBinder token = activity.getWindow().getDecorView().getWindowToken();
+        if (token == null) {
+            return; // window not up yet; the focus poll retries
+        }
+        host.lp.token = token;
+        activity.getWindowManager().addView(host.clip, host.lp);
+    }
+
+    // webviewNudgeIME asks the IME to show for the web view's focused editor,
+    // used after the panel window turned focusable — the editor's own request
+    // raced the flag and was dropped. A view with no editable focus makes
+    // this a no-op.
+    static void webviewNudgeIME(BelluiWebViewHost host) {
+        GoNativeActivity activity = goNativeActivity;
+        if (activity == null || host == null || host.web == null || !host.web.hasFocus()) {
+            return;
+        }
+        android.view.inputmethod.InputMethodManager imm =
+                (android.view.inputmethod.InputMethodManager)
+                        activity.getSystemService(INPUT_METHOD_SERVICE);
+        if (imm != null) {
+            imm.showSoftInput(host.web, 0);
+        }
+    }
+
+    // webviewAnyPanelFocused reports whether any webview panel window is
+    // currently focusable — i.e. holds (or is about to hold) the keyboard.
+    static boolean webviewAnyPanelFocused() {
+        synchronized (mWebViews) {
+            for (BelluiWebViewHost h : mWebViews.values()) {
+                if (h.lp != null && (h.lp.flags
+                        & android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE) == 0) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    // webviewPanelFocusable moves real window focus between the panel and the
+    // activity — Chromium's WebView refuses to start its IME machinery
+    // without window focus, so no flag trickery substitutes (#76 measured
+    // both: ALT_FOCUSABLE_IM summons nothing, and an in-place flag update on
+    // this OEM never transfers focus, leaving the keyboard dead unless the
+    // activity had it open already). Taking focus therefore RE-ADDS the
+    // window with the focusable flags — window addition always re-evaluates
+    // focus, and the topmost focusable window wins. Giving it back is the
+    // easy direction: turning NOT_FOCUSABLE on drops focus to the activity
+    // immediately. UI thread only.
+    static void webviewPanelFocusable(BelluiWebViewHost host, boolean focusable) {
+        GoNativeActivity activity = goNativeActivity;
+        if (activity == null || host == null || host.lp == null || host.clip == null
+                || host.clip.getParent() == null) {
+            return;
+        }
+        boolean isFocusable =
+                (host.lp.flags & android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE) == 0;
+        if (focusable == isFocusable) {
+            return;
+        }
+        if (focusable) {
+            host.lp.flags &= ~android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+            activity.getWindowManager().removeView(host.clip);
+            activity.getWindowManager().addView(host.clip, host.lp);
+        } else {
+            host.lp.flags |= android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+            activity.getWindowManager().updateViewLayout(host.clip, host.lp);
         }
     }
 
@@ -4037,11 +4186,11 @@ public class GoNativeActivity extends NativeActivity {
                     host.web.destroy();
                     host.web = null;
                 }
-                ViewParent parent = host.clip.getParent();
-                if (parent instanceof ViewGroup) {
-                    ((ViewGroup) parent).removeView(host.clip);
+                if (host.clip.getParent() != null) {
+                    activity.getWindowManager().removeView(host.clip);
                 }
                 host.clip = null;
+                host.lp = null;
             }
         });
     }
@@ -4057,17 +4206,19 @@ public class GoNativeActivity extends NativeActivity {
             @Override
             public void run() {
                 BelluiWebViewHost host = webviewHost(id);
-                if (host == null || host.clip == null) {
+                if (host == null || host.clip == null || host.lp == null) {
                     return;
                 }
-                FrameLayout.LayoutParams clipParams =
-                        (FrameLayout.LayoutParams) host.clip.getLayoutParams();
-                clipParams.width = clipW;
-                clipParams.height = clipH;
-                clipParams.leftMargin = clipX;
-                clipParams.topMargin = clipY;
-                clipParams.gravity = Gravity.TOP | Gravity.LEFT;
-                host.clip.setLayoutParams(clipParams);
+                webviewEnsureHosted(host);
+                // The clip IS the panel window, so its rectangle is window
+                // geometry rather than layout margins.
+                host.lp.x = clipX;
+                host.lp.y = clipY;
+                host.lp.width = clipW;
+                host.lp.height = clipH;
+                if (host.clip.getParent() != null) {
+                    activity.getWindowManager().updateViewLayout(host.clip, host.lp);
+                }
 
                 if (host.web != null) {
                     FrameLayout.LayoutParams webParams =
@@ -4229,7 +4380,24 @@ public class GoNativeActivity extends NativeActivity {
 
     static boolean webviewHasFocus(final int id) {
         BelluiWebViewHost host = webviewHost(id);
-        return host != null && host.hasFocus;
+        if (host == null) {
+            return false;
+        }
+        if (host.clip != null && host.clip.getParent() == null) {
+            // Polled every frame by the host's focus bridge, which makes this
+            // the heartbeat that retries hosting until the window token
+            // exists (see webviewEnsureHosted).
+            final GoNativeActivity activity = goNativeActivity;
+            if (activity != null) {
+                activity.runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        webviewEnsureHosted(webviewHost(id));
+                    }
+                });
+            }
+        }
+        return host.hasFocus;
     }
 
     static boolean webviewSetFocus(final int id, final boolean take) {
@@ -4251,6 +4419,9 @@ public class GoNativeActivity extends NativeActivity {
                 if (h == null || h.web == null) {
                     return;
                 }
+                // The panel window's focusability decides where keys and the
+                // IME go; the view focus follows inside it.
+                webviewPanelFocusable(h, take);
                 if (take) {
                     h.web.setFocusableInTouchMode(true);
                     h.web.requestFocus();
