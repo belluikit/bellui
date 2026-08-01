@@ -49,3 +49,6 @@ tags
 # Persistent undo
 [._]*.un~
 hack/*/*.app/
+
+# probe build droppings
+/webviewprobe
