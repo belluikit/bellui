@@ -55,3 +55,5 @@ hack/*/*.app/
 
 # probe app bundles
 hack/*/[a-z]*.app/
+
+hack/*/*.apk
