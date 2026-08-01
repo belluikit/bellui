@@ -542,10 +542,23 @@ void belluiWebViewSetGeometry(void *handle,
         }
         belluiWebViewEnsureHosted(clip);
 
-        // UIKit already uses a top-left origin, so unlike the macOS bridge the
-        // incoming rectangles are used as they arrive.
-        [clip setFrame:CGRectMake(clipX, clipY, clipW, clipH)];
-        [[clip webView] setFrame:CGRectMake(viewX - clipX, viewY - clipY, viewW, viewH)];
+        // The incoming values are pixels (bellui points x the canvas scale).
+        // UIKit frames are in UIKit points — pixels / the screen scale, the
+        // same transform the driver's text-layout bridge uses
+        // (darwin_ios.m). On macOS the equivalent multiply is invisible
+        // because the desktop canvas scale is 1.0; here it is the display
+        // scale, and using pixels as points doubled every rectangle — the
+        // clip box spilling over the widgets below was how #75's device
+        // pass caught it.
+        CGFloat ss = [[UIScreen mainScreen] scale];
+        if (ss <= 0) {
+            ss = 1;
+        }
+        // UIKit already uses a top-left origin, so unlike the macOS bridge
+        // no flip is needed.
+        [clip setFrame:CGRectMake(clipX / ss, clipY / ss, clipW / ss, clipH / ss)];
+        [[clip webView] setFrame:CGRectMake((viewX - clipX) / ss, (viewY - clipY) / ss,
+                                            viewW / ss, viewH / ss)];
     });
 }
 
