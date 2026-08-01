@@ -100,6 +100,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -366,7 +367,7 @@ func runAuto(a bellui.App, w bellui.Window, host *webview.Host, view *webview.We
 		defer os.RemoveAll(p.dir)
 	}
 
-	fmt.Println("== #45/#66 measurements: NativeViewHost + WKWebView on macOS ==")
+	fmt.Printf("== #45/#66 measurements: NativeViewHost + the %s web engine ==\n", runtime.GOOS)
 
 	if srv, addr, err := serveProbePages(); err == nil {
 		p.addr = addr

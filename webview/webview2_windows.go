@@ -212,9 +212,15 @@ func (o comObject) call(slot int, args ...uintptr) int32 {
 		return ePointer
 	}
 	// The one deliberate look through a raw address in this package: the
-	// interface pointer came from the engine, and its vtable is the only way to
-	// reach the methods.
-	vtbl := (*[64]uintptr)(unsafe.Pointer(o))
+	// interface pointer came from the engine, and its vtable is the only way
+	// to reach the methods. Two hops, not one — the interface pointer
+	// addresses the object, whose FIRST WORD holds the vtable's address; the
+	// slots live behind that word. Collapsing them reads the object's own
+	// fields as function addresses and jumps into the engine's data (#82
+	// found this on the first live run: dialog's comCall gets the second hop
+	// for free from its typed struct, and flattening comObject to a uintptr
+	// here silently dropped it).
+	vtbl := (*[64]uintptr)(unsafe.Pointer(*(*uintptr)(unsafe.Pointer(o))))
 
 	all := make([]uintptr, 0, len(args)+1)
 	all = append(all, uintptr(o))
