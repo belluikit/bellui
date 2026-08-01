@@ -220,6 +220,15 @@ func (w *WebView) loadURLRaw(url string) {
 	if w.id == 0 {
 		return
 	}
+	// android.webkit consults shouldOverrideUrlLoading only for navigations
+	// the PAGE starts; a programmatic loadUrl bypasses it entirely, which
+	// would make LoadURL the one navigation OnNavigate never sees on this
+	// platform (#76 measured exactly that). The policy hook is applied here
+	// instead, with the same refusal semantics the engine path has: a denied
+	// main-frame load reports LoadStateFailed with ErrNavigationCancelled.
+	if !w.decideNavigation(NavigationRequest{URL: url, Kind: NavigationOther, MainFrame: true}) {
+		return
+	}
 	c := C.CString(url)
 	defer C.free(unsafe.Pointer(c))
 	withJNI(func(env uintptr) {
