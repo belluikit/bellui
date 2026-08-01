@@ -100,6 +100,7 @@ var (
 	//	cefhostprobe -profile read       -profile-dir /tmp/p   # survived?
 	//	cefhostprobe -profile write                            # in-memory, then:
 	//	cefhostprobe -profile read-empty                       # discarded?
+	live        = flag.Bool("live", false, "run the #127 live-session checks under the real driver (needs a display)")
 	profileMode = flag.String("profile", "", "persistence check step: write, read, or read-empty")
 	profileDir  = flag.String("profile-dir", "", "profile directory for -profile; empty opts into in-memory")
 	profilePort = flag.Int("profile-port", 38913, "fixed local port, so both runs share one origin")
@@ -126,6 +127,10 @@ func main() {
 		))
 	}
 
+	if *live {
+		runLive() // exits itself; the real driver owns the main goroutine
+		return
+	}
 	if *profileMode != "" {
 		runProfileStep()
 		fmt.Printf("\n== %d checks: %d PASS, %d FAIL ==\n", pass+fail, pass, fail)

@@ -180,16 +180,27 @@ func (r *offscreenHostRenderer) Layout(size geo.Size) {
 	h := r.host
 	h.raster.Resize(size)
 
+	scaleChanged := false
 	if c := h.canvas(); c != nil {
-		h.scale = c.Scale()
+		if s := c.Scale(); s != h.scale {
+			// The scale changed after creation — a monitor move, or a
+			// settings change. CEF has to be told, or content keeps
+			// rasterising at the old density. This is the toolkit's half;
+			// Chromium currently ignores the answer anyway (#139), so the
+			// blurry-HiDPI symptom outlives this fix until that closes.
+			h.scale = s
+			scaleChanged = true
+		}
 	}
 
 	w, hh := int(size.Width), int(size.Height)
-	if w != h.lastViewW || hh != h.lastViewH {
+	if w != h.lastViewW || hh != h.lastViewH || scaleChanged {
 		h.lastViewW, h.lastViewH = w, hh
 		if b := h.view.eng.browser; b != nil {
-			// CEF re-reads the size through ViewSize, so the fields above must
-			// change before this call — that ordering is the contract.
+			// CEF re-reads the size through ViewSize — and the screen info
+			// through GetScreenInfo; WasResized re-queries both, which is why
+			// a pure scale change also routes through here. The fields above
+			// must change before this call — that ordering is the contract.
 			b.Resize(w, hh)
 		}
 	}
