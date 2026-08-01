@@ -2,7 +2,10 @@
 
 package webview
 
-import "github.com/belluikit/bellui/geo"
+import (
+	"github.com/belluikit/bellui/core"
+	"github.com/belluikit/bellui/geo"
+)
 
 // newPlatformHost selects the composited offscreen host: on Linux the engine
 // renders offscreen and the content lives inside bellui's canvas, not in an
@@ -28,4 +31,9 @@ func (h *offscreenHost) setMinSize(min geo.Size) {
 // the ordinary way.
 func (h *offscreenHost) syncStats() (uint64, uint64) {
 	return 0, 0
+}
+
+// object: the offscreen host is a real widget and stands in the tree itself.
+func (h *offscreenHost) object() core.CanvasObject {
+	return h
 }
