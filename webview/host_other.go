@@ -3,6 +3,7 @@
 package webview
 
 import (
+	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/widget"
 )
@@ -36,4 +37,12 @@ func (n *nativeHostImpl) setMinSize(min geo.Size) {
 
 func (n *nativeHostImpl) syncStats() (uint64, uint64) {
 	return n.SyncStats()
+}
+
+// object hands the render tree the NativeViewHost itself, not this adapter:
+// the host's per-frame sync locates itself in the tree by identity, so an
+// adapter standing in for it would never be matched and the platform view
+// would never attach (the #82 regression).
+func (n *nativeHostImpl) object() core.CanvasObject {
+	return n.NativeViewHost
 }
