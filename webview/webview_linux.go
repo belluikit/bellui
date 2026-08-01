@@ -333,6 +333,19 @@ func (e *cefEngine) sendCDP(method string, params any) (uint64, bool) {
 // off nothing is installed at all — the queue opens immediately and the page
 // gets no channel, not an ignored one.
 func (e *cefEngine) Created() {
+	// Creation is asynchronous, so the size and scale CEF captured on the way
+	// up can already be stale — a canvas whose scale settled after the first
+	// layout (BELLUI_SCALE, a monitor pick during startup) has no later
+	// layout to notify it through, because the browser was nil while it was
+	// changing. One WasResized here makes CEF re-read ViewSize and
+	// GetScreenInfo at their current values (#127's HiDPI leg measured
+	// devicePixelRatio stuck at the creation-time scale without this).
+	if e.host != nil && e.browser != nil {
+		if w, h := e.host.viewSize(); w > 0 && h > 0 {
+			e.browser.Resize(w, h)
+		}
+	}
+
 	script := e.view.bridgeScript("window." + cefBindingName + "(s);")
 	if script == "" {
 		e.becomeReady()
