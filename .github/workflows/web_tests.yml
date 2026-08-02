@@ -46,11 +46,13 @@ jobs:
         run: go build -tags gl
 
       # Real-DOM execution leg (#73). wasmbrowsertest runs the test binary in
-      # headless Chromium, so the wasm webview backend is exercised against an
-      # actual iframe/postMessage surface rather than only type-checked. Needs
-      # `chromium` on PATH (snap on the Ubuntu runner). Scope is deliberately
-      # ./webview/ for now: the other packages' wasm test builds are not yet
-      # green (see #77), and each package costs a browser launch.
+      # headless Chromium, so the wasm packages are exercised against a real
+      # browser — real IndexedDB for app's storage tests, a real
+      # iframe/postMessage surface for webview — rather than only
+      # type-checked. Needs `chromium` on PATH (snap on the Ubuntu runner).
+      # Scope: ./webview/ plus ./app/ and ./dialog/, triaged in #79; each
+      # package costs a browser launch, and the remaining packages are still
+      # unmeasured — widen one at a time as each is triaged (#79).
       - name: Install wasmbrowsertest
         run: go install github.com/agnivade/wasmbrowsertest@v0.11.0
 
@@ -59,4 +61,4 @@ jobs:
           GOOS: js
           GOARCH: wasm
           CGO_ENABLED: "0"
-        run: go test -tags ci -exec="$(go env GOPATH)/bin/wasmbrowsertest" ./webview/
+        run: go test -tags ci -exec="$(go env GOPATH)/bin/wasmbrowsertest" ./webview/ ./app/ ./dialog/
