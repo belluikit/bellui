@@ -22,18 +22,38 @@ install:
 	install -Dm00644 usr/{{.Local}}share/applications/$(AppID).desktop $(DESTDIR)$(PREFIX)/share/applications/$(AppID).desktop
 	install -Dm00755 usr/{{.Local}}bin/$(Exec) $(DESTDIR)$(PREFIX)/bin/$(Exec)
 	install -Dm00644 usr/{{.Local}}share/pixmaps/$(Icon) $(DESTDIR)$(PREFIX)/share/pixmaps/$(Icon)
+{{- if .BundleCEF}}
+	# The CEF payload: the web engine this application bundles (bellui #107).
+	mkdir -p $(DESTDIR)$(PREFIX)/bin/cef
+	cp -r usr/{{.Local}}bin/cef/. $(DESTDIR)$(PREFIX)/bin/cef/
+	# Chromium's sandbox needs its helper setuid root. Best effort: without
+	# it the application still runs, with the sandbox disabled and a notice.
+	-chown root:root $(DESTDIR)$(PREFIX)/bin/cef/chrome-sandbox && chmod 4755 $(DESTDIR)$(PREFIX)/bin/cef/chrome-sandbox
+{{- end}}
 uninstall:
 	-rm $(DESTDIR)$(PREFIX)/share/applications/$(AppID).desktop
 	-rm $(DESTDIR)$(PREFIX)/bin/$(Exec)
 	-rm $(DESTDIR)$(PREFIX)/share/pixmaps/$(Icon)
+{{- if .BundleCEF}}
+	-rm -r $(DESTDIR)$(PREFIX)/bin/cef
+{{- end}}
 
 user-install:
 	install -Dm00644 usr/{{.Local}}share/applications/$(AppID).desktop $(DESTDIR)$(HOME)/.local/share/applications/$(AppID).desktop
 	install -Dm00755 usr/{{.Local}}bin/$(Exec) $(DESTDIR)$(HOME)/.local/bin/$(Exec)
 	install -Dm00644 usr/{{.Local}}share/pixmaps/$(Icon) $(DESTDIR)$(HOME)/.local/share/icons/$(Icon)
 	sed -i -e "s,Exec=$(Exec),Exec=$(DESTDIR)$(HOME)/.local/bin/$(Exec),g" $(DESTDIR)$(HOME)/.local/share/applications/$(AppID).desktop
+{{- if .BundleCEF}}
+	# A user install cannot make the sandbox helper setuid root; the
+	# application runs with the CEF sandbox disabled and says so.
+	mkdir -p $(DESTDIR)$(HOME)/.local/bin/cef
+	cp -r usr/{{.Local}}bin/cef/. $(DESTDIR)$(HOME)/.local/bin/cef/
+{{- end}}
 
 user-uninstall:
 	-rm $(DESTDIR)$(HOME)/.local/share/applications/$(AppID).desktop
 	-rm $(DESTDIR)$(HOME)/.local/bin/$(Exec)
 	-rm $(DESTDIR)$(HOME)/.local/share/icons/$(Icon)
+{{- if .BundleCEF}}
+	-rm -r $(DESTDIR)$(HOME)/.local/bin/cef
+{{- end}}
