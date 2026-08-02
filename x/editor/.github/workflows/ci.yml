@@ -17,9 +17,11 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # fycoder depends on the private trendvidia/fyne fork; fetch it straight from
-  # GitHub using the self-hosted runner's git credentials (no PAT needed).
-  GOPRIVATE: github.com/trendvidia/*
+  # x/editor depends on the private belluikit/* modules; fetch them straight
+  # from GitHub using the self-hosted runner's git credentials (no PAT needed).
+  # (Vestigial file from the standalone-repo era — nested workflow files never
+  # run on GitHub; the live CI for this module is the root x_tests.yml.)
+  GOPRIVATE: github.com/belluikit/*
 
 jobs:
   # Build/vet/test on the go-plus fork (macOS self-hosted). Golden image tests

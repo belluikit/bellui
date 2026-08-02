@@ -3,6 +3,7 @@ package theme
 import (
 	"image/color"
 	"log"
+	"strings"
 	"sync"
 
 	"github.com/belluikit/bellui"
@@ -68,9 +69,14 @@ var knownSizes = map[bellui.ThemeSizeName]bool{
 
 var warnedKeys sync.Map
 
-// warnUnknownColor logs a warning the first time an unknown color name is used.
+// warnUnknownColor logs a warning the first time an unknown color name is
+// used. Namespaced names (containing "." or ":", e.g. x/editor's
+// "editor.syntax.keyword" or x/tables' "fytables:rowSelected") are
+// extension-owned: a theme delegating them to the built-in palette is the
+// supported "not answered, use your default" pattern (#150), not a typo, so
+// they are exempt.
 func warnUnknownColor(name bellui.ThemeColorName) {
-	if knownColors[name] {
+	if knownColors[name] || namespacedThemeName(string(name)) {
 		return
 	}
 	if _, warned := warnedKeys.LoadOrStore("color:"+string(name), true); !warned {
@@ -79,13 +85,20 @@ func warnUnknownColor(name bellui.ThemeColorName) {
 }
 
 // warnUnknownSize logs a warning the first time an unknown size name is used.
+// Namespaced names are exempt, as in warnUnknownColor.
 func warnUnknownSize(name bellui.ThemeSizeName) {
-	if knownSizes[name] {
+	if knownSizes[name] || namespacedThemeName(string(name)) {
 		return
 	}
 	if _, warned := warnedKeys.LoadOrStore("size:"+string(name), true); !warned {
 		log.Printf("bellui theme: unknown size name %q — check for typos. Got fallback 0.", name)
 	}
+}
+
+// namespacedThemeName reports whether a theme name carries an extension
+// namespace separator, marking it owned by a package outside this one.
+func namespacedThemeName(name string) bool {
+	return strings.ContainsAny(name, ".:")
 }
 
 // ValidateTheme checks a theme implementation against all known keys and reports

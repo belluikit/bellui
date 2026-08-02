@@ -39,7 +39,7 @@ Key design: the **gutter is a separate widget** outside the Entry's scroll viewp
 
 ### Bellui fork dependency
 
-Depends on `trendvidia/fyne` (local replace in go.mod). The fork adds three fields to `widget.Entry`:
+Depends on `github.com/belluikit/bellui` (pinned release in go.mod — no `replace`; CI injects an ephemeral one against the checkout, never committed). The fork adds three fields to `widget.Entry`:
 - `OnScrolled` — fires on scroll offset changes
 - `SuppressGutter` — disables built-in gutter when external gutter is active
 - `RowMetrics()` — exposes exact row Y positions for alignment
@@ -57,4 +57,4 @@ Depends on `trendvidia/fyne` (local replace in go.mod). The fork adds three fiel
 
 - `SetText()` suppresses `OnChanged` via a `suppressChange` flag — only user edits fire the callback.
 - Gutter and decorator renderers call `Refresh()` from `Layout()` when size changes, because the initial `Refresh()` runs before `Layout()` gives the widget its real dimensions.
-- `themeColor()` falls back to built-in Monokai-inspired defaults when the app theme doesn't define fycoder's custom color names.
+- `themeColor()` asks the app theme first — defining the `editor.*` names in an app theme restyles the editor (#150). A nil or `color.Transparent` answer (the toolkit's unknown-name sentinel) falls back to the built-in Monokai-inspired defaults.
