@@ -38,7 +38,7 @@ require (
 require (
 	github.com/Microsoft/go-winio v0.6.2
 	github.com/belluikit/glfw-js v1.0.4
-	github.com/belluikit/gocef v0.2.0
+	github.com/belluikit/gocef v0.3.0
 	github.com/go-text/typesetting-utils v0.0.0-20260419141703-4ffe8874dabc
 	github.com/jsummers/gobmp v0.0.0-20230614200233-a9de23ed2e25
 	github.com/trendvidia/protowire-go v1.2.2

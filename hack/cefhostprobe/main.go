@@ -116,9 +116,15 @@ func main() {
 	runtime.LockOSThread()
 	flag.Parse()
 
-	if os.Getenv("BELLUI_CEF_DIR") == "" {
-		fmt.Println("BELLUI_CEF_DIR is unset; point it at a payload directory (libcef.so, resources, cef_helper)")
-		os.Exit(1)
+	// BELLUI_CEF_DIR is one of gocef.Locate's three answers, not a
+	// requirement: with it unset the probe exercises the packaged layout —
+	// a `cef` directory beside the executable, what `bellui package` lays
+	// out (#107) — or libcef.so beside the binary. Say which mode this run
+	// is in, so a missing-payload failure reads immediately.
+	if dir := os.Getenv("BELLUI_CEF_DIR"); dir != "" {
+		fmt.Println("  payload   BELLUI_CEF_DIR=" + dir)
+	} else {
+		fmt.Println("  payload   BELLUI_CEF_DIR unset → the packaged layout (cef/ beside the executable)")
 	}
 	if os.Getenv("DISPLAY") == "" && os.Getenv("WAYLAND_DISPLAY") == "" {
 		fmt.Println("  session   headless → --ozone-platform=headless")
