@@ -3,6 +3,7 @@ package commands
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -25,6 +26,10 @@ type unixData struct {
 	ExecParams     string
 	MimeTypes      string
 	StartupWMClass string
+
+	// BundleCEF marks a package carrying the CEF payload under bin/cef, so
+	// the Makefile installs it and sets up the sandbox helper (#107).
+	BundleCEF bool
 
 	SourceRepo, SourceDir string
 }
@@ -53,6 +58,22 @@ func (p *Packager) packageUNIX() error {
 	err := util.CopyExeFile(p.exe, binName)
 	if err != nil {
 		return fmt.Errorf("failed to copy application binary file: %w", err)
+	}
+
+	// A binary that links the CEF binding needs the engine beside it — on
+	// Linux the application bundles CEF, unlike every other webview backend
+	// (#107). Without the payload the shipped app's web views degrade to
+	// inert hosts at first Attach.
+	bundledCEF := false
+	if p.os == "linux" {
+		if ok, goarch := needsCEFPayload(p.exe); ok {
+			version, err := bundleCEFPayload(binDir, goarch)
+			if err != nil {
+				return fmt.Errorf("failed to bundle the CEF payload the executable needs: %w", err)
+			}
+			bundledCEF = true
+			log.Printf("bundled CEF %s under bin/cef — the sandbox helper needs setuid root, which `make install` sets up; without it the app runs sandbox-disabled with a notice", version)
+		}
 	}
 
 	appIDOrName := p.AppID
@@ -116,6 +137,7 @@ func (p *Packager) packageUNIX() error {
 		ExecParams:     linuxBSD.ExecParams,
 		MimeTypes:      mimes,
 		StartupWMClass: p.Name,
+		BundleCEF:      bundledCEF,
 	}
 
 	if p.sourceMetadata != nil {
