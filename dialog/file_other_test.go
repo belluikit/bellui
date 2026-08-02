@@ -1,4 +1,7 @@
-//go:build !windows
+// Tagged like file_unix.go, whose one "Computer" place this asserts: the wasm
+// build's getPlaces (file_wasm.go) returns no places at all, so places[0]
+// panicked in-browser (#79).
+//go:build !windows && !wasm && !js
 
 package dialog
 
