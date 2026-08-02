@@ -25,6 +25,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -70,7 +71,7 @@ func ensureCEFRuntime() error {
 	cache, root := resolveCEFProfile()
 	cefProfile.locked = true
 
-	err = gocef.Initialize(gocef.Config{
+	cfg := gocef.Config{
 		Dir:           dir,
 		HelperPath:    filepath.Join(dir, "cef_helper"),
 		SandboxPath:   resolveCEFSandbox(dir),
@@ -84,7 +85,17 @@ func ensureCEFRuntime() error {
 			strings.Fields(os.Getenv("BELLUI_CEF_SWITCHES")), os.Getenv("DISPLAY"),
 		),
 		LogFile: os.Getenv("BELLUI_CEF_LOG"),
-	})
+	}
+	if os.Getenv("BELLUI_CEF_EXTERNAL_PUMP") == "1" {
+		// Phase A of #120, opt-in: CEF asks for Work between frames
+		// (external_message_pump), cutting the ≤16 ms latency floor a
+		// fixed-rate pump puts under everything a page schedules. The
+		// repeat-forever animation pump keeps running alongside — over-pumping
+		// is harmless, and removing it is Phase B (with a soak behind it),
+		// tracked in its own issue.
+		cfg.PumpScheduler = cefSchedulePump
+	}
+	err = gocef.Initialize(cfg)
 	if err != nil {
 		cefRuntime.failed = fmt.Errorf("webview: CEF failed to initialize: %w", err)
 		return cefRuntime.failed
@@ -171,6 +182,42 @@ func sandboxHelperUsable(fi os.FileInfo) bool {
 		return false
 	}
 	return st.Uid == 0 && fi.Mode()&os.ModeSetuid != 0
+}
+
+// cefPump is the external-pump scheduler state (#120, Phase A). CEF's
+// contract: a schedule request REPLACES any pending one — delay <= 0 means
+// pump reasonably soon, > 0 after that many milliseconds. One timer, reset on
+// every request, implements exactly that.
+var cefPump struct {
+	mu    sync.Mutex
+	timer *time.Timer
+}
+
+// cefSchedulePump is handed to gocef as Config.PumpScheduler. It fires from
+// arbitrary CEF threads, so it only arms a timer; the Work call itself hops
+// to the main goroutine via bellui.Do — which also wakes a parked event loop
+// — preserving the backend's invariant that every CEF callback arrives inside
+// Work() on the main goroutine.
+func cefSchedulePump(delayMS int64) {
+	d := time.Duration(delayMS) * time.Millisecond
+	if d <= 0 {
+		d = time.Millisecond
+	}
+	cefPump.mu.Lock()
+	defer cefPump.mu.Unlock()
+	if cefPump.timer == nil {
+		cefPump.timer = time.AfterFunc(d, func() { bellui.Do(cefPumpOnce) })
+		return
+	}
+	cefPump.timer.Reset(d)
+}
+
+// cefPumpOnce runs one scheduled Work on the main goroutine. The runtime is
+// never shut down, so a late-firing timer at worst pumps an idle loop.
+func cefPumpOnce() {
+	if cefRuntime.running {
+		gocef.Work()
+	}
 }
 
 // cefBrowserCreated counts a browser from the moment its creation is
