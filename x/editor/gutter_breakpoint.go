@@ -44,6 +44,10 @@ func (g *BreakpointGutter) dotScale() float32 {
 	return 0.6
 }
 
+// GutterColumn implements [GutterColumnProvider]: breakpoints are a leading
+// marker column.
+func (g *BreakpointGutter) GutterColumn() GutterColumn { return GutterColumnMarker }
+
 // Width implements [GutterProvider].
 // The breakpoint column is sized to fit a dot with padding.
 func (g *BreakpointGutter) Width(_ int, textSize float32) float32 {

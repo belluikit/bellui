@@ -11,6 +11,8 @@
 //
 //   - [Highlighter] provides per-line syntax highlighting via [StyleRun] tokens.
 //   - [GutterProvider] renders the area left of the text (line numbers, markers).
+//     [NewCompositeGutter] arranges several providers into the conventional
+//     column order — markers, line numbers, fold control — see [GutterColumn].
 //   - [RowDecorator] adds background or overlay effects to individual text rows.
 //
 // The gutter is rendered as a separate widget outside the text scroll viewport,
