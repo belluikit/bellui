@@ -261,28 +261,7 @@ func main() {
 	check(err == nil && strings.Contains(string(res), "a"),
 		fmt.Sprintf("the keystroke arrived (got %s)", res))
 
-	// --- in-page Tab traversal (#126) ----------------------------------------
-	fmt.Println("\n[tab] plain Tab walks the page's own tab order; the escape leaves it")
-	tabOK := false
-	if tb, ok := tc.Focused().(event.Tabbable); ok {
-		tabOK = tb.AcceptsTab()
-	}
-	check(tabOK, "the focused host captures plain Tab (event.Tabbable)")
-
-	tab(tc, clickAt, false)
-	res, err = evalResult(view, "document.activeElement.id")
-	check(err == nil && strings.Contains(string(res), "first"),
-		fmt.Sprintf("Tab focused the page's first input (activeElement %s)", res))
-
-	tab(tc, clickAt, false)
-	res, err = evalResult(view, "document.activeElement.id")
-	check(err == nil && strings.Contains(string(res), "second"),
-		fmt.Sprintf("a second Tab advanced to the next input (activeElement %s)", res))
-
-	tab(tc, clickAt, true)
-	res, err = evalResult(view, "document.activeElement.id")
-	check(err == nil && strings.Contains(string(res), "first"),
-		fmt.Sprintf("Shift+Tab traversed backwards (activeElement %s)", res))
+	runTabAndIMEChecks(tc, view, clickAt)
 
 	// --- navigation veto ------------------------------------------------------
 	fmt.Println("\n[nav] OnNavigate veto")
@@ -407,6 +386,21 @@ func runProfileStep() {
 }
 
 // evalResult runs js and waits for its result, pumping CEF meanwhile.
+// evalString evaluates js and decodes a JSON string result: CDP escapes
+// non-ASCII (`に…`), so a raw substring check against a UTF-8 literal
+// always fails for CJK — the [ime] section's checks decode first.
+func evalString(view *webview.WebView, js string) (string, error) {
+	res, err := evalResult(view, js)
+	if err != nil {
+		return "", err
+	}
+	var s string
+	if json.Unmarshal(res, &s) != nil {
+		return string(res), nil
+	}
+	return s, nil
+}
+
 func evalResult(view *webview.WebView, js string) (json.RawMessage, error) {
 	var res json.RawMessage
 	var resErr error
@@ -574,5 +568,82 @@ func writePNG(img image.Image, name string) {
 	defer f.Close()
 	if err := png.Encode(f, img); err != nil {
 		fmt.Println("  dump:", err)
+	}
+}
+
+// runTabAndIMEChecks drives the #126 in-page Tab traversal and the #121 IME
+// composition sections, split out of main to stay under the
+// cyclomatic-complexity cap.
+func runTabAndIMEChecks(tc core.Canvas, view *webview.WebView, clickAt geo.Position) {
+	// --- in-page Tab traversal (#126) ----------------------------------------
+	fmt.Println("\n[tab] plain Tab walks the page's own tab order; the escape leaves it")
+	tabOK := false
+	if tb, ok := tc.Focused().(event.Tabbable); ok {
+		tabOK = tb.AcceptsTab()
+	}
+	check(tabOK, "the focused host captures plain Tab (event.Tabbable)")
+
+	tab(tc, clickAt, false)
+	res, err := evalResult(view, "document.activeElement.id")
+	check(err == nil && strings.Contains(string(res), "first"),
+		fmt.Sprintf("Tab focused the page's first input (activeElement %s)", res))
+
+	tab(tc, clickAt, false)
+	res, err = evalResult(view, "document.activeElement.id")
+	check(err == nil && strings.Contains(string(res), "second"),
+		fmt.Sprintf("a second Tab advanced to the next input (activeElement %s)", res))
+
+	tab(tc, clickAt, true)
+	res, err = evalResult(view, "document.activeElement.id")
+	check(err == nil && strings.Contains(string(res), "first"),
+		fmt.Sprintf("Shift+Tab traversed backwards (activeElement %s)", res))
+
+	// --- IME composition (#121) ----------------------------------------------
+	// Rides [tab]'s end state: the page's #first input holds focus, which is
+	// what a composition needs as its target. The probe drives the Composable
+	// seam exactly as the desktop driver does — preedit via Compose, committed
+	// text via TypedRune, cancel via ComposeCancel.
+	fmt.Println("\n[ime] composition through the Composable seam")
+	comp, isComp := tc.Focused().(event.Composable)
+	check(isComp, "the focused host accepts IME composition (event.Composable)")
+	if isComp {
+		comp.Compose(&event.PreeditEvent{Text: "にほ", CursorPos: 2})
+		pump(500*time.Millisecond, nil)
+		val, verr := evalString(view, "document.getElementById('first').value")
+		check(verr == nil && val == "にほ",
+			fmt.Sprintf("the preedit renders inline in the page's input (value %q)", val))
+
+		// The candidate window's anchor arrives from CEF's composition-range
+		// report, in view coordinates — bellui points. The input sits at
+		// (8,120)+, so a plausible caret rect is the DIP-units check.
+		pr := tc.Focused().(event.PreeditPositioner).PreeditCursorRectangle()
+		check(!pr.Size.IsZero() && pr.Pos.X > 0 && pr.Pos.Y > 100 && pr.Pos.Y < 200,
+			fmt.Sprintf("PreeditCursorRectangle anchors inside the input (%+v)", pr))
+
+		// Desktop commit: chars via TypedRune. The first completes the active
+		// composition (ImeCommitText), the second inserts as a plain char.
+		k := tc.Focused().(interface{ TypedRune(rune) })
+		k.TypedRune('日')
+		k.TypedRune('本')
+		pump(500*time.Millisecond, nil)
+		val, verr = evalString(view, "document.getElementById('first').value")
+		check(verr == nil && val == "日本",
+			fmt.Sprintf("committed text replaced the preedit (value %q)", val))
+
+		// Cancel discards without applying.
+		comp.Compose(&event.PreeditEvent{Text: "x", CursorPos: 1})
+		pump(300*time.Millisecond, nil)
+		comp.ComposeCancel()
+		pump(300*time.Millisecond, nil)
+		val, verr = evalString(view, "document.getElementById('first').value")
+		check(verr == nil && val == "日本",
+			fmt.Sprintf("a cancelled composition was discarded (value %q)", val))
+
+		// Astral-plane input rides ImeCommitText instead of being dropped.
+		k.TypedRune('😀')
+		pump(500*time.Millisecond, nil)
+		val, verr = evalString(view, "document.getElementById('first').value")
+		check(verr == nil && val == "日本😀",
+			fmt.Sprintf("an astral rune committed through the IME route (value %q)", val))
 	}
 }

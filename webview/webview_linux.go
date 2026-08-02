@@ -610,6 +610,14 @@ func (e *cefEngine) Paint(buf []byte, w, h int, popup bool) {
 	}
 }
 
+// ImeCompositionRangeChanged implements gocef.ImeHandler: the caret rect for
+// the candidate window flows to the host's PreeditPositioner (#121).
+func (e *cefEngine) ImeCompositionRangeChanged(sel gocef.Range, bounds []gocef.Rect) {
+	if e.host != nil && e.browser != nil {
+		e.host.engineImeCompositionRange(sel, bounds)
+	}
+}
+
 func (e *cefEngine) AcceleratedPaint(gocef.AcceleratedFrame) {
 	// Never requested: browsers are created with sharedTexture off. The
 	// dma-buf import into the WebGPU painter is #113, unscheduled — the CPU
@@ -641,4 +649,5 @@ var (
 	_ gocef.DevToolsHandler   = (*cefEngine)(nil)
 	_ gocef.LoadHandler       = (*cefEngine)(nil)
 	_ gocef.NavigationHandler = (*cefEngine)(nil)
+	_ gocef.ImeHandler        = (*cefEngine)(nil)
 )
