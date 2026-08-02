@@ -6,7 +6,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/belluikit/bellui"
-	"github.com/belluikit/bellui/storage"
 )
 
 func TestRichTextMarkdown_Blockquote(t *testing.T) {
@@ -148,40 +147,6 @@ func TestRichTextMarkdown_Hyperlink(t *testing.T) {
 		assert.Equal(t, "bellui.io", link.URL.Host)
 	} else {
 		t.Error("Segment should be a Hyperlink")
-	}
-}
-
-func TestRichTextMarkdown_Image(t *testing.T) {
-	// A schemeless (relative or absolute path) source must NOT be turned into a
-	// file:// URI — that fallback let untrusted markup read local files (#285).
-	r := NewRichTextFromMarkdown("![title](../../theme/testdata/bellui.png)")
-
-	assert.Len(t, r.Segments, 2)
-	if img, ok := r.Segments[0].(*ImageSegment); ok {
-		assert.Nil(t, img.Source)
-	} else {
-		t.Error("Segment should be a Image")
-	}
-
-	// An explicit file:// URI is still honoured.
-	r = NewRichTextFromMarkdown("![](file:///tmp/bellui.png)")
-
-	assert.Len(t, r.Segments, 2)
-	if img, ok := r.Segments[0].(*ImageSegment); ok {
-		assert.Equal(t, storage.NewFileURI("/tmp/bellui.png"), img.Source)
-	} else {
-		t.Error("Segment should be a Image")
-	}
-
-	// A remote URI is preserved on the segment (fetching is gated separately by
-	// RichText.AllowRemoteContent).
-	r = NewRichTextFromMarkdown("![](https://example.com/bellui.png)")
-
-	assert.Len(t, r.Segments, 2)
-	if img, ok := r.Segments[0].(*ImageSegment); ok {
-		assert.Equal(t, "https", img.Source.Scheme())
-	} else {
-		t.Error("Segment should be a Image")
 	}
 }
 

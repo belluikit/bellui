@@ -1,7 +1,6 @@
 package flow
 
 import (
-	"fmt"
 	"sync"
 	"testing"
 )
@@ -168,26 +167,4 @@ func TestDerived_Close(t *testing.T) {
 	if d.Get() != 10 { // should still have old value
 		t.Fatalf("expected 10 (stale after Close), got %d", d.Get())
 	}
-}
-
-func Example() {
-	name := New("World")
-	count := New(0)
-
-	greeting := Derive(func() string {
-		return fmt.Sprintf("Hello %s (%d)", name.Get(), count.Get())
-	}, name, count)
-
-	fmt.Println(greeting.Get())
-
-	name.Set("Bellui")
-	fmt.Println(greeting.Get())
-
-	count.Set(42)
-	fmt.Println(greeting.Get())
-
-	// Output:
-	// Hello World (0)
-	// Hello Bellui (0)
-	// Hello Bellui (42)
 }

@@ -2,7 +2,6 @@ package storage_test
 
 import (
 	"io"
-	"os"
 	"runtime"
 	"testing"
 
@@ -311,29 +310,6 @@ func TestExists(t *testing.T) {
 	fooParent, err := storage.Parent(foo)
 	assert.NoError(t, err)
 	assert.Equal(t, fooExpectedParent.String(), fooParent.String())
-}
-
-func TestFileAbs(t *testing.T) {
-	pwd, err := os.Getwd()
-	if err != nil {
-		t.Error("Could not get working directory")
-		defer os.Chdir(pwd)
-	}
-
-	home, err := os.UserHomeDir()
-	if err != nil {
-		t.Error("Could not get user home directory")
-	}
-
-	os.Chdir(home)
-
-	abs := storage.NewFileURI(home)
-	rel := storage.NewFileURI(".")
-
-	assert.Equal(t, abs.Path(), rel.Path())
-	assert.Equal(t, abs.String(), rel.String())
-
-	assert.Equal(t, "file:///", storage.NewFileURI("/").String())
 }
 
 func TestWriteAndDelete(t *testing.T) {

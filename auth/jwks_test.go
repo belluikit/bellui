@@ -1,3 +1,10 @@
+// Every positive path here fetches JWKS/discovery documents from an
+// in-process httptest server, which cannot listen inside a browser — and
+// without it the negative tests would pass for the wrong reason (any fetch
+// error also fails verification).
+// (#77's split convention; #79 Phase B.)
+//go:build !wasm
+
 package auth
 
 import (
