@@ -69,6 +69,8 @@ window.downs = [];
 window.keys = [];
 document.addEventListener('mousedown', function (e) { window.downs.push([e.clientX, e.clientY]); });
 document.addEventListener('keydown', function (e) { window.keys.push(e.key); });
+window.n = 0;
+(function tick() { window.n++; setTimeout(tick, 5); })();
 </script>
 </body>`
 
@@ -122,6 +124,19 @@ func liveChecks(w bellui.Window, view *webview.WebView) {
 	check(err == nil && strings.Contains(string(res), "complete"),
 		fmt.Sprintf("the page loaded with no probe-side pumping (got %s, err %v)", res, err))
 	fmt.Printf("  wayland   build.IsWayland=%v (runtime-selected)\n", build.IsWayland)
+
+	// --- external pump (#120, opt-in) ---------------------------------------
+	// With BELLUI_CEF_EXTERNAL_PUMP=1 CEF schedules its own Work between
+	// frames: the page's 5 ms setTimeout chain then runs near full speed
+	// (~200/s) instead of at the 60 Hz frame pump's ceiling (~60/s).
+	if os.Getenv("BELLUI_CEF_EXTERNAL_PUMP") == "1" {
+		fmt.Println("\n[live/pump-external] CEF-scheduled work between frames")
+		n1 := liveEvalInt(view, "window.n")
+		time.Sleep(time.Second)
+		n2 := liveEvalInt(view, "window.n")
+		check(n2-n1 >= 120,
+			fmt.Sprintf("5 ms page timers ran at scheduled speed: %d ticks in ~1 s (frame-pump ceiling is ~60)", n2-n1))
+	}
 
 	// --- composition through the real painter -------------------------------
 	fmt.Println("\n[live/compose] web frames through the real painter, seen by Capture")
@@ -437,4 +452,18 @@ func liveSeamClick(w bellui.Window, pos geo.Position) {
 	}
 	time.Sleep(150 * time.Millisecond)
 	bellui.DoAndWait(func() { m.MouseUp(ev) })
+}
+
+// liveEvalInt evaluates a numeric expression, answering -1 on any failure so
+// a delta check fails loudly rather than comparing garbage.
+func liveEvalInt(view *webview.WebView, js string) int {
+	res, err := liveEval(view, js, 10*time.Second)
+	if err != nil {
+		return -1
+	}
+	var n int
+	if json.Unmarshal(res, &n) != nil {
+		return -1
+	}
+	return n
 }
