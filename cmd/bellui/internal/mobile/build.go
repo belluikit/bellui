@@ -39,14 +39,15 @@ func runBuild(cmd *command) error {
 }
 
 // AppOutputName provides the name of a build resource for a given os - "ios" or "android".
-func AppOutputName(os, name string, release bool) string {
+// The .aab bundle is only produced for distribution builds ("bellui release");
+// a plain or --release package is an installable .apk (#144).
+func AppOutputName(os, name string, distribution bool) string {
 	switch os {
 	case "android/arm", "android/arm64", "android/amd64", "android/386", "android":
-		if release {
+		if distribution {
 			return androidPkgName(name) + ".aab"
-		} else {
-			return androidPkgName(name) + ".apk"
 		}
+		return androidPkgName(name) + ".apk"
 	case "ios", "iossimulator":
 		return rfc1034Label(name) + ".app"
 	}
@@ -119,7 +120,7 @@ func runBuildImpl(cmd *command) (*packages.Package, error) {
 			target = 34
 		}
 		nmpkgs, err = goAndroidBuild(pkg, buildBundleID, targetArchs, cmd.IconPath, cmd.AppName, cmd.Version, cmd.Build,
-			target, buildRelease, cmd.iconFG, cmd.iconBG, cmd.iconMono)
+			target, buildRelease, buildDistribution, cmd.iconFG, cmd.iconBG, cmd.iconMono)
 		if err != nil {
 			return nil, err
 		}
@@ -127,7 +128,11 @@ func runBuildImpl(cmd *command) (*packages.Package, error) {
 		if !xcodeAvailable() {
 			return nil, fmt.Errorf("-os=ios requires XCode")
 		}
-		if buildRelease {
+		// Keyed on distribution, not buildRelease: parseBuildTarget rewrites
+		// allArchs["ios"] to the host arch for iossimulator, and narrowing it
+		// back to device slices under a mere --release would force a device
+		// build into a simulator target (#144).
+		if buildDistribution {
 			if len(allArchs["ios"]) > 2 {
 				targetArchs = []string{"arm", "arm64"}
 			} else {
@@ -219,22 +224,23 @@ func printcmd(format string, args ...any) {
 
 // "Build flags", used by multiple commands.
 var (
-	buildA          bool        // -a
-	buildI          bool        // -i
-	buildN          bool        // -n
-	buildV          bool        // -v
-	buildX          bool        // -x
-	buildO          string      // -o
-	buildGcflags    string      // -gcflags
-	buildLdflags    string      // -ldflags
-	buildRelease    bool        // -release
-	buildTarget     string      // -os
-	buildTrimpath   bool        // -trimpath
-	buildWork       bool        // -work
-	buildBundleID   string      // -bundleid
-	buildIOSVersion string      // -iosversion
-	buildAndroidAPI int         // -androidapi
-	buildTags       stringsFlag // -tags
+	buildA            bool        // -a
+	buildI            bool        // -i
+	buildN            bool        // -n
+	buildV            bool        // -v
+	buildX            bool        // -x
+	buildO            string      // -o
+	buildGcflags      string      // -gcflags
+	buildLdflags      string      // -ldflags
+	buildRelease      bool        // -release: optimized, non-debuggable build (see RunNewBuild)
+	buildDistribution bool        // store-distribution artifact: .aab, distribution cert, external signing
+	buildTarget       string      // -os
+	buildTrimpath     bool        // -trimpath
+	buildWork         bool        // -work
+	buildBundleID     string      // -bundleid
+	buildIOSVersion   string      // -iosversion
+	buildAndroidAPI   int         // -androidapi
+	buildTags         stringsFlag // -tags
 
 	// buildURLSchemes and buildFileMimeTypes carry the file-type / URL-scheme
 	// handler declarations from manifest.pxf into the generated AndroidManifest.xml
@@ -254,13 +260,26 @@ var (
 )
 
 // RunNewBuild executes a new mobile build for the specified configuration
+// RunNewBuild carries two distinct bits (#144):
+//
+//   - release ("bellui package --release"): an optimized, non-debuggable
+//     build — stripped ldflags, trimpath, the release build tag, a
+//     non-debuggable manifest and current targetSdk — that still produces a
+//     locally installable artifact (.apk, debug-key-signed).
+//   - distribution ("bellui release", which sets both): the store artifact —
+//     .aab via bundletool, distribution certificate on iOS, signing left to
+//     the caller's keystore.
+//
+// They used to be conflated (buildRelease = distribution), which made
+// "package --release" ship a debug-manifested APK.
 func RunNewBuild(target, appID, icon, name, version string, build int, release, distribution bool, cert, profile string,
 	tags []string, iconFG, iconBG, iconMono string, urlSchemes, fileMimeTypes []string,
 	iosUsageDescriptions map[string]string, associatedDomains []string,
 ) error {
 	buildTarget = target
 	buildBundleID = appID
-	buildRelease = distribution
+	buildRelease = release || distribution
+	buildDistribution = distribution
 	buildTags = tags
 	buildURLSchemes = urlSchemes
 	buildFileMimeTypes = fileMimeTypes

@@ -67,7 +67,7 @@ func (i *Installer) AddFlags() {
 	flag.StringVar(&i.installDir, "dst", "", "A specific location to install to, rather than the OS default")
 	flag.StringVar(&i.icon, "icon", "Icon.png", "The name of the application icon file")
 	flag.StringVar(&i.AppID, "app-id", "", "For ios or darwin targets an app-id is required, for ios this must \nmatch a valid provisioning profile")
-	flag.BoolVar(&i.release, "release", false, "Should this package be installed in release mode? (disable debug etc)")
+	flag.BoolVar(&i.release, "release", false, "Install a release-mode build: optimized, non-debuggable (use 'bellui release' for store distribution)")
 }
 
 // PrintHelp prints the help for the install command.
@@ -294,7 +294,7 @@ func (i *Installer) install() error {
 }
 
 func (i *Installer) installAndroid() error {
-	target := mobile.AppOutputName(i.os, i.Packager.Name, i.release)
+	target := mobile.AppOutputName(i.os, i.Packager.Name, i.Packager.distribution)
 
 	_, err := os.Stat(target)
 	if os.IsNotExist(err) {
@@ -308,7 +308,7 @@ func (i *Installer) installAndroid() error {
 }
 
 func (i *Installer) installIOS() error {
-	target := mobile.AppOutputName(i.os, i.Packager.Name, i.release)
+	target := mobile.AppOutputName(i.os, i.Packager.Name, i.Packager.distribution)
 
 	// Always redo the package because the codesign for ios and iossimulator
 	// must be different.

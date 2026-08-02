@@ -39,7 +39,7 @@ func Release() *cli.Command {
 			stringFlags["keystore"](&r.keyStore),
 			stringFlags["keystore-pass"](&r.keyStorePass),
 			stringFlags["key-name"](&r.keyName),
-			stringFlags["key-pass"](&r.keyStorePass),
+			stringFlags["key-pass"](&r.keyPass),
 			stringFlags["name"](&r.Name),
 			stringFlags["tags"](&r.tags),
 			stringFlags["app-version"](&r.AppVersion),
@@ -153,7 +153,7 @@ func (r *Releaser) releaseAction(_ *cli.Context) error {
 
 func (r *Releaser) afterPackage() error {
 	if util.IsAndroid(r.os) {
-		target := mobile.AppOutputName(r.os, r.Packager.Name, r.release)
+		target := mobile.AppOutputName(r.os, r.Packager.Name, r.distribution)
 		apk := filepath.Join(r.dir, target)
 		if err := r.zipAlign(apk); err != nil {
 			return err
@@ -213,7 +213,7 @@ func (r *Releaser) packageIOSRelease() error {
 	payload := filepath.Join(r.dir, "Payload")
 	_ = os.Mkdir(payload, 0o750)
 	defer os.RemoveAll(payload)
-	appName := mobile.AppOutputName(r.os, r.Name, r.release)
+	appName := mobile.AppOutputName(r.os, r.Name, r.distribution)
 	payloadAppDir := filepath.Join(payload, appName)
 	if err := os.Rename(filepath.Join(r.dir, appName), payloadAppDir); err != nil {
 		return err
@@ -314,7 +314,7 @@ func (r *Releaser) packageWindowsRelease(outFile string) error {
 func (r *Releaser) signAndroid(path string) error {
 	signer := "jarsigner"
 	var args []string
-	if r.release {
+	if r.distribution {
 		args = []string{"-keystore", r.keyStore}
 	} else {
 		signer = filepath.Join(util.AndroidBuildToolsPath(), "/apksigner")
@@ -322,21 +322,21 @@ func (r *Releaser) signAndroid(path string) error {
 	}
 
 	if r.keyStorePass != "" {
-		if r.release {
+		if r.distribution {
 			args = append(args, "-storepass", r.keyStorePass)
 		} else {
 			args = append(args, "--ks-pass", "pass:"+r.keyStorePass)
 		}
 	}
 	if r.keyPass != "" {
-		if r.release {
+		if r.distribution {
 			args = append(args, "-keypass", r.keyPass)
 		} else {
 			args = append(args, "--key-pass", "pass:"+r.keyPass)
 		}
 	}
 	args = append(args, path)
-	if r.release {
+	if r.distribution {
 		if r.keyName == "" { // Required to sign Google Play .aab
 			return errors.New("missing required --key-name (alias) parameter")
 		}
