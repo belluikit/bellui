@@ -51,6 +51,22 @@ func (e *Editor) RedactionMode() RedactionMode {
 	return e.redaction.mode
 }
 
+// Redactions returns a copy of the current redaction spans, in the order they
+// were last set, as anchor-tracking has shifted them through edits since
+// (#130). It returns nil when none are set.
+//
+// This is the read-back for hosts that derive per-span state from the spans —
+// a reveal-this-secret toggle, a re-locate of secrets before save: the host's
+// own copy of what it passed to [Editor.SetRedactions] goes stale with every
+// edit, while these are the spans the editor is actually drawing (#158). The
+// symmetric accessor to [Editor.ProtectedRanges].
+func (e *Editor) Redactions() []TextRange {
+	if len(e.redaction.ranges) == 0 {
+		return nil
+	}
+	return append([]TextRange{}, e.redaction.ranges...)
+}
+
 // redactionController owns the redacted spans and the mask/reveal mode. It is an
 // internal [SpanDecorator] (drawing opaque bars when masked) and the owner of
 // the Entry's CaretOpaque ProtectedRanges — the field reserved for caret-barring
