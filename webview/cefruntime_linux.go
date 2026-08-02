@@ -25,9 +25,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/belluikit/bellui"
+	"github.com/belluikit/bellui/internal/build"
 	"github.com/belluikit/gocef"
 )
 
@@ -71,6 +73,7 @@ func ensureCEFRuntime() error {
 	err = gocef.Initialize(gocef.Config{
 		Dir:           dir,
 		HelperPath:    filepath.Join(dir, "cef_helper"),
+		SandboxPath:   resolveCEFSandbox(dir),
 		CachePath:     cache,
 		RootCachePath: root,
 		// Diagnostic and deployment seams, matching BELLUI_CEF_DIR's shape:
@@ -86,6 +89,51 @@ func ensureCEFRuntime() error {
 	}
 	cefRuntime.running = true
 	return nil
+}
+
+// resolveCEFSandbox is the #107 sandbox decision, recorded here rather than
+// left to chance. Chromium's Linux sandbox needs the payload's chrome-sandbox
+// helper owned by root with the setuid bit — and with the sandbox enabled but
+// no usable helper (user namespaces are restricted on recent Debian/Ubuntu),
+// Chromium aborts the process rather than reporting an error. So:
+//
+//   - In a Flatpak the sandbox stays off with no complaint: bubblewrap
+//     already provides the isolation — what Chromium-based Flatpaks do — and
+//     a Flatpak cannot ship a setuid binary anyway. (A flatpak'd app built
+//     without the flatpak tag still lands right: its helper cannot be
+//     setuid-root inside the container, so the ownership gate below applies.)
+//   - Outside one, the helper is used exactly when it is present and
+//     correctly owned — `make install` from the packaged tarball sets that
+//     up — and otherwise the sandbox is disabled with a notice, never a
+//     guess that could turn a missing file into a crash.
+//
+// Returns the helper path to enable the sandbox with, or "" to run without.
+func resolveCEFSandbox(dir string) string {
+	if build.IsFlatpak {
+		return ""
+	}
+	sb := filepath.Join(dir, "chrome-sandbox")
+	fi, err := os.Stat(sb)
+	if err != nil {
+		bellui.LogError("webview: running with the CEF sandbox disabled — the payload has no chrome-sandbox helper", nil)
+		return ""
+	}
+	if !sandboxHelperUsable(fi) {
+		bellui.LogError("webview: running with the CEF sandbox disabled — "+sb+
+			" must be owned by root with the setuid bit (chown root:root && chmod 4755, as the packaged Makefile's install does)", nil)
+		return ""
+	}
+	return sb
+}
+
+// sandboxHelperUsable reports whether the stat result describes a helper the
+// zygote host will accept: owned by root, setuid.
+func sandboxHelperUsable(fi os.FileInfo) bool {
+	st, ok := fi.Sys().(*syscall.Stat_t)
+	if !ok {
+		return false
+	}
+	return st.Uid == 0 && fi.Mode()&os.ModeSetuid != 0
 }
 
 // cefBrowserCreated counts a browser from the moment its creation is
