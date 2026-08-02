@@ -126,14 +126,15 @@ func TestVideoSurfaceCopiesPixels(t *testing.T) {
 	}
 }
 
-func TestVideoSurfaceStreamingMatchesPainter(t *testing.T) {
+func TestVideoSurfaceStreamingAlwaysOn(t *testing.T) {
 	s := newVideoSurface(320, 240)
-	// Streaming is only safe on the GL painter. Under WebGPU it must stay off:
-	// Canvas.freeObject skips releasing a streaming raster's texture, so the
-	// video would freeze on its first frame.
-	if s.raster.Streaming != streamingSupported {
-		t.Errorf("Streaming = %v, want %v for this painter backend",
-			s.raster.Streaming, streamingSupported)
+	// Both GPU painters implement the in-place streaming update (GL:
+	// TexSubImage2D; WebGPU since #34: WriteTexturePixels), and the software
+	// painter treats Streaming as a no-op — so it is set unconditionally
+	// (#100). The old per-painter constant guarded against a WebGPU freeze
+	// that #34 fixed.
+	if !s.raster.Streaming {
+		t.Error("Streaming = false, want true under every painter (#100)")
 	}
 	if s.raster.StreamPixW != 320 || s.raster.StreamPixH != 240 {
 		t.Errorf("stream dims = %dx%d, want 320x240", s.raster.StreamPixW, s.raster.StreamPixH)
@@ -149,8 +150,8 @@ func TestVideoSurfaceHandlesNilAndZeroSize(t *testing.T) {
 }
 
 // TestVideoSurfaceGeneratorNotNil is a regression test for a crash that unit
-// tests could not previously see. Only the GL painter implements the
-// Streaming/SetPixels fast path; the WebGPU painter calls Generator
+// tests could not previously see. Both GPU painters implement the
+// Streaming/SetPixels fast path, but the WebGPU painter still calls Generator
 // unconditionally in rasterizeRaster, so a nil Generator segfaults on the
 // first paint. The gallery runs WebGPU, and it crashed there.
 func TestVideoSurfaceGeneratorNotNil(t *testing.T) {
