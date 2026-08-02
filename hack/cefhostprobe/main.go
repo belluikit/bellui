@@ -70,15 +70,21 @@ var (
 // cefprobe used, so the three reports compare directly.
 const probePage = `<!doctype html>
 <body style="margin:0;background:#ff00aa">
+<input id="first" style="position:absolute;top:120px;left:8px">
+<input id="second" style="position:absolute;top:160px;left:8px">
 <script>
 window.shimAtStart = typeof window.bellui;
 window.downs = [];
 window.keys = [];
+window.focusTrail = [];
 document.addEventListener('mousedown', function (e) {
   window.downs.push([e.clientX, e.clientY]);
 });
 document.addEventListener('keydown', function (e) {
   window.keys.push(e.key);
+});
+document.addEventListener('focusin', function (e) {
+  window.focusTrail.push(e.target.id || e.target.tagName);
 });
 if (window.bellui) {
   window.bellui.handle('greet', function (name) {
@@ -254,6 +260,29 @@ func main() {
 	res, err = evalResult(view, "JSON.stringify(window.keys)")
 	check(err == nil && strings.Contains(string(res), "a"),
 		fmt.Sprintf("the keystroke arrived (got %s)", res))
+
+	// --- in-page Tab traversal (#126) ----------------------------------------
+	fmt.Println("\n[tab] plain Tab walks the page's own tab order; the escape leaves it")
+	tabOK := false
+	if tb, ok := tc.Focused().(event.Tabbable); ok {
+		tabOK = tb.AcceptsTab()
+	}
+	check(tabOK, "the focused host captures plain Tab (event.Tabbable)")
+
+	tab(tc, clickAt, false)
+	res, err = evalResult(view, "document.activeElement.id")
+	check(err == nil && strings.Contains(string(res), "first"),
+		fmt.Sprintf("Tab focused the page's first input (activeElement %s)", res))
+
+	tab(tc, clickAt, false)
+	res, err = evalResult(view, "document.activeElement.id")
+	check(err == nil && strings.Contains(string(res), "second"),
+		fmt.Sprintf("a second Tab advanced to the next input (activeElement %s)", res))
+
+	tab(tc, clickAt, true)
+	res, err = evalResult(view, "document.activeElement.id")
+	check(err == nil && strings.Contains(string(res), "first"),
+		fmt.Sprintf("Shift+Tab traversed backwards (activeElement %s)", res))
 
 	// --- navigation veto ------------------------------------------------------
 	fmt.Println("\n[nav] OnNavigate veto")
@@ -446,6 +475,32 @@ func keyboard(c core.Canvas, pos geo.Position) {
 	k.TypedRune('a')
 	pump(300*time.Millisecond, nil)
 	k.KeyUp(&event.KeyEvent{Name: event.KeyA})
+	pump(300*time.Millisecond, nil)
+}
+
+// tab delivers a Tab press the way the desktop driver does when the focused
+// object is an event.Tabbable answering true (#126): KeyDown with the raw
+// key, TypedKey with the char event, then the release. Shift rides the
+// modifier for backward traversal.
+func tab(c core.Canvas, pos geo.Position, shift bool) {
+	o, _, _ := intdriver.FindObjectAtPositionMatching(pos, func(o core.CanvasObject) bool {
+		_, ok := o.(desktop.Keyable)
+		return ok
+	}, c.Overlays().List(), c.Content())
+	if o == nil {
+		fmt.Println("  no Keyable at", pos)
+		return
+	}
+	var mod event.KeyModifier
+	if shift {
+		mod = event.KeyModifierShift
+	}
+	ev := &event.KeyEvent{Name: event.KeyTab, Modifier: mod}
+	k := o.(desktop.Keyable)
+	k.KeyDown(ev)
+	o.(interface{ TypedKey(*event.KeyEvent) }).TypedKey(ev)
+	pump(300*time.Millisecond, nil)
+	k.KeyUp(ev)
 	pump(300*time.Millisecond, nil)
 }
 

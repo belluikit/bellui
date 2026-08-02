@@ -210,6 +210,17 @@ func liveChecks(w bellui.Window, view *webview.WebView) {
 			fmt.Sprintf("an OS-synthesized click travelled the whole real input path (got %s, err %v)", res, err))
 		if osKey {
 			check(true, "the OS-synthesized keystroke arrived too")
+
+			// --- in-page Tab through the OS path (#126) -----------------------
+			// Only meaningful when the seat's keyboard focus reaches the window
+			// (the same gate as the keystroke above). The page's first tab stop
+			// is the <select>.
+			fmt.Println("\n[live/tab] plain Tab walks into the page's own tab order")
+			_ = exec.Command("xdotool", "key", "Tab").Run()
+			time.Sleep(500 * time.Millisecond)
+			res, err = liveEval(view, "document.activeElement.id", 10*time.Second)
+			check(err == nil && strings.Contains(string(res), "sel"),
+				fmt.Sprintf("Tab reached the page's first tab stop (activeElement %s)", res))
 		} else {
 			fmt.Println("  SKIP — the keystroke needs the seat's keyboard focus, which the compositor withholds from a synthetically activated window; run the Xvfb leg or type on the real session once")
 		}
