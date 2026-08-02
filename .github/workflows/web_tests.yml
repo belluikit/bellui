@@ -50,9 +50,17 @@ jobs:
       # browser — real IndexedDB for app's storage tests, a real
       # iframe/postMessage surface for webview — rather than only
       # type-checked. Needs `chromium` on PATH (snap on the Ubuntu runner).
-      # Scope: ./webview/ plus ./app/ and ./dialog/, triaged in #79; each
-      # package costs a browser launch, and the remaining packages are still
-      # unmeasured — widen one at a time as each is triaged (#79).
+      #
+      # Scope is the FULL module (#79): every eligible package was triaged —
+      # in-browser failures either got #77-style !wasm splits (behaviour the
+      # browser genuinely lacks: listeners, on-disk stores, fsnotify, -race
+      # busy-loop harnesses) or a filed issue (#168 RTL divergence, #169 wgpu
+      # JS glue). Excluded: internal/gsportal (no wasm build), the mobile
+      # driver, cmd/ and hack/ (not wasm targets), and the vendored
+      # oksvg/rasterx/render (their golden tests REWRITE checked-in masters
+      # when run under wasm — and the code is not ours, the gocyclo rationale).
+      # Each package costs a browser launch: the green sweep measured ~3 min
+      # of browser time locally (arm64 mac); budget more here.
       - name: Install wasmbrowsertest
         run: go install github.com/agnivade/wasmbrowsertest@v0.11.0
 
@@ -61,4 +69,6 @@ jobs:
           GOOS: js
           GOARCH: wasm
           CGO_ENABLED: "0"
-        run: go test -tags ci -exec="$(go env GOPATH)/bin/wasmbrowsertest" ./webview/ ./app/ ./dialog/
+        run: |
+          pkgs=$(go list ./... | grep -vE 'internal/gsportal|internal/driver/mobile|/cmd/|/hack/|internal/(oksvg|rasterx|render)')
+          go test -tags ci -timeout 240s -exec="$(go env GOPATH)/bin/wasmbrowsertest" $pkgs

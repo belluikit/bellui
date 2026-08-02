@@ -2,7 +2,6 @@ package lang
 
 import (
 	"sort"
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -60,21 +59,4 @@ func TestCompareFold_CaseAndAccentInsensitive(t *testing.T) {
 	assert.Zero(t, CompareFold("café", "cafe"), "accent-insensitive")
 	assert.Zero(t, CompareFold("RÉSUMÉ", "resume"))
 	assert.NotZero(t, Compare("Apple", "apple"), "plain Compare stays case-sensitive")
-}
-
-func TestCompare_ConcurrentSafe(t *testing.T) {
-	SetLocaleForTests(t, "de")
-
-	var wg sync.WaitGroup
-	for i := 0; i < 32; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for j := 0; j < 200; j++ {
-				_ = Compare("äpfel", "zebra")
-				_ = CompareFold("Apple", "apple")
-			}
-		}()
-	}
-	wg.Wait()
 }

@@ -1,6 +1,4 @@
-// Platform file-convention tests: IsHidden is documented always-false on
-// mobile/wasm (there is no dot-prefix convention to detect), and TestFileAbs
-// asserts real cwd/home path resolution the browser shim does not model.
+// TestFileAbs asserts real cwd/home path resolution the browser shim does not model.
 // (#77's split convention; #79 Phase B.)
 //go:build !wasm
 
