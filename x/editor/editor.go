@@ -1034,9 +1034,10 @@ func (e *Editor) repositionPopover() {
 // set, and never refreshes the float layer itself (see repositionPopover).
 func (e *Editor) layoutPopovers() (changed bool) {
 	bounds := e.popoverBounds()
+	flip := e.popoverFlipBounds(bounds)
 	for _, p := range e.activePopovers {
 		anchor := e.PositionAt(p.anchorRow, p.anchorCol)
-		p.resizeAndPlace(anchor, bounds)
+		p.resizeAndPlace(anchor, bounds, flip)
 	}
 	if inter, comp := e.interactivePopover(), e.companionPopover(); inter != nil && comp != nil && inter.overlaps(comp) {
 		return e.removePopover(comp)
@@ -1151,6 +1152,26 @@ func (e *Editor) popoverBounds() geo.Rectangle {
 		bounds = intersectRect(bounds, clipLocal)
 	}
 	return bounds
+}
+
+// popoverFlipBounds returns the region a popover prefers to stay inside when it
+// picks its side of the anchor line: the editor's own text viewport, in the same
+// editor-local space as [Editor.popoverBounds] (which it is intersected with, so
+// a host clip still applies).
+//
+// The distinction matters near the editor's bottom edge. Clamping is the
+// canvas's job — a popover may deliberately overflow a compact editor (#19) —
+// but the below/above choice must be the editor's, or a completion list opened
+// on the last visible line hangs off the widget instead of flipping above the
+// current line. When the popover fits on neither side of the anchor within this
+// region, [popoverPositionIn] falls back to the side with more room, so the
+// overflow behaviour of a compact editor is unchanged.
+func (e *Editor) popoverFlipBounds(bounds geo.Rectangle) geo.Rectangle {
+	viewport := geo.Rectangle{Size: e.entry.Size()}
+	if viewport.Size.Height <= 0 || viewport.Size.Width <= 0 {
+		return bounds
+	}
+	return intersectRect(bounds, viewport)
 }
 
 // intersectRect returns the overlap of a and b. With no overlap the result has

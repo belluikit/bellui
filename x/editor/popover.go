@@ -152,10 +152,13 @@ func (p *popover) sizeWithin(bounds geo.Rectangle) geo.Size {
 // resizeAndPlace sizes the popover and moves it to its anchored, flipped, and
 // clamped position within bounds (the usable region in editor-local
 // coordinates; its min corner may be negative when the popover may overflow the
-// editor into the surrounding canvas — see #19).
-func (p *popover) resizeAndPlace(anchor, bounds geo.Rectangle) {
+// editor into the surrounding canvas — see #19). flip is the smaller region the
+// popover prefers to stay inside when choosing its side — the editor's own
+// viewport — so a popover anchored near the editor's bottom edge opens above the
+// current line instead of hanging off the widget.
+func (p *popover) resizeAndPlace(anchor, bounds, flip geo.Rectangle) {
 	size := p.sizeWithin(bounds)
-	pos, placement := popoverPosition(anchor, size, bounds, p.prefersAbove)
+	pos, placement := popoverPositionIn(anchor, size, bounds, flip, p.prefersAbove)
 	p.placement = placement
 	p.obj.Resize(size)
 	p.obj.Move(pos)
@@ -176,9 +179,26 @@ func (p *popover) resizeAndPlace(anchor, bounds geo.Rectangle) {
 // the result are in editor-local coordinates; bounds.Pos is the (possibly
 // negative) min corner and bounds.Pos+bounds.Size the max corner.
 func popoverPosition(anchor geo.Rectangle, size geo.Size, bounds geo.Rectangle, prefersAbove bool) (geo.Position, popoverPlacement) {
+	return popoverPositionIn(anchor, size, bounds, bounds, prefersAbove)
+}
+
+// popoverPositionIn is [popoverPosition] with the side choice and the clamp
+// keyed on two different regions: flip is where the popover PREFERS to fit
+// (the editor's own viewport), bounds is the hard clamp it may spill into (the
+// canvas, or a host clip region — see #19).
+//
+// Deciding the side against the editor rather than the whole canvas is what
+// keeps a completion list anchored on the last visible line from hanging off
+// the bottom of the widget: with room above the caret inside the editor it
+// flips above the current line. When neither side fits within flip, the side
+// with more room there still wins, so a popover taller than a compact editor
+// opens downwards and overflows into the window as before.
+func popoverPositionIn(anchor geo.Rectangle, size geo.Size, bounds, flip geo.Rectangle, prefersAbove bool) (geo.Position, popoverPlacement) {
 	minX, minY := bounds.Pos.X, bounds.Pos.Y
 	maxX := minX + bounds.Size.Width
-	maxY := minY + bounds.Size.Height
+	if flip.Size.Height <= 0 || flip.Size.Width <= 0 {
+		flip = bounds
+	}
 
 	// Horizontal: left-align with the anchor, then nudge left to stay in bounds.
 	x := anchor.Pos.X
@@ -194,8 +214,8 @@ func popoverPosition(anchor geo.Rectangle, size geo.Size, bounds geo.Rectangle, 
 	// room. Keeping the signature card above and completion below this way leaves
 	// the anchor line between them, so the two don't overlap (#79).
 	below := anchor.Pos.Y + anchor.Size.Height
-	roomBelow := maxY - below
-	roomAbove := anchor.Pos.Y - minY
+	roomBelow := flip.Pos.Y + flip.Size.Height - below
+	roomAbove := anchor.Pos.Y - flip.Pos.Y
 
 	placement := placeBelow
 	if prefersAbove {
@@ -214,6 +234,8 @@ func popoverPosition(anchor geo.Rectangle, size geo.Size, bounds geo.Rectangle, 
 	if y < minY {
 		y = minY
 	}
+	// No bottom clamp: a popover that fits on neither side may overflow the
+	// bounds' bottom edge rather than being shoved up over its anchor line (#19).
 	return geo.NewPos(x, y), placement
 }
 

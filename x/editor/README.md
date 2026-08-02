@@ -38,10 +38,20 @@ Three independent, composable interfaces:
 | Interface | Purpose | Built-in implementations |
 |-----------|---------|------------------------|
 | `Highlighter` | Per-line syntax highlighting | `HighlighterFunc`, `highlight/starlark` |
-| `GutterProvider` | Gutter area left of text | `LineNumberGutter`, `BreakpointGutter`, `CompositeGutter` |
+| `GutterProvider` | Gutter area left of text | `LineNumberGutter`, `BreakpointGutter`, `DiagnosticGutter`, `FoldGutter`, `CompositeGutter` |
 | `RowDecorator` | Row background/overlay effects | `CurrentLineDecorator`, `SearchHighlightDecorator` |
 
 These are fully decoupled — you can have line numbers without highlighting, or highlighting without a gutter.
+
+### Gutter columns
+
+`NewCompositeGutter` arranges its providers in the conventional editor order, whatever order you pass them in:
+
+```
+[ markers ][ line numbers ][ fold ]  code…
+```
+
+Markers (breakpoints, diagnostics, and any provider that does not declare a column) take the leading edge, the line numbers sit next to the code, and only the fold control comes between them. A provider declares its column by implementing `GutterColumnProvider`; use `NewCompositeGutterInOrder` for a bespoke layout the conventional order does not express.
 
 ## Features
 
