@@ -40,8 +40,14 @@ package webview
 // documented exit back to bellui's focus ring. bellui still sees every key,
 // so there is no WCAG 2.1.2 trap — the exit is a documented method, exactly
 // the pattern the guideline allows. An inert host (no engine) declines Tab
-// capture and stays an ordinary stop. IME composition is #121 and arrives
-// with gocef's binding for it.
+// capture and stays an ordinary stop.
+//
+// IME composition (#121): the host is event.Composable, so the driver routes
+// the OS preedit here — Compose feeds Blink's inline composition
+// (ImeSetComposition), the desktop driver's committed text arrives through
+// TypedRune (which completes any active composition via ImeCommitText — also
+// the transport for astral-plane runes), and the candidate window is anchored
+// through event.PreeditPositioner from CEF's composition-range reports.
 
 import (
 	"time"
@@ -82,6 +88,8 @@ type offscreenHost struct {
 	lastViewW, lastViewH   int     // points, what ViewSize answers
 	scale                  float32 // canvas scale, captured at layout
 	focused                bool
+	composing              bool          // an IME preedit is active in the page
+	imeCaret               geo.Rectangle // caret rect from the composition-range report, content points
 	hovered                bool
 	cursor                 desktop.StandardCursor
 	buttonMask             uint32 // pressed buttons, as CEF event flags
@@ -525,6 +533,12 @@ func (h *offscreenHost) FocusGained() {
 }
 
 func (h *offscreenHost) FocusLost() {
+	if h.composing {
+		// Mirror Entry's cancel-on-focus-out: the OS IME resets its own state
+		// on the window side (ResetPreeditText), and a preedit left dangling
+		// in the page would resurrect on the next keystroke.
+		h.ComposeCancel()
+	}
 	h.focused = false
 	if b := h.view.eng.browser; b != nil {
 		b.SetFocus(false)
@@ -537,12 +551,106 @@ func (h *offscreenHost) FocusLost() {
 // sees modifiers but no text, or text that no keydown handler saw.
 func (h *offscreenHost) TypedRune(r rune) {
 	b := h.view.eng.browser
-	if b == nil || r > 0xFFFF {
-		// Astral-plane input arrives through IME composition (#121), not as
-		// single UTF-16 units; dropping it beats sending half a surrogate.
+	if b == nil {
+		return
+	}
+	if h.composing || r > 0xFFFF {
+		// Two cases share one route (#121). While a composition is active, the
+		// desktop driver delivers the committed text as ordinary chars
+		// (window_desktop.go's design) — ImeCommitText completes the
+		// composition by replacing its contents, and plain-inserts when the
+		// IME already ended it, so the rule is order-independent against
+		// GLFW's commit-vs-preedit-clear sequencing. And an astral-plane rune
+		// cannot cross as a single UTF-16 key event at all; committing it is
+		// the correct transport, which also retires the old drop-it fallback.
+		b.ImeCommitText(string(r))
+		h.composing = false
 		return
 	}
 	b.SendKey(gocef.KeyChar, h.eventFlags(0), int(r), int(r), uint16(r), uint16(r), false)
+}
+
+// Compose forwards an in-progress IME preedit into the page (event.Composable):
+// Blink shows it inline in the focused editable, underlined, exactly as a
+// native browser would. CursorPos arrives in runes and CEF speaks UTF-16, so
+// the caret converts; nil underlines let gocef draw the standard solid one.
+func (h *offscreenHost) Compose(ev *event.PreeditEvent) {
+	b := h.view.eng.browser
+	if b == nil {
+		return
+	}
+	if ev.Text == "" {
+		// The desktop driver routes empty preedits to ComposeCancel, but the
+		// interface allows this form of "clear" too.
+		h.ComposeCancel()
+		return
+	}
+	b.ImeSetComposition(ev.Text, utf16Units(ev.Text, ev.CursorPos), nil)
+	h.composing = true
+}
+
+// ComposeCommit finalizes a composition with the given text. The desktop
+// driver never calls it (committed text arrives via TypedRune there); the
+// wasm and mobile drivers do, and the interface requires it.
+func (h *offscreenHost) ComposeCommit(s string) {
+	b := h.view.eng.browser
+	if b == nil {
+		return
+	}
+	b.ImeCommitText(s)
+	h.composing = false
+}
+
+// ComposeCancel discards the in-progress composition without applying it.
+// Safe to call when Blink already ended the composition itself.
+func (h *offscreenHost) ComposeCancel() {
+	b := h.view.eng.browser
+	if b == nil {
+		return
+	}
+	b.ImeCancelComposition()
+	h.composing = false
+	h.imeCaret = geo.Rectangle{}
+}
+
+// PreeditCursorRectangle reports the composition caret in the host's own
+// content coordinates (event.PreeditPositioner) — where the OS positions the
+// candidate window. Zero until the first composition-range report arrives
+// from CEF, which the interface documents as "unknown"; that first-keystroke
+// lag matches widget.Entry's behaviour.
+func (h *offscreenHost) PreeditCursorRectangle() geo.Rectangle {
+	return h.imeCaret
+}
+
+// engineImeCompositionRange stores the caret rect from CEF's composition-range
+// report: the last character's bound marks the caret's edge. CEF documents
+// the bounds in view coordinates — the DIP space input already crosses in, so
+// they are bellui points as-is (probe-asserted in [ime]).
+func (h *offscreenHost) engineImeCompositionRange(_ gocef.Range, bounds []gocef.Rect) {
+	if len(bounds) == 0 {
+		return
+	}
+	last := bounds[len(bounds)-1]
+	h.imeCaret = geo.NewRectangle(
+		float32(last.X+last.Width), float32(last.Y), 1, float32(last.Height),
+	)
+}
+
+// utf16Units converts a rune index into text to a UTF-16 code-unit index —
+// cef_range_t's unit. Indexes past the end clamp to the full length.
+func utf16Units(text string, runeIdx int) int {
+	units, i := 0, 0
+	for _, r := range text {
+		if i >= runeIdx {
+			break
+		}
+		i++
+		units++
+		if r > 0xFFFF {
+			units++ // surrogate pair
+		}
+	}
+	return units
 }
 
 // AcceptsTab keeps plain Tab / Shift+Tab on the page (event.Tabbable): the
@@ -679,13 +787,15 @@ func abs(v int) int {
 // The interfaces the host answers input through; a missing one here is a
 // silently dead input path, so they are asserted.
 var (
-	_ core.Widget        = (*offscreenHost)(nil)
-	_ desktop.Mouseable  = (*offscreenHost)(nil)
-	_ desktop.Keyable    = (*offscreenHost)(nil)
-	_ desktop.Cursorable = (*offscreenHost)(nil)
-	_ event.Focusable    = (*offscreenHost)(nil)
-	_ event.Tabbable     = (*offscreenHost)(nil)
-	_ event.Hoverable    = (*offscreenHost)(nil)
-	_ event.Scrollable   = (*offscreenHost)(nil)
-	_ event.Draggable    = (*offscreenHost)(nil)
+	_ core.Widget             = (*offscreenHost)(nil)
+	_ desktop.Mouseable       = (*offscreenHost)(nil)
+	_ desktop.Keyable         = (*offscreenHost)(nil)
+	_ desktop.Cursorable      = (*offscreenHost)(nil)
+	_ event.Focusable         = (*offscreenHost)(nil)
+	_ event.Tabbable          = (*offscreenHost)(nil)
+	_ event.Composable        = (*offscreenHost)(nil)
+	_ event.PreeditPositioner = (*offscreenHost)(nil)
+	_ event.Hoverable         = (*offscreenHost)(nil)
+	_ event.Scrollable        = (*offscreenHost)(nil)
+	_ event.Draggable         = (*offscreenHost)(nil)
 )
