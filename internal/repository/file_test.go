@@ -1,3 +1,8 @@
+// The file repository under test is the on-disk one (real paths, os.Stat
+// semantics); the browser shim is not the contract it asserts.
+// (#77's split convention; #79 Phase B.)
+//go:build !wasm
+
 package repository
 
 import (

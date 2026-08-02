@@ -1,3 +1,8 @@
+// The HTTP repository tests serve from an in-process httptest server,
+// which cannot listen inside a browser.
+// (#77's split convention; #79 Phase B.)
+//go:build !wasm
+
 package repository
 
 import (
