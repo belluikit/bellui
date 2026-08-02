@@ -43,6 +43,31 @@ func TestSandboxHelperUsable(t *testing.T) {
 	assert.False(t, sandboxHelperUsable(noStat), "no stat data reads as unusable, not a panic")
 }
 
+// The #139 platform decision: ozone-wayland caps the page's devicePixelRatio
+// at the compositor's own output scale regardless of what GetScreenInfo
+// answers, so CEF runs on ozone-x11 whenever an X display is reachable — and
+// an explicit operator choice always wins.
+func TestCEFOzonePlatformSwitches(t *testing.T) {
+	assert.Equal(t, []string{"--ozone-platform=x11"},
+		cefOzonePlatformSwitches(nil, ":0"),
+		"a reachable X display pins ozone-x11")
+
+	assert.Equal(t, []string{"--disable-gpu", "--ozone-platform=x11"},
+		cefOzonePlatformSwitches([]string{"--disable-gpu"}, ":0"),
+		"unrelated switches are kept, x11 appended")
+
+	assert.Nil(t, cefOzonePlatformSwitches(nil, ""),
+		"no X display: Chromium's own auto-selection stands")
+
+	wayland := []string{"--ozone-platform=wayland"}
+	assert.Equal(t, wayland, cefOzonePlatformSwitches(wayland, ":0"),
+		"an explicit platform choice is never overridden")
+
+	headless := []string{"--ozone-platform=headless"}
+	assert.Equal(t, headless, cefOzonePlatformSwitches(headless, ""),
+		"the probe's headless choice passes through untouched")
+}
+
 func TestResolveCEFSandbox_DisabledWithoutUsableHelper(t *testing.T) {
 	dir := t.TempDir()
 	assert.Empty(t, resolveCEFSandbox(dir), "no helper at all")

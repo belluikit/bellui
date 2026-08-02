@@ -185,9 +185,10 @@ func (r *offscreenHostRenderer) Layout(size geo.Size) {
 		if s := c.Scale(); s != h.scale {
 			// The scale changed after creation — a monitor move, or a
 			// settings change. CEF has to be told, or content keeps
-			// rasterising at the old density. This is the toolkit's half;
-			// Chromium currently ignores the answer anyway (#139), so the
-			// blurry-HiDPI symptom outlives this fix until that closes.
+			// rasterising at the old density. Chromium honours the answer
+			// because the runtime pins the CEF process to ozone-x11 (#139,
+			// cefOzonePlatformSwitches); on the pure-Wayland fallback the
+			// page scale stays capped at the compositor's own output scale.
 			h.scale = s
 			scaleChanged = true
 		}
