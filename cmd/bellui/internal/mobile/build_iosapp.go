@@ -265,7 +265,10 @@ func lookupCert(optName string) ([]byte, error) {
 	if optName != "" {
 		return lookupCertNamed(optName)
 	}
-	if buildRelease {
+	// Distribution certs are for store artifacts ("bellui release") only; a
+	// --release package keeps the Developer/Development cert so it still
+	// installs on registered devices (#144).
+	if buildDistribution {
 		// Grabs the first certificate for "iPhone Distribution"; will not work if there
 		// are multiple certificates and the first is not desired.
 		pemString, err := lookupCertNamed("iPhone Distribution")

@@ -98,7 +98,7 @@ func (p *Packager) AddFlags() {
 	flag.StringVar(&p.AppID, "app-id", "", "For ios or darwin targets an app-id is required, for ios this must \nmatch a valid provisioning profile")
 	flag.StringVar(&p.AppVersion, "app-version", "", "Version number in the form x, x.y or x.y.z semantic version")
 	flag.IntVar(&p.AppBuild, "app-build", 0, "Build number, should be greater than 0 and incremented for each build")
-	flag.BoolVar(&p.release, "release", false, "Should this package be prepared for release? (disable debug etc)")
+	flag.BoolVar(&p.release, "release", false, "Build in release mode: optimized, non-debuggable, still installable (use 'bellui release' for store distribution)")
 	flag.StringVar(&p.tags, "tags", "", "A comma-separated list of build tags")
 }
 
