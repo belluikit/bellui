@@ -8,6 +8,7 @@ import (
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/internal"
 	intapp "github.com/belluikit/bellui/internal/app"
+	"github.com/belluikit/bellui/internal/async"
 	"github.com/belluikit/bellui/internal/cache"
 	"github.com/belluikit/bellui/internal/painter"
 	"github.com/belluikit/bellui/internal/test"
@@ -298,7 +299,7 @@ func (s *testSettings) apply() {
 		listener <- s
 	}
 
-	s.app.driver.DoFromGoroutine(func() {
+	applyFn := func() {
 		s.app.propertyLock.Lock()
 		painter.ClearFontCache()
 		cache.ResetThemeCaches()
@@ -308,7 +309,23 @@ func (s *testSettings) apply() {
 		for _, l := range listenersFns {
 			l(s)
 		}
-	}, false)
+	}
+	// apply must have COMPLETED the re-theme walk before it returns —
+	// appliedTheme below is what waitForTheme polls, so an apply that is
+	// still in flight makes every ApplyTheme-then-capture sequence a race.
+	// Off the main goroutine the test driver's DoFromGoroutine runs inline,
+	// which is synchronous already. ON the main goroutine (a suite driving a
+	// real driver loop, like the local glfw one, applies themes from
+	// runOnMain) it must not be used: its EnsureNotMain guard would punt the
+	// walk to a bare goroutine and return immediately — the fire-and-forget
+	// behind the #115 nightly flake ("Butto" captured mid-re-theme) and its
+	// GUI-call-thread warning spam. Already being on the GUI goroutine is
+	// exactly the contract Do exists to establish, so call straight through.
+	if async.IsMainGoroutine() {
+		applyFn()
+	} else {
+		s.app.driver.DoFromGoroutine(applyFn, false)
+	}
 
 	s.app.propertyLock.Lock()
 	s.app.appliedTheme = s.Theme()
