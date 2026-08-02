@@ -13,8 +13,6 @@ import (
 	"time"
 
 	"github.com/belluikit/bellui"
-	intRepo "github.com/belluikit/bellui/internal/repository"
-	"github.com/belluikit/bellui/storage/repository"
 )
 
 func (a *belluiApp) SendNotification(n *bellui.Notification) {
@@ -307,14 +305,4 @@ func watchTheme(_ *settings) {
 
 func stopWatchingTheme() {
 	js.Global().Call("matchMedia", "(prefers-color-scheme: dark)").Call("removeEventListener", "change", themeChanged)
-}
-
-func (a *belluiApp) registerRepositories() {
-	repo, err := intRepo.NewIndexDBRepository()
-	if err != nil {
-		bellui.LogError("failed to create repository: %v", err)
-		return
-	}
-
-	repository.Register("idbfile", repo)
 }
