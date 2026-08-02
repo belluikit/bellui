@@ -102,9 +102,9 @@
 //   - On Linux the host is a Tab stop, and while the page is focused plain
 //     Tab / Shift+Tab traverse the page's own tab order; Ctrl+Tab /
 //     Ctrl+Shift+Tab leave it and continue in bellui's focus ring (#126).
-//     IME composition is not yet forwarded, so CJK text cannot be typed into
-//     the page (#121) — a property of bellui owning the keyboard, which is
-//     also what makes the host focusable at all.
+//     IME composition is forwarded like any other text input (#121): the OS
+//     preedit renders inline in the page and the candidate window follows
+//     the page's caret.
 //
 // # Talking to the page
 //
