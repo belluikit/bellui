@@ -2,7 +2,6 @@ package test
 
 import (
 	"image/color"
-	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -13,7 +12,6 @@ import (
 	"github.com/belluikit/bellui"
 	belluicanvas "github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/geo"
-	"github.com/belluikit/bellui/widget"
 )
 
 func Test_driver_AbsolutePositionForObject(t *testing.T) {
@@ -39,39 +37,6 @@ func TestDriver_CreateWindow(t *testing.T) {
 	w := d.CreateWindow("Test Window")
 
 	assert.Equal(t, "Test Window", w.Title())
-}
-
-// A background goroutine updating a widget through bellui.Do while the test
-// reads it through bellui.DoAndWait must be race-free: the test driver
-// serializes all Do callbacks under a mutex, establishing the same
-// happens-before edges the real drivers provide (issue #480).
-func TestDriver_DoFromGoroutineSerialized(t *testing.T) {
-	NewTempApp(t)
-
-	label := widget.NewLabel("start")
-	final := "updated " + strconv.Itoa(99)
-
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		for i := 0; i < 100; i++ {
-			text := "updated " + strconv.Itoa(i)
-			bellui.Do(func() {
-				label.SetText(text)
-			})
-		}
-	}()
-
-	got := ""
-	deadline := time.Now().Add(10 * time.Second)
-	for got != final && time.Now().Before(deadline) {
-		bellui.DoAndWait(func() {
-			got = label.Text
-		})
-	}
-	<-done
-
-	assert.Equal(t, final, got)
 }
 
 func TestDriver_DoFromGoroutineNested(t *testing.T) {

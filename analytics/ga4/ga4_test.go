@@ -1,3 +1,8 @@
+// Both tests POST batches to an in-process httptest server; a browser has
+// no loopback listener, and the sink's transport is the !wasm half anyway.
+// (#77's split convention; #79 Phase B.)
+//go:build !wasm
+
 package ga4
 
 import (

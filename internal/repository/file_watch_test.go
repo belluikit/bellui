@@ -1,3 +1,7 @@
+// WatchURI rides the forked fsnotify, which has no wasm implementation —
+// there is no filesystem to watch in a browser. (#79 Phase B.)
+//go:build !wasm
+
 package repository
 
 import (

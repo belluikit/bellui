@@ -1,3 +1,8 @@
+// IsHidden is documented always-false on mobile/wasm — there is no
+// dot-prefix or attribute convention to detect in a browser — so these
+// platform-convention assertions are !wasm (#79 Phase B).
+//go:build !wasm
+
 package storage_test
 
 import (
