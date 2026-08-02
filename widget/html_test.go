@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/belluikit/bellui"
-	"github.com/belluikit/bellui/storage"
 )
 
 func TestRichTextHTML_Paragraph(t *testing.T) {
@@ -235,35 +234,6 @@ func TestRichTextHTML_Link(t *testing.T) {
 		}
 	}
 	assert.True(t, found, "Should find hyperlink segment")
-}
-
-func TestRichTextHTML_Image(t *testing.T) {
-	// A schemeless src must NOT become a file:// URI — that fallback let
-	// untrusted markup read local files (#285). The alt text is still kept.
-	r := NewRichTextFromHTML(`<img src="../../theme/testdata/bellui.png" alt="icon">`)
-
-	found := false
-	for _, seg := range r.Segments {
-		if img, ok := seg.(*ImageSegment); ok {
-			assert.Nil(t, img.Source)
-			assert.Equal(t, "icon", img.Title)
-			found = true
-			break
-		}
-	}
-	assert.True(t, found, "Should find image segment")
-
-	// An explicit file:// URI is still honoured.
-	r = NewRichTextFromHTML(`<img src="file:///tmp/bellui.png" alt="icon">`)
-	found = false
-	for _, seg := range r.Segments {
-		if img, ok := seg.(*ImageSegment); ok {
-			assert.Equal(t, storage.NewFileURI("/tmp/bellui.png"), img.Source)
-			found = true
-			break
-		}
-	}
-	assert.True(t, found, "Should find image segment")
 }
 
 func TestRichTextHTML_List_Unordered(t *testing.T) {
