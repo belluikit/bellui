@@ -1,3 +1,8 @@
+// These tests POST to an in-process httptest server, which cannot listen
+// inside a browser — the wasm build's fetch has no loopback server to reach.
+// (#77's split convention; #79 Phase B.)
+//go:build !wasm
+
 package analytics
 
 import (
