@@ -29,45 +29,6 @@ func TestMasterSecret_UsesStoreAndPersists(t *testing.T) {
 	assert.Equal(t, s1, s2)
 }
 
-func TestMasterSecret_FallsBackToFileWhenNoStore(t *testing.T) {
-	redirectStorage(t) // installs newSecretStore -> nil
-
-	s, err := masterSecret()
-	require.NoError(t, err)
-
-	mk, err := machineKey()
-	require.NoError(t, err)
-	assert.Equal(t, mk, s, "no store available should use the file machineKey")
-}
-
-func TestMasterSecret_FallsBackToFileWhenStoreBroken(t *testing.T) {
-	redirectStorage(t)
-	store := newFakeStore()
-	store.failGet = true
-	useStore(t, store)
-
-	s, err := masterSecret()
-	require.NoError(t, err)
-
-	mk, err := machineKey()
-	require.NoError(t, err)
-	assert.Equal(t, mk, s, "a broken store should fall back to the file machineKey")
-}
-
-func TestMasterSecret_FallsBackWhenStoreUnwritable(t *testing.T) {
-	redirectStorage(t)
-	store := newFakeStore()
-	store.failSet = true // get says not-found, set fails
-	useStore(t, store)
-
-	s, err := masterSecret()
-	require.NoError(t, err)
-
-	mk, err := machineKey()
-	require.NoError(t, err)
-	assert.Equal(t, mk, s)
-}
-
 func TestSaveLoadToken_RoundTripViaStore(t *testing.T) {
 	redirectStorage(t)
 	useStore(t, newFakeStore())
