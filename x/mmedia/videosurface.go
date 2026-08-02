@@ -12,10 +12,11 @@ import (
 
 // videoSurface renders decoded frames through a streaming canvas.Raster.
 //
-// A Raster with Streaming set updates its GL texture in place via
-// TexSubImage2D on each refresh, rather than recreating the texture the way
-// the generic canvas.Image path does — the painter calls this "the fastest
-// path for video frame updates".
+// A Raster with Streaming set updates its GPU texture in place on each
+// refresh (TexSubImage2D on the GL painter, Device.WriteTexturePixels on
+// WebGPU), rather than recreating the texture the way the generic
+// canvas.Image path does — the painters call this "the fastest path for
+// video frame updates".
 //
 // The pixel buffers are double-buffered. SetPixels stores the slice by
 // reference and the painter reads it later on the GL thread, so writing the
@@ -50,12 +51,15 @@ func newVideoSurface(width, height int) *videoSurface {
 	// calls it unconditionally in rasterizeRaster, so a nil one segfaults on
 	// the first paint.
 	//
-	// Streaming is enabled only on the GL painter, which is the sole
-	// implementation of the in-place TexSubImage2D update. Enabling it under
-	// WebGPU freezes the video: Canvas.freeObject deliberately skips releasing
-	// a streaming raster's texture, expecting the painter to refresh it.
+	// Streaming is unconditional: both GPU painters implement the in-place
+	// update (GL: TexSubImage2D; WebGPU since #34: updateStreamingTexture /
+	// WriteTexturePixels — the freeze the old per-painter constant guarded
+	// against is exactly what #34 fixed, see #100), and the software painter
+	// re-draws the current pixels each paint, so Streaming is a no-op there.
+	// Verified on-GPU under both painters via hack/rasterstream and
+	// x/mmedia/hack/playprobe -auto.
 	s.raster = canvas.NewRaster(s.generate)
-	s.raster.Streaming = streamingSupported
+	s.raster.Streaming = true
 	s.raster.ScaleMode = canvas.ImageScaleSmooth
 	// Prime the texture so the first paint has something to upload into.
 	// Set directly rather than via publish: there is no canvas yet, and this
