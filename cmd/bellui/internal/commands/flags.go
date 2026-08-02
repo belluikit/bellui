@@ -205,7 +205,7 @@ var boolFlags = map[string]func(*bool) cli.Flag{
 	"release": func(dst *bool) cli.Flag {
 		return &cli.BoolFlag{
 			Name:        "release",
-			Usage:       "enable installation in release mode, disable debug, etc",
+			Usage:       "build in release mode: optimized and non-debuggable, still locally installable (debug-key-signed on Android) — use 'bellui release' for store distribution",
 			Destination: dst,
 		}
 	},
