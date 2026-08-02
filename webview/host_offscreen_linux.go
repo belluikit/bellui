@@ -34,11 +34,14 @@ package webview
 //
 // Unlike widget.NativeViewHost — deliberately not a Tab stop, because the OS
 // owns the keyboard once a platform view has it (WCAG 2.1.2) — this host is
-// event.Focusable: bellui sees every key, so Tab always moves bellui's focus
-// and there is no trap to fall into. The trade-off is the mirror image: the
-// page's own Tab navigation is not reachable, because Tab is consumed by the
-// canvas before TypedKey; page-internal focus moves with the mouse. IME
-// composition is #121 and arrives with gocef's binding for it.
+// event.Focusable AND event.Tabbable (#126): while the page is focused, plain
+// Tab / Shift+Tab traverse the page's own tab order (widget.Entry's multiline
+// capture, applied to a browser), and Ctrl+Tab / Ctrl+Shift+Tab are the
+// documented exit back to bellui's focus ring. bellui still sees every key,
+// so there is no WCAG 2.1.2 trap — the exit is a documented method, exactly
+// the pattern the guideline allows. An inert host (no engine) declines Tab
+// capture and stays an ordinary stop. IME composition is #121 and arrives
+// with gocef's binding for it.
 
 import (
 	"time"
@@ -542,15 +545,66 @@ func (h *offscreenHost) TypedRune(r rune) {
 	b.SendKey(gocef.KeyChar, h.eventFlags(0), int(r), int(r), uint16(r), uint16(r), false)
 }
 
-// TypedKey is intentionally empty: the desktop driver also delivers KeyDown
-// and KeyUp to a desktop.Keyable, and those carry the state Chromium wants.
-func (h *offscreenHost) TypedKey(*event.KeyEvent) {}
+// AcceptsTab keeps plain Tab / Shift+Tab on the page (event.Tabbable): the
+// driver then delivers Tab here instead of moving canvas focus, which is what
+// makes the page's own tab order keyboard-reachable (#126). The documented
+// exit is Ctrl+Tab / Ctrl+Shift+Tab (see KeyDown) — the standard
+// embedded-browser answer, and what keeps WCAG 2.1.2 satisfied. An inert host
+// (no engine, e.g. missing CEF payload) stays an ordinary Tab stop; capturing
+// Tab with nothing to give it to would be a mini keyboard trap.
+func (h *offscreenHost) AcceptsTab() bool {
+	return h.view.eng.browser != nil
+}
+
+// TypedKey forwards Tab as the char event Chromium needs for in-page focus
+// traversal — the RawDown/Up pair alone (from KeyDown/KeyUp) moves nothing.
+// Shift arrives in the modifier flags and makes Blink traverse backwards.
+// Every other key stays ignored here: KeyDown/KeyUp carry the key state,
+// TypedRune the text. (Ctrl+Tab never reaches TypedKey — the driver dispatches
+// modifier combos as shortcuts and returns early — so the escape lives in
+// KeyDown.)
+func (h *offscreenHost) TypedKey(ev *event.KeyEvent) {
+	if ev.Name != event.KeyTab {
+		return
+	}
+	b := h.view.eng.browser
+	if b == nil {
+		return
+	}
+	b.SendKey(gocef.KeyChar, h.eventFlags(ev.Modifier), 0x09, ev.Physical.ScanCode, 0x09, 0x09, false)
+}
+
+// tabEscape reports whether ev is the documented way out of the page's tab
+// order: Ctrl+Tab (forward) / Ctrl+Shift+Tab (backward).
+func tabEscape(ev *event.KeyEvent) bool {
+	return ev.Name == event.KeyTab && ev.Modifier&event.KeyModifierControl != 0
+}
 
 func (h *offscreenHost) KeyDown(ev *event.KeyEvent) {
+	if tabEscape(ev) {
+		// Move bellui focus and swallow the key — the page must not see half
+		// an escape. The driver then routes the same press to the canvas
+		// shortcut path (a no-op unless the app registered Ctrl+Tab) and
+		// delivers no TypedKey, so the newly focused widget receives nothing.
+		if c := h.canvas(); c != nil {
+			if ev.Modifier&event.KeyModifierShift != 0 {
+				c.FocusPrevious()
+			} else {
+				c.FocusNext()
+			}
+		}
+		return
+	}
 	h.sendKey(ev, gocef.KeyRawDown)
 }
 
 func (h *offscreenHost) KeyUp(ev *event.KeyEvent) {
+	// The escape's release half is swallowed too: in a window where the host
+	// is the only focusable, FocusNext wraps straight back to it and the
+	// release would otherwise leak an orphan key-up into the page.
+	if tabEscape(ev) {
+		return
+	}
 	h.sendKey(ev, gocef.KeyUp)
 }
 
@@ -630,6 +684,7 @@ var (
 	_ desktop.Keyable    = (*offscreenHost)(nil)
 	_ desktop.Cursorable = (*offscreenHost)(nil)
 	_ event.Focusable    = (*offscreenHost)(nil)
+	_ event.Tabbable     = (*offscreenHost)(nil)
 	_ event.Hoverable    = (*offscreenHost)(nil)
 	_ event.Scrollable   = (*offscreenHost)(nil)
 	_ event.Draggable    = (*offscreenHost)(nil)
