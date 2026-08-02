@@ -61,7 +61,7 @@ func gendex() error {
 	// Java sources are in the same tree — no cross-repo `../bellui` hop. Relative
 	// to the go:generate CWD (cmd/bellui/internal/mobile): four levels up is the
 	// repo root, then internal/driver/mobile/app.
-	javaFiles, err := filepath.Glob("../../../../../internal/driver/mobile/app/*.java")
+	javaFiles, err := filepath.Glob("../../../../internal/driver/mobile/app/*.java")
 	if err != nil {
 		return err
 	}
