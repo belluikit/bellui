@@ -1,4 +1,5 @@
 //go:build !gl && !wasm
+
 // (!wasm: these acquire a real WebGPU device; headless Chromium grants one,
 // but the fork's wgpu binding needs its JS support glue, which wasmbrowsertest
 // does not load — TryWriteTexture panics with "wasm is not defined". The wasm
