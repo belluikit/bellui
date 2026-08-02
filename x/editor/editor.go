@@ -749,8 +749,10 @@ func (e *Editor) applyHighlighter() {
 	e.entry.LineHighlighter = func(line string, state int) ([]widget.StyleRun, int) {
 		runs, newState := h.Highlight(line, state)
 		// Convert editor.StyleRun to widget.StyleRun.
-		// Resolve ColorName to a direct ForegroundColor via themeColor()
-		// because Bellui's theme doesn't know fycoder's custom color names.
+		// Resolve ColorName to a direct ForegroundColor via themeColor(),
+		// which asks the app theme first (so themes can restyle the editor,
+		// #150) and falls back to the built-in defaults when it does not
+		// answer.
 		wRuns := make([]widget.StyleRun, len(runs))
 		for i, r := range runs {
 			var fg color.Color
