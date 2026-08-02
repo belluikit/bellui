@@ -2156,6 +2156,7 @@ public class GoNativeActivity extends NativeActivity {
     @Override
     public void onWindowFocusChanged(boolean hasFocus) {
         super.onWindowFocusChanged(hasFocus);
+        webviewTrace("activity windowFocus=" + hasFocus);
         if (!hasFocus) {
             return;
         }
@@ -3832,6 +3833,127 @@ public class GoNativeActivity extends NativeActivity {
             new java.util.HashMap<Integer, BelluiWebViewHost>();
     private static int mWebViewNextId = 1;
 
+    // The #143 focus/IME trace. Off unless the operator turns it on at
+    // runtime (`adb shell setprop log.tag.BelluiWebView DEBUG`), so the
+    // instrumentation ships in every dex at no cost. Every line carries
+    // uptimeMillis so host-side dumpsys snapshots can be correlated with
+    // the in-process transitions.
+    private static final String WEBVIEW_TRACE_TAG = "BelluiWebView";
+
+    private static boolean webviewTraceOn() {
+        return Log.isLoggable(WEBVIEW_TRACE_TAG, Log.DEBUG);
+    }
+
+    private static void webviewTrace(String msg) {
+        if (webviewTraceOn()) {
+            Log.d(WEBVIEW_TRACE_TAG, android.os.SystemClock.uptimeMillis() + " " + msg);
+        }
+    }
+
+    // BelluiWebViewPanel is the clip FrameLayout with the hooks the plain
+    // class cannot provide: the touch-driven focus arbitration, window-focus
+    // transitions on the PANEL window (the other half of the two-window
+    // arbitration — the activity's half logs from onWindowFocusChanged
+    // above) and IME inset visibility as this window sees it.
+    private static final class BelluiWebViewPanel extends FrameLayout {
+        // The host this panel arbitrates for; set right after construction.
+        BelluiWebViewHost host;
+
+        // Down position of the in-flight gesture, for the tap-vs-scroll
+        // decision on UP.
+        private float mDownX, mDownY;
+
+        BelluiWebViewPanel(Context context) {
+            super(context);
+        }
+
+        // The promote-on-tap arbitration lives HERE and not in an
+        // OnTouchListener: a ViewGroup's own touch listener only runs when
+        // no child consumes the event, and the WebView child consumes every
+        // tap — so a listener-based promote never fired for a tap in the
+        // web area at all (#143's first instrumented run: taps inside the
+        // panel produced no listener callback), which is why a cold tap
+        // could not raise the keyboard. dispatchTouchEvent on the window's
+        // root view sees every gesture before any child can claim it.
+        @Override
+        public boolean dispatchTouchEvent(android.view.MotionEvent ev) {
+            if (host != null) {
+                if (ev.getAction() == android.view.MotionEvent.ACTION_DOWN) {
+                    // Promote as early as possible: window focus needs to
+                    // be the panel's BEFORE an editor-focusing gesture, or
+                    // Chromium treats the gesture as spent and refuses to
+                    // raise the keyboard (external showSoftInput cannot
+                    // override that policy).
+                    host.lastTapX = ev.getX();
+                    host.lastTapY = ev.getY();
+                    mDownX = ev.getX();
+                    mDownY = ev.getY();
+                    webviewTrace("touch DOWN (" + ev.getX() + "," + ev.getY()
+                            + ") panelWindowFocus=" + hasWindowFocus()
+                            + " webViewFocus="
+                            + (host.web != null && host.web.hasFocus()));
+                    webviewPanelFocusable(host, true);
+                }
+                if (ev.getAction() == android.view.MotionEvent.ACTION_UP) {
+                    webviewTrace("touch UP panelWindowFocus=" + hasWindowFocus());
+                    // If the focus grant lost the race against this
+                    // gesture, the editor is focused but the keyboard never
+                    // came — replay the tap into the now-focused window,
+                    // where it counts as the fresh gesture Chromium wants.
+                    // No-op when the keyboard is already up. Only a TAP is
+                    // replayed: a scroll or fling that moved past the touch
+                    // slop must not become a synthetic click at its start
+                    // point (a phantom link activation).
+                    float dx = ev.getX() - mDownX;
+                    float dy = ev.getY() - mDownY;
+                    int slop = android.view.ViewConfiguration.get(getContext())
+                            .getScaledTouchSlop();
+                    if (dx * dx + dy * dy <= (float) slop * slop) {
+                        final BelluiWebViewHost h = host;
+                        postDelayed(new Runnable() {
+                            @Override
+                            public void run() { webviewReplayTapForIME(h); }
+                        }, 250);
+                        postDelayed(new Runnable() {
+                            @Override
+                            public void run() { webviewReplayTapForIME(h); }
+                        }, 800);
+                    } else {
+                        webviewTrace("replay not scheduled: gesture moved past slop");
+                    }
+                }
+            }
+            return super.dispatchTouchEvent(ev);
+        }
+
+        @Override
+        public void onWindowFocusChanged(boolean hasWindowFocus) {
+            super.onWindowFocusChanged(hasWindowFocus);
+            webviewTrace("panel windowFocus=" + hasWindowFocus);
+        }
+
+        @Override
+        protected void onAttachedToWindow() {
+            super.onAttachedToWindow();
+            webviewTrace("panel attachedToWindow");
+        }
+
+        @Override
+        protected void onDetachedFromWindow() {
+            super.onDetachedFromWindow();
+            webviewTrace("panel detachedFromWindow");
+        }
+
+        @Override
+        public WindowInsets dispatchApplyWindowInsets(WindowInsets insets) {
+            if (Build.VERSION.SDK_INT >= 30 && webviewTraceOn()) {
+                webviewTrace("panel imeInsetVisible="
+                        + insets.isVisible(WindowInsets.Type.ime()));
+            }
+            return super.dispatchApplyWindowInsets(insets);
+        }
+    }
+
     // Load states, matching webview.LoadState in navigation.go.
     private static final int WEBVIEW_LOAD_LOADING = 1;
     private static final int WEBVIEW_LOAD_COMPLETE = 2;
@@ -3924,11 +4046,19 @@ public class GoNativeActivity extends NativeActivity {
     void doWebviewCreate(int id, long token, String bridgeScript) {
         final BelluiWebViewHost host = new BelluiWebViewHost(token);
 
-        host.clip = new FrameLayout(this);
+        BelluiWebViewPanel panel = new BelluiWebViewPanel(this);
+        panel.host = host;
+        host.clip = panel;
         host.clip.setClipChildren(true);
         host.clip.setClipToPadding(true);
         host.clip.setVisibility(View.GONE); // shown once the host reports geometry
 
+        if (webviewTraceOn()) {
+            // Chromium's ImeAdapter state is reachable through chrome://inspect
+            // only with WebView debugging on; ride the same runtime gate as the
+            // trace so a production app never exposes it.
+            WebView.setWebContentsDebuggingEnabled(true);
+        }
         final WebView web = new WebView(this);
         host.web = web;
         web.getSettings().setJavaScriptEnabled(true);
@@ -4000,37 +4130,8 @@ public class GoNativeActivity extends NativeActivity {
         // window starts NOT_FOCUSABLE so bellui keeps receiving keys, and a
         // touch inside flips it focusable before the WebView handles the
         // event — the overlay dance every view-over-NativeActivity does.
-        host.clip.setOnTouchListener(new View.OnTouchListener() {
-            @Override
-            public boolean onTouch(View v, android.view.MotionEvent ev) {
-                if (ev.getAction() == android.view.MotionEvent.ACTION_DOWN) {
-                    // Promote as early as possible: window focus needs to be
-                    // the panel's BEFORE an editor-focusing gesture, or
-                    // Chromium treats the gesture as spent and refuses to
-                    // raise the keyboard (external showSoftInput cannot
-                    // override that policy).
-                    host.lastTapX = ev.getX();
-                    host.lastTapY = ev.getY();
-                    webviewPanelFocusable(host, true);
-                }
-                if (ev.getAction() == android.view.MotionEvent.ACTION_UP) {
-                    // If the focus grant lost the race against this gesture,
-                    // the editor is focused but the keyboard never came —
-                    // replay the tap into the now-focused window, where it
-                    // counts as the fresh gesture Chromium wants. No-op when
-                    // the keyboard is already up.
-                    host.clip.postDelayed(new Runnable() {
-                        @Override
-                        public void run() { webviewReplayTapForIME(host); }
-                    }, 250);
-                    host.clip.postDelayed(new Runnable() {
-                        @Override
-                        public void run() { webviewReplayTapForIME(host); }
-                    }, 800);
-                }
-                return false; // the WebView still handles the touch itself
-            }
-        });
+        // The hook is the panel's dispatchTouchEvent (see BelluiWebViewPanel),
+        // NOT an OnTouchListener, which the consuming WebView child starves.
 
         // Hosted in a panel sub-window of the activity (own surface, drawn
         // above the GL frame) — see the comment on BelluiWebViewHost.lp for
@@ -4076,7 +4177,11 @@ public class GoNativeActivity extends NativeActivity {
             return; // window not up yet; the focus poll retries
         }
         host.lp.token = token;
+        // Named so the panel is identifiable in `dumpsys window`/`dumpsys
+        // input_method` output — the host-side half of the #143 trace.
+        host.lp.setTitle("BelluiWebViewPanel");
         activity.getWindowManager().addView(host.clip, host.lp);
+        webviewTrace("panel added to window manager");
         // Added — and kept — NOT_FOCUSABLE until a tap in the web area asks
         // for promotion: an attached sub-window that is focusable HOLDS the
         // app's window focus outright on this platform (taps on the activity
@@ -4094,15 +4199,36 @@ public class GoNativeActivity extends NativeActivity {
     // focused window this time. UI thread only.
     static void webviewReplayTapForIME(BelluiWebViewHost host) {
         if (host == null || host.clip == null || host.web == null
-                || host.clip.getParent() == null || !host.clip.hasWindowFocus()) {
+                || host.clip.getParent() == null) {
+            webviewTrace("replayTap skipped: panel gone");
+            return;
+        }
+        if (!host.clip.hasWindowFocus()) {
+            webviewTrace("replayTap skipped: panel never got window focus");
             return;
         }
         if (android.os.Build.VERSION.SDK_INT >= 30) {
             android.view.WindowInsets insets = host.clip.getRootWindowInsets();
             if (insets != null && insets.isVisible(android.view.WindowInsets.Type.ime())) {
+                webviewTrace("replayTap skipped: IME already visible");
                 return; // the keyboard made it after all
             }
         }
+        // Chromium hands the IMM an InputConnection only while an editable
+        // element is focused; without one, the tap hit a link or plain
+        // content and re-dispatching it would be a phantom second click.
+        GoNativeActivity activity = goNativeActivity;
+        if (activity != null) {
+            android.view.inputmethod.InputMethodManager imm =
+                    (android.view.inputmethod.InputMethodManager)
+                            activity.getSystemService(INPUT_METHOD_SERVICE);
+            if (imm != null && !imm.isActive(host.web)) {
+                webviewTrace("replayTap skipped: no active input connection (not an editor tap)");
+                return;
+            }
+        }
+        webviewTrace("replayTap firing at (" + host.lastTapX + "," + host.lastTapY
+                + ") webViewFocus=" + host.web.hasFocus());
         long now = android.os.SystemClock.uptimeMillis();
         float x = host.lastTapX - host.web.getLeft();
         float y = host.lastTapY - host.web.getTop();
@@ -4134,13 +4260,16 @@ public class GoNativeActivity extends NativeActivity {
             host.web.requestFocus();
         }
         if (!host.web.hasFocus()) {
+            webviewTrace("nudgeIME skipped: web view refused view focus");
             return;
         }
         android.view.inputmethod.InputMethodManager imm =
                 (android.view.inputmethod.InputMethodManager)
                         activity.getSystemService(INPUT_METHOD_SERVICE);
         if (imm != null) {
-            imm.showSoftInput(host.web, 0);
+            boolean accepted = imm.showSoftInput(host.web, 0);
+            webviewTrace("nudgeIME showSoftInput accepted=" + accepted
+                    + " panelWindowFocus=" + host.clip.hasWindowFocus());
         }
     }
 
@@ -4175,8 +4304,13 @@ public class GoNativeActivity extends NativeActivity {
         boolean isFocusable =
                 (host.lp.flags & android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE) == 0;
         if (focusable == isFocusable) {
+            webviewTrace("panelFocusable no-op: already " + focusable);
             return;
         }
+        webviewTrace((focusable ? "promote" : "demote")
+                + " panel: windowFocus=" + host.clip.hasWindowFocus()
+                + " activityWindowFocus="
+                + activity.getWindow().getDecorView().hasWindowFocus());
         if (focusable) {
             host.lp.flags &= ~android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
             activity.getWindowManager().updateViewLayout(host.clip, host.lp);
@@ -4484,6 +4618,7 @@ public class GoNativeActivity extends NativeActivity {
                 }
                 // The panel window's focusability decides where keys and the
                 // IME go; the view focus follows inside it.
+                webviewTrace("setFocus take=" + take + " (focus bridge)");
                 webviewPanelFocusable(h, take);
                 if (take) {
                     h.web.setFocusableInTouchMode(true);
