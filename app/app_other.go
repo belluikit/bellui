@@ -31,7 +31,3 @@ func watchTheme(_ *settings) {
 func stopWatchingTheme() {
 	// no-op
 }
-
-func (a *belluiApp) registerRepositories() {
-	// no-op
-}

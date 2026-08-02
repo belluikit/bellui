@@ -1,3 +1,9 @@
+// These tests write real files (os.WriteFile into t.TempDir, listed back via
+// storage.ListerForURI on file:// URIs) and drive the canvas file browser —
+// both the !wasm halves of their seams; the browser has neither (#77's split
+// convention, #79).
+//go:build !wasm
+
 package dialog
 
 import (
