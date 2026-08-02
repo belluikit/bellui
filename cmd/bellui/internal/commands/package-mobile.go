@@ -68,7 +68,7 @@ func (p *Packager) packageIOS(target string, tags []string) error {
 		return err
 	}
 
-	appDir := filepath.Join(p.dir, mobile.AppOutputName(p.os, p.Name, p.release))
+	appDir := filepath.Join(p.dir, mobile.AppOutputName(p.os, p.Name, p.distribution))
 	return runCmdCaptureOutput("xcrun", "actool", "Images.xcassets", "--compile", appDir, "--platform",
 		"iphoneos", "--target-device", "iphone", "--minimum-deployment-target", "9.0", "--app-icon", "AppIcon",
 		"--output-format", "human-readable-text", "--output-partial-info-plist", "/dev/null")

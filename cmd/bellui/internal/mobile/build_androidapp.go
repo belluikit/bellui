@@ -89,7 +89,7 @@ func androidManifestData(dir, bundleID, appName, libName, version string, build 
 }
 
 func goAndroidBuild(pkg *packages.Package, bundleID string, androidArchs []string,
-	iconPath, appName, version string, build, target int, release bool, iconFG, iconBG, iconMono string,
+	iconPath, appName, version string, build, target int, release, distribution bool, iconFG, iconBG, iconMono string,
 ) (map[string]bool, error) {
 	var env []string
 	if release { // Google Play Store requires 16K alignment
@@ -142,8 +142,10 @@ func goAndroidBuild(pkg *packages.Package, bundleID string, androidArchs []strin
 		libFiles = append(libFiles, libPath)
 	}
 
+	// Only a distribution build ("bellui release") produces the .aab store
+	// bundle; a --release package stays an installable .apk (#144).
 	ext := ".apk"
-	if release {
+	if distribution {
 		ext = ".aab"
 	}
 	if buildO == "" {
@@ -188,17 +190,21 @@ func goAndroidBuild(pkg *packages.Package, bundleID string, androidArchs []strin
 			return nil, err
 		}
 	}
-	if !release && !buildN {
+	if !distribution && !buildN {
 		// The built-in Writer only applies an APK Signature Scheme v1 (JAR)
 		// signature, which Android 11+ (API >= 30) rejects at install. Re-sign
 		// the debug APK with apksigner (v1+v2) so `bellui package` output installs
-		// directly on modern devices, matching the debug targetSdk (34).
+		// directly on modern devices — required for the plain debug build
+		// (targetSdk 34) and just as much for a --release one (targetSdk 35,
+		// non-debuggable, still debug-key-signed so it sideloads, #144). Only
+		// a distribution build skips this: its signing belongs to the caller's
+		// keystore in `bellui release`.
 		apkPath := buildO[:len(buildO)-3] + "apk"
 		if err := resignDebugAPK(apkPath); err != nil {
 			return nil, err
 		}
 	}
-	if release {
+	if distribution {
 		_, err := exec.LookPath("bundletool")
 		if err != nil {
 			_, _ = fmt.Fprint(os.Stderr, "Required command 'bundletool' not found when building Android for release.\n")
