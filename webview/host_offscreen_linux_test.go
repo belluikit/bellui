@@ -77,3 +77,34 @@ func TestOffscreenHostKeyHandlersInert(t *testing.T) {
 	h.KeyUp(&event.KeyEvent{Name: event.KeyTab, Modifier: event.KeyModifierControl})
 	h.KeyUp(&event.KeyEvent{Name: event.KeyTab})
 }
+
+// The Composable methods must be inert without an engine, and the caret-rect
+// seam converts CEF's last-character bound into a content-point rectangle.
+func TestOffscreenHostComposableInert(t *testing.T) {
+	test.NewTempApp(t)
+
+	v := New("about:blank")
+	h := newOffscreenHost(v)
+
+	h.Compose(&event.PreeditEvent{Text: "にほ", CursorPos: 2})
+	h.ComposeCommit("日本")
+	h.ComposeCancel()
+	h.TypedRune('😀') // astral: routed to ImeCommitText, nil-guarded
+
+	assert.True(t, h.PreeditCursorRectangle().Size.IsZero(),
+		"no composition-range report yet: the rect is the documented zero")
+
+	h.engineImeCompositionRange(gocef.Range{}, []gocef.Rect{{X: 10, Y: 20, Width: 8, Height: 16}})
+	pr := h.PreeditCursorRectangle()
+	assert.Equal(t, float32(18), pr.Pos.X, "caret sits at the last bound's right edge")
+	assert.Equal(t, float32(16), pr.Size.Height)
+}
+
+// utf16Units converts rune indices to cef_range_t's UTF-16 code units.
+func TestUTF16Units(t *testing.T) {
+	assert.Equal(t, 0, utf16Units("にほ", 0))
+	assert.Equal(t, 2, utf16Units("にほ", 2), "BMP runes are one unit each")
+	assert.Equal(t, 1, utf16Units("に", 5), "past-the-end clamps to the string's units")
+	assert.Equal(t, 2, utf16Units("😀", 1), "an astral rune is a surrogate pair")
+	assert.Equal(t, 3, utf16Units("😀a", 2))
+}
