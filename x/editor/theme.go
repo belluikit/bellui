@@ -136,21 +136,26 @@ func defaultColors() map[bellui.ThemeColorName]color.Color {
 	return defaultDarkColors
 }
 
-// themeColor resolves a named color from the current application theme.
-// If the theme does not define the name, falls back to [defaultColors].
-// If no application is running (e.g. in tests), returns the default or
-// the theme foreground color.
+// themeColor resolves a named color, asking the current application theme
+// first — that is what lets an app restyle the editor by defining the
+// editor.* names (#150). nil or color.Transparent means the theme did not
+// answer: Transparent is the toolkit's established unknown-name sentinel
+// (bellui's palette returns it for names it does not know, and
+// theme.ValidateTheme reads it as "missing"), so either falls back to the
+// variant-appropriate built-in defaults. With no app running (bare tests),
+// the built-in defaults answer directly.
+//
+// One default IS transparent — ColorNameGutterBackground — so a theme
+// answering Transparent for it degrades to the identical value; the sentinel
+// costs nothing there.
 func themeColor(name bellui.ThemeColorName) color.Color {
-	// Always prefer our own variant-aware defaults for fycoder-specific names.
-	// The app theme's fallback for unknown names is unreliable (Bellui returns
-	// a catch-all color like blue instead of transparent).
-	defaults := defaultColors()
-	if def, ok := defaults[name]; ok {
-		return def
-	}
-	// For non-fycoder names (e.g. theme.ColorNameForeground), use the app theme.
 	if a := bellui.CurrentApp(); a != nil {
-		return a.Settings().Theme().Color(name, a.Settings().ThemeVariant())
+		if c := a.Settings().Theme().Color(name, a.Settings().ThemeVariant()); c != nil && c != color.Transparent {
+			return c
+		}
+	}
+	if def, ok := defaultColors()[name]; ok {
+		return def
 	}
 	return color.White
 }
