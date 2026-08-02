@@ -1,3 +1,8 @@
+// Every test here Shows a FileDialog and asserts the window-hosted canvas
+// browser; on wasm Show routes to the native <input type=file> override
+// (file_wasm.go), so there is nothing window-hosted to assert (#79).
+//go:build !wasm
+
 package dialog
 
 import (

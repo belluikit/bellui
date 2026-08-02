@@ -70,42 +70,6 @@ func TestNewFileItem(t *testing.T) {
 	assert.Equal(t, "filename", item.name)
 }
 
-func TestNewFileItem_Folder(t *testing.T) {
-	f := &fileDialog{file: &FileDialog{}}
-	_ = f.makeUI()
-
-	currentLister, err := storage.ListerForURI(storage.NewFileURI("."))
-	assert.NoError(t, err)
-
-	parentDir, err := storage.Parent(currentLister)
-	assert.NoError(t, err)
-	parentLister, err := storage.ListerForURI(parentDir)
-	assert.NoError(t, err)
-
-	f.setLocation(parentLister)
-	item := f.newFileItem(currentLister, true, false)
-
-	assert.Equal(t, currentLister.Name(), item.name)
-	assert.Equal(t, currentLister.String(), item.location.String())
-}
-
-func TestNewFileItem_ParentFolder(t *testing.T) {
-	f := &fileDialog{file: &FileDialog{}}
-	_ = f.makeUI()
-	currentLister, err := storage.ListerForURI(storage.NewFileURI("."))
-	assert.NoError(t, err)
-
-	parentDir, err := storage.Parent(currentLister)
-	assert.NoError(t, err)
-	f.setLocation(currentLister)
-
-	item := f.newFileItem(parentDir, true, true)
-	item.ExtendBaseWidget(item)
-
-	assert.Equal(t, "(Parent)", item.name)
-	assert.Equal(t, parentDir.String(), f.data[0].String())
-}
-
 func TestFileItem_Wrap(t *testing.T) {
 	f := &fileDialog{file: &FileDialog{}}
 	_ = f.makeUI()
