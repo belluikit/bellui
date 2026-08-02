@@ -35,6 +35,38 @@ func TestRedactionMode_RoundTrip(t *testing.T) {
 	}
 }
 
+// --- Redactions() read-back (#158) ---------------------------------------
+
+func TestRedactions_ReadsBackTrackedSpans(t *testing.T) {
+	e := newProtectedEditor(t, protSample)
+	if got := e.Redactions(); got != nil {
+		t.Fatalf("Redactions() with none set = %v, want nil", got)
+	}
+
+	redactWorld(e)
+	got := e.Redactions()
+	if len(got) != 1 || got[0] != worldRange {
+		t.Fatalf("Redactions() = %v, want [%v]", got, worldRange)
+	}
+
+	// The getter must not alias the tracked slice: a caller mutating its copy
+	// must not move the editor's bars.
+	got[0].StartCol = 0
+	if again := e.Redactions(); again[0] != worldRange {
+		t.Errorf("mutating the returned copy leaked into the editor: %v", again[0])
+	}
+
+	// An insert before the span shifts it via anchor-tracking (#130); the
+	// getter reports the span the editor is actually drawing, not the one the
+	// host published — the exact staleness #158's reveal-toggle hits.
+	e.entry.CursorColumn = 0
+	e.entry.TypedRune('Z')
+	want := TextRange{StartRow: 0, StartCol: 7, EndRow: 0, EndCol: 12}
+	if shifted := e.Redactions(); len(shifted) != 1 || shifted[0] != want {
+		t.Errorf("after an insert above, Redactions() = %v, want [%v]", shifted, want)
+	}
+}
+
 // --- masked: opaque bars + caret-opaque protected ranges -----------------
 
 func TestRedaction_MaskedDrawsOpaqueBar(t *testing.T) {
