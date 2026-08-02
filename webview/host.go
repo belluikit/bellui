@@ -15,7 +15,9 @@ import (
 // Linux the engine (CEF) renders offscreen and the content is composited
 // *inside* bellui's canvas — overlays draw above it, [core.Canvas.Capture]
 // sees it, clipping and opacity apply, and the host is a Tab stop, because
-// bellui owns the keyboard rather than the OS.
+// bellui owns the keyboard rather than the OS. While the page is focused,
+// Tab traverses the page's own tab order; Ctrl+Tab / Ctrl+Shift+Tab return
+// to bellui's focus ring (#126).
 //
 // All methods must be called on the main goroutine.
 //

@@ -99,12 +99,12 @@
 //   - On Windows a navigation the user started is reported as
 //     [NavigationLinkClicked] whatever they did to start it, including
 //     submitting a form: WebView2 reports that the user initiated it, not how.
-//   - On Linux the host is a Tab stop, but the page's *own* Tab order is not
-//     keyboard-reachable — the canvas consumes Tab for focus traversal before
-//     the page sees it (#126) — and IME composition is not yet forwarded, so
-//     CJK text cannot be typed into the page (#121). Both are properties of
-//     bellui owning the keyboard, which is also what makes the host
-//     focusable at all.
+//   - On Linux the host is a Tab stop, and while the page is focused plain
+//     Tab / Shift+Tab traverse the page's own tab order; Ctrl+Tab /
+//     Ctrl+Shift+Tab leave it and continue in bellui's focus ring (#126).
+//     IME composition is not yet forwarded, so CJK text cannot be typed into
+//     the page (#121) — a property of bellui owning the keyboard, which is
+//     also what makes the host focusable at all.
 //
 // # Talking to the page
 //
