@@ -3,6 +3,7 @@ package test
 import (
 	"fmt"
 	"image/color"
+	"strings"
 
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/theme"
@@ -324,7 +325,11 @@ type configurableTheme struct {
 var _ bellui.Theme = (*configurableTheme)(nil)
 
 func (t *configurableTheme) Color(n bellui.ThemeColorName, _ bellui.ThemeVariant) color.Color {
-	if t.colors[n] == nil {
+	// Namespaced names ("." or ":") belong to extension packages (x/editor,
+	// x/tables); asking the app theme first and treating nil as "use your
+	// built-in default" is their supported pattern (#150), so an undefined one
+	// is not an error worth logging on every paint.
+	if t.colors[n] == nil && !strings.ContainsAny(string(n), ".:") {
 		bellui.LogError(fmt.Sprintf("color %s not defined in theme %s", n, t.name), nil)
 	}
 
