@@ -159,8 +159,10 @@ the `docs/notes/` file for its area.
 - **wasm build tags:** when adding a `wasm`-tagged file, its `!wasm` counterpart and its own
   tag must together cover `wasm && ci` — otherwise nothing builds and the symbol is
   undefined on that leg (#73, #77).
-- **Touching `app/GoNativeActivity.java` requires the tools-repo dex regen**
-  (`go run gendex/gendex.go -o dex.go` with `ANDROID_HOME` set).
+- **Touching `internal/driver/mobile/app/GoNativeActivity.java` requires regenerating the
+  CLI's embedded dex in the same PR** (`cd cmd/bellui/internal/mobile && go generate`, with
+  `ANDROID_HOME` set) — enforced by the `dex_regenerated_with_java` gate in
+  `.github/workflows/cli_tests.yml`.
 - **Live-verify harnesses live in `hack/*probe`**, most with an `-auto` scripted mode. A
   change to a platform bridge is not verified by unit tests alone — run the probe, on device
   or on GPU where the claim requires it.
@@ -264,8 +266,9 @@ the PR description, or unstated scope creep. Exactly one of:
 
 1. **In-scope**: small, same repo, and needed for this issue's acceptance → do it in the same PR.
 2. **File it now**: everything else → open an issue *before* the originating PR merges —
-   in this repo, or in the owning trendvidia repo when the gap belongs to a dependency we own
-   (glfw, glfw-js, protowire-go, govm, fycoder, tools/CLI, …). Triage it on the spot
+   in this repo (which also owns the `cmd/bellui` CLI), or in the owning trendvidia repo when
+   the gap belongs to a dependency we own (glfw, glfw-js, protowire-go, govm, fycoder, …).
+   Triage it on the spot
    (Workstream/Priority/Tranche here; `design-tool` label if story-related), wire a blocked-by
    edge if it blocks planned work, and cross-link it from the originating issue/PR.
 3. Third-party (not ours) → record the limitation in the issue/CLAUDE.md with the upstream link.
