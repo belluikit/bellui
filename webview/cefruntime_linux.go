@@ -80,8 +80,10 @@ func ensureCEFRuntime() error {
 		// extra Chromium switches (a display-less probe run needs
 		// --ozone-platform=headless), and Chromium's own log for a browser
 		// that silently does nothing (gocef raises severity to VERBOSE).
-		Switches: strings.Fields(os.Getenv("BELLUI_CEF_SWITCHES")),
-		LogFile:  os.Getenv("BELLUI_CEF_LOG"),
+		Switches: cefOzonePlatformSwitches(
+			strings.Fields(os.Getenv("BELLUI_CEF_SWITCHES")), os.Getenv("DISPLAY"),
+		),
+		LogFile: os.Getenv("BELLUI_CEF_LOG"),
 	})
 	if err != nil {
 		cefRuntime.failed = fmt.Errorf("webview: CEF failed to initialize: %w", err)
@@ -89,6 +91,41 @@ func ensureCEFRuntime() error {
 	}
 	cefRuntime.running = true
 	return nil
+}
+
+// cefOzonePlatformSwitches pins the CEF process to ozone-x11 whenever an X
+// display is reachable and the caller has not chosen a platform — the #139
+// decision.
+//
+// CEF renders offscreen here and opens no visible windows, so its ozone
+// platform is free to differ from the session bellui runs on. It matters
+// because Chromium's ozone-wayland does not honour the OSR client's screen
+// info: the page's devicePixelRatio comes out as min(GetScreenInfo answer,
+// wl_output scale) — measured across mutter, weston --scale=2 and XWayland on
+// linux_parallels — and --force-device-scale-factor is ignored there too
+// (crbug 40604649). Under ozone-x11 the client answer is authoritative, which
+// is the documented OSR contract, and upstream CEF itself moves OSR toward
+// forced x11 (cef#3953). So:
+//
+//   - An explicit --ozone-platform anywhere in BELLUI_CEF_SWITCHES wins;
+//     this function never second-guesses the operator.
+//   - Otherwise, DISPLAY set (a real X server or XWayland — every desktop
+//     GNOME/KDE Wayland session has one) pins --ozone-platform=x11. On an X11
+//     session this matches what Chromium's auto-selection did anyway.
+//   - Otherwise the switches pass through untouched and Chromium picks
+//     wayland or headless itself. On that pure-Wayland fallback, HiDPI above
+//     the compositor's own output scale is capped by the min() above — a
+//     recorded Chromium limitation, not something the backend can lift.
+func cefOzonePlatformSwitches(user []string, display string) []string {
+	for _, s := range user {
+		if strings.HasPrefix(s, "--ozone-platform") {
+			return user
+		}
+	}
+	if display == "" {
+		return user
+	}
+	return append(user, "--ozone-platform=x11")
 }
 
 // resolveCEFSandbox is the #107 sandbox decision, recorded here rather than
