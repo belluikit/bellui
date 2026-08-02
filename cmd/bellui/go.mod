@@ -3,10 +3,12 @@ module github.com/belluikit/bellui/cmd/bellui
 go 1.25.0
 
 require (
+	github.com/belluikit/gocef-libs v0.1.0
 	github.com/fogleman/gg v1.3.0
 	github.com/go-ole/go-ole v1.3.0
 	github.com/jackmordaunt/icns/v2 v2.2.6
 	github.com/josephspurrier/goversioninfo v1.4.0
+	github.com/klauspost/compress v1.19.1
 	github.com/lucor/goinfo v0.9.0
 	github.com/mcuadros/go-version v0.0.0-20190830083331-035f6764e8d2
 	github.com/natefinch/atomic v1.0.1
