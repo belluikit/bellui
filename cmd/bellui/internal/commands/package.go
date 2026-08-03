@@ -2,7 +2,6 @@ package commands
 
 import (
 	"errors"
-	"flag"
 	"fmt"
 	"image"
 	_ "image/jpeg" // import image encodings
@@ -84,48 +83,6 @@ type Packager struct {
 // NewPackager returns a command that can handle the packaging a GUI apps built using Bellui from local source code.
 func NewPackager() *Packager {
 	return &Packager{appData: &appData{}}
-}
-
-// AddFlags adds the flags for interacting with the package command.
-//
-// Deprecated: Access to the individual cli commands are being removed.
-func (p *Packager) AddFlags() {
-	flag.StringVar(&p.os, "os", "", "The operating system to target (android, android/arm, android/arm64, android/amd64, android/386, darwin, freebsd, ios, linux, netbsd, openbsd, windows, wasm)")
-	flag.StringVar(&p.exe, "executable", "", "Specify an existing binary instead of building before package")
-	flag.StringVar(&p.srcDir, "src", "", "The directory to package, if executable is not set")
-	flag.StringVar(&p.Name, "name", "", "The name of the application, default is the executable file name")
-	flag.StringVar(&p.icon, "icon", "", "The name of the application icon file")
-	flag.StringVar(&p.AppID, "app-id", "", "For ios or darwin targets an app-id is required, for ios this must \nmatch a valid provisioning profile")
-	flag.StringVar(&p.AppVersion, "app-version", "", "Version number in the form x, x.y or x.y.z semantic version")
-	flag.IntVar(&p.AppBuild, "app-build", 0, "Build number, should be greater than 0 and incremented for each build")
-	flag.BoolVar(&p.release, "release", false, "Build in release mode: optimized, non-debuggable, still installable (use 'bellui release' for store distribution)")
-	flag.StringVar(&p.tags, "tags", "", "A comma-separated list of build tags")
-}
-
-// PrintHelp prints the help for the package command.
-//
-// Deprecated: Access to the individual cli commands are being removed.
-func (*Packager) PrintHelp(indent string) {
-	fmt.Println(indent, "The package command prepares an application for installation and testing.")
-	fmt.Println(indent, "You may specify the --executable to package, otherwise --sourc-dir will be built.")
-	fmt.Println(indent, "Command usage: bellui package [parameters]")
-}
-
-// Run runs the package command.
-//
-// Deprecated: A better version will be exposed in the future.
-func (p *Packager) Run(_ []string) {
-	err := p.validate()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err.Error())
-		os.Exit(1)
-	}
-
-	err = p.doPackage(nil)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%s\n", err.Error())
-		os.Exit(1)
-	}
 }
 
 // Package starts the packaging process
