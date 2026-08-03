@@ -412,6 +412,20 @@ func TestTimePicker_DigitEntryEscapeClearsPartial(t *testing.T) {
 	assert.Equal(t, 0, calls)
 }
 
+func TestTimePicker_HandlesEscapeOnlyWhilePartial(t *testing.T) {
+	test.NewTempApp(t)
+	tp := NewTimePicker(9, 30, true, func(int, int) {})
+	tp.FocusGained()
+
+	assert.False(t, tp.HandlesEscape(), "with nothing to discard, Escape belongs to the dialog around the picker")
+
+	tp.TypedRune('1')
+	assert.True(t, tp.HandlesEscape(), "a buffered tens digit is the innermost thing to back out of")
+
+	tp.TypedKey(&event.KeyEvent{Name: event.KeyEscape})
+	assert.False(t, tp.HandlesEscape())
+}
+
 func TestTimePickerButton_Accessible(t *testing.T) {
 	test.NewTempApp(t)
 	tp := NewTimePicker(9, 30, false, nil)

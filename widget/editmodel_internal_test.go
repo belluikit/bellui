@@ -12,6 +12,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestEditEntry_HandlesEscape(t *testing.T) {
+	test.NewTempApp(t)
+	e := newEditEntry()
+	assert.True(t, e.HandlesEscape(), "Escape always cancels the in-place edit")
+}
+
 func passThroughEditor() CellEditor[string] {
 	return CellEditor[string]{
 		Text:   func(s string) string { return s },

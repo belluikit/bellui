@@ -226,10 +226,13 @@ type Tabbable interface {
 // Escape. Pop-ups, menus and dialogs implement it, so backing out of whatever
 // is on top works everywhere without each one wiring up its own key handler.
 //
-// The innermost implementing overlay is asked first, and the first one to
-// report true consumes the key.
+// Overlays are asked innermost-first. An implementing overlay that declines
+// passes the key to the overlay beneath it; the first to report true consumes
+// the key. An overlay that does not implement the interface ends the search
+// with the key unconsumed — it is assumed to handle Escape through the normal
+// focus path, the way menus and completion lists do.
 //
-// Since: 2.20
+// Since: 2.19
 type EscapeDismissible interface {
 	// DismissOnEscape closes this overlay and reports whether it did. An
 	// overlay that owns its own lifetime — a snackbar counting down to its own
@@ -249,7 +252,7 @@ type EscapeDismissible interface {
 //
 // A focusable that does not implement this never blocks the key.
 //
-// Since: 2.20
+// Since: 2.19
 type EscapeHandler interface {
 	HandlesEscape() bool
 }

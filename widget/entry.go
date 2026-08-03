@@ -1770,7 +1770,7 @@ var entryKeyHandlers = map[event.KeyName]func(e *Entry, provider *RichText, mult
 // for the key. Otherwise Escape falls through and closes the surface the entry
 // sits in.
 //
-// Since: 2.20
+// Since: 2.19
 func (e *Entry) HandlesEscape() bool {
 	if e.Disabled() {
 		return false
