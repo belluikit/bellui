@@ -163,6 +163,12 @@ the `docs/notes/` file for its area.
   CLI's embedded dex in the same PR** (`cd cmd/bellui/internal/mobile && go generate`, with
   `ANDROID_HOME` set) — enforced by the `dex_regenerated_with_java` gate in
   `.github/workflows/cli_tests.yml`.
+- **Provisional API is marked `Experimental:`.** A doc-comment paragraph beginning
+  `Experimental:` means the symbol sits outside the release's compatibility promise
+  and may change or be removed; it must say *why* it is provisional and name the
+  stable alternative. Introduced for `canvas.GLView`/`GLContext` (#216), which are
+  an escape hatch bound to the non-default GL painter — the point is that a v1 tag
+  must not silently freeze API nobody can use on a default build.
 - **Live-verify harnesses live in `hack/*probe`**, most with an `-auto` scripted mode. A
   change to a platform bridge is not verified by unit tests alone — run the probe, on device
   or on GPU where the claim requires it.
