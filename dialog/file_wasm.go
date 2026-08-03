@@ -32,7 +32,16 @@ func fileOpenOSOverride(f *FileDialog) bool {
 	if !ok {
 		return false
 	}
-	showBrowserOpenPicker(acceptForFilter(f.filter), cb)
+	// Report the close through SetOnClosed exactly like the desktop native
+	// backends (#233): immediately before the result callback, true whenever
+	// the user confirmed a choice — a dismissed picker delivers (nil, nil), so
+	// anything else, including a confirm whose file then failed to read, is a
+	// confirmation. showBrowserOpenPicker already delivers on the main
+	// goroutine.
+	showBrowserOpenPicker(acceptForFilter(f.filter), func(reader bellui.URIReadCloser, err error) {
+		f.notifyClosed(reader != nil || err != nil)
+		cb(reader, err)
+	})
 	return true
 }
 
@@ -50,7 +59,18 @@ func fileSaveOSOverride(f *FileDialog) bool {
 	if name == "" {
 		name = "download"
 	}
-	cb(newDownloadWriteCloser(name), nil)
+	// There is no picker-close moment here: the writer is handed out
+	// immediately and the "dialog" is the download offered when it is closed.
+	// Closing the writer is therefore the closest thing to confirming the
+	// dialog, so that is when SetOnClosed reports (#233) — after the result
+	// callback, unlike every picker-backed path, and never at all if the app
+	// abandons the writer. The hop keeps the report on the main goroutine
+	// whatever goroutine the app closes the writer from.
+	w := newDownloadWriteCloser(name)
+	w.onClose = func() {
+		bellui.Do(func() { f.notifyClosed(true) })
+	}
+	cb(w, nil)
 	return true
 }
 
@@ -179,9 +199,10 @@ func (b *bytesReadCloser) URI() bellui.URI { return b.uri }
 // downloadWriteCloser buffers writes and, on Close, offers the contents to the
 // browser as a download named after the requested file.
 type downloadWriteCloser struct {
-	buf  bytes.Buffer
-	name string
-	uri  bellui.URI
+	buf     bytes.Buffer
+	name    string
+	uri     bellui.URI
+	onClose func() // fired after the download is offered; reports the dialog close
 }
 
 func newDownloadWriteCloser(name string) *downloadWriteCloser {
@@ -193,6 +214,9 @@ func (d *downloadWriteCloser) URI() bellui.URI             { return d.uri }
 
 func (d *downloadWriteCloser) Close() error {
 	triggerBrowserDownload(d.name, d.buf.Bytes())
+	if d.onClose != nil {
+		d.onClose()
+	}
 	return nil
 }
 
