@@ -14,6 +14,7 @@ import (
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/core"
+	"github.com/belluikit/bellui/driver"
 	"github.com/belluikit/bellui/driver/desktop"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
@@ -135,35 +136,52 @@ type FileDialog struct {
 // Declare conformity to Dialog interface
 var _ Dialog = (*FileDialog)(nil)
 
-// useNativeFileDialogs gates the opt-in native/portal file dialog backends.
-// It is off by default; Flatpak builds ignore it and always use the portal
-// (the only correct path inside the sandbox).
-var useNativeFileDialogs atomic.Bool
+// noNativeFileDialogs records an explicit opt-out. The default is to use the
+// platform's own picker, so the zero value has to mean "native" — hence the
+// negative sense. Flatpak builds ignore it and always use the portal (the only
+// correct path inside the sandbox).
+var noNativeFileDialogs atomic.Bool
 
 // UseNativeFileDialogs enables (or disables) the platform-native file dialog
 // backends for FileOpen, FileSave and FolderOpen: NSOpenPanel/NSSavePanel on
 // macOS, IFileOpenDialog/IFileSaveDialog on Windows and the
-// org.freedesktop.portal.FileChooser portal on Linux/BSD. The native backend
-// presents OS-familiar chrome and, on Linux, is the only backend that works
-// under Flatpak/Snap sandboxing.
+// org.freedesktop.portal.FileChooser portal on Linux/BSD.
 //
-// It is disabled by default. When enabled but the native backend is
-// unavailable (no portal on the bus, unsupported platform, mobile/web) the
-// existing canvas-drawn dialog is used, so apps never lose the feature. The
-// SetShowHidden toggle and multi-selection are canvas-dialog-only; the native
-// surfaces cannot express them.
+// They are used by default: a file picker is where users expect their own
+// sidebar, favourites, search and network mounts, and on Linux the portal is
+// the only backend that works inside Flatpak/Snap. Pass false to force the
+// canvas-drawn dialog everywhere instead.
+//
+// When the native backend cannot serve a request the canvas-drawn dialog is
+// used, so an app never loses the feature. That covers no portal on the bus,
+// an unsupported platform, and a window with no platform handle behind it.
+// The SetShowHidden toggle is canvas-dialog-only; the native surfaces cannot
+// express it.
 //
 // Flatpak builds always use the portal regardless of this setting.
 //
 // Since: 2.17
 func UseNativeFileDialogs(enable bool) {
-	useNativeFileDialogs.Store(enable)
+	noNativeFileDialogs.Store(!enable)
 }
 
-// nativeFileDialogsEnabled reports whether a native backend should be used.
-// Flatpak forces it on; every other platform requires the opt-in.
+// nativeFileDialogsEnabled reports whether the native backends are wanted at
+// all. Flatpak forces them on; everywhere else an app can opt out.
 func nativeFileDialogsEnabled() bool {
-	return build.IsFlatpak || useNativeFileDialogs.Load()
+	return build.IsFlatpak || !noNativeFileDialogs.Load()
+}
+
+// nativeFileDialogsFor reports whether the native backend should handle this
+// particular dialog. A native picker is a window of the platform's own, and
+// needs a platform window to sit over: a driver that has none — the test
+// driver, the embedded driver — falls back to the canvas dialog rather than
+// putting up a picker its window system knows nothing about.
+func nativeFileDialogsFor(d *FileDialog) bool {
+	if !nativeFileDialogsEnabled() {
+		return false
+	}
+	_, native := d.parent.(driver.NativeWindow)
+	return native
 }
 
 func (f *fileDialog) makeUI() core.CanvasObject {

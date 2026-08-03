@@ -863,3 +863,28 @@ func TestSetOnClosedBeforeShow(t *testing.T) {
 	d.Hide()
 	assert.True(t, onClosedCalled)
 }
+
+func TestNativeFileDialogsDefaultsOn(t *testing.T) {
+	t.Cleanup(func() { UseNativeFileDialogs(true) })
+
+	assert.True(t, nativeFileDialogsEnabled(), "the platform picker is the default")
+
+	UseNativeFileDialogs(false)
+	assert.False(t, nativeFileDialogsEnabled(), "an app can still opt out")
+
+	UseNativeFileDialogs(true)
+	assert.True(t, nativeFileDialogsEnabled())
+}
+
+func TestNativeFileDialogsNeedAPlatformWindow(t *testing.T) {
+	// A native picker is a window of the platform's own. Under a driver with no
+	// platform windows there is nothing to put it over, so the canvas dialog
+	// serves the request instead — which is also what keeps this very test suite
+	// from opening real OS pickers.
+	test.NewTempApp(t)
+	w := test.NewTempWindow(t, widget.NewLabel("x"))
+
+	d := NewFileOpen(func(bellui.URIReadCloser, error) {}, w)
+	assert.False(t, nativeFileDialogsFor(d))
+	assert.True(t, nativeFileDialogsEnabled(), "…even though the native backends are wanted in general")
+}
