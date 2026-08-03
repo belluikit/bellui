@@ -1441,6 +1441,14 @@ func (d *driver) typeDownCanvas(canvas *canvas, r rune, code key.Code, mod key.M
 	r = runeToPrintable(r)
 	keyEvent := &event.KeyEvent{Name: keyName, Modifier: keyEventModifier(mod)}
 
+	// Escape closes the innermost pop-up, menu or dialog — the same default the
+	// desktop driver applies — unless the focused widget is using the key for a
+	// state of its own. Android's Back button reaches this through KeyBack
+	// below, not here.
+	if keyName == event.KeyEscape && intdriver.HandleEscape(canvas) {
+		return
+	}
+
 	if canvas.Focused() != nil {
 		if keyName != "" {
 			// Keyboard-activation parity with taps (#700).

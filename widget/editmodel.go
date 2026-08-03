@@ -45,6 +45,10 @@ func newEditEntry() *editEntry {
 	return e
 }
 
+// HandlesEscape reports true: Escape cancels the in-place edit, which is the
+// innermost thing the user can back out of.
+func (e *editEntry) HandlesEscape() bool { return true }
+
 func (e *editEntry) TypedKey(key *event.KeyEvent) {
 	if key.Name == event.KeyEscape {
 		if e.onCancel != nil {

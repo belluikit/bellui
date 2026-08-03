@@ -413,6 +413,13 @@ func (p *CompletionPopup) HandleKey(e *event.KeyEvent) bool {
 	return p.consumeKey(e)
 }
 
+// HandlesEscape reports whether Escape closes the completion list rather than
+// the surface it is shown over. It does so whenever the list is up: the list is
+// the innermost thing on screen.
+//
+// Since: 2.19
+func (p *CompletionPopup) HandlesEscape() bool { return p.shown }
+
 // consumeKey is the popup's key switch, shared by HandleKey (which gates it
 // on visibility for hosts) and TypedKey (which only fires while focused).
 func (p *CompletionPopup) consumeKey(e *event.KeyEvent) bool {
