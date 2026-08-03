@@ -521,6 +521,136 @@ func Test_snapshot(t *testing.T) {
 				"\t</content>\n" +
 				"</canvas>\n",
 		},
+		"path": {
+			content: func() core.CanvasObject {
+				p := &belluicanvas.Path{FillColor: color.NRGBA{R: 200, G: 100, B: 0, A: 50}}
+				p.MoveTo(0, 0)
+				p.LineTo(10, 0)
+				p.QuadTo(15, 5, 10, 10)
+				p.CubicTo(6, 12, 2, 12, 0, 10)
+				p.Close()
+				return p
+			}(),
+			size: geo.NewSize(42, 42),
+			pos:  geo.NewPos(17, 17),
+			want: "<canvas size=\"100x100\">\n" +
+				"\t<content>\n" +
+				"\t\t<path d=\"M0,0 L10,0 Q15,5 10,10 C6,12 2,12 0,10 Z\" fillColor=\"rgba(200,100,0,50)\" pos=\"17,17\" size=\"42x42\"/>\n" +
+				"\t</content>\n" +
+				"</canvas>\n",
+		},
+		"path with stroke": {
+			content: func() core.CanvasObject {
+				p := &belluicanvas.Path{
+					FillRule:    belluicanvas.FillRuleEvenOdd,
+					StrokeColor: theme.Color(theme.ColorNamePlaceHolder),
+					StrokeWidth: 2.5,
+					LineCap:     belluicanvas.LineCapRound,
+					LineJoin:    belluicanvas.LineJoinBevel,
+					MiterLimit:  8,
+					DashPattern: []float32{4, 2},
+					DashOffset:  1.5,
+				}
+				p.MoveTo(0, 0)
+				p.LineTo(10, 10)
+				return p
+			}(),
+			want: "<canvas size=\"100x100\">\n" +
+				"\t<content>\n" +
+				"\t\t<path d=\"M0,0 L10,10\" dash=\"4,2\" dashOffset=\"1.5\" fillRule=\"evenOdd\" lineCap=\"round\" lineJoin=\"bevel\" miterLimit=\"8\" size=\"100x100\" strokeColor=\"placeholder\" strokeWidth=\"2.5\"/>\n" +
+				"\t</content>\n" +
+				"</canvas>\n",
+		},
+		"textOnPath": {
+			content: func() core.CanvasObject {
+				t := &belluicanvas.TextOnPath{
+					Text:          "curved",
+					Color:         theme.Color(theme.ColorNamePrimary),
+					TextSize:      18,
+					TextStyle:     bellui.TextStyle{Italic: true, Underline: true},
+					Offset:        5,
+					BaselineShift: -2,
+				}
+				t.MoveTo(0, 20)
+				t.QuadTo(20, 0, 40, 20)
+				return t
+			}(),
+			want: "<canvas size=\"100x100\">\n" +
+				"\t<content>\n" +
+				"\t\t<textOnPath baselineShift=\"-2\" color=\"primary\" d=\"M0,20 Q20,0 40,20\" italic offset=\"5\" size=\"100x100\" textSize=\"18\" underline>curved</textOnPath>\n" +
+				"\t</content>\n" +
+				"</canvas>\n",
+		},
+		"styledText": {
+			content: &belluicanvas.StyledText{
+				Alignment: bellui.TextAlignCenter,
+				TextSize:  15,
+				Runs: []belluicanvas.TextRun{
+					{Text: "plain"},
+					{Text: "loud", TextSize: 20, TextStyle: bellui.TextStyle{Bold: true}},
+					{Text: "red", Color: theme.Color(theme.ColorNameError)},
+				},
+			},
+			want: "<canvas size=\"100x100\">\n" +
+				"\t<content>\n" +
+				"\t\t<styledText alignment=\"center\" size=\"100x100\" textSize=\"15\">\n" +
+				"\t\t\t<run>plain</run>\n" +
+				"\t\t\t<run bold textSize=\"20\">loud</run>\n" +
+				"\t\t\t<run color=\"error\">red</run>\n" +
+				"\t\t</styledText>\n" +
+				"\t</content>\n" +
+				"</canvas>\n",
+		},
+		"backdropBlur": {
+			content: belluicanvas.NewBackdropBlur(12.5),
+			size:    geo.NewSize(42, 42),
+			pos:     geo.NewPos(17, 17),
+			want: "<canvas size=\"100x100\">\n" +
+				"\t<content>\n" +
+				"\t\t<backdropBlur blurRadius=\"12.5\" pos=\"17,17\" size=\"42x42\"/>\n" +
+				"\t</content>\n" +
+				"</canvas>\n",
+		},
+		"ripple": {
+			content: func() core.CanvasObject {
+				r := belluicanvas.NewRipple(theme.Color(theme.ColorNamePressed))
+				r.Center = geo.NewPos(8, 4)
+				r.Radius = 24
+				r.Opacity = 0.5
+				r.CornerRadius = 6
+				return r
+			}(),
+			want: "<canvas size=\"100x100\">\n" +
+				"\t<content>\n" +
+				"\t\t<ripple center=\"8,4\" color=\"pressed\" cornerRadius=\"6\" opacity=\"0.5\" radius=\"24\" size=\"100x100\"/>\n" +
+				"\t</content>\n" +
+				"</canvas>\n",
+		},
+		"glView": {
+			content: belluicanvas.NewGLView(func(_ belluicanvas.GLContext, _, _ int, _ float32) {}),
+			want: "<canvas size=\"100x100\">\n" +
+				"\t<content>\n" +
+				"\t\t<glView render size=\"100x100\"/>\n" +
+				"\t</content>\n" +
+				"</canvas>\n",
+		},
+		"scene3D": {
+			content: func() core.CanvasObject {
+				s := belluicanvas.NewScene3D()
+				s.Camera = belluicanvas.Camera3D{
+					Position: belluicanvas.Vec3{X: 3, Y: 3, Z: 5},
+					FOV:      45,
+				}
+				s.BackfaceCulling = true
+				s.Meshes = []belluicanvas.Mesh3D{{}, {}}
+				return s
+			}(),
+			want: "<canvas size=\"100x100\">\n" +
+				"\t<content>\n" +
+				"\t\t<scene3D backfaceCulling cameraPos=\"3,3,5\" fov=\"45\" lights=\"1\" meshes=\"2\" size=\"100x100\"/>\n" +
+				"\t</content>\n" +
+				"</canvas>\n",
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			c := NewCanvas()
