@@ -7,8 +7,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
+	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/driver"
 	"github.com/belluikit/bellui/test"
@@ -69,6 +71,54 @@ func TestHandleEscape_SkipsOverlaysThatRefuse(t *testing.T) {
 	require.True(t, driver.HandleEscape(w.Canvas()))
 	assert.Equal(t, 1, snackbar.asked)
 	assert.Equal(t, 1, dialog.asked, "a surface that declines passes the key down, it does not swallow it")
+}
+
+func TestHandleEscape_UnknownOverlayEndsTheWalk(t *testing.T) {
+	test.NewTempApp(t)
+	w := test.NewTempWindow(t, widget.NewLabel("content"))
+
+	dialog := newEscapeOverlay(true)
+	w.Canvas().Overlays().Add(dialog)
+	w.Canvas().Overlays().Add(widget.NewLabel("menu stand-in")) // not EscapeDismissible
+
+	assert.False(t, driver.HandleEscape(w.Canvas()), "an overlay the walk cannot ask ends it, unconsumed")
+	assert.Zero(t, dialog.asked, "nothing beneath it may be reached")
+}
+
+func TestHandleEscape_MenuOverDialogClosesTheMenu(t *testing.T) {
+	// The regression case: a dropdown or context menu open above a modal
+	// dialog. The menu's overlay is an OverlayContainer, not a PopUp — it does
+	// not implement EscapeDismissible and closes itself through the focus
+	// path. Escape must close the menu, never the dialog beneath it.
+	test.NewTempApp(t)
+	w := test.NewTempWindow(t, widget.NewLabel("content"))
+	w.Resize(geo.NewSize(300, 200))
+
+	dialogClosed := 0
+	pop := widget.NewModalPopUp(widget.NewLabel("form"), w.Canvas())
+	pop.OnDismissed = func() {
+		dialogClosed++
+		pop.Hide()
+	}
+	pop.Show()
+
+	menu := widget.NewPopUpMenu(bellui.NewMenu("", bellui.NewMenuItem("A", func() {})), w.Canvas())
+	menu.ShowAtPosition(geo.NewPos(10, 10))
+
+	assert.False(t, driver.HandleEscape(w.Canvas()), "the walk stops at the menu's overlay")
+	assert.Zero(t, dialogClosed, "the dialog underneath must not cancel")
+
+	// The unconsumed key then takes the normal path to the focused menu,
+	// which closes itself — the behaviour menus have always had.
+	focused := w.Canvas().Focused()
+	require.NotNil(t, focused, "the menu holds focus while open")
+	focused.TypedKey(&event.KeyEvent{Name: event.KeyEscape})
+	assert.False(t, menu.Visible(), "the menu closed")
+	assert.True(t, pop.Visible(), "the dialog is still up")
+
+	// With the menu gone, Escape reaches the dialog as usual.
+	require.True(t, driver.HandleEscape(w.Canvas()))
+	assert.Equal(t, 1, dialogClosed)
 }
 
 func TestHandleEscape_FieldInsideThePopUpCanClaimIt(t *testing.T) {

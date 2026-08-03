@@ -953,6 +953,30 @@ func (w *window) capturesTab(modifier event.KeyModifier) bool {
 	return false
 }
 
+// processKeyReleased is the release half of the key callback: menu toggles
+// armed on press fire here, then the raw key-up reaches the focused widget or
+// the canvas hook.
+func (w *window) processKeyReleased(keyEvent *event.KeyEvent, pendingMenuToggle, pendingMenuDeactivation event.KeyName) {
+	if keyEvent.Name != "" {
+		switch keyEvent.Name {
+		case pendingMenuToggle:
+			w.canvas.ToggleMenu()
+		case pendingMenuDeactivation:
+			if w.canvas.DismissMenu() {
+				return
+			}
+		}
+	}
+
+	if w.canvas.Focused() != nil {
+		if focused, ok := w.canvas.Focused().(desktop.Keyable); ok {
+			focused.KeyUp(keyEvent)
+		}
+	} else if w.canvas.onKeyUp != nil {
+		w.canvas.onKeyUp(keyEvent)
+	}
+}
+
 func (w *window) processKeyPressed(keyName event.KeyName, keyASCII event.KeyName, scancode int, action action, keyDesktopModifier event.KeyModifier) {
 	keyEvent := &event.KeyEvent{Name: keyName, Physical: event.HardwareKey{ScanCode: scancode}, Modifier: keyDesktopModifier}
 
@@ -962,24 +986,7 @@ func (w *window) processKeyPressed(keyName event.KeyName, keyASCII event.KeyName
 	w.menuDeactivationPending = desktop.KeyNone
 	switch action {
 	case release:
-		if action == release && keyName != "" {
-			switch keyName {
-			case pendingMenuToggle:
-				w.canvas.ToggleMenu()
-			case pendingMenuDeactivation:
-				if w.canvas.DismissMenu() {
-					return
-				}
-			}
-		}
-
-		if w.canvas.Focused() != nil {
-			if focused, ok := w.canvas.Focused().(desktop.Keyable); ok {
-				focused.KeyUp(keyEvent)
-			}
-		} else if w.canvas.onKeyUp != nil {
-			w.canvas.onKeyUp(keyEvent)
-		}
+		w.processKeyReleased(keyEvent, pendingMenuToggle, pendingMenuDeactivation)
 		return // ignore key up in other core events
 	case press:
 		switch keyName {

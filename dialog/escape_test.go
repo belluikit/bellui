@@ -35,6 +35,29 @@ func TestConfirm_EscapeCancels(t *testing.T) {
 	assert.Empty(t, w.Canvas().Overlays().List(), "the dialog should be gone")
 }
 
+// The windowed wrapModal branch wires OnDismissed too: Escape must cancel a
+// windowed dialog through the same close path as its frame's close button.
+func TestConfirm_EscapeCancelsWindowed(t *testing.T) {
+	test.NewTempApp(t)
+	w := test.NewTempWindow(t, widget.NewLabel("content"))
+	w.Resize(geo.NewSize(400, 300))
+
+	answered := 0
+	var answer bool
+	d := dialog.NewConfirm("Delete?", "Really delete it?", func(ok bool) {
+		answered++
+		answer = ok
+	}, w)
+	d.SetWindowed(true)
+	d.Show()
+	require.Len(t, w.Canvas().Overlays().List(), 1, "the windowed dialog should be up")
+
+	require.True(t, intdriver.HandleEscape(w.Canvas()))
+	assert.Equal(t, 1, answered)
+	assert.False(t, answer, "Escape means no")
+	assert.Empty(t, w.Canvas().Overlays().List())
+}
+
 func TestInformation_EscapeCloses(t *testing.T) {
 	test.NewTempApp(t)
 	w := test.NewTempWindow(t, widget.NewLabel("content"))
