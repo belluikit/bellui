@@ -214,6 +214,10 @@ func (r *treeViewContentRenderer) Layout(size geo.Size) {
 	// Return unused items to pool
 	for uid, item := range r.items {
 		if _, ok := st.newItems[uid]; !ok {
+			// A pooled row must not carry an in-progress rename: reused later
+			// for the same id — the node deleted and re-added, or its row
+			// scrolled back into view — it would reopen the editor unasked.
+			item.renaming = false
 			r.itemPool.Put(item)
 		}
 	}
@@ -724,16 +728,27 @@ func (ti *treeViewItem) contextMenuItems() []*bellui.MenuItem {
 
 func (ti *treeViewItem) startRename() {
 	ti.renaming = true
+
+	tir, _ := cache.Renderer(ti).(*treeViewItemRenderer)
+	if tir != nil && tir.renameEntry != nil {
+		// Populate the editor here, once — not in Refresh, which runs on every
+		// layout pass and would rewrite the entry with the model's text while
+		// the user is typing in it.
+		ti.tree.mu.RLock()
+		text := ""
+		if n, ok := ti.tree.nodeMap[ti.uid]; ok {
+			text = n.Text
+		}
+		ti.tree.mu.RUnlock()
+		tir.renameEntry.SetText(text)
+	}
+
 	ti.Refresh()
 
-	// Find the renderer and focus the rename entry
-	if r := cache.Renderer(ti); r != nil {
-		tir := r.(*treeViewItemRenderer)
-		if tir.renameEntry != nil {
-			c := bellui.CurrentApp().Driver().CanvasForObject(ti)
-			if c != nil {
-				c.Focus(tir.renameEntry)
-			}
+	if tir != nil && tir.renameEntry != nil {
+		c := bellui.CurrentApp().Driver().CanvasForObject(ti)
+		if c != nil {
+			c.Focus(tir.renameEntry)
 		}
 	}
 }
@@ -923,7 +938,9 @@ func (ti *treeViewItem) CreateRenderer() core.WidgetRenderer {
 	}
 	// Clicking or tabbing away ends the rename. Layout used to end it as a side
 	// effect of rebuilding every row, which also ended renames nobody meant to
-	// cancel; this is the deliberate exit that replaces it.
+	// cancel; this is the deliberate exit that replaces it. onFocusChanged is a
+	// single-slot hook (Form claims it on entries it owns); taking it is safe
+	// only because renameEntry never leaves this renderer.
 	renameEntry.onFocusChanged = func(focused bool) {
 		if !focused {
 			ti.cancelRename()
@@ -1106,19 +1123,6 @@ func (r *treeViewItemRenderer) Refresh() {
 			r.icon.Resource = r.item.nodeIcon
 			r.icon.Refresh()
 		}
-	}
-
-	// Rename entry
-	if r.item.renaming {
-		// Populate entry with current text
-		r.item.tree.mu.RLock()
-		n, ok := r.item.tree.nodeMap[r.item.uid]
-		text := ""
-		if ok {
-			text = n.Text
-		}
-		r.item.tree.mu.RUnlock()
-		r.renameEntry.SetText(text)
 	}
 
 	// Content

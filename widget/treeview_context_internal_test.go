@@ -10,6 +10,7 @@ import (
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/cache"
 	"github.com/belluikit/bellui/internal/driver"
 	"github.com/belluikit/bellui/test"
 )
@@ -27,6 +28,15 @@ func firstTreeViewItem(t *testing.T, c core.Canvas) *treeViewItem {
 		return false
 	}, nil)
 	return item
+}
+
+// renameEntryOf returns a row's inline rename editor.
+func renameEntryOf(t *testing.T, item *treeViewItem) *Entry {
+	t.Helper()
+
+	r, ok := cache.Renderer(item).(*treeViewItemRenderer)
+	require.True(t, ok, "treeViewItem should have a treeViewItemRenderer")
+	return r.renameEntry
 }
 
 func menuLabels(items []*bellui.MenuItem) []string {
@@ -186,8 +196,54 @@ func TestTreeViewItem_RenameSurvivesRelayout(t *testing.T) {
 	item.startRename()
 	require.True(t, item.renaming)
 
+	entry := renameEntryOf(t, item)
+	require.Equal(t, "One", entry.Text, "the editor starts out holding the node's text")
+	test.Type(entry, "half-typed")
+	require.Equal(t, "half-typed", entry.Text)
+
 	// Anything that re-lays the content — a resize, a scroll, a refresh — must
-	// not silently drop the user out of the editor they are typing in.
+	// not silently drop the user out of the editor they are typing in, nor
+	// rewrite what they have typed with the model's text.
 	w.Resize(geo.NewSize(320, 220))
 	assert.True(t, item.renaming, "a re-layout cancelled an inline rename in progress")
+	assert.Equal(t, "half-typed", entry.Text, "a re-layout rewrote the text the user had typed")
+}
+
+func TestTreeViewItem_FocusLossCancelsRename(t *testing.T) {
+	tv, w := newRenderedTree(t)
+
+	tv.BeginRename("1")
+	item := firstTreeViewItem(t, w.Canvas())
+	require.NotNil(t, item)
+	require.True(t, item.renaming)
+
+	// Focus moving anywhere else — another widget, another window part — is
+	// the deliberate way out of a rename without submitting it.
+	w.Canvas().Unfocus()
+
+	assert.False(t, item.renaming, "losing focus should cancel the rename")
+}
+
+func TestTreeViewItem_RenameDoesNotSurvivePooling(t *testing.T) {
+	test.NewTempApp(t)
+	tv := NewTreeView()
+	for i := 0; i < 60; i++ {
+		require.NoError(t, tv.AddNode("", TreeViewNode{ID: TreeViewNodeID(strconv.Itoa(i)), Text: "node"}))
+	}
+	w := test.NewTempWindow(t, tv)
+	w.Resize(geo.NewSize(300, 100))
+
+	tv.BeginRename("0")
+	item := tv.itemForID("0")
+	require.NotNil(t, item)
+	require.True(t, item.renaming)
+
+	// Scroll the row out of view and lay the tree out again, which recycles
+	// its item into the pool. If the flag survived pooling, the editor would
+	// reopen unasked when the item is later reused for the same id.
+	tv.ScrollToBottom()
+	w.Resize(geo.NewSize(320, 110))
+
+	require.Nil(t, tv.itemForID("0"), "the row should have been scrolled out and pooled")
+	assert.False(t, item.renaming, "a pooled row must not keep an in-progress rename")
 }
