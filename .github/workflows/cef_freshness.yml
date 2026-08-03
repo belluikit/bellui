@@ -1,0 +1,116 @@
+# Staleness visibility for the bundled Chromium (#98).
+#
+# On Linux a bellui app ships the CEF payload we pinned, so its Chromium only
+# gets security fixes when we move the pin. The policy — security-driven bumps
+# with a quarterly floor — lives in docs/CEF-MAINTENANCE.md; this job is its
+# backstop, so a drifting pin is impossible to not notice.
+#
+# It cannot decide CVE reachability (no API answers that), so it reports drift
+# for a human read and only *fails* on the quarterly floor: three Chromium
+# majors, which at roughly one major every four weeks is the quarter expressed
+# in the units the version-history API gives us.
+#
+# Self-hosted because reading the pin needs the private belluikit/gocef-libs
+# module, which the runners' git credentials can fetch.
+name: CEF Freshness
+
+on:
+  schedule:
+    - cron: "41 6 * * 1" # Mondays, off-hours UTC
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  cef_freshness:
+    name: pinned Chromium vs stable
+    runs-on: [self-hosted, Linux, ARM64]
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Read the pinned Chromium version
+        id: pin
+        run: |
+          set -euo pipefail
+          dir=$(cd cmd/bellui && go list -m -f '{{.Dir}}' github.com/belluikit/gocef-libs)
+          full=$(grep -oE 'CEFVersion[[:space:]]*=[[:space:]]*"[^"]+"' "$dir/manifest/manifest.go" \
+                 | head -1 | sed 's/.*"\(.*\)"/\1/')
+          chromium=${full##*chromium-}
+          if [ -z "$chromium" ] || [ "$chromium" = "$full" ]; then
+            echo "::error::could not parse a chromium- version out of CEFVersion=$full"
+            exit 1
+          fi
+          echo "full=$full"          >> "$GITHUB_OUTPUT"
+          echo "chromium=$chromium"  >> "$GITHUB_OUTPUT"
+          echo "major=${chromium%%.*}" >> "$GITHUB_OUTPUT"
+          echo "pinned: $full (Chromium $chromium)"
+
+      - name: Ask for the current Linux stable
+        id: stable
+        run: |
+          set -euo pipefail
+          url='https://versionhistory.googleapis.com/v1/chrome/platforms/linux/channels/stable/versions?order_by=version%20desc&pageSize=1'
+          ver=$(curl -fsS --retry 3 "$url" | python3 -c 'import json,sys; print(json.load(sys.stdin)["versions"][0]["version"])')
+          echo "chromium=$ver"        >> "$GITHUB_OUTPUT"
+          echo "major=${ver%%.*}"     >> "$GITHUB_OUTPUT"
+          echo "stable: $ver"
+
+      - name: Compare
+        id: compare
+        env:
+          PIN: ${{ steps.pin.outputs.chromium }}
+          PIN_MAJOR: ${{ steps.pin.outputs.major }}
+          STABLE: ${{ steps.stable.outputs.chromium }}
+          STABLE_MAJOR: ${{ steps.stable.outputs.major }}
+        run: |
+          set -euo pipefail
+          gap=$(( STABLE_MAJOR - PIN_MAJOR ))
+          echo "gap=$gap" >> "$GITHUB_OUTPUT"
+          if [ "$PIN" = "$STABLE" ]; then
+            echo "pin matches stable ($PIN)"
+            echo "state=current" >> "$GITHUB_OUTPUT"
+          elif [ "$gap" -ge 3 ]; then
+            echo "::error::pinned Chromium $PIN is $gap majors behind stable $STABLE — past the quarterly floor in docs/CEF-MAINTENANCE.md"
+            echo "state=floor" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::pinned Chromium $PIN, stable is $STABLE ($gap majors behind). Check https://chromereleases.googleblog.com/ for High/Critical CVEs reachable from an embedded renderer — see docs/CEF-MAINTENANCE.md."
+            echo "state=drift" >> "$GITHUB_OUTPUT"
+          fi
+
+      # One tracking issue, reused: a weekly job must not open a weekly issue.
+      - name: Open or update the tracking issue
+        if: steps.compare.outputs.state == 'floor'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PIN: ${{ steps.pin.outputs.full }}
+          STABLE: ${{ steps.stable.outputs.chromium }}
+          GAP: ${{ steps.compare.outputs.gap }}
+        run: |
+          set -euo pipefail
+          title="CEF pin is $GAP Chromium majors behind stable"
+          doc="https://github.com/$GITHUB_REPOSITORY/blob/main/docs/CEF-MAINTENANCE.md"
+          body=$(printf '%s\n' \
+            "The bundled payload pins \`$PIN\`; current Linux stable is Chromium \`$STABLE\` ($GAP majors ahead)." \
+            "" \
+            "That is past the quarterly floor in [docs/CEF-MAINTENANCE.md]($doc), so a bump is due regardless of whether a specific CVE is named. The bump order and the post-bump verification are in that document." \
+            "" \
+            "_Opened by the CEF Freshness check; it updates this issue rather than opening a new one each week._")
+          existing=$(gh issue list --state open --search "\"CEF pin is\" in:title" --json number,title \
+                     --jq '[.[] | select(.title | startswith("CEF pin is"))][0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue edit "$existing" --title "$title" --body "$body"
+            gh issue comment "$existing" --body "Still behind as of $(date -u +%Y-%m-%d): pinned \`$PIN\`, stable \`$STABLE\`."
+            echo "updated issue #$existing"
+          else
+            gh issue create --title "$title" --body "$body" --label bug
+          fi
+
+      - name: Fail on a floor breach
+        if: steps.compare.outputs.state == 'floor'
+        run: exit 1
