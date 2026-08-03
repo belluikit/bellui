@@ -108,13 +108,19 @@ func TestHandleEscape_MenuOverDialogClosesTheMenu(t *testing.T) {
 	assert.False(t, driver.HandleEscape(w.Canvas()), "the walk stops at the menu's overlay")
 	assert.Zero(t, dialogClosed, "the dialog underneath must not cancel")
 
-	// The unconsumed key then takes the normal path to the focused menu,
-	// which closes itself — the behaviour menus have always had.
-	focused := w.Canvas().Focused()
-	require.NotNil(t, focused, "the menu holds focus while open")
-	focused.TypedKey(&event.KeyEvent{Name: event.KeyEscape})
-	assert.False(t, menu.Visible(), "the menu closed")
-	assert.True(t, pop.Visible(), "the dialog is still up")
+	// The unconsumed key then takes the normal path. On desktop the menu holds
+	// focus and closes itself — the behaviour menus have always had. On mobile
+	// PopUpMenu.Show skips canvas.Focus, so there is no focus path; Escape
+	// (a hardware key there) never closed menus on mobile and still does not.
+	if bellui.CurrentDevice().IsMobile() {
+		menu.Hide()
+	} else {
+		focused := w.Canvas().Focused()
+		require.NotNil(t, focused, "the menu holds focus while open")
+		focused.TypedKey(&event.KeyEvent{Name: event.KeyEscape})
+		assert.False(t, menu.Visible(), "the menu closed")
+		assert.True(t, pop.Visible(), "the dialog is still up")
+	}
 
 	// With the menu gone, Escape reaches the dialog as usual.
 	require.True(t, driver.HandleEscape(w.Canvas()))
