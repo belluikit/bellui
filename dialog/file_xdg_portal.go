@@ -34,12 +34,13 @@ var portalReady = sync.OnceValue(func() bool {
 	return has
 })
 
-// nativePortalReady reports whether the native portal backend should handle a
-// file dialog. Flatpak forces it on (the sandbox always provides a portal);
-// every other desktop requires the opt-in and a portal actually running on the
-// session bus. When it returns false the caller falls back to the canvas dialog.
-func nativePortalReady() bool {
-	if !nativeFileDialogsEnabled() {
+// nativePortalReady reports whether the native portal backend should handle
+// this file dialog. Flatpak forces it on (the sandbox always provides a
+// portal); every other desktop needs a portal actually running on the session
+// bus, and needs the app not to have opted out. When it returns false the
+// caller falls back to the canvas dialog.
+func nativePortalReady(d *FileDialog) bool {
+	if !nativeFileDialogsFor(d) {
 		return false
 	}
 	if build.IsFlatpak {
@@ -126,7 +127,7 @@ func saveFile(parentWindowHandle string, options *filechooser.SaveFileOptions) (
 }
 
 func fileOpenOSOverride(d *FileDialog) bool {
-	if !nativePortalReady() {
+	if !nativePortalReady(d) {
 		return false
 	}
 
@@ -169,7 +170,7 @@ func fileOpenOSOverride(d *FileDialog) bool {
 }
 
 func fileSaveOSOverride(d *FileDialog) bool {
-	if !nativePortalReady() {
+	if !nativePortalReady(d) {
 		return false
 	}
 
