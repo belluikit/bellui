@@ -71,7 +71,17 @@ jobs:
           CGO_ENABLED: "0"
         run: |
           pkgs=$(go list ./... | grep -vE 'internal/gsportal|internal/driver/mobile|/cmd/|/hack/|internal/(oksvg|rasterx|render)')
-          go test -tags ci -timeout 240s -exec="$(go env GOPATH)/bin/wasmbrowsertest" $pkgs
+          # -p 1: one package at a time, so one browser at a time. go test
+          # parallelises packages by default (GOMAXPROCS — six on this runner),
+          # and every package here launches its own headless Chromium with a
+          # wasm binary loaded. Six of those at once on an 11 GB box whose /tmp
+          # is a RAM-backed 5.6 G tmpfs starves someone: a browser is killed
+          # mid-run and its package reports "context canceled", which reads as
+          # a test failure in an unrelated package. That only became reachable
+          # when the leg widened from three packages to the whole module (#79).
+          # The parallelism bought little anyway — the cost here is browser
+          # startup per package, not CPU.
+          go test -p 1 -tags ci -timeout 240s -exec="$(go env GOPATH)/bin/wasmbrowsertest" $pkgs
 
       # One browser launch per package leaves a profile behind, and the snap
       # chromium writes them into its private /tmp — which is the SHARED tmpfs
