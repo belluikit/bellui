@@ -56,17 +56,22 @@ func (p *Packager) packageWindows(tags []string) error {
 	manifestGenerated := false
 	if _, err := os.Stat(manifest); os.IsNotExist(err) {
 		manifestGenerated = true
-		manifestFile, _ := os.Create(manifest)
+		manifestFile, err := os.Create(manifest)
+		if err != nil {
+			return fmt.Errorf("failed to create manifest file: %w", err)
+		}
 
 		tplData := windowsData{
 			Name:            encodeXMLString(p.Name),
 			CombinedVersion: p.combinedVersion(),
 		}
-		err := templates.ManifestWindows.Execute(manifestFile, tplData)
-		if err != nil {
+		if err := templates.ManifestWindows.Execute(manifestFile, tplData); err != nil {
+			manifestFile.Close()
 			return fmt.Errorf("failed to write manifest template: %w", err)
 		}
-		manifestFile.Close()
+		if err := manifestFile.Close(); err != nil {
+			return fmt.Errorf("failed to finish writing the manifest: %w", err)
+		}
 	}
 
 	// launch rsrc to generate the object file
