@@ -15,6 +15,21 @@ the trendvidia fork (github.com/trendvidia/fyne).
 
 ### Added
 
+* **Escape closes the innermost pop-up, menu or dialog**
+  ([#229](https://github.com/belluikit/bellui/issues/229)). The drivers give
+  Escape a default meaning ahead of key delivery: the focused widget gets
+  first refusal through the new `event.EscapeHandler` (`Entry` while composing
+  or with `OnEscape` set, the in-place cell editor, `TimePicker` holding a
+  half-typed value), then overlays are asked innermost-first through
+  `event.EscapeDismissible`, implemented by `widget.PopUp` — covering every
+  canvas dialog, sheet and drawer. Modality does not block it: Escape is how a
+  user cancels a modal dialog. Snackbars and toasts decline and pass the key
+  beneath; an overlay that implements neither interface (a menu, a completion
+  list) ends the search and keeps handling Escape through the focus path. The
+  new `widget.PopUp.OnDismissed` hook lets a host route dismissal through its
+  own close path, which is how a dialog cancelled with Escape still reports
+  its result.
+
 * **`x/mmedia` — media playback widgets, consolidated from
   `trendvidia/fyplayer`.** `MediaPlayer`, `VideoPlayer`, `AudioPlayer`,
   `SubtitleOverlay` and `TransportControls`, decoding through
@@ -28,6 +43,19 @@ the trendvidia fork (github.com/trendvidia/fyne).
   `go 1.26.2` rather than the `1.25.0` its siblings use, because
   `goffmpeg-libs` requires it. Source ref, rewrite set and verification are in
   `x/mmedia/PROVENANCE.md`.
+
+### Changed
+
+* **Native file dialogs are now the default**
+  ([#226](https://github.com/belluikit/bellui/issues/226)).
+  `dialog.UseNativeFileDialogs` flips from opt-in to opt-out: `FileOpen`,
+  `FileSave` and `FolderOpen` are served by NSOpenPanel/NSSavePanel,
+  IFileOpenDialog/IFileSaveDialog and the XDG FileChooser portal, with the
+  canvas-drawn dialog as the fallback whenever the native backend cannot serve
+  a request (no portal on the bus, unsupported platform, or a parent window
+  with no platform handle — which keeps the test driver on the canvas dialog).
+  Pass `UseNativeFileDialogs(false)` to restore the previous behaviour. The
+  `SetShowHidden` toggle remains canvas-dialog-only.
 
 ## v1.0.0-rc.5 — 2026-07-29
 

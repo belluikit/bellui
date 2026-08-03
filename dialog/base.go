@@ -213,7 +213,11 @@ func (d *dialog) create(buttons core.CanvasObject) {
 // and the full-canvas size.
 func wrapModal(body core.CanvasObject, cv core.Canvas, windowed bool, onClose func()) *widget.PopUp {
 	if !windowed {
-		return widget.NewModalPopUp(body, cv)
+		pop := widget.NewModalPopUp(body, cv)
+		// Escape dismisses the pop-up, and a dialog has a result to report when
+		// it closes — so route it through the dialog rather than a bare Hide.
+		pop.OnDismissed = onClose
+		return pop
 	}
 
 	win := container.NewInnerWindow("", body)
@@ -226,6 +230,7 @@ func wrapModal(body core.CanvasObject, cv core.Canvas, windowed bool, onClose fu
 	pop.SetPadded(false)
 
 	win.CloseIntercept = onClose
+	pop.OnDismissed = onClose
 	win.OnDragged = func(ev *event.DragEvent) {
 		pop.Move(win.Position().Add(ev.Dragged))
 	}

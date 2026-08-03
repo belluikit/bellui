@@ -127,6 +127,13 @@ func (n *noosDriver) doRun() {
 					}
 				}
 
+				// Escape closes the innermost pop-up, menu or dialog unless the
+				// focused widget is using it for a state of its own.
+				if keyEvent.Name == event.KeyEscape && intdriver.HandleEscape(w.c) {
+					n.renderWindow(n.wins[n.current])
+					continue
+				}
+
 				// No shortcut detected, pass down to TypedKey
 				focused := w.c.Focused()
 				if focused != nil {
