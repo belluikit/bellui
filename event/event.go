@@ -221,3 +221,35 @@ type Hoverable interface {
 type Tabbable interface {
 	AcceptsTab() bool
 }
+
+// EscapeDismissible describes an overlay that closes when the user presses
+// Escape. Pop-ups, menus and dialogs implement it, so backing out of whatever
+// is on top works everywhere without each one wiring up its own key handler.
+//
+// The innermost implementing overlay is asked first, and the first one to
+// report true consumes the key.
+//
+// Since: 2.20
+type EscapeDismissible interface {
+	// DismissOnEscape closes this overlay and reports whether it did. An
+	// overlay that owns its own lifetime — a snackbar counting down to its own
+	// dismissal — returns false and leaves the key to whatever is beneath it.
+	DismissOnEscape() bool
+}
+
+// EscapeHandler describes a [Focusable] that wants the Escape key for itself
+// rather than letting it close the surrounding pop-up or dialog.
+//
+// Escape means "back out of the innermost thing", and a widget can be that
+// innermost thing without being an overlay: a text field mid-IME-composition,
+// a cell being edited in place, a picker holding a half-typed value. Such a
+// widget reports true while it is in that state and false the rest of the
+// time, so Escape falls through to the dialog around it once there is nothing
+// left to back out of.
+//
+// A focusable that does not implement this never blocks the key.
+//
+// Since: 2.20
+type EscapeHandler interface {
+	HandlesEscape() bool
+}
