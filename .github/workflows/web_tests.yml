@@ -89,4 +89,10 @@ jobs:
           sudo find /tmp/snap-private-tmp/snap.chromium/tmp -mindepth 1 -maxdepth 1 \
             -exec rm -rf {} + 2>/dev/null || true
           find /tmp -maxdepth 1 -name 'chromedp-*' -exec rm -rf {} + 2>/dev/null || true
+          # Deleting inside the snap's private /tmp invalidates the mount
+          # namespace snapd caches for it: the next launch then dies with
+          # "Failed to open /dev/null" and a zygote "Check failed: File
+          # exists (17)", which looks like a test failure and is not one.
+          # Discarding the namespace makes the next launch rebuild it.
+          sudo /usr/lib/snapd/snap-discard-ns chromium 2>/dev/null || true
           df -h /tmp | tail -1
