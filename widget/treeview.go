@@ -904,8 +904,18 @@ func (tv *TreeView) BeginRename(id TreeViewNodeID) {
 	// ScrollTo may have laid the tree out again already, in which case the row
 	// exists and the layout hook has taken the request. Otherwise start it here
 	// if the row is there, and leave it armed if it is not.
-	if item := tv.itemForID(id); item != nil && tv.takePendingRename() != "" {
-		item.startRename()
+	if item := tv.itemForID(id); item != nil {
+		switch taken := tv.takePendingRename(); taken {
+		case id:
+			item.startRename()
+		case "":
+			// The layout hook already started this rename.
+		default:
+			// A reentrant BeginRename superseded this one — ScrollTo fires
+			// OnBranchOpened, and host code there may ask for another node.
+			// The newest request wins; leave it armed.
+			tv.armPendingRename(taken)
+		}
 	}
 }
 
