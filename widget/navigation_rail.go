@@ -51,34 +51,12 @@ func (n *NavigationRail) CreateRenderer() core.WidgetRenderer {
 	n.ExtendBaseWidget(n)
 	bg := canvas.NewRectangle(color.Transparent)
 
-	var objects []core.CanvasObject
-	objects = append(objects, bg)
-
-	var items []*navRailItemWidget
-	for i, item := range n.Items {
-		idx := i
-		w := &navRailItemWidget{
-			item: item, selected: i == n.Selected, showLabel: n.ShowLabels,
-			onTap: func() {
-				n.Selected = idx
-				if n.OnChanged != nil {
-					n.OnChanged(idx)
-				}
-				n.Refresh()
-			},
-		}
-		w.ExtendBaseWidget(w)
-		items = append(items, w)
-		objects = append(objects, w)
-	}
-
 	r := &navRailRenderer{
-		BaseRenderer: internalWidget.NewBaseRenderer(objects),
+		BaseRenderer: internalWidget.NewBaseRenderer([]core.CanvasObject{bg}),
 		bg:           bg,
-		items:        items,
 		rail:         n,
 	}
-	r.Refresh()
+	r.Refresh() // populates the item widgets from Items
 	return r
 }
 
@@ -188,6 +166,10 @@ func (r *navRailItemRenderer) Refresh() {
 	th := r.item.Theme()
 	v := bellui.CurrentApp().Settings().ThemeVariant()
 
+	// The widget may have been re-pointed at a different item by
+	// navRailRenderer.updateItems, so the label text re-syncs like the icon.
+	r.label.Text = r.item.item.Label
+
 	if r.item.selected {
 		r.indicator.FillColor = th.Color(theme.ColorNameSecondaryContainer, v)
 		r.icon.Resource = theme.NewColoredResource(r.item.item.Icon, theme.ColorNameOnSecondaryContainer)
@@ -241,6 +223,7 @@ func (r *navRailRenderer) Layout(size geo.Size) {
 }
 
 func (r *navRailRenderer) Refresh() {
+	r.updateItems()
 	th := r.rail.Theme()
 	v := bellui.CurrentApp().Settings().ThemeVariant()
 	r.bg.FillColor = th.Color(theme.ColorNameSurfaceContainerMedium, v)
@@ -253,4 +236,41 @@ func (r *navRailRenderer) Refresh() {
 	}
 	r.Layout(r.rail.Size())
 	canvas.Refresh(r.rail.super())
+}
+
+// updateItems re-syncs the drawn item widgets with the rail's current Items,
+// the radioGroupRenderer.updateItems pattern (#203, #234): Items is a public
+// slice, so it can be appended to, replaced or truncated at any time.
+// Surviving widgets are re-pointed at the live item; the tap closures capture
+// their index, so a widget never has to move within the row.
+func (r *navRailRenderer) updateItems() {
+	if len(r.items) > len(r.rail.Items) {
+		r.items = r.items[:len(r.rail.Items)]
+	}
+	for i, item := range r.rail.Items {
+		if i == len(r.items) {
+			rail, idx := r.rail, i
+			w := &navRailItemWidget{
+				item: item,
+				onTap: func() {
+					rail.Selected = idx
+					if rail.OnChanged != nil {
+						rail.OnChanged(idx)
+					}
+					rail.Refresh()
+				},
+			}
+			w.ExtendBaseWidget(w)
+			r.items = append(r.items, w)
+			continue
+		}
+		r.items[i].item = item
+	}
+
+	objects := make([]core.CanvasObject, 0, len(r.items)+1)
+	objects = append(objects, r.bg)
+	for _, item := range r.items {
+		objects = append(objects, item)
+	}
+	r.SetObjects(objects)
 }
