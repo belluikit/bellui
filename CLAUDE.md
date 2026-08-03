@@ -243,6 +243,18 @@ verify widget, theme and rendering changes.
 - Imports: `goimports` ordering
 - Dependency licenses must be: Apache-2.0, BSD-2-Clause, BSD-3-Clause, MIT, or ISC
 
+## Releasing
+
+`docs/RELEASING.md` is the procedure: changelog, green CI, annotated tag on the
+main module, **then** the five `x/*` pin bumps and their tags — that order is
+forced, not stylistic. The post-bump per-module verification is not optional
+even though `x_tests.yml` covers those modules: CI rewrites each `go.mod` with
+an ephemeral `replace`, so it never resolves the published pin.
+
+Releases are tags + `CHANGELOG.md`; there are deliberately no GitHub Release
+objects. Bumping the bundled Chromium has its own obligations —
+`docs/CEF-MAINTENANCE.md` (cadence, owner, the weekly freshness check).
+
 ## Backlog Protocol
 
 The toolkit backlog lives in the **Bellui Backlog** GitHub project (trendvidia/projects/2):
