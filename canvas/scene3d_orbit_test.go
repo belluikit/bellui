@@ -78,6 +78,59 @@ func TestOrbitCamera_Zoom_ClampsDistance(t *testing.T) {
 	assert.InDelta(t, 10.0, o.Distance, 1e-5)
 }
 
+func TestOrbitCamera_Zoom_HonoursCustomLimits(t *testing.T) {
+	o := &OrbitCamera{Distance: 500, MinDistance: 50, MaxDistance: 5000}
+
+	o.Zoom(1000)
+	assert.InDelta(t, 5000.0, o.Distance, 1e-5)
+
+	o.Distance = 500
+	o.Zoom(0.0001)
+	assert.InDelta(t, 50.0, o.Distance, 1e-5)
+
+	o.Distance = 500
+	o.Zoom(2)
+	assert.InDelta(t, 1000.0, o.Distance, 1e-5)
+}
+
+func TestOrbitCamera_Zoom_PartialLimitsFallBack(t *testing.T) {
+	// Only the max set: the min keeps its default.
+	o := &OrbitCamera{Distance: 500, MaxDistance: 5000}
+	o.Zoom(0.0001)
+	assert.InDelta(t, 0.5, o.Distance, 1e-5)
+
+	// Only the min set: the max keeps its default, even though that puts it
+	// below the min — the min wins so the two clamps cannot fight.
+	o = &OrbitCamera{Distance: 500, MinDistance: 200}
+	o.Zoom(1000)
+	assert.InDelta(t, 200.0, o.Distance, 1e-5)
+}
+
+func TestNewOrbitCamera_ScalesLimitsToAuthoredDistance(t *testing.T) {
+	// A camera far outside the default range must not snap on the first zoom.
+	o := NewOrbitCamera(Camera3D{Position: Vec3{0, 0, 500}, Target: Vec3{}})
+	assert.InDelta(t, 500.0, o.Distance, 1e-4)
+
+	o.Zoom(1.5)
+	assert.InDelta(t, 750.0, o.Distance, 1e-3, "zooming out from an authored camera must not clamp to 100")
+
+	// A miniature scene gets the same treatment in the other direction.
+	o = NewOrbitCamera(Camera3D{Position: Vec3{0, 0, 0.1}, Target: Vec3{}})
+	o.Zoom(0.5)
+	assert.InDelta(t, 0.05, o.Distance, 1e-5)
+}
+
+func TestNewOrbitCamera_DefaultRangeUnchanged(t *testing.T) {
+	// A camera inside the default range keeps the historical limits, so
+	// existing callers see no behaviour change.
+	o := NewOrbitCamera(Camera3D{Position: Vec3{0, 0, 5}, Target: Vec3{}})
+	assert.Zero(t, o.MinDistance)
+	assert.Zero(t, o.MaxDistance)
+
+	o.Zoom(1000)
+	assert.InDelta(t, 100.0, o.Distance, 1e-5)
+}
+
 func TestOrbitCamera_Camera_RoundTrip(t *testing.T) {
 	// Converting a Camera3D to an OrbitCamera and back must reproduce the
 	// original position and target (spherical <-> cartesian round-trip).
@@ -105,4 +158,16 @@ func TestOrbitCamera_Camera_Defaults(t *testing.T) {
 	assert.Equal(t, float32(45), c.FOV)
 	assert.InDelta(t, 0.1, c.Near, 1e-5)
 	assert.Equal(t, float32(100), c.Far)
+}
+
+func TestOrbitCamera_Camera_DefaultFarReachesCamera(t *testing.T) {
+	// The default far plane must clear a camera orbiting a large scene,
+	// otherwise the scene it frames is entirely behind it.
+	o := &OrbitCamera{Distance: 500, Up: Vec3{0, 1, 0}}
+	c := o.Camera(0, 0, 0)
+	assert.Greater(t, c.Far, o.Distance)
+
+	// An explicit far is still honoured, however small.
+	c = o.Camera(0, 0, 10)
+	assert.Equal(t, float32(10), c.Far)
 }
