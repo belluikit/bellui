@@ -143,23 +143,28 @@ func fileOpenOSOverride(d *FileDialog) bool {
 
 	windowHandle := windowHandleForPortal(d.parent)
 
+	// The portal helpers return (nil, nil) on cancel and (nil, err) on failure,
+	// so a non-nil result is the only confirm signal notifyClosed can report.
 	go func() {
 		switch {
 		case options.Directory:
 			folder, err := openFolder(windowHandle, options)
 			bellui.Do(func() {
+				d.notifyClosed(folder != nil)
 				folderCallback := d.callback.(func(bellui.ListableURI, error))
 				folderCallback(folder, err)
 			})
 		case options.Multiple:
 			readers, err := openFiles(windowHandle, options)
 			bellui.Do(func() {
+				d.notifyClosed(len(readers) > 0)
 				multiCallback := d.callback.(func([]bellui.URIReadCloser, error))
 				multiCallback(readers, err)
 			})
 		default:
 			file, err := openFile(windowHandle, options)
 			bellui.Do(func() {
+				d.notifyClosed(file != nil)
 				fileCallback := d.callback.(func(bellui.URIReadCloser, error))
 				fileCallback(file, err)
 			})
