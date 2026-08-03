@@ -6,6 +6,10 @@ import (
 )
 
 // GL handle types — thin wrappers over the underlying integer types used by OpenGL.
+//
+// Experimental: these, [GLContext], [GLView] and the GL_* constants below are
+// not covered by the compatibility promise and may change or be removed. See
+// [GLView] for why.
 type (
 	GLTexture     uint32
 	GLBuffer      uint32
@@ -103,6 +107,11 @@ const (
 
 // GLContext provides access to OpenGL operations during a GLView render callback.
 // It is only valid for the duration of the callback — do not store references.
+//
+// Experimental: not covered by the compatibility promise and may change or be
+// removed. This interface is the largest part of that promise — sixty-odd
+// methods mirroring the OpenGL API — and it can only ever be implemented by a
+// painter that has an OpenGL context. See [GLView].
 type GLContext interface {
 	// Texture operations
 	CreateTexture() GLTexture
@@ -207,6 +216,19 @@ var _ core.CanvasObject = (*GLView)(nil)
 // For GPU-drawn content that works under every painter, use [Scene3D]: it
 // describes meshes, a camera and lights declaratively rather than issuing GL
 // calls, and every painter can draw it.
+//
+// # Experimental
+//
+// GLView, [GLContext], the GL handle types and the GL_* constants are **not
+// covered by the compatibility promise** and may change or be removed.
+//
+// The reason is above: this is an escape hatch bound to one painter, and the
+// painter it is bound to is not the default. Promising its shape would freeze
+// GLContext's sixty-odd methods for the life of the major version, in exchange
+// for an API that a default-configured app cannot use. A portable custom-draw
+// surface is the intended replacement if a consumer needs one; until then
+// [Scene3D], a streaming [Raster] and the built-in GPU effects cover the
+// ground between them.
 type GLView struct {
 	baseObject
 
@@ -217,6 +239,8 @@ type GLView struct {
 }
 
 // NewGLView creates a new GLView with the given render callback.
+//
+// Experimental: see [GLView].
 func NewGLView(render func(ctx GLContext, width, height int, pixelScale float32)) *GLView {
 	return &GLView{Render: render}
 }
