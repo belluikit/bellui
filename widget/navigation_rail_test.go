@@ -3,6 +3,7 @@ package widget_test
 import (
 	"testing"
 
+	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/test"
 	"github.com/belluikit/bellui/theme"
 	"github.com/belluikit/bellui/widget"
@@ -66,4 +67,38 @@ func TestNavigationRail_ItemTap(t *testing.T) {
 	assert.Equal(t, 1, rail.Selected)
 	assert.Equal(t, 1, got)
 	assert.Equal(t, 1, calls)
+}
+
+// Items is a public slice, so a host can replace, append to or truncate it
+// after the renderer exists. Refresh must re-sync the drawn destinations with
+// the live slice (#203, #234).
+func TestNavigationRail_RefreshResyncsItems(t *testing.T) {
+	test.NewTempApp(t)
+	var got int
+	rail := widget.NewNavigationRail([]*widget.NavigationRailItem{
+		{Label: "A", Icon: theme.HomeIcon()},
+	}, func(idx int) { got = idx })
+	test.NewTempWindow(t, rail)
+	r := test.TempWidgetRenderer(t, rail)
+	assert.Len(t, tappableChildren(r.Objects()), 1)
+	minBefore := r.MinSize()
+
+	// Append: the new destination must draw, contribute to MinSize and select
+	// on tap.
+	rail.Items = append(rail.Items, &widget.NavigationRailItem{Label: "B", Icon: theme.SearchIcon()})
+	rail.Refresh()
+	taps := tappableChildren(r.Objects())
+	assert.Len(t, taps, 2)
+	assert.Greater(t, r.MinSize().Height, minBefore.Height)
+	test.Tap(taps[1])
+	assert.Equal(t, 1, rail.Selected)
+	assert.Equal(t, 1, got)
+
+	// Wholesale replacement re-points the surviving widget at the new item.
+	rail.Items = []*widget.NavigationRailItem{{Label: "C", Icon: theme.AccountIcon()}}
+	rail.Selected = 0
+	rail.Refresh()
+	taps = tappableChildren(r.Objects())
+	assert.Len(t, taps, 1)
+	assert.Equal(t, "C", taps[0].(core.Accessible).AccessibleLabel())
 }

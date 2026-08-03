@@ -3,6 +3,7 @@ package widget_test
 import (
 	"testing"
 
+	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/test"
 	"github.com/belluikit/bellui/theme"
 	"github.com/belluikit/bellui/widget"
@@ -45,4 +46,44 @@ func TestBottomAppBar_Renderer(t *testing.T) {
 	}
 	bar := widget.NewBottomAppBar(actions, nil)
 	assert.NotPanics(t, func() { test.TempWidgetRenderer(t, bar) })
+}
+
+// Actions and FAB are public fields, so a host can replace, append to or
+// truncate them after the renderer exists. Refresh must re-sync what is drawn
+// with the live fields (#203, #234).
+func TestBottomAppBar_RefreshResyncsActionsAndFAB(t *testing.T) {
+	test.NewTempApp(t)
+	var tapped string
+	bar := widget.NewBottomAppBar([]*widget.BottomAppBarAction{
+		{Icon: theme.SearchIcon(), OnTapped: func() { tapped = "search" }},
+	}, nil)
+	test.NewTempWindow(t, bar)
+	r := test.TempWidgetRenderer(t, bar)
+	assert.Len(t, r.Objects(), 2) // bg + one action button
+
+	// Append an action: a new button must draw and fire the new handler.
+	bar.Actions = append(bar.Actions, &widget.BottomAppBarAction{
+		Icon: theme.MoreVerticalIcon(), OnTapped: func() { tapped = "more" },
+	})
+	bar.Refresh()
+	taps := tappableChildren(r.Objects())
+	assert.Len(t, taps, 2)
+	test.Tap(taps[1])
+	assert.Equal(t, "more", tapped)
+
+	// A FAB set after construction must draw too...
+	fab := widget.NewFAB(theme.ContentAddIcon(), nil)
+	bar.FAB = fab
+	bar.Refresh()
+	assert.Contains(t, r.Objects(), core.CanvasObject(fab))
+
+	// ...and clearing it must remove it.
+	bar.FAB = nil
+	bar.Refresh()
+	assert.NotContains(t, r.Objects(), core.CanvasObject(fab))
+
+	// Truncate — a removed action must not linger in the object list.
+	bar.Actions = bar.Actions[:1]
+	bar.Refresh()
+	assert.Len(t, r.Objects(), 2)
 }
