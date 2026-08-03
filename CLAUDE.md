@@ -205,7 +205,8 @@ changing it**; the list below is only an index.
   locale override + live re-translation, CLDR date/time/currency/list/unit formatting,
   collation, grammatical select, and the `bellui translate` catalog workflow.
 - **Platform integration** — `docs/notes/platform.md`
-  Native/portal file dialogs (`dialog.UseNativeFileDialogs`, default off); **runtime**
+  Native/portal file dialogs (`dialog.UseNativeFileDialogs`, default **on**, canvas
+  dialog as fallback — including whenever the window has no platform handle); **runtime**
   Wayland/X11 selection (`build.IsWayland` is a runtime var; `BELLUI_PLATFORM` pins it);
   window positioning/screens, window-hosted dialogs with native parent + modality;
   per-platform multi-window semantics; single-instance mode and open-with/deep-link events;
