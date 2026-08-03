@@ -4,7 +4,7 @@ Fork-specific detail moved out of `CLAUDE.md` (see its **Fork Features** index).
 Everything below is verbatim; issue numbers refer to the Bellui Backlog.
 
 ### File Dialog Enhancements
-- `dialog.ShowHiddenFiles` / hidden files toggle — exposes control over hidden file visibility
+- `(*dialog.FileDialog).SetShowHidden(bool)` / hidden files toggle — exposes control over hidden file visibility
 - `storage.IsHidden(bellui.URI)` — the per-platform hidden-file convention behind that toggle as public storage API (Unix dot-prefix, Windows hidden attribute, mobile/wasm always false); the dialog and `widget.FileTree` both use it (#445, #455)
 
 ### Native / Portal File Dialogs (#514)

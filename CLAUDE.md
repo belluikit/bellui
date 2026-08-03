@@ -62,9 +62,9 @@ go generate ./cmd/bellui_settings/data/
 
 ### Core Interface Pattern
 
-Everything builds on `bellui.CanvasObject` (defined in `canvasobject.go`): MinSize, Move, Position, Resize, Size, Hide, Show, Visible, Refresh.
+Everything builds on `core.CanvasObject` (defined in `core/core.go`): MinSize, Move, Position, Resize, Size, Hide, Show, Visible, Refresh.
 
-Widgets implement `bellui.Widget` which adds `CreateRenderer() WidgetRenderer`. The renderer handles layout and drawing, separating logic from presentation. Key interfaces are defined in root-level files: `app.go`, `window.go`, `canvas.go`, `canvasobject.go`, `widget.go`, `driver.go`.
+Widgets implement `core.Widget` which adds `CreateRenderer() WidgetRenderer`. The renderer handles layout and drawing, separating logic from presentation. `core/core.go` holds the object, widget, canvas and renderer interfaces; the app, window and driver interfaces are root-level (`app.go`, `window.go`, `driver.go`).
 
 Behavioral capabilities are composed via interfaces: `Tappable`, `Draggable`, `Focusable`, `Scrollable`, `Hoverable`, `LongPressable`, `Disableable`, etc. (all in `event/event.go`).
 
