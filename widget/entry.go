@@ -1764,6 +1764,20 @@ var entryKeyHandlers = map[event.KeyName]func(e *Entry, provider *RichText, mult
 	event.KeyPageDown:  func(e *Entry, p *RichText, _ bool) bool { e.typedKeyPageDown(p); return true },
 }
 
+// HandlesEscape reports whether Escape belongs to this entry rather than to
+// the pop-up or dialog around it: while an IME composition is in flight there
+// is a composition to reject, and a host that set OnEscape has its own meaning
+// for the key. Otherwise Escape falls through and closes the surface the entry
+// sits in.
+//
+// Since: 2.19
+func (e *Entry) HandlesEscape() bool {
+	if e.Disabled() {
+		return false
+	}
+	return e.composing || e.OnEscape != nil
+}
+
 func (e *Entry) TypedKey(key *event.KeyEvent) {
 	if e.Disabled() {
 		return

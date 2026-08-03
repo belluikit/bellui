@@ -160,7 +160,8 @@ var noNativeFileDialogs atomic.Bool
 //
 // Flatpak builds always use the portal regardless of this setting.
 //
-// Since: 2.17
+// Since: 2.17. The native backends were opt-in when introduced; the default
+// changed to enabled in 2.19 (#226).
 func UseNativeFileDialogs(enable bool) {
 	noNativeFileDialogs.Store(!enable)
 }
@@ -179,6 +180,12 @@ func nativeFileDialogsEnabled() bool {
 func nativeFileDialogsFor(d *FileDialog) bool {
 	if !nativeFileDialogsEnabled() {
 		return false
+	}
+	if build.IsFlatpak {
+		// The portal is the only dialog that can see outside the sandbox — a
+		// canvas dialog would browse an empty filesystem — and it works
+		// unparented, so the window check must not disqualify it.
+		return true
 	}
 	_, native := d.parent.(driver.NativeWindow)
 	return native

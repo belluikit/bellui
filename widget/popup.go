@@ -24,6 +24,14 @@ type PopUp struct {
 	Content core.CanvasObject
 	Canvas  core.Canvas
 
+	// OnDismissed, when set, replaces hiding as the response to the user
+	// dismissing this pop-up. A host that has its own close path — a dialog
+	// with a result to report — sets it so that path runs whatever the user
+	// dismissed with.
+	//
+	// Since: 2.19
+	OnDismissed func() `json:"-"`
+
 	innerPos          geo.Position
 	innerPosMoved     bool // true if Move was called explicitly
 	innerSize         geo.Size
@@ -191,6 +199,30 @@ func (p *PopUp) PerformAccessibleAction(name string) {
 		return
 	}
 	p.Hide()
+}
+
+// DismissOnEscape closes the pop-up because the user pressed Escape, reporting
+// whether it did.
+//
+// Unlike an outside tap this is not blocked by being modal — Escape is how a
+// user cancels a dialog, and every canvas dialog is a modal pop-up. What does
+// block it is a pop-up that manages its own dismissal (a snackbar) or one that
+// is not an input surface at all (a toast, a tooltip): those keep counting down
+// and leave the key to whatever is beneath them.
+//
+// Since: 2.19
+func (p *PopUp) DismissOnEscape() bool {
+	if p.isHiding || p.noDismissOnTap || p.passThrough || !p.Visible() {
+		return false
+	}
+
+	if p.OnDismissed != nil {
+		// The host owns the close path — a dialog has a result to report.
+		p.OnDismissed()
+		return true
+	}
+	p.Hide()
+	return true
 }
 
 // Tapped is called when the user taps the popUp.
