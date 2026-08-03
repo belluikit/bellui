@@ -21,8 +21,9 @@ import (
 const edgeSoftness = 1.0
 
 // drawObject dispatches a canvas object to its WebGPU draw op. Ports the GL
-// painter's drawObject; ops not yet ported (GLView, TextOnPath) are skipped —
-// tracked as follow-ups on #201/#202.
+// painter's drawObject. An op with no case here is silently skipped — the
+// object simply never appears, with no error anywhere, which is how
+// TextOnPath went unnoticed until #210. GLView remains unported.
 func (p *painter) drawObject(o core.CanvasObject, pos geo.Position, frame geo.Size) {
 	switch obj := o.(type) {
 	case *canvas.Circle:
@@ -51,6 +52,8 @@ func (p *painter) drawObject(o core.CanvasObject, pos geo.Position, frame geo.Si
 		p.drawPath(obj, pos, frame)
 	case *canvas.StyledText:
 		p.drawStyledText(obj, pos, frame)
+	case *canvas.TextOnPath:
+		p.drawTextOnPath(obj, pos, frame)
 	case *canvas.Scene3D:
 		p.drawScene3D(obj, pos, frame)
 	case *canvas.BoxShadow:
@@ -634,6 +637,20 @@ func (p *painter) drawStyledText(st *canvas.StyledText, pos geo.Position, frame 
 	p.drawTexture(st, p.rasterizeStyledText, pos, size, frame, canvas.ImageFillStretch, 1.0)
 }
 
+// drawTextOnPath draws glyphs laid along a path, mirroring the GL painter's
+// op: the shared painter.DrawTextOnPath does the layout and rasterisation, so
+// both painters and the software one produce the same image (#210).
+func (p *painter) drawTextOnPath(top *canvas.TextOnPath, pos geo.Position, frame geo.Size) {
+	if top.Text == "" || len(top.Elements()) == 0 {
+		return
+	}
+	size := top.Size()
+	if size.IsZero() {
+		size = top.MinSize()
+	}
+	p.drawTexture(top, p.rasterizeTextOnPath, pos, size, frame, canvas.ImageFillStretch, 1.0)
+}
+
 // drawTexture rasterizes an object to an image, uploads it, and draws the
 // textured quad via the simple shader (ports drawTextureWithDetails).
 func (p *painter) drawTexture(o core.CanvasObject, raster func(core.CanvasObject) image.Image, pos geo.Position, size, frame geo.Size, fill canvas.ImageFill, alpha float32) {
@@ -795,6 +812,17 @@ func (p *painter) rasterizeStyledText(o core.CanvasObject) image.Image {
 	}
 	img := image.NewNRGBA(image.Rect(0, 0, width, height))
 	paint.DrawStyledRuns(img, st.Runs, clr, st.TextSize, p.pixScale)
+	return img
+}
+
+func (p *painter) rasterizeTextOnPath(o core.CanvasObject) image.Image {
+	top := o.(*canvas.TextOnPath)
+	img := paint.DrawTextOnPath(top, p.pixScale)
+	if img == nil {
+		// A nil image would otherwise reach the uploader as a typed nil
+		// inside a non-nil image.Image, which is not the same as no texture.
+		return nil
+	}
 	return img
 }
 
