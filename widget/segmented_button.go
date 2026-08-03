@@ -25,7 +25,7 @@ func (s *SegmentedButton) AccessibleLabel() string { return "" }
 type SegmentedButton struct {
 	BaseWidget
 	Items     []string
-	Selected  int       // index of selected item (-1 = none)
+	Selected  int       // index of selected item; -1 or out of range selects none
 	OnChanged func(int) `json:"-"`
 
 	focused bool
@@ -313,6 +313,7 @@ func (r *segButtonRenderer) Refresh() {
 // append or truncate moves the pill's outer corners.
 func (r *segButtonRenderer) updateSegments() {
 	if len(r.segments) > len(r.btn.Items) {
+		clear(r.segments[len(r.btn.Items):]) // drop the tail's references too
 		r.segments = r.segments[:len(r.btn.Items)]
 	}
 	for i, item := range r.btn.Items {

@@ -108,6 +108,7 @@ func (r *bottomAppBarRenderer) Refresh() {
 // its own constructor does that at build time.
 func (r *bottomAppBarRenderer) updateActions() {
 	if len(r.actionBtns) > len(r.bar.Actions) {
+		clear(r.actionBtns[len(r.bar.Actions):]) // drop the tail's references too
 		r.actionBtns = r.actionBtns[:len(r.bar.Actions)]
 	}
 	for i, a := range r.bar.Actions {
