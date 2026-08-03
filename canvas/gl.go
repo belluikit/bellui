@@ -194,6 +194,19 @@ var _ core.CanvasObject = (*GLView)(nil)
 // with the viewport set to the view's pixel bounds. The callback receives
 // a GLContext for issuing GL commands, the pixel dimensions, and the
 // display scale factor.
+//
+// # GLView requires the GL painter
+//
+// It hands the application a live OpenGL context and lets it draw into the
+// window's GL framebuffer, so it only works under the GL painter — built with
+// -tags gl, and the default on targets that have no WebGPU backend. The
+// WebGPU painter, which is the default on desktop, has no OpenGL context to
+// hand out: a GLView placed there draws nothing and reports why, once, to the
+// error log (#213).
+//
+// For GPU-drawn content that works under every painter, use [Scene3D]: it
+// describes meshes, a camera and lights declaratively rather than issuing GL
+// calls, and every painter can draw it.
 type GLView struct {
 	baseObject
 
