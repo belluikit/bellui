@@ -190,7 +190,8 @@ changing it**; the list below is only an index.
   `widget.RichEntry`.
 - **Widgets, events & layouts** — `docs/notes/widgets.md`
   `event.Hoverable`/`HoverEvent`, `LongPressable`, `KeyEvent.Modifier`, `ScrollEvent.Source`,
-  nested-scroll propagation; the 36 MD3 components; Date/Time/DateTime pickers and entries;
+  nested-scroll propagation; Escape closing the innermost overlay by default
+  (`event.EscapeDismissible`/`EscapeHandler`, applied by the drivers); the 36 MD3 components; Date/Time/DateTime pickers and entries;
   `CompletionPopup`, `ContextMenu`, `Paned`, `SearchField`, `SpinBox`, `StatusBar`, `Toast`,
   `AnimatedGif`, `FileTree`; `ShrinkLayout`, `ResponsiveLayout`; `dialog.NewAbout`.
 - **Rendering & canvas** — `docs/notes/rendering.md`

@@ -182,6 +182,15 @@ func (t *TimePicker) typeMinuteDigit(d int) {
 }
 
 // clearPartial discards any pending tens digit.
+// HandlesEscape reports whether Escape belongs to this picker: it discards a
+// half-typed value, so it only claims the key while one is buffered. With
+// nothing pending, Escape closes the dialog the picker is usually shown in.
+//
+// Since: 2.20
+func (t *TimePicker) HandlesEscape() bool {
+	return t.hasPartial
+}
+
 func (t *TimePicker) clearPartial() {
 	t.partial = 0
 	t.hasPartial = false

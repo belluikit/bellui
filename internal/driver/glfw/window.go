@@ -1010,6 +1010,15 @@ func (w *window) processKeyPressed(keyName event.KeyName, keyASCII event.KeyName
 		return
 	}
 
+	// Escape closes the innermost pop-up, menu or dialog unless the focused
+	// widget is using it for a state of its own. This runs ahead of TypedKey
+	// because a canvas-hosted dialog focuses nothing, so there is no widget for
+	// the key to reach — and where one is focused, a text field would otherwise
+	// swallow the key and trap the user in the dialog.
+	if action == press && keyName == event.KeyEscape && driver.HandleEscape(w.canvas) {
+		return
+	}
+
 	// No shortcut detected, pass down to TypedKey
 	focused := w.canvas.Focused()
 	if focused != nil {
