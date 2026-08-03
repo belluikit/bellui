@@ -52,8 +52,12 @@ func Encode(w io.Writer, im image.Image) error {
 
 	pngbb := new(bytes.Buffer)
 	pngwriter := bufio.NewWriter(pngbb)
-	png.Encode(pngwriter, m)
-	pngwriter.Flush()
+	if err := png.Encode(pngwriter, m); err != nil {
+		return err
+	}
+	if err := pngwriter.Flush(); err != nil {
+		return err
+	}
 	ide.sizeInBytes = uint32(len(pngbb.Bytes()))
 
 	bounds := m.Bounds()
@@ -61,12 +65,25 @@ func Encode(w io.Writer, im image.Image) error {
 	ide.imageHeight = uint8(bounds.Dy())
 	bb := new(bytes.Buffer)
 
-	var e error
-	binary.Write(bb, binary.LittleEndian, id)
-	binary.Write(bb, binary.LittleEndian, ide)
+	// Writes into bb cannot fail (bytes.Buffer grows or panics), but the
+	// header is built from them, so a future change that swaps the buffer
+	// should not silently lose them either.
+	if err := binary.Write(bb, binary.LittleEndian, id); err != nil {
+		return err
+	}
+	if err := binary.Write(bb, binary.LittleEndian, ide); err != nil {
+		return err
+	}
 
-	w.Write(bb.Bytes())
-	w.Write(pngbb.Bytes())
+	// These are the writes that matter: w is the caller's destination — a
+	// file being packaged, or a buffer handed to the window manager — and a
+	// short write there is what produces a truncated icon.
+	if _, err := w.Write(bb.Bytes()); err != nil {
+		return err
+	}
+	if _, err := w.Write(pngbb.Bytes()); err != nil {
+		return err
+	}
 
-	return e
+	return nil
 }
