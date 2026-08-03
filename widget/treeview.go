@@ -67,6 +67,15 @@ type TreeView struct {
 	CreateNode func(branch bool) core.CanvasObject
 	UpdateNode func(id TreeViewNodeID, branch bool, node core.CanvasObject)
 
+	// ContextActions supplies extra entries for a node's right-click menu.
+	// It is called per node, so the actions offered can depend on what that
+	// node is, and its items are appended below the built-in Rename and
+	// Delete entries with a separator between the two groups. Leaving it nil
+	// — or returning no items — gives exactly the built-in menu.
+	//
+	// Since: 2.7
+	ContextActions func(id TreeViewNodeID) []*bellui.MenuItem `json:"-"`
+
 	// Event callbacks
 	OnSelected     func(id TreeViewNodeID)                         `json:"-"`
 	OnUnselected   func(id TreeViewNodeID)                         `json:"-"`
@@ -97,6 +106,10 @@ type TreeView struct {
 
 	// Chunked loading
 	loadingInProgress map[TreeViewNodeID]bool
+
+	// Rename requested for a node that had no row yet, applied by the content
+	// renderer once that row exists.
+	pendingRename TreeViewNodeID
 }
 
 type dropLocation int
@@ -862,6 +875,80 @@ func (tv *TreeView) RenameNode(id TreeViewNodeID, newName string) {
 		f(id, newName)
 	}
 	tv.RefreshItem(id)
+}
+
+// BeginRename starts inline rename of a node, putting the row into the same
+// editor a double-click or the context menu's Rename entry opens. Use it for a
+// host-supplied menu item or toolbar button that should rename the way the
+// built-in gesture does — [TreeView.RenameNode] writes the new text straight
+// into the model, which is the wrong tool when the user is meant to type it.
+//
+// Ancestors are opened and the row scrolled into view first. A node added a
+// moment earlier has no row yet, so the rename is held until the row exists and
+// applied then; it is dropped if the row never appears. AllowRename gates the
+// user's own rename gestures and does not apply here: calling this is the
+// application asking for the editor.
+//
+// Since: 2.7
+func (tv *TreeView) BeginRename(id TreeViewNodeID) {
+	tv.mu.RLock()
+	_, known := tv.nodeMap[id]
+	tv.mu.RUnlock()
+	if !known {
+		return
+	}
+
+	tv.armPendingRename(id)
+	tv.ScrollTo(id)
+
+	// ScrollTo may have laid the tree out again already, in which case the row
+	// exists and the layout hook has taken the request. Otherwise start it here
+	// if the row is there, and leave it armed if it is not.
+	if item := tv.itemForID(id); item != nil {
+		switch taken := tv.takePendingRename(); taken {
+		case id:
+			item.startRename()
+		case "":
+			// The layout hook already started this rename.
+		default:
+			// A reentrant BeginRename superseded this one — ScrollTo fires
+			// OnBranchOpened, and host code there may ask for another node.
+			// The newest request wins; leave it armed.
+			tv.armPendingRename(taken)
+		}
+	}
+}
+
+// itemForID returns the row currently rendering a node, or nil when the node
+// is scrolled out of view, inside a closed branch, or not laid out yet.
+func (tv *TreeView) itemForID(id TreeViewNodeID) *treeViewItem {
+	r, ok := cache.Renderer(tv).(*treeViewRenderer)
+	if !ok {
+		return nil
+	}
+	cr, ok := cache.Renderer(r.content).(*treeViewContentRenderer)
+	if !ok {
+		return nil
+	}
+	return cr.items[id]
+}
+
+// armPendingRename records a rename to start as soon as the node has a row.
+func (tv *TreeView) armPendingRename(id TreeViewNodeID) {
+	tv.mu.Lock()
+	tv.pendingRename = id
+	tv.mu.Unlock()
+}
+
+// takePendingRename returns and clears any rename [TreeView.BeginRename] could
+// not start because the row did not exist yet.
+func (tv *TreeView) takePendingRename() TreeViewNodeID {
+	tv.mu.Lock()
+	defer tv.mu.Unlock()
+
+	id := tv.pendingRename
+	tv.pendingRename = ""
+	return id
 }
 
 // DeleteNode removes a node. Emits OnDeleted.
