@@ -28,7 +28,7 @@ require (
 	github.com/nicksnyder/go-i18n/v2 v2.5.1
 	github.com/rymdport/portal v0.4.2
 	github.com/stretchr/testify v1.11.1
-	github.com/yuin/goldmark v1.7.8
+	github.com/yuin/goldmark v1.8.5
 	golang.org/x/image v0.44.0
 	golang.org/x/net v0.57.0
 	golang.org/x/sys v0.47.0
