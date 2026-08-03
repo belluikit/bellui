@@ -72,3 +72,21 @@ jobs:
         run: |
           pkgs=$(go list ./... | grep -vE 'internal/gsportal|internal/driver/mobile|/cmd/|/hack/|internal/(oksvg|rasterx|render)')
           go test -tags ci -timeout 240s -exec="$(go env GOPATH)/bin/wasmbrowsertest" $pkgs
+
+      # One browser launch per package leaves a profile behind, and the snap
+      # chromium writes them into its private /tmp — which is the SHARED tmpfs
+      # every other runner on this box links binaries in. Left alone the
+      # full-module leg grew it by ~4 GB an hour and starved a concurrent
+      # platform_tests of link space ("mapping output file failed: disk quota
+      # exceeded"). Clean the CONTENTS only: deleting the private tmp
+      # directories themselves breaks every later chromium launch, because
+      # snapd's cached mount namespace keeps binding the deleted path
+      # ("Failed to create socket directory") and only snap-discard-ns
+      # recovers it.
+      - name: Reclaim the browser's temp space
+        if: always()
+        run: |
+          sudo find /tmp/snap-private-tmp/snap.chromium/tmp -mindepth 1 -maxdepth 1 \
+            -exec rm -rf {} + 2>/dev/null || true
+          find /tmp -maxdepth 1 -name 'chromedp-*' -exec rm -rf {} + 2>/dev/null || true
+          df -h /tmp | tail -1
