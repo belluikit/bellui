@@ -30,16 +30,11 @@ func (g *ButtonGroup) MinSize() geo.Size {
 
 func (g *ButtonGroup) CreateRenderer() core.WidgetRenderer {
 	g.ExtendBaseWidget(g)
-	var objects []core.CanvasObject
-	for _, btn := range g.Buttons {
-		objects = append(objects, btn)
-	}
-
 	r := &buttonGroupRenderer{
-		BaseRenderer: internalWidget.NewBaseRenderer(objects),
+		BaseRenderer: internalWidget.NewBaseRenderer(nil),
 		group:        g,
 	}
-	r.Refresh()
+	r.Refresh() // populates the objects from Buttons
 	return r
 }
 
@@ -77,9 +72,29 @@ func (r *buttonGroupRenderer) Layout(size geo.Size) {
 }
 
 func (r *buttonGroupRenderer) Refresh() {
+	r.updateButtons()
 	for _, btn := range r.group.Buttons {
 		btn.Refresh()
 	}
 	r.Layout(r.group.Size())
 	canvas.Refresh(r.group.super())
+}
+
+// updateButtons re-syncs the drawn objects with the group's current Buttons,
+// the radioGroupRenderer.updateItems pattern.
+//
+// Buttons is a public field, so it can be appended to, replaced or truncated
+// at any time. Capturing it once at CreateRenderer left the canvas drawing the
+// original buttons while Layout and MinSize measured the live slice — added
+// buttons never appeared, removed ones lingered, and the two disagreed about
+// sizing (#203). Buttons that arrive after construction are extended here,
+// since only NewButtonGroup does that at build time; ExtendBaseWidget is
+// idempotent, so re-extending the existing ones costs nothing.
+func (r *buttonGroupRenderer) updateButtons() {
+	objects := make([]core.CanvasObject, 0, len(r.group.Buttons))
+	for _, btn := range r.group.Buttons {
+		btn.ExtendBaseWidget(btn)
+		objects = append(objects, btn)
+	}
+	r.SetObjects(objects)
 }
