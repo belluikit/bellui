@@ -296,7 +296,7 @@ func (h *NativeViewHost) sync() {
 	d := app.Driver()
 	c := d.CanvasForObject(h)
 	if c == nil {
-		h.detached()
+		h.unresolved()
 		return
 	}
 
@@ -312,7 +312,7 @@ func (h *NativeViewHost) sync() {
 	// every frame for every hosted view.
 	pos, clip, clipped, ok := driver.GeometryForObject(c, h)
 	if !ok {
-		h.detached()
+		h.unresolved()
 		return
 	}
 
@@ -477,9 +477,33 @@ func (h *NativeViewHost) setShown(shown bool) {
 // detached hides the native view and stops the ticker, for the states in
 // which nothing can change until a widget-level event re-enters sync: no
 // canvas, or not in the visible tree.
-func (h *NativeViewHost) detached() {
+// unresolved handles the two very different states that look identical at the
+// probes above: the host has no canvas, or it is not in the visible tree.
+//
+// Once the host has attached, that is a genuine detach — hidden, an ancestor
+// hidden, removed from the tree — and the ticker stops, to be re-armed by the
+// widget-level event that reverses it.
+//
+// Before the first attach it means the opposite: the driver has not yet
+// painted (and cached) the tree, which is the ordinary state during the
+// initial SetContent layout, when the widget events that drive sync fire.
+// Stopping there left the host inert forever on a screen where nothing else
+// moves — no later event arrives to re-enter sync, so the platform view never
+// attached and the window stayed blank (#167). Arming the ticker instead lets
+// the next frame resolve the canvas: the same per-frame retry attach() already
+// does one level down for the window, and for the same reason — giving up
+// permanently on a state that is merely early leaves the host silently inert.
+//
+// The ticker this arms is bounded by the widget lifecycle: destroy(), which
+// the renderer calls when the host leaves the tree or its window closes,
+// stops it.
+func (h *NativeViewHost) unresolved() {
 	h.setShown(false)
-	h.stopSync()
+	if h.attached {
+		h.stopSync()
+		return
+	}
+	h.startSync()
 }
 
 // startSync arms the per-frame geometry ticker (the #417 prefill / #758
