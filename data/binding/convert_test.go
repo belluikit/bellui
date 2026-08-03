@@ -426,11 +426,13 @@ func TestStringToURI(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, "file:///tmp/test.txt", v.String())
 
-	// TODO fix issue in URI parser whereby "wrong" is a valid URI
-	//err = s.Set("wrong")
-	//assert.Nil(t, err)
-	//_, err = u.Get()
-	//assert.NotNil(t, err)
+	// A bare word is not a URI: setting the string succeeds, deriving the
+	// URI from it fails. (These assertions were commented out behind a TODO
+	// about the parser accepting "wrong"; it rejects it — scheme required.)
+	err = s.Set("wrong")
+	assert.Nil(t, err)
+	_, err = u.Get()
+	assert.NotNil(t, err)
 
 	uri := storage.NewFileURI("/mydir/")
 	err = u.Set(uri)
@@ -453,11 +455,12 @@ func TestURIToString(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, "file:///tmp/test.txt", v)
 
-	// TODO fix issue in URI parser whereby "wrong" is a valid URI
-	//err = s.Set("wrong")
-	//assert.NotNil(t, err)
-	//_, err = u.Get()
-	//assert.Nil(t, err)
+	// Writing a bare word through the derived string binding is rejected by
+	// the parser, and the URI binding keeps its previous value.
+	err = s.Set("wrong")
+	assert.NotNil(t, err)
+	_, err = u.Get()
+	assert.Nil(t, err)
 
 	err = s.Set("file:///tmp/test.txt")
 	assert.Nil(t, err)
