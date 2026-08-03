@@ -171,3 +171,26 @@ func TestOrbitCamera_Camera_DefaultFarReachesCamera(t *testing.T) {
 	c = o.Camera(0, 0, 10)
 	assert.Equal(t, float32(10), c.Far)
 }
+
+func TestOrbitCamera_Camera_DefaultNearScalesWithDistance(t *testing.T) {
+	// Depth precision is spent on the far/near ratio, so the default near
+	// must scale with the orbit distance like the default far does — a fixed
+	// 0.1 would let the ratio grow linearly with scene scale.
+	o := &OrbitCamera{Distance: 500, Up: Vec3{0, 1, 0}}
+	c := o.Camera(0, 0, 0)
+	assert.InDelta(t, 0.5, c.Near, 1e-5)
+	assert.LessOrEqual(t, c.Far/c.Near, float32(2000))
+
+	// An explicit near is still honoured, however small.
+	c = o.Camera(0, 0.001, 0)
+	assert.InDelta(t, 0.001, c.Near, 1e-7)
+}
+
+func TestOrbitCamera_Camera_DefaultNearUnchangedInDefaultRange(t *testing.T) {
+	// A camera anywhere inside the default zoom range must resolve to the
+	// historic 0.1 exactly, not merely approximately.
+	for _, dist := range []float32{defaultMinDistance, defaultDistance, defaultMaxDistance} {
+		o := &OrbitCamera{Distance: dist, Up: Vec3{0, 1, 0}}
+		assert.Equal(t, float32(0.1), o.Camera(0, 0, 0).Near, "distance %v", dist)
+	}
+}
