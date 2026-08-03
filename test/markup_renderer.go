@@ -97,6 +97,112 @@ func (r *markupRenderer) setFloatAttrWithDefault(attrs map[string]*string, name 
 	attrs[name] = &value
 }
 
+func (r *markupRenderer) setFloatsAttr(attrs map[string]*string, name string, values []float32) {
+	if len(values) == 0 {
+		return
+	}
+	parts := make([]string, len(values))
+	for i, v := range values {
+		parts[i] = fmt.Sprintf("%g", v)
+	}
+	r.setStringAttr(attrs, name, strings.Join(parts, ","))
+}
+
+func (r *markupRenderer) setFillRuleAttr(attrs map[string]*string, name string, f belluicanvas.FillRule) {
+	var value string
+	switch f {
+	case belluicanvas.FillRuleWinding:
+		// default rule, don’t add an attr
+	case belluicanvas.FillRuleEvenOdd:
+		value = "evenOdd"
+	default:
+		value = fmt.Sprintf("unknown fill rule: %d", f)
+	}
+	r.setStringAttr(attrs, name, value)
+}
+
+func (r *markupRenderer) setLineCapAttr(attrs map[string]*string, name string, c belluicanvas.LineCap) {
+	var value string
+	switch c {
+	case belluicanvas.LineCapButt:
+		// default cap, don’t add an attr
+	case belluicanvas.LineCapRound:
+		value = "round"
+	case belluicanvas.LineCapSquare:
+		value = "square"
+	default:
+		value = fmt.Sprintf("unknown line cap: %d", c)
+	}
+	r.setStringAttr(attrs, name, value)
+}
+
+func (r *markupRenderer) setLineJoinAttr(attrs map[string]*string, name string, j belluicanvas.LineJoin) {
+	var value string
+	switch j {
+	case belluicanvas.LineJoinMiter:
+		// default join, don’t add an attr
+	case belluicanvas.LineJoinRound:
+		value = "round"
+	case belluicanvas.LineJoinBevel:
+		value = "bevel"
+	default:
+		value = fmt.Sprintf("unknown line join: %d", j)
+	}
+	r.setStringAttr(attrs, name, value)
+}
+
+// setPathAttr encodes path elements the way SVG's "d" does — a command letter
+// followed by its control points — so a master stays readable and diffs point
+// at the segment that moved.
+func (r *markupRenderer) setPathAttr(attrs map[string]*string, name string, elements []belluicanvas.PathElement) {
+	if len(elements) == 0 {
+		return
+	}
+
+	var d strings.Builder
+	for i, e := range elements {
+		if i > 0 {
+			d.WriteRune(' ')
+		}
+		switch e.Cmd() {
+		case belluicanvas.PathMoveTo:
+			fmt.Fprintf(&d, "M%s", formatPoint(e.Point(0)))
+		case belluicanvas.PathLineTo:
+			fmt.Fprintf(&d, "L%s", formatPoint(e.Point(0)))
+		case belluicanvas.PathQuadTo:
+			fmt.Fprintf(&d, "Q%s %s", formatPoint(e.Point(0)), formatPoint(e.Point(1)))
+		case belluicanvas.PathCubicTo:
+			fmt.Fprintf(&d, "C%s %s %s", formatPoint(e.Point(0)), formatPoint(e.Point(1)), formatPoint(e.Point(2)))
+		case belluicanvas.PathClose:
+			d.WriteRune('Z')
+		default:
+			fmt.Fprintf(&d, "unknown path command: %d", e.Cmd())
+		}
+	}
+	r.setStringAttr(attrs, name, d.String())
+}
+
+func (r *markupRenderer) setTextStyleAttrs(attrs map[string]*string, s bellui.TextStyle) {
+	r.setBoolAttr(attrs, "bold", s.Bold)
+	r.setBoolAttr(attrs, "italic", s.Italic)
+	r.setBoolAttr(attrs, "monospace", s.Monospace)
+	r.setBoolAttr(attrs, "symbol", s.Symbol)
+	r.setBoolAttr(attrs, "underline", s.Underline)
+	r.setBoolAttr(attrs, "strikethrough", s.Strikethrough)
+}
+
+func (r *markupRenderer) setVec3Attr(attrs map[string]*string, name string, v belluicanvas.Vec3) {
+	if v == (belluicanvas.Vec3{}) {
+		return
+	}
+	value := fmt.Sprintf("%g,%g,%g", v.X, v.Y, v.Z)
+	attrs[name] = &value
+}
+
+func formatPoint(p geo.Position) string {
+	return fmt.Sprintf("%g,%g", p.X, p.Y)
+}
+
 func (r *markupRenderer) setFloatPosAttr(attrs map[string]*string, name string, x, y float64) {
 	if x == 0 && y == 0 {
 		return
@@ -249,8 +355,22 @@ func (r *markupRenderer) writeCanvasObject(obj core.CanvasObject, _, _ geo.Posit
 		r.writeArc(o, attrs)
 	case *belluicanvas.BoxShadow:
 		r.writeBoxShadow(o, attrs)
+	case *belluicanvas.Path:
+		r.writePath(o, attrs)
+	case *belluicanvas.TextOnPath:
+		r.writeTextOnPath(o, attrs)
+	case *belluicanvas.StyledText:
+		r.writeStyledText(o, attrs)
+	case *belluicanvas.BackdropBlur:
+		r.writeBackdropBlur(o, attrs)
+	case *belluicanvas.Ripple:
+		r.writeRipple(o, attrs)
+	case *belluicanvas.Scene3D:
+		r.writeScene3D(o, attrs)
+	case *belluicanvas.GLView:
+		r.writeGLView(o, attrs)
 	default:
-		panic(fmt.Sprint("please add support for", reflect.TypeOf(o)))
+		panic(fmt.Sprint("please add support for ", reflect.TypeOf(o)))
 	}
 
 	return false
@@ -375,6 +495,94 @@ func (r *markupRenderer) writeBoxShadow(s *belluicanvas.BoxShadow, attrs map[str
 	r.setFloatAttr(attrs, "offsetX", float64(s.OffsetX))
 	r.setFloatAttr(attrs, "offsetY", float64(s.OffsetY))
 	r.writeTag("boxShadow", true, attrs)
+}
+
+func (r *markupRenderer) writePath(p *belluicanvas.Path, attrs map[string]*string) {
+	r.setColorAttr(attrs, "fillColor", p.FillColor)
+	r.setFillRuleAttr(attrs, "fillRule", p.FillRule)
+	r.setColorAttr(attrs, "strokeColor", p.StrokeColor)
+	r.setFloatAttr(attrs, "strokeWidth", float64(p.StrokeWidth))
+	r.setLineCapAttr(attrs, "lineCap", p.LineCap)
+	r.setLineJoinAttr(attrs, "lineJoin", p.LineJoin)
+	r.setFloatAttr(attrs, "miterLimit", float64(p.MiterLimit))
+	r.setFloatsAttr(attrs, "dash", p.DashPattern)
+	r.setFloatAttr(attrs, "dashOffset", float64(p.DashOffset))
+	r.setPathAttr(attrs, "d", p.Elements())
+	r.writeTag("path", true, attrs)
+}
+
+func (r *markupRenderer) writeTextOnPath(t *belluicanvas.TextOnPath, attrs map[string]*string) {
+	r.setColorAttrWithDefault(attrs, "color", t.Color, theme.Color(theme.ColorNameForeground))
+	r.setSizeAttrWithDefault(attrs, "textSize", t.TextSize, theme.TextSize())
+	r.setTextStyleAttrs(attrs, t.TextStyle)
+	r.setResourceAttr(attrs, "font", t.FontSource)
+	r.setFloatAttr(attrs, "offset", float64(t.Offset))
+	r.setFloatAttr(attrs, "baselineShift", float64(t.BaselineShift))
+	r.setPathAttr(attrs, "d", t.Elements())
+	r.writeTag("textOnPath", false, attrs)
+	r.w.WriteString(t.Text)
+	r.writeCloseTag("textOnPath")
+}
+
+func (r *markupRenderer) writeStyledText(st *belluicanvas.StyledText, attrs map[string]*string) {
+	r.setColorAttrWithDefault(attrs, "color", st.Color, theme.Color(theme.ColorNameForeground))
+	r.setAlignmentAttr(attrs, "alignment", st.Alignment)
+	r.setSizeAttrWithDefault(attrs, "textSize", st.TextSize, theme.TextSize())
+	r.writeTag("styledText", false, attrs)
+	r.w.WriteRune('\n')
+
+	r.indentation++
+	for _, run := range st.Runs {
+		runAttrs := map[string]*string{}
+		// A run inherits colour, size and font from the parent when its own
+		// are unset, so an absent attribute here means "inherited".
+		r.setColorAttr(runAttrs, "color", run.Color)
+		r.setSizeAttrWithDefault(runAttrs, "textSize", run.TextSize, 0)
+		r.setTextStyleAttrs(runAttrs, run.TextStyle)
+		r.setResourceAttr(runAttrs, "font", run.FontSource)
+		r.writeTag("run", false, runAttrs)
+		r.w.WriteString(run.Text)
+		r.writeCloseTag("run")
+	}
+	r.indentation--
+
+	r.writeIndent()
+	r.writeCloseTag("styledText")
+}
+
+func (r *markupRenderer) writeBackdropBlur(b *belluicanvas.BackdropBlur, attrs map[string]*string) {
+	r.setFloatAttr(attrs, "blurRadius", float64(b.BlurRadius))
+	r.writeTag("backdropBlur", true, attrs)
+}
+
+func (r *markupRenderer) writeRipple(rp *belluicanvas.Ripple, attrs map[string]*string) {
+	r.setFloatPosAttr(attrs, "center", float64(rp.Center.X), float64(rp.Center.Y))
+	r.setFloatAttr(attrs, "radius", float64(rp.Radius))
+	r.setColorAttr(attrs, "color", rp.Color)
+	r.setFloatAttr(attrs, "opacity", float64(rp.Opacity))
+	r.setFloatAttr(attrs, "cornerRadius", float64(rp.CornerRadius))
+	r.writeTag("ripple", true, attrs)
+}
+
+func (r *markupRenderer) writeScene3D(s *belluicanvas.Scene3D, attrs map[string]*string) {
+	r.setColorAttr(attrs, "background", s.Background)
+	r.setBoolAttr(attrs, "backfaceCulling", s.BackfaceCulling)
+	// Mesh geometry is far too large to assert on; the counts plus the camera
+	// are what a markup master can meaningfully pin down.
+	r.setFloatAttr(attrs, "meshes", float64(len(s.Meshes)))
+	r.setFloatAttr(attrs, "lights", float64(len(s.Lights)))
+	r.setVec3Attr(attrs, "cameraPos", s.Camera.Position)
+	r.setVec3Attr(attrs, "cameraTarget", s.Camera.Target)
+	r.setFloatAttr(attrs, "fov", float64(s.Camera.FOV))
+	r.writeTag("scene3D", true, attrs)
+}
+
+// writeGLView records only that a GLView is present. Its content is drawn by
+// an application callback into a live GL context, which the software painter
+// behind these tests does not have — there is nothing else to serialise.
+func (r *markupRenderer) writeGLView(v *belluicanvas.GLView, attrs map[string]*string) {
+	r.setBoolAttr(attrs, "render", v.Render != nil)
+	r.writeTag("glView", true, attrs)
 }
 
 func (r *markupRenderer) writeSpacer(_ *layout.Spacer, attrs map[string]*string) {
