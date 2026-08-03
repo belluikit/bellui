@@ -214,6 +214,10 @@ func (r *treeViewContentRenderer) Layout(size geo.Size) {
 	// Return unused items to pool
 	for uid, item := range r.items {
 		if _, ok := st.newItems[uid]; !ok {
+			// A pooled row must not carry an in-progress rename: reused later
+			// for the same id — the node deleted and re-added, or its row
+			// scrolled back into view — it would reopen the editor unasked.
+			item.renaming = false
 			r.itemPool.Put(item)
 		}
 	}
@@ -224,6 +228,18 @@ func (r *treeViewContentRenderer) Layout(size geo.Size) {
 	// Drop indicator
 	if r.dropIndicator != nil {
 		r.objects = append(r.objects, r.dropIndicator)
+	}
+
+	// A rename asked for before the row existed — a node created and renamed in
+	// one go, or one scrolled to from far down the tree — starts once the row
+	// does. It keeps waiting across further layouts while the node is still
+	// there, since bringing a row into view can take more than one pass.
+	if uid := tree.takePendingRename(); uid != "" {
+		if item, ok := r.items[uid]; ok {
+			item.startRename()
+		} else if _, stillThere := tree.GetNode(uid); stillThere {
+			tree.armPendingRename(uid)
+		}
 	}
 }
 
@@ -638,10 +654,16 @@ func newTreeViewItem(tree *TreeView, content core.CanvasObject, isBranch bool) *
 }
 
 func (ti *treeViewItem) update(uid TreeViewNodeID, depth int, isBranch bool) {
+	if ti.uid != uid {
+		// This row is being recycled for a different node, so any inline editor
+		// on it belonged to the node it used to show. A row that keeps its node
+		// keeps its editor: layout runs on every resize, scroll and refresh, and
+		// clearing here would throw away whatever the user was typing.
+		ti.renaming = false
+	}
 	ti.uid = uid
 	ti.depth = depth
 	ti.isBranch = isBranch
-	ti.renaming = false
 	ti.Refresh()
 }
 
@@ -663,6 +685,21 @@ func (ti *treeViewItem) DoubleTapped(*event.PointEvent) {
 }
 
 func (ti *treeViewItem) TappedSecondary(e *event.PointEvent) {
+	items := ti.contextMenuItems()
+	if len(items) == 0 {
+		return
+	}
+	menu := bellui.NewMenu("", items...)
+	c := bellui.CurrentApp().Driver().CanvasForObject(ti)
+	pos := bellui.CurrentApp().Driver().AbsolutePositionForObject(ti)
+	popup := NewPopUpMenu(menu, c)
+	popup.ShowAtPosition(pos.Add(e.Position))
+}
+
+// contextMenuItems builds the row's right-click menu: the built-in entries the
+// tree's toggles allow, then whatever the host's ContextActions contributes for
+// this node. An empty result means no menu is worth showing.
+func (ti *treeViewItem) contextMenuItems() []*bellui.MenuItem {
 	var items []*bellui.MenuItem
 	if ti.tree.AllowRename {
 		items = append(items, bellui.NewMenuItem(lang.L("Rename"), func() {
@@ -674,30 +711,55 @@ func (ti *treeViewItem) TappedSecondary(e *event.PointEvent) {
 			ti.tree.DeleteNode(ti.uid)
 		}))
 	}
-	if len(items) == 0 {
-		return
+
+	f := ti.tree.ContextActions
+	if f == nil {
+		return items
 	}
-	menu := bellui.NewMenu("", items...)
-	c := bellui.CurrentApp().Driver().CanvasForObject(ti)
-	pos := bellui.CurrentApp().Driver().AbsolutePositionForObject(ti)
-	popup := NewPopUpMenu(menu, c)
-	popup.ShowAtPosition(pos.Add(e.Position))
+	extra := f(ti.uid)
+	if len(extra) == 0 {
+		return items
+	}
+	if len(items) > 0 {
+		items = append(items, bellui.NewMenuItemSeparator())
+	}
+	return append(items, extra...)
 }
 
 func (ti *treeViewItem) startRename() {
 	ti.renaming = true
+
+	tir, _ := cache.Renderer(ti).(*treeViewItemRenderer)
+	if tir != nil && tir.renameEntry != nil {
+		// Populate the editor here, once — not in Refresh, which runs on every
+		// layout pass and would rewrite the entry with the model's text while
+		// the user is typing in it.
+		ti.tree.mu.RLock()
+		text := ""
+		if n, ok := ti.tree.nodeMap[ti.uid]; ok {
+			text = n.Text
+		}
+		ti.tree.mu.RUnlock()
+		tir.renameEntry.SetText(text)
+	}
+
 	ti.Refresh()
 
-	// Find the renderer and focus the rename entry
-	if r := cache.Renderer(ti); r != nil {
-		tir := r.(*treeViewItemRenderer)
-		if tir.renameEntry != nil {
-			c := bellui.CurrentApp().Driver().CanvasForObject(ti)
-			if c != nil {
-				c.Focus(tir.renameEntry)
-			}
+	if tir != nil && tir.renameEntry != nil {
+		c := bellui.CurrentApp().Driver().CanvasForObject(ti)
+		if c != nil {
+			c.Focus(tir.renameEntry)
 		}
 	}
+}
+
+// cancelRename leaves the inline editor without writing anything back.
+func (ti *treeViewItem) cancelRename() {
+	if !ti.renaming {
+		return
+	}
+	ti.renaming = false
+	ti.Refresh()
 }
 
 func (ti *treeViewItem) commitRename(newText string) {
@@ -873,6 +935,16 @@ func (ti *treeViewItem) CreateRenderer() core.WidgetRenderer {
 	renameEntry := NewEntry()
 	renameEntry.OnSubmitted = func(text string) {
 		ti.commitRename(text)
+	}
+	// Clicking or tabbing away ends the rename. Layout used to end it as a side
+	// effect of rebuilding every row, which also ended renames nobody meant to
+	// cancel; this is the deliberate exit that replaces it. onFocusChanged is a
+	// single-slot hook (Form claims it on entries it owns); taking it is safe
+	// only because renameEntry never leaves this renderer.
+	renameEntry.onFocusChanged = func(focused bool) {
+		if !focused {
+			ti.cancelRename()
+		}
 	}
 	renameEntry.Hide()
 
@@ -1051,19 +1123,6 @@ func (r *treeViewItemRenderer) Refresh() {
 			r.icon.Resource = r.item.nodeIcon
 			r.icon.Refresh()
 		}
-	}
-
-	// Rename entry
-	if r.item.renaming {
-		// Populate entry with current text
-		r.item.tree.mu.RLock()
-		n, ok := r.item.tree.nodeMap[r.item.uid]
-		text := ""
-		if ok {
-			text = n.Text
-		}
-		r.item.tree.mu.RUnlock()
-		r.renameEntry.SetText(text)
 	}
 
 	// Content
