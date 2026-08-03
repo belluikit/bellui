@@ -64,7 +64,7 @@ func takePanel(handle int) *pendingPanel {
 }
 
 func fileOpenOSOverride(d *FileDialog) bool {
-	if !nativeFileDialogsEnabled() {
+	if !nativeFileDialogsFor(d) {
 		return false
 	}
 
@@ -78,7 +78,7 @@ func fileOpenOSOverride(d *FileDialog) bool {
 }
 
 func fileSaveOSOverride(d *FileDialog) bool {
-	if !nativeFileDialogsEnabled() {
+	if !nativeFileDialogsFor(d) {
 		return false
 	}
 
