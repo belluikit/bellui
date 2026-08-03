@@ -30,7 +30,7 @@ func (n *NavigationRail) AccessibleLabel() string { return "" }
 type NavigationRail struct {
 	BaseWidget
 	Items      []*NavigationRailItem
-	Selected   int
+	Selected   int       // index of the selected destination; out of range selects nothing
 	ShowLabels bool      // show labels below icons
 	OnChanged  func(int) `json:"-"`
 }
@@ -245,6 +245,7 @@ func (r *navRailRenderer) Refresh() {
 // their index, so a widget never has to move within the row.
 func (r *navRailRenderer) updateItems() {
 	if len(r.items) > len(r.rail.Items) {
+		clear(r.items[len(r.rail.Items):]) // drop the tail's references too
 		r.items = r.items[:len(r.rail.Items)]
 	}
 	for i, item := range r.rail.Items {

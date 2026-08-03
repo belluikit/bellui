@@ -30,7 +30,7 @@ func (n *NavigationBar) AccessibleLabel() string { return "" }
 type NavigationBar struct {
 	BaseWidget
 	Items     []*NavigationBarItem
-	Selected  int
+	Selected  int       // index of the selected destination; out of range selects nothing
 	OnChanged func(int) `json:"-"`
 }
 
@@ -245,6 +245,7 @@ func (r *navBarRenderer) Refresh() {
 // their index, so a widget never has to move within the row.
 func (r *navBarRenderer) updateItems() {
 	if len(r.items) > len(r.bar.Items) {
+		clear(r.items[len(r.bar.Items):]) // drop the tail's references too
 		r.items = r.items[:len(r.bar.Items)]
 	}
 	for i, item := range r.bar.Items {
