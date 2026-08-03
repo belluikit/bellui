@@ -108,3 +108,44 @@ func TestNavigationBar_ItemTap(t *testing.T) {
 	assert.Equal(t, 2, got)
 	assert.Equal(t, 1, calls)
 }
+
+// Items is a public slice, so a host can replace, append to or truncate it
+// after the renderer exists. Refresh must re-sync the drawn destinations with
+// the live slice (#203, #234).
+func TestNavigationBar_RefreshResyncsItems(t *testing.T) {
+	test.NewTempApp(t)
+	var got int
+	nav := widget.NewNavigationBar([]*widget.NavigationBarItem{
+		{Label: "A", Icon: theme.HomeIcon()},
+		{Label: "B", Icon: theme.SearchIcon()},
+	}, func(idx int) { got = idx })
+	test.NewTempWindow(t, nav)
+	r := test.TempWidgetRenderer(t, nav)
+	assert.Len(t, tappableChildren(r.Objects()), 2)
+
+	// Append: the new destination must draw and select on tap.
+	nav.Items = append(nav.Items, &widget.NavigationBarItem{Label: "C", Icon: theme.AccountIcon()})
+	nav.Refresh()
+	taps := tappableChildren(r.Objects())
+	assert.Len(t, taps, 3)
+	test.Tap(taps[2])
+	assert.Equal(t, 2, nav.Selected)
+	assert.Equal(t, 2, got)
+
+	// Wholesale replacement re-points the surviving widgets at the new items.
+	nav.Items = []*widget.NavigationBarItem{
+		{Label: "X", Icon: theme.HomeIcon()},
+		{Label: "Y", Icon: theme.SearchIcon()},
+	}
+	nav.Selected = 0
+	nav.Refresh()
+	taps = tappableChildren(r.Objects())
+	assert.Len(t, taps, 2)
+	assert.Equal(t, "X", taps[0].(core.Accessible).AccessibleLabel())
+	assert.Equal(t, "Y", taps[1].(core.Accessible).AccessibleLabel())
+
+	// Emptying is legal too — layout must cope with zero destinations.
+	nav.Items = nil
+	nav.Refresh()
+	assert.Empty(t, tappableChildren(r.Objects()))
+}
