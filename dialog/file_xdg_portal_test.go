@@ -63,12 +63,15 @@ func TestConvertFilterForPortal_MimeTypes(t *testing.T) {
 }
 
 func TestNativeFileDialogsToggle(t *testing.T) {
-	// Off by default (outside Flatpak).
-	assert.False(t, nativeFileDialogsEnabled())
+	t.Cleanup(func() { UseNativeFileDialogs(true) })
 
-	UseNativeFileDialogs(true)
+	// On by default; the portal is also the only backend that works under
+	// Flatpak, where the setting is ignored entirely.
 	assert.True(t, nativeFileDialogsEnabled())
 
 	UseNativeFileDialogs(false)
 	assert.False(t, nativeFileDialogsEnabled())
+
+	UseNativeFileDialogs(true)
+	assert.True(t, nativeFileDialogsEnabled())
 }
