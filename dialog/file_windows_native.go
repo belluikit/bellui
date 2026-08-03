@@ -427,38 +427,38 @@ func deliverWindowsResult(d *FileDialog, kind panelKind, paths []string, cancell
 	case kind == panelOpenFolder:
 		cb := d.callback.(func(bellui.ListableURI, error))
 		if cancelled || first == "" {
-			bellui.Do(func() { cb(nil, nil) })
+			bellui.Do(func() { d.notifyClosed(false); cb(nil, nil) })
 			return
 		}
 		lister, err := storage.ListerForURI(storage.NewFileURI(first))
-		bellui.Do(func() { cb(lister, err) })
+		bellui.Do(func() { d.notifyClosed(true); cb(lister, err) })
 
 	case kind == panelSaveFile:
 		cb := d.callback.(func(bellui.URIWriteCloser, error))
 		if cancelled || first == "" {
-			bellui.Do(func() { cb(nil, nil) })
+			bellui.Do(func() { d.notifyClosed(false); cb(nil, nil) })
 			return
 		}
 		writer, err := storage.Writer(storage.NewFileURI(first))
-		bellui.Do(func() { cb(writer, err) })
+		bellui.Do(func() { d.notifyClosed(true); cb(writer, err) })
 
 	case d.multiSelect:
 		cb := d.callback.(func([]bellui.URIReadCloser, error))
 		if cancelled || len(paths) == 0 {
-			bellui.Do(func() { cb(nil, nil) })
+			bellui.Do(func() { d.notifyClosed(false); cb(nil, nil) })
 			return
 		}
 		readers, err := windowsReadersForPaths(paths)
-		bellui.Do(func() { cb(readers, err) })
+		bellui.Do(func() { d.notifyClosed(true); cb(readers, err) })
 
 	default:
 		cb := d.callback.(func(bellui.URIReadCloser, error))
 		if cancelled || first == "" {
-			bellui.Do(func() { cb(nil, nil) })
+			bellui.Do(func() { d.notifyClosed(false); cb(nil, nil) })
 			return
 		}
 		reader, err := storage.Reader(storage.NewFileURI(first))
-		bellui.Do(func() { cb(reader, err) })
+		bellui.Do(func() { d.notifyClosed(true); cb(reader, err) })
 	}
 }
 

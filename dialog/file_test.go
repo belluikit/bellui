@@ -888,3 +888,19 @@ func TestNativeFileDialogsNeedAPlatformWindow(t *testing.T) {
 	assert.False(t, nativeFileDialogsFor(d))
 	assert.True(t, nativeFileDialogsEnabled(), "…even though the native backends are wanted in general")
 }
+
+func TestSetOnClosedFiresForNativeDelivery(t *testing.T) {
+	// A native picker never creates the canvas fileDialog: its close report
+	// arrives through notifyClosed instead, and must reach a callback that was
+	// set before Show — while f.dialog is still nil.
+	d := NewFileOpen(func(bellui.URIReadCloser, error) {}, nil)
+
+	closed := 0
+	d.SetOnClosed(func() { closed++ })
+
+	d.notifyClosed(true)
+	assert.Equal(t, 1, closed, "a confirmed native close reports once")
+
+	d.notifyClosed(false)
+	assert.Equal(t, 2, closed, "a cancelled native close reports too")
+}

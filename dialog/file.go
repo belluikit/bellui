@@ -1106,13 +1106,21 @@ func (f *FileDialog) SetOnClosed(closed func()) {
 	originalCallback := f.onClosedCallback
 
 	f.onClosedCallback = func(response bool) {
-		if f.dialog == nil {
-			return
-		}
 		if originalCallback != nil {
 			originalCallback(response)
 		}
 		closed()
+	}
+}
+
+// notifyClosed reports a native backend's close through the OnClosed callback,
+// mirroring the canvas dialog: fired immediately before the result callback,
+// true only when the user confirmed a choice. A native picker never creates
+// the canvas fileDialog, whose widgets otherwise make this report, so the
+// backends call it from the same main-goroutine hop that delivers the result.
+func (f *FileDialog) notifyClosed(confirmed bool) {
+	if f.onClosedCallback != nil {
+		f.onClosedCallback(confirmed)
 	}
 }
 
