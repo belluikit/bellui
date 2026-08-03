@@ -6,6 +6,7 @@ import (
 	"image"
 	"image/color"
 	"math"
+	"sync"
 
 	"github.com/belluikit/webgpu/wgpu"
 
@@ -21,9 +22,12 @@ import (
 const edgeSoftness = 1.0
 
 // drawObject dispatches a canvas object to its WebGPU draw op. Ports the GL
-// painter's drawObject. An op with no case here is silently skipped — the
-// object simply never appears, with no error anywhere, which is how
-// TextOnPath went unnoticed until #210. GLView remains unported.
+// painter's drawObject.
+//
+// An op with no case here is skipped and the object never appears, with
+// nothing logged — which is how TextOnPath went unnoticed until #210. The one
+// primitive this painter genuinely cannot draw, canvas.GLView, therefore says
+// so out loud rather than falling through (#213).
 func (p *painter) drawObject(o core.CanvasObject, pos geo.Position, frame geo.Size) {
 	switch obj := o.(type) {
 	case *canvas.Circle:
@@ -56,6 +60,8 @@ func (p *painter) drawObject(o core.CanvasObject, pos geo.Position, frame geo.Si
 		p.drawTextOnPath(obj, pos, frame)
 	case *canvas.Scene3D:
 		p.drawScene3D(obj, pos, frame)
+	case *canvas.GLView:
+		p.reportGLViewUnsupported(obj)
 	case *canvas.BoxShadow:
 		p.drawBoxShadow(obj, pos, frame)
 	case *canvas.BackdropBlur:
@@ -635,6 +641,31 @@ func (p *painter) drawStyledText(st *canvas.StyledText, pos geo.Position, frame 
 	size.Height = roundToPixel(size.Height, p.pixScale)
 	size.Width += roundToPixel(paint.VectorPad(st), p.pixScale)
 	p.drawTexture(st, p.rasterizeStyledText, pos, size, frame, canvas.ImageFillStretch, 1.0)
+}
+
+// glViewWarned keys the one-shot GLView warning by object, so a view in a
+// per-frame repaint reports once rather than on every frame.
+var glViewWarned sync.Map
+
+// reportGLViewUnsupported explains, once per view, that canvas.GLView cannot
+// render on this painter (#213).
+//
+// GLView hands the application a live OpenGL context — GLSL compilation,
+// buffers, framebuffers, stencil, readback — and lets it draw straight into
+// the window's GL framebuffer. WebGPU has no OpenGL context to hand out, so
+// supporting it here would mean implementing GL-ES over wgpu rather than
+// porting an op. canvas.Scene3D is the portable primitive for GPU content,
+// and this painter does draw it.
+//
+// Saying so is the point: a silent skip is what made the same defect in
+// TextOnPath (#210) cost a bug report and a bisect to find.
+func (p *painter) reportGLViewUnsupported(v *canvas.GLView) {
+	if _, seen := glViewWarned.LoadOrStore(v, true); seen {
+		return
+	}
+	bellui.LogError("canvas.GLView cannot be drawn by the WebGPU painter and will not appear: it needs "+
+		"an OpenGL context, which this painter does not have. Build with -tags gl for the GL painter, "+
+		"or use canvas.Scene3D for portable GPU content (#213).", nil)
 }
 
 // drawTextOnPath draws glyphs laid along a path, mirroring the GL painter's

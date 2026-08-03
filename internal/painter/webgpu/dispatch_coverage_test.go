@@ -84,3 +84,29 @@ func TestDrawTextOnPath_DegenerateInput(t *testing.T) {
 	assert.False(t, reachesGPU(noText), "empty text must be declined before the texture path")
 	assert.False(t, reachesGPU(noPath), "an empty path must be declined before the texture path")
 }
+
+// TestDrawObject_GLViewReportsInsteadOfSkipping is #213. GLView is the one
+// primitive this painter genuinely cannot draw — it hands the app a live
+// OpenGL context, which WebGPU has none of — so it must say so rather than
+// fall through the type switch, which is the silent failure that made #210
+// expensive to diagnose.
+//
+// The report never touches the GPU, so a device-less painter is enough: the
+// op must NOT reach the texture path (unlike its drawable peers).
+func TestDrawObject_GLViewReportsInsteadOfSkipping(t *testing.T) {
+	v := canvas.NewGLView(func(canvas.GLContext, int, int, float32) {})
+	v.Resize(geo.NewSize(80, 60))
+
+	assert.False(t, reachesGPU(v), "GLView must be declined before the texture path, not drawn")
+
+	// Once per view, not once per frame: a repainting view must not flood the
+	// log. Re-dispatching the same object stays quiet.
+	assert.NotPanics(t, func() {
+		p := &painter{pixScale: 1, groupOpacity: 1, transform: geo.Identity()}
+		for range 3 {
+			p.drawObject(v, geo.NewPos(0, 0), geo.NewSize(320, 240))
+		}
+	})
+	_, warned := glViewWarned.Load(v)
+	assert.True(t, warned, "the view is recorded as warned, so later frames stay silent")
+}
