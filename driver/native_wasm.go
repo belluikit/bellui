@@ -15,7 +15,7 @@ import "syscall/js"
 // extra window reports the root window's canvas, the one actually rendering
 // it.
 //
-// Since: 2.10
+// Since: 1.0
 type BrowserWindowContext struct {
 	// Canvas is the <canvas> element hosting the window, as a js.Value. It is
 	// the zero js.Value when the window has no canvas yet (not shown).
