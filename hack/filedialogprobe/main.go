@@ -105,6 +105,18 @@ func main() {
 		}, w)
 	}
 
+	// The canvas dialogs default to windowed mode, framed by an InnerWindow —
+	// on mobile the frame's close (X) button is the #254 target. The result
+	// logs either way, so a dead X shows up as a dialog that will not leave.
+	windowedDialog := func() {
+		d := dialog.NewConfirm("Windowed dialog probe",
+			"Tap the frame's X button — the dialog must dismiss\nand log confirmed=false (#254).",
+			func(ok bool) {
+				fmt.Printf("windowed dialog closed: confirmed=%v\n", ok)
+			}, w)
+		d.Show()
+	}
+
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "open":
@@ -115,6 +127,8 @@ func main() {
 			saveFile()
 		case "multiple":
 			openMultiple()
+		case "windowed":
+			windowedDialog()
 		}
 	}
 
@@ -124,6 +138,7 @@ func main() {
 		widget.NewButton("Open Multiple (Ctrl/Cmd+click, Shift+click)", openMultiple),
 		widget.NewButton("Open Folder", openFolder),
 		widget.NewButton("Save File", saveFile),
+		widget.NewButton("Windowed Dialog (frame X button)", windowedDialog),
 	))
 	w.Resize(geo.NewSize(320, 240))
 	w.Show()
