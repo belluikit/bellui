@@ -118,4 +118,14 @@ func Test_windowedDialogResizeCorner_TouchTarget(t *testing.T) {
 	assert.Positive(t, scroll.Offset.Y, "a drag starting outside the corner target must scroll the content")
 	_, final, _ := innerWindowRect(pop)
 	assert.Equal(t, winSize, final, "a content scroll must not resize the window")
+
+	// Release the second gesture too, so the handler's drag latch does not
+	// outlive the test (lprTapUp is pinned to pointer 0; this gesture is 1).
+	c.TapUp(scrollStart.AddXY(0, -60), 1, func(event.Tappable, *event.PointEvent) {
+	}, func(event.SecondaryTappable, *event.PointEvent) {
+	}, func(event.LongPressable, *event.PointEvent) {
+	}, func(event.DoubleTappable, *event.PointEvent) {
+	}, func(wid event.Draggable, _ *event.DragEvent) {
+		wid.DragEnd()
+	})
 }
