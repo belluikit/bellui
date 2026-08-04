@@ -1107,7 +1107,13 @@ func (f *FileDialog) SetLocation(u bellui.ListableURI) {
 }
 
 // SetOnClosed sets a callback function that is called when
-// the dialog is closed.
+// the dialog is closed. It fires immediately before the result callback,
+// whether the dialog is the canvas-drawn one or a platform-native picker.
+//
+// One exception: the web (wasm) save dialog has no picker — closing the
+// returned writer offers the browser download that stands in for it — so
+// there the callback fires when the writer is closed, after the result
+// callback, and never if the writer is abandoned.
 func (f *FileDialog) SetOnClosed(closed func()) {
 	// If there is already a callback set, remember it and call both.
 	originalCallback := f.onClosedCallback

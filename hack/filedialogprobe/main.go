@@ -34,7 +34,7 @@ func main() {
 	imgFilter := storage.NewExtensionFileFilter([]string{".png", ".jpg", ".jpeg"})
 
 	openFile := func() {
-		dialog.ShowFileOpen(func(r bellui.URIReadCloser, err error) {
+		d := dialog.NewFileOpen(func(r bellui.URIReadCloser, err error) {
 			if err != nil {
 				fmt.Println("open error:", err)
 				return
@@ -46,6 +46,11 @@ func main() {
 			fmt.Println("open:", r.URI())
 			_ = r.Close()
 		}, w)
+		// The close report must fire on every backend — canvas, desktop native
+		// (#227), and the mobile/wasm picker overrides (#233) — immediately
+		// before the result callback prints.
+		d.SetOnClosed(func() { fmt.Println("open: onClosed fired") })
+		d.Show()
 	}
 	openFileFiltered := func() {
 		d := dialog.NewFileOpen(func(r bellui.URIReadCloser, err error) {
@@ -60,13 +65,15 @@ func main() {
 		d.Show()
 	}
 	openFolder := func() {
-		dialog.ShowFolderOpen(func(l bellui.ListableURI, err error) {
+		d := dialog.NewFolderOpen(func(l bellui.ListableURI, err error) {
 			if l == nil {
 				fmt.Println("folder: cancelled or error:", err)
 				return
 			}
 			fmt.Println("folder:", l)
 		}, w)
+		d.SetOnClosed(func() { fmt.Println("folder: onClosed fired") })
+		d.Show()
 	}
 	saveFile := func() {
 		d := dialog.NewFileSave(func(wr bellui.URIWriteCloser, err error) {
@@ -78,6 +85,9 @@ func main() {
 			_ = wr.Close()
 		}, w)
 		d.SetFileName("untitled.txt")
+		// On wasm the save "dialog" is the download offered at writer close, so
+		// this fires after the save: line, not before it (#233).
+		d.SetOnClosed(func() { fmt.Println("save: onClosed fired") })
 		d.Show()
 	}
 
