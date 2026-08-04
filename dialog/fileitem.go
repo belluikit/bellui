@@ -21,7 +21,10 @@ const (
 	fileIconCellWidth  = fileIconSize * 1.5
 )
 
-var _ event.Hoverable = (*fileDialogItem)(nil)
+var (
+	_ event.Hoverable     = (*fileDialogItem)(nil)
+	_ event.LongPressable = (*fileDialogItem)(nil)
+)
 
 type fileDialogItem struct {
 	widget.BaseWidget
@@ -79,11 +82,27 @@ func (i *fileDialogItem) Tapped(*event.PointEvent) {
 	if i.choose != nil {
 		i.choose(i.id)
 	}
+	if i.picker.selectionMode {
+		// In selection mode taps toggle set membership (#259); the double-tap
+		// open shortcut is suspended — its second tap just changed the set it
+		// would confirm.
+		i.lastClick = time.Time{}
+		return
+	}
 	now := time.Now()
 	if !i.dir && now.Sub(i.lastClick) < bellui.DoubleTapDelay() && i.open != nil {
 		i.open()
 	}
 	i.lastClick = now
+}
+
+// LongPressed enters touch selection mode (#259): holding a file item switches
+// a multi-select dialog into a mode where plain taps toggle set membership, so
+// devices without modifier keys can build a set. Hold-fire dispatch (#758)
+// sends no Tapped on the release of the press that got here, so the held item
+// is selected exactly once. Ignored on directories and outside multi-select.
+func (i *fileDialogItem) LongPressed(*event.PointEvent) {
+	i.picker.enterSelectionMode(i.id)
 }
 
 func (i *fileDialogItem) HoverIn(*event.HoverEvent)    { i.hovered = true; i.Refresh() }

@@ -90,6 +90,12 @@ type fileDialog struct {
 	// anchor id for Shift-range selection.
 	multiSelected []bellui.URI
 	multiAnchor   int
+	// selectionMode (#259) is the touch counterpart to the modifier keys:
+	// entered by long-pressing a file item, it makes plain taps toggle set
+	// membership instead of replacing the selection. Escape/Back leaves the
+	// mode before it cancels the dialog; deselecting the last file leaves it
+	// too. It survives navigation, like the set itself.
+	selectionMode bool
 
 	// set while the dialog body is shown in its own native window (#597)
 	hostWin   bellui.Window
@@ -752,7 +758,10 @@ func (f *fileDialog) applyMultiTap(id int, mods event.KeyModifier) {
 		return
 	}
 
-	toggle := mods&(event.KeyModifierControl|event.KeyModifierSuper) != 0
+	// Selection mode gives a modifier-less tap the toggle meaning (#259);
+	// Shift-range and Ctrl/Cmd keep their usual precedence, so the gestures
+	// compose on devices that have both touch and a keyboard.
+	toggle := f.selectionMode || mods&(event.KeyModifierControl|event.KeyModifierSuper) != 0
 	rangeSel := mods&event.KeyModifierShift != 0
 
 	switch {
@@ -770,8 +779,51 @@ func (f *fileDialog) applyMultiTap(id int, mods event.KeyModifier) {
 		f.multiAnchor = id
 	}
 
+	if f.selectionMode && len(f.multiSelected) == 0 {
+		// Deselecting the last file ends the mode — nothing is left to act
+		// on, and a fresh long-press restarts it (#259).
+		f.selectionMode = false
+	}
 	f.selectedID = id
 	f.applyMultiSelection()
+}
+
+// enterSelectionMode is the long-press entry to touch multi-select (#259): it
+// switches the dialog into selection mode and selects the pressed file, so the
+// finger that held an item leaves with that item chosen. Directories navigate
+// on tap and are never part of a selection, so they do not enter the mode; a
+// single-select dialog has no set to build, so long-press is inert there.
+func (f *fileDialog) enterSelectionMode(id int) {
+	if !f.file.multiSelect {
+		return
+	}
+	file, ok := f.getDisplayItem(id)
+	if !ok {
+		return
+	}
+	if listable, err := storage.CanList(file); err == nil && listable {
+		return
+	}
+	f.selectionMode = true
+	if !f.isSelected(file) {
+		f.multiSelected = append(f.multiSelected, file)
+	}
+	f.multiAnchor = id
+	f.selectedID = id
+	f.applyMultiSelection()
+}
+
+// exitSelectionMode leaves touch selection mode, clearing the set, and reports
+// whether there was a mode to leave — Escape/Back backs out of the mode first
+// and only its next press cancels the dialog (#259).
+func (f *fileDialog) exitSelectionMode() bool {
+	if !f.selectionMode {
+		return false
+	}
+	f.selectionMode = false
+	f.multiSelected = nil
+	f.applyMultiSelection()
+	return true
 }
 
 // selectRange replaces the selection with every selectable (non-directory)
@@ -983,6 +1035,16 @@ func showFile(file *FileDialog) *fileDialog {
 		d.win = wrapModal(ui, file.parent.Canvas(), file.windowed, func() {
 			d.dismiss.OnTapped()
 		})
+		// Escape backs out of touch selection mode before it cancels the
+		// dialog (#259). Only OnDismissed is wrapped: the windowed frame's
+		// close button (CloseIntercept) keeps closing outright.
+		dismissDialog := d.win.OnDismissed
+		d.win.OnDismissed = func() {
+			if d.exitSelectionMode() {
+				return
+			}
+			dismissDialog()
+		}
 		d.win.Resize(size)
 	}
 
@@ -1020,9 +1082,9 @@ func (f *FileDialog) Show() {
 			return
 		}
 	} else {
-		// Multi-select is honoured natively only where a backend supports it
-		// (macOS NSOpenPanel today, #716); backends without it decline a
-		// multi-select request and fall through to the canvas dialog (#627).
+		// Multi-select is honoured natively by every desktop backend and the
+		// mobile pickers (#716, #255); an environment without a multi picker
+		// declines and falls through to the canvas dialog (#627).
 		if fileOpenOSOverride(f) {
 			return
 		}
