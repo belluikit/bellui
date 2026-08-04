@@ -130,7 +130,14 @@ func showBrowserOpenPicker(accept string, cb func(bellui.URIReadCloser, error)) 
 			return
 		}
 		done = true
+		// Detach every listener before releasing its func: the dismissal
+		// fallback can finish while the picker is still open, and a change or
+		// cancel event arriving after that must find no listener — reaching a
+		// released js.Func is also dropped, but logs a "call to released
+		// function" error on the console.
 		js.Global().Call("removeEventListener", "focus", focusFn)
+		input.Call("removeEventListener", "change", changeFn)
+		input.Call("removeEventListener", "cancel", cancelFn)
 		changeFn.Release()
 		cancelFn.Release()
 		focusFn.Release()
@@ -166,9 +173,12 @@ func showBrowserOpenPicker(accept string, cb func(bellui.URIReadCloser, error)) 
 	// focus — the picker closing — stands in: if no change or cancel event has
 	// arrived within the grace period, report the dismissal. chosen covers the
 	// async read that follows a change event; done covers losing the race to a
-	// real cancel event. Known cost: a browser whose picker is not modal to
-	// the window would report a dismissal if the user refocuses the page for
-	// over the grace period mid-pick.
+	// real cancel event. Known costs, both only on browsers taking this
+	// fallback: a picker that is not modal to the window reports a dismissal
+	// if the user refocuses the page for over the grace period mid-pick, and a
+	// choice whose change event trails the refocus by more than the grace
+	// period is dropped — the dismissal has already been reported and finish
+	// has detached the listeners.
 	focusFn = js.FuncOf(func(this js.Value, args []js.Value) any {
 		time.AfterFunc(pickerDismissGrace, func() {
 			if !chosen {
