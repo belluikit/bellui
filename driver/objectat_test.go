@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/core"
@@ -73,6 +74,33 @@ func TestObjectAtPositionMatching_SkipsRejected(t *testing.T) {
 	assert.Same(t, btn, matched)
 	assert.NotSame(t, deepest, matched, "unfiltered pick lands on a renderer internal, not the button")
 	assert.Equal(t, geo.NewSize(120, 40), bounds.Size)
+}
+
+func TestObjectAtPosition_MatchesAbsolutePositionForObjectSpace(t *testing.T) {
+	test.NewTempApp(t)
+
+	leaf := canvas.NewRectangle(color.Black)
+	leaf.Move(geo.NewPos(20, 20))
+	leaf.Resize(geo.NewSize(60, 30))
+	content := container.NewWithoutLayout(leaf)
+
+	w := test.NewWindow(content)
+	defer w.Close()
+	w.Resize(geo.NewSize(200, 200))
+
+	// The probe and the returned bounds live in the same coordinate space as
+	// Driver.AbsolutePositionForObject — the composition the doc comment
+	// recommends for the reverse direction. The test canvas's non-zero
+	// interactive-area inset is what makes this a real assertion: before #235
+	// the two spaces disagreed by exactly that inset, so a probe composed
+	// from the driver position landed wide of a small target.
+	abs := bellui.CurrentApp().Driver().AbsolutePositionForObject(leaf)
+
+	obj, bounds, ok := driver.ObjectAtPosition(w.Canvas(), abs.AddXY(1, 1))
+	require.True(t, ok)
+	assert.Same(t, leaf, obj)
+	assert.Equal(t, abs, bounds.Pos)
+	assert.Equal(t, leaf.Size(), bounds.Size)
 }
 
 func TestObjectAtPosition_OverlayAboveContent(t *testing.T) {

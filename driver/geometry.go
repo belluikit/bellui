@@ -29,8 +29,9 @@ import (
 // deliberately *not* [bellui.Driver.AbsolutePositionForObject], which
 // additionally subtracts the canvas [core.Canvas.InteractiveArea] inset and so
 // reports a position relative to the interactive area rather than the canvas
-// tree. The two differ only where that inset is non-zero (mobile, and the test
-// canvas). Reporting position and clip in one space is the point: a caller
+// tree — the space [ObjectAtPosition] also lives in (#235). The two differ
+// only where that inset is non-zero (mobile, and the test canvas). Reporting
+// position and clip in one space is the point: a caller
 // that intersects them — as [widget.NativeViewHost] does to place an OS view —
 // gets a meaningless rectangle if they come from different origins.
 //
