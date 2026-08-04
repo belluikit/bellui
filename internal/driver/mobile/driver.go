@@ -1447,8 +1447,20 @@ func (d *driver) typeDownCanvas(canvas *canvas, r rune, code key.Code, mod key.M
 	// backing out of the innermost surface is what Back does everywhere else on
 	// the platform, so it only falls through to KeyBack delivery / GoBack below
 	// when there is nothing to dismiss.
-	if (keyName == event.KeyEscape || keyName == mobile.KeyBack) && intdriver.HandleEscape(canvas) {
-		return
+	if keyName == event.KeyEscape || keyName == mobile.KeyBack {
+		if intdriver.HandleEscape(canvas) {
+			return
+		}
+		// The walk declines when the focused widget claims the Escape meaning
+		// for a state of its own (event.EscapeHandler) — but such widgets act
+		// on KeyEscape in TypedKey, so Back must arrive as the key they listen
+		// for or it would go dead exactly when the widget has state to back
+		// out of.
+		if keyName == mobile.KeyBack {
+			if h, ok := canvas.Focused().(event.EscapeHandler); ok && h.HandlesEscape() {
+				keyEvent.Name = event.KeyEscape
+			}
+		}
 	}
 
 	if canvas.Focused() != nil {

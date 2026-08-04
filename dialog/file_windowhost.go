@@ -63,6 +63,7 @@ func (f *fileDialog) hostWindowClosed() {
 		return
 	}
 	f.hostWin = nil
+	f.selectionMode = false // closing ends selection mode (see hide)
 	removeScrim(f.file.parent, f.scrim)
 	f.scrim = nil
 	f.reportCancel()
@@ -72,6 +73,11 @@ func (f *fileDialog) hostWindowClosed() {
 // scrim when window-hosted, the overlay popup otherwise — without running any
 // response callback (the caller reports its own response).
 func (f *fileDialog) hide() {
+	// Closing ends touch selection mode however the dialog closes — Cancel,
+	// the frame's X, confirm — matching the Escape path, so a re-Show does
+	// not reopen with plain taps still toggling (#259). The selection set
+	// keeps its own persistence.
+	f.selectionMode = false
 	if f.hostWin != nil {
 		w := f.hostWin
 		f.hostWin = nil
