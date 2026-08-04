@@ -15,6 +15,23 @@ the trendvidia fork (github.com/trendvidia/fyne).
 
 ### Added
 
+* **Touch multi-select for the canvas file dialog — long-press selection
+  mode** ([#259](https://github.com/belluikit/bellui/issues/259)). In
+  open-multiple mode, long-pressing a file item enters selection mode: plain
+  taps toggle set membership — the modifier-less counterpart to
+  Ctrl/Cmd/Shift-click, for touchscreens and for mobile embeddings whose
+  platform app provides no multi picker (the canvas-dialog fallback from
+  #255). Escape or Android's Back leaves the mode before it cancels the
+  dialog, deselecting the last file ends it too, the double-tap open shortcut
+  is suspended while the mode is active, and the pointer modifiers keep their
+  usual precedence throughout. As part of this, the mobile driver now gives
+  Android's Back button the Escape meaning generally: Back dismisses the
+  innermost pop-up, menu or dialog and only falls through to the app's
+  `KeyBack` delivery (or backgrounding the app) when there is nothing left to
+  dismiss. Desktop touchscreens cannot reach the gesture yet — the GLFW
+  driver has no touch long-press dispatch
+  ([#266](https://github.com/belluikit/bellui/issues/266)).
+
 * **Escape closes the innermost pop-up, menu or dialog**
   ([#229](https://github.com/belluikit/bellui/issues/229)). The drivers give
   Escape a default meaning ahead of key delivery: the focused widget gets
