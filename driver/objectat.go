@@ -10,7 +10,9 @@ import (
 // together with its absolute bounds. ok is false when no object is hit.
 //
 // It uses the same hit-test the toolkit uses for tap dispatch: overlays are
-// searched top-down before the content, and an input-pass-through overlay (a
+// searched top-down first, then the canvas's remaining dispatch roots — on
+// canvases that have them, the desktop menu bar and the mobile window head or
+// open menu (#245) — then the content; an input-pass-through overlay (a
 // tooltip, Toast or Snackbar) does not block objects beneath it. This is the
 // "pick" primitive behind the #540 widget inspector, exposed for tooling that
 // maps a click back to the object that produced it (e.g. a design tool's
@@ -45,6 +47,18 @@ func ObjectAtPosition(c core.Canvas, pos geo.Position) (core.CanvasObject, geo.R
 // deepest object that is one of your own source-mapped widgets.
 //
 // Since: 2.10
+// dispatchHitTester is implemented by canvases whose dispatch hit-walk covers
+// more than overlays + content — the glfw menu bar, the mobile window head
+// and open menu — or prefers a spatial index. When a canvas exposes it, the
+// wrappers here probe through it so a public pick matches tap dispatch
+// exactly (#245); otherwise they fall back to walking overlays + content,
+// which is the whole tree on canvases without those extra roots (the test
+// and embedded canvases).
+type dispatchHitTester interface {
+	FindObjectAtPositionMatching(pos geo.Position, matches func(core.CanvasObject) bool) (core.CanvasObject, geo.Position, int)
+	ObjectTrees() []core.CanvasObject
+}
+
 func ObjectAtPositionMatching(c core.Canvas, pos geo.Position, matches func(core.CanvasObject) bool) (core.CanvasObject, geo.Rectangle, bool) {
 	if c == nil || matches == nil {
 		return nil, geo.Rectangle{}, false
@@ -56,13 +70,22 @@ func ObjectAtPositionMatching(c core.Canvas, pos geo.Position, matches func(core
 	// translate back out (#235). A zero inset — every desktop driver — makes
 	// both a no-op.
 	inset, _ := c.InteractiveArea()
-	overlays := c.Overlays().List()
-	obj, _, _ := idriver.FindObjectAtPositionMatching(pos.Add(inset), matches, overlays, c.Content())
+	treePos := pos.Add(inset)
+
+	var obj core.CanvasObject
+	var trees []core.CanvasObject
+	if ht, ok := c.(dispatchHitTester); ok {
+		obj, _, _ = ht.FindObjectAtPositionMatching(treePos, matches)
+		trees = ht.ObjectTrees()
+	} else {
+		overlays := c.Overlays().List()
+		obj, _, _ = idriver.FindObjectAtPositionMatching(treePos, matches, overlays, c.Content())
+		trees = append([]core.CanvasObject{c.Content()}, overlays...)
+	}
 	if obj == nil {
 		return nil, geo.Rectangle{}, false
 	}
 
-	roots := append([]core.CanvasObject{c.Content()}, overlays...)
-	origin := idriver.AbsolutePositionForObject(obj, roots).Subtract(inset)
+	origin := idriver.AbsolutePositionForObject(obj, trees).Subtract(inset)
 	return obj, geo.Rectangle{Pos: origin, Size: obj.Size()}, true
 }
