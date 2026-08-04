@@ -63,11 +63,13 @@ func closestSupportedTag(tags []language.Tag) bellui.Locale {
 // parseUserLocales parses the locale strings the OS reports into language
 // tags, dropping entries that cannot be made well-formed. Systems hand out
 // non-BCP-47 forms — Java Locale.toString() underscores ("en_US") and its
-// trailing "#..." script/extension marker ("zh_CN_#Hans"), and ColorOS has
-// delivered a list whose entry is the empty string (#271) — so entries are
-// normalized before parsing, and one that still fails is logged with the raw
-// string %q-quoted (an empty or whitespace entry stays visible in the log,
-// which is the on-device capture for vendor forms) and skipped rather than
+// trailing "#..." script/extension marker ("zh_CN_#Hans"), and go-locale
+// turns a failed Android JNI lookup into a list holding one empty string
+// (#271: the "tag is not well-formed at every start" on the OPD2403 bench
+// was exactly that, a "no current JVM" failure during package init) — so
+// entries are normalized before parsing, and one that still fails is logged
+// with the raw string %q-quoted (an empty or whitespace entry stays visible
+// in the log, the on-device capture instrument) and skipped rather than
 // handed to the matcher as an und tag: a bad entry must not cost the locale
 // the parseable entries behind it.
 func parseUserLocales(locs []string) []language.Tag {
