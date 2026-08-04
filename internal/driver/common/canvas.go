@@ -348,8 +348,15 @@ func (c *Canvas) ObjectTrees() []core.CanvasObject {
 	if c.menuTree != nil && c.menuTree.root != nil {
 		menu = c.menuTree.root.obj
 	}
-	trees := make([]core.CanvasObject, 0, len(c.Overlays().List())+2)
+	var head core.CanvasObject
+	if c.mWindowHeadTree != nil && c.mWindowHeadTree.root != nil {
+		head = c.mWindowHeadTree.root.obj
+	}
+	trees := make([]core.CanvasObject, 0, len(c.Overlays().List())+3)
 	trees = append(trees, content)
+	if head != nil {
+		trees = append(trees, head)
+	}
 	if menu != nil {
 		trees = append(trees, menu)
 	}
