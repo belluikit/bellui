@@ -28,6 +28,12 @@ import (
 // two differ by the interactive-area inset, which is non-zero only on mobile
 // and the test canvas.
 //
+// Event positions are in the raw-tree space as well: the tap dispatcher feeds
+// this same hit-walk the position it later delivers as
+// [event.PointEvent].AbsolutePosition, so a probe taken from an event must
+// subtract the [core.Canvas.InteractiveArea] inset before calling here — a
+// no-op on desktop, where the inset is zero.
+//
 // Since: 2.10
 func ObjectAtPosition(c core.Canvas, pos geo.Position) (core.CanvasObject, geo.Rectangle, bool) {
 	return ObjectAtPositionMatching(c, pos, func(core.CanvasObject) bool { return true })
