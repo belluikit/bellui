@@ -629,6 +629,10 @@ func (d *driver) handleLifecycle(e lifecycle.Event, w *window) {
 	}
 	switch e.Crosses(lifecycle.StageFocused) {
 	case lifecycle.CrossOn: // foregrounding
+		// Re-resolve a system locale changed while backgrounded (Android only;
+		// #282) before the app's foreground hook, so that hook already sees
+		// the new locale.
+		resolveSystemLocale()
 		if f := bellui.CurrentApp().Lifecycle().(*intapp.Lifecycle).OnEnteredForeground(); f != nil {
 			f()
 		}
