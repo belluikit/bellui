@@ -46,6 +46,14 @@ the trendvidia fork (github.com/trendvidia/fyne).
 
 ### Fixed
 
+* **Android: folders granted through the SAF picker's Download shortcut are
+  accepted** ([#244](https://github.com/belluikit/bellui/issues/244)). The
+  listability probe trusted `ContentResolver.getType`, which the downloads
+  provider answers with null for a tree root the app holds a perfectly good
+  grant for; the probe now falls back to attempting the children query that
+  `List()` actually performs. Verified live on the Android 15/ColorOS bench
+  device.
+
 * **File pickers: four fixes from the first on-device iOS pass** (#239).
   Closing a saved file no longer segfaults — the ObjC file bridge handed Go
   autoreleased `NSURL`/`NSFileHandle` pointers, now retained across the
