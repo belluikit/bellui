@@ -31,6 +31,7 @@ void setKeyboardState(char* text, int selStart, int selEnd);
 void setKeyboardUndoState(int canUndo, int canRedo);
 
 void showFileOpenPicker(char* mimes, char *exts);
+void showFileOpenMultiPicker(char* mimes, char *exts);
 void showFileSavePicker(char* mimes, char *exts, char *filename);
 void closeFileResource(void* urlPtr);
 */
@@ -373,6 +374,9 @@ var fileCallback func(string, func())
 //export filePickerReturned
 func filePickerReturned(str *C.char, urlPtr unsafe.Pointer) {
 	if fileCallback == nil {
+		// No session to hand it to: still release the URL the delegate
+		// retained, or its security scope is stranded.
+		C.closeFileResource(urlPtr)
 		return
 	}
 
@@ -390,6 +394,53 @@ func driverShowFileOpenPicker(callback func(string, func()), filter *FileFilter)
 	defer C.free(unsafe.Pointer(extStr))
 
 	C.showFileOpenPicker(mimeStr, extStr)
+}
+
+// The multi-select picker session (#255). The delegate appends each picked
+// URL, then completes; all three exported hooks run sequentially on the UIKit
+// main thread, so the accumulation needs no locking. A cancelled picker
+// completes with nothing appended, delivering the empty list that signals
+// cancellation.
+var (
+	fileMultiCallback func([]string, []func())
+	fileMultiURLs     []string
+	fileMultiClosers  []func()
+)
+
+//export filePickerMultiAppend
+func filePickerMultiAppend(str *C.char, urlPtr unsafe.Pointer) {
+	if fileMultiCallback == nil {
+		// No session to hand it to: still release the URL the delegate
+		// retained, or its security scope is stranded.
+		C.closeFileResource(urlPtr)
+		return
+	}
+
+	fileMultiURLs = append(fileMultiURLs, C.GoString(str))
+	fileMultiClosers = append(fileMultiClosers, func() {
+		C.closeFileResource(urlPtr)
+	})
+}
+
+//export filePickerMultiComplete
+func filePickerMultiComplete() {
+	if fileMultiCallback == nil {
+		return
+	}
+
+	callback, urls, closers := fileMultiCallback, fileMultiURLs, fileMultiClosers
+	fileMultiCallback, fileMultiURLs, fileMultiClosers = nil, nil, nil
+	callback(urls, closers)
+}
+
+func driverShowFileOpenMultiplePicker(callback func([]string, []func()), filter *FileFilter) {
+	fileMultiCallback = callback
+
+	mimeStr, extStr := cStringsForFilter(filter)
+	defer C.free(unsafe.Pointer(mimeStr))
+	defer C.free(unsafe.Pointer(extStr))
+
+	C.showFileOpenMultiPicker(mimeStr, extStr)
 }
 
 func driverShowFileSavePicker(callback func(string, func()), filter *FileFilter, filename string) {

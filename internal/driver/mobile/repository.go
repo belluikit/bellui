@@ -65,13 +65,13 @@ func (m *mobileFileRepo) Parent(u bellui.URI) (bellui.URI, error) {
 }
 
 func (m *mobileFileRepo) Reader(u bellui.URI) (bellui.URIReadCloser, error) {
-	return fileReaderForURI(u)
+	return fileReaderForURI(u, nil)
 }
 
 func (m *mobileFileRepo) Writer(u bellui.URI) (bellui.URIWriteCloser, error) {
-	return fileWriterForURI(u, true)
+	return fileWriterForURI(u, true, nil)
 }
 
 func (m *mobileFileRepo) Appender(u bellui.URI) (bellui.URIWriteCloser, error) {
-	return fileWriterForURI(u, false)
+	return fileWriterForURI(u, false, nil)
 }
