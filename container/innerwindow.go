@@ -389,9 +389,13 @@ type cornerIndicatorLayout struct{}
 
 func (cornerIndicatorLayout) Layout(objs []core.CanvasObject, size geo.Size) {
 	for _, o := range objs {
-		min := o.MinSize()
-		o.Resize(min)
-		o.Move(geo.NewPos(size.Width-min.Width, size.Height-min.Height))
+		// Clamp to the corner widget: the renderer caps the corner below the
+		// indicator size in windows shrunk under their minimum, and an
+		// unclamped pin would push the indicator out of the widget's top-left
+		// (the desktop path scales the same way via SimpleRenderer).
+		sz := o.MinSize().Min(size)
+		o.Resize(sz)
+		o.Move(geo.NewPos(size.Width-sz.Width, size.Height-sz.Height))
 	}
 }
 
