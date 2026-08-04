@@ -44,6 +44,18 @@ the trendvidia fork (github.com/trendvidia/fyne).
   `goffmpeg-libs` requires it. Source ref, rewrite set and verification are in
   `x/mmedia/PROVENANCE.md`.
 
+### Fixed
+
+* **`driver.ObjectAtPosition`/`ObjectAtPositionMatching` cover every dispatch
+  root** ([#245](https://github.com/belluikit/bellui/issues/245)). The public
+  pick wrappers now probe through the canvas's own dispatch hit-walk when it
+  exposes one, so the desktop menu bar and the mobile window head or open
+  menu are pickable — and the spatial-index fast path is used — exactly as
+  in tap dispatch; canvases without extra roots keep the overlays+content
+  walk. Window-head objects also resolve through
+  `Driver.AbsolutePositionForObject` now (their tree was missing from the
+  canvas object trees).
+
 ### Changed
 
 * **`driver.ObjectAtPosition`/`ObjectAtPositionMatching` now probe and report
