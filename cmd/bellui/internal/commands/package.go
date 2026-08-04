@@ -232,14 +232,6 @@ func (p *Packager) validate() (err error) {
 	if !hasGoCode(p.srcDir) {
 		return fmt.Errorf("failed to find go code in source directory: %s", p.srcDir)
 	}
-	if pkgName, ok := mainPackageIn(p.srcDir); !ok {
-		// Without this the failure surfaces much later and much more
-		// confusingly: the metadata init file (package main) is injected into
-		// the non-main package and the build dies with go's "found packages X
-		// and main" (#248) — typically after packaging was run from the module
-		// root while the application lives in a subdirectory.
-		return fmt.Errorf("source directory %s is package %q, not a main package — run bellui package from the application's main package directory", p.srcDir, pkgName)
-	}
 
 	p.appData.CustomMetadata = p.customMetadata.m
 	p.appData.Release = p.release
@@ -268,6 +260,10 @@ func (p *Packager) validate() (err error) {
 		}
 	} else if p.os == "ios" || p.os == "android" {
 		_, _ = fmt.Fprint(os.Stderr, "Parameter --executable is ignored for mobile builds.\n")
+	}
+
+	if err := p.validateMainPackage(); err != nil {
+		return err
 	}
 
 	if p.Name == "" {
@@ -409,11 +405,36 @@ func validateAppID(appID, os, name string, release bool) (string, error) {
 	return appID, nil
 }
 
+// validateMainPackage fails fast when packaging would build p.srcDir but its
+// own package is not main. Without this the failure surfaces much later and
+// much more confusingly: the metadata init file (package main) is injected
+// into the non-main package and the build dies with go's "found packages X
+// and main" (#248) — typically after packaging was run from the module root
+// while the application lives in a subdirectory. Wrapping a prebuilt
+// --executable neither builds nor injects, so the source package is
+// irrelevant there and the check is skipped; mobile targets always build
+// through gomobile, so they are always checked.
+func (p *Packager) validateMainPackage() error {
+	if !util.IsMobile(p.os) && util.Exists(p.exe) {
+		return nil
+	}
+	pkgName, ok := mainPackageIn(p.srcDir)
+	if ok {
+		return nil
+	}
+	if pkgName == "" {
+		return fmt.Errorf("source directory %s has no buildable Go files of its own — run bellui package from the application's main package directory", p.srcDir)
+	}
+	return fmt.Errorf("source directory %s is package %q, not a main package — run bellui package from the application's main package directory", p.srcDir, pkgName)
+}
+
 // mainPackageIn reports whether dir's own package (the one `bellui package`
 // builds — not subdirectories) declares package main in at least one Go file.
 // Build constraints are deliberately ignored: a main package for another
-// target OS still counts. When no file declares main, the name of the package
-// found there (if any) is returned for the error message.
+// target OS still counts. Files the go tool never builds are skipped:
+// _test.go files and names starting with "_" or ".". When no file declares
+// main, the name of the package found there (if any) is returned for the
+// error message.
 func mainPackageIn(dir string) (pkgName string, ok bool) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -422,7 +443,8 @@ func mainPackageIn(dir string) (pkgName string, ok bool) {
 	fset := token.NewFileSet()
 	for _, e := range entries {
 		name := e.Name()
-		if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+		if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") ||
+			strings.HasPrefix(name, "_") || strings.HasPrefix(name, ".") {
 			continue
 		}
 		f, err := parser.ParseFile(fset, filepath.Join(dir, name), nil, parser.PackageClauseOnly)
