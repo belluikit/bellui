@@ -10,9 +10,10 @@ import "syscall/js"
 //
 // Beyond handing out the canvas, the context is the web driver's window
 // identity: the wasm file-dialog overrides assert NativeWindow on the dialog's
-// parent (#257), so a window that cannot produce it — the test driver's, or an
-// emulated extra window — is served by the canvas dialog instead of a real
-// browser picker.
+// parent (#257), so a window that cannot produce it — the test driver's — is
+// served by the canvas dialog instead of a real browser picker. An emulated
+// extra window reports the root window's canvas, the one actually rendering
+// it.
 //
 // Since: 2.10
 type BrowserWindowContext struct {
