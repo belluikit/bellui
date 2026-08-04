@@ -192,7 +192,7 @@ func (l *Label) MinSize() geo.Size {
 // ~0, so use IntrinsicSize to size a container, popover or tooltip to the
 // content. When Wrapping and Truncation are off it equals MinSize.
 //
-// Since: 2.11
+// Since: 1.0
 func (l *Label) IntrinsicSize() geo.Size {
 	l.ExtendBaseWidget(l)
 	cache.Renderer(l.super()) // the RichText provider is created lazily on first render

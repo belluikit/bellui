@@ -16,7 +16,7 @@ var _ ToolbarItem = (*TwoStateToolbarAction)(nil)
 // different icon depending on its state, e.g. play/pause for a media player
 // or show/hide for a side panel. Tapping toggles the state.
 //
-// Since: 2.15
+// Since: 1.0
 type TwoStateToolbarAction struct {
 	// OnActivated is called with the new state whenever it changes, by tap
 	// or by SetOn.
@@ -32,7 +32,7 @@ type TwoStateToolbarAction struct {
 // NewTwoStateToolbarAction returns a new two-state ToolbarItem showing
 // offIcon while the state is false and onIcon while it is true.
 //
-// Since: 2.15
+// Since: 1.0
 func NewTwoStateToolbarAction(offIcon, onIcon bellui.Resource, onActivated func(on bool)) *TwoStateToolbarAction {
 	t := &TwoStateToolbarAction{OnActivated: onActivated, offIcon: offIcon, onIcon: onIcon}
 	t.button.SetIcon(t.offIcon)

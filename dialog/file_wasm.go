@@ -11,6 +11,7 @@ import (
 
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/core"
+	"github.com/belluikit/bellui/driver"
 	"github.com/belluikit/bellui/storage"
 )
 
@@ -25,10 +26,26 @@ func (f *fileDialog) loadPlaces() []core.CanvasObject {
 	return nil
 }
 
+// browserWindowFor reports whether the dialog's parent is a real
+// browser-hosted window — the wasm mirror of the desktop backends'
+// nativeFileDialogsFor window check (#257). The web driver's windows
+// implement driver.NativeWindow (with a BrowserWindowContext); the test
+// driver's do not, which is what keeps a js/wasm test binary on the canvas
+// dialog instead of clicking a real <input type="file"> or triggering a real
+// download from the harness page. Device.IsBrowser cannot discriminate here:
+// it is platform-derived and answers true for both drivers on wasm.
+func browserWindowFor(f *FileDialog) bool {
+	_, native := f.parent.(driver.NativeWindow)
+	return native
+}
+
 // fileOpenOSOverride presents a browser file picker (<input type="file">) for
 // the open case. Directory selection has no portable <input> equivalent, so it
 // falls back to the canvas dialog (returns false) rather than doing nothing.
 func fileOpenOSOverride(f *FileDialog) bool {
+	if !browserWindowFor(f) {
+		return false
+	}
 	if f.isDirectory() {
 		return false
 	}
@@ -58,6 +75,9 @@ func fileOpenOSOverride(f *FileDialog) bool {
 // showSaveFilePicker is not universally available (absent in Firefox/Safari),
 // so the download path is used for portability across Chrome + Firefox.
 func fileSaveOSOverride(f *FileDialog) bool {
+	if !browserWindowFor(f) {
+		return false
+	}
 	cb, ok := f.callback.(func(bellui.URIWriteCloser, error))
 	if !ok {
 		return false

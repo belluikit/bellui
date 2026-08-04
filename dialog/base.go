@@ -54,7 +54,7 @@ type Dialog interface {
 	// ignored and the dialog falls back to the standard overlay
 	// presentation. Call before Show.
 	//
-	// Since: 2.16
+	// Since: 1.0
 	SetWindowHosted(hosted bool)
 }
 
