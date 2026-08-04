@@ -12,6 +12,11 @@
 //	go run ./hack/filedialogprobe save       # auto-open a File-Save panel
 //	go run ./hack/filedialogprobe multiple   # auto-open a multi-select File-Open panel
 //	go run ./hack/filedialogprobe windowed   # windowed canvas dialog (frame X + resize corner)
+//
+// The button UI carries a "Native pickers" check bound to
+// dialog.UseNativeFileDialogs: unchecking it must serve every request with
+// the canvas dialog — on iOS/Android too (#267), which is how #259's
+// long-press selection mode is reached on-device.
 package main
 
 import (
@@ -137,7 +142,18 @@ func main() {
 		}
 	}
 
+	// The toggle exercises UseNativeFileDialogs on every platform — on
+	// iOS/Android unchecking it must swap the system picker for the canvas
+	// dialog (#267), which is also how #259's long-press selection mode is
+	// reached on a packaged device build.
+	nativeCheck := widget.NewCheck("Native pickers (UseNativeFileDialogs)", func(on bool) {
+		dialog.UseNativeFileDialogs(on)
+		fmt.Println("UseNativeFileDialogs:", on)
+	})
+	nativeCheck.SetChecked(true)
+
 	w.SetContent(container.NewVBox(
+		nativeCheck,
 		widget.NewButton("Open File", openFile),
 		widget.NewButton("Open File (image filter)", openFileFiltered),
 		widget.NewButton("Open Multiple (Ctrl/Cmd+click, Shift+click)", openMultiple),

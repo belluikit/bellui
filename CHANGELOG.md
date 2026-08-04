@@ -62,6 +62,18 @@ the trendvidia fork (github.com/trendvidia/fyne).
 
 ### Fixed
 
+* **The mobile pickers honour `UseNativeFileDialogs(false)`**
+  ([#267](https://github.com/belluikit/bellui/issues/267)). The doc promised
+  the canvas dialog "everywhere", but the iOS/Android overrides consulted
+  only picker availability, so the opt-out was silently inert on mobile —
+  and the canvas dialog was unreachable on a packaged device build. The
+  toggle now gates both mobile overrides; wasm remains the documented
+  exception (a canvas dialog has no real filesystem to browse in a
+  browser). Note the cost, now recorded in the doc: the platform picker is
+  the only surface that reaches outside the app sandbox on modern mobile
+  systems, so an app opting out for desktop-consistency reasons should gate
+  the call on the platform.
+
 * **wasm: the browser picker overrides no longer fire under the test driver**
   ([#257](https://github.com/belluikit/bellui/issues/257)). In a js/wasm test
   binary, `FileOpen.Show()` clicked a real hidden `<input type="file">` in the
