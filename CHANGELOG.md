@@ -44,6 +44,16 @@ the trendvidia fork (github.com/trendvidia/fyne).
   `goffmpeg-libs` requires it. Source ref, rewrite set and verification are in
   `x/mmedia/PROVENANCE.md`.
 
+### Fixed
+
+* **`bellui package` fails fast, and clearly, when run outside a main
+  package** ([#248](https://github.com/belluikit/bellui/issues/248)).
+  Running it from the module root while the application lives in a
+  subdirectory used to inject the generated metadata file into the non-main
+  package and die later inside the build with go's cryptic "found packages X
+  and main"; the packager now checks the source directory's own package up
+  front and names it in the error.
+
 ### Changed
 
 * **`driver.ObjectAtPosition`/`ObjectAtPositionMatching` now probe and report
