@@ -3,6 +3,7 @@
 package dialog
 
 import (
+	"syscall/js"
 	"testing"
 
 	"github.com/belluikit/bellui"
@@ -36,4 +37,40 @@ func TestFileSaveOSOverrideReportsCloseAtWriterClose(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NoError(t, writer.Close())
 	assert.Equal(t, 1, closed, "closing the writer reports the close once")
+
+	assert.NoError(t, writer.Close())
+	assert.Equal(t, 1, closed, "a second Close — a deferred one alongside an explicit one — does not re-report")
+}
+
+// A dismissed browser open picker reports through SetOnClosed immediately
+// before the (nil, nil) result callback, like every picker-backed path (#233).
+// The programmatic click cannot open a real picker (no user activation), so
+// the injected <input> stays in the DOM and the browser's cancel event is
+// synthesized on it directly.
+func TestFileOpenOSOverrideReportsCancel(t *testing.T) {
+	test.NewTempApp(t)
+
+	calls := 0
+	d := NewFileOpen(func(r bellui.URIReadCloser, err error) {
+		calls++
+		assert.Nil(t, r, "a dismissed picker delivers (nil, nil)")
+		assert.NoError(t, err)
+	}, nil)
+
+	closed := 0
+	d.SetOnClosed(func() {
+		closed++
+		assert.Zero(t, calls, "the close reports before the result callback")
+	})
+
+	assert.True(t, fileOpenOSOverride(d))
+
+	input := js.Global().Get("document").Call("querySelector", `input[type="file"]`)
+	if !assert.True(t, input.Truthy(), "the override injects a hidden file input") {
+		return
+	}
+	input.Call("dispatchEvent", js.Global().Get("Event").New("cancel"))
+
+	assert.Equal(t, 1, calls, "the result callback reports the dismissal")
+	assert.Equal(t, 1, closed, "the close reports exactly once")
 }
