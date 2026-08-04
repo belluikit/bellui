@@ -7,11 +7,19 @@ import (
 	"fmt"
 	"strings"
 	"syscall/js"
+	"time"
 
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/storage"
 )
+
+// pickerDismissGrace is how long after the window regains focus (the picker
+// closing) showBrowserOpenPicker waits for a change or cancel event before
+// treating the silence as a dismissal — the fallback for browsers that never
+// fire "cancel" on <input type="file">. Change events can trail the refocus,
+// so this errs generous.
+const pickerDismissGrace = time.Second
 
 func (f *fileDialog) loadPlaces() []core.CanvasObject {
 	return nil
@@ -32,7 +40,16 @@ func fileOpenOSOverride(f *FileDialog) bool {
 	if !ok {
 		return false
 	}
-	showBrowserOpenPicker(acceptForFilter(f.filter), cb)
+	// Report the close through SetOnClosed exactly like the desktop native
+	// backends (#233): immediately before the result callback, true whenever
+	// the user confirmed a choice — a dismissed picker delivers (nil, nil), so
+	// anything else, including a confirm whose file then failed to read, is a
+	// confirmation. showBrowserOpenPicker already delivers on the main
+	// goroutine.
+	showBrowserOpenPicker(acceptForFilter(f.filter), func(reader bellui.URIReadCloser, err error) {
+		f.notifyClosed(reader != nil || err != nil)
+		cb(reader, err)
+	})
 	return true
 }
 
@@ -50,7 +67,18 @@ func fileSaveOSOverride(f *FileDialog) bool {
 	if name == "" {
 		name = "download"
 	}
-	cb(newDownloadWriteCloser(name), nil)
+	// There is no picker-close moment here: the writer is handed out
+	// immediately and the "dialog" is the download offered when it is closed.
+	// Closing the writer is therefore the closest thing to confirming the
+	// dialog, so that is when SetOnClosed reports (#233) — after the result
+	// callback, unlike every picker-backed path, and never at all if the app
+	// abandons the writer. The hop keeps the report on the main goroutine
+	// whatever goroutine the app closes the writer from.
+	w := newDownloadWriteCloser(name)
+	w.onClose = func() {
+		bellui.Do(func() { f.notifyClosed(true) })
+	}
+	cb(w, nil)
 	return true
 }
 
@@ -94,15 +122,25 @@ func showBrowserOpenPicker(accept string, cb func(bellui.URIReadCloser, error)) 
 	}
 	input.Get("style").Set("display", "none")
 
-	var changeFn, cancelFn js.Func
+	var changeFn, cancelFn, focusFn js.Func
 	done := false
+	chosen := false
 	finish := func(r bellui.URIReadCloser, err error) {
 		if done {
 			return
 		}
 		done = true
+		// Detach every listener before releasing its func: the dismissal
+		// fallback can finish while the picker is still open, and a change or
+		// cancel event arriving after that must find no listener — reaching a
+		// released js.Func is also dropped, but logs a "call to released
+		// function" error on the console.
+		js.Global().Call("removeEventListener", "focus", focusFn)
+		input.Call("removeEventListener", "change", changeFn)
+		input.Call("removeEventListener", "cancel", cancelFn)
 		changeFn.Release()
 		cancelFn.Release()
+		focusFn.Release()
 		if body := doc.Get("body"); body.Truthy() {
 			body.Call("removeChild", input)
 		}
@@ -110,6 +148,7 @@ func showBrowserOpenPicker(accept string, cb func(bellui.URIReadCloser, error)) 
 	}
 
 	changeFn = js.FuncOf(func(this js.Value, args []js.Value) any {
+		chosen = true // a choice arrived; the dismissal fallback must stand down
 		files := input.Get("files")
 		if !files.Truthy() || files.Get("length").Int() == 0 {
 			finish(nil, nil)
@@ -130,9 +169,28 @@ func showBrowserOpenPicker(accept string, cb func(bellui.URIReadCloser, error)) 
 		finish(nil, nil)
 		return nil
 	})
+	// Older browsers fire nothing at all on dismissal, so the window regaining
+	// focus — the picker closing — stands in: if no change or cancel event has
+	// arrived within the grace period, report the dismissal. chosen covers the
+	// async read that follows a change event; done covers losing the race to a
+	// real cancel event. Known costs, both only on browsers taking this
+	// fallback: a picker that is not modal to the window reports a dismissal
+	// if the user refocuses the page for over the grace period mid-pick, and a
+	// choice whose change event trails the refocus by more than the grace
+	// period is dropped — the dismissal has already been reported and finish
+	// has detached the listeners.
+	focusFn = js.FuncOf(func(this js.Value, args []js.Value) any {
+		time.AfterFunc(pickerDismissGrace, func() {
+			if !chosen {
+				finish(nil, nil)
+			}
+		})
+		return nil
+	})
 
 	input.Call("addEventListener", "change", changeFn)
 	input.Call("addEventListener", "cancel", cancelFn)
+	js.Global().Call("addEventListener", "focus", focusFn, map[string]any{"once": true})
 	doc.Get("body").Call("appendChild", input)
 	input.Call("click")
 }
@@ -177,11 +235,15 @@ func (b *bytesReadCloser) Close() error    { return nil }
 func (b *bytesReadCloser) URI() bellui.URI { return b.uri }
 
 // downloadWriteCloser buffers writes and, on Close, offers the contents to the
-// browser as a download named after the requested file.
+// browser as a download named after the requested file. Close is idempotent:
+// a deferred Close alongside an explicit one must not offer the download — or
+// report the dialog close — twice.
 type downloadWriteCloser struct {
-	buf  bytes.Buffer
-	name string
-	uri  bellui.URI
+	buf     bytes.Buffer
+	name    string
+	uri     bellui.URI
+	closed  bool
+	onClose func() // fired after the download is offered; reports the dialog close
 }
 
 func newDownloadWriteCloser(name string) *downloadWriteCloser {
@@ -192,7 +254,14 @@ func (d *downloadWriteCloser) Write(p []byte) (int, error) { return d.buf.Write(
 func (d *downloadWriteCloser) URI() bellui.URI             { return d.uri }
 
 func (d *downloadWriteCloser) Close() error {
+	if d.closed {
+		return nil
+	}
+	d.closed = true
 	triggerBrowserDownload(d.name, d.buf.Bytes())
+	if d.onClose != nil {
+		d.onClose()
+	}
 	return nil
 }
 
