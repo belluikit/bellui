@@ -73,6 +73,21 @@ the trendvidia fork (github.com/trendvidia/fyne).
   front and names it in the error. Wrapping a prebuilt `--executable` never
   builds or injects, so it stays exempt from the check.
 
+* **File pickers: four fixes from the first on-device iOS pass** (#239).
+  Closing a saved file no longer segfaults — the ObjC file bridge handed Go
+  autoreleased `NSURL`/`NSFileHandle` pointers, now retained across the
+  bridge and released on close, with the writer flushed before the security
+  scope drops ([#250](https://github.com/belluikit/bellui/issues/250)).
+  File filters actually filter — the picker moved off the deprecated
+  UTI/`initWithDocumentTypes:` path to `UTType` +
+  `initForOpeningContentTypes:`
+  ([#251](https://github.com/belluikit/bellui/issues/251)). `SetFileName`
+  reaches the save picker instead of every save offering the literal name
+  "filename" ([#252](https://github.com/belluikit/bellui/issues/252)). And
+  cancelling a multi-select canvas file dialog — every mobile multi-select —
+  no longer panics on the callback shape
+  ([#253](https://github.com/belluikit/bellui/issues/253)).
+
 ### Changed
 
 * **`driver.ObjectAtPosition`/`ObjectAtPositionMatching` now probe and report
