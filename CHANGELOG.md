@@ -44,6 +44,16 @@ the trendvidia fork (github.com/trendvidia/fyne).
   `goffmpeg-libs` requires it. Source ref, rewrite set and verification are in
   `x/mmedia/PROVENANCE.md`.
 
+### Fixed
+
+* **Android: folders granted through the SAF picker's Download shortcut are
+  accepted** ([#244](https://github.com/belluikit/bellui/issues/244)). The
+  listability probe trusted `ContentResolver.getType`, which the downloads
+  provider answers with null for a tree root the app holds a perfectly good
+  grant for; the probe now falls back to attempting the children query that
+  `List()` actually performs. Verified live on the Android 15/ColorOS bench
+  device.
+
 ### Changed
 
 * **`driver.ObjectAtPosition`/`ObjectAtPositionMatching` now probe and report
