@@ -166,8 +166,8 @@ var noNativeFileDialogs atomic.Bool
 //
 // Flatpak builds always use the portal regardless of this setting.
 //
-// Since: 2.17. The native backends were opt-in when introduced; the default
-// changed to enabled in 2.19 (#226).
+// Since: 1.0. The native backends were opt-in when introduced; the default
+// changed to enabled before the first stable release (#226).
 func UseNativeFileDialogs(enable bool) {
 	noNativeFileDialogs.Store(!enable)
 }
@@ -1220,7 +1220,7 @@ func (f *FileDialog) SetFilter(filter storage.FileFilter) {
 // user extend the selection with Ctrl/Cmd-click (toggle) and Shift-click
 // (range). Call before the dialog is shown.
 //
-// Since: 2.19
+// Since: 1.0
 func (f *FileDialog) SetMultiSelect(multi bool) {
 	if f.save || f.isDirectory() {
 		bellui.LogError("Multi-select is only supported for file open dialogs", nil)
@@ -1317,7 +1317,7 @@ func ShowFileOpen(callback func(reader bellui.URIReadCloser, err error), parent 
 //
 // The dialog will appear over the window specified when Show() is called.
 //
-// Since: 2.19
+// Since: 1.0
 func NewFileOpenMultiple(callback func(readers []bellui.URIReadCloser, err error), parent bellui.Window) *FileDialog {
 	return &FileDialog{callback: callback, parent: parent, windowed: true, multiSelect: true}
 }
@@ -1327,7 +1327,7 @@ func NewFileOpenMultiple(callback func(readers []bellui.URIReadCloser, err error
 //
 // The dialog will appear over the window specified.
 //
-// Since: 2.19
+// Since: 1.0
 func ShowFileOpenMultiple(callback func(readers []bellui.URIReadCloser, err error), parent bellui.Window) {
 	NewFileOpenMultiple(callback, parent).Show()
 }
@@ -1548,7 +1548,7 @@ func (f *FileDialog) SetWindowed(windowed bool) {
 // ignored and the dialog falls back to the standard overlay presentation.
 // Call before Show.
 //
-// Since: 2.18
+// Since: 1.0
 func (f *FileDialog) SetWindowHosted(hosted bool) {
 	f.windowHosted = hosted
 }

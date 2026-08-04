@@ -17,7 +17,7 @@ import (
 // is an opt-out wrapper — reusing the same visible-tree walk the painter and
 // hit-test use, so it descends both containers and widget-renderer internals.
 //
-// Since: 2.10
+// Since: 1.0
 func AncestorsOfObject(c core.Canvas, obj core.CanvasObject) ([]core.CanvasObject, bool) {
 	if c == nil || obj == nil {
 		return nil, false

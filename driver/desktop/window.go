@@ -7,7 +7,7 @@ import "github.com/belluikit/bellui"
 // The method set matches the upstream Bellui 2.8 desktop.Window interface so
 // that code written against upstream asserts and works unchanged here.
 //
-// Since: 2.16
+// Since: 1.0
 type Window interface {
 	// RequestFullScreenSecondary asks for a window to fullscreen on a non-primary monitor.
 	// When there is only one screen it will fullscreen on the primary monitor.
@@ -39,7 +39,7 @@ type Window interface {
 //
 // Windows on mobile and web targets do not implement this interface.
 //
-// Since: 2.16
+// Since: 1.0
 type PositionableWindow interface {
 	Window
 
@@ -71,7 +71,7 @@ type PositionableWindow interface {
 //
 // Windows on mobile and web targets do not implement this interface.
 //
-// Since: 2.19
+// Since: 1.0
 type AttentionWindow interface {
 	Window
 
@@ -92,7 +92,7 @@ type AttentionWindow interface {
 //
 // Windows on mobile and web targets do not implement this interface.
 //
-// Since: 2.19
+// Since: 1.0
 type ProgressWindow interface {
 	Window
 
@@ -114,7 +114,7 @@ type ProgressWindow interface {
 //
 // Windows on mobile and web targets do not implement this interface.
 //
-// Since: 2.18
+// Since: 1.0
 type ChildWindow interface {
 	Window
 
@@ -140,7 +140,7 @@ type ChildWindow interface {
 //
 // Windows on mobile and web targets do not implement this interface.
 //
-// Since: 2.18
+// Since: 1.0
 type ModalWindow interface {
 	ChildWindow
 

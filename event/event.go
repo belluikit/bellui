@@ -42,7 +42,7 @@ type KeyEvent struct {
 	// modifier state outside a key event, see the desktop driver's
 	// KeyModifierDriver interface.
 	//
-	// Since: 3.0
+	// Since: 1.0
 	Modifier KeyModifier
 }
 
@@ -145,7 +145,7 @@ type Focusable interface {
 // that embeds an activatable base (for example one embedding widget.Button)
 // inherits it automatically, and the driver reports the outer focused object.
 //
-// Since: 2.19
+// Since: 1.0
 type Activatable interface {
 	Focusable
 	// ActivatedByKey reports whether the given key event activates this object
@@ -160,7 +160,7 @@ type Activatable interface {
 // committed; the final committed text arrives separately via
 // [Composable.ComposeCommit].
 //
-// Since: 2.10
+// Since: 1.0
 type PreeditEvent struct {
 	// Text is the composition (preedit) text to display inline. An empty
 	// string clears any visible preedit without committing.
@@ -174,7 +174,7 @@ type PreeditEvent struct {
 // text via a preedit/candidate workflow. Drivers detect support via a type
 // assertion on the focused object.
 //
-// Since: 2.10
+// Since: 1.0
 type Composable interface {
 	Focusable
 	// Compose sets or replaces the inline preedit text shown at the caret. It
@@ -191,7 +191,7 @@ type Composable interface {
 // caret rectangle, in its own content coordinates, so a driver can position the
 // IME candidate window near the text cursor.
 //
-// Since: 2.10
+// Since: 1.0
 type PreeditPositioner interface {
 	// PreeditCursorRectangle returns the caret rectangle in the object's content
 	// coordinate space. A zero rectangle means the position is unknown.
@@ -232,7 +232,7 @@ type Tabbable interface {
 // with the key unconsumed — it is assumed to handle Escape through the normal
 // focus path, the way menus and completion lists do.
 //
-// Since: 2.19
+// Since: 1.0
 type EscapeDismissible interface {
 	// DismissOnEscape closes this overlay and reports whether it did. An
 	// overlay that owns its own lifetime — a snackbar counting down to its own
@@ -252,7 +252,7 @@ type EscapeDismissible interface {
 //
 // A focusable that does not implement this never blocks the key.
 //
-// Since: 2.19
+// Since: 1.0
 type EscapeHandler interface {
 	HandlesEscape() bool
 }

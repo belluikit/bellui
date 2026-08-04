@@ -21,8 +21,8 @@ type FlexHBoxLayout struct {
 	Flex      []float32 // flex grow factor per child (0 = fixed size)
 	MinWidth  []float32 // minimum width per child (0 = use MinSize)
 	MaxWidth  []float32 // maximum width per child (0 = no limit)
-	MinHeight []float32 // cross-axis minimum height per child (0 = unset); Since: 2.19
-	MaxHeight []float32 // cross-axis maximum height per child (0 = no limit, full stretch); Since: 2.19
+	MinHeight []float32 // cross-axis minimum height per child (0 = unset); Since: 1.0
+	MaxHeight []float32 // cross-axis maximum height per child (0 = no limit, full stretch); Since: 1.0
 	Padding   float32   // spacing between children (0 = theme default)
 }
 
@@ -151,8 +151,8 @@ type FlexVBoxLayout struct {
 	Flex      []float32 // flex grow factor per child
 	MinHeight []float32 // minimum height per child
 	MaxHeight []float32 // maximum height per child
-	MinWidth  []float32 // cross-axis minimum width per child (0 = unset); Since: 2.19
-	MaxWidth  []float32 // cross-axis maximum width per child (0 = no limit, full stretch); Since: 2.19
+	MinWidth  []float32 // cross-axis minimum width per child (0 = unset); Since: 1.0
+	MaxWidth  []float32 // cross-axis maximum width per child (0 = no limit, full stretch); Since: 1.0
 	Padding   float32   // spacing between children (0 = theme default)
 }
 

@@ -62,6 +62,21 @@ the trendvidia fork (github.com/trendvidia/fyne).
 
 ### Fixed
 
+* **wasm: the browser picker overrides no longer fire under the test driver**
+  ([#257](https://github.com/belluikit/bellui/issues/257)). In a js/wasm test
+  binary, `FileOpen.Show()` clicked a real hidden `<input type="file">` in the
+  harness page and `FileSave.Show()` handed out a writer whose Close triggered
+  a real browser download. The web driver's window now implements
+  `driver.NativeWindow` — delivering the new `driver.BrowserWindowContext`,
+  which carries the window's `<canvas>` element — and the wasm overrides
+  assert it on the dialog's parent exactly like the desktop native backends,
+  so the test driver falls back to the canvas dialog. An emulated extra window
+  keeps the picker — it delegates to the root window it embeds and reports the
+  root's `<canvas>`. A `nil` dialog parent no longer reaches the browser
+  picker either: it now takes the canvas-dialog path, which — as on every
+  desktop backend — requires a real parent window. The two #257-skipped
+  cancel-shape subtests are back on js.
+
 * **Mobile multi-select open uses the native pickers**
   ([#255](https://github.com/belluikit/bellui/issues/255)).
   `ShowFileOpenMultiple` on iOS and Android used to fall back to the canvas
@@ -143,6 +158,14 @@ the trendvidia fork (github.com/trendvidia/fyne).
   backgrounding the app). Previously Back backgrounded the app even while a
   modal dialog was open; apps that consumed `KeyBack` in `SetOnTypedKey`
   while an overlay was up will now see the overlay close instead.
+
+* **Godoc `Since:` annotations on previously unreleased API now read
+  `Since: 1.0`** ([#264](https://github.com/belluikit/bellui/issues/264)).
+  API added after the fork's 2.9.0 release carried annotations from version
+  lines that never shipped on this module path (2.10–2.19, 3.0); all are
+  rewritten to the version that actually ships it, `v1.0.0`. Annotations from
+  releases that did ship — upstream Fyne 1.0–2.7.3 and the fork's 2.8/2.9 —
+  are unchanged. The mapping is recorded in `docs/REBRAND.md`.
 
 * **`driver.ObjectAtPosition`/`ObjectAtPositionMatching` now probe and report
   in the `Driver.AbsolutePositionForObject` space**

@@ -121,7 +121,7 @@ func newLinkController(e *Editor) *linkController {
 // tracked from the window's key callbacks (and pointer events on the web
 // target), so it is current regardless of which widget (if any) has focus.
 // The GLFW driver implements [desktop.KeyModifierDriver] on desktop AND wasm
-// (fyne#460, since v2.15). ok is false when the running driver has no such
+// (fyne#460, since v1.0). ok is false when the running driver has no such
 // state (mobile, tests), in which case the caller keeps the Entry-focused
 // KeyDown/Up tracking.
 func driverKeyModifiers() (event.KeyModifier, bool) {

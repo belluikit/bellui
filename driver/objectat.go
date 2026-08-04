@@ -36,7 +36,7 @@ import (
 // subtract the [core.Canvas.InteractiveArea] inset before calling here — a
 // no-op on desktop, where the inset is zero.
 //
-// Since: 2.10
+// Since: 1.0
 func ObjectAtPosition(c core.Canvas, pos geo.Position) (core.CanvasObject, geo.Rectangle, bool) {
 	return ObjectAtPositionMatching(c, pos, func(core.CanvasObject) bool { return true })
 }
@@ -58,7 +58,7 @@ type dispatchHitTester interface {
 // rejects. Use it to skip renderer-internal primitives and resolve, say, the
 // deepest object that is one of your own source-mapped widgets.
 //
-// Since: 2.10
+// Since: 1.0
 func ObjectAtPositionMatching(c core.Canvas, pos geo.Position, matches func(core.CanvasObject) bool) (core.CanvasObject, geo.Rectangle, bool) {
 	if c == nil || matches == nil {
 		return nil, geo.Rectangle{}, false
