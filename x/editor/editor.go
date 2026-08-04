@@ -51,16 +51,23 @@ type Editor struct {
 
 	// Gutter provides the gutter rendering to the left of the text.
 	// Set to nil to hide the gutter. Use [NewCompositeGutter] to combine
-	// multiple providers (e.g. line numbers + breakpoints).
+	// multiple providers (e.g. line numbers + breakpoints). The field is read
+	// when the editor first renders; to swap it afterwards call
+	// [Editor.ApplyGutter] (mutating a retained provider's state only needs
+	// [Editor.RefreshGutter]).
 	Gutter GutterProvider
 
 	// Decorators provide row-level background or overlay rendering.
-	// They are applied in order.
+	// They are applied in order. The field is read when the editor first
+	// renders; to change the set afterwards call [Editor.ApplyDecorators]
+	// (mutating a retained decorator's state only needs
+	// [Editor.RefreshDecorators]).
 	Decorators []RowDecorator
 
 	// SpanDecorators provide character-range (span) decorations: squiggles,
 	// sub-line backgrounds, boxes, and opaque redaction overlays. They are
-	// applied in order, over the row decorators.
+	// applied in order, over the row decorators. Like Decorators, the field is
+	// read at first render and re-read by [Editor.ApplyDecorators].
 	SpanDecorators []SpanDecorator
 
 	// Highlighter provides syntax highlighting for the editor content.
@@ -882,6 +889,23 @@ func (e *Editor) RefreshGutter() {
 	}
 }
 
+// ApplyGutter re-applies the Gutter field, rebuilding the gutter widget and
+// the editor layout around it. Call it after assigning a new provider — or
+// nil, which removes the gutter — on an editor that has already rendered;
+// CreateRenderer applies the field on first show, so hosts that only configure
+// Gutter before showing never need it. It is the re-apply counterpart to
+// [Editor.RefreshGutter], which repaints the installed gutter without
+// re-reading the field, and the gutter analogue of [Editor.RefreshHighlighter].
+func (e *Editor) ApplyGutter() {
+	e.applyGutter()
+	// Rebuild the entry's highlight/row cache first (SuppressGutter may have
+	// toggled) so the sync below reads populated row metrics — the same order
+	// CreateRenderer uses.
+	e.entry.Refresh()
+	e.syncExternalWidgets()
+	e.hbox.Refresh()
+}
+
 // RefreshDecorators triggers a repaint of all row and span decorators. Call
 // it after mutating a decorator's state (e.g. a StaticSpanDecorator's spans).
 // Adding the first decorator to a previously bare editor requires a full
@@ -890,6 +914,19 @@ func (e *Editor) RefreshDecorators() {
 	if e.decOverlay != nil {
 		e.decOverlay.Refresh()
 	}
+}
+
+// ApplyDecorators re-applies the Decorators and SpanDecorators fields,
+// rebuilding the decorator overlay (the editor's internal decorators — search
+// matches, diagnostics, hover, links, redaction — are re-appended and keep
+// working). Call it after assigning either slice on an editor that has already
+// rendered; CreateRenderer applies the fields on first show. It is the
+// re-apply counterpart to [Editor.RefreshDecorators], which repaints the
+// installed overlay without re-reading the fields.
+func (e *Editor) ApplyDecorators() {
+	e.applyDecorators()
+	e.syncExternalWidgets()
+	e.hbox.Refresh()
 }
 
 // showPopoverAt displays p anchored to the character cell at (row, col). The
