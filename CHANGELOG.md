@@ -91,6 +91,20 @@ the trendvidia fork (github.com/trendvidia/fyne).
   resource closer was assigned after the native reader/writer had captured
   its nil value, so the iOS security scope was never released.
 
+* **The windowed canvas dialog's resize corner is grabbable on mobile**
+  ([#263](https://github.com/belluikit/bellui/issues/263)). The
+  `container.InnerWindow` resize corner was the #254 bug class left on
+  desktop metrics: a 16dp drag target under every platform's touch floor,
+  with the drivers' 8dp upward touch shift leaving ~8dp of it usable — a
+  finger trying to resize a windowed dialog missed it most of the time. On
+  mobile the corner now spans the frame-button touch target (48dp on the
+  default theme) with the visual indicator unchanged, pinned bottom-right.
+  The deliberate cost: a drag *starting* inside that corner square resizes
+  the window instead of scrolling content beneath it; scrolls starting
+  anywhere else are unaffected (the drag target latches at the gesture
+  origin), and taps in the square pass through to the content — the corner
+  captures drags only. Desktop keeps its 16dp corner.
+
 * **The windowed canvas dialog's frame buttons are tappable on mobile**
   ([#254](https://github.com/belluikit/bellui/issues/254)). The
   `container.InnerWindow` chrome used desktop metrics everywhere, leaving the
