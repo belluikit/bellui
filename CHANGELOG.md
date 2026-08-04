@@ -64,6 +64,15 @@ the trendvidia fork (github.com/trendvidia/fyne).
   `Driver.AbsolutePositionForObject` now (their tree was missing from the
   canvas object trees).
 
+* **`bellui package` fails fast, and clearly, when run outside a main
+  package** ([#248](https://github.com/belluikit/bellui/issues/248)).
+  Running it from the module root while the application lives in a
+  subdirectory used to inject the generated metadata file into the non-main
+  package and die later inside the build with go's cryptic "found packages X
+  and main"; the packager now checks the source directory's own package up
+  front and names it in the error. Wrapping a prebuilt `--executable` never
+  builds or injects, so it stays exempt from the check.
+
 ### Changed
 
 * **`driver.ObjectAtPosition`/`ObjectAtPositionMatching` now probe and report
