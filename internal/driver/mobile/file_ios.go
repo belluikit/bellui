@@ -163,9 +163,8 @@ func nativeFileSave(f *fileSave, truncate bool) (io.WriteCloser, error) {
 	handle := C.iosOpenFileWriter(url, C.bool(truncate), &errMsg)
 	C.iosReleaseObject(url) // the writer keeps the handle, not the URL
 	if handle == nil {
-		if f.done != nil {
-			f.done()
-		}
+		// fileWriterForURI runs f.done when no writer is produced — running
+		// it here as well would end the security scope twice.
 		msg := "unable to open file for writing on iOS"
 		if errMsg != nil {
 			msg += ": " + C.GoString(errMsg)
