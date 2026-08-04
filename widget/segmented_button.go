@@ -25,7 +25,7 @@ func (s *SegmentedButton) AccessibleLabel() string { return "" }
 type SegmentedButton struct {
 	BaseWidget
 	Items     []string
-	Selected  int       // index of selected item (-1 = none)
+	Selected  int       // index of selected item; -1 or out of range selects none
 	OnChanged func(int) `json:"-"`
 
 	focused bool
@@ -107,41 +107,11 @@ func (s *SegmentedButton) MinSize() geo.Size {
 func (s *SegmentedButton) CreateRenderer() core.WidgetRenderer {
 	s.ExtendBaseWidget(s)
 
-	var segments []*segmentWidget
-	var objects []core.CanvasObject
-
-	for i, item := range s.Items {
-		idx := i
-		seg := &segmentWidget{
-			text:     item,
-			selected: i == s.Selected,
-			first:    i == 0,
-			last:     i == len(s.Items)-1,
-			onTap: func() {
-				s.Selected = idx
-				// Move keyboard focus to the parent group so that
-				// click-then-arrow navigation works without first Tabbing to
-				// it (#174). Mirrors widget.Select.Tapped.
-				if !s.focused {
-					focusIfNotMobile(s.super())
-				}
-				if s.OnChanged != nil {
-					s.OnChanged(idx)
-				}
-				s.Refresh()
-			},
-		}
-		seg.ExtendBaseWidget(seg)
-		segments = append(segments, seg)
-		objects = append(objects, seg)
-	}
-
 	r := &segButtonRenderer{
-		BaseRenderer: internalWidget.NewBaseRenderer(objects),
-		segments:     segments,
+		BaseRenderer: internalWidget.NewBaseRenderer(nil),
 		btn:          s,
 	}
-	r.Refresh()
+	r.Refresh() // populates the segments from Items
 	return r
 }
 
@@ -235,6 +205,10 @@ func (r *segmentRenderer) Refresh() {
 	th := r.seg.Theme()
 	v := bellui.CurrentApp().Settings().ThemeVariant()
 
+	// The segment's text may have been re-synced from a mutated Items by
+	// segButtonRenderer.updateSegments.
+	r.label.Text = r.seg.text
+
 	// Corner radius: pill on outer ends, flat on inner edges. Under RTL the
 	// segment row is reflected (see segButtonRenderer.Layout), so the logical
 	// first segment sits on the right and the logical last on the left; swap
@@ -303,6 +277,9 @@ func (r *segButtonRenderer) MinSize() geo.Size {
 }
 
 func (r *segButtonRenderer) Layout(size geo.Size) {
+	if len(r.segments) == 0 {
+		return
+	}
 	segW := size.Width / float32(len(r.segments))
 	for i, seg := range r.segments {
 		seg.Move(geo.NewPos(float32(i)*segW, 0))
@@ -316,6 +293,7 @@ func (r *segButtonRenderer) Layout(size geo.Size) {
 }
 
 func (r *segButtonRenderer) Refresh() {
+	r.updateSegments()
 	for i, seg := range r.segments {
 		seg.selected = i == r.btn.Selected
 		seg.focused = r.btn.focused && i == r.btn.Selected
@@ -323,4 +301,52 @@ func (r *segButtonRenderer) Refresh() {
 	}
 	r.Layout(r.btn.Size())
 	canvas.Refresh(r.btn.super())
+}
+
+// updateSegments re-syncs the drawn segments with the button's current Items,
+// the radioGroupRenderer.updateItems pattern (#203, #234): Items is a public
+// slice, so it can be appended to, replaced or truncated at any time — and
+// cycleSelection already walks the live slice, so before this re-sync the
+// keyboard could select an index the renderer never drew. Surviving segments
+// keep their tap closure (it captures the index, which never moves) and get
+// their text re-synced; first/last are recomputed for the whole row because an
+// append or truncate moves the pill's outer corners.
+func (r *segButtonRenderer) updateSegments() {
+	if len(r.segments) > len(r.btn.Items) {
+		clear(r.segments[len(r.btn.Items):]) // drop the tail's references too
+		r.segments = r.segments[:len(r.btn.Items)]
+	}
+	for i, item := range r.btn.Items {
+		if i == len(r.segments) {
+			btn, idx := r.btn, i
+			seg := &segmentWidget{
+				text: item,
+				onTap: func() {
+					btn.Selected = idx
+					// Move keyboard focus to the parent group so that
+					// click-then-arrow navigation works without first Tabbing to
+					// it (#174). Mirrors widget.Select.Tapped.
+					if !btn.focused {
+						focusIfNotMobile(btn.super())
+					}
+					if btn.OnChanged != nil {
+						btn.OnChanged(idx)
+					}
+					btn.Refresh()
+				},
+			}
+			seg.ExtendBaseWidget(seg)
+			r.segments = append(r.segments, seg)
+			continue
+		}
+		r.segments[i].text = item
+	}
+
+	objects := make([]core.CanvasObject, len(r.segments))
+	for i, seg := range r.segments {
+		seg.first = i == 0
+		seg.last = i == len(r.segments)-1
+		objects[i] = seg
+	}
+	r.SetObjects(objects)
 }

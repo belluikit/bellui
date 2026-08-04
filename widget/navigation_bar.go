@@ -30,7 +30,7 @@ func (n *NavigationBar) AccessibleLabel() string { return "" }
 type NavigationBar struct {
 	BaseWidget
 	Items     []*NavigationBarItem
-	Selected  int
+	Selected  int       // index of the selected destination; out of range selects nothing
 	OnChanged func(int) `json:"-"`
 }
 
@@ -50,30 +50,12 @@ func (n *NavigationBar) CreateRenderer() core.WidgetRenderer {
 	n.ExtendBaseWidget(n)
 	bg := canvas.NewRectangle(color.Transparent)
 
-	var objects []core.CanvasObject
-	objects = append(objects, bg)
-
-	var items []*navBarItemWidget
-	for i, item := range n.Items {
-		idx := i
-		w := newNavBarItem(item, i == n.Selected, func() {
-			n.Selected = idx
-			if n.OnChanged != nil {
-				n.OnChanged(idx)
-			}
-			n.Refresh()
-		})
-		items = append(items, w)
-		objects = append(objects, w)
-	}
-
 	r := &navBarRenderer{
-		BaseRenderer: internalWidget.NewBaseRenderer(objects),
+		BaseRenderer: internalWidget.NewBaseRenderer([]core.CanvasObject{bg}),
 		bg:           bg,
-		items:        items,
 		bar:          n,
 	}
-	r.Refresh()
+	r.Refresh() // populates the item widgets from Items
 	return r
 }
 
@@ -183,6 +165,10 @@ func (r *navBarItemRenderer) Refresh() {
 	th := r.item.Theme()
 	v := bellui.CurrentApp().Settings().ThemeVariant()
 
+	// The widget may have been re-pointed at a different item by
+	// navBarRenderer.updateItems, so the label text re-syncs like the icon.
+	r.label.Text = r.item.item.Label
+
 	if r.item.selected {
 		r.indicator.FillColor = th.Color(theme.ColorNameSecondaryContainer, v)
 		r.icon.Resource = theme.NewColoredResource(r.item.item.Icon, theme.ColorNameOnSecondaryContainer)
@@ -223,6 +209,9 @@ func (r *navBarRenderer) MinSize() geo.Size {
 
 func (r *navBarRenderer) Layout(size geo.Size) {
 	r.bg.Resize(size)
+	if len(r.items) == 0 {
+		return
+	}
 	itemWidth := size.Width / float32(len(r.items))
 	for i, item := range r.items {
 		item.Move(geo.NewPos(float32(i)*itemWidth, 0))
@@ -235,6 +224,7 @@ func (r *navBarRenderer) Layout(size geo.Size) {
 }
 
 func (r *navBarRenderer) Refresh() {
+	r.updateItems()
 	th := r.bar.Theme()
 	v := bellui.CurrentApp().Settings().ThemeVariant()
 	r.bg.FillColor = th.Color(theme.ColorNameSurfaceContainerMedium, v)
@@ -246,4 +236,38 @@ func (r *navBarRenderer) Refresh() {
 	}
 	r.Layout(r.bar.Size())
 	canvas.Refresh(r.bar.super())
+}
+
+// updateItems re-syncs the drawn item widgets with the bar's current Items,
+// the radioGroupRenderer.updateItems pattern (#203, #234): Items is a public
+// slice, so it can be appended to, replaced or truncated at any time.
+// Surviving widgets are re-pointed at the live item; the tap closures capture
+// their index, so a widget never has to move within the row.
+func (r *navBarRenderer) updateItems() {
+	if len(r.items) > len(r.bar.Items) {
+		clear(r.items[len(r.bar.Items):]) // drop the tail's references too
+		r.items = r.items[:len(r.bar.Items)]
+	}
+	for i, item := range r.bar.Items {
+		if i == len(r.items) {
+			bar, idx := r.bar, i
+			w := newNavBarItem(item, idx == bar.Selected, func() {
+				bar.Selected = idx
+				if bar.OnChanged != nil {
+					bar.OnChanged(idx)
+				}
+				bar.Refresh()
+			})
+			r.items = append(r.items, w)
+			continue
+		}
+		r.items[i].item = item
+	}
+
+	objects := make([]core.CanvasObject, 0, len(r.items)+1)
+	objects = append(objects, r.bg)
+	for _, item := range r.items {
+		objects = append(objects, item)
+	}
+	r.SetObjects(objects)
 }
