@@ -19,7 +19,7 @@ type Driver interface {
 	// HasSecondaryDisplay returns true if there are more than one screens available on this computer.
 	// This is commonly used alongside the desktop [Window.RequestFullScreenSecondary] call.
 	//
-	// Since: 2.16
+	// Since: 1.0
 	HasSecondaryDisplay() bool
 }
 
@@ -31,7 +31,7 @@ type Driver interface {
 // the browser as well; assert this instead of [Driver] when the splash-window
 // capability is not needed.
 //
-// Since: 2.15
+// Since: 1.0
 type KeyModifierDriver interface {
 	// CurrentKeyModifiers returns the set of key modifiers currently active.
 	CurrentKeyModifiers() event.KeyModifier
@@ -60,7 +60,7 @@ type KeyModifierDriver interface {
 // a nil error there means the request was accepted, not that the binding is
 // necessarily live yet.
 //
-// Since: 2.19
+// Since: 1.0
 type GlobalShortcutApp interface {
 	// RegisterGlobalShortcut binds a system-wide shortcut. handler is invoked on
 	// the main goroutine each time the shortcut fires. It returns an error if the

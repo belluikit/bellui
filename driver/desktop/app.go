@@ -47,7 +47,7 @@ type App interface {
 	// Not every platform renders a tray tooltip (notably it is unreliable on some Linux
 	// desktops), so treat it as a best-effort hint.
 	//
-	// Since: 2.19
+	// Since: 1.0
 	SetSystemTrayTooltip(text string)
 
 	// SetSystemTrayOnTapped sets a custom handler for a left-click (primary tap) on the
@@ -60,6 +60,6 @@ type App interface {
 	//
 	// The handler is invoked on the main goroutine.
 	//
-	// Since: 2.19
+	// Since: 1.0
 	SetSystemTrayOnTapped(fn func())
 }

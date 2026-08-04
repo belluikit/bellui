@@ -37,7 +37,7 @@ var errNotListable = errors.New("URI is not listable")
 // changing them). Filter and Sorter are invoked on a background goroutine and
 // must not touch widget state.
 //
-// Since: 2.15
+// Since: 1.0
 type FileTree struct {
 	Tree
 
@@ -68,7 +68,7 @@ type FileTree struct {
 	// desktop and mobile, while platforms or schemes without change
 	// notification degrade silently to manual Refresh.
 	//
-	// Since: 2.15
+	// Since: 1.0
 	Watch bool
 
 	listCache     map[TreeNodeID][]TreeNodeID
@@ -98,7 +98,7 @@ type FileTree struct {
 
 // NewFileTree creates a new FileTree from the given root URI.
 //
-// Since: 2.15
+// Since: 1.0
 func NewFileTree(root bellui.URI) *FileTree {
 	tree := &FileTree{
 		Tree: Tree{

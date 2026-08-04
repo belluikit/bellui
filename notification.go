@@ -14,7 +14,7 @@ func NewNotification(title, content string) *Notification {
 // [NotificationOptions]. Tapping the button in the OS notification runs
 // Callback on the main goroutine.
 //
-// Since: 2.19
+// Since: 1.0
 type NotificationAction struct {
 	// Label is the user-visible button text.
 	Label string
@@ -37,7 +37,7 @@ type NotificationAction struct {
 // implementation that cannot show action buttons still shows the title, content
 // and icon rather than dropping the notification. See [SendNotificationWithOptions].
 //
-// Since: 2.19
+// Since: 1.0
 type NotificationOptions struct {
 	// Title and Content are the notification headline and body, as in [Notification].
 	Title, Content string

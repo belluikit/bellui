@@ -13,7 +13,7 @@ import (
 // A callback this package accepts is always called exactly once, so a caller
 // never has to distinguish "failed" from "never answered".
 //
-// Since: 2.19
+// Since: 1.0
 var (
 	// ErrNotAttached is reported when the view has no native web engine —
 	// either it has not been attached to a window yet, or it has been
@@ -34,7 +34,7 @@ var (
 // content reports scheme, host and non-default port, e.g. "https://example.com"
 // or "http://localhost:8080".
 //
-// Since: 2.19
+// Since: 1.0
 const OriginOpaque = "null"
 
 // OriginPolicy reports whether page content served from origin may use the
@@ -42,7 +42,7 @@ const OriginOpaque = "null"
 // sub-frames, so a page that navigates or embeds a third-party frame cannot
 // widen its own access.
 //
-// Since: 2.19
+// Since: 1.0
 type OriginPolicy func(origin string) bool
 
 // TrustAllOrigins allows every page loaded in the view to use the bridge.
@@ -54,7 +54,7 @@ type OriginPolicy func(origin string) bool
 // app's own content. Constrain what may be loaded with [WebView.OnNavigate] as
 // well if the answer is not obviously "nothing else can be".
 //
-// Since: 2.19
+// Since: 1.0
 func TrustAllOrigins() OriginPolicy {
 	return func(string) bool { return true }
 }
@@ -64,7 +64,7 @@ func TrustAllOrigins() OriginPolicy {
 // content loaded from a data: URL or about:blank, and "file://" to trust
 // content the app loaded from disk.
 //
-// Since: 2.19
+// Since: 1.0
 func TrustOrigins(origins ...string) OriginPolicy {
 	allowed := make(map[string]bool, len(origins))
 	for _, o := range origins {
@@ -76,7 +76,7 @@ func TrustOrigins(origins ...string) OriginPolicy {
 // Message is one inbound communication from the page: a notification posted
 // with window.bellui.post, or a request made with window.bellui.call.
 //
-// Since: 2.19
+// Since: 1.0
 type Message struct {
 	// Name is the handler the page addressed, for a request made with
 	// window.bellui.call. It is empty for a posted notification.
@@ -96,7 +96,7 @@ type Message struct {
 
 // Decode unmarshals the message payload into v, which must be a pointer.
 //
-// Since: 2.19
+// Since: 1.0
 func (m Message) Decode(v any) error {
 	if len(m.Payload) == 0 {
 		return errors.New("webview: message has no payload")
@@ -113,7 +113,7 @@ func (m Message) Decode(v any) error {
 // it, so it must return promptly. Hand slow work to a goroutine and report it
 // later with [WebView.Post].
 //
-// Since: 2.19
+// Since: 1.0
 type Handler func(Message) (any, error)
 
 // bridgeState is the portable half of the bridge: who may talk to us, what we
@@ -142,7 +142,7 @@ type bridgeState struct {
 // in the page but silent; use [TrustAllOrigins] or [TrustOrigins] to say what
 // is trusted.
 //
-// Since: 2.19
+// Since: 1.0
 func (w *WebView) EnableBridge(policy OriginPolicy) {
 	if w.attachedRaw() {
 		bellui.LogError("webview: EnableBridge must be called before Attach", nil)
@@ -154,7 +154,7 @@ func (w *WebView) EnableBridge(policy OriginPolicy) {
 
 // BridgeEnabled reports whether [WebView.EnableBridge] has been called.
 //
-// Since: 2.19
+// Since: 1.0
 func (w *WebView) BridgeEnabled() bool {
 	return w.bridge.enabled
 }
@@ -164,7 +164,7 @@ func (w *WebView) BridgeEnabled() bool {
 // registered at any time; a request that arrives for a name with no handler
 // rejects the page's promise with an error rather than hanging it.
 //
-// Since: 2.19
+// Since: 1.0
 func (w *WebView) Handle(name string, fn Handler) {
 	if fn == nil {
 		delete(w.bridge.handlers, name)
@@ -183,7 +183,7 @@ func (w *WebView) Handle(name string, fn Handler) {
 // It is the counterpart of [WebView.OnMessage]. Use [WebView.Call] when an
 // answer is wanted.
 //
-// Since: 2.19
+// Since: 1.0
 func (w *WebView) Post(payload any) {
 	if !w.bridge.enabled || !w.attached() {
 		return
@@ -211,7 +211,7 @@ func (w *WebView) Post(payload any) {
 // until the view is destroyed, which fails it — the correlation is honoured,
 // but the page's own liveness is the page's responsibility.
 //
-// Since: 2.19
+// Since: 1.0
 func (w *WebView) Call(name string, arg any, onResult func(json.RawMessage, error)) {
 	if !w.bridge.enabled {
 		reportResult(onResult, ErrBridgeDisabled)

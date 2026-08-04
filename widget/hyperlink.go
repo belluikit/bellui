@@ -47,7 +47,7 @@ type Hyperlink struct {
 	// underline and its focus ring. When empty (the zero value) the link uses
 	// the theme's primary color, so existing links are unchanged.
 	//
-	// Since: 2.18
+	// Since: 1.0
 	ColorName bellui.ThemeColorName
 
 	// FontSource is an optional custom font resource used to render the link
@@ -55,7 +55,7 @@ type Hyperlink struct {
 	// value) the theme font is used, so existing links are unchanged. The chosen
 	// font is honoured for measurement as well as rendering.
 	//
-	// Since: 2.18
+	// Since: 1.0
 	FontSource bellui.Resource
 
 	// OnTapped overrides the default `bellui.OpenURL` call when the link is tapped

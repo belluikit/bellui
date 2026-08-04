@@ -27,7 +27,7 @@ import (
 // frames are advanced by a per-frame animation tick, so playback pauses with
 // the canvas and needs no background goroutine.
 //
-// Since: 2.15
+// Since: 1.0
 type AnimatedGif struct {
 	BaseWidget
 	min geo.Size

@@ -21,7 +21,7 @@ import (
 //
 // All methods must be called on the main goroutine.
 //
-// Since: 2.19
+// Since: 1.0
 type Host struct {
 	widget.BaseWidget
 
@@ -53,7 +53,7 @@ var _ core.Widget = (*Host)(nil)
 // NewHost returns a [Host] embedding a new web view for url, and the view for
 // driving it. It is the one-call form of wrapping [New] in a host.
 //
-// Since: 2.19
+// Since: 1.0
 func NewHost(url string) (*Host, *WebView) {
 	w := New(url)
 	h := &Host{view: w, impl: newPlatformHost(w)}

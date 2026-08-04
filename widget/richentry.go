@@ -31,14 +31,14 @@ import (
 // #665). Word/character wrapping is opt-in via [RichEntry.Wrapping] (#653; the
 // default is off, one rendered row per '\n'-separated line).
 //
-// Since: 2.18
+// Since: 1.0
 type RichEntry struct {
 	BaseWidget
 
 	// OnChanged is called, on the main goroutine, after any edit that changes the
 	// content.
 	//
-	// Since: 2.18
+	// Since: 1.0
 	OnChanged func()
 
 	// OnContentChanged is called, on the main goroutine, after any edit that
@@ -47,7 +47,7 @@ type RichEntry struct {
 	// [RichEntry.Segments]). Use this instead of OnChanged + Segments() when a
 	// host wants the rich content on every change without a separate read.
 	//
-	// Since: 2.18
+	// Since: 1.0
 	OnContentChanged func([]RichTextSegment)
 
 	// Wrapping selects how logical lines that exceed the width are laid out. The
@@ -56,7 +56,7 @@ type RichEntry struct {
 	// [bellui.TextWrapBreak] soft-wrap a long line onto multiple visual rows, with
 	// the caret and selection mapping following the wrap (#653).
 	//
-	// Since: 2.18
+	// Since: 1.0
 	Wrapping bellui.TextWrap
 
 	// Style selects the MD3 visual chrome, matching [Entry.Style]: [EntryStyleFilled]
@@ -64,14 +64,14 @@ type RichEntry struct {
 	// transparent with an always-visible outline. In both styles the border adopts
 	// the primary color while focused.
 	//
-	// Since: 2.18
+	// Since: 1.0
 	Style EntryStyle
 
 	// TypingStyle is the style applied to newly typed text. Its zero value means
 	// "inherit the style at the caret" (typing inside a bold run stays bold); set
 	// it to type in a specific style regardless of the surrounding runs.
 	//
-	// Since: 2.18
+	// Since: 1.0
 	TypingStyle RichTextStyle
 
 	doc      *richEntryDoc
@@ -121,7 +121,7 @@ type RichEntry struct {
 
 // NewRichEntry creates a new empty rich-text editor.
 //
-// Since: 2.18
+// Since: 1.0
 func NewRichEntry() *RichEntry {
 	e := &RichEntry{doc: newRichEntryDoc()}
 	e.ExtendBaseWidget(e)
@@ -133,7 +133,7 @@ func NewRichEntry() *RichEntry {
 // moves the caret to the start. Text segments are forced inline; non-text
 // segments are rendered but not yet caret-addressable (Phase 1).
 //
-// Since: 2.18
+// Since: 1.0
 func (e *RichEntry) SetSegments(segs []RichTextSegment) {
 	e.doc.setSegments(segs)
 	e.caret, e.anchor, e.selecting = 0, 0, false
@@ -146,14 +146,14 @@ func (e *RichEntry) SetSegments(segs []RichTextSegment) {
 // Segments returns the current document segments. The slice is the live backing
 // store — treat it as read-only and use the editing methods to mutate content.
 //
-// Since: 2.18
+// Since: 1.0
 func (e *RichEntry) Segments() []RichTextSegment {
 	return e.doc.segments()
 }
 
 // String returns the plain-text content of the editor.
 //
-// Since: 2.18
+// Since: 1.0
 func (e *RichEntry) String() string {
 	return e.doc.String()
 }
@@ -161,7 +161,7 @@ func (e *RichEntry) String() string {
 // SelectedText returns the currently selected text, or the empty string when
 // nothing is selected.
 //
-// Since: 2.18
+// Since: 1.0
 func (e *RichEntry) SelectedText() string {
 	from, to, ok := e.selection()
 	if !ok {
@@ -174,7 +174,7 @@ func (e *RichEntry) SelectedText() string {
 // selection boundaries. With no selection it sets [RichEntry.TypingStyle] so the
 // next typed text uses the style.
 //
-// Since: 2.18
+// Since: 1.0
 func (e *RichEntry) ApplyStyle(style RichTextStyle) {
 	if from, to, ok := e.selection(); ok {
 		e.mutate(from, to, func() { e.doc.applyStyle(from, to, style) })
@@ -187,7 +187,7 @@ func (e *RichEntry) ApplyStyle(style RichTextStyle) {
 // is a block that occupies its own row; the caret lands after it. Any current
 // selection is replaced.
 //
-// Since: 2.18
+// Since: 1.0
 func (e *RichEntry) InsertImage(img image.Image) {
 	e.insertAtom(&ImageSegment{Image: img})
 }
@@ -195,7 +195,7 @@ func (e *RichEntry) InsertImage(img image.Image) {
 // InsertImageResource is like [RichEntry.InsertImage] for a resource-backed image
 // (e.g. bundled bytes).
 //
-// Since: 2.18
+// Since: 1.0
 func (e *RichEntry) InsertImageResource(res bellui.Resource) {
 	e.insertAtom(&ImageSegment{Resource: res})
 }
@@ -205,7 +205,7 @@ func (e *RichEntry) InsertImageResource(res bellui.Resource) {
 // step. The image occupies one caret position; any current selection is
 // replaced (#665).
 //
-// Since: 2.18
+// Since: 1.0
 func (e *RichEntry) InsertInlineImage(img image.Image) {
 	e.insertAtom(&ImageSegment{Image: img, InlineImage: true})
 }
@@ -213,7 +213,7 @@ func (e *RichEntry) InsertInlineImage(img image.Image) {
 // InsertInlineImageResource is like [RichEntry.InsertInlineImage] for a
 // resource-backed image.
 //
-// Since: 2.18
+// Since: 1.0
 func (e *RichEntry) InsertInlineImageResource(res bellui.Resource) {
 	e.insertAtom(&ImageSegment{Resource: res, InlineImage: true})
 }
@@ -234,7 +234,7 @@ func (e *RichEntry) insertAtom(seg RichTextSegment) {
 // Undo reverts the last edit, restoring the caret. It is a no-op when there is
 // nothing to undo.
 //
-// Since: 2.18
+// Since: 1.0
 func (e *RichEntry) Undo() {
 	if ed := e.undo.undo(); ed != nil {
 		e.caret = ed.apply(e.doc, false)
@@ -246,7 +246,7 @@ func (e *RichEntry) Undo() {
 // Redo re-applies the last undone edit. It is a no-op when there is nothing to
 // redo.
 //
-// Since: 2.18
+// Since: 1.0
 func (e *RichEntry) Redo() {
 	if ed := e.undo.redo(); ed != nil {
 		e.caret = ed.apply(e.doc, true)

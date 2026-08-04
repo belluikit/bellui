@@ -24,7 +24,7 @@ import (
 // necessarily has a runtime: WebView2 is a separate component and [WebView.Attach]
 // reports [ErrRuntimeMissing] when it is absent, leaving the host inert.
 //
-// Since: 2.19
+// Since: 1.0
 const Supported = true
 
 // winState is where a view is in the WebView2 creation handshake. Creating an

@@ -18,7 +18,7 @@ import (
 // completions). It is separate from the platform IME candidate window, which the
 // operating system renders and positions itself.
 //
-// Since: 2.10
+// Since: 1.0
 func (e *Entry) ShowCompletion(title string, items []CompletionItem) {
 	if len(items) == 0 {
 		e.HideCompletion()
@@ -56,7 +56,7 @@ func (e *Entry) ShowCompletion(title string, items []CompletionItem) {
 
 // HideCompletion hides the completion popup if one is showing.
 //
-// Since: 2.10
+// Since: 1.0
 func (e *Entry) HideCompletion() {
 	if e.completion != nil {
 		e.completion.Hide()

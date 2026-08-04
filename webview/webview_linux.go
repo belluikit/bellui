@@ -52,7 +52,7 @@ import (
 
 // Supported reports whether this platform has a web engine binding.
 //
-// Since: 2.19
+// Since: 1.0
 const Supported = true
 
 // cefBindingName is the page-side function Runtime.addBinding installs; the
