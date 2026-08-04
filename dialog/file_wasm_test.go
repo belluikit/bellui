@@ -73,4 +73,12 @@ func TestFileOpenOSOverrideReportsCancel(t *testing.T) {
 
 	assert.Equal(t, 1, calls, "the result callback reports the dismissal")
 	assert.Equal(t, 1, closed, "the close reports exactly once")
+
+	// The dismissal fallback can finish while the picker is still open, so a
+	// change event may arrive after finish has run. finish detaches the
+	// listeners, so the late event finds nothing — it must neither deliver a
+	// result nor re-report the close.
+	input.Call("dispatchEvent", js.Global().Get("Event").New("change"))
+	assert.Equal(t, 1, calls, "a change event after finish is dropped, not delivered")
+	assert.Equal(t, 1, closed, "a change event after finish does not re-report the close")
 }
