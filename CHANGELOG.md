@@ -62,6 +62,17 @@ the trendvidia fork (github.com/trendvidia/fyne).
 
 ### Fixed
 
+* **A malformed system locale entry no longer degrades the whole locale**
+  ([#271](https://github.com/belluikit/bellui/issues/271)). ColorOS 15 hands
+  the app a locale list holding an empty string, which failed BCP-47 parsing
+  and silently dropped translations, CLDR formatting and collation to the
+  fallback. Locale strings are now normalized before parsing (Java
+  `Locale.toString()` underscores and trailing `#...` markers), unparseable
+  entries are logged with the raw string quoted and skipped — so the
+  parseable entries behind them still win — and the CLDR formatting tag
+  comes from the first entry that parsed rather than blindly the first
+  entry reported.
+
 * **wasm: the browser picker overrides no longer fire under the test driver**
   ([#257](https://github.com/belluikit/bellui/issues/257)). In a js/wasm test
   binary, `FileOpen.Show()` clicked a real hidden `<input type="file">` in the
