@@ -684,9 +684,12 @@ var _ driver.NativeWindow = (*window)(nil)
 // RunNative provides the browser-hosted window's native context: the <canvas>
 // element rendering it. Implementing driver.NativeWindow is also the web
 // driver's identity seam (#257): the wasm file-dialog overrides assert it on
-// the dialog's parent before putting up a real browser picker, so the test
-// driver's windows — and the emulated extra windows (wrapInner), which have no
-// canvas of their own — stay on the canvas dialog.
+// the dialog's parent before putting up a real browser picker, which keeps the
+// test driver's windows on the canvas dialog. An emulated extra window
+// (wrapInner) promotes this method from the root window it embeds and so
+// reports the root's canvas — correct on both counts: the inner window is
+// rendered on that canvas, and the browser surfaces the overrides put up
+// (the <input type="file"> picker, the download) are page-global anyway.
 func (w *window) RunNative(f func(any)) {
 	context := driver.BrowserWindowContext{}
 	if v := w.view(); v != nil {
