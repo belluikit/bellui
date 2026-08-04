@@ -3,6 +3,7 @@
 #import <Foundation/Foundation.h>
 
 #import <stdbool.h>
+#import <string.h>
 
 void iosDeletePath(const char* path) {
     NSString *pathStr = [NSString stringWithUTF8String:path];
@@ -41,7 +42,13 @@ const void* iosReadFromURL(void* urlPtr, int* len)  {
     return data.bytes;
 }
 
-const void* iosOpenFileWriter(void* urlPtr, bool truncate) {
+// iosOpenFileWriter returns a retained NSFileHandle, or NULL on failure. On
+// failure *errMsg (when non-NULL) is set to a malloc'd copy of the OS error
+// text, which the caller must free.
+const void* iosOpenFileWriter(void* urlPtr, bool truncate, char** errMsg) {
+    if (errMsg != NULL) {
+        *errMsg = NULL;
+    }
     NSURL* url = (NSURL*)urlPtr;
 
     if (truncate || ![[NSFileManager defaultManager] fileExistsAtPath:url.path]) {
@@ -49,9 +56,11 @@ const void* iosOpenFileWriter(void* urlPtr, bool truncate) {
     }
 
     NSError *err = nil;
-    // TODO handle error
     NSFileHandle* handle = [NSFileHandle fileHandleForWritingToURL:url error:&err];
     if (handle == nil) {
+        if (errMsg != NULL && err != nil) {
+            *errMsg = strdup([[err localizedDescription] UTF8String]);
+        }
         return NULL;
     }
 
