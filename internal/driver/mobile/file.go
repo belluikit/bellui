@@ -96,33 +96,41 @@ func ShowFileOpenMultiplePicker(callback func([]bellui.URIReadCloser, error), fi
 			callback(nil, nil)
 			return
 		}
-		readers := make([]bellui.URIReadCloser, 0, len(uris))
-		for i, uri := range uris {
-			var closer func()
-			if i < len(closers) {
-				closer = closers[i]
-			}
-			f, err := fileReaderForURI(nativeURI(uri), closer)
-			if f == nil {
-				// Stop at the first failure: release everything already
-				// opened and everything not yet reached, then report the
-				// error rather than a partial set.
-				for _, r := range readers {
-					r.Close()
-				}
-				for j := i + 1; j < len(closers); j++ {
-					if closers[j] != nil {
-						closers[j]()
-					}
-				}
-				callback(nil, err)
-				return
-			}
-			readers = append(readers, f)
-		}
-		callback(readers, nil)
+		callback(multiReadersForURIs(uris, closers, func(uri string, closer func()) (bellui.URIReadCloser, error) {
+			return fileReaderForURI(nativeURI(uri), closer)
+		}))
 	}, mobileFilter(filter))
 	return true
+}
+
+// multiReadersForURIs opens a reader per picked URI. open follows
+// fileReaderForURI's contract: it owns the per-URI closer (which may be nil),
+// running it itself when it produces no reader.
+func multiReadersForURIs(uris []string, closers []func(), open func(uri string, closer func()) (bellui.URIReadCloser, error)) ([]bellui.URIReadCloser, error) {
+	readers := make([]bellui.URIReadCloser, 0, len(uris))
+	for i, uri := range uris {
+		var closer func()
+		if i < len(closers) {
+			closer = closers[i]
+		}
+		f, err := open(uri, closer)
+		if f == nil {
+			// Stop at the first failure: release everything already opened
+			// and everything not yet reached, then report the error rather
+			// than a partial set.
+			for _, r := range readers {
+				r.Close()
+			}
+			for j := i + 1; j < len(closers); j++ {
+				if closers[j] != nil {
+					closers[j]()
+				}
+			}
+			return nil, err
+		}
+		readers = append(readers, f)
+	}
+	return readers, nil
 }
 
 // ShowFolderOpenPicker loads the native folder open dialog and calls back the
@@ -166,12 +174,15 @@ func (f *fileSave) URI() bellui.URI {
 // fileWriterForURI opens a native writer for u. done, which may be nil, is
 // the platform resource closer for a picker-vended URI; as with
 // fileReaderForURI it must arrive before nativeFileSave builds the writer,
-// which captures it at construction (#255). nativeFileSave runs it itself on
-// its own error path.
+// which captures it at construction — and, also like the reader, it runs
+// here when no writer takes ownership of it (#255).
 func fileWriterForURI(u bellui.URI, truncate bool, done func()) (bellui.URIWriteCloser, error) {
 	file := &fileSave{uri: u, done: done}
 	write, err := nativeFileSave(file, truncate)
 	if write == nil {
+		if done != nil {
+			done()
+		}
 		return nil, err
 	}
 	file.WriteCloser = write
