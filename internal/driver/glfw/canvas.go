@@ -105,6 +105,27 @@ func (c *glCanvas) InteractiveArea() (geo.Position, geo.Size) {
 	return geo.Position{}, c.Size()
 }
 
+// FindObjectAtPositionMatching is the dispatch hit-walk: overlays, then the
+// menu, then the content, preferring the spatial index when it is current.
+// It also serves the public driver.ObjectAtPositionMatching through the
+// canvas capability assertion (#245), so it must stay equivalent to what tap
+// and mouse dispatch use.
+func (c *glCanvas) FindObjectAtPositionMatching(mouse geo.Position, matches func(object core.CanvasObject) bool) (core.CanvasObject, geo.Position, int) {
+	overlay := c.Overlays().Top()
+	// The spatial index is rebuilt during the paint walk, so between a content
+	// change and the next frame it does not reflect the current tree — only
+	// treat it as authoritative while the canvas is clean (#590).
+	if overlay == nil {
+		if idx := c.SpatialIndex(); idx != nil && !c.IsDirty() {
+			if obj, pos, ok := idx.FindObjectAtPositionMatching(mouse, matches); ok {
+				return obj, pos, 0
+			}
+			return nil, geo.Position{}, 0
+		}
+	}
+	return driver.FindObjectAtPositionMatching(mouse, matches, c.Overlays().List(), c.menu, c.Content())
+}
+
 func (c *glCanvas) MinSize() geo.Size {
 	return c.canvasSize(c.content.MinSize())
 }
