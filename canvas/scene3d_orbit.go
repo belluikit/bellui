@@ -118,8 +118,9 @@ func (o *OrbitCamera) limits() (minDist, maxDist float32) {
 
 // Camera returns the Camera3D corresponding to the current orbit state.
 //
-// Non-positive fov, near and far resolve to defaults; the near and far
-// defaults both scale with the orbit distance. Callers that feed a resolved
+// Non-positive fov, near and far resolve to defaults; the near default scales
+// with the orbit distance in both directions, while the far default only
+// grows with it. Callers that feed a resolved
 // Near or Far back into the next call freeze that default at its first value —
 // keep passing zero (or an explicit choice) to let it track the zoom.
 func (o *OrbitCamera) Camera(fov, near, far float32) Camera3D {
@@ -141,12 +142,19 @@ func (o *OrbitCamera) Camera(fov, near, far float32) Camera3D {
 	if near <= 0 {
 		// Depth precision is spent on the far/near ratio, so a fixed near
 		// would let the ratio grow linearly with scene scale once the far
-		// default below starts tracking the distance. Scaling both keeps the
-		// ratio bounded (~2,000) at any scale, while a camera inside the
-		// default zoom range keeps the historic 0.1 exactly.
+		// default below starts tracking the distance. Scaling it up keeps the
+		// ratio bounded (~2,000) at any large scale. Below the default zoom
+		// range a fixed near would sit beyond the orbit target itself,
+		// clipping everything a miniature scene frames, so the near scales
+		// down as well; the far default needs no down-scaling counterpart —
+		// a too-large far costs precision but never clips the framed scene.
+		// A camera inside the default zoom range keeps the historic 0.1
+		// exactly.
 		near = 0.1
 		if scaled := o.Distance / 1000; scaled > near {
 			near = scaled
+		} else if o.Distance > 0 && o.Distance < defaultMinDistance {
+			near = 0.1 * o.Distance / defaultMinDistance
 		}
 	}
 	if far <= 0 {
