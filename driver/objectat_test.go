@@ -96,6 +96,10 @@ func TestObjectAtPosition_MatchesAbsolutePositionForObjectSpace(t *testing.T) {
 	// from the driver position landed wide of a small target.
 	abs := bellui.CurrentApp().Driver().AbsolutePositionForObject(leaf)
 
+	inset, _ := w.Canvas().InteractiveArea()
+	require.NotEqual(t, geo.Position{}, inset,
+		"the test canvas must report a non-zero inset or the round-trip below asserts nothing")
+
 	obj, bounds, ok := driver.ObjectAtPosition(w.Canvas(), abs.AddXY(1, 1))
 	require.True(t, ok)
 	assert.Same(t, leaf, obj)
