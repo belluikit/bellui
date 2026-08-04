@@ -54,6 +54,7 @@ static jmethodID hide_keyboard_method;
 static jmethodID set_keyboard_state_method;
 static jmethodID keyboard_editor_changed_method;
 static jmethodID show_file_open_method;
+static jmethodID show_file_open_multi_method;
 static jmethodID show_file_save_method;
 static jmethodID finish_method;
 
@@ -99,6 +100,7 @@ void ANativeActivity_onCreate(ANativeActivity *activity, void* savedState, size_
 		set_keyboard_state_method = find_static_method(env, current_class, "setKeyboardState", "(Ljava/lang/String;II)V");
 		keyboard_editor_changed_method = find_static_method(env, current_class, "keyboardEditorChanged", "()V");
 		show_file_open_method = find_static_method(env, current_class, "showFileOpen", "(Ljava/lang/String;)V");
+		show_file_open_multi_method = find_static_method(env, current_class, "showFileOpenMulti", "(Ljava/lang/String;)V");
 		show_file_save_method = find_static_method(env, current_class, "showFileSave", "(Ljava/lang/String;Ljava/lang/String;)V");
 		finish_method = find_method(env, current_class, "finishActivity", "()V");
 
@@ -293,6 +295,16 @@ void showFileOpen(JNIEnv* env, char* mimes) {
 	);
 }
 
+void showFileOpenMulti(JNIEnv* env, char* mimes) {
+    jstring mimesJString = (*env)->NewStringUTF(env, mimes);
+    (*env)->CallStaticVoidMethod(
+		env,
+		current_class,
+		show_file_open_multi_method,
+		mimesJString
+	);
+}
+
 void showFileSave(JNIEnv* env, char* mimes, char* filename) {
     jstring mimesJString = (*env)->NewStringUTF(env, mimes);
     jstring filenameJString = (*env)->NewStringUTF(env, filename);
@@ -308,6 +320,15 @@ void showFileSave(JNIEnv* env, char* mimes, char* filename) {
 void Java_org_golang_app_GoNativeActivity_filePickerReturned(JNIEnv *env, jclass clazz, jstring str) {
     const char* cstr = (*env)->GetStringUTFChars(env, str, JNI_FALSE);
 	filePickerReturned((char*)cstr);
+	// The Go side copies the string before returning (C.GoString).
+	(*env)->ReleaseStringUTFChars(env, str, cstr);
+}
+
+void Java_org_golang_app_GoNativeActivity_filePickerMultiReturned(JNIEnv *env, jclass clazz, jstring str) {
+    const char* cstr = (*env)->GetStringUTFChars(env, str, JNI_FALSE);
+	filePickerMultiReturned((char*)cstr);
+	// The Go side copies the string before returning (C.GoString).
+	(*env)->ReleaseStringUTFChars(env, str, cstr);
 }
 
 void Java_org_golang_app_GoNativeActivity_insetsChanged(JNIEnv *env, jclass clazz, int top, int bottom, int left, int right) {
