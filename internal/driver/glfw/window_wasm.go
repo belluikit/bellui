@@ -84,6 +84,11 @@ type window struct {
 	mouseClickCount      int
 	mouseCancelFunc      context.CancelFunc
 
+	// Press-and-hold long-press dispatch (#266); see window_desktop.go.
+	longPressSeq   int
+	longPressPos   geo.Position
+	longPressFired core.CanvasObject
+
 	onClosed           func()
 	onCloseIntercepted func()
 
