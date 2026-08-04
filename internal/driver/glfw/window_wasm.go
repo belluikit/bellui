@@ -10,6 +10,7 @@ import (
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/core"
+	"github.com/belluikit/bellui/driver"
 	"github.com/belluikit/bellui/driver/desktop"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
@@ -675,6 +676,24 @@ func (w *window) view() *glfw.Window {
 		return nil
 	}
 	return w.viewport
+}
+
+// assert we are implementing driver.NativeWindow
+var _ driver.NativeWindow = (*window)(nil)
+
+// RunNative provides the browser-hosted window's native context: the <canvas>
+// element rendering it. Implementing driver.NativeWindow is also the web
+// driver's identity seam (#257): the wasm file-dialog overrides assert it on
+// the dialog's parent before putting up a real browser picker, so the test
+// driver's windows — and the emulated extra windows (wrapInner), which have no
+// canvas of their own — stay on the canvas dialog.
+func (w *window) RunNative(f func(any)) {
+	context := driver.BrowserWindowContext{}
+	if v := w.view(); v != nil {
+		context.Canvas = v.GetCanvas()
+	}
+
+	f(context)
 }
 
 // wrapInner represents a window that is provided by an InnerWindow container in the canvas.
