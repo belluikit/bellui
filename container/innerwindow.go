@@ -235,6 +235,11 @@ func (i *innerWindowRenderer) Layout(size geo.Size) {
 	i.win.content.Resize(innerSize)
 
 	cornerSize := i.corner.MinSize()
+	// Cap the (touch-sized on mobile, #263) corner to the area below the
+	// title bar: MinSize reserves no room for it, so in a window shrunk to
+	// minimal content the full target would stack over the frame buttons.
+	cornerSize = geo.NewSize(geo.Min(cornerSize.Width, size.Width),
+		geo.Max(0, geo.Min(cornerSize.Height, size.Height-barHeight)))
 	i.corner.Move(geo.NewPos(size.Components()).Subtract(cornerSize).AddXY(1, 1))
 	i.corner.Resize(cornerSize)
 }
@@ -348,6 +353,10 @@ func (d *draggableLabel) labelMinSize() geo.Size {
 	return d.Label.MinSize()
 }
 
+// dragCornerIndicatorSize is the resize indicator's visual edge — and, on
+// desktop, the whole drag target.
+const dragCornerIndicatorSize = 16
+
 type draggableCorner struct {
 	widget.BaseWidget
 	win *InnerWindow
@@ -361,8 +370,56 @@ func newDraggableCorner(w *InnerWindow) *draggableCorner {
 
 func (c *draggableCorner) CreateRenderer() core.WidgetRenderer {
 	prop := canvas.NewImageFromResource(bellui.CurrentApp().Settings().Theme().Icon(theme.IconNameDragCornerIndicator))
-	prop.SetMinSize(geo.NewSquareSize(16))
+	prop.SetMinSize(geo.NewSquareSize(dragCornerIndicatorSize))
+	if bellui.CurrentDevice().IsMobile() {
+		// Touch-sized drag target (#263), the #254 geometry: the visual
+		// indicator keeps its desktop size, pinned to the bottom-right of a
+		// widget spanning the full touch target, so nothing changes on screen
+		// while a finger gains a graspable corner. The pinning layout derives
+		// the inset per pass — a padded layout would bake it at renderer
+		// creation and mis-size the indicator after a theme change.
+		return widget.NewSimpleRenderer(New(cornerIndicatorLayout{}, prop))
+	}
 	return widget.NewSimpleRenderer(prop)
+}
+
+// cornerIndicatorLayout pins each child at its min size in the bottom-right
+// of the (touch-sized) corner widget (#263).
+type cornerIndicatorLayout struct{}
+
+func (cornerIndicatorLayout) Layout(objs []core.CanvasObject, size geo.Size) {
+	for _, o := range objs {
+		// Clamp to the corner widget: the renderer caps the corner below the
+		// indicator size in windows shrunk under their minimum, and an
+		// unclamped pin would push the indicator out of the widget's top-left
+		// (the desktop path scales the same way via SimpleRenderer).
+		sz := o.MinSize().Min(size)
+		o.Resize(sz)
+		o.Move(geo.NewPos(size.Width-sz.Width, size.Height-sz.Height))
+	}
+}
+
+func (cornerIndicatorLayout) MinSize(objs []core.CanvasObject) geo.Size {
+	var min geo.Size
+	for _, o := range objs {
+		min = min.Max(o.MinSize())
+	}
+	return min
+}
+
+// MinSize spans the platform drag target: the indicator size on desktop,
+// raised to the frame-button touch target on mobile (#263) — the same 48dp
+// floor and tapYOffset reasoning as the frame buttons (#254). The renderer's
+// Layout derives both the corner's size and its bottom-right anchoring from
+// this value. The cost of the larger target is deliberate and bounded: the
+// mobile drag latch resolves at the gesture origin, so only drags *starting*
+// inside the corner square resize instead of reaching the content below —
+// see docs/notes/widgets.md.
+func (c *draggableCorner) MinSize() geo.Size {
+	if bellui.CurrentDevice().IsMobile() {
+		return geo.NewSquareSize(frameButtonTouchTarget(c.win.Theme()))
+	}
+	return geo.NewSquareSize(dragCornerIndicatorSize)
 }
 
 func (c *draggableCorner) Dragged(ev *event.DragEvent) {
