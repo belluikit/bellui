@@ -62,6 +62,17 @@ the trendvidia fork (github.com/trendvidia/fyne).
 
 ### Fixed
 
+* **Android: canvas scale is derived arithmetically from the reported
+  density** ([#272](https://github.com/belluikit/bellui/issues/272)),
+  matching `DisplayMetrics.density` (densityDpi/160), instead of a bucket
+  lookup that rounded off-bucket densities to the nearest step. Devices
+  configured between the classic buckets — 356, 420, 440dpi panels are
+  common — previously rendered everything derived from dp (touch-target
+  floors, text sizes) up to ~12% off in physical units; bucket densities
+  (160/240/320/480/640) map exactly as before. The "unknown density" log for
+  such values is gone, and the `ACONFIGURATION_DENSITY_ANY` sentinel no
+  longer reads as a 65534dpi screen.
+
 * **wasm: the browser picker overrides no longer fire under the test driver**
   ([#257](https://github.com/belluikit/bellui/issues/257)). In a js/wasm test
   binary, `FileOpen.Show()` clicked a real hidden `<input type="file">` in the

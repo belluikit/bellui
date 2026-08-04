@@ -224,39 +224,25 @@ func windowConfigRead(activity *C.ANativeActivity) windowConfig {
 	density := C.AConfiguration_getDensity(aconfig)
 	C.AConfiguration_delete(aconfig)
 
-	// Calculate the screen resolution. This value is approximate. For example,
-	// a physical resolution of 200 DPI may be quantized to one of the
-	// ACONFIGURATION_DENSITY_XXX values such as 160 or 240.
-	//
-	// A more accurate DPI could possibly be calculated from
-	// https://developer.android.com/reference/android/util/DisplayMetrics.html#xdpi
-	// but this does not appear to be accessible via the NDK. In any case, the
-	// hardware might not even provide a more accurate number, as the system
-	// does not apparently use the reported value. See golang.org/issue/13366
-	// for a discussion.
+	// The reported density is the device's configured dpi
+	// (Configuration.densityDpi). It is not restricted to the classic bucket
+	// constants — 356, 420 or 440dpi panels are common — and the canvas scale
+	// is derived arithmetically from it (androidScaleForDPI, #272), so any
+	// positive value below the sentinels is taken as-is rather than logged as
+	// "unknown". ACONFIGURATION_DENSITY_ANY (0xfffe) and _NONE (0xffff) are
+	// sentinels meaning "no density", not densities: both fall back to mdpi
+	// (scale 1.0, what the old dpi-72 fallback produced through the bucket
+	// table). ANY previously fell through the default arm as a 65534dpi
+	// screen.
 	var dpi int
-	switch density {
-	case C.ACONFIGURATION_DENSITY_DEFAULT:
-		dpi = 160
-	case C.ACONFIGURATION_DENSITY_LOW,
-		C.ACONFIGURATION_DENSITY_MEDIUM,
-		213, // C.ACONFIGURATION_DENSITY_TV
-		C.ACONFIGURATION_DENSITY_HIGH,
-		320, // ACONFIGURATION_DENSITY_XHIGH
-		480, // ACONFIGURATION_DENSITY_XXHIGH
-		640: // ACONFIGURATION_DENSITY_XXXHIGH
+	switch {
+	case density > 0 && density < C.ACONFIGURATION_DENSITY_ANY:
 		dpi = int(density)
-	case C.ACONFIGURATION_DENSITY_NONE:
-		log.Print("android device reports no screen density")
-		dpi = 72
+	case density == C.ACONFIGURATION_DENSITY_DEFAULT: // 0: density unset
+		dpi = 160
 	default:
-		log.Printf("android device reports unknown density: %d", density)
-		// All we can do is guess.
-		if density > 0 {
-			dpi = int(density)
-		} else {
-			dpi = 72
-		}
+		log.Printf("android device reports no usable screen density: %d", density)
+		dpi = 160
 	}
 
 	o := size.OrientationUnknown
