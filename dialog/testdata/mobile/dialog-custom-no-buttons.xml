@@ -84,8 +84,10 @@
 						</widget>
 					</container>
 				</container>
-				<widget pos="185,145" size="16x16" type="*container.draggableCorner">
-					<image rsc="drag-corner-indicator.svg" size="16x16" themed="foreground"/>
+				<widget pos="153,113" size="48x48" type="*container.draggableCorner">
+					<container size="48x48">
+						<image pos="32,32" rsc="drag-corner-indicator.svg" size="16x16" themed="foreground"/>
+					</container>
 				</widget>
 			</widget>
 		</widget>
