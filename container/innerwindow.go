@@ -177,10 +177,18 @@ func (w *InnerWindow) barHeight() float32 {
 	th := w.Theme()
 	height := th.Size(theme.SizeNameWindowTitleBarHeight)
 	if bellui.CurrentDevice().IsMobile() {
-		buttons := th.Size(theme.SizeNameIconButtonSize) + th.Size(theme.SizeNamePadding)*2
-		return geo.Max(height, buttons)
+		return geo.Max(height, frameButtonTouchTarget(th))
 	}
 	return height
+}
+
+// frameButtonTouchTarget returns the edge of a frame button's touch target on
+// mobile: the icon-button visual plus a padding ring on each side — 40+2×4 =
+// 48dp on the default theme, the MD3/Android touch-target floor. The ring
+// matters beyond the floor: the drivers shift every touch up by up to 8dp
+// (tapYOffset), which the ring absorbs.
+func frameButtonTouchTarget(th bellui.Theme) float32 {
+	return th.Size(theme.SizeNameIconButtonSize) + th.Size(theme.SizeNamePadding)*2
 }
 
 func (w *InnerWindow) buttonPosition() widget.ButtonAlign {
@@ -388,7 +396,22 @@ func newBorderButton(icon bellui.Resource, mode titleBarButtonMode, th bellui.Th
 }
 
 func (b *borderButton) CreateRenderer() core.WidgetRenderer {
+	if bellui.CurrentDevice().IsMobile() {
+		// MD3 icon-button geometry (#254): the visual button keeps the
+		// standard icon-button size while the widget spans the full touch
+		// target; the surrounding ring is kept live by borderButton.Tapped.
+		pad := b.Theme().Size(theme.SizeNamePadding)
+		return widget.NewSimpleRenderer(New(layout.NewCustomPaddedLayout(pad, pad, pad, pad), b.c))
+	}
 	return widget.NewSimpleRenderer(b.c)
+}
+
+// Tapped keeps the padding ring around the visual button live on mobile: the
+// inner widget.Button only spans the icon-button visual, so taps resolving
+// inside the touch target but outside the visual land here (#254). Tapped is
+// a no-op for disabled buttons — widget.Button guards that itself.
+func (b *borderButton) Tapped(ev *event.PointEvent) {
+	b.b.Tapped(ev)
 }
 
 func (b *borderButton) Disable() {
@@ -410,7 +433,7 @@ func (b *borderButton) MinSize() geo.Size {
 		// Meet the platform minimum touch target (#254): the desktop chrome
 		// button is too small to hit with a finger, especially with the
 		// drivers' tapYOffset shifting touches upward.
-		height = geo.Max(height, th.Size(theme.SizeNameIconButtonSize))
+		height = geo.Max(height, frameButtonTouchTarget(th))
 	}
 	return geo.NewSquareSize(height)
 }

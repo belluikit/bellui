@@ -52,9 +52,10 @@ the trendvidia fork (github.com/trendvidia/fyne).
   close button a 16dp target — under every platform's touch minimum — while
   the mobile drivers shift each touch up by 8dp of finger compensation, so on
   an iPad a tap on the X resolved above the button onto the inert title label
-  nearly every time. On mobile devices the title bar now sizes itself to hold
-  `IconButtonSize` frame buttons carrying the standard icon size; desktop
-  chrome is unchanged.
+  nearly every time. On mobile devices each frame button now spans the theme's
+  icon-button size plus a padding ring — 48dp on the default theme, the
+  MD3/Android touch-target floor — with the visual button kept at the
+  icon-button size carrying the standard icon; desktop chrome is unchanged.
 
 * **Android: folders granted through the SAF picker's Download shortcut are
   accepted** ([#244](https://github.com/belluikit/bellui/issues/244)). The
