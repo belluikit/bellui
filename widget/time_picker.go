@@ -185,7 +185,7 @@ func (t *TimePicker) typeMinuteDigit(d int) {
 // half-typed value, so it only claims the key while one is buffered. With
 // nothing pending, Escape closes the dialog the picker is usually shown in.
 //
-// Since: 2.19
+// Since: 1.0
 func (t *TimePicker) HandlesEscape() bool {
 	return t.hasPartial
 }

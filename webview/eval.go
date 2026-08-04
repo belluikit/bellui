@@ -15,7 +15,7 @@ import (
 // passed to the script as data. Each name must be a JavaScript identifier; it
 // becomes a parameter of the function the body runs as.
 //
-// Since: 2.19
+// Since: 1.0
 type Args map[string]any
 
 // evalState tracks the results this view is still waiting for. Eval results
@@ -57,7 +57,7 @@ func (w *WebView) Eval(js string) {
 //
 // The injection caveat on [WebView.Eval] applies here too.
 //
-// Since: 2.19
+// Since: 1.0
 func (w *WebView) EvalResult(js string, onResult func(json.RawMessage, error)) {
 	if !w.attached() {
 		reportResult(onResult, ErrNotAttached)
@@ -92,7 +92,7 @@ func (w *WebView) EvalResult(js string, onResult func(json.RawMessage, error)) {
 // This is the injection-safe form of [WebView.Eval] and needs no cooperation
 // from the page, unlike [WebView.Call].
 //
-// Since: 2.19
+// Since: 1.0
 func (w *WebView) EvalFunc(body string, args Args) {
 	js, err := scriptFunc(body, args)
 	if err != nil {
@@ -105,7 +105,7 @@ func (w *WebView) EvalFunc(body string, args Args) {
 // EvalFuncResult is [WebView.EvalFunc] reporting the function's return value,
 // with the result and error contract of [WebView.EvalResult].
 //
-// Since: 2.19
+// Since: 1.0
 func (w *WebView) EvalFuncResult(body string, args Args, onResult func(json.RawMessage, error)) {
 	js, err := scriptFunc(body, args)
 	if err != nil {

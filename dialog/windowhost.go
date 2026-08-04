@@ -32,7 +32,7 @@ import (
 // On single-window platforms (mobile, web) the mode is ignored and the
 // dialog falls back to the standard overlay presentation. Call before Show.
 //
-// Since: 2.16
+// Since: 1.0
 func (d *dialog) SetWindowHosted(hosted bool) {
 	d.windowHosted = hosted
 }

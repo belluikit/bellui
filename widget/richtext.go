@@ -442,7 +442,7 @@ func NewRichTextWithText(text string) *RichText {
 // untrusted-content security model, #285). A requested family that is not
 // registered falls through to the default behaviour (nil FontSource).
 //
-// Since: 2.18
+// Since: 1.0
 func (t *RichText) RegisterNamedFont(name string, res bellui.Resource) {
 	key := normalizeFontName(name)
 	if key == "" {

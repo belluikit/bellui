@@ -22,7 +22,7 @@ import (
 // name and version above the markdown content, with the links in a row along
 // the bottom. You should call Show on the returned dialog to display it.
 //
-// Since: 2.15
+// Since: 1.0
 func NewAbout(content string, links []*widget.Hyperlink, a bellui.App, w bellui.Window) Dialog {
 	d := NewCustom(aboutTitle(a.Metadata()), lang.L("OK"),
 		aboutContent(content, links, a.Metadata()), w)
@@ -35,7 +35,7 @@ func NewAbout(content string, links []*widget.Hyperlink, a bellui.App, w bellui.
 // icon, name and version above the markdown content, with the links in a row
 // along the bottom. You should call Show on the returned window to display it.
 //
-// Since: 2.15
+// Since: 1.0
 func NewAboutWindow(content string, links []*widget.Hyperlink, a bellui.App) bellui.Window {
 	w := a.NewWindow(aboutTitle(a.Metadata()))
 	w.SetContent(container.NewPadded(aboutContent(content, links, a.Metadata())))
@@ -47,7 +47,7 @@ func NewAboutWindow(content string, links []*widget.Hyperlink, a bellui.App) bel
 // ShowAbout opens an about dialog built from the app metadata along with the
 // markdown content and links passed into this method.
 //
-// Since: 2.15
+// Since: 1.0
 func ShowAbout(content string, links []*widget.Hyperlink, a bellui.App, w bellui.Window) {
 	NewAbout(content, links, a, w).Show()
 }
@@ -55,7 +55,7 @@ func ShowAbout(content string, links []*widget.Hyperlink, a bellui.App, w bellui
 // ShowAboutWindow opens an about window built from the app metadata along
 // with the markdown content and links passed into this method.
 //
-// Since: 2.15
+// Since: 1.0
 func ShowAboutWindow(content string, links []*widget.Hyperlink, a bellui.App) {
 	NewAboutWindow(content, links, a).Show()
 }

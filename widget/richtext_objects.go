@@ -130,7 +130,7 @@ type HyperlinkSegment struct {
 	// (not Style.Alignment) controls alignment; Style.Inline, HeadingLevel and the
 	// internal concealed flag are not consulted for links.
 	//
-	// Since: 2.18
+	// Since: 1.0
 	Style RichTextStyle
 }
 
@@ -228,14 +228,14 @@ type ImageSegment struct {
 	// subject to the AllowRemoteContent policy. Use it to embed decoded image
 	// data (e.g. a pasted bitmap) directly.
 	//
-	// Since: 2.18
+	// Since: 1.0
 	Image image.Image
 
 	// Resource is an in-memory resource source (e.g. bundled image bytes). Like
 	// Image it is rendered without network or disk access. Source precedence is
 	// Image, then Resource, then Source.
 	//
-	// Since: 2.18
+	// Since: 1.0
 	Resource bellui.Resource
 
 	// Alignment specifies the horizontal alignment of this image segment
@@ -247,7 +247,7 @@ type ImageSegment struct {
 	// image still occupies exactly one caret position. Zero value (false) keeps
 	// the historical block layout, so existing content is unchanged (#665).
 	//
-	// Since: 2.18
+	// Since: 1.0
 	InlineImage bool
 
 	// allowRemote is set by the embedding RichText from its AllowRemoteContent
@@ -893,7 +893,7 @@ type RichTextStyle struct {
 	// is honoured consistently across measurement, wrapping, alignment, selection
 	// and truncation, so a custom-font segment lays out exactly as it renders.
 	//
-	// Since: 2.18
+	// Since: 1.0
 	FontSource bellui.Resource
 
 	// HeadingLevel marks the segment as a document heading of the given
