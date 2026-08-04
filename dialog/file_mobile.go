@@ -23,7 +23,9 @@ func hideFile(filename string) error {
 // resource then failed to open, is a confirmation. The picker result arrives
 // on a platform thread (a JNI upcall on Android, the UIKit main thread on
 // iOS), so both are queued to the main goroutine in one hop, per the fork's
-// main-goroutine discipline.
+// main-goroutine discipline. A platform app without a picker makes the
+// mobile.Show* call report false, and the override falls back to the canvas
+// dialog rather than silently dropping the request.
 
 func fileOpenOSOverride(f *FileDialog) bool {
 	if f.multiSelect {
@@ -31,24 +33,21 @@ func fileOpenOSOverride(f *FileDialog) bool {
 	}
 	if f.isDirectory() {
 		cb := f.callback.(func(bellui.ListableURI, error))
-		mobile.ShowFolderOpenPicker(func(list bellui.ListableURI, err error) {
+		return mobile.ShowFolderOpenPicker(func(list bellui.ListableURI, err error) {
 			bellui.Do(func() { f.notifyClosed(list != nil || err != nil); cb(list, err) })
 		})
-	} else {
-		cb := f.callback.(func(bellui.URIReadCloser, error))
-		mobile.ShowFileOpenPicker(func(reader bellui.URIReadCloser, err error) {
-			bellui.Do(func() { f.notifyClosed(reader != nil || err != nil); cb(reader, err) })
-		}, f.filter)
 	}
-	return true
+	cb := f.callback.(func(bellui.URIReadCloser, error))
+	return mobile.ShowFileOpenPicker(func(reader bellui.URIReadCloser, err error) {
+		bellui.Do(func() { f.notifyClosed(reader != nil || err != nil); cb(reader, err) })
+	}, f.filter)
 }
 
 func fileSaveOSOverride(f *FileDialog) bool {
 	cb := f.callback.(func(bellui.URIWriteCloser, error))
-	mobile.ShowFileSavePicker(func(writer bellui.URIWriteCloser, err error) {
+	return mobile.ShowFileSavePicker(func(writer bellui.URIWriteCloser, err error) {
 		bellui.Do(func() { f.notifyClosed(writer != nil || err != nil); cb(writer, err) })
 	}, f.filter, f.initialFileName)
-	return true
 }
 
 func getFavoriteLocation(homeURI bellui.URI, name string) (bellui.URI, error) {
