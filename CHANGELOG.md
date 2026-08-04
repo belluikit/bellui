@@ -46,6 +46,18 @@ the trendvidia fork (github.com/trendvidia/fyne).
 
 ### Changed
 
+* **`driver.ObjectAtPosition`/`ObjectAtPositionMatching` now probe and report
+  in the `Driver.AbsolutePositionForObject` space**
+  ([#235](https://github.com/belluikit/bellui/issues/235)). The pick
+  primitive's position and returned bounds are relative to the canvas
+  interactive area rather than the raw canvas tree, so composing it with
+  `AbsolutePositionForObject` — the pairing its doc comment recommends — is
+  now exact on every driver. The interactive-area inset is zero on all
+  desktop drivers, so behaviour changes only on mobile and the test canvas;
+  the raw-tree helpers `GeometryForObject`/`ClipBoundsForObject` are
+  deliberately unchanged. Pointer events still deliver `AbsolutePosition` in
+  the raw-tree space — an event-sourced probe must subtract the inset first.
+
 * **Native file dialogs are now the default**
   ([#226](https://github.com/belluikit/bellui/issues/226)).
   `dialog.UseNativeFileDialogs` flips from opt-in to opt-out: `FileOpen`,
