@@ -29,7 +29,12 @@ func hideFile(filename string) error {
 
 func fileOpenOSOverride(f *FileDialog) bool {
 	if f.multiSelect {
-		return false // native multi-select not wired for mobile pickers yet (#716)
+		// iOS allowsMultipleSelection / Android EXTRA_ALLOW_MULTIPLE (#255);
+		// an app without the multi picker falls back to the canvas dialog.
+		cb := f.callback.(func([]bellui.URIReadCloser, error))
+		return mobile.ShowFileOpenMultiplePicker(func(readers []bellui.URIReadCloser, err error) {
+			bellui.Do(func() { f.notifyClosed(readers != nil || err != nil); cb(readers, err) })
+		}, f.filter)
 	}
 	if f.isDirectory() {
 		cb := f.callback.(func(bellui.ListableURI, error))
