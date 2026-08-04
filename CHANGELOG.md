@@ -22,14 +22,13 @@ the trendvidia fork (github.com/trendvidia/fyne).
   Ctrl/Cmd/Shift-click, for touchscreens and for mobile embeddings whose
   platform app provides no multi picker (the canvas-dialog fallback from
   #255). Escape or Android's Back leaves the mode before it cancels the
-  dialog, deselecting the last file ends it too, the double-tap open shortcut
-  is suspended while the mode is active, and the pointer modifiers keep their
-  usual precedence throughout. As part of this, the mobile driver now gives
-  Android's Back button the Escape meaning generally: Back dismisses the
-  innermost pop-up, menu or dialog and only falls through to the app's
-  `KeyBack` delivery (or backgrounding the app) when there is nothing left to
-  dismiss. Desktop touchscreens cannot reach the gesture yet — the GLFW
-  driver has no touch long-press dispatch
+  dialog, closing the dialog by any path ends it too (as does deselecting the
+  last file), the double-tap open shortcut is suspended while the mode is
+  active, and the pointer modifiers keep their usual precedence throughout.
+  As part of this, the mobile driver now gives Android's Back button the
+  Escape meaning generally — a behavior change for existing apps, recorded
+  under Changed below. Desktop touchscreens cannot reach the gesture yet —
+  the GLFW driver has no touch long-press dispatch
   ([#266](https://github.com/belluikit/bellui/issues/266)).
 
 * **Escape closes the innermost pop-up, menu or dialog**
@@ -131,6 +130,19 @@ the trendvidia fork (github.com/trendvidia/fyne).
   ([#253](https://github.com/belluikit/bellui/issues/253)).
 
 ### Changed
+
+* **Android's Back button now carries the Escape meaning**
+  ([#259](https://github.com/belluikit/bellui/issues/259)). The mobile driver
+  routes Back through the same dismissal walk as Escape, ahead of key
+  delivery: it backs out of the innermost dismissible surface — a pop-up,
+  menu, dialog, or the file dialog's touch selection mode — and a focused
+  widget that claims Escape for a state of its own (`event.EscapeHandler`,
+  e.g. an `Entry` with `OnEscape` set) receives the key as `KeyEscape`, the
+  name its escape handling listens for. Only with nothing to dismiss does
+  Back fall through to the app's `KeyBack` delivery (or, with no key hook,
+  backgrounding the app). Previously Back backgrounded the app even while a
+  modal dialog was open; apps that consumed `KeyBack` in `SetOnTypedKey`
+  while an overlay was up will now see the overlay close instead.
 
 * **`driver.ObjectAtPosition`/`ObjectAtPositionMatching` now probe and report
   in the `Driver.AbsolutePositionForObject` space**
