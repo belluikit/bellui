@@ -163,3 +163,48 @@ func TestFileDialog_SelectionMode_DirsAndSingleSelectInert(t *testing.T) {
 	}
 	assert.False(t, sd.selectionMode, "single-select dialogs never enter selection mode")
 }
+
+func TestFileDialog_SelectionMode_DoubleTapAcrossModeBoundary(t *testing.T) {
+	opened := false
+	d := newLoadedMultiDialog(t, func(readers []bellui.URIReadCloser, err error) {
+		opened = true
+		for _, r := range readers {
+			_ = r.Close()
+		}
+	})
+	fd := d.dialog
+	ids := fileItemIDs(t, fd)
+	require.NotEmpty(t, ids)
+	items := visibleFileItems(t, fd)
+	require.NotNil(t, items[ids[0]])
+
+	test.LongPress(items[ids[0]])
+	require.True(t, fd.selectionMode)
+	require.Len(t, fd.multiSelected, 1)
+
+	// Double-tap the sole selected file: the first tap empties the set and
+	// ends the mode, but it is still a selection-mode tap — it must not arm
+	// the double-tap open, or the second tap would confirm the dialog with
+	// the file the user just deselected.
+	test.Tap(items[ids[0]])
+	assert.False(t, fd.selectionMode, "deselecting the last file ends the mode")
+	test.Tap(items[ids[0]])
+	assert.False(t, opened, "double-tap open stays suspended across the mode boundary")
+	assert.Len(t, fd.multiSelected, 1, "the second tap is a plain select")
+}
+
+func TestFileDialog_SelectionMode_ClosingDialogEndsMode(t *testing.T) {
+	d := newLoadedMultiDialog(t, func([]bellui.URIReadCloser, error) {})
+	fd := d.dialog
+	ids := fileItemIDs(t, fd)
+	require.NotEmpty(t, ids)
+
+	fd.enterSelectionMode(ids[0])
+	require.True(t, fd.selectionMode)
+
+	// Cancel via the button — the frame's X and the confirm path share this
+	// teardown. Closing must end the mode, or a re-Show would reopen with
+	// plain taps still toggling.
+	fd.dismiss.OnTapped()
+	assert.False(t, fd.selectionMode, "closing the dialog ends selection mode")
+}

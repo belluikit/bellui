@@ -79,10 +79,14 @@ func (i *fileDialogItem) setLocation(l bellui.URI, dir, up bool) {
 }
 
 func (i *fileDialogItem) Tapped(*event.PointEvent) {
+	// Read the mode before choose runs: the tap that deselects the last file
+	// ends the mode inside it, and that tap is still a selection-mode tap —
+	// it must not arm (or fire) the double-tap open below.
+	wasSelecting := i.picker.selectionMode
 	if i.choose != nil {
 		i.choose(i.id)
 	}
-	if i.picker.selectionMode {
+	if wasSelecting {
 		// In selection mode taps toggle set membership (#259); the double-tap
 		// open shortcut is suspended — its second tap just changed the set it
 		// would confirm.
