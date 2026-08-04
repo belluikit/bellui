@@ -11,6 +11,7 @@
 
 #import <UIKit/UIKit.h>
 #import <MobileCoreServices/MobileCoreServices.h>
+#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 #import <GLKit/GLKit.h>
 #import <UserNotifications/UserNotifications.h>
 
@@ -1778,45 +1779,48 @@ void belluiInputViewSetTextLayout(const char *wire, double originX, double origi
     [view belluiSetTextLayoutWire:wire originX:originX originY:originY scale:scale];
 }
 
-NSMutableArray *docTypesForMimeExts(char *mimes, char *exts) {
-    NSMutableArray *docTypes = [NSMutableArray array];
+// contentTypesForMimeExts maps the picker filter to UTTypes via the modern
+// (iOS 14+) UniformTypeIdentifiers API. The previous
+// UTTypeCreatePreferredIdentifierForTag + initWithDocumentTypes: path is
+// deprecated and left matching files un-pickable on current iOS (#251).
+NSMutableArray<UTType *> *contentTypesForMimeExts(char *mimes, char *exts) {
+    NSMutableArray<UTType *> *types = [NSMutableArray array];
     if (mimes != NULL && strlen(mimes) > 0) {
         NSString *mimeList = [NSString stringWithUTF8String:mimes];
 
         if ([mimeList isEqualToString:@"application/x-directory"]) {
-            [docTypes addObject:(NSString*)kUTTypeFolder];
+            [types addObject:UTTypeFolder];
         } else {
-            NSArray *mimeItems = [mimeList componentsSeparatedByString:@"|"];
-
-            for (NSString *mime in mimeItems)  {
-                NSString *UTI = (NSString *) UTTypeCreatePreferredIdentifierForTag(kUTTagClassMIMEType, (CFStringRef)mime, NULL);
-
-                [docTypes addObject:UTI];
+            for (NSString *mime in [mimeList componentsSeparatedByString:@"|"]) {
+                UTType *type = [UTType typeWithMIMEType:mime];
+                if (type != nil) {
+                    [types addObject:type];
+                }
             }
         }
     } else if (exts != NULL && strlen(exts) > 0) {
         NSString *extList = [NSString stringWithUTF8String:exts];
-        NSArray *extItems = [extList componentsSeparatedByString:@"|"];
-
-        for (NSString *ext in extItems)  {
-            NSString *UTI = (NSString *) UTTypeCreatePreferredIdentifierForTag(kUTTagClassFilenameExtension, (CFStringRef)ext, NULL);
-
-            [docTypes addObject:UTI];
+        for (NSString *ext in [extList componentsSeparatedByString:@"|"]) {
+            UTType *type = [UTType typeWithFilenameExtension:ext];
+            if (type != nil) {
+                [types addObject:type];
+            }
         }
-    } else {
-        [docTypes addObject:@"public.data"];
+    }
+    if (types.count == 0) {
+        [types addObject:UTTypeData];
     }
 
-    return docTypes;
+    return types;
 }
 
 void showFileOpenPicker(char* mimes, char *exts) {
     GoAppAppDelegate *appDelegate = (GoAppAppDelegate *)[[UIApplication sharedApplication] delegate];
 
-    NSMutableArray *docTypes = docTypesForMimeExts(mimes, exts);
+    NSArray<UTType *> *types = contentTypesForMimeExts(mimes, exts);
 
     UIDocumentPickerViewController *documentPicker = [[UIDocumentPickerViewController alloc]
-        initWithDocumentTypes:docTypes inMode:UIDocumentPickerModeOpen];
+        initForOpeningContentTypes:types asCopy:NO];
     documentPicker.delegate = (id) appDelegate;
 
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -1824,20 +1828,25 @@ void showFileOpenPicker(char* mimes, char *exts) {
     });
 }
 
-void showFileSavePicker(char* mimes, char *exts) {
+void showFileSavePicker(char* mimes, char *exts, char *filename) {
     GoAppAppDelegate *appDelegate = (GoAppAppDelegate *)[[UIApplication sharedApplication] delegate];
 
-    NSMutableArray *docTypes = docTypesForMimeExts(mimes, exts);
+    // The staged temporary file carries the name the picker offers, so it must
+    // be the caller's SetFileName, not a hardcoded placeholder (#252).
+    NSString *name = @"Untitled";
+    if (filename != NULL && strlen(filename) > 0) {
+        name = [NSString stringWithUTF8String:filename];
+    }
 
     NSURL *temporaryDirectoryURL = [NSURL fileURLWithPath: NSTemporaryDirectory() isDirectory: YES];
-    NSURL *temporaryFileURL = [temporaryDirectoryURL URLByAppendingPathComponent:@"filename"];
+    NSURL *temporaryFileURL = [temporaryDirectoryURL URLByAppendingPathComponent:name];
 
     char* bytes = "\n";
     NSData *data = [NSData dataWithBytes:bytes length:1];
-    BOOL ok = [data writeToURL:temporaryFileURL atomically:YES];
+    [data writeToURL:temporaryFileURL atomically:YES];
 
     UIDocumentPickerViewController *documentPicker = [[UIDocumentPickerViewController alloc]
-        initWithURL:temporaryFileURL inMode:UIDocumentPickerModeMoveToService];
+        initForExportingURLs:@[temporaryFileURL] asCopy:NO];
     documentPicker.delegate = (id) appDelegate;
 
     dispatch_async(dispatch_get_main_queue(), ^{
