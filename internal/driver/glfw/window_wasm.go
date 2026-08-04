@@ -233,6 +233,10 @@ func belluiToNativeCursor(cursor desktop.Cursor) (*Cursor, bool) {
 		name = "ew-resize"
 	case desktop.VResizeCursor:
 		name = "ns-resize"
+	case desktop.NWSEResizeCursor:
+		name = "nwse-resize"
+	case desktop.NESWResizeCursor:
+		name = "nesw-resize"
 	case desktop.HiddenCursor:
 		name = "none"
 	}
