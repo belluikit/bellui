@@ -46,6 +46,16 @@ the trendvidia fork (github.com/trendvidia/fyne).
 
 ### Fixed
 
+* **The windowed canvas dialog's frame buttons are tappable on mobile**
+  ([#254](https://github.com/belluikit/bellui/issues/254)). The
+  `container.InnerWindow` chrome used desktop metrics everywhere, leaving the
+  close button a 16dp target — under every platform's touch minimum — while
+  the mobile drivers shift each touch up by 8dp of finger compensation, so on
+  an iPad a tap on the X resolved above the button onto the inert title label
+  nearly every time. On mobile devices the title bar now sizes itself to hold
+  `IconButtonSize` frame buttons carrying the standard icon size; desktop
+  chrome is unchanged.
+
 * **Android: folders granted through the SAF picker's Download shortcut are
   accepted** ([#244](https://github.com/belluikit/bellui/issues/244)). The
   listability probe trusted `ContentResolver.getType`, which the downloads
