@@ -323,13 +323,17 @@ func updateLocalizer() {
 	all, err := locale.GetLocales()
 	if err != nil {
 		bellui.LogError("Failed to load user locales", err)
+		// A failed lookup still returns a value — on Android a JNI failure
+		// comes back as [""], which is not a locale list; parsing it would
+		// just log a second, misleading error (#271).
+		all = nil
 	}
 	tags := parseUserLocales(all)
 	if len(tags) == 0 {
 		// GetLocales reports an empty list without an error in a C/POSIX
-		// locale environment (e.g. LANG=C; #1148), and a vendor list whose
-		// every entry fails to parse (ColorOS has delivered [""], #271)
-		// degrades the same way: English, keeping tags[0] below valid.
+		// locale environment (e.g. LANG=C; #1148), and a failed or fully
+		// unparseable lookup (#271) degrades the same way: English, keeping
+		// tags[0] below valid.
 		tags = []language.Tag{language.English}
 	}
 	setupLang(closestSupportedTag(tags).LanguageString())
