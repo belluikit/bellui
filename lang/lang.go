@@ -324,16 +324,19 @@ func updateLocalizer() {
 	if err != nil {
 		bellui.LogError("Failed to load user locales", err)
 	}
-	if len(all) == 0 {
+	tags := parseUserLocales(all)
+	if len(tags) == 0 {
 		// GetLocales reports an empty list without an error in a C/POSIX
-		// locale environment (e.g. LANG=C); all[0] below must stay valid
-		// (#1148).
-		all = []string{"en"}
+		// locale environment (e.g. LANG=C; #1148), and a vendor list whose
+		// every entry fails to parse (ColorOS has delivered [""], #271)
+		// degrades the same way: English, keeping tags[0] below valid.
+		tags = []language.Tag{language.English}
 	}
-	setupLang(closestSupportedLocale(all).LanguageString())
-	// Override currentTag with the full system locale (including region)
-	// so that formatting functions can use the region for CLDR lookups.
-	if tag, err := language.Parse(all[0]); err == nil {
-		setCurrentTag(tag)
-	}
+	setupLang(closestSupportedTag(tags).LanguageString())
+	// Override currentTag with the full system locale (including region) so
+	// that formatting functions can use the region for CLDR lookups — the
+	// first entry that parsed, not blindly the first entry reported: a
+	// malformed leading entry otherwise silently degrades formatting,
+	// collation and direction to the matcher's language-only tag (#271).
+	setCurrentTag(tags[0])
 }

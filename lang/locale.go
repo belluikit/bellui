@@ -1,6 +1,9 @@
 package lang
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/jeandeaual/go-locale"
 	"golang.org/x/text/language"
 
@@ -18,9 +21,9 @@ func SystemLocale() bellui.Locale {
 		loc = "en"
 	}
 
-	tag, err := language.Parse(loc)
-	if err != nil {
-		bellui.LogError("Error parsing user locale "+loc, err)
+	tag := language.English
+	if parsed := parseUserLocales([]string{loc}); len(parsed) > 0 {
+		tag = parsed[0]
 	}
 	return localeFromTag(tag)
 }
@@ -43,22 +46,46 @@ func CurrentLocale() bellui.Locale {
 }
 
 func closestSupportedLocale(locs []string) bellui.Locale {
+	return closestSupportedTag(parseUserLocales(locs))
+}
+
+func closestSupportedTag(tags []language.Tag) bellui.Locale {
 	// translated is mutated by addLanguage; build the matcher under the read
 	// lock so a concurrent AddTranslations cannot race the slice.
 	tagMu.RLock()
 	matcher := language.NewMatcher(translated)
 	tagMu.RUnlock()
 
-	tags := make([]language.Tag, len(locs))
-	for i, loc := range locs {
-		tag, err := language.Parse(loc)
-		if err != nil {
-			bellui.LogError("Error parsing user locale "+loc, err)
-		}
-		tags[i] = tag
-	}
 	best, _, _ := matcher.Match(tags...)
 	return localeFromTag(best)
+}
+
+// parseUserLocales parses the locale strings the OS reports into language
+// tags, dropping entries that cannot be made well-formed. Systems hand out
+// non-BCP-47 forms — Java Locale.toString() underscores ("en_US") and its
+// trailing "#..." script/extension marker ("zh_CN_#Hans"), and ColorOS has
+// delivered a list whose entry is the empty string (#271) — so entries are
+// normalized before parsing, and one that still fails is logged with the raw
+// string %q-quoted (an empty or whitespace entry stays visible in the log,
+// which is the on-device capture for vendor forms) and skipped rather than
+// handed to the matcher as an und tag: a bad entry must not cost the locale
+// the parseable entries behind it.
+func parseUserLocales(locs []string) []language.Tag {
+	tags := make([]language.Tag, 0, len(locs))
+	for _, loc := range locs {
+		norm := strings.TrimSpace(loc)
+		if i := strings.IndexByte(norm, '#'); i >= 0 {
+			norm = strings.TrimRight(norm[:i], "-_ ")
+		}
+		norm = strings.ReplaceAll(norm, "_", "-")
+		tag, err := language.Parse(norm)
+		if err != nil {
+			bellui.LogError(fmt.Sprintf("Error parsing user locale %q", loc), err)
+			continue
+		}
+		tags = append(tags, tag)
+	}
+	return tags
 }
 
 func localeFromTag(in language.Tag) bellui.Locale {
