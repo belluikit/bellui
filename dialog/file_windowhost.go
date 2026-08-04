@@ -36,6 +36,11 @@ func (f *fileDialog) showHostWindow(size geo.Size) {
 	w.SetOnClosed(f.hostWindowClosed)
 	w.Canvas().SetOnTypedKey(func(ev *event.KeyEvent) {
 		if ev.Name == event.KeyEscape {
+			// Selection mode is the innermost state: Escape leaves it first
+			// and only its next press cancels the dialog (#259).
+			if f.exitSelectionMode() {
+				return
+			}
 			f.dismiss.OnTapped()
 		}
 	})
@@ -58,6 +63,7 @@ func (f *fileDialog) hostWindowClosed() {
 		return
 	}
 	f.hostWin = nil
+	f.selectionMode = false // closing ends selection mode (see hide)
 	removeScrim(f.file.parent, f.scrim)
 	f.scrim = nil
 	f.reportCancel()
@@ -67,6 +73,11 @@ func (f *fileDialog) hostWindowClosed() {
 // scrim when window-hosted, the overlay popup otherwise — without running any
 // response callback (the caller reports its own response).
 func (f *fileDialog) hide() {
+	// Closing ends touch selection mode however the dialog closes — Cancel,
+	// the frame's X, confirm — matching the Escape path, so a re-Show does
+	// not reopen with plain taps still toggling (#259). The selection set
+	// keeps its own persistence.
+	f.selectionMode = false
 	if f.hostWin != nil {
 		w := f.hostWin
 		f.hostWin = nil
