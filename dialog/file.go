@@ -482,6 +482,8 @@ func (f *fileDialog) reportCancel() {
 			f.file.callback.(func(bellui.URIWriteCloser, error))(nil, nil)
 		} else if f.file.isDirectory() {
 			f.file.callback.(func(bellui.ListableURI, error))(nil, nil)
+		} else if f.file.multiSelect {
+			f.file.callback.(func([]bellui.URIReadCloser, error))(nil, nil)
 		} else {
 			f.file.callback.(func(bellui.URIReadCloser, error))(nil, nil)
 		}
