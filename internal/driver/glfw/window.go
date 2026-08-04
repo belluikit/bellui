@@ -359,19 +359,7 @@ func (w *window) processRefresh() {
 }
 
 func (w *window) findObjectAtPositionMatching(canvas *glCanvas, mouse geo.Position, matches func(object core.CanvasObject) bool) (core.CanvasObject, geo.Position, int) {
-	overlay := canvas.Overlays().Top()
-	// The spatial index is rebuilt during the paint walk, so between a content
-	// change and the next frame it does not reflect the current tree — only
-	// treat it as authoritative while the canvas is clean (#590).
-	if overlay == nil {
-		if idx := canvas.SpatialIndex(); idx != nil && !canvas.IsDirty() {
-			if obj, pos, ok := idx.FindObjectAtPositionMatching(mouse, matches); ok {
-				return obj, pos, 0
-			}
-			return nil, geo.Position{}, 0
-		}
-	}
-	return driver.FindObjectAtPositionMatching(mouse, matches, canvas.Overlays().List(), canvas.menu, canvas.Content())
+	return canvas.FindObjectAtPositionMatching(mouse, matches)
 }
 
 func (w *window) processMouseMoved(xpos float64, ypos float64) {
