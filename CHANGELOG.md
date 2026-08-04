@@ -15,6 +15,22 @@ the trendvidia fork (github.com/trendvidia/fyne).
 
 ### Added
 
+* **Desktop press-and-hold dispatches `LongPressed`**
+  ([#266](https://github.com/belluikit/bellui/issues/266)). The glfw driver
+  hold-fires the gesture the touch drivers already had (#758): a lone
+  primary-button press held stationary for 300 ms dispatches `LongPressed`
+  to the `LongPressable` under the pointer while the button is still down,
+  and the release of a hold-fired press is not a tap. This applies to every
+  primary press — mouse included, matching how GTK, Flutter and Qt
+  long-press recognizers treat mice, and on a desktop touchscreen the
+  synthesized events are indistinguishable anyway — so `Entry` word-selects
+  on a slow click and the canvas file dialog's selection mode (#259) is now
+  reachable on desktop. Unlike the touch drivers, the release of a
+  hold-fired press dispatches nothing further: right-click keeps sole
+  ownership of `TappedSecondary` on desktop. Windows touchscreens still
+  promote a touch hold to a right-click before the app sees it —
+  belluikit/glfw#1 tracks real touch delivery (with Wayland `wl_touch`).
+
 * **Touch multi-select for the canvas file dialog — long-press selection
   mode** ([#259](https://github.com/belluikit/bellui/issues/259)). In
   open-multiple mode, long-pressing a file item enters selection mode: plain
@@ -27,9 +43,8 @@ the trendvidia fork (github.com/trendvidia/fyne).
   active, and the pointer modifiers keep their usual precedence throughout.
   As part of this, the mobile driver now gives Android's Back button the
   Escape meaning generally — a behavior change for existing apps, recorded
-  under Changed below. Desktop touchscreens cannot reach the gesture yet —
-  the GLFW driver has no touch long-press dispatch
-  ([#266](https://github.com/belluikit/bellui/issues/266)).
+  under Changed below. The GLFW driver's press-and-hold dispatch (#266,
+  above) makes the gesture reachable on desktop too.
 
 * **Escape closes the innermost pop-up, menu or dialog**
   ([#229](https://github.com/belluikit/bellui/issues/229)). The drivers give
