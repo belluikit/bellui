@@ -8,7 +8,7 @@ import "github.com/belluikit/bellui/geo"
 // ghost. It gives in-canvas drag-and-drop a visual affordance without every app
 // hand-rolling a following overlay (#819).
 //
-// Since: 2.19
+// Since: 1.0
 type DragImageProvider interface {
 	// DragImage returns the object to paint under the pointer during a drag, or
 	// nil for no ghost. It is read once when the drag starts.
@@ -22,7 +22,7 @@ type DragImageProvider interface {
 // drag as an in-canvas DnD drag, which is what enables DragTarget routing — so a
 // plain draggable (slider, scrollbar) never triggers drop-target callbacks.
 //
-// Since: 2.19
+// Since: 1.0
 type DragPayloadProvider interface {
 	// DragPayload returns the value delivered to drop targets, or nil.
 	DragPayload() any
@@ -32,7 +32,7 @@ type DragPayloadProvider interface {
 // [DragTarget] during an in-canvas drag (#819). Position is relative to the
 // target's top-left; AbsolutePosition is in canvas coordinates.
 //
-// Since: 2.19
+// Since: 1.0
 type DragTargetEvent struct {
 	AbsolutePosition geo.Position
 	Position         geo.Position
@@ -50,7 +50,7 @@ type DragTargetEvent struct {
 // [DragPayloadProvider] or [DragImageProvider] — so ordinary draggables never
 // reach a DragTarget.
 //
-// Since: 2.19
+// Since: 1.0
 type DragTarget interface {
 	// DragEnter fires when the pointer enters the target during a drag.
 	DragEnter(*DragTargetEvent)

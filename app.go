@@ -110,7 +110,7 @@ type NotifierApp interface {
 // Callback delivery is on the main goroutine and session-scoped; see
 // [NotificationOptions].
 //
-// Since: 2.19
+// Since: 1.0
 type NotifierWithOptionsApp interface {
 	// SendNotificationWithOptions sends a rich system notification.
 	SendNotificationWithOptions(*NotificationOptions)
@@ -125,7 +125,7 @@ type NotifierWithOptionsApp interface {
 // and only implemented on desktop platforms; mobile and web apps do not satisfy
 // this interface.
 //
-// Since: 2.19
+// Since: 1.0
 type BadgeApp interface {
 	// SetBadge sets the numeric badge on the app icon. A count of 0 (or less)
 	// clears the badge. Call on the main goroutine.
@@ -142,7 +142,7 @@ type BadgeApp interface {
 // on macOS the underlying service requires a bundled app (SetLaunchAtLogin
 // returns an error when that is not the case).
 //
-// Since: 2.19
+// Since: 1.0
 type LaunchAtLoginApp interface {
 	// SetLaunchAtLogin enables or disables starting this app at user login,
 	// returning an error if the change could not be applied (for example an
@@ -164,7 +164,7 @@ type LaunchAtLoginApp interface {
 // OS file-association and URL-scheme handling on Windows and Linux, where "open
 // with" relaunches the binary with the target in the arguments.
 //
-// Since: 2.17
+// Since: 1.0
 type SingleInstanceApp interface {
 	// SetSingleInstance enables single-instance mode, keyed on the app's UniqueID.
 	//
@@ -182,7 +182,7 @@ type SingleInstanceApp interface {
 	// no unique ID (see [NewWithID]). On platforms that are inherently single-instance
 	// (mobile, web) it is a no-op that reports primary true.
 	//
-	// Since: 2.17
+	// Since: 1.0
 	SetSingleInstance(onOpen func(args []string)) (primary bool, err error)
 }
 
@@ -205,7 +205,7 @@ type SingleInstanceApp interface {
 // handler. On platforms without a delivery mechanism the setters are accepted
 // but never fire (for example [SetOnFileOpened] on the web).
 //
-// Since: 2.17
+// Since: 1.0
 type OpenHandlerApp interface {
 	// SetOnFileOpened registers a callback fired with the URI of a file the app
 	// was asked to open.
@@ -247,7 +247,7 @@ func SendNotification(n *Notification) {
 // dropped; the callbacks and actions are lost in that case. It reports whether
 // the rich form was delivered.
 //
-// Since: 2.19
+// Since: 1.0
 func SendNotificationWithOptions(n *NotificationOptions) bool {
 	a := CurrentApp()
 	if a == nil || n == nil {

@@ -19,7 +19,7 @@ import (
 // forcing a materialization. O(1) on the lazy single-segment path (the
 // buffer keeps a line index); O(content) otherwise.
 //
-// Since: 2.15
+// Since: 1.0
 func (e *Entry) LineCount() int {
 	p := &e.text
 	// The identity chain (#400/#410) keeps Entry.Text and the buffer's
@@ -41,7 +41,7 @@ func (e *Entry) LineCount() int {
 // range; compare [Entry.CursorTextOffset] against Start and End to recover
 // which end is the anchor.
 //
-// Since: 2.14
+// Since: 1.0
 func (e *Entry) SelectionRange() (r TextRange, ok bool) {
 	if e.sel == nil || !e.sel.selecting {
 		return TextRange{}, false
@@ -65,7 +65,7 @@ func (e *Entry) SelectionRange() (r TextRange, ok bool) {
 // A no-op for read-only or disabled entries and for an empty string.
 // It is safe to call from any goroutine.
 //
-// Since: 2.14
+// Since: 1.0
 func (e *Entry) InsertText(text string) {
 	onMain(func() {
 		e.cancelComposition()
@@ -77,7 +77,7 @@ func (e *Entry) InsertText(text string) {
 // rune range [Start, End) of the current content is replaced by Text.
 // Start == End inserts at that offset; an empty Text deletes the range.
 //
-// Since: 2.14
+// Since: 1.0
 type TextEdit struct {
 	Start, End int
 	Text       string
@@ -103,7 +103,7 @@ type TextEdit struct {
 // last edit's replacement text. Any in-progress IME composition is cancelled
 // first. It is safe to call from any goroutine.
 //
-// Since: 2.14
+// Since: 1.0
 func (e *Entry) ApplyEdits(edits []TextEdit) bool {
 	applied := false
 	onMain(func() {

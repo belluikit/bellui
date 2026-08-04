@@ -17,7 +17,7 @@ import (
 // to the region that will actually be visible, instead of overflowing into an
 // area an ancestor scroll then clips.
 //
-// Since: 2.10
+// Since: 1.0
 func ClipBoundsForObject(c core.Canvas, obj core.CanvasObject) (geo.Rectangle, bool) {
 	if c == nil || obj == nil {
 		return geo.Rectangle{}, false

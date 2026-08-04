@@ -104,7 +104,7 @@ func (w *BaseWidget) AccessibilityLabel() string {
 //	btn := widget.NewIconButton(theme.ContentAddIcon(), onNew)
 //	btn.SetToolTipText(lang.L("New file"))
 //
-// Since: 2.19
+// Since: 1.0
 func (w *BaseWidget) SetToolTipText(text string) {
 	w.toolTipText = text
 }
@@ -113,7 +113,7 @@ func (w *BaseWidget) SetToolTipText(text string) {
 // empty string when none is set. It implements [core.ToolTipable], so every
 // widget can carry a hover tooltip.
 //
-// Since: 2.19
+// Since: 1.0
 func (w *BaseWidget) ToolTip() string {
 	return w.toolTipText
 }

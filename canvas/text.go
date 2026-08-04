@@ -87,7 +87,7 @@ func (t *Text) MinSize() geo.Size {
 // a pointee in place must assign a fresh pointer (or style) for the change to
 // be measured.
 //
-// Since: 3.0
+// Since: 1.0
 func (t *Text) MinSizeWithBaseline() (geo.Size, float32) {
 	gen := cache.ThemeCacheGeneration()
 	if m := t.measureMemo.Load(); m != nil && m.gen == gen &&

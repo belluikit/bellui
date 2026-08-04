@@ -15,7 +15,7 @@ import (
 
 // Supported reports whether this platform has a web engine binding.
 //
-// Since: 2.19
+// Since: 1.0
 const Supported = true
 
 // The web target is the one platform where the "native view" is already a web

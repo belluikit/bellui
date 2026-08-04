@@ -41,7 +41,7 @@ const (
 	// thumb grabbable no matter how long the content is; without a floor a
 	// very long document's proportional thumb shrinks to a few pixels.
 	//
-	// Since: 2.15
+	// Since: 1.0
 	SizeNameScrollBarMinThumb bellui.ThemeSizeName = "scrollBarMinThumb"
 
 	// SizeNameScrollBarSmall is the name of theme lookup for the shrunk scrollbar size.
@@ -247,7 +247,7 @@ func ScrollBarSmallSize() float32 {
 // ScrollBarMinThumbSize is the minimum length of a scroll bar thumb along its
 // axis, keeping it grabbable on very long content.
 //
-// Since: 2.15
+// Since: 1.0
 func ScrollBarMinThumbSize() float32 {
 	return Current().Size(SizeNameScrollBarMinThumb)
 }
