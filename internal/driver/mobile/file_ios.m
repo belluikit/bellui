@@ -14,9 +14,23 @@ bool iosExistsPath(const char* path) {
     return [[NSFileManager defaultManager] fileExistsAtPath:pathStr];
 }
 
+// This file is compiled without ARC, so every object handed to Go as a raw
+// pointer must be explicitly retained here and released via iosReleaseObject
+// (or the close functions below) — an autoreleased pointer dies with the next
+// pool drain and the later use from Go is a use-after-free (#250).
 void* iosParseUrl(const char* url) {
     NSString *urlStr = [NSString stringWithUTF8String:url];
-    return [NSURL URLWithString:urlStr];
+    NSURL *parsed = [NSURL URLWithString:urlStr];
+    if (parsed != nil) {
+        CFRetain((CFTypeRef)parsed);
+    }
+    return parsed;
+}
+
+void iosReleaseObject(void* ptr) {
+    if (ptr != NULL) {
+        CFRelease((CFTypeRef)ptr);
+    }
 }
 
 const void* iosReadFromURL(void* urlPtr, int* len)  {
@@ -37,19 +51,27 @@ const void* iosOpenFileWriter(void* urlPtr, bool truncate) {
     NSError *err = nil;
     // TODO handle error
     NSFileHandle* handle = [NSFileHandle fileHandleForWritingToURL:url error:&err];
+    if (handle == nil) {
+        return NULL;
+    }
 
     if (!truncate) {
         [handle seekToEndOfFile];
     }
 
+    CFRetain((CFTypeRef)handle);
     return handle;
 }
 
 void iosCloseFileWriter(void* handlePtr) {
+    if (handlePtr == NULL) {
+        return;
+    }
     NSFileHandle* handle = (NSFileHandle*)handlePtr;
 
     [handle synchronizeFile];
     [handle closeFile];
+    CFRelease((CFTypeRef)handlePtr);
 }
 
 
