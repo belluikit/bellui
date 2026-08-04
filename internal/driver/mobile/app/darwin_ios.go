@@ -8,7 +8,7 @@ package app
 
 /*
 #cgo CFLAGS: -x objective-c -DGL_SILENCE_DEPRECATION
-#cgo LDFLAGS: -framework Foundation -framework UIKit -framework CoreGraphics -framework MobileCoreServices -framework GLKit -framework OpenGLES -framework QuartzCore -framework UserNotifications
+#cgo LDFLAGS: -framework Foundation -framework UIKit -framework CoreGraphics -framework MobileCoreServices -framework GLKit -framework OpenGLES -framework QuartzCore -framework UserNotifications -framework UniformTypeIdentifiers
 #include <sys/utsname.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -31,7 +31,7 @@ void setKeyboardState(char* text, int selStart, int selEnd);
 void setKeyboardUndoState(int canUndo, int canRedo);
 
 void showFileOpenPicker(char* mimes, char *exts);
-void showFileSavePicker(char* mimes, char *exts);
+void showFileSavePicker(char* mimes, char *exts, char *filename);
 void closeFileResource(void* urlPtr);
 */
 import "C"
@@ -399,5 +399,8 @@ func driverShowFileSavePicker(callback func(string, func()), filter *FileFilter,
 	defer C.free(unsafe.Pointer(mimeStr))
 	defer C.free(unsafe.Pointer(extStr))
 
-	C.showFileSavePicker(mimeStr, extStr)
+	nameStr := C.CString(filename)
+	defer C.free(unsafe.Pointer(nameStr))
+
+	C.showFileSavePicker(mimeStr, extStr, nameStr)
 }

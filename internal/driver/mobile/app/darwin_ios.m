@@ -11,6 +11,7 @@
 
 #import <UIKit/UIKit.h>
 #import <MobileCoreServices/MobileCoreServices.h>
+#import <UniformTypeIdentifiers/UniformTypeIdentifiers.h>
 #import <GLKit/GLKit.h>
 #import <UserNotifications/UserNotifications.h>
 
@@ -208,7 +209,11 @@ void belluiKeyboardExpectRaise(void) {
     NSURL* toClose = NULL;
     BOOL secured = [url startAccessingSecurityScopedResource];
     if (secured) {
+        // Go keeps this pointer until the app closes the picked file, long
+        // after this delegate's autorelease pool drains — retain it and let
+        // closeFileResource release it (the #250 bridge invariant).
         toClose = url;
+        CFRetain((CFTypeRef)toClose);
     }
 
     filePickerReturned((char*)[[url description] UTF8String], toClose);
@@ -1778,70 +1783,92 @@ void belluiInputViewSetTextLayout(const char *wire, double originX, double origi
     [view belluiSetTextLayoutWire:wire originX:originX originY:originY scale:scale];
 }
 
-NSMutableArray *docTypesForMimeExts(char *mimes, char *exts) {
-    NSMutableArray *docTypes = [NSMutableArray array];
+// contentTypesForMimeExts maps the picker filter to UTTypes via the modern
+// (iOS 14+) UniformTypeIdentifiers API. The previous
+// UTTypeCreatePreferredIdentifierForTag + initWithDocumentTypes: path is
+// deprecated and left matching files un-pickable on current iOS (#251).
+NSMutableArray<UTType *> *contentTypesForMimeExts(char *mimes, char *exts) {
+    NSMutableArray<UTType *> *types = [NSMutableArray array];
     if (mimes != NULL && strlen(mimes) > 0) {
         NSString *mimeList = [NSString stringWithUTF8String:mimes];
 
         if ([mimeList isEqualToString:@"application/x-directory"]) {
-            [docTypes addObject:(NSString*)kUTTypeFolder];
+            [types addObject:UTTypeFolder];
         } else {
-            NSArray *mimeItems = [mimeList componentsSeparatedByString:@"|"];
-
-            for (NSString *mime in mimeItems)  {
-                NSString *UTI = (NSString *) UTTypeCreatePreferredIdentifierForTag(kUTTagClassMIMEType, (CFStringRef)mime, NULL);
-
-                [docTypes addObject:UTI];
+            for (NSString *mime in [mimeList componentsSeparatedByString:@"|"]) {
+                UTType *type = [UTType typeWithMIMEType:mime];
+                if (type != nil) {
+                    [types addObject:type];
+                }
             }
         }
     } else if (exts != NULL && strlen(exts) > 0) {
         NSString *extList = [NSString stringWithUTF8String:exts];
-        NSArray *extItems = [extList componentsSeparatedByString:@"|"];
-
-        for (NSString *ext in extItems)  {
-            NSString *UTI = (NSString *) UTTypeCreatePreferredIdentifierForTag(kUTTagClassFilenameExtension, (CFStringRef)ext, NULL);
-
-            [docTypes addObject:UTI];
+        for (NSString *ext in [extList componentsSeparatedByString:@"|"]) {
+            UTType *type = [UTType typeWithFilenameExtension:ext];
+            if (type != nil) {
+                [types addObject:type];
+            }
         }
-    } else {
-        [docTypes addObject:@"public.data"];
+    }
+    if (types.count == 0) {
+        [types addObject:UTTypeData];
     }
 
-    return docTypes;
+    return types;
 }
 
 void showFileOpenPicker(char* mimes, char *exts) {
     GoAppAppDelegate *appDelegate = (GoAppAppDelegate *)[[UIApplication sharedApplication] delegate];
 
-    NSMutableArray *docTypes = docTypesForMimeExts(mimes, exts);
+    NSArray<UTType *> *types = contentTypesForMimeExts(mimes, exts);
 
     UIDocumentPickerViewController *documentPicker = [[UIDocumentPickerViewController alloc]
-        initWithDocumentTypes:docTypes inMode:UIDocumentPickerModeOpen];
+        initForOpeningContentTypes:types asCopy:NO];
     documentPicker.delegate = (id) appDelegate;
 
     dispatch_async(dispatch_get_main_queue(), ^{
         [appDelegate.controller presentViewController:documentPicker animated:YES completion:nil];
+        // No ARC here: presentation owns the picker now, balance the alloc.
+        [documentPicker release];
     });
 }
 
-void showFileSavePicker(char* mimes, char *exts) {
+void showFileSavePicker(char* mimes, char *exts, char *filename) {
     GoAppAppDelegate *appDelegate = (GoAppAppDelegate *)[[UIApplication sharedApplication] delegate];
 
-    NSMutableArray *docTypes = docTypesForMimeExts(mimes, exts);
+    // The staged temporary file carries the name the picker offers, so it must
+    // be the caller's SetFileName, not a hardcoded placeholder (#252). Only the
+    // last path component is used — a separator in the name would stage the
+    // file outside the temporary directory, or nowhere at all.
+    NSString *name = nil;
+    if (filename != NULL && strlen(filename) > 0) {
+        name = [[NSString stringWithUTF8String:filename] lastPathComponent];
+    }
+    if (name == nil || name.length == 0) {
+        name = @"Untitled";
+    }
 
     NSURL *temporaryDirectoryURL = [NSURL fileURLWithPath: NSTemporaryDirectory() isDirectory: YES];
-    NSURL *temporaryFileURL = [temporaryDirectoryURL URLByAppendingPathComponent:@"filename"];
+    NSURL *temporaryFileURL = [temporaryDirectoryURL URLByAppendingPathComponent:name];
 
     char* bytes = "\n";
     NSData *data = [NSData dataWithBytes:bytes length:1];
-    BOOL ok = [data writeToURL:temporaryFileURL atomically:YES];
+    if (![data writeToURL:temporaryFileURL atomically:YES]) {
+        // Exporting a URL that failed to stage would present a picker for a
+        // file that does not exist; a plain fallback name always stages.
+        temporaryFileURL = [temporaryDirectoryURL URLByAppendingPathComponent:@"Untitled"];
+        [data writeToURL:temporaryFileURL atomically:YES];
+    }
 
     UIDocumentPickerViewController *documentPicker = [[UIDocumentPickerViewController alloc]
-        initWithURL:temporaryFileURL inMode:UIDocumentPickerModeMoveToService];
+        initForExportingURLs:@[temporaryFileURL] asCopy:NO];
     documentPicker.delegate = (id) appDelegate;
 
     dispatch_async(dispatch_get_main_queue(), ^{
         [appDelegate.controller presentViewController:documentPicker animated:YES completion:nil];
+        // No ARC here: presentation owns the picker now, balance the alloc.
+        [documentPicker release];
     });
 }
 
@@ -1852,4 +1879,5 @@ void closeFileResource(void* urlPtr) {
 
     NSURL* url = (NSURL*) urlPtr;
     [url stopAccessingSecurityScopedResource];
+    CFRelease((CFTypeRef)urlPtr);
 }
