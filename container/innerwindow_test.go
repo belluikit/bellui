@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/belluikit/bellui"
+	"github.com/belluikit/bellui/driver/desktop"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/cache"
 	"github.com/belluikit/bellui/test"
@@ -73,6 +74,14 @@ func TestInnerWindow_MinSize(t *testing.T) {
 
 	w2 := NewInnerWindow("Much longer title that will truncate", widget.NewLabel("Content"))
 	assert.Equal(t, winMin, w2.MinSize())
+}
+
+func TestInnerWindow_CornerResizeCursor(t *testing.T) {
+	w := NewInnerWindow("Title", widget.NewLabel("Content"))
+
+	// The corner sits bottom-right, so the desktop pointer affordance is the
+	// northwest–southeast diagonal resize shape (#269).
+	assert.Equal(t, desktop.NWSEResizeCursor, newDraggableCorner(w).Cursor())
 }
 
 func TestInnerWindow_SetContent(t *testing.T) {

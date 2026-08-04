@@ -15,6 +15,15 @@ the trendvidia fork (github.com/trendvidia/fyne).
 
 ### Added
 
+* **Diagonal resize cursors, and a pointer affordance on the `InnerWindow`
+  resize corner** ([#269](https://github.com/belluikit/bellui/issues/269)).
+  `desktop.StandardCursor` gains `NWSEResizeCursor` and `NESWResizeCursor`
+  (glfw 3.4 shapes; the driver falls back to the horizontal-resize shape on
+  X11 cursor themes that lack the diagonals, and wasm maps them to CSS
+  `nwse-resize`/`nesw-resize`). `container.InnerWindow`'s resize corner now
+  returns the NWSE shape, so on desktop the pointer signals the corner
+  resizes before it is dragged.
+
 * **Touch multi-select for the canvas file dialog — long-press selection
   mode** ([#259](https://github.com/belluikit/bellui/issues/259)). In
   open-multiple mode, long-pressing a file item enters selection mode: plain
