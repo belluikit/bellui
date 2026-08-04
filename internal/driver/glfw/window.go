@@ -369,15 +369,7 @@ func (w *window) processMouseMoved(xpos float64, ypos float64) {
 	mouseDragPos := w.mouseDragPos
 	mouseOver := w.mouseOver
 
-	// A pointer that travels past the drag threshold is a drag or a
-	// selection sweep, not a press-and-hold: invalidate any pending
-	// long-press fire (#266). The origin is the armed press position, not
-	// the last move, so slow sub-threshold creep accumulates and cancels.
-	if w.mouseButton&desktop.MouseButtonPrimary != 0 &&
-		(math.Abs(float64(mousePos.X-w.longPressPos.X)) >= dragMoveThreshold ||
-			math.Abs(float64(mousePos.Y-w.longPressPos.Y)) >= dragMoveThreshold) {
-		w.longPressSeq++
-	}
+	w.cancelLongPressOnMove(mousePos)
 
 	cursor := desktop.Cursor(desktop.DefaultCursor)
 
@@ -779,25 +771,26 @@ func (w *window) processMouseClicked(button desktop.MouseButton, action action, 
 		}
 	}
 
-	longPressed := w.longPressFired
-	if action == release && button == desktop.MouseButtonPrimary {
-		w.longPressFired = nil
-		w.longPressSeq++ // the press is over; a pending fire must not land
-	}
-
 	// Check for double click/tap on left mouse button
 	if action == release && button == desktop.MouseButtonPrimary && !mouseDragStarted {
-		if longPressed == nil {
-			w.mouseClickedHandleTapDoubleTap(co, ev)
-		} else {
-			// The hold already dispatched LongPressed (#266): the release of
-			// a hold-fired press is not a tap, exactly as on the touch
-			// drivers. Unlike them it is not a secondary tap either —
-			// desktop right-click owns that surface, and mirroring the
-			// mobile lift-opens-the-menu pattern here would pop context
-			// menus on slow clicks.
-			w.mousePressed = nil
-		}
+		w.mouseClickedHandleTapDoubleTap(co, ev)
+	}
+}
+
+// cancelLongPressOnMove invalidates a pending long-press fire once the
+// pointer travels past the drag threshold (#266): that press is a drag or a
+// selection sweep, not a press-and-hold. The origin is the armed press
+// position, not the last move, so slow sub-threshold creep accumulates and
+// cancels. A pending fire needs no release-time cancellation beyond this:
+// fireLongPress re-checks that the primary button is still the only one down,
+// and arming the next press bumps the generation.
+func (w *window) cancelLongPressOnMove(mousePos geo.Position) {
+	if w.mouseButton&desktop.MouseButtonPrimary == 0 {
+		return
+	}
+	if math.Abs(float64(mousePos.X-w.longPressPos.X)) >= dragMoveThreshold ||
+		math.Abs(float64(mousePos.Y-w.longPressPos.Y)) >= dragMoveThreshold {
+		w.longPressSeq++
 	}
 }
 
@@ -898,6 +891,19 @@ func (w *window) mouseClickedHandleMouseable(mev *desktop.MouseEvent, action act
 }
 
 func (w *window) mouseClickedHandleTapDoubleTap(co core.CanvasObject, ev *event.PointEvent) {
+	if w.longPressFired != nil {
+		// The hold already dispatched LongPressed (#266): the release of a
+		// hold-fired press is not a tap, exactly as on the touch drivers.
+		// Unlike them it is not a secondary tap either — desktop right-click
+		// owns that surface, and mirroring the mobile lift-opens-the-menu
+		// pattern here would pop context menus on slow clicks. (A hold that
+		// turned into a drag skips this path; armLongPress clears the stale
+		// flag at the next press.)
+		w.longPressFired = nil
+		w.mousePressed = nil
+		return
+	}
+
 	_, doubleTap := co.(event.DoubleTappable)
 	if doubleTap {
 		w.mouseClickCount++
