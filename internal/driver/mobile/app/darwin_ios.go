@@ -374,6 +374,9 @@ var fileCallback func(string, func())
 //export filePickerReturned
 func filePickerReturned(str *C.char, urlPtr unsafe.Pointer) {
 	if fileCallback == nil {
+		// No session to hand it to: still release the URL the delegate
+		// retained, or its security scope is stranded.
+		C.closeFileResource(urlPtr)
 		return
 	}
 
@@ -407,6 +410,9 @@ var (
 //export filePickerMultiAppend
 func filePickerMultiAppend(str *C.char, urlPtr unsafe.Pointer) {
 	if fileMultiCallback == nil {
+		// No session to hand it to: still release the URL the delegate
+		// retained, or its security scope is stranded.
+		C.closeFileResource(urlPtr)
 		return
 	}
 
