@@ -10,6 +10,7 @@ import (
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/core"
+	"github.com/belluikit/bellui/driver"
 	"github.com/belluikit/bellui/driver/desktop"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
@@ -677,6 +678,25 @@ func (w *window) view() *glfw.Window {
 	return w.viewport
 }
 
+// assert we are implementing driver.NativeWindow
+var _ driver.NativeWindow = (*window)(nil)
+
+// RunNative provides the browser-hosted window's native context: the <canvas>
+// element rendering it. Implementing driver.NativeWindow is also the web
+// driver's identity seam (#257): the wasm file-dialog overrides assert it on
+// the dialog's parent before putting up a real browser picker, which keeps the
+// test driver's windows on the canvas dialog. An emulated extra window
+// (wrapInner) delegates here and so reports the root's canvas; see
+// wrapInner.RunNative.
+func (w *window) RunNative(f func(any)) {
+	context := driver.BrowserWindowContext{}
+	if v := w.view(); v != nil {
+		context.Canvas = v.GetCanvas()
+	}
+
+	f(context)
+}
+
 // wrapInner represents a window that is provided by an InnerWindow container in the canvas.
 type wrapInner struct {
 	bellui.Window
@@ -715,6 +735,28 @@ func (w *wrapInner) Move(p geo.Position) {
 
 func (w *wrapInner) Resize(s geo.Size) {
 	w.inner.Resize(s)
+}
+
+// assert the emulated extra window keeps the web driver's identity seam
+var _ driver.NativeWindow = (*wrapInner)(nil)
+
+// RunNative delegates to the root window this emulated extra window embeds,
+// so it reports the root's canvas — correct on both counts: the inner window
+// is rendered on that canvas, and the browser surfaces the file-dialog
+// overrides put up (the <input type="file"> picker, the download) are
+// page-global anyway (#257). The delegation must be explicit: wrapInner
+// embeds the bellui.Window interface, which promotes only that interface's
+// methods — RunNative, an extension method on the concrete window, is not
+// among them, so without this method the extra window would fail the
+// driver.NativeWindow assertion and lose the browser picker.
+func (w *wrapInner) RunNative(f func(any)) {
+	if native, ok := w.Window.(driver.NativeWindow); ok {
+		native.RunNative(f)
+		return
+	}
+	// The root is always the web driver's own window today; degrade visibly
+	// to a canvas-less browser context rather than dropping the seam.
+	f(driver.BrowserWindowContext{})
 }
 
 func (w *wrapInner) SetContent(o core.CanvasObject) {
