@@ -102,7 +102,7 @@ func (w *InnerWindow) CreateRenderer() core.WidgetRenderer {
 	title := newDraggableLabel(w.title, w)
 	title.Truncation = bellui.TextTruncateEllipsis
 
-	height := w.Theme().Size(theme.SizeNameWindowTitleBarHeight)
+	height := w.barHeight()
 	off := (height - title.labelMinSize().Height) / 2
 	barMid := New(layout.NewCustomPaddedLayout(off, 0, 0, 0), title)
 	if w.buttonPosition() == widget.ButtonAlignTrailing {
@@ -167,6 +167,22 @@ func (w *InnerWindow) SetTitle(title string) {
 	w.Refresh()
 }
 
+// barHeight returns the title-bar height: the theme's desktop metric, raised
+// on mobile devices so the bar can hold touch-sized frame buttons (#254). The
+// desktop value (26dp) leaves the buttons at 16dp — under the minimum touch
+// target, and the mobile drivers additionally shift every touch up by ~8dp
+// (tapYOffset finger compensation), so on a device nearly every tap on the
+// close button resolved above it, onto the inert title label.
+func (w *InnerWindow) barHeight() float32 {
+	th := w.Theme()
+	height := th.Size(theme.SizeNameWindowTitleBarHeight)
+	if bellui.CurrentDevice().IsMobile() {
+		buttons := th.Size(theme.SizeNameIconButtonSize) + th.Size(theme.SizeNamePadding)*2
+		return geo.Max(height, buttons)
+	}
+	return height
+}
+
 func (w *InnerWindow) buttonPosition() widget.ButtonAlign {
 	if w.Alignment != widget.ButtonAlignCenter {
 		return w.Alignment
@@ -199,7 +215,7 @@ func (i *innerWindowRenderer) Layout(size geo.Size) {
 	i.LayoutShadow(size, geo.Position{})
 	i.bg.Resize(size)
 
-	barHeight := i.win.Theme().Size(theme.SizeNameWindowTitleBarHeight)
+	barHeight := i.win.barHeight()
 	i.bar.Move(geo.NewPos(pad, 0))
 	i.bar.Resize(geo.NewSize(size.Width-pad*2, barHeight))
 
@@ -219,7 +235,7 @@ func (i *innerWindowRenderer) MinSize() geo.Size {
 	th := i.win.Theme()
 	pad := th.Size(theme.SizeNamePadding)
 	contentMin := i.win.content.MinSize()
-	barHeight := th.Size(theme.SizeNameWindowTitleBarHeight)
+	barHeight := i.win.barHeight()
 
 	innerWidth := geo.Max(i.bar.MinSize().Width, contentMin.Width)
 
@@ -388,7 +404,14 @@ func (b *borderButton) SetOnTapped(fn func()) {
 }
 
 func (b *borderButton) MinSize() geo.Size {
-	height := b.Theme().Size(theme.SizeNameWindowButtonHeight)
+	th := b.Theme()
+	height := th.Size(theme.SizeNameWindowButtonHeight)
+	if bellui.CurrentDevice().IsMobile() {
+		// Meet the platform minimum touch target (#254): the desktop chrome
+		// button is too small to hit with a finger, especially with the
+		// drivers' tapYOffset shifting touches upward.
+		height = geo.Max(height, th.Size(theme.SizeNameIconButtonSize))
+	}
 	return geo.NewSquareSize(height)
 }
 
@@ -419,7 +442,13 @@ func (b *buttonTheme) Size(n bellui.ThemeSizeName) float32 {
 		}
 		n = theme.SizeNameWindowButtonRadius
 	case theme.SizeNameInlineIcon:
-		n = theme.SizeNameWindowButtonIcon
+		if bellui.CurrentDevice().IsMobile() {
+			// Touch-sized frame buttons (#254) carry the standard icon size;
+			// the desktop chrome icon would float tiny in the larger button.
+			n = theme.SizeNameIconSize
+		} else {
+			n = theme.SizeNameWindowButtonIcon
+		}
 	}
 
 	return b.Theme.Size(n)
