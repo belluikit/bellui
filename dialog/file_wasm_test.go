@@ -7,10 +7,37 @@ import (
 	"testing"
 
 	"github.com/belluikit/bellui"
+	"github.com/belluikit/bellui/driver"
 	"github.com/belluikit/bellui/test"
 
 	"github.com/stretchr/testify/assert"
 )
+
+// browserWindowStub satisfies the driver.NativeWindow identity check the wasm
+// overrides gate on (#257), standing in for a real web-driver window so the
+// override mechanics below can still be exercised from a test binary. Only the
+// type assertion is used; no other bellui.Window method is called.
+type browserWindowStub struct {
+	bellui.Window
+}
+
+func (*browserWindowStub) RunNative(f func(any)) {
+	f(driver.BrowserWindowContext{})
+}
+
+// The overrides gate on the parent being a real browser-hosted window: under
+// the test driver they must decline, so a js/wasm test binary is served by the
+// canvas dialog instead of clicking a real <input type="file"> or triggering a
+// real download in the harness page (#257).
+func TestFileOSOverridesDeclineWithoutBrowserWindow(t *testing.T) {
+	test.NewTempApp(t)
+
+	open := NewFileOpen(func(bellui.URIReadCloser, error) {}, nil)
+	assert.False(t, fileOpenOSOverride(open), "open must fall back to the canvas dialog under the test driver")
+
+	save := NewFileSave(func(bellui.URIWriteCloser, error) {}, nil)
+	assert.False(t, fileSaveOSOverride(save), "save must fall back to the canvas dialog under the test driver")
+}
 
 // The wasm save override has no picker-close moment: the writer is handed out
 // immediately and the "dialog" is the download offered when it is closed.
@@ -24,7 +51,7 @@ func TestFileSaveOSOverrideReportsCloseAtWriterClose(t *testing.T) {
 	d := NewFileSave(func(w bellui.URIWriteCloser, err error) {
 		writer = w
 		assert.NoError(t, err)
-	}, nil)
+	}, &browserWindowStub{})
 
 	closed := 0
 	d.SetOnClosed(func() { closed++ })
@@ -55,7 +82,7 @@ func TestFileOpenOSOverrideReportsCancel(t *testing.T) {
 		calls++
 		assert.Nil(t, r, "a dismissed picker delivers (nil, nil)")
 		assert.NoError(t, err)
-	}, nil)
+	}, &browserWindowStub{})
 
 	closed := 0
 	d.SetOnClosed(func() {
