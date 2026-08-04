@@ -6,7 +6,7 @@ import "sort"
 // identifies a contiguous block of lines, for example a folded region fed to
 // [Entry.HiddenRanges] (where the unit is logical, newline-delimited lines).
 //
-// Since: 2.10
+// Since: 1.0
 type LineRange struct {
 	Start, End int
 }

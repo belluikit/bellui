@@ -12,7 +12,7 @@ import "github.com/belluikit/bellui/internal/thread"
 // goroutine with [Do] or [DoAndWait]. [RunOnMain] composes the two for the common
 // "run on main, inline if already there" case.
 //
-// Since: 2.19
+// Since: 1.0
 func IsMainGoroutine() bool {
 	return thread.IsMainGoroutine()
 }
@@ -28,7 +28,7 @@ func IsMainGoroutine() bool {
 // is reached both from UI event handlers (already on main) and from background
 // goroutines.
 //
-// Since: 2.19
+// Since: 1.0
 func RunOnMain(fn func()) {
 	if thread.IsMainGoroutine() {
 		fn()

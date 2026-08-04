@@ -70,7 +70,7 @@ func Drag(c core.Canvas, pos geo.Position, deltaX, deltaY float32) {
 // mid-drag state such as ghost previews or drop highlights. onStep receives the
 // 1-based step index.
 //
-// Since: 3.0
+// Since: 1.0
 func DragSteps(c core.Canvas, pos geo.Position, deltaX, deltaY float32, steps int, onStep func(step int)) {
 	if steps < 1 {
 		steps = 1
@@ -257,7 +257,7 @@ func TypeOnCanvas(c core.Canvas, chars string) {
 // object of the canvas when it supports composition ([event.Composable]). It is
 // a no-op if nothing focusable composable is focused.
 //
-// Since: 2.10
+// Since: 1.0
 func Compose(c core.Canvas, text string, cursorPos int) {
 	if comp, ok := c.Focused().(event.Composable); ok {
 		comp.Compose(&event.PreeditEvent{Text: text, CursorPos: cursorPos})
@@ -268,7 +268,7 @@ func Compose(c core.Canvas, text string, cursorPos int) {
 // the canvas, inserting text as if it had been typed. A no-op when the focused
 // object does not support composition.
 //
-// Since: 2.10
+// Since: 1.0
 func ComposeCommit(c core.Canvas, text string) {
 	if comp, ok := c.Focused().(event.Composable); ok {
 		comp.ComposeCommit(text)
@@ -279,7 +279,7 @@ func ComposeCommit(c core.Canvas, text string) {
 // composable object of the canvas. A no-op when the focused object does not
 // support composition.
 //
-// Since: 2.10
+// Since: 1.0
 func ComposeCancel(c core.Canvas) {
 	if comp, ok := c.Focused().(event.Composable); ok {
 		comp.ComposeCancel()

@@ -39,7 +39,7 @@ const completionDocDividerWidth = 1
 
 // CompletionItem is a single suggestion shown in a [CompletionPopup].
 //
-// Since: 2.10
+// Since: 1.0
 type CompletionItem struct {
 	// Text is the primary suggestion, shown leading and inserted on selection.
 	Text string
@@ -55,12 +55,12 @@ type CompletionItem struct {
 	// documentation, a scrollable panel is shown beside the list and follows
 	// the selection; it replaces the small Detail tooltip while visible (#435).
 	//
-	// Since: 2.14
+	// Since: 1.0
 	Documentation string
 	// DocumentationMarkdown renders Documentation as markdown when true, and
 	// verbatim text otherwise.
 	//
-	// Since: 2.14
+	// Since: 1.0
 	DocumentationMarkdown bool
 }
 
@@ -80,7 +80,7 @@ type CompletionItem struct {
 // system owns and positions itself; CompletionPopup complements it for
 // app-level suggestions.
 //
-// Since: 2.10
+// Since: 1.0
 type CompletionPopup struct {
 	BaseWidget
 
@@ -92,7 +92,7 @@ type CompletionPopup struct {
 	// view, the mouse wheel moves the window, and a thin indicator shows the
 	// position). Zero applies the default of 8 rows (#436).
 	//
-	// Since: 2.14
+	// Since: 1.0
 	MaxVisibleRows int
 
 	// KeepHostFocus, when set before Show, leaves keyboard focus where it is
@@ -110,7 +110,7 @@ type CompletionPopup struct {
 	// plain [Entry.ShowCompletion] hosts keep the default forwarding model
 	// (#361).
 	//
-	// Since: 2.15
+	// Since: 1.0
 	KeepHostFocus bool
 
 	// OnMoved, when set, is called with the popup's final on-canvas rectangle
@@ -122,7 +122,7 @@ type CompletionPopup struct {
 	// rectangle. Hosts use it to anchor a companion surface — e.g. a signature
 	// help card — next to wherever the popup actually landed (#437).
 	//
-	// Since: 2.14
+	// Since: 1.0
 	OnMoved func(geo.Rectangle) `json:"-"`
 
 	canvas   core.Canvas
@@ -163,7 +163,7 @@ type CompletionPopup struct {
 // NewCompletionPopup creates a completion popup for the given items on canvas c.
 // Show it with [CompletionPopup.ShowAtCaret].
 //
-// Since: 2.10
+// Since: 1.0
 func NewCompletionPopup(c core.Canvas, items []CompletionItem) *CompletionPopup {
 	p := &CompletionPopup{canvas: c, items: items, detailRow: -1}
 	p.ExtendBaseWidget(p)
@@ -289,7 +289,7 @@ func (p *CompletionPopup) ShowAtCaret(caret geo.Rectangle) {
 // the content scrolls underneath; a set OnMoved observes the new placement.
 // A no-op while the popup is hidden.
 //
-// Since: 2.15
+// Since: 1.0
 func (p *CompletionPopup) Reposition(caret geo.Rectangle) {
 	if !p.shown {
 		return
@@ -405,7 +405,7 @@ func (p *CompletionPopup) TypedRune(r rune) {
 // [CompletionPopup.KeepHostFocus] hosts, and the same switch the popup's own
 // TypedKey consumes first in the default focused model.
 //
-// Since: 2.15
+// Since: 1.0
 func (p *CompletionPopup) HandleKey(e *event.KeyEvent) bool {
 	if !p.shown {
 		return false
@@ -417,7 +417,7 @@ func (p *CompletionPopup) HandleKey(e *event.KeyEvent) bool {
 // the surface it is shown over. It does so whenever the list is up: the list is
 // the innermost thing on screen.
 //
-// Since: 2.19
+// Since: 1.0
 func (p *CompletionPopup) HandlesEscape() bool { return p.shown }
 
 // consumeKey is the popup's key switch, shared by HandleKey (which gates it
@@ -595,7 +595,7 @@ func (p *CompletionPopup) scrollDocPage(down bool) bool {
 //
 // Scrolled implements the [event.Scrollable] interface.
 //
-// Since: 2.14
+// Since: 1.0
 func (p *CompletionPopup) Scrolled(e *event.ScrollEvent) {
 	if len(p.items) <= p.visibleRows() {
 		return

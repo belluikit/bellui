@@ -31,7 +31,7 @@ type KeyEvent struct {
 	// may leave it unset. It is carried through to the Modifier field of the
 	// event.KeyEvent delivered to key handlers.
 	//
-	// Since: 3.0
+	// Since: 1.0
 	Modifiers event.KeyModifier
 }
 

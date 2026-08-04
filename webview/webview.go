@@ -135,7 +135,7 @@
 // package makes — messages, results, load events, navigation decisions — runs
 // on it too.
 //
-// Since: 2.19
+// Since: 1.0
 package webview
 
 import (
@@ -170,7 +170,7 @@ import (
 // It is declared on every platform so that a cross-platform app can test for
 // it with [errors.Is] without a build tag; no other platform reports it.
 //
-// Since: 2.19
+// Since: 1.0
 var ErrRuntimeMissing = errors.New("webview: the web engine runtime is not installed")
 
 // WebView is a platform web engine hosted in a bellui layout. Create one with
@@ -179,7 +179,7 @@ var ErrRuntimeMissing = errors.New("webview: the web engine runtime is not insta
 //
 // All methods must be called on the main goroutine.
 //
-// Since: 2.19
+// Since: 1.0
 type WebView struct {
 	webView // platform implementation
 
@@ -220,7 +220,7 @@ type WebView struct {
 // New returns a web view that will load url once it is attached to a window.
 // An empty url leaves the engine on a blank page.
 //
-// Since: 2.19
+// Since: 1.0
 func New(url string) *WebView {
 	w := &WebView{}
 	w.url = url

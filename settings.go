@@ -43,7 +43,7 @@ type Settings interface {
 // implementations that can change the user's named primary color at runtime.
 // The settings of a running app (and of the test app) implement it.
 //
-// Since: 2.14
+// Since: 1.0
 type PrimaryColorSettings interface {
 	Settings
 

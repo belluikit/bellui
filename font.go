@@ -25,7 +25,7 @@ func SetFontFallbackRegister(fn func(Resource)) {
 // Register fallbacks once at startup, before building the UI. Registering after
 // text has been measured is supported but invalidates the font caches.
 //
-// Since: 2.10
+// Since: 1.0
 func RegisterFontFallback(res Resource) {
 	if res == nil || fontFallbackRegister == nil {
 		return
