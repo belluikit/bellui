@@ -1443,9 +1443,11 @@ func (d *driver) typeDownCanvas(canvas *canvas, r rune, code key.Code, mod key.M
 
 	// Escape closes the innermost pop-up, menu or dialog — the same default the
 	// desktop driver applies — unless the focused widget is using the key for a
-	// state of its own. Android's Back button reaches this through KeyBack
-	// below, not here.
-	if keyName == event.KeyEscape && intdriver.HandleEscape(canvas) {
+	// state of its own. Android's Back button carries the same meaning (#259):
+	// backing out of the innermost surface is what Back does everywhere else on
+	// the platform, so it only falls through to KeyBack delivery / GoBack below
+	// when there is nothing to dismiss.
+	if (keyName == event.KeyEscape || keyName == mobile.KeyBack) && intdriver.HandleEscape(canvas) {
 		return
 	}
 

@@ -36,6 +36,11 @@ func (f *fileDialog) showHostWindow(size geo.Size) {
 	w.SetOnClosed(f.hostWindowClosed)
 	w.Canvas().SetOnTypedKey(func(ev *event.KeyEvent) {
 		if ev.Name == event.KeyEscape {
+			// Selection mode is the innermost state: Escape leaves it first
+			// and only its next press cancels the dialog (#259).
+			if f.exitSelectionMode() {
+				return
+			}
 			f.dismiss.OnTapped()
 		}
 	})
