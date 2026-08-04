@@ -320,11 +320,15 @@ void showFileSave(JNIEnv* env, char* mimes, char* filename) {
 void Java_org_golang_app_GoNativeActivity_filePickerReturned(JNIEnv *env, jclass clazz, jstring str) {
     const char* cstr = (*env)->GetStringUTFChars(env, str, JNI_FALSE);
 	filePickerReturned((char*)cstr);
+	// The Go side copies the string before returning (C.GoString).
+	(*env)->ReleaseStringUTFChars(env, str, cstr);
 }
 
 void Java_org_golang_app_GoNativeActivity_filePickerMultiReturned(JNIEnv *env, jclass clazz, jstring str) {
     const char* cstr = (*env)->GetStringUTFChars(env, str, JNI_FALSE);
 	filePickerMultiReturned((char*)cstr);
+	// The Go side copies the string before returning (C.GoString).
+	(*env)->ReleaseStringUTFChars(env, str, cstr);
 }
 
 void Java_org_golang_app_GoNativeActivity_insetsChanged(JNIEnv *env, jclass clazz, int top, int bottom, int left, int right) {
