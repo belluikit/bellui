@@ -58,6 +58,7 @@ type App interface {
 	ShowVirtualKeyboard(KeyboardType)
 	HideVirtualKeyboard()
 	ShowFileOpenPicker(func(string, func()), *FileFilter)
+	ShowFileOpenMultiplePicker(func([]string, []func()), *FileFilter)
 	ShowFileSavePicker(func(string, func()), *FileFilter, string)
 }
 
@@ -162,6 +163,14 @@ func (a *app) HideVirtualKeyboard() {
 
 func (a *app) ShowFileOpenPicker(callback func(string, func()), filter *FileFilter) {
 	driverShowFileOpenPicker(callback, filter)
+}
+
+// ShowFileOpenMultiplePicker presents the platform open picker in multi-select
+// mode. The callback receives the chosen URIs with a parallel slice of per-URI
+// resource closers (a closer entry may be nil); a cancelled picker calls back
+// with an empty list.
+func (a *app) ShowFileOpenMultiplePicker(callback func([]string, []func()), filter *FileFilter) {
+	driverShowFileOpenMultiplePicker(callback, filter)
 }
 
 func (a *app) ShowFileSavePicker(callback func(string, func()), filter *FileFilter, filename string) {

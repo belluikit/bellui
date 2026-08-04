@@ -50,6 +50,7 @@ public class GoNativeActivity extends NativeActivity {
 	private static GoNativeActivity goNativeActivity;
 	private static final int FILE_OPEN_CODE = 1;
 	private static final int FILE_SAVE_CODE = 2;
+	private static final int FILE_OPEN_MULTI_CODE = 3;
 
 	// The shadow EditText must advertise a real text class: an inputType with
 	// no TYPE_MASK_CLASS bits reads as TYPE_NULL to the IME, and IMEs disable
@@ -84,6 +85,7 @@ public class GoNativeActivity extends NativeActivity {
 	private static final int PASSWORD_KEYBOARD_CODE = 3;
 
     private native void filePickerReturned(String str);
+    private native void filePickerMultiReturned(String str);
     private native void insetsChanged(int top, int bottom, int left, int right);
     private native void keyboardTyped(String str);
     private native void keyboardReplace(int start, int end, String str);
@@ -676,10 +678,14 @@ public class GoNativeActivity extends NativeActivity {
     }
 
     static void showFileOpen(String mimes) {
-        goNativeActivity.doShowFileOpen(mimes);
+        goNativeActivity.doShowFileOpen(mimes, false);
     }
 
-    void doShowFileOpen(String mimes) {
+    static void showFileOpenMulti(String mimes) {
+        goNativeActivity.doShowFileOpen(mimes, true);
+    }
+
+    void doShowFileOpen(String mimes, boolean multi) {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         if ("application/x-directory".equals(mimes) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE); // ask for a directory picker if OS supports it
@@ -692,7 +698,11 @@ public class GoNativeActivity extends NativeActivity {
             intent.setType(mimes);
             intent.addCategory(Intent.CATEGORY_OPENABLE);
         }
-        startActivityForResult(Intent.createChooser(intent, "Open File"), FILE_OPEN_CODE);
+        if (multi) {
+            intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+        }
+        startActivityForResult(Intent.createChooser(intent, "Open File"),
+                multi ? FILE_OPEN_MULTI_CODE : FILE_OPEN_CODE);
     }
 
     static void showFileSave(String mimes, String filename) {
@@ -1845,6 +1855,32 @@ public class GoNativeActivity extends NativeActivity {
 
 	@Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == FILE_OPEN_MULTI_CODE) {
+            // dialog was cancelled
+            if (resultCode != Activity.RESULT_OK) {
+                filePickerMultiReturned("");
+                return;
+            }
+
+            // Multiple choices arrive as ClipData items; a single choice in
+            // multi mode arrives as plain data. Joined with newlines, which
+            // cannot occur inside a content URI.
+            StringBuilder uris = new StringBuilder();
+            android.content.ClipData clip = data.getClipData();
+            if (clip != null) {
+                for (int i = 0; i < clip.getItemCount(); i++) {
+                    if (i > 0) {
+                        uris.append('\n');
+                    }
+                    uris.append(clip.getItemAt(i).getUri().toString());
+                }
+            } else if (data.getData() != null) {
+                uris.append(data.getData().toString());
+            }
+            filePickerMultiReturned(uris.toString());
+            return;
+        }
+
         // unhandled request
         if (requestCode != FILE_OPEN_CODE && requestCode != FILE_SAVE_CODE) {
             return;

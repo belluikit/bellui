@@ -46,6 +46,20 @@ the trendvidia fork (github.com/trendvidia/fyne).
 
 ### Fixed
 
+* **Mobile multi-select open uses the native pickers**
+  ([#255](https://github.com/belluikit/bellui/issues/255)).
+  `ShowFileOpenMultiple` on iOS and Android used to fall back to the canvas
+  dialog, whose multi-select needs modifier keys a touch device does not
+  have — picking more than one file was impossible. The iOS document picker
+  now presents with `allowsMultipleSelection` (each URL crossing the bridge
+  with its own retained security-scope closer) and Android's SAF intent sets
+  `EXTRA_ALLOW_MULTIPLE` (verified live on the Android bench: two files
+  chosen and both readers delivered; cancel reports `(nil, nil)`). An app
+  whose platform provides no multi picker still falls back to the canvas
+  dialog. Fixing the bridge also plugs a single-select leak: the picker's
+  resource closer was assigned after the native reader/writer had captured
+  its nil value, so the iOS security scope was never released.
+
 * **Android: folders granted through the SAF picker's Download shortcut are
   accepted** ([#244](https://github.com/belluikit/bellui/issues/244)). The
   listability probe trusted `ContentResolver.getType`, which the downloads
