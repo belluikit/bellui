@@ -26,7 +26,11 @@ func TestInnerWindow_Alignment(t *testing.T) {
 
 	w.Alignment = widget.ButtonAlignTrailing
 	w.Refresh()
-	assert.Greater(t, buttons.Position().X, float32(100))
+	// The bar is inset by one padding each side; trailing buttons sit at its
+	// right edge. Derived rather than a literal so it holds for the larger
+	// mobile touch-target buttons too (#254).
+	barWidth := w.Size().Width - theme.Padding()*2
+	assert.Equal(t, barWidth-buttons.MinSize().Width, buttons.Position().X)
 }
 
 func TestInnerWindow_Close(t *testing.T) {
@@ -64,7 +68,7 @@ func TestInnerWindow_MinSize(t *testing.T) {
 	btnMin := theme.Size(theme.SizeNameWindowButtonHeight)
 
 	winMin := w.MinSize()
-	assert.Equal(t, content.MinSize().Height+theme.Size(theme.SizeNameWindowTitleBarHeight)+theme.Padding()*3, winMin.Height)
+	assert.Equal(t, content.MinSize().Height+w.barHeight()+theme.Padding()*3, winMin.Height)
 	assert.Greater(t, winMin.Width, btnMin*3+theme.Padding()*5)
 
 	w2 := NewInnerWindow("Much longer title that will truncate", widget.NewLabel("Content"))
