@@ -54,7 +54,11 @@ the trendvidia fork (github.com/trendvidia/fyne).
   `driver.NativeWindow` — delivering the new `driver.BrowserWindowContext`,
   which carries the window's `<canvas>` element — and the wasm overrides
   assert it on the dialog's parent exactly like the desktop native backends,
-  so the test driver falls back to the canvas dialog. The two #257-skipped
+  so the test driver falls back to the canvas dialog. An emulated extra window
+  keeps the picker — it delegates to the root window it embeds and reports the
+  root's `<canvas>`. A `nil` dialog parent no longer reaches the browser
+  picker either: it now takes the canvas-dialog path, which — as on every
+  desktop backend — requires a real parent window. The two #257-skipped
   cancel-shape subtests are back on js.
 
 * **Android: folders granted through the SAF picker's Download shortcut are
