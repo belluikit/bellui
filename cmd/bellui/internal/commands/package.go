@@ -3,6 +3,8 @@ package commands
 import (
 	"errors"
 	"fmt"
+	"go/parser"
+	"go/token"
 	"image"
 	_ "image/jpeg" // import image encodings
 	"image/png"    // import image encodings
@@ -230,6 +232,14 @@ func (p *Packager) validate() (err error) {
 	if !hasGoCode(p.srcDir) {
 		return fmt.Errorf("failed to find go code in source directory: %s", p.srcDir)
 	}
+	if pkgName, ok := mainPackageIn(p.srcDir); !ok {
+		// Without this the failure surfaces much later and much more
+		// confusingly: the metadata init file (package main) is injected into
+		// the non-main package and the build dies with go's "found packages X
+		// and main" (#248) — typically after packaging was run from the module
+		// root while the application lives in a subdirectory.
+		return fmt.Errorf("source directory %s is package %q, not a main package — run bellui package from the application's main package directory", p.srcDir, pkgName)
+	}
 
 	p.appData.CustomMetadata = p.customMetadata.m
 	p.appData.Release = p.release
@@ -397,6 +407,34 @@ func validateAppID(appID, os, name string, release bool) (string, error) {
 	}
 
 	return appID, nil
+}
+
+// mainPackageIn reports whether dir's own package (the one `bellui package`
+// builds — not subdirectories) declares package main in at least one Go file.
+// Build constraints are deliberately ignored: a main package for another
+// target OS still counts. When no file declares main, the name of the package
+// found there (if any) is returned for the error message.
+func mainPackageIn(dir string) (pkgName string, ok bool) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return "", false
+	}
+	fset := token.NewFileSet()
+	for _, e := range entries {
+		name := e.Name()
+		if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") {
+			continue
+		}
+		f, err := parser.ParseFile(fset, filepath.Join(dir, name), nil, parser.PackageClauseOnly)
+		if err != nil {
+			continue
+		}
+		if f.Name.Name == "main" {
+			return "main", true
+		}
+		pkgName = f.Name.Name
+	}
+	return pkgName, false
 }
 
 var errStopWalking = errors.New("stop walking")
