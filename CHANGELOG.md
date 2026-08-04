@@ -52,7 +52,8 @@ the trendvidia fork (github.com/trendvidia/fyne).
   subdirectory used to inject the generated metadata file into the non-main
   package and die later inside the build with go's cryptic "found packages X
   and main"; the packager now checks the source directory's own package up
-  front and names it in the error.
+  front and names it in the error. Wrapping a prebuilt `--executable` never
+  builds or injects, so it stays exempt from the check.
 
 ### Changed
 
