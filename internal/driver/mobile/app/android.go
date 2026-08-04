@@ -48,10 +48,12 @@ void hideKeyboard(JNIEnv* env);
 void setKeyboardState(JNIEnv* env, char* text, int selStart, int selEnd);
 void keyboardEditorChanged(JNIEnv* env);
 void showFileOpen(JNIEnv* env, char* mimes);
+void showFileOpenMulti(JNIEnv* env, char* mimes);
 void showFileSave(JNIEnv* env, char* mimes, char* filename);
 void finish(JNIEnv* env, jobject ctx);
 
 void Java_org_golang_app_GoNativeActivity_filePickerReturned(JNIEnv *env, jclass clazz, jstring str);
+void Java_org_golang_app_GoNativeActivity_filePickerMultiReturned(JNIEnv *env, jclass clazz, jstring str);
 */
 import "C"
 
@@ -432,6 +434,28 @@ func filePickerReturned(str *C.char) {
 	fileCallback = nil
 }
 
+var fileMultiCallback func([]string, []func())
+
+//export filePickerMultiReturned
+func filePickerMultiReturned(str *C.char) {
+	if fileMultiCallback == nil {
+		return
+	}
+	callback := fileMultiCallback
+	fileMultiCallback = nil
+
+	// The Java side joins the picked content URIs with newlines (never valid
+	// inside a URI); an empty payload is a cancelled picker. Android needs no
+	// per-URI closer — SAF read grants last for the activity's lifetime, there
+	// is no security scope to end (the single-select path passes nil too).
+	joined := C.GoString(str)
+	if joined == "" {
+		callback(nil, nil)
+		return
+	}
+	callback(strings.Split(joined, "\n"), nil)
+}
+
 //export insetsChanged
 func insetsChanged(top, bottom, left, right int) {
 	currentSize.InsetTopPx = top
@@ -479,6 +503,24 @@ func driverShowFileOpenPicker(callback func(string, func()), filter *FileFilter)
 		// TODO pass in filter...
 		env := (*C.JNIEnv)(unsafe.Pointer(jniEnv)) // not a Go heap pointer
 		C.showFileOpen(env, mimeStr)
+		return nil
+	}
+
+	if err := mobileinit.RunOnJVM(open); err != nil {
+		log.Fatalf("app: %v", err)
+	}
+}
+
+func driverShowFileOpenMultiplePicker(callback func([]string, []func()), filter *FileFilter) {
+	fileMultiCallback = callback
+
+	mimes := mimeStringFromFilter(filter)
+	mimeStr := C.CString(mimes)
+	defer C.free(unsafe.Pointer(mimeStr))
+
+	open := func(vm, jniEnv, ctx uintptr) error {
+		env := (*C.JNIEnv)(unsafe.Pointer(jniEnv)) // not a Go heap pointer
+		C.showFileOpenMulti(env, mimeStr)
 		return nil
 	}
 
