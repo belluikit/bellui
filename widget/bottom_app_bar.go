@@ -46,27 +46,12 @@ func (b *BottomAppBar) CreateRenderer() core.WidgetRenderer {
 	b.ExtendBaseWidget(b)
 	bg := canvas.NewRectangle(nil)
 
-	var objects []core.CanvasObject
-	objects = append(objects, bg)
-
-	var actionBtns []*IconButton
-	for _, a := range b.Actions {
-		btn := NewIconButton(a.Icon, a.OnTapped)
-		actionBtns = append(actionBtns, btn)
-		objects = append(objects, btn)
-	}
-
-	if b.FAB != nil {
-		objects = append(objects, b.FAB)
-	}
-
 	r := &bottomAppBarRenderer{
-		BaseRenderer: internalWidget.NewBaseRenderer(objects),
+		BaseRenderer: internalWidget.NewBaseRenderer([]core.CanvasObject{bg}),
 		bg:           bg,
-		actionBtns:   actionBtns,
 		bar:          b,
 	}
-	r.Refresh()
+	r.Refresh() // populates the buttons and FAB from the public fields
 	return r
 }
 
@@ -106,10 +91,45 @@ func (r *bottomAppBarRenderer) Layout(size geo.Size) {
 }
 
 func (r *bottomAppBarRenderer) Refresh() {
+	r.updateActions()
 	th := r.bar.Theme()
 	v := bellui.CurrentApp().Settings().ThemeVariant()
 	r.bg.FillColor = th.Color(theme.ColorNameSurfaceContainerMedium, v)
 	r.bg.Refresh()
 	r.Layout(r.bar.Size())
 	canvas.Refresh(r.bar.super())
+}
+
+// updateActions re-syncs the drawn objects with the bar's current Actions and
+// FAB, the radioGroupRenderer.updateItems pattern (#203, #234): both are
+// public fields, so they can be appended to, replaced or truncated at any
+// time. Surviving buttons are reused with their icon and handler re-synced in
+// place. A FAB that arrives after construction is extended here, since only
+// its own constructor does that at build time.
+func (r *bottomAppBarRenderer) updateActions() {
+	if len(r.actionBtns) > len(r.bar.Actions) {
+		clear(r.actionBtns[len(r.bar.Actions):]) // drop the tail's references too
+		r.actionBtns = r.actionBtns[:len(r.bar.Actions)]
+	}
+	for i, a := range r.bar.Actions {
+		if i == len(r.actionBtns) {
+			r.actionBtns = append(r.actionBtns, NewIconButton(a.Icon, a.OnTapped))
+			continue
+		}
+		btn := r.actionBtns[i]
+		btn.Icon = a.Icon
+		btn.OnTapped = a.OnTapped
+		btn.Refresh()
+	}
+
+	objects := make([]core.CanvasObject, 0, len(r.actionBtns)+2)
+	objects = append(objects, r.bg)
+	for _, btn := range r.actionBtns {
+		objects = append(objects, btn)
+	}
+	if fab := r.bar.FAB; fab != nil {
+		fab.ExtendBaseWidget(fab)
+		objects = append(objects, fab)
+	}
+	r.SetObjects(objects)
 }
