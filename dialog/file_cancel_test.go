@@ -1,6 +1,7 @@
 package dialog
 
 import (
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -39,6 +40,13 @@ func TestFileDialog_CancelReportsEveryCallbackShape(t *testing.T) {
 	})
 
 	t.Run("single open", func(t *testing.T) {
+		if runtime.GOOS == "js" {
+			// The browser <input type="file"> picker serves single open on wasm
+			// even under the test driver (#257), so the canvas dialog — and the
+			// reportCancel path this exercises — is unreachable here. The shape
+			// is covered by every desktop leg.
+			t.Skip("single open is served by the browser picker on wasm, not the canvas dialog (#257)")
+		}
 		called := false
 		d := NewFileOpen(func(r bellui.URIReadCloser, err error) {
 			called = true
@@ -65,6 +73,13 @@ func TestFileDialog_CancelReportsEveryCallbackShape(t *testing.T) {
 	})
 
 	t.Run("save", func(t *testing.T) {
+		if runtime.GOOS == "js" {
+			// Save on wasm has no picker at all: the override hands out the
+			// download writer immediately, even under the test driver (#257),
+			// so there is no cancel to report. The shape is covered by every
+			// desktop leg.
+			t.Skip("save is served by the immediate download writer on wasm, not the canvas dialog (#257)")
+		}
 		called := false
 		d := NewFileSave(func(wr bellui.URIWriteCloser, err error) {
 			called = true
