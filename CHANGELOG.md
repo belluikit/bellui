@@ -54,6 +54,25 @@ the trendvidia fork (github.com/trendvidia/fyne).
   `List()` actually performs. Verified live on the Android 15/ColorOS bench
   device.
 
+* **`driver.ObjectAtPosition`/`ObjectAtPositionMatching` cover every dispatch
+  root** ([#245](https://github.com/belluikit/bellui/issues/245)). The public
+  pick wrappers now probe through the canvas's own dispatch hit-walk when it
+  exposes one, so the desktop menu bar and the mobile window head or open
+  menu are pickable — and the spatial-index fast path is used — exactly as
+  in tap dispatch; canvases without extra roots keep the overlays+content
+  walk. Window-head objects also resolve through
+  `Driver.AbsolutePositionForObject` now (their tree was missing from the
+  canvas object trees).
+
+* **`bellui package` fails fast, and clearly, when run outside a main
+  package** ([#248](https://github.com/belluikit/bellui/issues/248)).
+  Running it from the module root while the application lives in a
+  subdirectory used to inject the generated metadata file into the non-main
+  package and die later inside the build with go's cryptic "found packages X
+  and main"; the packager now checks the source directory's own package up
+  front and names it in the error. Wrapping a prebuilt `--executable` never
+  builds or injects, so it stays exempt from the check.
+
 * **File pickers: four fixes from the first on-device iOS pass** (#239).
   Closing a saved file no longer segfaults — the ObjC file bridge handed Go
   autoreleased `NSURL`/`NSFileHandle` pointers, now retained across the
