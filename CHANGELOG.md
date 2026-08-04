@@ -61,6 +61,31 @@ the trendvidia fork (github.com/trendvidia/fyne).
   desktop backend — requires a real parent window. The two #257-skipped
   cancel-shape subtests are back on js.
 
+* **Mobile multi-select open uses the native pickers**
+  ([#255](https://github.com/belluikit/bellui/issues/255)).
+  `ShowFileOpenMultiple` on iOS and Android used to fall back to the canvas
+  dialog, whose multi-select needs modifier keys a touch device does not
+  have — picking more than one file was impossible. The iOS document picker
+  now presents with `allowsMultipleSelection` (each URL crossing the bridge
+  with its own retained security-scope closer) and Android's SAF intent sets
+  `EXTRA_ALLOW_MULTIPLE` (verified live on the Android bench: two files
+  chosen and both readers delivered; cancel reports `(nil, nil)`). An app
+  whose platform provides no multi picker still falls back to the canvas
+  dialog. Fixing the bridge also plugs a single-select leak: the picker's
+  resource closer was assigned after the native reader/writer had captured
+  its nil value, so the iOS security scope was never released.
+
+* **The windowed canvas dialog's frame buttons are tappable on mobile**
+  ([#254](https://github.com/belluikit/bellui/issues/254)). The
+  `container.InnerWindow` chrome used desktop metrics everywhere, leaving the
+  close button a 16dp target — under every platform's touch minimum — while
+  the mobile drivers shift each touch up by 8dp of finger compensation, so on
+  an iPad a tap on the X resolved above the button onto the inert title label
+  nearly every time. On mobile devices each frame button now spans the theme's
+  icon-button size plus a padding ring — 48dp on the default theme, the
+  MD3/Android touch-target floor — with the visual button kept at the
+  icon-button size carrying the standard icon; desktop chrome is unchanged.
+
 * **Android: folders granted through the SAF picker's Download shortcut are
   accepted** ([#244](https://github.com/belluikit/bellui/issues/244)). The
   listability probe trusted `ContentResolver.getType`, which the downloads
