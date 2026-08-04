@@ -54,8 +54,8 @@ the trendvidia fork (github.com/trendvidia/fyne).
   `driver.NativeWindow` — delivering the new `driver.BrowserWindowContext`,
   which carries the window's `<canvas>` element — and the wasm overrides
   assert it on the dialog's parent exactly like the desktop native backends,
-  so the test driver (and the emulated extra windows) fall back to the canvas
-  dialog. The two #257-skipped cancel-shape subtests are back on js.
+  so the test driver falls back to the canvas dialog. The two #257-skipped
+  cancel-shape subtests are back on js.
 
 * **Android: folders granted through the SAF picker's Download shortcut are
   accepted** ([#244](https://github.com/belluikit/bellui/issues/244)). The
