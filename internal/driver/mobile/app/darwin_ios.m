@@ -209,7 +209,11 @@ void belluiKeyboardExpectRaise(void) {
     NSURL* toClose = NULL;
     BOOL secured = [url startAccessingSecurityScopedResource];
     if (secured) {
+        // Go keeps this pointer until the app closes the picked file, long
+        // after this delegate's autorelease pool drains — retain it and let
+        // closeFileResource release it (the #250 bridge invariant).
         toClose = url;
+        CFRetain((CFTypeRef)toClose);
     }
 
     filePickerReturned((char*)[[url description] UTF8String], toClose);
@@ -1825,6 +1829,8 @@ void showFileOpenPicker(char* mimes, char *exts) {
 
     dispatch_async(dispatch_get_main_queue(), ^{
         [appDelegate.controller presentViewController:documentPicker animated:YES completion:nil];
+        // No ARC here: presentation owns the picker now, balance the alloc.
+        [documentPicker release];
     });
 }
 
@@ -1832,10 +1838,15 @@ void showFileSavePicker(char* mimes, char *exts, char *filename) {
     GoAppAppDelegate *appDelegate = (GoAppAppDelegate *)[[UIApplication sharedApplication] delegate];
 
     // The staged temporary file carries the name the picker offers, so it must
-    // be the caller's SetFileName, not a hardcoded placeholder (#252).
-    NSString *name = @"Untitled";
+    // be the caller's SetFileName, not a hardcoded placeholder (#252). Only the
+    // last path component is used — a separator in the name would stage the
+    // file outside the temporary directory, or nowhere at all.
+    NSString *name = nil;
     if (filename != NULL && strlen(filename) > 0) {
-        name = [NSString stringWithUTF8String:filename];
+        name = [[NSString stringWithUTF8String:filename] lastPathComponent];
+    }
+    if (name == nil || name.length == 0) {
+        name = @"Untitled";
     }
 
     NSURL *temporaryDirectoryURL = [NSURL fileURLWithPath: NSTemporaryDirectory() isDirectory: YES];
@@ -1843,7 +1854,12 @@ void showFileSavePicker(char* mimes, char *exts, char *filename) {
 
     char* bytes = "\n";
     NSData *data = [NSData dataWithBytes:bytes length:1];
-    [data writeToURL:temporaryFileURL atomically:YES];
+    if (![data writeToURL:temporaryFileURL atomically:YES]) {
+        // Exporting a URL that failed to stage would present a picker for a
+        // file that does not exist; a plain fallback name always stages.
+        temporaryFileURL = [temporaryDirectoryURL URLByAppendingPathComponent:@"Untitled"];
+        [data writeToURL:temporaryFileURL atomically:YES];
+    }
 
     UIDocumentPickerViewController *documentPicker = [[UIDocumentPickerViewController alloc]
         initForExportingURLs:@[temporaryFileURL] asCopy:NO];
@@ -1851,6 +1867,8 @@ void showFileSavePicker(char* mimes, char *exts, char *filename) {
 
     dispatch_async(dispatch_get_main_queue(), ^{
         [appDelegate.controller presentViewController:documentPicker animated:YES completion:nil];
+        // No ARC here: presentation owns the picker now, balance the alloc.
+        [documentPicker release];
     });
 }
 
@@ -1861,4 +1879,5 @@ void closeFileResource(void* urlPtr) {
 
     NSURL* url = (NSURL*) urlPtr;
     [url stopAccessingSecurityScopedResource];
+    CFRelease((CFTypeRef)urlPtr);
 }

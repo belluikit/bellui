@@ -14,7 +14,7 @@ bool iosExistsPath(const char* path);
 void* iosParseUrl(const char* url);
 const void* iosReadFromURL(void* url, int* len);
 
-const void* iosOpenFileWriter(void* url, bool truncate);
+const void* iosOpenFileWriter(void* url, bool truncate, char** errMsg);
 void iosCloseFileWriter(void* handle);
 const int iosWriteToFile(void* handle, const void* bytes, int len);
 void iosReleaseObject(void* ptr);
@@ -159,13 +159,19 @@ func nativeFileSave(f *fileSave, truncate bool) (io.WriteCloser, error) {
 
 	url := C.iosParseUrl(cStr)
 
-	handle := C.iosOpenFileWriter(url, C.bool(truncate))
+	var errMsg *C.char
+	handle := C.iosOpenFileWriter(url, C.bool(truncate), &errMsg)
 	C.iosReleaseObject(url) // the writer keeps the handle, not the URL
 	if handle == nil {
 		if f.done != nil {
 			f.done()
 		}
-		return nil, errors.New("unable to open file for writing on iOS")
+		msg := "unable to open file for writing on iOS"
+		if errMsg != nil {
+			msg += ": " + C.GoString(errMsg)
+			C.free(unsafe.Pointer(errMsg))
+		}
+		return nil, errors.New(msg)
 	}
 	fileStruct := &secureWriteCloser{handle: handle, closer: f.done}
 	return fileStruct, nil
