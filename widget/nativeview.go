@@ -79,7 +79,7 @@ import (
 //
 // All methods must be called on the main goroutine.
 //
-// Since: 2.19
+// Since: 1.0
 type NativeViewHost struct {
 	BaseWidget
 
@@ -113,7 +113,7 @@ type NativeViewHost struct {
 //
 // Every method is called on the main goroutine.
 //
-// Since: 2.19
+// Since: 1.0
 type NativeView interface {
 	// Attach creates the platform view inside win, whose native handle the
 	// backend obtains through [driver.NativeWindow.RunNative]. It is called
@@ -150,7 +150,7 @@ type NativeView interface {
 // per-frame sync it already runs, so a backend needs no focus-change
 // notification of its own. Every method is called on the main goroutine.
 //
-// Since: 2.19
+// Since: 1.0
 type NativeViewFocuser interface {
 	NativeView
 
@@ -175,7 +175,7 @@ var _ core.Widget = (*NativeViewHost)(nil)
 // NewNativeViewHost returns a host that embeds view at its position in the
 // layout. The view is not created until the host is laid out on a canvas.
 //
-// Since: 2.19
+// Since: 1.0
 func NewNativeViewHost(view NativeView) *NativeViewHost {
 	h := &NativeViewHost{view: view}
 	h.ExtendBaseWidget(h)

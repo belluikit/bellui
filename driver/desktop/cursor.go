@@ -41,12 +41,12 @@ const (
 	HiddenCursor
 	// GrabCursor indicates an item that can be grabbed to drag (open-hand style).
 	//
-	// Since: 2.19
+	// Since: 1.0
 	GrabCursor
 	// GrabbingCursor indicates an item currently being dragged (closed-hand /
 	// move style); the driver applies it for the duration of a Draggable drag.
 	//
-	// Since: 2.19
+	// Since: 1.0
 	GrabbingCursor
 )
 

@@ -14,7 +14,7 @@ type Clipboard interface {
 // raster images. Assert it on the value returned by [App.Clipboard]; on
 // platforms without image clipboard support the assertion fails.
 //
-// Since: 2.16
+// Since: 1.0
 type ImageClipboard interface {
 	// Image returns the image on the clipboard, or (nil, false) when the
 	// clipboard holds no image or reading it failed.
@@ -28,7 +28,7 @@ type ImageClipboard interface {
 // manager. Assert it on the value returned by [App.Clipboard]; on platforms
 // without file clipboard support the assertion fails.
 //
-// Since: 2.16
+// Since: 1.0
 type FileClipboard interface {
 	// Files returns the list of files on the clipboard, or nil when the
 	// clipboard holds no files.
@@ -43,7 +43,7 @@ type FileClipboard interface {
 // [App.Clipboard]; on platforms without rich clipboard support the assertion
 // fails.
 //
-// Since: 2.16
+// Since: 1.0
 type HTMLClipboard interface {
 	// HTML returns the HTML markup on the clipboard, or ("", false) when the
 	// clipboard holds no HTML flavor.
@@ -61,7 +61,7 @@ type HTMLClipboard interface {
 // fields are omitted from the transaction; a wholly zero value clears the
 // clipboard.
 //
-// Since: 3.0
+// Since: 1.0
 type ClipboardContent struct {
 	// Text is the plain-text flavor, doubling as the fallback for
 	// applications that cannot paste any of the richer flavors.
@@ -84,7 +84,7 @@ type ClipboardContent struct {
 // flavors. Assert it on the value returned by [App.Clipboard]; on platforms
 // without multi-flavor support the assertion fails.
 //
-// Since: 3.0
+// Since: 1.0
 type MultiFlavorClipboard interface {
 	// SetFlavors replaces the clipboard content with every set flavor of
 	// content, written as one transaction. A flavor the platform cannot
@@ -97,7 +97,7 @@ type MultiFlavorClipboard interface {
 // It returns (nil, false) when no app is running, the clipboard does not
 // support images ([ImageClipboard]) or no image is present.
 //
-// Since: 2.16
+// Since: 1.0
 func ClipboardImage() (image.Image, bool) {
 	if a := CurrentApp(); a != nil {
 		if c, ok := a.Clipboard().(ImageClipboard); ok {
@@ -111,7 +111,7 @@ func ClipboardImage() (image.Image, bool) {
 // It reports whether the clipboard supports images ([ImageClipboard]) —
 // when false nothing was written.
 //
-// Since: 2.16
+// Since: 1.0
 func SetClipboardImage(img image.Image) bool {
 	if a := CurrentApp(); a != nil {
 		if c, ok := a.Clipboard().(ImageClipboard); ok {
@@ -126,7 +126,7 @@ func SetClipboardImage(img image.Image) bool {
 // It returns nil when no app is running, the clipboard does not support file
 // lists ([FileClipboard]) or no files are present.
 //
-// Since: 2.16
+// Since: 1.0
 func ClipboardFiles() []URI {
 	if a := CurrentApp(); a != nil {
 		if c, ok := a.Clipboard().(FileClipboard); ok {
@@ -140,7 +140,7 @@ func ClipboardFiles() []URI {
 // It reports whether the clipboard supports file lists ([FileClipboard]) —
 // when false nothing was written.
 //
-// Since: 2.16
+// Since: 1.0
 func SetClipboardFiles(files []URI) bool {
 	if a := CurrentApp(); a != nil {
 		if c, ok := a.Clipboard().(FileClipboard); ok {
@@ -155,7 +155,7 @@ func SetClipboardFiles(files []URI) bool {
 // It returns ("", false) when no app is running, the clipboard does not
 // support HTML ([HTMLClipboard]) or no HTML flavor is present.
 //
-// Since: 2.16
+// Since: 1.0
 func ClipboardHTML() (string, bool) {
 	if a := CurrentApp(); a != nil {
 		if c, ok := a.Clipboard().(HTMLClipboard); ok {
@@ -170,7 +170,7 @@ func ClipboardHTML() (string, bool) {
 // supports multi-flavor writes ([MultiFlavorClipboard]) — when false nothing
 // was written.
 //
-// Since: 3.0
+// Since: 1.0
 func SetClipboardFlavors(content ClipboardContent) bool {
 	if a := CurrentApp(); a != nil {
 		if c, ok := a.Clipboard().(MultiFlavorClipboard); ok {
@@ -186,7 +186,7 @@ func SetClipboardFlavors(content ClipboardContent) bool {
 // It reports whether the clipboard supports HTML ([HTMLClipboard]) —
 // when false nothing was written.
 //
-// Since: 2.16
+// Since: 1.0
 func SetClipboardHTML(html, plainFallback string) bool {
 	if a := CurrentApp(); a != nil {
 		if c, ok := a.Clipboard().(HTMLClipboard); ok {

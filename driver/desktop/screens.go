@@ -4,7 +4,7 @@ package desktop
 // native-system coordinates as [Window.RequestPosition] — positions inside it
 // can be passed to RequestPosition verbatim.
 //
-// Since: 2.16
+// Since: 1.0
 type ScreenArea struct {
 	X, Y          int
 	Width, Height int
@@ -15,7 +15,7 @@ type ScreenArea struct {
 // onto a screen that still exists, or placing a window on a specific display.
 // It is deliberately not a display-configuration API.
 //
-// Since: 2.16
+// Since: 1.0
 type ScreenInfo struct {
 	// Name is the system-reported name of the display.
 	Name string
@@ -43,7 +43,7 @@ type ScreenInfo struct {
 // On Linux Wayland global coordinates are compositor-private, so the reported
 // bounds are best-effort and may not relate to actual window positions.
 //
-// Since: 2.16
+// Since: 1.0
 type ScreensDriver interface {
 	// Screens returns information about every display attached to the
 	// system, in system order. The primary display has Primary set.

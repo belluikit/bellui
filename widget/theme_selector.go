@@ -18,7 +18,7 @@ import (
 // ThemeVariantSelection is the variant choice of a [ThemeSelection]: follow
 // the system appearance, always light, or always dark.
 //
-// Since: 2.14
+// Since: 1.0
 type ThemeVariantSelection int
 
 const (
@@ -46,7 +46,7 @@ func (v ThemeVariantSelection) String() string {
 // ThemeSelection is the state of a [ThemeSelector]: a theme variant choice
 // and a named primary color (one of [theme.PrimaryColorNames]).
 //
-// Since: 2.14
+// Since: 1.0
 type ThemeSelection struct {
 	Variant ThemeVariantSelection
 	Primary string
@@ -91,7 +91,7 @@ const (
 // own Preferences, so the appearance choice follows the app rather than the
 // system-wide Bellui settings. Restore it with [LoadThemeSelection].
 //
-// Since: 2.14
+// Since: 1.0
 func SaveThemeSelection(sel ThemeSelection, p bellui.Preferences) {
 	bellui.SetPref(p, themeSelectionVariantKey, sel.Variant.String())
 	bellui.SetPref(p, themeSelectionPrimaryKey, sel.Primary)
@@ -101,7 +101,7 @@ func SaveThemeSelection(sel ThemeSelection, p bellui.Preferences) {
 // The boolean reports whether a stored selection was found; call
 // [ThemeSelection.Apply] on the result at startup to restore the appearance.
 //
-// Since: 2.14
+// Since: 1.0
 func LoadThemeSelection(p bellui.Preferences) (ThemeSelection, bool) {
 	stored := bellui.PrefOr(p, themeSelectionVariantKey, "")
 	if stored == "" {
@@ -124,7 +124,7 @@ func LoadThemeSelection(p bellui.Preferences) (ThemeSelection, bool) {
 // OnChanged, but nothing is applied or persisted by the widget itself.
 // Use [ThemeSelection.Apply] and [SaveThemeSelection] for that.
 //
-// Since: 2.14
+// Since: 1.0
 type ThemeSelector struct {
 	BaseWidget
 
@@ -137,7 +137,7 @@ type ThemeSelector struct {
 // NewThemeSelector creates a theme selector. The initial selection is the
 // system variant with the app's current primary color.
 //
-// Since: 2.14
+// Since: 1.0
 func NewThemeSelector(changed func(ThemeSelection)) *ThemeSelector {
 	t := &ThemeSelector{OnChanged: changed}
 	if a := bellui.CurrentApp(); a != nil {

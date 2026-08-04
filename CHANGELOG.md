@@ -130,6 +130,14 @@ the trendvidia fork (github.com/trendvidia/fyne).
 
 ### Changed
 
+* **Godoc `Since:` annotations on previously unreleased API now read
+  `Since: 1.0`** ([#264](https://github.com/belluikit/bellui/issues/264)).
+  API added after the fork's 2.9.0 release carried annotations from version
+  lines that never shipped on this module path (2.10–2.19, 3.0); all are
+  rewritten to the version that actually ships it, `v1.0.0`. Annotations from
+  releases that did ship — upstream Fyne 1.0–2.7.3 and the fork's 2.8/2.9 —
+  are unchanged. The mapping is recorded in `docs/REBRAND.md`.
+
 * **`driver.ObjectAtPosition`/`ObjectAtPositionMatching` now probe and report
   in the `Driver.AbsolutePositionForObject` space**
   ([#235](https://github.com/belluikit/bellui/issues/235)). The pick

@@ -16,7 +16,7 @@ var ErrShareNotSupported = errors.New("sharing is not supported on this platform
 // (ACTION_SEND / UIActivityViewController). Platforms without a share surface
 // return [ErrShareNotSupported] rather than silently doing nothing.
 //
-// Since: 2.19
+// Since: 1.0
 type SharerApp interface {
 	// ShareText offers the given text to the platform share UI.
 	ShareText(text string) error

@@ -29,7 +29,7 @@ type PopUp struct {
 	// with a result to report — sets it so that path runs whatever the user
 	// dismissed with.
 	//
-	// Since: 2.19
+	// Since: 1.0
 	OnDismissed func() `json:"-"`
 
 	innerPos          geo.Position
@@ -210,7 +210,7 @@ func (p *PopUp) PerformAccessibleAction(name string) {
 // is not an input surface at all (a toast, a tooltip): those keep counting down
 // and leave the key to whatever is beneath them.
 //
-// Since: 2.19
+// Since: 1.0
 func (p *PopUp) DismissOnEscape() bool {
 	if p.isHiding || p.noDismissOnTap || p.passThrough || !p.Visible() {
 		return false

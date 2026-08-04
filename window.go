@@ -128,7 +128,7 @@ type DroppableWindow interface {
 // DropEvent carries the items dropped onto a [Droppable] target along with the
 // drop position.
 //
-// Since: 2.19
+// Since: 1.0
 type DropEvent struct {
 	// AbsolutePosition is the drop position relative to the window canvas.
 	AbsolutePosition geo.Position
@@ -151,7 +151,7 @@ type DropEvent struct {
 // A Droppable may additionally implement [DropHoverable] to receive
 // drag-enter/over/leave hover feedback while a drag is in progress over it.
 //
-// Since: 2.19
+// Since: 1.0
 type Droppable interface {
 	// Dropped is called when one or more items are dropped onto this object.
 	Dropped(*DropEvent)
@@ -164,7 +164,7 @@ type Droppable interface {
 // desktop drag protocols do not make the payload available before the drop, so
 // the items arrive only with the final [DropEvent].
 //
-// Since: 2.19
+// Since: 1.0
 type DragHoverEvent struct {
 	// AbsolutePosition is the pointer position relative to the window canvas.
 	AbsolutePosition geo.Position
@@ -187,7 +187,7 @@ type DragHoverEvent struct {
 // exposes it (X11 XDND, macOS and Windows OLE); where it is unavailable the object still
 // receives [Droppable.Dropped], just without the hover phases.
 //
-// Since: 2.19
+// Since: 1.0
 type DropHoverable interface {
 	Droppable
 

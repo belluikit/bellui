@@ -9,7 +9,7 @@ import "github.com/belluikit/bellui"
 // the hidden file attribute. Non-"file" URIs, and every URI on mobile and
 // web targets, report false.
 //
-// Since: 2.15
+// Since: 1.0
 func IsHidden(u bellui.URI) bool {
 	return isHidden(u)
 }

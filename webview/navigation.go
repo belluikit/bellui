@@ -5,7 +5,7 @@ import "errors"
 // LoadState is what the view's main frame is doing. It changes only for main
 // frame navigations; a sub-frame loading its own content does not move it.
 //
-// Since: 2.19
+// Since: 1.0
 type LoadState int
 
 const (
@@ -38,7 +38,7 @@ func (s LoadState) String() string {
 // LoadEvent reports a change of [WebView.LoadState], delivered to
 // [WebView.OnLoadChanged] on the main goroutine.
 //
-// Since: 2.19
+// Since: 1.0
 type LoadEvent struct {
 	// State is the state the view has just entered.
 	State LoadState
@@ -58,13 +58,13 @@ type LoadEvent struct {
 // [WebView.OnNavigate] refused, and of one stopped with
 // [WebView.StopLoading].
 //
-// Since: 2.19
+// Since: 1.0
 var ErrNavigationCancelled = errors.New("webview: navigation cancelled")
 
 // NavigationKind says what started a navigation, so a policy can treat a link
 // the user clicked differently from one the page started on its own.
 //
-// Since: 2.19
+// Since: 1.0
 type NavigationKind int
 
 const (
@@ -101,7 +101,7 @@ func (k NavigationKind) String() string {
 // NavigationRequest is a navigation the engine is about to start, offered to
 // [WebView.OnNavigate] before it does.
 //
-// Since: 2.19
+// Since: 1.0
 type NavigationRequest struct {
 	// URL is where the engine is about to go.
 	URL string
@@ -122,7 +122,7 @@ type NavigationRequest struct {
 
 // LoadState reports what the view's main frame is currently doing.
 //
-// Since: 2.19
+// Since: 1.0
 func (w *WebView) LoadState() LoadState {
 	return w.load
 }
@@ -153,7 +153,7 @@ func (w *WebView) LoadURL(url string) {
 // not something this package can arrange around; give the content a real
 // baseURL, or serve it, if it has to be navigable.
 //
-// Since: 2.19
+// Since: 1.0
 func (w *WebView) LoadHTML(html, baseURL string) {
 	if !w.attachedRaw() {
 		return
@@ -164,7 +164,7 @@ func (w *WebView) LoadHTML(html, baseURL string) {
 
 // Reload loads the current page again.
 //
-// Since: 2.19
+// Since: 1.0
 func (w *WebView) Reload() {
 	w.navRaw(navReload)
 }
@@ -173,7 +173,7 @@ func (w *WebView) Reload() {
 // reported to [WebView.OnLoadChanged] as failed with
 // [ErrNavigationCancelled].
 //
-// Since: 2.19
+// Since: 1.0
 func (w *WebView) StopLoading() {
 	if !w.attachedRaw() {
 		return
@@ -187,7 +187,7 @@ func (w *WebView) StopLoading() {
 
 // CanGoBack reports whether there is an earlier entry in session history.
 //
-// Since: 2.19
+// Since: 1.0
 func (w *WebView) CanGoBack() bool {
 	return w.navRaw(navCanGoBack)
 }
@@ -195,14 +195,14 @@ func (w *WebView) CanGoBack() bool {
 // GoBack moves to the previous entry in session history, reporting whether
 // there was one to move to.
 //
-// Since: 2.19
+// Since: 1.0
 func (w *WebView) GoBack() bool {
 	return w.navRaw(navGoBack)
 }
 
 // CanGoForward reports whether there is a later entry in session history.
 //
-// Since: 2.19
+// Since: 1.0
 func (w *WebView) CanGoForward() bool {
 	return w.navRaw(navCanGoForward)
 }
@@ -210,7 +210,7 @@ func (w *WebView) CanGoForward() bool {
 // GoForward moves to the next entry in session history, reporting whether
 // there was one to move to.
 //
-// Since: 2.19
+// Since: 1.0
 func (w *WebView) GoForward() bool {
 	return w.navRaw(navGoForward)
 }
