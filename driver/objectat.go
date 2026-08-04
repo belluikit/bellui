@@ -7,8 +7,7 @@ import (
 )
 
 // ObjectAtPosition returns the deepest visible object at pos within canvas c,
-// together with its absolute bounds in canvas coordinates. ok is false when no
-// object is hit.
+// together with its absolute bounds. ok is false when no object is hit.
 //
 // It uses the same hit-test the toolkit uses for tap dispatch: overlays are
 // searched top-down before the content, and an input-pass-through overlay (a
@@ -17,9 +16,23 @@ import (
 // maps a click back to the object that produced it (e.g. a design tool's
 // pick-to-source).
 //
-// To go the other way — highlight a known object — take its bounds from
-// [ObjectAtPosition] here or compose [bellui.Driver.AbsolutePositionForObject]
-// with the object's size.
+// # Coordinate space
+//
+// pos and the returned bounds are both in the space of
+// [bellui.Driver.AbsolutePositionForObject]: relative to the canvas's
+// interactive area ([core.Canvas.InteractiveArea]), not to the raw canvas
+// tree. To go the other way — highlight a known object — compose
+// [bellui.Driver.AbsolutePositionForObject] with the object's size; the
+// result matches the bounds returned here (#235). The raw-tree helpers
+// [GeometryForObject] and [ClipBoundsForObject] report the other space; the
+// two differ by the interactive-area inset, which is non-zero only on mobile
+// and the test canvas.
+//
+// Event positions are in the raw-tree space as well: the tap dispatcher feeds
+// this same hit-walk the position it later delivers as
+// [event.PointEvent].AbsolutePosition, so a probe taken from an event must
+// subtract the [core.Canvas.InteractiveArea] inset before calling here — a
+// no-op on desktop, where the inset is zero.
 //
 // Since: 2.10
 func ObjectAtPosition(c core.Canvas, pos geo.Position) (core.CanvasObject, geo.Rectangle, bool) {
@@ -36,13 +49,20 @@ func ObjectAtPositionMatching(c core.Canvas, pos geo.Position, matches func(core
 	if c == nil || matches == nil {
 		return nil, geo.Rectangle{}, false
 	}
+
+	// The hit-walk itself runs in raw canvas-tree coordinates, but the public
+	// contract is the [bellui.Driver.AbsolutePositionForObject] space, so the
+	// probe translates in by the interactive-area inset and the bounds
+	// translate back out (#235). A zero inset — every desktop driver — makes
+	// both a no-op.
+	inset, _ := c.InteractiveArea()
 	overlays := c.Overlays().List()
-	obj, _, _ := idriver.FindObjectAtPositionMatching(pos, matches, overlays, c.Content())
+	obj, _, _ := idriver.FindObjectAtPositionMatching(pos.Add(inset), matches, overlays, c.Content())
 	if obj == nil {
 		return nil, geo.Rectangle{}, false
 	}
 
 	roots := append([]core.CanvasObject{c.Content()}, overlays...)
-	origin := idriver.AbsolutePositionForObject(obj, roots)
+	origin := idriver.AbsolutePositionForObject(obj, roots).Subtract(inset)
 	return obj, geo.Rectangle{Pos: origin, Size: obj.Size()}, true
 }
