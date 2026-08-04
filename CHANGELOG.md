@@ -60,6 +60,21 @@ the trendvidia fork (github.com/trendvidia/fyne).
   `goffmpeg-libs` requires it. Source ref, rewrite set and verification are in
   `x/mmedia/PROVENANCE.md`.
 
+* **`x/editor`: `Editor.ApplyGutter` and `Editor.ApplyDecorators`**
+  ([#281](https://github.com/belluikit/bellui/issues/281)). The `Gutter`,
+  `Decorators` and `SpanDecorators` fields were read exactly once, at first
+  render — `RefreshGutter`/`RefreshDecorators` repaint the *installed* objects
+  and `RefreshHighlighter` re-applies the `Highlighter` field, but nothing
+  re-applied a swapped gutter or decorator set, so hosts had to seal their
+  gutter composition at construction and mutate retained provider instances
+  for anything dynamic. The new methods mirror `RefreshHighlighter`: they
+  re-read the field(s), rebuild the gutter widget / decorator overlay (the
+  editor's internal decorators — search matches, diagnostics, hover, links,
+  redaction — are re-appended) and refresh the layout, so a gutter can be
+  installed, swapped or removed on a live editor. Downstream, player's
+  `CodeEditor` can drop its build-time-only `gutters` sealing
+  (belluikit/player#45).
+
 ### Fixed
 
 * **wasm: the browser picker overrides no longer fire under the test driver**
