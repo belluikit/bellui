@@ -250,7 +250,11 @@ bool canListContentURI(uintptr_t jni_env, uintptr_t ctx, char* uriCstr) {
 	if (getDoc == NULL) { // API 21
 		return false;
 	}
-	jstring docID = (jobject)(*env)->CallStaticObjectMethod(env, contractClass, getDoc, uri);
+	jstring docID = (jstring)(*env)->CallStaticObjectMethod(env, contractClass, getDoc, uri);
+	if ((*env)->ExceptionOccurred(env) != NULL) { // not a tree URI
+		(*env)->ExceptionClear(env);
+		return false;
+	}
 
 	jmethodID getTree = find_static_method(env, contractClass, "buildDocumentUriUsingTree", "(Landroid/net/Uri;Ljava/lang/String;)Landroid/net/Uri;");
 	jobject treeUri = (jobject)(*env)->CallStaticObjectMethod(env, contractClass, getTree, uri, docID);
@@ -258,13 +262,47 @@ bool canListContentURI(uintptr_t jni_env, uintptr_t ctx, char* uriCstr) {
 	jclass resolverClass = (*env)->GetObjectClass(env, resolver);
 	jmethodID getType = find_method(env, resolverClass, "getType", "(Landroid/net/Uri;)Ljava/lang/String;");
 	jstring type = (jstring)(*env)->CallObjectMethod(env, resolver, getType, treeUri);
+	if ((*env)->ExceptionOccurred(env) != NULL) {
+		(*env)->ExceptionClear(env);
+		type = NULL;
+	}
 
-	if (type == NULL) {
+	if (type != NULL) {
+		const char *str = getString(jni_env, ctx, type);
+		if (strcmp(str, "vnd.android.document/directory") == 0) {
+			return true;
+		}
+	}
+
+	// Some providers answer getType with null or a non-directory type for a
+	// tree root the app holds a valid grant for — the downloads provider
+	// behind the picker's Download shortcut does (#244). The children query
+	// is the operation List() actually performs (listContentURI below), so
+	// attempt it: getting a cursor back, even an empty one, proves the URI
+	// is listable.
+	jmethodID getChild = find_static_method(env, contractClass, "buildChildDocumentsUriUsingTree", "(Landroid/net/Uri;Ljava/lang/String;)Landroid/net/Uri;");
+	jobject childrenUri = (jobject)(*env)->CallStaticObjectMethod(env, contractClass, getChild, uri, docID);
+
+	jclass stringClass = find_class(env, "java/lang/String");
+	jobjectArray project = (*env)->NewObjectArray(env, 1, stringClass, (*env)->NewStringUTF(env, "document_id"));
+
+	jmethodID query = find_method(env, resolverClass, "query", "(Landroid/net/Uri;[Ljava/lang/String;Landroid/os/Bundle;Landroid/os/CancellationSignal;)Landroid/database/Cursor;");
+	if (query == NULL) { // API 26
+		return false;
+	}
+	jobject cursor = (jobject)(*env)->CallObjectMethod(env, resolver, query, childrenUri, project, NULL, NULL);
+	if ((*env)->ExceptionOccurred(env) != NULL) { // no grant, or not a directory
+		(*env)->ExceptionClear(env);
+		return false;
+	}
+	if (cursor == NULL) {
 		return false;
 	}
 
-	const char *str = getString(jni_env, ctx, type);
-	return strcmp(str, "vnd.android.document/directory") == 0;
+	jclass cursorClass = (*env)->GetObjectClass(env, cursor);
+	jmethodID close = find_method(env, cursorClass, "close", "()V");
+	(*env)->CallVoidMethod(env, cursor, close);
+	return true;
 }
 
 bool canListFileURI(char* uriCstr) {
@@ -423,7 +461,7 @@ char* listContentURI(uintptr_t jni_env, uintptr_t ctx, char* uriCstr) {
 
 	jclass resolverClass = (*env)->GetObjectClass(env, resolver);
 	jmethodID query = find_method(env, resolverClass, "query", "(Landroid/net/Uri;[Ljava/lang/String;Landroid/os/Bundle;Landroid/os/CancellationSignal;)Landroid/database/Cursor;");
-	if (getDoc == NULL) { // API 26
+	if (query == NULL) { // API 26
 		return "";
 	}
 
