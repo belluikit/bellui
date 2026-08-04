@@ -155,7 +155,12 @@ func (c *canvas) applyThemeOutOfTreeObjects() {
 	}
 }
 
-func (c *canvas) findObjectAtPositionMatching(pos geo.Position, test func(object core.CanvasObject) bool) (core.CanvasObject, geo.Position, int) {
+// FindObjectAtPositionMatching is the dispatch hit-walk: overlays, then the
+// menu when one is open, else the window head and content, preferring the
+// spatial index when it is current. It also serves the public
+// driver.ObjectAtPositionMatching through the canvas capability assertion
+// (#245), so it must stay equivalent to what tap dispatch uses.
+func (c *canvas) FindObjectAtPositionMatching(pos geo.Position, test func(object core.CanvasObject) bool) (core.CanvasObject, geo.Position, int) {
 	overlay := c.Overlays().Top()
 	// Only trust the spatial index while the canvas is clean — it is rebuilt
 	// during the paint walk and is stale between a change and the next frame (#590).
@@ -243,7 +248,7 @@ type mobileFinder struct {
 }
 
 func (f *mobileFinder) FindObjectAtPositionMatching(pos geo.Position, test func(core.CanvasObject) bool) (core.CanvasObject, geo.Position, int) {
-	return f.canvas.findObjectAtPositionMatching(pos, test)
+	return f.canvas.FindObjectAtPositionMatching(pos, test)
 }
 
 func (f *mobileFinder) CanvasForTouch() core.Canvas {
