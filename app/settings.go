@@ -57,7 +57,7 @@ func (s *settings) PrimaryColor() string {
 // the system-wide settings file — apps that want to remember the choice should
 // store it in their own Preferences (see widget.SaveThemeSelection).
 //
-// Since: 2.14
+// Since: 1.0
 func (s *settings) SetPrimaryColor(name string) {
 	s.schema.PrimaryColor = name
 	s.apply()

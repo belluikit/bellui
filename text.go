@@ -154,7 +154,7 @@ type TextStyle struct {
 	// (Label, RichText, canvas.Text) as well as in
 	// [github.com/belluikit/bellui/widget.TextGrid].
 	//
-	// Since: 2.16
+	// Since: 1.0
 	Strikethrough bool // Should text be struck through.
 
 	// Weight specifies the font weight (100–900). When nil, the Bold flag is

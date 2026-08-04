@@ -23,7 +23,7 @@ type SelectEntry struct {
 	// OnChanged cannot distinguish from free-text typing. Typing never
 	// triggers it, even when the typed text equals an option (#1047).
 	//
-	// Since: 3.0
+	// Since: 1.0
 	OnOptionSelected func(string)
 
 	dropDown *bellui.Menu

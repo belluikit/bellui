@@ -75,6 +75,6 @@ type WaylandWindowContext struct {
 	// form "wayland:<ExportedHandle>". Computing it exports the toplevel and is
 	// cached for the window's lifetime.
 	//
-	// Since: 2.19
+	// Since: 1.0
 	ExportedHandle string
 }

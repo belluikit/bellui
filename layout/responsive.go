@@ -40,7 +40,7 @@ var _ core.Layout = (*ResponsiveLayout)(nil)
 // ratios would exceed the full width. Rows are as tall as their tallest
 // member and mirror under a right-to-left layout direction.
 //
-// Since: 2.15
+// Since: 1.0
 type ResponsiveLayout struct {
 	// Breakpoints are the ascending, exclusive upper bounds (in dp) of each
 	// size class except the last. When nil, [DefaultResponsiveBreakpoints]
@@ -65,7 +65,7 @@ type ResponsiveLayout struct {
 //	    label2,                                // full row in every class
 //	)
 //
-// Since: 2.15
+// Since: 1.0
 func NewResponsiveLayout(objects ...core.CanvasObject) *bellui.Container {
 	wrapped := make([]core.CanvasObject, 0, len(objects))
 	for _, o := range objects {
@@ -88,7 +88,7 @@ func NewResponsiveLayout(objects ...core.CanvasObject) *bellui.Container {
 // A class without a ratio inherits the previous one, or 1.0 when none was
 // given at all.
 //
-// Since: 2.15
+// Since: 1.0
 func Responsive(object core.CanvasObject, ratios ...float32) core.CanvasObject {
 	return &bellui.Container{
 		Layout:  &responsiveStack{config: newResponsiveConf(ratios...)},
