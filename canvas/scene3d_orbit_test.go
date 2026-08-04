@@ -186,6 +186,23 @@ func TestOrbitCamera_Camera_DefaultNearScalesWithDistance(t *testing.T) {
 	assert.InDelta(t, 0.001, c.Near, 1e-7)
 }
 
+func TestOrbitCamera_Camera_DefaultNearScalesDownForMiniatureScene(t *testing.T) {
+	// A camera orbiting a miniature scene can legitimately sit at
+	// Distance < 0.1 once its zoom limits scale down; a fixed default near
+	// would then lie beyond the orbit target, clipping the whole framed
+	// scene — the near-side counterpart of DefaultFarReachesCamera above.
+	o := NewOrbitCamera(Camera3D{Position: Vec3{0, 0, 0.1}, Target: Vec3{}})
+	o.Zoom(0.5) // Distance now 0.05, inside its scaled limits
+	c := o.Camera(0, 0, 0)
+	assert.Greater(t, c.Near, float32(0))
+	assert.Less(t, c.Near, o.Distance)
+	assert.InDelta(t, 0.01, c.Near, 1e-6) // 0.1 × Distance/defaultMinDistance
+
+	// An explicit near is still honoured, however large.
+	c = o.Camera(0, 0.2, 0)
+	assert.Equal(t, float32(0.2), c.Near)
+}
+
 func TestOrbitCamera_Camera_DefaultNearUnchangedInDefaultRange(t *testing.T) {
 	// A camera anywhere inside the default zoom range must resolve to the
 	// historic 0.1 exactly, not merely approximately.
