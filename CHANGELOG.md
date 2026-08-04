@@ -46,6 +46,17 @@ the trendvidia fork (github.com/trendvidia/fyne).
 
 ### Fixed
 
+* **wasm: the browser picker overrides no longer fire under the test driver**
+  ([#257](https://github.com/belluikit/bellui/issues/257)). In a js/wasm test
+  binary, `FileOpen.Show()` clicked a real hidden `<input type="file">` in the
+  harness page and `FileSave.Show()` handed out a writer whose Close triggered
+  a real browser download. The web driver's window now implements
+  `driver.NativeWindow` — delivering the new `driver.BrowserWindowContext`,
+  which carries the window's `<canvas>` element — and the wasm overrides
+  assert it on the dialog's parent exactly like the desktop native backends,
+  so the test driver (and the emulated extra windows) fall back to the canvas
+  dialog. The two #257-skipped cancel-shape subtests are back on js.
+
 * **Android: folders granted through the SAF picker's Download shortcut are
   accepted** ([#244](https://github.com/belluikit/bellui/issues/244)). The
   listability probe trusted `ContentResolver.getType`, which the downloads
