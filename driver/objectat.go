@@ -41,12 +41,6 @@ func ObjectAtPosition(c core.Canvas, pos geo.Position) (core.CanvasObject, geo.R
 	return ObjectAtPositionMatching(c, pos, func(core.CanvasObject) bool { return true })
 }
 
-// ObjectAtPositionMatching is like [ObjectAtPosition] but returns the deepest
-// object for which matches reports true, descending past objects the predicate
-// rejects. Use it to skip renderer-internal primitives and resolve, say, the
-// deepest object that is one of your own source-mapped widgets.
-//
-// Since: 2.10
 // dispatchHitTester is implemented by canvases whose dispatch hit-walk covers
 // more than overlays + content — the glfw menu bar, the mobile window head
 // and open menu — or prefers a spatial index. When a canvas exposes it, the
@@ -59,6 +53,12 @@ type dispatchHitTester interface {
 	ObjectTrees() []core.CanvasObject
 }
 
+// ObjectAtPositionMatching is like [ObjectAtPosition] but returns the deepest
+// object for which matches reports true, descending past objects the predicate
+// rejects. Use it to skip renderer-internal primitives and resolve, say, the
+// deepest object that is one of your own source-mapped widgets.
+//
+// Since: 2.10
 func ObjectAtPositionMatching(c core.Canvas, pos geo.Position, matches func(core.CanvasObject) bool) (core.CanvasObject, geo.Rectangle, bool) {
 	if c == nil || matches == nil {
 		return nil, geo.Rectangle{}, false
