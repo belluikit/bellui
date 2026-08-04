@@ -38,7 +38,7 @@ import (
 // Like [AncestorsOfObject], the walk covers the canvas content and its
 // overlays; objects inside a window's menu bar are not reached.
 //
-// Since: 2.19
+// Since: 1.0
 func GeometryForObject(c core.Canvas, obj core.CanvasObject) (pos geo.Position, clip geo.Rectangle, clipped, ok bool) {
 	if c == nil || obj == nil {
 		return geo.Position{}, geo.Rectangle{}, false, false

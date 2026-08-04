@@ -17,7 +17,7 @@ import (
 // compile, so a cross-platform app builds everywhere and degrades to an empty
 // space.
 //
-// Since: 2.19
+// Since: 1.0
 const Supported = false
 
 // webView carries no platform view on an unsupported target, only the URL it

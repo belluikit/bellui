@@ -20,7 +20,7 @@ func (e *Entry) clampCaretFromOpaqueForKey(key event.KeyName) {
 // into Text: Start is inclusive, End exclusive. Start == End is an empty range
 // (a caret position). It is the unit passed to [Entry.BeforeChange].
 //
-// Since: 2.10
+// Since: 1.0
 type TextRange struct {
 	Start, End int
 }
@@ -39,7 +39,7 @@ type TextRange struct {
 // Offsets are rune indices into the current Text; the caller owns reconciling
 // them when Text changes.
 //
-// Since: 2.10
+// Since: 1.0
 type ProtectedRange struct {
 	Start, End  int
 	CaretOpaque bool

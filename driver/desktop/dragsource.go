@@ -13,7 +13,7 @@ import (
 //
 // It is the outbound counterpart of the inbound [bellui.DropEvent].
 //
-// Since: 2.19
+// Since: 1.0
 type DragData struct {
 	// Text is a plain-text flavor — for example a selection dragged into a text
 	// editor.
@@ -32,7 +32,7 @@ type DragData struct {
 	// only consulted when Image is nil (a raw Image always wins). It carries no
 	// data flavor — set Text/URIs/Image for the payload.
 	//
-	// Since: 2.19
+	// Since: 1.0
 	DragImageObject core.CanvasObject
 	// OnCompleted is an optional callback fired once the native drag finishes,
 	// reporting whether a target accepted the drop (a copy/move) versus the drag
@@ -40,7 +40,7 @@ type DragData struct {
 	// so a source can react to the outcome — for example deleting a file it
 	// dragged out as a move. Nil to ignore the outcome (fire-and-forget).
 	//
-	// Since: 2.19
+	// Since: 1.0
 	OnCompleted func(accepted bool)
 }
 
@@ -52,7 +52,7 @@ type DragData struct {
 // the native window handle; a driver or platform that cannot start a native drag
 // reports false. Detect support with a type assertion, or use [StartDrag].
 //
-// Since: 2.19
+// Since: 1.0
 type DragSource interface {
 	// StartDragging begins a native drag session carrying data from the key
 	// window. Call it from a widget's Dragged handler on the main goroutine (a
@@ -77,7 +77,7 @@ type DragSource interface {
 // consult DragOutProvider (for example to pre-arm). A plain draggable that does
 // not implement it never triggers a drag-out, so in-app dragging is untouched.
 //
-// Since: 2.19
+// Since: 1.0
 type DragOutProvider interface {
 	// DragOutData returns the payload to hand to the OS drag and true, or a zero
 	// value and false to decline (keeping the in-app drag). It is read once at
@@ -90,7 +90,7 @@ type DragOutProvider interface {
 // It is package sugar over the driver assertion, mirroring the clipboard-flavor
 // helpers. Call it from a widget's Dragged handler on the main goroutine.
 //
-// Since: 2.19
+// Since: 1.0
 func StartDrag(data DragData) bool {
 	if ds, ok := bellui.CurrentApp().Driver().(DragSource); ok {
 		return ds.StartDragging(data)

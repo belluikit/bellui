@@ -58,7 +58,7 @@ var cefProfile struct {
 // the platform engine manages it — so on other platforms this reports nil and
 // changes nothing.
 //
-// Since: 2.19
+// Since: 1.0
 func SetCEFProfileDir(dir string) error {
 	if cefProfile.locked {
 		return errCEFProfileLocked
@@ -82,7 +82,7 @@ func SetCEFProfileDir(dir string) error {
 // The same restrictions as [SetCEFProfileDir] apply: call it before the first
 // [WebView.Attach], on the main goroutine; it has no effect off Linux.
 //
-// Since: 2.19
+// Since: 1.0
 func SetCEFProfileInMemory() error {
 	if cefProfile.locked {
 		return errCEFProfileLocked

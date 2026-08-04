@@ -82,7 +82,7 @@ type Repository interface {
 // notifications; custom repositories may implement it to make widgets like
 // FileTree refresh automatically when their backing store changes.
 //
-// Since: 2.15
+// Since: 1.0
 type WatchableRepository interface {
 	Repository
 

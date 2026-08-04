@@ -87,7 +87,7 @@ type Entry struct {
 	// precedence: Escape discards the composition (#354) and reaches this
 	// hook only once no composition is pending. Nil ignores the key.
 	//
-	// Since: 3.0
+	// Since: 1.0
 	OnEscape  func() `json:"-"`
 	Password  bool
 	MultiLine bool
@@ -120,7 +120,7 @@ type Entry struct {
 	// per-keystroke behavior. Off by default — the default behavior is
 	// unchanged.
 	//
-	// Since: 2.13
+	// Since: 1.0
 	DeferTextSync bool
 
 	// Scroll can be used to turn off the scrolling of our entry when Wrapping is WrapNone.
@@ -213,7 +213,7 @@ type Entry struct {
 	// that one row are shifted until commit — and the preedit underline is
 	// drawn over the overlay.
 	//
-	// Since: 2.10
+	// Since: 1.0
 	StyleOverlayForRow func(row int) []StyleRun `json:"-"`
 
 	// Icon is displayed at the outer left of the entry.
@@ -269,7 +269,7 @@ type Entry struct {
 	// its wrapped rows (#145). For wrap-off content a line is a single row, so
 	// the two coincide.
 	//
-	// Since: 2.10
+	// Since: 1.0
 	HiddenRanges []LineRange `json:"-"`
 
 	cursorAnim *entryCursorAnimation
@@ -356,7 +356,7 @@ type Entry struct {
 	// select-and-overwrite. A nil hook imposes no restriction. The
 	// whole-document resets SetText and Append are not gated.
 	//
-	// Since: 2.10
+	// Since: 1.0
 	BeforeChange func(sel TextRange, next string) bool `json:"-"`
 
 	// ProtectedRanges are spans the Entry refuses to mutate. An edit overlapping
@@ -373,7 +373,7 @@ type Entry struct {
 	// that overlaps a range protected after that edit was recorded. Treat
 	// ProtectedRanges as caller-managed view state reconciled alongside history.
 	//
-	// Since: 2.10
+	// Since: 1.0
 	ProtectedRanges []ProtectedRange `json:"-"`
 
 	// ActionItem is a small item which is displayed at the outer right of the entry (like a password revealer)
@@ -443,7 +443,7 @@ type StyleRun struct {
 	// analysis stream. StrikeColor selects its color (the run's text color
 	// when nil, like UnderlineColor).
 	//
-	// Since: 2.10
+	// Since: 1.0
 	StrikeThrough bool
 	StrikeColor   color.Color
 }
@@ -848,7 +848,7 @@ func (e *Entry) CaretRect(row, col int) geo.Rectangle {
 // coordinate space (adjusted for the current scroll offset) so a driver can
 // position the IME candidate window. It implements [event.PreeditPositioner].
 //
-// Since: 2.10
+// Since: 1.0
 func (e *Entry) PreeditCursorRectangle() geo.Rectangle {
 	e.cursorMu.Lock()
 	row, col := e.CursorRow, e.CursorColumn
@@ -1216,7 +1216,7 @@ func (e *Entry) MinSize() geo.Size {
 // IntrinsicSize to size the entry (or a container around it) to its content. It
 // measures the text only; the entry's own chrome (border, scrollbars) is not added.
 //
-// Since: 2.11
+// Since: 1.0
 func (e *Entry) IntrinsicSize() geo.Size {
 	e.ExtendBaseWidget(e)
 	return e.textProvider().IntrinsicSize()
@@ -1409,7 +1409,7 @@ func (e *Entry) Select(startRow, startCol, endRow, endCol int) {
 // it is. When a non-empty selection was cleared, OnSelectChanged fires with the
 // empty string. It is a no-op when nothing is selected.
 //
-// Since: 2.10
+// Since: 1.0
 func (e *Entry) Unselect() {
 	changed := false
 	e.setFieldsAndRefresh(func() {
@@ -1770,7 +1770,7 @@ var entryKeyHandlers = map[event.KeyName]func(e *Entry, provider *RichText, mult
 // for the key. Otherwise Escape falls through and closes the surface the entry
 // sits in.
 //
-// Since: 2.19
+// Since: 1.0
 func (e *Entry) HandlesEscape() bool {
 	if e.Disabled() {
 		return false
@@ -2291,7 +2291,7 @@ func (e *Entry) removeAppliedPreedit() {
 // Compose implements the [event.Composable] interface; platform drivers call it
 // while an input method is composing.
 //
-// Since: 2.10
+// Since: 1.0
 func (e *Entry) Compose(ev *event.PreeditEvent) {
 	if ev == nil || e.isReadOnly() {
 		return
@@ -2343,7 +2343,7 @@ func (e *Entry) Compose(ev *event.PreeditEvent) {
 //
 // ComposeCommit implements the [event.Composable] interface.
 //
-// Since: 2.10
+// Since: 1.0
 func (e *Entry) ComposeCommit(text string) {
 	onMain(func() {
 		composing := e.composing
@@ -2440,7 +2440,7 @@ func (e *Entry) ComposeCommit(text string) {
 //
 // ComposeCancel implements the [event.Composable] interface.
 //
-// Since: 2.10
+// Since: 1.0
 func (e *Entry) ComposeCancel() {
 	onMain(func() {
 		if !e.composing {
@@ -3857,7 +3857,7 @@ func (e *Entry) syncDeferredTextNotify() string {
 // current and SyncText simply returns it.
 // It is safe to call from any goroutine.
 //
-// Since: 2.13
+// Since: 1.0
 func (e *Entry) SyncText() string {
 	var text string
 	onMain(func() {

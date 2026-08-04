@@ -24,7 +24,7 @@ import (
 
 // Supported reports whether this platform has a web engine binding.
 //
-// Since: 2.19
+// Since: 1.0
 const Supported = true
 
 // webView holds the macOS platform state: an opaque handle to the flipped,
