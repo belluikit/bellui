@@ -10,6 +10,8 @@
 //	go run ./hack/filedialogprobe open       # auto-open a File-Open panel
 //	go run ./hack/filedialogprobe folder     # auto-open a Folder-Open panel
 //	go run ./hack/filedialogprobe save       # auto-open a File-Save panel
+//	go run ./hack/filedialogprobe multiple   # auto-open a multi-select File-Open panel
+//	go run ./hack/filedialogprobe windowed   # windowed canvas dialog (frame X + resize corner)
 package main
 
 import (
@@ -106,11 +108,14 @@ func main() {
 	}
 
 	// The canvas dialogs default to windowed mode, framed by an InnerWindow —
-	// on mobile the frame's close (X) button is the #254 target. The result
-	// logs either way, so a dead X shows up as a dialog that will not leave.
+	// on mobile the frame's close (X) button is the #254 target and the
+	// bottom-right resize corner is the #263 target. The result logs either
+	// way, so a dead X shows up as a dialog that will not leave; a dead
+	// corner as a frame that will not grow.
 	windowedDialog := func() {
 		d := dialog.NewConfirm("Windowed dialog probe",
-			"Tap the frame's X button — the dialog must dismiss\nand log confirmed=false (#254).",
+			"1. Drag the bottom-right corner — the frame must resize (#263).\n"+
+				"2. Tap the frame's X button — the dialog must dismiss\nand log confirmed=false (#254).",
 			func(ok bool) {
 				fmt.Printf("windowed dialog closed: confirmed=%v\n", ok)
 			}, w)
