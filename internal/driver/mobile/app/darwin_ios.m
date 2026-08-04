@@ -201,6 +201,22 @@ void belluiKeyboardExpectRaise(void) {
 }
 
 - (void)documentPicker:(UIDocumentPickerViewController *)controller didPickDocumentsAtURLs:(NSArray <NSURL *>*)urls {
+    if (controller.allowsMultipleSelection) {
+        // Multi-select session (#255): hand every URL across, each with its
+        // own retained pointer for the per-file security scope, then complete.
+        for (NSURL* url in urls) {
+            NSURL* toClose = NULL;
+            BOOL secured = [url startAccessingSecurityScopedResource];
+            if (secured) {
+                toClose = url;
+                CFRetain((CFTypeRef)toClose);
+            }
+            filePickerMultiAppend((char*)[[url description] UTF8String], toClose);
+        }
+        filePickerMultiComplete();
+        return;
+    }
+
     if ([urls count] == 0) {
         return;
     }
@@ -220,6 +236,11 @@ void belluiKeyboardExpectRaise(void) {
 }
 
 - (void)documentPickerWasCancelled:(UIDocumentPickerViewController *)controller {
+    if (controller.allowsMultipleSelection) {
+        // Nothing appended: the empty completion is the cancel signal.
+        filePickerMultiComplete();
+        return;
+    }
     filePickerReturned("", NULL);
 }
 
@@ -1825,6 +1846,25 @@ void showFileOpenPicker(char* mimes, char *exts) {
 
     UIDocumentPickerViewController *documentPicker = [[UIDocumentPickerViewController alloc]
         initForOpeningContentTypes:types asCopy:NO];
+    documentPicker.delegate = (id) appDelegate;
+
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [appDelegate.controller presentViewController:documentPicker animated:YES completion:nil];
+        // No ARC here: presentation owns the picker now, balance the alloc.
+        [documentPicker release];
+    });
+}
+
+void showFileOpenMultiPicker(char* mimes, char *exts) {
+    GoAppAppDelegate *appDelegate = (GoAppAppDelegate *)[[UIApplication sharedApplication] delegate];
+
+    NSArray<UTType *> *types = contentTypesForMimeExts(mimes, exts);
+
+    UIDocumentPickerViewController *documentPicker = [[UIDocumentPickerViewController alloc]
+        initForOpeningContentTypes:types asCopy:NO];
+    // allowsMultipleSelection also routes the delegate callbacks to the
+    // multi-session bridge (filePickerMultiAppend/Complete, #255).
+    documentPicker.allowsMultipleSelection = YES;
     documentPicker.delegate = (id) appDelegate;
 
     dispatch_async(dispatch_get_main_queue(), ^{
