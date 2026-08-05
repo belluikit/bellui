@@ -95,6 +95,28 @@ func LatestAPIResourcesPath() (string, error) {
 	return path.Join(sdkdir, "platforms", maxSDK, "android.jar"), nil
 }
 
+// checkStripAssumptions reports whether pkg is shaped the way PackResources'
+// stripping hard-codes: the four leading type specs being, in order,
+// attr/id/style/string. A platform that breaks that must fail to pack rather
+// than embed a garbage table. Both halves are load-bearing — the type pool
+// names the types, but it is spec order that decides which specs PackResources'
+// pkg.specs[3] and pkg.specs[:4] actually reach.
+func checkStripAssumptions(pkg *Package) error {
+	want := []string{"attr", "id", "style", "string"}
+	if len(pkg.typePool.strings) < len(want) || !slices.Equal(pkg.typePool.strings[:len(want)], want) {
+		return fmt.Errorf("%s type pool no longer starts with %v: %v", SDKPlatform, want, pkg.typePool.strings[:min(len(pkg.typePool.strings), 6)])
+	}
+	if len(pkg.specs) < len(want) {
+		return fmt.Errorf("%s package declares %v type specs, want at-least %v", SDKPlatform, len(pkg.specs), len(want))
+	}
+	for i := range want {
+		if int(pkg.specs[i].id) != i+1 {
+			return fmt.Errorf("%s type spec %v has type id %v, want %v (%q)", SDKPlatform, i, pkg.specs[i].id, i+1, want[i])
+		}
+	}
+	return nil
+}
+
 // PackResources produces a stripped down gzip version of the resources.arsc from api jar.
 func PackResources() ([]byte, error) {
 	tbl, err := OpenSDKTable()
@@ -105,12 +127,8 @@ func PackResources() ([]byte, error) {
 	tbl.pool.strings = []string{} // should not be needed
 	pkg := tbl.pkgs[0]
 
-	// The stripping below hard-codes the four leading specs being, in order,
-	// attr/id/style/string; refuse to pack a platform that breaks that
-	// assumption rather than embed a garbage table.
-	if want := []string{"attr", "id", "style", "string"}; len(pkg.typePool.strings) < len(want) ||
-		!slices.Equal(pkg.typePool.strings[:len(want)], want) {
-		return nil, fmt.Errorf("%s type pool no longer starts with %v: %v", SDKPlatform, want, pkg.typePool.strings[:min(len(pkg.typePool.strings), 6)])
+	if err := checkStripAssumptions(pkg); err != nil {
+		return nil, err
 	}
 
 	// drop language string entries
