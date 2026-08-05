@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
@@ -151,9 +150,11 @@ func TestBootstrap(t *testing.T) {
 	checkMarshal(bxml, bxml.size())
 }
 
+// TestEncode compares a binres-compiled manifest against the checked-in aapt
+// output for the same source. Both sides ride the repo (testdata plus the
+// embedded table), so nothing here needs an installed SDK.
 func TestEncode(t *testing.T) {
 	r := require.New(t)
-	checkResources(t)
 	f, err := os.Open("testdata/bootstrap.xml")
 	r.NoError(err)
 
@@ -252,6 +253,68 @@ func TestEncodeConfigChangesUnknownFlag(t *testing.T) {
 	r.Error(err)
 	r.Contains(err.Error(), "notAConfigChange")
 	r.Contains(err.Error(), "configChanges")
+}
+
+// screenOrientationManifest returns a minimal manifest declaring the given
+// android:screenOrientation value on its activity.
+func screenOrientationManifest(value string) string {
+	return fmt.Sprintf(`<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.example.orient">
+	<application android:label="Orient">
+		<activity android:name="android.app.NativeActivity"
+			android:label="Orient"
+			android:screenOrientation=%q>
+		</activity>
+	</application>
+</manifest>`, value)
+}
+
+// TestEncodeScreenOrientation verifies single-valued enum attribute names
+// resolve against the embedded SDK resource table (#295). landscape is the
+// interesting valid case: its table value is 0, indistinguishable from the
+// zeroed TypedValue a silent resolution miss used to leave behind.
+func TestEncodeScreenOrientation(t *testing.T) {
+	tests := []struct {
+		value string
+		want  uint32
+	}{
+		{"landscape", 0},
+		{"portrait", 1},
+		{"sensor", 4},
+	}
+	for _, tt := range tests {
+		t.Run(tt.value, func(t *testing.T) {
+			r := require.New(t)
+
+			bx, err := UnmarshalXML(strings.NewReader(screenOrientationManifest(tt.value)), false, 30)
+			r.NoError(err)
+
+			nref, err := bx.Pool.RefByName("screenOrientation")
+			r.NoError(err)
+
+			for el := range bx.iterElements() {
+				for _, attr := range el.attrs {
+					if attr.Name == nref {
+						r.Equal(DataIntDec, attr.TypedValue.Type)
+						r.Equal(tt.want, attr.TypedValue.Value)
+						return
+					}
+				}
+			}
+			t.Fatal("screenOrientation attribute not found")
+		})
+	}
+}
+
+// TestEncodeScreenOrientationUnknownValue verifies an unresolvable enum value
+// is a hard error naming the value, not a silently zeroed TypedValue that
+// compiles to a valid-but-wrong manifest (#295).
+func TestEncodeScreenOrientationUnknownValue(t *testing.T) {
+	r := require.New(t)
+	_, err := UnmarshalXML(strings.NewReader(screenOrientationManifest("typo")), false, 30)
+	r.Error(err)
+	r.Contains(err.Error(), `"typo"`)
+	r.Contains(err.Error(), "screenOrientation")
+	r.Contains(err.Error(), SDKPlatform)
 }
 
 func TestRawValueByName(t *testing.T) {
@@ -405,16 +468,7 @@ func compareStrings(t *testing.T, a, b []string) error {
 			}
 		}
 		if err == nil && v == "__" {
-			if !strings.HasPrefix(x, "4.0.") {
-				// as of the time of this writing, the current version of build tools being targeted
-				// reports 4.0.4-1406430. Previously, this was 4.0.3. This number is likely still due
-				// to change so only report error if 4.x incremented.
-				//
-				// TODO this check has the potential to hide real errors but can be fixed once more
-				// of the xml document is unmarshalled and XML can be queried to assure this is related
-				// to platformBuildVersionName.
-				err = fmt.Errorf("has missing/incorrect values")
-			}
+			err = fmt.Errorf("has missing/incorrect values")
 		}
 		fmt.Fprintf(buf, "Pool(%2v, %s) %q\n", i, v, x)
 	}
@@ -451,12 +505,9 @@ func compareStrings(t *testing.T, a, b []string) error {
 	return err
 }
 
+// TestOpenTable reads the embedded table; it needs no installed SDK.
 func TestOpenTable(t *testing.T) {
 	r := require.New(t)
-	sdkdir := os.Getenv("ANDROID_HOME")
-	if sdkdir == "" {
-		t.Skip("ANDROID_HOME env var not set")
-	}
 	tbl, err := OpenTable()
 	r.NoError(err)
 
@@ -492,7 +543,7 @@ func TestOpenTable(t *testing.T) {
 
 func TestTableRefByName(t *testing.T) {
 	r := require.New(t)
-	checkResources(t)
+	checkSDKResources(t)
 	tbl, err := OpenSDKTable()
 	r.NoError(err)
 
@@ -508,10 +559,18 @@ func TestTableRefByName(t *testing.T) {
 	}
 }
 
+// TestTableMarshal round-trips the real (installed) SDKPlatform table through
+// this package's marshaler. Decoding normalizes aapt2's modern encodings —
+// sparse and offset16 indices, compact entries, extended configs — into the
+// dense legacy form (#287), and the decoded structs cache the original chunk
+// headers, so the original table and a decode of its re-marshal can never be
+// deep-equal (#297). What must hold instead: the pools survive the trip
+// exactly, and our own output is a marshaling fixed point — decoding it and
+// marshaling again reproduces it byte for byte.
 func TestTableMarshal(t *testing.T) {
 	r := require.New(t)
 
-	checkResources(t)
+	checkSDKResources(t)
 	tbl, err := OpenSDKTable()
 	r.NoError(err)
 
@@ -525,42 +584,42 @@ func TestTableMarshal(t *testing.T) {
 	r.Equal(len(tbl.pool.strings), len(xtbl.pool.strings))
 	r.Equal(len(tbl.pkgs), len(xtbl.pkgs))
 
-	pkg, xpkg := tbl.pkgs[0], xtbl.pkgs[0]
-	err = compareStrings(t, pkg.typePool.strings, xpkg.typePool.strings)
-	r.NoError(err)
+	// Marshaling preserves order, so the pools must match exactly. Not
+	// compareStrings: content-tolerant matching is O(n²), minutes over a
+	// real platform's pools.
+	for i := range tbl.pkgs {
+		pkg, xpkg := tbl.pkgs[i], xtbl.pkgs[i]
+		r.Equal(pkg.typePool.strings, xpkg.typePool.strings, "pkg %d type pool", i)
+		r.Equal(pkg.keyPool.strings, xpkg.keyPool.strings, "pkg %d key pool", i)
+	}
 
-	err = compareStrings(t, pkg.keyPool.strings, xpkg.keyPool.strings)
+	xbin, err := xtbl.MarshalBinary()
 	r.NoError(err)
-
-	r.Equal(pkg.specs, xpkg.specs)
+	if !bytes.Equal(bin, xbin) {
+		i := 0
+		for i < len(bin) && i < len(xbin) && bin[i] == xbin[i] {
+			i++
+		}
+		t.Fatalf("re-marshal is not a fixed point: lengths %d/%d, first mismatch at byte %d", len(bin), len(xbin), i)
+	}
 }
 
-func checkResources(t *testing.T) {
+// checkSDKResources skips t unless the platform the embedded table is pinned
+// to (SDKPlatform) is installed — that platform's android.jar is what
+// OpenSDKTable reads. Its predecessor skipped on anything newer than
+// android-15, which permanently disabled the gated tests on modern SDKs (#297).
+func checkSDKResources(t *testing.T) {
 	t.Helper()
-	sdkdir := os.Getenv("ANDROID_HOME")
-	if sdkdir == "" {
-		t.Skip("ANDROID_HOME env var not set")
-	}
-	rscPath, err := LatestAPIResourcesPath()
+	rscPath, err := sdkAPIResourcesPath()
 	if err != nil {
-		t.Skipf("failed to find resources: %v", err)
+		t.Skipf("skipping test needing the %s SDK platform: %v", SDKPlatform, err)
 	}
 	if _, err := os.Stat(rscPath); err != nil {
-		t.Skipf("failed to find resources: %v", err)
-	}
-
-	version := filepath.Base(filepath.Dir(rscPath))
-	if version > "android-15" {
-		t.Skipf("Cannot run legacy tests after SDK 15: %s", version)
+		t.Skipf("skipping test needing the %s SDK platform: %v", SDKPlatform, err)
 	}
 }
 
 func BenchmarkTableRefByName(b *testing.B) {
-	sdkdir := os.Getenv("ANDROID_HOME")
-	if sdkdir == "" {
-		b.Fatal("ANDROID_HOME env var not set")
-	}
-
 	b.ReportAllocs()
 	b.ResetTimer()
 	for n := 0; n < b.N; n++ {
