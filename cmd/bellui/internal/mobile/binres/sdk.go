@@ -121,6 +121,12 @@ func LatestAPIResourcesPath() (string, error) {
 
 	maxSDK, maxLevel := "", 0
 	for _, d := range dir {
+		// A platform is a directory; a stray file named like one is not a
+		// platform. ReadDir does not follow symlinks, so a symlinked platform
+		// reports as ModeSymlink rather than a directory — still a candidate.
+		if !d.IsDir() && d.Type()&os.ModeSymlink == 0 {
+			continue
+		}
 		name := d.Name()
 		if !strings.HasPrefix(name, "android-") {
 			continue

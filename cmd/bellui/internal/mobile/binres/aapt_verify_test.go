@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -78,8 +79,17 @@ func TestAaptDumpTemplateManifest(t *testing.T) {
 	r := require.New(t)
 	aapt := buildToolsAapt(t)
 
+	// binres cannot reach mobile.manifestTmplData (unexported, and that package
+	// imports this one), so the template data is a map — which makes a field
+	// added to the template render as "<no value>" here rather than fail. The
+	// clone turns that silent drift into an error; it is a clone so the option
+	// does not leak into the shared template other tests execute.
+	tmpl, err := templates.ManifestAndroid.Clone()
+	r.NoError(err)
+	tmpl = tmpl.Option("missingkey=error")
+
 	var manifest bytes.Buffer
-	r.NoError(templates.ManifestAndroid.Execute(&manifest, map[string]any{
+	r.NoError(tmpl.Execute(&manifest, map[string]any{
 		"JavaPkgPath":  "com.example.probe",
 		"Build":        7,
 		"Version":      "1.2.3",
@@ -93,8 +103,9 @@ func TestAaptDumpTemplateManifest(t *testing.T) {
 
 	// the package-wide test init suppresses the uses-sdk and icon synthesis;
 	// this test wants the manifest a real build produces.
+	restore := skipSynthesize
 	skipSynthesize = false
-	t.Cleanup(func() { skipSynthesize = true })
+	t.Cleanup(func() { skipSynthesize = restore })
 
 	bx, err := UnmarshalXML(bytes.NewReader(manifest.Bytes()), true, 30)
 	r.NoError(err)
@@ -117,13 +128,21 @@ func TestAaptDumpTemplateManifest(t *testing.T) {
 	r.NoError(err, "aapt dump xmltree failed:\n%s", out)
 	dump := string(out)
 
-	themeAttr, err := OpenTable()
+	tbl, err := OpenTable()
 	r.NoError(err)
-	theme, err := themeAttr.RefByName("@android:style/Theme")
+	theme, err := tbl.RefByName("@android:style/Theme")
 	r.NoError(err)
 
+	// The fourth build-platform attribute, platformBuildVersionName, is the one
+	// whose drift #297 found (the old golden claimed "5.0.1-1624448"). aapt
+	// keeps the codename as the raw string whether or not it also parses as a
+	// decimal — "15" does, a preview codename would not — so the raw is what
+	// holds across a SDKPlatform bump; the typed value beside it would not.
+	r.Regexp(`(?m)^\s*A: platformBuildVersionName=.*\(Raw: "`+regexp.QuoteMeta(SDKPlatformCodename)+`"\)`, dump)
+
 	for _, want := range []string{
-		// the four synthesized build-platform attributes (#297)
+		// three of the four synthesized build-platform attributes (#297); the
+		// fourth is asserted above
 		fmt.Sprintf("A: android:compileSdkVersion(0x01010572)=(type 0x10)%#x", SDKPlatformVersion),
 		fmt.Sprintf("A: android:compileSdkVersionCodename(0x01010573)=%q", SDKPlatformCodename),
 		fmt.Sprintf("A: platformBuildVersionCode=(type 0x10)%#x", SDKPlatformVersion),

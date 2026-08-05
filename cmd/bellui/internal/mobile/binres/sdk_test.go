@@ -13,19 +13,24 @@ import (
 )
 
 // platformsFixture points ANDROID_HOME at a temp SDK whose platforms/ holds
-// exactly the named directories.
-func platformsFixture(t *testing.T, names ...string) {
+// exactly the named directories, and returns that platforms/ path so a test
+// can drop non-directory entries beside them.
+func platformsFixture(t *testing.T, names ...string) string {
 	t.Helper()
 	sdkdir := t.TempDir()
-	require.NoError(t, os.MkdirAll(filepath.Join(sdkdir, "platforms"), 0o755))
+	platforms := filepath.Join(sdkdir, "platforms")
+	require.NoError(t, os.MkdirAll(platforms, 0o755))
 	for _, name := range names {
-		require.NoError(t, os.MkdirAll(filepath.Join(sdkdir, "platforms", name), 0o755))
+		require.NoError(t, os.MkdirAll(filepath.Join(platforms, name), 0o755))
 	}
 	t.Setenv("ANDROID_HOME", sdkdir)
+	return platforms
 }
 
-// TestSDKPlatformPinConsistency keeps the three SDKPlatform* constants moving
-// together: the version must be the API level SDKPlatform names.
+// TestSDKPlatformPinConsistency keeps SDKPlatformVersion tied to SDKPlatform:
+// the version must be the API level SDKPlatform names. SDKPlatformCodename is
+// not derivable from either, so it rides the goldens instead — TestEncode
+// compares against aapt output recorded for exactly this pin.
 func TestSDKPlatformPinConsistency(t *testing.T) {
 	level, ok := platformAPILevel(SDKPlatform)
 	require.True(t, ok, "SDKPlatform %q has no parsable API level", SDKPlatform)
@@ -57,7 +62,11 @@ func TestLatestAPIResourcesPath(t *testing.T) {
 	})
 
 	t.Run("stray entries are not platforms", func(t *testing.T) {
-		platformsFixture(t, "android-34", "tools", ".DS_Store")
+		platforms := platformsFixture(t, "android-34", "tools")
+		// a file is never a platform, not even one named like the newest one
+		for _, name := range []string{".DS_Store", "android-99"} {
+			require.NoError(t, os.WriteFile(filepath.Join(platforms, name), nil, 0o644))
+		}
 		require.Equal(t, "android-34", latest(t))
 	})
 
