@@ -242,21 +242,36 @@ func UnmarshalXML(r io.Reader, withIcon bool, targetSDK int) (*XML, error) {
 			case "uses-sdk":
 				return nil, fmt.Errorf("manual declaration of uses-sdk in AndroidManifest.xml not supported")
 			case "manifest":
-				// synthesize additional attributes and nodes for use during encode.
+				// synthesize the four build-platform attributes aapt records
+				// when packaging against SDKPlatform (#297).
 				tkn.Attr = append(tkn.Attr,
+					xml.Attr{
+						Name: xml.Name{
+							Space: androidSchema,
+							Local: "compileSdkVersion",
+						},
+						Value: strconv.Itoa(SDKPlatformVersion),
+					},
+					xml.Attr{
+						Name: xml.Name{
+							Space: androidSchema,
+							Local: "compileSdkVersionCodename",
+						},
+						Value: SDKPlatformCodename,
+					},
 					xml.Attr{
 						Name: xml.Name{
 							Space: "",
 							Local: "platformBuildVersionCode",
 						},
-						Value: "15",
+						Value: strconv.Itoa(SDKPlatformVersion),
 					},
 					xml.Attr{
 						Name: xml.Name{
 							Space: "",
 							Local: "platformBuildVersionName",
 						},
-						Value: "4.0.4-1406430",
+						Value: SDKPlatformCodename,
 					})
 
 				q = append(q, ltoken{tkn, line})
@@ -631,14 +646,20 @@ func addAttributes(tkn xml.StartElement, bx *XML, line int, pool *Pool, el *Elem
 			nattr.NS = NoEntry
 			// TODO it's unclear how to query these
 			switch attr.Name.Local {
-			case "platformBuildVersionCode":
-				nattr.TypedValue.Type = DataIntDec
-				i, err := strconv.Atoi(attr.Value)
-				if err != nil {
-					return err
+			case "platformBuildVersionCode", "platformBuildVersionName":
+				// aapt keeps the raw string and, when the value parses as
+				// one, a decimal typed value beside it. Both take that shape
+				// on a modern platform ("35"/"15"), but the codename is not
+				// numeric on previews, hence the fallback (#297).
+				nattr.RawValue = pool.ref(attr.Value)
+				if i, err := strconv.Atoi(attr.Value); err == nil {
+					nattr.TypedValue.Type = DataIntDec
+					nattr.TypedValue.Value = uint32(i)
+				} else {
+					nattr.TypedValue.Type = DataString
+					nattr.TypedValue.Value = uint32(nattr.RawValue)
 				}
-				nattr.TypedValue.Value = uint32(i)
-			default: // "package", "platformBuildVersionName", and any invalid
+			default: // "package" and any invalid
 				nattr.RawValue = pool.ref(attr.Value)
 				nattr.TypedValue.Type = DataString
 			}
@@ -727,6 +748,7 @@ func addAttributeNamespace(attr xml.Attr, nattr *Attribute, tbl *Table, pool *Po
 		t := nt.values[len(nt.values)-1].data.Type
 		switch t {
 		case DataIntDec:
+			found := false
 			for _, val := range nt.values {
 				if val.name == 0x01000000 {
 					continue
@@ -737,8 +759,16 @@ func addAttributeNamespace(attr xml.Attr, nattr *Attribute, tbl *Table, pool *Po
 				}
 				if attr.Value == nr.key.Resolve(tbl.pkgs[0].keyPool) { // TODO hard-coded pkg ref
 					nattr.TypedValue = *val.data
+					found = true
 					break
 				}
+			}
+			if !found {
+				// A zeroed TypedValue is a valid enum value for most
+				// attributes (for screenOrientation it means landscape), so a
+				// silent miss compiles a manifest that means something else (#295).
+				return fmt.Errorf("unknown enum value %q for %s; not a value of the %s resource table",
+					attr.Value, attr.Name.Local, SDKPlatform)
 			}
 		case DataIntHex:
 			nattr.TypedValue.Type = t

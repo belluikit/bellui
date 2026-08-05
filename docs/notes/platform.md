@@ -65,13 +65,21 @@ was **wrong**, disproven by goroutine dumps.
   seam on the driver goroutine. So a per-app language change on a foregrounded
   app applies (relayout included) with no recreation and no lifecycle
   crossing; the StageFocused re-resolve remains the pickup for changes made
-  while backgrounded. Rotation also lands on this path (its config event
-  precedes the redraw), which is fine: the re-resolve is override-guarded and
-  a no-op while the locale is unchanged. Verified 2026-08-05 on the pixel143
-  AVD (stock android-34): deviceinfoprobe prints one `trigger=localechange`
-  line with the new `current=` and recreateprobe shows zero lifecycle lines
-  through the change. **ColorOS 16 needs `screenLayout` declared too
-  (#299)**: its `ActivityRecordExtImpl.hookShouldRelaunchLocked` computes
+  while backgrounded. Every other declared change lands on the same path
+  (rotation — whose config event precedes the redraw — plus `uiMode` and
+  `keyboardHidden`), which is fine but not free: the re-resolve is
+  override-guarded and skips the relayout while the locale is unchanged, yet
+  it still costs a `GetLocales` JNI round trip plus a localizer rebuild on the
+  driver goroutine. That cannot wedge the redraw handshake the config event
+  precedes — go-locale runs the lookup through `RunOnJVM`, which attaches its
+  own thread rather than borrowing the Java main thread (the deadlock shape
+  the soft-keyboard `keyboardOps` worker exists to avoid) — but a future
+  rotation-latency investigation should know it is there. Verified 2026-08-05
+  on the pixel143 AVD (stock android-34): deviceinfoprobe prints one
+  `trigger=localechange` line with the new `current=` and recreateprobe shows
+  zero lifecycle lines through the change. **ColorOS 16 needs `screenLayout`
+  declared too (#299)**: its
+  `ActivityRecordExtImpl.hookShouldRelaunchLocked` computes
   `adjustedChanges={CONFIG_LOCALE, CONFIG_SCREEN_LAYOUT,
   CONFIG_LAYOUT_DIRECTION}` — the vendor hook adds CONFIG_SCREEN_LAYOUT
   (stock masks the layout-direction bits *out* of the screenLayout diff) —
