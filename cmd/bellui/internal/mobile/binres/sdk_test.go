@@ -9,6 +9,7 @@ import (
 	"compress/gzip"
 	"io"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -45,6 +46,71 @@ func TestPackedTableMatchesSDK(t *testing.T) {
 	}
 	r.True(bytes.Equal(gunzip(arsc), gunzip(fresh)),
 		"embedded arsc.go is stale for %s: run `go generate` in internal/mobile/binres", SDKPlatform)
+}
+
+// platformsFixture points ANDROID_HOME at a temp SDK whose platforms/ holds
+// exactly the named directories, and returns that platforms/ path so a test
+// can drop non-directory entries beside them.
+func platformsFixture(t *testing.T, names ...string) string {
+	t.Helper()
+	sdkdir := t.TempDir()
+	platforms := filepath.Join(sdkdir, "platforms")
+	require.NoError(t, os.MkdirAll(platforms, 0o755))
+	for _, name := range names {
+		require.NoError(t, os.MkdirAll(filepath.Join(platforms, name), 0o755))
+	}
+	t.Setenv("ANDROID_HOME", sdkdir)
+	return platforms
+}
+
+// TestSDKPlatformPinConsistency keeps SDKPlatformVersion tied to SDKPlatform:
+// the version must be the API level SDKPlatform names. SDKPlatformCodename is
+// not derivable from either, so it rides the goldens instead — TestEncode
+// compares against aapt output recorded for exactly this pin.
+func TestSDKPlatformPinConsistency(t *testing.T) {
+	level, ok := platformAPILevel(SDKPlatform)
+	require.True(t, ok, "SDKPlatform %q has no parsable API level", SDKPlatform)
+	require.Equal(t, SDKPlatformVersion, level,
+		"SDKPlatformVersion must match the API level of SDKPlatform %q", SDKPlatform)
+}
+
+func TestLatestAPIResourcesPath(t *testing.T) {
+	latest := func(t *testing.T) string {
+		p, err := LatestAPIResourcesPath()
+		require.NoError(t, err)
+		return filepath.Base(filepath.Dir(p))
+	}
+
+	// android-9 sorts after android-36 lexically; the pick must be numeric (#296).
+	t.Run("numeric beats lexical", func(t *testing.T) {
+		platformsFixture(t, "android-36", "android-9", "android-34")
+		require.Equal(t, "android-36", latest(t))
+	})
+
+	t.Run("previews and extension SDKs rank behind numbered releases", func(t *testing.T) {
+		platformsFixture(t, "android-VanillaIceCream", "android-35", "android-36-ext4", "android-9")
+		require.Equal(t, "android-35", latest(t))
+	})
+
+	t.Run("preview wins only when nothing numbered is installed", func(t *testing.T) {
+		platformsFixture(t, "android-Baklava", "android-VanillaIceCream")
+		require.Equal(t, "android-VanillaIceCream", latest(t))
+	})
+
+	t.Run("stray entries are not platforms", func(t *testing.T) {
+		platforms := platformsFixture(t, "android-34", "tools")
+		// a file is never a platform, not even one named like the newest one
+		for _, name := range []string{".DS_Store", "android-99"} {
+			require.NoError(t, os.WriteFile(filepath.Join(platforms, name), nil, 0o644))
+		}
+		require.Equal(t, "android-34", latest(t))
+	})
+
+	t.Run("empty platforms dir errors", func(t *testing.T) {
+		platformsFixture(t)
+		_, err := LatestAPIResourcesPath()
+		require.ErrorContains(t, err, "no SDK platforms")
+	})
 }
 
 // stripFixture returns a package shaped the way PackResources' stripping
