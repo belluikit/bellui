@@ -129,12 +129,34 @@ the trendvidia fork (github.com/trendvidia/fyne).
 
 ### Fixed
 
+* **Android: a per-app language change applies without restarting the app**
+  ([#288](https://github.com/belluikit/bellui/issues/288)). With `locale` and
+  `layoutDirection` declared in the packaged manifest (#283, #287), an
+  Android 13+ per-app language change reaches a foregrounded app as an
+  in-place `onConfigurationChanged` — no activity recreation, and therefore
+  no lifecycle crossing for the #282 foregrounding re-resolve to catch, so
+  the app kept running in the old language until it was next backgrounded
+  and brought forward. The native callback now forwards a
+  configuration-change event through the app event queue (the send is
+  unbounded, so the platform main thread never blocks) and the mobile driver
+  answers it on its own goroutine with the same `lang.ResolveSystemLocale`
+  seam: translations, CLDR formatting, collation and text direction
+  re-resolve and every window re-lays-out in place. An explicit
+  `lang.SetLocale` override still wins, and an unchanged locale skips the
+  relayout, so the other declared configuration changes that land on the same
+  path (rotation, dark mode, keyboard availability) cost only the locale
+  lookup. Verified on a pixel143 AVD with `hack/deviceinfoprobe` and
+  `hack/recreateprobe`; vendor builds whose relaunch mask still covers the
+  change (ColorOS 16) keep recreating the activity and pick the new locale up
+  on the foregrounding re-cross, as before.
+
 * **Android: in-process activity recreation no longer hangs the app (ANR)**
   ([#283](https://github.com/belluikit/bellui/issues/283)). A configuration
   change the manifest does not declare — an Android 13+ per-app language
-  override is a guaranteed trigger, a display density/size change another —
-  recreates the activity inside the surviving process, and the WebGPU painter
-  kept presenting frames into the just-destroyed native window during the
+  override was the guaranteed trigger until `locale` was declared (#287,
+  below), a display density/size change another — recreates the activity
+  inside the surviving process, and the WebGPU painter kept presenting
+  frames into the just-destroyed native window during the
   destroy→create gap; the poisoned surface then made the swap to the new
   window block forever, parking the platform main thread in the redraw
   handshake (on the emulator it also wedged the host GPU channel so *every*
@@ -169,7 +191,43 @@ the trendvidia fork (github.com/trendvidia/fyne).
   template declares `layoutDirection` alongside `locale` (#283's pair), so
   an Android 13+ per-app language change reaches the app as
   `onConfigurationChanged` instead of recreating the activity.
-  
+
+* **`bellui package` Android manifests: an unknown enum attribute value is a
+  hard error instead of silently encoding 0**
+  ([#295](https://github.com/belluikit/bellui/issues/295)). #287 made
+  unresolvable `configChanges` *flag* names fatal, but the sibling enum
+  branch kept the silent miss: a single-valued enum attribute matching no
+  table value left the typed value zeroed, and 0 is a valid enum value for
+  most attributes — `android:screenOrientation="typo"` compiled to a
+  manifest that meant `landscape`. An unresolvable enum value now fails
+  manifest compilation naming the value, the attribute and the pinned
+  platform.
+
+* **The CLI's aapt2-link step picks the newest installed SDK platform
+  numerically** ([#296](https://github.com/belluikit/bellui/issues/296)).
+  `binres.LatestAPIResourcesPath` sorted platform directories lexically, so
+  a stray ancient `android-9` beat `android-36`. It now compares the API
+  level as a number; preview and extension platform directories
+  (`android-VanillaIceCream`, `android-36-ext4`) deliberately rank behind
+  every numbered release and are only picked when nothing numbered is
+  installed.
+
+* **The binres aapt-golden tests run again**
+  ([#297](https://github.com/belluikit/bellui/issues/297)). `TestEncode`,
+  `TestTableRefByName` and `TestTableMarshal` were gated by a skip on any
+  SDK newer than android-15, so on every real machine they never ran — and
+  the checked-in golden had drifted from the encoder's synthesized
+  build-version attributes years ago without anything noticing. The goldens
+  are regenerated from the pinned android-35 platform, the encoder
+  synthesizes the four build-platform attributes modern aapt records
+  (`compileSdkVersion`, `compileSdkVersionCodename`, both
+  `platformBuildVersion*` — derived from the `binres.SDKPlatform` pin),
+  `TestEncode` runs unconditionally (both sides ride the repo),
+  `TestTableMarshal` round-trips the real installed platform table when the
+  pinned platform is present, and #287's throwaway `aapt dump xmltree`
+  verification of the compiled template manifest is now a test, opt-in on
+  ANDROID_HOME + build-tools.
+
 * **The mobile pickers honour `UseNativeFileDialogs(false)`**
   ([#267](https://github.com/belluikit/bellui/issues/267)). The doc promised
   the canvas dialog "everywhere", but the iOS/Android overrides consulted
