@@ -167,6 +167,40 @@ func checkStripAssumptions(pkg *Package) error {
 	return nil
 }
 
+// stripKeyPool blanks every key-pool string no surviving entry of the kept
+// specs (pkg.specs[:4], the attr/id/style/string that checkStripAssumptions
+// pins) references. A key index is shared whenever the same name recurs across
+// specs — id/screenLayout and the dropped ^attr-private/screenLayout share one
+// slot — so dropped entries cannot blank their keys independently: the old
+// per-entry collision scan overwrote its own verdict on the next kept spec (its
+// break left only the innermost loop) and stripped screenLayout out of the
+// packed table, making the flag undeclarable (#299). Call it after the entries
+// to be dropped have been nil'd, since a nil entry keeps nothing alive.
+//
+// Keeping every name whose entry survives costs table size: a string resource
+// name is shared with each of its translations, so the old rule blanked ~2400
+// default-locale string names (and 85 attr/id names, screenLayout among them)
+// that belonged to entries still in the table. Restoring them grows the
+// embedded android-35 table by about 13%. That is the deliberate trade —
+// a name blanked out from under a live entry is #299's whole failure mode.
+func stripKeyPool(pkg *Package) {
+	kept := make(map[PoolRef]bool)
+	for _, spec := range pkg.specs[:4] {
+		for _, typ := range spec.types {
+			for _, nt := range typ.entries {
+				if nt != nil {
+					kept[nt.key] = true
+				}
+			}
+		}
+	}
+	for i := range pkg.keyPool.strings {
+		if !kept[PoolRef(i)] {
+			pkg.keyPool.strings[i] = ""
+		}
+	}
+}
+
 // PackResources produces a stripped down gzip version of the resources.arsc from api jar.
 func PackResources() ([]byte, error) {
 	tbl, err := OpenSDKTable()
@@ -194,28 +228,7 @@ func PackResources() ([]byte, error) {
 		}
 	}
 
-	// Blank every key-pool string no surviving entry of the kept specs
-	// references. A key index is shared whenever the same name recurs across
-	// specs — id/screenLayout and the dropped ^attr-private/screenLayout share
-	// one slot — so dropped entries cannot blank their keys independently: the
-	// old per-entry collision scan overwrote its own verdict on the next kept
-	// spec (its break left only the innermost loop) and stripped screenLayout
-	// out of the packed table, making the flag undeclarable (#299).
-	kept := make(map[PoolRef]bool)
-	for _, spec := range pkg.specs[:4] {
-		for _, typ := range spec.types {
-			for _, nt := range typ.entries {
-				if nt != nil {
-					kept[nt.key] = true
-				}
-			}
-		}
-	}
-	for i := range pkg.keyPool.strings {
-		if !kept[PoolRef(i)] {
-			pkg.keyPool.strings[i] = ""
-		}
-	}
+	stripKeyPool(pkg)
 
 	// entries are densely packed but probably safe to drop nil entries off the end
 	for _, spec := range pkg.specs[:4] {
