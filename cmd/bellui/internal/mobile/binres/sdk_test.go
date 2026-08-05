@@ -17,13 +17,18 @@ import (
 // TestPackedTableMatchesSDK re-packs the pinned SDK platform's resources.arsc
 // and requires the result to match the checked-in arsc.go, catching a strip
 // edit (or SDKPlatform bump) committed without `go generate`. No CI runner is
-// guaranteed the SDK, so it skips without ANDROID_HOME — it gates the machines
-// that can regenerate, which are the ones that introduce the drift. The
-// comparison is on the uncompressed table so a Go-release gzip change cannot
-// fail it.
+// guaranteed the pinned platform (the macos runner has an ANDROID_HOME but not
+// android-35), so it skips unless the platform jar is present — it gates the
+// machines that can regenerate, which are the ones that introduce the drift.
+// The comparison is on the uncompressed table so a Go-release gzip change
+// cannot fail it.
 func TestPackedTableMatchesSDK(t *testing.T) {
-	if os.Getenv("ANDROID_HOME") == "" {
-		t.Skipf("ANDROID_HOME not set; cannot re-pack %s to compare", SDKPlatform)
+	jar, err := sdkAPIResourcesPath()
+	if err != nil {
+		t.Skipf("cannot re-pack %s to compare: %v", SDKPlatform, err)
+	}
+	if _, err := os.Stat(jar); err != nil {
+		t.Skipf("%s not installed; cannot re-pack to compare: %v", SDKPlatform, err)
 	}
 	r := require.New(t)
 
