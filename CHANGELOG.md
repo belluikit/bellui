@@ -27,8 +27,19 @@ the trendvidia fork (github.com/trendvidia/fyne).
   `desktop.Mouseable`); on Windows this replaces the system's legacy
   touch-to-mouse emulation for bellui windows. X11 and macOS are unchanged
   (touch continues to arrive as an emulated mouse, which the press-and-hold
-  entry below covers). Content flick-scrolling remains a mouse-parity
-  non-goal for now. Verify with `hack/touchprobe`.
+  entry below covers). Verify with `hack/touchprobe`.
+
+* **Desktop touch flick-scrolls content**
+  ([#291](https://github.com/belluikit/bellui/issues/291)). A touchscreen
+  drag over scrollable content now scrolls it mobile-style: the drag rides
+  the wheel's scroll dispatch as touch-sourced `event.ScrollEvent`s
+  (`ScrollSourceTouch`), so nested-scroll propagation applies, and a flick
+  keeps scrolling with the mobile decay curve until it fades, hits the
+  boundary, or the next contact stops it. Mouse drags deliberately still do
+  not scroll content, and Draggables under the finger (scrollbar thumbs,
+  sliders) keep winning the gesture. Touch-sourced scrolls are
+  direction-absolute in `widget.Scroll`: no RTL flip, no vertical→horizontal
+  redirect — the content tracks the finger, as on mobile.
 
 * **Desktop press-and-hold dispatches `LongPressed`**
 
