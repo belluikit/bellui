@@ -169,7 +169,43 @@ the trendvidia fork (github.com/trendvidia/fyne).
   template declares `layoutDirection` alongside `locale` (#283's pair), so
   an Android 13+ per-app language change reaches the app as
   `onConfigurationChanged` instead of recreating the activity.
-  
+
+* **`bellui package` Android manifests: an unknown enum attribute value is a
+  hard error instead of silently encoding 0**
+  ([#295](https://github.com/belluikit/bellui/issues/295)). #287 made
+  unresolvable `configChanges` *flag* names fatal, but the sibling enum
+  branch kept the silent miss: a single-valued enum attribute matching no
+  table value left the typed value zeroed, and 0 is a valid enum value for
+  most attributes — `android:screenOrientation="typo"` compiled to a
+  manifest that meant `landscape`. An unresolvable enum value now fails
+  manifest compilation naming the value, the attribute and the pinned
+  platform.
+
+* **The CLI's aapt2-link step picks the newest installed SDK platform
+  numerically** ([#296](https://github.com/belluikit/bellui/issues/296)).
+  `binres.LatestAPIResourcesPath` sorted platform directories lexically, so
+  a stray ancient `android-9` beat `android-36`. It now compares the API
+  level as a number; preview and extension platform directories
+  (`android-VanillaIceCream`, `android-36-ext4`) deliberately rank behind
+  every numbered release and are only picked when nothing numbered is
+  installed.
+
+* **The binres aapt-golden tests run again**
+  ([#297](https://github.com/belluikit/bellui/issues/297)). `TestEncode`,
+  `TestTableRefByName` and `TestTableMarshal` were gated by a skip on any
+  SDK newer than android-15, so on every real machine they never ran — and
+  the checked-in golden had drifted from the encoder's synthesized
+  build-version attributes years ago without anything noticing. The goldens
+  are regenerated from the pinned android-35 platform, the encoder
+  synthesizes the four build-platform attributes modern aapt records
+  (`compileSdkVersion`, `compileSdkVersionCodename`, both
+  `platformBuildVersion*` — derived from the `binres.SDKPlatform` pin),
+  `TestEncode` runs unconditionally (both sides ride the repo),
+  `TestTableMarshal` round-trips the real installed platform table when the
+  pinned platform is present, and #287's throwaway `aapt dump xmltree`
+  verification of the compiled template manifest is now a test, opt-in on
+  ANDROID_HOME + build-tools.
+
 * **The mobile pickers honour `UseNativeFileDialogs(false)`**
   ([#267](https://github.com/belluikit/bellui/issues/267)). The doc promised
   the canvas dialog "everywhere", but the iOS/Android overrides consulted
