@@ -79,8 +79,9 @@ the trendvidia fork (github.com/trendvidia/fyne).
   repeated locale-override and density recreations, rotation and
   background/resume cycles. The packaging template additionally declares
   `locale` in `configChanges` — inert until the binres SDK table learns the
-  `layoutDirection` flag Android pairs with it, but the recreation that still
-  happens is now survivable.
+  `layoutDirection` flag Android pairs with it
+  ([#287](https://github.com/belluikit/bellui/issues/287)), but the recreation
+  that still happens is now survivable.
 
 * **wasm: the browser picker overrides no longer fire under the test driver**
   ([#257](https://github.com/belluikit/bellui/issues/257)). In a js/wasm test

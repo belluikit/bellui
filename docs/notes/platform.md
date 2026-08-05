@@ -53,9 +53,9 @@ was **wrong**, disproven by goroutine dumps.
   `configChanges`, but that is **inert for now** — the framework adds
   `layoutDirection` to every locale change mask, and the CLI's embedded binres
   SDK table predates that flag (API 17) and silently drops unknown flag names.
-  Until the table is regenerated, a per-app language change still recreates —
-  survivably. Live in-place locale pickup additionally needs the #282 re-resolve
-  seam on `onConfigurationChanged`.
+  Until the table is regenerated (#287), a per-app language change still
+  recreates — survivably. Live in-place locale pickup additionally needs the
+  #282 re-resolve seam on `onConfigurationChanged`.
 - **Probes**: `hack/recreateprobe` (lifecycle lines + `alive=`/`tick=`
   heartbeats — at a wedge, `alive=` keeps counting while `tick=` stops);
   verified on pixel143 (goldfish) and OPD2403 (ColorOS 16, which recreates
