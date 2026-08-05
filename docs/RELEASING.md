@@ -1,8 +1,15 @@
 # Releasing
 
-A release here is **annotated tags plus a `CHANGELOG.md` entry**. There are no
-GitHub Release objects — `gh release list` is empty by design, so nobody should
-"fix" that by creating one. There is no release automation yet
+A release here is **annotated tags plus a `CHANGELOG.md` entry plus a GitHub
+Release on the main-module tag** (step 7). The Releases page is part of the
+release: the newest stable is marked **latest**, rc tags are marked
+pre-release, and the `x/*` tags deliberately get no Release object of their
+own (they always accompany a main-module release; a Release per tag would
+bury the real entries under five echoes). This reverses the earlier
+"tags only, `gh release list` empty by design" stance — decided in
+[#136](https://github.com/belluikit/bellui/issues/136) (2026-08-05) so that
+the Releases page users actually look at is authoritative. There is no
+release automation yet
 ([#731](https://github.com/belluikit/bellui/issues/731) tracks the release-train
 Action); this document is the procedure.
 
@@ -140,6 +147,31 @@ writing this:
 
 Repeat with one `x/` module (`go get github.com/belluikit/bellui/x/charts@…`)
 to prove step 5's tags are visible to the proxy.
+
+### 7. GitHub Release on the main-module tag
+
+Last on purpose: the Release is the announcement, so it goes up only after the
+pins, tags and smoke check have proven the version actually resolves for a
+consumer. For an rc:
+
+```sh
+gh release create v1.0.0-rc.7 --verify-tag --prerelease \
+  --title "v1.0.0-rc.7" \
+  --notes "Release candidate — see the Unreleased section of CHANGELOG.md."
+```
+
+For a stable, mark it **latest** and carry the changelog entry as the notes
+(for `v1.0.0` itself, the v1 line summary that
+[#136](https://github.com/belluikit/bellui/issues/136) describes):
+
+```sh
+gh release create v1.0.0 --verify-tag --latest \
+  --title "v1.0.0" --notes-file /tmp/v1-notes.md
+```
+
+`--verify-tag` makes the command fail rather than invent a tag if step 3 was
+skipped. Only the main-module tag gets a Release; the `x/*` tags do not (see
+the top of this document).
 
 ## Linux webview releases carry a browser engine
 
