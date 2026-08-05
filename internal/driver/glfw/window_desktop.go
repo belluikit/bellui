@@ -52,10 +52,10 @@ const (
 	CursorDisabled int = glfw.CursorDisabled
 )
 
-var cursors [desktop.GrabbingCursor + 1]*glfw.Cursor
+var cursors [desktop.NESWResizeCursor + 1]*glfw.Cursor
 
 func initCursors() {
-	cursors = [desktop.GrabbingCursor + 1]*glfw.Cursor{
+	cursors = [desktop.NESWResizeCursor + 1]*glfw.Cursor{
 		desktop.DefaultCursor:   glfw.CreateStandardCursor(glfw.ArrowCursor),
 		desktop.TextCursor:      glfw.CreateStandardCursor(glfw.IBeamCursor),
 		desktop.CrosshairCursor: glfw.CreateStandardCursor(glfw.CrosshairCursor),
@@ -65,9 +65,37 @@ func initCursors() {
 		desktop.HiddenCursor:    nil,
 		// glfw 3.4 has no dedicated grab/grabbing cursor; approximate with the
 		// hand (grabbable) and the four-way move cursor (actively dragging).
-		desktop.GrabCursor:     glfw.CreateStandardCursor(glfw.HandCursor),
-		desktop.GrabbingCursor: glfw.CreateStandardCursor(glfw.ResizeAllCursor),
+		desktop.GrabCursor:       glfw.CreateStandardCursor(glfw.HandCursor),
+		desktop.GrabbingCursor:   glfw.CreateStandardCursor(glfw.ResizeAllCursor),
+		desktop.NWSEResizeCursor: glfw.CreateStandardCursor(glfw.ResizeNWSECursor),
+		desktop.NESWResizeCursor: glfw.CreateStandardCursor(glfw.ResizeNESWCursor),
 	}
+
+	// The diagonal shapes are new in glfw 3.4 and are not universally
+	// available: an X11 or Wayland cursor theme without them has no core-font
+	// name to fall back on, and the Cocoa backend reaches them through a
+	// private NSCursor selector (only Win32 is guaranteed). glfw then reports
+	// CursorUnavailable and CreateStandardCursor returns nil — which this
+	// driver renders as HiddenCursor, so an unavailable diagonal would take
+	// the pointer away over the corner rather than degrade it.
+	if cursors[desktop.NWSEResizeCursor] == nil {
+		cursors[desktop.NWSEResizeCursor] = diagonalResizeFallback()
+	}
+	if cursors[desktop.NESWResizeCursor] == nil {
+		cursors[desktop.NESWResizeCursor] = diagonalResizeFallback()
+	}
+}
+
+// diagonalResizeFallback returns the shape that stands in for a diagonal
+// resize cursor the platform could not create: the horizontal resize shape, so
+// a corner still shows *a* resize affordance (both X11 and Wayland fall back
+// to the core sb_h_double_arrow for it, so it is there in practice), and the
+// arrow if even that failed — never nil, which would hide the pointer.
+func diagonalResizeFallback() *glfw.Cursor {
+	if c := cursors[desktop.HResizeCursor]; c != nil {
+		return c
+	}
+	return cursors[desktop.DefaultCursor]
 }
 
 // Declare conformity to Window interface and the desktop extensions
