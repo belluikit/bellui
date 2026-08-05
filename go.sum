@@ -6,8 +6,8 @@ github.com/belluikit/fsnotify v1.9.1 h1:Tgp4GeFmk5vqo3AlQfYHvEnbdBo8L5MTaoGqBiJv
 github.com/belluikit/fsnotify v1.9.1/go.mod h1:Eerjau1+jB7zBYpe753/iAfJd4kWDaGL2DsQH1pqK5c=
 github.com/belluikit/gl-js v0.2.1 h1:DWtRW7ztetpAfztJ3msW9YWFWVaydmMlfT2sa6GrAEY=
 github.com/belluikit/gl-js v0.2.1/go.mod h1:2/qoK/hK1zTuTBiZ7DYdMS6vapNN3KoYhAfpUb2vh1k=
-github.com/belluikit/glfw v1.9.0 h1:h6P1w4qrxrlnlbNqIWX3GleLxmCsVghGe1UuJ+U4L5o=
-github.com/belluikit/glfw v1.9.0/go.mod h1:mEc2Kpmxh42yey5lCRmU6AkCSMwvKbPW1QAro97VvYY=
+github.com/belluikit/glfw v1.10.0 h1:4C7upiPCBTUGgx/FftqPpEJQ9fA4N8TNMkIT11GjxP4=
+github.com/belluikit/glfw v1.10.0/go.mod h1:mEc2Kpmxh42yey5lCRmU6AkCSMwvKbPW1QAro97VvYY=
 github.com/belluikit/glfw-js v1.0.4 h1:E+339oJ3SjI0noviExqKj5GOfTQ5/fKGOi6VeNkSrN4=
 github.com/belluikit/glfw-js v1.0.4/go.mod h1:JYXSw+veF7drhhMre99XhEIGdUHLiyF9JWXEwzd8cZ4=
 github.com/belluikit/gocef v0.5.0 h1:ZfmzCS4CC4EFdvlkPhjSUmEluS+prSbm1iqRUxeGeHI=
