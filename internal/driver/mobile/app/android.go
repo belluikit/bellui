@@ -63,6 +63,7 @@ import (
 	"mime"
 	"os"
 	"strings"
+	"sync/atomic"
 	"time"
 	"unsafe"
 
@@ -285,7 +286,28 @@ var (
 
 	currentSize size.Event
 	darkMode    bool
+
+	// nativeWindowLive tracks whether the ANativeWindow the driver last saw is
+	// still alive. mainUI is the sole writer: false as soon as it receives
+	// onNativeWindowDestroyed, true again on onNativeWindowCreated /
+	// onNativeWindowRedrawNeeded. The WebGPU driver reads it (NativeWindowLive)
+	// to refuse painting or presenting into a destroyed window: during an
+	// in-process activity recreation (a per-app locale override is a guaranteed
+	// trigger on Android 13+) the destroy→create gap overlaps queued paint
+	// ticks, and a Vulkan present into the dead window wedges the emulator's
+	// GPU channel so hard that the next surface call never returns — the #283
+	// ANR, which then poisons every later launch until the emulator host
+	// process restarts. The GL path needs no flag: mainUI destroys the EGL
+	// surface synchronously in the windowDestroyed case and Publish checks
+	// C.surface.
+	nativeWindowLive atomic.Bool
 )
+
+// NativeWindowLive reports whether the Android native window is currently
+// alive — false from onNativeWindowDestroyed until the next
+// onNativeWindowCreated or onNativeWindowRedrawNeeded. The WebGPU driver
+// backend gates painting, surface rebuilds and presenting on it (#283).
+func NativeWindowLive() bool { return nativeWindowLive.Load() }
 
 func init() {
 	theApp.registerGLViewportFilter()
@@ -562,6 +584,7 @@ func mainUI(vm, jniEnv, ctx uintptr) error {
 		case cfg := <-windowConfigChange:
 			pixelsPerPt = cfg.pixelsPerPt
 		case w := <-windowCreated:
+			nativeWindowLive.Store(true)
 			if surfaceInitialized && !wasDestroyed && !webgpuBackend {
 				if errStr := C.destroyEGLSurface(); errStr != nil {
 					return fmt.Errorf("%s (%s)", C.GoString(errStr), eglGetError())
@@ -583,6 +606,7 @@ func mainUI(vm, jniEnv, ctx uintptr) error {
 				theApp.events.In() <- paint.Event{External: true, Window: uintptr(unsafe.Pointer(w))}
 			}
 		case w := <-windowRedrawNeeded:
+			nativeWindowLive.Store(true)
 			// Under -tags webgpu the ANativeWindow is owned by wgpu (Vulkan), so
 			// no EGL surface is created; surfaceInitialized gates the one-time
 			// metrics setup instead of C.surface.
@@ -619,6 +643,11 @@ func mainUI(vm, jniEnv, ctx uintptr) error {
 			theApp.events.In() <- currentSize
 			theApp.events.In() <- paint.Event{External: true, Window: uintptr(unsafe.Pointer(w))}
 		case <-windowDestroyed:
+			// Flip liveness before anything else: the onNativeWindowDestroyed
+			// callback returns (and Android destroys the window) as soon as its
+			// channel send is received, so this store is the driver's only
+			// near-synchronous signal to stop presenting (#283).
+			nativeWindowLive.Store(false)
 			if C.surface != nil {
 				if errStr := C.destroyEGLSurface(); errStr != nil {
 					return fmt.Errorf("%s (%s)", C.GoString(errStr), eglGetError())
