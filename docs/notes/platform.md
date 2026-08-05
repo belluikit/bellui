@@ -56,15 +56,38 @@ was **wrong**, disproven by goroutine dumps.
   recreation (#283). Declaring it needed the #287 regeneration of the CLI's
   embedded binres SDK table (now pinned via `binres.SDKPlatform`, recorded in
   the generated arsc.go header); since #287 an unknown `configChanges` flag
-  name is a hard manifest-compile error instead of a silently dropped bit, and
-  since #295 the same holds for single-valued enum attributes
-  (`screenOrientation="typo"` used to encode 0 = `landscape`). The binres
-  aapt goldens are android-35 output and their tests run again (#297 — the old
-  gate skipped on any SDK newer than android-15, i.e. always); the compiled
-  template manifest is additionally verified against a real `aapt dump
-  xmltree` when ANDROID_HOME with build-tools is present.
-  Live in-place locale pickup additionally needs the #282 re-resolve seam on
-  `onConfigurationChanged`.
+  name is a hard manifest-compile error instead of a silently dropped bit.
+  Live in-place locale pickup rides this delivery (#288): the native
+  `onConfigurationChanged` callback forwards a `config.Event`
+  (`internal/driver/mobile/event/config`) through the app event queue — the
+  send is unbounded, so the Java main thread never blocks — and the driver's
+  event loop answers it with the #282 `lang.ResolveSystemLocale` re-resolve
+  seam on the driver goroutine. So a per-app language change on a foregrounded
+  app applies (relayout included) with no recreation and no lifecycle
+  crossing; the StageFocused re-resolve remains the pickup for changes made
+  while backgrounded. Every other declared change lands on the same path
+  (rotation — whose config event precedes the redraw — plus `uiMode` and
+  `keyboardHidden`), which is fine but not free: the re-resolve is
+  override-guarded and skips the relayout while the locale is unchanged, yet
+  it still costs a `GetLocales` JNI round trip plus a localizer rebuild on the
+  driver goroutine. That cannot wedge the redraw handshake the config event
+  precedes — go-locale runs the lookup through `RunOnJVM`, which attaches its
+  own thread rather than borrowing the Java main thread (the deadlock shape
+  the soft-keyboard `keyboardOps` worker exists to avoid) — but a future
+  rotation-latency investigation should know it is there. Verified 2026-08-05
+  on the pixel143 AVD (stock android-34): deviceinfoprobe prints one
+  `trigger=localechange` line with the new `current=` and recreateprobe shows
+  zero lifecycle lines through the change. **ColorOS 16 (OPD2403) still
+  relaunches**: its
+  `ActivityRecordExtImpl.hookShouldRelaunchLocked` computes
+  `adjustedChanges={CONFIG_LOCALE, CONFIG_SCREEN_LAYOUT,
+  CONFIG_LAYOUT_DIRECTION}` — the vendor hook adds CONFIG_SCREEN_LAYOUT
+  (stock masks the layout-direction bits *out* of the screenLayout diff),
+  which the manifest does not declare — so the per-app change degrades to the
+  pre-#288 covered-indirectly path there: an in-process recreation
+  (survivable, #286) whose StageFocused re-cross picks the locale up.
+  Whether declaring `screenLayout` would defeat the hook, and what declaring
+  it means for fold/unfold and multi-window resource handling, is #299.
 - **Probes**: `hack/recreateprobe` (lifecycle lines + `alive=`/`tick=`
   heartbeats — at a wedge, `alive=` keeps counting while `tick=` stops);
   verified on pixel143 (goldfish) and OPD2403 (ColorOS 16, which recreates
