@@ -129,12 +129,34 @@ the trendvidia fork (github.com/trendvidia/fyne).
 
 ### Fixed
 
+* **Android: a per-app language change applies without restarting the app**
+  ([#288](https://github.com/belluikit/bellui/issues/288)). With `locale` and
+  `layoutDirection` declared in the packaged manifest (#283, #287), an
+  Android 13+ per-app language change reaches a foregrounded app as an
+  in-place `onConfigurationChanged` — no activity recreation, and therefore
+  no lifecycle crossing for the #282 foregrounding re-resolve to catch, so
+  the app kept running in the old language until it was next backgrounded
+  and brought forward. The native callback now forwards a
+  configuration-change event through the app event queue (the send is
+  unbounded, so the platform main thread never blocks) and the mobile driver
+  answers it on its own goroutine with the same `lang.ResolveSystemLocale`
+  seam: translations, CLDR formatting, collation and text direction
+  re-resolve and every window re-lays-out in place. An explicit
+  `lang.SetLocale` override still wins, and an unchanged locale skips the
+  relayout, so the other declared configuration changes that land on the same
+  path (rotation, dark mode, keyboard availability) cost only the locale
+  lookup. Verified on a pixel143 AVD with `hack/deviceinfoprobe` and
+  `hack/recreateprobe`; vendor builds whose relaunch mask still covers the
+  change (ColorOS 16) keep recreating the activity and pick the new locale up
+  on the foregrounding re-cross, as before.
+
 * **Android: in-process activity recreation no longer hangs the app (ANR)**
   ([#283](https://github.com/belluikit/bellui/issues/283)). A configuration
   change the manifest does not declare — an Android 13+ per-app language
-  override is a guaranteed trigger, a display density/size change another —
-  recreates the activity inside the surviving process, and the WebGPU painter
-  kept presenting frames into the just-destroyed native window during the
+  override was the guaranteed trigger until `locale` was declared (#287,
+  below), a display density/size change another — recreates the activity
+  inside the surviving process, and the WebGPU painter kept presenting
+  frames into the just-destroyed native window during the
   destroy→create gap; the poisoned surface then made the swap to the new
   window block forever, parking the platform main thread in the redraw
   handshake (on the emulator it also wedged the host GPU channel so *every*

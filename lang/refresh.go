@@ -23,7 +23,8 @@ var (
 	nextLocaleListener uint64
 )
 
-// RegisterLocaleChangeRefresh registers the callback that [SetLocale] invokes
+// RegisterLocaleChangeRefresh registers the callback that [SetLocale] — and a
+// [ResolveSystemLocale] re-resolve that lands on a different locale — invokes
 // when the active locale changes, so the app can re-lay-out and repaint its
 // running windows (re-translating text and re-applying locale-derived formatting
 // and direction). It is called automatically by the app package; applications do
@@ -36,7 +37,8 @@ func RegisterLocaleChangeRefresh(fn func()) {
 }
 
 // AddLocaleChangeListener registers fn to be called whenever the active locale
-// changes through [SetLocale]. It returns a function that removes the listener
+// changes — through [SetLocale] or a [ResolveSystemLocale] re-resolve that
+// lands on a different locale. It returns a function that removes the listener
 // again; callers should invoke it when the listener is no longer needed so it
 // can be garbage collected.
 //
