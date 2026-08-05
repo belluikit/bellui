@@ -190,6 +190,15 @@ func makeStoreDocs(id string, s *store) *internal.Docs {
 }
 
 func newAppWithDriver(d bellui.Driver, clipboard bellui.Clipboard, id string) bellui.App {
+	// Android resolves its locale here, not at lang's package init — the init
+	// lookup runs before the JVM is attached and settles on English (#282).
+	// App creation precedes any widget construction, so UI built in main sees
+	// the real locale. Deliberately ahead of SetCurrentApp and the locale-change
+	// refresh registration below: there is nothing built to re-lay-out yet, so
+	// the correction lands without a relayout or a flash of English. A no-op on
+	// every other platform.
+	resolveStartupLocale()
+
 	newApp := &belluiApp{uniqueID: id, clipboard: clipboard, driver: d}
 	bellui.SetCurrentApp(newApp)
 
