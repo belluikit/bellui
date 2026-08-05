@@ -138,38 +138,32 @@ func PackResources() ([]byte, error) {
 				if nt == nil { // NoEntry
 					continue
 				}
-				pkg.keyPool.strings[nt.key] = ""
 				typ.indices[j] = NoEntry
 				typ.entries[j] = nil
 			}
 		}
 	}
 
-	// drop strings from pool for specs to be dropped
-	for _, spec := range pkg.specs[4:] {
+	// Blank every key-pool string no surviving entry of the kept specs
+	// references. A key index is shared whenever the same name recurs across
+	// specs — id/screenLayout and the dropped ^attr-private/screenLayout share
+	// one slot — so dropped entries cannot blank their keys independently: the
+	// old per-entry collision scan overwrote its own verdict on the next kept
+	// spec (its break left only the innermost loop) and stripped screenLayout
+	// out of the packed table, making the flag undeclarable (#299).
+	kept := make(map[PoolRef]bool)
+	for _, spec := range pkg.specs[:4] {
 		for _, typ := range spec.types {
 			for _, nt := range typ.entries {
-				if nt == nil { // NoEntry
-					continue
-				}
-				// don't drop if there's a collision
-				var collision bool
-				for _, xspec := range pkg.specs[:4] {
-					for _, xtyp := range xspec.types {
-						for _, xnt := range xtyp.entries {
-							if xnt == nil {
-								continue
-							}
-							if collision = nt.key == xnt.key; collision {
-								break
-							}
-						}
-					}
-				}
-				if !collision {
-					pkg.keyPool.strings[nt.key] = ""
+				if nt != nil {
+					kept[nt.key] = true
 				}
 			}
+		}
+	}
+	for i := range pkg.keyPool.strings {
+		if !kept[PoolRef(i)] {
+			pkg.keyPool.strings[i] = ""
 		}
 	}
 
