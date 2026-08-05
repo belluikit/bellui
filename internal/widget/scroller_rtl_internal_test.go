@@ -89,3 +89,21 @@ func TestScrollContainer_RTL_UserScrollSupersedesPin(t *testing.T) {
 	scroll.Resize(geo.NewSize(80, 100))
 	assert.Equal(t, float32(890), scroll.Offset.X)
 }
+
+func TestScrollContainer_RTL_TouchScrollDirectionAbsolute(t *testing.T) {
+	rtlScroll(t, bellui.DirectionRTL)
+
+	scroll := newWideScroll()
+	require.Equal(t, float32(900), scroll.Offset.X)
+
+	// A wheel scroll is RTL-resolved: positive DX flips, staying clamped at
+	// the right-edge reading start.
+	scroll.Scrolled(&event.ScrollEvent{Scrolled: geo.NewDelta(30, 0), Source: event.ScrollSourceMouseWheel})
+	assert.Equal(t, float32(900), scroll.Offset.X)
+
+	// A direct-touch scroll (#291) is direction-absolute: the content tracks
+	// the finger — a rightwards drag reveals content to the left, RTL or not —
+	// exactly as the mobile driver's drag path behaves.
+	scroll.Scrolled(&event.ScrollEvent{Scrolled: geo.NewDelta(30, 0), Source: event.ScrollSourceTouch})
+	assert.Equal(t, float32(870), scroll.Offset.X)
+}

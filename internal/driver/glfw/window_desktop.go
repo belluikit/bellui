@@ -165,6 +165,10 @@ type window struct {
 	// began must be ignored.
 	touch       common.TouchHandler
 	touchActive map[int]bool
+	// touchScrollGen invalidates in-flight flick momentum (#291): bumped on
+	// every TouchBegin, and momentum ticks stop when their generation is no
+	// longer current. Main-goroutine state, like the long-press fields below.
+	touchScrollGen int
 
 	// Press-and-hold long-press dispatch (#266) on the mouse path — real
 	// mouse holds, and emulated touch where the touch callback never fires
