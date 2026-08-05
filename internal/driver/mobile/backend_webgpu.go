@@ -66,7 +66,20 @@ func (d *driver) recreateSurface(c *canvas, w *window) {
 
 // presentPainter submits and presents the WebGPU frame. gomobile's Publish()
 // does not present under -tags webgpu (EGL is bypassed), so the painter must.
+//
+// If the native window died while the frame was being recorded (Android
+// destroys it mid-recreation; nativeSurfacePresentable is the per-OS liveness
+// check), the frame is abandoned instead: presenting into a destroyed
+// ANativeWindow is what wedges the GPU channel behind the #283 ANR. The
+// abandoned frame's content is not lost for long — the recreated window's
+// lifecycle re-cross refreshes the canvas, so the next paint redraws it.
 func (d *driver) presentPainter(c *canvas) {
+	if !d.nativeSurfacePresentable() {
+		if ab, ok := c.Painter().(interface{ AbandonFrame() }); ok {
+			ab.AbandonFrame()
+		}
+		return
+	}
 	if pr, ok := c.Painter().(interface{ Present() }); ok {
 		pr.Present()
 	}

@@ -6,11 +6,27 @@ import (
 	"unsafe"
 
 	"github.com/belluikit/webgpu/wgpu"
+
+	"github.com/belluikit/bellui/internal/driver/mobile/app"
 )
 
 // renderReady reports whether the ANativeWindow handle is available (it arrives
-// via paint.Event.Window), so the wgpu Vulkan surface can be created.
-func (d *driver) renderReady(w *window) bool { return w != nil && w.handle != 0 }
+// via paint.Event.Window) and the window is still alive, so the wgpu Vulkan
+// surface can be created and presented to. The liveness check is load-bearing:
+// during an in-process activity recreation the destroy→create gap overlaps
+// queued paint ticks (the lifecycle re-cross refreshes the canvas), and a
+// Vulkan present into the destroyed window wedges the emulator's GPU channel
+// permanently — the #283 ANR. The handle alone cannot express this: it stays
+// set until the recreated activity's paint event replaces it.
+func (d *driver) renderReady(w *window) bool {
+	return w != nil && w.handle != 0 && app.NativeWindowLive()
+}
+
+// nativeSurfacePresentable is the last-moment presentPainter re-check of the
+// same liveness flag: a paint that began on a live window may outlive it (the
+// destroy callback fires mid-frame), and the present — not the draw — is what
+// poisons the dead window (#283). iOS has no equivalent window death.
+func (d *driver) nativeSurfacePresentable() bool { return app.NativeWindowLive() }
 
 // webgpuSurfaceDescriptor builds an ANativeWindow-backed surface descriptor for
 // the Android window; wgpu-native renders into it via Vulkan. w.handle is the
