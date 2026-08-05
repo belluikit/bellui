@@ -17,6 +17,7 @@ import (
 	"github.com/belluikit/bellui/driver/desktop"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/driver/common"
 	"github.com/belluikit/bellui/internal/scale"
 	internalTest "github.com/belluikit/bellui/internal/test"
 	intwidget "github.com/belluikit/bellui/internal/widget"
@@ -1201,6 +1202,150 @@ func TestWindow_Tapped(t *testing.T) {
 	})
 }
 
+// A stationary primary press held past common.TapSecondaryDelay hold-fires
+// LongPressed while the button is still down, and the release of a hold-fired
+// press is not a tap (#266) — the desktop mirror of the touch drivers'
+// hold-fire dispatch (#758), minus the lift-secondary.
+func TestWindow_LongPress_FiresWhileHeld(t *testing.T) {
+	w := createWindow("Test")
+	prop := canvas.NewRectangle(color.White)
+	prop.SetMinSize(geo.NewSize(100, 100))
+	o := newLongPressableObject()
+	w.SetContent(container.NewStack(prop, o))
+	repaintWindow(w) // settle layout before clicking — SetContent work is queued
+
+	runOnMain(func() {
+		w.mousePos = geo.NewPos(50, 60)
+		w.mouseClicked(w.viewport, glfw.MouseButton1, glfw.Press, 0)
+	})
+
+	select {
+	case ev := <-o.longPresses:
+		assert.Equal(t, geo.NewPos(50, 60), ev.AbsolutePosition)
+		assert.Equal(t, geo.NewPos(46, 56), ev.Position)
+	case <-time.After(4 * common.TapSecondaryDelay):
+		t.Fatal("no LongPressed while the press was held")
+	}
+
+	runOnMain(func() {
+		w.mouseClicked(w.viewport, glfw.MouseButton1, glfw.Release, 0)
+		assert.Nil(t, o.popTapEvent(), "release of a hold-fired press is not a tap")
+		assert.Nil(t, o.popSecondaryTapEvent(), "and not a secondary tap — right-click owns that on desktop")
+
+		// The gesture state is fully consumed: an ordinary click afterwards
+		// taps as usual.
+		w.mouseClicked(w.viewport, glfw.MouseButton1, glfw.Press, 0)
+		w.mouseClicked(w.viewport, glfw.MouseButton1, glfw.Release, 0)
+		assert.NotNil(t, o.popTapEvent(), "a following quick click taps normally")
+	})
+}
+
+// A click released before the hold delay taps as before and never long-presses.
+func TestWindow_LongPress_QuickClickStillTaps(t *testing.T) {
+	w := createWindow("Test")
+	prop := canvas.NewRectangle(color.White)
+	prop.SetMinSize(geo.NewSize(100, 100))
+	o := newLongPressableObject()
+	w.SetContent(container.NewStack(prop, o))
+	repaintWindow(w)
+
+	runOnMain(func() {
+		w.mousePos = geo.NewPos(50, 60)
+		w.mouseClicked(w.viewport, glfw.MouseButton1, glfw.Press, 0)
+		w.mouseClicked(w.viewport, glfw.MouseButton1, glfw.Release, 0)
+		assert.NotNil(t, o.popTapEvent(), "quick click taps")
+	})
+
+	select {
+	case <-o.longPresses:
+		t.Fatal("a released press must not hold-fire")
+	case <-time.After(2 * common.TapSecondaryDelay):
+	}
+}
+
+// Movement past the drag threshold before the delay cancels the pending fire.
+func TestWindow_LongPress_MoveCancels(t *testing.T) {
+	w := createWindow("Test")
+	prop := canvas.NewRectangle(color.White)
+	prop.SetMinSize(geo.NewSize(100, 100))
+	o := newLongPressableObject()
+	w.SetContent(container.NewStack(prop, o))
+	repaintWindow(w)
+
+	runOnMain(func() {
+		w.mousePos = geo.NewPos(50, 60)
+		w.mouseClicked(w.viewport, glfw.MouseButton1, glfw.Press, 0)
+		w.mouseMoved(w.viewport, 58, 68) // past dragMoveThreshold: a drag, not a hold
+	})
+
+	select {
+	case <-o.longPresses:
+		t.Fatal("a moved press must not hold-fire")
+	case <-time.After(2 * common.TapSecondaryDelay):
+	}
+
+	runOnMain(func() {
+		w.mouseClicked(w.viewport, glfw.MouseButton1, glfw.Release, 0)
+	})
+}
+
+// Only a lone primary press arms the hold: secondary presses and chords never
+// dispatch LongPressed.
+func TestWindow_LongPress_SecondaryButtonDoesNot(t *testing.T) {
+	w := createWindow("Test")
+	prop := canvas.NewRectangle(color.White)
+	prop.SetMinSize(geo.NewSize(100, 100))
+	o := newLongPressableObject()
+	w.SetContent(container.NewStack(prop, o))
+	repaintWindow(w)
+
+	runOnMain(func() {
+		w.mousePos = geo.NewPos(50, 60)
+		w.mouseClicked(w.viewport, glfw.MouseButton2, glfw.Press, 0)
+	})
+
+	select {
+	case <-o.longPresses:
+		t.Fatal("a secondary press must not hold-fire")
+	case <-time.After(2 * common.TapSecondaryDelay):
+	}
+
+	runOnMain(func() {
+		w.mouseClicked(w.viewport, glfw.MouseButton2, glfw.Release, 0)
+	})
+}
+
+// A second button chorded in after the hold fired must not hand the tap back:
+// only a primary press starts a fresh gesture, so the suppression survives
+// until the held button is released.
+func TestWindow_LongPress_ChordAfterFireKeepsTapSuppressed(t *testing.T) {
+	w := createWindow("Test")
+	prop := canvas.NewRectangle(color.White)
+	prop.SetMinSize(geo.NewSize(100, 100))
+	o := newLongPressableObject()
+	w.SetContent(container.NewStack(prop, o))
+	repaintWindow(w)
+
+	runOnMain(func() {
+		w.mousePos = geo.NewPos(50, 60)
+		w.mouseClicked(w.viewport, glfw.MouseButton1, glfw.Press, 0)
+	})
+
+	select {
+	case <-o.longPresses:
+	case <-time.After(4 * common.TapSecondaryDelay):
+		t.Fatal("no LongPressed while the press was held")
+	}
+
+	runOnMain(func() {
+		// Right-click without lifting the primary button, then release both.
+		w.mouseClicked(w.viewport, glfw.MouseButton2, glfw.Press, 0)
+		w.mouseClicked(w.viewport, glfw.MouseButton2, glfw.Release, 0)
+		w.mouseClicked(w.viewport, glfw.MouseButton1, glfw.Release, 0)
+		assert.Nil(t, o.popTapEvent(), "the hold-fired press still owns its release")
+	})
+}
+
 func TestWindow_TappedSecondary(t *testing.T) {
 	w := createWindow("Test")
 	prop := canvas.NewRectangle(color.White)
@@ -2100,6 +2245,25 @@ type draggableMouseableObject struct {
 type tappableObject struct {
 	*canvas.Rectangle
 	tappable
+}
+
+var _ event.LongPressable = (*longPressableObject)(nil)
+
+type longPressableObject struct {
+	*canvas.Rectangle
+	tappable
+	longPresses chan *event.PointEvent
+}
+
+func newLongPressableObject() *longPressableObject {
+	return &longPressableObject{
+		Rectangle:   canvas.NewRectangle(color.White),
+		longPresses: make(chan *event.PointEvent, 1),
+	}
+}
+
+func (o *longPressableObject) LongPressed(ev *event.PointEvent) {
+	o.longPresses <- ev
 }
 
 var _ event.Tappable = (*tappable)(nil)
