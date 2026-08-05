@@ -1,4 +1,5 @@
 #! /usr/bin/env bash
+set -eu
 
 # Regenerates the aapt golden files (*.bin, *.arsc) from the *.xml sources.
 #
@@ -11,8 +12,13 @@
 BUILD_TOOLS=${BUILD_TOOLS:-35.0.0}
 AAPT=${ANDROID_HOME}/build-tools/${BUILD_TOOLS}/aapt
 
-# keep in sync with binres.SDKPlatform
-SDK_PLATFORM=android-35
+# read straight off the pin rather than duplicating it — a golden regenerated
+# against a different platform is exactly the drift #297 found.
+SDK_PLATFORM=$(sed -n 's/^const SDKPlatform = "\(.*\)"$/\1/p' "$(dirname "$0")/../sdk.go")
+if [ -z "$SDK_PLATFORM" ]; then
+	echo "cannot read SDKPlatform from ../sdk.go" >&2
+	exit 1
+fi
 APIJAR=${ANDROID_HOME}/platforms/${SDK_PLATFORM}/android.jar
 
 for f in *.xml; do
