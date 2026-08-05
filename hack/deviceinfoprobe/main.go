@@ -9,7 +9,7 @@
 // stdout (logcat tag Bellui on Android) two seconds after launch, once the
 // first size event has landed:
 //
-//	deviceinfo scale=2.6250 sizePt=411x891 locales=["en-US"] localesErr=<nil> system=en-US current=en-US
+//	deviceinfo trigger=timer scale=2.6250 sizePt=411x891 locales=["en-US"] localesErr=<nil> system=en-US current=en-US
 //
 // current is lang.CurrentLocale — the tag driving translations, CLDR
 // formatting, collation and direction. On a healthy start it matches the
@@ -17,8 +17,14 @@
 // device is the #282 stuck-fallback state. A fresh line is also printed on
 // every foregrounding — the driver re-resolves the system locale just before
 // the foreground hook (#282), so backgrounding the app, switching the system
-// (or per-app: `adb shell cmd locale set-app-locales <id> --locales pt-BR`)
-// language and returning captures the pickup without a tap; the "report
+// language and returning captures the pickup without a tap — and on every
+// locale change (lang.AddLocaleChangeListener). The latter is the #288
+// in-place check: with the packaged manifest declaring locale|layoutDirection
+// (#287), a per-app language change on a *foregrounded* app
+// (`adb shell cmd locale set-app-locales <id> --user 0 --locales pt-BR`)
+// must print a trigger=localechange line with the new current= and no
+// trigger=foreground line around it — the change arrived as an in-place
+// onConfigurationChanged, not a recreation or foregrounding. The "report
 // again" button re-reads on demand.
 //
 // Android: package with `bellui package --target android/arm64` from this
@@ -46,17 +52,17 @@ func main() {
 	scaleLabel := widget.NewLabel("scale: collecting…")
 	localeLabel := widget.NewLabel("locales: collecting…")
 	localeLabel.Wrapping = bellui.TextWrapWord
-	var report func()
+	var report func(trigger string)
 	w.SetContent(container.NewVBox(scaleLabel, localeLabel,
-		widget.NewButton("report again", func() { report() })))
+		widget.NewButton("report again", func() { report("button") })))
 
-	report = func() {
+	report = func(trigger string) {
 		c := w.Canvas()
 		// GetLocales is what lang.updateLocalizer consults; log it with %q so
 		// an empty or vendor-form entry is visible verbatim (#271).
 		locs, err := locale.GetLocales()
-		line := fmt.Sprintf("deviceinfo scale=%.4f sizePt=%.0fx%.0f locales=%q localesErr=%v system=%s current=%s",
-			c.Scale(), c.Size().Width, c.Size().Height, locs, err, lang.SystemLocale(), lang.CurrentLocale())
+		line := fmt.Sprintf("deviceinfo trigger=%s scale=%.4f sizePt=%.0fx%.0f locales=%q localesErr=%v system=%s current=%s",
+			trigger, c.Scale(), c.Size().Width, c.Size().Height, locs, err, lang.SystemLocale(), lang.CurrentLocale())
 		log.Println(line)
 		scaleLabel.SetText(fmt.Sprintf("scale: %.4f (size %.0fx%.0f pt)", c.Scale(), c.Size().Width, c.Size().Height))
 		localeLabel.SetText(fmt.Sprintf("locales: %q (err %v)\nsystem: %s\ncurrent: %s", locs, err, lang.SystemLocale(), lang.CurrentLocale()))
@@ -66,13 +72,20 @@ func main() {
 	// window is up, and again on demand via the button.
 	go func() {
 		time.Sleep(2 * time.Second)
-		bellui.Do(report)
+		bellui.Do(func() { report("timer") })
 	}()
 
 	// Report on every foregrounding: the mobile driver re-resolves the system
 	// locale immediately before this hook fires (#282), so this line shows
 	// whether a language switched while backgrounded was picked up.
-	a.Lifecycle().SetOnEnteredForeground(report)
+	a.Lifecycle().SetOnEnteredForeground(func() { report("foreground") })
+
+	// Report on every locale change. The #288 in-place path: a per-app
+	// language change on a foregrounded app arrives as an in-place
+	// onConfigurationChanged (manifest declares locale|layoutDirection, #287)
+	// and the driver re-resolves the locale from the config-change event — so
+	// this line must appear with the new current= and no foreground line.
+	lang.AddLocaleChangeListener(func() { report("localechange") })
 
 	bellui.ShowAndRun(w)
 }
