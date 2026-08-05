@@ -210,9 +210,13 @@ func fallbackWithData(key, fallback string, data any) string {
 // It is exported so that widget tests in other packages can test
 // locale-dependent behavior. It should not be called from production code.
 //
-// The previous locale is automatically restored via t.Cleanup when the
-// test (or subtest) finishes, preventing locale state from leaking
-// between tests.
+// The locale counts as an explicit override for the duration of the test, so
+// neither a toolkit re-resolve of the system locale ([ResolveSystemLocale]) nor
+// an [AddTranslations] call can replace it.
+//
+// The previous locale — and the previous override state — is automatically
+// restored via t.Cleanup when the test (or subtest) finishes, preventing locale
+// state from leaking between tests.
 func SetLocaleForTests(t interface{ Cleanup(func()) }, locale string) {
 	prevTag := getCurrentTag()
 	prevLocalizer := getLocalizer()
@@ -234,6 +238,13 @@ func SetLocaleForTests(t interface{ Cleanup(func()) }, locale string) {
 // (including region and script) is retained for formatting, [CurrentLocale],
 // [IsRTL] and text shaping. Unlike [SystemLocale], subsequent calls to those
 // helpers reflect this override.
+//
+// A non-empty locale also pins the app against later system-locale resolution:
+// neither [ResolveSystemLocale] — which the toolkit runs itself on Android once
+// the Java runtime is available — nor the localizer rebuild that
+// [AddTranslations] and its variants trigger will replace it (translations added
+// afterwards are still picked up for the overridden locale). Passing an empty
+// locale releases the pin and reverts to tracking the system locale.
 //
 // When the active locale actually changes and an app is running, every running
 // window is re-laid-out and repainted — re-applying locale-derived formatting
