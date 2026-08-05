@@ -152,6 +152,13 @@ type window struct {
 	mouseClickCount      int
 	mouseCancelFunc      context.CancelFunc
 
+	// Press-and-hold long-press dispatch (#266). All three are main-goroutine
+	// state: the hold timer hops back via runOnMain before touching them
+	// (the waitForDoubleTap pattern).
+	longPressSeq   int          // arm generation; bumping cancels a pending fire
+	longPressPos   geo.Position // where the armed press went down (slop origin)
+	longPressFired bool         // this primary press hold-fired, so its release is not a tap
+
 	onClosed           func()
 	onCloseIntercepted func()
 	onMoved            func(x, y int)
