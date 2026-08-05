@@ -48,6 +48,17 @@ const (
 	//
 	// Since: 1.0
 	GrabbingCursor
+	// NWSEResizeCursor is the cursor often used to indicate diagonal resize
+	// from the top-left or bottom-right corner (northwest–southeast), such as
+	// the bottom-right resize corner of an [github.com/belluikit/bellui/container.InnerWindow].
+	//
+	// Since: 1.0
+	NWSEResizeCursor
+	// NESWResizeCursor is the cursor often used to indicate diagonal resize
+	// from the bottom-left or top-right corner (northeast–southwest).
+	//
+	// Since: 1.0
+	NESWResizeCursor
 )
 
 // Cursorable describes any CanvasObject that needs a cursor change
