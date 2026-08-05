@@ -119,10 +119,30 @@ the trendvidia fork (github.com/trendvidia/fyne).
   `hack/recreateprobe` on a pixel143 AVD and an OPD2403 (ColorOS 16) through
   repeated locale-override and density recreations, rotation and
   background/resume cycles. The packaging template additionally declares
-  `locale` in `configChanges` — inert until the binres SDK table learns the
-  `layoutDirection` flag Android pairs with it
-  ([#287](https://github.com/belluikit/bellui/issues/287)), but the recreation
-  that still happens is now survivable.
+  `locale` in `configChanges` — completed by `layoutDirection` once the
+  binres SDK table learned that flag
+  ([#287](https://github.com/belluikit/bellui/issues/287), next entry) — and
+  the recreation that still happens is now survivable.
+
+* **`bellui package` Android manifests: `configChanges` flags newer than the
+  gomobile-era SDK table now encode, and an unknown name fails loudly**
+  ([#287](https://github.com/belluikit/bellui/issues/287)). The CLI's binres
+  manifest encoder resolves each `|`-separated `configChanges` name against
+  an embedded, stripped copy of the platform resource table that dated from
+  the upstream gomobile era and silently dropped any name it did not know:
+  `orientation|keyboardHidden|uiMode|locale|layoutDirection` encoded as
+  0x2a4 — `layoutDirection` (API 17, bit 0x2000) simply vanished from the
+  packaged APK. The table is now regenerated from a pinned platform
+  (`binres.SDKPlatform` = android-35, recorded in the generated arsc.go
+  header so regeneration is reproducible), which required teaching the
+  binres decoder the modern aapt2 table encodings (sparse and offset16 entry
+  indices, compact entries, staged-alias chunks, multi-package tables). The
+  same mask now encodes as 0x22a4, verified against `aapt dump xmltree`, and
+  an unresolvable flag name is a hard manifest-compile error naming the flag
+  instead of silent data loss. With the table current, the packaging
+  template declares `layoutDirection` alongside `locale` (#283's pair), so
+  an Android 13+ per-app language change reaches the app as
+  `onConfigurationChanged` instead of recreating the activity.
   
 * **The mobile pickers honour `UseNativeFileDialogs(false)`**
   ([#267](https://github.com/belluikit/bellui/issues/267)). The doc promised
