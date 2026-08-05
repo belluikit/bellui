@@ -15,6 +15,54 @@ Everything below is verbatim; issue numbers refer to the Bellui Backlog.
 - **Windows (Phase 3, done)** — the modern Common Item Dialog (`IFileOpenDialog`/`IFileSaveDialog`) driven **purely through `x/sys/windows` COM syscalls, no cgo** (`file_windows_native.go`). CLSID/IID `windows.GUID` literals + hand-written vtable slot offsets (IUnknown→IModalWindow→IFileDialog; both dialogs share the `IFileDialog` base so `GetResult` covers single-select open + save); `ole32.dll` `CoCreateInstance`/`CoTaskMemFree` + `shell32.dll` `SHCreateItemFromParsingName` (for `SetFolder`). Runs on a dedicated `runtime.LockOSThread`'d goroutine (never unlocked → the STA COM apartment lives and dies with the goroutine; `Show` pumps its own modal loop) with `CoInitializeEx(APARTMENTTHREADED)` (skips the balancing `CoUninitialize` only on `RPC_E_CHANGED_MODE`); result marshalled back via `bellui.Do`, mirroring portal/macOS. Parent `HWND` best-effort via `RunNative`→`WindowsWindowContext.HWND` (0/unparented is fine — Show blocks either way; cross-thread owner isn't auto-disabled, acceptable for v1). Filters → `COMDLG_FILTERSPEC` (`*.ext;…`); MIME filters have no native Windows concept so they're best-effort mapped via `mime.ExtensionsByType` (unmappable → all files). **cgo-free pointer hygiene**: the `comCall` helper stashes args in a `[]uintptr`, which forfeits the `//go:uintptrescapes` liveness guarantee (that only holds for `syscall.SyscallN`/`LazyProc.Call` with the conversion *in* the call expression, as the direct `Show`/`GetResult`/`CoCreateInstance`/`SHCreate…` calls use) — Go's GC is non-moving so addresses stay valid, but every Go pointer handed through `comCall` is pinned in a `pins []any` kept alive to end of function.
 - **Canvas-only caveats**: `SetShowHidden` is not expressible on the native surfaces — documented as canvas-dialog-only. Multi-selection *is* honoured natively for file-open — macOS NSOpenPanel (#716), the Windows dialog, the portal, and the mobile pickers (#255) — with an environment lacking a multi picker declining into the canvas dialog (#627), where the long-press selection mode (#259, above) is the touch entry. Mobile keeps its native pickers (`file_mobile.go`) but since #267 they honour `UseNativeFileDialogs(false)` — a gate at the top of both overrides, settling the contract in favour of the toggle's "everywhere" doc: the canvas dialog browses something real on mobile (app-scoped storage), so an explicit opt-out must not be a silent no-op, and it is also what makes the canvas dialog (and on-device probing of #259's gesture — `filedialogprobe`'s native-pickers check) reachable on a packaged device build. The recorded cost, in the `UseNativeFileDialogs` doc: the platform picker is the only surface reaching outside the sandbox on modern mobile, so opting out for desktop-consistency reasons should be platform-gated by the app. wasm is the one deliberate holdout — the toggle is ignored there because a canvas dialog has no real filesystem to browse in a browser (`file_wasm.go` — `<input type=file>` for open, Blob download-on-`Close()` for save (#625); since #257 the wasm overrides require a real browser-hosted parent window (`browserWindowFor` above) — the test driver falls back to the canvas dialog; directory-open falls back to the canvas dialog).
 
+### Android In-Process Activity Recreation (#283)
+
+Any configuration change the manifest does not declare makes Android destroy and
+recreate the activity **inside the surviving process** (guaranteed trigger: an
+Android 13+ per-app locale override, `cmd locale set-app-locales`; also display
+density/size changes). The gomobile lifecycle plumbing survives this fine —
+`activityDestroyed` → StageDead → the recreated activity re-crosses to
+StageFocused; #283's original "the driver treats StageDead as terminal" theory
+was **wrong**, disproven by goroutine dumps.
+
+- **Root cause of the #283 ANR (WebGPU only)**: the destroy→create gap overlaps
+  queued paint ticks — the lifecycle re-cross refreshes the canvas — so the
+  painter **presented Vulkan frames into the just-destroyed ANativeWindow**,
+  then `Device.RecreateSurface`'s `GetCapabilities` on the new window never
+  returned. The Java main thread was meanwhile parked in gomobile's
+  `onNativeWindowRedrawNeeded` handshake waiting for a first frame → ANR. The
+  GL path was never affected: mainUI destroys the EGL surface synchronously in
+  its `windowDestroyed` case and `Publish` checks `C.surface`.
+- **Fix**: `app.NativeWindowLive()` — an atomic written only by mainUI (false on
+  `onNativeWindowDestroyed`, true on `onNativeWindowCreated`/`RedrawNeeded`).
+  The Android WebGPU backend gates `renderReady` on it (whole frames skip while
+  the window is dead — the handle alone can't express this, it stays stale until
+  the recreated activity's paint event replaces it) and `presentPainter`
+  re-checks it last-moment, abandoning the open frame (`painter.AbandonFrame`,
+  the #337 dangling-SurfaceOutput discard) instead of presenting. Late *release*
+  of the dead window's surface is harmless (the plain background→resume path
+  has always done it); only the *present* poisons.
+- **Emulator diagnostic gotcha (goldfish)**: one bad present wedges the
+  emulator **host process's** GPU channel permanently — after that, every app
+  launch hangs in `wgpuCreateInstance` (black screen → ANR on any start, which
+  is what the issue misread as "any launch with an override ANRs"), and a
+  **guest reboot does not clear it — only restarting the emulator process
+  does**. If pixel143 starts hanging every bellui app at launch, restart the
+  emulator before debugging anything else.
+- **Manifest**: the packaging template now declares `locale` in
+  `configChanges`, but that is **inert for now** — the framework adds
+  `layoutDirection` to every locale change mask, and the CLI's embedded binres
+  SDK table predates that flag (API 17) and silently drops unknown flag names.
+  Until the table is regenerated (#287), a per-app language change still
+  recreates — survivably. Live in-place locale pickup additionally needs the
+  #282 re-resolve seam on `onConfigurationChanged`.
+- **Probes**: `hack/recreateprobe` (lifecycle lines + `alive=`/`tick=`
+  heartbeats — at a wedge, `alive=` keeps counting while `tick=` stops);
+  verified on pixel143 (goldfish) and OPD2403 (ColorOS 16, which recreates
+  in-process the same way). Go-side stacks on a hung device build: add a
+  `net/http/pprof` listener to the probe and `adb forward` — SIGQUIT is taken
+  by ART, not the Go runtime.
+
 ### System Tray — Linux delivery caveat (#512)
 System tray (`desktop.App.SetSystemTray*`) is delivered via **StatusNotifierItem over D-Bus** on Linux/BSD (native status items on macOS/Windows). An SNI item only appears where the desktop environment runs an **SNI host**: KDE Plasma and most Wayland compositors do; **stock GNOME shows nothing** unless the user installs the AppIndicator (KStatusNotifierItem) shell extension, and legacy **XEmbed-only** trays (some minimal WMs) are unsupported by `github.com/belluikit/systray`. This is a desktop-environment property, not a bellui bug (every non-GTK toolkit shares it). **Design rule: never make the tray the only path to a feature** — always keep a window/menu route (the "Show Window" menu-item advice). Doc'd on the `desktop.App` interface.
 

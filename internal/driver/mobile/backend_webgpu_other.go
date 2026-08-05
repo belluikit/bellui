@@ -8,6 +8,11 @@ import "github.com/belluikit/webgpu/wgpu"
 // of this package (e.g. desktop test compilation of the default webgpu build).
 func (d *driver) renderReady(*window) bool { return false }
 
+// nativeSurfacePresentable is always true: only Android's ANativeWindow dies
+// under a live painter (#283), and renderReady above never lets a frame begin
+// here anyway.
+func (d *driver) nativeSurfacePresentable() bool { return true }
+
 // webgpuSurfaceDescriptor has no native window on non-mobile builds of this
 // package (e.g. desktop test compilation of the default webgpu build). iOS provides its
 // own (CAMetalLayer) in backend_webgpu_ios.go.

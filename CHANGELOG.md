@@ -103,6 +103,27 @@ the trendvidia fork (github.com/trendvidia/fyne).
 
 ### Fixed
 
+* **Android: in-process activity recreation no longer hangs the app (ANR)**
+  ([#283](https://github.com/belluikit/bellui/issues/283)). A configuration
+  change the manifest does not declare — an Android 13+ per-app language
+  override is a guaranteed trigger, a display density/size change another —
+  recreates the activity inside the surviving process, and the WebGPU painter
+  kept presenting frames into the just-destroyed native window during the
+  destroy→create gap; the poisoned surface then made the swap to the new
+  window block forever, parking the platform main thread in the redraw
+  handshake (on the emulator it also wedged the host GPU channel so *every*
+  later app launch hung until the emulator process was restarted). The driver
+  now tracks native-window liveness (`app.NativeWindowLive`): frames are
+  skipped while the window is dead, and a frame already being recorded when
+  the window dies is discarded instead of presented. Verified with
+  `hack/recreateprobe` on a pixel143 AVD and an OPD2403 (ColorOS 16) through
+  repeated locale-override and density recreations, rotation and
+  background/resume cycles. The packaging template additionally declares
+  `locale` in `configChanges` — inert until the binres SDK table learns the
+  `layoutDirection` flag Android pairs with it
+  ([#287](https://github.com/belluikit/bellui/issues/287)), but the recreation
+  that still happens is now survivable.
+  
 * **The mobile pickers honour `UseNativeFileDialogs(false)`**
   ([#267](https://github.com/belluikit/bellui/issues/267)). The doc promised
   the canvas dialog "everywhere", but the iOS/Android overrides consulted
