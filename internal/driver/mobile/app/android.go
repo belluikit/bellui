@@ -217,6 +217,20 @@ type windowConfig struct {
 	pixelsPerPt float32
 }
 
+// density.go mirrors these NDK constants so that the density mapping builds
+// without cgo; a drift would be silent, so tie them together at compile time
+// (each pair must be 0 from both sides — a negative constant fails to convert).
+const (
+	_ uint = densityDefault - C.ACONFIGURATION_DENSITY_DEFAULT
+	_ uint = C.ACONFIGURATION_DENSITY_DEFAULT - densityDefault
+	_ uint = densityMedium - C.ACONFIGURATION_DENSITY_MEDIUM
+	_ uint = C.ACONFIGURATION_DENSITY_MEDIUM - densityMedium
+	_ uint = densityAny - C.ACONFIGURATION_DENSITY_ANY
+	_ uint = C.ACONFIGURATION_DENSITY_ANY - densityAny
+	_ uint = densityNone - C.ACONFIGURATION_DENSITY_NONE
+	_ uint = C.ACONFIGURATION_DENSITY_NONE - densityNone
+)
+
 func windowConfigRead(activity *C.ANativeActivity) windowConfig {
 	aconfig := C.AConfiguration_new()
 	C.AConfiguration_fromAssetManager(aconfig, activity.assetManager)
@@ -224,25 +238,12 @@ func windowConfigRead(activity *C.ANativeActivity) windowConfig {
 	density := C.AConfiguration_getDensity(aconfig)
 	C.AConfiguration_delete(aconfig)
 
-	// The reported density is the device's configured dpi
-	// (Configuration.densityDpi). It is not restricted to the classic bucket
-	// constants — 356, 420 or 440dpi panels are common — and the canvas scale
-	// is derived arithmetically from it (androidScaleForDPI, #272), so any
-	// positive value below the sentinels is taken as-is rather than logged as
-	// "unknown". ACONFIGURATION_DENSITY_ANY (0xfffe) and _NONE (0xffff) are
-	// sentinels meaning "no density", not densities: both fall back to mdpi
-	// (scale 1.0, what the old dpi-72 fallback produced through the bucket
-	// table). ANY previously fell through the default arm as a 65534dpi
-	// screen.
-	var dpi int
-	switch {
-	case density > 0 && density < C.ACONFIGURATION_DENSITY_ANY:
-		dpi = int(density)
-	case density == C.ACONFIGURATION_DENSITY_DEFAULT: // 0: density unset
-		dpi = 160
-	default:
+	// The density → dpi decision lives in density.go so it can be tested off
+	// device; see androidDPIForDensity for why an off-bucket value is taken
+	// as-is and what the sentinels mean (#272).
+	dpi, usable := androidDPIForDensity(int32(density))
+	if !usable {
 		log.Printf("android device reports no usable screen density: %d", density)
-		dpi = 160
 	}
 
 	o := size.OrientationUnknown

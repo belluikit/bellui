@@ -6,7 +6,7 @@
 // stdout (logcat tag Bellui on Android) two seconds after launch, once the
 // first size event has landed:
 //
-//	deviceinfo scale=2.6250 sizePt=411x891 locales=["en-US"] localesErr=<nil> system=en-US
+//	deviceinfo scale=2.6250 sizePt=411x914 locales=["en-US"] localesErr=<nil> system=en-US
 //
 // Android: package with `bellui package --target android/arm64` from this
 // directory, install, launch, then `adb logcat -d -s Bellui | grep deviceinfo`.
