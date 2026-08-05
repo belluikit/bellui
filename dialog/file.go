@@ -801,17 +801,21 @@ func (f *fileDialog) applyMultiTap(id int, mods event.KeyModifier) {
 // switches the dialog into selection mode and selects the pressed file, so the
 // finger that held an item leaves with that item chosen. Directories navigate
 // on tap and are never part of a selection, so they do not enter the mode; a
-// single-select dialog has no set to build, so long-press is inert there.
-func (f *fileDialog) enterSelectionMode(id int) {
+// single-select dialog has no set to build, so there is no mode to enter.
+//
+// It reports whether the hold entered the mode: the drivers deliver no Tapped
+// on the release of a hold-fired press, so a declining item has to give that
+// press back rather than swallow it (see fileDialogItem.LongPressed).
+func (f *fileDialog) enterSelectionMode(id int) bool {
 	if !f.file.multiSelect {
-		return
+		return false
 	}
 	file, ok := f.getDisplayItem(id)
 	if !ok {
-		return
+		return false
 	}
 	if listable, err := storage.CanList(file); err == nil && listable {
-		return
+		return false
 	}
 	f.selectionMode = true
 	if !f.isSelected(file) {
@@ -820,6 +824,7 @@ func (f *fileDialog) enterSelectionMode(id int) {
 	f.multiAnchor = id
 	f.selectedID = id
 	f.applyMultiSelection()
+	return true
 }
 
 // exitSelectionMode leaves touch selection mode, clearing the set, and reports
