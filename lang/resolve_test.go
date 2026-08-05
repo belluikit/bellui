@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/text/language"
 
 	"github.com/belluikit/bellui"
 )
@@ -40,12 +41,22 @@ func TestResolveSystemLocale_RespectsOverride(t *testing.T) {
 func TestResolveSystemLocale_AppliesAfterFailedInit(t *testing.T) {
 	snapshotLocaleState(t)
 
-	// Simulate the Android cold-start state (#282): no override active, and the
-	// tag seated by a lookup that ran before the JVM attached. "zz" can never
-	// come back from a real system resolution, so the re-resolve must change it
-	// whatever locale the host machine runs.
+	// Learn what a working lookup reports on this host, then seat a different —
+	// but well-formed — tag to stand in for the Android cold-start state (#282):
+	// no override active, and a fallback tag left behind by a lookup that ran
+	// before the JVM attached. It has to parse: an ill-formed string lands as
+	// language.Und, which CurrentLocale treats as "not initialised yet" rather
+	// than as the stuck fallback this reproduces.
 	localeOverride.Store(false)
-	setupLang("zz")
+	ResolveSystemLocale()
+	system := getCurrentTag()
+
+	stale := language.MustParse("zu") // Zulu; swapped below on the off chance it is the host locale
+	if stale.String() == system.String() {
+		stale = language.MustParse("is")
+	}
+	setupLang(stale.String())
+	require.Equal(t, stale.String(), getCurrentTag().String(), "the stale tag must parse")
 
 	fired := false
 	remove := AddLocaleChangeListener(func() { fired = true })
@@ -54,7 +65,7 @@ func TestResolveSystemLocale_AppliesAfterFailedInit(t *testing.T) {
 	ResolveSystemLocale()
 
 	assert.True(t, fired, "a changed resolution must notify locale listeners")
-	assert.NotEqual(t, "zz", getCurrentTag().String())
+	assert.Equal(t, system.String(), getCurrentTag().String(), "the re-resolve must seat the system tag")
 
 	// With the system locale unchanged, a second resolve must not re-fire.
 	fired = false
