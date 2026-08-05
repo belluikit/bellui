@@ -124,6 +124,35 @@ func stripFixture() *Package {
 	return pkg
 }
 
+// TestStripKeyPool locks the key-blanking rule itself, which is otherwise
+// guarded only by tests that need the pinned platform installed
+// (TestPackedTableMatchesSDK) or that reach it through the embedded table
+// (TestConfigChangesFlagNamesSurviveStrip, configChanges names only).
+func TestStripKeyPool(t *testing.T) {
+	pkg := stripFixture()
+	shared := pkg.keyPool.ref("screenLayout")
+	keptOnly := pkg.keyPool.ref("configChanges")
+	droppedOnly := pkg.keyPool.ref("^attr-private/windowFrame")
+	unreferenced := pkg.keyPool.ref("orphan")
+
+	// attr and id are kept specs; string holds a dropped (nil'd) entry beside
+	// a surviving one; dimen is a spec that goes away wholesale and happens to
+	// reference the same key slot as the kept id entry — the #299 shape.
+	pkg.specs[0].types = []*Type{{entries: []*Entry{{key: keptOnly}}}}
+	pkg.specs[1].types = []*Type{{entries: []*Entry{{key: shared}}}}
+	pkg.specs[3].types = []*Type{{entries: []*Entry{nil, {key: keptOnly}}}}
+	pkg.specs[4].types = []*Type{{entries: []*Entry{{key: shared}, {key: droppedOnly}}}}
+
+	stripKeyPool(pkg)
+
+	r := require.New(t)
+	r.Equal("screenLayout", shared.Resolve(pkg.keyPool),
+		"a key a kept entry references must survive a dropped spec sharing its slot (#299)")
+	r.Equal("configChanges", keptOnly.Resolve(pkg.keyPool))
+	r.Empty(droppedOnly.Resolve(pkg.keyPool), "a key only a dropped spec references must be blanked")
+	r.Empty(unreferenced.Resolve(pkg.keyPool), "a key nothing references must be blanked")
+}
+
 func TestCheckStripAssumptions(t *testing.T) {
 	t.Run("android-35 shape", func(t *testing.T) {
 		require.NoError(t, checkStripAssumptions(stripFixture()))

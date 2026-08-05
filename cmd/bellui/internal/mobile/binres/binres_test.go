@@ -276,7 +276,12 @@ func TestConfigChangesFlagNamesSurviveStrip(t *testing.T) {
 	r.NoError(err)
 	seen := 0
 	for _, val := range nt.values {
-		if val.name == 0x01000000 { // the leading non-ref marker, not a flag
+		// The 0x0100000x pseudo-attributes that lead a bag (ATTR_TYPE and, on
+		// other attrs, ATTR_MIN/MAX/L10N) are not flags. Skip the whole family
+		// by its zero type byte rather than only ATTR_TYPE: TableRef.Resolve
+		// indexes pkg.specs[typeByte-1], which for a zero byte wraps to 255
+		// and panics out of range instead of failing this test's assertion.
+		if val.name>>16&0xff == 0 {
 			continue
 		}
 		nr, err := val.name.Resolve(tbl)
