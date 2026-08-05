@@ -22,6 +22,7 @@ import (
 	"github.com/belluikit/bellui/internal/async"
 	"github.com/belluikit/bellui/internal/build"
 	"github.com/belluikit/bellui/internal/cache"
+	"github.com/belluikit/bellui/internal/driver/common"
 	"github.com/belluikit/bellui/internal/painter"
 	"github.com/belluikit/bellui/internal/scale"
 	"github.com/belluikit/bellui/internal/svg"
@@ -123,6 +124,18 @@ type window struct {
 	mousePressed         core.CanvasObject
 	mouseClickCount      int
 	mouseCancelFunc      context.CancelFunc
+
+	// touch is the touchscreen gesture state machine (#266) — the same
+	// common.TouchHandler the mobile driver runs, fed from the glfw fork's
+	// touch callback (Windows WM_POINTER, Wayland wl_touch), so desktop touch
+	// gets mobile's gesture vocabulary: slop-cancelled taps, drag latching,
+	// double-tap, and hold-fire long-press (#758) — the #259 selection-mode
+	// entry. Initialized lazily on the first contact; nil-Finder means
+	// untouched. touchActive tracks ids currently down: a mid-sequence
+	// callback set/unset truncates sequences (see glfw.SetTouchCallback), so
+	// moves/ends for ids that never began must be ignored.
+	touch       common.TouchHandler
+	touchActive map[int]bool
 
 	onClosed           func()
 	onCloseIntercepted func()
@@ -1248,6 +1261,7 @@ func (w *window) create() {
 	win.SetCursorPosCallback(w.mouseMoved)
 	win.SetMouseButtonCallback(w.mouseClicked)
 	win.SetScrollCallback(w.mouseScrolled)
+	win.SetTouchCallback(w.touchEvent)
 	win.SetDropCallback(w.processDropped)
 	win.SetKeyCallback(w.keyPressed)
 	win.SetCharCallback(w.charInput)

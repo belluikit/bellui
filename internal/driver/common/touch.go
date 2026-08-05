@@ -387,6 +387,37 @@ func (h *TouchHandler) TapUp(pos geo.Position, tapID int,
 	}
 }
 
+// TapCancel handles a system-cancelled touch sequence (the desktop driver's
+// glfw TouchCancel, #266): the system took the contact over — e.g. a palm
+// rejection or an edge gesture — so the gesture must end without dispatching
+// any tap. A pending hold-fire and tooltip are cancelled, a Touchable gets
+// TouchCancel, and an in-progress drag gets DragEnd (the drag's effect so far
+// stands; there is no undo protocol for Draggable). pos is the last known
+// contact position — it may be zero where the platform does not report one,
+// so it is used for the cancel event only, never for hit testing.
+func (h *TouchHandler) TapCancel(pos geo.Position, tapID int) {
+	h.hideToolTip()
+	h.cancelLongPress(tapID)
+	h.TouchCancelLock.Lock()
+	delete(h.longPressFired, tapID)
+	h.TouchCancelLock.Unlock()
+
+	if wid := h.Touched[tapID]; wid != nil {
+		touchEv := &mobile.TouchEvent{}
+		touchEv.Position = pos
+		touchEv.AbsolutePosition = pos
+		wid.TouchCancel(touchEv)
+		h.Touched[tapID] = nil
+	}
+	if h.Dragging != nil {
+		h.Dragging.DragEnd()
+		h.Dragging = nil
+	}
+	delete(h.LastTapDown, tapID)
+	delete(h.LastTapDownPos, tapID)
+	delete(h.LastTapDelta, tapID)
+}
+
 func (h *TouchHandler) waitForDoubleTap(co core.CanvasObject, ev *event.PointEvent,
 	tapCallback func(event.Tappable, *event.PointEvent),
 	doubleTapCallback func(event.DoubleTappable, *event.PointEvent),
