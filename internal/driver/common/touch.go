@@ -43,6 +43,10 @@ type TouchHandler struct {
 	DragOffset geo.Position
 	DragStart  geo.Position
 	Dragging   event.Draggable
+	// draggingID is the contact that latched Dragging, so a cancel of some
+	// other contact — a palm rejected while a finger drags (#266) — does not
+	// end the drag that contact never owned.
+	draggingID int
 
 	Touched         map[int]mobile.Touchable
 	TouchCancelFunc context.CancelFunc
@@ -64,10 +68,11 @@ type TouchHandler struct {
 	// handling in TapUp unchanged.
 	LongPressCallback func(event.LongPressable, *event.PointEvent)
 
-	// longPressSeq/longPressFired are guarded by TouchCancelLock: the hold
-	// timer fires off the event goroutine (like waitForDoubleTap) before
-	// hopping back via DoFromGoroutine.
-	longPressSeq   map[int]int  // arm generation per touch; bumping cancels a pending fire
+	// longPressGen/longPressArmed/longPressFired are guarded by
+	// TouchCancelLock: the hold timer fires off the event goroutine (like
+	// waitForDoubleTap) before hopping back via DoFromGoroutine.
+	longPressGen   int          // monotonic arm generation, never reused
+	longPressArmed map[int]int  // generation of the pending fire per touch; dropping it cancels the fire
 	longPressFired map[int]bool // hold-fire happened for this touch
 }
 
@@ -78,7 +83,7 @@ func (h *TouchHandler) InitTouchHandler(finder ObjectFinder) {
 	h.LastTapDownPos = make(map[int]geo.Position)
 	h.LastTapDelta = make(map[int]geo.Delta)
 	h.Touched = make(map[int]mobile.Touchable)
-	h.longPressSeq = make(map[int]int)
+	h.longPressArmed = make(map[int]int)
 	h.longPressFired = make(map[int]bool)
 }
 
@@ -155,8 +160,9 @@ func (h *TouchHandler) armLongPress(pos geo.Position, tapID int) {
 		return
 	}
 	h.TouchCancelLock.Lock()
-	h.longPressSeq[tapID]++
-	seq := h.longPressSeq[tapID]
+	h.longPressGen++
+	seq := h.longPressGen
+	h.longPressArmed[tapID] = seq
 	delete(h.longPressFired, tapID)
 	h.TouchCancelLock.Unlock()
 	time.AfterFunc(TapSecondaryDelay, func() {
@@ -171,9 +177,12 @@ func (h *TouchHandler) armLongPress(pos geo.Position, tapID int) {
 // finger, if any; otherwise the touch keeps its release-time handling.
 func (h *TouchHandler) fireLongPress(pos geo.Position, tapID, seq int) {
 	h.TouchCancelLock.Lock()
-	current := h.longPressSeq[tapID]
+	current, armed := h.longPressArmed[tapID]
+	if armed && current == seq {
+		delete(h.longPressArmed, tapID) // this timer has resolved, whatever it decides below
+	}
 	h.TouchCancelLock.Unlock()
-	if current != seq || h.Dragging != nil {
+	if !armed || current != seq || h.Dragging != nil {
 		return // lifted, moved, or re-pressed since armed
 	}
 
@@ -196,13 +205,16 @@ func (h *TouchHandler) fireLongPress(pos geo.Position, tapID, seq int) {
 	h.LongPressCallback(wid, ev)
 }
 
-// cancelLongPress invalidates any pending hold-fire for the touch.
+// cancelLongPress invalidates any pending hold-fire for the touch. The armed
+// generation is dropped rather than bumped, so the entry does not outlive the
+// contact — and since generations are never reused, a timer armed before this
+// call can never match a later arming of the same id.
 func (h *TouchHandler) cancelLongPress(tapID int) {
-	if h.longPressSeq == nil {
+	if h.longPressArmed == nil {
 		return
 	}
 	h.TouchCancelLock.Lock()
-	h.longPressSeq[tapID]++
+	delete(h.longPressArmed, tapID)
 	h.TouchCancelLock.Unlock()
 }
 
@@ -269,6 +281,7 @@ func (h *TouchHandler) TapMove(pos geo.Position, tapID int,
 		}
 		if drag, ok := dragCo.(event.Draggable); ok {
 			h.Dragging = drag
+			h.draggingID = tapID
 			h.DragOffset = previousPos.Subtract(dragPos)
 			h.DragStart = dragCo.Position()
 		} else {
@@ -302,6 +315,7 @@ func (h *TouchHandler) TapUp(pos geo.Position, tapID int,
 	longPressed := h.longPressFired[tapID]
 	delete(h.longPressFired, tapID)
 	h.TouchCancelLock.Unlock()
+	defer h.forgetTouch(tapID) // the contact is gone whichever branch dispatches it
 
 	// Pre-hook for platform-specific handling (e.g., mobile menu dismissal).
 	if h.OnTapUp != nil && h.OnTapUp(pos) {
@@ -317,6 +331,7 @@ func (h *TouchHandler) TapUp(pos geo.Position, tapID int,
 		dragCallback(h.Dragging, ev)
 
 		h.Dragging = nil
+		h.draggingID = 0
 		return
 	}
 
@@ -391,10 +406,12 @@ func (h *TouchHandler) TapUp(pos geo.Position, tapID int,
 // glfw TouchCancel, #266): the system took the contact over — e.g. a palm
 // rejection or an edge gesture — so the gesture must end without dispatching
 // any tap. A pending hold-fire and tooltip are cancelled, a Touchable gets
-// TouchCancel, and an in-progress drag gets DragEnd (the drag's effect so far
-// stands; there is no undo protocol for Draggable). pos is the last known
-// contact position — it may be zero where the platform does not report one,
-// so it is used for the cancel event only, never for hit testing.
+// TouchCancel, and a drag this contact latched gets DragEnd (the drag's effect
+// so far stands; there is no undo protocol for Draggable) — a drag some other
+// contact owns is left alone, which is the point of a palm rejection arriving
+// mid-drag. pos is the last known contact position — it may be zero where the
+// platform does not report one, so it is used for the cancel event only, never
+// for hit testing.
 func (h *TouchHandler) TapCancel(pos geo.Position, tapID int) {
 	h.hideToolTip()
 	h.cancelLongPress(tapID)
@@ -407,15 +424,24 @@ func (h *TouchHandler) TapCancel(pos geo.Position, tapID int) {
 		touchEv.Position = pos
 		touchEv.AbsolutePosition = pos
 		wid.TouchCancel(touchEv)
-		h.Touched[tapID] = nil
 	}
-	if h.Dragging != nil {
+	if h.Dragging != nil && h.draggingID == tapID {
 		h.Dragging.DragEnd()
 		h.Dragging = nil
+		h.draggingID = 0
 	}
+	h.forgetTouch(tapID)
+}
+
+// forgetTouch drops the per-contact state of a finished sequence. Touch ids are
+// not recycled everywhere the handler runs — Windows reports a fresh WM_POINTER
+// id per contact (#266) — so entries left behind would grow these maps for the
+// life of the process.
+func (h *TouchHandler) forgetTouch(tapID int) {
 	delete(h.LastTapDown, tapID)
 	delete(h.LastTapDownPos, tapID)
 	delete(h.LastTapDelta, tapID)
+	delete(h.Touched, tapID)
 }
 
 func (h *TouchHandler) waitForDoubleTap(co core.CanvasObject, ev *event.PointEvent,

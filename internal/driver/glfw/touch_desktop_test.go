@@ -4,6 +4,7 @@ package glfw
 
 import (
 	"image/color"
+	"sync"
 	"testing"
 	"time"
 
@@ -21,16 +22,33 @@ import (
 // longPressableObject records the full gesture vocabulary a touchscreen can
 // reach, so the tests can tell hold-fire long-press, tap and secondary tap
 // apart (#266/#758).
+//
+// The hold-fire arrives through bellui.CurrentApp().Driver().DoFromGoroutine,
+// which in this test binary is the *test* driver (bellui/test's init makes it
+// the current app, while the windows here are real glfw ones) — it runs the
+// dispatch inline on the hold timer's goroutine instead of hopping onto the
+// glfw main thread as the real driver does. So the long-press count is written
+// off-main and must be guarded, or the assertions race it.
 type longPressableObject struct {
 	*canvas.Rectangle
 	tappable
+	longPressLock   sync.Mutex
 	longPressEvents []any
 }
 
 var _ event.LongPressable = (*longPressableObject)(nil)
 
 func (l *longPressableObject) LongPressed(e *event.PointEvent) {
+	l.longPressLock.Lock()
+	defer l.longPressLock.Unlock()
 	l.longPressEvents = append(l.longPressEvents, e)
+}
+
+// longPresses is the guarded read of the events LongPressed records.
+func (l *longPressableObject) longPresses() []any {
+	l.longPressLock.Lock()
+	defer l.longPressLock.Unlock()
+	return append([]any(nil), l.longPressEvents...)
 }
 
 func TestWindow_TouchTap(t *testing.T) {
@@ -71,7 +89,7 @@ func TestWindow_TouchLongPress_HoldFire(t *testing.T) {
 	time.Sleep(common.TapSecondaryDelay + 150*time.Millisecond)
 
 	runOnMain(func() {
-		assert.Len(t, o.longPressEvents, 1, "LongPressed hold-fired while the finger is still down")
+		assert.Len(t, o.longPresses(), 1, "LongPressed hold-fired while the finger is still down")
 
 		w.touchEvent(w.viewport, 1, glfw.TouchEnd, 50, 60)
 		assert.Nil(t, o.popTapEvent(), "the release of a hold-fired touch never delivers Tapped")
@@ -95,7 +113,7 @@ func TestWindow_TouchLongPress_SlopCancel(t *testing.T) {
 	time.Sleep(common.TapSecondaryDelay + 150*time.Millisecond)
 
 	runOnMain(func() {
-		assert.Empty(t, o.longPressEvents, "movement past the slop cancels the pending hold-fire")
+		assert.Empty(t, o.longPresses(), "movement past the slop cancels the pending hold-fire")
 		w.touchEvent(w.viewport, 1, glfw.TouchEnd, 70, 80)
 	})
 }
@@ -124,6 +142,37 @@ func TestWindow_TouchDrag_EndAndCancel(t *testing.T) {
 		w.touchEvent(w.viewport, 2, glfw.TouchCancel, 60, 70)
 		assert.Len(t, o.endEvents, 2, "DragEnd on system cancel")
 		assert.Nil(t, o.popTapEvent(), "a cancelled touch is not a tap")
+	})
+}
+
+// touchVocabularyObject offers the desktop-mouse surfaces alongside the tap
+// one, so a touch can be checked against the vocabulary it is documented to
+// dispatch: the mobile one, never hover or desktop.Mouseable (#266).
+type touchVocabularyObject struct {
+	*canvas.Rectangle
+	tappable
+	hoverable
+	mouseable
+}
+
+func TestWindow_TouchDispatchesMobileVocabularyOnly(t *testing.T) {
+	w := createWindow("Test")
+	prop := canvas.NewRectangle(color.White)
+	prop.SetMinSize(geo.NewSize(100, 100))
+	o := &touchVocabularyObject{Rectangle: canvas.NewRectangle(color.White)}
+	w.SetContent(container.NewStack(prop, o))
+	repaintWindow(w)
+
+	runOnMain(func() {
+		w.touchEvent(w.viewport, 1, glfw.TouchBegin, 50, 60)
+		w.touchEvent(w.viewport, 1, glfw.TouchMove, 51, 61) // inside the tap slop
+		w.touchEvent(w.viewport, 1, glfw.TouchEnd, 51, 61)
+
+		assert.NotNil(t, o.popTapEvent(), "touch taps the object")
+		assert.Nil(t, o.popMouseInEvent(), "touch never hovers in")
+		assert.Nil(t, o.popMouseMovedEvent(), "touch never hovers moved")
+		assert.Nil(t, o.popMouseOutEvent(), "touch never hovers out")
+		assert.Nil(t, o.popMouseEvent(), "touch never dispatches desktop.Mouseable")
 	})
 }
 

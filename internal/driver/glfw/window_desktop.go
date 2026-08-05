@@ -130,10 +130,11 @@ type window struct {
 	// touch callback (Windows WM_POINTER, Wayland wl_touch), so desktop touch
 	// gets mobile's gesture vocabulary: slop-cancelled taps, drag latching,
 	// double-tap, and hold-fire long-press (#758) — the #259 selection-mode
-	// entry. Initialized lazily on the first contact; nil-Finder means
-	// untouched. touchActive tracks ids currently down: a mid-sequence
-	// callback set/unset truncates sequences (see glfw.SetTouchCallback), so
-	// moves/ends for ids that never began must be ignored.
+	// entry. Both are built lazily on the first contact, so a nil touchActive
+	// means this window has never been touched. touchActive also tracks the
+	// ids currently down: a mid-sequence callback set/unset truncates
+	// sequences (see glfw.SetTouchCallback), so moves/ends for ids that never
+	// began must be ignored.
 	touch       common.TouchHandler
 	touchActive map[int]bool
 
