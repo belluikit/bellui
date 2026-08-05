@@ -1,10 +1,25 @@
 #! /usr/bin/env bash
+set -eu
 
-# version of build-tools tests run against
-AAPT=${ANDROID_HOME}/build-tools/23.0.1/aapt
+# Regenerates the aapt golden files (*.bin, *.arsc) from the *.xml sources.
+#
+# The platform jar must be the one binres.SDKPlatform pins: the goldens are
+# compared against binres output, and binres resolves attributes and
+# synthesizes the build-platform attributes (compileSdkVersion & co) from
+# exactly that platform (#287, #297). The build-tools version only needs to be
+# modern enough to record those attributes (aapt >= 28).
 
-# minimum version of android api for resource identifiers supported
-APIJAR=${ANDROID_HOME}/platforms/android-15/android.jar
+BUILD_TOOLS=${BUILD_TOOLS:-35.0.0}
+AAPT=${ANDROID_HOME}/build-tools/${BUILD_TOOLS}/aapt
+
+# read straight off the pin rather than duplicating it — a golden regenerated
+# against a different platform is exactly the drift #297 found.
+SDK_PLATFORM=$(sed -n 's/^const SDKPlatform = "\(.*\)"$/\1/p' "$(dirname "$0")/../sdk.go")
+if [ -z "$SDK_PLATFORM" ]; then
+	echo "cannot read SDKPlatform from ../sdk.go" >&2
+	exit 1
+fi
+APIJAR=${ANDROID_HOME}/platforms/${SDK_PLATFORM}/android.jar
 
 for f in *.xml; do
 	RES=""
