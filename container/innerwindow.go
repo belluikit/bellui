@@ -8,6 +8,7 @@ import (
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
+	"github.com/belluikit/bellui/driver/desktop"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
 	intWidget "github.com/belluikit/bellui/internal/widget"
@@ -362,6 +363,8 @@ type draggableCorner struct {
 	win *InnerWindow
 }
 
+var _ desktop.Cursorable = (*draggableCorner)(nil)
+
 func newDraggableCorner(w *InnerWindow) *draggableCorner {
 	d := &draggableCorner{win: w}
 	d.ExtendBaseWidget(d)
@@ -420,6 +423,13 @@ func (c *draggableCorner) MinSize() geo.Size {
 		return geo.NewSquareSize(frameButtonTouchTarget(c.win.Theme()))
 	}
 	return geo.NewSquareSize(dragCornerIndicatorSize)
+}
+
+// Cursor gives the corner a diagonal-resize pointer affordance on desktop
+// (#269): the corner sits bottom-right, so the northwest–southeast shape.
+// Without it the corner is indistinguishable from content until dragged.
+func (c *draggableCorner) Cursor() desktop.Cursor {
+	return desktop.NWSEResizeCursor
 }
 
 func (c *draggableCorner) Dragged(ev *event.DragEvent) {
