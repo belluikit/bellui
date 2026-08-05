@@ -11,10 +11,17 @@
 	     instead of an in-process activity recreation (#283) - the framework
 	     adds layoutDirection to every locale change mask, so declaring locale
 	     alone is inert. Declarable since the binres SDK table regeneration
-	     (#287). -->
+	     (#287). screenLayout: ColorOS 16 adds CONFIG_SCREEN_LAYOUT to the
+	     locale change mask (stock masks the layout-direction bits out of the
+	     screenLayout diff), so without it OPPO/realme/OnePlus devices relaunch
+	     the activity on every per-app language change (#299). Declaring it
+	     also moves screen-layout-only transitions (e.g. ColorOS split-screen
+	     entry) in place - bellui relayouts from the size events - while
+	     changes carrying the undeclared screenSize/smallestScreenSize bits
+	     (fold/unfold, split resize crossings) keep recreating as before. -->
 	<activity android:name="org.golang.app.GoNativeActivity"
 		android:label="{{.Name}}"
-		android:configChanges="orientation|keyboardHidden|uiMode|locale|layoutDirection"
+		android:configChanges="orientation|keyboardHidden|uiMode|locale|layoutDirection|screenLayout"
 		android:exported="true"
 		android:theme="@android:style/Theme">
 		<meta-data android:name="android.app.lib_name" android:value="{{.LibName}}" />
