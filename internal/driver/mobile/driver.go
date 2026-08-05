@@ -25,6 +25,7 @@ import (
 	"github.com/belluikit/bellui/internal/driver/common"
 	"github.com/belluikit/bellui/internal/driver/mobile/app"
 	"github.com/belluikit/bellui/internal/driver/mobile/event/composition"
+	"github.com/belluikit/bellui/internal/driver/mobile/event/config"
 	"github.com/belluikit/bellui/internal/driver/mobile/event/key"
 	"github.com/belluikit/bellui/internal/driver/mobile/event/lifecycle"
 	"github.com/belluikit/bellui/internal/driver/mobile/event/paint"
@@ -312,6 +313,15 @@ func (d *driver) Run() {
 				switch e := a.Filter(e).(type) {
 				case lifecycle.Event:
 					d.handleLifecycle(e, current)
+				case config.Event:
+					// An in-place configuration change (Android delivers
+					// manifest-declared changes as onConfigurationChanged —
+					// locale|layoutDirection since #287). Re-resolve the system
+					// locale so an Android 13+ per-app language change applies
+					// with no lifecycle crossing for the StageFocused seam to
+					// catch (#288). Override-guarded and a no-op when the
+					// locale is unchanged, so rotation config events are cheap.
+					resolveSystemLocale()
 				case size.Event:
 					if e.WidthPx <= 0 {
 						continue
