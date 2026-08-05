@@ -69,6 +69,7 @@ import (
 
 	"github.com/belluikit/bellui/internal/async"
 	"github.com/belluikit/bellui/internal/driver/mobile/app/callfn"
+	"github.com/belluikit/bellui/internal/driver/mobile/event/config"
 	"github.com/belluikit/bellui/internal/driver/mobile/event/key"
 	"github.com/belluikit/bellui/internal/driver/mobile/event/lifecycle"
 	"github.com/belluikit/bellui/internal/driver/mobile/event/paint"
@@ -267,6 +268,14 @@ func onConfigurationChanged(activity *C.ANativeActivity) {
 	// calls onNativeWindowRedrawNeeded. We extract the orientation
 	// here and save it for the redraw event.
 	windowConfigChange <- windowConfigRead(activity)
+
+	// A configuration change the manifest declares (locale|layoutDirection,
+	// #287) arrives here in place — no recreation, no lifecycle crossing the
+	// driver could hook. Forward it as an event so the driver re-resolves the
+	// locale on its own goroutine, not this Java main thread (#288). The send
+	// above already serialized with mainUI, and events is unbounded, so this
+	// never blocks.
+	theApp.events.In() <- config.Event{}
 }
 
 //export onLowMemory

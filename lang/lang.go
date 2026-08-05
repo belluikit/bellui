@@ -295,10 +295,13 @@ func SetLocale(l bellui.Locale) {
 // during the shared library's global constructor, before the Java runtime is
 // attached, so it fails and settles on the English fallback (#282). The
 // toolkit calls this itself once the JVM context is available — at app
-// creation, and again on each foregrounding to pick up a system locale changed
+// creation, again on each foregrounding to pick up a system locale changed
 // while the app was backgrounded (Android then recreates the activity but not
-// the process, so package init does not run again). Applications do not need
-// to call it. Like [SetLocale] it should be called on the main goroutine.
+// the process, so package init does not run again), and on an in-place
+// configuration change (an Android 13+ per-app language change reaches a
+// foregrounded app as onConfigurationChanged with no lifecycle transition,
+// #288). Applications do not need to call it. Like [SetLocale] it should be
+// called on the main goroutine.
 //
 // Since: 1.0
 func ResolveSystemLocale() {
