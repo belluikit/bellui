@@ -84,6 +84,11 @@ type window struct {
 	mouseClickCount      int
 	mouseCancelFunc      context.CancelFunc
 
+	// Press-and-hold long-press dispatch (#266); see window_desktop.go.
+	longPressSeq   int
+	longPressPos   geo.Position
+	longPressFired bool
+
 	onClosed           func()
 	onCloseIntercepted func()
 
@@ -233,6 +238,10 @@ func belluiToNativeCursor(cursor desktop.Cursor) (*Cursor, bool) {
 		name = "ew-resize"
 	case desktop.VResizeCursor:
 		name = "ns-resize"
+	case desktop.NWSEResizeCursor:
+		name = "nwse-resize"
+	case desktop.NESWResizeCursor:
+		name = "nesw-resize"
 	case desktop.HiddenCursor:
 		name = "none"
 	}
