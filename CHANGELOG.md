@@ -15,6 +15,16 @@ the trendvidia fork (github.com/trendvidia/fyne).
 
 ### Added
 
+* **Diagonal resize cursors, and a pointer affordance on the `InnerWindow`
+  resize corner** ([#269](https://github.com/belluikit/bellui/issues/269)).
+  `desktop.StandardCursor` gains `NWSEResizeCursor` and `NESWResizeCursor`
+  (glfw 3.4 shapes; the driver falls back to the horizontal-resize shape
+  wherever the platform cannot create a diagonal — an X11/Wayland cursor theme
+  without it, or a Cocoa build without the private NSCursor selector — and
+  wasm maps them to CSS `nwse-resize`/`nesw-resize`). `container.InnerWindow`'s
+  resize corner now returns the NWSE shape, so on desktop the pointer signals
+  the corner resizes before it is dragged.
+
 * **Touch multi-select for the canvas file dialog — long-press selection
   mode** ([#259](https://github.com/belluikit/bellui/issues/259)). In
   open-multiple mode, long-pressing a file item enters selection mode: plain
@@ -73,6 +83,40 @@ the trendvidia fork (github.com/trendvidia/fyne).
   the only surface that reaches outside the app sandbox on modern mobile
   systems, so an app opting out for desktop-consistency reasons should gate
   the call on the platform.
+  
+* **A malformed system locale entry no longer degrades the whole locale**
+  ([#271](https://github.com/belluikit/bellui/issues/271)). On Android a
+  failed locale lookup came back from go-locale as a list holding one empty
+  string, which failed BCP-47 parsing at every start: the region-carrying
+  tag behind CLDR date/number formatting, collation and text direction was
+  left at the matcher's language-only value, `SystemLocale()` reported the
+  undetermined locale `und`, and the log named no locale at all. Locale
+  strings are now normalized before parsing — Java `Locale.toString()`
+  underscores, and the trailing `#...` marker whose script is folded back
+  into the tag (`zh_CN_#Hans` → `zh-Hans-CN`) rather than dropped. An entry
+  that is still not well-formed is logged with the raw string quoted and
+  keeps whatever part of the tag parsed, so it cannot pass the locale to the
+  entry behind it; only an entry carrying nothing at all is dropped. A
+  failed lookup no longer has its result parsed, and the formatting tag
+  comes from the first entry that parsed rather than blindly the first entry
+  reported. The underlying Android lookup failure (`no current JVM` — the
+  locale resolves during library init, before JNI_OnLoad), which still
+  settles the locale on the fallback there, is tracked as
+  [#282](https://github.com/belluikit/bellui/issues/282).
+  
+* **Android: canvas scale is derived arithmetically from the reported
+  density** ([#272](https://github.com/belluikit/bellui/issues/272)),
+  matching `DisplayMetrics.density` (densityDpi/160), instead of a bucket
+  lookup that rounded off-bucket densities to the nearest step. Devices
+  configured between the classic buckets — 356, 420, 440dpi panels are
+  common — previously rendered everything derived from dp (touch-target
+  floors, text sizes) up to ~12% off in physical units; bucket densities
+  (160/240/320/480/640) map exactly as before. The one bucket that does
+  change is tvdpi (213), which now scales by 1.33125 as the platform does
+  rather than the 1.5 the old ladder rounded it to, so an Android TV panel
+  configured at tvdpi renders ~11% smaller. The "unknown density" log for
+  off-bucket values is gone, and the `ACONFIGURATION_DENSITY_ANY` sentinel no
+  longer reads as a 65534dpi screen.
 
 * **wasm: the browser picker overrides no longer fire under the test driver**
   ([#257](https://github.com/belluikit/bellui/issues/257)). In a js/wasm test
