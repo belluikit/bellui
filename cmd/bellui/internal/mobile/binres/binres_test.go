@@ -180,6 +180,80 @@ func TestEncode(t *testing.T) {
 	r.NoError(err)
 }
 
+// configChangesManifest returns a minimal manifest declaring the given
+// android:configChanges value on its activity.
+func configChangesManifest(flags string) string {
+	return fmt.Sprintf(`<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.example.config">
+	<application android:label="Config">
+		<activity android:name="android.app.NativeActivity"
+			android:label="Config"
+			android:configChanges=%q>
+		</activity>
+	</application>
+</manifest>`, flags)
+}
+
+// configChangesValue compiles a manifest declaring flags and returns the
+// encoded typed value of the activity's configChanges attribute.
+func configChangesValue(t *testing.T, flags string) uint32 {
+	t.Helper()
+	r := require.New(t)
+
+	bx, err := UnmarshalXML(strings.NewReader(configChangesManifest(flags)), false, 30)
+	r.NoError(err)
+
+	elref, err := bx.Pool.RefByName("activity")
+	r.NoError(err)
+	nref, err := bx.Pool.RefByName("configChanges")
+	r.NoError(err)
+
+	for el := range bx.iterElements() {
+		if el.Name != elref {
+			continue
+		}
+		for _, attr := range el.attrs {
+			if attr.Name == nref {
+				r.Equal(DataIntHex, attr.TypedValue.Type)
+				return attr.TypedValue.Value
+			}
+		}
+	}
+	t.Fatal("configChanges attribute not found")
+	return 0
+}
+
+// TestEncodeConfigChanges verifies configChanges flag names resolve against
+// the embedded SDK resource table to the bit values aapt would produce (#287).
+// layoutDirection (API 17) and density (API 24) postdate the original
+// gomobile-era table and were silently dropped before it was regenerated.
+func TestEncodeConfigChanges(t *testing.T) {
+	tests := []struct {
+		flags string
+		want  uint32
+	}{
+		{"orientation|keyboardHidden", 0x00a0},
+		{"layoutDirection", 0x2000},
+		{"density", 0x1000},
+		{"orientation|keyboardHidden|uiMode|locale|layoutDirection", 0x22a4},
+	}
+	for _, tt := range tests {
+		t.Run(tt.flags, func(t *testing.T) {
+			r := require.New(t)
+			r.Equal(tt.want, configChangesValue(t, tt.flags))
+		})
+	}
+}
+
+// TestEncodeConfigChangesUnknownFlag verifies an unresolvable flag name is a
+// hard error naming the flag, not a silently dropped bit (#287).
+func TestEncodeConfigChangesUnknownFlag(t *testing.T) {
+	r := require.New(t)
+	_, err := UnmarshalXML(strings.NewReader(configChangesManifest("orientation|notAConfigChange")), false, 30)
+	r.Error(err)
+	r.Contains(err.Error(), "notAConfigChange")
+	r.Contains(err.Error(), "configChanges")
+}
+
 func TestRawValueByName(t *testing.T) {
 	r := require.New(t)
 	f, err := os.Open("testdata/bootstrap.xml")
