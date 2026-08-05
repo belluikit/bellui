@@ -1,10 +1,12 @@
-// Command filedialogprobe live-verifies the opt-in native file dialogs (#514).
+// Command filedialogprobe live-verifies the platform-native file dialogs
+// (#514), default-on since #226.
 //
 // It builds a small window with buttons that open a native File-Open,
-// Folder-Open and File-Save panel (dialog.UseNativeFileDialogs is enabled),
-// logging the chosen URI to stdout. On macOS the panels are NSOpenPanel /
-// NSSavePanel; on Linux/BSD the xdg portal; on Windows the Common Item Dialog
-// (IFileOpenDialog / IFileSaveDialog).
+// Folder-Open and File-Save panel (the native backends start enabled; the
+// "Native pickers" check toggles them), logging the chosen URI to stdout.
+// On macOS the panels are NSOpenPanel / NSSavePanel; on Linux/BSD the xdg
+// portal; on Windows the Common Item Dialog (IFileOpenDialog /
+// IFileSaveDialog); on iOS/Android the system document pickers.
 //
 //	go run ./hack/filedialogprobe            # button UI
 //	go run ./hack/filedialogprobe open       # auto-open a File-Open panel
@@ -12,6 +14,11 @@
 //	go run ./hack/filedialogprobe save       # auto-open a File-Save panel
 //	go run ./hack/filedialogprobe multiple   # auto-open a multi-select File-Open panel
 //	go run ./hack/filedialogprobe windowed   # windowed canvas dialog (frame X + resize corner)
+//
+// The button UI carries a "Native pickers" check bound to
+// dialog.UseNativeFileDialogs: unchecking it must serve every request with
+// the canvas dialog — on iOS/Android too (#267), which is how #259's
+// long-press selection mode is reached on-device.
 package main
 
 import (
@@ -137,7 +144,16 @@ func main() {
 		}
 	}
 
+	// See the package doc: every button below must be served by the canvas
+	// dialog while this is unchecked, on iOS/Android too (#267).
+	nativeCheck := widget.NewCheck("Native pickers (UseNativeFileDialogs)", func(on bool) {
+		dialog.UseNativeFileDialogs(on)
+		fmt.Println("UseNativeFileDialogs:", on)
+	})
+	nativeCheck.SetChecked(true)
+
 	w.SetContent(container.NewVBox(
+		nativeCheck,
 		widget.NewButton("Open File", openFile),
 		widget.NewButton("Open File (image filter)", openFileFiltered),
 		widget.NewButton("Open Multiple (Ctrl/Cmd+click, Shift+click)", openMultiple),
