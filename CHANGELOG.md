@@ -72,6 +72,18 @@ the trendvidia fork (github.com/trendvidia/fyne).
 
 ### Fixed
 
+* **The mobile pickers honour `UseNativeFileDialogs(false)`**
+  ([#267](https://github.com/belluikit/bellui/issues/267)). The doc promised
+  the canvas dialog "everywhere", but the iOS/Android overrides consulted
+  only picker availability, so the opt-out was silently inert on mobile —
+  and the canvas dialog was unreachable on a packaged device build. The
+  toggle now gates both mobile overrides; wasm remains the documented
+  exception (a canvas dialog has no real filesystem to browse in a
+  browser). Note the cost, now recorded in the doc: the platform picker is
+  the only surface that reaches outside the app sandbox on modern mobile
+  systems, so an app opting out for desktop-consistency reasons should gate
+  the call on the platform.
+  
 * **A malformed system locale entry no longer degrades the whole locale**
   ([#271](https://github.com/belluikit/bellui/issues/271)). On Android a
   failed locale lookup came back from go-locale as a list holding one empty
