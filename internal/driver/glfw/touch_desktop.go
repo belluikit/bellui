@@ -123,7 +123,7 @@ func (w *window) startTouchScrollMomentum(origin geo.Position, delta geo.Delta) 
 			}
 			stop := false
 			runOnMain(func() {
-				if w.touchScrollGen != gen || w.viewport == nil {
+				if w.touchScrollGen != gen || w.isClosing() {
 					stop = true
 					return
 				}

@@ -187,7 +187,23 @@ func TestMobileA11yScroll_RoutesPagedScroll(t *testing.T) {
 	// Forward reveals content below → negative DY; one page ≈ 0.8 × viewport.
 	assert.InDelta(t, -160, sc.events[0].Scrolled.DY, 0.01)
 	assert.InDelta(t, 160, sc.events[1].Scrolled.DY, 0.01)
-	assert.Equal(t, event.ScrollSourceTouch, sc.events[0].Source)
+	assert.NotEqual(t, event.ScrollSourceTouch, sc.events[0].Source,
+		"a paged screen-reader scroll must keep the pointer conventions (#291), not direct-touch semantics")
+}
+
+// TestMobileA11yScroll_PagesHorizontalOnlyScroller locks the axis mapping the
+// paged scroll depends on: the vertical delta reaches a horizontal-only
+// scroller as horizontal movement. A direct-touch source would skip that
+// mapping (#291) and the gesture would move nothing.
+func TestMobileA11yScroll_PagesHorizontalOnlyScroller(t *testing.T) {
+	wide := belluicanvas.NewRectangle(color.Black)
+	wide.SetMinSize(geo.NewSize(1000, 50))
+	scroll := container.NewHScroll(wide)
+	scroll.Resize(geo.NewSize(100, 50))
+	n := &accessibility.Node{Pos: geo.NewPos(0, 0), Size: geo.NewSize(100, 50), ScrollAncestor: scroll}
+
+	mobileA11yScroll(n, true)
+	assert.Greater(t, scroll.Offset.X, float32(0), "a forward page scrolls horizontal-only content")
 }
 
 // fakeLongPressable is an accessible object that records long-press + secondary.
