@@ -15,6 +15,14 @@
 //	drag                 → drag… then drag-end; no tap on release
 //	double tap           → double-tap
 //
+// The list beside the pad verifies touch flick-scrolling (#291): a finger
+// drag over it must scroll the content with the finger (`scroll y=…` lines),
+// a flick must keep scrolling after the release (decaying offsets, stopped
+// dead by touching again), and dragging the scrollbar thumb must still work.
+// A MOUSE drag over the list must NOT scroll it — only the wheel does. On
+// X11/macOS (emulated mouse) the list therefore does not touch-scroll, which
+// is the expected outcome there.
+//
 // The "open-multiple dialog" button forces the canvas file dialog
 // (UseNativeFileDialogs(false)) in open-multiple mode — the #259 acceptance:
 // long-pressing a file item on a touchscreen must enter selection mode, and
@@ -93,9 +101,21 @@ func main() {
 		d.Show()
 	})
 
+	// Flick-scroll verification surface (#291): scrollable content beside the
+	// pad, logging offsets so a flick's decay is visible in the output.
+	items := make([]core.CanvasObject, 0, 60)
+	for i := range 60 {
+		items = append(items, widget.NewLabel(fmt.Sprintf("row %02d — drag/flick me", i)))
+	}
+	list := container.NewVScroll(container.NewVBox(items...))
+	list.OnScrolled = func(off geo.Position) {
+		log.Printf("touchprobe scroll y=%.1f", off.Y)
+	}
+
 	w.SetContent(container.NewBorder(
-		widget.NewLabel("touchprobe: tap / hold / drag / double-tap the pad"),
-		container.NewVBox(status, openMulti), nil, nil, pad,
+		widget.NewLabel("touchprobe: tap / hold / drag / double-tap the pad; drag/flick the list (#291)"),
+		container.NewVBox(status, openMulti), nil, nil,
+		container.NewGridWithColumns(2, pad, list),
 	))
 	w.Resize(geo.NewSize(500, 500))
 	bellui.ShowAndRun(w)
