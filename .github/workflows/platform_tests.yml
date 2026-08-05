@@ -325,12 +325,15 @@ jobs:
       - name: Tests (GL fallback)
         shell: bash
         run: |
-          # internal/driver/mobile is excluded on this arch only: its package
-          # init downloads an ANGLE prebuilt keyed on GOARCH, and Google never
-          # published a windows/arm64 one, so gl.NewContext() panics before any
-          # test runs. Upstream gomobile code, works on amd64 — see #17.
+          # internal/driver/mobile and .../mobile/app are excluded on this arch
+          # only: app's package init downloads an ANGLE prebuilt keyed on
+          # GOARCH, and Google never published a windows/arm64 one, so
+          # gl.NewContext() panics before any test runs (mobile's test binary
+          # inits app too). Upstream gomobile code, works on amd64 — see #17.
+          # app is listed since it grew its first test file (#272); the other
+          # mobile subpackages have no tests, so no binary ever inits app there.
           # Same collapsed-package-list guard as the x64 leg (#565).
-          pkgs=$(go list -tags gl,ci,no_glfw,migrated_belluido ./... | grep -v '/internal/driver/mobile$' || true)
+          pkgs=$(go list -tags gl,ci,no_glfw,migrated_belluido ./... | grep -vE '/internal/driver/mobile(/app)?$' || true)
           n=$(printf '%s\n' "$pkgs" | grep -c . || true)
           echo "Resolved ${n} packages to test"
           if [ "${n}" -lt 50 ]; then
