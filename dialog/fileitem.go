@@ -102,11 +102,20 @@ func (i *fileDialogItem) Tapped(*event.PointEvent) {
 
 // LongPressed enters touch selection mode (#259): holding a file item switches
 // a multi-select dialog into a mode where plain taps toggle set membership, so
-// devices without modifier keys can build a set. Hold-fire dispatch (#758)
-// sends no Tapped on the release of the press that got here, so the held item
-// is selected exactly once. Ignored on directories and outside multi-select.
-func (i *fileDialogItem) LongPressed(*event.PointEvent) {
-	i.picker.enterSelectionMode(i.id)
+// devices without modifier keys can build a set. Hold-fire dispatch (#758
+// touch, #266 desktop) sends no Tapped on the release of the press that got
+// here, so the held item is selected exactly once.
+//
+// A dialog that declines the mode — single-select, or a directory, which
+// navigates instead of joining a set — must not leave the press unanswered:
+// with the tap already swallowed by the driver, a slow click would otherwise
+// select nothing at all. The press falls back to the plain tap it would have
+// been.
+func (i *fileDialogItem) LongPressed(ev *event.PointEvent) {
+	if i.picker.enterSelectionMode(i.id) {
+		return
+	}
+	i.Tapped(ev)
 }
 
 func (i *fileDialogItem) HoverIn(*event.HoverEvent)    { i.hovered = true; i.Refresh() }

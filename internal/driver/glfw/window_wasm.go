@@ -87,7 +87,7 @@ type window struct {
 	// Press-and-hold long-press dispatch (#266); see window_desktop.go.
 	longPressSeq   int
 	longPressPos   geo.Position
-	longPressFired core.CanvasObject
+	longPressFired bool
 
 	onClosed           func()
 	onCloseIntercepted func()
