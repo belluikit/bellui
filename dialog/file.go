@@ -170,9 +170,10 @@ var noNativeFileDialogs atomic.Bool
 // express it.
 //
 // Two exceptions ignore this setting: Flatpak builds always use the portal
-// (the only dialog that can see outside the sandbox), and the wasm open
-// picker is always the browser's own — a canvas dialog has no real
-// filesystem to browse there.
+// (the only dialog that can see outside the sandbox), and on wasm both
+// overrides stay the browser's own — the <input type="file"> picker for open
+// and the download offered at writer close for save — because a canvas dialog
+// has no real filesystem to browse there.
 //
 // Since: 1.0. The native backends were opt-in when introduced; the default
 // changed to enabled before the first stable release (#226).
