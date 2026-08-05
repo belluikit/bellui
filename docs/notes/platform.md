@@ -50,10 +50,10 @@ was **wrong**, disproven by goroutine dumps.
   does**. If pixel143 starts hanging every bellui app at launch, restart the
   emulator before debugging anything else.
 - **Manifest**: the packaging template declares `locale|layoutDirection` in
-  `configChanges` — the framework adds `layoutDirection` to every locale
-  change mask, so both are required for an Android 13+ per-app language
-  change to arrive as `onConfigurationChanged` instead of an activity
-  recreation (#283). Declaring it needed the #287 regeneration of the CLI's
+  `configChanges` (and `screenLayout` since #299, below) — the framework adds
+  `layoutDirection` to every locale change mask, so both are required for an
+  Android 13+ per-app language change to arrive as `onConfigurationChanged`
+  instead of an activity recreation (#283). Declaring it needed the #287 regeneration of the CLI's
   embedded binres SDK table (now pinned via `binres.SDKPlatform`, recorded in
   the generated arsc.go header); since #287 an unknown `configChanges` flag
   name is a hard manifest-compile error instead of a silently dropped bit.
@@ -98,7 +98,10 @@ was **wrong**, disproven by goroutine dumps.
   CONFIG_SCREEN_LAYOUT}`, an `am task resize` bucket crossing
   `{CONFIG_SCREEN_LAYOUT}`) now arrive in place — and bellui handles them:
   the size event relayouts, deviceinfoprobe reports the new `sizePt` for the
-  resized pane, ticks never stop. Stock is unaffected (its locale mask never
+  resized pane, ticks never stop. They join rotation in paying the config
+  event's `GetLocales` round trip above, per multi-window transition rather
+  than per relaunch — the cheaper half of the trade the declaration makes.
+  Stock is unaffected (its locale mask never
   carried screenLayout; re-verified on pixel143 with the new manifest).
   Declaring `screenLayout` needed a binres strip fix: `PackResources`' old
   per-entry collision scan overwrote its own verdict (its `break` left only
