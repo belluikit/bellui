@@ -69,8 +69,11 @@ the trendvidia fork (github.com/trendvidia/fyne).
   configured between the classic buckets — 356, 420, 440dpi panels are
   common — previously rendered everything derived from dp (touch-target
   floors, text sizes) up to ~12% off in physical units; bucket densities
-  (160/240/320/480/640) map exactly as before. The "unknown density" log for
-  such values is gone, and the `ACONFIGURATION_DENSITY_ANY` sentinel no
+  (160/240/320/480/640) map exactly as before. The one bucket that does
+  change is tvdpi (213), which now scales by 1.33125 as the platform does
+  rather than the 1.5 the old ladder rounded it to, so an Android TV panel
+  configured at tvdpi renders ~11% smaller. The "unknown density" log for
+  off-bucket values is gone, and the `ACONFIGURATION_DENSITY_ANY` sentinel no
   longer reads as a 65534dpi screen.
 
 * **wasm: the browser picker overrides no longer fire under the test driver**

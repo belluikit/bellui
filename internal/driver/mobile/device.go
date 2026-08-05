@@ -13,7 +13,7 @@ type device struct {
 	keyboardShown bool
 }
 
-//lint:file-ignore U1000 Var currentDPI is used in other files, but not here
+//lint:file-ignore U1000 Var currentDPI and androidScaleForDPI are used in other files (per platform), but not here
 var (
 	currentOrientation size.Orientation
 	currentDPI         float32
@@ -30,10 +30,13 @@ var _ bellui.Device = (*device)(nil)
 // classic buckets (356, 420, 440dpi panels are common). The former lookup
 // table rounded those to the nearest step: an OPD2403 reporting 356 ran at
 // scale 2.0 instead of 2.225, ~10% small in physical units (#272). Bucket
-// densities map exactly as before (240→1.5, 320→2, 480→3, 640→4). At or
-// below mdpi the scale clamps to 1 — sub-1 scales served no shipping ldpi
-// hardware, and the clamp keeps the pre-first-size-event state (dpi 0) at a
-// usable scale — a deliberate deviation from DisplayMetrics there.
+// densities map exactly as before (240→1.5, 320→2, 480→3, 640→4) except
+// tvdpi: the old ladder rounded 213 up to 1.5 where the platform's own
+// density is 213/160 = 1.33125, so an Android TV panel configured at tvdpi
+// renders ~11% smaller than it did. At or below mdpi the scale clamps to
+// 1 — sub-1 scales served no shipping ldpi hardware, and the clamp keeps the
+// pre-first-size-event state (dpi 0) at a usable scale — a deliberate
+// deviation from DisplayMetrics there.
 func androidScaleForDPI(dpi float32) float32 {
 	if dpi <= 160 {
 		return 1
