@@ -15,6 +15,20 @@ the trendvidia fork (github.com/trendvidia/fyne).
 
 ### Added
 
+* **Desktop touchscreen gesture dispatch**
+  ([#266](https://github.com/belluikit/bellui/issues/266)). The GLFW driver
+  now receives real touch input on Windows (`WM_POINTER`) and Wayland
+  (`wl_touch`) via the glfw fork's new touch callback (belluikit/glfw
+  v1.10.0) and feeds it through the same gesture state machine the mobile
+  driver runs — so a desktop touchscreen gets slop-cancelled taps, drags,
+  double-tap and the hold-fire long-press, making the #259 file-dialog
+  selection mode (and `event.LongPressable` generally) reachable there for
+  the first time. Touch dispatches the mobile vocabulary (no hover, no
+  `desktop.Mouseable`); on Windows this replaces the system's legacy
+  touch-to-mouse emulation for bellui windows. X11 and macOS are unchanged
+  (touch continues to arrive as an emulated mouse). Content flick-scrolling
+  remains a mouse-parity non-goal for now. Verify with `hack/touchprobe`.
+
 * **Touch multi-select for the canvas file dialog — long-press selection
   mode** ([#259](https://github.com/belluikit/bellui/issues/259)). In
   open-multiple mode, long-pressing a file item enters selection mode: plain
