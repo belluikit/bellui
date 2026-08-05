@@ -12,8 +12,8 @@
 	     framework adds layoutDirection to every locale change mask, and the
 	     binres SDK table predates that flag (API 17) and silently drops
 	     unknown flag names, so it cannot be declared until the table is
-	     regenerated - the recreation this still triggers is survivable since
-	     the #283 fix. -->
+	     regenerated (#287) - the recreation this still triggers is survivable
+	     since the #283 fix. -->
 	<activity android:name="org.golang.app.GoNativeActivity"
 		android:label="{{.Name}}"
 		android:configChanges="orientation|keyboardHidden|uiMode|locale"
