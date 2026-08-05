@@ -168,6 +168,11 @@ var (
 // from the key window (no per-event handle plumbing, unlike Android).
 func (d *driver) renderReady(w *window) bool { return w != nil }
 
+// nativeSurfacePresentable is always true on iOS: the CAMetalLayer lives with
+// the view hierarchy and is never destroyed under a live painter the way
+// Android's ANativeWindow is (#283).
+func (d *driver) nativeSurfacePresentable() bool { return true }
+
 // webgpuSurfaceDescriptor builds a CAMetalLayer-backed surface descriptor for the
 // iOS view; wgpu-native renders into it via Metal. Returns nil until the window
 // and its view exist (the painter's Init then retries on the next frame).

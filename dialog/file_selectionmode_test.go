@@ -129,23 +129,7 @@ func TestFileDialog_SelectionMode_ComposesWithModifiers(t *testing.T) {
 func TestFileDialog_SelectionMode_DirsAndSingleSelectInert(t *testing.T) {
 	d := newLoadedMultiDialog(t, func([]bellui.URIReadCloser, error) {})
 	fd := d.dialog
-	files := fileItemIDs(t, fd)
-	dirID := -1
-	for id := 0; id < fd.displayCount(); id++ {
-		isFile := false
-		for _, f := range files {
-			if f == id {
-				isFile = true
-				break
-			}
-		}
-		if !isFile {
-			dirID = id
-			break
-		}
-	}
-	require.GreaterOrEqual(t, dirID, 0, "the listing should include the parent entry")
-	fd.enterSelectionMode(dirID)
+	fd.enterSelectionMode(dirItemID(t, fd))
 	assert.False(t, fd.selectionMode, "directories navigate; they never enter selection mode")
 
 	// A single-select dialog has no set to build: long-press is inert.
@@ -162,6 +146,67 @@ func TestFileDialog_SelectionMode_DirsAndSingleSelectInert(t *testing.T) {
 		sd.enterSelectionMode(id)
 	}
 	assert.False(t, sd.selectionMode, "single-select dialogs never enter selection mode")
+}
+
+// A hold the dialog declines still has to answer the press: neither driver
+// delivers Tapped on the release of a hold-fired press (#758 touch, #266
+// desktop), so an item that cannot enter selection mode falls back to the
+// plain tap instead of swallowing the click.
+func TestFileDialog_SelectionMode_DeclinedLongPressFallsBackToTap(t *testing.T) {
+	// Single-select: the held file is selected, exactly as a click selects it.
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "a.txt"), []byte("x"), 0o644))
+	start, err := storage.ListerForURI(storage.NewFileURI(dir))
+	require.NoError(t, err)
+	w := test.NewTempWindow(t, widget.NewLabel("x"))
+	s := NewFileOpen(func(bellui.URIReadCloser, error) {}, w)
+	s.SetLocation(start)
+	s.Show()
+	sd := s.dialog
+	fileIDs := fileItemIDs(t, sd)
+	require.NotEmpty(t, fileIDs)
+	items := visibleFileItems(t, sd)
+	require.NotNil(t, items[fileIDs[0]])
+
+	test.LongPress(items[fileIDs[0]])
+	assert.False(t, sd.selectionMode, "single-select dialogs never enter selection mode")
+	if assert.NotNil(t, sd.selected, "a declined hold still selects the held file") {
+		assert.Equal(t, "a.txt", sd.selected.Name())
+	}
+
+	// Multi-select on a directory: the hold navigates, like the tap it stands in for.
+	d := newLoadedMultiDialog(t, func([]bellui.URIReadCloser, error) {})
+	fd := d.dialog
+	dirID := dirItemID(t, fd)
+	dirItems := visibleFileItems(t, fd)
+	require.NotNil(t, dirItems[dirID])
+	before := fd.dir.String()
+
+	test.LongPress(dirItems[dirID])
+	assert.False(t, fd.selectionMode, "directories never enter selection mode")
+	assert.Empty(t, fd.multiSelected, "and never join the set")
+	assert.NotEqual(t, before, fd.dir.String(), "the hold navigates, like a tap on a directory")
+}
+
+// dirItemID returns the display id of the first listing entry that is not a
+// file — the parent ("..") entry in the loaded fixtures.
+func dirItemID(t *testing.T, fd *fileDialog) int {
+	t.Helper()
+	files := fileItemIDs(t, fd)
+	for id := 0; id < fd.displayCount(); id++ {
+		isFile := false
+		for _, f := range files {
+			if f == id {
+				isFile = true
+				break
+			}
+		}
+		if !isFile {
+			return id
+		}
+	}
+	require.Fail(t, "the listing should include the parent entry")
+	return -1
 }
 
 func TestFileDialog_SelectionMode_DoubleTapAcrossModeBoundary(t *testing.T) {
