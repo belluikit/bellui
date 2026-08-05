@@ -59,6 +59,27 @@ type TouchHandler struct {
 	// (the hook handled the event). Used by mobile for menu dismissal.
 	OnTapUp func(pos geo.Position) bool
 
+	// ScrollCallback, when set by the driver, enables touch flick-scrolling of
+	// scrollable content (#291): a move past the tap slop that latches no
+	// Draggable but began over an event.Scrollable becomes a scroll gesture —
+	// every move calls this with the gesture origin and the move's delta, and
+	// the driver turns it into a touch-sourced ScrollEvent (which buys nested
+	// propagation from its scroll dispatch). Drivers whose Scroll is itself
+	// Draggable (mobile) leave this nil and nothing changes for them.
+	ScrollCallback func(origin geo.Position, delta geo.Delta)
+	// ScrollEndCallback is called when a scroll gesture's contact lifts, with
+	// the last move's delta as the momentum seed. A system cancel ends the
+	// gesture without it — momentum from a contact the system took over would
+	// keep content moving after a palm rejection.
+	ScrollEndCallback func(origin geo.Position, delta geo.Delta)
+
+	// scrolling/scrollingID/scrollOrigin latch a scroll gesture the way
+	// Dragging/draggingID latch a drag: one session at a time, owned by the
+	// contact that started it.
+	scrolling    bool
+	scrollingID  int
+	scrollOrigin geo.Position
+
 	// LongPressCallback, when set by the driver, enables hold-fire long-press
 	// (#758): a stationary touch dispatches LongPressed at TapSecondaryDelay
 	// while the finger is still down — native mobile behavior — instead of on
@@ -92,6 +113,8 @@ func (h *TouchHandler) TapDown(pos geo.Position, tapID int) {
 	h.LastTapDown[tapID] = time.Now()
 	h.LastTapDownPos[tapID] = pos
 	h.Dragging = nil
+	h.scrolling = false
+	h.scrollingID = 0
 
 	// Tap-through overlays (#472/#569): when the top overlay opted in and the
 	// press lands outside its content, dismiss it now so the hit tests below
@@ -235,7 +258,8 @@ func (h *TouchHandler) TapMove(pos geo.Position, tapID int,
 	deltaX := pos.X - previousPos.X
 	deltaY := pos.Y - previousPos.Y
 
-	if h.Dragging == nil && (math.Abs(float64(deltaX)) < TapMoveThreshold && math.Abs(float64(deltaY)) < TapMoveThreshold) {
+	scrollingThis := h.scrolling && h.scrollingID == tapID
+	if h.Dragging == nil && !scrollingThis && (math.Abs(float64(deltaX)) < TapMoveThreshold && math.Abs(float64(deltaY)) < TapMoveThreshold) {
 		return
 	}
 
@@ -267,6 +291,10 @@ func (h *TouchHandler) TapMove(pos geo.Position, tapID int,
 	}
 
 	if h.Dragging == nil {
+		if scrollingThis {
+			h.ScrollCallback(h.scrollOrigin, offset)
+			return
+		}
 		// Latch the drag target at the gesture origin, not the current finger
 		// position (matching the desktop driver): a fast first move can jump
 		// clear across a small Draggable — a selection handle, a slider thumb —
@@ -285,6 +313,7 @@ func (h *TouchHandler) TapMove(pos geo.Position, tapID int,
 			h.DragOffset = previousPos.Subtract(dragPos)
 			h.DragStart = dragCo.Position()
 		} else {
+			h.tryLatchScroll(previousPos, offset, tapID)
 			return
 		}
 	}
@@ -296,6 +325,31 @@ func (h *TouchHandler) TapMove(pos geo.Position, tapID int,
 	ev.Dragged = offset
 
 	dragCallback(h.Dragging, ev)
+}
+
+// tryLatchScroll begins a scroll gesture for a drag that latched no Draggable
+// (#291): if the driver opted in and an event.Scrollable sits under the gesture
+// origin, the contact becomes a scroll session and this first past-the-slop
+// move is dispatched. The origin is latched like a drag target's — the finger
+// may wander off the scroller mid-gesture and content keeps following it. Only
+// the existence of a Scrollable is tested here; the driver's dispatch re-walks
+// the scrollables under the origin per delta, propagating to outer scrollers
+// when the inner one is at its boundary.
+func (h *TouchHandler) tryLatchScroll(origin geo.Position, offset geo.Delta, tapID int) {
+	if h.ScrollCallback == nil || h.scrolling {
+		return
+	}
+	co, _, _ := h.Finder.FindObjectAtPositionMatching(origin, func(object core.CanvasObject) bool {
+		_, ok := object.(event.Scrollable)
+		return ok
+	})
+	if co == nil {
+		return
+	}
+	h.scrolling = true
+	h.scrollingID = tapID
+	h.scrollOrigin = origin
+	h.ScrollCallback(origin, offset)
 }
 
 // TapUp handles a pointer-up event (tap, secondary tap, long-press, or drag end).
@@ -320,6 +374,15 @@ func (h *TouchHandler) TapUp(pos geo.Position, tapID int,
 	// Pre-hook for platform-specific handling (e.g., mobile menu dismissal).
 	if h.OnTapUp != nil && h.OnTapUp(pos) {
 		return
+	}
+
+	if h.scrolling && h.scrollingID == tapID {
+		h.scrolling = false
+		h.scrollingID = 0
+		if h.ScrollEndCallback != nil {
+			h.ScrollEndCallback(h.scrollOrigin, h.LastTapDelta[tapID])
+		}
+		return // a scroll gesture's release is not a tap
 	}
 
 	if h.Dragging != nil {
@@ -429,6 +492,12 @@ func (h *TouchHandler) TapCancel(pos geo.Position, tapID int) {
 		h.Dragging.DragEnd()
 		h.Dragging = nil
 		h.draggingID = 0
+	}
+	if h.scrolling && h.scrollingID == tapID {
+		// The scroll this contact latched ends where it stands — no momentum
+		// seeded from a contact the system took over.
+		h.scrolling = false
+		h.scrollingID = 0
 	}
 	h.forgetTouch(tapID)
 }

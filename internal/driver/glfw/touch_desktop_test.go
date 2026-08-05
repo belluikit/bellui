@@ -194,3 +194,131 @@ func TestWindow_TouchUnknownIDIgnored(t *testing.T) {
 		assert.Nil(t, o.popTapEvent(), "an end without a begin is not a tap")
 	})
 }
+
+func TestWindow_TouchScrollContent(t *testing.T) {
+	w := createWindow("Test")
+	prop := canvas.NewRectangle(color.White)
+	prop.SetMinSize(geo.NewSize(100, 100))
+	big := canvas.NewRectangle(color.White)
+	big.SetMinSize(geo.NewSize(400, 400))
+	tapObj := &tappableObject{Rectangle: canvas.NewRectangle(color.White)}
+	scroll := container.NewScroll(container.NewStack(big, tapObj))
+	w.SetContent(container.NewStack(prop, scroll))
+	repaintWindow(w)
+
+	runOnMain(func() {
+		// Desktop Scroll is not Draggable (#291): the drag latches no target,
+		// becomes a scroll gesture, and the content follows the finger.
+		w.touchEvent(w.viewport, 1, glfw.TouchBegin, 50, 60)
+		w.touchEvent(w.viewport, 1, glfw.TouchMove, 50, 40)
+		assert.Equal(t, float32(20), scroll.Offset.Y, "content follows the finger")
+		assert.Equal(t, float32(0), scroll.Offset.X)
+
+		// Once latched, moves below the tap slop still scroll — a slow finger
+		// must not stutter.
+		w.touchEvent(w.viewport, 1, glfw.TouchMove, 50, 39)
+		assert.Equal(t, float32(21), scroll.Offset.Y, "small moves keep scrolling once latched")
+
+		// The settling release (last delta under the momentum threshold) ends
+		// the gesture in place, and is not a tap on the content.
+		w.touchEvent(w.viewport, 1, glfw.TouchEnd, 50, 39)
+		assert.Equal(t, float32(21), scroll.Offset.Y)
+		assert.Nil(t, tapObj.popTapEvent(), "a scroll gesture's release is not a tap")
+	})
+}
+
+func TestWindow_TouchScrollDraggablePriority(t *testing.T) {
+	w := createWindow("Test")
+	prop := canvas.NewRectangle(color.White)
+	prop.SetMinSize(geo.NewSize(100, 100))
+	big := canvas.NewRectangle(color.White)
+	big.SetMinSize(geo.NewSize(400, 400))
+	drag := &draggableTappableObject{Rectangle: canvas.NewRectangle(color.White)}
+	scroll := container.NewScroll(container.NewStack(big, drag))
+	w.SetContent(container.NewStack(prop, scroll))
+	repaintWindow(w)
+
+	runOnMain(func() {
+		// A Draggable under the finger (thumb, slider, handle) still wins over
+		// content scrolling.
+		w.touchEvent(w.viewport, 1, glfw.TouchBegin, 50, 60)
+		w.touchEvent(w.viewport, 1, glfw.TouchMove, 50, 40)
+		w.touchEvent(w.viewport, 1, glfw.TouchEnd, 50, 40)
+
+		assert.Len(t, drag.events, 1, "the Draggable latches the gesture")
+		assert.Len(t, drag.endEvents, 1)
+		assert.Equal(t, float32(0), scroll.Offset.Y, "no content scroll under a latched drag")
+	})
+}
+
+func TestWindow_TouchScrollNestedPropagation(t *testing.T) {
+	w := createWindow("Test")
+	prop := canvas.NewRectangle(color.White)
+	prop.SetMinSize(geo.NewSize(100, 100))
+	innerContent := canvas.NewRectangle(color.White)
+	innerContent.SetMinSize(geo.NewSize(50, 50))
+	inner := container.NewScroll(innerContent)
+	big := canvas.NewRectangle(color.White)
+	big.SetMinSize(geo.NewSize(400, 400))
+	outer := container.NewScroll(container.NewStack(big, inner))
+	w.SetContent(container.NewStack(prop, outer))
+	repaintWindow(w)
+
+	runOnMain(func() {
+		// The touch scroll rides the wheel's nested-propagation chain: the
+		// inner scroller's content fits, so it reports not-consumed and the
+		// outer one scrolls.
+		w.touchEvent(w.viewport, 1, glfw.TouchBegin, 50, 60)
+		w.touchEvent(w.viewport, 1, glfw.TouchMove, 50, 40)
+		assert.Equal(t, float32(0), inner.Offset.Y, "fitting inner content does not consume")
+		assert.Equal(t, float32(20), outer.Offset.Y, "the outer scroller consumes the propagated scroll")
+
+		w.touchEvent(w.viewport, 1, glfw.TouchMove, 50, 39)
+		w.touchEvent(w.viewport, 1, glfw.TouchEnd, 50, 39)
+	})
+}
+
+func TestWindow_TouchScrollFlickMomentum(t *testing.T) {
+	w := createWindow("Test")
+	prop := canvas.NewRectangle(color.White)
+	prop.SetMinSize(geo.NewSize(100, 100))
+	big := canvas.NewRectangle(color.White)
+	big.SetMinSize(geo.NewSize(400, 400))
+	scroll := container.NewScroll(big)
+	w.SetContent(container.NewStack(prop, scroll))
+	repaintWindow(w)
+
+	runOnMain(func() {
+		w.touchEvent(w.viewport, 1, glfw.TouchBegin, 50, 70)
+		w.touchEvent(w.viewport, 1, glfw.TouchMove, 50, 40) // a 30px flick
+		assert.Equal(t, float32(30), scroll.Offset.Y)
+		w.touchEvent(w.viewport, 1, glfw.TouchEnd, 50, 40)
+	})
+
+	// The flick's momentum keeps scrolling after the release, decaying per
+	// tick. All reads hop to the main goroutine, where the momentum ticks run.
+	deadline := time.Now().Add(3 * time.Second)
+	continued := false
+	for time.Now().Before(deadline) {
+		var off float32
+		runOnMain(func() { off = scroll.Offset.Y })
+		if off > 100 {
+			continued = true
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	assert.True(t, continued, "flick momentum continues scrolling past the release")
+
+	// Touch-to-stop: a new contact halts the in-flight momentum dead.
+	var stopAt float32
+	runOnMain(func() {
+		w.touchEvent(w.viewport, 2, glfw.TouchBegin, 50, 50)
+		stopAt = scroll.Offset.Y
+	})
+	time.Sleep(150 * time.Millisecond)
+	runOnMain(func() {
+		assert.Equal(t, stopAt, scroll.Offset.Y, "a new contact halts flick momentum")
+		w.touchEvent(w.viewport, 2, glfw.TouchEnd, 50, 50)
+	})
+}
