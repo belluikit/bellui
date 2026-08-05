@@ -9,6 +9,8 @@ import (
 	"os"
 	"path"
 	"slices"
+	"strconv"
+	"strings"
 )
 
 // MinSDK is the targeted sdk version for support by package binres.
@@ -21,6 +23,17 @@ const MinSDK = 21
 // deliberately when the table needs attribute or flag values introduced by a
 // newer API level, then regenerate.
 const SDKPlatform = "android-35"
+
+// SDKPlatformVersion and SDKPlatformCodename are what aapt records for
+// SDKPlatform when packaging a manifest against it: the API level goes into
+// android:compileSdkVersion and platformBuildVersionCode, the Android release
+// name into android:compileSdkVersionCodename and platformBuildVersionName.
+// UnmarshalXML synthesizes the same four attributes. Bump together with
+// SDKPlatform.
+const (
+	SDKPlatformVersion  = 35
+	SDKPlatformCodename = "15"
+)
 
 // Requires environment variable ANDROID_HOME to be set.
 func apiResources() ([]byte, error) {
@@ -73,8 +86,28 @@ func sdkAPIResourcesPath() (string, error) {
 	return path.Join(sdkdir, "platforms", SDKPlatform, "android.jar"), nil
 }
 
+// platformAPILevel returns the numeric API level of a platforms/ directory
+// named exactly "android-<level>", or false for anything else — preview
+// platforms ("android-VanillaIceCream"), extension platforms
+// ("android-36-ext4") and stray files.
+func platformAPILevel(name string) (int, bool) {
+	suffix, ok := strings.CutPrefix(name, "android-")
+	if !ok {
+		return 0, false
+	}
+	level, err := strconv.Atoi(suffix)
+	if err != nil || level <= 0 {
+		return 0, false
+	}
+	return level, true
+}
+
 // LatestAPIResourcesPath returns the android.jar of the newest installed SDK
-// platform.
+// platform, by numeric API level — a lexical sort would rank android-9 above
+// android-36 (#296). Platform directories without a numeric level (previews,
+// extension SDKs) are deliberately ordered behind every numbered release and
+// compared lexically among themselves, so one is only picked when nothing
+// numbered is installed.
 func LatestAPIResourcesPath() (string, error) {
 	sdkdir := os.Getenv("ANDROID_HOME")
 	if sdkdir == "" {
@@ -86,13 +119,24 @@ func LatestAPIResourcesPath() (string, error) {
 		return "", err
 	}
 
-	maxSDK := ""
+	maxSDK, maxLevel := "", 0
 	for _, d := range dir {
-		if d.Name() > maxSDK {
-			maxSDK = d.Name()
+		name := d.Name()
+		if !strings.HasPrefix(name, "android-") {
+			continue
+		}
+		level, numeric := platformAPILevel(name)
+		switch {
+		case numeric && level > maxLevel:
+			maxSDK, maxLevel = name, level
+		case !numeric && maxLevel == 0 && name > maxSDK:
+			maxSDK = name
 		}
 	}
-	return path.Join(sdkdir, "platforms", maxSDK, "android.jar"), nil
+	if maxSDK == "" {
+		return "", fmt.Errorf("no SDK platforms installed in %s", parent)
+	}
+	return path.Join(parent, maxSDK, "android.jar"), nil
 }
 
 // checkStripAssumptions reports whether pkg is shaped the way PackResources'
