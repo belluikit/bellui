@@ -6,17 +6,15 @@
 
 	<application android:label="{{.Name}}" android:debuggable="{{.Debug}}"
 				 {{if .AdaptiveIcon}}android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round"{{end}}>
-	<!-- configChanges locale: half of the pair that will let an Android 13+
-	     per-app language change reach the app as onConfigurationChanged
-	     instead of an in-process activity recreation (#283). Inert alone: the
-	     framework adds layoutDirection to every locale change mask, and the
-	     binres SDK table predates that flag (API 17) and silently drops
-	     unknown flag names, so it cannot be declared until the table is
-	     regenerated (#287) - the recreation this still triggers is survivable
-	     since the #283 fix. -->
+	<!-- configChanges locale|layoutDirection: the pair that lets an Android
+	     13+ per-app language change reach the app as onConfigurationChanged
+	     instead of an in-process activity recreation (#283) - the framework
+	     adds layoutDirection to every locale change mask, so declaring locale
+	     alone is inert. Declarable since the binres SDK table regeneration
+	     (#287). -->
 	<activity android:name="org.golang.app.GoNativeActivity"
 		android:label="{{.Name}}"
-		android:configChanges="orientation|keyboardHidden|uiMode|locale"
+		android:configChanges="orientation|keyboardHidden|uiMode|locale|layoutDirection"
 		android:exported="true"
 		android:theme="@android:style/Theme">
 		<meta-data android:name="android.app.lib_name" android:value="{{.LibName}}" />
