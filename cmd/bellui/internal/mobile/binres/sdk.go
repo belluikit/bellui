@@ -8,21 +8,30 @@ import (
 	"io"
 	"os"
 	"path"
+	"slices"
 )
 
 // MinSDK is the targeted sdk version for support by package binres.
 const MinSDK = 21
 
+// SDKPlatform is the SDK platform directory name the embedded resource table
+// (arsc.go) is generated from. Regeneration (go generate, which runs
+// genarsc.go) resolves exactly this platform — never simply the newest
+// installed one — so the generated output is reproducible. Bump it
+// deliberately when the table needs attribute or flag values introduced by a
+// newer API level, then regenerate.
+const SDKPlatform = "android-35"
+
 // Requires environment variable ANDROID_HOME to be set.
 func apiResources() ([]byte, error) {
-	apiResPath, err := LatestAPIResourcesPath()
+	apiResPath, err := sdkAPIResourcesPath()
 	if err != nil {
 		return nil, err
 	}
 	zr, err := zip.OpenReader(apiResPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf(`%v; consider installing with "android update sdk --all --no-ui --filter android-%d"`, err, MinSDK)
+			return nil, fmt.Errorf(`%v; consider installing with "sdkmanager 'platforms;%s'"`, err, SDKPlatform)
 		}
 		return nil, err
 	}
@@ -52,6 +61,20 @@ func apiResources() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+// sdkAPIResourcesPath returns the path of the android.jar belonging to the
+// pinned SDKPlatform. It is the jar the embedded resource table is generated
+// from; use LatestAPIResourcesPath for build steps that just need any recent
+// platform jar.
+func sdkAPIResourcesPath() (string, error) {
+	sdkdir := os.Getenv("ANDROID_HOME")
+	if sdkdir == "" {
+		return "", fmt.Errorf("ANDROID_HOME env var not set")
+	}
+	return path.Join(sdkdir, "platforms", SDKPlatform, "android.jar"), nil
+}
+
+// LatestAPIResourcesPath returns the android.jar of the newest installed SDK
+// platform.
 func LatestAPIResourcesPath() (string, error) {
 	sdkdir := os.Getenv("ANDROID_HOME")
 	if sdkdir == "" {
@@ -81,6 +104,14 @@ func PackResources() ([]byte, error) {
 
 	tbl.pool.strings = []string{} // should not be needed
 	pkg := tbl.pkgs[0]
+
+	// The stripping below hard-codes the four leading specs being, in order,
+	// attr/id/style/string; refuse to pack a platform that breaks that
+	// assumption rather than embed a garbage table.
+	if want := []string{"attr", "id", "style", "string"}; len(pkg.typePool.strings) < len(want) ||
+		!slices.Equal(pkg.typePool.strings[:len(want)], want) {
+		return nil, fmt.Errorf("%s type pool no longer starts with %v: %v", SDKPlatform, want, pkg.typePool.strings[:min(len(pkg.typePool.strings), 6)])
+	}
 
 	// drop language string entries
 	for _, typ := range pkg.specs[3].types {

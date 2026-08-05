@@ -88,6 +88,13 @@ const (
 	ResTableType     ResType = 0x0201
 	ResTableTypeSpec ResType = 0x0202
 	ResTableLibrary  ResType = 0x0203
+
+	// Metadata chunks emitted by modern aapt2 inside a package. They carry
+	// nothing the manifest encoder resolves (overlay policy, staged resource
+	// id aliases), and are skipped — not decoded — by Package.UnmarshalBinary.
+	ResTableOverlayable       ResType = 0x0204
+	ResTableOverlayablePolicy ResType = 0x0205
+	ResTableStagedAlias       ResType = 0x0206
 )
 
 var (
@@ -736,6 +743,7 @@ func addAttributeNamespace(attr xml.Attr, nattr *Attribute, tbl *Table, pool *Po
 		case DataIntHex:
 			nattr.TypedValue.Type = t
 			for _, x := range strings.Split(attr.Value, "|") {
+				found := false
 				for _, val := range nt.values {
 					if val.name == 0x01000000 {
 						continue
@@ -746,8 +754,15 @@ func addAttributeNamespace(attr xml.Attr, nattr *Attribute, tbl *Table, pool *Po
 					}
 					if x == nr.key.Resolve(tbl.pkgs[0].keyPool) { // TODO hard-coded pkg ref
 						nattr.TypedValue.Value |= val.data.Value
+						found = true
 						break
 					}
+				}
+				if !found {
+					// A silently dropped bit is invisible data loss in the
+					// compiled manifest, so an unresolvable name is fatal (#287).
+					return fmt.Errorf("unknown flag %q in %s=%q; not a value of the %s resource table",
+						x, attr.Name.Local, attr.Value, SDKPlatform)
 				}
 			}
 		default:
