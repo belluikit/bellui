@@ -15,6 +15,23 @@ the trendvidia fork (github.com/trendvidia/fyne).
 
 ### Added
 
+* **Desktop press-and-hold dispatches `LongPressed`**
+
+  ([#266](https://github.com/belluikit/bellui/issues/266)). The glfw driver
+  hold-fires the gesture the touch drivers already had (#758): a lone
+  primary-button press held stationary for 300 ms dispatches `LongPressed`
+  to the `LongPressable` under the pointer while the button is still down,
+  and the release of a hold-fired press is not a tap. This applies to every
+  primary press — mouse included, matching how GTK, Flutter and Qt
+  long-press recognizers treat mice, and on a desktop touchscreen the
+  synthesized events are indistinguishable anyway — so `Entry` word-selects
+  on a slow click and the canvas file dialog's selection mode (#259) is now
+  reachable on desktop. Unlike the touch drivers, the release of a
+  hold-fired press dispatches nothing further: right-click keeps sole
+  ownership of `TappedSecondary` on desktop. Windows touchscreens still
+  promote a touch hold to a right-click before the app sees it —
+  belluikit/glfw#1 tracks real touch delivery (with Wayland `wl_touch`).
+  
 * **Diagonal resize cursors, and a pointer affordance on the `InnerWindow`
   resize corner** ([#269](https://github.com/belluikit/bellui/issues/269)).
   `desktop.StandardCursor` gains `NWSEResizeCursor` and `NESWResizeCursor`
@@ -37,9 +54,8 @@ the trendvidia fork (github.com/trendvidia/fyne).
   active, and the pointer modifiers keep their usual precedence throughout.
   As part of this, the mobile driver now gives Android's Back button the
   Escape meaning generally — a behavior change for existing apps, recorded
-  under Changed below. Desktop touchscreens cannot reach the gesture yet —
-  the GLFW driver has no touch long-press dispatch
-  ([#266](https://github.com/belluikit/bellui/issues/266)).
+  under Changed below. The GLFW driver's press-and-hold dispatch (#266,
+  above) makes the gesture reachable on desktop too.
 
 * **Escape closes the innermost pop-up, menu or dialog**
   ([#229](https://github.com/belluikit/bellui/issues/229)). The drivers give
@@ -215,6 +231,19 @@ the trendvidia fork (github.com/trendvidia/fyne).
   ([#253](https://github.com/belluikit/bellui/issues/253)).
 
 ### Changed
+
+* **A desktop primary press held on a `LongPressable` no longer delivers
+  `Tapped`** ([#266](https://github.com/belluikit/bellui/issues/266)). The
+  press-and-hold dispatch above is a behavior change for existing desktop
+  apps: a click whose button stays down for 300 ms now dispatches
+  `LongPressed` instead of `Tapped` to a widget implementing
+  `event.LongPressable` — in this toolkit `Entry`, `RichEntry`, selectable
+  text and the canvas file dialog's items; every other widget, `Button`
+  included, taps on a slow click exactly as before. A `LongPressable` that
+  declines the gesture must answer the press another way rather than ignore
+  it (the file dialog's items fall back to the plain tap when the dialog is
+  single-select or the item is a directory), because the withheld `Tapped`
+  is not delivered afterwards.
 
 * **Android's Back button now carries the Escape meaning**
   ([#259](https://github.com/belluikit/bellui/issues/259)). The mobile driver
