@@ -5,12 +5,48 @@
 package binres
 
 import (
+	"bytes"
+	"compress/gzip"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
+
+// TestPackedTableMatchesSDK re-packs the pinned SDK platform's resources.arsc
+// and requires the result to match the checked-in arsc.go, catching a strip
+// edit (or SDKPlatform bump) committed without `go generate`. No CI runner is
+// guaranteed the pinned platform (the macos runner has an ANDROID_HOME but not
+// android-35), so it skips unless the platform jar is present — it gates the
+// machines that can regenerate, which are the ones that introduce the drift.
+// The comparison is on the uncompressed table so a Go-release gzip change
+// cannot fail it.
+func TestPackedTableMatchesSDK(t *testing.T) {
+	jar, err := sdkAPIResourcesPath()
+	if err != nil {
+		t.Skipf("cannot re-pack %s to compare: %v", SDKPlatform, err)
+	}
+	if _, err := os.Stat(jar); err != nil {
+		t.Skipf("%s not installed; cannot re-pack to compare: %v", SDKPlatform, err)
+	}
+	r := require.New(t)
+
+	fresh, err := PackResources()
+	r.NoError(err)
+
+	gunzip := func(b []byte) []byte {
+		zr, err := gzip.NewReader(bytes.NewReader(b))
+		r.NoError(err)
+		defer zr.Close()
+		raw, err := io.ReadAll(zr)
+		r.NoError(err)
+		return raw
+	}
+	r.True(bytes.Equal(gunzip(arsc), gunzip(fresh)),
+		"embedded arsc.go is stale for %s: run `go generate` in internal/mobile/binres", SDKPlatform)
+}
 
 // platformsFixture points ANDROID_HOME at a temp SDK whose platforms/ holds
 // exactly the named directories, and returns that platforms/ path so a test
@@ -86,6 +122,35 @@ func stripFixture() *Package {
 		pkg.specs = append(pkg.specs, &TypeSpec{id: uint8(i) + 1})
 	}
 	return pkg
+}
+
+// TestStripKeyPool locks the key-blanking rule itself, which is otherwise
+// guarded only by tests that need the pinned platform installed
+// (TestPackedTableMatchesSDK) or that reach it through the embedded table
+// (TestConfigChangesFlagNamesSurviveStrip, configChanges names only).
+func TestStripKeyPool(t *testing.T) {
+	pkg := stripFixture()
+	shared := pkg.keyPool.ref("screenLayout")
+	keptOnly := pkg.keyPool.ref("configChanges")
+	droppedOnly := pkg.keyPool.ref("^attr-private/windowFrame")
+	unreferenced := pkg.keyPool.ref("orphan")
+
+	// attr and id are kept specs; string holds a dropped (nil'd) entry beside
+	// a surviving one; dimen is a spec that goes away wholesale and happens to
+	// reference the same key slot as the kept id entry — the #299 shape.
+	pkg.specs[0].types = []*Type{{entries: []*Entry{{key: keptOnly}}}}
+	pkg.specs[1].types = []*Type{{entries: []*Entry{{key: shared}}}}
+	pkg.specs[3].types = []*Type{{entries: []*Entry{nil, {key: keptOnly}}}}
+	pkg.specs[4].types = []*Type{{entries: []*Entry{{key: shared}, {key: droppedOnly}}}}
+
+	stripKeyPool(pkg)
+
+	r := require.New(t)
+	r.Equal("screenLayout", shared.Resolve(pkg.keyPool),
+		"a key a kept entry references must survive a dropped spec sharing its slot (#299)")
+	r.Equal("configChanges", keptOnly.Resolve(pkg.keyPool))
+	r.Empty(droppedOnly.Resolve(pkg.keyPool), "a key only a dropped spec references must be blanked")
+	r.Empty(unreferenced.Resolve(pkg.keyPool), "a key nothing references must be blanked")
 }
 
 func TestCheckStripAssumptions(t *testing.T) {
