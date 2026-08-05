@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/driver/desktop"
@@ -79,9 +80,12 @@ func TestInnerWindow_MinSize(t *testing.T) {
 func TestInnerWindow_CornerResizeCursor(t *testing.T) {
 	w := NewInnerWindow("Title", widget.NewLabel("Content"))
 
-	// The corner sits bottom-right, so the desktop pointer affordance is the
-	// northwest–southeast diagonal resize shape (#269).
-	assert.Equal(t, desktop.NWSEResizeCursor, newDraggableCorner(w).Cursor())
+	// Asserted on the corner the renderer installs, not a throwaway one, so
+	// swapping the corner out cannot silently drop the affordance. It sits
+	// bottom-right, so the shape is the northwest–southeast diagonal (#269).
+	corner, ok := test.WidgetRenderer(w).(*innerWindowRenderer).corner.(desktop.Cursorable)
+	require.True(t, ok, "the resize corner must offer a desktop cursor")
+	assert.Equal(t, desktop.NWSEResizeCursor, corner.Cursor())
 }
 
 func TestInnerWindow_SetContent(t *testing.T) {
