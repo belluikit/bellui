@@ -152,10 +152,29 @@ the trendvidia fork (github.com/trendvidia/fyne).
   failed lookup no longer has its result parsed, and the formatting tag
   comes from the first entry that parsed rather than blindly the first entry
   reported. The underlying Android lookup failure (`no current JVM` — the
-  locale resolves during library init, before JNI_OnLoad), which still
-  settles the locale on the fallback there, is tracked as
-  [#282](https://github.com/belluikit/bellui/issues/282).
-  
+  locale resolves during library init, before JNI_OnLoad) is fixed below
+  ([#282](https://github.com/belluikit/bellui/issues/282)).
+
+* **Android apps no longer run in English on a non-English device**
+  ([#282](https://github.com/belluikit/bellui/issues/282)). The lang package
+  resolves the system locale during package init, which on Android runs in the
+  shared library's global constructor — before the JVM is attached — so the
+  lookup failed deterministically on every start and the app settled on the
+  English fallback for translations, CLDR date/number formatting, collation
+  and text direction. Apps that happened to call `AddTranslations*` from their
+  own `main()` self-healed by accident; everything else stayed English. The
+  locale is now re-resolved at app creation (the JNI context is available
+  before Go's `main` starts, so UI built there — including `lang.L` strings
+  captured at build time — sees the real locale from the first frame), and
+  again on each foregrounding, which picks up a system language switched while
+  the app was backgrounded (Android recreates the activity, not the process).
+  A change fires the same relayout as `lang.SetLocale`. The re-resolve — new
+  exported seam `lang.ResolveSystemLocale` — respects an explicit `SetLocale`
+  override, and `AddTranslations*` after `SetLocale` no longer silently
+  reverts the app to the system locale (the same override guard, previously
+  missing from the shared re-derivation path). Verified on the Android bench;
+  other platforms resolve at init successfully and are unaffected.
+
 * **Android: canvas scale is derived arithmetically from the reported
   density** ([#272](https://github.com/belluikit/bellui/issues/272)),
   matching `DisplayMetrics.density` (densityDpi/160), instead of a bucket

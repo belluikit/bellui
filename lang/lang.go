@@ -9,6 +9,7 @@ import (
 	"log"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"text/template"
 
 	"github.com/jeandeaual/go-locale"
@@ -41,6 +42,12 @@ var (
 	currentTag language.Tag // resolved language tag for formatting functions
 	tagMu      sync.RWMutex
 	setupOnce  sync.Once
+
+	// localeOverride records that an explicit locale override is active —
+	// [SetLocale] with a non-empty locale, or [SetLocaleForTests]. While set,
+	// system locale resolution ([ResolveSystemLocale], and the updateLocalizer
+	// runs triggered by AddTranslations*) must not replace the override (#282).
+	localeOverride atomic.Bool
 
 	//go:embed translations
 	translations embed.FS
@@ -203,16 +210,23 @@ func fallbackWithData(key, fallback string, data any) string {
 // It is exported so that widget tests in other packages can test
 // locale-dependent behavior. It should not be called from production code.
 //
-// The previous locale is automatically restored via t.Cleanup when the
-// test (or subtest) finishes, preventing locale state from leaking
-// between tests.
+// The locale counts as an explicit override for the duration of the test, so
+// neither a toolkit re-resolve of the system locale ([ResolveSystemLocale]) nor
+// an [AddTranslations] call can replace it.
+//
+// The previous locale — and the previous override state — is automatically
+// restored via t.Cleanup when the test (or subtest) finishes, preventing locale
+// state from leaking between tests.
 func SetLocaleForTests(t interface{ Cleanup(func()) }, locale string) {
 	prevTag := getCurrentTag()
 	prevLocalizer := getLocalizer()
+	prevOverride := localeOverride.Load()
 	t.Cleanup(func() {
 		setLocalizer(prevLocalizer)
 		setCurrentTag(prevTag)
+		localeOverride.Store(prevOverride)
 	})
+	localeOverride.Store(true)
 	setupLang(locale)
 }
 
@@ -224,6 +238,13 @@ func SetLocaleForTests(t interface{ Cleanup(func()) }, locale string) {
 // (including region and script) is retained for formatting, [CurrentLocale],
 // [IsRTL] and text shaping. Unlike [SystemLocale], subsequent calls to those
 // helpers reflect this override.
+//
+// A non-empty locale also pins the app against later system-locale resolution:
+// neither [ResolveSystemLocale] — which the toolkit runs itself on Android once
+// the Java runtime is available — nor the localizer rebuild that
+// [AddTranslations] and its variants trigger will replace it (translations added
+// afterwards are still picked up for the overridden locale). Passing an empty
+// locale releases the pin and reverts to tracking the system locale.
 //
 // When the active locale actually changes and an app is running, every running
 // window is re-laid-out and repainted — re-applying locale-derived formatting
@@ -245,8 +266,10 @@ func SetLocale(l bellui.Locale) {
 	prev := getCurrentTag()
 
 	if l == "" { // revert to the system locale
+		localeOverride.Store(false)
 		updateLocalizer()
 	} else {
+		localeOverride.Store(true)
 		setupOnce.Do(initRuntime)
 		loc := l.String()
 		setupLang(closestSupportedLocale([]string{loc}).LanguageString())
@@ -257,6 +280,34 @@ func SetLocale(l bellui.Locale) {
 		}
 	}
 
+	if getCurrentTag() != prev {
+		refreshLocaleChange()
+	}
+}
+
+// ResolveSystemLocale re-runs the operating-system locale lookup and applies
+// the result to translations, formatting, collation and text direction. When
+// an explicit [SetLocale] (or test) override is active it does nothing, and
+// when the resolved locale actually changes it triggers the same running-app
+// relayout and listener notifications as [SetLocale].
+//
+// It exists for the Android start sequence: this package's initial lookup runs
+// during the shared library's global constructor, before the Java runtime is
+// attached, so it fails and settles on the English fallback (#282). The
+// toolkit calls this itself once the JVM context is available — at app
+// creation, and again on each foregrounding to pick up a system locale changed
+// while the app was backgrounded (Android then recreates the activity but not
+// the process, so package init does not run again). Applications do not need
+// to call it. Like [SetLocale] it should be called on the main goroutine.
+//
+// Since: 1.0
+func ResolveSystemLocale() {
+	if localeOverride.Load() {
+		return
+	}
+
+	prev := getCurrentTag()
+	updateLocalizer()
 	if getCurrentTag() != prev {
 		refreshLocaleChange()
 	}
@@ -319,6 +370,17 @@ func setupLang(lang string) {
 // updateLocalizer Finds the closest translation from the user's locale list and sets it up
 func updateLocalizer() {
 	setupOnce.Do(initRuntime)
+
+	if localeOverride.Load() {
+		// An explicit override is active: rebuild the localizer against the
+		// (possibly grown) bundle so newly added translations are picked up,
+		// but resolve it for the override tag and leave currentTag alone — the
+		// system lookup must not clobber [SetLocale] (#282; previously an
+		// AddTranslations* call after SetLocale silently reverted to the
+		// system locale).
+		setLocalizer(newLocalizer(closestSupportedLocaleForTags([]language.Tag{getCurrentTag()}).LanguageString()))
+		return
+	}
 
 	all, err := locale.GetLocales()
 	if err != nil {
