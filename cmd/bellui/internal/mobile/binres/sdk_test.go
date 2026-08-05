@@ -5,10 +5,42 @@
 package binres
 
 import (
+	"bytes"
+	"compress/gzip"
+	"io"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
+
+// TestPackedTableMatchesSDK re-packs the pinned SDK platform's resources.arsc
+// and requires the result to match the checked-in arsc.go, catching a strip
+// edit (or SDKPlatform bump) committed without `go generate`. No CI runner is
+// guaranteed the SDK, so it skips without ANDROID_HOME — it gates the machines
+// that can regenerate, which are the ones that introduce the drift. The
+// comparison is on the uncompressed table so a Go-release gzip change cannot
+// fail it.
+func TestPackedTableMatchesSDK(t *testing.T) {
+	if os.Getenv("ANDROID_HOME") == "" {
+		t.Skipf("ANDROID_HOME not set; cannot re-pack %s to compare", SDKPlatform)
+	}
+	r := require.New(t)
+
+	fresh, err := PackResources()
+	r.NoError(err)
+
+	gunzip := func(b []byte) []byte {
+		zr, err := gzip.NewReader(bytes.NewReader(b))
+		r.NoError(err)
+		defer zr.Close()
+		raw, err := io.ReadAll(zr)
+		r.NoError(err)
+		return raw
+	}
+	r.True(bytes.Equal(gunzip(arsc), gunzip(fresh)),
+		"embedded arsc.go is stale for %s: run `go generate` in internal/mobile/binres", SDKPlatform)
+}
 
 // stripFixture returns a package shaped the way PackResources' stripping
 // requires: type pool attr/id/style/string/dimen, one spec per type in order.
