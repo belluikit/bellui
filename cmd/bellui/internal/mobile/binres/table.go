@@ -304,8 +304,14 @@ func (pkg *Package) UnmarshalBinary(bin []byte) error {
 
 	// bin may extend past this package (the table can hold several); walk
 	// only this package's chunk.
+	if uint64(idOffset) > uint64(pkg.byteSize) {
+		return fmt.Errorf("package %q pools end past its own chunk, %v > %v", pkg.name, idOffset, pkg.byteSize)
+	}
 	buf := bin[idOffset:pkg.byteSize]
 	for len(buf) > 0 {
+		if len(buf) < 8 {
+			return fmt.Errorf("package %q has %v trailing bytes, too few for a chunk header", pkg.name, len(buf))
+		}
 		t := ResType(btou16(buf))
 		switch t {
 		case ResTableTypeSpec:
@@ -324,8 +330,13 @@ func (pkg *Package) UnmarshalBinary(bin []byte) error {
 			last.types = append(last.types, typ)
 			buf = buf[typ.byteSize:]
 		case ResTableLibrary, ResTableOverlayable, ResTableOverlayablePolicy, ResTableStagedAlias:
-			// metadata irrelevant to resolving manifest attributes; skip.
-			buf = buf[btou32(buf[4:]):]
+			// metadata irrelevant to resolving manifest attributes; skip. The
+			// bound matters: a zero size would spin here forever.
+			sz := btou32(buf[4:])
+			if sz < 8 || uint64(sz) > uint64(len(buf)) {
+				return fmt.Errorf("%s chunk size %v out of range, %v bytes left in package %q", t, sz, len(buf), pkg.name)
+			}
+			buf = buf[sz:]
 		default:
 			return errWrongType(t, ResTableTypeSpec, ResTableType)
 		}
@@ -567,7 +578,7 @@ func (typ *Type) UnmarshalBinary(bin []byte) error {
 	switch {
 	case typ.flags&typeFlagSparse != 0:
 		// sorted (entry id, offset/4) u16 pairs; entryCount counts the pairs.
-		if len(buf) < int(typ.entryCount)*4 {
+		if uint64(len(buf)) < uint64(typ.entryCount)*4 {
 			return fmt.Errorf("sparse index too short for entryCount[%v]", typ.entryCount)
 		}
 		if typ.entryCount > 0 {
@@ -588,7 +599,7 @@ func (typ *Type) UnmarshalBinary(bin []byte) error {
 		}
 	case typ.flags&typeFlagOffset16 != 0:
 		// u16 offsets in units of 4 bytes, 0xFFFF for no entry.
-		if len(buf) < int(typ.entryCount)*2 {
+		if uint64(len(buf)) < uint64(typ.entryCount)*2 {
 			return fmt.Errorf("offset16 index too short for entryCount[%v]", typ.entryCount)
 		}
 		for i := uint32(0); i < typ.entryCount; i++ {
