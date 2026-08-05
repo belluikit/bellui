@@ -22,19 +22,22 @@ func _() {
 	_ = x[ResTableType-513]
 	_ = x[ResTableTypeSpec-514]
 	_ = x[ResTableLibrary-515]
+	_ = x[ResTableOverlayable-516]
+	_ = x[ResTableOverlayablePolicy-517]
+	_ = x[ResTableStagedAlias-518]
 }
 
 const (
 	_ResType_name_0 = "ResNullResStringPoolResTableResXML"
 	_ResType_name_1 = "ResXMLStartNamespaceResXMLEndNamespaceResXMLStartElementResXMLEndElementResXMLCharData"
 	_ResType_name_2 = "ResXMLResourceMap"
-	_ResType_name_3 = "ResTablePackageResTableTypeResTableTypeSpecResTableLibrary"
+	_ResType_name_3 = "ResTablePackageResTableTypeResTableTypeSpecResTableLibraryResTableOverlayableResTableOverlayablePolicyResTableStagedAlias"
 )
 
 var (
 	_ResType_index_0 = [...]uint8{0, 7, 20, 28, 34}
 	_ResType_index_1 = [...]uint8{0, 20, 38, 56, 72, 86}
-	_ResType_index_3 = [...]uint8{0, 15, 27, 43, 58}
+	_ResType_index_3 = [...]uint8{0, 15, 27, 43, 58, 77, 102, 121}
 )
 
 func (i ResType) String() string {
@@ -46,7 +49,7 @@ func (i ResType) String() string {
 		return _ResType_name_1[_ResType_index_1[i]:_ResType_index_1[i+1]]
 	case i == 384:
 		return _ResType_name_2
-	case 512 <= i && i <= 515:
+	case 512 <= i && i <= 518:
 		i -= 512
 		return _ResType_name_3[_ResType_index_3[i]:_ResType_index_3[i+1]]
 	default:
