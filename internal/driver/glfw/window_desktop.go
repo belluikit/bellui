@@ -22,6 +22,7 @@ import (
 	"github.com/belluikit/bellui/internal/async"
 	"github.com/belluikit/bellui/internal/build"
 	"github.com/belluikit/bellui/internal/cache"
+	"github.com/belluikit/bellui/internal/driver/common"
 	"github.com/belluikit/bellui/internal/painter"
 	"github.com/belluikit/bellui/internal/scale"
 	"github.com/belluikit/bellui/internal/svg"
@@ -152,9 +153,25 @@ type window struct {
 	mouseClickCount      int
 	mouseCancelFunc      context.CancelFunc
 
-	// Press-and-hold long-press dispatch (#266). All three are main-goroutine
-	// state: the hold timer hops back via runOnMain before touching them
-	// (the waitForDoubleTap pattern).
+	// touch is the touchscreen gesture state machine (#266) — the same
+	// common.TouchHandler the mobile driver runs, fed from the glfw fork's
+	// touch callback (Windows WM_POINTER, Wayland wl_touch), so desktop touch
+	// gets mobile's gesture vocabulary: slop-cancelled taps, drag latching,
+	// double-tap, and hold-fire long-press (#758) — the #259 selection-mode
+	// entry. Both are built lazily on the first contact, so a nil touchActive
+	// means this window has never been touched. touchActive also tracks the
+	// ids currently down: a mid-sequence callback set/unset truncates
+	// sequences (see glfw.SetTouchCallback), so moves/ends for ids that never
+	// began must be ignored.
+	touch       common.TouchHandler
+	touchActive map[int]bool
+
+	// Press-and-hold long-press dispatch (#266) on the mouse path — real
+	// mouse holds, and emulated touch where the touch callback never fires
+	// (X11/macOS; on Windows registering the callback suppresses the
+	// emulation, so a touch reaches exactly one of the two mechanisms). All
+	// three are main-goroutine state: the hold timer hops back via runOnMain
+	// before touching them (the waitForDoubleTap pattern).
 	longPressSeq   int          // arm generation; bumping cancels a pending fire
 	longPressPos   geo.Position // where the armed press went down (slop origin)
 	longPressFired bool         // this primary press hold-fired, so its release is not a tap
@@ -1283,6 +1300,7 @@ func (w *window) create() {
 	win.SetCursorPosCallback(w.mouseMoved)
 	win.SetMouseButtonCallback(w.mouseClicked)
 	win.SetScrollCallback(w.mouseScrolled)
+	win.SetTouchCallback(w.touchEvent)
 	win.SetDropCallback(w.processDropped)
 	win.SetKeyCallback(w.keyPressed)
 	win.SetCharCallback(w.charInput)

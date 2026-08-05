@@ -15,6 +15,21 @@ the trendvidia fork (github.com/trendvidia/fyne).
 
 ### Added
 
+* **Desktop touchscreen gesture dispatch**
+  ([#266](https://github.com/belluikit/bellui/issues/266)). The GLFW driver
+  now receives real touch input on Windows (`WM_POINTER`) and Wayland
+  (`wl_touch`) via the glfw fork's new touch callback (belluikit/glfw
+  v1.10.0) and feeds it through the same gesture state machine the mobile
+  driver runs — so a desktop touchscreen gets slop-cancelled taps, drags,
+  double-tap and the hold-fire long-press, making the #259 file-dialog
+  selection mode (and `event.LongPressable` generally) reachable from real
+  desktop touch. Touch dispatches the mobile vocabulary (no hover, no
+  `desktop.Mouseable`); on Windows this replaces the system's legacy
+  touch-to-mouse emulation for bellui windows. X11 and macOS are unchanged
+  (touch continues to arrive as an emulated mouse, which the press-and-hold
+  entry below covers). Content flick-scrolling remains a mouse-parity
+  non-goal for now. Verify with `hack/touchprobe`.
+
 * **Desktop press-and-hold dispatches `LongPressed`**
 
   ([#266](https://github.com/belluikit/bellui/issues/266)). The glfw driver
@@ -28,9 +43,9 @@ the trendvidia fork (github.com/trendvidia/fyne).
   on a slow click and the canvas file dialog's selection mode (#259) is now
   reachable on desktop. Unlike the touch drivers, the release of a
   hold-fired press dispatches nothing further: right-click keeps sole
-  ownership of `TappedSecondary` on desktop. Windows touchscreens still
-  promote a touch hold to a right-click before the app sees it —
-  belluikit/glfw#1 tracks real touch delivery (with Wayland `wl_touch`).
+  ownership of `TappedSecondary` on desktop. Windows and Wayland
+  touchscreens now deliver real touch contacts past this path entirely
+  (the touchscreen gesture dispatch entry above, belluikit/glfw#1).
   
 * **Diagonal resize cursors, and a pointer affordance on the `InnerWindow`
   resize corner** ([#269](https://github.com/belluikit/bellui/issues/269)).

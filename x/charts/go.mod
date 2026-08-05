@@ -8,7 +8,7 @@ require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/belluikit/fsnotify v1.9.1 // indirect
 	github.com/belluikit/gl-js v0.2.1 // indirect
-	github.com/belluikit/glfw v1.9.0 // indirect
+	github.com/belluikit/glfw v1.10.0 // indirect
 	github.com/belluikit/glfw-js v1.0.4 // indirect
 	github.com/belluikit/systray v1.12.0 // indirect
 	github.com/belluikit/typesetting v0.3.6 // indirect
