@@ -49,11 +49,11 @@ func main() {
 	go func() {
 		for i := 1; ; i++ {
 			time.Sleep(time.Second)
-			log.Println("recreateprobe alive=", i)
+			log.Printf("recreateprobe alive=%d", i)
 			n := i
 			bellui.Do(func() {
 				tick.SetText(fmt.Sprintf("tick: %d", n))
-				log.Println("recreateprobe tick=", n)
+				log.Printf("recreateprobe tick=%d", n)
 			})
 		}
 	}()

@@ -317,9 +317,9 @@ var (
 )
 
 // NativeWindowLive reports whether the Android native window is currently
-// alive — false between onNativeWindowDestroyed and the next
-// onNativeWindowCreated. The WebGPU driver backend gates painting and
-// presenting on it (#283).
+// alive — false from onNativeWindowDestroyed until the next
+// onNativeWindowCreated or onNativeWindowRedrawNeeded. The WebGPU driver
+// backend gates painting, surface rebuilds and presenting on it (#283).
 func NativeWindowLive() bool { return nativeWindowLive.Load() }
 
 func init() {
