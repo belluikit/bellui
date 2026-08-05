@@ -302,8 +302,16 @@ func (pkg *Package) UnmarshalBinary(bin []byte) error {
 		return nil
 	}
 
-	buf := bin[idOffset:]
+	// bin may extend past this package (the table can hold several); walk
+	// only this package's chunk.
+	if uint64(idOffset) > uint64(pkg.byteSize) {
+		return fmt.Errorf("package %q pools end past its own chunk, %v > %v", pkg.name, idOffset, pkg.byteSize)
+	}
+	buf := bin[idOffset:pkg.byteSize]
 	for len(buf) > 0 {
+		if len(buf) < 8 {
+			return fmt.Errorf("package %q has %v trailing bytes, too few for a chunk header", pkg.name, len(buf))
+		}
 		t := ResType(btou16(buf))
 		switch t {
 		case ResTableTypeSpec:
@@ -321,6 +329,14 @@ func (pkg *Package) UnmarshalBinary(bin []byte) error {
 			last := pkg.specs[len(pkg.specs)-1]
 			last.types = append(last.types, typ)
 			buf = buf[typ.byteSize:]
+		case ResTableLibrary, ResTableOverlayable, ResTableOverlayablePolicy, ResTableStagedAlias:
+			// metadata irrelevant to resolving manifest attributes; skip. The
+			// bound matters: a zero size would spin here forever.
+			sz := btou32(buf[4:])
+			if sz < 8 || uint64(sz) > uint64(len(buf)) {
+				return fmt.Errorf("%s chunk size %v out of range, %v bytes left in package %q", t, sz, len(buf), pkg.name)
+			}
+			buf = buf[sz:]
 		default:
 			return errWrongType(t, ResTableTypeSpec, ResTableType)
 		}
@@ -447,11 +463,20 @@ func (spec *TypeSpec) MarshalBinary() ([]byte, error) {
 	return bin, nil
 }
 
+// ResTable_type flags, stored in the byte the legacy struct reserved as res0.
+const (
+	typeFlagSparse   = 0x01 // index is a sorted sparse array of (entry id, offset/4) u16 pairs
+	typeFlagOffset16 = 0x02 // index offsets are u16 in units of 4 bytes, 0xFFFF for no entry
+)
+
 // Type provides a collection of entries for a specific device configuration.
 type Type struct {
 	chunkHeader
-	id           uint8
-	res0         uint8  // must be 0
+	id uint8
+	// flags of the encoded chunk (sparse/offset16). UnmarshalBinary
+	// normalizes the decoded representation to the dense legacy layout that
+	// MarshalBinary emits, then zeroes this.
+	flags        uint8
 	res1         uint16 // must be 0
 	entryCount   uint32 // number of uint32 entry configuration masks that follow
 	entriesStart uint32 // offset from header where Entry data starts
@@ -511,13 +536,16 @@ func (typ *Type) UnmarshalBinary(bin []byte) error {
 	}
 
 	typ.id = bin[8]
-	typ.res0 = bin[9]
+	typ.flags = bin[9]
 	typ.res1 = btou16(bin[10:])
 	typ.entryCount = btou32(bin[12:])
 	typ.entriesStart = btou32(bin[16:])
 
-	if typ.res0 != 0 || typ.res1 != 0 {
-		return fmt.Errorf("res0 res1 not zero")
+	if typ.flags&^uint8(typeFlagSparse|typeFlagOffset16) != 0 {
+		return fmt.Errorf("unsupported ResTable_type flags %0#2x", typ.flags)
+	}
+	if typ.res1 != 0 {
+		return fmt.Errorf("res1 not zero")
 	}
 
 	typ.config.size = btou32(bin[20:])
@@ -544,16 +572,55 @@ func (typ *Type) UnmarshalBinary(bin []byte) error {
 
 	// fmt.Println("language/country:", u16tos(typ.config.locale.language), u16tos(typ.config.locale.country))
 
+	// Decode the entry index. Every branch produces the dense legacy form:
+	// typ.indices[entry id] holds a byte offset from entriesStart, or NoEntry.
 	buf := bin[typ.headerByteSize:typ.entriesStart]
-	for len(buf) > 0 {
-		typ.indices = append(typ.indices, btou32(buf))
-		buf = buf[4:]
+	switch {
+	case typ.flags&typeFlagSparse != 0:
+		// sorted (entry id, offset/4) u16 pairs; entryCount counts the pairs.
+		if uint64(len(buf)) < uint64(typ.entryCount)*4 {
+			return fmt.Errorf("sparse index too short for entryCount[%v]", typ.entryCount)
+		}
+		if typ.entryCount > 0 {
+			var maxID uint32
+			for i := uint32(0); i < typ.entryCount; i++ {
+				if id := uint32(btou16(buf[i*4:])); id > maxID {
+					maxID = id
+				}
+			}
+			typ.indices = make([]uint32, maxID+1)
+			for i := range typ.indices {
+				typ.indices[i] = NoEntry
+			}
+			for i := uint32(0); i < typ.entryCount; i++ {
+				id := uint32(btou16(buf[i*4:]))
+				typ.indices[id] = uint32(btou16(buf[i*4+2:])) * 4
+			}
+		}
+	case typ.flags&typeFlagOffset16 != 0:
+		// u16 offsets in units of 4 bytes, 0xFFFF for no entry.
+		if uint64(len(buf)) < uint64(typ.entryCount)*2 {
+			return fmt.Errorf("offset16 index too short for entryCount[%v]", typ.entryCount)
+		}
+		for i := uint32(0); i < typ.entryCount; i++ {
+			x := btou16(buf[i*2:])
+			if x == 0xFFFF {
+				typ.indices = append(typ.indices, NoEntry)
+			} else {
+				typ.indices = append(typ.indices, uint32(x)*4)
+			}
+		}
+	default:
+		for len(buf) > 0 {
+			typ.indices = append(typ.indices, btou32(buf))
+			buf = buf[4:]
+		}
+		if len(typ.indices) != int(typ.entryCount) {
+			return fmt.Errorf("indices len[%v] doesn't match entryCount[%v]", len(typ.indices), typ.entryCount)
+		}
 	}
 
-	if len(typ.indices) != int(typ.entryCount) {
-		return fmt.Errorf("indices len[%v] doesn't match entryCount[%v]", len(typ.indices), typ.entryCount)
-	}
-	typ.entries = make([]*Entry, typ.entryCount)
+	typ.entries = make([]*Entry, len(typ.indices))
 
 	for i, x := range typ.indices {
 		if x == NoEntry {
@@ -565,6 +632,10 @@ func (typ *Type) UnmarshalBinary(bin []byte) error {
 		}
 		typ.entries[i] = nt
 	}
+
+	// normalized to the dense legacy representation MarshalBinary emits.
+	typ.flags = 0
+	typ.entryCount = uint32(len(typ.entries))
 
 	return nil
 }
@@ -625,6 +696,10 @@ func (typ *Type) MarshalBinary() ([]byte, error) {
 	return bin, nil
 }
 
+// entryFlagCompact marks a ResTable_entry encoded as {u16 key; u16 flags;
+// u32 data} with the data type in the flags high byte (aapt2 since API 35).
+const entryFlagCompact = 0x0008
+
 // Entry is a resource key typically followed by a value or resource map.
 type Entry struct {
 	size  uint16
@@ -642,6 +717,22 @@ type Entry struct {
 func (nt *Entry) UnmarshalBinary(bin []byte) error {
 	nt.size = btou16(bin)
 	nt.flags = btou16(bin[2:])
+
+	if nt.flags&entryFlagCompact != 0 {
+		// compact simple entry: {u16 key; u16 flags; u32 data} with the data
+		// type in the flags high byte. Normalize to the classic 8-byte simple
+		// entry representation that MarshalBinary emits.
+		nt.key = PoolRef(btou16(bin))
+		nt.values = append(nt.values, &Value{0, &Data{
+			ByteSize: 8,
+			Type:     DataType(nt.flags >> 8),
+			Value:    btou32(bin[4:]),
+		}})
+		nt.size = 8
+		nt.flags &= 0x00ff &^ entryFlagCompact
+		return nil
+	}
+
 	nt.key = PoolRef(btou32(bin[4:]))
 
 	if nt.size == 16 {
