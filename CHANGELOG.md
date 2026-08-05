@@ -65,16 +65,21 @@ the trendvidia fork (github.com/trendvidia/fyne).
 * **A malformed system locale entry no longer degrades the whole locale**
   ([#271](https://github.com/belluikit/bellui/issues/271)). On Android a
   failed locale lookup came back from go-locale as a list holding one empty
-  string, which failed BCP-47 parsing and silently dropped translations,
-  CLDR formatting and collation to the fallback. Locale strings are now
-  normalized before parsing (Java `Locale.toString()` underscores and
-  trailing `#...` markers), unparseable entries are logged with the raw
-  string quoted and skipped — so the parseable entries behind them still
-  win — a failed lookup no longer has its result parsed at all, and the
-  CLDR formatting tag comes from the first entry that parsed rather than
-  blindly the first entry reported. The underlying Android lookup failure
-  (`no current JVM` — the locale resolves during library init, before
-  JNI_OnLoad) is tracked as
+  string, which failed BCP-47 parsing at every start: the region-carrying
+  tag behind CLDR date/number formatting, collation and text direction was
+  left at the matcher's language-only value, `SystemLocale()` reported the
+  undetermined locale `und`, and the log named no locale at all. Locale
+  strings are now normalized before parsing — Java `Locale.toString()`
+  underscores, and the trailing `#...` marker whose script is folded back
+  into the tag (`zh_CN_#Hans` → `zh-Hans-CN`) rather than dropped. An entry
+  that is still not well-formed is logged with the raw string quoted and
+  keeps whatever part of the tag parsed, so it cannot pass the locale to the
+  entry behind it; only an entry carrying nothing at all is dropped. A
+  failed lookup no longer has its result parsed, and the formatting tag
+  comes from the first entry that parsed rather than blindly the first entry
+  reported. The underlying Android lookup failure (`no current JVM` — the
+  locale resolves during library init, before JNI_OnLoad), which still
+  settles the locale on the fallback there, is tracked as
   [#282](https://github.com/belluikit/bellui/issues/282).
 
 * **wasm: the browser picker overrides no longer fire under the test driver**
