@@ -150,6 +150,22 @@ the trendvidia fork (github.com/trendvidia/fyne).
   change (ColorOS 16) keep recreating the activity and pick the new locale up
   on the foregrounding re-cross, as before.
 
+* **Android: the in-place language change reaches ColorOS 16 devices too**
+  ([#299](https://github.com/belluikit/bellui/issues/299)). ColorOS 16
+  (OPPO/realme/OnePlus) adds `CONFIG_SCREEN_LAYOUT` to every per-app locale
+  change mask, so the #288 in-place path never engaged there — each per-app
+  language change relaunched the activity. The packaged manifest now declares
+  `screenLayout` as well, which defeats the vendor hook; measured on an
+  OPD2403, changes carrying the still-undeclared screen-size bits
+  (fold/unfold, split-screen divider resizes) keep recreating exactly as
+  before, while screen-layout-only transitions (ColorOS split-screen entry)
+  now resize in place. Declaring the flag also fixed the `bellui package`
+  resource table: the table-stripping generator blanked any attribute-flag
+  name whose key-pool slot it shared with a dropped private entry —
+  `screenLayout` was the casualty — making the name a hard manifest-compile
+  error; every `configChanges` flag of the pinned SDK platform is now
+  declarable and locked by tests.
+
 * **Android: in-process activity recreation no longer hangs the app (ANR)**
   ([#283](https://github.com/belluikit/bellui/issues/283)). A configuration
   change the manifest does not declare — an Android 13+ per-app language
