@@ -964,7 +964,26 @@ func (w *window) waitForDoubleTapEnded(co core.CanvasObject, ev *event.PointEven
 }
 
 func (w *window) processMouseScrolled(xoff float64, yoff float64) {
-	mousePos := w.mousePos
+	if math.Abs(xoff) >= scrollAccelerateCutoff {
+		xoff *= scrollAccelerateRate
+	}
+	if math.Abs(yoff) >= scrollAccelerateCutoff {
+		yoff *= scrollAccelerateRate
+	}
+
+	delta := geo.NewDelta(float32(xoff)*scrollSpeed, float32(yoff)*scrollSpeed)
+	w.dispatchScroll(w.mousePos, delta, event.ScrollSourceMouseWheel)
+}
+
+// dispatchScroll delivers a scroll of delta to the scrollables under pos,
+// deepest to shallowest: a scrollable that implements ScrollConsumer and
+// reports the event not consumed (at boundary, or content fits) passes it to
+// the next parent scrollable. The wheel path arrives here with its
+// acceleration and speed scaling already applied; the touch scroll path (#291)
+// passes finger deltas 1:1. Reports whether any scrollable consumed the
+// scroll, so touch momentum can stop dead at a boundary instead of decaying
+// against it.
+func (w *window) dispatchScroll(pos geo.Position, delta geo.Delta, source event.ScrollSource) bool {
 	isScrollable := func(object core.CanvasObject) bool {
 		_, ok := object.(event.Scrollable)
 		return ok
@@ -973,56 +992,47 @@ func (w *window) processMouseScrolled(xoff float64, yoff float64) {
 	overlay := w.canvas.Overlays().Top()
 	var scrollables []driver.ObjectAtPosition
 	if overlay != nil {
-		scrollables = driver.FindAllObjectsAtPositionMatching(mousePos, isScrollable, overlay)
+		scrollables = driver.FindAllObjectsAtPositionMatching(pos, isScrollable, overlay)
 		// If no scrollable found in overlay, fall through to content beneath.
 		if len(scrollables) == 0 {
 			if idx := w.canvas.SpatialIndex(); idx != nil && !w.canvas.IsDirty() {
-				scrollables = idx.FindAllObjectsAtPositionMatching(mousePos, isScrollable)
+				scrollables = idx.FindAllObjectsAtPositionMatching(pos, isScrollable)
 			} else {
-				scrollables = driver.FindAllObjectsAtPositionMatching(mousePos, isScrollable,
+				scrollables = driver.FindAllObjectsAtPositionMatching(pos, isScrollable,
 					nil, w.canvas.menu, w.canvas.Content())
 			}
 		}
 	} else if idx := w.canvas.SpatialIndex(); idx != nil && !w.canvas.IsDirty() {
-		scrollables = idx.FindAllObjectsAtPositionMatching(mousePos, isScrollable)
+		scrollables = idx.FindAllObjectsAtPositionMatching(pos, isScrollable)
 	} else {
-		scrollables = driver.FindAllObjectsAtPositionMatching(mousePos, isScrollable,
+		scrollables = driver.FindAllObjectsAtPositionMatching(pos, isScrollable,
 			nil, w.canvas.menu, w.canvas.Content())
 	}
 
 	if len(scrollables) == 0 {
-		return
-	}
-
-	if math.Abs(xoff) >= scrollAccelerateCutoff {
-		xoff *= scrollAccelerateRate
-	}
-	if math.Abs(yoff) >= scrollAccelerateCutoff {
-		yoff *= scrollAccelerateRate
+		return false
 	}
 
 	ev := &event.ScrollEvent{}
-	ev.Scrolled = geo.NewDelta(float32(xoff)*scrollSpeed, float32(yoff)*scrollSpeed)
-	ev.AbsolutePosition = mousePos
-	ev.Source = event.ScrollSourceMouseWheel
+	ev.Scrolled = delta
+	ev.AbsolutePosition = pos
+	ev.Source = source
 
-	// Try each scrollable from deepest to shallowest. If a scrollable implements
-	// ScrollConsumer and reports the event was not consumed (at boundary or content
-	// fits), propagate to the next parent scrollable.
 	for _, oap := range scrollables {
 		ev.Position = oap.Position
 		if consumer, ok := oap.Object.(driver.ScrollConsumer); ok {
 			if consumer.TryScrolled(ev) {
-				return
+				return true
 			}
 			continue
 		}
 		// Fallback: plain Scrollable without propagation support, always consumes.
 		if wid, ok := oap.Object.(event.Scrollable); ok {
 			wid.Scrolled(ev)
-			return
+			return true
 		}
 	}
+	return false
 }
 
 func (w *window) capturesTab(modifier event.KeyModifier) bool {

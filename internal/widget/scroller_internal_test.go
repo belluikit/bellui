@@ -156,6 +156,23 @@ func TestScrollContainer_OnScrolled(t *testing.T) {
 	assert.False(t, scrolled) // don't repeat for no-change
 }
 
+func TestScrollContainer_TouchScrollSkipsAxisRedirect(t *testing.T) {
+	rect := canvas.NewRectangle(color.Black)
+	rect.SetMinSize(geo.NewSize(1000, 50))
+	scroll := NewScroll(rect)
+	scroll.Resize(geo.NewSize(100, 100))
+
+	// A pointer scroll redirects vertical input to horizontal-only content.
+	scroll.Scrolled(&event.ScrollEvent{Scrolled: geo.NewDelta(0, -30), Source: event.ScrollSourceMouseWheel})
+	assert.Equal(t, float32(30), scroll.Offset.X)
+
+	// A direct-touch scroll (#291) never redirects: the content tracks the
+	// finger, and a vertical drag over horizontal-only content moves nothing.
+	prev := scroll.Offset
+	scroll.Scrolled(&event.ScrollEvent{Scrolled: geo.NewDelta(0, -30), Source: event.ScrollSourceTouch})
+	assert.Equal(t, prev, scroll.Offset)
+}
+
 func TestScrollContainer_AddScrollListener(t *testing.T) {
 	rect := canvas.NewRectangle(color.Black)
 	rect.SetMinSize(geo.NewSize(1000, 1000))

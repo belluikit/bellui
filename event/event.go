@@ -66,7 +66,13 @@ const (
 	// ScrollSourceTouchpad indicates scrolling from a touchpad gesture.
 	ScrollSourceTouchpad
 
-	// ScrollSourceTouch indicates scrolling from a direct touch gesture.
+	// ScrollSourceTouch indicates scrolling from a direct touch gesture — a
+	// finger dragging the content itself. Unlike the pointer sources it is
+	// direct manipulation, so the delta is direction-absolute: a scroller
+	// applies it raw, without the pointer conventions (right-to-left flip,
+	// vertical-to-horizontal axis redirect) that a wheel or touchpad delta
+	// goes through. Synthesized scrolls that mean "advance a page" rather
+	// than "the content follows this finger" want a pointer source instead.
 	ScrollSourceTouch
 )
 
