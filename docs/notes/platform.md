@@ -70,16 +70,36 @@ was **wrong**, disproven by goroutine dumps.
   a no-op while the locale is unchanged. Verified 2026-08-05 on the pixel143
   AVD (stock android-34): deviceinfoprobe prints one `trigger=localechange`
   line with the new `current=` and recreateprobe shows zero lifecycle lines
-  through the change. **ColorOS 16 (OPD2403) still relaunches**: its
-  `ActivityRecordExtImpl.hookShouldRelaunchLocked` computes
+  through the change. **ColorOS 16 needs `screenLayout` declared too
+  (#299)**: its `ActivityRecordExtImpl.hookShouldRelaunchLocked` computes
   `adjustedChanges={CONFIG_LOCALE, CONFIG_SCREEN_LAYOUT,
   CONFIG_LAYOUT_DIRECTION}` — the vendor hook adds CONFIG_SCREEN_LAYOUT
-  (stock masks the layout-direction bits *out* of the screenLayout diff),
-  which the manifest does not declare — so the per-app change degrades to the
-  pre-#288 covered-indirectly path there: an in-process recreation
-  (survivable, #286) whose StageFocused re-cross picks the locale up.
-  Whether declaring `screenLayout` would defeat the hook, and what declaring
-  it means for fold/unfold and multi-window resource handling, is #299.
+  (stock masks the layout-direction bits *out* of the screenLayout diff) —
+  so with only `locale|layoutDirection` declared, OPPO/realme/OnePlus
+  devices relaunched on every per-app language change. The packaging
+  template now declares `screenLayout` as well, which defeats the hook: the
+  A/B on the OPD2403 (2026-08-05) shows the same change arriving as one
+  in-place `trigger=localechange` with zero lifecycle lines. Do not read the
+  hook's `state: true` logcat line as a relaunch — it prints *before* the
+  manifest check (it appears identically on a declared-mask change that then
+  proceeds in place). Cost of declaring it, measured on the same device:
+  masks carrying the undeclared size bits (`wm size` crossings, split-screen
+  divider drags — `{CONFIG_SCREEN_LAYOUT, CONFIG_SMALLEST_SCREEN_SIZE}`;
+  fold/unfold is this class) keep recreating exactly as before, while
+  screen-layout-only masks (ColorOS split-screen *entry* `{CONFIG_ORIENTATION,
+  CONFIG_SCREEN_LAYOUT}`, an `am task resize` bucket crossing
+  `{CONFIG_SCREEN_LAYOUT}`) now arrive in place — and bellui handles them:
+  the size event relayouts, deviceinfoprobe reports the new `sizePt` for the
+  resized pane, ticks never stop. Stock is unaffected (its locale mask never
+  carried screenLayout; re-verified on pixel143 with the new manifest).
+  Declaring `screenLayout` needed a binres strip fix: `PackResources`' old
+  per-entry collision scan overwrote its own verdict (its `break` left only
+  the innermost loop), so `id/screenLayout` — whose key-pool slot is shared
+  with the dropped `^attr-private/screenLayout` — was blanked out of the
+  embedded table and the flag name was unresolvable (the #287 hard error).
+  The strip now blanks exactly the keys no surviving kept-spec entry
+  references; `TestConfigChangesFlagNamesSurviveStrip` locks every
+  configChanges flag name resolvable in the packed table.
 - **Probes**: `hack/recreateprobe` (lifecycle lines + `alive=`/`tick=`
   heartbeats — at a wedge, `alive=` keeps counting while `tick=` stops);
   verified on pixel143 (goldfish) and OPD2403 (ColorOS 16, which recreates

@@ -235,6 +235,10 @@ func TestEncodeConfigChanges(t *testing.T) {
 		{"layoutDirection", 0x2000},
 		{"density", 0x1000},
 		{"orientation|keyboardHidden|uiMode|locale|layoutDirection", 0x22a4},
+		// screenLayout shares its key-pool slot with the dropped
+		// ^attr-private/screenLayout, which the pre-#299 strip blanked.
+		{"screenLayout", 0x0100},
+		{"orientation|keyboardHidden|uiMode|locale|layoutDirection|screenLayout", 0x23a4},
 	}
 	for _, tt := range tests {
 		t.Run(tt.flags, func(t *testing.T) {
@@ -252,6 +256,37 @@ func TestEncodeConfigChangesUnknownFlag(t *testing.T) {
 	r.Error(err)
 	r.Contains(err.Error(), "notAConfigChange")
 	r.Contains(err.Error(), "configChanges")
+}
+
+// TestConfigChangesFlagNamesSurviveStrip walks every flag value the embedded
+// table records for configChanges and requires each to resolve to a non-empty
+// name. PackResources blanks key-pool strings the kept specs no longer
+// reference, and a key slot is shared whenever the same name recurs across
+// specs — the pre-#299 strip blanked id/screenLayout through the dropped
+// ^attr-private/screenLayout that shared its slot, making the flag
+// undeclarable. A blank here means a regenerated table has re-broken a flag.
+func TestConfigChangesFlagNamesSurviveStrip(t *testing.T) {
+	r := require.New(t)
+	tbl, err := OpenTable()
+	r.NoError(err)
+	ref, err := tbl.RefByName("attr/configChanges")
+	r.NoError(err)
+	nt, err := ref.Resolve(tbl)
+	r.NoError(err)
+	seen := 0
+	for _, val := range nt.values {
+		if val.name == 0x01000000 { // the leading non-ref marker, not a flag
+			continue
+		}
+		nr, err := val.name.Resolve(tbl)
+		r.NoError(err)
+		name := nr.key.Resolve(tbl.pkgs[0].keyPool)
+		r.NotEmptyf(name, "flag value 0x%04x has a blank name in the packed table", val.data.Value)
+		seen++
+	}
+	// android-35 defines 18 configChanges flags (mcc through fontScale); a
+	// future platform may add more but can hardly drop below that.
+	r.GreaterOrEqual(seen, 18)
 }
 
 func TestRawValueByName(t *testing.T) {
