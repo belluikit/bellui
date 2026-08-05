@@ -390,6 +390,13 @@ func updateLocalizer() {
 		// just log a second, misleading error (#271).
 		all = nil
 	}
+	applyUserLocales(all)
+}
+
+// applyUserLocales seats the localizer and the formatting tag from the locale
+// list the OS reported. Split out of updateLocalizer so that tests can drive
+// the list rather than the machine's own locale (#271).
+func applyUserLocales(all []string) {
 	tags := parseUserLocales(all)
 	if len(tags) == 0 {
 		// GetLocales reports an empty list without an error in a C/POSIX
@@ -398,7 +405,7 @@ func updateLocalizer() {
 		// tags[0] below valid.
 		tags = []language.Tag{language.English}
 	}
-	setupLang(closestSupportedTag(tags).LanguageString())
+	setupLang(closestSupportedLocaleForTags(tags).LanguageString())
 	// Override currentTag with the full system locale (including region) so
 	// that formatting functions can use the region for CLDR lookups — the
 	// first entry that parsed, not blindly the first entry reported: a

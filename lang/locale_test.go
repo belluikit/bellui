@@ -17,26 +17,56 @@ func TestParseUserLocales(t *testing.T) {
 		return out
 	}
 
-	assert.Equal(t, []string{"en-US"},
-		toStrings(parseUserLocales([]string{"en-US"})))
+	// Well-formed entries pass through untouched; surrounding whitespace is
+	// trimmed rather than costing the entry.
+	assert.Equal(t, []string{"en-US", "en-GB"},
+		toStrings(parseUserLocales([]string{"en-US", "  en-GB  "})))
 
 	// Java Locale.toString() forms normalize: underscores, and the trailing
-	// "#..." script/extension marker (#271).
-	assert.Equal(t, []string{"en-US", "zh-CN", "de-DE"},
-		toStrings(parseUserLocales([]string{"en_US", "zh_CN_#Hans", "de_DE_#u-co-phonebk"})))
+	// "#..." marker — whose script is folded back into the tag while its
+	// Unicode extension is dropped (#271).
+	assert.Equal(t, []string{"en-US", "zh-Hans-CN", "sr-Latn-RS", "de-DE"},
+		toStrings(parseUserLocales([]string{"en_US", "zh_CN_#Hans", "sr_RS_#Latn", "de_DE_#u-co-phonebk"})))
 
-	// Unparseable entries are dropped rather than passed to the matcher as
-	// und tags — the entries behind them must keep winning. ColorOS has
-	// delivered a list holding an empty string (#271).
+	// An entry that is not well-formed still contributes whatever part of the
+	// tag parsed — it must not pass the locale to the entry behind it.
+	assert.Equal(t, []string{"th-TH", "nb-NO"},
+		toStrings(parseUserLocales([]string{"th_TH_TH_#u-nu-thai", "nb-NO"})))
+
+	// Entries carrying nothing at all are dropped rather than passed on as
+	// und tags — an und currentTag aliases the "not yet initialised" zero
+	// Tag. A failed Android lookup arrives as a list holding one empty
+	// string (#271).
 	assert.Equal(t, []string{"nb-NO"},
 		toStrings(parseUserLocales([]string{"", "nb-NO"})))
 
-	assert.Empty(t, parseUserLocales([]string{"", "utter junk!!"}))
+	assert.Empty(t, parseUserLocales([]string{"", "   ", "utter junk!!", "und", "root"}))
+	assert.Empty(t, parseUserLocales(nil))
+}
+
+func TestApplyUserLocales_MalformedLeadingEntry(t *testing.T) {
+	SetLocaleForTests(t, "en") // restores the localizer and tag on cleanup
+
+	// The region-carrying tag that drives CLDR formatting, collation and
+	// direction comes from the first entry that parsed. Before #271 a
+	// malformed leading entry skipped the override entirely, silently
+	// degrading it to the matcher's language-only tag.
+	applyUserLocales([]string{"", "fr-FR"})
+	assert.Equal(t, "fr-FR", getCurrentTag().String())
+	assert.Equal(t, "fr-FR", CurrentLocale().String())
+
+	// Nothing parseable at all degrades to English, like the C/POSIX empty
+	// list (#1148) — not to an und tag.
+	applyUserLocales([]string{""})
+	assert.Equal(t, "en", getCurrentTag().String())
 }
 
 func TestClosestSupportedLocale_SkipsMalformedEntries(t *testing.T) {
 	// A malformed leading entry must not cost the locale the parseable
-	// entries behind it (#271).
+	// entries behind it (#271). This pins the contract rather than guarding a
+	// regression: language.NewMatcher already skipped und candidates, so the
+	// translation lookup survived a bad entry even before #271 — it was
+	// currentTag that degraded (see TestApplyUserLocales_MalformedLeadingEntry).
 	assert.Equal(t, "fr", closestSupportedLocale([]string{"", "fr-FR"}).LanguageString())
 
 	// Nothing parseable at all degrades to the matcher default rather than
