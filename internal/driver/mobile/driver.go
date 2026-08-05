@@ -654,14 +654,14 @@ func (d *driver) handlePaint(e paint.Event, w *window) {
 	if e.Window != 0 { // not all paint events come from hardware
 		// A changed native-window handle after init means the OS recreated the
 		// window (e.g. Android delivers a fresh ANativeWindow when the app returns
-		// from the background). Rebuild the surface or the painter presents to the
-		// destroyed one — a black canvas and a main-thread stall/ANR (#310).
+		// from the background). The surface must be rebuilt or the painter presents
+		// to the destroyed one — a black canvas and a main-thread stall/ANR (#310);
+		// note it and let the liveness gate below pick the moment.
 		d.nativeWindow = e.Window // the shared Android ANativeWindow
-		recreated := c.initialized && e.Window != w.handle
-		w.handle = e.Window
-		if recreated {
-			d.recreateSurface(c, w)
+		if c.initialized && e.Window != w.handle {
+			w.surfaceStale = true
 		}
+		w.handle = e.Window
 	} else if w.handle == 0 {
 		// A window opened over another (a child in the stack) becomes current
 		// without ever receiving a hardware paint event — only handle-less
@@ -671,7 +671,22 @@ func (d *driver) handlePaint(e paint.Event, w *window) {
 		w.handle = d.nativeWindow
 	}
 	d.painting = false
-	if !d.renderReady(w) || e.External {
+	if !d.renderReady(w) {
+		return
+	}
+	if w.surfaceStale {
+		// Rebuild here rather than the moment the handle changed: renderReady is
+		// the native-window liveness gate on Android (#283), and building a wgpu
+		// surface on a destroyed ANativeWindow wedges the same GetCapabilities
+		// call that presenting into one does. Paint events are queued, so a fresh
+		// handle can be drained after the window it names has died — hold the
+		// rebuild until a paint the window is alive for. Still ahead of the
+		// External return so a resume rebuilds on the handle-carrying event
+		// rather than waiting for the next draw tick (#312).
+		w.surfaceStale = false
+		d.recreateSurface(c, w)
+	}
+	if e.External {
 		return
 	}
 	// Hand the shared Android native surface to the window about to paint,
