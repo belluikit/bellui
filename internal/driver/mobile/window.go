@@ -24,6 +24,12 @@ type window struct {
 	icon   bellui.Resource
 	menu   *bellui.MainMenu
 	handle uintptr // the window handle - currently just Android
+
+	// surfaceStale marks that handle changed under an initialized canvas, so the
+	// painter's native surface must be rebuilt before the next paint. Deferred
+	// rather than rebuilt on the spot because the replacement window may already
+	// be dead by the time the queued paint event carrying it is drained (#283).
+	surfaceStale bool
 }
 
 func (w *window) Title() string {

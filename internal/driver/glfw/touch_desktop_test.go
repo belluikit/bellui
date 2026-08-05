@@ -19,7 +19,7 @@ import (
 	"github.com/belluikit/glfw"
 )
 
-// longPressableObject records the full gesture vocabulary a touchscreen can
+// touchLongPressableObject records the full gesture vocabulary a touchscreen can
 // reach, so the tests can tell hold-fire long-press, tap and secondary tap
 // apart (#266/#758).
 //
@@ -29,23 +29,23 @@ import (
 // dispatch inline on the hold timer's goroutine instead of hopping onto the
 // glfw main thread as the real driver does. So the long-press count is written
 // off-main and must be guarded, or the assertions race it.
-type longPressableObject struct {
+type touchLongPressableObject struct {
 	*canvas.Rectangle
 	tappable
 	longPressLock   sync.Mutex
 	longPressEvents []any
 }
 
-var _ event.LongPressable = (*longPressableObject)(nil)
+var _ event.LongPressable = (*touchLongPressableObject)(nil)
 
-func (l *longPressableObject) LongPressed(e *event.PointEvent) {
+func (l *touchLongPressableObject) LongPressed(e *event.PointEvent) {
 	l.longPressLock.Lock()
 	defer l.longPressLock.Unlock()
 	l.longPressEvents = append(l.longPressEvents, e)
 }
 
 // longPresses is the guarded read of the events LongPressed records.
-func (l *longPressableObject) longPresses() []any {
+func (l *touchLongPressableObject) longPresses() []any {
 	l.longPressLock.Lock()
 	defer l.longPressLock.Unlock()
 	return append([]any(nil), l.longPressEvents...)
@@ -75,7 +75,7 @@ func TestWindow_TouchLongPress_HoldFire(t *testing.T) {
 	w := createWindow("Test")
 	prop := canvas.NewRectangle(color.White)
 	prop.SetMinSize(geo.NewSize(100, 100))
-	o := &longPressableObject{Rectangle: canvas.NewRectangle(color.White)}
+	o := &touchLongPressableObject{Rectangle: canvas.NewRectangle(color.White)}
 	w.SetContent(container.NewStack(prop, o))
 	repaintWindow(w)
 
@@ -101,7 +101,7 @@ func TestWindow_TouchLongPress_SlopCancel(t *testing.T) {
 	w := createWindow("Test")
 	prop := canvas.NewRectangle(color.White)
 	prop.SetMinSize(geo.NewSize(100, 100))
-	o := &longPressableObject{Rectangle: canvas.NewRectangle(color.White)}
+	o := &touchLongPressableObject{Rectangle: canvas.NewRectangle(color.White)}
 	w.SetContent(container.NewStack(prop, o))
 	repaintWindow(w)
 
