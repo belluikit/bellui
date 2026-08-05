@@ -18,10 +18,11 @@
 // (#287): it now arrives as an in-place onConfigurationChanged, so on a
 // current build that command must produce NO lifecycle lines at all (the #288
 // half of the check; deviceinfoprobe shows the locale was still picked up).
-// Exception: ColorOS 16 (OPD2403) relaunches anyway — its
+// That includes ColorOS 16 (OPD2403) since #299: its
 // ActivityRecordExtImpl.hookShouldRelaunchLocked adds CONFIG_SCREEN_LAYOUT to
-// the change mask, which the manifest does not declare — so on that device
-// expect the recreation lines and the locale pickup on the re-cross.
+// the change mask, so the manifest now declares screenLayout too — the hook's
+// "state: true" logcat line still prints (it fires before the manifest check)
+// but no relaunch follows.
 // To force a recreation use a config change the manifest does not declare: a
 // font-scale change recreates promptly and reliably; `wm density` proved
 // unreliable on the goldfish AVD (2026-08-05: sometimes no relaunch at all,

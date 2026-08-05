@@ -317,15 +317,18 @@ func (d *driver) Run() {
 					// An in-place configuration change (Android delivers
 					// manifest-declared changes as onConfigurationChanged —
 					// orientation|keyboardHidden|uiMode|locale|layoutDirection
-					// since #287). Re-resolve the system locale so an Android
-					// 13+ per-app language change applies with no lifecycle
-					// crossing for the StageFocused seam to catch (#288).
+					// since #287, plus screenLayout since #299). Re-resolve
+					// the system locale so an Android 13+ per-app language
+					// change applies with no lifecycle crossing for the
+					// StageFocused seam to catch (#288).
 					// Override-guarded, and an unchanged locale skips the
 					// relayout, so the changes that are not locale changes
-					// (rotation above all) cost only the GetLocales lookup —
-					// which go-locale runs on its own attached JNI thread, so
-					// it cannot deadlock against the Java main thread waiting
-					// in the redraw handshake behind this event.
+					// (rotation above all, and since #299 the multi-window
+					// screen-layout transitions) cost only the GetLocales
+					// lookup — which go-locale runs on its own attached JNI
+					// thread, so it cannot deadlock against the Java main
+					// thread waiting in the redraw handshake behind this
+					// event.
 					resolveSystemLocale()
 				case size.Event:
 					if e.WidthPx <= 0 {
