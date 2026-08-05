@@ -1,0 +1,5 @@
+{
+  "owner": "trendvidia",
+  "project": "2",
+  "strip_env": ["GH_TOKEN", "GITHUB_TOKEN", "CGO_ENABLED"]
+}

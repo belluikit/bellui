@@ -150,13 +150,18 @@ var noNativeFileDialogs atomic.Bool
 
 // UseNativeFileDialogs enables (or disables) the platform-native file dialog
 // backends for FileOpen, FileSave and FolderOpen: NSOpenPanel/NSSavePanel on
-// macOS, IFileOpenDialog/IFileSaveDialog on Windows and the
-// org.freedesktop.portal.FileChooser portal on Linux/BSD.
+// macOS, IFileOpenDialog/IFileSaveDialog on Windows, the
+// org.freedesktop.portal.FileChooser portal on Linux/BSD, and the system
+// document pickers on iOS and Android (#267).
 //
 // They are used by default: a file picker is where users expect their own
 // sidebar, favourites, search and network mounts, and on Linux the portal is
 // the only backend that works inside Flatpak/Snap. Pass false to force the
-// canvas-drawn dialog everywhere instead.
+// canvas-drawn dialog everywhere instead. On iOS and Android that choice
+// carries a real cost: the platform picker is the only surface that reaches
+// outside the app sandbox on modern mobile systems, so the canvas dialog
+// browses app-scoped storage only — an app opting out for
+// desktop-consistency reasons should gate the call on the platform.
 //
 // When the native backend cannot serve a request the canvas-drawn dialog is
 // used, so an app never loses the feature. That covers no portal on the bus,
@@ -164,7 +169,11 @@ var noNativeFileDialogs atomic.Bool
 // The SetShowHidden toggle is canvas-dialog-only; the native surfaces cannot
 // express it.
 //
-// Flatpak builds always use the portal regardless of this setting.
+// Two exceptions ignore this setting: Flatpak builds always use the portal
+// (the only dialog that can see outside the sandbox), and on wasm both
+// overrides stay the browser's own — the <input type="file"> picker for open
+// and the download offered at writer close for save — because a canvas dialog
+// has no real filesystem to browse there.
 //
 // Since: 1.0. The native backends were opt-in when introduced; the default
 // changed to enabled before the first stable release (#226).
