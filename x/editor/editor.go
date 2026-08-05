@@ -795,6 +795,11 @@ func (e *Editor) applyGutter() {
 
 	e.entry.SuppressGutter = true
 	e.gutterW = newGutterWidget(e.Gutter)
+	// Seed the fresh widget with the editor's last known scroll offset: a
+	// re-apply (#281) can rebuild it while the document is scrolled, and
+	// OnScrolled only fires on a move, so a gutter left at 0 would draw its
+	// rows — and hit-test taps — a viewport off until the next scroll.
+	e.gutterW.scrollY = e.scrollY
 	e.gutterW.getLineCount = e.lineCount
 	e.gutterW.getRowPositions = func() ([]float32, []float32) {
 		return e.entry.RowPositions()
@@ -827,6 +832,9 @@ func (e *Editor) applyDecorators() {
 	}
 
 	e.decOverlay = newDecoratorOverlay(e.Decorators, spanDecs)
+	// Same as the gutter above: a re-applied overlay inherits the current
+	// scroll offset so its row decorations stay on their rows.
+	e.decOverlay.scrollY = e.scrollY
 	e.decOverlay.getLineCount = e.lineCount
 	e.decOverlay.getRowPositions = func() ([]float32, []float32) {
 		return e.entry.RowPositions()
@@ -882,7 +890,9 @@ func (e *Editor) rebuildHbox() {
 	}
 }
 
-// RefreshGutter triggers a repaint of the gutter.
+// RefreshGutter triggers a repaint of the installed gutter. It does not
+// re-read the Gutter field — assigning a new provider (or nil) needs
+// [Editor.ApplyGutter].
 func (e *Editor) RefreshGutter() {
 	if e.gutterW != nil {
 		e.gutterW.Refresh()
@@ -896,6 +906,11 @@ func (e *Editor) RefreshGutter() {
 // Gutter before showing never need it. It is the re-apply counterpart to
 // [Editor.RefreshGutter], which repaints the installed gutter without
 // re-reading the field, and the gutter analogue of [Editor.RefreshHighlighter].
+//
+// Like any refresh of the editor — [Editor.Refresh] and
+// [Editor.RefreshHighlighter] included — it re-anchors the viewport on the
+// caret, so a re-apply while the user has scrolled away from the cursor
+// scrolls the cursor back into view.
 func (e *Editor) ApplyGutter() {
 	e.applyGutter()
 	// Rebuild the entry's highlight/row cache first (SuppressGutter may have
@@ -908,8 +923,10 @@ func (e *Editor) ApplyGutter() {
 
 // RefreshDecorators triggers a repaint of all row and span decorators. Call
 // it after mutating a decorator's state (e.g. a StaticSpanDecorator's spans).
-// Adding the first decorator to a previously bare editor requires a full
-// refresh instead, since the overlay is created lazily.
+// It does not re-read the Decorators/SpanDecorators fields — the overlay holds
+// the slices it was built with, so changing either set (including adding the
+// first decorator to a bare editor) needs [Editor.ApplyDecorators]; a plain
+// Refresh of the editor will not pick it up.
 func (e *Editor) RefreshDecorators() {
 	if e.decOverlay != nil {
 		e.decOverlay.Refresh()
@@ -922,7 +939,9 @@ func (e *Editor) RefreshDecorators() {
 // working). Call it after assigning either slice on an editor that has already
 // rendered; CreateRenderer applies the fields on first show. It is the
 // re-apply counterpart to [Editor.RefreshDecorators], which repaints the
-// installed overlay without re-reading the fields.
+// installed overlay without re-reading the fields. It re-anchors the viewport
+// on the caret, like every other refresh of the editor (see
+// [Editor.ApplyGutter]).
 func (e *Editor) ApplyDecorators() {
 	e.applyDecorators()
 	e.syncExternalWidgets()
