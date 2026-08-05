@@ -108,12 +108,18 @@ type SecondaryTappable interface {
 }
 
 // LongPressable describes a CanvasObject that responds to long-press gestures.
-// On touch devices, this is triggered when the user holds a pointer down
-// without moving it for a duration (typically 300ms).
+// It is triggered when the user holds a pointer down without moving it for a
+// duration (typically 300ms): a held finger on touch devices, and a held
+// primary mouse button on desktop (#266), where the gesture fires while the
+// button is still down and its release delivers no Tapped.
 //
 // Unlike SecondaryTappable (which is triggered by right-click on desktop),
-// LongPressable is specifically for held-touch gestures. A widget can
-// implement both interfaces to handle right-click and long-press differently.
+// LongPressable is the press-and-hold gesture. A widget can implement both
+// interfaces to handle right-click and long-press differently.
+//
+// A widget that may decline the gesture must answer the press some other way
+// rather than ignore it: the drivers have already withheld the Tapped that
+// would have followed.
 type LongPressable interface {
 	LongPressed(*PointEvent)
 }

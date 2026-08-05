@@ -175,6 +175,19 @@ the trendvidia fork (github.com/trendvidia/fyne).
 
 ### Changed
 
+* **A desktop primary press held on a `LongPressable` no longer delivers
+  `Tapped`** ([#266](https://github.com/belluikit/bellui/issues/266)). The
+  press-and-hold dispatch above is a behavior change for existing desktop
+  apps: a click whose button stays down for 300 ms now dispatches
+  `LongPressed` instead of `Tapped` to a widget implementing
+  `event.LongPressable` — in this toolkit `Entry`, `RichEntry`, selectable
+  text and the canvas file dialog's items; every other widget, `Button`
+  included, taps on a slow click exactly as before. A `LongPressable` that
+  declines the gesture must answer the press another way rather than ignore
+  it (the file dialog's items fall back to the plain tap when the dialog is
+  single-select or the item is a directory), because the withheld `Tapped`
+  is not delivered afterwards.
+
 * **Android's Back button now carries the Escape meaning**
   ([#259](https://github.com/belluikit/bellui/issues/259)). The mobile driver
   routes Back through the same dismissal walk as Escape, ahead of key
