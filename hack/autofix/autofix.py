@@ -1,32 +1,52 @@
 #!/usr/bin/env python3
-"""Unattended backlog fixer for the Bellui Backlog GitHub project
-(trendvidia/projects/2 by default; override with PLAN_PROJECT).
+"""Unattended backlog fixer: select actionable open issues, triage/group them
+with one claude call, then run one headless claude fix session per group that
+implements with tests, commits, pushes and opens a PR.
+
+Portable: drop this directory into any repo's tree (anywhere inside the git
+checkout). Two optional files beside this script specialize it per repo:
+  config.json  — {"owner": "...", "project": "N",           # Projects v2 board
+                  "source": "auto|project|issues",
+                  "strip_env": ["VAR", ...]}                 # removed from the
+                 env of every child process (gh + claude sessions), for hosts
+                 where an exported token/toolchain var shadows the working one
+  PROTOCOL.md  — appended verbatim to every fix session's prompt as
+                 repository-specific protocol (tooling, conventions, gates)
+
+Issue sources (--source, default auto = project when one is configured):
+  project — a GitHub Projects v2 board (same source as hack/plan/plan.py).
+            Board fields are honored when present: Status "Done" drops the
+            item, Tranche/Wave "Parked" is skipped, Priority P0-P2 orders
+            work, the "linked pull requests" column marks in-flight items.
+  issues  — plain `gh issue list` for repos without a project board.
+            In-flight work is detected via the issue's linked open PRs
+            (the Development panel / closing references); native blocked-by
+            edges are still honored.
+
+Configuration precedence: CLI flags > env (PLAN_OWNER, PLAN_PROJECT) >
+config.json > built-ins (owner defaults to the target repo's owner).
 
 Pipeline:
-  1. fetch    — project items (same source as hack/plan/plan.py) plus per-issue
-                details (createdAt, labels, body) for the survivors
-  2. filter   — deterministic: this repo only, open, real issues (no epics,
-                no Parked, no linked PRs, no open blockers), then the cutoffs:
-                --before DATE drops issues created after DATE, --max-issue N
-                drops issues numbered above N
-  3. triage   — one claude call marks issues that need a human decision (or
-                cannot be completed autonomously) and groups the rest by
+  1. fetch    — issues from the selected source
+  2. filter   — deterministic: open, non-epic, non-Parked, unblocked, no PR
+                in flight, plus the cutoffs: --before DATE drops issues
+                created after DATE, --max-issue N drops numbers above N
+  3. triage   — one claude call excludes issues that need a human decision
+                (or cannot be completed autonomously) and groups the rest by
                 similarity: one group == one session == one PR
   4. execute  — per group: git worktree off origin/<default branch>, headless
                 `claude -p --dangerously-skip-permissions` implements the fix
-                with unit + functional tests, applies the CLAUDE.md follow-up
-                rule (files discovered work as issues before the PR), commits,
-                pushes and opens the PR; the script then verifies the PR exists
+                with unit + functional tests, files follow-up issues for any
+                discovered work, commits, pushes and opens the PR; the script
+                then verifies the PR exists
 
-Needs: gh (keyring-authenticated with project + repo scopes) and claude on
-PATH. GH_TOKEN/GITHUB_TOKEN are stripped from the environment for every child
-process — an env token shadows the keyring token that carries read:project.
-CGO_ENABLED is stripped too so sessions can cross-compile (wasm legs).
+Needs gh (authenticated with repo — and, for project mode, project — scopes)
+and claude on PATH.
 
 Typical use:
   hack/autofix/autofix.sh --list-only                 # what would be considered
   hack/autofix/autofix.sh --before 2026-08-01 --dry-run
-  hack/autofix/autofix.sh --max-issue 280 --max-groups 2
+  hack/autofix/autofix.sh --source issues --max-groups 2
 """
 import argparse
 import datetime
@@ -37,18 +57,22 @@ import subprocess
 import sys
 import time
 
-PROJECT = os.environ.get("PLAN_PROJECT", "2")
-OWNER = "trendvidia"
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 EPIC_RE = re.compile(r"^\[?Epic[\]:]")
 PRIO = {"P0": 0, "P1": 1, "P2": 2}
 TRIAGE_BODY_LIMIT = 3500   # chars of issue body shown to the triage call
 FIX_BODY_LIMIT = 12000     # chars of issue body inlined into a fix prompt
 
-# Env for every child process: env GH tokens shadow the keyring token that has
-# read:project; the interactive shell exports CGO_ENABLED=1 which breaks
-# cross/wasm builds inside fix sessions.
-ENV = {k: v for k, v in os.environ.items()
-       if k not in ("GH_TOKEN", "GITHUB_TOKEN", "CGO_ENABLED")}
+CFG = {}
+try:
+    with open(os.path.join(SCRIPT_DIR, "config.json")) as f:
+        CFG = json.load(f)
+except FileNotFoundError:
+    pass
+
+ENV = dict(os.environ)
+for k in CFG.get("strip_env", []):
+    ENV.pop(k, None)
 
 
 def note(msg):
@@ -61,8 +85,8 @@ def run(cmd, **kw):
     return subprocess.run(cmd, **kw)
 
 
-def gh(*args):
-    r = run(["gh", *args], capture_output=True)
+def gh(*args, cwd=None):
+    r = run(["gh", *args], capture_output=True, cwd=cwd)
     if r.returncode != 0:
         sys.exit("gh %s failed: %s" % (" ".join(args[:3]), r.stderr.strip()))
     return json.loads(r.stdout) if r.stdout.strip() else None
@@ -74,16 +98,28 @@ def open_blockers(repo, num):
             for b in got if b["state"] == "open"]
 
 
+def linked_open_prs(repo, num):
+    """Open PRs that would close the issue (the Development panel links)."""
+    owner, name = repo.split("/", 1)
+    q = ("query($o:String!,$n:String!,$i:Int!){repository(owner:$o,name:$n){"
+         "issue(number:$i){closedByPullRequestsReferences(first:1,"
+         "includeClosedPrs:false){totalCount}}}}")
+    got = gh("api", "graphql", "-f", "query=" + q, "-F", "o=" + owner,
+             "-F", "n=" + name, "-F", "i=" + str(num))
+    return got["data"]["repository"]["issue"][
+        "closedByPullRequestsReferences"]["totalCount"]
+
+
 # ---------------------------------------------------------------- fetch/filter
 
-def candidates(args):
-    """Deterministically filtered board items, with issue details attached."""
-    items = gh("project", "item-list", PROJECT, "--owner", OWNER,
+def project_candidates(args, skipped):
+    """Board items with details attached, minus deterministic skips."""
+    items = gh("project", "item-list", args.project, "--owner", args.owner,
                "--format", "json", "--limit", "1000")["items"]
     if len(items) >= 1000:
         sys.exit("board has >= 1000 items; raise the --limit in autofix.py")
 
-    skipped, picked = [], []
+    picked = []
     for it in items:
         c = it.get("content") or {}
         if not c.get("number") or c.get("type") != "Issue":
@@ -116,17 +152,65 @@ def candidates(args):
                "number,title,body,createdAt,labels,state")
         if d["state"] != "OPEN":
             continue
-        created = datetime.datetime.strptime(
-            d["createdAt"], "%Y-%m-%dT%H:%M:%SZ").date()
-        if args.before and created > args.before:
-            skipped.append((it["number"], it["title"],
-                            "created %s > --before" % created))
+        if not keep_created(it, d["createdAt"], args, skipped):
             continue
-        it["created"] = str(created)
+        it["labels"] = [lb["name"] for lb in d["labels"]]
+        it["body"] = d["body"] or ""
+        kept.append(it)
+    return kept
+
+
+def issue_candidates(args, skipped):
+    """Open issues straight from `gh issue list` (repos without a board)."""
+    items = gh("issue", "list", "--repo", args.repo, "--state", "open",
+               "--limit", "1000", "--json", "number,title,body,createdAt,labels")
+    if len(items) >= 1000:
+        sys.exit("repo has >= 1000 open issues; raise the --limit in autofix.py")
+    note("issue list: %d open issues" % len(items))
+
+    kept = []
+    for d in items:
+        num, title = d["number"], d["title"]
+        if EPIC_RE.match(title):
+            continue
+        if num in args.exclude:
+            skipped.append((num, title, "--exclude"))
+            continue
+        if args.max_issue and num > args.max_issue:
+            skipped.append((num, title, "number > --max-issue"))
+            continue
+        it = {"repo": args.repo, "number": num, "title": title,
+              "tranche": None, "prio": None, "ws": None}
+        if not keep_created(it, d["createdAt"], args, skipped):
+            continue
         it["labels"] = [lb["name"] for lb in d["labels"]]
         it["body"] = d["body"] or ""
         kept.append(it)
 
+    out = []
+    for it in kept:
+        if linked_open_prs(it["repo"], it["number"]):
+            skipped.append((it["number"], it["title"],
+                            "already has an open PR linked"))
+        else:
+            out.append(it)
+    return out
+
+
+def keep_created(it, created_at, args, skipped):
+    created = datetime.datetime.strptime(created_at, "%Y-%m-%dT%H:%M:%SZ").date()
+    if args.before and created > args.before:
+        skipped.append((it["number"], it["title"],
+                        "created %s > --before" % created))
+        return False
+    it["created"] = str(created)
+    return True
+
+
+def candidates(args):
+    skipped = []
+    kept = (project_candidates if args.source == "project"
+            else issue_candidates)(args, skipped)
     unblocked = []
     for it in kept:
         blockers = open_blockers(it["repo"], it["number"])
@@ -135,7 +219,6 @@ def candidates(args):
                             "blocked by " + ", ".join(blockers)))
         else:
             unblocked.append(it)
-
     unblocked.sort(key=lambda r: (PRIO.get(r["prio"], 3), r["number"]))
     return unblocked, skipped
 
@@ -228,31 +311,24 @@ def triage(cands, args):
 
 FIX_PROMPT = """\
 You are working unattended in a dedicated git worktree of %(repo)s on branch
-%(branch)s, forked from origin/%(base)s. Fix the following backlog issue(s)
-end to end in this one session. The issue body is the work spec; the full
-bodies are inlined below, and `gh issue view N --repo %(repo)s --comments`
-has any later discussion.
+%(branch)s, forked from origin/%(base)s. Fix the following issue(s) end to
+end in this one session. The issue body is the work spec; the full bodies are
+inlined below, and `gh issue view N --repo %(repo)s --comments` has any later
+discussion.
 
 %(issues)s
 
-Protocol — follow CLAUDE.md (loaded from the worktree) plus:
-1. Read the docs/notes/ file for each area before changing it; follow the
-   Fork Conventions.
-2. Add unit tests, and functional/behavioral tests (test.Assert* helpers,
-   markup or image assertions, interaction tests) where possible.
-3. Verify before committing: gofumpt -d -e . and goimports -e -d . are clean
-   on changed files; go vet ./...; scoped `go test -race -tags ci` for the
-   affected packages plus anything that imports them (x/ submodules are
-   separate modules — cd into them). Staticcheck: use
-   `go run honnef.co/go/tools/cmd/staticcheck@2025.1.1 ./...` — the locally
-   installed staticcheck binary is stale.
-4. No silent tech debt (CLAUDE.md follow-up rule): discovered work is either
-   done here or filed NOW with `gh issue create --repo %(repo)s` before the PR
-   opens — never a TODO comment or a "later" note. Put suggested
-   Workstream/Priority/Tranche in the new issue body (the add-to-project
-   workflow picks it up) and cross-link it from the PR body.
-5. Commit with messages referencing the issue number(s), e.g.
-   "widget: fix X (#N)".
+Protocol:
+1. Follow this repository's own conventions and instructions (CLAUDE.md,
+   contributing docs) for style, formatting, build, lint and test commands.
+2. Add unit tests, and functional/behavioral tests where the repository's
+   test harness allows.
+3. Verify before committing: the repository's formatter and linters are clean
+   on the changed code, and the test suites covering it pass.
+4. No silent tech debt: work you discover but do not do here is filed NOW
+   with `gh issue create --repo %(repo)s` before the PR opens — never a TODO
+   comment or a "later" note — and cross-linked from the PR body.
+5. Commit with messages referencing the issue number(s), e.g. "area: fix X (#N)".
 6. Push the branch (`git push -u origin %(branch)s`) and open ONE pull request
    for this group: `gh pr create --repo %(repo)s --base %(base)s`. The PR body
    must contain "Fixes #N" for each completed issue, summarize the change,
@@ -262,7 +338,7 @@ Protocol — follow CLAUDE.md (loaded from the worktree) plus:
    complete the rest, and explain the omission in the PR body. If nothing in
    the group is completable, do not open a PR and make your final line
    "AUTOFIX-ABORT: <reason>".
-
+%(extra)s
 Make the final line of your reply the PR URL alone (or the AUTOFIX-ABORT line).
 """
 
@@ -277,8 +353,16 @@ def fix_prompt(group, args):
             it["repo"], it["number"], it["title"],
             " · ".join(x for x in (it["prio"], it["tranche"], it["ws"]) if x),
             body))
+    extra = ""
+    try:
+        with open(os.path.join(SCRIPT_DIR, "PROTOCOL.md")) as f:
+            extra = ("\nRepository-specific protocol (in addition to the "
+                     "above):\n\n%s\n" % f.read().strip())
+    except FileNotFoundError:
+        pass
     return FIX_PROMPT % {"repo": args.repo, "branch": "autofix/" + group["slug"],
-                         "base": args.base, "issues": "\n\n".join(blocks)}
+                         "base": args.base, "issues": "\n\n".join(blocks),
+                         "extra": extra}
 
 
 def execute(groups, args, root, run_dir):
@@ -337,6 +421,15 @@ def execute(groups, args, root, run_dir):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--source", choices=["auto", "project", "issues"],
+                    default=CFG.get("source", "auto"),
+                    help="issue source (auto: project when one is configured)")
+    ap.add_argument("--owner",
+                    default=os.environ.get("PLAN_OWNER") or CFG.get("owner"),
+                    help="Projects v2 owner (default: env/config, else repo owner)")
+    ap.add_argument("--project",
+                    default=os.environ.get("PLAN_PROJECT") or CFG.get("project"),
+                    metavar="N", help="Projects v2 number (default: env/config)")
     ap.add_argument("--before", type=lambda s: datetime.datetime.strptime(
         s, "%Y-%m-%d").date(), metavar="YYYY-MM-DD",
         help="drop issues created after this date (created on it are kept)")
@@ -355,18 +448,30 @@ def main():
     ap.add_argument("--fix-model", default="claude-fable-5")
     ap.add_argument("--timeout-min", type=int, default=90, metavar="MIN",
                     help="per-session wall clock cap (0 = none, default 90)")
-    ap.add_argument("--work-dir", default=os.path.expanduser("~/.bellui-autofix"),
+    ap.add_argument("--work-dir", default=os.path.expanduser("~/.autofix"),
                     help="worktrees + logs live under here")
     args = ap.parse_args()
     args.exclude = {int(n) for n in args.exclude.split(",") if n.strip()}
 
-    root = run(["git", "-C", os.path.dirname(os.path.abspath(__file__)),
-                "rev-parse", "--show-toplevel"],
+    root = run(["git", "-C", SCRIPT_DIR, "rev-parse", "--show-toplevel"],
                capture_output=True).stdout.strip()
+    if not root:
+        sys.exit("autofix.py must live inside the target git checkout")
     if not args.repo:
-        args.repo = gh("repo", "view", "--json", "nameWithOwner")["nameWithOwner"]
+        args.repo = gh("repo", "view", "--json", "nameWithOwner",
+                       cwd=root)["nameWithOwner"]
     args.base = gh("repo", "view", args.repo, "--json",
                    "defaultBranchRef")["defaultBranchRef"]["name"]
+    if args.source == "auto":
+        args.source = "project" if args.project else "issues"
+    if args.source == "project":
+        if not args.project:
+            sys.exit("--source project needs a project number "
+                     "(--project, PLAN_PROJECT or config.json)")
+        args.project = str(args.project)
+        args.owner = args.owner or args.repo.split("/", 1)[0]
+    note("source: %s%s" % (args.source, "  (%s/projects/%s)" %
+         (args.owner, args.project) if args.source == "project" else ""))
 
     cands, skipped = candidates(args)
     print("# Autofix — %s, %d candidate issue(s)\n" % (args.repo, len(cands)))
@@ -396,7 +501,8 @@ def main():
         print("\n(dry run — no sessions started)")
         return
 
-    run_dir = os.path.join(args.work_dir, time.strftime("%Y%m%d-%H%M%S"))
+    run_dir = os.path.join(args.work_dir, args.repo.replace("/", "-"),
+                           time.strftime("%Y%m%d-%H%M%S"))
     os.makedirs(os.path.join(run_dir, "logs"), exist_ok=True)
     os.makedirs(os.path.join(run_dir, "wt"), exist_ok=True)
     print("\nrun dir: %s\n" % run_dir)
