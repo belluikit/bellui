@@ -49,13 +49,16 @@ was **wrong**, disproven by goroutine dumps.
   **guest reboot does not clear it — only restarting the emulator process
   does**. If pixel143 starts hanging every bellui app at launch, restart the
   emulator before debugging anything else.
-- **Manifest**: the packaging template now declares `locale` in
-  `configChanges`, but that is **inert for now** — the framework adds
-  `layoutDirection` to every locale change mask, and the CLI's embedded binres
-  SDK table predates that flag (API 17) and silently drops unknown flag names.
-  Until the table is regenerated (#287), a per-app language change still
-  recreates — survivably. Live in-place locale pickup additionally needs the
-  #282 re-resolve seam on `onConfigurationChanged`.
+- **Manifest**: the packaging template declares `locale|layoutDirection` in
+  `configChanges` — the framework adds `layoutDirection` to every locale
+  change mask, so both are required for an Android 13+ per-app language
+  change to arrive as `onConfigurationChanged` instead of an activity
+  recreation (#283). Declaring it needed the #287 regeneration of the CLI's
+  embedded binres SDK table (now pinned via `binres.SDKPlatform`, recorded in
+  the generated arsc.go header); since #287 an unknown `configChanges` flag
+  name is a hard manifest-compile error instead of a silently dropped bit.
+  Live in-place locale pickup additionally needs the #282 re-resolve seam on
+  `onConfigurationChanged`.
 - **Probes**: `hack/recreateprobe` (lifecycle lines + `alive=`/`tick=`
   heartbeats — at a wedge, `alive=` keeps counting while `tick=` stops);
   verified on pixel143 (goldfish) and OPD2403 (ColorOS 16, which recreates
