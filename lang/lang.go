@@ -378,7 +378,7 @@ func updateLocalizer() {
 		// system lookup must not clobber [SetLocale] (#282; previously an
 		// AddTranslations* call after SetLocale silently reverted to the
 		// system locale).
-		setLocalizer(newLocalizer(closestSupportedTag([]language.Tag{getCurrentTag()}).LanguageString()))
+		setLocalizer(newLocalizer(closestSupportedLocaleForTags([]language.Tag{getCurrentTag()}).LanguageString()))
 		return
 	}
 
