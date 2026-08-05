@@ -93,6 +93,16 @@ func TestApplyDecorators_AfterRender(t *testing.T) {
 	e.Decorators = []RowDecorator{cur}
 	e.SpanDecorators = []SpanDecorator{spans}
 	prev := e.decOverlay
+
+	// A plain repaint does not re-read the fields — the overlay holds the
+	// slices it was built with. This is what RefreshDecorators' doc promises
+	// and the reason ApplyDecorators exists.
+	e.Refresh()
+	e.RefreshDecorators()
+	if got := len(e.decOverlay.decorators); got != 0 {
+		t.Errorf("repaint-only refresh picked up %d row decorators, want 0", got)
+	}
+
 	e.ApplyDecorators()
 
 	if e.decOverlay == prev {
@@ -119,6 +129,7 @@ func TestApplyDecorators_AfterRender(t *testing.T) {
 	for _, o := range center.Objects {
 		if o == core.CanvasObject(e.decOverlay) {
 			found = true
+			break
 		}
 	}
 	if !found {
@@ -147,5 +158,46 @@ func TestApplyGutter_BeforeRender(t *testing.T) {
 	}
 	if got := len(e.hbox.Objects); got != 2 {
 		t.Errorf("hbox holds %d objects, want 2", got)
+	}
+	// The pre-render ApplyDecorators is equally harmless: CreateRenderer built
+	// the overlay again, internal decorators and all.
+	if e.decOverlay == nil {
+		t.Fatal("no decorator overlay after pre-render ApplyDecorators + show")
+	}
+	if len(e.decOverlay.spanDecorators) == 0 {
+		t.Error("internal span decorators lost across pre-render ApplyDecorators + show")
+	}
+}
+
+// TestApply_PreservesScrollOffset pins the offset invariant of a rebuild: the
+// gutter widget and decorator overlay are new objects, and a scrolled editor
+// must hand them its current offset — OnScrolled only fires on a move, so a
+// widget left at 0 would draw (and hit-test) a viewport off. It drives the
+// unexported helpers on purpose: the exported wrappers' refresh chain happens
+// to re-notify OnScrolled today, which would mask the invariant rather than
+// test it.
+func TestApply_PreservesScrollOffset(t *testing.T) {
+	test.NewTempApp(t)
+	e := NewEditor()
+	e.SetText("one\ntwo\nthree\nfour\nfive\nsix\nseven\neight")
+	win := test.NewWindow(e)
+	defer win.Close()
+	win.Resize(geo.NewSize(300, 100))
+
+	const off = 42
+	scrollTo(e, off)
+
+	e.Gutter = NewLineNumberGutter()
+	e.applyGutter()
+	if e.gutterW.scrollY != off {
+		t.Errorf("re-applied gutter starts at scrollY %v, want the editor's %v",
+			e.gutterW.scrollY, float32(off))
+	}
+
+	e.Decorators = []RowDecorator{NewCurrentLineDecorator(1)}
+	e.applyDecorators()
+	if e.decOverlay.scrollY != off {
+		t.Errorf("re-applied overlay starts at scrollY %v, want the editor's %v",
+			e.decOverlay.scrollY, float32(off))
 	}
 }
