@@ -1,10 +1,12 @@
-// Command filedialogprobe live-verifies the opt-in native file dialogs (#514).
+// Command filedialogprobe live-verifies the platform-native file dialogs
+// (#514), default-on since #226.
 //
 // It builds a small window with buttons that open a native File-Open,
-// Folder-Open and File-Save panel (dialog.UseNativeFileDialogs is enabled),
-// logging the chosen URI to stdout. On macOS the panels are NSOpenPanel /
-// NSSavePanel; on Linux/BSD the xdg portal; on Windows the Common Item Dialog
-// (IFileOpenDialog / IFileSaveDialog).
+// Folder-Open and File-Save panel (the native backends start enabled; the
+// "Native pickers" check toggles them), logging the chosen URI to stdout.
+// On macOS the panels are NSOpenPanel / NSSavePanel; on Linux/BSD the xdg
+// portal; on Windows the Common Item Dialog (IFileOpenDialog /
+// IFileSaveDialog); on iOS/Android the system document pickers.
 //
 //	go run ./hack/filedialogprobe            # button UI
 //	go run ./hack/filedialogprobe open       # auto-open a File-Open panel
@@ -142,10 +144,8 @@ func main() {
 		}
 	}
 
-	// The toggle exercises UseNativeFileDialogs on every platform — on
-	// iOS/Android unchecking it must swap the system picker for the canvas
-	// dialog (#267), which is also how #259's long-press selection mode is
-	// reached on a packaged device build.
+	// See the package doc: every button below must be served by the canvas
+	// dialog while this is unchecked, on iOS/Android too (#267).
 	nativeCheck := widget.NewCheck("Native pickers (UseNativeFileDialogs)", func(on bool) {
 		dialog.UseNativeFileDialogs(on)
 		fmt.Println("UseNativeFileDialogs:", on)
