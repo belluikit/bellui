@@ -1315,6 +1315,37 @@ func TestWindow_LongPress_SecondaryButtonDoesNot(t *testing.T) {
 	})
 }
 
+// A second button chorded in after the hold fired must not hand the tap back:
+// only a primary press starts a fresh gesture, so the suppression survives
+// until the held button is released.
+func TestWindow_LongPress_ChordAfterFireKeepsTapSuppressed(t *testing.T) {
+	w := createWindow("Test")
+	prop := canvas.NewRectangle(color.White)
+	prop.SetMinSize(geo.NewSize(100, 100))
+	o := newLongPressableObject()
+	w.SetContent(container.NewStack(prop, o))
+	repaintWindow(w)
+
+	runOnMain(func() {
+		w.mousePos = geo.NewPos(50, 60)
+		w.mouseClicked(w.viewport, glfw.MouseButton1, glfw.Press, 0)
+	})
+
+	select {
+	case <-o.longPresses:
+	case <-time.After(4 * common.TapSecondaryDelay):
+		t.Fatal("no LongPressed while the press was held")
+	}
+
+	runOnMain(func() {
+		// Right-click without lifting the primary button, then release both.
+		w.mouseClicked(w.viewport, glfw.MouseButton2, glfw.Press, 0)
+		w.mouseClicked(w.viewport, glfw.MouseButton2, glfw.Release, 0)
+		w.mouseClicked(w.viewport, glfw.MouseButton1, glfw.Release, 0)
+		assert.Nil(t, o.popTapEvent(), "the hold-fired press still owns its release")
+	})
+}
+
 func TestWindow_TappedSecondary(t *testing.T) {
 	w := createWindow("Test")
 	prop := canvas.NewRectangle(color.White)

@@ -734,7 +734,7 @@ func (w *window) processMouseClicked(button desktop.MouseButton, action action, 
 	switch action {
 	case press:
 		w.mouseButton |= button
-		w.armLongPress(mousePos)
+		w.armLongPress(button, mousePos)
 	case release:
 		w.mouseButton &= ^button
 	}
@@ -804,9 +804,15 @@ func (w *window) cancelLongPressOnMove(mousePos geo.Position) {
 // touch: press-and-hold under a mouse is how touch-first toolkits behave
 // (GTK's GtkGestureLongPress fires for mice by default), and on a desktop
 // touchscreen the synthesized events are indistinguishable anyway.
-func (w *window) armLongPress(pos geo.Position) {
+func (w *window) armLongPress(button desktop.MouseButton, pos geo.Position) {
 	w.longPressSeq++ // a new press invalidates any pending fire
-	w.longPressFired = nil
+	if button == desktop.MouseButtonPrimary {
+		// Only a primary press begins a fresh gesture, and only a primary
+		// release consults the flag. Clearing it for any button would let a
+		// right-click chorded into a hold-fired press hand the tap back to
+		// the primary release the hold must silence.
+		w.longPressFired = false
+	}
 	if w.mouseButton != desktop.MouseButtonPrimary {
 		return // chorded or non-primary press: not a press-and-hold
 	}
@@ -846,7 +852,7 @@ func (w *window) fireLongPress(seq int) {
 		return
 	}
 
-	w.longPressFired = co
+	w.longPressFired = true
 	ev := &event.PointEvent{
 		Position:         pos,
 		AbsolutePosition: w.mousePos,
@@ -891,15 +897,15 @@ func (w *window) mouseClickedHandleMouseable(mev *desktop.MouseEvent, action act
 }
 
 func (w *window) mouseClickedHandleTapDoubleTap(co core.CanvasObject, ev *event.PointEvent) {
-	if w.longPressFired != nil {
+	if w.longPressFired {
 		// The hold already dispatched LongPressed (#266): the release of a
 		// hold-fired press is not a tap, exactly as on the touch drivers.
 		// Unlike them it is not a secondary tap either — desktop right-click
 		// owns that surface, and mirroring the mobile lift-opens-the-menu
 		// pattern here would pop context menus on slow clicks. (A hold that
 		// turned into a drag skips this path; armLongPress clears the stale
-		// flag at the next press.)
-		w.longPressFired = nil
+		// flag at the next primary press.)
+		w.longPressFired = false
 		w.mousePressed = nil
 		return
 	}
