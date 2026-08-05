@@ -705,8 +705,21 @@ func (s *Scroll) refreshWithoutOffsetUpdate() {
 // Scrolled is called when an input device triggers a scroll event
 func (s *Scroll) Scrolled(ev *event.ScrollEvent) {
 	if s.Direction != ScrollNone {
-		s.scrollBy(ev.Scrolled.DX, ev.Scrolled.DY)
+		s.applyScroll(s.eventScrollDelta(ev))
 	}
+}
+
+// eventScrollDelta resolves a ScrollEvent's delta for this scroller. Pointer
+// scrolls (wheel, touchpad) get the pointer conventions — RTL flips horizontal
+// input, and vertical input redirects to horizontal-only content — while a
+// direct-touch scroll (#291) is direct manipulation: the content tracks the
+// finger, so the raw deltas apply in both cases, exactly as on the mobile
+// driver's drag path.
+func (s *Scroll) eventScrollDelta(ev *event.ScrollEvent) (float32, float32) {
+	if ev.Source == event.ScrollSourceTouch {
+		return ev.Scrolled.DX, ev.Scrolled.DY
+	}
+	return s.resolveScrollDelta(ev.Scrolled.DX, ev.Scrolled.DY)
 }
 
 // TryScrolled handles a scroll event and returns true if the event was consumed
@@ -727,7 +740,7 @@ func (s *Scroll) TryScrolled(ev *event.ScrollEvent) bool {
 		return false
 	}
 
-	dx, dy := s.resolveScrollDelta(ev.Scrolled.DX, ev.Scrolled.DY)
+	dx, dy := s.eventScrollDelta(ev)
 	min := s.Content.MinSize()
 
 	newX := computeOffset(s.Offset.X, -dx, size.Width, min.Width)
@@ -737,7 +750,7 @@ func (s *Scroll) TryScrolled(ev *event.ScrollEvent) bool {
 		return false // at boundary, allow propagation
 	}
 
-	s.scrollBy(ev.Scrolled.DX, ev.Scrolled.DY)
+	s.applyScroll(dx, dy)
 	return true
 }
 
@@ -796,6 +809,11 @@ func (s *Scroll) swapAxesIfNeeded(dx, dy float32) (float32, float32) {
 
 func (s *Scroll) scrollBy(dx, dy float32) {
 	dx, dy = s.resolveScrollDelta(dx, dy)
+	s.applyScroll(dx, dy)
+}
+
+// applyScroll moves the offset by an already-resolved delta.
+func (s *Scroll) applyScroll(dx, dy float32) {
 	if s.updateOffset(dx, dy) {
 		s.rtlPinned = true // a real scroll supersedes the initial right-edge pin
 		s.refreshWithoutOffsetUpdate()

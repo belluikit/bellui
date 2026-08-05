@@ -1089,7 +1089,11 @@ func mobileA11yScroll(n *accessibility.Node, forward bool) {
 	}
 	sc.Scrolled(&event.ScrollEvent{
 		Scrolled: geo.NewDelta(0, dy),
-		Source:   event.ScrollSourceTouch,
+		// Deliberately not ScrollSourceTouch: a screen-reader page is a
+		// logical "next screenful" request, not a finger tracking content,
+		// and a direct-touch event skips the scroller's pointer conventions
+		// (#291) — including the vertical→horizontal mapping this relies on.
+		Source: event.ScrollSourceUnknown,
 	})
 }
 
