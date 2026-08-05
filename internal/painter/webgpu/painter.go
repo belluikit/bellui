@@ -228,6 +228,22 @@ func (p *painter) Present() {
 	p.framing = false
 }
 
+// AbandonFrame discards the frame in progress without presenting it. The
+// mobile driver calls this instead of Present when the native window died
+// while the frame was being recorded (Android destroys the ANativeWindow
+// mid-recreation, #283): presenting into the dead window is what wedges the
+// GPU channel, and the open frame's SurfaceOutput must not be left dangling
+// (the same hazard SetOutputSize and RecreateSurface guard against, #337).
+func (p *painter) AbandonFrame() {
+	if p.dev == nil || !p.framing {
+		return
+	}
+	if p.dev.HasOpenFrame() {
+		p.dev.DiscardFrame()
+	}
+	p.framing = false
+}
+
 func (p *painter) Paint(obj core.CanvasObject, pos geo.Position, frame geo.Size) {
 	if p.dev == nil || !p.framing || !obj.Visible() {
 		return
