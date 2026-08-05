@@ -369,6 +369,8 @@ func (w *window) processMouseMoved(xpos float64, ypos float64) {
 	mouseDragPos := w.mouseDragPos
 	mouseOver := w.mouseOver
 
+	w.cancelLongPressOnMove(mousePos)
+
 	cursor := desktop.Cursor(desktop.DefaultCursor)
 
 	obj, pos, _ := w.findObjectAtPositionMatching(w.canvas, mousePos, func(object core.CanvasObject) bool {
@@ -732,6 +734,7 @@ func (w *window) processMouseClicked(button desktop.MouseButton, action action, 
 	switch action {
 	case press:
 		w.mouseButton |= button
+		w.armLongPress(button, mousePos)
 	case release:
 		w.mouseButton &= ^button
 	}
@@ -774,6 +777,89 @@ func (w *window) processMouseClicked(button desktop.MouseButton, action action, 
 	}
 }
 
+// cancelLongPressOnMove invalidates a pending long-press fire once the
+// pointer travels past the drag threshold (#266): that press is a drag or a
+// selection sweep, not a press-and-hold. The origin is the armed press
+// position, not the last move, so slow sub-threshold creep accumulates and
+// cancels. A pending fire needs no release-time cancellation beyond this:
+// fireLongPress re-checks that the primary button is still the only one down,
+// and arming the next press bumps the generation.
+func (w *window) cancelLongPressOnMove(mousePos geo.Position) {
+	if w.mouseButton&desktop.MouseButtonPrimary == 0 {
+		return
+	}
+	if math.Abs(float64(mousePos.X-w.longPressPos.X)) >= dragMoveThreshold ||
+		math.Abs(float64(mousePos.Y-w.longPressPos.Y)) >= dragMoveThreshold {
+		w.longPressSeq++
+	}
+}
+
+// armLongPress schedules a hold-fire long-press for the primary-button press
+// that just went down (#266): a press held stationary for
+// common.TapSecondaryDelay dispatches LongPressed to the LongPressable under
+// the pointer while the button is still down — the desktop counterpart of the
+// touch drivers' hold-fire (#758), sharing their timing and their
+// cancellation (movement past the drag threshold, release, another button).
+// Deliberately for every primary press, mouse included, not just synthesized
+// touch: press-and-hold under a mouse is how touch-first toolkits behave
+// (GTK's GtkGestureLongPress fires for mice by default), and on a desktop
+// touchscreen the synthesized events are indistinguishable anyway.
+func (w *window) armLongPress(button desktop.MouseButton, pos geo.Position) {
+	w.longPressSeq++ // a new press invalidates any pending fire
+	if button == desktop.MouseButtonPrimary {
+		// Only a primary press begins a fresh gesture, and only a primary
+		// release consults the flag. Clearing it for any button would let a
+		// right-click chorded into a hold-fired press hand the tap back to
+		// the primary release the hold must silence.
+		w.longPressFired = false
+	}
+	if w.mouseButton != desktop.MouseButtonPrimary {
+		return // chorded or non-primary press: not a press-and-hold
+	}
+
+	co, _, _ := w.findObjectAtPositionMatching(w.canvas, pos, func(object core.CanvasObject) bool {
+		_, ok := object.(event.LongPressable)
+		return ok
+	})
+	if _, ok := co.(event.LongPressable); !ok {
+		return // nothing here can long-press; spawn no timer for plain clicks
+	}
+
+	w.longPressPos = pos
+	seq := w.longPressSeq
+	time.AfterFunc(common.TapSecondaryDelay, func() {
+		runOnMain(func() {
+			w.fireLongPress(seq)
+		})
+	})
+}
+
+// fireLongPress runs on the main goroutine when the hold timer elapses. It
+// re-resolves the target under the pointer — overlays may have changed since
+// the press was armed — and dispatches LongPressed if the press is still a
+// stationary, un-chorded primary hold.
+func (w *window) fireLongPress(seq int) {
+	if w.longPressSeq != seq || w.mouseButton != desktop.MouseButtonPrimary || w.mouseDragStarted {
+		return // released, moved, chorded or dragging since armed
+	}
+
+	co, pos, _ := w.findObjectAtPositionMatching(w.canvas, w.mousePos, func(object core.CanvasObject) bool {
+		_, ok := object.(event.LongPressable)
+		return ok
+	})
+	wid, ok := co.(event.LongPressable)
+	if !ok {
+		return
+	}
+
+	w.longPressFired = true
+	ev := &event.PointEvent{
+		Position:         pos,
+		AbsolutePosition: w.mousePos,
+	}
+	wid.LongPressed(ev)
+}
+
 // dismissTapThroughOverlay implements the outside-tap pass-through for
 // tap-through overlays (#472: OverlayContainer.TapThrough; #569: transient
 // PopUps like Toast/Snackbar): when the top overlay opted in and a press
@@ -811,6 +897,19 @@ func (w *window) mouseClickedHandleMouseable(mev *desktop.MouseEvent, action act
 }
 
 func (w *window) mouseClickedHandleTapDoubleTap(co core.CanvasObject, ev *event.PointEvent) {
+	if w.longPressFired {
+		// The hold already dispatched LongPressed (#266): the release of a
+		// hold-fired press is not a tap, exactly as on the touch drivers.
+		// Unlike them it is not a secondary tap either — desktop right-click
+		// owns that surface, and mirroring the mobile lift-opens-the-menu
+		// pattern here would pop context menus on slow clicks. (A hold that
+		// turned into a drag skips this path; armLongPress clears the stale
+		// flag at the next primary press.)
+		w.longPressFired = false
+		w.mousePressed = nil
+		return
+	}
+
 	_, doubleTap := co.(event.DoubleTappable)
 	if doubleTap {
 		w.mouseClickCount++

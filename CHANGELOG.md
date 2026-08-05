@@ -15,6 +15,33 @@ the trendvidia fork (github.com/trendvidia/fyne).
 
 ### Added
 
+* **Desktop press-and-hold dispatches `LongPressed`**
+
+  ([#266](https://github.com/belluikit/bellui/issues/266)). The glfw driver
+  hold-fires the gesture the touch drivers already had (#758): a lone
+  primary-button press held stationary for 300 ms dispatches `LongPressed`
+  to the `LongPressable` under the pointer while the button is still down,
+  and the release of a hold-fired press is not a tap. This applies to every
+  primary press — mouse included, matching how GTK, Flutter and Qt
+  long-press recognizers treat mice, and on a desktop touchscreen the
+  synthesized events are indistinguishable anyway — so `Entry` word-selects
+  on a slow click and the canvas file dialog's selection mode (#259) is now
+  reachable on desktop. Unlike the touch drivers, the release of a
+  hold-fired press dispatches nothing further: right-click keeps sole
+  ownership of `TappedSecondary` on desktop. Windows touchscreens still
+  promote a touch hold to a right-click before the app sees it —
+  belluikit/glfw#1 tracks real touch delivery (with Wayland `wl_touch`).
+  
+* **Diagonal resize cursors, and a pointer affordance on the `InnerWindow`
+  resize corner** ([#269](https://github.com/belluikit/bellui/issues/269)).
+  `desktop.StandardCursor` gains `NWSEResizeCursor` and `NESWResizeCursor`
+  (glfw 3.4 shapes; the driver falls back to the horizontal-resize shape
+  wherever the platform cannot create a diagonal — an X11/Wayland cursor theme
+  without it, or a Cocoa build without the private NSCursor selector — and
+  wasm maps them to CSS `nwse-resize`/`nesw-resize`). `container.InnerWindow`'s
+  resize corner now returns the NWSE shape, so on desktop the pointer signals
+  the corner resizes before it is dragged.
+
 * **Touch multi-select for the canvas file dialog — long-press selection
   mode** ([#259](https://github.com/belluikit/bellui/issues/259)). In
   open-multiple mode, long-pressing a file item enters selection mode: plain
@@ -27,9 +54,8 @@ the trendvidia fork (github.com/trendvidia/fyne).
   active, and the pointer modifiers keep their usual precedence throughout.
   As part of this, the mobile driver now gives Android's Back button the
   Escape meaning generally — a behavior change for existing apps, recorded
-  under Changed below. Desktop touchscreens cannot reach the gesture yet —
-  the GLFW driver has no touch long-press dispatch
-  ([#266](https://github.com/belluikit/bellui/issues/266)).
+  under Changed below. The GLFW driver's press-and-hold dispatch (#266,
+  above) makes the gesture reachable on desktop too.
 
 * **Escape closes the innermost pop-up, menu or dialog**
   ([#229](https://github.com/belluikit/bellui/issues/229)). The drivers give
@@ -62,19 +88,35 @@ the trendvidia fork (github.com/trendvidia/fyne).
 
 ### Fixed
 
+* **The mobile pickers honour `UseNativeFileDialogs(false)`**
+  ([#267](https://github.com/belluikit/bellui/issues/267)). The doc promised
+  the canvas dialog "everywhere", but the iOS/Android overrides consulted
+  only picker availability, so the opt-out was silently inert on mobile —
+  and the canvas dialog was unreachable on a packaged device build. The
+  toggle now gates both mobile overrides; wasm remains the documented
+  exception (a canvas dialog has no real filesystem to browse in a
+  browser). Note the cost, now recorded in the doc: the platform picker is
+  the only surface that reaches outside the app sandbox on modern mobile
+  systems, so an app opting out for desktop-consistency reasons should gate
+  the call on the platform.
+  
 * **A malformed system locale entry no longer degrades the whole locale**
   ([#271](https://github.com/belluikit/bellui/issues/271)). On Android a
   failed locale lookup came back from go-locale as a list holding one empty
-  string, which failed BCP-47 parsing and silently dropped translations,
-  CLDR formatting and collation to the fallback. Locale strings are now
-  normalized before parsing (Java `Locale.toString()` underscores and
-  trailing `#...` markers), unparseable entries are logged with the raw
-  string quoted and skipped — so the parseable entries behind them still
-  win — a failed lookup no longer has its result parsed at all, and the
-  CLDR formatting tag comes from the first entry that parsed rather than
-  blindly the first entry reported. The underlying Android lookup failure
-  (`no current JVM` — the locale resolves during library init, before
-  JNI_OnLoad) is fixed below
+  string, which failed BCP-47 parsing at every start: the region-carrying
+  tag behind CLDR date/number formatting, collation and text direction was
+  left at the matcher's language-only value, `SystemLocale()` reported the
+  undetermined locale `und`, and the log named no locale at all. Locale
+  strings are now normalized before parsing — Java `Locale.toString()`
+  underscores, and the trailing `#...` marker whose script is folded back
+  into the tag (`zh_CN_#Hans` → `zh-Hans-CN`) rather than dropped. An entry
+  that is still not well-formed is logged with the raw string quoted and
+  keeps whatever part of the tag parsed, so it cannot pass the locale to the
+  entry behind it; only an entry carrying nothing at all is dropped. A
+  failed lookup no longer has its result parsed, and the formatting tag
+  comes from the first entry that parsed rather than blindly the first entry
+  reported. The underlying Android lookup failure (`no current JVM` — the
+  locale resolves during library init, before JNI_OnLoad) is fixed below
   ([#282](https://github.com/belluikit/bellui/issues/282)).
 
 * **Android apps no longer run in English on a non-English device**
@@ -96,6 +138,20 @@ the trendvidia fork (github.com/trendvidia/fyne).
   reverts the app to the system locale (the same override guard, previously
   missing from the shared re-derivation path). Verified on the Android bench;
   other platforms resolve at init successfully and are unaffected.
+
+* **Android: canvas scale is derived arithmetically from the reported
+  density** ([#272](https://github.com/belluikit/bellui/issues/272)),
+  matching `DisplayMetrics.density` (densityDpi/160), instead of a bucket
+  lookup that rounded off-bucket densities to the nearest step. Devices
+  configured between the classic buckets — 356, 420, 440dpi panels are
+  common — previously rendered everything derived from dp (touch-target
+  floors, text sizes) up to ~12% off in physical units; bucket densities
+  (160/240/320/480/640) map exactly as before. The one bucket that does
+  change is tvdpi (213), which now scales by 1.33125 as the platform does
+  rather than the 1.5 the old ladder rounded it to, so an Android TV panel
+  configured at tvdpi renders ~11% smaller. The "unknown density" log for
+  off-bucket values is gone, and the `ACONFIGURATION_DENSITY_ANY` sentinel no
+  longer reads as a 65534dpi screen.
 
 * **wasm: the browser picker overrides no longer fire under the test driver**
   ([#257](https://github.com/belluikit/bellui/issues/257)). In a js/wasm test
@@ -194,6 +250,19 @@ the trendvidia fork (github.com/trendvidia/fyne).
   ([#253](https://github.com/belluikit/bellui/issues/253)).
 
 ### Changed
+
+* **A desktop primary press held on a `LongPressable` no longer delivers
+  `Tapped`** ([#266](https://github.com/belluikit/bellui/issues/266)). The
+  press-and-hold dispatch above is a behavior change for existing desktop
+  apps: a click whose button stays down for 300 ms now dispatches
+  `LongPressed` instead of `Tapped` to a widget implementing
+  `event.LongPressable` — in this toolkit `Entry`, `RichEntry`, selectable
+  text and the canvas file dialog's items; every other widget, `Button`
+  included, taps on a slow click exactly as before. A `LongPressable` that
+  declines the gesture must answer the press another way rather than ignore
+  it (the file dialog's items fall back to the plain tap when the dialog is
+  single-select or the item is a directory), because the withheld `Tapped`
+  is not delivered afterwards.
 
 * **Android's Back button now carries the Escape meaning**
   ([#259](https://github.com/belluikit/bellui/issues/259)). The mobile driver
