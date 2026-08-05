@@ -56,7 +56,13 @@ was **wrong**, disproven by goroutine dumps.
   recreation (#283). Declaring it needed the #287 regeneration of the CLI's
   embedded binres SDK table (now pinned via `binres.SDKPlatform`, recorded in
   the generated arsc.go header); since #287 an unknown `configChanges` flag
-  name is a hard manifest-compile error instead of a silently dropped bit.
+  name is a hard manifest-compile error instead of a silently dropped bit, and
+  since #295 the same holds for single-valued enum attributes
+  (`screenOrientation="typo"` used to encode 0 = `landscape`). The binres
+  aapt goldens are android-35 output and their tests run again (#297 — the old
+  gate skipped on any SDK newer than android-15, i.e. always); the compiled
+  template manifest is additionally verified against a real `aapt dump
+  xmltree` when ANDROID_HOME with build-tools is present.
   Live in-place locale pickup additionally needs the #282 re-resolve seam on
   `onConfigurationChanged`.
 - **Probes**: `hack/recreateprobe` (lifecycle lines + `alive=`/`tick=`

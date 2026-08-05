@@ -5,10 +5,68 @@
 package binres
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
+
+// platformsFixture points ANDROID_HOME at a temp SDK whose platforms/ holds
+// exactly the named directories.
+func platformsFixture(t *testing.T, names ...string) {
+	t.Helper()
+	sdkdir := t.TempDir()
+	require.NoError(t, os.MkdirAll(filepath.Join(sdkdir, "platforms"), 0o755))
+	for _, name := range names {
+		require.NoError(t, os.MkdirAll(filepath.Join(sdkdir, "platforms", name), 0o755))
+	}
+	t.Setenv("ANDROID_HOME", sdkdir)
+}
+
+// TestSDKPlatformPinConsistency keeps the three SDKPlatform* constants moving
+// together: the version must be the API level SDKPlatform names.
+func TestSDKPlatformPinConsistency(t *testing.T) {
+	level, ok := platformAPILevel(SDKPlatform)
+	require.True(t, ok, "SDKPlatform %q has no parsable API level", SDKPlatform)
+	require.Equal(t, SDKPlatformVersion, level,
+		"SDKPlatformVersion must match the API level of SDKPlatform %q", SDKPlatform)
+}
+
+func TestLatestAPIResourcesPath(t *testing.T) {
+	latest := func(t *testing.T) string {
+		p, err := LatestAPIResourcesPath()
+		require.NoError(t, err)
+		return filepath.Base(filepath.Dir(p))
+	}
+
+	// android-9 sorts after android-36 lexically; the pick must be numeric (#296).
+	t.Run("numeric beats lexical", func(t *testing.T) {
+		platformsFixture(t, "android-36", "android-9", "android-34")
+		require.Equal(t, "android-36", latest(t))
+	})
+
+	t.Run("previews and extension SDKs rank behind numbered releases", func(t *testing.T) {
+		platformsFixture(t, "android-VanillaIceCream", "android-35", "android-36-ext4", "android-9")
+		require.Equal(t, "android-35", latest(t))
+	})
+
+	t.Run("preview wins only when nothing numbered is installed", func(t *testing.T) {
+		platformsFixture(t, "android-Baklava", "android-VanillaIceCream")
+		require.Equal(t, "android-VanillaIceCream", latest(t))
+	})
+
+	t.Run("stray entries are not platforms", func(t *testing.T) {
+		platformsFixture(t, "android-34", "tools", ".DS_Store")
+		require.Equal(t, "android-34", latest(t))
+	})
+
+	t.Run("empty platforms dir errors", func(t *testing.T) {
+		platformsFixture(t)
+		_, err := LatestAPIResourcesPath()
+		require.ErrorContains(t, err, "no SDK platforms")
+	})
+}
 
 // stripFixture returns a package shaped the way PackResources' stripping
 // requires: type pool attr/id/style/string/dimen, one spec per type in order.
