@@ -55,6 +55,11 @@ Depends on `github.com/belluikit/bellui` (pinned release in go.mod — no `repla
 
 ## Key patterns
 
+- The `Gutter`, `Decorators`/`SpanDecorators` and `Highlighter` fields are applied at first
+  render (`CreateRenderer`). To change them on a live editor call the re-apply methods —
+  `ApplyGutter`, `ApplyDecorators`, `RefreshHighlighter` (#281); `RefreshGutter`/
+  `RefreshDecorators` only repaint the installed objects (use those after mutating a
+  retained provider/decorator's state).
 - `SetText()` suppresses `OnChanged` via a `suppressChange` flag — only user edits fire the callback.
 - Gutter and decorator renderers call `Refresh()` from `Layout()` when size changes, because the initial `Refresh()` runs before `Layout()` gives the widget its real dimensions.
 - `themeColor()` asks the app theme first — defining the `editor.*` names in an app theme restyles the editor (#150). A nil or `color.Transparent` answer (the toolkit's unknown-name sentinel) falls back to the built-in Monokai-inspired defaults.

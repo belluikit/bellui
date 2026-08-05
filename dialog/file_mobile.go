@@ -28,6 +28,15 @@ func hideFile(filename string) error {
 // dialog rather than silently dropping the request.
 
 func fileOpenOSOverride(f *FileDialog) bool {
+	if !nativeFileDialogsEnabled() {
+		// UseNativeFileDialogs(false) forces the canvas dialog on mobile too
+		// (#267): the doc promises "everywhere", and the canvas dialog
+		// browses something real here (app-scoped storage) — unlike wasm,
+		// which stays picker-always. The cost is the app's to weigh: the
+		// platform pickers are the only surfaces that reach outside the
+		// sandbox on modern Android/iOS.
+		return false
+	}
 	if f.multiSelect {
 		// iOS allowsMultipleSelection / Android EXTRA_ALLOW_MULTIPLE (#255);
 		// an app without the multi picker falls back to the canvas dialog.
@@ -49,6 +58,9 @@ func fileOpenOSOverride(f *FileDialog) bool {
 }
 
 func fileSaveOSOverride(f *FileDialog) bool {
+	if !nativeFileDialogsEnabled() {
+		return false // see fileOpenOSOverride (#267)
+	}
 	cb := f.callback.(func(bellui.URIWriteCloser, error))
 	return mobile.ShowFileSavePicker(func(writer bellui.URIWriteCloser, err error) {
 		bellui.Do(func() { f.notifyClosed(writer != nil || err != nil); cb(writer, err) })
