@@ -11,7 +11,19 @@ This file lists the main changes with each version of the Fyne toolkit.
 Entries up to 2.7.3 are inherited from upstream Fyne; later entries describe
 the trendvidia fork (github.com/trendvidia/fyne).
 
-## Unreleased
+## v1.0.0 — 2026-08-05
+
+The first **bellui stable**, closing out the v1.0.0-rc line
+([#136](https://github.com/belluikit/bellui/issues/136)). The v1 line in one
+paragraph: the MD3 foundation (tonal palettes, type scale, 36 components),
+the text/IME/editor stack, the observable data-model layer, opt-in
+screen-reader accessibility on five platform backends, deep platform
+integration (native dialogs, runtime Wayland/X11 selection, clipboard
+flavors, notifications, single-instance/open-with), the portable webview —
+including the Linux CEF backend with its documented bundling costs
+(docs/CEF-MAINTENANCE.md) — and the opt-in devtools inspector and
+consent-first analytics. Everything below is new since v1.0.0-rc.5; the
+rc.6 tag (2026-07-31) cut mid-section and shares this entry.
 
 ### Added
 
