@@ -259,8 +259,10 @@ forced, not stylistic. The post-bump per-module verification is not optional
 even though `x_tests.yml` covers those modules: CI rewrites each `go.mod` with
 an ephemeral `replace`, so it never resolves the published pin.
 
-Releases are tags + `CHANGELOG.md`; there are deliberately no GitHub Release
-objects. Bumping the bundled Chromium has its own obligations —
+Releases are tags + `CHANGELOG.md` + a GitHub Release on the main-module tag
+(newest stable marked **latest**, rc tags pre-release, no Release objects for
+the `x/*` tags) — decided in #136, reversing the earlier tags-only stance.
+Bumping the bundled Chromium has its own obligations —
 `docs/CEF-MAINTENANCE.md` (cadence, owner, the weekly freshness check).
 
 ## Backlog Protocol
