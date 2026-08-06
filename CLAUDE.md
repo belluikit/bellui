@@ -241,9 +241,10 @@ changing it**; the list below is only an index.
 
 ### MD3 Gallery App
 
-The Material Design 3 component showcase lives at `github.com/trendvidia/gallery` (checked
-out as a sibling of this repo, resolved via the workspace `go.work`). Use it to manually
-verify widget, theme and rendering changes.
+The Material Design 3 component showcase lives at `github.com/belluikit/gallery` (checked
+out as a sibling of this repo; `github.com/trendvidia/gallery` is the pre-rebrand app on
+the old fyne line and is not it). Use it to manually verify widget, theme and rendering
+changes.
 
 ## Code Style
 
