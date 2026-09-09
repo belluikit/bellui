@@ -95,8 +95,7 @@ tap_text() {
 wait_for_start() {
 	local i
 	for ((i = 0; i < 60; i++)); do
-		if probe_lines >/dev/null 2>&1 &&
-			adb logcat -d -s GoLog 2>/dev/null | grep -q 'safprobe: START'; then
+		if adb logcat -d 2>/dev/null | grep -q 'safprobe: START'; then
 			note "  probe started after ~$((i * 2))s"
 			return 0
 		fi
@@ -155,7 +154,10 @@ wait_for_done() {
 # probe prints on launch — so a log buffer that could not be cleared cannot
 # make an earlier run's PASSes, or its DONE, count for this one.
 probe_lines() {
-	adb logcat -d -s GoLog 2>/dev/null | sed -n 's/.*safprobe: //p' |
+	# No -s tag filter: gomobile routes the probe's stdout through the toolkit's
+	# log bridge under the "Bellui" tag, not "GoLog", and that is not worth
+	# depending on. The "safprobe: " prefix identifies our lines whatever the tag.
+	adb logcat -d 2>/dev/null | sed -n 's/.*safprobe: //p' |
 		awk '/^START$/ {n = 0; next} {a[n++] = $0} END {for (i = 0; i < n; i++) print a[i]}'
 }
 
