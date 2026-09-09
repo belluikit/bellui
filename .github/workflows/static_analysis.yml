@@ -64,7 +64,7 @@ jobs:
       - name: Get dependencies
         run: |
           flock /tmp/bellui-ci-apt.lock sudo apt-get -o DPkg::Lock::Timeout=600 update
-          flock /tmp/bellui-ci-apt.lock sudo apt-get -o DPkg::Lock::Timeout=600 install --no-install-recommends clang lld libegl1-mesa-dev libgl1-mesa-dev libgles2-mesa-dev libx11-dev xorg-dev xvfb language-pack-en
+          flock /tmp/bellui-ci-apt.lock sudo apt-get -o DPkg::Lock::Timeout=600 install -y --no-install-recommends clang lld libegl1-mesa-dev libgl1-mesa-dev libgles2-mesa-dev libx11-dev xorg-dev xvfb language-pack-en
 
       - name: Set environment variable LANG
         run: export LANG=en_EN.UTF-8
