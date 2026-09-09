@@ -22,6 +22,7 @@ import (
 
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/storage"
+	"github.com/belluikit/bellui/storage/repository"
 )
 
 func canListURI(uri bellui.URI) bool {
@@ -57,4 +58,13 @@ func listURI(uri bellui.URI) ([]bellui.URI, error) {
 		list = append(list, u)
 	}
 	return list, nil
+}
+
+func contentChild(bellui.URI, string) (bellui.URI, error) {
+	// content:// is an Android scheme; iOS security-scoped URLs are file://
+	return nil, repository.ErrOperationNotSupported
+}
+
+func contentCreateChild(bellui.URI, string, bool) (bellui.URI, error) {
+	return nil, repository.ErrOperationNotSupported
 }
