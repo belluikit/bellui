@@ -51,6 +51,10 @@ public class GoNativeActivity extends NativeActivity {
 	private static final int FILE_OPEN_CODE = 1;
 	private static final int FILE_SAVE_CODE = 2;
 	private static final int FILE_OPEN_MULTI_CODE = 3;
+	// A folder pick gets its own request code so onActivityResult knows to take
+	// a persistable grant for it without asking DocumentsContract.isTreeUri,
+	// which is API 24 and this activity targets minSdk 21 (#303).
+	private static final int FILE_OPEN_FOLDER_CODE = 4;
 
 	// The shadow EditText must advertise a real text class: an inputType with
 	// no TYPE_MASK_CLASS bits reads as TYPE_NULL to the IME, and IMEs disable
@@ -689,7 +693,18 @@ public class GoNativeActivity extends NativeActivity {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         if ("application/x-directory".equals(mimes) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE); // ask for a directory picker if OS supports it
-            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            // Write as well as read, so the app can scaffold into the folder it
+            // was given, and persistable so the grant can outlive the process —
+            // takePersistableUriPermission can only take flags the request
+            // asked for, and without this every pick is single-use (#303).
+            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+                    | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+            // Launched directly, not through Intent.createChooser: there is one
+            // system picker for a tree request, so the chooser adds a step and
+            // an extra Intent for the grant flags to survive.
+            startActivityForResult(intent, FILE_OPEN_FOLDER_CODE);
+            return;
         } else if (mimes.contains("|") && Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
             intent.setType("*/*");
             intent.putExtra(Intent.EXTRA_MIME_TYPES, mimes.split("\\|"));
@@ -1882,7 +1897,8 @@ public class GoNativeActivity extends NativeActivity {
         }
 
         // unhandled request
-        if (requestCode != FILE_OPEN_CODE && requestCode != FILE_SAVE_CODE) {
+        if (requestCode != FILE_OPEN_CODE && requestCode != FILE_SAVE_CODE
+                && requestCode != FILE_OPEN_FOLDER_CODE) {
             return;
         }
 
@@ -1893,7 +1909,33 @@ public class GoNativeActivity extends NativeActivity {
         }
 
         Uri uri = data.getData();
+        if (requestCode == FILE_OPEN_FOLDER_CODE) {
+            takePersistableFolderPermission(uri, data.getFlags());
+        }
         filePickerReturned(uri.toString());
+    }
+
+    // takePersistableFolderPermission keeps the grant the picker just handed
+    // over across process death, so an app can store the folder URI and reopen
+    // it later instead of re-prompting on every launch (#303). It takes only
+    // the flags the result actually carries: asking for more throws.
+    private void takePersistableFolderPermission(Uri uri, int intentFlags) {
+        if (uri == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT) {
+            return;
+        }
+        int flags = intentFlags
+                & (Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+        if (flags == 0) {
+            return;
+        }
+        try {
+            getContentResolver().takePersistableUriPermission(uri, flags);
+        } catch (SecurityException e) {
+            // The provider offered no persistable grant. The URI still works
+            // for this process; it just will not survive a restart, which is
+            // the behaviour every pick had before.
+            Log.w("Bellui", "could not persist folder grant: " + e);
+        }
     }
 
     @Override

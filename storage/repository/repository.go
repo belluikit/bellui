@@ -206,6 +206,37 @@ type HierarchicalRepository interface {
 	Child(bellui.URI, string) (bellui.URI, error)
 }
 
+// ChildCreatingRepository is an extension of the Repository interface for
+// backends where a child's identity is assigned by the store rather than
+// derived from its parent's path, so a child cannot be named before it exists.
+//
+// Android's Storage Access Framework is the case that forced it (#303): a
+// document's ID is opaque and DocumentsContract hands the URI back only when
+// the document is created, so Child() has nothing to return for a child that
+// is not there yet and CreateListable() has no URI to be given. A repository
+// implementing this interface answers both halves in one call.
+//
+// Repositories that can name a child by path arithmetic have no reason to
+// implement it — storage.CreateChild falls back to Child() plus
+// CreateListable() or Writer() for them.
+//
+// Since: 2.7
+type ChildCreatingRepository interface {
+	Repository
+
+	// CreateChild will be used to implement calls to storage.CreateChild()
+	// for the registered scheme of this repository. It creates a child of
+	// parent named name — a listable resource (a directory) when listable
+	// is true, otherwise an empty one — and returns the URI the store
+	// assigned it.
+	//
+	// It should report an error if a child of that name already exists;
+	// callers that want the existing one should ask Child() first.
+	//
+	// Since: 2.7
+	CreateChild(parent bellui.URI, name string, listable bool) (bellui.URI, error)
+}
+
 // DeleteAllRepository is an extension of the WritableRepository interface which
 // also supports deleting a URI and all its children.
 //
