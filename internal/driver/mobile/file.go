@@ -150,11 +150,15 @@ func ShowFolderOpenPicker(callback func(bellui.ListableURI, error)) bool {
 			return
 		}
 
-		uri, err := storage.ParseURI(path)
-		if err != nil {
+		if _, err := storage.ParseURI(path); err != nil {
 			callback(nil, err)
 			return
 		}
+		// nativeURI, not the parsed URI: on Android that wrapper is what
+		// carries the content:// Name()/Extension() overrides, and without it
+		// Name() answers the percent-encoded document ID — "primary%3ADocs"
+		// where the user expects "Docs" (#315).
+		uri := nativeURI(path)
 
 		callback(listerForURI(uri))
 	}, mobileFilter(filter))
@@ -209,11 +213,15 @@ func ShowFileSavePicker(callback func(bellui.URIWriteCloser, error), filter stor
 			return
 		}
 
-		uri, err := storage.ParseURI(path)
-		if err != nil {
+		if _, err := storage.ParseURI(path); err != nil {
 			callback(nil, err)
 			return
 		}
+		// nativeURI, not the parsed URI: on Android that wrapper is what
+		// carries the content:// Name()/Extension() overrides, and without it
+		// Name() answers the percent-encoded document ID — "primary%3ADocs"
+		// where the user expects "Docs" (#315).
+		uri := nativeURI(path)
 
 		// TODO: does the save dialog want to truncate by default?
 		callback(fileWriterForURI(uri, true, closer))
