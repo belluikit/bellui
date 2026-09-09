@@ -33,7 +33,7 @@ jobs:
       - name: Get dependencies
         run: |
           flock /tmp/bellui-ci-apt.lock sudo apt-get -o DPkg::Lock::Timeout=600 update
-          flock /tmp/bellui-ci-apt.lock sudo apt-get -o DPkg::Lock::Timeout=600 install --no-install-recommends clang lld libegl1-mesa-dev libgles2-mesa-dev libx11-dev xorg-dev
+          flock /tmp/bellui-ci-apt.lock sudo apt-get -o DPkg::Lock::Timeout=600 install -y --no-install-recommends clang lld libegl1-mesa-dev libgles2-mesa-dev libx11-dev xorg-dev
 
       # WebGPU is the default mobile backend (Phase 5, #204); GLES is the fallback
       # behind -tags gl. This comprehensive leg exercises the GLES fallback path.
