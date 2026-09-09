@@ -34,6 +34,7 @@ note() { printf '%s\n' "$*" >&2; }
 # binary on a loaded host ANRs SystemUI and DocumentsUI routinely, and the
 # dialog steals focus from whatever the flow was driving; left alone it reads
 # as "the button never appeared".
+anr_count=0
 dismiss_anr() {
 	local xml b
 	xml=$(dump_ui || true)
@@ -44,16 +45,28 @@ dismiss_anr() {
 	[ -n "$b" ] || return 0
 	read -r x1 y1 x2 y2 < <(printf '%s' "$b" | tr -cs '0-9' ' ')
 	adb shell input tap $(((x1 + x2) / 2)) $(((y1 + y2) / 2))
-	note "  dismissed an ANR dialog"
+	anr_count=$((anr_count + 1))
+	note "  dismissed an ANR dialog ($anr_count)"
+	# A device ANRing this persistently is starved, not slow. Carrying on
+	# produces a wall of "never appeared" that looks like a product failure
+	# and is a host-load one.
+	if [ "$anr_count" -ge 12 ]; then
+		note "ABORT: $anr_count ANRs — the device is starved of CPU, not failing."
+		note "       Free the host (check its load average) and rerun."
+		exit 3
+	fi
 	sleep 2
 }
 
 # DocumentsUI is an ordinary view hierarchy, so the picker can be driven by
 # text rather than by coordinates. tap_text dumps the tree, finds the node
 # whose text or content-desc matches, and taps the centre of its bounds.
+# The dump goes to /data/local/tmp, not /sdcard: scoped storage makes the
+# latter unreadable to the shell user, so `cat` answers "Permission denied"
+# and every tap_text reads as "the button never appeared".
 dump_ui() {
-	adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1 || return 1
-	adb shell cat /sdcard/ui.xml
+	adb shell uiautomator dump /data/local/tmp/ui.xml >/dev/null 2>&1 || return 1
+	adb shell cat /data/local/tmp/ui.xml
 }
 
 tap_text() {
@@ -73,6 +86,24 @@ tap_text() {
 		sleep 1
 	done
 	note "  '$want' never appeared"
+	return 1
+}
+
+# wait_for_start blocks until THIS run's probe process has reached its launch
+# marker. Without it wait_for_picker can match a DocumentsUI window an earlier
+# attempt left focused and start tapping before the probe has opened anything.
+wait_for_start() {
+	local i
+	for ((i = 0; i < 60; i++)); do
+		if probe_lines >/dev/null 2>&1 &&
+			adb logcat -d -s GoLog 2>/dev/null | grep -q 'safprobe: START'; then
+			note "  probe started after ~$((i * 2))s"
+			return 0
+		fi
+		dismiss_anr
+		sleep 2
+	done
+	note "TIMEOUT: the probe never printed its START marker"
 	return 1
 }
 
@@ -98,12 +129,19 @@ wait_for_picker() {
 }
 
 # ---- probe output -----------------------------------------------------------
+# clear_log drops the log buffer. It fails on a busy device ("failed to clear
+# the 'main' log"), which must not end the run: report reads only lines after
+# the last DONE, so a stale buffer costs nothing.
+clear_log() {
+	adb logcat -c 2>/dev/null || note "  (could not clear the log buffer; reading the tail instead)"
+}
+
 # wait_for_done blocks until the probe prints its terminating DONE line, so the
 # report is never read half-written. A timeout is a failure, not a quiet pass.
 wait_for_done() {
 	local i
 	for ((i = 0; i < 90; i++)); do
-		if adb logcat -d -s GoLog 2>/dev/null | grep -q 'safprobe: DONE'; then
+		if probe_lines | grep -q '^DONE'; then
 			return 0
 		fi
 		dismiss_anr
@@ -113,9 +151,17 @@ wait_for_done() {
 	return 1
 }
 
+# probe_lines is every probe line since the most recent START — the marker the
+# probe prints on launch — so a log buffer that could not be cleared cannot
+# make an earlier run's PASSes, or its DONE, count for this one.
+probe_lines() {
+	adb logcat -d -s GoLog 2>/dev/null | sed -n 's/.*safprobe: //p' |
+		awk '/^START$/ {n = 0; next} {a[n++] = $0} END {for (i = 0; i < n; i++) print a[i]}'
+}
+
 report() {
 	local lines pass fail
-	lines=$(adb logcat -d -s GoLog 2>/dev/null | sed -n 's/.*safprobe: //p')
+	lines=$(probe_lines)
 	printf '%s\n' "$lines"
 	pass=$(printf '%s\n' "$lines" | grep -c '^PASS ' || true)
 	fail=$(printf '%s\n' "$lines" | grep -c '^FAIL ' || true)
@@ -149,8 +195,9 @@ cmd_install() {
 cmd_pick() {
 	note "fresh run: clearing app data so the picker opens ..."
 	adb shell pm clear $APP >/dev/null
-	adb logcat -c
+	clear_log
 	adb shell am start -n $APP/$ACT >/dev/null
+	wait_for_start
 	wait_for_picker
 
 	# DocumentsUI opens on Recent; go to a real tree the app can be granted.
@@ -169,7 +216,7 @@ cmd_pick() {
 cmd_rerun() {
 	note "rerun: app data KEPT, so the folder URI is remembered ..."
 	adb shell am force-stop $APP
-	adb logcat -c
+	clear_log
 	adb shell am start -n $APP/$ACT >/dev/null
 	wait_for_done
 	report
