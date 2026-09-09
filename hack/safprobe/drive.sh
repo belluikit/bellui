@@ -202,14 +202,17 @@ cmd_pick() {
 	wait_for_start
 	wait_for_picker
 
-	# DocumentsUI opens on Recent; go to a real tree the app can be granted.
-	tap_text "Show roots" 10 || tap_text "More options" 5 || true
-	sleep 1
-	tap_text "Documents" 15 || note "  (already inside a folder?)"
-	sleep 2
-	tap_text "USE THIS FOLDER" 15 || tap_text "ALLOW ACCESS" 10
-	sleep 1
-	tap_text "ALLOW" 10 || true
+	# ACTION_OPEN_DOCUMENT_TREE lands on the device's storage root, which
+	# Android refuses to grant — it shows "Can't use this folder / To protect
+	# your privacy, choose another folder" and leaves USE THIS FOLDER inert. So
+	# enter a subfolder first; Documents is present on every image.
+	#
+	# Do NOT go via "Show roots" or "More options": the latter opens the
+	# overflow menu, which then covers the file list, and every subsequent
+	# tap_text reports "never appeared" while the picker is simply obscured.
+	tap_text "Documents" 20
+	tap_text "USE THIS FOLDER" 15
+	tap_text "ALLOW" 15
 
 	wait_for_done
 	report
