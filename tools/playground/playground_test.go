@@ -9,12 +9,18 @@ import (
 	"github.com/belluikit/bellui/driver/software"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/test"
+	belluitest "github.com/belluikit/bellui/test"
 	"github.com/belluikit/bellui/theme"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestRender(t *testing.T) {
+	// software.Render resolves theme colours through bellui.CurrentApp. The app
+	// used to arrive via driver/software's import of bellui/test; that import is
+	// gone (#304), so install one explicitly.
+	belluitest.NewTempApp(t)
+
 	obj := canvas.NewRectangle(color.Black)
 	obj.SetMinSize(geo.NewSquareSize(10))
 
