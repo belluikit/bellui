@@ -38,6 +38,39 @@ jobs:
         working-directory: cmd/bellui_settings
         run: go build -tags osusergo
 
+      # The test helpers must not reach a shipped binary (#304). driver/software
+      # is linked into every desktop and web build, and while it imported
+      # bellui/test it dragged testify and gopkg.in/yaml.v3 along: 500,910 bytes
+      # of code, 2.2% of the code section, in the wasm build above. The gate
+      # lives on the web leg because payload size is a product metric here.
+      #
+      # Both build tag sets are checked: a !wasm/wasm split could otherwise
+      # reintroduce the import on the leg the other check does not compile.
+      - name: Assert no test-only packages in the web binary
+        env:
+          GOOS: js
+          GOARCH: wasm
+          CGO_ENABLED: "0"
+        working-directory: cmd/bellui_settings
+        run: |
+          set -euo pipefail
+          for tags in osusergo gl; do
+            go list -deps -tags "$tags" . > deps.txt
+            # Positive marker: an empty or partial listing must fail loudly
+            # rather than read as "no test packages found".
+            grep -qx 'github.com/belluikit/bellui/driver/software' deps.txt || {
+              echo "::error::-tags $tags: driver/software is not in the dependency listing — the check did not measure what it claims"
+              exit 1
+            }
+            found=$(grep -E '^(testing|github.com/stretchr/testify|gopkg.in/yaml.v3|github.com/belluikit/bellui/(internal/)?test)($|/)' deps.txt || true)
+            if [ -n "$found" ]; then
+              echo "::error::-tags $tags: test-only packages linked into the web binary:"
+              echo "$found"
+              exit 1
+            fi
+          done
+          rm -f deps.txt
+
       - name: Build WebAssembly binary (WebGL fallback)
         env:
           GOOS: js
