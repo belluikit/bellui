@@ -88,6 +88,9 @@ func main() {
 	var once sync.Once
 	a.Lifecycle().SetOnEnteredForeground(func() {
 		once.Do(func() {
+			// A launch marker, so a driver script reading a log buffer it
+			// could not clear can tell this run's lines from the last one's.
+			say("START")
 			if saved := bellui.PrefOr(a.Preferences(), prefRoot, ""); saved != "" {
 				rerun(saved)
 				return
