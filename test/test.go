@@ -10,6 +10,7 @@ import (
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/cache"
 	intdriver "github.com/belluikit/bellui/internal/driver"
+	"github.com/belluikit/bellui/internal/memcanvas"
 )
 
 // RenderObjectToMarkup renders the given [github.com/belluikit/bellui.CanvasObject] to a markup string.
@@ -109,8 +110,8 @@ func DragSteps(c core.Canvas, pos geo.Position, deltaX, deltaY float32, steps in
 
 // FocusNext focuses the next focusable on the canvas.
 func FocusNext(c core.Canvas) {
-	if tc, ok := c.(*canvas); ok {
-		tc.focusManager().FocusNext()
+	if tc, ok := c.(*memcanvas.Canvas); ok {
+		tc.FocusManager().FocusNext()
 	} else {
 		bellui.LogError("FocusNext can only be called with a test canvas", nil)
 	}
@@ -118,8 +119,8 @@ func FocusNext(c core.Canvas) {
 
 // FocusPrevious focuses the previous focusable on the canvas.
 func FocusPrevious(c core.Canvas) {
-	if tc, ok := c.(*canvas); ok {
-		tc.focusManager().FocusPrevious()
+	if tc, ok := c.(*memcanvas.Canvas); ok {
+		tc.FocusManager().FocusPrevious()
 	} else {
 		bellui.LogError("FocusPrevious can only be called with a test canvas", nil)
 	}
@@ -139,10 +140,10 @@ func MoveMouse(c core.Canvas, pos geo.Position) {
 		return
 	}
 
-	tc, _ := c.(*canvas)
+	tc, _ := c.(*memcanvas.Canvas)
 	var oldHovered, hovered event.Hoverable
 	if tc != nil {
-		oldHovered = tc.hovered
+		oldHovered = tc.Hovered()
 	}
 	matches := func(object core.CanvasObject) bool {
 		_, ok := object.(event.Hoverable)
@@ -169,7 +170,7 @@ func MoveMouse(c core.Canvas, pos geo.Position) {
 		oldHovered.HoverOut()
 	}
 	if tc != nil {
-		tc.hovered = hovered
+		tc.SetHovered(hovered)
 	}
 }
 
