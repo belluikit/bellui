@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"errors"
 	"path"
 	"path/filepath"
 	"runtime"
@@ -599,4 +600,82 @@ func CreateListable(u bellui.URI) error {
 	}
 
 	return lrepo.CreateListable(u)
+}
+
+// CreateChild creates a resource named name below parent and returns its URI:
+// a listable resource (a directory) when listable is true, otherwise an empty
+// one.
+//
+// It exists because [Child] cannot serve every backend. Child does path
+// arithmetic — it names a resource whether or not anything is there — and that
+// only works where a child's identity follows from its parent's. Android's
+// Storage Access Framework assigns document IDs itself and hands the URI back
+// only on creation, so under a folder the user picked there, Child has nothing
+// to return for a name that does not exist yet (#303). CreateChild asks the
+// store to make the resource and tells you what it called it.
+//
+// Repositories that can name a child by path arithmetic need do nothing: for
+// them CreateChild is [Child] followed by [CreateListable] or an empty
+// [Writer], which is what you would have written by hand. A repository
+// implementing [repository.ChildCreatingRepository] answers instead.
+//
+// This can fail in several ways:
+//
+//   - If the parent does not exist, or is not listable, then the underlying
+//     repository will normally report an error.
+//
+//   - If a child of that name already exists, this fails rather than returning
+//     the existing resource — ask [Child] first if that is what you want.
+//
+//   - If the scheme of the given URI has no registered repository supporting
+//     the needed operations, this fails with
+//     [repository.ErrOperationNotSupported].
+//
+// Since: 2.7
+func CreateChild(parent bellui.URI, name string, listable bool) (bellui.URI, error) {
+	repo, err := repository.ForURI(parent)
+	if err != nil {
+		return nil, err
+	}
+
+	if crepo, ok := repo.(repository.ChildCreatingRepository); ok {
+		return crepo.CreateChild(parent, name, listable)
+	}
+
+	child, err := Child(parent, name)
+	if err != nil {
+		return nil, err
+	}
+
+	if listable {
+		if err := CreateListable(child); err != nil {
+			return nil, err
+		}
+		return child, nil
+	}
+
+	// Not listable: the closest equivalent of the store creating an empty
+	// document is opening a writer and closing it.
+	w, err := Writer(child)
+	if err != nil {
+		return nil, err
+	}
+	if err := w.Close(); err != nil {
+		return nil, err
+	}
+
+	// Whether that left anything behind is up to the repository: Writer
+	// promises to create the resource when written to, and zero bytes is not
+	// obviously a write — the in-memory repository stores nothing. Checking
+	// makes the difference an error rather than a silent no-op, since the
+	// caller asked for a resource and would otherwise be handed the URI of
+	// one that is not there.
+	exists, err := Exists(child)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.New("repository did not create " + child.String())
+	}
+	return child, nil
 }
