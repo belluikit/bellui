@@ -45,11 +45,47 @@ jobs:
         working-directory: cmd/bellui_settings
         run: go build -tags gl
 
+      # Run the browser binary directly, out from under snap-confine (#311).
+      # /snap/bin/chromium is a wrapper that calls snap-confine, which refuses
+      # to launch from the runner service with
+      #   "...actions.runner....service is not a snap cgroup for tag snap.chromium.chromium"
+      # and takes every package down with it — the browser never starts, so no
+      # test runs. The snap's own binary underneath has no such check and works;
+      # a shim named `chromium`, ahead of /snap/bin on PATH, is what chromedp
+      # (inside wasmbrowsertest) then finds.
+      #
+      # --no-sandbox because the SUID sandbox helper is set up by the snap's
+      # confinement, which is exactly what is being bypassed here. This is CI
+      # running our own code in a throwaway VM.
+      #
+      # This still depends on the chromium SNAP being installed — just not on
+      # snap-confine to launch it. The root cause of the refusal is NOT
+      # established: the same wrapper runs fine by hand as the same user, in a
+      # transient system-slice service, and even inside the runner service's
+      # own cgroup. Only the real job reproduces it.
+      - name: Put a snap-confine-free chromium on PATH
+        run: |
+          set -euo pipefail
+          real=/snap/chromium/current/usr/lib/chromium-browser/chrome
+          test -x "$real" || { echo "::error::$real is missing — is the chromium snap installed?"; exit 1; }
+          mkdir -p "$RUNNER_TEMP/browser-bin"
+          cat > "$RUNNER_TEMP/browser-bin/chromium" <<SHIM
+          #!/usr/bin/env bash
+          exec $real --no-sandbox "\$@"
+          SHIM
+          chmod +x "$RUNNER_TEMP/browser-bin/chromium"
+          echo "$RUNNER_TEMP/browser-bin" >> "$GITHUB_PATH"
+          # Positive marker: prove the shim launches a browser before the tests
+          # depend on it, so a launch failure is reported here rather than as
+          # 40-odd unrelated package failures.
+          "$RUNNER_TEMP/browser-bin/chromium" --headless --disable-gpu --dump-dom about:blank > /dev/null
+          echo "chromium shim launches OK"
+
       # Real-DOM execution leg (#73). wasmbrowsertest runs the test binary in
       # headless Chromium, so the wasm packages are exercised against a real
       # browser — real IndexedDB for app's storage tests, a real
       # iframe/postMessage surface for webview — rather than only
-      # type-checked. Needs `chromium` on PATH (snap on the Ubuntu runner).
+      # type-checked. Needs `chromium` on PATH — supplied by the shim above.
       #
       # Scope is the FULL module (#79): every eligible package was triaged —
       # in-browser failures either got #77-style !wasm splits (behaviour the
@@ -83,26 +119,18 @@ jobs:
           # startup per package, not CPU.
           go test -p 1 -tags ci -timeout 240s -exec="$(go env GOPATH)/bin/wasmbrowsertest" $pkgs
 
-      # One browser launch per package leaves a profile behind, and the snap
-      # chromium writes them into its private /tmp — which is the SHARED tmpfs
-      # every other runner on this box links binaries in. Left alone the
-      # full-module leg grew it by ~4 GB an hour and starved a concurrent
-      # platform_tests of link space ("mapping output file failed: disk quota
-      # exceeded"). Clean the CONTENTS only: deleting the private tmp
-      # directories themselves breaks every later chromium launch, because
-      # snapd's cached mount namespace keeps binding the deleted path
-      # ("Failed to create socket directory") and only snap-discard-ns
-      # recovers it.
+      # One browser launch per package leaves a profile behind in /tmp — the
+      # SHARED tmpfs every other runner on this box links binaries in. Left
+      # alone the full-module leg grew it by ~4 GB an hour and starved a
+      # concurrent platform_tests of link space ("mapping output file failed:
+      # disk quota exceeded").
+      #
+      # The snap's private /tmp is no longer involved: launching the binary
+      # directly (#311) never uses it, so the reclamation there — and the
+      # snap-discard-ns call that repaired the mount namespace it invalidated —
+      # are gone with it.
       - name: Reclaim the browser's temp space
         if: always()
         run: |
-          sudo find /tmp/snap-private-tmp/snap.chromium/tmp -mindepth 1 -maxdepth 1 \
-            -exec rm -rf {} + 2>/dev/null || true
           find /tmp -maxdepth 1 -name 'chromedp-*' -exec rm -rf {} + 2>/dev/null || true
-          # Deleting inside the snap's private /tmp invalidates the mount
-          # namespace snapd caches for it: the next launch then dies with
-          # "Failed to open /dev/null" and a zygote "Check failed: File
-          # exists (17)", which looks like a test failure and is not one.
-          # Discarding the namespace makes the next launch rebuild it.
-          sudo /usr/lib/snapd/snap-discard-ns chromium 2>/dev/null || true
           df -h /tmp | tail -1
