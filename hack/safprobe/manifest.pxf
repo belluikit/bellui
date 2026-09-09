@@ -2,5 +2,5 @@ details {
   name = "safprobe"
   id = "io.bellui.safprobe"
   version = "1.0.0"
-  build = 3
+  build = 1
 }
