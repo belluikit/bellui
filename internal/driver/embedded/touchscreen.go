@@ -8,11 +8,10 @@ import (
 	"github.com/belluikit/bellui/internal/driver/common"
 
 	"github.com/belluikit/bellui/driver/software"
-	"github.com/belluikit/bellui/test"
 )
 
 type touchCanvas struct {
-	test.WindowlessCanvas
+	software.WindowlessCanvas
 	common.TouchHandler
 }
 

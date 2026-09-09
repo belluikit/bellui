@@ -4,6 +4,7 @@ import (
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/memcanvas"
 )
 
 type window struct {
@@ -14,7 +15,7 @@ type window struct {
 	onClosed           func()
 	onCloseIntercepted func()
 
-	canvas *canvas
+	canvas *memcanvas.Canvas
 	driver *driver
 	menu   *bellui.MainMenu
 }

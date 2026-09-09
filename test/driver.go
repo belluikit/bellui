@@ -1,7 +1,6 @@
 package test
 
 import (
-	"image"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -11,6 +10,7 @@ import (
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/async"
 	intdriver "github.com/belluikit/bellui/internal/driver"
+	"github.com/belluikit/bellui/internal/memcanvas"
 	"github.com/belluikit/bellui/internal/painter"
 	"github.com/belluikit/bellui/internal/painter/software"
 	intRepo "github.com/belluikit/bellui/internal/repository"
@@ -19,9 +19,7 @@ import (
 )
 
 // SoftwarePainter describes a simple type that can render canvases
-type SoftwarePainter interface {
-	Paint(core.Canvas) image.Image
-}
+type SoftwarePainter = memcanvas.Painter
 
 type driver struct {
 	device       device
@@ -100,8 +98,8 @@ func (d *driver) AbsolutePositionForObject(co core.CanvasObject) geo.Position {
 		return geo.NewPos(0, 0)
 	}
 
-	tc := c.(*canvas)
-	pos := intdriver.AbsolutePositionForObject(co, tc.objectTrees())
+	tc := c.(*memcanvas.Canvas)
+	pos := intdriver.AbsolutePositionForObject(co, tc.ObjectTrees())
 	inset, _ := c.InteractiveArea()
 	return pos.Subtract(inset)
 }
@@ -120,11 +118,11 @@ func (d *driver) CanvasForObject(core.CanvasObject) core.Canvas {
 }
 
 func (d *driver) CreateWindow(title string) bellui.Window {
-	c := NewCanvas().(*canvas)
+	c := memcanvas.New()
 	if d.painter != nil {
-		c.painter = d.painter
+		c.SetPainter(d.painter)
 	} else {
-		c.painter = software.NewPainter()
+		c.SetPainter(software.NewPainter())
 	}
 
 	w := &window{canvas: c, driver: d, title: title}
