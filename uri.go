@@ -65,7 +65,17 @@ type URI interface {
 	// Since: 2.0
 	Authority() string
 
-	// Path should return the URI path, as defined by IETF RFC3986.
+	// Path should return the URI path, as defined by IETF RFC3986 — the
+	// path component of the URI itself, still percent-encoded.
+	//
+	// It is a filesystem path only when Scheme() is "file". For any other
+	// scheme it is whatever that scheme puts in the path component, which
+	// may look like a filesystem path and not be one: an Android
+	// content:// URI from the folder picker gives
+	// "/tree/primary%3ADocuments", the provider's document ID, and handing
+	// that to os.MkdirAll resolves it under / (#303). Use Name() for
+	// something to show a user, and the storage package — Child,
+	// CreateChild, List — to work with the resource.
 	//
 	// Since: 2.0
 	Path() string
