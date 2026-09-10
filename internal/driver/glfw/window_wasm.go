@@ -849,3 +849,7 @@ func (w *wrapInner) updateVisibility() {
 func (w *window) scaleInput(in float64) float64 {
 	return in
 }
+
+// cancelPendingTap is a no-op here: the wasm driver runs no touch state
+// machine, so there is never a pending double-tap to abandon (#310).
+func (w *window) cancelPendingTap() {}
