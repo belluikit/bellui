@@ -72,8 +72,9 @@ func listURI(uri bellui.URI) ([]bellui.URI, error) {
 		if len(part) == 0 {
 			continue
 		}
-		u, _ := storage.ParseURI(part)
-		list = append(list, u)
+		// nativeURI so each child carries the content:// Name() override;
+		// a plain ParseURI leaves Name() answering the document ID (#315).
+		list = append(list, nativeURI(part))
 	}
 	return list, nil
 }

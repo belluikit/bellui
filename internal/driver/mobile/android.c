@@ -15,6 +15,12 @@
 // into one, and logging it at FATAL priority reads in logcat as though the
 // process were about to die. (Neither macro aborts — __android_log_print never
 // does, whatever the priority; only __android_log_assert would.)
+// INVARIANT: memory allocated on one side of the cgo boundary is freed on that
+// same side. Go allocates its argument buffers (C.CString / C.CBytes) and frees
+// them; this file must not. And every char* handed back to Go from this file is either
+// heap-allocated (strdup/malloc, and the Go caller frees it) or NULL. Never a
+// string literal — Go cannot tell the difference and frees it, which corrupts
+// the allocator and aborts the process inside free() (#315).
 #define LOG_UNSUPPORTED(...) __android_log_print(ANDROID_LOG_WARN, "Bellui", __VA_ARGS__)
 
 static jclass find_class(JNIEnv *env, const char *class_name) {
@@ -198,11 +204,12 @@ jbyte* readStream(uintptr_t jni_env, uintptr_t ctx, void* stream, int len, int* 
 	return bytes;
 }
 
+// writeStream does NOT free buf: the Go caller allocated it with C.CBytes and
+// frees it itself. Freeing here as well is a double free, which Scudo catches
+// and turns into an abort — "invalid chunk state when deallocating" — on every
+// write to a file (#315).
 void writeStream(uintptr_t jni_env, uintptr_t ctx, void* stream, jbyte* buf, int len) {
 	if (stream == NULL) {
-		if (buf != NULL) {
-			free(buf);
-		}
 		return;
 	}
 	JNIEnv *env = (JNIEnv*)jni_env;
@@ -213,8 +220,6 @@ void writeStream(uintptr_t jni_env, uintptr_t ctx, void* stream, jbyte* buf, int
 	(*env)->SetByteArrayRegion(env, data, 0, len, buf);
 
 	(*env)->CallVoidMethod(env, stream, write, data, 0, len);
-
-	free(buf);
 }
 
 void closeStream(uintptr_t jni_env, uintptr_t ctx, void* stream) {
@@ -636,15 +641,36 @@ bool createListableURI(uintptr_t jni_env, uintptr_t ctx, char* uriCstr) {
 	return false;
 }
 
+// contentURIGetFileName answers a content:// URI's display name, or NULL.
+//
+// It resolves through documentURI first. _display_name is a column of the
+// DOCUMENT: a tree URI (/tree/<id>), and anything buildDocumentUriUsingTree
+// produced, is not itself queryable for it. Querying the raw URI returns no
+// row, and androidURI.Name() then falls back to the generic URI name — the
+// percent-encoded document ID, "primary%3ADocuments" where the user expects
+// "Documents" (#315).
+//
+// NULL, never "", on every failure path. The Go caller frees a non-NULL
+// return, and free() on a string literal corrupts the allocator and later
+// aborts the process inside free() (#315).
 const char* contentURIGetFileName(uintptr_t jni_env, uintptr_t ctx, char* uriCstr) {
 	JNIEnv *env = (JNIEnv*)jni_env;
 	jobject resolver = getContentResolver(jni_env, ctx);
 	jobject uri = parseURI(jni_env, ctx, uriCstr);
-	jthrowable loadErr = (*env)->ExceptionOccurred(env);
-
-	if (loadErr != NULL) {
+	if ((*env)->ExceptionOccurred(env) != NULL) {
 		(*env)->ExceptionClear(env);
-		return "";
+		return NULL;
+	}
+
+	// A plain content:// from a single-file pick is not under a tree and has
+	// no document URI; query it directly in that case.
+	jobject target = uri;
+	jclass contractClass = find_class(env, "android/provider/DocumentsContract");
+	if (contractClass != NULL) {
+		jobject doc = documentURI(jni_env, ctx, contractClass, uri);
+		if (doc != NULL) {
+			target = doc;
+		}
 	}
 
 	jclass stringClass = find_class(env, "java/lang/String");
@@ -653,19 +679,29 @@ const char* contentURIGetFileName(uintptr_t jni_env, uintptr_t ctx, char* uriCst
 	jclass resolverClass = (*env)->GetObjectClass(env, resolver);
 	jmethodID query = find_method(env, resolverClass, "query", "(Landroid/net/Uri;[Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;Ljava/lang/String;)Landroid/database/Cursor;");
 
-	jobject cursor = (jobject)(*env)->CallObjectMethod(env, resolver, query, uri, project, NULL, NULL, NULL);
-	jclass cursorClass = (*env)->GetObjectClass(env, cursor);
+	jobject cursor = (jobject)(*env)->CallObjectMethod(env, resolver, query, target, project, NULL, NULL, NULL);
+	if ((*env)->ExceptionOccurred(env) != NULL) {
+		(*env)->ExceptionClear(env);
+		return NULL;
+	}
+	if (cursor == NULL) { // a provider may answer null rather than an empty cursor
+		return NULL;
+	}
 
+	jclass cursorClass = (*env)->GetObjectClass(env, cursor);
 	jmethodID first = find_method(env, cursorClass, "moveToFirst", "()Z");
 	jmethodID get = find_method(env, cursorClass, "getString", "(I)Ljava/lang/String;");
 
+	const char *fname = NULL;
 	if (((jboolean)(*env)->CallBooleanMethod(env, cursor, first)) == JNI_TRUE) {
 		jstring name = (jstring)(*env)->CallObjectMethod(env, cursor, get, 0);
-		const char *fname = getString(jni_env, ctx, name);
-		return fname;
+		if (name != NULL) {
+			fname = getString(jni_env, ctx, name);
+		}
 	}
 
-	return NULL;
+	closeCursor(env, cursor);
+	return fname;
 }
 
 char *filePath(char *uriCstr) {
@@ -727,17 +763,17 @@ char* listContentURI(uintptr_t jni_env, uintptr_t ctx, char* uriCstr) {
 
 	if (loadErr != NULL) {
 		(*env)->ExceptionClear(env);
-		return "";
+		return NULL;
 	}
 
 	jclass contractClass = find_class(env, "android/provider/DocumentsContract");
 	if (contractClass == NULL) { // API 19
-		return "";
+		return NULL;
 	}
 
 	jobject cursor = queryChildren(jni_env, ctx, contractClass, uri);
 	if (cursor == NULL) {
-		return "";
+		return NULL;
 	}
 
 	jclass cursorClass = (*env)->GetObjectClass(env, cursor);
@@ -837,7 +873,7 @@ char* listURI(uintptr_t jni_env, uintptr_t ctx, char* uriCstr) {
 		return listContentURI(jni_env, ctx, uriCstr);
 	}
 	LOG_UNSUPPORTED("Unrecognized scheme: %s", uriCstr);
-	return "";
+	return NULL;
 }
 
 void keepScreenOn(uintptr_t jni_env, uintptr_t ctx, bool disabled) {

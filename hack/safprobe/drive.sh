@@ -95,8 +95,7 @@ tap_text() {
 wait_for_start() {
 	local i
 	for ((i = 0; i < 60; i++)); do
-		if probe_lines >/dev/null 2>&1 &&
-			adb logcat -d -s GoLog 2>/dev/null | grep -q 'safprobe: START'; then
+		if adb logcat -d 2>/dev/null | grep -q 'safprobe: START'; then
 			note "  probe started after ~$((i * 2))s"
 			return 0
 		fi
@@ -155,7 +154,10 @@ wait_for_done() {
 # probe prints on launch — so a log buffer that could not be cleared cannot
 # make an earlier run's PASSes, or its DONE, count for this one.
 probe_lines() {
-	adb logcat -d -s GoLog 2>/dev/null | sed -n 's/.*safprobe: //p' |
+	# No -s tag filter: gomobile routes the probe's stdout through the toolkit's
+	# log bridge under the "Bellui" tag, not "GoLog", and that is not worth
+	# depending on. The "safprobe: " prefix identifies our lines whatever the tag.
+	adb logcat -d 2>/dev/null | sed -n 's/.*safprobe: //p' |
 		awk '/^START$/ {n = 0; next} {a[n++] = $0} END {for (i = 0; i < n; i++) print a[i]}'
 }
 
@@ -200,14 +202,17 @@ cmd_pick() {
 	wait_for_start
 	wait_for_picker
 
-	# DocumentsUI opens on Recent; go to a real tree the app can be granted.
-	tap_text "Show roots" 10 || tap_text "More options" 5 || true
-	sleep 1
-	tap_text "Documents" 15 || note "  (already inside a folder?)"
-	sleep 2
-	tap_text "USE THIS FOLDER" 15 || tap_text "ALLOW ACCESS" 10
-	sleep 1
-	tap_text "ALLOW" 10 || true
+	# ACTION_OPEN_DOCUMENT_TREE lands on the device's storage root, which
+	# Android refuses to grant — it shows "Can't use this folder / To protect
+	# your privacy, choose another folder" and leaves USE THIS FOLDER inert. So
+	# enter a subfolder first; Documents is present on every image.
+	#
+	# Do NOT go via "Show roots" or "More options": the latter opens the
+	# overflow menu, which then covers the file list, and every subsequent
+	# tap_text reports "never appeared" while the picker is simply obscured.
+	tap_text "Documents" 20
+	tap_text "USE THIS FOLDER" 15
+	tap_text "ALLOW" 15
 
 	wait_for_done
 	report
