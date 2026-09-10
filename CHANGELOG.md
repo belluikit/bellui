@@ -11,6 +11,112 @@ This file lists the main changes with each version of the Fyne toolkit.
 Entries up to 2.7.3 are inherited from upstream Fyne; later entries describe
 the trendvidia fork (github.com/trendvidia/fyne).
 
+## v1.1.0 — 2026-09-10
+
+Android's Storage Access Framework becomes usable, two long-standing cgo
+memory bugs in the Android bridge are fixed, and the test helpers stop
+shipping in production binaries. The minor bump is for the new
+`storage.CreateChild` API; everything else is additive or a fix.
+
+### Added
+
+* **`storage.CreateChild`, for stores that name their own children**
+  ([#303](https://github.com/belluikit/bellui/issues/303)). `storage.Child`
+  does path arithmetic — it names a resource whether or not anything is
+  there — and that does not work where the store assigns identity. Under
+  Android's SAF a document ID is opaque and `DocumentsContract` hands the URI
+  back only on creation, so a folder the user picked could not be scaffolded
+  into at all. `CreateChild(parent, name, listable)` asks the store to make
+  the resource and returns what it called it, and
+  `repository.ChildCreatingRepository` is the optional capability a repository
+  implements to answer it. Repositories that can name a child by path
+  arithmetic implement nothing: for them `CreateChild` is `Child` plus
+  `CreateListable` or an empty `Writer`, and it verifies the resource exists
+  before returning rather than handing back a URI pointing at nothing.
+* `driver/software.WindowlessCanvas`, so the software driver's constructors
+  return a nameable type without reaching into `bellui/test`
+  ([#304](https://github.com/belluikit/bellui/issues/304)).
+
+### Fixed
+
+* **The test helpers no longer ship in production binaries**
+  ([#304](https://github.com/belluikit/bellui/issues/304)). `driver/software`
+  imported `bellui/test` for one interface and two constructors, and
+  `bellui/test` imports testify — so every desktop and web binary linked
+  testify, `gopkg.in/yaml.v3`, spew, difflib and `testing`. In the js/wasm
+  build of `cmd/bellui_settings` that was **988,505 bytes**, 2.09% of the
+  artifact, and 208 yaml symbols. The canvas moved to `internal/memcanvas`;
+  the public API is unchanged, since `test.WindowlessCanvas` and
+  `test.SoftwarePainter` are now aliases of the moved types. A CI gate keeps
+  it that way.
+* **Android: every write to a file was a double free**
+  ([#315](https://github.com/belluikit/bellui/issues/315)). `writeStream`
+  freed the buffer the Go caller had allocated with `C.CBytes` and frees
+  itself, which Scudo catches and turns into an abort — *"invalid chunk state
+  when deallocating"*. Pre-existing; found by the first complete
+  `hack/safprobe` run.
+* **Android: `contentURIGetFileName` corrupted the heap and answered the wrong
+  name** ([#315](https://github.com/belluikit/bellui/issues/315)). It returned
+  a string literal on its error path, which the Go caller frees — `free()` on
+  static storage. It also queried the raw URI, but `_display_name` is a column
+  of the *document*, so a tree URI had no row to find and `Name()` fell back to
+  the percent-encoded document ID: `primary%3ADocuments` where a user expects
+  `Documents`. The same literal-return shape was in `listContentURI` and
+  `listURI`.
+* **Android: a picked SAF folder can be scaffolded into**
+  ([#303](https://github.com/belluikit/bellui/issues/303)). `CreateChild` for
+  `content://` goes through `DocumentsContract.createDocument`, and refuses a
+  duplicate name rather than letting the provider silently invent
+  `"name (1)"`. `Child` resolves an existing child by display name, and
+  reports `storage.ErrNotExists` for one that is not there instead of a URI
+  that looks real. `Exists` and `Delete` work for `content://`. `Parent`
+  remains unsupported, and now says why: SAF exposes no upward link.
+* **Android: listing a subdirectory listed the picked folder instead**
+  ([#303](https://github.com/belluikit/bellui/issues/303)). `List` and
+  `CanList` took their document ID from `getTreeDocumentId`, which returns the
+  *root's* ID for any URI under the tree — so a scaffolded tree looked flat.
+* **Android: folder grants survive a restart**
+  ([#303](https://github.com/belluikit/bellui/issues/303)). Nothing called
+  `takePersistableUriPermission`, so every pick was single-use and an app
+  could not store a folder URI and reopen it later.
+* **Android: `listContentURI` leaked a JNI local reference per row**
+  ([#303](https://github.com/belluikit/bellui/issues/303)) — a directory of
+  any size overruns the 512-entry table, which aborts the process.
+* **A pending double-tap no longer outlives its widget**
+  ([#310](https://github.com/belluikit/bellui/issues/310)). A single tap on a
+  `DoubleTappable` leaves a timer waiting `TapDoubleDelay` for a second one,
+  and nothing cancelled it when the canvas went away — only a second tap did.
+  It then dispatched into widgets whose renderers had been destroyed. Tap a
+  widget, close the dialog holding it inside the double-tap window, and that
+  was a nil dereference.
+* `URI.Path()` now says what it is: the RFC3986 path component, and a
+  filesystem path only under `file://`. On Android a `content://` URI gives
+  `/tree/primary%3ADocuments`, which looks like a path, is not one, and
+  resolves under `/` if handed to `os.MkdirAll`
+  ([#303](https://github.com/belluikit/bellui/issues/303)).
+
+### Note
+
+The SAF behaviour above is verified on a device — 21 assertions against the
+external-storage provider on an API 34 emulator, including the duplicate-name
+refusal and a grant surviving a force-stop — using the new `hack/safprobe`
+harness. The remaining gap is that the run was driven by hand rather than by
+the harness's own script
+([#314](https://github.com/belluikit/bellui/issues/314)).
+
+### CI
+
+* `apt-get install` needs `-y`: five Linux legs died the moment apt had an
+  upgrade to do ([#307](https://github.com/belluikit/bellui/issues/307)).
+* chromium is launched without `snap-confine`, which had refused to start it
+  from the runner service and took every wasm package down with it
+  ([#311](https://github.com/belluikit/bellui/issues/311)).
+* `TestRender` asserts the rendered image rather than an exact PNG byte
+  string, which go1.27's `compress/flate` changed
+  ([#318](https://github.com/belluikit/bellui/issues/318)).
+* The PowerShell go-plus assertions accept `(plus <version>)`, which go1.27's
+  fork build reports ([#320](https://github.com/belluikit/bellui/issues/320)).
+
 ## v1.0.0 — 2026-08-05
 
 The first **bellui stable**, closing out the v1.0.0-rc line
