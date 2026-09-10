@@ -240,6 +240,10 @@ func (w *window) Close() {
 		}
 
 		w.closing = true
+		// Abandon a pending double-tap before the canvas goes: its timer runs
+		// for up to TapDoubleDelay after the gesture and would dispatch into
+		// widgets this close is about to tear down (#310).
+		w.cancelPendingTap()
 		w.viewport.SetShouldClose(true)
 
 		cache.RangeTexturesFor(w.canvas, w.canvas.Painter().Free)
