@@ -11,6 +11,7 @@ import (
 	"github.com/belluikit/bellui/driver/mobile"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/driver"
 )
 
 // Tap handling constants shared by mobile and embedded drivers.
@@ -53,6 +54,13 @@ type TouchHandler struct {
 	TouchCancelLock sync.Mutex
 	TouchLastTapped core.CanvasObject
 	TouchTapCount   int
+
+	// tapGeneration is bumped by CancelPendingTap. A waitForDoubleTap
+	// goroutine captures it when it starts and refuses to dispatch once it
+	// has moved on: the goroutine cannot be interrupted while it waits, so
+	// this is how a teardown tells it that the object it captured is no
+	// longer anyone's to call (#310).
+	tapGeneration uint64
 
 	// OnTapUp is an optional hook called at the start of TapUp, before
 	// tap/drag processing. If it returns true, tap processing is skipped
@@ -445,12 +453,16 @@ func (h *TouchHandler) TapUp(pos geo.Position, tapID int,
 			h.TouchTapCount++
 			h.TouchLastTapped = co
 			cancel := h.TouchCancelFunc
+			// Read the generation HERE, not inside the goroutine: between
+			// `go` and the goroutine's first statement a teardown can bump it,
+			// and a generation captured after the bump looks current (#310).
+			gen := h.tapGeneration
 			h.TouchCancelLock.Unlock()
 			if cancel != nil {
 				cancel()
 				return
 			}
-			go h.waitForDoubleTap(co, ev, tapCallback, doubleTapCallback)
+			go h.waitForDoubleTap(co, ev, gen, tapCallback, doubleTapCallback)
 		} else {
 			if wid, ok := co.(event.Tappable); ok {
 				tapCallback(wid, ev)
@@ -513,12 +525,76 @@ func (h *TouchHandler) forgetTouch(tapID int) {
 	delete(h.Touched, tapID)
 }
 
-func (h *TouchHandler) waitForDoubleTap(co core.CanvasObject, ev *event.PointEvent,
+// CancelPendingTap abandons a double-tap wait that has not fired yet. Call it
+// when the canvas those taps were dispatched against goes away — a window
+// closing, a driver shutting down.
+//
+// Cancelling the context alone is not enough and never was: that is how a
+// SECOND tap tells the waiter to fire early as a double tap, so it makes the
+// dispatch happen rather than preventing it. The generation bump is what
+// distinguishes "fire now" from "do not fire at all".
+func (h *TouchHandler) CancelPendingTap() {
+	h.TouchCancelLock.Lock()
+	cancel := h.TouchCancelFunc
+	h.TouchCancelFunc = nil
+	h.TouchTapCount = 0
+	h.TouchLastTapped = nil
+	h.tapGeneration++
+	h.TouchCancelLock.Unlock()
+
+	if cancel != nil {
+		cancel() // wake the waiter; the generation check stops it dispatching
+	}
+}
+
+// tapTargetLive reports whether co is still on the canvas the taps came from.
+//
+// A pending double-tap outlives its own gesture by TapDoubleDelay, and in that
+// window the object can be dismissed — a dialog closed, an overlay popped —
+// leaving a widget whose renderer the cache has destroyed. Calling Tapped on it
+// then dereferences freed state (#310). Nothing cancels on that path, because
+// the canvas itself is still alive, so the check has to be here.
+func (h *TouchHandler) tapTargetLive(co core.CanvasObject) bool {
+	if h.Finder == nil {
+		return true // no finder to ask — behave as before
+	}
+	c := h.Finder.CanvasForTouch()
+	if c == nil {
+		return false
+	}
+
+	found := false
+	seek := func(o core.CanvasObject, _, _ geo.Position, _ geo.Size) bool {
+		if o == co {
+			found = true
+		}
+		return found
+	}
+
+	driver.WalkVisibleObjectTree(c.Content(), seek, nil)
+	if found {
+		return true
+	}
+	for _, o := range c.Overlays().List() {
+		driver.WalkVisibleObjectTree(o, seek, nil)
+		if found {
+			return true
+		}
+	}
+	return false
+}
+
+func (h *TouchHandler) waitForDoubleTap(co core.CanvasObject, ev *event.PointEvent, gen uint64,
 	tapCallback func(event.Tappable, *event.PointEvent),
 	doubleTapCallback func(event.DoubleTappable, *event.PointEvent),
 ) {
 	ctx, cancel := context.WithDeadline(context.TODO(), time.Now().Add(TapDoubleDelay))
 	h.TouchCancelLock.Lock()
+	if h.tapGeneration != gen { // abandoned before this goroutine got going
+		h.TouchCancelLock.Unlock()
+		cancel()
+		return
+	}
 	h.TouchCancelFunc = cancel
 	h.TouchCancelLock.Unlock()
 	defer cancel()
@@ -526,9 +602,17 @@ func (h *TouchHandler) waitForDoubleTap(co core.CanvasObject, ev *event.PointEve
 	<-ctx.Done()
 	bellui.CurrentApp().Driver().DoFromGoroutine(func() {
 		h.TouchCancelLock.Lock()
+		stale := h.tapGeneration != gen
 		touchCount := h.TouchTapCount
 		touchLast := h.TouchLastTapped
 		h.TouchCancelLock.Unlock()
+
+		// Abandoned while we waited — the canvas these taps belonged to is
+		// gone — or the object has since left the tree. Either way co is no
+		// longer ours to call (#310).
+		if stale || !h.tapTargetLive(co) {
+			return
+		}
 
 		if touchCount == 2 && touchLast == co {
 			if wid, ok := co.(event.DoubleTappable); ok {
