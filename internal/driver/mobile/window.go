@@ -181,6 +181,13 @@ func (w *window) tryClose() {
 }
 
 func (w *window) Close() {
+	// Abandon any double-tap still waiting on this window's canvas: its timer
+	// would otherwise fire up to TapDoubleDelay from now, into widgets whose
+	// renderers this close destroys (#310).
+	if c, ok := w.Canvas().(interface{ CancelPendingTap() }); ok {
+		c.CancelPendingTap()
+	}
+
 	d := w.driver
 	pos := -1
 	for i, win := range d.windows {
