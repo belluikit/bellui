@@ -1342,3 +1342,11 @@ func (w *window) view() *glfw.Window {
 func wrapInnerWindow(*container.InnerWindow, bellui.Window, *gLDriver) bellui.Window {
 	return nil
 }
+
+// cancelPendingTap abandons a double-tap still waiting on this window, so its
+// timer cannot dispatch into widgets a close is tearing down (#310). The touch
+// handler is a desktop-only field — the wasm build has no touch state machine —
+// so the call site in the shared window.go goes through this seam.
+func (w *window) cancelPendingTap() {
+	w.touch.CancelPendingTap()
+}
