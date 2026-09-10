@@ -60,7 +60,7 @@ jobs:
         shell: powershell
         run: |
           go version
-          if (-not (go version | Select-String '\(plus\)')) { Write-Error 'runner go is not the go-plus fork'; exit 1 }
+          if (-not (go version | Select-String '\(plus[ )]')) { Write-Error 'runner go is not the go-plus fork'; exit 1 }
       - name: Resolve the toolkit from this checkout
         working-directory: cmd/bellui
         run: go mod edit -replace github.com/belluikit/bellui=../..
