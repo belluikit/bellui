@@ -57,3 +57,32 @@ hack/*/*.app/
 hack/*/[a-z]*.app/
 
 hack/*/*.apk
+
+# OS and editor files, Go test and profiling output
+Thumbs.db
+*.swp
+coverage.out
+coverage.html
+coverage.txt
+
+# Binaries from `go build ./hack/<name>` and the other main packages land in the
+# repository root. Anchored to the root so they cannot match source directories.
+# (theme/ is a source directory, so the `theme` main package is not listed.)
+/*probe
+/*probe.exe
+/*probe[0-9]*
+/repro*
+/adrenorepro
+/bellui
+/bellui.exe
+/bellui_settings
+/bellui_settings.exe
+/binres
+/demo
+/framebench
+/gendex
+/openwith
+/prvalidate
+/rasterstream
+/singleinstance
+/wasm
