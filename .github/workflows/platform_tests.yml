@@ -260,6 +260,8 @@ jobs:
     runs-on: windows-11-arm
     env:
       LLVM_MINGW: llvm-mingw-20261006-ucrt-aarch64
+      # GitHub's published digest for that release asset.
+      LLVM_MINGW_SHA256: 9a835d5179c9f3a5a783c11a7f14062a249b4765dd11add64a66786864e82ab2
     steps:
       - uses: actions/checkout@v7
         with:
@@ -276,6 +278,7 @@ jobs:
           set -euo pipefail
           curl -fsSL --retry 3 -o "$RUNNER_TEMP/llvm-mingw.zip" \
             "https://github.com/mstorsjo/llvm-mingw/releases/download/20261006/${LLVM_MINGW}.zip"
+          echo "$LLVM_MINGW_SHA256  $RUNNER_TEMP/llvm-mingw.zip" | sha256sum -c -
           unzip -q "$RUNNER_TEMP/llvm-mingw.zip" -d "$RUNNER_TEMP"
           bin="$(cygpath -w "$RUNNER_TEMP/$LLVM_MINGW/bin")"
           echo "$bin" >> "$GITHUB_PATH"
