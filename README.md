@@ -7,19 +7,15 @@ Bellui began as a fork of the [Fyne](https://fyne.io) toolkit and diverges
 substantially from it; it is not intended to merge back. Highlights: a Material Design 3 theme system and component set, a
 reworked package architecture (`geo`/`event`/`core` as the source of truth for
 fundamental types), goroutine-safe widget APIs, and a GL rendering engine with
-canvas FBO, shadows, stencil clipping, and 3D support. See `CLAUDE.md`,
-`docs/notes/` (per-area design detail) and `ROADMAP.md` for details.
+canvas FBO, shadows, stencil clipping, and 3D support. See `docs/notes/`
+(per-area design detail) and `ROADMAP.md` for details.
 Module path: `github.com/belluikit/bellui`
-
-> **Access note:** the `belluikit/*` dependency repos are currently **private**.
-> Building outside the org needs `GOPRIVATE=github.com/belluikit/*` and git
-> credentials for GitHub (SSH, or a token with an `insteadOf` rewrite).
 
 # Prerequisites
 
-To develop apps using Bellui you will need Go version 1.17 or later, a C compiler and your system's development tools.
+To develop apps using Bellui you will need Go version 1.25 or later, a C compiler and your system's development tools.
 If you're not sure if that's all installed or you don't know how then check out our
-[Getting Started](https://bellui.io/develop/) document.
+[Getting Started](https://bellui.com/develop/) document.
 
 > **Rendering backend:** this fork renders with **WebGPU** by default (Metal /
 > Vulkan / D3D12 / browser WebGPU). The legacy OpenGL/GLES/WebGL backend remains
@@ -39,7 +35,7 @@ After importing a new module, run the following command before compiling the cod
 To run a showcase of the features of this fork, build the MD3 gallery from
 the sibling repository:
 
-    git clone git@github.com:trendvidia/gallery.git
+    git clone https://github.com/belluikit/gallery.git
     cd gallery && go run .
 
 And you should see something like this (after you click a few buttons):
@@ -161,15 +157,13 @@ The above command will create a '.ipa' file that can then be uploaded to the iOS
 
 # Documentation
 
-More documentation is available at the [Bellui developer website](https://developer.bellui.io/) or on [pkg.go.dev](https://pkg.go.dev/github.com/belluikit/bellui?tab=doc).
+More documentation is available at the [Bellui website](https://bellui.com/) or on [pkg.go.dev](https://pkg.go.dev/github.com/belluikit/bellui?tab=doc).
 
 # Examples
 
 The [Bellui gallery](https://github.com/belluikit/gallery) is a Material Design 3
 showcase covering every widget, theme and rendering feature in the toolkit — use it
 to explore the API and to manually verify changes.
-
-The `bellui_demo` directory in this repository is a smaller, self-contained example app.
 
 # Shipping the Bellui Toolkit
 
