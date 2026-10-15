@@ -1,5 +1,5 @@
 details {
-  icon = "../../theme/icons/bellui.png"
+  icon = "Icon.png"
   name = "Bellui Settings"
   id = "io.bellui.settings"
   version = "2.6.0"
