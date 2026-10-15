@@ -39,7 +39,7 @@ The selection is purely a compile-time build tag; there is no runtime switch.
 | Linux (X11 + Wayland) | Vulkan | Verified live (Wayland), compile + headless readback (X11) |
 | Windows | D3D12 | Verified live |
 | Web (WebAssembly) | Browser WebGPU | Verified live (headless Chromium/Dawn) |
-| Android | Vulkan (wgpu-native via NDK) | Verified live (emulator) |
+| Android | Vulkan (wgpu-native via NDK) | Verified live (device) |
 | iOS Simulator | Metal | Verified live |
 | iOS device | Metal | Verified live (iPad) |
 
