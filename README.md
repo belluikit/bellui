@@ -179,3 +179,14 @@ It is recommended that you install the following additional apps:
 | bellui_settings | `github.com/belluikit/bellui/cmd/bellui_settings` | A GUI for managing your global Bellui settings like theme and scaling    |
 
 These are optional applications but can help to create a more complete desktop experience.
+
+# License
+
+Bellui is released under the BSD 3-Clause license; see [`LICENSE`](LICENSE).
+
+Bellui is a derivative work of the [Fyne](https://github.com/fyne-io/fyne)
+toolkit. Fyne's copyright notice and license conditions are retained in full in
+`LICENSE`, as the BSD 3-Clause license requires, and Fyne's contributors are
+listed in [`AUTHORS`](AUTHORS). Modifications made for Bellui are Copyright (C)
+2026 the Bellui authors and are released under the same terms. Third-party code,
+fonts and icons are listed in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
