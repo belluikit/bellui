@@ -77,8 +77,8 @@ func TestBelluiApp_transitionCloud_Storage(t *testing.T) {
 	a.Storage().Create("nothere")
 
 	// The test app storage root (os.TempDir()/Documents) is shared across test
-	// apps and persists on self-hosted CI runners, so it may already hold files
-	// from other tests or prior runs (e.g. a stray analytics spool). Assert our
+	// apps and persists between runs on the same machine, so it may already hold
+	// files from other tests or prior runs (e.g. a stray analytics spool). Assert our
 	// file is present rather than that the shared dir has exactly one entry.
 	assert.Contains(t, a.Storage().List(), "nothere")
 

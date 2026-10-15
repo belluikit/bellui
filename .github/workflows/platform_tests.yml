@@ -23,48 +23,43 @@ jobs:
         platform: [linux, linux-x64, macos]
         include:
           - platform: linux
-            runs-on: [self-hosted, Linux, ARM64]
-            # -a (auto-servernum) so parallel self-hosted runners on one box
-            # don't collide on Xvfb display :99.
+            runs-on: ubuntu-24.04-arm
             runner: ./.github/scripts/xvfb-run-safe
             # WebGPU is the default backend; the legacy GL/GLES path is now opt-in
             # via -tags gl. This comprehensive leg exercises the GL fallback (pure
             # Go link, no GPU) and holds the coverage gate; the webgpu_tests job
-            # below covers the default WebGPU backend on a GPU.
+            # below covers the default WebGPU backend.
             tags: gl,ci,migrated_belluido
             coverage: true
-          # Same suite on x86_64. Every other Linux leg in this repo is ARM64, so
-          # nothing was catching amd64-specific breakage: assembly and SIMD paths
-          # (the vectorized newline scan in internal/textbuf), cgo struct layout
-          # and alignment against the X11/Wayland/GL headers, and unsafe pointer
-          # arithmetic all differ by arch. Pure Go link, no GPU — the GPU legs
-          # stay on the two machines that have one.
+          # Same suite on x86_64. The other Linux legs in this workflow are ARM64,
+          # so this is what catches amd64-specific breakage: assembly and SIMD
+          # paths (the vectorized newline scan in internal/textbuf), cgo struct
+          # layout and alignment against the X11/Wayland/GL headers, and unsafe
+          # pointer arithmetic all differ by arch. Pure Go link, no GPU.
           - platform: linux-x64
-            runs-on: [self-hosted, Linux, X64]
+            runs-on: ubuntu-24.04
             runner: ./.github/scripts/xvfb-run-safe
             tags: gl,ci,migrated_belluido
             # The ARM64 leg owns the coverage gate; running it twice would just
             # spend minutes to assert the same number.
             coverage: false
           - platform: macos
-            runs-on: [self-hosted, macOS, ARM64]
+            runs-on: macos-15
             tags: gl,no_glfw,ci,migrated_belluido
             coverage: false
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - name: Assert go-plus toolchain
-        run: |
-          go version
-          go version | grep -qE '\(plus[ )]' || { echo "::error::runner go is not the go-plus fork"; exit 1; }
-
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ matrix.go-version }}
 
       - name: Get dependencies
         run: |
-          flock /tmp/bellui-ci-apt.lock sudo apt-get -o DPkg::Lock::Timeout=600 update
-          flock /tmp/bellui-ci-apt.lock sudo apt-get -o DPkg::Lock::Timeout=600 install -y --no-install-recommends bc clang lld libgl1-mesa-dev libwayland-dev libx11-dev libxkbcommon-dev xorg-dev xvfb language-pack-en
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends bc clang lld libgl1-mesa-dev libwayland-dev libx11-dev libxkbcommon-dev xorg-dev xvfb language-pack-en
           echo "CC=clang" >> "$GITHUB_ENV"
           echo "CGO_LDFLAGS=-fuse-ld=lld" >> "$GITHUB_ENV"
         if: ${{ runner.os == 'Linux' }}
@@ -127,10 +122,10 @@ jobs:
 
 
   # WebGPU is the default backend (Phase 5, #204). This job builds the default
-  # ./... and runs the WebGPU painter's headless GPU readback tests on a real
-  # adapter: Metal on the self-hosted mac, Vulkan (lavapipe) on the self-hosted
-  # Linux box. The wgpu-native libs ship in the belluikit/webgpu module (no
-  # system install); the link requires a clean CGO env (no -fuse-ld=lld).
+  # ./... and runs the WebGPU painter's headless readback tests: Vulkan through
+  # Mesa's lavapipe software ICD on Linux, Metal on macOS. The wgpu-native libs
+  # ship in the belluikit/webgpu module (no system install); the link requires
+  # a clean CGO env (no -fuse-ld=lld).
   webgpu_tests:
     runs-on: ${{ matrix.runs-on }}
     strategy:
@@ -138,31 +133,29 @@ jobs:
       matrix:
         include:
           - platform: linux
-            runs-on: [self-hosted, Linux, ARM64]
+            runs-on: ubuntu-24.04-arm
             runner: ./.github/scripts/xvfb-run-safe
           - platform: macos
-            runs-on: [self-hosted, macOS, ARM64]
+            runs-on: macos-15
             runner: ""
     env:
       # wgpu-native links cleanly only without the host's -fuse-ld=lld / CFLAGS.
       CGO_LDFLAGS: ""
       CGO_CFLAGS: ""
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - name: Assert go-plus toolchain
-        run: |
-          go version
-          go version | grep -qE '\(plus[ )]' || { echo "::error::runner go is not the go-plus fork"; exit 1; }
-
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
 
       - name: Get dependencies
-        # -y: mesa-vulkan-drivers (lavapipe, a deterministic headless Vulkan ICD
-        # for the readback tests) is a fresh install, so apt must not prompt.
+        # mesa-vulkan-drivers provides lavapipe, a deterministic headless Vulkan
+        # ICD for the readback tests.
         run: |
-          flock /tmp/bellui-ci-apt.lock sudo apt-get -o DPkg::Lock::Timeout=600 update
-          flock /tmp/bellui-ci-apt.lock sudo apt-get -o DPkg::Lock::Timeout=600 install -y --no-install-recommends clang lld libgl1-mesa-dev libwayland-dev libx11-dev libxkbcommon-dev xorg-dev xvfb mesa-vulkan-drivers libvulkan1
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang lld libgl1-mesa-dev libwayland-dev libx11-dev libxkbcommon-dev xorg-dev xvfb mesa-vulkan-drivers libvulkan1
         if: ${{ runner.os == 'Linux' }}
 
       - name: Build default (WebGPU) ./...
@@ -176,50 +169,29 @@ jobs:
       # Every other WebGPU GPU test is offscreen readback and never creates a
       # surface or presents; this is the only standing net for that path (#329).
       # No ci/gl/no_glfw tags so it builds WebGPU on a real window; the test
-      # self-skips if no window/adapter is available. ./.github/scripts/xvfb-run-safe supplies the
-      # Linux display; the macOS runner is an interactive desktop session.
+      # self-skips if no window/adapter is available. ./.github/scripts/xvfb-run-safe
+      # supplies the Linux display.
       - name: WebGPU windowed present + Capture (#329)
         run: ${{ matrix.runner }} go test -run TestWindowedSurfaceCapture -count=1 -timeout 120s ./internal/driver/glfw/
 
 
   windows_tests:
-    runs-on: [self-hosted, X64, Windows]
+    runs-on: windows-2025
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      # `shell: bash` resolves bash from PATH, and Windows ships a WSL launcher
-      # at C:\Windows\System32\bash.exe. A runner whose PATH puts System32 ahead
-      # of Git's bin therefore hands every bash step to the WSL stub, which
-      # exits 1 with "Windows Subsystem for Linux has no installed
-      # distributions" — nothing to do with the step's own script. That is not
-      # hypothetical: a Git for Windows upgrade on bellui-omen moved git.exe to
-      # Git\cmd and left Git\bin off PATH, and every bash step below died that
-      # way. GITHUB_PATH prepends for later steps in this job only, so it cannot
-      # shadow anything outside it, and Git\bin holds just bash/sh/git — unlike
-      # Git\usr\bin, which would shadow find.exe and sort.exe.
-      - name: Put Git Bash ahead of the WSL launcher
-        shell: powershell
-        run: |
-          $bin = 'C:\Program Files\Git\bin'
-          if (-not (Test-Path "$bin\bash.exe")) { Write-Error "Git Bash not found at $bin"; exit 1 }
-          Add-Content $env:GITHUB_PATH $bin
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
 
-      - name: Assert go-plus toolchain
-        shell: powershell
-        run: |
-          go version
-          if (-not (go version | Select-String '\(plus[ )]')) { Write-Error 'runner go is not the go-plus fork'; exit 1 }
-
-
+      # cgo (and so -race) uses the image's MinGW-w64 gcc, which is on PATH.
       - name: Tests (GL fallback)
         shell: bash
         run: |
-          # Resolve the package set. Under a service account `go list` can fail
-          # VCS stamping ("dubious ownership") and print nothing to stdout; the
-          # old inline $(go list ...) substitution then silently collapsed to a
-          # single package and green-lit a ~24s near-empty run (#565). Refuse to
-          # proceed on a collapsed list so the failure is loud, not silent.
+          # Resolve the package set, and refuse to proceed on a collapsed list:
+          # an inline $(go list ...) that fails prints nothing to stdout, and a
+          # near-empty test run would otherwise read as green (#565).
           pkgs=$(go list -tags gl,ci,no_glfw,migrated_belluido ./... || true)
           n=$(printf '%s\n' "$pkgs" | grep -c . || true)
           echo "Resolved ${n} packages to test"
@@ -248,8 +220,9 @@ jobs:
           CGO_CFLAGS: ""
         run: go build ./...
 
-      # Headless GPU readback on the real GPU via the default all-backends
-      # instance.
+      # Headless readback via the default all-backends instance. The hosted
+      # runner has no GPU, so D3D12 runs on whatever adapter the image offers
+      # (WARP); the tests self-skip when no adapter is available.
       - name: WebGPU painter GPU tests (D3D12)
         shell: bash
         env:
@@ -260,19 +233,12 @@ jobs:
       # Real-window present + Canvas().Capture() coverage on D3D12 (#329);
       # self-skips if no window/adapter.
       #
-      # This step needs a real desktop session, so the bellui-omen runner is the
-      # one runner in the fleet NOT installed as a service: it runs from a
-      # logon-triggered scheduled task in the logged-on session (WinSta0), as an
-      # ordinary user rather than NT AUTHORITY\NETWORK SERVICE. A service lives
-      # in session 0, whose window station has no display surfaces, and there
-      # D3D12's CreateSwapChainForHwnd answers DXGI_ERROR_NOT_CURRENTLY_AVAILABLE
-      # — which wgpu-native turns into a fatal panic, not a returnable error, so
-      # the step aborts rather than skipping (#20, #25). GLFW still hands out a
-      # window handle in session 0, so the test's window != nil guard cannot
-      # catch that on its own.
-      #
-      # If this step starts failing at checkout or aborting in wgpuSurfaceConfigure,
-      # suspect the runner: it is offline whenever nobody is logged on to the box.
+      # Needs a desktop session: in a session-0 service, D3D12's
+      # CreateSwapChainForHwnd answers DXGI_ERROR_NOT_CURRENTLY_AVAILABLE, which
+      # wgpu-native turns into a fatal panic rather than a returnable error
+      # (#20, #25). GitHub's hosted Windows runners run jobs in an interactive
+      # session. If this step starts aborting in wgpuSurfaceConfigure, suspect
+      # the session first.
       - name: WebGPU windowed present + Capture (D3D12, x64)
         shell: bash
         env:
@@ -281,9 +247,9 @@ jobs:
         run: go test -run TestWindowedSurfaceCapture -count=1 -timeout 120s ./internal/driver/glfw/
 
 
-  # Windows on ARM64, the second mingw flavor. The x64 runner builds the UIA cgo
-  # bridge with winlibs gcc; this one uses llvm-mingw clang, and the two disagree
-  # often enough to matter — the hand-written COM vtable slot offsets in
+  # Windows on ARM64, the second mingw flavor. The x64 job builds the UIA cgo
+  # bridge with MinGW-w64 gcc; this one uses llvm-mingw clang, and the two
+  # disagree often enough to matter — the hand-written COM vtable slot offsets in
   # internal/driver/glfw/accessibility_windows.c are laid out against
   # uiautomationcore.h, and pointer-width-independent struct packing is exactly
   # the kind of thing only a second compiler catches. Deliberately a separate job
@@ -291,40 +257,42 @@ jobs:
   # check to `windows_tests (x64)` and silently drop it from any branch
   # protection rule referencing the old name.
   windows_arm64_tests:
-    runs-on: [self-hosted, ARM64, Windows]
+    runs-on: windows-11-arm
+    env:
+      LLVM_MINGW: llvm-mingw-20261006-ucrt-aarch64
+      # GitHub's published digest for that release asset.
+      LLVM_MINGW_SHA256: 9a835d5179c9f3a5a783c11a7f14062a249b4765dd11add64a66786864e82ab2
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      # `shell: bash` resolves bash from PATH, and Windows ships a WSL launcher
-      # at C:\Windows\System32\bash.exe. A runner whose PATH puts System32 ahead
-      # of Git's bin therefore hands every bash step to the WSL stub, which
-      # exits 1 with "Windows Subsystem for Linux has no installed
-      # distributions" — nothing to do with the step's own script. That is not
-      # hypothetical: a Git for Windows upgrade on bellui-omen moved git.exe to
-      # Git\cmd and left Git\bin off PATH, and every bash step below died that
-      # way. GITHUB_PATH prepends for later steps in this job only, so it cannot
-      # shadow anything outside it, and Git\bin holds just bash/sh/git — unlike
-      # Git\usr\bin, which would shadow find.exe and sort.exe.
-      - name: Put Git Bash ahead of the WSL launcher
-        shell: powershell
-        run: |
-          $bin = 'C:\Program Files\Git\bin'
-          if (-not (Test-Path "$bin\bash.exe")) { Write-Error "Git Bash not found at $bin"; exit 1 }
-          Add-Content $env:GITHUB_PATH $bin
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
 
-      - name: Assert go-plus toolchain
-        shell: powershell
+      # The image's own gcc is not llvm-mingw, and llvm-mingw is the point of
+      # this job, so install a pinned release and put it first on PATH.
+      - name: Install llvm-mingw
+        shell: bash
         run: |
-          go version
-          if (-not (go version | Select-String '\(plus[ )]')) { Write-Error 'runner go is not the go-plus fork'; exit 1 }
+          set -euo pipefail
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/llvm-mingw.zip" \
+            "https://github.com/mstorsjo/llvm-mingw/releases/download/20261006/${LLVM_MINGW}.zip"
+          echo "$LLVM_MINGW_SHA256  $RUNNER_TEMP/llvm-mingw.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/llvm-mingw.zip" -d "$RUNNER_TEMP"
+          bin="$(cygpath -w "$RUNNER_TEMP/$LLVM_MINGW/bin")"
+          echo "$bin" >> "$GITHUB_PATH"
+          echo "CC=$bin\\clang.exe" >> "$GITHUB_ENV"
+          # Positive marker: the compiler cgo will use is the one just installed.
+          "$RUNNER_TEMP/$LLVM_MINGW/bin/clang.exe" --version | head -1
 
       # No -race anywhere in this job: the race detector has no windows/arm64
       # support (`go build -race` fails outright with "-race is not supported on
-      # windows/arm64"), so race coverage stays the x64 runner's job.
+      # windows/arm64"), so race coverage stays the x64 job's.
       - name: Tests (GL fallback)
         shell: bash
         run: |
+          go env CC
           # internal/driver/mobile and .../mobile/app are excluded on this arch
           # only: app's package init downloads an ANGLE prebuilt keyed on
           # GOARCH, and Google never published a windows/arm64 one, so
@@ -349,9 +317,8 @@ jobs:
         run: go test -tags accessibility,gl,ci,no_glfw,migrated_belluido ./internal/accessibility/... ./core/... ./internal/driver/glfw/
 
       # Build-only. wgpu-native ships a windows/arm64 slice, so this guards the
-      # link; the GPU test steps the x64 job runs are deliberately omitted until
-      # a D3D12 adapter is confirmed usable under the Parallels virtual GPU —
-      # see #15.
+      # link; the GPU test steps the x64 job runs are omitted here until a
+      # D3D12 adapter is confirmed usable on this runner — see #15.
       - name: WebGPU build (D3D12)
         shell: bash
         env:

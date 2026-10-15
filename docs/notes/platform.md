@@ -1,7 +1,7 @@
 # Platform Integration (desktop/mobile/web)
 
-Fork-specific detail moved out of `CLAUDE.md` (see its **Fork Features** index).
-Everything below is verbatim; issue numbers refer to the Bellui Backlog.
+Fork-specific design detail for this area. Issue numbers refer to the Bellui
+Backlog.
 
 ### File Dialog Enhancements
 - `(*dialog.FileDialog).SetShowHidden(bool)` / hidden files toggle — exposes control over hidden file visibility

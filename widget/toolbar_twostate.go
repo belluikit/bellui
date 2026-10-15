@@ -1,6 +1,6 @@
 package widget
 
-// TwoStateToolbarAction follows the API of the bellui-x project's widget of the
+// TwoStateToolbarAction follows the API of the fyne-x project's widget of the
 // same name (fyne.io/x/fyne, widget/twostatetoolbaraction.go, Copyright (C)
 // 2020 Fyne.io developers and community, BSD-3-Clause license), written fresh
 // against this fork's Toolbar.

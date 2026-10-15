@@ -5,7 +5,7 @@
 > and are left verbatim — they refer to the toolkit by its former names (`fyne`,
 > `github.com/trendvidia/fyne`, `fyne.io/fyne`) and to files and flags by the
 > identifiers actually in use at the time (e.g. `FyneApp.toml`, `fyneDo`).
-> Rewriting them would falsify the record. See `docs/REBRAND.md`.
+> Rewriting them would falsify the record.
 
 This file lists the main changes with each version of the Fyne tools project.
 More detailed release notes can be found on the [releases page](https://github.com/fyne-io/tools/releases).

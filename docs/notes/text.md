@@ -1,7 +1,7 @@
 # Text, IME & Editors
 
-Fork-specific detail moved out of `CLAUDE.md` (see its **Fork Features** index).
-Everything below is verbatim; issue numbers refer to the Bellui Backlog.
+Fork-specific design detail for this area. Issue numbers refer to the Bellui
+Backlog.
 
 ### Advanced Text Layout
 `bellui.TextStyle` has three new fields for fine-grained text control. All three are **pointer** types with a **nil** sentinel — in struct literals wrap the value with `bellui.Ptr(...)` (e.g. `bellui.TextStyle{Weight: bellui.Ptr(bellui.WeightBold)}`); a bare `bellui.WeightBold` will not compile:

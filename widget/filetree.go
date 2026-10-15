@@ -1,6 +1,6 @@
 package widget
 
-// FileTree is adapted from the bellui-x project (fyne.io/x/fyne,
+// FileTree is adapted from the fyne-x project (fyne.io/x/fyne,
 // widget/filetree.go), Copyright (C) 2020 Fyne.io developers and community,
 // BSD-3-Clause license. The port lists directories asynchronously (showing a
 // placeholder row while a listing is in flight), filters hidden files by

@@ -81,8 +81,8 @@ powershell -ExecutionPolicy Bypass -File windows\uia_assert_45.ps1 `
   -UiaTree (Join-Path $fyne 'hack\a11yprobe\windows\uiatree.ps1')
 ```
 
-The `.github/workflows/a11y-uia.yml` job wraps these for a future **interactive**
-self-hosted runner (manual dispatch only).
+These steps need an interactive Windows desktop session, so they are run by
+hand rather than in CI.
 
 ## Verified result
 

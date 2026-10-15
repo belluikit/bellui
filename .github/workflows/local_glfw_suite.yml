@@ -2,9 +2,8 @@
 #
 # These tests are tagged `!no_glfw && !ci && !mobile`, so no PR/push workflow
 # ever runs them — they rotted silently until #590/#592. They open real GLFW
-# windows, which rules out the self-hosted mac runner (windows would pop up on
-# the workstation display); the linux runner gives them a headless display via
-# xvfb-run instead. `-tags gl` selects the pure-Go GL fallback so the leg needs
+# windows, so they run on Linux, where xvfb-run-safe gives them a headless
+# display. `-tags gl` selects the pure-Go GL fallback so the leg needs
 # no GPU, mirroring the comprehensive linux leg in platform_tests.
 name: Local GLFW Suite
 
@@ -22,26 +21,22 @@ permissions:
 
 jobs:
   local_glfw_suite:
-    runs-on: [self-hosted, Linux, ARM64]
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - name: Assert go-plus toolchain
-        run: |
-          go version
-          go version | grep -qE '\(plus[ )]' || { echo "::error::runner go is not the go-plus fork"; exit 1; }
-
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
 
       - name: Get dependencies
         run: |
-          flock /tmp/bellui-ci-apt.lock sudo apt-get -o DPkg::Lock::Timeout=600 update
-          flock /tmp/bellui-ci-apt.lock sudo apt-get -o DPkg::Lock::Timeout=600 install -y --no-install-recommends bc clang lld libgl1-mesa-dev libwayland-dev libx11-dev libxkbcommon-dev xorg-dev xvfb language-pack-en
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends bc clang lld libgl1-mesa-dev libwayland-dev libx11-dev libxkbcommon-dev xorg-dev xvfb language-pack-en
           echo "CC=clang" >> "$GITHUB_ENV"
           echo "CGO_LDFLAGS=-fuse-ld=lld" >> "$GITHUB_ENV"
 
-      # -a (auto-servernum) so parallel self-hosted runners on one box don't
-      # collide on Xvfb display :99.
       - name: Local glfw suite
         run: ./.github/scripts/xvfb-run-safe go test -tags gl -timeout 20m ./internal/driver/glfw/
