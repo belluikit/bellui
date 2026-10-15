@@ -1,6 +1,6 @@
 # fycoder
 
-A composable code editor widget for [Bellui](https://bellui.io) applications.
+A composable code editor widget for [Bellui](https://bellui.com) applications.
 
 fycoder provides pluggable syntax highlighting, a customizable gutter (line numbers, breakpoints, annotations), row-level decorations, and a built-in find bar. The gutter renders as a separate widget outside the text scroll viewport, so it stays pinned when scrolling horizontally — matching the behavior of production code editors.
 

@@ -1,6 +1,6 @@
 # Bellui X — charts
 
-A native Go charting library inspired by [Apache ECharts](https://echarts.apache.org/), built on top of the [Fyne](https://bellui.io/) GUI toolkit. Charts are rendered entirely with Fyne canvas primitives -- no HTML, JavaScript, or WebView dependencies.
+A native Go charting library inspired by [Apache ECharts](https://echarts.apache.org/), built on top of the [Bellui](https://bellui.com/) GUI toolkit. Charts are rendered entirely with Bellui canvas primitives -- no HTML, JavaScript, or WebView dependencies.
 
 ## Features
 

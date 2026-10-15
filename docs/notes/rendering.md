@@ -1,7 +1,7 @@
 # Rendering & Canvas
 
-Fork-specific detail moved out of `CLAUDE.md` (see its **Fork Features** index).
-Everything below is verbatim; issue numbers refer to the Bellui Backlog.
+Fork-specific design detail for this area. Issue numbers refer to the Bellui
+Backlog.
 
 ### Text-Along-Path
 `canvas.TextOnPath` and `canvas.NewTextOnPath(text, color, buildPath)` — renders text along an arbitrary path with per-glyph positioning and rotation. Path construction via `MoveTo`/`LineTo`/`QuadTo`/`CubicTo`/`Close` (same API as `canvas.Path`). Arc-length parameterized glyph placement via `PathSampler`. Configurable `Offset` (starting distance along path) and `BaselineShift` (perpendicular offset from path). Per-glyph rendering: each glyph is shaped via HarfBuzz, rendered to a temp image, then affine-transformed (rotated + translated) onto the output. GL and software painter support.

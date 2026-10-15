@@ -16,7 +16,7 @@ import (
 // ensureCanvasSizeOrSkip waits for the window's canvas to reach size, SKIPPING
 // the test if it never does within the retry budget — unlike the shared
 // ensureCanvasSize, which fails. A headless or degraded surface cannot configure
-// the window to the requested size (e.g. a self-hosted CI runner whose xvfb lacks
+// the window to the requested size (e.g. a CI runner whose xvfb lacks
 // DRI3 — "libEGL DRI3 error: Could not get DRI3 device" — where the WebGPU
 // swapchain lands at a garbage size). These present→capture tests exercise the
 // GPU round-trip, not window sizing, so an environment that can't size the

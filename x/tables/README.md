@@ -1,6 +1,6 @@
 # fytables
 
-An AG Grid-equivalent data table widget for the [Bellui](https://bellui.io) GUI framework.
+An AG Grid-equivalent data table widget for the [Bellui](https://bellui.com) GUI framework.
 
 fytables provides a high-performance, feature-rich data grid with virtual scrolling, column sorting/filtering, cell editing, sparklines, column pinning/grouping, row grouping with aggregation, pagination, pivot tables, and more.
 
@@ -65,8 +65,9 @@ Options: stroke/fill colors, markers (circle/square/diamond), axis line, domain 
 package main
 
 import (
-    "bellui.io/fyne/v2"
-    "bellui.io/fyne/v2/app"
+    "github.com/belluikit/bellui"
+    "github.com/belluikit/bellui/app"
+    "github.com/belluikit/bellui/geo"
     "github.com/belluikit/bellui/x/tables"
 )
 
@@ -88,10 +89,10 @@ func main() {
     )
 
     a := app.New()
-    w := a.NewWindow("fytables")
+    w := a.NewWindow("tables")
     w.SetContent(grid)
-    w.Resize(bellui.NewSize(500, 400))
-    w.ShowAndRun()
+    w.Resize(geo.NewSize(500, 400))
+    bellui.ShowAndRun(w)
 }
 ```
 
