@@ -4,24 +4,24 @@ go 1.26.2
 
 require (
 	github.com/belluikit/bellui v1.0.0
-	github.com/belluikit/goffmpeg v0.4.0
+	github.com/belluikit/goffmpeg v0.4.1
 	github.com/ebitengine/oto/v3 v3.4.0
 )
 
 require (
 	github.com/belluikit/fsnotify v1.9.1 // indirect
 	github.com/belluikit/gl-js v0.2.1 // indirect
-	github.com/belluikit/goffmpeg-libs/android_amd64 v0.3.0 // indirect
-	github.com/belluikit/goffmpeg-libs/android_arm v0.3.0 // indirect
-	github.com/belluikit/goffmpeg-libs/android_arm64 v0.3.0 // indirect
-	github.com/belluikit/goffmpeg-libs/darwin_amd64 v0.3.0 // indirect
-	github.com/belluikit/goffmpeg-libs/darwin_arm64 v0.3.0 // indirect
-	github.com/belluikit/goffmpeg-libs/ios_arm64 v0.3.0 // indirect
-	github.com/belluikit/goffmpeg-libs/iossimulator_arm64 v0.3.0 // indirect
-	github.com/belluikit/goffmpeg-libs/linux_amd64 v0.3.0 // indirect
-	github.com/belluikit/goffmpeg-libs/linux_arm64 v0.3.0 // indirect
-	github.com/belluikit/goffmpeg-libs/windows_amd64 v0.3.0 // indirect
-	github.com/belluikit/goffmpeg-libs/windows_arm64 v0.3.0 // indirect
+	github.com/belluikit/goffmpeg-libs/android_amd64 v0.3.1 // indirect
+	github.com/belluikit/goffmpeg-libs/android_arm v0.3.1 // indirect
+	github.com/belluikit/goffmpeg-libs/android_arm64 v0.3.1 // indirect
+	github.com/belluikit/goffmpeg-libs/darwin_amd64 v0.3.1 // indirect
+	github.com/belluikit/goffmpeg-libs/darwin_arm64 v0.3.1 // indirect
+	github.com/belluikit/goffmpeg-libs/ios_arm64 v0.3.1 // indirect
+	github.com/belluikit/goffmpeg-libs/iossimulator_arm64 v0.3.1 // indirect
+	github.com/belluikit/goffmpeg-libs/linux_amd64 v0.3.1 // indirect
+	github.com/belluikit/goffmpeg-libs/linux_arm64 v0.3.1 // indirect
+	github.com/belluikit/goffmpeg-libs/windows_amd64 v0.3.1 // indirect
+	github.com/belluikit/goffmpeg-libs/windows_arm64 v0.3.1 // indirect
 	github.com/belluikit/typesetting v0.3.6 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/ebitengine/purego v0.10.0 // indirect
