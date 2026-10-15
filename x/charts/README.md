@@ -11,14 +11,14 @@ A native Go charting library inspired by [Apache ECharts](https://echarts.apache
 - **LTTB downsampling**: Automatically applied when data points exceed pixel width, preserving visual shape
 - **Overlays**: ReferenceLine, ReferenceBand, and Annotation overlays with data-space positioning
 - **Drilldown**: Hierarchical data navigation with breadcrumb trail and back button
-- **3D charts**: Bar, Scatter, and Surface charts rendered via `canvas.Scene3D` (Fyne fork) with orbit rotation and scroll zoom
+- **3D charts**: Bar, Scatter, and Surface charts rendered via Bellui's `canvas.Scene3D` with orbit rotation and scroll zoom
 - **VisualMap**: Data-to-color gradient and data-to-size mapping for heatmaps, scatter, and other series
 - **Toolbox**: Save-as-image and magic type (chart type switching) toolbar buttons
 - **Dataset with transforms**: Column-oriented data storage, Encode mapping, Filter/Sort transforms, and Pipeline chaining
 - **Animation**: Entrance animations (400ms ease-decelerate) and data transition animations (300ms ease-standard)
 - **Interactive**: Hover tooltips, clickable legend toggle, scroll-to-zoom, drag-to-pan, brush selection, crosshair
 - **Multi-axis**: Support for multiple Y axes (left + right) with independent scales
-- **Theme-aware**: Automatically adapts to Fyne's Material Design 3 theme (light/dark mode)
+- **Theme-aware**: Automatically adapts to Bellui's Material Design 3 theme (light/dark mode)
 - **Crosshair**: Vertical, horizontal, or both -- clipped to the plot area
 - **Event system**: Central EventBus with typed events and filtered subscriptions
 
@@ -28,8 +28,6 @@ A native Go charting library inspired by [Apache ECharts](https://echarts.apache
 go get github.com/belluikit/bellui/x/charts
 ```
 
-> **Note**: fycharts depends on the [trendvidia/fyne](https://github.com/trendvidia/fyne) fork. Your `go.mod` should include a `replace` directive pointing to your local copy or the fork's module path.
-
 ## Quick Start
 
 ```go
@@ -38,6 +36,7 @@ package main
 import (
     "github.com/belluikit/bellui"
     "github.com/belluikit/bellui/app"
+    "github.com/belluikit/bellui/geo"
 
     "github.com/belluikit/bellui/x/charts/axis"
     "github.com/belluikit/bellui/x/charts/chart"
@@ -47,7 +46,7 @@ import (
 func main() {
     a := app.New()
     w := a.NewWindow("My Chart")
-    w.Resize(bellui.NewSize(800, 500))
+    w.Resize(geo.NewSize(800, 500))
 
     c := chart.New(chart.Option{
         Title: &chart.Title{Text: "Weekly Sales"},
@@ -66,7 +65,7 @@ func main() {
     })
 
     w.SetContent(c)
-    w.ShowAndRun()
+    bellui.ShowAndRun(w)
 }
 ```
 
@@ -98,7 +97,7 @@ fycharts/
   axis/          Axis types, scales, tick computation
   component/     UI components (title, legend, tooltip, zoom controls, overlays, breadcrumb, toolbox, visualmap)
   interact/      Hit testing, event bus, zoom/brush state
-  style/         Theme resolver (Fyne MD3 -> chart styles)
+  style/         Theme resolver (Bellui MD3 -> chart styles)
   builder/       Fluent API for constructing chart Options
   dataset/       Column-oriented storage, Encode mapping, Transform pipeline
   animate/       Entrance and transition animation controllers
@@ -112,7 +111,7 @@ fycharts/
 
 #### `chart/` -- Chart Widget
 
-The entry point. `chart.New(opt)` creates a Fyne widget that renders a chart from a declarative `Option` struct.
+The entry point. `chart.New(opt)` creates a Bellui widget that renders a chart from a declarative `Option` struct.
 
 | File | Purpose |
 |------|---------|
@@ -226,7 +225,7 @@ Column-oriented data storage supporting float64, string, and time.Time dimension
 
 #### `animate/` -- Animation
 
-`Controller` drives entrance and transition animations using Fyne's animation system:
+`Controller` drives entrance and transition animations using Bellui's animation system:
 
 - **Entrance**: animates from 0 to 1 over 400ms with `EaseStandardDecelerate`
 - **Transition**: morphs from current progress to 1 over 300ms with `EaseStandard`
@@ -243,7 +242,7 @@ Column-oriented data storage supporting float64, string, and time.Time dimension
 
 #### `style/` -- Theming
 
-`Resolver` reads from Fyne's MD3 theme at render time:
+`Resolver` reads from Bellui's MD3 theme at render time:
 
 - Series palette derived from Primary/Secondary/Tertiary + defaults
 - Grid lines from Separator color
