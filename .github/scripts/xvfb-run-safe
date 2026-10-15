@@ -29,8 +29,12 @@ Xvfb -displayfd 3 -screen 0 1280x1024x24 -nolisten tcp \
 	3>"$tmp/displayfd" >"$tmp/xvfb.log" 2>&1 &
 xpid=$!
 
-if ! read -t 15 -r display <"$tmp/displayfd"; then
-	echo "xvfb-run-safe: Xvfb did not report a display within 15s" >&2
+# 60s, not 15s: a freshly booted CI VM can take longer than 15s to bring Xvfb
+# up the first time (hosted ubuntu-24.04-arm timed out once at 15s while the
+# same script started fine in three other jobs on the same image).
+if ! read -t 60 -r display <"$tmp/displayfd"; then
+	echo "xvfb-run-safe: Xvfb did not report a display within 60s; its log follows" >&2
+	cat "$tmp/xvfb.log" >&2 || true
 	exit 1
 fi
 
