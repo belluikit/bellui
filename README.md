@@ -38,22 +38,16 @@ the sibling repository:
     git clone https://github.com/belluikit/gallery.git
     cd gallery && go run .
 
-And you should see something like this (after you click a few buttons):
+And you should see something like this:
 
 <p align="center" markdown="1" style="max-width: 100%">
-  <img src="img/widgets-dark.png" width="752" alt="Bellui Demo Dark Theme" style="max-width: 100%" />
+  <img src="img/gallery-light.png" width="752" alt="The Bellui gallery, light theme" style="max-width: 100%" />
 </p>
 
-Or if you are using the light theme:
+Or if you are using the dark theme:
 
 <p align="center" markdown="1" style="max-width: 100%">
-  <img src="img/widgets-light.png" width="752" alt="Bellui Demo Light Theme" style="max-width: 100%" />
-</p>
-
-And even running on a mobile device:
-
-<p align="center" markdown="1" style="max-width: 100%">
-  <img src="img/widgets-mobile-light.png" width="348" alt="Bellui Demo Mobile Light Theme" style="max-width: 100%" />
+  <img src="img/gallery-dark.png" width="752" alt="The Bellui gallery, dark theme" style="max-width: 100%" />
 </p>
 
 # Getting Started
@@ -68,6 +62,7 @@ Open a new file and you're ready to write your first app!
 package main
 
 import (
+	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/app"
 	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/widget"
@@ -85,7 +80,7 @@ func main() {
 		}),
 	))
 
-	w.ShowAndRun()
+	bellui.ShowAndRun(w)
 }
 ```
 
@@ -101,9 +96,9 @@ It should look like this:
 <div align="center">
   <table cellpadding="0" cellspacing="0" style="margin: auto; border-collapse: collapse;">
     <tr style="border: none;"><td style="border: none;">
-      <img src="img/hello-light.png" width="207" alt="Bellui Hello Dark Theme" />
+      <img src="img/hello-light.png" width="207" alt="Bellui Hello, light theme" />
     </td><td style="border: none;">
-      <img src="img/hello-dark.png" width="207" alt="Bellui Hello Dark Theme" />
+      <img src="img/hello-dark.png" width="207" alt="Bellui Hello, dark theme" />
     </td></tr>
   </table>
 </div>

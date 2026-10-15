@@ -10,7 +10,7 @@
 //	func main() {
 //	    w := app.New().NewWindow("My App")
 //	    dev.Enable(w) // add dev tools
-//	    w.ShowAndRun()
+//	    bellui.ShowAndRun(w)
 //	}
 package dev
 

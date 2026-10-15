@@ -12,7 +12,7 @@
 //	    if os.Getenv("BELLUI_INSPECT") == "1" {
 //	        inspector.Show(w) // opens the inspector in its own window
 //	    }
-//	    w.ShowAndRun()
+//	    bellui.ShowAndRun(w)
 //	}
 //
 // The inspector window shows:
