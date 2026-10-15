@@ -12,8 +12,8 @@ import (
 
 // These tests cover the context-free CanvasObject surface of GLView (creation,
 // move/resize/hide/refresh). The GL-thread Render callback and actual drawing
-// require a live GL context and are exercised by the -tags gl painter tests on
-// the self-hosted GPU runners, not here.
+// require a live GL context and are exercised by the -tags gl painter tests,
+// not here.
 
 func TestNewGLView(t *testing.T) {
 	called := false
