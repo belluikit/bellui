@@ -41,7 +41,7 @@ The selection is purely a compile-time build tag; there is no runtime switch.
 | Web (WebAssembly) | Browser WebGPU | Verified live (headless Chromium/Dawn) |
 | Android | Vulkan (wgpu-native via NDK) | Verified live (emulator) |
 | iOS Simulator | Metal | Verified live |
-| iOS device | Metal | Links; not yet verified on hardware (#242) |
+| iOS device | Metal | Verified live (iPad) |
 
 The GL fallback (`-tags gl`) supports the same desktop/mobile/web platforms as
 before the migration.
