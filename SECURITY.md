@@ -4,10 +4,10 @@
 
 Minor releases will receive security updates and fixes until the next minor or major release.
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 2.6.x   | :white_check_mark: |
-| < 2.6.0 | :x:                |
+| Version                     | Supported          |
+| --------------------------- | ------------------ |
+| latest 1.x minor release    | :white_check_mark: |
+| earlier 1.x minor releases  | :x:                |
 
 ## Bundled Chromium (Linux webview)
 
