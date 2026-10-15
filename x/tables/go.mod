@@ -8,7 +8,7 @@ require (
 )
 
 require (
-	github.com/belluikit/fsnotify v1.9.1 // indirect
+	github.com/belluikit/fsnotify v1.10.2 // indirect
 	github.com/belluikit/gl-js v0.2.1 // indirect
 	github.com/belluikit/typesetting v0.3.6 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
