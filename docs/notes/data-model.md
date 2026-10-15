@@ -1,7 +1,7 @@
 # Data Model Layer
 
-Fork-specific detail moved out of `CLAUDE.md` (see its **Fork Features** index).
-Everything below is verbatim; issue numbers refer to the Bellui Backlog.
+Fork-specific design detail for this area. Issue numbers refer to the Bellui
+Backlog.
 
 ### Data Model Layer — Sort/Filter/Selection (#539)
 `data/model` is a generic, observable data layer that sits **between** app data and the `List`/`Table` widgets (Qt `QSortFilterProxyModel`/`QItemSelectionModel`-style), so apps stop hand-rolling sort state, filter re-indexing and the selection-remap bugs. It is **widget-free** (imports only `data/binding` + `lang`); the widget adapters live in `widget` (the B2 placement — one-way `widget → data/model`, no cycle).

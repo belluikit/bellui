@@ -8,7 +8,7 @@ in the source repo. Recording the ref and the sha rather than a version is the
 rule `x/tables` exists to enforce; here it is not a formality, because no
 version number identifies this content.
 
-The source ref was checked before copying, as `docs/REBRAND.md` requires:
+The source ref was checked before copying:
 `HEAD` equalled `origin/main`, and no remote branch carried unmerged commits.
 `fyplayer` does have a `chore/fyne-v3` branch — the same name that sent
 `x/tables` and `x/editor` out stale — but here it is fully merged into `main`

@@ -1,7 +1,7 @@
 # MD3 Foundation, Theming & i18n
 
-Fork-specific detail moved out of `CLAUDE.md` (see its **Fork Features** index).
-Everything below is verbatim; issue numbers refer to the Bellui Backlog.
+Fork-specific design detail for this area. Issue numbers refer to the Bellui
+Backlog.
 
 ### MD3 Foundation
 - **State layers** (`theme/state.go`) — `StateLayerHover/Focus/Pressed/Dragged` compute content-derived overlays at MD3 opacities (8%/12%/12%/16%).

@@ -1,7 +1,7 @@
 # Widgets, Events & Layouts
 
-Fork-specific detail moved out of `CLAUDE.md` (see its **Fork Features** index).
-Everything below is verbatim; issue numbers refer to the Bellui Backlog.
+Fork-specific design detail for this area. Issue numbers refer to the Bellui
+Backlog.
 
 ### Event System Enhancements
 **HoverEvent + Hoverable** (`event/event.go`): `event.HoverEvent` (position-only, no button/modifier) replaces `desktop.MouseEvent` for hover. `event.Hoverable` interface with `HoverIn(*HoverEvent)`, `HoverMoved(*HoverEvent)`, `HoverOut()`. Deprecated aliases in `driver/desktop/mouse.go`. Cross-platform (not desktop-only).

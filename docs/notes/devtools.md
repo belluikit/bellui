@@ -1,7 +1,7 @@
 # DevTools & Analytics
 
-Fork-specific detail moved out of `CLAUDE.md` (see its **Fork Features** index).
-Everything below is verbatim; issue numbers refer to the Bellui Backlog.
+Fork-specific design detail for this area. Issue numbers refer to the Bellui
+Backlog.
 
 ### Widget-Tree Inspector (DevTools, #540)
 `dev/inspector` — an opt-in, **read-only** runtime widget-tree inspector for debugging layouts (the human-facing half of the #490-deferred introspection seam). `inspector.Show(w bellui.Window) *Inspector` opens a **separate** native window (desktop-only; mobile/wasm are single-window and out of scope) targeting `w`; apps gate it themselves (e.g. `if os.Getenv("BELLUI_INSPECT") == "1" { inspector.Show(w) }`). Heavy code is only linked when the package is imported (`theme/cjk` placement pattern); the existing lightweight `dev.Enable(w)` F12 overlay is unrelated and untouched.

@@ -1,7 +1,7 @@
 # Native View Embedding
 
-Fork-specific detail moved out of `CLAUDE.md` (see its **Fork Features** index).
-Everything below is verbatim; issue numbers refer to the Bellui Backlog.
+Fork-specific design detail for this area. Issue numbers refer to the Bellui
+Backlog.
 
 ### Native View Embedding — widget.NativeViewHost + webview (#45, spike)
 `widget.NativeViewHost` embeds an OS-owned view (web view, native video, map, camera preview) at a widget's position. It is a **hole punch**, the architecture Flutter/Compose Multiplatform/Avalonia ship: bellui draws its scene into one GPU surface and an OS view cannot be composited into it, so the host **draws nothing** and drives a real platform view positioned over the canvas. The spike (#45) decided **(A) hole punch over (B) offscreen-render-to-texture** — (B) is impossible on macOS/iOS (WKWebView has no supported offscreen API) and would mean bundling CEF (~150–200 MB) on every platform, untenable for a toolkit with a 385 KB font budget (#686).

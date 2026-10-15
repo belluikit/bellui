@@ -9,7 +9,8 @@ WebGPU is implemented on top of [`oliverbestmann/webgpu`](https://github.com/oli
 [`wgpu-native`](https://github.com/gfx-rs/wgpu-native) on desktop/mobile and the
 browser's WebGPU via `syscall/js` on the web. The fork was rebased onto that base
 in v1.1.0, from the frozen `cogentcore/webgpu` it started on; our fork now carries
-only two platform slices upstream does not ship — see `docs/REBRAND.md`.
+only two platform slices upstream does not ship (iOS Simulator and windows/arm64)
+— see the [webgpu fork's NOTICE](https://github.com/belluikit/webgpu/blob/main/NOTICE).
 
 ## Why
 
