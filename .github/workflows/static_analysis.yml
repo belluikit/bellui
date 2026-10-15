@@ -18,19 +18,18 @@ env:
 
 jobs:
   static_analysis:
-    runs-on: [self-hosted, Linux, ARM64]
+    runs-on: ubuntu-24.04
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
           # Full history + all branches so `buf breaking` can resolve the
           # origin/main baseline (the proto breaking-change check below).
           fetch-depth: 0
-      - name: Assert go-plus toolchain
-        run: |
-          go version
-          go version | grep -qE '\(plus[ )]' || { echo "::error::runner go is not the go-plus fork"; exit 1; }
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
 
       # Godoc Since: annotations must not name version lines that never shipped
       # on this module path. The pre-v1 sweep (#264) rewrote 2.10–2.19 and 3.x
@@ -63,8 +62,8 @@ jobs:
 
       - name: Get dependencies
         run: |
-          flock /tmp/bellui-ci-apt.lock sudo apt-get -o DPkg::Lock::Timeout=600 update
-          flock /tmp/bellui-ci-apt.lock sudo apt-get -o DPkg::Lock::Timeout=600 install -y --no-install-recommends clang lld libegl1-mesa-dev libgl1-mesa-dev libgles2-mesa-dev libx11-dev xorg-dev xvfb language-pack-en
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang lld libegl1-mesa-dev libgl1-mesa-dev libgles2-mesa-dev libx11-dev xorg-dev xvfb language-pack-en
 
       - name: Set environment variable LANG
         run: export LANG=en_EN.UTF-8
@@ -87,10 +86,9 @@ jobs:
           go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.5
 
       - name: Put go-installed tools on PATH
-        # `go install` drops binaries in $(go env GOPATH)/bin, which is not on
-        # the self-hosted runner's PATH by default (GitHub-hosted runners add it,
-        # ours don't). Export it so buf/gofumpt/staticcheck/gocyclo/lian below
-        # are found instead of failing with "command not found".
+        # `go install` drops binaries in $(go env GOPATH)/bin. Export it
+        # explicitly so buf/gofumpt/staticcheck/gocyclo/lian below are found
+        # regardless of what the runner image or setup-go put on PATH.
         run: echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
       - name: Lint protobuf

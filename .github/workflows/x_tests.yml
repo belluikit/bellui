@@ -52,9 +52,7 @@ jobs:
           # hardware (nothing in the current tests needs a camera, but the
           # device-selector code is the part a Windows leg would be for).
           - platform: linux
-            runs-on: [self-hosted, Linux, ARM64]
-            # -a (auto-servernum) so parallel self-hosted runners on one box
-            # don't collide on Xvfb display :99.
+            runs-on: ubuntu-24.04-arm
             runner: ./.github/scripts/xvfb-run-safe
             # -tags gl: the pure-Go GL fallback, so this needs no GPU and no
             # wgpu-native link. Mirrors the comprehensive leg in
@@ -62,7 +60,7 @@ jobs:
             tags: gl,ci
             coverage: true
           - platform: macos
-            runs-on: [self-hosted, macOS, ARM64]
+            runs-on: macos-15
             runner: ""
             tags: gl,no_glfw,ci
             # The Linux leg owns the coverage gate; running it twice would just
@@ -70,19 +68,18 @@ jobs:
             coverage: false
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
 
-      - name: Assert go-plus toolchain
-        run: |
-          go version
-          go version | grep -qE '\(plus[ )]' || { echo "::error::runner go is not the go-plus fork"; exit 1; }
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
 
       - name: Get dependencies
         run: |
-          flock /tmp/bellui-ci-apt.lock sudo apt-get -o DPkg::Lock::Timeout=600 update
-          flock /tmp/bellui-ci-apt.lock sudo apt-get -o DPkg::Lock::Timeout=600 install -y --no-install-recommends bc clang lld libgl1-mesa-dev libwayland-dev libx11-dev libxkbcommon-dev xorg-dev xvfb language-pack-en
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends bc clang lld libgl1-mesa-dev libwayland-dev libx11-dev libxkbcommon-dev xorg-dev xvfb language-pack-en
           echo "CC=clang" >> "$GITHUB_ENV"
           echo "CGO_LDFLAGS=-fuse-ld=lld" >> "$GITHUB_ENV"
         if: ${{ runner.os == 'Linux' }}

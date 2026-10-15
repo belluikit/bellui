@@ -15,17 +15,17 @@ permissions:
 
 jobs:
   web_tests:
-    runs-on: [self-hosted, Linux, ARM64]
+    # x86_64 on purpose: the wasm build is arch-independent, and the arm64
+    # runner image ships no browser for the headless test leg below.
+    runs-on: ubuntu-24.04
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - name: Assert go-plus toolchain
-        run: |
-          go version
-          go version | grep -qE '\(plus[ )]' || { echo "::error::runner go is not the go-plus fork"; exit 1; }
-
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
 
       # WebGPU (browser WebGPU) is the default wasm backend (Phase 5, #204); the
       # WebGL gl-js path is the fallback behind -tags gl. Build both. wasm has no
@@ -78,29 +78,16 @@ jobs:
         working-directory: cmd/bellui_settings
         run: go build -tags gl
 
-      # Run the browser binary directly, out from under snap-confine (#311).
-      # /snap/bin/chromium is a wrapper that calls snap-confine, which refuses
-      # to launch from the runner service with
-      #   "...actions.runner....service is not a snap cgroup for tag snap.chromium.chromium"
-      # and takes every package down with it — the browser never starts, so no
-      # test runs. The snap's own binary underneath has no such check and works;
-      # a shim named `chromium`, ahead of /snap/bin on PATH, is what chromedp
-      # (inside wasmbrowsertest) then finds.
-      #
-      # --no-sandbox because the SUID sandbox helper is set up by the snap's
-      # confinement, which is exactly what is being bypassed here. This is CI
-      # running our own code in a throwaway VM.
-      #
-      # This still depends on the chromium SNAP being installed — just not on
-      # snap-confine to launch it. The root cause of the refusal is NOT
-      # established: the same wrapper runs fine by hand as the same user, in a
-      # transient system-slice service, and even inside the runner service's
-      # own cgroup. Only the real job reproduces it.
-      - name: Put a snap-confine-free chromium on PATH
+      # wasmbrowsertest drives a headless browser through chromedp, which finds
+      # it as `chromium` on PATH. The runner image ships Google Chrome; a shim
+      # named `chromium` launches it with --no-sandbox, because Ubuntu 24.04's
+      # AppArmor policy blocks the unprivileged user namespaces Chrome's own
+      # sandbox needs. This is CI running our own code in a throwaway VM.
+      - name: Put a chromium shim on PATH
         run: |
           set -euo pipefail
-          real=/snap/chromium/current/usr/lib/chromium-browser/chrome
-          test -x "$real" || { echo "::error::$real is missing — is the chromium snap installed?"; exit 1; }
+          real=$(command -v google-chrome || command -v google-chrome-stable || true)
+          test -n "$real" || { echo "::error::no google-chrome on the runner image"; exit 1; }
           mkdir -p "$RUNNER_TEMP/browser-bin"
           cat > "$RUNNER_TEMP/browser-bin/chromium" <<SHIM
           #!/usr/bin/env bash
@@ -112,7 +99,7 @@ jobs:
           # depend on it, so a launch failure is reported here rather than as
           # 40-odd unrelated package failures.
           "$RUNNER_TEMP/browser-bin/chromium" --headless --disable-gpu --dump-dom about:blank > /dev/null
-          echo "chromium shim launches OK"
+          echo "chromium shim launches OK ($real)"
 
       # Real-DOM execution leg (#73). wasmbrowsertest runs the test binary in
       # headless Chromium, so the wasm packages are exercised against a real
@@ -141,29 +128,10 @@ jobs:
         run: |
           pkgs=$(go list ./... | grep -vE 'internal/gsportal|internal/driver/mobile|/cmd/|/hack/|internal/(oksvg|rasterx|render)')
           # -p 1: one package at a time, so one browser at a time. go test
-          # parallelises packages by default (GOMAXPROCS — six on this runner),
-          # and every package here launches its own headless Chromium with a
-          # wasm binary loaded. Six of those at once on an 11 GB box whose /tmp
-          # is a RAM-backed 5.6 G tmpfs starves someone: a browser is killed
-          # mid-run and its package reports "context canceled", which reads as
-          # a test failure in an unrelated package. That only became reachable
-          # when the leg widened from three packages to the whole module (#79).
-          # The parallelism bought little anyway — the cost here is browser
-          # startup per package, not CPU.
+          # parallelises packages by default (GOMAXPROCS), and every package
+          # here launches its own headless browser with a wasm binary loaded.
+          # Several at once starve memory: a browser is killed mid-run and its
+          # package reports "context canceled", which reads as a test failure
+          # in an unrelated package (#79). The parallelism bought little
+          # anyway — the cost here is browser startup per package, not CPU.
           go test -p 1 -tags ci -timeout 240s -exec="$(go env GOPATH)/bin/wasmbrowsertest" $pkgs
-
-      # One browser launch per package leaves a profile behind in /tmp — the
-      # SHARED tmpfs every other runner on this box links binaries in. Left
-      # alone the full-module leg grew it by ~4 GB an hour and starved a
-      # concurrent platform_tests of link space ("mapping output file failed:
-      # disk quota exceeded").
-      #
-      # The snap's private /tmp is no longer involved: launching the binary
-      # directly (#311) never uses it, so the reclamation there — and the
-      # snap-discard-ns call that repaired the mount namespace it invalidated —
-      # are gone with it.
-      - name: Reclaim the browser's temp space
-        if: always()
-        run: |
-          find /tmp -maxdepth 1 -name 'chromedp-*' -exec rm -rf {} + 2>/dev/null || true
-          df -h /tmp | tail -1

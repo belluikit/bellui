@@ -18,28 +18,24 @@ env:
 
 jobs:
   mobile_tests:
-    runs-on: [self-hosted, Linux, ARM64]
+    runs-on: ubuntu-24.04-arm
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - name: Assert go-plus toolchain
-        run: |
-          go version
-          go version | grep -qE '\(plus[ )]' || { echo "::error::runner go is not the go-plus fork"; exit 1; }
-
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
 
       - name: Get dependencies
         run: |
-          flock /tmp/bellui-ci-apt.lock sudo apt-get -o DPkg::Lock::Timeout=600 update
-          flock /tmp/bellui-ci-apt.lock sudo apt-get -o DPkg::Lock::Timeout=600 install -y --no-install-recommends clang lld libegl1-mesa-dev libgles2-mesa-dev libx11-dev xorg-dev
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang lld libegl1-mesa-dev libgles2-mesa-dev libx11-dev xorg-dev
 
       # WebGPU is the default mobile backend (Phase 5, #204); GLES is the fallback
       # behind -tags gl. This comprehensive leg exercises the GLES fallback path.
       - name: Tests (GLES fallback)
-        # -a (auto-servernum) so parallel self-hosted runners on one box don't
-        # collide on Xvfb display :99.
         run: ./.github/scripts/xvfb-run-safe go test -race -tags gl,mobile,ci,migrated_belluido ./...
 
       - name: Partial-repaint (opt-in) build + region logic
