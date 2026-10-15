@@ -1,26 +1,34 @@
 // Separate module so the runtime-spike harness can pull the full Bellui app
-// stack without adding those deps to the fycoder library's go.mod.
-// The replace points at the repo root, so it always builds against the
-// working-tree fycoder, not a published version.
+// stack without adding those deps to the x/editor library's go.mod.
+// The replace points at the x/editor module root, so it always builds against
+// the working-tree editor, not a published version.
 module github.com/belluikit/bellui/x/editor/examples/wasm
 
 go 1.25.0
 
 require (
+	github.com/belluikit/bellui v1.0.0
 	github.com/belluikit/bellui/x/editor v0.0.0
-	github.com/trendvidia/fyne/v2 v2.15.3
 )
 
 require (
-	bellui.io/systray v1.12.0 // indirect
-	github.com/BurntSushi/toml v1.5.0 // indirect
+	github.com/Microsoft/go-winio v0.6.2 // indirect
+	github.com/belluikit/fsnotify v1.9.1 // indirect
+	github.com/belluikit/gl-js v0.2.1 // indirect
+	github.com/belluikit/glfw v1.10.0 // indirect
+	github.com/belluikit/glfw-js v1.0.4 // indirect
+	github.com/belluikit/systray v1.12.0 // indirect
+	github.com/belluikit/typesetting v0.3.6 // indirect
+	github.com/belluikit/webgpu v1.2.0 // indirect
+	github.com/belluikit/webgpu/libs-android v0.0.0-20260731101013-82e3bdc8353b // indirect
+	github.com/belluikit/webgpu/libs-darwin v0.0.0-20260731101014-ce4f86d4438c // indirect
+	github.com/belluikit/webgpu/libs-ios v0.0.0-20260727093643-fcde44a448a6 // indirect
+	github.com/belluikit/webgpu/libs-linux v0.0.0-20260731101015-884076933a5d // indirect
+	github.com/belluikit/webgpu/libs-windows v0.0.0-20260727093645-6b8e55d25f27 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fredbi/uri v1.1.1 // indirect
-	github.com/fsnotify/fsnotify v1.9.0 // indirect
-	github.com/fyne-io/image v0.1.1 // indirect
-	github.com/fyne-io/oksvg v0.2.0 // indirect
 	github.com/go-gl/gl v0.0.0-20231021071112-07e5d0ea2e71 // indirect
-	github.com/go-gl/glfw/v3.4/glfw v0.1.0-pre.1 // indirect
+	github.com/go-gl/glfw/v3.4/glfw v0.1.0-pre.1.0.20260628091122-0bd588dc30cf // indirect
 	github.com/godbus/dbus/v5 v5.2.2 // indirect
 	github.com/hack-pad/go-indexeddb v0.3.2 // indirect
 	github.com/hack-pad/safejs v0.1.0 // indirect
@@ -30,28 +38,15 @@ require (
 	github.com/nicksnyder/go-i18n/v2 v2.5.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rymdport/portal v0.4.2 // indirect
-	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c // indirect
-	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
-	github.com/trendvidia/gl-js v0.2.1 // indirect
-	github.com/trendvidia/glfw v1.0.1 // indirect
-	github.com/trendvidia/glfw-js v1.0.3 // indirect
-	github.com/trendvidia/render v0.2.3 // indirect
-	github.com/trendvidia/typesetting v0.3.5 // indirect
-	github.com/trendvidia/webgpu v1.0.6 // indirect
-	github.com/yuin/goldmark v1.7.8 // indirect
-	golang.org/x/image v0.41.0 // indirect
-	golang.org/x/net v0.55.0 // indirect
-	golang.org/x/sys v0.45.0 // indirect
-	golang.org/x/text v0.37.0 // indirect
+	github.com/trendvidia/protowire-go v1.2.2 // indirect
+	github.com/yuin/goldmark v1.8.5 // indirect
+	golang.org/x/image v0.44.0 // indirect
+	golang.org/x/net v0.57.0 // indirect
+	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/text v0.40.0 // indirect
+	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
 replace github.com/belluikit/bellui/x/editor => ../..
-
-// WASM renderer fix: upstream fyne-io/gl-js v0.2.0 panics on first paint
-// (EnsureCanvasFBO -> TexImage2D with a typed-nil pixel slice). Point at the
-// trendvidia/gl-js fork (renamed module path) that returns js.Null() for
-// empty slices — fix merged in trendvidia/gl-js#1, released as v0.2.1.
-// Remove this once trendvidia/fyne itself replaces gl-js with the fixed fork.
-replace github.com/fyne-io/gl-js => github.com/trendvidia/gl-js v0.2.1
