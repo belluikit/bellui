@@ -1,6 +1,6 @@
 package widget
 
-// AnimatedGif is adapted from the bellui-x project (fyne.io/x/fyne, widget/gif.go),
+// AnimatedGif is adapted from the fyne-x project (fyne.io/x/fyne, widget/gif.go),
 // Copyright (C) 2020 Fyne.io developers and community, BSD-3-Clause license.
 // The port replaces the frame-driving goroutine with a bellui.Animation frame
 // ticker on the main goroutine and adds renderer lifecycle handling

@@ -1,6 +1,6 @@
 package layout
 
-// Responsive layout, inspired by the bellui-x project's layout.Responsive
+// Responsive layout, inspired by the fyne-x project's layout.Responsive
 // (fyne.io/x/fyne, layout/responsive.go, Copyright (C) 2020 Fyne.io
 // developers and community, BSD-3-Clause license) and by Bootstrap's grid
 // system. Reimplemented for this fork: size classes follow the Material
