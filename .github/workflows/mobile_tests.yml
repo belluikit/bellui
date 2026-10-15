@@ -31,7 +31,7 @@ jobs:
       - name: Get dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends clang lld libegl1-mesa-dev libgles2-mesa-dev libx11-dev xorg-dev
+          sudo apt-get install -y --no-install-recommends clang lld libegl1-mesa-dev libgles2-mesa-dev libx11-dev libwayland-dev libxkbcommon-dev xorg-dev
 
       # WebGPU is the default mobile backend (Phase 5, #204); GLES is the fallback
       # behind -tags gl. This comprehensive leg exercises the GLES fallback path.
