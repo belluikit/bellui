@@ -1,6 +1,6 @@
 package dialog
 
-// The About dialog follows the API shape of the bellui-x project's dialog.NewAbout
+// The About dialog follows the API shape of the fyne-x project's dialog.NewAbout
 // (fyne.io/x/fyne, dialog/about.go, Copyright (C) 2020 Fyne.io developers and
 // community, BSD-3-Clause license), reimplemented natively for this fork's
 // MD3 theming: surface-neutral composition, typography tokens for the app
