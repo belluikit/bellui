@@ -1,7 +1,7 @@
 # Accessibility
 
-Fork-specific detail moved out of `CLAUDE.md` (see its **Fork Features** index).
-Everything below is verbatim; issue numbers refer to the Bellui Backlog.
+Fork-specific design detail for this area. Issue numbers refer to the Bellui
+Backlog.
 
 ### Accessibility Semantic Layer (#484, epic #490)
 Screen-reader support is built in two layers:

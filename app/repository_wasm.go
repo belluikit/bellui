@@ -13,8 +13,8 @@ import (
 // wasm tests in a real Chromium with a real IndexedDB, so the idbfile scheme
 // must register there too — stubbing it under ci would leave the storage
 // tests asserting against nothing (#79). Its !wasm counterpart is
-// repository_other.go; together the two cover `wasm && ci` per the CLAUDE.md
-// wasm-tag invariant (#73, #77).
+// repository_other.go; together the two cover `wasm && ci`, as the wasm-tag
+// invariant requires (#73, #77).
 func (a *belluiApp) registerRepositories() {
 	repo, err := intRepo.NewIndexDBRepository()
 	if err != nil {

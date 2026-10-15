@@ -73,7 +73,7 @@ cost scales with viewport, not document size.
 - The fork is shared with appviewer and other trendvidia Bellui apps; additive,
   backward-compatible changes only. New fields default to today's behavior.
 - Mirror the existing fycoder convention: "extra fields activate as the fork
-  adds support" (see `CLAUDE.md`). fycoder can land the *consuming* API behind
+  adds support". fycoder can land the *consuming* API behind
   the inert fields first, then light up when the fork ships — F1 in particular
   can be developed this way.
 - Each fork capability above should ship with a fycoder gallery demo that

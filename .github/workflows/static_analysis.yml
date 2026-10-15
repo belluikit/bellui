@@ -34,15 +34,15 @@ jobs:
 
       # Godoc Since: annotations must not name version lines that never shipped
       # on this module path. The pre-v1 sweep (#264) rewrote 2.10–2.19 and 3.x
-      # to 1.0, and docs/REBRAND.md records the standing rule: cherry-picks from
-      # the frozen fyne repo rewrite their Since: lines on the way in. This gate
+      # to 1.0, and the standing rule is that cherry-picks from the frozen fyne
+      # repo rewrite their Since: lines on the way in. This gate
       # makes the rule self-enforcing (#273) — the vector is real: #262 crossed
       # the sweep in flight and carried one straggler back onto main. A plain
       # git grep deliberately reaches what vet/staticcheck cannot: the x/
-      # submodules, markdown, and prose forms like "since v2.15". Three files
-      # are allowlisted: CHANGELOG.md and docs/REBRAND.md are the intentional
-      # historical record of the ghost versions, and this workflow carries the
-      # pattern's own test strings.
+      # submodules, markdown, and prose forms like "since v2.15". Two files
+      # are allowlisted: CHANGELOG.md is the intentional historical record of
+      # the ghost versions, and this workflow carries the pattern's own test
+      # strings.
       - name: Stale Since annotations
         run: |
           pattern='[Ss]ince:? ?v?(2\.1[0-9]|3\.[0-9]+)([^0-9]|$)'
@@ -53,11 +53,11 @@ jobs:
           # git grep exits 1 on "no matches", which is the pass case; any other
           # nonzero is a real error and must fail the step, not pass it.
           matches=$(git grep -I -n -E "$pattern" -- \
-            ':!CHANGELOG.md' ':!docs/REBRAND.md' ':!.github/workflows/static_analysis.yml' \
+            ':!CHANGELOG.md' ':!.github/workflows/static_analysis.yml' \
             || test $? -eq 1)
           if [ -n "$matches" ]; then
             printf '%s\n' "$matches"
-            echo "::error::stale Since: annotation — version lines 2.10–2.19 and 3.x never shipped on this module path. Rewrite to the release that actually ships the API (Since: 1.0 for anything unreleased; see docs/REBRAND.md and #264)."
+            echo "::error::stale Since: annotation — version lines 2.10–2.19 and 3.x never shipped on this module path. Rewrite to the release that actually ships the API (Since: 1.0 for anything unreleased; see #264)."
             exit 1
           fi
 
