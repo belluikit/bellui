@@ -10,8 +10,8 @@
 # majors, which at roughly one major every four weeks is the quarter expressed
 # in the units the version-history API gives us.
 #
-# Self-hosted because reading the pin needs the private belluikit/gocef-libs
-# module, which the runners' git credentials can fetch.
+# Reading the pin resolves the belluikit/gocef-libs module through the Go
+# module proxy, so the job needs Go but no credentials.
 name: CEF Freshness
 
 on:
@@ -30,15 +30,24 @@ permissions:
 jobs:
   cef_freshness:
     name: pinned Chromium vs stable
-    runs-on: [self-hosted, Linux, ARM64]
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
 
       - name: Read the pinned Chromium version
         id: pin
         run: |
           set -euo pipefail
+          # A fresh runner has an empty module cache, and `go list -m` reports
+          # an empty Dir for a module that has not been downloaded.
+          (cd cmd/bellui && go mod download github.com/belluikit/gocef-libs)
           dir=$(cd cmd/bellui && go list -m -f '{{.Dir}}' github.com/belluikit/gocef-libs)
+          test -n "$dir" || { echo "::error::github.com/belluikit/gocef-libs did not resolve to a module directory"; exit 1; }
           full=$(grep -oE 'CEFVersion[[:space:]]*=[[:space:]]*"[^"]+"' "$dir/manifest/manifest.go" \
                  | head -1 | sed 's/.*"\(.*\)"/\1/')
           chromium=${full##*chromium-}

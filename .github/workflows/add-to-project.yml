@@ -6,24 +6,17 @@ name: Add issues to projects
 # addProjectV2ItemById is idempotent — re-adding returns the existing item — so
 # relabeling and reopening are harmless.
 #
-# Runs on the self-hosted fleet: the job is one API call, and hosted minutes are
-# billable on a private repo. [self-hosted, Linux, ARM64] is the repo's usual
-# label set and resolves to linux_parallels, the only Linux runner with the gh
-# CLI installed (trader has none).
-#
 # The boards are addressed by node ID rather than `gh project item-add --owner`,
-# which has to resolve the owner to a user-or-org first: that lookup fails on the
-# runner's gh 2.46 with a bare "unknown owner type", and node IDs are stable and
+# which has to resolve the owner to a user-or-org first: that lookup failed on
+# gh 2.46 with a bare "unknown owner type", and node IDs are stable and
 # version-independent. IDs from:
 #   gh api graphql -f query='{user(login:"trendvidia"){projectV2(number:N){id}}}'
 #
 # AUTH: needs a token with the `project` scope plus read access to this repo's
 # issues — a classic PAT in the ADD_TO_PROJECT_PAT secret. The built-in
 # GITHUB_TOKEN cannot write to user-owned Projects, which is why a secret is
-# needed at all. Without the secret the job falls back to the runner's own gh
-# credentials; as of 2026-07-28 those are expired on every machine in the fleet,
-# so the secret is the working path. Note `gh auth status` exits 0 even on an
-# invalid token in gh 2.46 — `gh api user` is the probe that actually tells.
+# needed at all. `gh api user` is the credential probe: `gh auth status` has
+# exited 0 on an invalid token in some gh versions.
 
 on:
   issues:
@@ -38,7 +31,7 @@ env:
 
 jobs:
   add-to-project:
-    runs-on: [self-hosted, Linux, ARM64]
+    runs-on: ubuntu-24.04
     steps:
       - name: Add to projects
         env:
@@ -49,13 +42,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [ -z "${GH_TOKEN:-}" ]; then
-            unset GH_TOKEN # fall back to the runner's own gh credentials
-            echo "::notice::ADD_TO_PROJECT_PAT is not set; trying the runner's own gh credentials."
-          fi
-
-          if ! gh api user --jq .login >/dev/null 2>&1; then
-            echo "::error::No usable GitHub credentials. Provision the ADD_TO_PROJECT_PAT secret (classic PAT, 'project' + 'repo' scopes), or run 'gh auth login' on this runner."
+          if [ -z "${GH_TOKEN:-}" ] || ! gh api user --jq .login >/dev/null 2>&1; then
+            echo "::error::No usable GitHub credentials. Provision the ADD_TO_PROJECT_PAT secret (classic PAT, 'project' + 'repo' scopes)."
             exit 1
           fi
 
