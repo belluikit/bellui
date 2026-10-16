@@ -1,6 +1,6 @@
-# fycoder — WASM runtime / F1–F5 acceptance harness
+# x/editor — WASM runtime / F1–F5 acceptance harness
 
-A browser harness for exercising the *complete* fycoder editor under
+A browser harness for exercising the *complete* x/editor widget under
 `GOOS=js GOARCH=wasm`. It backs the runtime half of
 [`docs/roadmap/10-wasm-web-target.md`](../../docs/roadmap/10-wasm-web-target.md)
 and is the acceptance harness for the F1–F5 browser-verify
