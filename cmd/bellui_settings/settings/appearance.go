@@ -181,7 +181,7 @@ func (s *Settings) saveToFile(path string) error {
 	}
 
 	// Drop the superseded legacy settings.json once the PXF store is written
-	// (#872 dropped the JSON path outright; this clears any stale file it left).
+	// (pre-rebrand tracker #872 dropped the JSON path outright; this clears any stale file it left).
 	os.Remove(filepath.Join(filepath.Dir(path), "settings.json"))
 	return nil
 }

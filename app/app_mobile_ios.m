@@ -9,7 +9,7 @@ void openURL(char *urlStr) {
 }
 
 // shareItem presents a UIActivityViewController (the iOS share sheet) for the
-// given value: plain text, or a file URL when isFile != 0 (fyne#711). It is
+// given value: plain text, or a file URL when isFile != 0 (pre-rebrand tracker #711). It is
 // shown from the top-most presented view controller on the key window. On iPad
 // the sheet is a popover, which UIKit requires be anchored to a source rect —
 // omitting it raises an exception — so it is centred on the presenting view.

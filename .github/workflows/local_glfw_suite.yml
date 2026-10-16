@@ -1,7 +1,7 @@
-# Nightly run of the local (!ci) glfw driver test suite (#592).
+# Nightly run of the local (!ci) glfw driver test suite (pre-rebrand tracker #592).
 #
 # These tests are tagged `!no_glfw && !ci && !mobile`, so no PR/push workflow
-# ever runs them — they rotted silently until #590/#592. They open real GLFW
+# ever runs them — they rotted silently until pre-rebrand tracker #590/#592. They open real GLFW
 # windows, so they run on Linux, where xvfb-run-safe gives them a headless
 # display. `-tags gl` selects the pure-Go GL fallback so the leg needs
 # no GPU, mirroring the comprehensive linux leg in platform_tests.

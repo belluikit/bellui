@@ -21,7 +21,7 @@ import (
 // and macOS it never fires and touch keeps arriving as an emulated mouse.
 // The contacts feed the same common.TouchHandler the mobile driver runs, so
 // desktop touch gets mobile's gesture vocabulary — slop-cancelled taps,
-// origin-latched drags, double-tap, and hold-fire long-press (#758), the
+// origin-latched drags, double-tap, and hold-fire long-press (pre-rebrand tracker #758), the
 // #259 selection-mode entry that was unreachable on desktop touchscreens.
 //
 // Deliberate consequences and limits:

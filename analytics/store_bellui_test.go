@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestBelluiStore_SaveCreatesThenOverwrites is the regression for #699: the very
+// TestBelluiStore_SaveCreatesThenOverwrites is the regression for pre-rebrand tracker #699: the very
 // first Save must CREATE the spool file. bellui.Storage.Save only reopens an
 // existing document (ErrNotExists otherwise), so before the fix the spool was
 // never written and the error was swallowed — crash-safe spooling silently
@@ -22,7 +22,7 @@ func TestBelluiStore_SaveCreatesThenOverwrites(t *testing.T) {
 	s := NewBelluiStore(bellui.CurrentApp())
 
 	// The underlying bellui.Storage.Save refuses a not-yet-created document — this
-	// is the quirk BelluiStore.Save works around, and the direct cause of #699.
+	// is the quirk BelluiStore.Save works around, and the direct cause of pre-rebrand tracker #699.
 	_, rawErr := bellui.CurrentApp().Storage().Save("nonexistent-" + spoolFileName)
 	assert.ErrorIs(t, rawErr, storage.ErrNotExists)
 
@@ -51,7 +51,7 @@ func TestBelluiStore_SaveCreatesThenOverwrites(t *testing.T) {
 }
 
 // TestSpoolRoundTrip_BelluiStore is TestSpoolRoundTrip over the real bellui-storage
-// spool rather than the in-memory memStore — the path the #699 device run
+// spool rather than the in-memory memStore — the path the pre-rebrand tracker #699 device run
 // exercised, and the one the memStore test could not have caught.
 func TestSpoolRoundTrip_BelluiStore(t *testing.T) {
 	test.NewTempApp(t)

@@ -50,7 +50,7 @@ func TestSnackbar_DoesNotBlockContentBeneath(t *testing.T) {
 	s.Show(c)
 	t.Cleanup(s.Hide)
 
-	// A tap aimed at the button beneath the snackbar reaches it (#569) and
+	// A tap aimed at the button beneath the snackbar reaches it (pre-rebrand tracker #569) and
 	// the snackbar persists (MD3: transient surfaces never block, and
 	// outside interaction does not dismiss them).
 	btnCenter := btn.Position().Add(geo.NewPos(btn.Size().Width/2, btn.Size().Height/2))

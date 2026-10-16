@@ -1,4 +1,4 @@
-# orcaspeech — Orca speech-capture harness (Linux, #981)
+# orcaspeech — Orca speech-capture harness (Linux, pre-rebrand tracker #981)
 
 The `busctl` / `dbus-monitor` recipes in [`hack/a11yprobe`](../a11yprobe/README.md)
 verify the AT-SPI2 **provider tree** the way Orca queries it. This harness goes

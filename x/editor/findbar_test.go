@@ -101,7 +101,7 @@ func TestFindBarUpdateMatches(t *testing.T) {
 }
 
 // TestFindBarActiveMatchStableAcrossResearch verifies the identity-stable
-// current match (#165): after navigating to a later match, re-running the search
+// current match (pre-rebrand tracker #165): after navigating to a later match, re-running the search
 // (an OnChanged re-type, a case toggle, a FindNext with a rebuilt set) keeps the
 // highlight on the same match by identity instead of snapping back to the first.
 func TestFindBarActiveMatchStableAcrossResearch(t *testing.T) {

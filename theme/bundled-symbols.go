@@ -8,7 +8,7 @@ import (
 	"github.com/belluikit/bellui"
 )
 
-// Bundled UI-symbol fallback faces (#686): subsets of Noto Sans Symbols 2 and
+// Bundled UI-symbol fallback faces (pre-rebrand tracker #686): subsets of Noto Sans Symbols 2 and
 // Noto Sans Symbols (SIL OFL 1.1, see font/LICENSE_NotoSansSymbols.txt)
 // covering the common symbol blocks the primary bundled fonts lack — General
 // Punctuation gaps, Letterlike Symbols, Number Forms, Arrows, Mathematical

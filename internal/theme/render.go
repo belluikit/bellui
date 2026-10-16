@@ -18,7 +18,7 @@ var goroutineStacks sync.Map // map[uint64][]bellui.Theme
 // goroutine (thread.GoroutineID calls the expensive runtime.Stack) when no
 // ThemeOverride is in effect at all — the overwhelmingly common case. This read
 // runs once per theme lookup, i.e. once per text measurement, so it dominates
-// large layouts: SetText of a 10k-line Entry made ~10k runtime.Stack calls (#138).
+// large layouts: SetText of a 10k-line Entry made ~10k runtime.Stack calls (pre-rebrand tracker #138).
 var activeOverrides atomic.Int64
 
 // CurrentlyRenderingWithFallback returns the theme that is currently being used during rendering or layout

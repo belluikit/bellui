@@ -1,7 +1,7 @@
-// Command a11ygestureprobe verifies #762: TalkBack accessibility gestures —
+// Command a11ygestureprobe verifies pre-rebrand tracker #762: TalkBack accessibility gestures —
 // scroll, long-press and slider adjust — must route to the corresponding Bellui
 // behaviours even though Bellui consumes raw touch through the native input
-// queue (which bypasses the framework's touch-exploration filter, so the #761
+// queue (which bypasses the framework's touch-exploration filter, so the pre-rebrand tracker #761
 // tap-gate suppresses raw gestures under TalkBack).
 //
 // It shows:

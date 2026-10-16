@@ -13,7 +13,7 @@ import (
 )
 
 // activatableStub is a focusable that declares Space activates it, so the driver
-// should fire the keyboard-activation signal for it (#700).
+// should fire the keyboard-activation signal for it (pre-rebrand tracker #700).
 type activatableStub struct {
 	canvas.Rectangle
 }
@@ -30,7 +30,7 @@ func (a *activatableStub) ActivatedByKey(ev *event.KeyEvent) bool {
 // TestWindow_KeyboardActivationNotifies asserts the glfw driver fires
 // core.NotifyActivation(obj, viaKeyboard=true) when a focused event.Activatable
 // receives its activation key, and does NOT fire for a plain focusable that
-// consumes the key (parity with the pointer-tap activation path, #700).
+// consumes the key (parity with the pointer-tap activation path, pre-rebrand tracker #700).
 func TestWindow_KeyboardActivationNotifies(t *testing.T) {
 	var gotObj core.CanvasObject
 	var gotKbd bool

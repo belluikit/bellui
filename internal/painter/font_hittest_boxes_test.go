@@ -11,7 +11,7 @@ import (
 
 // TestStyledLineLayoutHitTestBoxesLTR pins the box-aware inverse of BoxCaretX in
 // plain left-to-right flow: a click inside the box resolves to that box (nearer
-// edge → before/after), a click in the surrounding text resolves to text (#983).
+// edge → before/after), a click in the surrounding text resolves to text (pre-rebrand tracker #983).
 func TestStyledLineLayoutHitTestBoxesLTR(t *testing.T) {
 	lang.SetLocaleForTests(t, "en-US")
 
@@ -51,7 +51,7 @@ func TestStyledLineLayoutHitTestBoxesLTR(t *testing.T) {
 
 // TestStyledLineLayoutHitTestBoxesRTLWords pins the box-aware inverse between two
 // right-to-left words, where the box edges genuinely differ from the text carets
-// (the #913 property): a click inside the box must resolve to the box rather than
+// (the pre-rebrand tracker #913 property): a click inside the box must resolve to the box rather than
 // snap to the neighbouring RTL text caret, and the before/after sides track the
 // box's own before-/after-edge positions (BoxCaretX) — direction-agnostic.
 func TestStyledLineLayoutHitTestBoxesRTLWords(t *testing.T) {

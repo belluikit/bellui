@@ -72,13 +72,13 @@ type window struct {
 	mouseDraggedOffset   geo.Position
 	mouseDragPos         geo.Position
 	mouseDragStarted     bool
-	dragGhost            *internalWidget.DragGhost // ghost overlay following the pointer during a drag (#819)
-	dndDrag              bool                      // the active drag opted into in-canvas DnD (#819)
+	dragGhost            *internalWidget.DragGhost // ghost overlay following the pointer during a drag (pre-rebrand tracker #819)
+	dndDrag              bool                      // the active drag opted into in-canvas DnD (pre-rebrand tracker #819)
 	dragPayload          any                       // source-declared payload carried to DragTargets
 	dragTarget           core.DragTarget           // current DragTarget under the pointer
 	mouseButton          desktop.MouseButton
 	mouseOver            event.Hoverable
-	tooltipObj           core.CanvasObject // current driver-level tooltip target under the pointer (#800)
+	tooltipObj           core.CanvasObject // current driver-level tooltip target under the pointer (pre-rebrand tracker #800)
 	mouseLastClick       core.CanvasObject
 	mousePressed         core.CanvasObject
 	mouseClickCount      int
@@ -663,7 +663,7 @@ func (w *window) create() {
 	win.SetCharCallback(w.charInput)
 	win.SetFocusCallback(w.focused)
 
-	installNativeDragOut(w) // HTML5 drag-and-drop out of the canvas (#857/#874)
+	installNativeDragOut(w) // HTML5 drag-and-drop out of the canvas (pre-rebrand tracker #857/#874)
 
 	w.canvas.detectedScale = w.detectScale()
 	w.canvas.scale = w.calculatedScale()

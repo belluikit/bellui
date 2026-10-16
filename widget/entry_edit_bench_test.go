@@ -17,7 +17,7 @@ const benchLine = "the quick brown fox jumps over the lazy dog line content here
 
 // benchDocSizes are the document sizes the large-document benchmarks run at:
 // the historical 50k-line (~3 MB) corpus and a 500k-line (~30 MB) multi-MB
-// document (#382 Tier 2 acceptance).
+// document (pre-rebrand tracker #382 Tier 2 acceptance).
 var benchDocSizes = []struct {
 	name  string
 	lines int
@@ -51,7 +51,7 @@ func newBenchEntry(b *testing.B, lines int) (*Entry, bellui.Window) {
 // single-segment document, at the document head and at the tail (the tail
 // variant pins position independence — the pre-rope backing paid O(cursor
 // position) per keystroke). The per-keystroke floor is the single mandated
-// document materialization for the exported Entry.Text field (#382).
+// document materialization for the exported Entry.Text field (pre-rebrand tracker #382).
 func BenchmarkEntryTypeBigDoc(b *testing.B) {
 	for _, size := range benchDocSizes {
 		for _, pos := range []string{"head", "tail"} {
@@ -75,7 +75,7 @@ func BenchmarkEntryTypeBigDoc(b *testing.B) {
 }
 
 // BenchmarkEntryTypeBigDocDeferred is BenchmarkEntryTypeBigDoc with the
-// DeferTextSync mode (#410) on: the per-keystroke document materialization is
+// DeferTextSync mode (pre-rebrand tracker #410) on: the per-keystroke document materialization is
 // deferred to sync points, so typing latency should be O(edit + window) —
 // flat across document sizes — instead of memcpy-bound on the document.
 func BenchmarkEntryTypeBigDocDeferred(b *testing.B) {
@@ -102,9 +102,9 @@ func BenchmarkEntryTypeBigDocDeferred(b *testing.B) {
 	}
 }
 
-// BenchmarkEntrySetTextBigDoc measures the initial-load path (fycoder#106):
+// BenchmarkEntrySetTextBigDoc measures the initial-load path (pre-rebrand fycoder tracker #106):
 // SetText plus the first row-bounds build, with a synthetic per-line
-// highlighter attached — the windowed highlight build (#401) must keep the
+// highlighter attached — the windowed highlight build (pre-rebrand tracker #401) must keep the
 // highlighter out of the load path entirely.
 func BenchmarkEntrySetTextBigDoc(b *testing.B) {
 	for _, size := range benchDocSizes {
@@ -129,7 +129,7 @@ func BenchmarkEntrySetTextBigDoc(b *testing.B) {
 }
 
 // BenchmarkEntryUndoRedoBigDoc measures one undo+redo pair. Delta-native
-// replay (#401) applies the recorded edit through the incremental splice path;
+// replay (pre-rebrand tracker #401) applies the recorded edit through the incremental splice path;
 // before it, each application decoded and re-concatenated the whole document
 // and forced a full row-model rebuild.
 func BenchmarkEntryUndoRedoBigDoc(b *testing.B) {
@@ -151,7 +151,7 @@ func BenchmarkEntryUndoRedoBigDoc(b *testing.B) {
 }
 
 // BenchmarkEntryComposeBigDoc measures one IME preedit update. Splicing the
-// preedit through the buffer (#402) keeps composition on the incremental path;
+// preedit through the buffer (pre-rebrand tracker #402) keeps composition on the incremental path;
 // before it, every update rebuilt the whole row model.
 func BenchmarkEntryComposeBigDoc(b *testing.B) {
 	for _, size := range benchDocSizes {
@@ -172,7 +172,7 @@ func BenchmarkEntryComposeBigDoc(b *testing.B) {
 	}
 }
 
-// TestEntryTypeFlatLatency is the #382 Tier 2 acceptance gate: per-keystroke
+// TestEntryTypeFlatLatency is the pre-rebrand tracker #382 Tier 2 acceptance gate: per-keystroke
 // cost must scale with the single mandated document materialization (one
 // alloc + memcpy for the exported Entry.Text field) and nothing else. It
 // asserts allocated bytes/op at 500k lines stay within ~12× of 50k lines
@@ -218,7 +218,7 @@ func TestEntryTypeFlatLatency(t *testing.T) {
 	fmt.Printf("flat-latency gate: ns ratio %.2f, bytes ratio %.2f, allocs ratio %.2f\n", nsRatio, byteRatio, allocRatio)
 }
 
-// TestEntryTypeFlatLatencyDeferred is the deferred-mode (#410) counterpart of
+// TestEntryTypeFlatLatencyDeferred is the deferred-mode (pre-rebrand tracker #410) counterpart of
 // TestEntryTypeFlatLatency: with DeferTextSync on there is no mandated
 // per-keystroke materialization at all, so a 10× document must cost the same
 // per keystroke — truly flat, not merely memcpy-bound. Run with BELLUI_PERF=1.

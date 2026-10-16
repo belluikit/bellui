@@ -1,4 +1,4 @@
-// Command atspiprobe is a research spike for fyne#489: a *pure-Go* AT-SPI2
+// Command atspiprobe is a research spike for pre-rebrand tracker #489: a *pure-Go* AT-SPI2
 // accessibility provider, speaking the org.a11y.atspi.* D-Bus protocol directly
 // through github.com/godbus/dbus/v5 (already a fork dependency) with no cgo and
 // no Rust/AccessKit.
@@ -232,7 +232,7 @@ func (p *provider) emitStateChanged(n *node, detail string, detail1 int32) {
 
 func main() {
 	log.SetFlags(log.Ltime)
-	log.Println("atspiprobe — pure-Go AT-SPI2 provider spike (fyne#489)")
+	log.Println("atspiprobe — pure-Go AT-SPI2 provider spike (pre-rebrand tracker #489)")
 
 	// 1. Discover the a11y bus address via the session bus.
 	sess, err := dbus.SessionBus()

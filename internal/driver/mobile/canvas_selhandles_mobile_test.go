@@ -13,7 +13,7 @@ import (
 	"github.com/belluikit/bellui/widget"
 )
 
-// Selection handles through the real touch pipeline (#758): after a hold-fire
+// Selection handles through the real touch pipeline (pre-rebrand tracker #758): after a hold-fire
 // long-press the handle overlay is on the canvas; a touch on a handle keeps
 // the entry focused (the RetainsFocus seam) and dragging it adjusts the
 // selection. The window comes from the shared test driver so the widget's
@@ -49,7 +49,7 @@ func Test_canvas_SelectionHandleDragAdjustsSelection(t *testing.T) {
 	// Dismiss the context menu (a user taps outside it; how the popup handles
 	// that is its own widget's concern). The handles overlay is
 	// input-pass-through, so with the menu gone the entry owns the keyboard
-	// again (TopFocusManager skips pass-through overlays, #569).
+	// again (TopFocusManager skips pass-through overlays, pre-rebrand tracker #569).
 	waitAndCheck(50, func() {
 		c.Overlays().Remove(c.Overlays().Top())
 		assert.Len(t, c.Overlays().List(), 1, "only the handle overlay remains")

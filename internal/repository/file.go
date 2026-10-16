@@ -50,9 +50,9 @@ func (f *file) URI() bellui.URI {
 //
 // Since: 1.0
 type FileRepository struct {
-	// Shared fsnotify watcher backing WatchURI, created on first use (#454).
+	// Shared fsnotify watcher backing WatchURI, created on first use (pre-rebrand tracker #454).
 	//
-	// Two locks, two jobs (#957): watchOps serializes the control-plane
+	// Two locks, two jobs (pre-rebrand tracker #957): watchOps serializes the control-plane
 	// operations (WatchURI, a subscription's cancel, closeWatcher) across
 	// their whole bodies, including the fsnotify Add/Remove/Close calls;
 	// watchLock guards only the watcher/watchSubs fields and is never held

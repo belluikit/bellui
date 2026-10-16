@@ -107,7 +107,7 @@ func TestNewAboutWindow(t *testing.T) {
 	w.Close()
 }
 
-// --- #453: parallax underlay ---
+// --- pre-rebrand tracker #453: parallax underlay ---
 
 func TestAboutContent_ParallaxUnderlay(t *testing.T) {
 	test.NewTempApp(t)

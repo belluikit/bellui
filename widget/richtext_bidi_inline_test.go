@@ -14,7 +14,7 @@ import (
 	"github.com/belluikit/bellui/theme"
 )
 
-// Tests for the bidi-aware inline-atom caret/selection geometry (#913): a row
+// Tests for the bidi-aware inline-atom caret/selection geometry (pre-rebrand tracker #913): a row
 // mixing right-to-left text with an inline image must place the caret and the
 // selection highlight from the row's visual layout, not the LTR prefix walk.
 

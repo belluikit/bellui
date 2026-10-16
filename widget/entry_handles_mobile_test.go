@@ -15,7 +15,7 @@ import (
 	"github.com/belluikit/bellui/test"
 )
 
-// The mobile selection-handle overlay (#758): shown while a focused entry has
+// The mobile selection-handle overlay (pre-rebrand tracker #758): shown while a focused entry has
 // a non-empty touch-initiated selection (long-press, double-tap, touch drag,
 // Select all from the context menu), hidden when the selection or focus goes
 // away. Keyboard and programmatic selections summon no handles.
@@ -143,7 +143,7 @@ func TestEntry_LongPressed_WhitespaceSnapsToNearestWord(t *testing.T) {
 	w.Canvas().Focus(e)
 
 	// Long-press inside the space run, nearer its right edge: the following
-	// word is selected — never the sliver-thin space run itself (#958).
+	// word is selected — never the sliver-thin space run itself (pre-rebrand tracker #958).
 	pos := e.caretRect(0, 7, true).Pos.Subtract(e.scroll.Offset)
 	e.LongPressed(&event.PointEvent{Position: pos})
 	assert.Equal(t, "countryside", e.SelectedText(), "whitespace long-press snaps to the nearest word")

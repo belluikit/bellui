@@ -20,7 +20,7 @@ import (
 )
 
 func init() {
-	// Live-region announcements (#525): deliver accessibility.Announce calls
+	// Live-region announcements (pre-rebrand tracker #525): deliver accessibility.Announce calls
 	// as UIAccessibilityAnnouncementNotification so VoiceOver speaks
 	// transient status (Toast, Snackbar) without moving its cursor.
 	accessibility.AddAnnouncementListener(func(text string, assertive bool) {
@@ -43,7 +43,7 @@ var (
 	iosA11yLastSent  = map[uintptr]mobileA11yNode{}
 	iosA11yLastOrder []uintptr
 	// iosA11yLastFocusText tracks which text element held the canvas focus
-	// last frame: the ObjC side swaps the real input proxy in for it (#570),
+	// last frame: the ObjC side swaps the real input proxy in for it (pre-rebrand tracker #570),
 	// so a focus change must reach BelluiA11ySetElements even when the element
 	// order is unchanged.
 	iosA11yLastFocusText uintptr
@@ -167,7 +167,7 @@ func belluiMobileA11yAction(handle C.uintptr_t, action C.int) {
 // belluiMobileA11yRealizeCell is called by the ObjC bridge from a grid element's
 // accessibilityDataTableCellElementForRow:column: when the requested cell is
 // not among the visible (walked) ones: it realizes the off-viewport cell
-// through the neutral seam (#817, the iOS analog of the desktop bridges'
+// through the neutral seam (pre-rebrand tracker #817, the iOS analog of the desktop bridges'
 // GridPattern.GetItem / accessibilityCellForColumn:row:). It fills out with the
 // cell's wire properties — the string fields are Go-allocated C strings the
 // caller must free() — and returns the cell's element handle, or 0 when the
@@ -212,7 +212,7 @@ func belluiMobileA11yRealizeCell(grid C.uintptr_t, row, col C.long, out *C.Bellu
 }
 
 // belluiMobileA11ySetFocus is called by the ObjC bridge when VoiceOver focus
-// enters or leaves an element. It drives the in-scene focus ring (#759/#798):
+// enters or leaves an element. It drives the in-scene focus ring (pre-rebrand tracker #759/#798):
 // VoiceOver's own focus rectangle has nothing real to outline over Bellui's flat
 // GPU (Metal) surface — the elements are zero-frame proxies — so Bellui paints its
 // own ring over the focused element, the iOS mirror of the Android

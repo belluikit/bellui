@@ -1,6 +1,6 @@
 package dialog
 
-// Window-hosted mode for FileDialog (#597): SetWindowHosted parity with the
+// Window-hosted mode for FileDialog (pre-rebrand tracker #597): SetWindowHosted parity with the
 // shared *dialog host (windowhost.go). FileDialog has its own show/hide
 // plumbing (the fileDialog.win popup, direct win.Show()/Hide() calls and
 // internal popups anchored to win.Canvas), so the host-aware seams below give

@@ -15,7 +15,7 @@ import (
 )
 
 // These benchmarks isolate the per-draw allocation tradeoff the draw-slot pool
-// addresses (#204): the old Record allocated a fresh vertex buffer, uniform
+// addresses (pre-rebrand tracker #204): the old Record allocated a fresh vertex buffer, uniform
 // buffer and bind group on every draw and released them after each frame;
 // the pool keeps them and refreshes contents via queue.WriteBuffer. Run with:
 //
@@ -24,7 +24,7 @@ import (
 //
 // They need a real WebGPU adapter (Metal/Vulkan/D3D12) and skip without one.
 //
-// BenchmarkWriteBufferPerDraw vs BenchmarkWriteBufferArena isolate the #255
+// BenchmarkWriteBufferPerDraw vs BenchmarkWriteBufferArena isolate the pre-rebrand tracker #255
 // arena win on top of the pool: the pool still issues two WriteBuffer cgo calls
 // per draw (vertex + uniform), so a frame with N draws makes ~2N calls; the
 // arena accumulates every draw into two staging slices and flushes each with a
@@ -171,7 +171,7 @@ func BenchmarkWriteBufferPerDraw(b *testing.B) {
 	}
 }
 
-// BenchmarkWriteBufferArena is the #255 arena's behaviour: every draw's data is
+// BenchmarkWriteBufferArena is the pre-rebrand tracker #255 arena's behaviour: every draw's data is
 // accumulated into two CPU staging slices (cheap appends) and each whole arena
 // is flushed with a single WriteBuffer per frame — two cgo calls per frame
 // regardless of draw count.

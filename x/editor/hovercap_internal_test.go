@@ -12,7 +12,7 @@ import (
 	"github.com/belluikit/bellui/theme"
 )
 
-// TestHoverCapture_LeavesScrollBarStrips pins the #151 fix: the transparent
+// TestHoverCapture_LeavesScrollBarStrips pins the pre-rebrand tracker #151 fix: the transparent
 // hover-capture layer is inset by the scroll bar strips (trailing + bottom),
 // so the Entry's scroll bar underneath still receives the hover that expands
 // it to its grabbable width — fyne delivers hover to the topmost hoverable,

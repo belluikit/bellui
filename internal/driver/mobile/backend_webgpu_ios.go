@@ -14,7 +14,7 @@ package mobile
 // desktop NSWindow bridge (painter/webgpu/surface_darwin.go) for iOS/UIView.
 // Under -tags webgpu the gomobile GLKView/GLES draw path is bypassed (see the
 // app package's BELLUI_WEBGPU branch), so the bare Metal sublayer is what shows —
-// which also dodges the iOS-Simulator's broken GLES path (#195).
+// which also dodges the iOS-Simulator's broken GLES path (pre-rebrand tracker #195).
 static void *metalLayerForKeyWindowMain() {
 	UIWindow *keyWin = nil;
 	for (UIWindow *win in [UIApplication sharedApplication].windows) {
@@ -102,7 +102,7 @@ static void removeMetalLayer(void *layerPtr) {
 
 // setMetalLayerHiddenMain toggles a layer's visibility without detaching it, so a
 // Hidden (but re-Showable) window's layer stops covering the window beneath while
-// staying available for a later Show (#742). Unlike removeMetalLayer, the layer
+// staying available for a later Show (pre-rebrand tracker #742). Unlike removeMetalLayer, the layer
 // keeps its place in the superlayer and its wgpu surface stays valid.
 static void setMetalLayerHiddenMain(void *layerPtr, int hidden) {
 	if (layerPtr == NULL) { return; }
@@ -122,7 +122,7 @@ static void setMetalLayerHidden(void *layerPtr, int hidden) {
 
 // bringMetalLayerToFrontMain re-orders a layer to the top of its superlayer's
 // sublayer stack, so a re-Shown window covers the one revealed while it was
-// hidden (#742). Re-adding an already-attached sublayer moves it to the front.
+// hidden (pre-rebrand tracker #742). Re-adding an already-attached sublayer moves it to the front.
 static void bringMetalLayerToFrontMain(void *layerPtr) {
 	if (layerPtr == NULL) { return; }
 	CAMetalLayer *layer = (__bridge CAMetalLayer *)layerPtr;
@@ -151,14 +151,14 @@ import (
 )
 
 // iosMetalLayer is the CAMetalLayer created for the key window, retained so the
-// layer can be re-sized on rotation/resize (#243). Only touched from the mobile
+// layer can be re-sized on rotation/resize (pre-rebrand tracker #243). Only touched from the mobile
 // paint goroutine (webgpuSurfaceDescriptor and syncNativeSurfaceSize both run
 // there, in handlePaint), so no synchronisation is needed.
 var (
 	iosMetalLayer        unsafe.Pointer
 	iosLayerW, iosLayerH int
 	// iosWindowLayers maps each window to the CAMetalLayer created for it, so
-	// Close can detach exactly that window's layer (#645). Only touched from the
+	// Close can detach exactly that window's layer (pre-rebrand tracker #645). Only touched from the
 	// mobile paint/run goroutine (webgpuSurfaceDescriptor in handlePaint, Close
 	// via bellui.Do), so no synchronisation is needed — like iosMetalLayer.
 	iosWindowLayers = map[*window]unsafe.Pointer{}
@@ -196,11 +196,11 @@ func webgpuSurfaceDescriptor(w *window) *wgpu.SurfaceDescriptor {
 
 // claimNativeSurface is a no-op on iOS: each window gets its own CAMetalLayer
 // sublayer (stacked/detached/hidden per window), so there is no shared-surface
-// contention to hand over — that is the Android-only #753 problem.
+// contention to hand over — that is the Android-only pre-rebrand tracker #753 problem.
 func (d *driver) claimNativeSurface(*canvas, *window) {}
 
 // detachWindowSurface removes a closed window's CAMetalLayer from the view so it
-// stops covering the window revealed beneath it (#645). If the removed layer was
+// stops covering the window revealed beneath it (pre-rebrand tracker #645). If the removed layer was
 // the one tracked for resizing, re-point the resize state at the now-current
 // window's layer.
 func (d *driver) detachWindowSurface(w *window) {
@@ -220,7 +220,7 @@ func (d *driver) detachWindowSurface(w *window) {
 }
 
 // setWindowSurfaceHidden toggles a window's CAMetalLayer visibility for
-// Hide/Show pop-back (#742). Hiding keeps the layer attached and its wgpu
+// Hide/Show pop-back (pre-rebrand tracker #742). Hiding keeps the layer attached and its wgpu
 // surface intact (a hidden window may be re-Shown), unlike Close's
 // detachWindowSurface which removes it. Hiding also re-points the resize state at
 // the now-revealed window; un-hiding brings the layer back to the front and
@@ -256,10 +256,10 @@ func cInt(b bool) C.int {
 
 // syncNativeSurfaceSize re-syncs the CAMetalLayer to the new pixel size when it
 // changes — on rotation or any resize the sublayer must follow the view, else
-// the render is mis-sized/clipped (#243). The CAMetalLayer bridge sets the size
+// the render is mis-sized/clipped (pre-rebrand tracker #243). The CAMetalLayer bridge sets the size
 // once at creation, so without this the layer would stay at its initial bounds.
 // Guarded on an actual change to avoid a per-frame main-thread round-trip (the
-// paint loop calls this every frame, like the #262 Device.Resize guard).
+// paint loop calls this every frame, like the pre-rebrand tracker #262 Device.Resize guard).
 func syncNativeSurfaceSize(w, h int) {
 	if iosMetalLayer == nil || w <= 0 || h <= 0 {
 		return

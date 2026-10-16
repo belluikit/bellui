@@ -21,7 +21,7 @@ type StatusBarItem interface {
 // By default the text truncates with an ellipsis instead of growing the
 // status bar's minimum size: a status bar is a fixed strip, and a long
 // message (an error with a file path) must not force a window-wide relayout
-// (#1041). Within the bar the section is width-flexible — it shows the full
+// (pre-rebrand tracker #1041). Within the bar the section is width-flexible — it shows the full
 // text whenever the bar has room and shrinks (truncating) when it does not.
 // Set NoTruncate for a section whose text must always be fully visible and
 // may dictate the bar's minimum width.
@@ -55,7 +55,7 @@ func (s *StatusBarLabel) SetText(text string) {
 	if s.label != nil {
 		s.label.SetText(text)
 	}
-	// A truncating label's MinSize is text-independent (#1041), so no relayout
+	// A truncating label's MinSize is text-independent (pre-rebrand tracker #1041), so no relayout
 	// reaches the bar from the text change — re-run the row layout ourselves
 	// so this section grows into the bar's slack or shrinks back.
 	if s.bar != nil {
@@ -117,7 +117,7 @@ func (s *StatusBarSeparator) StatusBarObject() core.CanvasObject {
 // [StatusBarLabel] produces by default) are width-flexible: they render at
 // their natural width when the bar has room and shrink — truncating with an
 // ellipsis — when it does not, so a long status message never grows the
-// bar's minimum size (#1041). Other items keep their minimum width and
+// bar's minimum size (pre-rebrand tracker #1041). Other items keep their minimum width and
 // [StatusBarSpacer] absorbs any leftover space.
 //
 // Since: 1.0
@@ -157,7 +157,7 @@ func (sb *StatusBar) SetItems(items ...StatusBarItem) {
 // relayoutSections re-runs the row layout so width-flexible sections track a
 // text change — growing into the bar's slack or shrinking back — without any
 // relayout propagating to ancestors (the bar's MinSize is unchanged by
-// design, #1041).
+// design, pre-rebrand tracker #1041).
 func (sb *StatusBar) relayoutSections() {
 	r, ok := cache.Renderer(sb.super()).(*statusBarRenderer)
 	if !ok {
@@ -220,7 +220,7 @@ func (r *statusBarRenderer) Refresh() {
 	canvas.Refresh(r.statusBar)
 }
 
-// statusBarItemsLayout is an HBox variant for the status bar row (#1041).
+// statusBarItemsLayout is an HBox variant for the status bar row (pre-rebrand tracker #1041).
 // Sections containing a truncating label are width-flexible: MinSize charges
 // them only their (near-zero) truncated minimum, and Layout grows them toward
 // their natural text width when the bar has room — sharing the shortage via

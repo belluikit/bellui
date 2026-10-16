@@ -142,7 +142,7 @@ func TestTextGrid_ScrollToBottom(t *testing.T) {
 	test.AssertObjectRendersToMarkup(t, "textgrid/scroll.xml", scrolling)
 }
 
-// TestTextGrid_ScrollTo_NoScroller guards #387: ScrollToTop/ScrollToBottom on a
+// TestTextGrid_ScrollTo_NoScroller guards pre-rebrand tracker #387: ScrollToTop/ScrollToBottom on a
 // default (ScrollNone) grid — whose internal scroller has nil Content — or on a
 // not-yet-rendered grid (nil scroller) must be a safe no-op, not a nil-deref panic.
 func TestTextGrid_ScrollTo_NoScroller(t *testing.T) {

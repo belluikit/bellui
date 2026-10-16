@@ -31,7 +31,7 @@
 >   `driver.ClipBoundsForObject` to clamp overflow to the nearest clipping
 >   ancestor for hosts that wrap the editor in a scroll
 >   ([#73](https://github.com/belluikit/bellui/x/editor/issues/73), fork
->   [trendvidia/fyne#171](https://github.com/trendvidia/fyne/pull/171)).
+>   pre-rebrand tracker #171).
 > - **Deliverable 2 — completion: ✅ shipped**
 >   ([#14](https://github.com/belluikit/bellui/x/editor/issues/14) /
 >   [#21](https://github.com/belluikit/bellui/x/editor/pull/21)). `completion.go` adds

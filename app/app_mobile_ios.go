@@ -32,13 +32,13 @@ func (a *belluiApp) OpenURL(url *url.URL) error {
 }
 
 // ShareText presents the iOS share sheet (UIActivityViewController) for the
-// given text, implementing bellui.SharerApp (fyne#711).
+// given text, implementing bellui.SharerApp (pre-rebrand tracker #711).
 func (a *belluiApp) ShareText(text string) error {
 	return shareNative(text, false)
 }
 
 // ShareFile presents the iOS share sheet for the given file URI (which must use
-// the "file" scheme), implementing bellui.SharerApp (fyne#711).
+// the "file" scheme), implementing bellui.SharerApp (pre-rebrand tracker #711).
 func (a *belluiApp) ShareFile(uri bellui.URI) error {
 	if uri == nil || uri.Scheme() != "file" {
 		return bellui.ErrShareNotSupported

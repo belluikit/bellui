@@ -13,7 +13,7 @@ import (
 )
 
 // newWrappedEntry builds a word-wrapping multi-line Entry in a narrow window so
-// its first logical line wraps to several visual rows — the #145 case. It
+// its first logical line wraps to several visual rows — the pre-rebrand tracker #145 case. It
 // returns the entry once its first logical line is confirmed to span >1 row.
 func newWrappedEntry(t *testing.T) *Entry {
 	t.Helper()
@@ -33,7 +33,7 @@ func newWrappedEntry(t *testing.T) *Entry {
 
 // rowsOfLine returns the visual rows whose logical line equals line. It uses the
 // analytic firstRowOfLine so it works for both the dense rowToLine map and the lazy
-// model (#157), which carries no per-row map.
+// model (pre-rebrand tracker #157), which carries no per-row map.
 func rowsOfLine(e *Entry, line int) []int {
 	start := e.text.firstRowOfLine(line)
 	end := e.text.firstRowOfLine(line + 1)
@@ -53,7 +53,7 @@ func lineOfRowForTest(e *Entry, row int) int {
 	return e.text.rowToLine[row]
 }
 
-// TestEntry_WrappedFold_HidesAllWrappedRows is the core #145 acceptance: folding
+// TestEntry_WrappedFold_HidesAllWrappedRows is the core pre-rebrand tracker #145 acceptance: folding
 // a logical line that wraps to several visual rows hides every one of those rows.
 func TestEntry_WrappedFold_HidesAllWrappedRows(t *testing.T) {
 	e := newWrappedEntry(t)
@@ -125,7 +125,7 @@ func TestEntry_WrappedFold_WrapOffIdentity(t *testing.T) {
 	e.Refresh()
 
 	// Wrap-off: one logical line is one visual row, so the row<->line map is the
-	// identity (served analytically in the lazy model #157).
+	// identity (served analytically in the lazy model pre-rebrand tracker #157).
 	require.Equal(t, 4, e.text.rows())
 	for i := 0; i < 4; i++ {
 		require.Equal(t, i, e.text.firstRowOfLine(i))

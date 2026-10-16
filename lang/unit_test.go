@@ -52,7 +52,7 @@ func TestFormatMass_Imperial(t *testing.T) {
 	assert.Equal(t, "2 lb", FormatMass(2*453.59237))
 }
 
-// TestFormatUnit_PluralInflection is the #862 payload: the unit label is chosen
+// TestFormatUnit_PluralInflection is the pre-rebrand tracker #862 payload: the unit label is chosen
 // by the value's CLDR plural category, not a fixed "other" form.
 func TestFormatUnit_PluralInflection(t *testing.T) {
 	setupLang("pl") // Polish: one/few/many/other = mila/mile/mil/mili

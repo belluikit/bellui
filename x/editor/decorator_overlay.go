@@ -21,7 +21,7 @@ type decoratorOverlay struct {
 	stride         float32 // row-to-row Y distance, from Entry.RowMetrics()
 
 	// getLineCount returns the document's live logical-line count (the fork's
-	// O(1) Entry.LineCount, #149) — replaces counting a pushed text copy,
+	// O(1) Entry.LineCount, pre-rebrand tracker #149) — replaces counting a pushed text copy,
 	// which was an O(document) scan per repaint and went stale between
 	// DeferTextSync sync points.
 	getLineCount func() int
@@ -80,12 +80,12 @@ func (r *decoratorOverlayRenderer) Destroy() {}
 // height < y+rowHeight); fyne does not auto-clip widget content, so without this
 // that overhang draws past the editor — over the gutter or a neighbouring status
 // bar — on every backend (this, not a WebGPU-painter difference, was the real
-// cause of trendvidia/fyne#341). The marker is the no-arg method the fyne paint
+// cause of pre-rebrand tracker #341). The marker is the no-arg method the fyne paint
 // walk detects via internal/driver.IsClip.
 //
 // Clipping here (the overlay subtree) rather than at the editor level is
 // deliberate: the editor's floatLayer popovers intentionally overflow the editor
-// into the window (compact-editor completion/hover, #19/#69), so an editor-wide
+// into the window (compact-editor completion/hover, pre-rebrand tracker #19/#69), so an editor-wide
 // clip would break them.
 func (r *decoratorOverlayRenderer) IsClip() {}
 

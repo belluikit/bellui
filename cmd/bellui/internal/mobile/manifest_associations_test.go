@@ -51,7 +51,7 @@ func TestIOSEntitlementsAssociatedDomains(t *testing.T) {
 	assert.NoError(t, err)
 	out := buf.String()
 
-	// Universal Links (#622) need a com.apple.developer.associated-domains
+	// Universal Links (pre-rebrand tracker #622) need a com.apple.developer.associated-domains
 	// entitlement with an applinks:<domain> entry per declared domain.
 	assert.Contains(t, out, "<key>com.apple.developer.associated-domains</key>")
 	assert.Contains(t, out, "<string>applinks:example.com</string>")
@@ -93,7 +93,7 @@ func TestIOSInfoPlistDocumentTypes(t *testing.T) {
 	out := buf.String()
 
 	// iOS 14+ routes file-open targets by UTI (LSItemContentTypes), so the app
-	// only surfaces as a handler when the UTI is emitted (#622 follow-up); the
+	// only surfaces as a handler when the UTI is emitted (pre-rebrand tracker #622 follow-up); the
 	// legacy MIME list stays for back-compat.
 	assert.Contains(t, out, "<key>LSItemContentTypes</key>")
 	assert.Contains(t, out, "<string>public.plain-text</string>")

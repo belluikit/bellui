@@ -71,7 +71,7 @@ func TestDrawText_LeadingAlignmentRTL(t *testing.T) {
 	assert.Greater(t, rtlMin, width/2, "leading text should be on the right half under RTL")
 }
 
-// TestDrawText_LeadingAlignmentContainerScope verifies the RTL Phase 7 (#178)
+// TestDrawText_LeadingAlignmentContainerScope verifies the RTL Phase 7 (pre-rebrand tracker #178)
 // paint-time fix: with the process-global direction left as LTR, a leading-aligned
 // canvas.Text wrapped in a container.DirectionScope(RTL) still hugs the right edge.
 // This exercises Seam B — paint-time alignment resolved against a *container*
@@ -104,7 +104,7 @@ func TestDrawText_LeadingAlignmentContainerScope(t *testing.T) {
 }
 
 // TestDrawText_LeadingAlignmentCanvasScope verifies the per-canvas paint path
-// (#186): with the process-global direction left as LTR, a leading-aligned
+// (pre-rebrand tracker #186): with the process-global direction left as LTR, a leading-aligned
 // canvas.Text on a canvas put into RTL via Canvas.SetDirection still hugs the
 // right edge. This is the software-painter analogue of the GL drivers' per-canvas
 // paint wrap, now exercisable without a GPU.

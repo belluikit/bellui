@@ -95,7 +95,7 @@ func TestPopoverPosition(t *testing.T) {
 	}
 }
 
-// TestPopoverPosition_OverflowsEditorWithinCanvas covers #19: when bounds (the
+// TestPopoverPosition_OverflowsEditorWithinCanvas covers pre-rebrand tracker #19: when bounds (the
 // host canvas area) are larger than the editor, a popover may extend past the
 // editor's own height/width instead of being clamped to it.
 func TestPopoverPosition_OverflowsEditorWithinCanvas(t *testing.T) {
@@ -353,7 +353,7 @@ func TestIntersectRect(t *testing.T) {
 	}
 }
 
-// TestPopoverBounds_NoClipIsFullCanvas covers #19: with no clipping ancestor,
+// TestPopoverBounds_NoClipIsFullCanvas covers pre-rebrand tracker #19: with no clipping ancestor,
 // popoverBounds is the whole canvas (so popovers can overflow the editor).
 func TestPopoverBounds_NoClipIsFullCanvas(t *testing.T) {
 	test.NewTempApp(t)
@@ -370,12 +370,12 @@ func TestPopoverBounds_NoClipIsFullCanvas(t *testing.T) {
 	}
 }
 
-// TestPopoverBounds_ClampedToHostScroll covers #73: when a host wraps the editor
+// TestPopoverBounds_ClampedToHostScroll covers pre-rebrand tracker #73: when a host wraps the editor
 // in a container.Scroll smaller than the window, popoverBounds clamps to that
 // scroll's viewport rather than the full canvas.
 func TestPopoverBounds_ClampedToHostScroll(t *testing.T) {
 	test.NewTempApp(t)
-	captureLog(t) // this test intentionally nests the editor in a scroll (#111 guard warns)
+	captureLog(t) // this test intentionally nests the editor in a scroll (pre-rebrand tracker #111 guard warns)
 	e := NewEditor()
 	e.SetText("abc\ndef\nghi")
 	scroll := container.NewScroll(e)

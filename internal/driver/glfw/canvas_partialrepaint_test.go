@@ -10,7 +10,7 @@ import (
 
 // TestClampRegionToCanvas covers the dirty-region clamp that keeps a partial
 // repaint's clip in bounds when a refreshed object sits (partly) off-canvas —
-// e.g. content scrolled out of a container (#238).
+// e.g. content scrolled out of a container (pre-rebrand tracker #238).
 func TestClampRegionToCanvas(t *testing.T) {
 	canvas := geo.NewSize(100, 100)
 	for _, tt := range []struct {

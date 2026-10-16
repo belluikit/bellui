@@ -3,7 +3,7 @@
 // app_badge_ios.go supplies the iOS counterparts to app_badge_darwin.go: the
 // app-icon badge via UIApplication and a no-op notification fallback (iOS apps
 // are always bundled+signed, so the UserNotifications authorization path in
-// app_darwin.m never falls back). See #739.
+// app_darwin.m never falls back). See pre-rebrand tracker #739.
 
 package app
 

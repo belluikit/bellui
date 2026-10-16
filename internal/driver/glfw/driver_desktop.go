@@ -107,7 +107,7 @@ func (d *gLDriver) runSystray(m *bellui.Menu) {
 			d.SetSystemTrayIcon(theme.BrokenImageIcon())
 		}
 
-		// Some XDG systray crash without a title (See #3678)
+		// Some XDG systray crash without a title (See pre-rebrand tracker #3678)
 		if runtime.GOOS == "linux" || runtime.GOOS == "openbsd" || runtime.GOOS == "freebsd" || runtime.GOOS == "netbsd" {
 			app := bellui.CurrentApp()
 			title := app.Metadata().Name

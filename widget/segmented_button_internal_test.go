@@ -13,7 +13,7 @@ import (
 
 // TestSegmentedButton_TapMovesFocus verifies that tapping a segment moves
 // keyboard focus to the parent SegmentedButton so that click-then-arrow
-// navigation works without first Tabbing to the group (#174).
+// navigation works without first Tabbing to the group (pre-rebrand tracker #174).
 func TestSegmentedButton_TapMovesFocus(t *testing.T) {
 	test.NewTempApp(t)
 

@@ -94,7 +94,7 @@ func TestOverlaySubrange(t *testing.T) {
 }
 
 // overlayEntry builds a multi-line Entry with per-line "primary" highlighting and
-// the given overlay, mirroring an LSP-semantic-token host (#1079).
+// the given overlay, mirroring an LSP-semantic-token host (pre-rebrand tracker #1079).
 func overlayEntry(t *testing.T, text string, overlay func(row int) []StyleRun) *Entry {
 	t.Helper()
 	test.NewTempApp(t)

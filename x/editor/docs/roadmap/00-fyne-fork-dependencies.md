@@ -62,7 +62,7 @@ pxfed opens large effective-config and dataset files. Confirm (or add) that the
 `Entry` only lays out and paints visible rows, so highlight + decoration + gutter
 cost scales with viewport, not document size.
 
-> **✅ Resolved** by [fyne#119](https://github.com/trendvidia/fyne/issues/119):
+> **✅ Resolved** by pre-rebrand tracker #119:
 > `widget.Entry` previously materialised *every* row (large documents froze,
 > fatally on single-threaded wasm) and now virtualizes. F4 (row hiding) must
 > compose with this — a hidden row inside a virtualized window is simply never
@@ -83,11 +83,11 @@ cost scales with viewport, not document size.
 
 | Fork item | Gates | When | Status |
 |---|---|---|---|
-| F1 (rich StyleRun) | Phase 1 | before/with Phase 1 | ✅ shipped — fyne v2.9.0 ([fyne#114](https://github.com/trendvidia/fyne/issues/114), [PR #116](https://github.com/trendvidia/fyne/pull/116)) |
-| F2 (`CaretRect`) | Phases 1, 2, 3 | before/with Phase 1 | ✅ shipped — fyne v2.9.0 ([fyne#115](https://github.com/trendvidia/fyne/issues/115), [PR #116](https://github.com/trendvidia/fyne/pull/116)) |
-| F3 (edit interception) | Phase 4 | before Phase 4 | ✅ merged to fork `main` — [fyne#140](https://github.com/trendvidia/fyne/issues/140) — **unreleased**, consumed now via a pre-release go.mod pin (pseudo-version of the fork commit); swap to the fyne v2.10.0 tag when cut |
-| F4 (row hiding) | Phase 5 | before Phase 5 — **start early, long pole** | ✅ merged to fork `main` — [fyne#141](https://github.com/trendvidia/fyne/issues/141) — **unreleased**, consumable via the same pre-release pin as F3 |
-| F5 (virtualization) | Phase 5 | measure during Phase 5 | ✅ resolved — [fyne#119](https://github.com/trendvidia/fyne/issues/119) (`Entry` no longer materialises every row) |
+| F1 (rich StyleRun) | Phase 1 | before/with Phase 1 | ✅ shipped — fyne v2.9.0 (pre-rebrand tracker #114, pre-rebrand tracker #116) |
+| F2 (`CaretRect`) | Phases 1, 2, 3 | before/with Phase 1 | ✅ shipped — fyne v2.9.0 (pre-rebrand tracker #115, pre-rebrand tracker #116) |
+| F3 (edit interception) | Phase 4 | before Phase 4 | ✅ merged to fork `main` — pre-rebrand tracker #140 — **unreleased**, consumed now via a pre-release go.mod pin (pseudo-version of the fork commit); swap to the fyne v2.10.0 tag when cut |
+| F4 (row hiding) | Phase 5 | before Phase 5 — **start early, long pole** | ✅ merged to fork `main` — pre-rebrand tracker #141 — **unreleased**, consumable via the same pre-release pin as F3 |
+| F5 (virtualization) | Phase 5 | measure during Phase 5 | ✅ resolved — pre-rebrand tracker #119 (`Entry` no longer materialises every row) |
 
 > **Pre-release pin (2026-06-26):** F3 + F4 are merged on `trendvidia/fyne` `main`
 > but **not in any release tag** — the latest, v2.9.0, was cut before they

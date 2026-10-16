@@ -17,7 +17,7 @@ breaking:
   # preferences, app manifests), so what matters is binary wire compatibility —
   # a reused field number or changed type silently corrupts saved data, while a
   # source-level change FILE flags (moving a message, renaming a field) does
-  # not. CI runs this advisory/non-blocking (see static_analysis.yml, #930):
+  # not. CI runs this advisory/non-blocking (see static_analysis.yml, pre-rebrand tracker #930):
   # it surfaces wire breaks in the PR without hard-failing intended schema
   # evolution. Run locally with `buf breaking --against '.git#ref=origin/trendvidia'`.
   use:

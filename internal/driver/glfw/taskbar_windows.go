@@ -15,7 +15,7 @@ import (
 // HRESULT so the live-verify harness can confirm the calls succeeded.
 var taskbarDebug = os.Getenv("BELLUI_TASKBAR_DEBUG") != ""
 
-// Windows taskbar progress backend for desktop.ProgressWindow (#517). It drives
+// Windows taskbar progress backend for desktop.ProgressWindow (pre-rebrand tracker #517). It drives
 // ITaskbarList3::SetProgressState / SetProgressValue purely through
 // x/sys/windows COM syscalls (no cgo), mirroring the native file-dialog style
 // in dialog/file_windows_native.go. All calls run on the main goroutine (that

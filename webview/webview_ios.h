@@ -11,7 +11,7 @@
 // NativeViewHost inside a container.Scroll a native equivalent of bellui's
 // clipping; the web view carries the host's own rectangle relative to it.
 //
-// It is deliberately NOT a subview of the GLKView. That is the #1124 lesson,
+// It is deliberately NOT a subview of the GLKView. That is the pre-rebrand tracker #1124 lesson,
 // learned from BelluiTextInputView: a view hosted inside the GLKView entangles
 // with its CAMetalLayer and stalls rendering. macOS is the other way round —
 // there the clip view IS a subview of the GLFW content view and composites

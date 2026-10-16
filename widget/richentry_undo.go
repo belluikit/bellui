@@ -4,7 +4,7 @@ package widget
 // `before` occupying [at, at+len(before)) was replaced by `after`. Both ends
 // carry the caret offset so undo/redo restore it. Expressing every mutation as a
 // styled range-replace makes undo/redo preserve per-run styling (unlike Entry's
-// flat rune model, #648/#656).
+// flat rune model, pre-rebrand tracker #648/#656).
 type richEntryEdit struct {
 	at          int
 	before      []RichTextSegment

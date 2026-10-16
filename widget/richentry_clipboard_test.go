@@ -67,7 +67,7 @@ func TestRichEntry_CopyPasteStyledText(t *testing.T) {
 
 // TestRichEntry_HTMLRoundTripPreservesBoundaryWhitespace verifies a single space
 // at a *style boundary* survives an HTML copy/paste round-trip now that the HTML
-// parser preserves inline boundary whitespace (#668). Previously the parser
+// parser preserves inline boundary whitespace (pre-rebrand tracker #668). Previously the parser
 // trimmed each inline text node and "x <b>y</b>" collapsed to "xy".
 func TestRichEntry_HTMLRoundTripPreservesBoundaryWhitespace(t *testing.T) {
 	test.NewTempApp(t)

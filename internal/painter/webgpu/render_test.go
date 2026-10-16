@@ -360,7 +360,7 @@ func TestRippleRenderReadback(t *testing.T) {
 // red fill restricted to that mask, into an offscreen target, and returns the
 // center and top-left-corner RGBA bytes. It exercises the depth-stencil
 // attachment, the depthStencilState / colorWriteMask pipeline helpers and
-// pass.SetStencilReference — the machinery behind #222 stencil clipping and path
+// pass.SetStencilReference — the machinery behind pre-rebrand tracker #222 stencil clipping and path
 // fill — headless. maskMode stamps the mask (color off); fillMode draws color
 // only where the stencil matches ref.
 func runStencilReadback(t *testing.T, maskMode, fillMode StencilMode, ref uint32) (center, corner [4]byte) {
@@ -723,7 +723,7 @@ func TestScene3DRenderReadback(t *testing.T) {
 	}
 }
 
-// runSceneStencilIsolation reproduces the #231 hazard at the GPU level on a
+// runSceneStencilIsolation reproduces the pre-rebrand tracker #231 hazard at the GPU level on a
 // single color target shared by three passes — modelling a full-canvas Scene3D
 // nested in an active stencil clip:
 //
@@ -943,7 +943,7 @@ func runSceneStencilIsolation(t *testing.T, dedicated bool) (center, corner [4]b
 	return center, corner
 }
 
-// TestSceneDedicatedDepthPreservesStencilClip is the #231 regression: a scene
+// TestSceneDedicatedDepthPreservesStencilClip is the pre-rebrand tracker #231 regression: a scene
 // pass with its own dedicated depth-stencil leaves an enclosing stencil clip
 // intact (center fills red), whereas reusing the shared canvas depth-stencil
 // wipes the clip (center stays the scene's blue). The second assertion confirms

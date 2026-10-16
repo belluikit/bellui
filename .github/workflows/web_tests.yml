@@ -27,7 +27,7 @@ jobs:
         with:
           go-version: stable
 
-      # WebGPU (browser WebGPU) is the default wasm backend (Phase 5, #204); the
+      # WebGPU (browser WebGPU) is the default wasm backend (Phase 5, pre-rebrand tracker #204); the
       # WebGL gl-js path is the fallback behind -tags gl. Build both. wasm has no
       # cgo, so no wgpu-native libs are needed here; osusergo avoids the wasm
       # os/user dependency on the default build.

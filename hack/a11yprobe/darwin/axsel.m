@@ -1,4 +1,4 @@
-// axsel: #556 verify — selection protocol on a selectable static-text label.
+// axsel: pre-rebrand tracker #556 verify — selection protocol on a selectable static-text label.
 #import <Cocoa/Cocoa.h>
 #import <ApplicationServices/ApplicationServices.h>
 

@@ -6,7 +6,7 @@ import (
 )
 
 // KeyMap holds the editor's configurable interaction shortcuts — the "smart
-// editing" chords whose fixed defaults were historically macOS-hostile (#110).
+// editing" chords whose fixed defaults were historically macOS-hostile (pre-rebrand tracker #110).
 //
 // A host customizes a binding by assigning to [Editor.KeyMap] before the editor
 // is first shown. Start from [DefaultKeyMap] and adjust only the fields you care

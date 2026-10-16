@@ -13,11 +13,11 @@ import (
 // atom). U+FFFC OBJECT REPLACEMENT CHARACTER is the conventional placeholder.
 const objectReplacementRune = '￼'
 
-// RichEntry implements [core.AccessibleTexter] (#659/#773), the editor contract
-// of the neutral text-input mirror seam (#768). This is what binds RichEntry to
+// RichEntry implements [core.AccessibleTexter] (pre-rebrand tracker #659/#773), the editor contract
+// of the neutral text-input mirror seam (pre-rebrand tracker #768). This is what binds RichEntry to
 // the mobile IME / accessibility text bridge: with it, composition, plain
 // typing, selection and replace-selection all flow through the same seam as
-// widget.Entry (e.g. the iOS GoInputView document mirror, #771). Without it
+// widget.Entry (e.g. the iOS GoInputView document mirror, pre-rebrand tracker #771). Without it
 // Session.Bind unbinds on RichEntry focus and every mirror op is inert.
 var (
 	_ core.Accessible         = (*RichEntry)(nil)
@@ -27,10 +27,10 @@ var (
 )
 
 // AccessibleRole reports the rich editor as a multi-line text input — the
-// semantic-role half of #659, deferred when the AccessibleTexter seam shipped
-// and delivered during the #951 device pass: without a text role the editor
+// semantic-role half of pre-rebrand tracker #659, deferred when the AccessibleTexter seam shipped
+// and delivered during the pre-rebrand tracker #951 device pass: without a text role the editor
 // publishes no accessibility element at all, so a screen reader cannot focus
-// it and the mobile input-view swap (#570/#1124) never engages — leaving
+// it and the mobile input-view swap (pre-rebrand tracker #570/#1124) never engages — leaving
 // VoiceOver caret navigation with no editing context. The role also makes the
 // editor one semantic unit (NonInteractiveChildrenPresentational prunes the
 // internal render widgets that paint its value).
@@ -49,7 +49,7 @@ func (e *RichEntry) AccessibleValue() string { return e.AccessibleText() }
 // AccessibleRange is not applicable to text editors; it returns zeros.
 func (e *RichEntry) AccessibleRange() (min, max, current float64) { return 0, 0, 0 }
 
-// AccessibleActions declares the editor's undo/redo actions (#1025), each
+// AccessibleActions declares the editor's undo/redo actions (pre-rebrand tracker #1025), each
 // gated on its history being non-empty — the same availability rule as
 // [Entry.AccessibleActions] and the TappedSecondary context menu. The
 // backends surface them data-driven (VoiceOver's actions rotor, TalkBack's
@@ -71,7 +71,7 @@ func (e *RichEntry) PerformAccessibleAction(name string) {
 	case core.ActionUndo, core.ActionRedo:
 		// Cancel an in-flight IME composition before replaying history —
 		// the preedit is display-only and its position context would be
-		// invalidated by the undo (#1034, same rule as Entry).
+		// invalidated by the undo (pre-rebrand tracker #1034, same rule as Entry).
 		e.ComposeCancel()
 		if name == core.ActionUndo {
 			e.Undo()
@@ -92,8 +92,8 @@ func (e *RichEntry) PerformAccessibleAction(name string) {
 // restyle: those leave this rune stream unchanged, so dropping the memo there
 // would rebuild the whole string per query for no reason — the exact large-doc
 // thrash the desktop a11y-text bridges hit while a screen reader tracks the caret
-// during CJK composition (#794). The mobile text-input mirror's per-paint-frame
-// sync (#783) thus reuses the same string object until the next real edit, so the
+// during CJK composition (pre-rebrand tracker #794). The mobile text-input mirror's per-paint-frame
+// sync (pre-rebrand tracker #783) thus reuses the same string object until the next real edit, so the
 // seam's redundant-push filter stays O(1). Main-goroutine-owned, like the rest of
 // the widget's state.
 func (e *RichEntry) AccessibleText() string {
@@ -113,7 +113,7 @@ func (e *RichEntry) AccessibleText() string {
 }
 
 // AccessibleComposing reports whether an IME composition is currently active,
-// for the text-input mirror seam's stale-finalize detection (#1057) — see the
+// for the text-input mirror seam's stale-finalize detection (pre-rebrand tracker #1057) — see the
 // [Entry.AccessibleComposing] doc.
 func (e *RichEntry) AccessibleComposing() bool {
 	return e.composing

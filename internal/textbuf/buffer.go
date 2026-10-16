@@ -1,5 +1,5 @@
 // Package textbuf provides the editable text storage backing the lazy
-// single-segment editing path of widget.Entry / widget.RichText (#381).
+// single-segment editing path of widget.Entry / widget.RichText (pre-rebrand tracker #381).
 //
 // A Buffer is addressed by rune offset and keeps a logical-line index
 // (newline-delimited) alongside the content. Its String method is memoized:

@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Compose tests for #149: ProtectedRanges (F3) and HiddenRanges (F4) set on the
+// Compose tests for pre-rebrand tracker #149: ProtectedRanges (F3) and HiddenRanges (F4) set on the
 // same Entry. Folding is pure view state and does not move rune offsets, so
 // protection (rune offsets) still applies to text inside a folded region and the
 // caret skips both folded and caret-opaque spans. These exercise the

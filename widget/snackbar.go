@@ -88,7 +88,7 @@ func (s *Snackbar) Show(c core.Canvas) {
 	s.popUp = newPopUpWithBgColor(padded, c, bgColor)
 	s.popUp.noDismissOnTap = true // snackbar handles its own dismissal via timer/action
 	// Like Toast, a snackbar never blocks interaction with the UI beneath
-	// it (#569); its own action button remains tappable.
+	// it (pre-rebrand tracker #569); its own action button remains tappable.
 	s.popUp.passThrough = true
 	s.mu.Unlock()
 
@@ -117,7 +117,7 @@ func (s *Snackbar) Show(c core.Canvas) {
 
 	// A snackbar auto-dismisses before a screen-reader user would discover it
 	// in the tree, so push the text as a polite live-region announcement
-	// (#525). The action button stays a normal tree node; only the message is
+	// (pre-rebrand tracker #525). The action button stays a normal tree node; only the message is
 	// announced.
 	accessibility.Announce(s.Text, false)
 

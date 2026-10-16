@@ -11,7 +11,7 @@ import (
 
 // BuildTextIndex is the standalone (non-caching) builder for consumers that
 // hold many indexes at once — the AT-SPI backend keeps one per exposed text
-// node (#986/#993) — so two builds must never alias the IndexText cache or
+// node (pre-rebrand tracker #986/#993) — so two builds must never alias the IndexText cache or
 // each other.
 func TestBuildTextIndex_Standalone(t *testing.T) {
 	cached := IndexText("cached text")
@@ -81,7 +81,7 @@ func TestA11yLineHelpers(t *testing.T) {
 	assert.Equal(t, 0, empty.UTF16Len())
 }
 
-// The #555 perf gate: with the index cached, a screen-reader-style query
+// The pre-rebrand tracker #555 perf gate: with the index cached, a screen-reader-style query
 // burst on a multi-megabyte document must not re-scan it.
 func BenchmarkA11yTextQueriesBigDoc(b *testing.B) {
 	text := strings.Repeat("the quick brown fox jumps over the lazy dog\n", 70_000) // ~3 MB
@@ -178,7 +178,7 @@ func TestA11yUnitStep(t *testing.T) {
 	assert.Equal(t, [2]int{0, 0}, step(UnitDocument, 0, -1), "already at start")
 }
 
-// Character unit = grapheme cluster (#991): screen-reader character stepping
+// Character unit = grapheme cluster (pre-rebrand tracker #991): screen-reader character stepping
 // must move one user-perceived character, matching Android's BreakIterator
 // semantics — an emoji ZWJ family, a flag pair or a letter plus combining
 // marks is one step, and no offset ever lands inside a cluster.

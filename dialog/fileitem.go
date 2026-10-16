@@ -38,7 +38,7 @@ type fileDialogItem struct {
 	dir      bool
 
 	hovered   bool
-	selected  bool // part of a multi-select set (#627)
+	selected  bool // part of a multi-select set (pre-rebrand tracker #627)
 	lastClick time.Time
 }
 
@@ -102,7 +102,7 @@ func (i *fileDialogItem) Tapped(*event.PointEvent) {
 
 // LongPressed enters touch selection mode (#259): holding a file item switches
 // a multi-select dialog into a mode where plain taps toggle set membership, so
-// devices without modifier keys can build a set. Hold-fire dispatch (#758
+// devices without modifier keys can build a set. Hold-fire dispatch (pre-rebrand tracker #758
 // touch, #266 desktop) sends no Tapped on the release of the press that got
 // here, so the held item is selected exactly once.
 //
@@ -193,7 +193,7 @@ func (s *fileItemRenderer) Refresh() {
 	v := bellui.CurrentApp().Settings().ThemeVariant()
 	switch {
 	case s.item.selected:
-		// Multi-select highlight (#627). Blend the selection color with a hover
+		// Multi-select highlight (pre-rebrand tracker #627). Blend the selection color with a hover
 		// layer so a hovered selected item still reads as hovered.
 		s.bg.FillColor = th.Color(theme.ColorNameSelection, v)
 	case s.item.hovered:

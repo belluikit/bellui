@@ -95,7 +95,7 @@ func connectComposition(dummyEntry js.Value) {
 // curWindow is set by the browser focus callback — but a page that loads
 // already focused never gets a focus transition, leaving curWindow nil until
 // the user switches away and back; composition silently dropped its events in
-// that state (#674 wasm leg). The web target has exactly one real window, so
+// that state (pre-rebrand tracker #674 wasm leg). The web target has exactly one real window, so
 // fall back to it.
 func composeTargetWindow() *window {
 	if curWindow != nil {

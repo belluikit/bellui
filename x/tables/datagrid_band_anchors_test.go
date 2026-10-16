@@ -9,7 +9,7 @@ import (
 
 // The body's drawn positions (doLayout) must match the band anchors hit-testing
 // and the header/filter rows use (hitRegions), since both now come from the one
-// bandAnchors source. This guards against the two drifting apart (#69): the
+// bandAnchors source. This guards against the two drifting apart (pre-rebrand tracker #69): the
 // pinned-left band starts at 0, the main scroll at mainX, and the pinned-right
 // overlay at pinnedRightX — including when a narrow width forces the clamp.
 func TestBodyLayout_MatchesBandAnchors(t *testing.T) {

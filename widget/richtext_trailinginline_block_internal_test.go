@@ -11,7 +11,7 @@ import (
 	"github.com/belluikit/bellui/test"
 )
 
-// TestRichText_TrailingInlineBeforeBlock_NoOverlap reproduces #207: an inline
+// TestRichText_TrailingInlineBeforeBlock_NoOverlap reproduces pre-rebrand tracker #207: an inline
 // segment that is not terminated by a newline, immediately followed by a block
 // segment, must not share a row with the block. Before the fix the block was
 // appended to the trailing-inline row and laid out at the same Y, overlapping it.

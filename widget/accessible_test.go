@@ -146,7 +146,7 @@ func TestEntry_AccessibleActions_Gated(t *testing.T) {
 }
 
 // Undo/redo through the accessible action cancel an in-flight IME composition
-// first (#1034): replaying history under a live preedit orphans it, and a
+// first (pre-rebrand tracker #1034): replaying history under a live preedit orphans it, and a
 // later IME convergence would commit the orphan at a bogus offset.
 func TestEntry_PerformAccessibleAction_UndoCancelsComposition(t *testing.T) {
 	e := NewEntry()
@@ -258,7 +258,7 @@ func a11yActionNames(actions []core.AccessibleAction) []string {
 }
 
 // A range slider is a group of two independently adjustable thumb sliders
-// (#810): each thumb is its own accessible child, so a screen reader adjusts
+// (pre-rebrand tracker #810): each thumb is its own accessible child, so a screen reader adjusts
 // either directly with no active-thumb mode switch.
 func TestRangeSlider_AccessibleRole_IsGroup(t *testing.T) {
 	s := NewRangeSlider(0, 100)
@@ -646,7 +646,7 @@ func TestTable_AccessibleGridDimensions(t *testing.T) {
 	assert.Equal(t, 7, cols)
 
 	// The dimensions reach the semantic node so backends can report the
-	// full extent of a virtualized table (UIA Grid pattern, #487).
+	// full extent of a virtualized table (UIA Grid pattern, pre-rebrand tracker #487).
 	node, ok := core.SnapshotAccessible(tb)
 	assert.True(t, ok)
 	assert.True(t, node.HasGridDims)
@@ -841,7 +841,7 @@ func TestDateTimePicker_Accessible(t *testing.T) {
 	assert.NotEmpty(t, p.AccessibleValue())
 }
 
-// --- Table cells / Tree nodes (#524) ---
+// --- Table cells / Tree nodes (pre-rebrand tracker #524) ---
 
 func TestTableCellHost_Accessible(t *testing.T) {
 	test.NewTempApp(t)
@@ -912,7 +912,7 @@ func TestTreeNode_Accessible(t *testing.T) {
 	assert.Equal(t, 2, node.Level)
 }
 
-// --- passwordRevealer (#531) ---
+// --- passwordRevealer (pre-rebrand tracker #531) ---
 
 func TestPasswordRevealer_Accessible(t *testing.T) {
 	test.NewTempApp(t)
@@ -933,7 +933,7 @@ func TestPasswordRevealer_Accessible(t *testing.T) {
 	assert.False(t, entry.Password, "press must stay inert while disabled")
 }
 
-// --- TreeView rows (#532) ---
+// --- TreeView rows (pre-rebrand tracker #532) ---
 
 func TestTreeViewItem_Accessible(t *testing.T) {
 	test.NewTempApp(t)

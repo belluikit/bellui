@@ -79,7 +79,7 @@ func (w *WebView) init() {}
 //
 // win is unused: the web target draws every bellui window into the single
 // canvas the page owns — extra windows are emulated inside it as in-canvas
-// InnerWindows (#499) — so there is exactly one surface to position against,
+// InnerWindows (pre-rebrand tracker #499) — so there is exactly one surface to position against,
 // and the host's canvas-absolute geometry is already in its coordinate space.
 func (w *WebView) attachRaw(win bellui.Window) error {
 	doc := js.Global().Get("document")

@@ -17,7 +17,7 @@ import (
 	"github.com/belluikit/glfw"
 )
 
-// ghostDraggable is a drag source that opts into the #819 ghost affordance.
+// ghostDraggable is a drag source that opts into the pre-rebrand tracker #819 ghost affordance.
 type ghostDraggable struct {
 	*canvas.Rectangle
 	draggable

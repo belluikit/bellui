@@ -1,5 +1,5 @@
-// Command analyticsprobe live-verifies the analytics battery model (#699,
-// follow-up to #526/#527) on a real device. Instead of a real backend +
+// Command analyticsprobe live-verifies the analytics battery model (pre-rebrand tracker #699,
+// follow-up to pre-rebrand tracker #526/#527) on a real device. Instead of a real backend +
 // mitmproxy, it wires a custom Sink that logs every batch to logcat with its
 // size and timestamp — so the batch CADENCE (batched, not per-event) is visible
 // directly:
@@ -12,7 +12,7 @@
 //   - Explicit Flush.
 //   - Background-edge flush: press Home → Attach's SetOnExitedForeground fires a
 //     batch (session_end included) — the workhorse on mobile.
-//   - Auto-capture (#527): taps become "ui.activate" and coalesce into batches.
+//   - Auto-capture (pre-rebrand tracker #527): taps become "ui.activate" and coalesce into batches.
 //   - Spool drain: events fired before consent are spooled; relaunch + enable
 //     drains them oldest-first.
 package main

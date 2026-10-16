@@ -20,7 +20,7 @@ import (
 // the only universally-supported mode and the right choice for normal apps), but
 // honors BELLUI_WEBGPU_PRESENT=immediate|mailbox|fifo when that mode is advertised
 // by the surface. The override exists to take vsync out of the loop when
-// frame-time profiling (BELLUI_FRAME_DEBUG, issue #9): under Fifo every paint
+// frame-time profiling (BELLUI_FRAME_DEBUG, pre-rebrand issue #9): under Fifo every paint
 // blocks on the swapchain at the next refresh, which masks the actual draw-call
 // cost the partial-repaint optimization changes.
 func choosePresentMode(modes []wgpu.PresentMode) wgpu.PresentMode {
@@ -51,10 +51,10 @@ func choosePresentMode(modes []wgpu.PresentMode) wgpu.PresentMode {
 
 // logSurfaceFormats reports the surface's advertised formats (preferred first)
 // and the one chooseSurfaceFormat selected, gated behind BELLUI_WEBGPU_DEBUG so it
-// is silent in normal use. It is the diagnostic for #325's "watch for a surface
+// is silent in normal use. It is the diagnostic for pre-rebrand tracker #325's "watch for a surface
 // advertising only sRGB" concern: a backend that offers no non-sRGB sibling
 // makes chooseSurfaceFormat keep an sRGB format, which re-encodes authored
-// colors and over-brightens the theme-dark background (#322). When that happens
+// colors and over-brightens the theme-dark background (pre-rebrand tracker #322). When that happens
 // the logged line marks the chosen format SRGB-ONLY so the per-box sweep can
 // spot it without a windowed capture.
 func logSurfaceFormats(where string, formats []wgpu.TextureFormat, chosen wgpu.TextureFormat) {
@@ -111,7 +111,7 @@ func capturePixelsSwapped(format wgpu.TextureFormat) bool {
 // of the GL painter's per-platform context plus its ProgramState set, built
 // from the backend-neutral descriptors in layout.go and the WGSL in shaders/.
 //
-// This is the device-dependent half of WebGPU Phase 2 (#201): PSO management
+// This is the device-dependent half of WebGPU Phase 2 (pre-rebrand tracker #201): PSO management
 // keyed by shader+blend+format, bind groups for uniforms+texture/sampler, a
 // per-frame command encoder + render pass, and surface acquire/present. The
 // draw-op geometry (Paint dispatch) is layered on top in painter.go.
@@ -130,7 +130,7 @@ type Device struct {
 	// depthStencils caches the depth+stencil attachment texture per pixel size,
 	// reused across frames and passes. Every render pass attaches one (and every
 	// pipeline carries a matching DepthStencilState) so stencil-based clipping
-	// and path fill work (#202/#222). Depth is unused for now (compare Always,
+	// and path fill work (pre-rebrand tracker #202/#222). Depth is unused for now (compare Always,
 	// no write) but the same attachment is the foundation for Scene3D depth.
 	depthStencils map[[2]int]*depthStencil
 
@@ -140,7 +140,7 @@ type Device struct {
 	encoder   *wgpu.CommandEncoder
 	pass      *wgpu.RenderPassEncoder
 
-	// GPU-time profiling (BELLUI_GPU_PROFILE, #336). See gpuprofile.go.
+	// GPU-time profiling (BELLUI_GPU_PROFILE, pre-rebrand tracker #336). See gpuprofile.go.
 	gpuProfile bool   // per-frame GPU drain timing enabled
 	gpuValid   bool   // gpuNanos holds a real measurement
 	gpuNanos   uint64 // last measured GPU drain time (ns)
@@ -152,7 +152,7 @@ type Device struct {
 	// the foundation for the FBO-based features (boundary, shadows, blur).
 	targets []renderTarget
 
-	// Per-frame vertex/uniform arena (#255). Every draw appends its vertex bytes
+	// Per-frame vertex/uniform arena (pre-rebrand tracker #255). Every draw appends its vertex bytes
 	// and its 256-padded uniform block to arena's CPU staging during Record, and
 	// EndFrame flushes each staging slice to vtxArena / uniArena with a single
 	// queue.WriteBuffer — collapsing the slot pool's ~2N WriteBuffer/frame to ~2.
@@ -180,7 +180,7 @@ type Device struct {
 	// by every non-textured draw (SetBindGroup with the block's dynamic offset).
 	// Rebuilt only when uniArena regrows. Textured draws need the texture in the
 	// bind group, so they use texBinds: a per-frame-position cache (mirroring the
-	// #245 slot pool's per-slot caching) of dynamic-offset bind groups over
+	// pre-rebrand tracker #245 slot pool's per-slot caching) of dynamic-offset bind groups over
 	// uniArena, rebuilt when the position's texture view changes or uniArena
 	// regrows. texBindInUse resets each frame; the slice persists for reuse.
 	arenaBindUniform *wgpu.BindGroup
@@ -201,17 +201,17 @@ type Device struct {
 	frameBuffers []*wgpu.Buffer
 	frameBinds   []*wgpu.BindGroup
 	// frameDepths holds dedicated depth-stencil attachments created mid-frame (the
-	// Scene3D off-screen render, #231), released after the frame is submitted so
+	// Scene3D off-screen render, pre-rebrand tracker #231), released after the frame is submitted so
 	// the recorded pass keeps them alive until the GPU is done.
 	frameDepths []*depthStencil
 	// frameTextures holds transient textures created mid-frame (the box-shadow and
-	// backdrop-blur ping-pong / capture targets, #223), released after the frame is
+	// backdrop-blur ping-pong / capture targets, pre-rebrand tracker #223), released after the frame is
 	// submitted so the recorded draws keep sampling them until the GPU is done.
 	frameTextures []*Texture
 
 	// scissor is the active window-space clip (painter StartClipping). It is
 	// tracked here so it can be re-applied when a content pass is reopened after a
-	// render-target pop (#235) — a fresh RenderPassEncoder starts unclipped, so
+	// render-target pop (pre-rebrand tracker #235) — a fresh RenderPassEncoder starts unclipped, so
 	// without this an enclosing clip would be lost across a boundary/scene/shadow
 	// off-screen pass. The off-screen passes themselves run unclipped (full).
 	scissor scissorRect
@@ -219,14 +219,14 @@ type Device struct {
 	// stencilRef is the active stencil reference value (painter clip / fill ops).
 	// Like scissor, it is render-pass state that a fresh RenderPassEncoder resets,
 	// so it is tracked here and re-applied when a content pass is reopened after a
-	// render-target pop (#305) — otherwise an enclosing rounded/path stencil clip
+	// render-target pop (pre-rebrand tracker #305) — otherwise an enclosing rounded/path stencil clip
 	// silently rejects everything once a boundary/Scene3D/shadow off-screen pass
 	// has round-tripped (e.g. a Card's elevation shadow blanked its own content).
 	stencilRef uint32
 
 	// capture is a persistent copy of the last presented frame, kept so
 	// Capture() can read back content after the swapchain texture is gone. The
-	// per-frame copy is only maintained once Capture has been requested (#219).
+	// per-frame copy is only maintained once Capture has been requested (pre-rebrand tracker #219).
 	captureTex       *wgpu.Texture
 	captureW         int
 	captureH         int
@@ -298,7 +298,7 @@ func (t *Texture) Release() {
 type renderTarget struct {
 	view *wgpu.TextureView
 	// tex is the texture backing view, kept so a feature that needs to read the
-	// target back (backdrop blur's CopyActiveTargetRegion, #223) has a copy source.
+	// target back (backdrop blur's CopyActiveTargetRegion, pre-rebrand tracker #223) has a copy source.
 	// nil targets simply cannot be copied from.
 	tex     *wgpu.Texture
 	w, h    int
@@ -307,7 +307,7 @@ type renderTarget struct {
 	// depthView, when set, is a dedicated depth-stencil attachment for this target
 	// instead of the shared size-keyed one (ensureDepthStencil). Scene3D uses this
 	// so its depth/stencil never aliases — and thus never clears — the canvas
-	// pass's stencil clip when their pixel sizes coincide (#231).
+	// pass's stencil clip when their pixel sizes coincide (pre-rebrand tracker #231).
 	depthView *wgpu.TextureView
 }
 
@@ -333,7 +333,7 @@ type DrawCall struct {
 // environments whose *virtual* GPU driver crashes during a backend's init:
 // on the Windows-on-ARM Parallels/VM GPUs the all-backends path segfaults in
 // GL init, while restricting to "dx12" enumerates the D3D12 adapter cleanly
-// (trendvidia/fyne#612 / #609). Because that failure is a hard segfault *inside*
+// (pre-rebrand tracker #612 / pre-rebrand tracker #609). Because that failure is a hard segfault *inside*
 // CreateInstance — not a returnable error — the backend set must be narrowed
 // here, up-front; it cannot be recovered from after the call.
 //
@@ -421,7 +421,7 @@ func NewDevice(sd *wgpu.SurfaceDescriptor, width, height int) (d *Device, err er
 		return d, fmt.Errorf("request device: %w", err)
 	}
 	d.queue = d.device.GetQueue()
-	d.initGPUProfiling() // BELLUI_GPU_PROFILE, #336
+	d.initGPUProfiling() // BELLUI_GPU_PROFILE, pre-rebrand tracker #336
 
 	caps := d.surface.GetCapabilities(d.adapter)
 	d.config, err = surfaceConfig(caps, width, height, "surface configure")
@@ -467,7 +467,7 @@ func (d *Device) Format() uint32 { return uint32(d.config.Format) }
 // and its shaders do no gamma encoding. Configuring the surface with an sRGB
 // format (e.g. macOS Metal reports BGRA8UnormSrgb first) makes the GPU re-encode
 // those writes a second time, brightening every color: theme-dark #121216
-// reads back as #4b4b53 (#322). To match GL/software, prefer a NON-sRGB
+// reads back as #4b4b53 (pre-rebrand tracker #322). To match GL/software, prefer a NON-sRGB
 // (linear-store) surface format: the non-sRGB sibling of the preferred format
 // when the surface advertises it, otherwise the preferred format unchanged so a
 // configure never fails on a backend that only offers sRGB. Staying within the
@@ -490,10 +490,10 @@ func chooseSurfaceFormat(formats []wgpu.TextureFormat) wgpu.TextureFormat {
 	}
 	// No non-sRGB sibling advertised: forced to keep an sRGB format, which makes
 	// the GPU re-encode every authored color a second time and over-brightens the
-	// whole surface (#322, theme-dark #121216 → #4b4b53). No current backend hits
-	// this (#327 sweep), but a future driver / headless config could regress here
+	// whole surface (pre-rebrand tracker #322, theme-dark #121216 → #4b4b53). No current backend hits
+	// this (pre-rebrand tracker #327 sweep), but a future driver / headless config could regress here
 	// and only show as washed-out colors. Warn once, unconditionally (not gated
-	// behind BELLUI_WEBGPU_DEBUG), so the condition is visible in normal logs (#331).
+	// behind BELLUI_WEBGPU_DEBUG), so the condition is visible in normal logs (pre-rebrand tracker #331).
 	srgbOnlyWarnOnce.Do(func() {
 		bellui.LogError(fmt.Sprintf("webgpu: surface advertises only sRGB formats %v; "+
 			"keeping %v — authored colors will over-brighten (#322/#331)", formats, preferred), nil)
@@ -524,7 +524,7 @@ func nonSRGBFormat(f wgpu.TextureFormat) wgpu.TextureFormat {
 // surface.Configure per frame — wasted work, and on iOS/Metal it makes wgpu
 // re-read the CAMetalLayer view dimensions from the render goroutine, flooding
 // the log with "Unable to get the current view dimensions on a non-main thread"
-// (#262). Only an actual size change needs a reconfigure.
+// (pre-rebrand tracker #262). Only an actual size change needs a reconfigure.
 func (d *Device) Resize(width, height int) {
 	if width <= 0 || height <= 0 {
 		return
@@ -544,7 +544,7 @@ func (d *Device) Resize(width, height int) {
 // descriptor, keeping the existing device/adapter/queue/pipelines. Android
 // destroys the ANativeWindow when the app is backgrounded and delivers a fresh
 // handle on resume; without rebuilding the surface the painter keeps presenting
-// to the destroyed one — a black canvas and a main-thread stall/ANR (#310).
+// to the destroyed one — a black canvas and a main-thread stall/ANR (pre-rebrand tracker #310).
 func (d *Device) RecreateSurface(sd *wgpu.SurfaceDescriptor) {
 	if sd == nil || d.instance == nil {
 		return
@@ -574,7 +574,7 @@ func (d *Device) RecreateSurface(sd *wgpu.SurfaceDescriptor) {
 // ReleaseSurface drops this device's presentation surface without tearing down
 // the device/adapter/queue/pipelines, so another window's surface can take over
 // the shared Android ANativeWindow — two configured Vulkan swapchains on one
-// native window can't both present (#753). The surface is rebuilt by
+// native window can't both present (pre-rebrand tracker #753). The surface is rebuilt by
 // RecreateSurface when this window is presented again. No-op if already
 // surfaceless.
 func (d *Device) ReleaseSurface() {
@@ -665,8 +665,8 @@ func (d *Device) buildPipeline(key PipelineKey) (*wgpu.RenderPipeline, error) {
 // and an optional hardware depth test. The stencil face state and write mask
 // vary with mode (mirroring the GL painter's StencilFunc/StencilOp calls); depth
 // is inert (compare Always, no write) unless depth is true, when it becomes a
-// real z-buffer — write enabled, compare Less — for Scene3D (#224). The same
-// Depth24PlusStencil8 attachment serves both (#222 stencil + #224 depth).
+// real z-buffer — write enabled, compare Less — for Scene3D (pre-rebrand tracker #224). The same
+// Depth24PlusStencil8 attachment serves both (pre-rebrand tracker #222 stencil + pre-rebrand tracker #224 depth).
 func depthStencilState(mode StencilMode, depth bool) *wgpu.DepthStencilState {
 	keep := wgpu.StencilFaceState{
 		Compare:     wgpu.CompareFunctionAlways,
@@ -825,7 +825,7 @@ func uniformBytes[T any](u *T) []byte {
 
 // texBind caches a textured draw's dynamic-offset bind group (uniArena + a
 // texture view + the shared sampler) for one position within a frame, mirroring
-// the #245 slot pool's per-slot bind-group caching but with the uniform buffer
+// the pre-rebrand tracker #245 slot pool's per-slot bind-group caching but with the uniform buffer
 // now the shared arena addressed via dynamic offset. Rebuilt when the position's
 // texture view changes or uniArena regrows; reused across frames otherwise.
 type texBind struct {
@@ -1207,7 +1207,7 @@ func (d *Device) CreateRenderTexture(w, h int) (*Texture, error) {
 		SampleCount:   1,
 		Dimension:     wgpu.TextureDimension2D,
 		Format:        d.config.Format,
-		// CopySrc lets a render target double as a backdrop-blur copy source (#223).
+		// CopySrc lets a render target double as a backdrop-blur copy source (pre-rebrand tracker #223).
 		Usage: wgpu.TextureUsageRenderAttachment | wgpu.TextureUsageTextureBinding | wgpu.TextureUsageCopySrc,
 	})
 	if err != nil {
@@ -1223,7 +1223,7 @@ func (d *Device) CreateRenderTexture(w, h int) (*Texture, error) {
 
 // ReleaseTextureAfterFrame defers a transient texture's release until the frame
 // is submitted, so draws that sample it stay valid until the GPU is done with
-// them. Used by the box-shadow / backdrop-blur ping-pong + capture targets (#223).
+// them. Used by the box-shadow / backdrop-blur ping-pong + capture targets (pre-rebrand tracker #223).
 func (d *Device) ReleaseTextureAfterFrame(t *Texture) {
 	if t != nil {
 		d.frameTextures = append(d.frameTextures, t)
@@ -1231,7 +1231,7 @@ func (d *Device) ReleaseTextureAfterFrame(t *Texture) {
 }
 
 // CopyActiveTargetRegion copies a pixel rectangle of the current render target
-// into a fresh sampled texture, for backdrop blur (#223): the already-rendered
+// into a fresh sampled texture, for backdrop blur (pre-rebrand tracker #223): the already-rendered
 // content under a widget is captured, blurred, and drawn back. The active pass is
 // ended for the copy (a GPU copy cannot run inside a render pass) and reopened
 // with LoadOp=Load afterwards so its contents are preserved. The region is
@@ -1293,7 +1293,7 @@ func (d *Device) CopyActiveTargetRegion(x, y, w, h int) (*Texture, int, int, err
 
 // PushTarget / PopTarget expose the render-target stack to the painter's
 // RepaintBoundary implementation (boundary.go). The pushed *Texture is kept on
-// the stack entry so a nested backdrop blur can read it back (#223).
+// the stack entry so a nested backdrop blur can read it back (pre-rebrand tracker #223).
 func (d *Device) PushTarget(t *Texture, w, h int) { d.pushTarget(t.View(), t.tex, w, h) }
 func (d *Device) PopTarget()                      { d.popTarget() }
 
@@ -1302,10 +1302,10 @@ func (d *Device) PopTarget()                      { d.popTarget() }
 // attachment (cleared to far / 0). The dedicated attachment — rather than the
 // shared size-keyed one — keeps the off-screen pass's depth/stencil from
 // aliasing, and thus clearing, the canvas pass's stencil clip when the pixel
-// sizes coincide (#231). It is released after the frame is submitted
+// sizes coincide (pre-rebrand tracker #231). It is released after the frame is submitted
 // (frameDepths). Falls back to the shared attachment if the dedicated one cannot
-// be created. Used by Scene3D (z-buffering, #231) and by the box-shadow / blur
-// off-screen passes (#223), which need the same clip isolation.
+// be created. Used by Scene3D (z-buffering, pre-rebrand tracker #231) and by the box-shadow / blur
+// off-screen passes (pre-rebrand tracker #223), which need the same clip isolation.
 func (d *Device) PushOffscreenTarget(t *Texture, w, h int, clear wgpu.Color) {
 	d.endPass()
 	rt := renderTarget{view: t.View(), tex: t.tex, w: w, h: h, clear: clear}
@@ -1329,7 +1329,7 @@ func (d *Device) PushTargetLoad(t *Texture, w, h int) {
 }
 
 // SetScissor restricts subsequent draws to the given pixel rectangle. The rect is
-// remembered so it can be restored after a render-target pop (#235). The rect is
+// remembered so it can be restored after a render-target pop (pre-rebrand tracker #235). The rect is
 // clamped to the active render target's bounds: WebGPU rejects a scissor that
 // extends past the attachment (a validation error that can escalate to a lost
 // device), and dirty-region / clip rects are padded and can spill a few pixels
@@ -1353,7 +1353,7 @@ func (d *Device) SetScissor(x, y, w, h int) {
 // target so it culls every draw, instead of leaving the previous scissor active:
 // that "leave prior" behavior let fully-clipped content (e.g. list rows below a
 // scrolled viewport, whose clip-owner does not intersect the partial-repaint dirty
-// region) leak through (#333).
+// region) leak through (pre-rebrand tracker #333).
 func resolveScissor(x, y, w, h, tw, th int, hasTarget bool) (rx, ry, rw, rh int, ok bool) {
 	if hasTarget {
 		x, y, w, h = clampRect(x, y, w, h, tw, th)
@@ -1457,7 +1457,7 @@ func (d *Device) acquireSurfaceTexture() (*wgpu.Texture, error) {
 // classifyAcquire maps a surface-acquire error to the recovery action. A typed
 // *SurfaceStatusError carries the concrete status; anything else (e.g. a
 // validation error, or a nil-but-unexpected case) degrades to a plain skip. Pure
-// and side-effect free so the branch table is unit-testable without a GPU (#385).
+// and side-effect free so the branch table is unit-testable without a GPU (pre-rebrand tracker #385).
 func classifyAcquire(err error) acquireAction {
 	var se *SurfaceStatusError
 	if errors.As(err, &se) {
@@ -1493,7 +1493,7 @@ func (d *Device) BeginFrame(clear wgpu.Color) error {
 			// Outdated: the swapchain no longer matches the window (a resize the
 			// surface hasn't been reconfigured for, or a suboptimal present). Reconfigure
 			// at the current size and re-acquire once so the frame renders instead of
-			// dropping until some other event reconfigures (#385). Mirrors Resize's
+			// dropping until some other event reconfigures (pre-rebrand tracker #385). Mirrors Resize's
 			// reconfigure + depth-stencil drop; BeginFrame below re-sizes the render
 			// target from the freshly acquired texture, so no size bookkeeping is needed.
 			d.surface.Configure(d.device, d.config)
@@ -1513,7 +1513,7 @@ func (d *Device) BeginFrame(clear wgpu.Color) error {
 	view, err := st.TryCreateView(nil)
 	if err != nil {
 		// frameTex was acquired; drop it so its SurfaceOutput can't block a later
-		// surface reconfigure (#337).
+		// surface reconfigure (pre-rebrand tracker #337).
 		d.DiscardFrame()
 		return err
 	}
@@ -1531,7 +1531,7 @@ func (d *Device) BeginFrame(clear wgpu.Color) error {
 	// continuous resize; sizing the depth-stencil (in beginTopPass) from the
 	// cached config then desyncs it from the color view by one frame, so every
 	// mid-resize pass is invalid (depthStencil size != color size) and the frame
-	// is dropped — the resize flicker in #346. Deriving the target extent (hence
+	// is dropped — the resize flicker in pre-rebrand tracker #346. Deriving the target extent (hence
 	// both attachments) from one read of the acquired texture keeps them in step.
 	// Native swapchains reallocate color+size together so this matches today's
 	// behavior there; it only changes the transient web-resize case. Falls back to
@@ -1541,7 +1541,7 @@ func (d *Device) BeginFrame(clear wgpu.Color) error {
 		tw, th = int(d.config.Width), int(d.config.Height)
 	}
 	d.targets = append(d.targets, renderTarget{view: view, tex: st, w: tw, h: th, clear: clear})
-	d.stencilRef = 0 // fresh pass starts with no clip reference (#305)
+	d.stencilRef = 0 // fresh pass starts with no clip reference (pre-rebrand tracker #305)
 	d.beginTopPass()
 	return nil
 }
@@ -1605,7 +1605,7 @@ func (d *Device) ensureDepthStencil(w, h int) *wgpu.TextureView {
 
 // newDepthStencil creates a standalone depth+stencil attachment sized w×h, owned
 // by the caller (not the shared size-keyed cache). Used for the Scene3D
-// off-screen render's dedicated attachment (#231). Returns nil on failure.
+// off-screen render's dedicated attachment (pre-rebrand tracker #231). Returns nil on failure.
 func (d *Device) newDepthStencil(w, h int) *depthStencil {
 	if w <= 0 || h <= 0 {
 		return nil
@@ -1690,7 +1690,7 @@ func (d *Device) pushTarget(view *wgpu.TextureView, tex *wgpu.Texture, w, h int)
 // its prior contents are preserved). The off-screen pass that was active ran
 // unclipped (a fresh pass starts with the full scissor); re-apply the saved
 // window-space clip to the reopened parent so an enclosing StartClipping survives
-// the boundary/scene/shadow render-target round-trip (#235).
+// the boundary/scene/shadow render-target round-trip (pre-rebrand tracker #235).
 func (d *Device) popTarget() {
 	d.endPass()
 	if len(d.targets) > 1 {
@@ -1702,7 +1702,7 @@ func (d *Device) popTarget() {
 			d.pass.SetScissorRect(uint32(d.scissor.x), uint32(d.scissor.y), uint32(d.scissor.w), uint32(d.scissor.h))
 		}
 		// Restore the stencil reference: the off-screen pass left it at the new
-		// pass's default (0), but an enclosing rounded/path clip set it (#305).
+		// pass's default (0), but an enclosing rounded/path clip set it (pre-rebrand tracker #305).
 		d.pass.SetStencilReference(d.stencilRef)
 	}
 }
@@ -1717,7 +1717,7 @@ func (d *Device) EndFrame() error {
 
 	// Copy the just-rendered surface texture into the persistent capture texture
 	// before Present (the swapchain texture is invalid afterwards) — but only once
-	// Capture has been requested, so frames cost nothing extra until then (#219).
+	// Capture has been requested, so frames cost nothing extra until then (pre-rebrand tracker #219).
 	if d.captureRequested && d.ensureCaptureTex() {
 		d.encoder.CopyTextureToTexture(
 			&wgpu.TexelCopyTextureInfo{Texture: d.frameTex},
@@ -1726,7 +1726,7 @@ func (d *Device) EndFrame() error {
 		)
 	}
 
-	// Flush both arenas with a single WriteBuffer each (#255): every draw this
+	// Flush both arenas with a single WriteBuffer each (pre-rebrand tracker #255): every draw this
 	// frame accumulated its vertices and uniform block into the staging slices,
 	// and the recorded passes reference the GPU arenas at the matching offsets.
 	// WriteBuffer is queue-ordered before the Submit below, so the draws read the
@@ -1755,7 +1755,7 @@ func (d *Device) EndFrame() error {
 
 	d.surface.Present()
 
-	d.gpuDrainAfterPresent() // blocking GPU drain timing, #336
+	d.gpuDrainAfterPresent() // blocking GPU drain timing, pre-rebrand tracker #336
 
 	// The arena buffers and the cached bind groups persist across frames and are
 	// reused, so only the genuinely transient mid-frame resources are released
@@ -1832,7 +1832,7 @@ func (d *Device) ensureCaptureTex() bool {
 }
 
 // EnableCapture requests that EndFrame maintain the per-frame capture copy from
-// now on (#219). Until this is called, the copy is skipped to save the per-frame
+// now on (pre-rebrand tracker #219). Until this is called, the copy is skipped to save the per-frame
 // GPU cost.
 func (d *Device) EnableCapture() { d.captureRequested = true }
 
@@ -1848,7 +1848,7 @@ func (d *Device) CaptureImage() *image.RGBA {
 
 // CaptureTexture reads back an arbitrary texture (surface format, CopySrc) into
 // an *image.RGBA. Used as the first-capture fallback that reads the persistent
-// canvas FBO directly, before the per-frame copy has been populated (#219).
+// canvas FBO directly, before the per-frame copy has been populated (pre-rebrand tracker #219).
 func (d *Device) CaptureTexture(tex *wgpu.Texture, w, h int) *image.RGBA {
 	if tex == nil || w <= 0 || h <= 0 {
 		return nil

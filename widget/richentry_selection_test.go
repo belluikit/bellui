@@ -12,7 +12,7 @@ import (
 )
 
 // RichEntry must expose pointer/touch selection through the standard event
-// interfaces so the desktop and mobile drivers drive it (#750).
+// interfaces so the desktop and mobile drivers drive it (pre-rebrand tracker #750).
 var (
 	_ event.Draggable      = (*RichEntry)(nil)
 	_ event.DoubleTappable = (*RichEntry)(nil)

@@ -19,7 +19,7 @@ import (
 // no named-font allowlist yet, so any font-family / <font face> in the content
 // falls through to the default behaviour. To let parsed content select a custom
 // font, build the widget, register the font with RegisterNamedFont, then call
-// ParseHTML / AppendHTML (#496).
+// ParseHTML / AppendHTML (pre-rebrand tracker #496).
 func NewRichTextFromHTML(content string) *RichText {
 	return NewRichText(parseHTML(content, nil)...)
 }
@@ -50,11 +50,11 @@ type htmlStyle struct {
 	strikethrough bool
 
 	// fontSource is the inherited custom font resolved from a font-family /
-	// <font face> that matched the RichText's named-font allowlist (#496). It
+	// <font face> that matched the RichText's named-font allowlist (pre-rebrand tracker #496). It
 	// flows down to produced text segments; nil means the default font.
 	fontSource bellui.Resource
 
-	// named is the per-RichText named-font allowlist for this parse (#496). It is
+	// named is the per-RichText named-font allowlist for this parse (pre-rebrand tracker #496). It is
 	// set once at the root and carried unchanged through the walk; only registered
 	// families can be selected. nil/empty means no custom fonts are available.
 	named map[string]bellui.Resource
@@ -163,7 +163,7 @@ func handleTextNode(n *html.Node, style htmlStyle, blockquote bool) []RichTextSe
 	// space at a run boundary when this text node sits *between inline siblings*
 	// (e.g. "x <b>y</b>" must keep the space). Whitespace at a block edge, or a
 	// pure-whitespace node between block elements (pretty-printed HTML), is still
-	// dropped. Fixes boundary-space loss on HTML round-trips (#668).
+	// dropped. Fixes boundary-space loss on HTML round-trips (pre-rebrand tracker #668).
 	text := collapseWhitespace(n.Data)
 	lead, trail := edgeSpaces(n.Data)
 	keepLead := lead && isInlineHTMLNode(n.PrevSibling)
@@ -194,7 +194,7 @@ func handleTextNode(n *html.Node, style htmlStyle, blockquote bool) []RichTextSe
 // isCollapsibleSpace reports whether r is whitespace that HTML inline formatting
 // collapses and trims. It excludes the non-breaking space U+00A0 (&nbsp;): a
 // browser never collapses or trims a &nbsp;, it is significant content, so we
-// treat it as an ordinary glyph rather than layout whitespace (#876).
+// treat it as an ordinary glyph rather than layout whitespace (pre-rebrand tracker #876).
 func isCollapsibleSpace(r rune) bool {
 	return r != '\u00A0' && unicode.IsSpace(r)
 }
@@ -212,7 +212,7 @@ func hasVisibleText(s string) bool {
 
 // edgeSpaces reports whether s begins and/or ends with a collapsible whitespace
 // rune (a &nbsp; at an edge is content, not a boundary space, so it does not
-// count — #876).
+// count — pre-rebrand tracker #876).
 func edgeSpaces(s string) (lead, trail bool) {
 	if s == "" {
 		return false, false
@@ -366,7 +366,7 @@ func htmlHeadingLevelStyle(a atom.Atom) RichTextStyle {
 
 // applyNamedFont returns style with its fontSource set to the app-registered
 // resource matching the first family name in the comma-separated list, or
-// unchanged when nothing matches (#496).
+// unchanged when nothing matches (pre-rebrand tracker #496).
 func applyNamedFont(style htmlStyle, families string) htmlStyle {
 	if res := resolveNamedFont(families, style.named); res != nil {
 		style.fontSource = res
@@ -471,7 +471,7 @@ func extractHTMLHeaderCells(tr *html.Node) ([]string, []bellui.TextAlign) {
 
 // extractHTMLCells extracts cell text from a data <tr>. Cell edges are trimmed of
 // *collapsible* whitespace only, so a leading/trailing &nbsp; (U+00A0) survives
-// like an internal one (#914) rather than being trimmed by plain TrimSpace.
+// like an internal one (pre-rebrand tracker #914) rather than being trimmed by plain TrimSpace.
 func extractHTMLCells(tr *html.Node) []string {
 	var cells []string
 	for c := tr.FirstChild; c != nil; c = c.NextSibling {
@@ -535,7 +535,7 @@ func collectPreTextInto(b *strings.Builder, n *html.Node) {
 // collapseWhitespace replaces runs of collapsible whitespace with a single space
 // and trims the result. A non-breaking space (U+00A0, &nbsp;) is not collapsible
 // — it is preserved verbatim as content, so it survives and blocks trimming of an
-// adjacent edge (#876).
+// adjacent edge (pre-rebrand tracker #876).
 func collapseWhitespace(s string) string {
 	var b strings.Builder
 	prevSpace := true // start true to trim leading whitespace

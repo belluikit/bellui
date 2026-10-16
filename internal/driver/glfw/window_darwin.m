@@ -29,7 +29,7 @@ void setFullScreen(bool full, void *win) {
 
 // setWindowParent establishes an owner relationship so AppKit keeps child above
 // parent, orders/minimizes them together and treats child as owned. A NULL
-// parent removes the relationship. (fyne#598)
+// parent removes the relationship. (pre-rebrand tracker #598)
 void setWindowParent(void *childPtr, void *parentPtr) {
     NSWindow *child = (NSWindow*)childPtr;
     if (child == nil) {
@@ -50,7 +50,7 @@ void setWindowParent(void *childPtr, void *parentPtr) {
 // so keyboard focus cannot reach it and its title bar renders inactive — the
 // closest AppKit gets to window-modally blocking a single free-floating window
 // without a sheet (not free-floating) or an app-modal session (blocks every
-// window). (fyne#676)
+// window). (pre-rebrand tracker #676)
 static BOOL belluiModalCannotBecomeKey(id self, SEL _cmd) { return NO; }
 
 // Associated-object key holding a blocked parent's original class so it can be

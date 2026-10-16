@@ -10,7 +10,7 @@ import (
 // pressed with the platform shortcut modifier held (Control, or Super on
 // macOS), or nil when the key is not one of the built-ins. Clipboard shortcuts
 // (Copy/Cut/Paste) are given clip. Shared by the desktop (glfw) and mobile
-// drivers so both map the same keys to the same shortcuts (#1077).
+// drivers so both map the same keys to the same shortcuts (pre-rebrand tracker #1077).
 func BuiltinKeyboardShortcut(key event.KeyName, clip bellui.Clipboard) core.Shortcut {
 	switch key {
 	case event.KeyZ: // undo

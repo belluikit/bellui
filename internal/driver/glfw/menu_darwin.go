@@ -101,7 +101,7 @@ var (
 // menuContainsItems reports whether a menu has at least one non-separator item.
 // An empty (or separators-only) bellui.Menu must never be handed to AppKit as a
 // native NSMenu — a stray empty submenu in the key-equivalent routing path is one
-// of the concrete triggers of the #811 use-after-free.
+// of the concrete triggers of the pre-rebrand tracker #811 use-after-free.
 func menuContainsItems(menu *bellui.Menu) bool {
 	for _, item := range menu.Items {
 		if !item.IsSeparator {
@@ -315,7 +315,7 @@ func menuChecked(id int) bool {
 // disableGLFWMenubar tells GLFW not to build its own basic menu bar / Services
 // menu when AppKit initialises during glfw.Init(). bellui constructs and owns the
 // native main menu itself (createBelluiMainMenu), so GLFW's orphaned scaffolding —
-// the dangling native reference behind the macOS-26 use-after-free (#831) — never
+// the dangling native reference behind the macOS-26 use-after-free (pre-rebrand tracker #831) — never
 // exists. Must be called before glfw.Init().
 func disableGLFWMenubar() {
 	glfw.InitHint(glfw.CocoaMenubar, glfw.False)
@@ -324,7 +324,7 @@ func disableGLFWMenubar() {
 // ensureRegularActivationPolicy makes an unbundled process a regular foreground
 // UI app so its windows can become key and take keyboard focus. GLFW did this
 // during glfw.Init() only when its Cocoa menu bar was enabled, and
-// disableGLFWMenubar turns that off (#831) — which also dropped the promotion,
+// disableGLFWMenubar turns that off (pre-rebrand tracker #831) — which also dropped the promotion,
 // leaving terminal-launched apps as background processes that route typed keys
 // to the launching terminal. Since bellui owns the menu bar now, it owns this too.
 // Must run after glfw.Init() (AppKit initialised), on the main goroutine. No-op
@@ -347,7 +347,7 @@ func belluiMainMenuAppName() string {
 // (About/Services/Hide/Show All/Quit) plus the standard Window menu — replacing
 // what GLFW's createMenuBar() used to build. It is idempotent (the bar is created
 // exactly once) and retains the scaffolding for the whole process lifetime, so it
-// is never freed underfoot (#831). Safe to call on the main goroutine only.
+// is never freed underfoot (pre-rebrand tracker #831). Safe to call on the main goroutine only.
 func ensureBelluiMainMenu() {
 	cName := C.CString(belluiMainMenuAppName())
 	C.createBelluiMainMenu(cName)

@@ -35,7 +35,7 @@ func (w *window) doSetParentNative(parent *window) {
 // manager blocks input to this window's WM_TRANSIENT_FOR owner (set by
 // doSetParentNative) while it is up. Must run on the main goroutine. Modality
 // is expressed against the owner, so with no resolved parent it is left to the
-// pure-Go scrim (#498).
+// pure-Go scrim (pre-rebrand tracker #498).
 func (w *window) doSetModalNative(parent *window, modal bool) {
 	if parent == nil {
 		return

@@ -164,7 +164,7 @@ func TestHover_MouseOutDismisses(t *testing.T) {
 	}
 }
 
-// TestHover_KeepAliveOverCard covers #27: sliding the pointer onto the card
+// TestHover_KeepAliveOverCard covers pre-rebrand tracker #27: sliding the pointer onto the card
 // cancels the grace dismiss and keeps it alive; leaving the card re-arms it.
 func TestHover_KeepAliveOverCard(t *testing.T) {
 	test.NewTempApp(t)
@@ -279,7 +279,7 @@ func TestWordHoverProvider(t *testing.T) {
 	}
 }
 
-// --- #29: keyboard "show hover" ------------------------------------------
+// --- pre-rebrand tracker #29: keyboard "show hover" ------------------------------------------
 
 func wordHoverEditor(t *testing.T) *Editor {
 	t.Helper()

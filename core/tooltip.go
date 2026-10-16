@@ -9,7 +9,7 @@ package core
 // This is the driver-level replacement for the overlay-based widget.Tooltip,
 // which never fired on the glfw desktop driver: the driver delivers hover to the
 // widget itself reliably, so tooltips ride that instead of an invisible
-// hit-test overlay (#800).
+// hit-test overlay (pre-rebrand tracker #800).
 type ToolTipable interface {
 	ToolTip() string
 }

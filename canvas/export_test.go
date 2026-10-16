@@ -1,6 +1,6 @@
 package canvas
 
-// TextMeasureMemoForTest exposes Text's measurement memo (#923) so external
+// TextMeasureMemoForTest exposes Text's measurement memo (pre-rebrand tracker #923) so external
 // tests can assert memoisation behaviour: entry is the current memo as an
 // opaque pointer (stable across memo hits, replaced on re-measure), gen the
 // theme/font cache generation it was taken under, ok whether one is populated.

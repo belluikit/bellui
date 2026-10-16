@@ -339,13 +339,13 @@ func main(f func(App)) {
 }
 
 // keyboardOps serializes every soft-keyboard JVM call — show, hide and the
-// #572 state mirror — through one background worker goroutine. FIFO order is
+// pre-rebrand tracker #572 state mirror — through one background worker goroutine. FIFO order is
 // preserved (a focus switch's hide-then-show lands in sequence, and a state
 // push never overtakes the show that precedes it), but the caller returns
 // immediately. The previous blocking RunOnJVM round-trip from the main
 // goroutine deadlocked against the Android UI thread when a TalkBack-dispatched
 // focus switch re-entered the show/hide path while the keyboard was already up
-// (#973); keyboard calls carry no result, so nothing needs the round-trip.
+// (pre-rebrand tracker #973); keyboard calls carry no result, so nothing needs the round-trip.
 var keyboardOps = async.NewUnboundedChan[func()]()
 
 func init() {
@@ -371,12 +371,12 @@ func driverShowVirtualKeyboard(keyboard KeyboardType) {
 }
 
 // SetKeyboardState mirrors the focused bellui editor's flat text + selection (rune
-// offsets) into the bellui-owned IME buffer (#1006 Phase 4). It is the push half of
+// offsets) into the bellui-owned IME buffer (pre-rebrand tracker #1006 Phase 4). It is the push half of
 // the bellui-driven flat transport: the buffer is what the soft keyboard's
 // InputConnection reads, and this push keeps it in step with bellui's document
 // whenever the document changes off the IME path (SetText, a tap/undo/TalkBack
 // edit). The Java side (doSetKeyboardState) clears the composing region on every
-// push — so the IME can never recompose already-committed text (#966) — and skips
+// push — so the IME can never recompose already-committed text (pre-rebrand tracker #966) — and skips
 // the push while an IME composition is active. Because the IME's own edits already
 // update the buffer through BelluiInputConnection, an echoing push of an
 // IME-originated change is a strict no-op there.
@@ -384,7 +384,7 @@ func driverShowVirtualKeyboard(keyboard KeyboardType) {
 // Routed through keyboardOps so it stays ordered behind the show that precedes it
 // and runs off the main goroutine (the RunOnJVM round-trip from the main goroutine
 // deadlocked against the Android UI thread under a TalkBack-dispatched focus
-// switch, #973).
+// switch, pre-rebrand tracker #973).
 func SetKeyboardState(text string, selStart, selEnd int) {
 	keyboardOps.In() <- func() {
 		err := mobileinit.RunOnJVM(func(vm, jniEnv, ctx uintptr) error {
@@ -401,7 +401,7 @@ func SetKeyboardState(text string, selStart, selEnd int) {
 }
 
 // KeyboardEditorChanged tells the Java side the bound bellui editor's identity
-// changed (#966): the IME session state it holds — an in-flight composing word,
+// changed (pre-rebrand tracker #966): the IME session state it holds — an in-flight composing word,
 // the echo/recent-state filters — belongs to the PREVIOUS field, so it must be
 // dropped and the next setKeyboardState seed must reseed + restartInput
 // unconditionally, never be swallowed as an echo. Routed through keyboardOps so
@@ -420,8 +420,8 @@ func KeyboardEditorChanged() {
 	}
 }
 
-// SetKeyboardUndoState is a no-op on Android (#1134): Android soft keyboards
-// have no undo-manager-driven UI; TalkBack undo/redo ride the #1025 custom
+// SetKeyboardUndoState is a no-op on Android (pre-rebrand tracker #1134): Android soft keyboards
+// have no undo-manager-driven UI; TalkBack undo/redo ride the pre-rebrand tracker #1025 custom
 // accessibility actions instead.
 func SetKeyboardUndoState(canUndo, canRedo bool) {}
 
@@ -609,7 +609,7 @@ func mainUI(vm, jniEnv, ctx uintptr) error {
 				// now so the surface is rebuilt as soon as the window exists, instead of
 				// waiting for the next hardware onNativeWindowRedrawNeeded to carry it.
 				// When that redraw lags (seconds, on some devices) the painter would
-				// otherwise present to the destroyed surface — a black canvas (#312).
+				// otherwise present to the destroyed surface — a black canvas (pre-rebrand tracker #312).
 				// handlePaint recreates the surface only when the handle actually
 				// changed, so a redraw arriving in the same frame is a no-op.
 				theApp.events.In() <- paint.Event{External: true, Window: uintptr(unsafe.Pointer(w))}
@@ -796,18 +796,18 @@ func processKey(env *C.JNIEnv, e *C.AInputEvent) {
 // keyboardShortcutKey routes a hardware-keyboard shortcut combination (a key
 // pressed with Ctrl/Alt/Meta held) from the IME's InputConnection.sendKeyEvent
 // into bellui's key path, carrying the Android meta-state so the driver can build
-// the matching bellui.Shortcut (#1077). Gboard hands these to the InputConnection
+// the matching bellui.Shortcut (pre-rebrand tracker #1077). Gboard hands these to the InputConnection
 // with getUnicodeChar()==0, so they never reach the native input queue; without
 // this they went to the inert host EditText and were lost. Delivered as a
 // NON-native key event, so the one-writer reroute's native-echo suppression
-// (#1061) never touches it. Lives here (android-tagged) beside convAndroidKeyCode
+// (pre-rebrand tracker #1061) never touches it. Lives here (android-tagged) beside convAndroidKeyCode
 // / androidKeyModifiers, unlike the cross-platform keyboard.go up-calls.
 //
 // keyboardArrowKey routes an IME-delivered arrow key (soft editing-panel or a
 // hardware DPAD forwarded through sendKeyEvent) into bellui's key path. Arrow keys
 // never reach the native input queue (`convAndroidKeyCode` leaves DPAD
 // unmapped), so this is their sole delivery — it now carries the meta-state so
-// an editor extends its selection on Shift+Arrow (#1083). Android-tagged beside
+// an editor extends its selection on Shift+Arrow (pre-rebrand tracker #1083). Android-tagged beside
 // androidKeyModifiers, like keyboardShortcutKey.
 //
 //export keyboardArrowKey
@@ -844,7 +844,7 @@ func keyboardShortcutKey(keyCode, metaState C.int) {
 // androidKeyModifiers maps an Android AMETA_* meta-state bitmask to gomobile's
 // key.Modifiers. Populated on hardware-key events so the driver can tell a bare
 // keystroke from a shortcut combination (Ctrl/Alt/Super) — the latter is never
-// suppressed by the one-writer IME reroute (#1061).
+// suppressed by the one-writer IME reroute (pre-rebrand tracker #1061).
 func androidKeyModifiers(meta int32) key.Modifiers {
 	var m key.Modifiers
 	if meta&C.AMETA_SHIFT_ON != 0 {

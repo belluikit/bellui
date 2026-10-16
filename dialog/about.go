@@ -116,7 +116,7 @@ func aboutContent(content string, links []*widget.Hyperlink, meta bellui.AppMeta
 // movement, so the decoration drifts slower than the text above it.
 const aboutParallaxFactor = 3
 
-// aboutUnderlay builds the decorative parallax layer (#453): the app icon,
+// aboutUnderlay builds the decorative parallax layer (pre-rebrand tracker #453): the app icon,
 // oversized and almost transparent in the manner of an MD3 surface tint,
 // drifting upward at a fraction of the content scroll speed. Nil without an
 // icon. The layer is clipped by a non-scrolling Scroll so the oversized icon

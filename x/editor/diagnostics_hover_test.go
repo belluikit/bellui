@@ -9,7 +9,7 @@ import (
 )
 
 // TestDiagnostics_PointRangeSquiggle verifies a zero-width (point) diagnostic is
-// widened to a visible, non-empty span (#52) while non-zero ranges are unchanged.
+// widened to a visible, non-empty span (pre-rebrand tracker #52) while non-zero ranges are unchanged.
 func TestDiagnostics_PointRangeSquiggle(t *testing.T) {
 	test.NewTempApp(t)
 	e := NewEditor()
@@ -111,7 +111,7 @@ func TestHover_NoProviderNoDiagnostic(t *testing.T) {
 }
 
 // TestHover_DiagnosticMessageRendersVerbatim verifies a diagnostic message with
-// markdown-significant characters is shown literally, not reinterpreted (#92),
+// markdown-significant characters is shown literally, not reinterpreted (pre-rebrand tracker #92),
 // while the dimmed source annotation still renders.
 func TestHover_DiagnosticMessageRendersVerbatim(t *testing.T) {
 	test.NewTempApp(t)
@@ -213,7 +213,7 @@ func TestHoverCard_DiagnosticNewlineTermination(t *testing.T) {
 // TestHoverShownRange_UnionOfOverlapping verifies the card's keep-alive range is
 // the bounding union of every matched diagnostic (plus any provider range), so
 // the card persists across the whole hovered region when ranges of different
-// extents overlap (#58).
+// extents overlap (pre-rebrand tracker #58).
 func TestHoverShownRange_UnionOfOverlapping(t *testing.T) {
 	// A small inner diagnostic and a larger outer one both cover (0,4).
 	inner := Diagnostic{Range: TextRange{StartRow: 0, StartCol: 3, EndRow: 0, EndCol: 5}}
@@ -225,7 +225,7 @@ func TestHoverShownRange_UnionOfOverlapping(t *testing.T) {
 		t.Errorf("union range = %+v, want %+v", got, want)
 	}
 	// The union must keep covering a point outside the first diagnostic but inside
-	// the larger one — the regression #58 fixes.
+	// the larger one — the regression pre-rebrand tracker #58 fixes.
 	if !got.Contains(0, 8) {
 		t.Errorf("union range %+v should still contain (0,8)", got)
 	}

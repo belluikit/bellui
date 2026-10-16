@@ -46,7 +46,7 @@ type selectable struct {
 	// nil and handle pointer input directly.
 	host selectableHost
 
-	// Mobile touch-selection state (#944, the #758 follow-up): selHandles is
+	// Mobile touch-selection state (pre-rebrand tracker #944, the pre-rebrand tracker #758 follow-up): selHandles is
 	// the draggable-handle overlay shown while a standalone selectable has a
 	// live touch-initiated selection; touchPointer notes whether the most
 	// recent pointer-down was a touch; touchSelection marks the selection as
@@ -109,7 +109,7 @@ func (s *selectable) DragEnd() {
 	s.notifySelectChanged()
 
 	// A finished touch drag-select offers the Copy menu for the new
-	// selection, like a handle adjustment (native toolbar parity, #945).
+	// selection, like a handle adjustment (native toolbar parity, pre-rebrand tracker #945).
 	// Touch-gated: desktop mouse selection is unchanged.
 	if s.touchPointer && s.touchSelection && s.selecting && bellui.CurrentDevice().IsMobile() {
 		if a, _ := s.selection(); a >= 0 {
@@ -153,12 +153,12 @@ func (s *selectable) dragged(d *event.DragEvent) {
 	// A drag confined to a standalone block row gives the same zero-column position
 	// for start and end (the row has one caret column), so it would select nothing.
 	// Treat any drag within a block row as selecting the whole atomic block, with
-	// the synthetic trailing column selectAll uses (issue #56).
+	// the synthetic trailing column selectAll uses (pre-rebrand issue #56).
 	if s.selectRow == s.cursorRow && s.selectColumn == s.cursorColumn && s.provider.isBlockRow(s.cursorRow) {
 		s.cursorColumn = 1
 	}
 	if s.touchPointer && s.selecting {
-		s.markTouchSelection() // a touch drag-select gets handles (#944)
+		s.markTouchSelection() // a touch drag-select gets handles (pre-rebrand tracker #944)
 	}
 	s.Refresh()
 }
@@ -169,7 +169,7 @@ func (s *selectable) MouseDown(m *desktop.MouseEvent) {
 		// The host owns caret/selection and handles focus in its Tapped/Dragged.
 		// Grab focus on press for responsiveness; do nothing else so the host's
 		// own model — not the selectable's — drives the click. It does see the
-		// press, so it can track the pointer type (#888).
+		// press, so it can track the pointer type (pre-rebrand tracker #888).
 		if h, ok := s.host.(desktop.Mouseable); ok {
 			h.MouseDown(m)
 		}
@@ -228,13 +228,13 @@ func (s *selectable) SelectedText() string {
 	// Fast path: a single text segment (a plain Label, or a single-segment RichText —
 	// the common selectable case). Slice the source text by offset so characters that
 	// word-wrap consumes at a wrap point (a space dropped from both adjacent visual
-	// rows) are preserved, along with hard newlines (#161). This also matches
-	// Entry.SelectedText and is exact under the lazy row model (#157).
+	// rows) are preserved, along with hard newlines (pre-rebrand tracker #161). This also matches
+	// Entry.SelectedText and is exact under the lazy row model (pre-rebrand tracker #157).
 	if _, ok := s.provider.singleSegment(); ok {
 		a := textPosFromRowCol(rowA, colA, s.provider)
 		b := textPosFromRowCol(rowB, colB, s.provider)
 		// textRange reads from the lazy buffer when live (no full-document
-		// decode, #401) and decodes the segment text otherwise.
+		// decode, pre-rebrand tracker #401) and decodes the segment text otherwise.
 		return s.provider.textRange(a, b)
 	}
 
@@ -242,7 +242,7 @@ func (s *selectable) SelectedText() string {
 	// rows by default; constrain only the first and last rows to the selected
 	// columns. It also splices in any inline non-text segment (link, image) whose
 	// opaque box is covered by the selection, so the copied text matches the
-	// highlighted rectangles (issue #46).
+	// highlighted rectangles (pre-rebrand issue #46).
 	var buf strings.Builder
 	for r := rowA; r <= rowB && r < s.provider.rows(); r++ {
 		rowLen := s.provider.rowLength(r)
@@ -251,7 +251,7 @@ func (s *selectable) SelectedText() string {
 			// standalone block non-text segment (image/table/separator) is
 			// all-or-nothing — since we only get here for a non-degenerate selection,
 			// any block row the selection reaches (including the last/only row) is
-			// covered, so include its Textual() (issues #50, #53). An ordinary blank
+			// covered, so include its Textual() (pre-rebrand issues #50, pre-rebrand tracker #53). An ordinary blank
 			// text row yields "" here, so its newline behaviour is unchanged.
 			buf.WriteString(s.provider.rowBlockText(r))
 			s.appendRowJoiner(&buf, r, rowB)
@@ -280,7 +280,7 @@ func (s *selectable) SelectedText() string {
 // appendRowJoiner writes what goes between visual row r and the next selected row:
 // a newline at a hard logical-line end, or — when r and r+1 are a soft wrap of the
 // same logical line — the run word-wrap consumed at the break (so the copied text
-// keeps its spaces, #161). Nothing is written after the last selected row.
+// keeps its spaces, pre-rebrand tracker #161). Nothing is written after the last selected row.
 func (s *selectable) appendRowJoiner(buf *strings.Builder, r, rowB int) {
 	if r >= rowB {
 		return
@@ -321,7 +321,7 @@ func (s *selectable) TappedSecondary(ev *event.PointEvent) {
 	if s.host != nil {
 		// The embedding editor offers its own, richer context menu (Cut/Paste/
 		// Undo need the editor's document model); the selectable's read-only
-		// Copy menu would also desync the host's selection state (#888).
+		// Copy menu would also desync the host's selection state (pre-rebrand tracker #888).
 		if st, ok := s.host.(event.SecondaryTappable); ok {
 			st.TappedSecondary(ev)
 		}
@@ -354,7 +354,7 @@ func (s *selectable) TouchDown(m *mobile.TouchEvent) {
 	s.touchPointer = true
 	if s.host != nil {
 		// The embedding editor gates its own selection handles on the pointer
-		// type, so it must see the touch too (mirrors Tapped/Dragged, #888).
+		// type, so it must see the touch too (mirrors Tapped/Dragged, pre-rebrand tracker #888).
 		if h, ok := s.host.(mobile.Touchable); ok {
 			h.TouchDown(m)
 		}
@@ -392,7 +392,7 @@ func (s *selectable) selectAll() {
 	// A standalone block row (image/table/separator) has no caret column, so when
 	// it is the only content the selection above would be degenerate (0,0)==(0,0)
 	// and select nothing. Give it a synthetic trailing column so the block is
-	// enclosed and thus copied/highlighted (issue #53). Multi-row select-all is
+	// enclosed and thus copied/highlighted (pre-rebrand issue #53). Multi-row select-all is
 	// already non-degenerate, so a trailing block on row `last` is covered as-is.
 	if s.cursorRow == s.selectRow && s.cursorColumn == s.selectColumn && s.provider.isBlockRow(last) {
 		s.cursorColumn = 1
@@ -416,7 +416,7 @@ func (s *selectable) alignOffsetX(row int) float32 {
 	innerPad := th.Size(theme.SizeNameInnerPadding)
 	// Measure each segment in its own style/size so multi-segment rows centre or
 	// trail exactly; a single-style measurement drifts when segments differ in
-	// size or weight (issue #42).
+	// size or weight (pre-rebrand issue #42).
 	textWidth := s.provider.rowWidth(row, textSize) + 2*innerPad
 	containerWidth := s.Size().Width
 	if containerWidth <= textWidth {
@@ -440,11 +440,11 @@ func (s *selectable) cursorColAt(row int, text []rune, pos geo.Position) (col in
 	textSize := th.Size(s.getSizeName())
 	innerPad := th.Size(theme.SizeNameInnerPadding)
 
-	// Rows mixing text with inline non-text atoms (inline images, #665) need
+	// Rows mixing text with inline non-text atoms (inline images, pre-rebrand tracker #665) need
 	// atom-aware hit-testing: the plain LTR scan below measures *through* the
 	// image (landing every hit after it one image-width off) and the bidi
 	// HitTestAffinity returns box-blind text-only columns, so a click on or past
-	// an image resolves wrong (#983). Resolve both column spaces from the row's
+	// an image resolves wrong (pre-rebrand tracker #983). Resolve both column spaces from the row's
 	// layout — bidi first (RTL/mixed), else the LTR atom-aware walk — and return
 	// the one the host addresses content in: the document space (each atom one
 	// position) for an editor host like RichEntry, the text-only space otherwise.
@@ -492,7 +492,7 @@ func (s *selectable) getRowCol(p geo.Position) (row, col int, downstream bool) {
 	innerPad := th.Size(theme.SizeNameInnerPadding)
 
 	// Map the click Y to a row: O(1) analytic inverse for the lazy/uniform-stride
-	// model (#160), cached-geometry scan otherwise. -1 ⇒ fall back to uniform below.
+	// model (pre-rebrand tracker #160), cached-geometry scan otherwise. -1 ⇒ fall back to uniform below.
 	numRows := s.provider.rows()
 	downstream = true
 	row = s.provider.rowAtY(p.Y)
@@ -528,7 +528,7 @@ func (s *selectable) selectCurrentRow(focus bool) {
 	// A standalone block row (image/table/separator) has no caret column, so the
 	// range above would be degenerate (0 == 0) and select nothing. Give it a
 	// synthetic trailing column so the atomic block is enclosed, mirroring
-	// selectAll (issue #56).
+	// selectAll (pre-rebrand issue #56).
 	if s.cursorColumn == s.selectColumn && provider.isBlockRow(s.cursorRow) {
 		s.cursorColumn = 1
 	}
@@ -577,11 +577,11 @@ func textPosFromRowCol(row, col int, prov *RichText) int {
 
 // rowColFromTextPos obtains the row,col for a rune offset into the provider —
 // the inverse of textPosFromRowCol. Shared by Entry.rowColFromTextPos and the
-// selectable accessibility seam (#556). wrapping is the owning widget's text
+// selectable accessibility seam (pre-rebrand tracker #556). wrapping is the owning widget's text
 // wrap mode, needed to resolve positions that sit exactly on a soft wrap.
 func rowColFromTextPos(pos int, provider *RichText, wrapping bellui.TextWrap) (row, col int) {
 	if provider.lazy {
-		// Lazy model (#157): O(log lines + one line measure) instead of scanning
+		// Lazy model (pre-rebrand tracker #157): O(log lines + one line measure) instead of scanning
 		// (and thereby measuring) every row.
 		return provider.lazyRowColFromTextPos(pos)
 	}
@@ -610,7 +610,7 @@ func rowColFromTextPos(pos int, provider *RichText, wrapping bellui.TextWrap) (r
 
 // accessibleSelection returns the selection as a normalized half-open rune
 // range into the provider text; when nothing is selected both offsets are
-// the cursor position (the [core.AccessibleTexter] contract, #556).
+// the cursor position (the [core.AccessibleTexter] contract, pre-rebrand tracker #556).
 func (s *selectable) accessibleSelection() (start, end int) {
 	if s == nil {
 		return 0, 0
@@ -704,7 +704,7 @@ func (r *selectableRenderer) Refresh() {
 		}
 	}
 
-	// The central mobile selection-handle seam (#944): every selection or
+	// The central mobile selection-handle seam (pre-rebrand tracker #944): every selection or
 	// focus mutation funnels through this Refresh (a no-op off mobile and
 	// for editor-embedded selectables).
 	r.sel.updateSelectionHandles()
@@ -749,7 +749,7 @@ func (r *selectableRenderer) buildSelection() {
 		// A row with an inline image atom counts columns in document-position space,
 		// which lineSizeToColumn (text-rune columns) mis-measures — it steps through
 		// the image. Use the atom-aware walk for the x so the highlight edge lands
-		// correctly across an inline image (#893); the height still comes from sz.
+		// correctly across an inline image (pre-rebrand tracker #893); the height still comes from sz.
 		if ix, ok := provider.inlineColumnX(row, column, textSize, innerPad); ok {
 			xw = ix
 		}
@@ -782,7 +782,7 @@ func (r *selectableRenderer) buildSelection() {
 	}
 	rowCount := selectEndRow - selectStartRow + 1
 
-	// When the provider is virtualised (#119), only build rectangles for the
+	// When the provider is virtualised (pre-rebrand tracker #119), only build rectangles for the
 	// rows in the materialised window — building (and measuring) a rect for every
 	// selected row would re-introduce the O(rows) cost on select-all. Rect Y/width
 	// come from analytic RowGeometry, so off-window rows are correctly omitted and
@@ -815,7 +815,7 @@ func (r *selectableRenderer) buildSelection() {
 			continue // outside the virtualised window — rebuilt on scroll
 		}
 		if provider.rowHidden(row) {
-			continue // folded row (#141): part of the model, but draws no rectangle
+			continue // folded row (pre-rebrand tracker #141): part of the model, but draws no rectangle
 		}
 		startCol, endCol := selectStartCol, selectEndCol
 		if selectStartRow < row {
@@ -834,7 +834,7 @@ func (r *selectableRenderer) buildSelection() {
 		// columns, so the column-based path would draw a zero-width sliver. Fill the
 		// whole box width instead, all-or-nothing. The loop only runs for a real
 		// selection, so any block row it reaches (including the last/only row) is
-		// covered — matching SelectedText (issues #50, #53). A blank text row is not
+		// covered — matching SelectedText (pre-rebrand issues #50, pre-rebrand tracker #53). A blank text row is not
 		// a block row, so it falls through to the legacy path.
 		if provider.isBlockRow(row) {
 			if w := provider.rowWidth(row, textSize); w > 0 {
@@ -848,7 +848,7 @@ func (r *selectableRenderer) buildSelection() {
 		// A bidi row holding inline atoms needs the document-column-aware span
 		// path first: the plain RTL spans index text-only columns and would
 		// both mis-map the endpoints (atoms count a position each) and decide
-		// atom highlighting by the wrong rule (#913).
+		// atom highlighting by the wrong rule (pre-rebrand tracker #913).
 		spans, spansOK := provider.bidiInlineSelectionSpans(row, startCol, endCol, innerPad)
 		if !spansOK {
 			spans, spansOK = provider.rtlSelectionSpans(row, startCol, endCol, innerPad)

@@ -14,7 +14,7 @@ import (
 )
 
 // Test_mobileDriver_MultiWindowStack documents and verifies the mobile
-// multi-window semantics (#499): windows form a stack with only the topmost
+// multi-window semantics (pre-rebrand tracker #499): windows form a stack with only the topmost
 // visible one shown at a time. A window opened over a visible one is a child;
 // closing it pops back to reveal the previous window.
 func Test_mobileDriver_MultiWindowStack(t *testing.T) {
@@ -34,7 +34,7 @@ func Test_mobileDriver_MultiWindowStack(t *testing.T) {
 	assert.Len(t, d.AllWindows(), 2)
 
 	// only one window shows at a time — the topmost visible one. Closing the
-	// child removes it from its owning driver's list (#644 — Close() uses the
+	// child removes it from its owning driver's list (pre-rebrand tracker #644 — Close() uses the
 	// window's own driver, not the current app driver), popping the stack back
 	// to reveal the parent.
 	w2.Close()

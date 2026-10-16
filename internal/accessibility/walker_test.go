@@ -118,7 +118,7 @@ func TestBuildTree_PresentationalChildrenPruned(t *testing.T) {
 }
 
 // A text input drops the internal widgets painting its value but keeps
-// embedded interactive controls reachable (#522): the SearchField's clear
+// embedded interactive controls reachable (pre-rebrand tracker #522): the SearchField's clear
 // button and a DateEntry-style ActionItem surface as child nodes, while the
 // text-painting RichText stays pruned.
 func TestBuildTree_TextInputKeepsInteractiveChildren(t *testing.T) {
@@ -163,7 +163,7 @@ func TestBuildTree_SearchFieldClearButtonReachable(t *testing.T) {
 }
 
 // The password reveal control is a labeled, actionable child of a password
-// entry (#531).
+// entry (pre-rebrand tracker #531).
 func TestBuildTree_PasswordRevealerReachable(t *testing.T) {
 	test.NewTempApp(t)
 
@@ -184,7 +184,7 @@ func TestBuildTree_PasswordRevealerReachable(t *testing.T) {
 	assert.NotEmpty(t, reveal.Actions)
 }
 
-// Hyperlinks inside rich text surface as RoleLink nodes (#523): the
+// Hyperlinks inside rich text surface as RoleLink nodes (pre-rebrand tracker #523): the
 // HyperlinkSegment renders a real Hyperlink widget, and RichText's selective
 // prune keeps it while dropping the textual segments.
 func TestBuildTree_RichTextKeepsHyperlinks(t *testing.T) {
@@ -213,7 +213,7 @@ func TestBuildTree_RichTextKeepsHyperlinks(t *testing.T) {
 }
 
 // Headings inside rich text surface as virtual RoleHeading nodes with
-// levels (#533): they have no CanvasObject of their own, so RichText
+// levels (pre-rebrand tracker #533): they have no CanvasObject of their own, so RichText
 // reports them via core.AccessibleVirtualNodeProvider and the walker
 // attaches them with absolute bounds.
 func TestBuildTree_RichTextHeadingNodes(t *testing.T) {
@@ -256,7 +256,7 @@ func TestBuildTree_RichTextHeadingNodes(t *testing.T) {
 }
 
 // A document mixing links and headings lists them in document order, not
-// all real nodes followed by all virtual ones (#545).
+// all real nodes followed by all virtual ones (pre-rebrand tracker #545).
 func TestBuildTree_VirtualNodesInReadingOrder(t *testing.T) {
 	test.NewTempApp(t)
 
@@ -390,7 +390,7 @@ func TestBuildTree_RTLOrderIsReadingOrder(t *testing.T) {
 // virtualGrid is a fake virtualized grid: a large logical extent reported via
 // AccessibleGridDimensioner, but AccessibleVirtualNodes returns only a bounded
 // window of flat RoleTableCell nodes carrying grid coordinates — the model a
-// real virtualized table (fytables DataGrid) uses (#630).
+// real virtualized table (fytables DataGrid) uses (pre-rebrand tracker #630).
 type virtualGrid struct {
 	widget.BaseWidget
 	totalRows, cols    int
@@ -435,7 +435,7 @@ func (g *virtualGrid) AccessibleVirtualNodes() []core.AccessibleVirtualNode {
 // AccessibleRealizeCell realizes any single cell on demand, including rows far
 // outside the AccessibleVirtualNodes window, without materializing the rows
 // between — the point-addressed lazy path a screen reader uses to navigate a
-// virtualized grid past its viewport (#637). The off-viewport cell reports its
+// virtualized grid past its viewport (pre-rebrand tracker #637). The off-viewport cell reports its
 // logical position (row 500000 sits far below the realized window).
 func (g *virtualGrid) AccessibleRealizeCell(row, col int) (core.AccessibleVirtualNode, bool) {
 	if row < 0 || row >= g.totalRows || col < 0 || col >= g.cols {
@@ -470,7 +470,7 @@ func (g *virtualGrid) Scrolled(*event.ScrollEvent) {}
 
 // A virtual node has no real ancestors in the walk, so it inherits its scroll
 // target from the provider: the provider itself when that handles scroll
-// events (#952) — the AT scroll gesture on a virtual cell then pages the grid.
+// events (pre-rebrand tracker #952) — the AT scroll gesture on a virtual cell then pages the grid.
 func TestBuildTree_VirtualNodeScrollAncestor(t *testing.T) {
 	test.NewTempApp(t)
 	g := newVirtualGrid()
@@ -492,7 +492,7 @@ func TestBuildTree_VirtualNodeScrollAncestor(t *testing.T) {
 
 // A virtualized grid surfaces a bounded window of virtual cells with grid
 // coordinates and a stable identity, while the dimensioner reports the full
-// extent — the walker never touches all N rows (#630 windowing).
+// extent — the walker never touches all N rows (pre-rebrand tracker #630 windowing).
 func TestBuildTree_VirtualizedGridWindow(t *testing.T) {
 	test.NewTempApp(t)
 	g := newVirtualGrid()
@@ -523,7 +523,7 @@ func TestBuildTree_VirtualizedGridWindow(t *testing.T) {
 }
 
 // identifiedWidget is a realized accessible widget that advertises a stable
-// data identity (core.AccessibleIdentified, #635) — the shape a virtualized
+// data identity (core.AccessibleIdentified, pre-rebrand tracker #635) — the shape a virtualized
 // grid's recycled cell host uses so its element tracks the record.
 type identifiedWidget struct {
 	widget.BaseWidget
@@ -563,7 +563,7 @@ func TestBuildTree_RealizedIdentity(t *testing.T) {
 }
 
 // A shown CompletionPopup exposes its suggestion rows as RoleListItem virtual
-// nodes, and its active descendant matches the selected row's NodeID (#801).
+// nodes, and its active descendant matches the selected row's NodeID (pre-rebrand tracker #801).
 func TestBuildTree_CompletionPopupRows(t *testing.T) {
 	test.NewTempApp(t)
 	w := test.NewTempWindow(t, canvas.NewRectangle(nil))

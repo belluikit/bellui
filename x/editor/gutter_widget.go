@@ -22,7 +22,7 @@ type gutterWidget struct {
 	stride    float32 // row-to-row Y distance, from Entry.RowMetrics()
 
 	// getLineCount returns the document's live logical-line count (the fork's
-	// O(1) Entry.LineCount, #149) — replaces counting a pushed text copy,
+	// O(1) Entry.LineCount, pre-rebrand tracker #149) — replaces counting a pushed text copy,
 	// which was an O(document) scan per repaint and went stale between
 	// DeferTextSync sync points.
 	getLineCount func() int
@@ -255,7 +255,7 @@ func (r *gutterWidgetRenderer) Refresh() {
 		next = y + rh
 		// Skip folded-away rows: a hidden row collapses to zero height and shares
 		// the next visible row's Y, so drawing its line number here stacks the
-		// hidden numbers into a smudge at the fold point (#116 follow-up).
+		// hidden numbers into a smudge at the fold point (pre-rebrand tracker #116 follow-up).
 		if rh <= 0 {
 			continue
 		}

@@ -1,5 +1,5 @@
 // Command singleinstance is the live-verify probe for single-instance mode with
-// argument forwarding (#509 / bellui.SingleInstanceApp).
+// argument forwarding (pre-rebrand tracker #509 / bellui.SingleInstanceApp).
 //
 //	go run ./hack/singleinstance            # first launch -> becomes primary, opens a window
 //	go run ./hack/singleinstance a.txt --x  # while the primary runs -> forwards [a.txt --x] and exits
@@ -8,7 +8,7 @@
 // to $TMPDIR/bellui-si-probe.log, proving that "open with MyApp <file>" reaches
 // the already-running instance instead of spawning a second one. This is the
 // desktop building block behind OS file-association / URL-scheme handling
-// (#510). Set BELLUI_SI_PROBE_QUIT=1 to make the primary quit after the first
+// (pre-rebrand tracker #510). Set BELLUI_SI_PROBE_QUIT=1 to make the primary quit after the first
 // forwarded launch (used by the automated two-process check).
 package main
 

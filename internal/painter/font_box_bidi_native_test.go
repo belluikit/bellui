@@ -21,7 +21,7 @@ import (
 // extent — and its insertion points are its own edges. Those edges are NOT the
 // neighbouring text carets: the text caret at the same logical offset hugs the
 // RTL word's logical end (its visual left), which is exactly why the caret
-// beside an inline atom must come from the box extent (#913).
+// beside an inline atom must come from the box extent (pre-rebrand tracker #913).
 func TestStyledLineLayoutBoxCaretXRTLWords(t *testing.T) {
 	lang.SetLocaleForTests(t, "en-US")
 
@@ -49,4 +49,4 @@ func TestStyledLineLayoutBoxCaretXRTLWords(t *testing.T) {
 // TestStyledLineLayoutSelectionSpansBoxes verifies caller-controlled box
 // inclusion: an atom-only selection (empty text range) fills exactly the box,
 // and a text selection with the box excluded leaves a gap where the legacy
-// owner-rune heuristic would have filled it (#913).
+// owner-rune heuristic would have filled it (pre-rebrand tracker #913).

@@ -18,7 +18,7 @@ import (
 	"github.com/belluikit/bellui/internal/async"
 )
 
-// Windows taskbar badge backend for bellui.BadgeApp (#706/#517). App.SetBadge on
+// Windows taskbar badge backend for bellui.BadgeApp (pre-rebrand tracker #706/#517). App.SetBadge on
 // Windows draws a count overlay on the app's taskbar button(s) via
 // ITaskbarList3::SetOverlayIcon — the platform's badge affordance. The count
 // glyph is rendered through bellui's own software renderer (so it uses the theme

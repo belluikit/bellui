@@ -20,7 +20,7 @@ import (
 // A background goroutine updating a widget through bellui.Do while the test
 // reads it through bellui.DoAndWait must be race-free: the test driver
 // serializes all Do callbacks under a mutex, establishing the same
-// happens-before edges the real drivers provide (issue #480).
+// happens-before edges the real drivers provide (pre-rebrand issue #480).
 func TestDriver_DoFromGoroutineSerialized(t *testing.T) {
 	NewTempApp(t)
 

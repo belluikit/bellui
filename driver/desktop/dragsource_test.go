@@ -21,7 +21,7 @@ func TestStartDrag_UnsupportedDriver(t *testing.T) {
 }
 
 // dragOutBox is a Draggable that also exposes its drag-out payload via the
-// pull-based DragOutProvider seam (#874), as the web backend (#857) consumes it.
+// pull-based DragOutProvider seam (pre-rebrand tracker #874), as the web backend (pre-rebrand tracker #857) consumes it.
 type dragOutBox struct {
 	data desktop.DragData
 	ok   bool
@@ -36,7 +36,7 @@ var (
 	_ desktop.DragOutProvider = (*dragOutBox)(nil)
 )
 
-// TestDragOutProvider_PullSeam documents the pull-based drag-out contract (#874):
+// TestDragOutProvider_PullSeam documents the pull-based drag-out contract (pre-rebrand tracker #874):
 // a backend that suppresses pointer events during a native drag (wasm) reads the
 // payload once at drag start via DragOutData instead of the push Dragged path,
 // and a false return declines so the in-app drag is kept.

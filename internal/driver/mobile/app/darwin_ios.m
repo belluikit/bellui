@@ -27,14 +27,14 @@ static CGFloat keyboardHeight;
 // drive the hidden text-input surface: BelluiTextInputView, a bare
 // UIView<UITextInput> that intercepts edits at source (insertText:/
 // deleteBackward:/setMarkedText:), the Flutter FlutterTextInputView model, and
-// owns its own tokenizer (#1113). It replaced the GoInputView UITextView proxy
-// (which reverse-engineered edits by diffing textViewDidChange:) at the #1119
-// cutover, after the #1118 on-device IME/CJK + VoiceOver gate passed.
+// owns its own tokenizer (pre-rebrand tracker #1113). It replaced the GoInputView UITextView proxy
+// (which reverse-engineered edits by diffing textViewDidChange:) at the pre-rebrand tracker #1119
+// cutover, after the pre-rebrand tracker #1118 on-device IME/CJK + VoiceOver gate passed.
 @protocol BelluiTextInputProxy <NSObject>
 // belluiSetDocument mirrors the focused editor's text + selection (rune offsets,
 // pushed from Go via setKeyboardState) so the IME composes against real content.
 - (void)belluiSetDocument:(NSString *)text selStart:(int)selStart selEnd:(int)selEnd;
-// belluiSetTextLayoutWire pushes bellui's #1107 visual-layout sidecar so the view
+// belluiSetTextLayoutWire pushes bellui's pre-rebrand tracker #1107 visual-layout sidecar so the view
 // answers VoiceOver's per-line/caret geometry from bellui's real layout.
 - (void)belluiSetTextLayoutWire:(const char *)wire originX:(double)originX originY:(double)originY scale:(double)scale;
 @end
@@ -42,7 +42,7 @@ static CGFloat keyboardHeight;
 @class BelluiTextInputView;
 
 // BelluiTextPosition/BelluiTextRange are the bare BelluiTextInputView's own
-// UITextPosition/UITextRange (#1117), backed by a UTF-16 code-unit index into
+// UITextPosition/UITextRange (pre-rebrand tracker #1117), backed by a UTF-16 code-unit index into
 // the document. A UITextView owns these types internally; a bare UITextInput
 // must supply them.
 @interface BelluiTextPosition : UITextPosition
@@ -55,38 +55,38 @@ static CGFloat keyboardHeight;
 + (instancetype)rangeWithNSRange:(NSRange)range;
 @end
 
-// BelluiTextInputView is the bare UIView<UITextInput> text-input surface (#1117,
-// default since the #1119 cutover), the Flutter FlutterTextInputView model. It
+// BelluiTextInputView is the bare UIView<UITextInput> text-input surface (pre-rebrand tracker #1117,
+// default since the pre-rebrand tracker #1119 cutover), the Flutter FlutterTextInputView model. It
 // owns an authoritative UTF-16 document mirror (text + selection + marked range)
 // that it mutates optimistically the instant UIKit calls insertText:/
 // deleteBackward:/setMarkedText:/replaceRange: — so UIKit reads back consistent
 // state — and forwards each edit to the focused bellui editor at source via the
 // keyboardTyped/keyboardReplace/keyboardComposing/keyboardComposeCommit/
 // keyboardSetSelection up-calls. belluiSetDocument resynchronises the mirror from
-// Go; the #1107 sidecar and the #570 VoiceOver focus handshake ride on it.
+// Go; the pre-rebrand tracker #1107 sidecar and the pre-rebrand tracker #570 VoiceOver focus handshake ride on it.
 @interface BelluiTextInputView : UIView<UITextInput, UITextInputTraits, BelluiTextInputProxy> {
     NSMutableString *_text;   // UTF-16 document mirror
     NSRange _selectedRange;   // caret/selection, UTF-16 units
     NSRange _markedRange;     // IME preedit, {NSNotFound,0} when none
     // Dedicated undo manager holding only PROXY actions mirroring bellui's
-    // undo/redo availability (#1134, the Flutter FlutterUndoManagerPlugin
+    // undo/redo availability (pre-rebrand tracker #1134, the Flutter FlutterUndoManagerPlugin
     // model): bellui owns the history; the manager exists so the iPad keyboard's
     // undo/redo bar keys and the system undo gestures light up and route back
     // to bellui (keyboardUndoRedo). Lazily created by the undoManager override.
     NSUndoManager *_belluiUndoManager;
     UITextInputStringTokenizer *_tokenizer;
     // a11yActive is YES only while this view stands in as the VoiceOver editing
-    // element (the a11y bridge's swap, #1124). The view lives in the window from
+    // element (the a11y bridge's swap, pre-rebrand tracker #1124). The view lives in the window from
     // startup with a zero frame; claiming accessibility while parked would leave
     // a stray zero-frame text-input element in every bellui window — an invalid
     // focus target (VoiceOver refuses zero-frame elements) sitting beside the
-    // real element tree (#951).
+    // real element tree (pre-rebrand tracker #951).
 @public
     BOOL a11yActive;
     // syncingFromGo is YES while belluiSetDocument: applies a Go-pushed state, so
     // the selection setter does not echo it back with keyboardSetSelection.
     BOOL syncingFromGo;
-    // Native-selection confirmation tracking (#1124) — the Flutter guarantee
+    // Native-selection confirmation tracking (pre-rebrand tracker #1124) — the Flutter guarantee
     // (native _selectedTextRange is authoritative, never clobbered by a stale
     // framework push) adapted to bellui's ASYNC editor bridge. When a native caret
     // move (setSelectedTextRange:, e.g. VoiceOver line/word/char navigation) sets
@@ -102,13 +102,13 @@ static CGFloat keyboardHeight;
     NSRange _awaitingSel;
     BOOL _awaitingConfirm;
     int _awaitingPushes;
-    // Visual-layout sidecar (#1107).
+    // Visual-layout sidecar (pre-rebrand tracker #1107).
     CGRect *belluiLayoutRects;
     int belluiLayoutBase;
     int belluiLayoutCount;
-    // Visual line boundaries from the sidecar L: section (#995), driving the
+    // Visual line boundaries from the sidecar L: section (pre-rebrand tracker #995), driving the
     // BelluiTokenizer's Line granularity so VoiceOver navigates bellui's real
-    // visual lines (#1113). belluiLineBounds[k] is the UTF-16 start of visual
+    // visual lines (pre-rebrand tracker #1113). belluiLineBounds[k] is the UTF-16 start of visual
     // line k; line k spans [belluiLineBounds[k], belluiLineBounds[k+1]).
     int *belluiLineBounds;
     int belluiLineCount;
@@ -124,14 +124,14 @@ static CGFloat keyboardHeight;
 @property(nonatomic) UIKeyboardAppearance keyboardAppearance;
 // belluiLineRangeForOffset returns the visual-line range (UTF-16) enclosing an
 // offset, from the sidecar's real bellui lines (falling back to logical '\n'
-// lines); the BelluiTokenizer's Line granularity is built on it (#1113).
+// lines); the BelluiTokenizer's Line granularity is built on it (pre-rebrand tracker #1113).
 - (NSRange)belluiLineRangeForOffset:(NSUInteger)off;
 // belluiSetUndoState mirrors bellui's undo/redo availability into the proxy
-// NSUndoManager (#1134); called from setKeyboardUndoState on the main queue.
+// NSUndoManager (pre-rebrand tracker #1134); called from setKeyboardUndoState on the main queue.
 - (void)belluiSetUndoState:(BOOL)canUndo canRedo:(BOOL)canRedo;
 @end
 
-// BelluiTokenizer is the BelluiTextInputView's Line-granularity tokenizer (#1113),
+// BelluiTokenizer is the BelluiTextInputView's Line-granularity tokenizer (pre-rebrand tracker #1113),
 // the counterpart of Flutter's FlutterTokenizer: the stock
 // UITextInputStringTokenizer mishandles UITextGranularityLine (VoiceOver's
 // line-swipe reject-beeps), so this subclass answers Line queries from bellui's
@@ -143,7 +143,7 @@ static CGFloat keyboardHeight;
 
 // Armed by the accessibility bridge just before it moves VoiceOver focus
 // onto the input proxy; consumed by accessibilityElementDidBecomeFocused
-// (#570). Main thread only.
+// (pre-rebrand tracker #570). Main thread only.
 static BOOL belluiKeyboardRaisePending = NO;
 
 void belluiKeyboardExpectRaise(void) {
@@ -251,7 +251,7 @@ void belluiKeyboardExpectRaise(void) {
 }
 
 // forwardOpenURL hands an "open with" URL to Go. For a file:// URL handed over by
-// another app it does the security-scoped-resource dance (fyne#622): access the
+// another app it does the security-scoped-resource dance (pre-rebrand tracker #622): access the
 // original, copy it into our own sandbox (NSTemporaryDirectory) under a
 // coordinated read, release access, and forward the readable copy's URL — so the
 // app can read it regardless of open-in-place vs the default copy-to-Inbox mode,
@@ -291,7 +291,7 @@ static void forwardOpenURL(NSURL *url) {
 }
 
 // application:openURL: delivers an "open with" launch or deep-link — a custom
-// URL scheme (myapp://…) or a file:// URL handed over by another app (fyne#622).
+// URL scheme (myapp://…) or a file:// URL handed over by another app (pre-rebrand tracker #622).
 // The URL is forwarded to Go via onOpenIntent, which buffers it until the app
 // registers a handler; also fires on cold launch (after didFinishLaunching).
 - (BOOL)application:(UIApplication *)application
@@ -305,7 +305,7 @@ static void forwardOpenURL(NSURL *url) {
 }
 
 // application:continueUserActivity: delivers a Universal Link (a web URL routed
-// to the app via an associated domain), forwarded the same way (fyne#622).
+// to the app via an associated domain), forwarded the same way (pre-rebrand tracker #622).
 - (BOOL)application:(UIApplication *)application
 continueUserActivity:(NSUserActivity *)userActivity
   restorationHandler:(void (^)(NSArray<id<UIUserActivityRestoring>> *restorableObjects))restorationHandler {
@@ -345,10 +345,10 @@ continueUserActivity:(NSUserActivity *)userActivity
 - (void)viewDidLoad {
 	[super viewDidLoad];
 	self.context = [[EAGLContext alloc] initWithAPI:kEAGLRenderingAPIOpenGLES2];
-	// The bare-UIView UITextInput proxy (#1117): no UITextView delegate/editable/
+	// The bare-UIView UITextInput proxy (pre-rebrand tracker #1117): no UITextView delegate/editable/
 	// scroll knobs — it owns its document model directly. A non-No autocorrection
 	// type is required for the IME suggestion / CJK candidate bar to appear over
-	// the hidden proxy (#771); it is suppressed entirely when set to No.
+	// the hidden proxy (pre-rebrand tracker #771); it is suppressed entirely when set to No.
 	BelluiTextInputView *bare = [[BelluiTextInputView alloc] initWithFrame:CGRectMake(0, 0, 0, 0)];
 	bare.autocapitalizationType = UITextAutocapitalizationTypeNone;
 	bare.autocorrectionType = UITextAutocorrectionTypeDefault;
@@ -357,7 +357,7 @@ continueUserActivity:(NSUserActivity *)userActivity
 	// carries the CAMetalLayer (metalLayerForKeyWindow adds it as a sublayer of
 	// rootViewController.view.layer). Flutter's separate inputHider model: as a
 	// GLKView subview, the bare view's keyboard presentation stalled the render
-	// surface — the #1124 real-tap freeze.
+	// surface — the pre-rebrand tracker #1124 real-tap freeze.
 	UIWindow *win = ((GoAppAppDelegate *)[UIApplication sharedApplication].delegate).window;
 	[win addSubview:self.inputView];
 	self.glview = (GLKView*)self.view;
@@ -389,7 +389,7 @@ continueUserActivity:(NSUserActivity *)userActivity
     // during UIKit tracking/modal runloop modes (native text selection menu,
     // keyboard, scrolling). Under the default mode the link stops in those modes,
     // which under WebGPU wedges the paint goroutine on the publish handshake when a
-    // bare UIView<UITextInput> first responder raises native UI (#1124/#1125).
+    // bare UIView<UITextInput> first responder raises native UI (pre-rebrand tracker #1124/#1125).
     [displayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSRunLoopCommonModes];
 }
 
@@ -408,12 +408,12 @@ continueUserActivity:(NSUserActivity *)userActivity
     [self.glview display];
 #else
     // Under -tags webgpu the GLKView/GLES draw is skipped (it is the broken path
-    // on the iOS Simulator, #195); the bellui mobile driver's own paint ticker
+    // on the iOS Simulator, pre-rebrand tracker #195); the bellui mobile driver's own paint ticker
     // drives the WebGPU painter, which renders into the CAMetalLayer. But the GL
     // worker + Publish handshake (app.Publish's vestigial gl.Flush) still needs
     // servicing every frame, and drawInRect (below) — which used to do it — stops
     // firing when a bare UIView<UITextInput> first responder raises native UI,
-    // deadlocking the renderer (#1124/#1125). This CADisplayLink keeps firing
+    // deadlocking the renderer (pre-rebrand tracker #1124/#1125). This CADisplayLink keeps firing
     // regardless, so service the handshake here, non-blocking.
     drawtick();
 #endif
@@ -421,7 +421,7 @@ continueUserActivity:(NSUserActivity *)userActivity
 
 - (void)glkView:(GLKView *)view drawInRect:(CGRect)rect {
     // GLES-fallback path only; under WebGPU render: drives drawtick() instead
-    // (drawInRect is unreliable there, #1125), so do not double-drive the worker.
+    // (drawInRect is unreliable there, pre-rebrand tracker #1125), so do not double-drive the worker.
 #ifndef BELLUI_WEBGPU
     drawloop();
 #endif
@@ -484,7 +484,7 @@ static void sendTouches(int change, NSSet* touches) {
 
 // belluiRuneOffset returns the number of Unicode code points (Go runes) in the
 // first utf16idx UTF-16 code units of s — converting an iOS UITextInput offset
-// into the rune-offset space core.AccessibleTexter uses (#771). A surrogate
+// into the rune-offset space core.AccessibleTexter uses (pre-rebrand tracker #771). A surrogate
 // pair (one code point, two UTF-16 units) counts once.
 static int belluiRuneOffset(NSString *s, NSInteger utf16idx) {
     if (s == nil || utf16idx <= 0) {
@@ -510,7 +510,7 @@ static int belluiRuneOffset(NSString *s, NSInteger utf16idx) {
 
 // belluiUTF16Offset is the inverse of belluiRuneOffset: the UTF-16 code-unit offset
 // of the runeIdx-th code point in s. Used to map a rune-offset selection pushed
-// from Go back onto an iOS UITextPosition (#771).
+// from Go back onto an iOS UITextPosition (pre-rebrand tracker #771).
 static NSInteger belluiUTF16Offset(NSString *s, int runeIdx) {
     if (s == nil || runeIdx <= 0) {
         return 0;
@@ -564,7 +564,7 @@ static NSUInteger belluiCommonSuffix(NSString *a, NSString *b, NSUInteger maxLen
 }
 
 // BelluiTextSelectionRect carries one sidecar-derived rectangle to VoiceOver via
-// selectionRectsForRange: (#1107) — the method VoiceOver actually uses to draw
+// selectionRectsForRange: (pre-rebrand tracker #1107) — the method VoiceOver actually uses to draw
 // the editing/line cursor ring (device-confirmed; it does not call
 // firstRectForRange: for this). UITextSelectionRect is abstract, so a concrete
 // subclass overriding the geometry getters is required.
@@ -587,7 +587,7 @@ static NSUInteger belluiCommonSuffix(NSString *a, NSString *b, NSUInteger maxLen
 - (BOOL)isVertical { return NO; }
 @end
 
-// belluiParseLayoutWire parses bellui's visual-layout sidecar (#1107) into an array
+// belluiParseLayoutWire parses bellui's visual-layout sidecar (pre-rebrand tracker #1107) into an array
 // of point-space per-UTF-16-character rectangles for the BelluiTextInputView
 // geometry overrides. wire is the L:/C: encoding from
 // mobileA11yTextLayout; only the C: section (per-UTF-16 rects, native pixels,
@@ -646,9 +646,9 @@ static void belluiParseLayoutWire(const char *wire, double originX, double origi
     *outCount = n;
 }
 
-// belluiParseLineWire parses the sidecar's L: section (#995) — a comma-separated
+// belluiParseLineWire parses the sidecar's L: section (pre-rebrand tracker #995) — a comma-separated
 // list of UTF-16 boundary offsets where visual line k spans [b_k, b_{k+1}) —
-// into an int array, for the BelluiTokenizer line model (#1113). Outputs cleared
+// into an int array, for the BelluiTokenizer line model (pre-rebrand tracker #1113). Outputs cleared
 // when there is no L: section or fewer than two boundaries (no line). The caller
 // owns *outBounds (free it before calling / in dealloc).
 static void belluiParseLineWire(const char *wire, int **outBounds, int *outCount) {
@@ -772,7 +772,7 @@ static CGRect belluiCaretRectFromArray(CGRect *rects, int base, int count, NSInt
 }
 
 // A view-based UITextInput is its own text-input view — the backing view whose
-// coordinate space the UITextInput geometry is expressed in (#1124).
+// coordinate space the UITextInput geometry is expressed in (pre-rebrand tracker #1124).
 - (UIView *)textInputView {
     return self;
 }
@@ -838,19 +838,19 @@ static CGRect belluiCaretRectFromArray(CGRect *rects, int base, int count, NSInt
     um.groupsByEvent = groupsByEvent;
 }
 
-// This view IS the VoiceOver-focused editing element (#1124): in every working
+// This view IS the VoiceOver-focused editing element (pre-rebrand tracker #1124): in every working
 // VoiceOver text field the focused accessibility element and the first responder
 // are the SAME object — that is what makes VoiceOver drive the insertion point on
 // it (a detached forwarding element engages reading/cut but never caret
 // navigation; device-verified). A plain UIView is not an accessibility element by
 // default, so opt in (a UITextView already is) — but ONLY while actually standing
 // in for an edited entry: parked (zero-frame, no editing), the view must stay
-// invisible to VoiceOver instead of floating as a stray text-input element (#951).
+// invisible to VoiceOver instead of floating as a stray text-input element (pre-rebrand tracker #951).
 - (BOOL)isAccessibilityElement {
     return a11yActive;
 }
 
-// #570 keyboard-raise handshake: when VoiceOver moves focus onto this element the
+// pre-rebrand tracker #570 keyboard-raise handshake: when VoiceOver moves focus onto this element the
 // bridge arms belluiKeyboardRaisePending; re-claim first responder so iOS raises the
 // software keyboard (it only does so when VO focus sits on the real first responder).
 - (void)accessibilityElementDidBecomeFocused {
@@ -874,7 +874,7 @@ static CGRect belluiCaretRectFromArray(CGRect *rects, int base, int count, NSInt
 // an invisible off-screen IME sink. It must NOT present the native selection UI
 // / edit menu (the Cut/Copy/Paste callout), which is a duplicate of bellui's own
 // menu and, for a bare UITextInput first responder with a selection, pops up
-// over the entry (#1126). Suppress every edit action (classic UIMenuController
+// over the entry (pre-rebrand tracker #1126). Suppress every edit action (classic UIMenuController
 // path) and the modern edit menu (iOS 16+).
 - (BOOL)canPerformAction:(SEL)action withSender:(id)sender {
     return NO;
@@ -915,11 +915,11 @@ static CGRect belluiCaretRectFromArray(CGRect *rects, int base, int count, NSInt
 }
 
 // insertText: is the source interception point for plain typing and IME
-// candidate commits (#1117) — no textViewDidChange: diff. Apply to the mirror
+// candidate commits (pre-rebrand tracker #1117) — no textViewDidChange: diff. Apply to the mirror
 // optimistically, then forward at source:
 //   - committing an active preedit -> keyboardComposeCommit;
 //   - a caret insert -> keyboardTyped (per-rune, so NumericEntry's filter runs);
-//   - typing over a selection -> keyboardReplace (#748).
+//   - typing over a selection -> keyboardReplace (pre-rebrand tracker #748).
 - (void)insertText:(NSString *)text {
     if (text == nil) {
         text = @"";
@@ -1024,14 +1024,14 @@ static CGRect belluiCaretRectFromArray(CGRect *rects, int base, int count, NSInt
         // OUTSIDE it is an external caret placement — with VoiceOver on, a tap
         // arrives here (VoiceOver drives the native view), never through bellui's
         // touch pipeline — and silently dropping it strands the composition
-        // (#1118). Finalize DETERMINISTICALLY ourselves: commit the marked text
+        // (pre-rebrand tracker #1118). Finalize DETERMINISTICALLY ourselves: commit the marked text
         // as typed (an as-typed commit leaves _text unchanged, so the target
         // offsets stay valid), move bellui's caret to the target, then tell the
         // keyboard its composition is gone (textDidChange resets it; a late
         // keyboard unmarkText no-ops on the cleared marked range). Merely
         // *notifying* and letting the keyboard finalize is IME-dependent:
         // Apple's Pinyin commits and then restores ITS OWN caret after the
-        // committed text, yanking the user's placement back (#1118 device
+        // committed text, yanking the user's placement back (pre-rebrand tracker #1118 device
         // finding — typed letters landed at the old position).
         BOOL inside = _selectedRange.location >= _markedRange.location &&
             NSMaxRange(_selectedRange) <= NSMaxRange(_markedRange);
@@ -1048,7 +1048,7 @@ static CGRect belluiCaretRectFromArray(CGRect *rects, int base, int count, NSInt
     }
     // A genuine native caret move (not a Go echo): hold this range authoritatively
     // until bellui echoes it back, so a lagging per-repaint push cannot clobber it
-    // (#1124). See the _awaitingSel ivar comment.
+    // (pre-rebrand tracker #1124). See the _awaitingSel ivar comment.
     _awaitingSel = _selectedRange;
     _awaitingConfirm = YES;
     _awaitingPushes = 0;
@@ -1065,10 +1065,10 @@ static CGRect belluiCaretRectFromArray(CGRect *rects, int base, int count, NSInt
     return [BelluiTextRange rangeWithNSRange:_markedRange];
 }
 
-// setMarkedText:selectedRange: shows the IME preedit inline (#1117). Splice the
+// setMarkedText:selectedRange: shows the IME preedit inline (pre-rebrand tracker #1117). Splice the
 // marked text into the mirror over the previous marked region (or the
 // selection), and report it as composition — display-only in bellui until commit
-// (#747). selectedRange is relative to the
+// (pre-rebrand tracker #747). selectedRange is relative to the
 // marked text; its end is the caret within the preedit.
 - (void)setMarkedText:(NSString *)markedText selectedRange:(NSRange)selectedRange {
     if (markedText == nil) {
@@ -1092,7 +1092,7 @@ static CGRect belluiCaretRectFromArray(CGRect *rects, int base, int count, NSInt
     }
     NSString *committed = [_text substringWithRange:_markedRange];
     // Keep a selection already moved OUTSIDE the marked region (the external
-    // caret placement that triggered this finalize, #1118) — an as-typed commit
+    // caret placement that triggered this finalize, pre-rebrand tracker #1118) — an as-typed commit
     // leaves the text unchanged, so its offsets stay valid, and bellui preserves
     // the same caret across its commit. The normal in-composition case keeps
     // the caret-after-committed convention.
@@ -1135,10 +1135,10 @@ static CGRect belluiCaretRectFromArray(CGRect *rects, int base, int count, NSInt
                                   offset:(NSInteger)offset {
     NSInteger idx = (NSInteger)((BelluiTextPosition *)position).index;
     // Vertical (Up/Down) movement is line navigation — VoiceOver's line-swipe
-    // drives the insertion point through this (#1124). Move `offset` visual lines
+    // drives the insertion point through this (pre-rebrand tracker #1124). Move `offset` visual lines
     // in the direction, keeping the column (clamped to the target line), and return
     // nil only at the document edge. Returning a DIFFERENT position each step (nil
-    // only at the limit) is what avoids the #1126 spin — that loop only ran forever
+    // only at the limit) is what avoids the pre-rebrand tracker #1126 spin — that loop only ran forever
     // because the old code returned the *same* input position; a real adjacent-line
     // position both navigates AND terminates the walk.
     if (direction == UITextLayoutDirectionUp || direction == UITextLayoutDirectionDown) {
@@ -1212,7 +1212,7 @@ static CGRect belluiCaretRectFromArray(CGRect *rects, int base, int count, NSInt
 - (id<UITextInputTokenizer>)tokenizer {
     if (_tokenizer == nil) {
         // The BelluiTokenizer answers Line granularity from bellui's visual lines
-        // (#1113); all other granularities defer to UITextInputStringTokenizer.
+        // (pre-rebrand tracker #1113); all other granularities defer to UITextInputStringTokenizer.
         _tokenizer = [[BelluiTokenizer alloc] initWithTextInput:self];
     }
     return _tokenizer;
@@ -1223,7 +1223,7 @@ static CGRect belluiCaretRectFromArray(CGRect *rects, int base, int count, NSInt
     if (off > len) {
         off = len;
     }
-    // Sidecar visual lines (matches the #1107 ring, handles soft-wrap): line k
+    // Sidecar visual lines (matches the pre-rebrand tracker #1107 ring, handles soft-wrap): line k
     // spans [b_k, b_{k+1}). A caret at an interior boundary belongs to the line
     // it starts; at the final boundary it belongs to the last line.
     if (belluiLineCount >= 2) {
@@ -1334,7 +1334,7 @@ static CGRect belluiCaretRectFromArray(CGRect *rects, int base, int count, NSInt
 }
 
 // selectionRectsForRange: is what VoiceOver queries to draw the editing/line
-// ring (#1107). One sidecar-derived rectangle per visual line the range covers.
+// ring (pre-rebrand tracker #1107). One sidecar-derived rectangle per visual line the range covers.
 - (NSArray<UITextSelectionRect *> *)selectionRectsForRange:(UITextRange *)range {
     NSMutableArray<UITextSelectionRect *> *out = [NSMutableArray array];
     if (belluiLayoutCount == 0) {
@@ -1408,12 +1408,12 @@ static CGRect belluiCaretRectFromArray(CGRect *rects, int base, int count, NSInt
 
 #pragma mark Go bridge (BelluiTextInputProxy)
 
-// belluiSetDocument resynchronises the mirror from Go (#771), pushed each repaint
+// belluiSetDocument resynchronises the mirror from Go (pre-rebrand tracker #771), pushed each repaint
 // by syncKeyboardState. It updates the ivars *without* notifying the input
 // delegate: on a first-responder view, textDidChange:/selectionDidChange: make
 // UIKit re-evaluate the keyboard/accessory, which changes the viewport, which
 // dirties the canvas, which drives the next repaint's syncKeyboardState back
-// into here — a self-sustaining relayout storm (#1126). UITextInput reads the
+// into here — a self-sustaining relayout storm (pre-rebrand tracker #1126). UITextInput reads the
 // fresh ivars on demand, so no proactive notification is needed. While composing
 // the IME owns the field (matching Android) and the push is dropped — except the
 // external-caret-move finalize below.
@@ -1421,19 +1421,19 @@ static CGRect belluiCaretRectFromArray(CGRect *rects, int base, int count, NSInt
     if (_markedRange.location != NSNotFound) {
         // While composing the IME owns the mirror, so the push is not applied —
         // BUT it still carries one signal worth reading: bellui pushes committed-only
-        // text (the seam subtracts the preedit, #1057) with the selection collapsed
+        // text (the seam subtracts the preedit, pre-rebrand tracker #1057) with the selection collapsed
         // to the composition anchor, so a pushed caret that differs from the anchor
         // means the user moved the caret externally mid-composition (a tap in the
         // entry, with VoiceOver off — the touch went through bellui's pipeline).
         // Silently ignoring that desynchronises the keyboard — it keeps composing
         // at the old spot while bellui's caret is elsewhere, leaving the preedit
-        // stranded (#1118 CJK gate). Finalize deterministically ourselves, the
+        // stranded (pre-rebrand tracker #1118 CJK gate). Finalize deterministically ourselves, the
         // same self-serve as setSelectedTextRange:'s external-move branch: commit
         // the marked text as typed (bellui's ComposeCommit preserves the externally
         // placed caret), update the local selection into post-commit space, and
         // tell the keyboard its composition is gone. One-shot by construction —
         // the cleared marked range ends this branch — so the per-repaint push
-        // loop cannot storm the delegate (#1126).
+        // loop cannot storm the delegate (pre-rebrand tracker #1126).
         NSString *cwant = text != nil ? text : @"";
         NSUInteger cus = (NSUInteger)belluiUTF16Offset(cwant, selStart);
         NSUInteger cue = (NSUInteger)belluiUTF16Offset(cwant, selEnd);
@@ -1464,7 +1464,7 @@ static CGRect belluiCaretRectFromArray(CGRect *rects, int base, int count, NSInt
     }
     NSRange newSel = NSMakeRange(us, ue >= us ? ue - us : 0);
 
-    // Confirmation gate (#1124): while awaiting bellui's echo of a native caret move,
+    // Confirmation gate (pre-rebrand tracker #1124): while awaiting bellui's echo of a native caret move,
     // accept the selection only once it matches the awaited range (bellui caught up)
     // — then clear the wait and resume normal sync. A differing selection is a
     // stale push from before bellui applied the move; reject it (hold _selectedRange)
@@ -1662,9 +1662,9 @@ void showKeyboard(int keyboardType) {
 
         // Give the proxy a non-zero frame while it is first responder. iOS
         // suppresses the IME suggestion / CJK candidate bar for a zero-size input
-        // view, so the empty default frame (kept as the #570 VO "not overlaid"
-        // sentinel) must be widened here (#771) — Flutter's tiny 1x1 frame
-        // suffices (#1118 device-verified: the candidate bar appears). Under
+        // view, so the empty default frame (kept as the pre-rebrand tracker #570 VO "not overlaid"
+        // sentinel) must be widened here (pre-rebrand tracker #771) — Flutter's tiny 1x1 frame
+        // suffices (pre-rebrand tracker #1118 device-verified: the candidate bar appears). Under
         // VoiceOver the accessibility bridge overlays the view on the entry
         // instead; hideKeyboard restores the empty frame.
         if (CGRectIsEmpty(view.frame)) {
@@ -1683,7 +1683,7 @@ void hideKeyboard() {
     dispatch_async(dispatch_get_main_queue(), ^{
         belluiKeyboardRaisePending = NO;
         [view resignFirstResponder];
-        // Restore the empty frame (the #570 VoiceOver "not overlaid" sentinel).
+        // Restore the empty frame (the pre-rebrand tracker #570 VoiceOver "not overlaid" sentinel).
         // Under VoiceOver the accessibility bridge owns the frame and clears it
         // itself; guard so we do not fight an active overlay.
         if (!UIAccessibilityIsVoiceOverRunning()) {
@@ -1693,7 +1693,7 @@ void hideKeyboard() {
 }
 
 // setKeyboardState mirrors the focused editor's real text + selection (rune
-// offsets) from Go into the input view's document (#771 state mirror), so the
+// offsets) from Go into the input view's document (pre-rebrand tracker #771 state mirror), so the
 // IME composes against real content and the field's selection round-trips. It
 // hops to the main thread and is a no-op while the field is composing (handled
 // in belluiSetDocument).
@@ -1708,7 +1708,7 @@ void setKeyboardState(char *text, int selStart, int selEnd) {
 }
 
 // setKeyboardUndoState mirrors bellui's undo/redo availability into the input
-// view's proxy NSUndoManager (#1134), lighting up the iPad keyboard's undo/redo
+// view's proxy NSUndoManager (pre-rebrand tracker #1134), lighting up the iPad keyboard's undo/redo
 // bar keys and the system undo gestures. Pushed from Go on change only, beside
 // the per-repaint keyboard-state sync.
 void setKeyboardUndoState(int canUndo, int canRedo) {
@@ -1726,7 +1726,7 @@ void setKeyboardUndoState(int canUndo, int canRedo) {
 // accessibility bridge (accessibility_ios.m): under VoiceOver the bridge
 // substitutes this real UITextView for the focused entry's synthetic
 // element, because iOS only raises the software keyboard when VoiceOver
-// focus sits on the actual first responder (#570).
+// focus sits on the actual first responder (pre-rebrand tracker #570).
 UIView *belluiKeyboardInputView(void) {
     GoAppAppDelegate *appDelegate = (GoAppAppDelegate *)[[UIApplication sharedApplication] delegate];
     return appDelegate.controller.inputView;
@@ -1747,7 +1747,7 @@ UIWindow *belluiAppWindow(void) {
 }
 
 // belluiTextEditingA11yElement returns the accessibility element that stands in for
-// the focused entry while VoiceOver edits it (#1124): the input view itself, which
+// the focused entry while VoiceOver edits it (pre-rebrand tracker #1124): the input view itself, which
 // is BOTH the first responder and the VoiceOver-focused element — the same-object
 // model every native text field uses, and what makes VoiceOver drive the
 // insertion point (a detached forwarding element engages reading/cut but never
@@ -1758,7 +1758,7 @@ id belluiTextEditingA11yElement(void) {
 }
 
 // belluiPrepareSwapSurrogateFrame overlays the input view on the edited entry
-// (#1124): while it stands in for the entry's synthetic element it needs a real
+// (pre-rebrand tracker #1124): while it stands in for the entry's synthetic element it needs a real
 // on-screen frame (UIKit deems a zero-frame view invisible and VoiceOver refuses
 // to focus it) and a clear caret tint so it stays visually silent.
 void belluiPrepareSwapSurrogateFrame(CGRect entryFrameInView) {
@@ -1776,7 +1776,7 @@ void belluiPrepareSwapSurrogateFrame(CGRect entryFrameInView) {
 
 // belluiParkSwapSurrogate is the counterpart of belluiPrepareSwapSurrogateFrame:
 // editing ended, so the input view returns to its parked state — zero frame
-// and invisible to VoiceOver (#951; before this, isAccessibilityElement was
+// and invisible to VoiceOver (pre-rebrand tracker #951; before this, isAccessibilityElement was
 // unconditionally YES, leaving a stray zero-frame accessible text-input
 // element in every bellui window from launch).
 void belluiParkSwapSurrogate(void) {
@@ -1793,7 +1793,7 @@ void belluiParkSwapSurrogate(void) {
 
 // belluiInputViewSetTextLayout pushes bellui's visual-layout sidecar into the input
 // proxy so it answers VoiceOver's per-line/caret geometry from bellui's real
-// layout (#1107). Called from the accessibility bridge, already on the main
+// layout (pre-rebrand tracker #1107). Called from the accessibility bridge, already on the main
 // thread (inside its main-queue block), so it forwards synchronously.
 void belluiInputViewSetTextLayout(const char *wire, double originX, double originY, double scale) {
     GoAppAppDelegate *appDelegate = (GoAppAppDelegate *)[[UIApplication sharedApplication] delegate];

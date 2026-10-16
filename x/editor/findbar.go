@@ -28,11 +28,11 @@ type findBar struct {
 	caseSwitch *widget.Switch
 	matchLabel *widget.Label
 
-	// matches holds the current match set as a data/model source (fyne#539);
+	// matches holds the current match set as a data/model source (pre-rebrand tracker #539);
 	// selection tracks the active match by identity (matchPos value) rather than
 	// by row index, so re-running the search — a re-typed query, a case toggle,
 	// or FindNext with a stale set — keeps the highlight on the same match
-	// instead of snapping back to the first (#165).
+	// instead of snapping back to the first (pre-rebrand tracker #165).
 	matches   *model.SliceModel[matchPos]
 	selection *model.SelectionModel[matchPos, matchPos]
 

@@ -33,7 +33,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends clang lld libegl1-mesa-dev libgles2-mesa-dev libx11-dev libwayland-dev libxkbcommon-dev xorg-dev
 
-      # WebGPU is the default mobile backend (Phase 5, #204); GLES is the fallback
+      # WebGPU is the default mobile backend (Phase 5, pre-rebrand tracker #204); GLES is the fallback
       # behind -tags gl. This comprehensive leg exercises the GLES fallback path.
       - name: Tests (GLES fallback)
         run: ./.github/scripts/xvfb-run-safe go test -race -tags gl,mobile,ci,migrated_belluido ./...
@@ -51,7 +51,7 @@ jobs:
           go vet -tags gl,mobile,partialrepaint ./internal/driver/mobile/ ./internal/driver/common/
           ./.github/scripts/xvfb-run-safe go test -tags gl,partialrepaint,ci,migrated_belluido ./internal/driver/common/
 
-      # Mobile accessibility backends (#488): the shared flatten layer and its
+      # Mobile accessibility backends (pre-rebrand tracker #488): the shared flatten layer and its
       # tests compile in the host slice under -tags accessibility, mirroring
       # the desktop legs in platform_tests. The android/ios cgo bridges need a
       # device toolchain (NDK / Xcode) and are cross-compile-verified locally.
@@ -64,7 +64,7 @@ jobs:
 
       # WebGPU mobile backend (default): wgpu-native via Vulkan (Android) / Metal
       # (iOS). Builds the whole tree: now that internal/painter/gl carries the GL
-      # build constraint (#251), ./... no longer compiles the unused GL gomobile
+      # build constraint (pre-rebrand tracker #251), ./... no longer compiles the unused GL gomobile
       # painter under -tags mobile, so the full module is clean on the webgpu
       # default. Clean CGO env for the wgpu-native link; the host (linux) slice
       # uses the stub surface descriptor.

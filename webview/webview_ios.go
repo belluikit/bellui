@@ -108,7 +108,7 @@ func belluiWebViewNavigate(token C.uint64_t, url *C.char, kind C.int, mainFrame,
 // [driver.UnknownContext] from RunNative, so there is no native handle to take
 // from it. The window is reached through the driver's own belluiAppWindow
 // accessor instead — and there is exactly one, since mobile shows a single
-// window at a time (#499).
+// window at a time (pre-rebrand tracker #499).
 func (w *WebView) attachRaw(win bellui.Window) error {
 	// The bridge is part of the configuration, so this is the one moment it
 	// can be installed — and an empty script means WebKit is handed no script

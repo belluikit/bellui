@@ -53,7 +53,7 @@ type CompletionItem struct {
 	// Documentation is optional longer help for the item — e.g. a language
 	// server's documentation string. When any item in the popup carries
 	// documentation, a scrollable panel is shown beside the list and follows
-	// the selection; it replaces the small Detail tooltip while visible (#435).
+	// the selection; it replaces the small Detail tooltip while visible (pre-rebrand tracker #435).
 	//
 	// Since: 1.0
 	Documentation string
@@ -90,7 +90,7 @@ type CompletionPopup struct {
 	// MaxVisibleRows caps how many suggestion rows are visible at once; a
 	// longer list scrolls behind that window (Up/Down keep the selection in
 	// view, the mouse wheel moves the window, and a thin indicator shows the
-	// position). Zero applies the default of 8 rows (#436).
+	// position). Zero applies the default of 8 rows (pre-rebrand tracker #436).
 	//
 	// Since: 1.0
 	MaxVisibleRows int
@@ -102,13 +102,13 @@ type CompletionPopup struct {
 	// popup were not open. The popup then receives no key events itself; the
 	// host offers them via [CompletionPopup.HandleKey] (arrows, Enter, Tab,
 	// Escape → consumed) and accepts the selection through OnSelected as
-	// usual. The overlay is also tap-through on desktop (#472): a click
+	// usual. The overlay is also tap-through on desktop (pre-rebrand tracker #472): a click
 	// outside the popup dismisses it and is re-delivered to the widget
 	// beneath, so the same click places the caret in the editor host.
 	// Intended for editor hosts whose caret, focus-loss logic, window
-	// shortcuts and key routing must survive the popup being open (#442);
+	// shortcuts and key routing must survive the popup being open (pre-rebrand tracker #442);
 	// plain [Entry.ShowCompletion] hosts keep the default forwarding model
-	// (#361).
+	// (pre-rebrand tracker #361).
 	//
 	// Since: 1.0
 	KeepHostFocus bool
@@ -120,7 +120,7 @@ type CompletionPopup struct {
 	// on-screen clamping), a live [CompletionPopup.SetItems] resize, or any
 	// explicit move. When the popup hides it is called once with the zero
 	// rectangle. Hosts use it to anchor a companion surface — e.g. a signature
-	// help card — next to wherever the popup actually landed (#437).
+	// help card — next to wherever the popup actually landed (pre-rebrand tracker #437).
 	//
 	// Since: 1.0
 	OnMoved func(geo.Rectangle) `json:"-"`
@@ -136,7 +136,7 @@ type CompletionPopup struct {
 	top         int
 	scrollAccum float32
 
-	// docScroll/docRich are the documentation side panel (#435), created with
+	// docScroll/docRich are the documentation side panel (pre-rebrand tracker #435), created with
 	// the renderer and shown only while some item carries Documentation.
 	docScroll *intWidget.Scroll
 	docRich   *RichText
@@ -144,16 +144,16 @@ type CompletionPopup struct {
 	// lastRect is the placement last reported through OnMoved, so unchanged
 	// placements do not re-notify. shown gates the reports to the span between
 	// Show and Hide — a fresh BaseWidget claims Visible() before its first
-	// Show, which would leak ShowAtCaret's pre-placement Resize (#437).
+	// Show, which would leak ShowAtCaret's pre-placement Resize (pre-rebrand tracker #437).
 	lastRect geo.Rectangle
 	shown    bool
 
 	// host, when set, is the Entry that owns this popup. The popup is the focused
 	// overlay while open and forwards typing/editing keys back to the host so the
-	// text keeps editing and the list filters live (#361).
+	// text keeps editing and the list filters live (pre-rebrand tracker #361).
 	host *Entry
 
-	// Delayed detail tooltip for the active row's info icon (#362).
+	// Delayed detail tooltip for the active row's info icon (pre-rebrand tracker #362).
 	detailMu    sync.Mutex
 	detailTimer *time.Timer
 	detailPopup *PopUp
@@ -223,7 +223,7 @@ type completionRowID struct {
 // (scrollSelectionIntoView), so the active descendant is always present. The
 // selected row carries [core.StateSelected]; each node's ID is a
 // [completionRowID] so the backend can track it and resolve the active
-// descendant (#801).
+// descendant (pre-rebrand tracker #801).
 func (p *CompletionPopup) AccessibleVirtualNodes() []core.AccessibleVirtualNode {
 	if len(p.items) == 0 {
 		return nil
@@ -257,7 +257,7 @@ func (p *CompletionPopup) AccessibleVirtualNodes() []core.AccessibleVirtualNode 
 
 // AccessibleActiveDescendant returns the identity of the keyboard-selected row,
 // so assistive technology follows and announces each candidate as the user
-// arrows through the list rather than re-announcing the whole popup (#688). It
+// arrows through the list rather than re-announcing the whole popup (pre-rebrand tracker #688). It
 // reports nil when the selection is scrolled outside the emitted window (a
 // wheel scroll that left the cursor behind), since a designated descendant must
 // be a node in the reconciled tree.
@@ -350,7 +350,7 @@ func (p *CompletionPopup) Show() {
 	// In KeepHostFocus mode the overlay is focus-transparent: the canvas
 	// keeps routing keys, runes and shortcuts to the focused host as if the
 	// popup were not there, and the host offers keys via HandleKey. It is
-	// also tap-through (#472): the outside click that dismisses the popup is
+	// also tap-through (pre-rebrand tracker #472): the outside click that dismisses the popup is
 	// re-delivered to the widget beneath, so an editor host dismisses and
 	// places the caret in one click.
 	p.overlay.FocusTransparent = p.KeepHostFocus
@@ -625,7 +625,7 @@ func (p *CompletionPopup) trigger(i int) {
 	}
 }
 
-// --- detail tooltip (#362) ---
+// --- detail tooltip (pre-rebrand tracker #362) ---
 //
 // When the active row carries a Detail string, its info icon reveals that text
 // in a small inverted tooltip after a short delay, on both hover and keyboard
@@ -637,7 +637,7 @@ func (p *CompletionPopup) refreshDetail() {
 	row := p.selected
 	hasDetail := row >= 0 && row < len(p.items) && p.items[row].Detail != ""
 	if p.hasDocs() {
-		hasDetail = false // the documentation panel subsumes the tooltip (#435)
+		hasDetail = false // the documentation panel subsumes the tooltip (pre-rebrand tracker #435)
 	}
 
 	p.detailMu.Lock()
@@ -788,7 +788,7 @@ type popupMetrics struct {
 	titleH     float32 // 0 when no title
 	dividerH   float32 // 0 when no title
 	contentTop float32 // y of the first row, relative to the widget
-	docW       float32 // documentation panel width, 0 when no panel (#435)
+	docW       float32 // documentation panel width, 0 when no panel (pre-rebrand tracker #435)
 }
 
 // listArea returns the x origin and width of the suggestion-list portion of a
@@ -883,7 +883,7 @@ type completionPopupRenderer struct {
 	divider *canvas.Rectangle
 	rows    []completionRow
 
-	// Documentation side panel (#435): a vertical rule and, on the popup
+	// Documentation side panel (pre-rebrand tracker #435): a vertical rule and, on the popup
 	// itself, a RichText in a scroll. docFor tracks which item's documentation
 	// is currently rendered so selection moves re-fill it only when needed.
 	docDivider *canvas.Rectangle

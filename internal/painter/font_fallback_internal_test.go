@@ -54,9 +54,9 @@ func TestFontFallback_CoversUnknownRune(t *testing.T) {
 	assert.True(t, ok, "ResolveFace returns a covering face for the CJK rune")
 }
 
-// TestMeasure_CJKFallbackGrowsLineBox locks in the #130 follow-up fix: the line
+// TestMeasure_CJKFallbackGrowsLineBox locks in the pre-rebrand tracker #130 follow-up fix: the line
 // box measured for text is sized from every run's face, not just the primary
-// Latin one. A taller fallback face (the bundled CJK font, #314) must grow the
+// Latin one. A taller fallback face (the bundled CJK font, pre-rebrand tracker #314) must grow the
 // line height and baseline so its glyphs are not clipped at the bottom of an
 // Entry. Latin-only text, which shapes in the same face as the measured space,
 // is unaffected.

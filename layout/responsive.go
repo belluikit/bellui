@@ -102,7 +102,7 @@ func Responsive(object core.CanvasObject, ratios ...float32) core.CanvasObject {
 // bellui.Container in a custom wrapper type, which the exact-type switches in the
 // object-tree walker and the test markup renderer do not match — wrapped
 // children were never walked (not painted, not hit-tested) and markup tests
-// panicked (#767).
+// panicked (pre-rebrand tracker #767).
 type responsiveStack struct {
 	stackLayout // the wrapped object fills the wrapper
 

@@ -31,7 +31,7 @@ import (
 var _ bellui.SharerApp = (*belluiApp)(nil)
 
 // ShareText hands text to the Android share sheet (ACTION_SEND chooser),
-// implementing bellui.SharerApp (fyne#711).
+// implementing bellui.SharerApp (pre-rebrand tracker #711).
 func (a *belluiApp) ShareText(text string) error {
 	textStr := C.CString(text)
 	defer C.free(unsafe.Pointer(textStr))
@@ -44,7 +44,7 @@ func (a *belluiApp) ShareText(text string) error {
 }
 
 // ShareFile hands a file to the Android share sheet (ACTION_SEND chooser),
-// implementing bellui.SharerApp (fyne#711). The file's bytes are copied into the
+// implementing bellui.SharerApp (pre-rebrand tracker #711). The file's bytes are copied into the
 // app-private share directory (cacheDir/belluishare) so BelluiFileProvider can vend
 // them as a content:// URI with temporary read access; the source URI may be a
 // local file:// or a content:// document.
@@ -123,7 +123,7 @@ func (a *belluiApp) SendNotification(n *bellui.Notification) {
 	})
 }
 
-// SendNotificationWithOptions posts a rich notification (fyne#516/#723): body-tap
+// SendNotificationWithOptions posts a rich notification (pre-rebrand tracker #516/#723): body-tap
 // and action-button callbacks are delivered via PendingIntents that route back
 // through GoNativeActivity.onNewIntent -> notificationActivated -> the session
 // registry (fireNotifyTapped/fireNotifyAction). A notification without callbacks

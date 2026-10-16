@@ -23,14 +23,14 @@ import (
 	"github.com/belluikit/bellui"
 )
 
-// This is the Windows rich-notification backend for #516 Phase 2 (#722). It
+// This is the Windows rich-notification backend for pre-rebrand tracker #516 Phase 2 (pre-rebrand tracker #722). It
 // replaces the PowerShell toast sender (which has no channel back into the
 // process) with WinRT ToastNotification calls plus a COM toast activator
 // (INotificationActivationCallback), so a body click and action buttons route
 // their callbacks back to the running app via the shared notify registry
 // (app/notification.go) — mirroring the Linux D-Bus and macOS UNUserNotification
 // backends. It is driven purely through x/sys/windows COM/WinRT syscalls with no
-// cgo, matching the #514 native-file-dialog precedent.
+// cgo, matching the pre-rebrand tracker #514 native-file-dialog precedent.
 //
 // Activation requires, per the Windows desktop (unpackaged) toast contract:
 //   - an AppUserModelID (AUMID) set on the process,

@@ -15,12 +15,12 @@ import (
 	"github.com/belluikit/glfw"
 )
 
-// Clipboard flavors on Linux (#513 phase 2) ride on the forked GLFW's
+// Clipboard flavors on Linux (pre-rebrand tracker #513 phase 2) ride on the forked GLFW's
 // generic MIME clipboard API (glfwSetClipboardData & co.), which owns the
 // X11 selection / Wayland data source for both text and data flavors. The
 // GLFW platform layer dispatches to X11 or Wayland at runtime.
 
-// Declare conformity with the optional clipboard flavor interfaces (#513).
+// Declare conformity with the optional clipboard flavor interfaces (pre-rebrand tracker #513).
 var (
 	_ bellui.ImageClipboard       = clipboard{}
 	_ bellui.FileClipboard        = clipboard{}
@@ -123,7 +123,7 @@ func fileFlavors(paths []string) []glfw.ClipboardFlavor {
 }
 
 // SetFlavors replaces the clipboard content with every set flavor of content
-// in one transaction (#583). The forked GLFW's MIME clipboard API is already
+// in one transaction (pre-rebrand tracker #583). The forked GLFW's MIME clipboard API is already
 // transaction-native, so the struct maps 1:1 onto one SetClipboardData call.
 func (c clipboard) SetFlavors(content bellui.ClipboardContent) {
 	var flavors []glfw.ClipboardFlavor

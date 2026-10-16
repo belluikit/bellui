@@ -26,7 +26,7 @@ import (
 
 // screenshotRegion is the window area to capture, in physical pixels on the
 // screen — the same rectangle on every platform, resolved from the window
-// position (#497) and the canvas scale.
+// position (pre-rebrand tracker #497) and the canvas scale.
 type screenshotRegion struct {
 	x, y, w, h int
 }

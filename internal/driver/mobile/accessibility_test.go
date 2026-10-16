@@ -336,7 +336,7 @@ func TestMobileA11yGather_ClipsOverscanRowBoundsToViewport(t *testing.T) {
 	// No emitted row extends past the scroll viewport: an overscan row realized
 	// just past the fold has its focus bounds clipped to the visible area, so the
 	// screen reader and the in-scene ring never land under the system nav bar
-	// (#808). The interactive area is the full canvas in the test harness, so the
+	// (pre-rebrand tracker #808). The interactive area is the full canvas in the test harness, so the
 	// viewport bottom is the canvas height.
 	viewportBottom := scale.ToScreenCoordinate(w.canvas, 100)
 	for _, n := range nodes {
@@ -345,7 +345,7 @@ func TestMobileA11yGather_ClipsOverscanRowBoundsToViewport(t *testing.T) {
 	}
 }
 
-// The editable-text wire fields (#974 option D): a text-input node backed by
+// The editable-text wire fields (pre-rebrand tracker #974 option D): a text-input node backed by
 // core.AccessibleTexter publishes its live document and rune selection, and
 // the TextEditable flag gates the mutating protocol.
 func TestMobileA11yGather_EditableTextDocument(t *testing.T) {
@@ -406,7 +406,7 @@ func TestMobileA11yGather_PasswordDocumentIsMask(t *testing.T) {
 }
 
 // The text-edit dispatch lands on the editor's own gated paths via the
-// internal/textinput primitives, exactly like the desktop backends (#974).
+// internal/textinput primitives, exactly like the desktop backends (pre-rebrand tracker #974).
 func TestMobileA11yTextDispatch_EditsThroughSeam(t *testing.T) {
 	w := newA11yTestWindow(t)
 
@@ -437,7 +437,7 @@ func TestMobileA11yTextDispatch_EditsThroughSeam(t *testing.T) {
 	mobileA11yTextDispatchOnMain(99999, mobileA11yTextActSetText, 0, 0, "x")
 }
 
-// Undo/redo travel as custom actions (#1025): declared once history exists,
+// Undo/redo travel as custom actions (pre-rebrand tracker #1025): declared once history exists,
 // carried on the wire node as stable (registry id, label) pairs, and
 // dispatched back through the custom kind block onto the widget's own
 // undo/redo paths.
@@ -483,7 +483,7 @@ func TestMobileA11yGather_CustomActionsUndoRedo(t *testing.T) {
 }
 
 // The iOS bridge's per-frame diff must see every wire-node field, including
-// the customActs slice that broke plain == comparability (#1036/#1027).
+// the customActs slice that broke plain == comparability (pre-rebrand tracker #1036/#1027).
 func TestMobileA11yNodesEqual(t *testing.T) {
 	base := mobileA11yNode{
 		handle: 7, role: mobileRoleTextField, flags: 3,
@@ -645,7 +645,7 @@ func (g *groupHeaderStub) PerformAccessibleAction(name string) {
 }
 
 // A labeled RoleTableRow — a grid group header — is a real reading stop with
-// expand/collapse offered through the custom-actions channel. Before the #951
+// expand/collapse offered through the custom-actions channel. Before the pre-rebrand tracker #951
 // re-verify fix the row fell through mobileA11yRole as a container, so group
 // headers were unreachable under TalkBack/VoiceOver.
 func TestMobileA11yGather_LabeledTableRowSurfaces(t *testing.T) {
@@ -679,7 +679,7 @@ func TestMobileA11yGather_LabeledTableRowSurfaces(t *testing.T) {
 // The tree walk emits a grid's regions block by block (pinned column subtree,
 // then main cells), but linear AT navigation needs reading order: sorted per
 // row band, cells by display column, a spanning header row alone in its band.
-// Non-grid nodes keep their positions (#951).
+// Non-grid nodes keep their positions (pre-rebrand tracker #951).
 func TestMobileA11ySortGridChildren_ReadingOrder(t *testing.T) {
 	cell := func(row, col, x, y int) mobileA11yNode {
 		return mobileA11yNode{gridHandle: 7, cellRow: row, cellCol: col, x: x, y: y, role: mobileRoleCell}

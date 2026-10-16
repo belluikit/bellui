@@ -71,7 +71,7 @@ func NewFilterChip(text string, changed func(bool)) *Chip {
 
 func (c *Chip) Tapped(e *event.PointEvent) {
 	// On an input chip a tap landing on the trailing delete (X) button fires
-	// OnDeleted rather than OnTapped; otherwise the X would be inert (#291).
+	// OnDeleted rather than OnTapped; otherwise the X would be inert (pre-rebrand tracker #291).
 	if c.Style == ChipStyleInput && c.OnDeleted != nil && e != nil && c.inDeleteRegion(e.Position.X) {
 		c.OnDeleted()
 		return

@@ -65,7 +65,7 @@ func (f *FocusManager) Focus(obj event.Focusable) bool {
 			// On mobile a disabled text *input* must not take focus (it would
 			// summon the soft keyboard), but a read-only selectable — which
 			// reports Disabled only to skip tab traversal — must, so touch
-			// selection can show its highlight and handles (#944). The
+			// selection can show its highlight and handles (pre-rebrand tracker #944). The
 			// distinction is Keyboardable: only keyboard-summoning widgets
 			// stay excluded.
 			if _, needsKeyboard := obj.(mobile.Keyboardable); needsKeyboard && bellui.CurrentDevice().IsMobile() {

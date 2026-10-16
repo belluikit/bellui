@@ -71,7 +71,7 @@ jobs:
       - name: Tests
         run: ${{ matrix.runner }} go test -race -tags "${{ matrix.tags }}" -covermode=atomic -coverprofile=coverage.out ./...
 
-      # Accessibility semantic layer (#484) + platform backends (#485): the
+      # Accessibility semantic layer (pre-rebrand tracker #484) + platform backends (pre-rebrand tracker #485): the
       # tree walker and the NSAccessibility bridge only compile under
       # -tags accessibility, so exercise them explicitly on both desktop
       # platforms to keep the tagged code from rotting. The test build pulls
@@ -82,9 +82,9 @@ jobs:
       - name: Accessibility tagged tests
         run: ${{ matrix.runner }} go test -race -tags "accessibility,${{ matrix.tags }}" ./internal/accessibility/... ./core/... ./internal/driver/glfw/
 
-      # iOS accessibility compile gate (#1037): the `accessibility && ios`
+      # iOS accessibility compile gate (pre-rebrand tracker #1037): the `accessibility && ios`
       # slice (accessibility_ios.{go,m,h} + the iOS halves of the mobile
-      # driver) needs the iPhone SDK, so only this leg can compile it — #1036
+      # driver) needs the iPhone SDK, so only this leg can compile it — pre-rebrand tracker #1036
       # landed silently because none did. Compile-only, non-main packages
       # (no link, no signing): the iOS app closure (`app` selects the mobile
       # driver under GOOS=ios) plus every package carrying ios-tagged files.
@@ -103,7 +103,7 @@ jobs:
         run: go test -race -tags gl,no_glfw,ci,wayland ./...
         if: ${{ runner.os == 'Linux' }}
 
-      # The default build now selects X11/Wayland at runtime (#542), so the
+      # The default build now selects X11/Wayland at runtime (pre-rebrand tracker #542), so the
       # forced single-backend `x11` build is the only path not exercised above.
       # Compile-smoke the driver package in both painter modes so the forced-x11
       # files (backend_webgpu_x11.go, window_x11.go) can't rot.
@@ -121,7 +121,7 @@ jobs:
         if: ${{ matrix.coverage && matrix.go-version == 'stable' }}
 
 
-  # WebGPU is the default backend (Phase 5, #204). This job builds the default
+  # WebGPU is the default backend (Phase 5, pre-rebrand tracker #204). This job builds the default
   # ./... and runs the WebGPU painter's headless readback tests: Vulkan through
   # Mesa's lavapipe software ICD on Linux, Metal on macOS. The wgpu-native libs
   # ship in the belluikit/webgpu module (no system install); the link requires
@@ -167,7 +167,7 @@ jobs:
       # Real-window surface configure → present → Canvas().Capture() coverage on
       # the default WebGPU backend (Metal on macOS, Vulkan/lavapipe on Linux).
       # Every other WebGPU GPU test is offscreen readback and never creates a
-      # surface or presents; this is the only standing net for that path (#329).
+      # surface or presents; this is the only standing net for that path (pre-rebrand tracker #329).
       # No ci/gl/no_glfw tags so it builds WebGPU on a real window; the test
       # self-skips if no window/adapter is available. ./.github/scripts/xvfb-run-safe
       # supplies the Linux display.
@@ -191,7 +191,7 @@ jobs:
         run: |
           # Resolve the package set, and refuse to proceed on a collapsed list:
           # an inline $(go list ...) that fails prints nothing to stdout, and a
-          # near-empty test run would otherwise read as green (#565).
+          # near-empty test run would otherwise read as green (pre-rebrand tracker #565).
           pkgs=$(go list -tags gl,ci,no_glfw,migrated_belluido ./... || true)
           n=$(printf '%s\n' "$pkgs" | grep -c . || true)
           echo "Resolved ${n} packages to test"
@@ -201,7 +201,7 @@ jobs:
           fi
           go test -race -tags gl,ci,no_glfw,migrated_belluido ${pkgs}
 
-      # Accessibility semantic layer (#484) + Windows UIA backend (#487):
+      # Accessibility semantic layer (pre-rebrand tracker #484) + Windows UIA backend (pre-rebrand tracker #487):
       # the walker and the UIA cgo bridge only compile under
       # -tags accessibility, so exercise them explicitly — mirroring the
       # linux/macOS legs — to keep the tagged code (and its mingw build)
@@ -230,7 +230,7 @@ jobs:
           CGO_CFLAGS: ""
         run: go test -count=1 ./internal/painter/webgpu/...
 
-      # Real-window present + Canvas().Capture() coverage on D3D12 (#329);
+      # Real-window present + Canvas().Capture() coverage on D3D12 (pre-rebrand tracker #329);
       # self-skips if no window/adapter.
       #
       # Needs a desktop session: in a session-0 service, D3D12's
@@ -300,7 +300,7 @@ jobs:
           # inits app too). Upstream gomobile code, works on amd64 — see #17.
           # app is listed since it grew its first test file (#272); the other
           # mobile subpackages have no tests, so no binary ever inits app there.
-          # Same collapsed-package-list guard as the x64 leg (#565).
+          # Same collapsed-package-list guard as the x64 leg (pre-rebrand tracker #565).
           pkgs=$(go list -tags gl,ci,no_glfw,migrated_belluido ./... | grep -vE '/internal/driver/mobile(/app)?$' || true)
           n=$(printf '%s\n' "$pkgs" | grep -c . || true)
           echo "Resolved ${n} packages to test"

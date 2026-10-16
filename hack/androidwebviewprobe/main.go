@@ -1,7 +1,7 @@
 // Command androidwebviewprobe is the on-device pass for the Android
 // android.webkit.WebView backend (#63, #76) and the #143 IME polish work:
 // hosting in the panel window, the runOnUiThread threading discipline under
-// churn (the #973 deadlock shape), geometry + native clip inside a
+// churn (the pre-rebrand tracker #973 deadlock shape), geometry + native clip inside a
 // container.Scroll, the #59 focus bridge, the bridge and navigation API,
 // teardown — and instrumented cold-tap / keystroke-latency measurement.
 //
@@ -153,7 +153,7 @@ func main() {
 	entry := widget.NewEntry()
 	entry.SetPlaceHolder("bellui Entry — tap when asked")
 
-	// The spinner is the stall detector (frozen == the #1124 stall) — and a
+	// The spinner is the stall detector (frozen == the pre-rebrand tracker #1124 stall) — and a
 	// full-canvas GL redraw per frame, which is exactly the probe cost the
 	// latency measurement must exclude (#143 item 2).
 	var top core.CanvasObject = widget.NewLabel("#143 webview pass [" + mode + "]")
@@ -372,7 +372,7 @@ func run(a bellui.App, w bellui.Window, host *webview.Host, view *webview.WebVie
 	step(7 * time.Second)
 	bellui.DoAndWait(func() { scroll.Offset = geo.NewPos(0, 0); scroll.Refresh() })
 
-	// --- threading churn: the #973 shape under load ---------------------------
+	// --- threading churn: the pre-rebrand tracker #973 shape under load ---------------------------
 	// Scroll offsets, focus flips and shadow reads hammered together: every
 	// down-call posts to the UI thread, every read is shadow state, and the
 	// navigation veto is the one DoAndWait — a deadlock here freezes the app

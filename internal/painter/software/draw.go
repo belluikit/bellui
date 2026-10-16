@@ -348,7 +348,7 @@ func drawPath(c core.Canvas, path *canvas.Path, pos geo.Position, base *image.NR
 	// Rasterize over the path's full control-point extent, not just its laid-out
 	// Size, so a zero-sized object drawing in canvas space (and any segments
 	// reaching above/left of the origin) still render; the composite rect and
-	// origin must match the raster from painter.DrawPath (see #1011, #1013).
+	// origin must match the raster from painter.DrawPath (see pre-rebrand tracker #1011, pre-rebrand tracker #1013).
 	origin, extent := painter.PathRasterBounds(path)
 	scaledWidth := scale.ToScreenCoordinate(c, extent.Width+pad*2)
 	scaledHeight := scale.ToScreenCoordinate(c, extent.Height+pad*2)

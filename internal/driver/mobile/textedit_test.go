@@ -10,7 +10,7 @@ import (
 	"github.com/belluikit/bellui/widget"
 )
 
-// A textedit.Event with Selection set is a pure selection change (#1030): it
+// A textedit.Event with Selection set is a pure selection change (pre-rebrand tracker #1030): it
 // moves the editor's selection through the text-input seam and leaves the
 // text untouched — the IME's own caret moves and Select All ride this.
 func TestHandleTextEdit_SelectionEvent(t *testing.T) {

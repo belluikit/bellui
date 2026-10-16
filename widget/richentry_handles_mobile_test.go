@@ -17,8 +17,8 @@ import (
 	"github.com/belluikit/bellui/test"
 )
 
-// Mobile touch text selection for RichEntry (#888, parity with Entry's #758
-// and the selectable's #944): a hold-fired long-press selects the word under
+// Mobile touch text selection for RichEntry (pre-rebrand tracker #888, parity with Entry's pre-rebrand tracker #758
+// and the selectable's pre-rebrand tracker #944): a hold-fired long-press selects the word under
 // the finger and summons the shared selection-handle overlay; dragging a
 // handle adjusts the selection with the drag magnifier over the target;
 // keyboard/programmatic selections summon no handles.

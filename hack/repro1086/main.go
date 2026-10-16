@@ -1,6 +1,6 @@
-// Command repro1086 drives the #1086 aligned-oversized-container scene on a real
+// Command repro1086 drives the pre-rebrand tracker #1086 aligned-oversized-container scene on a real
 // window (WebGPU/Metal by default) so the anchor point can be eyeballed against
-// the software golden (hack/repro1086 TestSoftwareGolden). With the #1086 fix the
+// the software golden (hack/repro1086 TestSoftwareGolden). With the pre-rebrand tracker #1086 fix the
 // scaled glyphs pivot on the text-box origin (they stay left, matching software);
 // a pre-fix draw.go shifts center/trailing glyphs right of the magenta guide.
 package main

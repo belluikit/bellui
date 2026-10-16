@@ -19,7 +19,7 @@ import (
 
 // blockSegment is a standalone block (Inline() == false) non-text RichTextSegment
 // with a controllable Textual() and visual size, standing in for an image/table on
-// its own row (issue #50).
+// its own row (pre-rebrand issue #50).
 type blockSegment struct {
 	text          string
 	width, height float32
@@ -73,7 +73,7 @@ func newBlockRichText(t *testing.T, before, after string) (*RichText, *blockSegm
 
 // TestSelectable_BlockSegment_CopyAndHighlight verifies that a selection fully
 // spanning a standalone block non-text segment copies its Textual() in logical
-// order and draws a full-row highlight for it (issue #50, LTR).
+// order and draws a full-row highlight for it (pre-rebrand issue #50, LTR).
 func TestSelectable_BlockSegment_CopyAndHighlight(t *testing.T) {
 	lang.SetLocaleForTests(t, "en-US")
 	test.NewTempApp(t)
@@ -90,7 +90,7 @@ func TestSelectable_BlockSegment_CopyAndHighlight(t *testing.T) {
 
 // TestSelectable_BlockSegment_LastRowIncluded verifies that a selection reaching
 // the block row as its last row now covers it — a block is atomic, so reaching its
-// row selects it (issue #53). Copy and highlight stay in sync.
+// row selects it (pre-rebrand issue #53). Copy and highlight stay in sync.
 func TestSelectable_BlockSegment_LastRowIncluded(t *testing.T) {
 	lang.SetLocaleForTests(t, "en-US")
 	test.NewTempApp(t)
@@ -106,7 +106,7 @@ func TestSelectable_BlockSegment_LastRowIncluded(t *testing.T) {
 }
 
 // TestSelectable_BlockSegment_SelectAllTrailing verifies select-all on content
-// ending with a block row copies and highlights the trailing block (issue #53).
+// ending with a block row copies and highlights the trailing block (pre-rebrand issue #53).
 func TestSelectable_BlockSegment_SelectAllTrailing(t *testing.T) {
 	lang.SetLocaleForTests(t, "en-US")
 	test.NewTempApp(t)
@@ -131,7 +131,7 @@ func TestSelectable_BlockSegment_SelectAllTrailing(t *testing.T) {
 
 // TestSelectable_BlockSegment_TripleTapSelects verifies a triple-tap
 // (selectCurrentRow) on a standalone block row selects and highlights it — the
-// zero-column range needs the synthetic trailing column (issue #56).
+// zero-column range needs the synthetic trailing column (pre-rebrand issue #56).
 func TestSelectable_BlockSegment_TripleTapSelects(t *testing.T) {
 	lang.SetLocaleForTests(t, "en-US")
 	test.NewTempApp(t)
@@ -148,7 +148,7 @@ func TestSelectable_BlockSegment_TripleTapSelects(t *testing.T) {
 }
 
 // TestSelectable_BlockSegment_DragSelects verifies a drag confined to a standalone
-// block row selects and highlights it (issue #56).
+// block row selects and highlights it (pre-rebrand issue #56).
 func TestSelectable_BlockSegment_DragSelects(t *testing.T) {
 	lang.SetLocaleForTests(t, "en-US")
 	test.NewTempApp(t)
@@ -168,7 +168,7 @@ func TestSelectable_BlockSegment_DragSelects(t *testing.T) {
 
 // TestSelectable_BlockSegment_SelectAllOnlyRow verifies select-all on a RichText
 // whose only row is a standalone block copies and highlights it — the single-row
-// case needs a synthetic trailing column to form a non-degenerate range (#53).
+// case needs a synthetic trailing column to form a non-degenerate range (pre-rebrand tracker #53).
 func TestSelectable_BlockSegment_SelectAllOnlyRow(t *testing.T) {
 	lang.SetLocaleForTests(t, "en-US")
 	test.NewTempApp(t)

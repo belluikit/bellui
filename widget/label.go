@@ -110,7 +110,7 @@ func (l *Label) AccessibleLabel() string { return l.Text }
 
 var _ core.AccessibleTexter = (*Label)(nil)
 
-// AccessibleText returns the label text for assistive technologies (#556):
+// AccessibleText returns the label text for assistive technologies (pre-rebrand tracker #556):
 // together with the selection offsets below it lets a screen reader read a
 // selectable label's content, selection and caret, not just its static value.
 func (l *Label) AccessibleText() string { return l.Text }

@@ -35,7 +35,7 @@ func (e *Entry) ShowCompletion(title string, items []CompletionItem) {
 		e.completion = NewCompletionPopup(c, items)
 		// The popup is the focused overlay while open, but it forwards typing
 		// and editing keys back to this Entry so the user keeps editing and the
-		// list filters live; navigation/accept keys it handles itself (#361).
+		// list filters live; navigation/accept keys it handles itself (pre-rebrand tracker #361).
 		e.completion.host = e
 	} else {
 		e.completion.SetItems(items)

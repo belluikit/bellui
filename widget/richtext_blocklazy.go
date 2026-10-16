@@ -9,11 +9,11 @@ import (
 	"github.com/belluikit/bellui/theme"
 )
 
-// This file implements the windowed multi-segment ("block-lazy") build (#317):
+// This file implements the windowed multi-segment ("block-lazy") build (pre-rebrand tracker #317):
 // the cold-build analogue of the single-segment lazy model (richtext_lazy.go).
 //
 // A virtualised multi-segment varHeight RichText already windows its rendering
-// (scroll is O(window), #158), but its cold build still shapes every row up front
+// (scroll is O(window), pre-rebrand tracker #158), but its cold build still shapes every row up front
 // in updateRowBounds to learn the wrap boundaries — ~58% MeasureText / HarfBuzz on
 // a 10k-segment document, all before the first frame. This model removes that floor
 // by shaping rows only when they are addressed.
@@ -30,7 +30,7 @@ import (
 // Block-level prefix sums (blockStartRow for the row axis, blockTopY for the Y axis)
 // give O(log blocks) row<->Y mapping; they are refined as blocks are measured,
 // converging the estimated scroll extent to exact — the same estimate-then-refine
-// trade #157/#158 already make.
+// trade pre-rebrand tracker #157/#158 already make.
 
 // richBlock is the cheap structural description of one logical block, built without
 // shaping. runeLen/newlines drive the row-count estimate; volatile marks a block
@@ -57,7 +57,7 @@ func (t *RichText) shapeBlock(segs []RichTextSegment, maxWidth, innerPadding flo
 		if _, ok := seg.(*TextSegment); !ok {
 			// A block (non-inline) segment fills the whole line width, so it cannot
 			// share a row with a trailing inline run not terminated by a newline
-			// (#207): close the open inline row first.
+			// (pre-rebrand tracker #207): close the open inline row first.
 			if !seg.Inline() && currentBound != nil {
 				currentBound = nil
 				wrapWidth = maxWidth

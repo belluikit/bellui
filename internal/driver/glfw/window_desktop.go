@@ -141,13 +141,13 @@ type window struct {
 	mouseDraggedOffset   geo.Position
 	mouseDragPos         geo.Position
 	mouseDragStarted     bool
-	dragGhost            *internalWidget.DragGhost // ghost overlay following the pointer during a drag (#819)
-	dndDrag              bool                      // the active drag opted into in-canvas DnD (#819)
+	dragGhost            *internalWidget.DragGhost // ghost overlay following the pointer during a drag (pre-rebrand tracker #819)
+	dndDrag              bool                      // the active drag opted into in-canvas DnD (pre-rebrand tracker #819)
 	dragPayload          any                       // source-declared payload carried to DragTargets
 	dragTarget           core.DragTarget           // current DragTarget under the pointer
 	mouseButton          desktop.MouseButton
 	mouseOver            event.Hoverable
-	tooltipObj           core.CanvasObject // current driver-level tooltip target under the pointer (#800)
+	tooltipObj           core.CanvasObject // current driver-level tooltip target under the pointer (pre-rebrand tracker #800)
 	mouseLastClick       core.CanvasObject
 	mousePressed         core.CanvasObject
 	mouseClickCount      int
@@ -157,7 +157,7 @@ type window struct {
 	// common.TouchHandler the mobile driver runs, fed from the glfw fork's
 	// touch callback (Windows WM_POINTER, Wayland wl_touch), so desktop touch
 	// gets mobile's gesture vocabulary: slop-cancelled taps, drag latching,
-	// double-tap, and hold-fire long-press (#758) — the #259 selection-mode
+	// double-tap, and hold-fire long-press (pre-rebrand tracker #758) — the #259 selection-mode
 	// entry. Both are built lazily on the first contact, so a nil touchActive
 	// means this window has never been touched. touchActive also tracks the
 	// ids currently down: a mid-sequence callback set/unset truncates
@@ -184,11 +184,11 @@ type window struct {
 	onCloseIntercepted func()
 	onMoved            func(x, y int)
 	onDropped          func(pos geo.Position, items []bellui.URI)
-	dragHoverTarget    bellui.DropHoverable // object currently receiving external drag-hover feedback (#708)
-	parent             bellui.Window        // owner window for a native child/owner relationship (#598)
-	modal              bool                 // native window-modality against parent (#498)
-	modalChildren      int                  // count of modal children blocking this window as a parent (#682)
-	modalBlockApplied  bool                 // whether this window currently contributes to its parent's modal block (#682)
+	dragHoverTarget    bellui.DropHoverable // object currently receiving external drag-hover feedback (pre-rebrand tracker #708)
+	parent             bellui.Window        // owner window for a native child/owner relationship (pre-rebrand tracker #598)
+	modal              bool                 // native window-modality against parent (pre-rebrand tracker #498)
+	modalChildren      int                  // count of modal children blocking this window as a parent (pre-rebrand tracker #682)
+	modalBlockApplied  bool                 // whether this window currently contributes to its parent's modal block (pre-rebrand tracker #682)
 
 	menuTogglePending       event.KeyName
 	menuDeactivationPending event.KeyName
@@ -197,14 +197,14 @@ type window struct {
 	// view so imeFocusChanged only toggles it on an actual change. Re-applying
 	// the mode resets the system input source to a Roman/US layout on macOS, so
 	// a redundant toggle (focus callbacks can repeat) kicks the user out of their
-	// CJK input method mid-typing (#352).
+	// CJK input method mid-typing (pre-rebrand tracker #352).
 	imeModeOn  bool
 	imeModeSet bool
 
 	// preeditActive reports whether the last preedit delivered by GLFW was
 	// non-empty. Some backends re-deliver an empty preedit repeatedly (the
 	// Wayland text-input done handler acknowledged every commit this way,
-	// #414), so empty→empty transitions are dropped instead of forwarding a
+	// pre-rebrand tracker #414), so empty→empty transitions are dropped instead of forwarding a
 	// redundant ComposeCancel to the focused widget every frame.
 	preeditActive bool
 
@@ -230,7 +230,7 @@ func (w *window) SetFullScreen(full bool) {
 	}
 }
 
-// assert desktop windows expose the native parent/owner relationship (#598)
+// assert desktop windows expose the native parent/owner relationship (pre-rebrand tracker #598)
 var _ desktop.ChildWindow = (*window)(nil)
 
 func (w *window) RequestAlwaysOnTop() {
@@ -343,7 +343,7 @@ func (w *window) parentWindow() *window {
 // blockParentModal ref-counts modal children on parent so a shared native
 // parent block (Windows EnableWindow, macOS key suppression) is applied on the
 // first modal child and lifted only when the last one clears — keeping the
-// parent blocked while any window-hosted modal over it is open (#682). It
+// parent blocked while any window-hosted modal over it is open (pre-rebrand tracker #682). It
 // reports whether this call is the 0<->1 transition that should toggle the
 // native block, and is idempotent per child via w.modalBlockApplied (so
 // repeated SetModal(true) or a stray unblock cannot mis-count). X11 and Wayland
@@ -465,7 +465,7 @@ func (w *window) processDropped(_ *glfw.Window, names []string) {
 	}
 }
 
-// processDragMotion is the GLFW drag-motion callback (belluikit/glfw #708). It
+// processDragMotion is the GLFW drag-motion callback (belluikit/glfw pre-rebrand tracker #708). It
 // routes external drag hover feedback to the deepest bellui.DropHoverable under the
 // pointer: DragEnter/DragOver as it moves within, DragLeave when it moves off the
 // object, leaves the window, or the drag ends. The final drop still arrives via
@@ -1125,7 +1125,7 @@ func (w *window) imeFocusChanged(obj event.Focusable) {
 	// Only toggle when the desired mode actually changes: re-applying it resets
 	// the system input source to US/Roman on macOS, and this callback can fire
 	// redundantly (focus is re-asserted on interactions), which would drop the
-	// user out of their CJK input method on every such event (#352).
+	// user out of their CJK input method on every such event (pre-rebrand tracker #352).
 	if w.imeModeSet && w.imeModeOn == composable {
 		return
 	}
@@ -1168,10 +1168,10 @@ func (w *window) updatePreeditCursorRect() {
 func (w *window) focused(viewport *glfw.Window, focused bool) {
 	if !focused {
 		// Discard any composition the OS input method is still holding. The
-		// focused widget cancels its inline preedit on focus-out (#354), but
+		// focused widget cancels its inline preedit on focus-out (pre-rebrand tracker #354), but
 		// without this the IME keeps its own marked text and commits it as
 		// char events when the window is refocused, resurrecting text the
-		// user saw cancelled (#413). Cocoa discards the marked text, Windows
+		// user saw cancelled (pre-rebrand tracker #413). Cocoa discards the marked text, Windows
 		// sends IMM CPS_CANCEL; a no-op when nothing is composing.
 		viewport.ResetPreeditText()
 	}
@@ -1268,7 +1268,7 @@ func (w *window) create() {
 	// (CW_USEDEFAULT), whose cascade pins to the work-area corner on an
 	// otherwise-empty desktop, while GLFW centers them on macOS. Center the
 	// app's first window when no position was requested, so first-run
-	// placement matches across platforms (#955); later windows (a visible
+	// placement matches across platforms (pre-rebrand tracker #955); later windows (a visible
 	// sibling exists) keep the OS cascade, which anchors near that centered
 	// window — the Windows counterpart of Cocoa's cascade. X11/Wayland are
 	// untouched: window managers own placement policy there.

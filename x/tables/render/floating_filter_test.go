@@ -39,7 +39,7 @@ func layoutFilterRow(fake *fakeFilterAccess) (*FloatingFilterRow, *floatingFilte
 }
 
 // The floating-filter row renders one entry per VISIBLE column (pinned + main +
-// right), not just the main columns (#63).
+// right), not just the main columns (pre-rebrand tracker #63).
 func TestFloatingFilter_EntryPerVisibleColumn(t *testing.T) {
 	row, _ := layoutFilterRow(&fakeFilterAccess{})
 	if len(row.entries) != 4 {
@@ -50,7 +50,7 @@ func TestFloatingFilter_EntryPerVisibleColumn(t *testing.T) {
 // The main-band entries live inside the clip container (so the driver clips
 // their painting AND their pointer events to the main region), while the pinned
 // entries are positioned directly on the row — this is what removes the
-// interactive sliver, not a visual-only occluder (#65).
+// interactive sliver, not a visual-only occluder (pre-rebrand tracker #65).
 func TestFloatingFilter_MainEntriesAreClipped(t *testing.T) {
 	_, r := layoutFilterRow(&fakeFilterAccess{})
 
@@ -84,7 +84,7 @@ func TestFloatingFilter_MainEntriesAreClipped(t *testing.T) {
 
 // The row shares the body's region layout: the main-band entries translate by
 // -offset.X under horizontal scroll while the pinned-left/right entries stay
-// fixed (#63).
+// fixed (pre-rebrand tracker #63).
 func TestFloatingFilter_MainScrollsPinnedFixed(t *testing.T) {
 	fake := &fakeFilterAccess{offsetX: 0}
 	row, r := layoutFilterRow(fake)
@@ -135,7 +135,7 @@ func TestFloatingFilter_MainScrollsPinnedFixed(t *testing.T) {
 
 // Each entry reports its ABSOLUTE display-column index to OnFloatingFilterChanged,
 // so the filter is applied to the column drawn above it even when pinned columns
-// reorder the display (#63). Previously the row passed a main-only index.
+// reorder the display (pre-rebrand tracker #63). Previously the row passed a main-only index.
 func TestFloatingFilter_ReportsAbsoluteColumn(t *testing.T) {
 	fake := &fakeFilterAccess{}
 	row, _ := layoutFilterRow(fake)

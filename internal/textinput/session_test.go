@@ -82,7 +82,7 @@ func (c *composingEditor) TypedKey(*event.KeyEvent) {}
 
 // preeditEditor mimics Entry's composition model on top of composingEditor: the
 // preedit is spliced into the accessible text at its anchor (so AccessibleText
-// mixes committed and composing runes, #1057) and reported via
+// mixes committed and composing runes, pre-rebrand tracker #1057) and reported via
 // AccessiblePreedit, with the caret inside the preedit.
 type preeditEditor struct {
 	composingEditor
@@ -179,7 +179,7 @@ func TestSession_BindForcesPushEvenWhenIdentical(t *testing.T) {
 
 // Re-binding the already-bound editor must not force a push: drivers re-Bind the
 // unchanged focus freely (the Android driver does so on every overlay change,
-// #1016), and a forced redundant push is churn against the native IME.
+// pre-rebrand tracker #1016), and a forced redundant push is churn against the native IME.
 func TestSession_RebindSameEditorDoesNotForcePush(t *testing.T) {
 	b := &recordingBackend{}
 	s := NewSession(b)
@@ -199,7 +199,7 @@ func TestSession_RebindSameEditorDoesNotForcePush(t *testing.T) {
 	assert.Len(t, b.states, 2)
 }
 
-// Bind reports editor-identity changes (#966): drivers use the signal to reset
+// Bind reports editor-identity changes (pre-rebrand tracker #966): drivers use the signal to reset
 // per-editor native IME session state (Android composing flag + echo filters,
 // and the unconditional restartInput on the seed push), so one IME session can
 // never span two fields.
@@ -299,7 +299,7 @@ func TestSession_ComposeNoOpWithoutComposable(t *testing.T) {
 	assert.Equal(t, "x", ed.AccessibleText())
 }
 
-// The pushed snapshot must carry committed text only (#1057): an editor that
+// The pushed snapshot must carry committed text only (pre-rebrand tracker #1057): an editor that
 // splices its IME preedit into the accessible text (Entry) reports the span via
 // AccessiblePreedit and the seam subtracts it, so the native IME buffer is
 // never reseeded with composing runes baked in.
@@ -348,7 +348,7 @@ func TestSession_SyncSubtractsPreeditRemapsSelection(t *testing.T) {
 }
 
 // A preedit report that does not match the document — the split-brain states
-// #1057 fix B targets — must not cut the wrong span: the push falls back to the
+// pre-rebrand tracker #1057 fix B targets — must not cut the wrong span: the push falls back to the
 // live text as-is.
 func TestSession_SyncPreeditMismatchPushesAsIs(t *testing.T) {
 	b := &recordingBackend{}
@@ -370,7 +370,7 @@ func TestSession_SyncPreeditMismatchPushesAsIs(t *testing.T) {
 
 // EditorComposing reports the bound editor's composition state, defaulting to
 // true whenever it cannot know — the Android driver drops an IME commit only
-// on a definitive "not composing" (#1057), and an unknown editor must never
+// on a definitive "not composing" (pre-rebrand tracker #1057), and an unknown editor must never
 // lose a commit.
 func TestSession_EditorComposing(t *testing.T) {
 	s := NewSession(&recordingBackend{})
@@ -405,7 +405,7 @@ func TestSession_OpsNoOpWhenUnbound(t *testing.T) {
 
 // The package-level primitives below are the seam's shared document-view read
 // and edit vocabulary — the same code the desktop accessibility text protocols
-// call directly (#772). Session's methods delegate to them, so these lock the
+// call directly (pre-rebrand tracker #772). Session's methods delegate to them, so these lock the
 // contract both callers rely on.
 
 func TestRead_CapturesDocumentView(t *testing.T) {
@@ -419,7 +419,7 @@ func TestRead_CapturesDocumentView(t *testing.T) {
 }
 
 // countingEditor wraps fakeEditor to count AccessibleText reads, proving
-// ReadSelection does not touch the document (#789).
+// ReadSelection does not touch the document (pre-rebrand tracker #789).
 type countingEditor struct {
 	fakeEditor
 	textReads int
@@ -489,7 +489,7 @@ func TestSession_InvalidateForcesPush(t *testing.T) {
 	assert.Len(t, b.states, 2)
 }
 
-// TestSession_SyncPushesOutOfBandEditorChange pins the #763 invariant: when the
+// TestSession_SyncPushesOutOfBandEditorChange pins the pre-rebrand tracker #763 invariant: when the
 // bound editor's text changes out of band — a programmatic SetText, a binding
 // write, undo/redo, autocomplete — with no intervening input op, the next Sync
 // (which the driver calls every dirty paint frame) reads the live editor and

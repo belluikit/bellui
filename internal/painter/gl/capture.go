@@ -36,7 +36,7 @@ func (p *painter) Capture(c core.Canvas) image.Image {
 }
 
 // CaptureBack reads the back buffer instead of the front one. The driver uses
-// it for canvas capture (#473): it paints a fresh frame and reads it before
+// it for canvas capture (pre-rebrand tracker #473): it paints a fresh frame and reads it before
 // any swap, so the readback deterministically contains that exact frame —
 // overlays and menus included — instead of racing the presentation pipeline.
 func (p *painter) CaptureBack(c core.Canvas) image.Image {

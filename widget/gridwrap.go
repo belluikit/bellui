@@ -174,7 +174,7 @@ func (l *GridWrap) RefreshItem(id GridWrapItemID) {
 
 // focusedItemObject returns the realized gridWrapItem for the currently focused
 // cell, or nil when it is not currently laid out. It lets keyboard activation
-// report the same item object the pointer path hit-tests (#834).
+// report the same item object the pointer path hit-tests (pre-rebrand tracker #834).
 func (l *GridWrap) focusedItemObject() core.CanvasObject {
 	if l.scroller == nil {
 		return nil
@@ -288,7 +288,7 @@ func (l *GridWrap) TypedKey(ev *event.KeyEvent) {
 	case event.KeySpace:
 		l.Select(l.currentFocus)
 		// Report the realized item object (RoleListItem) so keyboard activation
-		// matches the pointer path for autocapture (#834, #700).
+		// matches the pointer path for autocapture (pre-rebrand tracker #834, pre-rebrand tracker #700).
 		if item := l.focusedItemObject(); item != nil {
 			core.NotifyActivation(item, true)
 		}

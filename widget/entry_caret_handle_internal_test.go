@@ -13,7 +13,7 @@ import (
 	"github.com/belluikit/bellui/test"
 )
 
-// The caret drag-handle is touch-gated like the selection handles (#943): off
+// The caret drag-handle is touch-gated like the selection handles (pre-rebrand tracker #943): off
 // mobile a touch event summons no overlay, keeping desktop behavior and the
 // shared render masters unchanged.
 func TestEntry_CaretHandle_NotShownOffMobile(t *testing.T) {

@@ -169,7 +169,7 @@ func TestPerspectiveMatrix(t *testing.T) {
 }
 
 func TestPerspectiveMatrix_DepthTerms(t *testing.T) {
-	// m[10] and m[14] are the near/far depth terms behind the #29/#280 clip
+	// m[10] and m[14] are the near/far depth terms behind the pre-rebrand tracker #29/#280 clip
 	// fixes; assert their exact values rather than just sign/positivity.
 	near, far := float32(0.1), float32(100)
 	m := PerspectiveMatrix(45, 1.0, near, far)
@@ -625,7 +625,7 @@ func countOpaque(img *image.NRGBA) int {
 
 // A triangle straddling the near plane must render its visible portion rather
 // than being dropped wholesale (the GL hardware clips per-edge; the software
-// rasterizer now matches by clipping the geometry in clip space). See #29.
+// rasterizer now matches by clipping the geometry in clip space). See pre-rebrand tracker #29.
 func TestScene3D_Render_NearPlaneClip_StraddlingTriangleVisible(t *testing.T) {
 	s := NewScene3D()
 	// Camera at z=2 looking toward -z; near plane sits at world z = 1.9.
@@ -685,7 +685,7 @@ func TestScene3D_Render_NearPlaneClip_FullyBehindSkipped(t *testing.T) {
 
 // A triangle straddling the far plane must render its visible portion rather than
 // being dropped, and the part beyond the far plane must not appear at all (the GL
-// hardware clips per-edge; the software rasterizer now matches). See #280.
+// hardware clips per-edge; the software rasterizer now matches). See pre-rebrand tracker #280.
 func TestScene3D_Render_FarPlaneClip_StraddlingTriangleVisible(t *testing.T) {
 	s := NewScene3D()
 	// Camera at z=10 looking toward -z; far plane sits at world z = 10-far.

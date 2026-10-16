@@ -115,7 +115,7 @@ func TestDirectionScope_SetDirectionHonoredOnRelayout(t *testing.T) {
 
 	// SetDirection updates the field; the new direction is applied on the next
 	// real relayout (here forced by a size change). In-place live toggling
-	// without a relayout is the runtime direction-change refresh tracked by #65,
+	// without a relayout is the runtime direction-change refresh tracked by pre-rebrand tracker #65,
 	// the same limitation the global SetLayoutDirection has.
 	scope.SetDirection(bellui.DirectionRTL)
 	scope.Resize(scope.Size().Add(geo.NewSize(40, 0)))

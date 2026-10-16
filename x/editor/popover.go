@@ -80,7 +80,7 @@ func newPopover(content core.CanvasObject) *popover {
 	// A soft drop shadow gives the surface elevation so it reads as floating
 	// above the text. canvas.BoxShadow is GPU-blurred on the GL painter (and
 	// falls back to a solid translucent rect on software/test painters), so this
-	// is a true soft shadow rather than the earlier flat offset block. See #72.
+	// is a true soft shadow rather than the earlier flat offset block. See pre-rebrand tracker #72.
 	shadow := canvas.NewBoxShadow(theme.Color(theme.ColorNameShadow), popoverShadowBlur)
 	shadow.CornerRadius = bg.CornerRadius
 	shadow.OffsetY = popoverShadowOffsetY
@@ -96,7 +96,7 @@ func newPopover(content core.CanvasObject) *popover {
 	}
 }
 
-// Elevation shadow tuning (see #72): a soft Gaussian blur radius and a small
+// Elevation shadow tuning (see pre-rebrand tracker #72): a soft Gaussian blur radius and a small
 // downward offset, roughly matching a Material "popup"-level elevation.
 const (
 	popoverShadowBlur    = 10
@@ -119,7 +119,7 @@ func (p *popover) overlaps(q *popover) bool {
 
 // overlapsRect reports whether the popover intersects r, an editor-local
 // rectangle — used against the overlay completion popup's reported placement
-// (#143), which lives outside the float layer's popover set.
+// (pre-rebrand tracker #143), which lives outside the float layer's popover set.
 func (p *popover) overlapsRect(r geo.Rectangle) bool {
 	if r.IsZero() {
 		return false
@@ -212,7 +212,7 @@ func popoverPositionIn(anchor geo.Rectangle, size geo.Size, bounds, flip geo.Rec
 	// Vertical: sit on the preferred side, flipping to the other only when the
 	// popover does not fit on the preferred side and the opposite side has more
 	// room. Keeping the signature card above and completion below this way leaves
-	// the anchor line between them, so the two don't overlap (#79).
+	// the anchor line between them, so the two don't overlap (pre-rebrand tracker #79).
 	below := anchor.Pos.Y + anchor.Size.Height
 	roomBelow := flip.Pos.Y + flip.Size.Height - below
 	roomAbove := anchor.Pos.Y - flip.Pos.Y

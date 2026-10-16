@@ -8,13 +8,13 @@ import (
 )
 
 // benchmarkRichEntryType measures the per-keystroke cost of editing a large
-// multi-segment RichEntry document (#671, #896, #921) — the perf gate for the
+// multi-segment RichEntry document (pre-rebrand tracker #671, pre-rebrand tracker #896, pre-rebrand tracker #921) — the perf gate for the
 // layout-cost work. Removed so far: the O(cache × segments) visual-cache
-// eviction and redundant row-model rebuilds (#671); the provider's accidental
+// eviction and redundant row-model rebuilds (pre-rebrand tracker #671); the provider's accidental
 // internal Scroll, per-row re-measurement, the dead wrap-off trailing-width
-// measure, and the redundant double syncProvider per keystroke (#896); the
+// measure, and the redundant double syncProvider per keystroke (pre-rebrand tracker #896); the
 // O(document) row-bounds rebuild, object-list rebuild and full re-layout —
-// now edit-incremental (#921), leaving allocations flat regardless of
+// now edit-incremental (pre-rebrand tracker #921), leaving allocations flat regardless of
 // document size. The remaining size-dependent cost is allocation-free
 // position arithmetic in the document model (segment prefix walks, the
 // segment diff, the row-model scan).

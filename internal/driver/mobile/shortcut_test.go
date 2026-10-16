@@ -25,10 +25,10 @@ func (r *shortcutRecorder) TypedRune(rune)                {}
 func (r *shortcutRecorder) TypedKey(ev *event.KeyEvent)   { r.keys = append(r.keys, ev) }
 func (r *shortcutRecorder) TypedShortcut(s core.Shortcut) { r.shortcuts = append(r.shortcuts, s) }
 
-// Hardware-keyboard editing shortcuts forwarded from the Android IME (#1077)
+// Hardware-keyboard editing shortcuts forwarded from the Android IME (pre-rebrand tracker #1077)
 // reach the focused Shortcutable as the matching bellui.Shortcut, and a bare
 // Ctrl/Cmd combo does not also fire TypedKey. A Shift-mixed combo is not a
-// built-in shortcut and still reaches TypedKey (#1042).
+// built-in shortcut and still reaches TypedKey (pre-rebrand tracker #1042).
 func Test_mobileDriver_HardwareShortcut(t *testing.T) {
 	d := &driver{}
 	c := newCanvas(bellui.CurrentDevice()).(*canvas)

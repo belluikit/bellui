@@ -10,7 +10,7 @@ import (
 	"github.com/belluikit/bellui/geo"
 )
 
-// TestTransformedRectCoordsAnchored covers #960 in the GL painter: a textured
+// TestTransformedRectCoordsAnchored covers pre-rebrand tracker #960 in the GL painter: a textured
 // quad under a non-trivial world transform scales/rotates about the object's own
 // origin, not the canvas origin. The worldTransform the paint walk supplies
 // already contains Translate(pos), so applying it to the object's absolute

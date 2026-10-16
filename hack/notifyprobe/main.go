@@ -1,5 +1,5 @@
 // Command notifyprobe is a live-verify harness for rich system notifications
-// (#516, bellui.NotifierWithOptionsApp / SendNotificationWithOptions): click
+// (pre-rebrand tracker #516, bellui.NotifierWithOptionsApp / SendNotificationWithOptions): click
 // activation, an inline action button and a per-notification icon.
 //
 // Tapping "Send notification" posts a notification carrying a body-click

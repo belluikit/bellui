@@ -760,7 +760,7 @@ func (s *sliderRenderer) Layout(size geo.Size) {
 	s.track.Resize(trackSize)
 
 	// Pass the freshly-computed trackSize rather than re-reading s.track.Size(),
-	// which lags a layout behind while the slider is being resized (#293).
+	// which lags a layout behind while the slider is being resized (pre-rebrand tracker #293).
 	activeOffset := s.getOffset(trackSize, inlineIconSize, innerPadding)
 	switch s.slider.Orientation {
 	case Vertical:

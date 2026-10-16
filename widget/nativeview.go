@@ -506,7 +506,7 @@ func (h *NativeViewHost) unresolved() {
 	h.startSync()
 }
 
-// startSync arms the per-frame geometry ticker (the #417 prefill / #758
+// startSync arms the per-frame geometry ticker (the pre-rebrand tracker #417 prefill / pre-rebrand tracker #758
 // selection-handle pattern). A native view is not in the widget tree, so no
 // layout pass reaches it: only re-evaluating every frame keeps it glued to a
 // host that a parent scroll, window resize or animation is moving.

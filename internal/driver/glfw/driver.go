@@ -30,7 +30,7 @@ var curWindow *window
 
 // Declare conformity with Driver — including the desktop extensions on the
 // web target, so browser apps can assert desktop.Driver /
-// desktop.KeyModifierDriver for the window-wide modifier state (#460).
+// desktop.KeyModifierDriver for the window-wide modifier state (pre-rebrand tracker #460).
 var (
 	_ bellui.Driver             = (*gLDriver)(nil)
 	_ desktop.Driver            = (*gLDriver)(nil)
@@ -158,7 +158,7 @@ func (d *gLDriver) Device() bellui.Device {
 
 // AnnounceToScreenReader implements the optional bellui.AccessibilityAnnouncer
 // interface by fanning the message out to the registered accessibility
-// backends (#525). A no-op without the accessibility build tag or while no
+// backends (pre-rebrand tracker #525). A no-op without the accessibility build tag or while no
 // backend listener is registered.
 func (d *gLDriver) AnnounceToScreenReader(text string, assertive bool) {
 	accessibility.Announce(text, assertive)

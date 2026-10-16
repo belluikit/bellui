@@ -14,7 +14,7 @@ import (
 	"github.com/belluikit/bellui/widget"
 )
 
-// Hold-fire long-press (#758): a stationary touch dispatches LongPressed at
+// Hold-fire long-press (pre-rebrand tracker #758): a stationary touch dispatches LongPressed at
 // the long-press threshold while the finger is still down; the release then
 // dispatches SecondaryTappable. Moving past the tap slop or lifting early
 // cancels the pending fire.

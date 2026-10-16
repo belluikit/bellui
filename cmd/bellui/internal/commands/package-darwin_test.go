@@ -80,7 +80,7 @@ func TestDarwinUsageDescriptions(t *testing.T) {
 func TestInfoPlistUsageDescriptions(t *testing.T) {
 	// The darwin bundle reuses the app's IOSUsageDescriptions (same NS* keys), so
 	// a packaged macOS app that uses GPS gets the system location prompt and real
-	// fixes (appviewer#157).
+	// fixes (pre-rebrand appviewer tracker #157).
 	tplData := darwinData{
 		Name:  "Testing",
 		AppID: "com.example.testing",

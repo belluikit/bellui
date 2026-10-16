@@ -204,7 +204,7 @@ func (p *painter) drawBoxShadow(shadow *canvas.BoxShadow, pos geo.Position, fram
 	// The shadow is a two-pass FBO blur. On targets without framebuffer
 	// support (wasm) the blur programs are uninitialised and the FBO ops are
 	// stubs, so attempting the draw would panic on a nil program state. Skip
-	// it — the shadowed widget still renders, just without its shadow (#118).
+	// it — the shadowed widget still renders, just without its shadow (pre-rebrand tracker #118).
 	if !framebufferSupported {
 		return
 	}
@@ -299,7 +299,7 @@ func (p *painter) drawBackdropBlur(blur *canvas.BackdropBlur, pos geo.Position, 
 	// Backdrop blur captures the framebuffer and runs the FBO blur pipeline,
 	// which is unavailable on the wasm target (stubbed FBO ops, uninitialised
 	// blur programs). Skip rather than panic — the widget renders without the
-	// frosted-glass effect (#118).
+	// frosted-glass effect (pre-rebrand tracker #118).
 	if !framebufferSupported {
 		return
 	}
@@ -661,7 +661,7 @@ func (p *painter) drawArc(arc *canvas.Arc, pos geo.Position, frame geo.Size) {
 // Under a non-trivial world transform the alignment offset is carried through
 // the transform's *linear* part before being added to the box origin `pos`, so
 // the scale/rotation keeps pivoting on the true text-box origin rather than the
-// alignment-shifted glyph position (#1086, follow-up to #960). This matches the
+// alignment-shifted glyph position (pre-rebrand tracker #1086, follow-up to pre-rebrand tracker #960). This matches the
 // software painter, which anchors at the box origin (wt.TX/TY) and applies the
 // alignment offset inside the scaled bitmap. With no transform the linear part is
 // the identity, so the offset is added verbatim (behavior identical to before).
@@ -1200,7 +1200,7 @@ func (p *painter) hasTransform() bool {
 // it yields pos + L·localOffset — i.e. the object scales/rotates about its own
 // top-left instead of the canvas origin.
 //
-// This is the fix for #960. The paint walk hands the painter the full
+// This is the fix for pre-rebrand tracker #960. The paint walk hands the painter the full
 // worldTransform, which already carries Translate(pos) (worldTransform =
 // parentWT · Translate(objPos) · objTransform). The draw helpers below feed that
 // matrix the object's *absolute* corners, so applying the raw worldTransform
@@ -1230,7 +1230,7 @@ func (p *painter) uploadInvTransform(program ProgramState, pos geo.Position, fra
 	}
 
 	// Anchor about the object origin so the inverse maps a (correctly-placed)
-	// fragment back to the absolute pixel space the SDF rect_coords live in (#960).
+	// fragment back to the absolute pixel space the SDF rect_coords live in (pre-rebrand tracker #960).
 	wInv, ok := p.anchor(pos).Inverse()
 	if !ok {
 		// Non-invertible transform — skip rendering.
@@ -1303,7 +1303,7 @@ func (p *painter) transformedRectCoords(size geo.Size, pos geo.Position, frame g
 ) ([]float32, [4]float32) {
 	// Anchor about the object's own origin (before rectInnerCoords shifts pos for
 	// letterboxing) so the scale/rotation pivots on the object, not the canvas
-	// origin — the letterbox inset stays a local offset that scales with it (#960).
+	// origin — the letterbox inset stays a local offset that scales with it (pre-rebrand tracker #960).
 	wt := p.anchor(pos)
 	size, pos = rectInnerCoords(size, pos, fill, aspect)
 

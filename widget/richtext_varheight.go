@@ -12,19 +12,19 @@ import (
 // virtualBufferPixels is the vertical over-scan (above and below the viewport)
 // the variable-height window materialises so a small scroll does not immediately
 // require a re-window. Expressed in pixels, not rows: with variable heights a tall
-// image row would make a fixed row buffer span an unpredictable distance (#158).
+// image row would make a fixed row buffer span an unpredictable distance (pre-rebrand tracker #158).
 const virtualBufferPixels = float32(240)
 
 // virtualWidthSampleRows bounds the widest-row scan for a wrap-off variable-height
 // document. Scanning every row to find the widest would be O(rows) shaping and
-// partly defeat virtualisation on a huge wrap-off document (#170). Instead the
+// partly defeat virtualisation on a huge wrap-off document (pre-rebrand tracker #170). Instead the
 // natural width is estimated from a bounded uniform sample of rows plus the
 // currently materialised window, and only ever grows (see widenVirtualWidthForWindow)
 // so the horizontal scroll extent always covers what the user can actually see and
 // never snaps narrower while scrolling. The off-screen extent can momentarily
 // under-report if the single widest row falls outside both the sample and the
 // window, correcting as that row scrolls into view — the same estimate-then-refine
-// trade the variable-height path already makes for row heights (#157). Documents
+// trade the variable-height path already makes for row heights (pre-rebrand tracker #157). Documents
 // with no more than this many rows are scanned exactly.
 const virtualWidthSampleRows = 512
 
@@ -60,7 +60,7 @@ func (t *RichText) rowVolatile(row int) bool {
 // rowHeightOrEstimate returns row's height for the variable-height prefix: the
 // cached measured value when present; an exactly-measured (and cached) value for
 // stable text rows; or the running-average estimate for a not-yet-measured
-// volatile row (images/tables refine to exact once they enter the window, #157
+// volatile row (images/tables refine to exact once they enter the window, pre-rebrand tracker #157
 // scroll-extent jitter). The cache must already be sized (ensureHeightPrefix
 // calls ensureRowHeightCache first).
 func (t *RichText) rowHeightOrEstimate(row int) float32 {
@@ -186,7 +186,7 @@ func (t *RichText) rowGeometryVar(row int) (yPos, height float32) {
 }
 
 // varHeightVirtualWidth estimates the widest wrap-off row's width for the virtual
-// MinSize without the O(rows) scan that would shape every row (#170). It measures a
+// MinSize without the O(rows) scan that would shape every row (pre-rebrand tracker #170). It measures a
 // bounded uniform sample across the document plus every materialised window row, so
 // the visible region is always covered exactly while the cost stays O(sample+window).
 // This is the baseline computed once per rowBoundsVersion (virtualWidth caches it);
@@ -225,7 +225,7 @@ func (t *RichText) varHeightVirtualWidth() float32 {
 
 // widenVirtualWidthForWindow grows the cached wrap-off varHeight virtual width to
 // cover the freshly materialised window rows, so scrolling onto a row wider than the
-// bounded sample (#170) extends the horizontal scroll extent in place. Called after
+// bounded sample (pre-rebrand tracker #170) extends the horizontal scroll extent in place. Called after
 // each re-window; monotonic and O(window). A no-op until varHeightVirtualWidth has
 // computed the baseline for the current version (then minVirtual reads the grown
 // cache directly without re-sampling).

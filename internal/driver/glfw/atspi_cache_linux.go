@@ -4,7 +4,7 @@ package glfw
 
 import "github.com/godbus/dbus/v5"
 
-// P2 of the Linux AT-SPI2 backend (#987): the org.a11y.atspi.Cache fast path.
+// P2 of the Linux AT-SPI2 backend (pre-rebrand tracker #987): the org.a11y.atspi.Cache fast path.
 // Orca prefers a single Cache.GetItems round-trip over walking the tree
 // property-by-property (the P0/P1 per-node reads still work as the fallback the
 // spike proved). AddAccessible / RemoveAccessible keep Orca's cache coherent as

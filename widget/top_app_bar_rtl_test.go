@@ -72,7 +72,7 @@ func TestTopAppBar_Layout_RTL(t *testing.T) {
 
 	// RTL mirror: nav moves to the trailing (right) edge, action to the leading
 	// (left) edge, and the title sits to the LEFT of the nav icon without
-	// overlapping it (the #122 bug was the title overlapping the nav icon).
+	// overlapping it (the pre-rebrand tracker #122 bug was the title overlapping the nav icon).
 	assert.Greater(t, nav.Position().X, float32(200), "nav should mirror to the right")
 	assert.Less(t, action.Position().X, float32(200), "action should mirror to the left")
 	assert.LessOrEqual(t, title.Position().X+title.Size().Width, nav.Position().X,

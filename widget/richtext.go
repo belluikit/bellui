@@ -42,7 +42,7 @@ func (t *RichText) AccessibleRole() core.AccessibleRole { return core.RoleLabel 
 func (t *RichText) AccessibleLabel() string { return t.String() }
 
 // AccessibleText returns the concatenated segment text for assistive
-// technologies (#556). Selection offsets index this text; around non-text
+// technologies (pre-rebrand tracker #556). Selection offsets index this text; around non-text
 // block segments (images, separators) — which contribute rows but no runes —
 // the mapping is approximate.
 func (t *RichText) AccessibleText() string { return t.String() }
@@ -81,7 +81,7 @@ func (t *RichText) SetAccessibleSelection(start, end int) {
 func (t *RichText) ReplaceAccessibleSelection(string) {}
 
 // AccessibleVirtualNodes reports one RoleHeading node per heading segment
-// (#533), so screen readers can navigate rendered markdown/HTML by
+// (pre-rebrand tracker #533), so screen readers can navigate rendered markdown/HTML by
 // headings. Headings have no CanvasObject of their own — their text is
 // painted by the shared row machinery — so each node's bounds are the
 // union of the segment's laid-out row visuals, read from the visual cache
@@ -124,7 +124,7 @@ func (t *RichText) AccessibleVirtualNodes() []core.AccessibleVirtualNode {
 		// RichText virtualizes behind its internal scroller the widget-
 		// relative position must subtract the scroll offset, and rows
 		// scrolled out of the viewport are dropped like clipped real
-		// nodes (#545).
+		// nodes (pre-rebrand tracker #545).
 		if t.scr != nil {
 			rect.Pos = geo.NewPos(rect.Pos.X-t.scr.Offset.X, rect.Pos.Y-t.scr.Offset.Y)
 			viewport := t.scr.Size()
@@ -165,7 +165,7 @@ type RichText struct {
 	// source is a remote (http/https) or local-file URI. It is false by default
 	// so that rendering untrusted HTML/Markdown cannot, with no user
 	// interaction, trigger network requests (SSRF, unbounded downloads) or read
-	// local files (#285). When false, such ImageSegments render a broken-image
+	// local files (pre-rebrand tracker #285). When false, such ImageSegments render a broken-image
 	// placeholder instead of being fetched. Set it to true only for content you
 	// trust (e.g. local documentation or your own markdown).
 	//
@@ -175,14 +175,14 @@ type RichText struct {
 	// Virtualize opts a scrollable RichText (Scroll != ScrollNone) into row
 	// virtualisation: only the rows whose vertical band intersects the viewport
 	// are materialised and shaped, so a very large document (thousands of rows)
-	// scrolls without laying out every row up front (#158). It has no effect when
+	// scrolls without laying out every row up front (pre-rebrand tracker #158). It has no effect when
 	// Scroll is ScrollNone, or on the truncation/single-row configurations that
 	// cannot virtualise (see canVirtualize).
 	//
 	// Off by default: virtualisation trades exact, eager measurement for a
 	// windowed model whose vertical (and, for wrap-off content, horizontal) scroll
 	// extent is estimated from the materialised window and refines as you scroll
-	// (#157/#170 jitter). That is a worthwhile trade only for genuinely large
+	// (pre-rebrand tracker #157/#170 jitter). That is a worthwhile trade only for genuinely large
 	// documents, so it is opt-in rather than automatic for every scrolling
 	// RichText. Entry enables the equivalent path internally regardless of this
 	// field.
@@ -209,7 +209,7 @@ type RichText struct {
 	inset     geo.Size      // this varies due to how the widget works (entry with scroller vs others with padding)
 	rowBounds []rowBoundary // cache for boundaries
 	scr       *widget.Scroll
-	prop      *canvas.Rectangle // used to apply text minsize to the scroller `scr`, if present (upstream fyne#2464)
+	prop      *canvas.Rectangle // used to apply text minsize to the scroller `scr`, if present (upstream pre-rebrand tracker #2464)
 
 	visualMu    sync.Mutex
 	visualCache map[RichTextSegment]map[int]core.CanvasObject
@@ -223,9 +223,9 @@ type RichText struct {
 	rowBoundsWrapping   bellui.TextWrap       // wrapping when rowBounds was last computed
 	lastContentFP       uint64                // content fingerprint at last SyncState — detects external changes
 
-	// Memoized multi-segment String() result (#560): the returned object
+	// Memoized multi-segment String() result (pre-rebrand tracker #560): the returned object
 	// keeps its identity while the content version is unchanged, so
-	// identity-keyed consumers (the AX text index, #555) hit their caches
+	// identity-keyed consumers (the AX text index, pre-rebrand tracker #555) hit their caches
 	// instead of re-indexing per query. Guarded by the same staleness
 	// heuristics as the row model (rowBoundsVersion + contentFingerprint).
 	strMemo    string
@@ -246,7 +246,7 @@ type RichText struct {
 	rowYPos   []float32 // Y position of each row (absolute, from top)
 	rowHeight []float32 // height of each row
 
-	// Per-row measured-height cache (#158 Step 1). Dense (full-materialisation)
+	// Per-row measured-height cache (pre-rebrand tracker #158 Step 1). Dense (full-materialisation)
 	// path only: avoids re-measuring (re-shaping) unchanged rows on every
 	// calculateMin/Layout after the first pass. Parallel to rowBounds; a NaN
 	// entry means "not yet measured". Rebuilt (all NaN) whenever the key
@@ -262,19 +262,19 @@ type RichText struct {
 	rowHeightCacheTextSize    float32 // theme guard: text size
 
 	// styleHeightCache memoises the line height of ASCII text runs by their
-	// (size, style), so the variable-height prefix build (#158) measures each
-	// distinct style once instead of re-shaping every row (#313). Sound only for
+	// (size, style), so the variable-height prefix build (pre-rebrand tracker #158) measures each
+	// distinct style once instead of re-shaping every row (pre-rebrand tracker #313). Sound only for
 	// ASCII text: a non-ASCII run may shape with a fallback face whose line metrics
 	// differ, so those rows are always measured fresh. Reset with rowHeightCache.
 	styleHeightCache map[rtHeightKey]float32
 
-	// denseIncr is the edit-incremental dense build state (#921): a snapshot +
+	// denseIncr is the edit-incremental dense build state (pre-rebrand tracker #921): a snapshot +
 	// per-segment checkpoints of the last dense build, letting the next rebuild
 	// re-shape only the changed segment range and the renderer re-render only
 	// the resulting dirty rows. Nil whenever the incremental path is ineligible.
 	denseIncr *denseIncrState
 
-	// Row virtualisation (#119). When virtualize is set — by Entry for
+	// Row virtualisation (pre-rebrand tracker #119). When virtualize is set — by Entry for
 	// scrollable, non-wrapping, single-segment content — only the rows whose Y
 	// band intersects the viewport (+buffer) are materialised and shaped. Row
 	// geometry for every row is still filled analytically (uniform stride) so
@@ -289,7 +289,7 @@ type RichText struct {
 	virtWidthVer int     // rowBoundsVersion virtWidth was computed for
 	virtWidthOK  bool    // whether virtWidth has been computed at least once
 
-	// Code folding (#141). hiddenRanges are the resolved visual-row ranges laid
+	// Code folding (pre-rebrand tracker #141). hiddenRanges are the resolved visual-row ranges laid
 	// out and painted as absent: zero height, not materialised. The text model,
 	// row count and search positions are unaffected — only vertical geometry and
 	// rendering skip them. Empty == no folding. Normalised (sorted, merged,
@@ -297,7 +297,7 @@ type RichText struct {
 	hiddenRanges []LineRange
 	// hiddenLogical is the caller's fold request in logical-line coordinates
 	// (Entry.HiddenRanges). For wrapped content a logical line spans several
-	// visual rows; rowToLine translates the request into hiddenRanges (#145).
+	// visual rows; rowToLine translates the request into hiddenRanges (pre-rebrand tracker #145).
 	// For wrap-off single-segment content one logical line is one visual row, so
 	// the translation is the identity and behaviour matches the original F4.
 	hiddenLogical []LineRange
@@ -306,16 +306,16 @@ type RichText struct {
 	// single-segment content; nil for multi-segment, where folds stay row-based.
 	rowToLine []int
 
-	// Lazy/windowed wrap measurement (#157). Active only when canVirtualize();
+	// Lazy/windowed wrap measurement (pre-rebrand tracker #157). Active only when canVirtualize();
 	// then rowBounds stays nil and the row model is served from these per-logical-
 	// line structures, so a large wrapped document shapes only the lines spanning
 	// the viewport instead of every line up front. The Phase-A uniform-stride
 	// invariant (single segment, truncation off) makes row Y analytic, so only the
 	// wrapped-row COUNT per logical line is unknown until that line is measured;
 	// unmeasured lines carry a cheap ceil(runeLen/estCharsPerRow) estimate that
-	// refines to exact on measurement (accepted scroll-extent jitter, #157).
+	// refines to exact on measurement (accepted scroll-extent jitter, pre-rebrand tracker #157).
 	lazy           bool            // lazy row model is current (set by updateRowBounds)
-	buf            *textbuf.Buffer // canonical content buffer + logical-line index for the single segment (#380/#400)
+	buf            *textbuf.Buffer // canonical content buffer + logical-line index for the single segment (pre-rebrand tracker #380/#400)
 	lazyStr        string          // the segment Text value buf currently reflects (identity anchor)
 	lineMeasured   []bool          // line i's wrapped rows are exact (vs estimated)
 	lineWrap       [][]rowBoundary // line i's exact wrapped sub-rows, LINE-RELATIVE offsets (nil until measured)
@@ -325,12 +325,12 @@ type RichText struct {
 	estCharsPerRow float32         // estimate denominator (avg chars per wrapped row)
 	lazyMaxWidth   float32         // wrap/measure width the lazy model was built for
 	lineScratch    []rune          // reusable scratch for per-line wrap measurement (ensureLineMeasured)
-	lazyFullBuilds int             // full content (re)builds of buf — test hook for identity-chain regressions (#400)
-	vwLine         int             // widest logical line (wrap-off virtual width cache, #403)
+	lazyFullBuilds int             // full content (re)builds of buf — test hook for identity-chain regressions (pre-rebrand tracker #400)
+	vwLine         int             // widest logical line (wrap-off virtual width cache, pre-rebrand tracker #403)
 	vwLen          int             // rune length of vwLine when cached
 	vwDirty        bool            // widest-line cache needs a rescan
 
-	// Deferred text sync (#410). When deferText is set — by Entry when its
+	// Deferred text sync (pre-rebrand tracker #410). When deferText is set — by Entry when its
 	// DeferTextSync mode is on — lazySpliceText skips the per-edit document
 	// materialization: seg.Text and lazyStr keep the last-synced string object
 	// (so the identity gate still detects external writes) while buf runs
@@ -342,10 +342,10 @@ type RichText struct {
 
 	// onLazyLinesEdited, when set, is called after an incremental edit replaced
 	// logical lines [a..z] with newCount lines, so per-line caches layered above
-	// the provider (Entry's highlight cache) can splice in step (#401).
+	// the provider (Entry's highlight cache) can splice in step (pre-rebrand tracker #401).
 	onLazyLinesEdited func(a, z, newCount int)
 
-	// Variable-height multi-segment virtualisation (#158 Step 2). Mutually
+	// Variable-height multi-segment virtualisation (pre-rebrand tracker #158 Step 2). Mutually
 	// exclusive with lazy: lazy is the single-segment uniform-stride model;
 	// varHeight is the multi-segment model where each visual row can have a
 	// different height (images, tables, code blocks, blockquotes). rowBounds is
@@ -361,8 +361,8 @@ type RichText struct {
 	volatileEstAvg    float32   // running mean of measured volatile-row heights (estimate source)
 	volatileEstCount  int       // number of volatile rows folded into volatileEstAvg
 
-	// Windowed multi-segment build (#317). The block-lazy model is the cold-build
-	// analogue of the single-segment lazy model (#157) for the variable-height
+	// Windowed multi-segment build (pre-rebrand tracker #317). The block-lazy model is the cold-build
+	// analogue of the single-segment lazy model (pre-rebrand tracker #157) for the variable-height
 	// multi-segment case: instead of shaping every row up front (the O(n) HarfBuzz
 	// cost), updateRowBoundsBlockLazy groups segments into logical *blocks* with a
 	// cheap structural pass (no shaping) and estimates each block's visual-row count
@@ -388,10 +388,10 @@ type RichText struct {
 	blockEstCharsPerRow float32         // estimate denominator (avg chars per wrapped row)
 
 	// namedFonts is the per-RichText allowlist of custom fonts that parsed
-	// HTML/Markdown may request by family name (#496). Keys are normalised
+	// HTML/Markdown may request by family name (pre-rebrand tracker #496). Keys are normalised
 	// (trimmed, lowercased) so matching is case- and whitespace-insensitive.
 	// Populated only by RegisterNamedFont. Untrusted parsed content can only
-	// ever select a font present here (consistent with #285: no font-file
+	// ever select a font present here (consistent with pre-rebrand tracker #285: no font-file
 	// loading from content, allowlist-only); an unknown family falls through
 	// to the default behaviour with a nil FontSource.
 	namedFonts map[string]bellui.Resource
@@ -402,7 +402,7 @@ type RichText struct {
 const virtualRowBuffer = 8
 
 // varHeightMinRows is the visual-row count above which multi-segment content
-// switches to the variable-height virtual window (#158). Below it, small
+// switches to the variable-height virtual window (pre-rebrand tracker #158). Below it, small
 // documents stay on the simple full-materialisation path: windowing and the
 // volatile-row estimate jitter are pure overhead at small sizes.
 const varHeightMinRows = 2000
@@ -431,7 +431,7 @@ func NewRichTextWithText(text string) *RichText {
 
 // RegisterNamedFont adds a custom font to this RichText's per-widget allowlist
 // under the given family name, so that parsed HTML/Markdown content can select
-// it via CSS font-family / <font face> (#496). The name is matched case- and
+// it via CSS font-family / <font face> (pre-rebrand tracker #496). The name is matched case- and
 // whitespace-insensitively (it is trimmed and lowercased before storage and
 // lookup). Registering an empty name is a no-op; registering a nil resource
 // removes any existing entry.
@@ -439,7 +439,7 @@ func NewRichTextWithText(text string) *RichText {
 // This is the only way parsed (potentially untrusted) content can choose a
 // custom font: the parser will never load a font file named in the content,
 // only select from fonts the application registered here (consistent with the
-// untrusted-content security model, #285). A requested family that is not
+// untrusted-content security model, pre-rebrand tracker #285). A requested family that is not
 // registered falls through to the default behaviour (nil FontSource).
 //
 // Since: 1.0
@@ -503,7 +503,7 @@ func (t *RichText) SelectedText() string {
 // virtualised row model and, when the materialised window changes, triggers a
 // window-sized re-render. It is the standalone-RichText equivalent of
 // Entry.updateTextViewport (an Entry drives its own external scroll), letting a
-// scrollable RichText/Label window a huge document (#158). No-op unless
+// scrollable RichText/Label window a huge document (pre-rebrand tracker #158). No-op unless
 // virtualisation is active. SetVisibleRange only reports a change when the window
 // actually moved, so the Refresh→Layout→here loop converges after the window
 // stabilises (matching the Entry path).
@@ -525,9 +525,9 @@ func (t *RichText) CreateRenderer() core.WidgetRenderer {
 		}})
 		if t.Virtualize {
 			// Opted in: the scrollable RichText drives its own virtual window from
-			// the scroll offset (#158); large multi-segment documents then window
+			// the scroll offset (pre-rebrand tracker #158); large multi-segment documents then window
 			// via varHeight. Without opt-in the scroll container shows the fully
-			// materialised content, identical to the pre-#158 behaviour (#169).
+			// materialised content, identical to the before pre-rebrand tracker #158 behaviour (pre-rebrand tracker #169).
 			t.virtualize = true
 			t.scr.OnScrolled = func(geo.Position) { t.updateVirtualViewport() }
 		}
@@ -701,17 +701,17 @@ func (t *RichText) Resize(size geo.Size) {
 func (t *RichText) String() string {
 	// A single segment (the Entry editing case) is returned verbatim: no builder
 	// copy, and the returned string keeps its identity so the lazy edit path's
-	// seg.Text == lazyStr guard stays an O(1) pointer compare next keystroke (#380).
+	// seg.Text == lazyStr guard stays an O(1) pointer compare next keystroke (pre-rebrand tracker #380).
 	if len(t.Segments) == 1 {
 		return t.Segments[0].Textual()
 	}
 
-	// Multi-segment content memoizes the concatenation (#560): repeated calls
+	// Multi-segment content memoizes the concatenation (pre-rebrand tracker #560): repeated calls
 	// (the accessibility walker snapshots AccessibleLabel per tree update, the
 	// AX text protocol queries AccessibleText per screen-reader interaction)
 	// return the same string object until the content version moves, instead
 	// of re-concatenating each time — and identity-keyed consumers (the AX
-	// text index, #555) hit their caches. Staleness detection matches the row
+	// text index, pre-rebrand tracker #555) hit their caches. Staleness detection matches the row
 	// model's: the version bumped by the mutation paths plus the length-based
 	// fingerprint SyncState uses — a direct same-length Segments edit that
 	// bypasses both is already stale for rendering too.
@@ -760,10 +760,10 @@ func (t *RichText) canVirtualize() bool {
 		return true
 	}
 	// Multi-segment content has variable per-row heights, so the uniform-stride
-	// geometry does not hold; the variable-height model (#158) handles it via a
+	// geometry does not hold; the variable-height model (pre-rebrand tracker #158) handles it via a
 	// height prefix sum. varHeight is set by updateRowBounds once the document is
 	// large enough to be worth windowing (small docs stay on the simple full path).
-	// blockLazy is the windowed-build variant of the same multi-segment model (#317).
+	// blockLazy is the windowed-build variant of the same multi-segment model (pre-rebrand tracker #317).
 	return t.varHeight || t.blockLazy
 }
 
@@ -778,7 +778,7 @@ func (t *RichText) canVirtualizeSingle() bool {
 	// a whole line or a wrapped fragment, since every row shares the segment's
 	// font/size and no line-spacing is inserted between same-segment rows. So the
 	// analytic geometry in minVirtual/layoutVirtual holds for word/break wrapping
-	// too (#139): only the row count grows; rowBounds still carries each wrapped
+	// too (pre-rebrand tracker #139): only the row count grows; rowBounds still carries each wrapped
 	// fragment's begin/end. Truncation is excluded (it changes per-row content).
 	switch t.Wrapping {
 	case bellui.TextWrapOff, bellui.TextWrapWord, bellui.TextWrapBreak:
@@ -792,7 +792,7 @@ func (t *RichText) canVirtualizeSingle() bool {
 // varHeightEligible reports whether the (already built) dense rowBounds qualify for
 // the variable-height multi-segment window: virtualisation opted in, truncation
 // off, wrapping in {off, word, break}, more than one segment, and a document large
-// enough that windowing pays off (#158).
+// enough that windowing pays off (pre-rebrand tracker #158).
 func (t *RichText) varHeightEligible() bool {
 	if !t.virtualize || t.Truncation != bellui.TextTruncateOff {
 		return false
@@ -932,7 +932,7 @@ func (t *RichText) deleteFromTo(lowBound int, highBound int) []rune {
 		return []rune{}
 	}
 
-	// Single-segment lazy fast path (#380): splice the range out of the canonical
+	// Single-segment lazy fast path (pre-rebrand tracker #380): splice the range out of the canonical
 	// buffer and byte-splice seg.Text, mirroring insertAt.
 	if t.lazyCanEdit() {
 		removed := t.lazySpliceText(lowBound, highBound, nil)
@@ -993,7 +993,7 @@ func (t *RichText) cachedSegmentVisual(seg RichTextSegment, offset int) core.Can
 
 	// Propagate the content-security policy to image segments before their
 	// visual is (re)built or updated, so a remote/file image is only ever
-	// fetched when the embedding RichText opted in (#285).
+	// fetched when the embedding RichText opted in (pre-rebrand tracker #285).
 	if img, ok := seg.(*ImageSegment); ok {
 		img.allowRemote = t.AllowRemoteContent
 	}
@@ -1026,14 +1026,14 @@ func (t *RichText) cleanVisualCache() {
 	// Evict cached visuals whose segment is no longer present. A set of the
 	// current segments makes this O(cache + segments); the previous nested scan
 	// was O(cache × segments), which for a large multi-segment document (e.g. an
-	// editable RichEntry) cost quadratically per refresh — the #671 hotspot.
+	// editable RichEntry) cost quadratically per refresh — the pre-rebrand tracker #671 hotspot.
 	current := make(map[RichTextSegment]struct{}, len(t.Segments))
 	for _, seg := range t.Segments {
 		current[seg] = struct{}{}
 	}
 	for seg := range t.visualCache {
 		if _, ok := current[seg]; !ok {
-			// The per-object measurement memo (#923) lives on the canvas.Text
+			// The per-object measurement memo (pre-rebrand tracker #923) lives on the canvas.Text
 			// itself, so a removed segment's memo is collected with its visual —
 			// no side-table pruning needed here.
 			delete(t.visualCache, seg)
@@ -1043,7 +1043,7 @@ func (t *RichText) cleanVisualCache() {
 
 // insertAt inserts the text at the specified position
 func (t *RichText) insertAt(pos int, runes []rune) {
-	// Single-segment lazy fast path (#380): splice the canonical rune buffer and
+	// Single-segment lazy fast path (pre-rebrand tracker #380): splice the canonical rune buffer and
 	// byte-splice seg.Text in place instead of decoding then re-encoding the whole
 	// document. pos is a global char offset == local offset for a single segment.
 	if t.lazyCanEdit() {
@@ -1061,7 +1061,7 @@ func (t *RichText) insertAt(pos int, runes []rune) {
 		}
 		// Count runes without materialising a []rune (the slice for preceding
 		// segments would be discarded immediately); the target segment is converted
-		// once below (#375).
+		// once below (pre-rebrand tracker #375).
 		end := start + utf8.RuneCountInString(ts.Text)
 		into = ts
 		index = i
@@ -1111,7 +1111,7 @@ func (t *RichText) len() int {
 // segment. In the lazy path it reads from the buffer — a Substring against the
 // clean memo, no full-document decode — and falls back to decoding the segment
 // text otherwise (multi-segment content returns ""; callers use the row-based
-// reconstruction for that case). Bounds are swapped/clamped as needed (#401).
+// reconstruction for that case). Bounds are swapped/clamped as needed (pre-rebrand tracker #401).
 func (t *RichText) textRange(a, b int) string {
 	seg, ok := t.singleSegment()
 	if !ok {
@@ -1177,7 +1177,7 @@ func (t *RichText) lineSizeToColumn(col, row int, textSize, innerPad float32, do
 				start = bound.begin
 			}
 			// Read from the lazy buffer instead of re-converting the whole document
-			// for this one row (#375): fetch only the runes actually measured (up to
+			// for this one row (pre-rebrand tracker #375): fetch only the runes actually measured (up to
 			// col), never a full-document slice.
 			var measureText []rune
 			if t.lazy && t.buf != nil && len(bound.segments) == 1 && text == t.Segments[0] {
@@ -1219,7 +1219,7 @@ func (t *RichText) lineSizeToColumn(col, row int, textSize, innerPad float32, do
 }
 
 // inlineColumnX returns the x offset of a document-space column within a row that
-// contains an inline non-text atom (an inline image, #665), walking the row's
+// contains an inline non-text atom (an inline image, pre-rebrand tracker #665), walking the row's
 // segments so an atom advances by its rendered width and each text rune by its
 // measured width. The document-space column counts every text rune and every
 // inline atom as one position — unlike lineSizeToColumn, whose column is text-rune
@@ -1228,7 +1228,7 @@ func (t *RichText) lineSizeToColumn(col, row int, textSize, innerPad float32, do
 // excluded), so it is a drop-in for the caret and selection geometry.
 //
 // ok is false when the row has no inline atom, so callers keep the exact
-// lineSizeToColumn path for ordinary rows — byte-identical to before (#893).
+// lineSizeToColumn path for ordinary rows — byte-identical to before (pre-rebrand tracker #893).
 func (t *RichText) inlineColumnX(row, col int, textSize, innerPad float32) (float32, bool) {
 	b := t.rowBoundary(row)
 	if b == nil {
@@ -1280,7 +1280,7 @@ func (t *RichText) inlineColumnX(row, col int, textSize, innerPad float32) (floa
 	return x, true
 }
 
-// inlineColumnAt is the inverse of inlineColumnX (#983): it maps a visual x on a
+// inlineColumnAt is the inverse of inlineColumnX (pre-rebrand tracker #983): it maps a visual x on a
 // row containing an inline non-text atom back to a caret position, walking the
 // row's segments so an atom occupies its rendered width and each text rune its
 // measured width — the atom-aware counterpart of the plain prefix-width scan
@@ -1358,7 +1358,7 @@ func (t *RichText) inlineColumnAt(row int, x, innerPad float32) (textCol, docCol
 // holding the slice of its runes that belongs to this (possibly wrapped) row,
 // mirroring row(); each non-text segment (link, image) becomes an opaque box run
 // of its measured width, occupying a slot in the visual order but no caret column
-// (issue #41). It returns ok=false only if the row holds a concealed (password)
+// (pre-rebrand issue #41). It returns ok=false only if the row holds a concealed (password)
 // segment, whose obscured runes can't share the rune-indexed caret model.
 func (t *RichText) rowStyledRuns(row int) ([]paint.StyledRun, bool) {
 	bound := t.rowBoundary(row)
@@ -1433,7 +1433,7 @@ func (t *RichText) rowVisualLayout(row int) (paint.LineLayout, bool) {
 // segments (inline image/link box) use the same cached visual height that supplies
 // their box width, so a row whose tallest element is a non-text segment reports the
 // full row height — and rtlCaretX draws the caret at that height rather than the
-// text height (issue #47). This matches the row height cached in RowGeometry.
+// text height (pre-rebrand issue #47). This matches the row height cached in RowGeometry.
 func (t *RichText) rowVisualHeight(row int) float32 {
 	bound := t.rowBoundary(row)
 	if bound == nil {
@@ -1455,8 +1455,8 @@ func (t *RichText) rowVisualHeight(row int) float32 {
 }
 
 // measureText returns the rendered size and baseline of txt. Measurement is
-// memoised per visual object by canvas.Text itself (#923, generalising the
-// widget-local memo #896 introduced here), so an unchanged row reusing its
+// memoised per visual object by canvas.Text itself (pre-rebrand tracker #923, generalising the
+// widget-local memo pre-rebrand tracker #896 introduced here), so an unchanged row reusing its
 // cached visual re-measures nothing on a keystroke — only the edited segment's
 // object consults the string-keyed global metrics cache.
 func (t *RichText) measureText(txt *canvas.Text) (geo.Size, float32) {
@@ -1480,11 +1480,11 @@ type rtHeightKey struct {
 }
 
 // textSegmentHeight measures a text segment's line height, memoising the result
-// by (size, style) for ASCII runs (#313). The line height of ASCII text is the
+// by (size, style) for ASCII runs (pre-rebrand tracker #313). The line height of ASCII text is the
 // primary face's metric — independent of which characters appear — so one
 // measurement serves every same-style ASCII row instead of re-shaping each.
 // Non-ASCII runs may shape with a fallback face whose metrics differ, so they are
-// always measured fresh (preserving correct variable-height layout, #158).
+// always measured fresh (preserving correct variable-height layout, pre-rebrand tracker #158).
 func (t *RichText) textSegmentHeight(text *TextSegment) float32 {
 	size := text.size()
 	style := text.Style.TextStyle
@@ -1522,7 +1522,7 @@ func (t *RichText) textSegmentHeight(text *TextSegment) float32 {
 // styleNominalHeight returns the primary-face line height for a (size, style),
 // measured from a constant ASCII glyph and memoised by the same key as
 // textSegmentHeight. It is the shaping-free height estimate used by the block-lazy
-// build (#317): exact heights are deferred to ensureBlockMeasured, so estimating
+// build (pre-rebrand tracker #317): exact heights are deferred to ensureBlockMeasured, so estimating
 // from an ASCII proxy avoids shaping a block's (possibly non-ASCII) text up front
 // while still seeding the same cache textSegmentHeight reads from.
 func (t *RichText) styleNominalHeight(size float32, style bellui.TextStyle, source bellui.Resource) float32 {
@@ -1567,7 +1567,7 @@ func isASCII(s string) bool {
 // its own style and size, so a multi-segment row whose segments differ in size
 // or weight gets an exact width rather than a single-style approximation. Rows
 // with RTL content reuse the bidi visual layout's total advance (the same width,
-// already computed). This underpins alignment offsets; see issue #42.
+// already computed). This underpins alignment offsets; see pre-rebrand issue #42.
 func (t *RichText) rowWidth(row int, textSize float32) float32 {
 	if layout, ok := t.rowVisualLayout(row); ok {
 		return layout.Width
@@ -1681,7 +1681,7 @@ func (t *RichText) row(row int) []rune {
 		if text, ok := seg.(*TextSegment); ok {
 			// In the lazy single-segment path the buffer holds the whole segment
 			// with absolute begin/end offsets, so fetch just this row's runes
-			// instead of re-converting the entire document per row (#375).
+			// instead of re-converting the entire document per row (pre-rebrand tracker #375).
 			if t.lazy && t.buf != nil && nSegs == 1 && text == t.Segments[0] {
 				n := t.buf.Len()
 				start := bound.begin
@@ -1719,7 +1719,7 @@ func (t *RichText) row(row int) []rune {
 // non-text segment's Textual() content when that segment's opaque box falls in the
 // selection — using the same owner-rune test SelectionSpans uses to fill the box's
 // rectangle — so the copied string matches the highlighted rectangles for both LTR
-// and RTL rows (issue #46). A box's owner is the text rune it trails (counted-1);
+// and RTL rows (pre-rebrand issue #46). A box's owner is the text rune it trails (counted-1);
 // a box leading the row (owner == -1) is never selected, matching the layout.
 func (t *RichText) rowSelectedText(row, startCol, endCol int) string {
 	bound := t.rowBoundary(row)
@@ -1769,7 +1769,7 @@ func (t *RichText) rowSelectedText(row, startCol, endCol int) string {
 // isBlockRow reports whether row is a standalone block row: it has no text
 // columns but does contain a non-text segment (an image/table/separator, or
 // leading inline links with no following text). Such a row has no caret column,
-// so selection treats it all-or-nothing (issues #50, #53). An ordinary blank text
+// so selection treats it all-or-nothing (pre-rebrand issues #50, pre-rebrand tracker #53). An ordinary blank text
 // row (no non-text segment) is not a block row.
 func (t *RichText) isBlockRow(row int) bool {
 	if t.rowLength(row) != 0 {
@@ -1792,7 +1792,7 @@ func (t *RichText) isBlockRow(row int) bool {
 // one or more non-text segments — an image/table/separator, or leading inline
 // links with no following text). Such a row has no caret column for the text-based
 // selection model, so SelectedText treats it all-or-nothing and splices this text
-// when the selection reaches the row (issues #50, #53). It returns "" for an
+// when the selection reaches the row (pre-rebrand issues #50, pre-rebrand tracker #53). It returns "" for an
 // ordinary empty text row (a blank line), leaving that behaviour unchanged.
 func (t *RichText) rowBlockText(row int) string {
 	bound := t.rowBoundary(row)
@@ -1839,9 +1839,9 @@ func (t *RichText) RowGeometry(row int) (yPos, height float32) {
 // rowAtY returns the visual row whose vertical band contains the content-coordinate
 // y, clamped to [0, rows()-1], or -1 when there are no rows / no geometry yet.
 //
-// For the lazy model (#157) the uniform-stride geometry is invertible, so this is
+// For the lazy model (pre-rebrand tracker #157) the uniform-stride geometry is invertible, so this is
 // O(1) (with folds resolved via visibleIndexToRow) instead of the O(rows) scan a
-// click would otherwise cost on a very large document (#160). For the dense model
+// click would otherwise cost on a very large document (pre-rebrand tracker #160). For the dense model
 // it scans the cached per-row geometry, matching the previous hit-test behaviour.
 func (t *RichText) rowAtY(y float32) int {
 	n := t.rows()
@@ -1958,7 +1958,7 @@ func (t *RichText) rowBoundsCacheValid(width float32, lazy bool) bool {
 	// line, nothing is wrap-measured — so a width-only change must not force
 	// an O(lines) rebuild. Without this, typing into the document's widest
 	// line grows the scroll content width every keystroke and each one paid a
-	// full rebuild (#410).
+	// full rebuild (pre-rebrand tracker #410).
 	if t.rowBoundsWidth != width && !(lazy && t.Wrapping == bellui.TextWrapOff) {
 		return false
 	}
@@ -2002,7 +2002,7 @@ func (t *RichText) updateRowBoundsInner() bool {
 		return false
 	}
 
-	// Lazy/windowed measurement path (#157): single-segment, scrollable, truncation
+	// Lazy/windowed measurement path (pre-rebrand tracker #157): single-segment, scrollable, truncation
 	// off — shape only the lines spanning the viewport, not every line up front.
 	if lazy {
 		t.denseIncr = nil
@@ -2010,7 +2010,7 @@ func (t *RichText) updateRowBoundsInner() bool {
 		t.updateRowBoundsLazy(width)
 		return true
 	}
-	// Windowed multi-segment build (#317): shape blocks on demand rather than every
+	// Windowed multi-segment build (pre-rebrand tracker #317): shape blocks on demand rather than every
 	// row up front. Evaluated only on a real rebuild (cache invalid); blockLazyEligible
 	// builds t.blocks as a side effect, reused by updateRowBoundsBlockLazy.
 	if t.blockLazyEligible(width) {
@@ -2022,7 +2022,7 @@ func (t *RichText) updateRowBoundsInner() bool {
 		t.applyHiddenRanges()
 		return true
 	}
-	// Edit-incremental dense rebuild (#921): when only a contiguous segment
+	// Edit-incremental dense rebuild (pre-rebrand tracker #921): when only a contiguous segment
 	// range changed since the last dense build, re-shape just that range and
 	// splice, leaving the untouched rows (and their caches) in place.
 	if t.denseIncrRebuild(width) {
@@ -2044,7 +2044,7 @@ func (t *RichText) updateRowBoundsInner() bool {
 	fitSize.Height -= (innerPadding + t.inset.Height) * 2
 
 	// The dense iterate lives in denseBuildCtx.iterate (richtext_incremental.go)
-	// so the edit-incremental rebuild (#921) can run the identical logic over a
+	// so the edit-incremental rebuild (pre-rebrand tracker #921) can run the identical logic over a
 	// segment subrange; checkpoints are recorded when the document qualifies.
 	ctx := &denseBuildCtx{
 		t: t, th: th, innerPadding: innerPadding,
@@ -2067,14 +2067,14 @@ func (t *RichText) updateRowBoundsInner() bool {
 		t.denseIncr = nil
 	}
 	// Fresh bounds: force the per-row height cache to rebuild so it never aliases
-	// stale heights from a previous layout (#158 Step 1).
+	// stale heights from a previous layout (pre-rebrand tracker #158 Step 1).
 	t.rowHeightCacheVer = -1
 	// Decide whether this multi-segment document is large enough for the variable-
-	// height virtual window (#158 Step 2). The dense bounds are kept either way; the
+	// height virtual window (pre-rebrand tracker #158 Step 2). The dense bounds are kept either way; the
 	// flag only changes how geometry/rendering window the rows. The height prefix is
 	// marked dirty so it rebuilds against the new bounds. rowBoundsCacheStamp also
 	// rebuilds the visual-row -> logical-line map and re-resolves any logical-line
-	// folds against it (#145): when wrapping changes the row layout, a fold
+	// folds against it (pre-rebrand tracker #145): when wrapping changes the row layout, a fold
 	// requested over logical lines must follow its wrapped rows.
 	t.rowBoundsCacheStamp(t.Size().Width)
 	return true
@@ -2100,7 +2100,7 @@ type textRenderer struct {
 // Inline segments share the line horizontally (laid out via layoutRow); a block
 // segment (non-text, last in its row) is moved and resized to fill the line width
 // at its measured/HeightForWidth height. Shared by the dense Layout and the
-// variable-height window layout (#158) so the two cannot diverge.
+// variable-height window layout (pre-rebrand tracker #158) so the two cannot diverge.
 func (r *textRenderer) layoutOneRow(bound rowBoundary, objs []core.CanvasObject, oi int,
 	yTop, xInset, lineWidth, lineSpacing float32,
 ) (consumed int, height float32) {
@@ -2164,7 +2164,7 @@ func (r *textRenderer) Layout(size geo.Size) {
 	if r.obj.canVirtualize() {
 		// A scrollable virtualised RichText drives its window from the scroll
 		// viewport: resize the scroll container, then (re)compute the window for
-		// the current offset/height before positioning it (#158). On a plain
+		// the current offset/height before positioning it (pre-rebrand tracker #158). On a plain
 		// resize this picks up the new viewport without an external driver.
 		if r.obj.scr != nil {
 			r.obj.scr.Resize(size)
@@ -2221,7 +2221,7 @@ func (r *textRenderer) Layout(size geo.Size) {
 		rowStartY := yPos
 		rowObjStart := i
 
-		// Folded rows (#141) lay out as absent: consume their objects, hide them,
+		// Folded rows (pre-rebrand tracker #141) lay out as absent: consume their objects, hide them,
 		// and contribute zero height so following rows shift up by the fold.
 		if r.obj.rowHidden(row) {
 			for range bound.segments {
@@ -2246,7 +2246,7 @@ func (r *textRenderer) Layout(size geo.Size) {
 
 		// Warm the per-row height cache for non-volatile rows so a later
 		// MinSize/calculateMin at the same width serves this row without
-		// re-measuring (#158 Step 1). Volatile rows (images/tables) are left
+		// re-measuring (pre-rebrand tracker #158 Step 1). Volatile rows (images/tables) are left
 		// unmeasured and always re-measured fresh.
 		if consumed := i - rowObjStart; !segmentsVolatile(objs, rowObjStart, consumed) {
 			r.obj.ensureRowHeightCache(lineWidth, th)
@@ -2327,7 +2327,7 @@ var rowHeightUnmeasured = float32(math.NaN())
 // size that can change after first measurement — inline/block images (whose
 // MinSize firms up only once the canvas exists) and HeightForWidth widgets
 // (tables, code blocks). Such rows are never height-cached so a late resize is
-// never served stale; they are measured fresh on every pass (#158 Step 1).
+// never served stale; they are measured fresh on every pass (pre-rebrand tracker #158 Step 1).
 func segmentsVolatile(objs []core.CanvasObject, start, count int) bool {
 	for k := start; k < start+count && k < len(objs); k++ {
 		switch objs[k].(type) {
@@ -2366,7 +2366,7 @@ func (t *RichText) ensureRowHeightCache(width float32, th bellui.Theme) {
 	for i := range t.rowHeightCache {
 		t.rowHeightCache[i] = rowHeightUnmeasured
 	}
-	t.styleHeightCache = nil // content/theme changed: drop memoised per-style heights (#313)
+	t.styleHeightCache = nil // content/theme changed: drop memoised per-style heights (pre-rebrand tracker #313)
 	t.rowHeightCacheVer = t.rowBoundsVersion
 	t.rowHeightCacheWidth = width
 	t.rowHeightCacheInnerPad = innerPad
@@ -2376,7 +2376,7 @@ func (t *RichText) ensureRowHeightCache(width float32, th bellui.Theme) {
 
 // measuredRowHeight returns the height of visual row `row` — the max over its
 // segments' measured heights — serving a cached value on a hit and measuring +
-// storing on a miss. It measures exactly as the dense calculateMin does (#158
+// storing on a miss. It measures exactly as the dense calculateMin does (pre-rebrand tracker #158
 // Step 1), so it is behaviour-preserving. Callers must short-circuit folded rows
 // (height 0) before calling. `objStart` is the index of the row's first object in
 // `objs`; `consumed` is the number of objects the row actually owns, honouring the
@@ -2435,7 +2435,7 @@ func (r *textRenderer) calculateMin(bounds []rowBoundary, wrap bellui.TextWrap, 
 
 	i := 0
 	for row, bound := range bounds {
-		// Folded rows (#141) contribute no height and no width to the content size.
+		// Folded rows (pre-rebrand tracker #141) contribute no height and no width to the content size.
 		if r.obj.rowHidden(row) {
 			for range bound.segments {
 				if i == len(objs) {
@@ -2446,7 +2446,7 @@ func (r *textRenderer) calculateMin(bounds []rowBoundary, wrap bellui.TextWrap, 
 			continue
 		}
 		// Row height: cache-aware so a re-layout after the first pass does not
-		// re-shape unchanged rows (#158 Step 1). Volatile rows (images, tables)
+		// re-shape unchanged rows (pre-rebrand tracker #158 Step 1). Volatile rows (images, tables)
 		// are always measured fresh inside the helper.
 		hfwWidth := float32(0)
 		if w := r.obj.Size().Width; w > 0 {
@@ -2475,7 +2475,7 @@ func (r *textRenderer) calculateMin(bounds []rowBoundary, wrap bellui.TextWrap, 
 					if r.obj.scr != nil {
 						r.obj.prop.SetMinSize(min)
 					}
-					r.Refresh() // image size changed — full refresh needed (upstream fyne#2991)
+					r.Refresh() // image size changed — full refresh needed (upstream pre-rebrand tracker #2991)
 				}
 			}
 		}
@@ -2509,16 +2509,16 @@ func (r *textRenderer) minVirtual() geo.Size {
 	innerPad := th.Size(theme.SizeNameInnerPadding)
 	stride := r.obj.stride()
 
-	// Folded rows (#141) collapse to zero height, so the scroll extent is the
+	// Folded rows (pre-rebrand tracker #141) collapse to zero height, so the scroll extent is the
 	// visible-row count, not the total row count.
 	var height float32
 	if r.obj.blockLazy {
-		// Block-lazy: total content height is the block Y-prefix total (#317),
+		// Block-lazy: total content height is the block Y-prefix total (pre-rebrand tracker #317),
 		// estimated for unmeasured blocks and refined as they are measured.
 		r.obj.ensureBlockPrefix()
 		height = r.obj.blockTopY[len(r.obj.blocks)]
 	} else if r.obj.varHeight {
-		// Variable-height: total content height is the prefix-sum total (#158).
+		// Variable-height: total content height is the prefix-sum total (pre-rebrand tracker #158).
 		r.obj.ensureHeightPrefix()
 		height = r.obj.rowYPrefix[len(r.obj.rowBounds)]
 	} else {
@@ -2570,7 +2570,7 @@ func (r *textRenderer) virtualWidth() float32 {
 	if t.varHeight {
 		// Wrapped rows fit the content width, so (like the dense calculateMin)
 		// the natural width is reported as 0; only wrap-off rows can exceed it and
-		// need a widest-row scan (#158).
+		// need a widest-row scan (pre-rebrand tracker #158).
 		if t.Wrapping != bellui.TextWrapOff {
 			return 0
 		}
@@ -2734,7 +2734,7 @@ func (r *textRenderer) layoutVirtualLazy(size geo.Size) {
 
 // lazyWindowRowText serves a window row's text straight from the lazy buffer —
 // a Substring against the clean memo is a zero-copy slice, so the window render
-// allocates nothing per row (#400). Reports false when the row is not the lazy
+// allocates nothing per row (pre-rebrand tracker #400). Reports false when the row is not the lazy
 // single-segment case and the caller must take the generic decode path.
 func (r *textRenderer) lazyWindowRowText(txt *canvas.Text, bound rowBoundary, seg *TextSegment) bool {
 	buf := r.obj.buf
@@ -2757,7 +2757,7 @@ func (r *textRenderer) lazyWindowRowText(txt *canvas.Text, bound rowBoundary, se
 }
 
 func (r *textRenderer) Refresh() {
-	// Edit-incremental render (#921): when the last row-bounds rebuild spliced
+	// Edit-incremental render (pre-rebrand tracker #921): when the last row-bounds rebuild spliced
 	// a known dirty row range, regenerate objects + layout for those rows only.
 	if r.refreshIncremental() {
 		return
@@ -2769,7 +2769,7 @@ func (r *textRenderer) Refresh() {
 	// Row virtualisation: materialise only the rows in the visible window. Row
 	// geometry for every row is still derived analytically in layoutVirtual, so
 	// selection/cursor/gutter consumers see the full document. winRows lists the
-	// exact materialised logical rows so a fold (#141) inside the window is never
+	// exact materialised logical rows so a fold (pre-rebrand tracker #141) inside the window is never
 	// materialised.
 	winBounds := bounds
 	if r.obj.canVirtualize() {
@@ -2797,7 +2797,7 @@ func (r *textRenderer) Refresh() {
 			r.obj.winStart, r.obj.winEnd = 0, 0
 		}
 		// Grow the wrap-off horizontal extent to cover any newly visible wide row
-		// (#170); monotonic, so the scrollbar never snaps narrower while scrolling.
+		// (pre-rebrand tracker #170); monotonic, so the scrollbar never snaps narrower while scrolling.
 		r.obj.widenVirtualWidthForWindow()
 	}
 
@@ -2806,7 +2806,7 @@ func (r *textRenderer) Refresh() {
 	// single-segment case every window row references the same segment whose Text
 	// is the whole document, so converting it per row is O(document × window);
 	// segments are contiguous within a window, so a one-entry memo collapses that
-	// to a single conversion per distinct segment (#375). The lazy path skips even
+	// to a single conversion per distinct segment (pre-rebrand tracker #375). The lazy path skips even
 	// that single conversion by reading row substrings from the buffer.
 	var lastSeg *TextSegment
 	var lastRunes []rune
@@ -2871,7 +2871,7 @@ func (r *textRenderer) Refresh() {
 	if r.obj.scr != nil {
 		// Reuse the existing content structure ({prop, innerBox}) and update the
 		// inner box's objects in place so the scroll offset survives the window
-		// re-renders that drive virtualised scrolling (#158). Replacing scr.Content
+		// re-renders that drive virtualised scrolling (pre-rebrand tracker #158). Replacing scr.Content
 		// wholesale resets the offset to the top on every scroll, collapsing the
 		// window back to row 0.
 		if cont, ok := r.obj.scr.Content.(*bellui.Container); ok && len(cont.Objects) == 2 {
@@ -3365,7 +3365,7 @@ func lineBounds(seg *TextSegment, wrap bellui.TextWrap, trunc bellui.TextTruncat
 	// wrap width resets from firstWidth (the leftover after preceding inline
 	// segments) to the full max.Width, and a checker frozen at the narrow first
 	// width would clamp every later row's binary-searched wrap point to the
-	// leftover width — one word (or a mid-word fragment) per line (#1156).
+	// leftover width — one word (or a mid-word fragment) per line (pre-rebrand tracker #1156).
 	widthChecker := func(low int, high int) bool {
 		return measurer(text[low:high]).Width <= st.measureWidth
 	}
@@ -3382,7 +3382,7 @@ func lineBounds(seg *TextSegment, wrap bellui.TextWrap, trunc bellui.TextTruncat
 // reuse counter, measureWidth and yPos across calls. It returns done=true with the
 // bounds slice and yPos to return when a height/truncation limit forces lineBounds
 // to stop early. Extracted from the per-line body of lineBounds so a single line
-// can be wrapped in isolation (the lazy/windowed measurement path, #157); the dense
+// can be wrapped in isolation (the lazy/windowed measurement path, pre-rebrand tracker #157); the dense
 // lineBounds loop drives it identically to the previous inline switch.
 func lineBoundsForRange(seg *TextSegment, text []rune, low, high int, wrap bellui.TextWrap, trunc bellui.TextTruncation, max geo.Size, measurer func([]rune) geo.Size, widthChecker func(int, int) bool, st *lineWrapState) (bool, []rowBoundary, float32) {
 	if low == high {
@@ -3613,7 +3613,7 @@ func truncateLimit(s string, text *canvas.Text, limit float32, ellipsis []rune) 
 	l.Prepare(conf, runes, shaping.NewSliceIterator(outs))
 	// Keep the available width fractional (26.6 fixed point) rather than flooring it
 	// to an int, so text sized to exactly its own (fractional) intrinsic width is not
-	// spuriously truncated (#1045). WrapNextLine(int) would floor via fixed.I.
+	// spuriously truncated (pre-rebrand tracker #1045). WrapNextLine(int) would floor via fixed.I.
 	wrapped, done := l.WrapNextLineF(float32ToFixed266(limit))
 
 	count := len(runes)

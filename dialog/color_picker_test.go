@@ -24,7 +24,7 @@ func Test_colorAdvancedPicker_HexValidation(t *testing.T) {
 	assert.NoError(t, hex.Validate())
 
 	// Invalid input now enters the entry's error state rather than being
-	// accepted silently (#293).
+	// accepted silently (pre-rebrand tracker #293).
 	hex.SetText("nonsense")
 	assert.Error(t, hex.Validate())
 }

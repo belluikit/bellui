@@ -10,18 +10,18 @@ import (
 	"github.com/belluikit/bellui/widget"
 )
 
-// Tab / Shift-Tab block indent & dedent (#135), the block-editing companion to
-// auto-indent-on-Enter (#134). Like #134, the mechanism lives in fycoder: Tab is
+// Tab / Shift-Tab block indent & dedent (pre-rebrand tracker #135), the block-editing companion to
+// auto-indent-on-Enter (pre-rebrand tracker #134). Like pre-rebrand tracker #134, the mechanism lives in fycoder: Tab is
 // intercepted before the Entry inserts a literal tab, and a possibly-multi-line
 // edit is applied. It shares the indent unit ([Editor.TabWidth]/[Editor.UseSpaces])
 // with auto-indent, so Enter-indent and Tab-indent agree, and it is governed by
 // the same [Editor.AutoIndent] switch.
 //
-// A block edit is one Entry.ApplyEdits batch (fyne v2.14.0, fyne#433): one splice
+// A block edit is one Entry.ApplyEdits batch (fyne v2.14.0, pre-rebrand tracker #433): one splice
 // per touched line, applied atomically — a single undo step, one OnChanged, and
 // per-splice BeforeChange gating with all-or-nothing veto. Each line's splice is
 // gated exactly like a manual edit at that position: an insert at a protected
-// range's start boundary is allowed (it shifts the span, #108), while a dedent
+// range's start boundary is allowed (it shifts the span, pre-rebrand tracker #108), while a dedent
 // that would delete protected characters vetoes the whole batch.
 
 // handleTabIndent implements Tab (indent) and Shift-Tab (dedent). It returns true

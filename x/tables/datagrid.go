@@ -24,9 +24,9 @@ var (
 	_ core.Widget                        = (*DataGrid)(nil)
 	_ core.Accessible                    = (*DataGrid)(nil)
 	_ core.AccessibleGridDimensioner     = (*DataGrid)(nil)
-	_ core.AccessibleActiveDescendant    = (*DataGrid)(nil) // #42: cursor cell as AT-focused descendant (fyne#688)
-	_ core.AccessibleVirtualCellRealizer = (*DataGrid)(nil) // #78: navigate off-viewport cells (fyne#637)
-	_ core.AccessibleScrollIntoView      = (*DataGrid)(nil) // #78: bring an off-viewport cell into view (fyne#637)
+	_ core.AccessibleActiveDescendant    = (*DataGrid)(nil) // pre-rebrand tracker #42: cursor cell as AT-focused descendant (pre-rebrand tracker #688)
+	_ core.AccessibleVirtualCellRealizer = (*DataGrid)(nil) // #78: navigate off-viewport cells (pre-rebrand tracker #637)
+	_ core.AccessibleScrollIntoView      = (*DataGrid)(nil) // #78: bring an off-viewport cell into view (pre-rebrand tracker #637)
 	_ event.Focusable                    = (*DataGrid)(nil)
 	_ event.Tappable                     = (*DataGrid)(nil)
 	_ event.DoubleTappable               = (*DataGrid)(nil)
@@ -360,7 +360,7 @@ func (g *DataGrid) updateViewportGeometry() {
 
 // buildRowHeights populates the viewport's per-row height overrides, keyed by
 // display row. Two sparse, source-keyed inputs are folded here: Options.
-// RowHeightFunc (arbitrary per-row heights, #11) and master-detail expansion
+// RowHeightFunc (arbitrary per-row heights, pre-rebrand tracker #11) and master-detail expansion
 // (an extra DetailHeight band beneath expanded rows). Only rows that differ from
 // the default are stored, so a grid with neither input stays on the uniform O(1)
 // path. When either is active the loop is O(n) over display rows, which is the
@@ -1292,10 +1292,10 @@ func (g *DataGrid) AccessibleCellIdentity(row, col int) any {
 // AccessibleActiveDescendant returns the stable identity of the cell the
 // keyboard cursor is on, letting the platform a11y bridge move screen-reader
 // focus to that cell as the cursor travels — a focusable container designating
-// its AT-focused descendant, the aria-activedescendant analog (fyne#688). The
+// its AT-focused descendant, the aria-activedescendant analog (pre-rebrand tracker #688). The
 // value equals the focused cell's AccessibleCellIdentity, so it resolves through
 // the same source-keyed node identity the realized host and off-screen virtual
-// node already carry (core.AccessibleIdentified, #635); the bridge raises a UIA
+// node already carry (core.AccessibleIdentified, pre-rebrand tracker #635); the bridge raises a UIA
 // focus-change event when it changes.
 //
 // It is nil when the grid does not hold focus, the cursor is cleared, or the
@@ -1312,7 +1312,7 @@ func (g *DataGrid) AccessibleActiveDescendant() any {
 
 // AccessibleRealizeCell builds the semantic node for a single cell the screen
 // reader has navigated to that is NOT in the realized viewport window, without
-// materializing the rows between (core.AccessibleVirtualCellRealizer, fyne#637).
+// materializing the rows between (core.AccessibleVirtualCellRealizer, pre-rebrand tracker #637).
 // The grid virtualizes — only visible cells exist as real hosts — so this is the
 // only way assistive tech reaches a cell in a million-row grid past the viewport.
 //
@@ -1359,7 +1359,7 @@ func (g *DataGrid) AccessibleRealizeCell(row, col int) (core.AccessibleVirtualNo
 
 // AccessibleScrollCellIntoView scrolls the grid so the cell at the given display
 // (row, col) becomes visible and realized (core.AccessibleScrollIntoView,
-// fyne#637) — the explicit realize/activate path, kept separate from the read
+// pre-rebrand tracker #637) — the explicit realize/activate path, kept separate from the read
 // path so merely announcing an off-screen cell does not move the viewport. Once
 // on-screen the cell exists as a real host, so its "select" action then routes
 // normally. Out-of-range coordinates are ignored. Called on the main goroutine.
@@ -2126,7 +2126,7 @@ func (g *DataGrid) displayRowForSource(src int) int {
 // only the display-space cursors — selectedCell (edit/paste/scroll/API target)
 // and currentFocus (keyboard) — drift. Costs nothing when no cursor is set.
 //
-// Paginated grids: followCursorAcrossPages runs first (issue #9, Option A), so a
+// Paginated grids: followCursorAcrossPages runs first (pre-rebrand issue #9, Option A), so a
 // cursor whose row moved to another page has already been navigated onto that
 // page by the time we get here and resolves normally. A row that is genuinely
 // gone (filtered out of every page) still resolves to -1 and clears below.
@@ -2528,7 +2528,7 @@ func (g *DataGrid) activeCursorSource() int {
 }
 
 // followCursorAcrossPages keeps the interaction cursor with its source row when a
-// re-sort/re-filter pushes that row onto a different page (issue #9, Option A:
+// re-sort/re-filter pushes that row onto a different page (pre-rebrand issue #9, Option A:
 // follow). Without it the row falls outside the current page's index and the
 // cursor clears even though the row still exists. It navigates to the row's new
 // page (updating paginateTransform.CurrentPage) and marks the pipeline dirty so

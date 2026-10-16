@@ -5,7 +5,7 @@ import (
 )
 
 // Bidi-aware caret/selection geometry for rows mixing inline non-text atoms
-// (inline images, #665) with right-to-left text (#913).
+// (inline images, pre-rebrand tracker #665) with right-to-left text (pre-rebrand tracker #913).
 //
 // Two column spaces meet here. RichEntry addresses content in document
 // positions, where each inline atom occupies exactly one position; the bidi
@@ -117,7 +117,7 @@ func (t *RichText) rowBoxDocPositions(row int) []int {
 
 // bidiInlineColumnX resolves the caret x for a document-space column on a row
 // that mixes inline atoms with right-to-left text — the bidi-aware counterpart
-// of the LTR-only inlineColumnX (#913). The returned x uses the same baseline
+// of the LTR-only inlineColumnX (pre-rebrand tracker #913). The returned x uses the same baseline
 // convention (innerPad-inset, gutter excluded). ok=false when the row has no
 // inline atom or no RTL content, so callers keep the existing paths unchanged.
 func (t *RichText) bidiInlineColumnX(row, docCol int, innerPad float32, downstream bool) (float32, bool) {
@@ -143,7 +143,7 @@ func (t *RichText) bidiInlineColumnX(row, docCol int, innerPad float32, downstre
 // bidiInlineSelectionSpans returns the disjoint visual x-intervals covering
 // the document-space column range [startDocCol, endDocCol) on a row that
 // mixes inline atoms with right-to-left text — the bidi counterpart of the
-// LTR selection walk over inlineColumnX (#893, #913). An atom is filled
+// LTR selection walk over inlineColumnX (pre-rebrand tracker #893, pre-rebrand tracker #913). An atom is filled
 // exactly when its own document position lies inside the range, matching
 // RichEntry's position-space selection model. Coordinates match
 // rtlSelectionSpans (offset by innerPad-inset). ok=false when the row has no
@@ -220,7 +220,7 @@ func (t *RichText) rowTextColToDoc(row, textCol int) int {
 // bidiInlineHitTest maps a visual x on a row that mixes inline atoms with
 // right-to-left text back to a caret position — the bidi-aware inverse of
 // bidiInlineColumnX and the box-aware counterpart of the LTR inlineColumnAt
-// (#983). x uses the same baseline as bidiInlineColumnX (innerPad-inset, gutter
+// (pre-rebrand tracker #983). x uses the same baseline as bidiInlineColumnX (innerPad-inset, gutter
 // excluded); the row's visual layout resolves the hit against text carets and
 // inline-box edges alike, so a click on an image resolves to the atom rather
 // than snapping to the nearest text caret (HitTestAffinity is box-blind).

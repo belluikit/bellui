@@ -47,7 +47,7 @@ func (w *window) doSetParentNative(parent *window) {
 }
 
 // doSetModalNative blocks (or restores) keyboard/main focus on the parent
-// window while this dialog is modal (#676). macOS has no window-modal primitive
+// window while this dialog is modal (pre-rebrand tracker #676). macOS has no window-modal primitive
 // for a free-floating window — a sheet is not free-floating and an NSApp modal
 // session is app-modal (would block every window) — so instead of native
 // modality the parent NSWindow is prevented from becoming key/main
@@ -57,13 +57,13 @@ func (w *window) doSetParentNative(parent *window) {
 // is a no-op — the block is expressed against the owner.
 func (w *window) doSetModalNative(parent *window, modal bool) {
 	if parent == nil || !w.blockParentModal(parent, modal) {
-		return // nil parent, or another modal child already blocks it (#682)
+		return // nil parent, or another modal child already blocks it (pre-rebrand tracker #682)
 	}
 	C.setWindowModalBlocked(parent.view().GetCocoaWindow(), C.bool(modal))
 }
 
 // modalBlocked reports whether this window is currently key/main-blocked as a
-// modal dialog's parent (test introspection for #676).
+// modal dialog's parent (test introspection for pre-rebrand tracker #676).
 func (w *window) modalBlocked() bool {
 	return bool(C.isWindowModalBlocked(w.view().GetCocoaWindow()))
 }

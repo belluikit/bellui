@@ -10,7 +10,7 @@ import (
 )
 
 // The combined picker merges date and time changes so that adjusting one
-// component never discards the other (#291).
+// component never discards the other (pre-rebrand tracker #291).
 
 func TestDateTimePicker_DateChangePreservesTime(t *testing.T) {
 	test.NewTempApp(t)

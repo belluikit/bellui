@@ -18,7 +18,7 @@ import (
 )
 
 // TestDarwinMenu_belluiOwnsMainMenu verifies that bellui — not GLFW — builds the
-// native main menu bar (#831): after setup the app submenu (index 0) carries the
+// native main menu bar (pre-rebrand tracker #831): after setup the app submenu (index 0) carries the
 // standard About and Quit items, and the standard Window menu still exists. This
 // is what keeps the app menu (and its Quit ⌘Q) present now that GLFW's
 // createMenuBar() is suppressed via GLFW_COCOA_MENUBAR=false.
@@ -183,7 +183,7 @@ func TestDarwinMenu(t *testing.T) {
 	assertLastAction("new open")
 }
 
-// TestDarwinMenu_emptySubmenuNotAttached verifies fix (3) of #811: an item whose
+// TestDarwinMenu_emptySubmenuNotAttached verifies fix (3) of pre-rebrand tracker #811: an item whose
 // ChildMenu is empty (or separators-only) must not get a native NSMenu attached —
 // a stray empty submenu is one of the concrete triggers of the use-after-free.
 func TestDarwinMenu_emptySubmenuNotAttached(t *testing.T) {
@@ -219,7 +219,7 @@ func TestDarwinMenu_emptySubmenuNotAttached(t *testing.T) {
 }
 
 // TestDarwinMenu_rebuildRetainsObjects exercises the reset/rebuild path repeatedly
-// (fix (1) of #811). It doesn't reproduce the timing-dependent UAF, but drives the
+// (fix (1) of pre-rebrand tracker #811). It doesn't reproduce the timing-dependent UAF, but drives the
 // retain-then-deferred-release lifecycle to catch any imbalance (double free / leak
 // surfacing as an Obj-C exception) in menu teardown.
 func TestDarwinMenu_rebuildRetainsObjects(t *testing.T) {

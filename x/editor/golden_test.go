@@ -102,7 +102,7 @@ func TestGolden_Redaction(t *testing.T) {
 
 // fillRowDecorator paints every row, so the bottom partially-visible row always
 // produces an overhanging rect — the condition that bleeds past the editor
-// without the decoratorOverlay clip (#341 root cause).
+// without the decoratorOverlay clip (pre-rebrand tracker #341 root cause).
 type fillRowDecorator struct{}
 
 func (fillRowDecorator) Decorate(_ int, pos geo.Position, size geo.Size) []core.CanvasObject {

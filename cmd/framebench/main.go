@@ -1,5 +1,5 @@
 // Command framebench is a frame-time benchmark harness for the dirty-region
-// partial-repaint optimization (issue #9). The GL/WebGPU paint path cannot be
+// partial-repaint optimization (pre-rebrand issue #9). The GL/WebGPU paint path cannot be
 // exercised by the software-painter golden suite, so the optimization can only
 // be measured on a real GPU. This harness builds a deliberately heavy, mostly
 // static scene and then drives one deterministic update workload at a fixed

@@ -9,7 +9,7 @@ import (
 // wants before any word-wrapping — via fyne's [widget.RichText.IntrinsicSize].
 // A word-wrapping RichText reports MinSize().Width as ~0, so the hover and
 // signature cards size themselves from this and then flow the wrapped height
-// within the capped width (#103; the API landed in fyne v2.10.1 / fyne#192,
+// within the capped width (pre-rebrand tracker #103; the API landed in fyne v2.10.1 / pre-rebrand tracker #192,
 // replacing fycoder's earlier refresh-toggle workaround).
 func naturalRichSize(rt *widget.RichText) geo.Size {
 	return rt.IntrinsicSize()
@@ -18,7 +18,7 @@ func naturalRichSize(rt *widget.RichText) geo.Size {
 // MarkupKind says how a documentation string should be rendered. It is the
 // single representation shared by the hover card, the completion documentation
 // panel, and signature-help docs, so plaintext-vs-markdown is expressed the same
-// way across all three surfaces (#87).
+// way across all three surfaces (pre-rebrand tracker #87).
 type MarkupKind int
 
 const (

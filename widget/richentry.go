@@ -19,7 +19,7 @@ import (
 
 // RichEntry is an editable rich-text surface: text with per-run styling laid out
 // and rendered by [RichText], edited through a segment-aware document model
-// (#648, Phase 1).
+// (pre-rebrand tracker #648, Phase 1).
 //
 // Unlike [Entry] — which is flat-string / single-segment to the bone — RichEntry
 // stores its content as an ordered list of [TextSegment]s and [ImageSegment]
@@ -28,7 +28,7 @@ import (
 // deletion, caret navigation, selection), per-run styling via
 // [RichEntry.ApplyStyle], undo/redo, IME composition, flavor-aware clipboard, and
 // both block and inline images ([RichEntry.InsertImage] / [RichEntry.InsertInlineImage],
-// #665). Word/character wrapping is opt-in via [RichEntry.Wrapping] (#653; the
+// pre-rebrand tracker #665). Word/character wrapping is opt-in via [RichEntry.Wrapping] (pre-rebrand tracker #653; the
 // default is off, one rendered row per '\n'-separated line).
 //
 // Since: 1.0
@@ -54,7 +54,7 @@ type RichEntry struct {
 	// default [bellui.TextWrapOff] keeps each '\n'-separated line on one rendered row
 	// (horizontal scrolling is the caller's concern); [bellui.TextWrapWord] and
 	// [bellui.TextWrapBreak] soft-wrap a long line onto multiple visual rows, with
-	// the caret and selection mapping following the wrap (#653).
+	// the caret and selection mapping following the wrap (pre-rebrand tracker #653).
 	//
 	// Since: 1.0
 	Wrapping bellui.TextWrap
@@ -84,7 +84,7 @@ type RichEntry struct {
 	selectKeyDown bool
 	focused       bool
 
-	// IME composition state (#658). The preedit is shown inline at the caret but
+	// IME composition state (pre-rebrand tracker #658). The preedit is shown inline at the caret but
 	// never touches the document, undo or change callbacks until commit.
 	composing     bool
 	preeditText   string
@@ -95,7 +95,7 @@ type RichEntry struct {
 	shortcut   bellui.ShortcutHandler
 	undo       richEntryUndoStack
 
-	// Mobile touch-selection state (#888, parity with Entry's #758): selHandles
+	// Mobile touch-selection state (pre-rebrand tracker #888, parity with Entry's pre-rebrand tracker #758): selHandles
 	// is the draggable-handle overlay shown while a focused editor has a live
 	// touch-initiated selection; touchPointer notes whether the most recent
 	// pointer-down was a touch; touchSelection marks the selection as
@@ -104,16 +104,16 @@ type RichEntry struct {
 	selHandles                   *entrySelectionHandles
 	touchPointer, touchSelection bool
 
-	// caretHandle is the mobile caret drag-handle overlay (#999, parity with
-	// Entry's #943): a single draggable dot summoned after a plain touch tap so
+	// caretHandle is the mobile caret drag-handle overlay (pre-rebrand tracker #999, parity with
+	// Entry's pre-rebrand tracker #943): a single draggable dot summoned after a plain touch tap so
 	// the insertion point can be repositioned without selecting. See
 	// richentry_caret_handle.go.
 	caretHandle *richEntryCaretHandle
 
 	// axText memoizes AccessibleText's U+FFFC rune stream so the mobile
-	// text-input mirror's per-paint-frame sync (#783) does not rebuild the whole
+	// text-input mirror's per-paint-frame sync (pre-rebrand tracker #783) does not rebuild the whole
 	// document string every frame; invalidated only on committed-content changes
-	// (afterEditNotify + SetSegments), not on repaint/preedit/restyle (#794).
+	// (afterEditNotify + SetSegments), not on repaint/preedit/restyle (pre-rebrand tracker #794).
 	// Main-goroutine-owned, like the rest of the widget's state.
 	axText      string
 	axTextValid bool
@@ -138,7 +138,7 @@ func (e *RichEntry) SetSegments(segs []RichTextSegment) {
 	e.doc.setSegments(segs)
 	e.caret, e.anchor, e.selecting = 0, 0, false
 	e.undo.clear()        // external content replacement is not undoable
-	e.axTextValid = false // committed content replaced; drop the AccessibleText memo (#794)
+	e.axTextValid = false // committed content replaced; drop the AccessibleText memo (pre-rebrand tracker #794)
 	e.syncProvider()
 	e.Refresh()
 }
@@ -203,7 +203,7 @@ func (e *RichEntry) InsertImageResource(res bellui.Resource) {
 // InsertInlineImage inserts an in-memory image that flows *within* the current
 // text row (like a large glyph) rather than on its own block row, as one undo
 // step. The image occupies one caret position; any current selection is
-// replaced (#665).
+// replaced (pre-rebrand tracker #665).
 //
 // Since: 1.0
 func (e *RichEntry) InsertInlineImage(img image.Image) {
@@ -342,12 +342,12 @@ func (e *RichEntry) insertRunes(runes []rune) {
 // afterEditNotify refreshes the provider, repaints and fires OnChanged after a
 // content change (interactive edit, undo or redo).
 func (e *RichEntry) afterEditNotify() {
-	e.axTextValid = false // committed content changed; drop the AccessibleText memo (#783/#794)
+	e.axTextValid = false // committed content changed; drop the AccessibleText memo (pre-rebrand tracker #783/#794)
 	e.interruptCursor()
 	// e.Refresh() re-syncs the provider synchronously (BaseWidget.Refresh ->
 	// richEntryRenderer.Refresh -> syncProvider), so a direct syncProvider here
 	// would rebuild + re-lay-out the whole provider a second time per keystroke —
-	// O(document) wasted work on a large doc (#896).
+	// O(document) wasted work on a large doc (pre-rebrand tracker #896).
 	e.Refresh()
 	if e.OnChanged != nil {
 		e.OnChanged()
@@ -410,7 +410,7 @@ func (e *RichEntry) FocusLost() {
 // an IME composition is active, a typed rune commits it (the desktop char
 // callback path).
 func (e *RichEntry) TypedRune(r rune) {
-	// Typing dismisses the mobile caret drag-handle (#999).
+	// Typing dismisses the mobile caret drag-handle (pre-rebrand tracker #999).
 	e.hideCaretHandle()
 	if e.composing {
 		e.ComposeCommit(string(r))
@@ -421,7 +421,7 @@ func (e *RichEntry) TypedRune(r rune) {
 
 // TypedKey receives key input events for editing and navigation.
 func (e *RichEntry) TypedKey(key *event.KeyEvent) {
-	// Keyboard interaction dismisses the mobile caret drag-handle (#999).
+	// Keyboard interaction dismisses the mobile caret drag-handle (pre-rebrand tracker #999).
 	e.hideCaretHandle()
 	if e.composing {
 		if key.Name == event.KeyEscape {
@@ -521,7 +521,7 @@ func (e *RichEntry) Tapped(ev *event.PointEvent) {
 	row, col, _ := e.sel.getRowCol(ev.Position)
 	e.moveCaret(e.doc.rowColToOffset(row, col), false)
 	// A plain touch tap placing the caret summons the draggable caret handle
-	// (#999); a drag-select or long-press instead starts a selection, which
+	// (pre-rebrand tracker #999); a drag-select or long-press instead starts a selection, which
 	// updateCaretHandle then hides in favor of the selection handles.
 	e.showCaretHandle()
 }
@@ -557,7 +557,7 @@ func (e *RichEntry) DoubleTapped(ev *event.PointEvent) {
 	e.selecting = e.anchor != e.caret
 	e.interruptCursor()
 	if e.selecting && e.touchPointer {
-		e.markTouchSelection() // a mobile double-tap selection gets handles (#888)
+		e.markTouchSelection() // a mobile double-tap selection gets handles (pre-rebrand tracker #888)
 	}
 	e.Refresh()
 }
@@ -567,7 +567,7 @@ func (e *RichEntry) DoubleTapped(ev *event.PointEvent) {
 // Dragged extends a text selection as the pointer (or touch) moves. The first
 // event of a drag anchors the selection at the drag's start position; later
 // events move the caret end. This is the only selection path on mobile, which
-// has no Shift key (#750).
+// has no Shift key (pre-rebrand tracker #750).
 func (e *RichEntry) Dragged(d *event.DragEvent) {
 	e.requestFocus()
 	e.syncSel()
@@ -581,7 +581,7 @@ func (e *RichEntry) Dragged(d *event.DragEvent) {
 	e.caret = clampInt(e.doc.rowColToOffset(row, col), 0, e.doc.len())
 	e.interruptCursor()
 	if e.touchPointer && e.selecting {
-		e.markTouchSelection() // a touch drag-select gets handles (#888)
+		e.markTouchSelection() // a touch drag-select gets handles (pre-rebrand tracker #888)
 	}
 	e.Refresh()
 }
@@ -595,7 +595,7 @@ func (e *RichEntry) DragEnd() {
 	}
 
 	// A finished touch drag-select offers the context menu for the new
-	// selection, like a handle adjustment (native toolbar parity, #945).
+	// selection, like a handle adjustment (native toolbar parity, pre-rebrand tracker #945).
 	// This also covers the hold-fire long-press that keeps moving: its
 	// release ends as a drag, so the driver's release-time TappedSecondary
 	// never fires for it. Touch-gated: desktop mouse selection is unchanged.
@@ -647,7 +647,7 @@ func (e *RichEntry) selectAll() {
 }
 
 // copyToClipboard writes the selection to the clipboard, negotiating flavors
-// (#666): a lone in-memory image goes to the image flavor; styled text goes to
+// (pre-rebrand tracker #666): a lone in-memory image goes to the image flavor; styled text goes to
 // the HTML flavor (with a plain-text fallback); otherwise plain text.
 func (e *RichEntry) copyToClipboard(clipboard bellui.Clipboard) {
 	from, to, ok := e.selection()
@@ -681,7 +681,7 @@ func (e *RichEntry) cutToClipboard(clipboard bellui.Clipboard) {
 }
 
 // pasteFromClipboard inserts the clipboard content at the caret, negotiating
-// flavors (#657): an image is inserted as a block atom; HTML is parsed to styled
+// flavors (pre-rebrand tracker #657): an image is inserted as a block atom; HTML is parsed to styled
 // segments; otherwise plain text (line endings normalized to '\n'). Each paste is
 // one undo step.
 func (e *RichEntry) pasteFromClipboard(clipboard bellui.Clipboard) {
@@ -735,7 +735,7 @@ func (e *RichEntry) Hide() {
 	e.BaseWidget.Hide()
 }
 
-// --- IME composition (event.Composable / PreeditPositioner, #658) ---
+// --- IME composition (event.Composable / PreeditPositioner, pre-rebrand tracker #658) ---
 
 // Compose sets or replaces the inline preedit text shown at the caret. It does
 // not change the document, undo history or change callbacks.
@@ -855,7 +855,7 @@ func (e *RichEntry) caretDoc() (*richEntryDoc, int) {
 		disp := &richEntryDoc{segs: e.provider.Segments}
 		if e.Wrapping != bellui.TextWrapOff {
 			// Follow the wrap of the composed display so the candidate window is
-			// positioned on the correct visual row of a wrapped document (#891).
+			// positioned on the correct visual row of a wrapped document (pre-rebrand tracker #891).
 			disp.setWrapRows(disp.buildWrapRows(&e.provider))
 		}
 		return disp, e.caret + e.preeditCursor
@@ -874,7 +874,7 @@ func (e *RichEntry) syncProvider() {
 
 // rebuildWrapRows refreshes the wrapping-aware row model from the provider's
 // laid-out rowBounds when wrapping is on, so the caret/selection mapping follows
-// soft-wrap splits (#653); with wrapping off it reverts to the fast newline-count
+// soft-wrap splits (pre-rebrand tracker #653); with wrapping off it reverts to the fast newline-count
 // model. It is skipped during IME composition, whose display document (preedit
 // spliced in) is not d.segs — the caret then rides the composition temp doc
 // (caretDoc), which is wrap-off; live wrapping resumes on commit.
@@ -904,7 +904,7 @@ func (e *RichEntry) syncSel() {
 
 // rowHasInlineAtom reports whether the given rendered row contains an inline
 // non-text atom (an inline image), whose width the text-only column space does
-// not account for — so its caret geometry needs the segment walk (#665). A block
+// not account for — so its caret geometry needs the segment walk (pre-rebrand tracker #665). A block
 // image is not inline and takes the whole-row left-edge path instead.
 func (e *RichEntry) rowHasInlineAtom(row int) bool {
 	b := e.provider.rowBoundary(row)
@@ -925,7 +925,7 @@ func (e *RichEntry) rowHasInlineAtom(row int) bool {
 // caretXInlineWalk computes the caret x for a row that flows inline image atoms
 // among text: it walks the row's segments in order, advancing by each text
 // slice's measured width and each atom's rendered width, until it has consumed
-// `col` positions (#665). This is the atom-aware replacement for
+// `col` positions (pre-rebrand tracker #665). This is the atom-aware replacement for
 // lineSizeToColumn, which measures through images as if they were zero width.
 func (e *RichEntry) caretXInlineWalk(row, col int, textSize, leadingX float32) float32 {
 	innerPad := e.Theme().Size(theme.SizeNameInnerPadding)
@@ -946,7 +946,7 @@ func (e *RichEntry) caretRect() (pos geo.Position, size geo.Size) {
 
 // caretRectAt returns the caret rectangle at an arbitrary (row, column) in the
 // editor's content coordinates — the geometry shared by the caret visual and
-// the mobile selection-handle edges (#888).
+// the mobile selection-handle edges (pre-rebrand tracker #888).
 func (e *RichEntry) caretRectAt(row, col int, imageRow bool) (pos geo.Position, size geo.Size) {
 	th := e.Theme()
 	innerPad := th.Size(theme.SizeNameInnerPadding)
@@ -960,7 +960,7 @@ func (e *RichEntry) caretRectAt(row, col int, imageRow bool) (pos geo.Position, 
 	case e.rowHasInlineAtom(row):
 		// The row mixes text and inline image atoms, whose widths RichText's
 		// text-only column space ignores. Under bidi the visual layout resolves
-		// the position (#913); otherwise walk the row's segments LTR (#665).
+		// the position (pre-rebrand tracker #913); otherwise walk the row's segments LTR (pre-rebrand tracker #665).
 		if bx, ok := e.provider.bidiInlineColumnX(row, col, innerPad, true); ok {
 			x = bx + e.provider.GutterWidth
 		} else {
@@ -975,7 +975,7 @@ func (e *RichEntry) caretRectAt(row, col int, imageRow bool) (pos geo.Position, 
 		// only caret sits at the leading content edge. Measuring the row would return
 		// the same leading x in software, but some GPU/mobile text paths report a
 		// nonzero advance for an empty run and drop the caret at the trailing edge
-		// (#749) — placing it directly is both correct and quirk-proof.
+		// (pre-rebrand tracker #749) — placing it directly is both correct and quirk-proof.
 		x = leadingX
 	default:
 		before := e.provider.lineSizeToColumn(col, row, textSize, innerPad, true)
@@ -1051,7 +1051,7 @@ func (r *richEntryRenderer) Layout(size geo.Size) {
 
 	// A width change rewraps the content, so the wrapping-aware row model must be
 	// rebuilt from the freshly laid-out provider (Layout is not routed through
-	// syncProvider) so the caret mapping tracks the new wrap points (#653).
+	// syncProvider) so the caret mapping tracks the new wrap points (pre-rebrand tracker #653).
 	r.entry.rebuildWrapRows()
 }
 
@@ -1121,10 +1121,10 @@ func (r *richEntryRenderer) Refresh() {
 	r.cursor.Move(pos)
 	r.cursor.Resize(size)
 
-	// The central mobile selection-handle seam (#888): every selection or
+	// The central mobile selection-handle seam (pre-rebrand tracker #888): every selection or
 	// focus mutation funnels through this Refresh (a no-op off mobile).
 	e.updateSelectionHandles()
-	// The caret drag-handle (#999) rides the same central Refresh seam.
+	// The caret drag-handle (pre-rebrand tracker #999) rides the same central Refresh seam.
 	e.updateCaretHandle()
 
 	canvas.Refresh(e.super())

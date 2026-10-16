@@ -1,5 +1,5 @@
 // Command globalhotkeyprobe is a live-verify harness for the system-wide global
-// hotkey API (#518, desktop.GlobalShortcutApp). It registers Ctrl+Alt+K and
+// hotkey API (pre-rebrand tracker #518, desktop.GlobalShortcutApp). It registers Ctrl+Alt+K and
 // logs each time the shortcut fires — even while another application is in the
 // foreground, which is the whole point of a global hotkey.
 //

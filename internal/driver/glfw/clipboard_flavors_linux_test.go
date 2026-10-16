@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Clipboard flavors landed on Linux with #513 phase 2 (X11 selection /
+// Clipboard flavors landed on Linux with pre-rebrand tracker #513 phase 2 (X11 selection /
 // Wayland data-source support in the forked GLFW), so the capability
 // assertions must succeed like on macOS and Windows.
 func TestClipboard_FlavorsOnLinux(t *testing.T) {

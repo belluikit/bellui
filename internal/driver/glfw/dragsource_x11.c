@@ -1,7 +1,7 @@
 //go:build (linux && !wayland && !wasm && !test_web_driver) || freebsd || openbsd || netbsd
 
-// XDND (X Drag-and-Drop) *source* protocol, hand-rolled for drag-out (#838,
-// #515 Part B). GLFW exposes no drag-source API and keeps its Xlib Display on
+// XDND (X Drag-and-Drop) *source* protocol, hand-rolled for drag-out (pre-rebrand tracker #838,
+// pre-rebrand tracker #515 Part B). GLFW exposes no drag-source API and keeps its Xlib Display on
 // its own thread, so rather than fight GLFW's event loop we run the whole drag
 // on a *private* Xlib connection (opened here, used only by the caller's locked
 // OS thread — see dragsource_x11.go). That connection owns the XdndSelection,
@@ -216,7 +216,7 @@ static int waitForFinished(Display* dpy, XdndAtoms* A, int targetVer,
 	// its conversions by then, and keeping the loop (and our XdndSelection
 	// ownership) alive any longer overlaps the next gesture's drag loop — the
 	// teardown then revoked the newer loop's selection ownership and its drop
-	// could not convert (#933: the "stuck highlight" on the target).
+	// could not convert (pre-rebrand tracker #933: the "stuck highlight" on the target).
 	for (;;) {
 		while (XPending(dpy) > 0) {
 			XEvent ev;
@@ -259,7 +259,7 @@ typedef struct {
 // createDragIcon builds a click-through, override-redirect ARGB window showing
 // the iconW×iconH premultiplied-BGRA image, or leaves icon->win == None when no
 // image is given or the server has no 32-bit TrueColor (ARGB) visual — the icon
-// is purely cosmetic, so any failure degrades to the pre-#865 no-feedback drag.
+// is purely cosmetic, so any failure degrades to the before pre-rebrand tracker #865 no-feedback drag.
 static void createDragIcon(Display* dpy, int screen, Window root,
     const unsigned char* argb, int w, int h, DragIcon* icon) {
 	memset(icon, 0, sizeof(*icon));
@@ -268,7 +268,7 @@ static void createDragIcon(Display* dpy, int screen, Window root,
 	}
 
 	// A 32-bit TrueColor visual gives per-pixel alpha under a compositor (the
-	// common desktop case, e.g. GNOME/Mutter from the #865 report). Without one
+	// common desktop case, e.g. GNOME/Mutter from the pre-rebrand tracker #865 report). Without one
 	// we skip the icon rather than draw an opaque box with black fringes.
 	XVisualInfo vinfo;
 	if (!XMatchVisualInfo(dpy, screen, 32, TrueColor, &vinfo)) {
@@ -296,7 +296,7 @@ static void createDragIcon(Display* dpy, int screen, Window root,
 	// compositor/WM excludes it from XDND target tracking. Without this, a raised
 	// follower window sits in the drag path and derails Mutter's XWayland→Wayland
 	// drop routing — the drop never engages the real target and the source's grab
-	// isn't released for ~30s (#933). The empty input shape below is not enough:
+	// isn't released for ~30s (pre-rebrand tracker #933). The empty input shape below is not enough:
 	// it hides the window from *input*, not from the compositor's DnD hit-test.
 	// Must be set before the window is mapped.
 	Atom netWmWindowType = XInternAtom(dpy, "_NET_WM_WINDOW_TYPE", False);
@@ -361,7 +361,7 @@ static void moveDragIcon(Display* dpy, DragIcon* icon, int rx, int ry) {
 // destroyDragIcon tears down every icon resource. It unmaps first and XSyncs so
 // the server (and compositor) process the removal immediately — a destroy left
 // queued behind the drop handshake keeps the ghost's pixels on screen until the
-// next repaint (#919/#933).
+// next repaint (pre-rebrand tracker #919/#933).
 static void destroyDragIcon(Display* dpy, DragIcon* icon) {
 	if (icon->win == None) {
 		return;
@@ -443,7 +443,7 @@ int belluiStartDragX11(BelluiDragFlavor* flavors, int count,
 
 	Time now = getServerTime(dpy, src, timeProp);
 
-	// Cosmetic drag-icon window trailing the pointer (#865). Created on the same
+	// Cosmetic drag-icon window trailing the pointer (pre-rebrand tracker #865). Created on the same
 	// private connection; the compositor redirects/blends it like any window.
 	DragIcon icon;
 	createDragIcon(dpy, screen, root, iconARGB, iconW, iconH, &icon);
@@ -453,7 +453,7 @@ int belluiStartDragX11(BelluiDragFlavor* flavors, int count,
 	int accepted = 0;        // last XdndStatus accept flag from curTarget
 	int result = 0;
 
-	// Target-change debounce (#933): on XWayland the compositor bridges XDND to
+	// Target-change debounce (pre-rebrand tracker #933): on XWayland the compositor bridges XDND to
 	// Wayland through a 1x1 window it keeps moving under the cursor (Mutter's
 	// dnd window). Polling XQueryPointer races those moves — a single missed
 	// sample used to make us XdndLeave the bridge, which tears down the
@@ -477,7 +477,7 @@ int belluiStartDragX11(BelluiDragFlavor* flavors, int count,
 				// Per XDND, data.l[0] is the target window that sent the status —
 				// but Mutter's XWayland bridge stamps its *current* proxy window,
 				// which it rotates on every focus change, so the id may not match
-				// the window we messaged (#933). Only our current negotiation ever
+				// the window we messaged (pre-rebrand tracker #933). Only our current negotiation ever
 				// sends us XdndStatus, so accept it whenever a target is live.
 				if (curTarget != None) {
 					accepted = (ev.xclient.data.l[1] & 1) ? 1 : 0;
@@ -548,7 +548,7 @@ int belluiStartDragX11(BelluiDragFlavor* flavors, int count,
 		if ((mask & Button1Mask) == 0) {
 			// The gesture is over the instant the button is released; remove the
 			// trailing icon now so it never lingers through the accept-grace wait
-			// and the XdndDrop/XdndFinished handshake below (#919).
+			// and the XdndDrop/XdndFinished handshake below (pre-rebrand tracker #919).
 			destroyDragIcon(dpy, &icon);
 
 			// On a quick drag the target's XdndStatus (accept) may not have
@@ -565,7 +565,7 @@ int belluiStartDragX11(BelluiDragFlavor* flavors, int count,
 							serveSelection(dpy, &ev.xselectionrequest, flavors, atoms, count, A.targets);
 						} else if (ev.type == ClientMessage && ev.xclient.message_type == A.status) {
 							// See the drain loop above: Mutter stamps a rotated
-							// proxy-window id, so don't match on data.l[0] (#933).
+							// proxy-window id, so don't match on data.l[0] (pre-rebrand tracker #933).
 							accepted = (ev.xclient.data.l[1] & 1) ? 1 : 0;
 						}
 					}
@@ -596,7 +596,7 @@ int belluiStartDragX11(BelluiDragFlavor* flavors, int count,
 	// Only clear the XdndSelection if this drag still owns it — SetSelectionOwner
 	// is last-write-wins, so an unconditional clear here would revoke the
 	// ownership of a NEWER drag loop that started while this one was finishing,
-	// killing its data transfer (#933).
+	// killing its data transfer (pre-rebrand tracker #933).
 	if (XGetSelectionOwner(dpy, A.selection) == src) {
 		XSetSelectionOwner(dpy, A.selection, None, CurrentTime);
 	}

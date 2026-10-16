@@ -100,7 +100,7 @@ func TestEntryInsertText_ReplacesSelectionAndGates(t *testing.T) {
 }
 
 func TestEntryApplyEdits_BlockIndent(t *testing.T) {
-	// The #433 consumer scenario: indent every selected line as one undo step.
+	// The pre-rebrand tracker #433 consumer scenario: indent every selected line as one undo step.
 	e := NewMultiLineEntry()
 	e.SetText("aa\nbb\ncc")
 

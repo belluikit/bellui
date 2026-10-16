@@ -1,6 +1,6 @@
 //go:build accessibility && android
 
-// JNI down-calls for the TalkBack bridge (#488): thin shims from the Go side
+// JNI down-calls for the TalkBack bridge (pre-rebrand tracker #488): thin shims from the Go side
 // (via app.RunOnJVM) to the static accessibility methods on GoNativeActivity.
 // Method IDs are cached on first use; a missing method (an APK built with an
 // older embedded dex) degrades to a warning instead of crashing.
@@ -48,24 +48,24 @@ static void belluiA11yEnsureCached(JNIEnv *env, jobject ctx) {
 		{&a11y_clear_method, "clearAccessibilityNodes", "()V"},
 		{&a11y_add_method, "addAccessibilityNode",
 			"(IIILjava/lang/String;Ljava/lang/String;Ljava/lang/String;IIII)V"},
-		// V2 adds the virtualized-grid association (#817): parent grid node id,
+		// V2 adds the virtualized-grid association (pre-rebrand tracker #817): parent grid node id,
 		// cell display (row, col) and — for the grid itself — the collection
 		// extent. Missing on an APK built with an older embedded dex; the add
 		// call falls back to the original method then.
 		{&a11y_addv2_method, "addAccessibilityNodeV2",
 			"(IIILjava/lang/String;Ljava/lang/String;Ljava/lang/String;IIIIIIIII)V"},
-		// V3 adds the editable-text document (#974 option D): the live text, and
+		// V3 adds the editable-text document (pre-rebrand tracker #974 option D): the live text, and
 		// the half-open selection as rune offsets (-1/-1 when the node carries no
 		// document). Missing on an older embedded dex; falls back to V2 then V1.
 		{&a11y_addv3_method, "addAccessibilityNodeV3",
 			"(IIILjava/lang/String;Ljava/lang/String;Ljava/lang/String;IIIIIIIIILjava/lang/String;II)V"},
-		// V4 adds the custom accessibility actions (#1025): the encoded
+		// V4 adds the custom accessibility actions (pre-rebrand tracker #1025): the encoded
 		// (registry id, label) list a node offers beyond the standard
 		// semantics (undo/redo, ...). Missing on an older embedded dex; falls
 		// back to V3, V2 then V1.
 		{&a11y_addv4_method, "addAccessibilityNodeV4",
 			"(IIILjava/lang/String;Ljava/lang/String;Ljava/lang/String;IIIIIIIIILjava/lang/String;IILjava/lang/String;)V"},
-		// V5 adds the focused editor's visual-layout sidecar (#995): the
+		// V5 adds the focused editor's visual-layout sidecar (pre-rebrand tracker #995): the
 		// encoded line-boundary window + per-character rectangles behind
 		// legacy-TalkBack LINE granularity and the character-location extra.
 		// Missing on an older embedded dex; falls back to V4..V1.

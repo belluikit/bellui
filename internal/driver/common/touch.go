@@ -89,7 +89,7 @@ type TouchHandler struct {
 	scrollOrigin geo.Position
 
 	// LongPressCallback, when set by the driver, enables hold-fire long-press
-	// (#758): a stationary touch dispatches LongPressed at TapSecondaryDelay
+	// (pre-rebrand tracker #758): a stationary touch dispatches LongPressed at TapSecondaryDelay
 	// while the finger is still down — native mobile behavior — instead of on
 	// release. The release of a hold-fired touch then dispatches
 	// SecondaryTappable, so a widget implementing both gets "select on hold,
@@ -124,7 +124,7 @@ func (h *TouchHandler) TapDown(pos geo.Position, tapID int) {
 	h.scrolling = false
 	h.scrollingID = 0
 
-	// Tap-through overlays (#472/#569): when the top overlay opted in and the
+	// Tap-through overlays (pre-rebrand tracker #472/#569): when the top overlay opted in and the
 	// press lands outside its content, dismiss it now so the hit tests below
 	// (and the following TapUp) resolve this same press against the layer
 	// beneath — the mobile mirror of the desktop driver's
@@ -137,7 +137,7 @@ func (h *TouchHandler) TapDown(pos geo.Position, tapID int) {
 		}
 	}
 
-	// Long-press tooltip (#827): arm the ToolTipable under the finger. The
+	// Long-press tooltip (pre-rebrand tracker #827): arm the ToolTipable under the finger. The
 	// tooltip controller's own show-delay doubles as the press-and-hold
 	// threshold — a quick tap's TapUp cancels it before it appears, while a hold
 	// past the delay reveals the bubble (the touch mirror of the desktop hover
@@ -249,7 +249,7 @@ func (h *TouchHandler) cancelLongPress(tapID int) {
 	h.TouchCancelLock.Unlock()
 }
 
-// hideToolTip dismisses any pending or visible long-press tooltip (#827). Called
+// hideToolTip dismisses any pending or visible long-press tooltip (pre-rebrand tracker #827). Called
 // when the touch ends or turns into a drag, so a tooltip never lingers past the
 // gesture that summoned it.
 func (h *TouchHandler) hideToolTip() {
@@ -306,7 +306,7 @@ func (h *TouchHandler) TapMove(pos geo.Position, tapID int,
 		// Latch the drag target at the gesture origin, not the current finger
 		// position (matching the desktop driver): a fast first move can jump
 		// clear across a small Draggable — a selection handle, a slider thumb —
-		// and would otherwise start dragging whatever lies beyond it (#945
+		// and would otherwise start dragging whatever lies beyond it (pre-rebrand tracker #945
 		// device finding).
 		dragCo, dragPos := co, objPos
 		if originCo, originPos, _ := h.Finder.FindObjectAtPositionMatching(previousPos, func(object core.CanvasObject) bool {
@@ -368,7 +368,7 @@ func (h *TouchHandler) TapUp(pos geo.Position, tapID int,
 	doubleTapCallback func(event.DoubleTappable, *event.PointEvent),
 	dragCallback func(event.Draggable, *event.DragEvent),
 ) {
-	// The gesture is over: dismiss any long-press tooltip it summoned (#827)
+	// The gesture is over: dismiss any long-press tooltip it summoned (pre-rebrand tracker #827)
 	// and cancel any pending hold-fire, whatever kind of tap/drag it turns
 	// out to be.
 	h.hideToolTip()

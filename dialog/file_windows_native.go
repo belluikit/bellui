@@ -18,7 +18,7 @@ import (
 	"github.com/belluikit/bellui/storage"
 )
 
-// This is the Windows native file-dialog backend for #514: it drives the modern
+// This is the Windows native file-dialog backend for pre-rebrand tracker #514: it drives the modern
 // Common Item Dialog (IFileOpenDialog / IFileSaveDialog) purely through
 // x/sys/windows COM syscalls (no cgo). It plugs into the shared
 // fileOpenOSOverride / fileSaveOSOverride seam; returning false anywhere means
@@ -90,7 +90,7 @@ const (
 	vtblSetOkLabel   = 18 // IFileDialog::SetOkButtonLabel
 	vtblGetResult    = 20 // IFileDialog::GetResult
 	vtblSetDefExt    = 22 // IFileDialog::SetDefaultExtension
-	vtblGetResults   = 27 // IFileOpenDialog::GetResults (multi-select, #716)
+	vtblGetResults   = 27 // IFileOpenDialog::GetResults (multi-select, pre-rebrand tracker #716)
 )
 
 // IShellItem vtable slots.
@@ -99,7 +99,7 @@ const (
 	vtblShellItemGetDisplayName = 5
 )
 
-// IShellItemArray vtable slots (the multi-select result, #716).
+// IShellItemArray vtable slots (the multi-select result, pre-rebrand tracker #716).
 const (
 	vtblShellArrayRelease  = 2
 	vtblShellArrayGetCount = 7
@@ -121,7 +121,7 @@ func fileOpenOSOverride(d *FileDialog) bool {
 	if d.isDirectory() {
 		kind = panelOpenFolder
 	}
-	// Multi-select applies to file open only; a folder picker stays single (#716).
+	// Multi-select applies to file open only; a folder picker stays single (pre-rebrand tracker #716).
 	showWindowsDialog(d, kind, d.multiSelect && kind == panelOpenFile)
 	return true
 }
@@ -169,7 +169,7 @@ func showWindowsDialog(d *FileDialog, kind panelKind, multi bool) {
 	// The dialog's Show runs on the dedicated COM thread below, so Windows does
 	// not auto-disable the owner window (owner-modality needs same-thread
 	// ownership). Disable it manually here — on the parent's own (main)
-	// goroutine — for true modality, and re-enable once Show returns (#634).
+	// goroutine — for true modality, and re-enable once Show returns (pre-rebrand tracker #634).
 	// EnableWindow is skipped when unparented (hwnd == 0).
 	enableParentWindow(hwnd, false)
 
@@ -375,7 +375,7 @@ func windowsDialogResult(dialog *comObject) (path string, cancelled bool, err er
 
 // windowsDialogResultMulti pulls every chosen file-system path out of the
 // IShellItemArray returned by IFileOpenDialog::GetResults after a multi-select
-// Show (#716).
+// Show (pre-rebrand tracker #716).
 func windowsDialogResultMulti(dialog *comObject) (paths []string, cancelled bool, err error) {
 	var arr *comObject
 	if hr, _, _ := syscall.SyscallN(dialog.vtbl[vtblGetResults], uintptr(unsafe.Pointer(dialog)), uintptr(unsafe.Pointer(&arr))); int32(hr) < 0 || arr == nil {

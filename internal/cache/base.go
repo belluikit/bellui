@@ -23,7 +23,7 @@ var (
 	// or font change (ResetThemeCaches). Consumers that hold their own measurement
 	// memo derived from the global metrics cache read ThemeCacheGeneration to drop
 	// it in lock-step, so a theme swap or a late RegisterFontFallback (which pairs
-	// ClearFontCache with ResetThemeCaches) never serves stale sizes (#896).
+	// ClearFontCache with ResetThemeCaches) never serves stale sizes (pre-rebrand tracker #896).
 	themeCacheGen atomic.Uint64
 
 	// testing purpose only
@@ -116,7 +116,7 @@ func ResetThemeCaches() {
 // ThemeCacheGeneration returns a counter bumped each time the theme/font caches
 // are reset (ResetThemeCaches). A widget-level measurement memo compares this
 // against the generation it was built under and drops itself when it differs, so
-// it stays consistent with the authoritative global metrics cache (#896).
+// it stays consistent with the authoritative global metrics cache (pre-rebrand tracker #896).
 func ThemeCacheGeneration() uint64 {
 	return themeCacheGen.Load()
 }

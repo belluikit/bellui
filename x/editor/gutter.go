@@ -188,12 +188,12 @@ func (c *CompositeGutter) Tapped(row int) {
 //
 // A tap on an interactive provider's column reaches only that provider, so
 // click-to-reveal (diagnostics) and a breakpoint column in the same composite
-// don't both fire on a single tap (#95).
+// don't both fire on a single tap (pre-rebrand tracker #95).
 //
 // A tap on a non-interactive column — the wide line-number margin in the common
 // [line numbers, diagnostic, breakpoint] composition — falls back to toggling
 // the breakpoint gutter, so the whole margin acts as the breakpoint hit area
-// (VS Code-style) instead of swallowing the tap (#109). Because interactive
+// (VS Code-style) instead of swallowing the tap (pre-rebrand tracker #109). Because interactive
 // marker columns are handled first, this cannot double-fire a reveal and a
 // breakpoint toggle. A click past every column stays a no-op.
 func (c *CompositeGutter) TappedAtX(row int, x float32) {
@@ -206,7 +206,7 @@ func (c *CompositeGutter) TappedAtX(row int, x float32) {
 				return
 			}
 			// Non-interactive column (e.g. line numbers): treat the margin as
-			// the breakpoint hit area rather than dropping the tap (#109).
+			// the breakpoint hit area rather than dropping the tap (pre-rebrand tracker #109).
 			if bp := c.breakpointProvider(); bp != nil {
 				bp.Tapped(row)
 			}
@@ -218,7 +218,7 @@ func (c *CompositeGutter) TappedAtX(row int, x float32) {
 
 // breakpointProvider returns the first [BreakpointGutter] among the composite's
 // providers, or nil if none is present. It is the fallback target for taps that
-// land on a non-interactive column (#109).
+// land on a non-interactive column (pre-rebrand tracker #109).
 func (c *CompositeGutter) breakpointProvider() *BreakpointGutter {
 	for _, p := range c.columns {
 		if bp, ok := p.(*BreakpointGutter); ok {

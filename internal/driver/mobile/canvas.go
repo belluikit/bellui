@@ -163,7 +163,7 @@ func (c *canvas) applyThemeOutOfTreeObjects() {
 func (c *canvas) FindObjectAtPositionMatching(pos geo.Position, test func(object core.CanvasObject) bool) (core.CanvasObject, geo.Position, int) {
 	overlay := c.Overlays().Top()
 	// Only trust the spatial index while the canvas is clean — it is rebuilt
-	// during the paint walk and is stale between a change and the next frame (#590).
+	// during the paint walk and is stale between a change and the next frame (pre-rebrand tracker #590).
 	if overlay == nil {
 		if idx := c.SpatialIndex(); idx != nil && !c.IsDirty() {
 			if obj, lpos, ok := idx.FindObjectAtPositionMatching(pos, test); ok {
@@ -224,7 +224,7 @@ func (c *canvas) sizeContent(size geo.Size) {
 
 	for _, overlay := range c.Overlays().List() {
 		if p, ok := overlay.(*widget.PopUp); ok {
-			// TODO: remove this when #707 is being addressed.
+			// TODO: remove this when pre-rebrand tracker #707 is being addressed.
 			// “Notifies” the PopUp of the canvas size change.
 			p.Refresh()
 		} else {

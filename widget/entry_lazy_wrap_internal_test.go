@@ -36,7 +36,7 @@ func newLargeWrappedEntry(t *testing.T, lines int) (*Entry, bellui.Window) {
 	return e, w
 }
 
-// TestEntry_LazyWrap_NoFullMeasureOnFirstLayout is the #157 acceptance: a large
+// TestEntry_LazyWrap_NoFullMeasureOnFirstLayout is the pre-rebrand tracker #157 acceptance: a large
 // wrapped document does no O(rows) shaping at first layout — only the lines spanning
 // the viewport band are measured, the rest carry an estimate.
 func TestEntry_LazyWrap_NoFullMeasureOnFirstLayout(t *testing.T) {

@@ -324,7 +324,7 @@ func (h *hoverController) triggerAtRowCol(row, col int, keyboard bool) {
 // block first, then the provider's markdown, then the provider's plain text,
 // each present block separated by a divider. Rendering as segments (rather than
 // composing a markdown string) lets diagnostic messages and the plain-text body
-// show verbatim while the markdown body is still parsed (#92, #90). The result
+// show verbatim while the markdown body is still parsed (pre-rebrand tracker #92, pre-rebrand tracker #90). The result
 // is empty when there is nothing to show.
 func hoverCardSegments(diags []Diagnostic, content *HoverContent) []widget.RichTextSegment {
 	var blocks [][]widget.RichTextSegment
@@ -358,7 +358,7 @@ func hoverCardSegments(diags []Diagnostic, content *HoverContent) []widget.RichT
 }
 
 // diagnosticSegments renders each diagnostic as its message (verbatim plain text,
-// since an LSP diagnostic message is plain text — #92) followed by its dimmed
+// since an LSP diagnostic message is plain text — pre-rebrand tracker #92) followed by its dimmed
 // "(source)" annotation, one diagnostic per line.
 //
 // The message and source are inline so they share a line, and each diagnostic
@@ -392,7 +392,7 @@ func diagnosticSegments(diags []Diagnostic) []widget.RichTextSegment {
 // hoverShownRange picks the range that keeps the card alive while the pointer
 // stays within it: the bounding union of every matched diagnostic's (widened)
 // range plus the provider's explicit range, so the card persists across the whole
-// hovered region even when diagnostics of different extents overlap (#58). With
+// hovered region even when diagnostics of different extents overlap (pre-rebrand tracker #58). With
 // no diagnostics and no provider range it falls back to the single hovered cell.
 func hoverShownRange(diags []Diagnostic, content *HoverContent, row, col int) TextRange {
 	var u TextRange // empty; Union ignores empty operands
@@ -546,7 +546,7 @@ func (h *hoverCapture) Cursor() desktop.Cursor { return h.cursor() }
 // strips: fyne places the Entry's vertical bar flush to the right edge and
 // the horizontal bar along the bottom, and hover goes to the topmost
 // hoverable — a full-size capture layer would starve the bar of the hover
-// that expands it to its grabbable width (fycoder #151). Nothing is lost by
+// that expands it to its grabbable width (fycoder pre-rebrand tracker #151). Nothing is lost by
 // the inset: with ReserveBarSpace the text never occupies the vertical
 // strip, and the bottom strip is the bar's own hit area.
 type hoverCapLayout struct{}

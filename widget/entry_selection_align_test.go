@@ -10,7 +10,7 @@ import (
 	"github.com/belluikit/bellui/test"
 )
 
-// TestEntry_SelectionAdoptsAlignment guards #781: a non-leading Entry alignment
+// TestEntry_SelectionAdoptsAlignment guards pre-rebrand tracker #781: a non-leading Entry alignment
 // must propagate to the selectable so the selection highlight (and drag
 // hit-testing) tracks the text edge instead of being pinned to the left.
 func TestEntry_SelectionAdoptsAlignment(t *testing.T) {

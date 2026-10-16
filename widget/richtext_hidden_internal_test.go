@@ -67,7 +67,7 @@ func TestRichTextHiddenHelpers(t *testing.T) {
 	assert.Equal(t, 25, rt.visibleIndexToRow(15))
 }
 
-// TestRichTextRowToLineTranslation exercises the #145 logical-line -> visual-row
+// TestRichTextRowToLineTranslation exercises the pre-rebrand tracker #145 logical-line -> visual-row
 // translation in isolation: buildRowToLine derives the map from a single
 // segment's newlines and hand-crafted wrapped-row begin offsets, and a fold over
 // a wrapped logical line expands to all of its visual rows.
@@ -97,7 +97,7 @@ func TestRichTextRowToLineTranslation(t *testing.T) {
 
 // --- windowing must not materialise a folded block -----------------------
 
-// TestVirtualWindow_SkipsHugeFold guards the core composition with #119: a fold
+// TestVirtualWindow_SkipsHugeFold guards the core composition with pre-rebrand tracker #119: a fold
 // that collapses thousands of rows in the middle of the document must not force
 // those rows to materialise when the window sits at the fold boundary.
 func TestVirtualWindow_SkipsHugeFold(t *testing.T) {

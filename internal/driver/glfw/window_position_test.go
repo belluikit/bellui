@@ -142,7 +142,7 @@ func TestWindow_ModalRefCount(t *testing.T) {
 		c2 = d.CreateWindow("RefChild2").(*window)
 
 		// Only the 0<->1 transition toggles the native parent block; extra
-		// modal children keep it blocked without re-toggling (#682).
+		// modal children keep it blocked without re-toggling (pre-rebrand tracker #682).
 		assert.True(t, c1.blockParentModal(parent, true), "first block is the 0->1 transition")
 		assert.Equal(t, 1, parent.modalChildren)
 		assert.False(t, c1.blockParentModal(parent, true), "repeated block by the same child is a no-op")
