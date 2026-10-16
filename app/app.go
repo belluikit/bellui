@@ -233,4 +233,6 @@ type systrayDriver interface {
 	SetSystemTrayMenu(*bellui.Menu)
 	SetSystemTrayIcon(bellui.Resource)
 	SetSystemTrayWindow(bellui.Window)
+	SetSystemTrayTooltip(string)
+	SetSystemTrayOnTapped(func())
 }

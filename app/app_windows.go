@@ -12,6 +12,7 @@ import (
 	"syscall"
 
 	"github.com/belluikit/bellui"
+	"github.com/belluikit/bellui/driver/desktop"
 	internalapp "github.com/belluikit/bellui/internal/app"
 )
 
@@ -78,6 +79,25 @@ func (a *belluiApp) SetSystemTrayIcon(icon bellui.Resource) {
 func (a *belluiApp) SetSystemTrayWindow(w bellui.Window) {
 	a.Driver().(systrayDriver).SetSystemTrayWindow(w)
 }
+
+// SetSystemTrayTooltip sets the hover text of the system tray icon.
+func (a *belluiApp) SetSystemTrayTooltip(text string) {
+	if desk, ok := a.Driver().(systrayDriver); ok {
+		desk.SetSystemTrayTooltip(text)
+	}
+}
+
+// SetSystemTrayOnTapped sets the function run when the system tray icon is
+// tapped (left-clicked).
+func (a *belluiApp) SetSystemTrayOnTapped(fn func()) {
+	if desk, ok := a.Driver().(systrayDriver); ok {
+		desk.SetSystemTrayOnTapped(fn)
+	}
+}
+
+// The app value is what applications type-assert to desktop.App, so it must
+// carry every method of that interface, not only the driver.
+var _ desktop.App = (*belluiApp)(nil)
 
 // badgeDriver is implemented by the glfw driver on Windows to draw a taskbar
 // overlay-icon count badge (ITaskbarList3::SetOverlayIcon). Asserted so the app

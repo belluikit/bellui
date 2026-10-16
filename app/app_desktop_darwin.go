@@ -19,6 +19,7 @@ import (
 	"os/exec"
 
 	"github.com/belluikit/bellui"
+	"github.com/belluikit/bellui/driver/desktop"
 )
 
 func (a *belluiApp) OpenURL(url *url.URL) error {
@@ -46,6 +47,25 @@ func (a *belluiApp) SetSystemTrayMenu(menu *bellui.Menu) {
 func (a *belluiApp) SetSystemTrayWindow(w bellui.Window) {
 	a.Driver().(systrayDriver).SetSystemTrayWindow(w)
 }
+
+// SetSystemTrayTooltip sets the hover text of the system tray icon.
+func (a *belluiApp) SetSystemTrayTooltip(text string) {
+	if desk, ok := a.Driver().(systrayDriver); ok {
+		desk.SetSystemTrayTooltip(text)
+	}
+}
+
+// SetSystemTrayOnTapped sets the function run when the system tray icon is
+// tapped (left-clicked).
+func (a *belluiApp) SetSystemTrayOnTapped(fn func()) {
+	if desk, ok := a.Driver().(systrayDriver); ok {
+		desk.SetSystemTrayOnTapped(fn)
+	}
+}
+
+// The app value is what applications type-assert to desktop.App, so it must
+// carry every method of that interface, not only the driver.
+var _ desktop.App = (*belluiApp)(nil)
 
 //export themeChanged
 func themeChanged() {
