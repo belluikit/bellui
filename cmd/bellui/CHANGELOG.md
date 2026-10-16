@@ -10,11 +10,11 @@
 This file lists the main changes with each version of the Fyne tools project.
 More detailed release notes can be found on the [releases page](https://github.com/fyne-io/tools/releases).
 
-## Unreleased (first release as `cmd/bellui` v1.0.0)
+## v1.0.0 — 2026-10-16
 
 Version numbers restart at 1.0.0 with the first public release of the
 `github.com/belluikit/bellui/cmd/bellui` module; the 3.x entries below are
-the history of the tools project it grew from.
+the history of the tools project it grew from. Built against bellui v1.1.0.
 
 ### Fixed
 
