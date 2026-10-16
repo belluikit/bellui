@@ -104,7 +104,10 @@ Fonts used only by tests:
   `theme/icons/LICENSE-MaterialIcons.txt`.
 - **Go gopher.** `cmd/bellui/internal/templates/data/default-icon.png` shows a
   gopher. The Go gopher was designed by Renée French and is licensed under
-  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The image itself
+  is AI-generated: it was made with Google Gemini, whose
+  [Terms of Service](https://policies.google.com/terms) leave ownership of
+  generated content with the user.
 - **earth.gif.** `widget/testdata/gif/earth.gif` and `earth-once.gif` are CC BY-SA 3.0,
   by Wikipedia user Marvel, derived from NASA imagery
   ([source](https://commons.wikimedia.org/wiki/File:Rotating_earth_(large).gif)).
