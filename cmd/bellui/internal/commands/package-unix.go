@@ -158,8 +158,7 @@ func (p *Packager) packageUNIX() error {
 	defer os.RemoveAll(parent)
 
 	makefile, _ := os.Create(filepath.Join(outDir, "Makefile"))
-	tplData.Icon += ".png"
-	err = templates.MakefileUNIX.Execute(makefile, tplData)
+	err = templates.MakefileUNIX.Execute(makefile, makefileData(tplData, appIDOrName))
 	if err != nil {
 		return fmt.Errorf("failed to write Makefile string: %w", err)
 	}
@@ -222,4 +221,14 @@ func dedupeStrings(items []string) []string {
 		out = append(out, item)
 	}
 	return out
+}
+
+// makefileData adapts the desktop-entry data for the Makefile template. The
+// Makefile's AppID names the .desktop file it installs, which packageUNIX
+// writes as appIDOrName: an app without an ID is named after itself, so the
+// Makefile must use the same name or its install step points at no file.
+func makefileData(desktop unixData, appIDOrName string) unixData {
+	desktop.Icon += ".png"
+	desktop.AppID = appIDOrName
+	return desktop
 }
