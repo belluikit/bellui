@@ -19,33 +19,33 @@ type Rectangle struct {
 	StrokeWidth float32     // The stroke width of the rectangle
 	// The radius of the rectangle corners
 	//
-	// Since: 2.4
+	// Since: 1.0
 	CornerRadius float32
 
 	// Enforce an aspect ratio for the rectangle, the content will be made shorter or narrower
 	// to meet the requested aspect, if set.
 	//
-	// Since: 2.7
+	// Since: 1.0
 	Aspect float32
 
 	// The radius of the rectangle top-right corner only.
 	//
-	// Since: 2.7
+	// Since: 1.0
 	TopRightCornerRadius float32
 
 	// The radius of the rectangle top-left corner only.
 	//
-	// Since: 2.7
+	// Since: 1.0
 	TopLeftCornerRadius float32
 
 	// The radius of the rectangle bottom-right corner only.
 	//
-	// Since: 2.7
+	// Since: 1.0
 	BottomRightCornerRadius float32
 
 	// The radius of the rectangle bottom-left corner only.
 	//
-	// Since: 2.7
+	// Since: 1.0
 	BottomLeftCornerRadius float32
 }
 

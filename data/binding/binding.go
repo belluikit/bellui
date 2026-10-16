@@ -24,7 +24,7 @@ var (
 // DataItem is the base interface for all bindable data items.
 // All APIs on bindable data items are safe to invoke directly fron any goroutine.
 //
-// Since: 2.0
+// Since: 1.0
 type DataItem interface {
 	// AddListener attaches a new change listener to this DataItem.
 	// Listeners are called each time the data inside this DataItem changes.
@@ -38,14 +38,14 @@ type DataItem interface {
 // DataListener is any object that can register for changes in a bindable DataItem.
 // See NewDataListener to define a new listener using just an inline function.
 //
-// Since: 2.0
+// Since: 1.0
 type DataListener interface {
 	DataChanged()
 }
 
 // NewDataListener is a helper function that creates a new listener type from a simple callback function.
 //
-// Since: 2.0
+// Since: 1.0
 func NewDataListener(fn func()) DataListener {
 	return &listener{fn}
 }
@@ -110,25 +110,25 @@ func (b *base) triggerFromMain() {
 
 // Untyped supports binding an any value.
 //
-// Since: 2.1
+// Since: 1.0
 type Untyped = Item[any]
 
 // NewUntyped returns a bindable any value that is managed internally.
 //
-// Since: 2.1
+// Since: 1.0
 func NewUntyped() Untyped {
 	return NewItem(func(a1, a2 any) bool { return a1 == a2 })
 }
 
 // ExternalUntyped supports binding a any value to an external value.
 //
-// Since: 2.1
+// Since: 1.0
 type ExternalUntyped = ExternalItem[any]
 
 // BindUntyped returns a bindable any value that is bound to an external type.
 // The parameter must be a pointer to the type you wish to bind.
 //
-// Since: 2.1
+// Since: 1.0
 func BindUntyped(v any) ExternalUntyped {
 	t := reflect.TypeOf(v)
 	if t.Kind() != reflect.Ptr {

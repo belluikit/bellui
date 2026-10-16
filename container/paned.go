@@ -21,7 +21,7 @@ var _ core.CanvasObject = (*Paned)(nil)
 // Each panel is assigned a weight that determines its proportion of the available
 // space. Weights are normalized automatically.
 //
-// Since: 2.7
+// Since: 1.0
 type Paned struct {
 	widget.BaseWidget
 	Horizontal bool
@@ -32,7 +32,7 @@ type Paned struct {
 // NewHPaned creates a horizontally arranged paned container.
 // Panels are laid out left to right with vertical dividers between them.
 //
-// Since: 2.7
+// Since: 1.0
 func NewHPaned(panels ...core.CanvasObject) *Paned {
 	p := &Paned{
 		Horizontal: true,
@@ -46,7 +46,7 @@ func NewHPaned(panels ...core.CanvasObject) *Paned {
 // NewVPaned creates a vertically arranged paned container.
 // Panels are laid out top to bottom with horizontal dividers between them.
 //
-// Since: 2.7
+// Since: 1.0
 func NewVPaned(panels ...core.CanvasObject) *Paned {
 	p := &Paned{
 		Horizontal: false,

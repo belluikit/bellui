@@ -18,7 +18,7 @@ const (
 
 // FileIcon is an adaption of widget.Icon for showing files and folders
 //
-// Since: 1.4
+// Since: 1.0
 type FileIcon struct {
 	BaseWidget
 
@@ -30,7 +30,7 @@ type FileIcon struct {
 
 // NewFileIcon takes a filepath and creates an icon with an overlaid label using the detected mimetype and extension
 //
-// Since: 1.4
+// Since: 1.0
 func NewFileIcon(uri bellui.URI) *FileIcon {
 	i := &FileIcon{URI: uri}
 	i.ExtendBaseWidget(i)

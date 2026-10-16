@@ -154,7 +154,7 @@ func (p *PopUp) ShowAtPosition(pos geo.Position) {
 
 // ShowAtRelativePosition shows this pop-up at the given position relative to stated object.
 //
-// Since 2.4
+// Since: 1.0
 func (p *PopUp) ShowAtRelativePosition(rel geo.Position, to core.CanvasObject) {
 	withRelativePosition(rel, to, p.ShowAtPosition)
 }
@@ -302,7 +302,7 @@ func ShowPopUpAtPosition(content core.CanvasObject, canvas core.Canvas, pos geo.
 // ShowPopUpAtRelativePosition shows a new popUp for the specified content at the given position relative to stated object.
 // It will then display the popup on the passed canvas.
 //
-// Since 2.4
+// Since: 1.0
 func ShowPopUpAtRelativePosition(content core.CanvasObject, canvas core.Canvas, rel geo.Position, to core.CanvasObject) {
 	withRelativePosition(rel, to, func(pos geo.Position) {
 		ShowPopUpAtPosition(content, canvas, pos)

@@ -16,12 +16,12 @@ import (
 const (
 	// VariantDark is the version of a theme that satisfies a user preference for a dark look.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	VariantDark = internaltheme.VariantDark
 
 	// VariantLight is the version of a theme that satisfies a user preference for a light look.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	VariantLight = internaltheme.VariantLight
 )
 
@@ -40,7 +40,7 @@ func darkTheme() bellui.Theme {
 
 // DefaultTheme returns a built-in theme that can adapt to the user preference of light or dark colors.
 //
-// Since: 2.0
+// Since: 1.0
 func DefaultTheme() bellui.Theme {
 	if defaultTheme == nil {
 		defaultTheme = setupDefaultTheme()
@@ -170,7 +170,7 @@ func (t *builtinTheme) Font(style bellui.TextStyle) bellui.Resource {
 // Current returns the theme that is currently used for the running application.
 // It looks up based on user preferences and application configuration.
 //
-// Since: 2.5
+// Since: 1.0
 func Current() bellui.Theme {
 	app := bellui.CurrentApp()
 	if app == nil {
@@ -187,7 +187,7 @@ func Current() bellui.Theme {
 // CurrentForWidget returns the theme that is currently used for the specified widget.
 // It looks for widget overrides and falls back to the application's current theme.
 //
-// Since: 2.5
+// Since: 1.0
 func CurrentForWidget(w core.CanvasObject) bellui.Theme {
 	if custom := cache.WidgetTheme(w); custom != nil {
 		return custom

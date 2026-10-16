@@ -23,7 +23,7 @@ type Raster struct {
 	// Set a translucency value > 0.0 to fade the raster
 	Translucency float64
 	// Specify the type of scaling interpolation applied to the raster if it is not full-size
-	// Since: 1.4.1
+	// Since: 1.0
 	ScaleMode ImageScale
 
 	// Streaming enables in-place texture updates.

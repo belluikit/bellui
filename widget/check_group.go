@@ -14,7 +14,7 @@ var _ core.Widget = (*CheckGroup)(nil)
 // CheckGroup widget has a list of text labels and checkbox icons next to each.
 // Changing the selection (any number can be selected) will trigger the changed func.
 //
-// Since: 2.1
+// Since: 1.0
 type CheckGroup struct {
 	DisableableWidget
 	Horizontal bool
@@ -28,7 +28,7 @@ type CheckGroup struct {
 
 // NewCheckGroup creates a new check group widget with the set options and change handler
 //
-// Since: 2.1
+// Since: 1.0
 func NewCheckGroup(options []string, changed func([]string)) *CheckGroup {
 	r := &CheckGroup{
 		Options:   options,
@@ -74,7 +74,7 @@ func (r *CheckGroup) Refresh() {
 // Remove removes the first occurrence of the specified option found from a CheckGroup widget.
 // Return true if an option was removed.
 //
-// Since: 2.3
+// Since: 1.0
 func (r *CheckGroup) Remove(option string) bool {
 	for i, o := range r.Options {
 		if strings.EqualFold(option, o) {

@@ -15,7 +15,7 @@ import (
 // should use instead. This is only here because other functions in repository
 // need to call it, and it prevents a circular import.
 //
-// Since: 2.0
+// Since: 1.0
 func NewFileURI(path string) bellui.URI {
 	// URIs are supposed to use forward slashes. On Windows, it
 	// should be OK to use the platform native filepath with UNIX
@@ -37,7 +37,7 @@ func NewFileURI(path string) bellui.URI {
 // should use instead. This is only here because other functions in repository
 // need to call it, and it prevents a circular import.
 //
-// Since: 2.0
+// Since: 1.0
 func ParseURI(s string) (bellui.URI, error) {
 	// Extract the scheme.
 	scheme, path, ok := strings.Cut(s, ":")

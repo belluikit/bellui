@@ -17,7 +17,7 @@ import (
 // DateEntry is an Entry that accepts locale-formatted dates with an optional
 // calendar popup triggered by an action button.
 //
-// Since: 2.7
+// Since: 1.0
 type DateEntry struct {
 	Entry
 
@@ -34,7 +34,7 @@ type DateEntry struct {
 // locale-aware date validation. Use the DateEntry.OnChanged field (not
 // Entry.OnChanged) to receive parsed date values.
 //
-// Since: 2.7
+// Since: 1.0
 func NewDateEntry() *DateEntry {
 	e := &DateEntry{}
 	e.PlaceHolder = lang.DatePatternHint()

@@ -65,7 +65,7 @@ type Entry struct {
 	DisableableWidget
 	shortcut bellui.ShortcutHandler
 	Text     string
-	// Since: 2.0
+	// Since: 1.0
 	TextStyle bellui.TextStyle
 	// Alignment sets the horizontal alignment of the entry text.
 	// Defaults to bellui.TextAlignLeading (left).
@@ -78,7 +78,7 @@ type Entry struct {
 	// OnSubmitted will be called when the user presses Enter/Return (for a single line entry).
 	// MultiLine entries will be submitted when Shift+Enter (or Return) are pressed.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	OnSubmitted func(string) `json:"-"`
 
 	// OnEscape will be called when the user presses Escape while the entry is
@@ -97,7 +97,7 @@ type Entry struct {
 	// (no dimming) and allowing text selection, copy, and navigation.
 	// Unlike Disable(), read-only entries are focusable and selectable.
 	//
-	// Since: 2.7
+	// Since: 1.0
 	ReadOnly bool
 
 	// DeferTextSync, when true, defers synchronising the exported Text field
@@ -125,11 +125,11 @@ type Entry struct {
 
 	// Scroll can be used to turn off the scrolling of our entry when Wrapping is WrapNone.
 	//
-	// Since: 2.4
+	// Since: 1.0
 	Scroll bellui.ScrollDirection
 
 	// Set a validator that this entry will check against
-	// Since: 1.4
+	// Since: 1.0
 	Validator bellui.StringValidator `json:"-"`
 	// validatorInternal is the data-binding conversion check. It is deliberately
 	// not the public Validator field: Bind used to claim that field, silently
@@ -142,7 +142,7 @@ type Entry struct {
 
 	// If true, the Validator runs automatically on render without user interaction.
 	// It will reflect any validation errors found or those explicitly set via SetValidationError().
-	// Since: 2.7
+	// Since: 1.0
 	AlwaysShowValidationError bool
 
 	// ValidateWithBorder, when true, shows validation errors via a thicker red
@@ -184,7 +184,7 @@ type Entry struct {
 	// stops as soon as the state converges back into the already-highlighted
 	// stretch (#412).
 	//
-	// Since: 2.7
+	// Since: 1.0
 	LineHighlighter func(line string, state int) ([]StyleRun, int) `json:"-"`
 
 	// StyleOverlayForRow, when set, supplies additional per-row style runs
@@ -218,7 +218,7 @@ type Entry struct {
 
 	// Icon is displayed at the outer left of the entry.
 	// It is not clickable, but can be used to indicate the purpose of the entry.
-	// Since: 2.7
+	// Since: 1.0
 	Icon bellui.Resource `json:"-"`
 
 	// OnGutterTap is called when the user clicks in the line number gutter.
@@ -244,7 +244,7 @@ type Entry struct {
 	// Useful for synchronising external widgets (e.g. a pinned gutter)
 	// with the Entry's vertical scroll position.
 	//
-	// Since: 2.7
+	// Since: 1.0
 	OnScrolled func(geo.Position) `json:"-"`
 
 	// SuppressGutter disables the built-in line number gutter and breakpoint
@@ -252,7 +252,7 @@ type Entry struct {
 	// works; only the gutter is suppressed. Use this when an external gutter
 	// widget is managing line numbers and breakpoints.
 	//
-	// Since: 2.7
+	// Since: 1.0
 	SuppressGutter bool `json:"-"`
 
 	// HiddenRanges are logical-line ranges (0-based, inclusive Start, exclusive
@@ -422,18 +422,18 @@ type StyleRun struct {
 
 	// Bold renders this run in a bold font weight.
 	//
-	// Since: 2.9
+	// Since: 1.0
 	Bold bool
 	// BackgroundColor, when non-nil, fills the run's cell rectangle behind the
 	// text — a sub-line background (e.g. a semantic-token wash).
 	//
-	// Since: 2.9
+	// Since: 1.0
 	BackgroundColor color.Color
 	// Underline draws a line beneath the run. UnderlineStyle selects its shape
 	// (solid by default; wavy/dotted for diagnostic squiggles) and
 	// UnderlineColor its color (the run's text color when nil).
 	//
-	// Since: 2.9
+	// Since: 1.0
 	Underline      bool
 	UnderlineStyle UnderlineStyle
 	UnderlineColor color.Color
@@ -450,7 +450,7 @@ type StyleRun struct {
 
 // UnderlineStyle selects the shape of a [StyleRun] underline.
 //
-// Since: 2.9
+// Since: 1.0
 type UnderlineStyle int
 
 const (
@@ -490,7 +490,7 @@ func NewEntry() *Entry {
 
 // NewEntryWithData returns an Entry widget connected to the specified data source.
 //
-// Since: 2.0
+// Since: 1.0
 func NewEntryWithData(data binding.String) *Entry {
 	entry := NewEntry()
 	entry.Bind(data)
@@ -515,7 +515,7 @@ func NewPasswordEntry() *Entry {
 
 // AcceptsTab returns if Entry accepts the Tab key or not.
 //
-// Since: 2.1
+// Since: 1.0
 func (e *Entry) AcceptsTab() bool {
 	return e.MultiLine
 }
@@ -711,7 +711,7 @@ func (e *Entry) ReplaceAccessibleSelection(text string) {
 // A conversion error wins over the app's rule -- text that cannot be written to
 // the bound source is invalid whatever the app's rule says about it.
 //
-// Since: 2.0
+// Since: 1.0
 func (e *Entry) Bind(data binding.String) {
 	e.binder.SetCallback(e.updateFromData)
 	e.binder.Bind(data)
@@ -808,7 +808,7 @@ func (e *Entry) CreateRenderer() core.WidgetRenderer {
 
 // CursorPosition returns the relative position of this Entry widget's cursor.
 //
-// Since: 2.7
+// Since: 1.0
 func (e *Entry) CursorPosition() geo.Position {
 	e.cursorMu.Lock()
 	cursorRow, cursorCol := e.CursorRow, e.CursorColumn
@@ -829,7 +829,7 @@ func (e *Entry) CursorPosition() geo.Position {
 // decoration) should subtract the current scroll offset and treat positions
 // outside the viewport as hidden.
 //
-// Since: 2.9
+// Since: 1.0
 func (e *Entry) CaretRect(row, col int) geo.Rectangle {
 	provider := e.textProvider()
 	if provider == nil || row < 0 || row >= provider.rows() {
@@ -920,7 +920,7 @@ func (e *Entry) caretRect(row, col int, downstream bool) geo.Rectangle {
 
 // CursorTextOffset returns how many runes into the source text the cursor is positioned at.
 //
-// Since: 2.7
+// Since: 1.0
 func (e *Entry) CursorTextOffset() (pos int) {
 	e.cursorMu.Lock()
 	row, col := e.CursorRow, e.CursorColumn
@@ -1284,7 +1284,7 @@ func (e *Entry) MouseUp(m *desktop.MouseEvent) {
 // Like [Entry.Undo], Redo replays recorded history verbatim and is not re-gated
 // against [Entry.ProtectedRanges].
 //
-// Since: 2.5
+// Since: 1.0
 func (e *Entry) Redo() {
 	action := e.undoStack.Redo()
 	if action == nil {
@@ -1434,7 +1434,7 @@ func (e *Entry) clearSelection() bool {
 // The icon will be displayed at the outer left of the entry, but is not clickable.
 // This can be used to indicate the purpose of the entry, such as an email or password field.
 //
-// Since: 2.7
+// Since: 1.0
 func (e *Entry) SetIcon(res bellui.Resource) {
 	onMain(func() {
 		e.Icon = res
@@ -1447,7 +1447,7 @@ func (e *Entry) SetIcon(res bellui.Resource) {
 // Use this carefully as Bellui apps can run on small screens so you may wish to add a scroll container if
 // this number is high. Default is 3.
 //
-// Since: 2.2
+// Since: 1.0
 func (e *Entry) SetMinRowsVisible(count int) {
 	onMain(func() {
 		e.multiLineRows = count
@@ -1463,7 +1463,7 @@ func (e *Entry) SetMinRowsVisible(count int) {
 // After the first layout pass the values come from the cached RichText
 // geometry and are exact. Before layout a theme-derived fallback is used.
 //
-// Since: 2.7
+// Since: 1.0
 func (e *Entry) RowMetrics() (topOffset, stride float32) {
 	// Lazy model (#157): uniform stride, analytic Y — serve from RowGeometry of the
 	// first visible row instead of the (absent) dense rowYPos array.
@@ -1507,7 +1507,7 @@ func (e *Entry) RowMetrics() (topOffset, stride float32) {
 //
 // Returns nil before the first layout pass.
 //
-// Since: 2.7
+// Since: 1.0
 func (e *Entry) RowPositions() (yPositions []float32, heights []float32) {
 	// Lazy model (#157): no dense geometry array — synthesise positions analytically
 	// (uniform stride, fold-aware). O(rows); external gutters on very large documents
@@ -1595,7 +1595,7 @@ func (e *Entry) setText(text string, fromBinding bool) {
 
 // Append appends the text to the end of the entry.
 //
-// Since: 2.4
+// Since: 1.0
 func (e *Entry) Append(text string) {
 	onMain(func() {
 		provider := e.textProvider()
@@ -1706,7 +1706,7 @@ func (e *Entry) showContextMenu(pos geo.Position) {
 
 // TouchDown is called when this entry gets a touch down event on mobile device, we ensure we have focus.
 //
-// Since: 2.1
+// Since: 1.0
 func (e *Entry) TouchDown(ev *mobile.TouchEvent) {
 	now := time.Now().UnixMilli()
 	e.touchPointer = true
@@ -1733,13 +1733,13 @@ func (e *Entry) TouchDown(ev *mobile.TouchEvent) {
 
 // TouchUp is called when this entry gets a touch up event on mobile device.
 //
-// Since: 2.1
+// Since: 1.0
 func (e *Entry) TouchUp(*mobile.TouchEvent) {
 }
 
 // TouchCancel is called when this entry gets a touch cancel event on mobile device (app was removed from focus).
 //
-// Since: 2.1
+// Since: 1.0
 func (e *Entry) TouchCancel(*mobile.TouchEvent) {
 }
 
@@ -1880,7 +1880,7 @@ func (e *Entry) TypedKey(key *event.KeyEvent) {
 // range protected after the undone edit was recorded. Protection applies to new
 // interactive edits, not history replay.
 //
-// Since: 2.5
+// Since: 1.0
 func (e *Entry) Undo() {
 	action := e.undoStack.Undo()
 	if action == nil {
@@ -2679,7 +2679,7 @@ func (e *Entry) AddShortcut(shortcut core.Shortcut, handler func(core.Shortcut))
 // Any [Entry.Validator] the app installed is left in place -- Unbind only drops
 // the data-binding conversion check it installed itself.
 //
-// Since: 2.0
+// Since: 1.0
 func (e *Entry) Unbind() {
 	e.validatorInternal = nil
 	e.binder.Unbind()

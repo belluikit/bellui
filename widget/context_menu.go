@@ -19,7 +19,7 @@ var (
 // all normal interactions (tap, hover, drag, etc.) except the right-click
 // is intercepted to display the menu.
 //
-// Since: 2.7
+// Since: 1.0
 type ContextMenu struct {
 	BaseWidget
 
@@ -33,7 +33,7 @@ type ContextMenu struct {
 // NewContextMenu creates a context menu wrapper around the given content.
 // The provided items will be shown as a popup menu on right-click.
 //
-// Since: 2.7
+// Since: 1.0
 func NewContextMenu(content core.CanvasObject, items ...*bellui.MenuItem) *ContextMenu {
 	cm := &ContextMenu{
 		Content: content,
@@ -45,7 +45,7 @@ func NewContextMenu(content core.CanvasObject, items ...*bellui.MenuItem) *Conte
 
 // NewContextMenuWithMenu creates a context menu wrapper using a pre-built bellui.Menu.
 //
-// Since: 2.7
+// Since: 1.0
 func NewContextMenuWithMenu(content core.CanvasObject, menu *bellui.Menu) *ContextMenu {
 	cm := &ContextMenu{
 		Content: content,

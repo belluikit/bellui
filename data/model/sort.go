@@ -14,7 +14,7 @@ import (
 // comparator is replaced — never per displayed item — so a bound widget keeps
 // its O(visible) per-frame cost.
 //
-// Since: 2.8
+// Since: 1.0
 type SortProxy[T any] struct {
 	listeners
 
@@ -30,7 +30,7 @@ type SortProxy[T any] struct {
 // [SortProxy.SetLess] the proxy preserves the source order; for user-visible
 // text pass [StringLess].
 //
-// Since: 2.8
+// Since: 1.0
 func NewSortProxy[T any](src Model[T]) *SortProxy[T] {
 	p := &SortProxy[T]{src: src}
 	l := binding.NewDataListener(p.onSourceChanged)
@@ -102,7 +102,7 @@ func (p *SortProxy[T]) Item(i int) T {
 // SourceIndex maps a display index to the corresponding index in the source
 // model, or -1 if i is out of range.
 //
-// Since: 2.8
+// Since: 1.0
 func (p *SortProxy[T]) SourceIndex(i int) int {
 	p.mu.RLock()
 	defer p.mu.RUnlock()

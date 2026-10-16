@@ -22,7 +22,7 @@ import (
 // NOTE: this function should not be called except by an implementation of
 // the Repository interface - using this for unknown URIs may break.
 //
-// Since: 2.0
+// Since: 1.0
 func GenericParent(u bellui.URI) (bellui.URI, error) {
 	p := strings.TrimSuffix(u.Path(), "/")
 	if p == "" {
@@ -53,7 +53,7 @@ func GenericParent(u bellui.URI) (bellui.URI, error) {
 // NOTE: this function should not be called except by an implementation of
 // the Repository interface - using this for unknown URIs may break.
 //
-// Since: 2.0
+// Since: 1.0
 func GenericChild(u bellui.URI, component string) (bellui.URI, error) {
 	newURI := uri{
 		scheme:    u.Scheme(),
@@ -81,7 +81,7 @@ func GenericChild(u bellui.URI, component string) (bellui.URI, error) {
 // NOTE: this function should not be called except by an implementation of
 // the Repository interface - using this for unknown URIs may break.
 //
-// Since: 2.0
+// Since: 1.0
 func GenericCopy(source bellui.URI, destination bellui.URI) error {
 	// Look up repositories for the source and destination.
 	srcrepo, err := ForURI(source)
@@ -138,7 +138,7 @@ func GenericCopy(source bellui.URI, destination bellui.URI) error {
 // NOTE: this function should not be called except by an implementation of
 // the Repository interface - using this for unknown URIs may break.
 //
-// Since: 2.7
+// Since: 1.0
 func GenericDeleteAll(u bellui.URI) error {
 	repo, err := ForURI(u)
 	if err != nil {
@@ -169,7 +169,7 @@ func GenericDeleteAll(u bellui.URI) error {
 // NOTE: this function should not be called except by an implementation of
 // the Repository interface - using this for unknown URIs may break.
 //
-// Since: 2.0
+// Since: 1.0
 func GenericMove(source bellui.URI, destination bellui.URI) error {
 	// This looks a lot like GenericCopy(), but I duplicated the code
 	// to avoid having to look up the repositories more than once.

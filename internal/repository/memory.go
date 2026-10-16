@@ -55,7 +55,7 @@ type nodeReaderWriter struct {
 // rather to be simple and easy to read. If you need performance, look
 // elsewhere.
 //
-// Since: 2.0
+// Since: 1.0
 type InMemoryRepository struct {
 	// Data is exposed to allow tests to directly insert their own data
 	// without having to go through the API
@@ -133,7 +133,7 @@ func (n *nodeReaderWriter) URI() bellui.URI {
 // given the scheme it is registered for. The caller needs to call
 // repository.Register() on the result of this function.
 //
-// Since: 2.0
+// Since: 1.0
 func NewInMemoryRepository(scheme string) *InMemoryRepository {
 	return &InMemoryRepository{
 		Data:   make(map[string][]byte),
@@ -143,7 +143,7 @@ func NewInMemoryRepository(scheme string) *InMemoryRepository {
 
 // Exists checks if the given URI exists.
 //
-// Since: 2.0
+// Since: 1.0
 func (m *InMemoryRepository) Exists(u bellui.URI) (bool, error) {
 	path := u.Path()
 	if path == "" {
@@ -156,7 +156,7 @@ func (m *InMemoryRepository) Exists(u bellui.URI) (bool, error) {
 
 // Reader reads the contents of the given URI.
 //
-// Since: 2.0
+// Since: 1.0
 func (m *InMemoryRepository) Reader(u bellui.URI) (bellui.URIReadCloser, error) {
 	path := u.Path()
 
@@ -174,7 +174,7 @@ func (m *InMemoryRepository) Reader(u bellui.URI) (bellui.URIReadCloser, error) 
 
 // CanRead checks if the given URI can be read.
 //
-// Since: 2.0
+// Since: 1.0
 func (m *InMemoryRepository) CanRead(u bellui.URI) (bool, error) {
 	path := u.Path()
 	if path == "" {
@@ -192,7 +192,7 @@ func (m *InMemoryRepository) Destroy(scheme string) {
 
 // Writer writes to the given URI.
 //
-// Since: 2.0
+// Since: 1.0
 func (m *InMemoryRepository) Writer(u bellui.URI) (bellui.URIWriteCloser, error) {
 	path := u.Path()
 	if path == "" {
@@ -204,7 +204,7 @@ func (m *InMemoryRepository) Writer(u bellui.URI) (bellui.URIWriteCloser, error)
 
 // Appender returns a writer that appends to the given URI.
 //
-// Since: 2.6
+// Since: 1.0
 func (m *InMemoryRepository) Appender(u bellui.URI) (bellui.URIWriteCloser, error) {
 	path := u.Path()
 	if path == "" {
@@ -216,7 +216,7 @@ func (m *InMemoryRepository) Appender(u bellui.URI) (bellui.URIWriteCloser, erro
 
 // CanWrite checks if the given URI can be written to.
 //
-// Since: 2.0
+// Since: 1.0
 func (m *InMemoryRepository) CanWrite(u bellui.URI) (bool, error) {
 	if p := u.Path(); p == "" {
 		return false, fmt.Errorf("invalid path '%s'", p)
@@ -227,7 +227,7 @@ func (m *InMemoryRepository) CanWrite(u bellui.URI) (bool, error) {
 
 // Delete deletes the given URI.
 //
-// Since: 2.0
+// Since: 1.0
 func (m *InMemoryRepository) Delete(u bellui.URI) error {
 	path := u.Path()
 	_, ok := m.Data[path]
@@ -240,35 +240,35 @@ func (m *InMemoryRepository) Delete(u bellui.URI) error {
 
 // Parent returns the parent URI of the given URI.
 //
-// Since: 2.0
+// Since: 1.0
 func (m *InMemoryRepository) Parent(u bellui.URI) (bellui.URI, error) {
 	return repository.GenericParent(u)
 }
 
 // Child returns the child URI created from the given URI and component.
 //
-// Since: 2.0
+// Since: 1.0
 func (m *InMemoryRepository) Child(u bellui.URI, component string) (bellui.URI, error) {
 	return repository.GenericChild(u, component)
 }
 
 // Copy copies the source URI to the destination URI.
 //
-// Since: 2.0
+// Since: 1.0
 func (m *InMemoryRepository) Copy(source, destination bellui.URI) error {
 	return repository.GenericCopy(source, destination)
 }
 
 // Move moves the contents of the source URI to the destination.
 //
-// Since: 2.0
+// Since: 1.0
 func (m *InMemoryRepository) Move(source, destination bellui.URI) error {
 	return repository.GenericMove(source, destination)
 }
 
 // CanList checks if the given URI can be listed.
 //
-// Since: 2.0
+// Since: 1.0
 func (m *InMemoryRepository) CanList(u bellui.URI) (bool, error) {
 	path := u.Path()
 	exist, err := m.Exists(u)
@@ -286,7 +286,7 @@ func (m *InMemoryRepository) CanList(u bellui.URI) (bool, error) {
 
 // List returns a list of URIs that are children of the given URI.
 //
-// Since: 2.0
+// Since: 1.0
 func (m *InMemoryRepository) List(u bellui.URI) ([]bellui.URI, error) {
 	// Get the prefix, and make sure it ends with a path separator so that
 	// HasPrefix() will only find things that are children of it - this
@@ -331,7 +331,7 @@ func (m *InMemoryRepository) List(u bellui.URI) ([]bellui.URI, error) {
 
 // CreateListable makes the given URI a listable URI.
 //
-// Since: 2.0
+// Since: 1.0
 func (m *InMemoryRepository) CreateListable(u bellui.URI) error {
 	ex, err := m.Exists(u)
 	if err != nil {

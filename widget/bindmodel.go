@@ -19,7 +19,7 @@ import (
 // Mutate the underlying model on the main goroutine (use [bellui.Do] from a
 // background goroutine), the same rule the widgets already follow.
 //
-// Since: 2.8
+// Since: 1.0
 func BindListModel[T any](list *List, m model.Model[T],
 	createItem func() core.CanvasObject,
 	updateItem func(item T, row core.CanvasObject),
@@ -46,7 +46,7 @@ func BindListModel[T any](list *List, m model.Model[T],
 // For header-click sorting over a [model.SortProxy], pair this with
 // [BindTableSort] on the same proxy.
 //
-// Since: 2.8
+// Since: 1.0
 func BindTableModel[T any](t *Table, m model.Model[T], cols int,
 	createCell func() core.CanvasObject,
 	updateCell func(item T, col int, cell core.CanvasObject),
@@ -76,7 +76,7 @@ func BindTableModel[T any](t *Table, m model.Model[T], cols int,
 // [bellui.Do] from a background goroutine), the same rule the widgets already
 // follow. The returned function detaches the binding.
 //
-// Since: 2.8
+// Since: 1.0
 func BindTreeModel(tree *Tree, p *model.TreeProxy) (unbind func()) {
 	tree.Root = p.Root()
 	tree.ChildUIDs = p.Children
@@ -99,7 +99,7 @@ func BindTreeModel(tree *Tree, p *model.TreeProxy) (unbind func()) {
 // in sel — it only reflects the most recent selected row into the built-in
 // highlight. The returned function detaches the binding.
 //
-// Since: 2.8
+// Since: 1.0
 func BindListSelection[T any, K comparable](list *List, m model.Model[T], sel *model.SelectionModel[T, K]) (unbind func()) {
 	applying := false
 

@@ -15,7 +15,7 @@ import (
 
 // RenderObjectToMarkup renders the given [github.com/belluikit/bellui.CanvasObject] to a markup string.
 //
-// Since: 2.6
+// Since: 1.0
 func RenderObjectToMarkup(o core.CanvasObject) string {
 	c := NewCanvas()
 	c.SetPadded(false)
@@ -28,7 +28,7 @@ func RenderObjectToMarkup(o core.CanvasObject) string {
 
 // RenderToMarkup renders the given [github.com/belluikit/bellui.Canvas] to a markup string.
 //
-// Since: 2.6
+// Since: 1.0
 func RenderToMarkup(c core.Canvas) string {
 	return snapshot(c)
 }

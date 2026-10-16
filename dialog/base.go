@@ -32,12 +32,12 @@ type Dialog interface {
 
 	// MinSize returns the size that this dialog should not shrink below.
 	//
-	// Since: 2.1
+	// Since: 1.0
 	MinSize() geo.Size
 
 	// Dismiss instructs the dialog to close without any affirmative action.
 	//
-	// Since: 2.6
+	// Since: 1.0
 	Dismiss()
 
 	// SetWindowed controls whether the dialog is hosted in a window frame
@@ -93,7 +93,7 @@ func (d *dialog) Hide() {
 
 // MinSize returns the size that this dialog should not shrink below.
 //
-// Since: 2.1
+// Since: 1.0
 func (d *dialog) MinSize() geo.Size {
 	if d.hostWin != nil {
 		return d.body.MinSize()

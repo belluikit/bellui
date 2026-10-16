@@ -12,7 +12,7 @@ var _ Dialog = (*CustomDialog)(nil)
 
 // CustomDialog implements a custom dialog.
 //
-// Since: 2.4
+// Since: 1.0
 type CustomDialog struct {
 	*dialog
 }
@@ -40,7 +40,7 @@ func ShowCustom(title, dismiss string, content core.CanvasObject, parent bellui.
 // NewCustomWithoutButtons creates a new custom dialog without any buttons.
 // The MinSize() of the CanvasObject passed will be used to set the size of the window.
 //
-// Since: 2.4
+// Since: 1.0
 func NewCustomWithoutButtons(title string, content core.CanvasObject, parent bellui.Window) *CustomDialog {
 	d := &dialog{content: content, title: title, parent: parent, windowed: true}
 	d.create(container.NewGridWithColumns(1))
@@ -51,7 +51,7 @@ func NewCustomWithoutButtons(title string, content core.CanvasObject, parent bel
 // SetButtons sets the row of buttons at the bottom of the dialog.
 // Passing an empty slice will result in a dialog with no buttons.
 //
-// Since: 2.4
+// Since: 1.0
 func (d *CustomDialog) SetButtons(buttons []core.CanvasObject) {
 	d.dismiss = nil // New button row invalidates possible dismiss button.
 	d.setButtons(container.NewGridWithRows(1, buttons...))
@@ -60,7 +60,7 @@ func (d *CustomDialog) SetButtons(buttons []core.CanvasObject) {
 // SetIcon sets an icon to be shown in the top right of the dialog.
 // Passing a nil resource will remove the icon from the dialog.
 //
-// Since: 2.6
+// Since: 1.0
 func (d *CustomDialog) SetIcon(icon bellui.Resource) {
 	d.setIcon(icon)
 }
@@ -69,7 +69,7 @@ func (d *CustomDialog) SetIcon(icon bellui.Resource) {
 // using custom content.
 // The MinSize() of the CanvasObject passed will be used to set the size of the window.
 //
-// Since: 2.4
+// Since: 1.0
 func ShowCustomWithoutButtons(title string, content core.CanvasObject, parent bellui.Window) {
 	NewCustomWithoutButtons(title, content, parent).Show()
 }

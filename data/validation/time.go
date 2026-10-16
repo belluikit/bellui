@@ -11,7 +11,7 @@ import (
 // The reference time for the format: Mon Jan 2 15:04:05 -0700 MST 2006.
 // See time.Parse() for more information about the reference time: https://pkg.go.dev/time#Parse
 //
-// Since: 2.1
+// Since: 1.0
 func NewTime(format string) bellui.StringValidator {
 	return func(text string) error {
 		_, err := time.Parse(format, text)

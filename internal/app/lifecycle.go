@@ -9,7 +9,7 @@ var _ bellui.Lifecycle = (*Lifecycle)(nil)
 
 // Lifecycle represents the various phases that an app can transition through.
 //
-// Since: 2.1
+// Since: 1.0
 type Lifecycle struct {
 	onForeground func()
 	onBackground func()

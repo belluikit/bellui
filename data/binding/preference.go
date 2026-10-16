@@ -11,7 +11,7 @@ const keyTypeMismatchError = "A previous preference binding exists with differen
 // BindPreferenceBool returns a bindable bool value that is managed by the application preferences.
 // Changes to this value will be saved to application storage and when the app starts the previous values will be read.
 //
-// Since: 2.0
+// Since: 1.0
 func BindPreferenceBool(key string, p bellui.Preferences) Bool {
 	return bindPreferenceItem[bool](key, p)
 }
@@ -19,7 +19,7 @@ func BindPreferenceBool(key string, p bellui.Preferences) Bool {
 // BindPreferenceBoolList returns a bound list of bool values that is managed by the application preferences.
 // Changes to this value will be saved to application storage and when the app starts the previous values will be read.
 //
-// Since: 2.6
+// Since: 1.0
 func BindPreferenceBoolList(key string, p bellui.Preferences) BoolList {
 	return bindPreferenceListComparable[bool](key, p)
 }
@@ -27,7 +27,7 @@ func BindPreferenceBoolList(key string, p bellui.Preferences) BoolList {
 // BindPreferenceFloat returns a bindable float64 value that is managed by the application preferences.
 // Changes to this value will be saved to application storage and when the app starts the previous values will be read.
 //
-// Since: 2.0
+// Since: 1.0
 func BindPreferenceFloat(key string, p bellui.Preferences) Float {
 	return bindPreferenceItem[float64](key, p)
 }
@@ -35,7 +35,7 @@ func BindPreferenceFloat(key string, p bellui.Preferences) Float {
 // BindPreferenceFloatList returns a bound list of float64 values that is managed by the application preferences.
 // Changes to this value will be saved to application storage and when the app starts the previous values will be read.
 //
-// Since: 2.6
+// Since: 1.0
 func BindPreferenceFloatList(key string, p bellui.Preferences) FloatList {
 	return bindPreferenceListComparable[float64](key, p)
 }
@@ -43,7 +43,7 @@ func BindPreferenceFloatList(key string, p bellui.Preferences) FloatList {
 // BindPreferenceInt returns a bindable int value that is managed by the application preferences.
 // Changes to this value will be saved to application storage and when the app starts the previous values will be read.
 //
-// Since: 2.0
+// Since: 1.0
 func BindPreferenceInt(key string, p bellui.Preferences) Int {
 	return bindPreferenceItem[int](key, p)
 }
@@ -51,7 +51,7 @@ func BindPreferenceInt(key string, p bellui.Preferences) Int {
 // BindPreferenceIntList returns a bound list of int values that is managed by the application preferences.
 // Changes to this value will be saved to application storage and when the app starts the previous values will be read.
 //
-// Since: 2.6
+// Since: 1.0
 func BindPreferenceIntList(key string, p bellui.Preferences) IntList {
 	return bindPreferenceListComparable[int](key, p)
 }
@@ -59,7 +59,7 @@ func BindPreferenceIntList(key string, p bellui.Preferences) IntList {
 // BindPreferenceString returns a bindable string value that is managed by the application preferences.
 // Changes to this value will be saved to application storage and when the app starts the previous values will be read.
 //
-// Since: 2.0
+// Since: 1.0
 func BindPreferenceString(key string, p bellui.Preferences) String {
 	return bindPreferenceItem[string](key, p)
 }
@@ -67,7 +67,7 @@ func BindPreferenceString(key string, p bellui.Preferences) String {
 // BindPreferenceStringList returns a bound list of string values that is managed by the application preferences.
 // Changes to this value will be saved to application storage and when the app starts the previous values will be read.
 //
-// Since: 2.6
+// Since: 1.0
 func BindPreferenceStringList(key string, p bellui.Preferences) StringList {
 	return bindPreferenceListComparable[string](key, p)
 }
@@ -76,7 +76,7 @@ func BindPreferenceStringList(key string, p bellui.Preferences) StringList {
 // allowing it to be garbage collected. Future calls to BindPreference* with the same
 // key will create a new binding.
 //
-// Since: 2.7
+// Since: 1.0
 func UnbindPreference(key string, p bellui.Preferences) {
 	prefBinds.unbindPreference(key, p)
 }
@@ -85,7 +85,7 @@ func UnbindPreference(key string, p bellui.Preferences) {
 // instance. This should be called when a preferences instance is no longer needed
 // (e.g. when a window is closed) to allow garbage collection.
 //
-// Since: 2.7
+// Since: 1.0
 func CleanupPreferences(p bellui.Preferences) {
 	prefBinds.cleanupPreferences(p)
 }

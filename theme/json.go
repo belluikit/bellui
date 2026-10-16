@@ -16,7 +16,7 @@ import (
 // Any values not present in the data will fall back to the default theme.
 // If a parse error occurs it will be returned along with a default theme.
 //
-// Since: 2.2
+// Since: 1.0
 func FromJSON(data string) (bellui.Theme, error) {
 	return FromJSONReader(strings.NewReader(data))
 }
@@ -25,7 +25,7 @@ func FromJSON(data string) (bellui.Theme, error) {
 // Any values not present in the data will fall back to the specified theme.
 // If a parse error occurs it will be returned along with a specified fallback theme.
 //
-// Since: 2.7
+// Since: 1.0
 func FromJSONWithFallback(data string, fallback bellui.Theme) (bellui.Theme, error) {
 	return fromJSONWithFallback(strings.NewReader(data), fallback)
 }
@@ -34,7 +34,7 @@ func FromJSONWithFallback(data string, fallback bellui.Theme) (bellui.Theme, err
 // Any values not present in the data will fall back to the default theme.
 // If a parse error occurs it will be returned along with a default theme.
 //
-// Since: 2.2
+// Since: 1.0
 func FromJSONReader(r io.Reader) (bellui.Theme, error) {
 	return fromJSONWithFallback(r, DefaultTheme())
 }
@@ -43,7 +43,7 @@ func FromJSONReader(r io.Reader) (bellui.Theme, error) {
 // Any values not present in the data will fall back to the specified theme.
 // If a parse error occurs it will be returned along with a specified fallback theme.
 //
-// Since: 2.7
+// Since: 1.0
 func FromJSONReaderWithFallback(r io.Reader, fallback bellui.Theme) (bellui.Theme, error) {
 	return fromJSONWithFallback(r, fallback)
 }

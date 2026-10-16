@@ -19,19 +19,19 @@ type Settings interface {
 	SetTheme(Theme)
 	// ThemeVariant defines which preferred version of a theme should be used (i.e. light or dark)
 	//
-	// Since: 2.0
+	// Since: 1.0
 	ThemeVariant() ThemeVariant
 	// SetThemeVariant sets the preferred theme variant (light or dark) and re-applies the current theme.
 	SetThemeVariant(ThemeVariant)
 	Scale() float32
 	// PrimaryColor indicates a user preference for a named primary color
 	//
-	// Since: 1.4
+	// Since: 1.0
 	PrimaryColor() string
 
 	// AddListener registers a callback that is invoked whenever the settings change.
 	//
-	// Since: 2.6
+	// Since: 1.0
 	AddListener(func(Settings))
 
 	BuildType() BuildType

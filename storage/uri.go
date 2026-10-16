@@ -12,7 +12,7 @@ import (
 
 // EqualURI returns true if the two URIs are equal.
 //
-// Since: 2.6
+// Since: 1.0
 func EqualURI(t1, t2 bellui.URI) bool {
 	return repository.EqualURI(t1, t2)
 }
@@ -41,7 +41,7 @@ func NewFileURI(fpath string) bellui.URI {
 // NewFileURI(), which will correctly handle back-slashes appearing in the URI
 // path component on Windows.
 //
-// Since: 2.0
+// Since: 1.0
 func ParseURI(s string) (bellui.URI, error) {
 	return repository.ParseURI(s)
 }
@@ -77,7 +77,7 @@ func ParseURI(s string) (bellui.URI, error) {
 // function is a helper which calls into an appropriate repository instance for
 // the scheme of the URI it is given.
 //
-// Since: 1.4
+// Since: 1.0
 func Parent(u bellui.URI) (bellui.URI, error) {
 	repo, err := repository.ForURI(u)
 	if err != nil {
@@ -116,7 +116,7 @@ func Parent(u bellui.URI) (bellui.URI, error) {
 // function is a helper which calls into an appropriate repository instance for
 // the scheme of the URI it is given.
 //
-// Since: 1.4
+// Since: 1.0
 func Child(u bellui.URI, component string) (bellui.URI, error) {
 	repo, err := repository.ForURI(u)
 	if err != nil {
@@ -150,7 +150,7 @@ func Child(u bellui.URI, component string) (bellui.URI, error) {
 // scheme-specific implementation depending on which storage repositories have
 // been registered.
 //
-// Since: 1.4
+// Since: 1.0
 func Exists(u bellui.URI) (bool, error) {
 	repo, err := repository.ForURI(u)
 	if err != nil {
@@ -179,7 +179,7 @@ func Exists(u bellui.URI) (bool, error) {
 // Delete is backed by the repository system - this function calls
 // into a scheme-specific implementation from a registered repository.
 //
-// Since: 2.0
+// Since: 1.0
 func Delete(u bellui.URI) error {
 	repo, err := repository.ForURI(u)
 	if err != nil {
@@ -200,7 +200,7 @@ func Delete(u bellui.URI) error {
 // DeleteAll is backed by the repository system - this function calls
 // into a scheme-specific implementation from a registered repository.
 //
-// Since: 2.7
+// Since: 1.0
 func DeleteAll(u bellui.URI) error {
 	repo, err := repository.ForURI(u)
 	if err != nil {
@@ -234,7 +234,7 @@ func DeleteAll(u bellui.URI) error {
 // Reader is backed by the repository system - this function calls
 // into a scheme-specific implementation from a registered repository.
 //
-// Since: 2.0
+// Since: 1.0
 func Reader(u bellui.URI) (bellui.URIReadCloser, error) {
 	repo, err := repository.ForURI(u)
 	if err != nil {
@@ -260,7 +260,7 @@ func Reader(u bellui.URI) (bellui.URIReadCloser, error) {
 // CanRead is backed by the repository system - this function calls into a
 // scheme-specific implementation from a registered repository.
 //
-// Since: 2.0
+// Since: 1.0
 func CanRead(u bellui.URI) (bool, error) {
 	repo, err := repository.ForURI(u)
 	if err != nil {
@@ -299,7 +299,7 @@ func CanRead(u bellui.URI) (bool, error) {
 // Writer is backed by the repository system - this function calls into a
 // scheme-specific implementation from a registered repository.
 //
-// Since: 2.0
+// Since: 1.0
 func Writer(u bellui.URI) (bellui.URIWriteCloser, error) {
 	repo, err := repository.ForURI(u)
 	if err != nil {
@@ -341,7 +341,7 @@ func Writer(u bellui.URI) (bellui.URIWriteCloser, error) {
 // Appender is backed by the repository system - this function calls into a
 // scheme-specific implementation from a registered repository.
 //
-// Since: 2.6
+// Since: 1.0
 func Appender(u bellui.URI) (bellui.URIWriteCloser, error) {
 	repo, err := repository.ForURI(u)
 	if err != nil {
@@ -368,7 +368,7 @@ func Appender(u bellui.URI) (bellui.URIWriteCloser, error) {
 // CanWrite is backed by the repository system - this function calls into a
 // scheme-specific implementation from a registered repository.
 //
-// Since: 2.0
+// Since: 1.0
 func CanWrite(u bellui.URI) (bool, error) {
 	repo, err := repository.ForURI(u)
 	if err != nil {
@@ -412,7 +412,7 @@ func CanWrite(u bellui.URI) (bool, error) {
 // Copy is backed by the repository system - this function calls into a
 // scheme-specific implementation from a registered repository.
 //
-// Since: 2.0
+// Since: 1.0
 func Copy(source bellui.URI, destination bellui.URI) error {
 	repo, err := repository.ForURI(source)
 	if err != nil {
@@ -460,7 +460,7 @@ func Copy(source bellui.URI, destination bellui.URI) error {
 // Move is backed by the repository system - this function calls into a
 // scheme-specific implementation from a registered repository.
 //
-// Since: 2.0
+// Since: 1.0
 func Move(source bellui.URI, destination bellui.URI) error {
 	repo, err := repository.ForURI(source)
 	if err != nil {
@@ -496,7 +496,7 @@ func Move(source bellui.URI, destination bellui.URI) error {
 // CanList is backed by the repository system - this function calls into a
 // scheme-specific implementation from a registered repository.
 //
-// Since: 2.0
+// Since: 1.0
 func CanList(u bellui.URI) (bool, error) {
 	repo, err := repository.ForURI(u)
 	if err != nil {
@@ -536,7 +536,7 @@ func CanList(u bellui.URI) (bool, error) {
 // scheme-specific implementation from a registered repository, or fails with a
 // URIOperationNotSupported error.
 //
-// Since: 2.0
+// Since: 1.0
 func List(u bellui.URI) ([]bellui.URI, error) {
 	repo, err := repository.ForURI(u)
 	if err != nil {
@@ -587,7 +587,7 @@ func List(u bellui.URI) ([]bellui.URI, error) {
 // calls into a scheme-specific implementation from a registered repository, or
 // fails with a URIOperationNotSupported error.
 //
-// Since: 2.0
+// Since: 1.0
 func CreateListable(u bellui.URI) error {
 	repo, err := repository.ForURI(u)
 	if err != nil {
@@ -631,7 +631,7 @@ func CreateListable(u bellui.URI) error {
 //     the needed operations, this fails with
 //     [repository.ErrOperationNotSupported].
 //
-// Since: 2.7
+// Since: 1.1
 func CreateChild(parent bellui.URI, name string, listable bool) (bellui.URI, error) {
 	repo, err := repository.ForURI(parent)
 	if err != nil {

@@ -45,24 +45,24 @@ var repositoryTable = map[string]Repository{}
 // package, which will automatically detect the scheme of a URI and call into
 // the appropriate repository.
 //
-// Since: 2.0
+// Since: 1.0
 type Repository interface {
 	// Exists will be used to implement calls to storage.Exists() for the
 	// registered scheme of this repository.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	Exists(u bellui.URI) (bool, error)
 
 	// Reader will be used to implement calls to storage.Reader()
 	// for the registered scheme of this repository.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	Reader(u bellui.URI) (bellui.URIReadCloser, error)
 
 	// CanRead will be used to implement calls to storage.CanRead() for the
 	// registered scheme of this repository.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	CanRead(u bellui.URI) (bool, error)
 
 	// Destroy is called when the repository is un-registered from a given
@@ -72,7 +72,7 @@ type Repository interface {
 	// registered for. This may be useful for repositories that need to
 	// handle more than one URI scheme internally.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	Destroy(string)
 }
 
@@ -103,7 +103,7 @@ type WatchableRepository interface {
 // with 'scheme:', or storage.ParseURI() will not be able to determine which
 // storage repository to delegate to for parsing.
 //
-// Since: 2.0
+// Since: 1.0
 type CustomURIRepository interface {
 	Repository
 
@@ -115,40 +115,40 @@ type CustomURIRepository interface {
 // WritableRepository is an extension of the Repository interface which also
 // supports obtaining a writer for URIs of the scheme it is registered to.
 //
-// Since: 2.0
+// Since: 1.0
 type WritableRepository interface {
 	Repository
 
 	// Writer will be used to implement calls to storage.WriterTo() for
 	// the registered scheme of this repository.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	Writer(u bellui.URI) (bellui.URIWriteCloser, error)
 
 	// CanWrite will be used to implement calls to storage.CanWrite() for
 	// the registered scheme of this repository.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	CanWrite(u bellui.URI) (bool, error)
 
 	// Delete will be used to implement calls to storage.Delete() for the
 	// registered scheme of this repository.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	Delete(u bellui.URI) error
 }
 
 // AppendableRepository is an extension of the WritableRepository interface which also
 // supports opening a writer for URIs in append mode, without truncating their contents
 //
-// Since: 2.6
+// Since: 1.0
 type AppendableRepository interface {
 	WritableRepository
 
 	// Appender will be used to call a Writer without truncating the
 	// file if it exists
 	//
-	// Since: 2.6
+	// Since: 1.0
 	Appender(u bellui.URI) (bellui.URIWriteCloser, error)
 }
 
@@ -156,34 +156,34 @@ type AppendableRepository interface {
 // supports obtaining directory listings (generally analogous to a directory
 // listing) for URIs of the scheme it is registered to.
 //
-// Since: 2.0
+// Since: 1.0
 type ListableRepository interface {
 	Repository
 
 	// CanList will be used to implement calls to storage.Listable() for
 	// the registered scheme of this repository.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	CanList(u bellui.URI) (bool, error)
 
 	// List will be used to implement calls to storage.List() for the
 	// registered scheme of this repository.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	List(u bellui.URI) ([]bellui.URI, error)
 
 	// CreateListable will be used to implement calls to
 	// storage.CreateListable() for the registered scheme of this
 	// repository.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	CreateListable(u bellui.URI) error
 }
 
 // HierarchicalRepository is an extension of the Repository interface which
 // also supports determining the parent and child items of a URI.
 //
-// Since: 2.0
+// Since: 1.0
 type HierarchicalRepository interface {
 	Repository
 
@@ -193,7 +193,7 @@ type HierarchicalRepository interface {
 	// A generic implementation is provided in GenericParent(), which
 	// is based on the RFC3986 definition of a URI parent.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	Parent(bellui.URI) (bellui.URI, error)
 
 	// Child will be used to implement calls to storage.Child() for
@@ -202,7 +202,7 @@ type HierarchicalRepository interface {
 	// A generic implementation is provided in GenericParent(), which
 	// is based on RFC3986.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	Child(bellui.URI, string) (bellui.URI, error)
 }
 
@@ -220,7 +220,7 @@ type HierarchicalRepository interface {
 // implement it — storage.CreateChild falls back to Child() plus
 // CreateListable() or Writer() for them.
 //
-// Since: 2.7
+// Since: 1.1
 type ChildCreatingRepository interface {
 	Repository
 
@@ -233,14 +233,14 @@ type ChildCreatingRepository interface {
 	// It should report an error if a child of that name already exists;
 	// callers that want the existing one should ask Child() first.
 	//
-	// Since: 2.7
+	// Since: 1.1
 	CreateChild(parent bellui.URI, name string, listable bool) (bellui.URI, error)
 }
 
 // DeleteAllRepository is an extension of the WritableRepository interface which
 // also supports deleting a URI and all its children.
 //
-// Since: 2.7
+// Since: 1.0
 type DeleteAllRepository interface {
 	WritableRepository
 
@@ -249,14 +249,14 @@ type DeleteAllRepository interface {
 	//
 	// A generic implementation is provided by GenericDeleteAll().
 	//
-	// Since: 2.7
+	// Since: 1.0
 	DeleteAll(bellui.URI) error
 }
 
 // CopyableRepository is an extension of the Repository interface which also
 // supports copying referenced resources from one URI to another.
 //
-// Since: 2.0
+// Since: 1.0
 type CopyableRepository interface {
 	Repository
 
@@ -273,7 +273,7 @@ type CopyableRepository interface {
 	// repository is registered to handle. In such cases, implementations
 	// are suggested to fail-over to GenericCopy().
 	//
-	// Since: 2.0
+	// Since: 1.0
 	Copy(bellui.URI, bellui.URI) error
 }
 
@@ -283,7 +283,7 @@ type CopyableRepository interface {
 // Note: both Moveable and Movable are correct spellings, but Movable is newer
 // and more accepted. Source: https://grammarist.com/spelling/movable-moveable/
 //
-// Since: 2.0
+// Since: 1.0
 type MovableRepository interface {
 	Repository
 
@@ -300,7 +300,7 @@ type MovableRepository interface {
 	// repository is registered to handle. In such cases, implementations
 	// are suggested to fail-over to GenericMove().
 	//
-	// Since: 2.0
+	// Since: 1.0
 	Move(bellui.URI, bellui.URI) error
 }
 
@@ -308,7 +308,7 @@ type MovableRepository interface {
 // registered scheme will use methods implemented by the relevant repository
 // implementation.
 //
-// Since: 2.0
+// Since: 1.0
 func Register(scheme string, repository Repository) {
 	scheme = strings.ToLower(scheme)
 
@@ -327,7 +327,7 @@ func Register(scheme string, repository Repository) {
 // package. It generally should not be used outside of the bellui package -
 // instead you should use the methods in the storage package.
 //
-// Since: 2.0
+// Since: 1.0
 func ForURI(u bellui.URI) (Repository, error) {
 	return ForScheme(u.Scheme())
 }
@@ -339,7 +339,7 @@ func ForURI(u bellui.URI) (Repository, error) {
 // package. It generally should not be used outside of the bellui package -
 // instead you should use the methods in the storage package.
 //
-// Since: 2.0
+// Since: 1.0
 func ForScheme(scheme string) (Repository, error) {
 	repo, ok := repositoryTable[scheme]
 	if !ok {

@@ -62,7 +62,7 @@ type URI interface {
 	// and [net/url.URL.Host]. Consult IETF RFC3986, section
 	// 3.2, pp. 17.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	Authority() string
 
 	// Path should return the URI path, as defined by IETF RFC3986 — the
@@ -77,25 +77,25 @@ type URI interface {
 	// something to show a user, and the storage package — Child,
 	// CreateChild, List — to work with the resource.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	Path() string
 
 	// Query should return the URI query, as defined by IETF RFC3986.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	Query() string
 
 	// Fragment should return the URI fragment, as defined by IETF
 	// RFC3986.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	Fragment() string
 }
 
 // ListableURI represents a [URI] that can have child items, most commonly a
 // directory on disk in the native filesystem.
 //
-// Since: 1.4
+// Since: 1.0
 type ListableURI interface {
 	URI
 
@@ -105,7 +105,7 @@ type ListableURI interface {
 
 // URIWithIcon describes a [URI] that should be rendered with a certain icon in file browsers.
 //
-// Since: 2.5
+// Since: 1.0
 type URIWithIcon interface {
 	URI
 

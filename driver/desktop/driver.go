@@ -13,7 +13,7 @@ type Driver interface {
 
 	// Gets the set of key modifiers that are currently active
 	//
-	// Since: 2.4
+	// Since: 1.0
 	CurrentKeyModifiers() event.KeyModifier
 
 	// HasSecondaryDisplay returns true if there are more than one screens available on this computer.

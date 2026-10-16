@@ -29,7 +29,7 @@ import (
 // ViewLayout can be passed to SetView() to set the view of
 // a FileDialog
 //
-// Since: 2.5
+// Since: 1.0
 type ViewLayout int
 
 const (
@@ -1077,14 +1077,14 @@ func showFile(file *FileDialog) *fileDialog {
 
 // Dismiss instructs the dialog to close without any affirmative action.
 //
-// Since: 2.6
+// Since: 1.0
 func (f *FileDialog) Dismiss() {
 	f.dialog.dismiss.OnTapped()
 }
 
 // MinSize returns the size that this dialog should not shrink below
 //
-// Since: 2.1
+// Since: 1.0
 func (f *FileDialog) MinSize() geo.Size {
 	return f.dialog.minSize()
 }
@@ -1142,7 +1142,7 @@ func (f *FileDialog) Hide() {
 
 // SetConfirmText allows custom text to be set in the confirmation button
 //
-// Since: 2.2
+// Since: 1.0
 func (f *FileDialog) SetConfirmText(label string) {
 	f.confirmText = label
 	if f.dialog == nil {
@@ -1164,7 +1164,7 @@ func (f *FileDialog) SetDismissText(label string) {
 
 // SetTitleText allows custom text to be set in the dialog title
 //
-// Since: 2.6
+// Since: 1.0
 func (f *FileDialog) SetTitleText(label string) {
 	f.titleText = label
 	if f.dialog == nil {
@@ -1176,7 +1176,7 @@ func (f *FileDialog) SetTitleText(label string) {
 // SetLocation tells this FileDialog which location to display.
 // This is normally called before the dialog is shown.
 //
-// Since: 1.4
+// Since: 1.0
 func (f *FileDialog) SetLocation(u bellui.ListableURI) {
 	f.startingLocation = u
 	if f.dialog != nil {
@@ -1258,7 +1258,7 @@ func (f *FileDialog) SetFileName(fileName string) {
 // SetView changes the default display view of the FileDialog
 // This is normally called before the dialog is shown.
 //
-// Since: 2.5
+// Since: 1.0
 func (f *FileDialog) SetView(v ViewLayout) {
 	f.initialView = v
 	if f.dialog != nil {
@@ -1269,7 +1269,7 @@ func (f *FileDialog) SetView(v ViewLayout) {
 // SetShowHidden sets whether the dialog should display hidden files.
 // This is normally called before the dialog is shown.
 //
-// Since: 2.7
+// Since: 1.0
 func (f *FileDialog) SetShowHidden(show bool) {
 	f.showHidden = show
 	if f.dialog != nil {

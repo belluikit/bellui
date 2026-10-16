@@ -8,32 +8,32 @@ import (
 const (
 	// SizeNameCaptionText is the name of theme lookup for helper text size, normally smaller than regular text size.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	SizeNameCaptionText bellui.ThemeSizeName = "helperText"
 
 	// SizeNameInlineIcon is the name of theme lookup for inline icons size.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	SizeNameInlineIcon bellui.ThemeSizeName = "iconInline"
 
 	// SizeNameInnerPadding is the name of theme lookup for internal widget padding size.
 	//
-	// Since: 2.3
+	// Since: 1.0
 	SizeNameInnerPadding bellui.ThemeSizeName = "innerPadding"
 
 	// SizeNameLineSpacing is the name of theme lookup for between text line spacing.
 	//
-	// Since: 2.3
+	// Since: 1.0
 	SizeNameLineSpacing bellui.ThemeSizeName = "lineSpacing"
 
 	// SizeNamePadding is the name of theme lookup for padding size.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	SizeNamePadding bellui.ThemeSizeName = "padding"
 
 	// SizeNameScrollBar is the name of theme lookup for the scrollbar size.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	SizeNameScrollBar bellui.ThemeSizeName = "scrollBar"
 
 	// SizeNameScrollBarMinThumb is the name of theme lookup for the minimum
@@ -46,73 +46,73 @@ const (
 
 	// SizeNameScrollBarSmall is the name of theme lookup for the shrunk scrollbar size.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	SizeNameScrollBarSmall bellui.ThemeSizeName = "scrollBarSmall"
 
 	// SizeNameSeparatorThickness is the name of theme lookup for the thickness of a separator.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	SizeNameSeparatorThickness bellui.ThemeSizeName = "separator"
 
 	// SizeNameText is the name of theme lookup for text size.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	SizeNameText bellui.ThemeSizeName = "text"
 
 	// SizeNameHeadingText is the name of theme lookup for text size of a heading.
 	//
-	// Since: 2.1
+	// Since: 1.0
 	SizeNameHeadingText bellui.ThemeSizeName = "headingText"
 
 	// SizeNameSubHeadingText is the name of theme lookup for text size of a sub-heading.
 	//
-	// Since: 2.1
+	// Since: 1.0
 	SizeNameSubHeadingText bellui.ThemeSizeName = "subHeadingText"
 
 	// SizeNameInputBorder is the name of theme lookup for input border size.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	SizeNameInputBorder bellui.ThemeSizeName = "inputBorder"
 
 	// SizeNameInputRadius is the name of theme lookup for input corner radius.
 	//
-	// Since: 2.4
+	// Since: 1.0
 	SizeNameInputRadius bellui.ThemeSizeName = "inputRadius"
 
 	// SizeNameSelectionRadius is the name of theme lookup for selection corner radius.
 	//
-	// Since: 2.4
+	// Since: 1.0
 	SizeNameSelectionRadius bellui.ThemeSizeName = "selectionRadius"
 
 	// SizeNameScrollBarRadius is the name of theme lookup for the scroll bar corner radius.
 	//
-	// Since: 2.5
+	// Since: 1.0
 	SizeNameScrollBarRadius bellui.ThemeSizeName = "scrollBarRadius"
 
 	// SizeNameWindowButtonHeight is the name of the height for an inner window titleBar button.
 	//
-	// Since: 2.6
+	// Since: 1.0
 	SizeNameWindowButtonHeight bellui.ThemeSizeName = "windowButtonHeight"
 
 	// SizeNameWindowButtonRadius is the name of the radius for an inner window titleBar button.
 	//
-	// Since: 2.6
+	// Since: 1.0
 	SizeNameWindowButtonRadius bellui.ThemeSizeName = "windowButtonRadius"
 
 	// SizeNameWindowButtonIcon is the name of the width of an inner window titleBar button.
 	//
-	// Since: 2.6
+	// Since: 1.0
 	SizeNameWindowButtonIcon bellui.ThemeSizeName = "windowButtonIcon"
 
 	// SizeNameWindowTitleBarHeight is the height for inner window titleBars.
 	//
-	// Since: 2.6
+	// Since: 1.0
 	SizeNameWindowTitleBarHeight bellui.ThemeSizeName = "windowTitleBarHeight"
 
 	// SizeNameTabContentMargin is the gap between a tab bar and the content
 	// area of the selected tab in AppTabs and DocTabs.
 	//
-	// Since: 2.8
+	// Since: 1.0
 	SizeNameTabContentMargin bellui.ThemeSizeName = "tabContentMargin"
 
 	// SizeNameShadowDepth is a multiplier for shadow depth. The default builtin theme
@@ -203,28 +203,28 @@ func IconInlineSize() float32 {
 
 // InnerPadding is the standard gap between element content and the outside edge of a widget.
 //
-// Since: 2.3
+// Since: 1.0
 func InnerPadding() float32 {
 	return Current().Size(SizeNameInnerPadding)
 }
 
 // InputBorderSize returns the input border size (or underline size for an entry).
 //
-// Since: 2.0
+// Since: 1.0
 func InputBorderSize() float32 {
 	return Current().Size(SizeNameInputBorder)
 }
 
 // InputRadiusSize returns the input radius size.
 //
-// Since: 2.4
+// Since: 1.0
 func InputRadiusSize() float32 {
 	return Current().Size(SizeNameInputRadius)
 }
 
 // LineSpacing is the default gap between multiple lines of text.
 //
-// Since: 2.3
+// Since: 1.0
 func LineSpacing() float32 {
 	return Current().Size(SizeNameLineSpacing)
 }
@@ -254,21 +254,21 @@ func ScrollBarMinThumbSize() float32 {
 
 // SelectionRadiusSize returns the selection highlight radius size.
 //
-// Since: 2.4
+// Since: 1.0
 func SelectionRadiusSize() float32 {
 	return Current().Size(SizeNameSelectionRadius)
 }
 
 // SeparatorThicknessSize is the standard thickness of the separator widget.
 //
-// Since: 2.0
+// Since: 1.0
 func SeparatorThicknessSize() float32 {
 	return Current().Size(SizeNameSeparatorThickness)
 }
 
 // Size looks up the specified size for current theme.
 //
-// Since: 2.5
+// Since: 1.0
 func Size(name bellui.ThemeSizeName) float32 {
 	return Current().Size(name)
 }
@@ -276,14 +276,14 @@ func Size(name bellui.ThemeSizeName) float32 {
 // SizeForWidget looks up the specified size for the requested widget using the current theme.
 // If the widget theme has been overridden that theme will be used.
 //
-// Since: 2.5
+// Since: 1.0
 func SizeForWidget(name bellui.ThemeSizeName, w core.Widget) float32 {
 	return CurrentForWidget(w).Size(name)
 }
 
 // TextHeadingSize returns the text size for header text.
 //
-// Since: 2.1
+// Since: 1.0
 func TextHeadingSize() float32 {
 	return Current().Size(SizeNameHeadingText)
 }
@@ -295,7 +295,7 @@ func TextSize() float32 {
 
 // TextSubHeadingSize returns the text size for sub-header text.
 //
-// Since: 2.1
+// Since: 1.0
 func TextSubHeadingSize() float32 {
 	return Current().Size(SizeNameSubHeadingText)
 }

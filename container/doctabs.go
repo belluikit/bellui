@@ -28,7 +28,7 @@ func (t *DocTabs) AccessibleLabel() string { return "" }
 // The tabs contain text and/or an icon and allow the user to switch between the content specified in each TabItem.
 // Each item is represented by a button at the edge of the container.
 //
-// Since: 2.1
+// Since: 1.0
 type DocTabs struct {
 	widget.BaseWidget
 
@@ -49,7 +49,7 @@ type DocTabs struct {
 
 // NewDocTabs creates a new tab container that allows the user to choose between various pieces of content.
 //
-// Since: 2.1
+// Since: 1.0
 func NewDocTabs(items ...*TabItem) *DocTabs {
 	tabs := &DocTabs{Items: items}
 	tabs.ExtendBaseWidget(tabs)
@@ -94,28 +94,28 @@ func (t *DocTabs) CreateRenderer() core.WidgetRenderer {
 
 // DisableIndex disables the TabItem at the specified index.
 //
-// Since: 2.3
+// Since: 1.0
 func (t *DocTabs) DisableIndex(i int) {
 	disableIndex(t, i)
 }
 
 // DisableItem disables the specified TabItem.
 //
-// Since: 2.3
+// Since: 1.0
 func (t *DocTabs) DisableItem(item *TabItem) {
 	disableItem(t, item)
 }
 
 // EnableIndex enables the TabItem at the specified index.
 //
-// Since: 2.3
+// Since: 1.0
 func (t *DocTabs) EnableIndex(i int) {
 	enableIndex(t, i)
 }
 
 // EnableItem enables the specified TabItem.
 //
-// Since: 2.3
+// Since: 1.0
 func (t *DocTabs) EnableItem(item *TabItem) {
 	enableItem(t, item)
 }

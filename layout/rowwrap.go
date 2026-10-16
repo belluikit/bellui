@@ -16,7 +16,7 @@ type rowWrapLayout struct {
 // in rows and wraps them dynamically.
 // Objects are separated with horizontal and vertical padding.
 //
-// Since: 2.7
+// Since: 1.0
 func NewRowWrapLayout() core.Layout {
 	p := theme.Padding()
 	return &rowWrapLayout{
@@ -28,7 +28,7 @@ func NewRowWrapLayout() core.Layout {
 // NewRowWrapLayoutWithCustomPadding returns a new RowWrapLayout instance
 // with custom horizontal and inner padding.
 //
-// Since: 2.7
+// Since: 1.0
 func NewRowWrapLayoutWithCustomPadding(horizontal, vertical float32) core.Layout {
 	return &rowWrapLayout{
 		horizontalPadding: horizontal,

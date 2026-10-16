@@ -16,7 +16,7 @@ var _ core.Widget = (*Activity)(nil)
 // Activity is used to indicate that something is happening that should be waited for,
 // or is in the background (depending on usage).
 //
-// Since: 2.5
+// Since: 1.0
 type Activity struct {
 	BaseWidget
 
@@ -25,7 +25,7 @@ type Activity struct {
 
 // NewActivity returns a widget for indicating activity
 //
-// Since: 2.5
+// Since: 1.0
 func NewActivity() *Activity {
 	a := &Activity{}
 	a.ExtendBaseWidget(a)

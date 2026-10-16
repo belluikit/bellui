@@ -19,7 +19,7 @@ import (
 
 // TimePicker is an MD3-compliant time picker with a clock dial.
 //
-// Since: 2.7
+// Since: 1.0
 type TimePicker struct {
 	BaseWidget
 	Hour, Minute    int
@@ -287,7 +287,7 @@ func (t *TimePicker) setMeridiem(pm bool) {
 
 // NewTimePicker creates a new MD3 time picker.
 //
-// Since: 2.7
+// Since: 1.0
 func NewTimePicker(hour, minute int, use24h bool, changed func(hour, minute int)) *TimePicker {
 	t := &TimePicker{Hour: hour, Minute: minute, Use24Hour: use24h, OnChanged: changed}
 	t.ExtendBaseWidget(t)
@@ -535,21 +535,21 @@ func (t *TimePicker) fireChanged() {
 // NewAutoTimePicker creates a time picker that auto-detects 12h/24h mode
 // from the current locale.
 //
-// Since: 2.7
+// Since: 1.0
 func NewAutoTimePicker(hour, minute int, changed func(hour, minute int)) *TimePicker {
 	return NewTimePicker(hour, minute, lang.Prefers24HourClock(), changed)
 }
 
 // ShowAutoTimePicker shows a time picker modal that auto-detects 12h/24h mode.
 //
-// Since: 2.7
+// Since: 1.0
 func ShowAutoTimePicker(hour, minute int, changed func(hour, minute int), c core.Canvas) {
 	ShowTimePicker(hour, minute, lang.Prefers24HourClock(), changed, c)
 }
 
 // ShowTimePicker shows the time picker as a modal dialog.
 //
-// Since: 2.7
+// Since: 1.0
 func ShowTimePicker(hour, minute int, use24h bool, changed func(hour, minute int), c core.Canvas) {
 	picker := NewTimePicker(hour, minute, use24h, nil)
 

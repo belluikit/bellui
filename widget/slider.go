@@ -39,7 +39,7 @@ type Slider struct {
 	Orientation Orientation
 	OnChanged   func(float64) `json:"-"`
 
-	// Since: 2.4
+	// Since: 1.0
 	OnChangeEnded func(float64) `json:"-"`
 
 	// OnHover is called with the value under the pointer as it moves across the
@@ -98,7 +98,7 @@ func NewSlider(min, max float64) *Slider {
 
 // NewSliderWithData returns a slider connected with the specified data source.
 //
-// Since: 2.0
+// Since: 1.0
 func NewSliderWithData(min, max float64, data binding.Float) *Slider {
 	slider := NewSlider(min, max)
 	slider.Bind(data)
@@ -154,7 +154,7 @@ func (s *Slider) PerformAccessibleAction(name string) {
 // hook, so an app handler set before or after Bind keeps working and the data
 // source keeps tracking the widget either way.
 //
-// Since: 2.0
+// Since: 1.0
 func (s *Slider) Bind(data binding.Float) {
 	s.binder.SetCallback(s.updateFromData)
 	s.binder.Bind(data)
@@ -288,7 +288,7 @@ func (s *Slider) CursorPosition() geo.Position {
 
 // Tapped is called when a pointer tapped event is captured.
 //
-// Since: 2.4
+// Since: 1.0
 func (s *Slider) Tapped(e *event.PointEvent) {
 	if s.disabled {
 		return
@@ -336,7 +336,7 @@ func (s *Slider) fireChangeEnded() {
 
 // FocusGained is called when this item gained the focus.
 //
-// Since: 2.4
+// Since: 1.0
 func (s *Slider) FocusGained() {
 	s.focused = true
 	if !s.disabled {
@@ -346,7 +346,7 @@ func (s *Slider) FocusGained() {
 
 // FocusLost is called when this item lost the focus.
 //
-// Since: 2.4
+// Since: 1.0
 func (s *Slider) FocusLost() {
 	s.focused = false
 	if !s.disabled {
@@ -356,7 +356,7 @@ func (s *Slider) FocusLost() {
 
 // HoverIn is called when a desktop pointer enters the widget.
 //
-// Since: 2.4
+// Since: 1.0
 func (s *Slider) HoverIn(e *event.HoverEvent) {
 	s.hovered = true
 	if !s.disabled {
@@ -367,7 +367,7 @@ func (s *Slider) HoverIn(e *event.HoverEvent) {
 
 // HoverMoved is called when a desktop pointer hovers over the widget.
 //
-// Since: 2.4
+// Since: 1.0
 func (s *Slider) HoverMoved(e *event.HoverEvent) {
 	if s.disabled {
 		return
@@ -377,7 +377,7 @@ func (s *Slider) HoverMoved(e *event.HoverEvent) {
 
 // HoverOut is called when a desktop pointer exits the widget
 //
-// Since: 2.4
+// Since: 1.0
 func (s *Slider) HoverOut() {
 	s.hovered = false
 	if !s.disabled {
@@ -392,7 +392,7 @@ func (s *Slider) HoverOut() {
 
 // TypedKey is called when this item receives a key event.
 //
-// Since: 2.4
+// Since: 1.0
 func (s *Slider) TypedKey(key *event.KeyEvent) {
 	if s.disabled {
 		return
@@ -416,7 +416,7 @@ func (s *Slider) TypedKey(key *event.KeyEvent) {
 
 // TypedRune is called when this item receives a char event.
 //
-// Since: 2.4
+// Since: 1.0
 func (s *Slider) TypedRune(_ rune) {
 }
 
@@ -567,7 +567,7 @@ func (s *Slider) MinSize() geo.Size {
 
 // Disable disables the slider
 //
-// Since: 2.5
+// Since: 1.0
 func (s *Slider) Disable() {
 	if !s.disabled {
 		defer s.Refresh()
@@ -577,7 +577,7 @@ func (s *Slider) Disable() {
 
 // Enable enables the slider
 //
-// Since: 2.5
+// Since: 1.0
 func (s *Slider) Enable() {
 	if s.disabled {
 		defer s.Refresh()
@@ -587,7 +587,7 @@ func (s *Slider) Enable() {
 
 // Disabled returns true if the slider is currently disabled
 //
-// Since: 2.5
+// Since: 1.0
 func (s *Slider) Disabled() bool {
 	return s.disabled
 }
@@ -671,7 +671,7 @@ func (s *Slider) writeData(data binding.DataItem) {
 // Only the write-back hook Bind installed is removed; [Slider.OnChanged]
 // belongs to the app and is left alone.
 //
-// Since: 2.0
+// Since: 1.0
 func (s *Slider) Unbind() {
 	s.onChangedInternal = nil
 	s.binder.Unbind()
