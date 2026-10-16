@@ -1,0 +1,5 @@
+# These templates are embedded into the CLI and written into Linux/BSD
+# packages. Keep them LF even in a Windows checkout, or a CLI built on
+# Windows ships a Makefile and .desktop entry with CRLF line endings.
+Makefile      text eol=lf
+entry.desktop text eol=lf
