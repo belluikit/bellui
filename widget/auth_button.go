@@ -36,7 +36,8 @@ type AuthButton struct {
 	Issuer string
 
 	// Scopes is a space-separated list of OAuth scopes.
-	// Defaults to "openid email profile" for OIDC providers.
+	// Defaults to "openid email profile" for OIDC providers and to
+	// "user:email read:user" for GitHub.
 	Scopes string
 
 	// Text overrides the button label. Defaults to the provider preset.
