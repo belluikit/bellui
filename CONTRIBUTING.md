@@ -1,63 +1,91 @@
-Thanks very much for your interest in contributing to Bellui!
-The community is what makes this project successful and we are glad to welcome you on board.
+Thanks for your interest in contributing to Bellui!
 
-There are various ways to contribute, perhaps the following helps you know how to get started.
+Bellui is open source under the [BSD 3-Clause license](LICENSE). By sending a
+pull request you agree that your contribution is released under the same
+license. Everyone taking part is expected to follow the
+[code of conduct](CODE_OF_CONDUCT.md).
+
+## Asking a question
+
+For help with your own code, or a question about how something works, see the
+[support page](https://bellui.com/support/). The issue tracker is for bugs and
+feature requests.
 
 ## Reporting a bug
 
-If you've found something wrong we want to know about it, please help us understand the problem so we can resolve it.
+1. Search the [issue list](https://github.com/belluikit/bellui/issues) first.
+   If the bug is already there, add what you know to it.
+2. Otherwise open a new issue with the
+   [bug report form](https://github.com/belluikit/bellui/issues/new?template=bug_report.yml).
+   A small program that shows the problem, and the platform you saw it on, are
+   the most useful things you can include.
 
-1. Check to see if this already is recorded, if so add some more information [issue list](https://github.com/belluikit/bellui/issues)
-2. If not then create a new issue using the [bug report template](https://github.com/belluikit/bellui/issues/new?assignees=&labels=&template=bug_report.md&title=)
-3. Stay involved in the conversation on the issue as it is triaged and progressed.
+Security problems are not reported in public issues: see
+[SECURITY.md](SECURITY.md).
 
+## Fixing a bug
 
-## Fixing an issue
-
-Great! You found an issue and figured you can fix it for us.
-If you can follow these steps then your code should get accepted fast.
-
-1. Read through the "Contributing Code" section further down this page.
-2. Write a unit test to show it is broken.
-3. Create the fix and you should see the test passes.
-4. Run the tests and make sure everything still works as expected using `go test ./...`.
-5. [Open a PR](https://github.com/belluikit/bellui/compare) and work through the review checklist.
-
+1. Read [Contributing code](#contributing-code) below.
+2. Write a test that fails because of the bug.
+3. Fix it, and check that the test now passes.
+4. Run the checks listed below.
+5. [Open a pull request](https://github.com/belluikit/bellui/compare) against
+   `main` and say which issue it fixes (`Fixes #123`).
 
 ## Adding a feature
 
-It's always good news to hear that people want to contribute functionality.
-But first of all check that it fits within our [Vision](https://github.com/belluikit/bellui/wiki/Vision) and if we are already considering it on our [Roadmap](https://github.com/belluikit/bellui/wiki/Roadmap).
-If you're not sure then you should join our #bellui-contributors channel on the [Gophers Slack server](https://gophers.slack.com/app_redirect?channel=bellui-contributors).
+Bellui is maintained by TrendVidia. For anything larger than a small fix, open
+a [feature request](https://github.com/belluikit/bellui/issues/new?template=feature_request.yml)
+first and describe what you want to build and why, so we can agree on the
+approach before you write the code. [ROADMAP.md](ROADMAP.md) lists what is
+planned, and [docs/notes/](docs/notes/) explains how each area is designed.
 
-Once you are ready to code then the following steps should give you a smooth process:
+Bellui runs on desktop, mobile and the web, so a new feature is normally
+expected to work on all of them, or to say clearly where it does not (an
+optional interface the app can check, rather than a silent no-op).
 
-1. Read through the [Contributing Code](#contributing-code) section further down this page.
-2. Think about how you would structure your code and how it can be tested.
-3. Write some code and enjoy the ease of writing Go code for even a complex project :).
-4. Run the tests and make sure everything still works as expected using `go test ./...`.
-5. [Open a PR](https://github.com/belluikit/bellui/compare) and work through the review checklist.
+# Contributing code
 
+## Setting up
 
-# Contributing Code
+You need the Go version named in [go.mod](go.mod), a C compiler and your
+platform's development packages; [the getting started guide](https://bellui.com/develop/)
+lists them per platform.
 
-We aim to maintain a very high standard of code, through design, test and implementation.
-To manage this we have various checks and processes in place that everyone should follow, including:
+The repository holds several Go modules: the toolkit at the root, the command
+line tool in `cmd/bellui`, and the extensions in `x/charts`, `x/dag`,
+`x/editor`, `x/mmedia` and `x/tables`. Run the tests in each module you change.
 
-* We use the Go standard format (with tabs not spaces) - you can run `gofmt` before committing
-* Imports should be ordered according to the GoImports spec - you can use the `goimports` tool instead of `gofmt`.
-* Everything should have a unit test attached (as much as possible, to keep our coverage up)
+## Checks
 
-For detailed Code style, check [Contributing](https://github.com/belluikit/bellui/wiki/Contributing#code-style) in our wiki please.
+CI runs these on every pull request; running them first saves a round trip.
 
-# Decision Process
+```sh
+go test ./...                  # in each module you changed
+go vet ./...
+gofumpt -l .                   # formatting (stricter than gofmt)
+goimports -l .                 # import grouping
+staticcheck ./...
+```
 
-The following points apply to our decision making process:
+Install the tools with:
 
-* Any decisions or votes will be opened on the #bellui-votes Slack channel and follows lazy consensus.
-* Any contributors not responding in 4 days will be deemed in agreement.
-* Any PR that has not been responded to within 7 days can be automatically approved.
-* No functionality will be added unless at least 2 developers agree it belongs.
+```sh
+go install mvdan.cc/gofumpt@latest
+go install golang.org/x/tools/cmd/goimports@latest
+go install honnef.co/go/tools/cmd/staticcheck@latest
+```
 
-Bear in mind that this is a cross platform project so any new features would normally
-be required to work on multiple desktop and mobile platforms.
+The renderer also has an OpenGL build; if you touch rendering code, run
+`go vet -tags gl ./...` too.
+
+## Style
+
+- Everything new gets a unit test where that is possible.
+- New public API has a doc comment ending in a `Since:` line with the version
+  it first appears in.
+- A user-visible change gets an entry under `## Unreleased` in
+  [CHANGELOG.md](CHANGELOG.md) (or `cmd/bellui/CHANGELOG.md` for the command
+  line tool).
+- Breaking changes need a deprecation path, or an issue where they were agreed
+  first.

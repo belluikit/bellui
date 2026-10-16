@@ -1,6 +1,6 @@
-<!-- If this is your first pull request for Bellui please read the contributor docs at:
-https://github.com/belluikit/bellui (forked from fyne-io/fyne).
-Be sure that your work is based off `develop` branch. --> 
+<!-- If this is your first pull request for Bellui, please read CONTRIBUTING.md:
+https://github.com/belluikit/bellui/blob/main/CONTRIBUTING.md
+Base your work on the `main` branch. -->
 
 ### Description:
 <!-- A summary of the change included and which issue it addresses.
@@ -12,7 +12,7 @@ Fixes #(issue)
 <!-- Please tick these as appropriate using [x] -->
 
 - [ ] Tests included.
-- [ ] Lint and formatter run with no errors.
+- [ ] gofumpt, goimports, go vet and staticcheck run with no errors.
 - [ ] Tests all pass.
 
 #### Where applicable:
