@@ -1,6 +1,6 @@
 # WebGPU rendering backend
 
-As of the Phase 5 migration (#204), **WebGPU is the default GPU rendering backend**
+As of the Phase 5 migration (pre-rebrand tracker #204), **WebGPU is the default GPU rendering backend**
 on every platform this fork targets. The legacy OpenGL / OpenGL&nbsp;ES / WebGL
 backend is still fully supported and is selected with the **`gl`** build tag.
 
@@ -116,7 +116,7 @@ Gotchas:
 ### iOS / iOS Simulator
 
 `wgpu-native` renders via **Metal** on a `CAMetalLayer`; the gomobile GLKView/GLES
-draw path is compiled out (it is the broken-on-simulator path, #195). The
+draw path is compiled out (it is the broken-on-simulator path, pre-rebrand tracker #195). The
 simulator needs a simulator slice of `wgpu-native`, selected with the
 **`iossimulator`** tag:
 
