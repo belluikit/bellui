@@ -19,9 +19,12 @@ func redirectStorage(t *testing.T) string {
 	userConfigDir = func() (string, error) { return dir, nil }
 	origStore := newSecretStore
 	newSecretStore = func() secretStore { return nil }
+	origAppID := currentAppID
+	currentAppID = func() string { return "com.example.test" }
 	t.Cleanup(func() {
 		userConfigDir = orig
 		newSecretStore = origStore
+		currentAppID = origAppID
 	})
 	return dir
 }
