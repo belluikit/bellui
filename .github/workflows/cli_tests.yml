@@ -107,6 +107,9 @@ jobs:
   # to the native Java must land WITH a regenerated dex.go in the same PR — the
   # co-located workflow that replaced the old cross-repo split. (Regen with:
   # `cd cmd/bellui/internal/mobile && go generate`, Android SDK on PATH.)
+  # A change to comments and blank lines only is exempt: comments are not
+  # compiled, so the regenerated dex.go would be identical and git would
+  # show no change to commit (#366).
   dex_regenerated_with_java:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
@@ -124,7 +127,19 @@ jobs:
           java=$(echo "$changed" | grep -c '^internal/driver/mobile/app/GoNativeActivity\.java$' || true)
           dex=$(echo "$changed" | grep -c '^cmd/bellui/internal/mobile/dex\.go$' || true)
           if [ "$java" -gt 0 ] && [ "$dex" -eq 0 ]; then
-            echo "::error::GoNativeActivity.java changed but cmd/bellui/internal/mobile/dex.go did not. Regenerate the embedded dex ('cd cmd/bellui/internal/mobile && go generate') and commit it in this PR." >&2
-            exit 1
+            # Changed lines that are not a comment or blank. A line mixing
+            # code and a comment counts as code.
+            code=$(git diff -U0 "$BASE" "$HEAD" -- internal/driver/mobile/app/GoNativeActivity.java \
+              | grep -E '^[+-]' | grep -vE '^(\+\+\+|---) ' \
+              | sed -E 's/^[+-][[:space:]]*//' \
+              | grep -vE '^(//|/\*|\*|$)' || true)
+            if [ -n "$code" ]; then
+              echo "::error::GoNativeActivity.java changed but cmd/bellui/internal/mobile/dex.go did not. Regenerate the embedded dex ('cd cmd/bellui/internal/mobile && go generate') and commit it in this PR." >&2
+              echo "Changed code lines:" >&2
+              echo "$code" >&2
+              exit 1
+            fi
+            echo "ok: only comments changed in GoNativeActivity.java; the dex is unaffected"
+            exit 0
           fi
           echo "ok: Java=$java dex=$dex"
