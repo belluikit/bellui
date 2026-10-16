@@ -59,16 +59,16 @@ public class GoNativeActivity extends NativeActivity {
 	// The shadow EditText must advertise a real text class: an inputType with
 	// no TYPE_MASK_CLASS bits reads as TYPE_NULL to the IME, and IMEs disable
 	// inline composition against null-class editors (Gboard pinyin composed in
-	// its own bar and never called setComposingText — found on the pre-rebrand tracker #945 device
-	// pass). NO_SUGGESTIONS is intentionally NOT set (pre-rebrand tracker #1006 Phase 4): it was a
-	// pre-rebrand tracker #945 band-aid that suppressed the latin autocorrect strip because, in the
+	// its own bar and never called setComposingText — found on the #945 device
+	// pass). NO_SUGGESTIONS is intentionally NOT set (#1006 Phase 4): it was a
+	// #945 band-aid that suppressed the latin autocorrect strip because, in the
 	// pre-Phase-4 architecture, autocorrect's recompose of already-committed
-	// words drove the pre-rebrand tracker #966 replication. Phase 4 owns the composing region and
+	// words drove the #966 replication. Phase 4 owns the composing region and
 	// clears it on every bellui-side selection change (setKeyboardState), so
 	// autocorrect / inline suggestions are now safe and are wanted (the Phase 4
 	// gate). CJK composition is unaffected either way.
 	// AUTO_CORRECT + CAP_SENTENCES mark this as a normal prose text field, so the
-	// IME offers autocorrect and suggestions at all (pre-rebrand tracker #1007). Jetpack Compose sets
+	// IME offers autocorrect and suggestions at all (#1007). Jetpack Compose sets
 	// exactly these from its own (also custom, non-EditText) input connection —
 	// EditorInfo.update() ORs TYPE_TEXT_FLAG_AUTO_CORRECT whenever autocorrect is
 	// on, its default, plus the capitalization flag — and a working stock field
@@ -115,19 +115,19 @@ public class GoNativeActivity extends NativeActivity {
 	// touched on) the UI thread — unlike keyboardUp, which the static
 	// showKeyboard/hideKeyboard entry points set eagerly on the caller thread
 	// before the UI-thread runnable has run, so it cannot answer "is the IME
-	// already up for this type?" (pre-rebrand tracker #1016). NO_KEYBOARD_CODE = nothing applied.
+	// already up for this type?" (#1016). NO_KEYBOARD_CODE = nothing applied.
 	private int mAppliedKeyboardType = NO_KEYBOARD_CODE;
 	private int mAppliedInputType = 0;
 	private int mAppliedImeOptions = 0;
 	// Set (on the UI thread) by keyboardEditorChanged when the bound bellui editor's
-	// IDENTITY changes (pre-rebrand tracker #966), consumed by the next doSetKeyboardState: that push
+	// IDENTITY changes (#966), consumed by the next doSetKeyboardState: that push
 	// is the NEW field's seed and must reseed + restartInput unconditionally —
 	// never be dropped by the composing-echo or recent-state filters (whose state
 	// belongs to the previous field) and never take the sameText short-circuit
 	// (two empty fields still need the restart, or the IME session — and its
 	// composing word — silently spans both fields).
 	private boolean mEditorChanged = false;
-	// pre-rebrand tracker #1006 Phase 4 — bellui-driven flat IME transport (the Flutter
+	// #1006 Phase 4 — bellui-driven flat IME transport (the Flutter
 	// InputConnectionAdaptor model). mTextEdit is only the focusable host that
 	// triggers the soft keyboard and vends onCreateInputConnection; its own
 	// TextView document is NOT the source of truth. The IME edits a bellui-owned
@@ -142,7 +142,7 @@ public class GoNativeActivity extends NativeActivity {
 	// (updateSelection / restartInput).
 	private Editable mBelluiBuffer;
 	// IME composition state. TWO DISTINCT STATES share the buffer's composing
-	// span, and only one of them is this flag (pre-rebrand tracker #1021):
+	// span, and only one of them is this flag (#1021):
 	//
 	//   composing == true — a BELLUI-SIDE PREEDIT: the soft keyboard is building
 	//   inline composition text (a CJK candidate) that bellui shows display-only
@@ -158,10 +158,10 @@ public class GoNativeActivity extends NativeActivity {
 	//   bellui == buffer — the span is a marker only (the platform/Flutter model),
 	//   and pushes keep flowing; the span rides along in updateSelection so the
 	//   IME drops it itself when the caret leaves it. Treating this state as
-	//   "composing" is what deadlocked TalkBack caret moves (pre-rebrand tracker #1021).
+	//   "composing" is what deadlocked TalkBack caret moves (#1021).
 	private boolean composing = false;
 	private String composingText = "";
-	// Extracted-text dirty region (pre-rebrand tracker #1009): the union of buffer regions edited
+	// Extracted-text dirty region (#1009): the union of buffer regions edited
 	// since the last extracted-text report to the IME, maintained by a
 	// TextWatcher span on mBelluiBuffer (the TextView editor's ChangeWatcher
 	// model) so every mutation path — IC ops, the DEL key's manual delete,
@@ -178,7 +178,7 @@ public class GoNativeActivity extends NativeActivity {
 	private int extractDirtyDelta = 0;
 
 	// noteExtractDirty folds one buffer change — replace of [start,
-	// start+before) with `after` chars — into the dirty-region union (pre-rebrand tracker #1009).
+	// start+before) with `after` chars — into the dirty-region union (#1009).
 	private void noteExtractDirty(int start, int before, int after) {
 		if (extractDirtyStart < 0) {
 			extractDirtyStart = start;
@@ -215,7 +215,7 @@ public class GoNativeActivity extends NativeActivity {
 		}
 		return off;
 	}
-	// Push reconciliation state (pre-rebrand tracker #1007). mBelluiBuffer and bellui's document can
+	// Push reconciliation state (#1007). mBelluiBuffer and bellui's document can
 	// disagree for three very different reasons, and only one of them may answer
 	// with imm.restartInput() — a restart tears down the IME's session, and an IME
 	// consults the editor state it cached at onStartInput before offering an
@@ -241,7 +241,7 @@ public class GoNativeActivity extends NativeActivity {
 	// a large document is not copied per edit; a hash collision would drop one push,
 	// which the next push corrects.
 	//
-	// Entries EXPIRE (pre-rebrand tracker #1023): "the buffer has held this document" is only evidence
+	// Entries EXPIRE (#1023): "the buffer has held this document" is only evidence
 	// of lag for a moment — the bellui echo of an IME edit lands within a frame
 	// (measured 7 ms; bounded by the event-queue round-trip). An UNDO also returns
 	// bellui to a past buffer state, but seconds later, and dropping that push
@@ -284,7 +284,7 @@ public class GoNativeActivity extends NativeActivity {
 	}
 
 	// clearRecentBufferStates drops the echo ring wholesale on an editor change
-	// (pre-rebrand tracker #966): its entries describe the PREVIOUS field's buffer, and the new
+	// (#966): its entries describe the PREVIOUS field's buffer, and the new
 	// field's seed push must never match one and be dropped as "bellui lagging"
 	// (e.g. both fields empty within the TTL window).
 	private void clearRecentBufferStates() {
@@ -341,9 +341,9 @@ public class GoNativeActivity extends NativeActivity {
                         break;
                     case SINGLELINE_KEYBOARD_CODE:
                         imeOptions = EditorInfo.IME_ACTION_DONE;
-                        // NO_SUGGESTIONS intentionally dropped in pre-rebrand tracker #1006 Phase 4
+                        // NO_SUGGESTIONS intentionally dropped in #1006 Phase 4
                         // (see DEFAULT_INPUT_TYPE): autocorrect is now safe. The
-                        // suggest flags mark it a prose field (pre-rebrand tracker #1007).
+                        // suggest flags mark it a prose field (#1007).
                         inputType = InputType.TYPE_CLASS_TEXT | TEXT_SUGGEST_FLAGS;
                         break;
                     case NUMBER_KEYBOARD_CODE:
@@ -363,7 +363,7 @@ public class GoNativeActivity extends NativeActivity {
                 }
                 imeOptions |= EditorInfo.IME_FLAG_NO_FULLSCREEN;
 
-                // Idempotence gate (pre-rebrand tracker #1016, pre-rebrand tracker #1006 Phase 5). doShowKeyboard is
+                // Idempotence gate (#1016, #1006 Phase 5). doShowKeyboard is
                 // called on EVERY focus or overlay change — canvas.go's
                 // `OnFocus: d.handleKeyboard` and `overlayChanged()` — so a
                 // selection-handles overlay appearing, or a re-focus of the
@@ -375,11 +375,11 @@ public class GoNativeActivity extends NativeActivity {
                 // session, including mid-typing). An IME consults the editor
                 // state it cached at onStartInput before offering an autocorrect
                 // or replacing a word, so that churn throws away exactly the
-                // cache pre-rebrand tracker #1007 depends on, and racing it against the a11y
+                // cache #1007 depends on, and racing it against the a11y
                 // reconcile's layout traversals (which make ViewRootImpl call
                 // imm.checkFocus()) is the suspected source of the intermittent
                 // mServedView=null under TalkBack — keyboard up, no served
-                // editor, keystrokes discarded (pre-rebrand tracker #1005 Bug 1).
+                // editor, keystrokes discarded (#1005 Bug 1).
                 //
                 // So: when the IME is already up for this exact configuration
                 // and the connection is HEALTHY, there is nothing to do —
@@ -390,14 +390,14 @@ public class GoNativeActivity extends NativeActivity {
                 // doHideKeyboard, so a later show still re-raises the keyboard.
                 // A focus switch between two fields of the same type is
                 // deliberately skipped too — the shadow is a document-less sink
-                // (pre-rebrand tracker #1006 Phase 3), nothing about it is per-field except the
+                // (#1006 Phase 3), nothing about it is per-field except the
                 // input type, and the document swap is handled by
-                // setKeyboardState's re-seed + restartInput (pre-rebrand tracker #1007).
+                // setKeyboardState's re-seed + restartInput (#1007).
                 //
                 // isActive(mTextEdit) is the load-bearing half of "healthy": it
                 // reports whether mTextEdit is the view the IME is actually
                 // SERVING (IMM matches it against its served view), which is
-                // exactly the state pre-rebrand tracker #1005 Bug 1 observes going wrong —
+                // exactly the state #1005 Bug 1 observes going wrong —
                 // mServedView=null while the shadow is focused and mInputShown
                 // is true, so the keyboard is up but keystrokes are discarded.
                 // Gating on focus alone would skip the show in precisely that
@@ -429,7 +429,7 @@ public class GoNativeActivity extends NativeActivity {
                     mTextEdit.setImeOptions(imeOptions);
                 }
                 // setInputType on a focused View forces a restartInput, so only
-                // ever call it when the value actually changes (pre-rebrand tracker #1016). It also
+                // ever call it when the value actually changes (#1016). It also
                 // resets the key listener, hence the re-apply below it.
                 if (mAppliedInputType != inputType) {
                     mTextEdit.setInputType(inputType);
@@ -449,7 +449,7 @@ public class GoNativeActivity extends NativeActivity {
                 });
 
                 // The shadow EditText is a document-less IME sink: it does not
-                // mirror the focused Bellui Entry (pre-rebrand tracker #1006 Phase 3 removed the pre-rebrand tracker #572
+                // mirror the focused Bellui Entry (#1006 Phase 3 removed the #572
                 // state push). bellui drives its buffer through setKeyboardState
                 // and the IME edits it through BelluiInputConnection (Phase 4).
                 mTextEdit.setVisibility(View.VISIBLE);
@@ -474,7 +474,7 @@ public class GoNativeActivity extends NativeActivity {
         // InputMethodManager is driven from the UI thread only: calling
         // hideSoftInputFromWindow from the JNI-attached caller thread entered
         // IMM's internal locking off-thread, one edge of the field-switch
-        // deadlock under a TalkBack activate dispatch (pre-rebrand tracker #973).
+        // deadlock under a TalkBack activate dispatch (fyne#973).
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
@@ -489,7 +489,7 @@ public class GoNativeActivity extends NativeActivity {
                 composing = false;
                 composingText = "";
                 // The applied-state cache is what doShowKeyboard's idempotence
-                // gate tests (pre-rebrand tracker #1016); clearing it here is what makes a later
+                // gate tests (#1016); clearing it here is what makes a later
                 // show re-raise the keyboard rather than skip as redundant —
                 // including the back-press dismissal, which hides the keyboard
                 // while the bellui field stays focused, so the next show carries
@@ -506,17 +506,17 @@ public class GoNativeActivity extends NativeActivity {
         });
     }
 
-    // setKeyboardState is called from Go (pre-rebrand tracker #1006 Phase 4) with the focused bellui
+    // setKeyboardState is called from Go (#1006 Phase 4) with the focused bellui
     // editor's flat text and selection (rune offsets). It mirrors that state into
     // the bellui-owned IME buffer and notifies the IMM, so the soft keyboard's
     // InputConnection always reads bellui's real document + caret. Skipped only
     // while a BELLUI-SIDE PREEDIT is active (composing == true) — bellui's committed
     // text excludes the in-flight preedit and would clobber it. A region-recompose
-    // span over committed text does NOT block the push (pre-rebrand tracker #1021): bellui == buffer
+    // span over committed text does NOT block the push (#1021): bellui == buffer
     // then, and the selection report is exactly what lets the IME notice the
     // caret left its span and finish composing on its own.
     //
-    // Three-way, in strict order of how disruptive the answer is (pre-rebrand tracker #1007) — see the
+    // Three-way, in strict order of how disruptive the answer is (#1007) — see the
     // recentStates comment for the full reasoning:
     //   1. the push carries a RECENT PAST buffer state → bellui is lagging behind an
     //      IME edit already in the buffer: drop it, never restart;
@@ -525,12 +525,12 @@ public class GoNativeActivity extends NativeActivity {
     //   3. otherwise bellui genuinely holds a different document (SetText, undo,
     //      TalkBack, or a FOCUS SWITCH to another field): re-seed the buffer, remove
     //      the composing span (so the IME can never spontaneously recompose
-    //      committed text — the pre-rebrand tracker #966 replication) and restartInput so it re-reads.
+    //      committed text — the #966 replication) and restartInput so it re-reads.
     // Case 3 used to swallow case 1, restarting the IME every keystroke; a naive
     // echo filter instead swallows case 3, leaving the buffer on the previous
     // field's document so every edit lands at a bogus offset.
     //
-    // A push arriving with mEditorChanged armed (keyboardEditorChanged, pre-rebrand tracker #966) is
+    // A push arriving with mEditorChanged armed (keyboardEditorChanged, #966) is
     // the NEW field's seed and bypasses all three: filters describing the
     // previous field must not judge it, and it must restartInput even when the
     // text coincidentally matches (two empty fields) so the IME session — and
@@ -544,7 +544,7 @@ public class GoNativeActivity extends NativeActivity {
 
     // keyboardEditorChanged is called from Go (via the ordered keyboard-op queue,
     // between the show and the seed push) when the BOUND EDITOR'S IDENTITY
-    // changes — focus moved to a different bellui field (pre-rebrand tracker #966). Every piece of IME
+    // changes — focus moved to a different bellui field (#966). Every piece of IME
     // session state held here belongs to the previous field: the bellui-side
     // composing mirror (Gboard composes ordinary Latin words, so composing is
     // routinely true mid-word — and doShowKeyboard's idempotence gate skips
@@ -589,7 +589,7 @@ public class GoNativeActivity extends NativeActivity {
                 if (mBelluiBuffer == null) {
                     return;
                 }
-                // An armed editor change (pre-rebrand tracker #966) makes this push the NEW field's
+                // An armed editor change (#966) makes this push the NEW field's
                 // seed: skip every filter below (their state was reset with the
                 // previous field's session) and reseed + restartInput even when
                 // text and selection look unchanged — the IME session itself
@@ -614,7 +614,7 @@ public class GoNativeActivity extends NativeActivity {
                     // buffer MINUS the composing span. Skip those echoes (the
                     // old blanket skip), but let a genuinely different
                     // document through — an out-of-band change like undo/redo
-                    // from the accessibility actions menu (pre-rebrand tracker #1034). Falling
+                    // from the accessibility actions menu (#1034). Falling
                     // through converges: the composing mirror is cleared and
                     // the 3-way reseeds + restartInput, which makes the IME
                     // abandon its composition and re-read.
@@ -667,7 +667,7 @@ public class GoNativeActivity extends NativeActivity {
                 // TalkBack edit, or a focus switch to another field. Re-seed.
                 mBelluiBuffer.replace(0, mBelluiBuffer.length(), want);
                 // Drop any stale composing span before repositioning the caret so
-                // the IME resyncs against committed text with no preedit (pre-rebrand tracker #966).
+                // the IME resyncs against committed text with no preedit (#966).
                 BaseInputConnection.removeComposingSpans(mBelluiBuffer);
                 Selection.setSelection(mBelluiBuffer, s16, e16);
 
@@ -739,7 +739,7 @@ public class GoNativeActivity extends NativeActivity {
 
     // doShareFile hands a local file to the Android share sheet (ACTION_SEND) as
     // a content:// URI vended by BelluiFileProvider, granting the receiving app
-    // temporary read access (pre-rebrand tracker #711). Called from the app JNI (app package) via
+    // temporary read access (fyne#711). Called from the app JNI (app package) via
     // the ctx object's class; Go has already copied the file into the provider's
     // share directory (cacheDir/belluishare), so path is that copy.
     void doShareFile(String path, String mime) {
@@ -759,7 +759,7 @@ public class GoNativeActivity extends NativeActivity {
     }
 
     // doSetClipboardImage places the PNG at path on the system clipboard as an
-    // image/png content:// URI, vended through BelluiFileProvider (pre-rebrand tracker #580). The
+    // image/png content:// URI, vended through BelluiFileProvider (fyne#580). The
     // ClipDescription MIME is set explicitly so pasting apps recognise it as an
     // image (the provider's getType is generic).
     void doSetClipboardImage(String path) {
@@ -780,7 +780,7 @@ public class GoNativeActivity extends NativeActivity {
     }
 
     // doSetClipboardFlavors places every present flavor on the system clipboard
-    // in one transaction (pre-rebrand tracker #1142): a single ClipData.Item natively carries
+    // in one transaction (fyne#1142): a single ClipData.Item natively carries
     // text + HTML + an image content:// URI (vended through BelluiFileProvider
     // like doSetClipboardImage), and the ClipDescription lists each present
     // MIME. Null arguments mark a flavor absent; an all-absent call clears.
@@ -829,7 +829,7 @@ public class GoNativeActivity extends NativeActivity {
     }
 
     // doGetClipboardImage returns the path to a PNG temp file re-encoded from the
-    // clipboard's image URI, or null when the clipboard holds no image (pre-rebrand tracker #580).
+    // clipboard's image URI, or null when the clipboard holds no image (fyne#580).
     // The image MIME is checked against the ClipDescription (not the provider's
     // getType) so it works for both our own and other apps' image clips.
     String doGetClipboardImage() {
@@ -872,7 +872,7 @@ public class GoNativeActivity extends NativeActivity {
 
     // handleIntent inspects a launch or new intent for an "open with" payload —
     // a VIEW/EDIT data Uri (file association or custom URL scheme / deep link) —
-    // and forwards it to Go via openIntent (pre-rebrand tracker #622). Plain launcher (MAIN)
+    // and forwards it to Go via openIntent (fyne#622). Plain launcher (MAIN)
     // intents carry no data and are ignored.
     private void handleIntent(Intent intent) {
         if (intent == null) {
@@ -891,7 +891,7 @@ public class GoNativeActivity extends NativeActivity {
 
     // handleNotifyIntent inspects a launch or new intent for a rich-notification
     // activation payload — the token + action index a bellui notification's
-    // PendingIntent carries (pre-rebrand tracker #723) — and forwards it to Go. A body tap uses
+    // PendingIntent carries (fyne#723) — and forwards it to Go. A body tap uses
     // action -1; an action button uses its 0-based index. Non-notification
     // intents carry no bellui_notify_token extra and are ignored.
     private void handleNotifyIntent(Intent intent) {
@@ -957,9 +957,9 @@ public class GoNativeActivity extends NativeActivity {
 
 		// Deliver a launch "open with" payload (file association / deep link).
 		// The native library is loaded above, so openIntent is safe to call; the
-		// Go side buffers it until the app registers a handler (pre-rebrand tracker #622).
+		// Go side buffers it until the app registers a handler (fyne#622).
 		handleIntent(getIntent());
-		// A launch from tapping a rich notification (pre-rebrand tracker #723).
+		// A launch from tapping a rich notification (fyne#723).
 		handleNotifyIntent(getIntent());
     }
 
@@ -967,7 +967,7 @@ public class GoNativeActivity extends NativeActivity {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         // An already-running app was handed a new "open with" payload or a
-        // rich-notification tap/action (pre-rebrand tracker #622, pre-rebrand tracker #723).
+        // rich-notification tap/action (fyne#622, fyne#723).
         setIntent(intent);
         handleIntent(intent);
         handleNotifyIntent(intent);
@@ -977,13 +977,13 @@ public class GoNativeActivity extends NativeActivity {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                // The bellui-owned flat buffer the IME edits through (pre-rebrand tracker #1006
+                // The bellui-owned flat buffer the IME edits through (#1006
                 // Phase 4). bellui drives its content/selection; it is never read
                 // back out as document truth.
                 mBelluiBuffer = new SpannableStringBuilder();
                 Selection.setSelection(mBelluiBuffer, 0);
                 // Dirty-region tracking for partial extracted-text updates
-                // (pre-rebrand tracker #1009): a full-range INCLUSIVE_INCLUSIVE TextWatcher span
+                // (#1009): a full-range INCLUSIVE_INCLUSIVE TextWatcher span
                 // fires for every text mutation of the buffer, whatever path
                 // made it — the same mechanism TextView's ChangeWatcher uses.
                 mBelluiBuffer.setSpan(new TextWatcher() {
@@ -1005,7 +1005,7 @@ public class GoNativeActivity extends NativeActivity {
                     public boolean onKeyPreIme(int keyCode, KeyEvent event) {
                         // Intercept hardware-keyboard shortcut combinations
                         // (Ctrl/Alt/Meta + key) BEFORE the IME sees them and route
-                        // them straight to bellui's shortcut path (pre-rebrand tracker #1077). This is the
+                        // them straight to bellui's shortcut path (#1077). This is the
                         // pre-IME hook — the point Flutter routes hardware keys
                         // through its own framework rather than letting the IME claim
                         // them. Gboard, handed a Ctrl+Z, runs its OWN undo through
@@ -1013,7 +1013,7 @@ public class GoNativeActivity extends NativeActivity {
                         // empty commitText "ghost" ops, and its transaction log grows
                         // while the field sits idle) instead of forwarding the key —
                         // so bellui's undo never fired cleanly and a single undo took
-                        // many caret-bouncing presses (pre-rebrand tracker #1098). Consuming the combo
+                        // many caret-bouncing presses (#1098). Consuming the combo
                         // here keeps Gboard from ever seeing it, so each Ctrl+Z is
                         // one clean ShortcutUndo. getUnicodeChar()==0 is the shortcut
                         // signature (Ctrl+Z/A/C/V/X, …); a printable combo such as
@@ -1038,7 +1038,7 @@ public class GoNativeActivity extends NativeActivity {
                         // action) so the soft keyboard is the right type, but
                         // discard its EditableInputConnection: the IME must edit
                         // the bellui-owned buffer, not this View's TextView document
-                        // (pre-rebrand tracker #1006 Phase 4). Seed the initial selection from the
+                        // (#1006 Phase 4). Seed the initial selection from the
                         // buffer so the IME opens on bellui's caret.
                         super.onCreateInputConnection(outAttrs);
                         int s = Math.max(0, Selection.getSelectionStart(mBelluiBuffer));
@@ -1048,7 +1048,7 @@ public class GoNativeActivity extends NativeActivity {
                         // Seed the surrounding-text context the IME reads at
                         // connect (Compose does this via
                         // EditorInfoCompat.setInitialSurroundingText). Gboard uses
-                        // it as a compose-mode trust signal (pre-rebrand tracker #1007). API 30+.
+                        // it as a compose-mode trust signal (#1007). API 30+.
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                             outAttrs.setInitialSurroundingText(mBelluiBuffer);
                         }
@@ -1064,13 +1064,13 @@ public class GoNativeActivity extends NativeActivity {
                 // back to the focused field's proxy after the user explores
                 // another one (re-announcing it), so a double-tap never lands a
                 // stable ACTION_CLICK on the newly explored field and the caret
-                // cannot move (pre-rebrand tracker #945 device pass). Hide it from a11y.
+                // cannot move (fyne#945 device pass). Hide it from a11y.
                 mTextEdit.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
                 // Importance gates the TREE, not events: the shadow still
                 // emits its own per-keystroke TYPE_VIEW_TEXT_CHANGED /
                 // selection events (the visibility gate is isShown()), which
                 // would race the proxy node's synthesized ones — the editable
-                // text protocol (pre-rebrand tracker #974 option D) makes the proxy the single
+                // text protocol (#974 option D) makes the proxy the single
                 // event source, so swallow the shadow's entirely.
                 mTextEdit.setAccessibilityDelegate(new View.AccessibilityDelegate() {
                     @Override
@@ -1089,11 +1089,11 @@ public class GoNativeActivity extends NativeActivity {
                 addContentView(mTextEdit, mEditTextLayoutParams);
 
                 // The shadow's TextWatcher raw-delta echo (afterTextChanged ->
-                // keyboardTyped/keyboardDelete, the pre-rebrand tracker #966 echo path) was removed
-                // in pre-rebrand tracker #1006 Phase 3. The shadow no longer holds or reports the
+                // keyboardTyped/keyboardDelete, the #966 echo path) was removed
+                // in #1006 Phase 3. The shadow no longer holds or reports the
                 // bellui document: TalkBack editing flows through the option-D
                 // proxy-node actions, and soft-keyboard typing is knowingly
-                // stubbed until pre-rebrand tracker #1006 Phase 4 rebuilds a bellui-driven flat IME
+                // stubbed until #1006 Phase 4 rebuilds a bellui-driven flat IME
                 // transport that owns the composing region.
             }
         });
@@ -1105,7 +1105,7 @@ public class GoNativeActivity extends NativeActivity {
 	// Bellui's rune-based cursor — within the composing text. TalkBack/Gboard send
 	// the whole growing word as one composition with newCursorPosition=1 every
 	// time; passing that 1 straight through pinned the caret at column 1 as the
-	// preedit grew (the pre-rebrand tracker #572 stuck-caret bug). newCursorPosition=1 means "just
+	// preedit grew (the fyne#572 stuck-caret bug). newCursorPosition=1 means "just
 	// after the composing text", i.e. its end.
 	private static int composeCursor(String text, int newCursorPosition) {
 	    int len = text.codePointCount(0, text.length());
@@ -1115,7 +1115,7 @@ public class GoNativeActivity extends NativeActivity {
 	    return cursor;
 	}
 
-	// BelluiInputConnection is the bellui-driven flat IME transport (pre-rebrand tracker #1006 Phase 4),
+	// BelluiInputConnection is the bellui-driven flat IME transport (#1006 Phase 4),
 	// modelled on Flutter's InputConnectionAdaptor. It is a BaseInputConnection
 	// over the bellui-owned mBelluiBuffer (getEditable) rather than the host EditText's
 	// TextView document, so:
@@ -1136,7 +1136,7 @@ public class GoNativeActivity extends NativeActivity {
 	    // returns to 0, so a multi-op batch (e.g. autocorrect's delete+commit)
 	    // yields one settled updateSelection, not a mid-batch flicker.
 	    private int batchDepth = 0;
-	    // Batch-edit coalescing (pre-rebrand tracker #1080, the correct redo of the reverted pre-rebrand tracker #1015).
+	    // Batch-edit coalescing (#1080, the correct redo of the reverted #1015).
 	    // A TalkBack/IME batch that replaces text (Select-all then type → delete-all
 	    // + commit inside one beginBatchEdit/endBatchEdit pair; autocorrect
 	    // delete+commit; a suggestion-chip replaceText) must reach bellui as ONE
@@ -1145,18 +1145,18 @@ public class GoNativeActivity extends NativeActivity {
 	    // committed buffer at the outermost beginBatchEdit; while it is non-null
 	    // (deferCommitted()) the per-op committed forwards are SKIPPED (super.*
 	    // still mutates mBelluiBuffer), and endBatchEdit emits a single surrogate-safe
-	    // diff of base→final. This is why the pre-rebrand tracker #1067 attempt doubled ordinary typing:
+	    // diff of base→final. This is why the #1067 attempt doubled ordinary typing:
 	    // Gboard wraps even a single-char commit in a batch, so forwarding per-op
 	    // AND at the batch boundary fired twice — deferring the per-op forward is
 	    // the fix. Composition is excluded: a fresh preedit mid-batch flushes the
 	    // pending committed diff first (the iOS GoInputView model), then forwards
 	    // compose events immediately (batchBaseText is cleared by the flush).
 	    private String batchBaseText = null;
-	    // Re-entrancy guard (pre-rebrand tracker #1080): BaseInputConnection.commitText/replaceText/
+	    // Re-entrancy guard (#1080): BaseInputConnection.commitText/replaceText/
 	    // deleteSurroundingText/setComposingText etc. internally wrap their Editable
 	    // mutation in beginBatchEdit()/endBatchEdit(). Those dispatch virtually to
 	    // OUR overrides, so super.* would trigger a spurious snapshot+flush and
-	    // double-forward every edit (the pre-rebrand tracker #1067 regression). superEdit is raised
+	    // double-forward every edit (the #1067 regression). superEdit is raised
 	    // around every super.* edit call; while it is non-zero the batch overrides
 	    // only track depth and skip the snapshot/flush — coalescing keys off the
 	    // IME's OWN outer beginBatchEdit/endBatchEdit only.
@@ -1174,7 +1174,7 @@ public class GoNativeActivity extends NativeActivity {
 	    // The IME's own declared response cap (ExtractedTextRequest.hintMaxChars,
 	    // 0 = unlimited), remembered from the monitor request so oversized
 	    // monitor pushes degrade to a selection window instead of shipping a
-	    // whole large document (pre-rebrand tracker #1009).
+	    // whole large document (#1009).
 	    private int extractHint = 0;
 
 	    BelluiInputConnection() {
@@ -1187,7 +1187,7 @@ public class GoNativeActivity extends NativeActivity {
 	    }
 
 	    // deferCommitted reports whether committed-text forwarding should be held
-	    // back and coalesced into the single endBatchEdit diff (pre-rebrand tracker #1080). True only
+	    // back and coalesced into the single endBatchEdit diff (#1080). True only
 	    // while an outermost batch is open AND no composition has broken the
 	    // accumulation (see flushBatchDiff / setComposingText).
 	    private boolean deferCommitted() {
@@ -1244,12 +1244,12 @@ public class GoNativeActivity extends NativeActivity {
 	    // forwardReplace forwards a committed replace (rune offsets) to bellui,
 	    // dropping a genuine no-op — an empty range AND empty text, which deletes
 	    // nothing and inserts nothing. Gboard's hardware-Ctrl+Z undo does not reach
-	    // the pre-rebrand tracker #1077 keyboardShortcut path: Gboard INTERCEPTS Ctrl+Z and drives its
+	    // the #1077 keyboardShortcut path: Gboard INTERCEPTS Ctrl+Z and drives its
 	    // OWN undo through the InputConnection as setComposingRegion(caret,caret) +
 	    // an empty commitText, which lands in commitText's region-recompose branch
 	    // as keyboardReplace(caret,caret,"") once per press. Forwarding those
 	    // recorded ghost undo steps in bellui (and bounced the caret) before the real
-	    // deletions began (pre-rebrand tracker #1098). A real edit — non-empty range or non-empty text —
+	    // deletions began (#1098). A real edit — non-empty range or non-empty text —
 	    // always forwards, so nothing legitimate is dropped.
 	    private void forwardReplace(int start, int end, String text) {
 	        if (start == end && (text == null || text.isEmpty())) {
@@ -1267,7 +1267,7 @@ public class GoNativeActivity extends NativeActivity {
 	    // full editing state after every edit for the same reason.
 	    private void afterEdit() {
 	        // Record the post-edit buffer content so bellui's echo of the PRE-edit
-	        // document is recognised as lag, not as an external change (pre-rebrand tracker #1007).
+	        // document is recognised as lag, not as an external change (#1007).
 	        noteBufferState();
 	        if (batchDepth == 0) {
 	            updateImeSelection();
@@ -1288,7 +1288,7 @@ public class GoNativeActivity extends NativeActivity {
 	        int compS = getComposingSpanStart(mBelluiBuffer);
 	        int compE = getComposingSpanEnd(mBelluiBuffer);
 	        imm.updateSelection(mTextEdit, selS, selE, compS, compE);
-	        // Push the extracted-text delta only when the TEXT changed (pre-rebrand tracker #1009):
+	        // Push the extracted-text delta only when the TEXT changed (#1009):
 	        // a caret-only move already travelled in updateSelection above, and
 	        // TextView's editor likewise reports extracts only on content change.
 	        if (monitorExtract && extractDirtyStart >= 0) {
@@ -1298,7 +1298,7 @@ public class GoNativeActivity extends NativeActivity {
 	    }
 
 
-	    // buildExtractedText serves the IME's editing-state cache (pre-rebrand tracker #1009).
+	    // buildExtractedText serves the IME's editing-state cache (#1009).
 	    // allowPartial (monitor pushes) reports only the dirty region as a
 	    // partial update — partialStartOffset/partialEndOffset are the replaced
 	    // range in the text the IME already holds, et.text the replacement — so
@@ -1371,7 +1371,7 @@ public class GoNativeActivity extends NativeActivity {
 	        if (cs >= 0 && ce >= 0) {
 	            // Region recompose (see setComposingRegion): the marked text is
 	            // COMMITTED in bellui, so the IME's replacement of it is a committed
-	            // edit too — the explicit-range replaceText shape (pre-rebrand tracker #1007), the
+	            // edit too — the explicit-range replaceText shape (#1007), the
 	            // range being the span super is about to replace. bellui and the
 	            // buffer stay in lockstep; no bellui preedit is opened, so composing
 	            // stays false and state pushes keep flowing.
@@ -1390,7 +1390,7 @@ public class GoNativeActivity extends NativeActivity {
 	        }
 	        // Fresh preedit at the caret (CJK and other composing IMEs): bellui-side
 	        // composition — display-only, outside the document until commit. A preedit
-	        // opening mid-batch flushes the pending committed diff first (pre-rebrand tracker #1080) so the
+	        // opening mid-batch flushes the pending committed diff first (#1080) so the
 	        // committed edits land as one step before composition starts forwarding
 	        // immediately (the flush clears batchBaseText, ending deferral).
 	        if (deferCommitted()) {
@@ -1411,7 +1411,7 @@ public class GoNativeActivity extends NativeActivity {
 	        // The IME marks already-committed text (autocorrect recorrection,
 	        // word-granular re-edit) as the composing region. Gboard does this to
 	        // the word at the caret THE MOMENT a field is focused, so this path is
-	        // hot on every latin session, not a CJK corner (pre-rebrand tracker #1021).
+	        // hot on every latin session, not a CJK corner (#1021).
 	        //
 	        // Non-destructive, matching both the platform contract and Flutter's
 	        // InputConnectionAdaptor (a pure super delegation): only the span
@@ -1422,7 +1422,7 @@ public class GoNativeActivity extends NativeActivity {
 	        //
 	        // This used to lift the region OUT of bellui's document
 	        // (keyboardReplace(region, "") + keyboardComposing(region)) to reuse
-	        // the bellui preedit machinery. That was doubly wrong (pre-rebrand tracker #1021, measured
+	        // the bellui preedit machinery. That was doubly wrong (#1021, measured
 	        // on-device): the splice was destructive — an abandoned or misaligned
 	        // recompose permanently deleted document text — and it set
 	        // composing=true for the whole session (even for an EMPTY region),
@@ -1484,7 +1484,7 @@ public class GoNativeActivity extends NativeActivity {
 	        // Plain commit — soft-keyboard tap, gesture typing, autocorrect
 	        // acceptance. Replace the current selection (or insert at the caret when
 	        // collapsed) as ONE gated, undo-recorded bellui edit, so typing over a
-	        // selection replaces it in a single step (pre-rebrand tracker #748). Read the selection
+	        // selection replaces it in a single step (#748). Read the selection
 	        // BEFORE super mutates the buffer.
 	        if (!deferCommitted()) {
 	            String buf = mBelluiBuffer.toString();
@@ -1509,7 +1509,7 @@ public class GoNativeActivity extends NativeActivity {
 	    // on-device, it commits each character and shows no underline even in a
 	    // stock EditText (the as-you-type underline is a CJK-mode thing) — though
 	    // it DOES mark the committed word at the caret via setComposingRegion on
-	    // every connect (pre-rebrand tracker #1021). So for latin the chip replace arrives HERE and
+	    // every connect (#1021). So for latin the chip replace arrives HERE and
 	    // nowhere else — this override is what makes the feature work at all.
 	    //
 	    // Without this override BaseInputConnection's default implementation edits
@@ -1517,7 +1517,7 @@ public class GoNativeActivity extends NativeActivity {
 	    // the buffer gains the correction while bellui keeps the misspelling, they
 	    // desync permanently, and every later push is either a spurious
 	    // restartInput (killing the IME session) or a dropped echo (freezing the
-	    // buffer's caret so taps are overridden). That was the real pre-rebrand tracker #1007 bug.
+	    // buffer's caret so taps are overridden). That was the real #1007 bug.
 	    //
 	    // Unlike commitText, the range is given EXPLICITLY by the IME (absolute
 	    // UTF-16 offsets into the buffer), so map it straight to bellui's rune space
@@ -1576,7 +1576,7 @@ public class GoNativeActivity extends NativeActivity {
 	        // afterLength). Deleting one span ACROSS the selection, as this used to,
 	        // both diverged bellui from the buffer (super deleted only the two outer
 	        // ranges) and turned a select-all + keypress into delete-all + insert —
-	        // two undo steps with an empty document between them (pre-rebrand tracker #1007).
+	        // two undo steps with an empty document between them (#1007).
 	        //
 	        // Snap the boundaries so a surrogate pair is never split (the framework
 	        // contract deletes the whole pair). The trailing range goes first so
@@ -1620,7 +1620,7 @@ public class GoNativeActivity extends NativeActivity {
 	    }
 
 	    // The code-point-counted variant of deleteSurroundingText (API 24+). It is
-	    // the SAME bug class as replaceText (pre-rebrand tracker #1007): BaseInputConnection's default
+	    // the SAME bug class as replaceText (#1007): BaseInputConnection's default
 	    // implementation would edit getEditable() — the bellui-owned buffer — with
 	    // nothing forwarded to bellui, desyncing the two permanently. Convert the
 	    // code-point counts to UTF-16 units against the buffer and reuse the
@@ -1651,7 +1651,7 @@ public class GoNativeActivity extends NativeActivity {
 	        // The IME's editing-panel arrow keys arrive here, not through the
 	        // native input queue; delegating them to super would deliver them to
 	        // the focused IME-host EditText, whose empty document swallows them —
-	        // bellui's caret never moved (pre-rebrand tracker #1029). Route the DOWN into bellui's key
+	        // bellui's caret never moved (#1029). Route the DOWN into bellui's key
 	        // path (the caret move returns via the state push) and consume both
 	        // directions so the shadow never sees a stray UP.
 	        int arrowCode = event.getKeyCode();
@@ -1659,7 +1659,7 @@ public class GoNativeActivity extends NativeActivity {
 	                || arrowCode == KeyEvent.KEYCODE_DPAD_LEFT || arrowCode == KeyEvent.KEYCODE_DPAD_RIGHT) {
 	            if (event.getAction() == KeyEvent.ACTION_DOWN) {
 	                // Forward the meta-state so Shift+Arrow extends the selection
-	                // (pre-rebrand tracker #1083); arrow keys never reach the native input queue.
+	                // (#1083); arrow keys never reach the native input queue.
 	                keyboardArrow(arrowCode, event.getMetaState());
 	            }
 	            return true;
@@ -1670,7 +1670,7 @@ public class GoNativeActivity extends NativeActivity {
 	            // C/V/X): Gboard routes these here with getUnicodeChar()==0, not
 	            // through the native input queue, so delegating to super would
 	            // drop them on the inert host EditText. Forward the keycode +
-	            // meta-state to bellui's shortcut path and consume it (pre-rebrand tracker #1077). Bare
+	            // meta-state to bellui's shortcut path and consume it (#1077). Bare
 	            // modifier keys, and Shift-only combos (plain uppercase, which
 	            // arrive via commitText), are excluded.
 	            int meta = event.getMetaState();
@@ -1678,7 +1678,7 @@ public class GoNativeActivity extends NativeActivity {
 	                    && !KeyEvent.isModifierKey(code)) {
 	                // A shortcut does not mutate the shadow buffer, so it cannot ride
 	                // the batch diff — land any pending committed edit first, then
-	                // forward it (pre-rebrand tracker #1080).
+	                // forward it (#1080).
 	                if (deferCommitted()) {
 	                    flushBatchDiff();
 	                }
@@ -1694,7 +1694,7 @@ public class GoNativeActivity extends NativeActivity {
 	                // would go stale until the next push. Keep it coherent for an
 	                // immediate IME re-query.
 	                // Backspace mutates mBelluiBuffer below, so inside a batch the diff
-	                // captures the deletion — defer the forward, don't double it (pre-rebrand tracker #1080).
+	                // captures the deletion — defer the forward, don't double it (#1080).
 	                if (!deferCommitted()) {
 	                    keyboardDelete();
 	                }
@@ -1713,7 +1713,7 @@ public class GoNativeActivity extends NativeActivity {
 	                // Route Enter to bellui (a newline in a multiline field, or submit
 	                // on a single-line one). The following push reconciles the buffer
 	                // to bellui's resulting document. Enter does not mutate the shadow
-	                // buffer, so flush any pending batch diff first (pre-rebrand tracker #1080).
+	                // buffer, so flush any pending batch diff first (#1080).
 	                if (deferCommitted()) {
 	                    flushBatchDiff();
 	                }
@@ -1723,7 +1723,7 @@ public class GoNativeActivity extends NativeActivity {
 	            if (code == KeyEvent.KEYCODE_FORWARD_DEL) {
 	                // Forward-delete routes super to the host EditText, not mBelluiBuffer,
 	                // so it cannot ride the batch diff — flush any pending edit first
-	                // and forward immediately (pre-rebrand tracker #1080).
+	                // and forward immediately (#1080).
 	                if (deferCommitted()) {
 	                    flushBatchDiff();
 	                }
@@ -1746,7 +1746,7 @@ public class GoNativeActivity extends NativeActivity {
 	            // commitText, and a real EditText would insert them. Dropping them to
 	            // super (which edits the unused host-EditText document, not
 	            // mBelluiBuffer) silently ate the spacebar and digits in Pinyin mode
-	            // (pre-rebrand tracker #1101). Insert the char through bellui's typed-rune path (which
+	            // (#1101). Insert the char through bellui's typed-rune path (which
 	            // honours NumericEntry filtering) and let the following state push
 	            // reconcile the shadow buffer — the same model the Enter key above
 	            // uses, so no hand-mutation of mBelluiBuffer (which risks an
@@ -1784,7 +1784,7 @@ public class GoNativeActivity extends NativeActivity {
 	        // An active bellui-side preedit is display-only — outside bellui's
 	        // committed document — so buffer offsets and bellui offsets disagree
 	        // by the preedit length and the forwarded selection would come up
-	        // short by exactly that many characters (pre-rebrand tracker #1032). Converge first by
+	        // short by exactly that many characters (#1032). Converge first by
 	        // committing it: the IME moving the selection treats the composition
 	        // as settled (the same rule setComposingRegion applies), and the
 	        // ordered event queue lands the commit before the selection, so the
@@ -1796,10 +1796,10 @@ public class GoNativeActivity extends NativeActivity {
 	        }
 	        // The IME moving the caret or selecting a range (Select All,
 	        // spacebar cursor control). super keeps the buffer coherent; the
-	        // selection is also forwarded to bellui (pre-rebrand tracker #1030) — bellui owns the
+	        // selection is also forwarded to bellui (#1030) — bellui owns the
 	        // caret, so a buffer-only selection is invisible (no highlight, no
 	        // Copy/Cut on the a11y node) and the next state push collapses it.
-	        // Not flushed mid-batch on purpose (pre-rebrand tracker #1080): the canonical Select-all-
+	        // Not flushed mid-batch on purpose (#1080): the canonical Select-all-
 	        // then-type batch issues this BEFORE the commit, so flushing here (a
 	        // no-op that would still clear batchBaseText) would end deferral early
 	        // and un-coalesce the following edit. The immediate forward is safe —
@@ -1816,7 +1816,7 @@ public class GoNativeActivity extends NativeActivity {
 	        // updateSelection after EVERY selection change, including ones the
 	        // IME itself made. Without it Gboard keeps composing against a
 	        // stale region, and typing after Select All extends that word
-	        // instead of committing over the selection (pre-rebrand tracker #1030).
+	        // instead of committing over the selection (#1030).
 	        afterEdit();
 	        return r;
 	    }
@@ -1824,7 +1824,7 @@ public class GoNativeActivity extends NativeActivity {
 	    @Override
 	    public boolean beginBatchEdit() {
 	        // Snapshot the committed buffer at the IME's OUTERMOST batch so endBatchEdit
-	        // can coalesce every committed edit inside it into one diff (pre-rebrand tracker #1080). Skip
+	        // can coalesce every committed edit inside it into one diff (#1080). Skip
 	        // batches super opens internally (superEdit>0) and composition (the buffer
 	        // then holds the display-only preedit, which forwards immediately anyway).
 	        if (superEdit == 0 && batchDepth == 0 && !composing && mBelluiBuffer != null) {
@@ -1863,7 +1863,7 @@ public class GoNativeActivity extends NativeActivity {
 	        }
 	        // A direct request re-baselines the IME's cache: serve full text —
 	        // windowed at the IME's own hintMaxChars for large documents
-	        // (pre-rebrand tracker #1009) — never a partial (the IME may hold nothing yet).
+	        // (#1009) — never a partial (the IME may hold nothing yet).
 	        return buildExtractedText(request != null ? request.hintMaxChars : 0, false);
 	    }
 	}
@@ -1970,7 +1970,7 @@ public class GoNativeActivity extends NativeActivity {
     }
 
     // -------------------------------------------------------------------------
-    // Accessibility bridge (pre-rebrand tracker #488) — virtual-node provider approach (pre-rebrand tracker #1104).
+    // Accessibility bridge (#488) — virtual-node provider approach (#1104).
     //
     // Go stages one entry per semantic element and commits a frame; the commit
     // reconciles a map of per-node state records (A11yProxy) behind ONE
@@ -1982,7 +1982,7 @@ public class GoNativeActivity extends NativeActivity {
     // the per-frame reconcile's removeView/addView churn invalidated the node
     // ids TalkBack had cached, AccessibilityInteractionClient returned null,
     // and its two-finger scroll never found a node to send
-    // ACTION_SCROLL_FORWARD to (pre-rebrand tracker #1104). The host intercepts framework hover
+    // ACTION_SCROLL_FORWARD to (#1104). The host intercepts framework hover
     // events to drive touch exploration over the virtual nodes and handles
     // accessibility focus itself (the ExploreByTouchHelper model, as Flutter
     // and Compose do). Real touches still fall through to the GL surface, and
@@ -2013,7 +2013,7 @@ public class GoNativeActivity extends NativeActivity {
     static final int A11Y_ROLE_MENUITEM   = 19;
     static final int A11Y_ROLE_TREEITEM   = 20;
     static final int A11Y_ROLE_CELL       = 21;
-    // Virtualized grid/table container (pre-rebrand tracker #817): the one container role the flat
+    // Virtualized grid/table container (#817): the one container role the flat
     // overlay keeps. Its proxy is a ViewGroup hosting the visible cell proxies,
     // so TalkBack associates the cells' CollectionItemInfo with its
     // CollectionInfo (full logical extent) and ACTION_SCROLL_TO_POSITION can
@@ -2042,7 +2042,7 @@ public class GoNativeActivity extends NativeActivity {
     static final int A11Y_ACTION_SCROLL_BACKWARD = 7;
     static final int A11Y_ACTION_LONG_PRESS      = 8;
 
-    // Custom accessibility actions (pre-rebrand tracker #1025): a declared widget action with no
+    // Custom accessibility actions (#1025): a declared widget action with no
     // standard Android semantic (undo/redo on an editor, ...) arrives with a
     // small Go-side registry id. It is registered on the node as an
     // AccessibilityAction with id A11Y_CUSTOM_ACTION_BASE + registry id (a
@@ -2053,7 +2053,7 @@ public class GoNativeActivity extends NativeActivity {
     static final int A11Y_CUSTOM_ACTION_BASE = 0x0ff00000;
     static final int A11Y_ACTION_CUSTOM      = 0x1000;
 
-    // Editable-text action kinds sent through accessibilityTextAction (pre-rebrand tracker #974
+    // Editable-text action kinds sent through accessibilityTextAction (#974
     // option D). Offsets are RUNE indices into the node's document — this side
     // converts from UTF-16 via codePointCount/offsetByCodePoints — and every
     // edit lands on the widget's gated, undo-recorded paths in Go. Keep in
@@ -2104,12 +2104,12 @@ public class GoNativeActivity extends NativeActivity {
     private static final class A11yProxy {
         final int nodeId;
         int role, flags, x, y, w, h;
-        // Virtualized-grid association (pre-rebrand tracker #817): the grid proxy this node nests
+        // Virtualized-grid association (#817): the grid proxy this node nests
         // under (0 = the root overlay), the node's display cell coordinates
         // (-1 = not a grid item) and, for a grid proxy, the collection extent.
         int parentId, row = -1, col = -1, rowCount, colCount;
         String label = "", value = "", hint = "";
-        // Editable-text document (pre-rebrand tracker #974 option D): the live text of a
+        // Editable-text document (#974 option D): the live text of a
         // text-input node backed by the Go text seam, with its selection in
         // UTF-16 units (-1/-1 = the node carries no document). The selection
         // is stored RAW — selStart is the anchor and selEnd the free cursor,
@@ -2120,13 +2120,13 @@ public class GoNativeActivity extends NativeActivity {
         // per-frame reconcile converges them onto widget truth.
         String text = "";
         int selStart16 = -1, selEnd16 = -1;
-        // Custom accessibility actions (pre-rebrand tracker #1025): the encoded wire string and
+        // Custom accessibility actions (#1025): the encoded wire string and
         // its parsed (Go registry id, localized label) pairs; null when the
         // node offers none. Parsed once per change in the reconcile.
         String customActs = "";
         int[] customIds;
         String[] customLabels;
-        // Visual-layout sidecar (pre-rebrand tracker #995), present only on the focused editor:
+        // Visual-layout sidecar (#995), present only on the focused editor:
         // the encoded wire string and its parsed forms. lineBounds16 holds
         // UTF-16 boundary offsets of consecutive visual (soft-wrapped) lines
         // around the caret — line i of the window is [b[i], b[i+1]) — for
@@ -2191,7 +2191,7 @@ public class GoNativeActivity extends NativeActivity {
                         public void onAccessibilityStateChanged(boolean enabled) {
                             // Notify Go on both transitions: on enable, rebuild a
                             // tree Go was skipping; on disable, clear the in-scene
-                            // focus ring (pre-rebrand tracker #759) — no _FOCUS_CLEARED reaches the
+                            // focus ring (#759) — no _FOCUS_CLEARED reaches the
                             // proxies when the service is torn down, so the ring
                             // would otherwise stay painted.
                             accessibilityAction(0, A11Y_ACTION_STATE_CHANGED);
@@ -2204,7 +2204,7 @@ public class GoNativeActivity extends NativeActivity {
                     // activates the widget (both single- and double-tap "click").
                     // Track touch-exploration state so the driver suppresses raw
                     // tap activation while it is on — activation then comes only
-                    // via the double-tap -> ACTION_CLICK path (pre-rebrand tracker #572 device pass).
+                    // via the double-tap -> ACTION_CLICK path (#572 device pass).
                     am.addTouchExplorationStateChangeListener(
                             new AccessibilityManager.TouchExplorationStateChangeListener() {
                         @Override
@@ -2228,7 +2228,7 @@ public class GoNativeActivity extends NativeActivity {
     // and no state-change event follows because nothing changed. Without the
     // flag the driver never suppresses raw taps, so every explore-touch focuses
     // and activates the widget instead of TalkBack's swipe-to-focus /
-    // double-tap-to-activate two-stage model (pre-rebrand tracker #945 device pass). Window
+    // double-tap-to-activate two-stage model (fyne#945 device pass). Window
     // focus is regained on resume, TalkBack (re)connect and dialog dismiss —
     // exactly where a stale flag needs correcting.
     @Override
@@ -2262,7 +2262,7 @@ public class GoNativeActivity extends NativeActivity {
     }
 
     // Called from Go (via JNI) to register one accessible element with its
-    // virtualized-grid association (pre-rebrand tracker #817): the parent grid node id, the cell's
+    // virtualized-grid association (#817): the parent grid node id, the cell's
     // display (row, col) and — for a grid container — the collection extent.
     // Kept for APKs whose native library predates the V3 signature; nodes
     // arrive without their editable-text document.
@@ -2276,7 +2276,7 @@ public class GoNativeActivity extends NativeActivity {
     }
 
     // Called from Go (via JNI) to register one accessible element with its
-    // editable-text document (pre-rebrand tracker #974 option D): the live text of a text-input
+    // editable-text document (#974 option D): the live text of a text-input
     // node and its half-open selection as RUNE offsets (-1/-1 = no document).
     // Kept for APKs whose native library predates the V4 signature; nodes
     // arrive without their custom accessibility actions.
@@ -2291,7 +2291,7 @@ public class GoNativeActivity extends NativeActivity {
     }
 
     // Called from Go (via JNI) to register one accessible element with its
-    // custom accessibility actions (pre-rebrand tracker #1025): declared widget actions with no
+    // custom accessibility actions (#1025): declared widget actions with no
     // standard Android semantic (undo/redo, ...), encoded as
     // id U+001F label entries separated by U+001E ("" = none).
     static synchronized void addAccessibilityNodeV4(int id, int role, int flags,
@@ -2305,7 +2305,7 @@ public class GoNativeActivity extends NativeActivity {
     }
 
     // Called from Go (via JNI) to register one accessible element with the
-    // focused editor's visual-layout sidecar (pre-rebrand tracker #995): a window of visual
+    // focused editor's visual-layout sidecar (#995): a window of visual
     // (soft-wrapped) line boundaries around the caret plus per-character
     // rectangles around the selection ("" = none). Consumed for legacy-
     // TalkBack LINE granularity and the character-location extra behind the
@@ -2452,7 +2452,7 @@ public class GoNativeActivity extends NativeActivity {
     // keyed by nodeId, and re-derive the reading-order lists the provider
     // serves children from. No Views are created, moved or destroyed — the
     // provider answers TalkBack from these records on demand — so an update
-    // can never invalidate the node ids TalkBack has cached (pre-rebrand tracker #1104), and its
+    // can never invalidate the node ids TalkBack has cached (#1104), and its
     // accessibility focus survives value and position changes.
     // Must be called on the UI thread.
     private static void reconcileA11yNodes(java.util.List<int[]> data, java.util.List<String[]> strings) {
@@ -2506,7 +2506,7 @@ public class GoNativeActivity extends NativeActivity {
             p.rowCount = d[10];
             p.colCount = d[11];
 
-            // Editable-text document sync (pre-rebrand tracker #974 option D): converge the
+            // Editable-text document sync (#974 option D): converge the
             // optimistically-applied Java state onto widget truth and
             // synthesize the events TalkBack consumes — a diff of the old vs
             // new published state, the Compose model. Selection arrives as
@@ -2515,7 +2515,7 @@ public class GoNativeActivity extends NativeActivity {
                     oldText, oldSel16, oldEnd16, wasFocused);
 
             // Slot the node into the reading order under its parent. Cells of
-            // a virtualized grid nest under the grid node (pre-rebrand tracker #817) so TalkBack
+            // a virtualized grid nest under the grid node (#817) so TalkBack
             // associates their CollectionItemInfo with its CollectionInfo;
             // everything else is a child of the host root. The grid precedes
             // its cells on the wire, so its record exists when they resolve.
@@ -2556,7 +2556,7 @@ public class GoNativeActivity extends NativeActivity {
                     // The focused node left the tree (scrolled out of the
                     // realized window, dialog dismissed, ...): report the
                     // clear so TalkBack re-anchors and the in-scene focus
-                    // ring (pre-rebrand tracker #759) is dropped.
+                    // ring (#759) is dropped.
                     mA11yFocusedId = A11Y_NO_NODE;
                     a11ySendEventFor(gone, AccessibilityEvent.obtain(
                             AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUS_CLEARED));
@@ -2576,7 +2576,7 @@ public class GoNativeActivity extends NativeActivity {
         a11ySendEventFor(AccessibilityNodeProvider.HOST_VIEW_ID, ev);
     }
 
-    // The provider parent of a node: the grid it nests under (pre-rebrand tracker #817), or
+    // The provider parent of a node: the grid it nests under (#817), or
     // A11Y_NO_NODE for a child of the host root.
     private static int a11yParentKey(A11yProxy p) {
         if (p.parentId != A11Y_NO_NODE) {
@@ -2616,7 +2616,7 @@ public class GoNativeActivity extends NativeActivity {
     }
 
     // -------------------------------------------------------------------------
-    // Editable-text node protocol (pre-rebrand tracker #974 option D).
+    // Editable-text node protocol (#974 option D).
     //
     // A text-input node backed by the Go text seam publishes its live document
     // and selection and handles the platform editable-text actions itself:
@@ -2624,7 +2624,7 @@ public class GoNativeActivity extends NativeActivity {
     // java.text.BreakIterator = platform-exact semantics), the result is
     // applied to the proxy state optimistically and its events fired
     // immediately — performAccessibilityAction must answer synchronously while
-    // the Go dispatch is queued (pre-rebrand tracker #973) — and the edit is sent to Go as rune
+    // the Go dispatch is queued (fyne#973) — and the edit is sent to Go as rune
     // offsets, where it lands on the widget's gated, undo-recorded paths. The
     // per-frame reconcile then converges the optimistic state onto widget
     // truth, firing corrective events only on a real disagreement. Flutter and
@@ -2728,7 +2728,7 @@ public class GoNativeActivity extends NativeActivity {
         // Announce input focus so TalkBack couples its editing UX (cursor
         // control menu, typing echo) to the field the keyboard is on — the
         // shadow EditText that used to provide this is hidden from
-        // accessibility (pre-rebrand tracker #968).
+        // accessibility (fyne#968).
         if (focusedNow && !wasFocused) {
             a11ySendEvent(p, AccessibilityEvent.obtain(AccessibilityEvent.TYPE_VIEW_FOCUSED));
         }
@@ -2858,7 +2858,7 @@ public class GoNativeActivity extends NativeActivity {
         int[] seg = null;
         if (granularity == AccessibilityNodeInfo.MOVEMENT_GRANULARITY_LINE) {
             // Visual (soft-wrapped) lines from the focused editor's layout
-            // sidecar (pre-rebrand tracker #995) — what legacy TalkBack (< ~14, no self-computed
+            // sidecar (#995) — what legacy TalkBack (< ~14, no self-computed
             // soft-wrap LINE) needs for per-visual-line traversal. Outside
             // the sidecar's window this stays null and the logical
             // (paragraph) fallback below answers, as before.
@@ -3164,7 +3164,7 @@ public class GoNativeActivity extends NativeActivity {
         return new int[]{start, end};
     }
 
-    // Parses a proxy's encoded custom-action wire string (pre-rebrand tracker #1025) — Go registry
+    // Parses a proxy's encoded custom-action wire string (#1025) — Go registry
     // id U+001F localized label, entries separated by U+001E — into the parsed
     // arrays the delegate registers from. Malformed entries are skipped; no
     // valid entries leaves the arrays null (no custom actions).
@@ -3200,7 +3200,7 @@ public class GoNativeActivity extends NativeActivity {
         p.customLabels = java.util.Arrays.copyOf(labels, n);
     }
 
-    // Parses the visual-layout sidecar (pre-rebrand tracker #995) into the proxy's consumable
+    // Parses the visual-layout sidecar (#995) into the proxy's consumable
     // forms. Wire format (see the Go encoder mobileA11yTextLayout):
     //   "L:b0,b1,..."               visual-line boundary offsets (UTF-16)
     //   "\nC:start16:x,y,w,h;-;..." per-char rects in container px, '-' = none
@@ -3259,11 +3259,11 @@ public class GoNativeActivity extends NativeActivity {
     }
 
     // Visual (soft-wrapped) LINE segment from the sidecar's boundary window
-    // (pre-rebrand tracker #995), mirroring AOSP LineTextSegmentIterator semantics over the
+    // (#995), mirroring AOSP LineTextSegmentIterator semantics over the
     // covered range: line i of the window is [b[i], b[i+1]). Returns null
     // when the node carries no sidecar, the offset walks outside the covered
     // window, or the walk leaves the window — the caller then falls back to
-    // logical (paragraph) lines, the before pre-rebrand tracker #995 behavior; at a genuine
+    // logical (paragraph) lines, the pre-#995 behavior; at a genuine
     // document edge that fallback reports the edge identically.
     private static int[] a11yVisualLineSegment(A11yProxy p, int offset, boolean forward) {
         int[] b = p.lineBounds16;
@@ -3300,7 +3300,7 @@ public class GoNativeActivity extends NativeActivity {
     }
 
     // -------------------------------------------------------------------------
-    // Virtual-node provider (pre-rebrand tracker #1104): builds AccessibilityNodeInfos, performs
+    // Virtual-node provider (#1104): builds AccessibilityNodeInfos, performs
     // actions and maps touch-exploration hovers for the records behind the
     // host View. All callbacks arrive on the UI thread.
     // -------------------------------------------------------------------------
@@ -3346,7 +3346,7 @@ public class GoNativeActivity extends NativeActivity {
         info.setBoundsInScreen(new Rect(loc[0] + p.x, loc[1] + p.y,
                 loc[0] + p.x + p.w, loc[1] + p.y + p.h));
         if (p.role == A11Y_ROLE_GRID) {
-            // The grid serves its realized cells as children (pre-rebrand tracker #817).
+            // The grid serves its realized cells as children (#817).
             java.util.ArrayList<Integer> cells = mA11yChildOrder.get(p.nodeId);
             if (cells != null) {
                 for (int i = 0; i < cells.size(); i++) {
@@ -3377,7 +3377,7 @@ public class GoNativeActivity extends NativeActivity {
 
         final boolean textDoc = a11yHasTextDoc(p);
         if (textDoc) {
-            // Editable-text node (pre-rebrand tracker #974 option D): the document is
+            // Editable-text node (#974 option D): the document is
             // the node text — contentDescription would override it
             // on an EditText — and the placeholder label speaks as
             // hintText, the TextView convention.
@@ -3423,7 +3423,7 @@ public class GoNativeActivity extends NativeActivity {
             info.setHintText(hint);
         }
         if (textDoc) {
-            // Editable-text protocol (pre-rebrand tracker #974 option D): declare the
+            // Editable-text protocol (#974 option D): declare the
             // selection, every movement granularity — LINE included;
             // modern TalkBack resolves soft-wrap lines itself via
             // refresh + ACTION_SET_SELECTION, older falls back to
@@ -3440,7 +3440,7 @@ public class GoNativeActivity extends NativeActivity {
             info.setFocused((flags & A11Y_FLAG_FOCUSED) != 0);
             info.setMultiLine(role == A11Y_ROLE_TEXTAREA);
             info.setTextSelection(selS, selE);
-            // Advertise per-character geometry (pre-rebrand tracker #995): TalkBack's
+            // Advertise per-character geometry (#995): TalkBack's
             // granular highlight/magnifier requests it through
             // addExtraDataToAccessibilityNodeInfo below, served
             // from the sidecar the focused editor publishes.
@@ -3470,7 +3470,7 @@ public class GoNativeActivity extends NativeActivity {
             }
         }
         if (role == A11Y_ROLE_GRID) {
-            // Virtualized grid container (pre-rebrand tracker #817): report the FULL
+            // Virtualized grid container (#817): report the FULL
             // logical extent (the walk realizes only the visible
             // window), so TalkBack announces "row R of N" against
             // the real collection size, and accept
@@ -3490,7 +3490,7 @@ public class GoNativeActivity extends NativeActivity {
         }
         if (p.row >= 0) {
             // A cell of a virtualized grid: its display coordinates
-            // within the collection (pre-rebrand tracker #817).
+            // within the collection (#817).
             info.setCollectionItemInfo(AccessibilityNodeInfo.CollectionItemInfo.obtain(
                     p.row, 1, Math.max(p.col, 0), 1, false));
         }
@@ -3513,7 +3513,7 @@ public class GoNativeActivity extends NativeActivity {
             // placeholder: the spoken value comes from the
             // text/contentDescription set above and the real
             // increment/decrement runs in Go (ACTION_SCROLL_FORWARD/
-            // BACKWARD -> A11Y_ACTION_INCREMENT/DECREMENT). (pre-rebrand tracker #796)
+            // BACKWARD -> A11Y_ACTION_INCREMENT/DECREMENT). (#796)
             info.setClassName("android.widget.SeekBar");
             info.addAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD);
             info.addAction(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD);
@@ -3525,7 +3525,7 @@ public class GoNativeActivity extends NativeActivity {
             // real value through stateDescription — TalkBack announces
             // that instead of the placeholder "50 percent" — and clear
             // the text/contentDescription set earlier so the value is
-            // not announced twice. (pre-rebrand tracker #796)
+            // not announced twice. (#796)
             if (Build.VERSION.SDK_INT >= 30) {
                 info.setStateDescription(value.isEmpty() ? label : value);
                 info.setText(null);
@@ -3533,7 +3533,7 @@ public class GoNativeActivity extends NativeActivity {
             }
         } else if ((flags & A11Y_FLAG_SCROLLABLE) != 0) {
             // Inside a scroll area: expose the two-finger / scroll
-            // gesture so TalkBack can page the scroller (pre-rebrand tracker #762).
+            // gesture so TalkBack can page the scroller (#762).
             info.setScrollable(true);
             info.addAction(AccessibilityNodeInfo.ACTION_SCROLL_FORWARD);
             info.addAction(AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD);
@@ -3545,7 +3545,7 @@ public class GoNativeActivity extends NativeActivity {
         if ((flags & A11Y_FLAG_DISMISSABLE) != 0) {
             info.addAction(AccessibilityNodeInfo.ACTION_DISMISS);
         }
-        // Custom accessibility actions (pre-rebrand tracker #1025): declared widget
+        // Custom accessibility actions (#1025): declared widget
         // actions with no standard Android semantic (undo/redo on
         // an editor, ...), listed by TalkBack in its actions menu
         // with their localized labels.
@@ -3558,7 +3558,7 @@ public class GoNativeActivity extends NativeActivity {
         }
     }
 
-    // Serves EXTRA_DATA_TEXT_CHARACTER_LOCATION_KEY (pre-rebrand tracker #995): the
+    // Serves EXTRA_DATA_TEXT_CHARACTER_LOCATION_KEY (#995): the
     // per-character screen rectangles TalkBack's granular
     // highlight/magnifier asks for. The request is synchronous on
     // the UI thread while the Go dispatch is queued, so it is
@@ -3610,7 +3610,7 @@ public class GoNativeActivity extends NativeActivity {
     // Action entry point for the provider. The accessibility-focus actions
     // are handled here — the framework only tracks accessibility focus for
     // real Views — and the focus change is reported to Go so Bellui can paint
-    // its own in-scene focus ring (pre-rebrand tracker #759): TalkBack's green highlight cannot
+    // its own in-scene focus ring (#759): TalkBack's green highlight cannot
     // render over the flat GPU surface. Everything else routes to the
     // per-node dispatch below.
     private static boolean a11yPerformAction(A11yHostView host, int virtualViewId,
@@ -3650,7 +3650,7 @@ public class GoNativeActivity extends NativeActivity {
     // touches, so handling these does not affect touch pass-through.
     private static boolean a11yPerformNodeAction(A11yProxy p, int action, Bundle args) {
         final int nodeId = p.nodeId, flags = p.flags;
-        // Custom accessibility actions (pre-rebrand tracker #1025): map the Android
+        // Custom accessibility actions (#1025): map the Android
         // action id back to its Go registry id and dispatch it
         // through the standard action up-call as a custom kind.
         if (p.customIds != null && action >= A11Y_CUSTOM_ACTION_BASE) {
@@ -3663,7 +3663,7 @@ public class GoNativeActivity extends NativeActivity {
             }
         }
         // Bring a (row, col) cell of a virtualized grid into view
-        // (pre-rebrand tracker #817). Not a switch case: the action id is not a
+        // (#817). Not a switch case: the action id is not a
         // compile-time constant.
         if (Build.VERSION.SDK_INT >= 23 && p.role == A11Y_ROLE_GRID
                 && action == AccessibilityNodeInfo.AccessibilityAction
@@ -3678,7 +3678,7 @@ public class GoNativeActivity extends NativeActivity {
             }
             return false;
         }
-        // Editable-text actions (pre-rebrand tracker #974 option D) are handled fully
+        // Editable-text actions (#974 option D) are handled fully
         // here, against the published document (never a default View
         // traversal over the contentDescription). A false return
         // (document edge, empty selection, read-only) tells TalkBack
@@ -3905,7 +3905,7 @@ public class GoNativeActivity extends NativeActivity {
     // posted before a load runs before it, and no operation needs to block.
     // Queries that must answer synchronously (canGoBack, hasFocus) read a
     // shadow copy kept up to date on the UI thread instead of round-tripping,
-    // which is what keeps them off the deadlock path (pre-rebrand tracker #973).
+    // which is what keeps them off the deadlock path (#973).
 
     private static final java.util.HashMap<Integer, BelluiWebViewHost> mWebViews =
             new java.util.HashMap<Integer, BelluiWebViewHost>();
