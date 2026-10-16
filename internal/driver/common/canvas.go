@@ -59,6 +59,11 @@ type Canvas struct {
 	// nodeMap provides O(1) lookup from CanvasObject to its RenderCacheNode.
 	// Used for dirty propagation to find the nearest ancestor RepaintBoundary.
 	nodeMap async.Map[core.CanvasObject, *RenderCacheNode]
+	// walkGen numbers the full walks (WalkTrees). Each walk stamps the nodes
+	// it reaches, then drops nodeMap entries it did not reach: an object that
+	// left the canvas would otherwise stay in nodeMap, and so in memory, for
+	// as long as the window lives.
+	walkGen uint64
 
 	// dirtyRegion tracks the bounding box of all refreshed objects since the
 	// last paint. When set, the paint walk can use scissor testing to restrict
@@ -586,9 +591,17 @@ func (c *Canvas) WalkTrees(
 	beforeChildren func(*RenderCacheNode, geo.Position),
 	afterChildren func(*RenderCacheNode, geo.Position),
 ) {
+	c.walkGen++
 	c.WalkContentTrees(beforeChildren, afterChildren)
 	c.WalkOverlayTrees(beforeChildren, afterChildren)
 	c.RebuildSpatialIndex()
+	gen := c.walkGen
+	c.nodeMap.Range(func(obj core.CanvasObject, node *RenderCacheNode) bool {
+		if node.walkGen != gen {
+			c.nodeMap.Delete(obj)
+		}
+		return true
+	})
 }
 
 // WalkContentTrees walks content, window head, and menu trees (not overlays).
@@ -767,6 +780,7 @@ func (c *Canvas) walkTree(
 
 		// Populate the object→node lookup map and cache boundary status.
 		c.nodeMap.Store(obj, node)
+		node.walkGen = c.walkGen
 		node.isBoundary = driver.IsRepaintBoundary(obj)
 
 		if beforeChildren != nil {

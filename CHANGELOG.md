@@ -12,6 +12,19 @@ This file lists the main changes with each version of Bellui. Entries up to
 after them describe the trendvidia fork (github.com/trendvidia/fyne) that
 became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
 
+## Unreleased
+
+### Fixed
+
+* **Memory leak: content removed from a window stayed in memory for the
+  window's lifetime** ([#380](https://github.com/belluikit/bellui/issues/380)).
+  The canvas kept a lookup from every object it had ever drawn to its render
+  node and never removed entries, so a replaced page — with all its data —
+  could not be collected. In the gallery, every page visit kept about 8 MB;
+  in the browser this grew past 1 GB in minutes and Android closed the tab.
+  Entries for objects the latest layout pass no longer reaches are now
+  dropped.
+
 ## v1.1.1 — 2026-10-16
 
 A patch release for x/dag. The toolkit itself is unchanged from v1.1.0; the
