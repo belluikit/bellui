@@ -81,6 +81,9 @@ type Slider struct {
 	pendingChange     bool // true if value changed since last OnChangeEnded
 	dragging          bool // true between Dragged and DragEnd
 	valueIndicator    *PopUp
+	// The indicator's label and content, kept so a drag updates them in place.
+	valueIndicatorText    *canvas.Text
+	valueIndicatorContent *bellui.Container
 }
 
 // NewSlider returns a basic slider.
@@ -205,6 +208,10 @@ func (s *Slider) Dragged(e *event.DragEvent) {
 	s.showValueIndicator()
 }
 
+// showValueIndicator shows the value popup above the thumb, or updates it.
+// The popup is built once per drag and then updated in place: rebuilding it
+// for every drag event replaced the overlay and restarted its fade-in each
+// time, so the indicator trailed behind the thumb while dragging.
 func (s *Slider) showValueIndicator() {
 	if !s.ShowValueIndicator {
 		return
@@ -214,49 +221,51 @@ func (s *Slider) showValueIndicator() {
 		return
 	}
 
-	var text string
-	if s.Step >= 1 {
-		text = fmt.Sprintf("%d", int64(s.Value))
-	} else {
-		text = fmt.Sprintf("%.1f", s.Value)
-	}
-
 	th := s.Theme()
-	v := bellui.CurrentApp().Settings().ThemeVariant()
-	fgColor := th.Color(theme.ColorNameForeground, v)
-	bgColor := th.Color(theme.ColorNameBackground, v)
+	text := s.AccessibleValue()
+	created := false
+	if s.valueIndicator == nil || s.valueIndicator.Canvas != c {
+		s.hideValueIndicator()
+		v := bellui.CurrentApp().Settings().ThemeVariant()
+		fgColor := th.Color(theme.ColorNameForeground, v)
+		bgColor := th.Color(theme.ColorNameBackground, v)
 
-	if s.valueIndicator != nil {
-		s.valueIndicator.Hide()
+		label := canvas.NewText(text, bgColor)
+		label.TextSize = th.Size(theme.SizeNameCaptionText)
+		bg := canvas.NewRectangle(fgColor)
+		bg.CornerRadius = th.Size(theme.SizeNameInputRadius)
+		content := &bellui.Container{
+			Objects: []core.CanvasObject{bg, label},
+			Layout:  &tooltipContentLayout{padding: th.Size(theme.SizeNamePadding)},
+		}
+		s.valueIndicator = newPopUpWithBgColor(content, c, fgColor)
+		s.valueIndicatorText, s.valueIndicatorContent = label, content
+		created = true
+	} else if s.valueIndicatorText.Text != text {
+		s.valueIndicatorText.Text = text
+		s.valueIndicatorText.Refresh()
 	}
-
-	label := canvas.NewText(text, bgColor)
-	label.TextSize = th.Size(theme.SizeNameCaptionText)
-	bg := canvas.NewRectangle(fgColor)
-	bg.CornerRadius = th.Size(theme.SizeNameInputRadius)
-	pad := th.Size(theme.SizeNamePadding)
-	content := &bellui.Container{
-		Objects: []core.CanvasObject{bg, label},
-		Layout:  &tooltipContentLayout{padding: pad},
-	}
-
-	s.valueIndicator = newPopUpWithBgColor(content, c, fgColor)
 
 	// Position above the thumb.
 	absPos := bellui.CurrentApp().Driver().AbsolutePositionForObject(s)
 	thumbPos := s.CursorPosition()
-	indicatorSize := content.MinSize()
+	indicatorSize := s.valueIndicatorContent.MinSize()
 	pos := geo.NewPos(
 		absPos.X+thumbPos.X-indicatorSize.Width/2,
 		absPos.Y+thumbPos.Y-indicatorSize.Height-th.Size(theme.SizeNamePadding)*2,
 	)
-	s.valueIndicator.ShowAtPosition(pos)
+	if created {
+		s.valueIndicator.ShowAtPosition(pos)
+	} else {
+		s.valueIndicator.Move(pos)
+	}
 }
 
 func (s *Slider) hideValueIndicator() {
 	if s.valueIndicator != nil {
 		s.valueIndicator.Hide()
 		s.valueIndicator = nil
+		s.valueIndicatorText, s.valueIndicatorContent = nil, nil
 	}
 }
 

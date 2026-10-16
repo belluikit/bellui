@@ -24,6 +24,10 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
   in the browser this grew past 1 GB in minutes and Android closed the tab.
   Entries for objects the latest layout pass no longer reaches are now
   dropped.
+* **Slider: the value indicator keeps up while dragging.** It was rebuilt
+  for every drag event, replacing the popup and restarting its fade-in each
+  time, so it lagged behind the thumb. It is now built once per drag and
+  updated in place.
 
 ## v1.1.1 — 2026-10-16
 
