@@ -2,8 +2,8 @@ github.com/BurntSushi/toml v1.5.0 h1:W5quZX/G/csjUnuI8SUYlsHs9M38FC7znL0lIO+DvMg
 github.com/BurntSushi/toml v1.5.0/go.mod h1:ukJfTF/6rtPPRCnwkur4qwRxa8vTRFBF0uk2lLoLwho=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=
 github.com/Microsoft/go-winio v0.6.2/go.mod h1:yd8OoFMLzJbo9gZq8j5qaps8bJ9aShtEA8Ipt1oGCvU=
-github.com/belluikit/bellui v1.0.0 h1:3YEUPaLio69nAn2B0ZvZpYwm9oTv+2DN20ucwOZTyhQ=
-github.com/belluikit/bellui v1.0.0/go.mod h1:RsqpCASpYNtDEtfw/UKuVion/AEnCrxEc+AqpAmKKJo=
+github.com/belluikit/bellui v1.1.0 h1:9rBtjl59eQarbWgzsKjI/PfDfRHAYze1FM5lrDl2PKk=
+github.com/belluikit/bellui v1.1.0/go.mod h1:K7AH6xrBrDt8dS4nrNLfo/h9q7QYU536vCbfXfRS1lA=
 github.com/belluikit/fsnotify v1.10.2 h1:Kbop0VxWluUIAKunk+4op1v0KCkHfAFnAGAmVrD3Lc8=
 github.com/belluikit/fsnotify v1.10.2/go.mod h1:Zn9GYvdu+eJ1E+cDTkxZNY53ykn9kVXly2SAPLfPpLk=
 github.com/belluikit/gl-js v0.2.1 h1:DWtRW7ztetpAfztJ3msW9YWFWVaydmMlfT2sa6GrAEY=
@@ -36,8 +36,8 @@ github.com/belluikit/goffmpeg-libs/windows_amd64 v0.3.1 h1:iVUfh4o5h8YP5fYdnUKPv
 github.com/belluikit/goffmpeg-libs/windows_amd64 v0.3.1/go.mod h1:x+DbU4kyhbEvk4fr7080dbV7lzSiXMh9x5rmDEuuz1w=
 github.com/belluikit/goffmpeg-libs/windows_arm64 v0.3.1 h1:WNUAAuJX6iEo5lNv2FfZlro2TyKy+Tpt1mTsV6poA/g=
 github.com/belluikit/goffmpeg-libs/windows_arm64 v0.3.1/go.mod h1:R8fUvbRy4Z80X1S4gntJqzuKdldkrMSB78cEOXVRaTI=
-github.com/belluikit/systray v1.12.0 h1:Hnjwerl6gMnmS1JXXaKkWbC9ZPY29UsQgUjktVvSQLw=
-github.com/belluikit/systray v1.12.0/go.mod h1:peb+/O80A/aXu5fUel0gSgeAsAVYz5x01SZF5mnyErU=
+github.com/belluikit/systray v1.12.1 h1:lTFuyhv1azUPgXnrqfQ1NORDwbYCMkUgN3BBtfXrIpc=
+github.com/belluikit/systray v1.12.1/go.mod h1:peb+/O80A/aXu5fUel0gSgeAsAVYz5x01SZF5mnyErU=
 github.com/belluikit/typesetting v0.3.6 h1:M27Rx+fhz1IV2n6Tei3fNhs/Oe9gGAnq3QMrBpAqisY=
 github.com/belluikit/typesetting v0.3.6/go.mod h1:vOvJAyUaoKpOpxqHeDglX6xNuG1zv2C3IOG3yEnHuLQ=
 github.com/belluikit/webgpu v1.2.0 h1:JKzBgxelTB0/MJsXUbeHyDX/PJCcyu4lZXljvPNHcAA=

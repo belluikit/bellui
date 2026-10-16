@@ -7,7 +7,7 @@ module github.com/belluikit/bellui/x/mmedia/hack/playprobe
 go 1.26.2
 
 require (
-	github.com/belluikit/bellui v1.0.0
+	github.com/belluikit/bellui v1.1.0
 	github.com/belluikit/bellui/x/mmedia v0.0.0
 )
 
@@ -29,7 +29,7 @@ require (
 	github.com/belluikit/goffmpeg-libs/linux_arm64 v0.3.1 // indirect
 	github.com/belluikit/goffmpeg-libs/windows_amd64 v0.3.1 // indirect
 	github.com/belluikit/goffmpeg-libs/windows_arm64 v0.3.1 // indirect
-	github.com/belluikit/systray v1.12.0 // indirect
+	github.com/belluikit/systray v1.12.1 // indirect
 	github.com/belluikit/typesetting v0.3.6 // indirect
 	github.com/belluikit/webgpu v1.2.0 // indirect
 	github.com/belluikit/webgpu/libs-android v0.0.0-20260731101013-82e3bdc8353b // indirect
