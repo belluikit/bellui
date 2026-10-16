@@ -10,8 +10,8 @@ bury the real entries under five echoes). This reverses the earlier
 [#136](https://github.com/belluikit/bellui/issues/136) (2026-08-05) so that
 the Releases page users actually look at is authoritative. There is no
 release automation yet
-([#731](https://github.com/belluikit/bellui/issues/731) tracks the release-train
-Action); this document is the procedure.
+(a release-train Action was tracked as pre-rebrand tracker #731); this
+document is the procedure.
 
 The repository is one main module plus **five** nested `x/*` modules
 (`charts`, `dag`, `editor`, `mmedia`, `tables`), and `cmd/bellui` — the CLI —
