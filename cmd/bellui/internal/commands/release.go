@@ -5,6 +5,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strconv"
 	"strings"
 	"text/template"
 
@@ -408,9 +410,9 @@ func (r *Releaser) zipAlign(path string) error {
 var lookPath = exec.LookPath
 
 // findWindowsSDKBin returns the directory holding makeappx.exe (and, beside
-// it, signtool.exe): the one on PATH if there is one, else the first match
-// under the standard Windows Kits install location. Callers join the tool
-// names onto it.
+// it, signtool.exe): the one on PATH if there is one, else the best match
+// under the standard Windows Kits install location (see pickWindowsSDKBin).
+// Callers join the tool names onto it.
 func findWindowsSDKBin() (string, error) {
 	inPath, err := lookPath("makeappx.exe")
 	if err == nil {
@@ -422,7 +424,66 @@ func findWindowsSDKBin() (string, error) {
 		return "", errors.New("failed to look up standard locations for makeappx.exe")
 	}
 
-	return filepath.Dir(matches[0]), nil
+	return pickWindowsSDKBin(matches, runtime.GOARCH), nil
+}
+
+// windowsSDKArchDirs lists, per GOARCH, the SDK architecture directories
+// whose tools run on such a machine, best first.
+var windowsSDKArchDirs = map[string][]string{
+	"amd64": {"x64", "x86"},
+	"386":   {"x86"},
+	"arm64": {"arm64", "x64", "x86"},
+}
+
+// pickWindowsSDKBin chooses among .../bin/<version>/<arch>/makeappx.exe
+// matches: the architecture that runs best on goarch, then the newest SDK
+// version. filepath.Glob sorts lexically, so its first match is the oldest
+// version's arm64 directory, which an x64 machine cannot run.
+func pickWindowsSDKBin(matches []string, goarch string) string {
+	rank := func(match string) int {
+		arch := filepath.Base(filepath.Dir(match))
+		for i, a := range windowsSDKArchDirs[goarch] {
+			if strings.EqualFold(arch, a) {
+				return i
+			}
+		}
+		return len(windowsSDKArchDirs[goarch])
+	}
+
+	best := matches[0]
+	for _, match := range matches[1:] {
+		r, bestRank := rank(match), rank(best)
+		if r < bestRank || (r == bestRank && compareSDKVersions(sdkVersionOf(match), sdkVersionOf(best)) > 0) {
+			best = match
+		}
+	}
+	return filepath.Dir(best)
+}
+
+func sdkVersionOf(match string) string {
+	return filepath.Base(filepath.Dir(filepath.Dir(match)))
+}
+
+// compareSDKVersions compares dotted numeric versions such as 10.0.22621.0;
+// a part that is not a number counts as 0.
+func compareSDKVersions(a, b string) int {
+	as, bs := strings.Split(a, "."), strings.Split(b, ".")
+	for i := 0; i < len(as) || i < len(bs); i++ {
+		var x, y int
+		if i < len(as) {
+			x, _ = strconv.Atoi(as[i])
+		}
+		if i < len(bs) {
+			y, _ = strconv.Atoi(bs[i])
+		}
+		if x != y {
+			if x < y {
+				return -1
+			}
+			return 1
+		}
+	}
+	return 0
 }
 
 func isValidMacOSCategory(in string) bool {
