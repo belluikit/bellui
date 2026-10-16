@@ -9,11 +9,36 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/belluikit/bellui"
 )
+
+// realCurrentAppID is the production currentAppID, which redirectStorage
+// replaces with a fixed ID.
+var realCurrentAppID = currentAppID
+
+// idApp is an app whose only working method is UniqueID.
+type idApp struct {
+	bellui.App
+	id string
+}
+
+func (a idApp) UniqueID() string { return a.id }
+
+// useCurrentApp makes a the running app, and the real currentAppID the source
+// of the app ID, for the duration of a test.
+func useCurrentApp(t *testing.T, a bellui.App) {
+	t.Helper()
+	prev := bellui.CurrentApp()
+	bellui.SetCurrentApp(a)
+	currentAppID = realCurrentAppID
+	t.Cleanup(func() { bellui.SetCurrentApp(prev) })
+}
 
 func TestSaveLoadToken_RoundTrip(t *testing.T) {
 	redirectStorage(t)
@@ -177,4 +202,71 @@ func TestAppTokenDir_StaysInsideBelluiAuth(t *testing.T) {
 	got, _, err := appTokenDir()
 	require.NoError(t, err)
 	assert.Equal(t, filepath.Join(base, "com.example.notes"), got)
+}
+
+// An app created without an ID reports a stand-in "missing-id-<time>" that
+// changes every launch. A token stored under it could never be read back, so
+// it counts as no ID; so does no running app at all.
+func TestTokens_NeedARealAppID(t *testing.T) {
+	redirectStorage(t)
+
+	useCurrentApp(t, idApp{id: "missing-id-1760600000"})
+	assert.ErrorIs(t, SaveToken("google", "t", "e"), ErrNoAppID)
+
+	useCurrentApp(t, nil)
+	assert.ErrorIs(t, SaveToken("google", "t", "e"), ErrNoAppID)
+
+	useCurrentApp(t, idApp{id: "com.example.notes"})
+	require.NoError(t, SaveToken("google", "t", "e"))
+	refresh, _, err := LoadToken("google")
+	require.NoError(t, err)
+	assert.Equal(t, "t", refresh)
+}
+
+func TestStorageName(t *testing.T) {
+	for _, plain := range []string{"com.example.notes", "google", "com.example", "a", "my_app-2"} {
+		assert.Equal(t, plain, storageName(plain))
+	}
+	for _, unsafe := range []string{
+		"../../escape", "a/b", "..", ".", `c:\x`, "",
+		"Com.Example.Notes",                       // case-insensitive file systems would share it with com.example.notes
+		"app.",                                    // Windows drops the trailing dot
+		"con", "NUL", "aux.app", "com1", "lpt9.x", // Windows device names
+		"machine.key", // the fallback master secret's file
+	} {
+		got := storageName(unsafe)
+		assert.Len(t, got, 64, unsafe)
+		assert.NotContains(t, got, string(filepath.Separator), unsafe)
+		assert.Equal(t, strings.ToLower(got), got, unsafe)
+	}
+	assert.NotEqual(t, strings.ToLower(storageName("Com.Example.Notes")),
+		strings.ToLower(storageName("com.example.notes")))
+}
+
+// A provider name cannot place a token outside the app's own directory, where
+// it would overwrite, read or (via LoadToken's clean-up) delete another app's.
+func TestTokenPath_ProviderStaysInsideAppDir(t *testing.T) {
+	dir := redirectStorage(t)
+	appDir := filepath.Join(dir, "bellui-auth", "com.example.test")
+
+	for _, provider := range []string{"../com.example.mail/google", "a/b", "..", "Google"} {
+		got, _, err := tokenPath(provider)
+		require.NoError(t, err)
+		assert.Equal(t, appDir, filepath.Dir(got), provider)
+	}
+	got, _, err := tokenPath("google")
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(appDir, "google.enc"), got)
+}
+
+// The app ID and provider do not run together in the key: moving a character
+// from one to the other gives a different key.
+func TestDeriveKey_FieldsAreSeparate(t *testing.T) {
+	redirectStorage(t)
+
+	a, err := deriveKey("a:b", "c")
+	require.NoError(t, err)
+	b, err := deriveKey("a", "b:c")
+	require.NoError(t, err)
+	assert.NotEqual(t, a, b)
 }

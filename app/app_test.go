@@ -1,6 +1,8 @@
 package app
 
 import (
+	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -80,4 +82,32 @@ func TestFynaApp_Clipboard(t *testing.T) {
 	assert.Equal(t, "rich", cb.Content())
 
 	cb.SetContent(cliboardContent)
+}
+
+// An app created without an ID reports a stand-in starting "missing-id-", and
+// the auth package relies on that prefix to refuse storing a sign-in token
+// under it (auth.appIDOf). Callers on several goroutines all see one ID.
+func TestUniqueID_MissingIDPrefix(t *testing.T) {
+	a := &belluiApp{}
+	if a.Metadata().ID != "" {
+		t.Skip("the test binary has a metadata ID")
+	}
+
+	ids := make(chan string, 8)
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			ids <- a.UniqueID()
+		}()
+	}
+	wg.Wait()
+	close(ids)
+
+	first := a.UniqueID()
+	assert.True(t, strings.HasPrefix(first, "missing-id-"), first)
+	for id := range ids {
+		assert.Equal(t, first, id)
+	}
 }
