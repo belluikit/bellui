@@ -12,6 +12,20 @@ This file lists the main changes with each version of Bellui. Entries up to
 after them describe the trendvidia fork (github.com/trendvidia/fyne) that
 became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
 
+## Unreleased
+
+### Fixed
+
+* **x/dag: note text no longer overflows its box when zoomed.** The box was
+  sized from the text measured at the base size and scaled by the zoom, but a
+  fractional text size draws like the next whole pixel size
+  ([#374](https://github.com/belluikit/bellui/issues/374)), so at zoom 0.67 (the
+  gallery's default view) a one-line note ran 28 px past its box. Notes now
+  measure at the size they are drawn.
+* **x/dag: palette entries show their whole port summary.** The second line
+  sat in a fixed 14 px box, and its arrow comes from a fallback font whose line
+  is about 22 px at 11 pt, so it was cut off. Entries now size to their text.
+
 ## v1.1.0 — 2026-10-16
 
 Android's Storage Access Framework becomes usable, two long-standing cgo
