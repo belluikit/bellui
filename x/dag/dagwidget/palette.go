@@ -193,18 +193,29 @@ type paletteItemRenderer struct {
 	desc *canvas.Text
 }
 
+const (
+	paletteItemPad = 6 // inner padding of a palette entry
+	paletteItemGap = 2 // space between the name and the port summary
+)
+
+// Layout stacks the name and the port summary at their measured heights. They
+// were fixed 16 and 14 px boxes, but the summary's arrow comes from a fallback
+// font whose line is far taller than 14 px at 11 pt, so it was clipped.
 func (r *paletteItemRenderer) Layout(size geo.Size) {
 	r.bg.Resize(size)
 	r.bg.Move(geo.NewPos(0, 0))
-	pad := float32(6)
+	pad := float32(paletteItemPad)
+	nameH, descH := r.name.MinSize().Height, r.desc.MinSize().Height
 	r.name.Move(geo.NewPos(pad, pad))
-	r.name.Resize(geo.NewSize(size.Width-pad*2, 16))
-	r.desc.Move(geo.NewPos(pad, pad+18))
-	r.desc.Resize(geo.NewSize(size.Width-pad*2, 14))
+	r.name.Resize(geo.NewSize(size.Width-pad*2, nameH))
+	r.desc.Move(geo.NewPos(pad, pad+nameH+paletteItemGap))
+	r.desc.Resize(geo.NewSize(size.Width-pad*2, descH))
 }
 
 func (r *paletteItemRenderer) MinSize() geo.Size {
-	return geo.NewSize(160, 40)
+	h := 2*paletteItemPad + r.name.MinSize().Height + paletteItemGap + r.desc.MinSize().Height
+	w := max32(160, 2*paletteItemPad+max32(r.name.MinSize().Width, r.desc.MinSize().Width))
+	return geo.NewSize(w, h)
 }
 
 func (r *paletteItemRenderer) Refresh() {
