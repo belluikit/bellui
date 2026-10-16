@@ -3,6 +3,7 @@ package commands
 import (
 	"os"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -66,10 +67,11 @@ func (t *testCommandRuns) setEnv(env []string) {
 	if t.runs[t.currentRun].osEnv {
 		expectedEnv = append(expectedEnv, os.Environ()...)
 	}
-	sort.Strings(expectedEnv)
-	sort.Strings(env)
-
-	require.Equal(t.t, expectedEnv, env)
+	// Never print the environment: it holds whatever secrets the developer's
+	// shell or the CI runner exports. Report the names that differ (#371).
+	if missing, unexpected := envDiff(expectedEnv, env); len(missing)+len(unexpected) > 0 {
+		t.t.Fatalf("command environment differs (variable names only): missing %v, unexpected %v", missing, unexpected)
+	}
 
 	t.runs[t.currentRun].envSet = true
 }
@@ -85,4 +87,35 @@ func (t *testCommandRuns) verifyExpectation() {
 			assert.Equal(t.t, true, value.envSet)
 		}
 	}
+}
+
+// envDiff returns the names of the entries in want that are not in got, and of
+// the entries in got that are not in want, counting duplicates.
+func envDiff(want, got []string) (missing, unexpected []string) {
+	count := map[string]int{}
+	for _, kv := range got {
+		count[kv]++
+	}
+	for _, kv := range want {
+		if count[kv] > 0 {
+			count[kv]--
+			continue
+		}
+		missing = append(missing, envName(kv))
+	}
+	for kv, n := range count {
+		for ; n > 0; n-- {
+			unexpected = append(unexpected, envName(kv))
+		}
+	}
+	sort.Strings(missing)
+	sort.Strings(unexpected)
+	return missing, unexpected
+}
+
+func envName(kv string) string {
+	if i := strings.IndexByte(kv, '='); i >= 0 {
+		return kv[:i]
+	}
+	return kv
 }

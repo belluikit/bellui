@@ -18,6 +18,10 @@ the history of the tools project it grew from. Built against bellui v1.1.0.
 
 ### Fixed
 
+* `bellui build` passed `go build` the original `GOFLAGS` even after moving
+  its `-ldflags` onto the command line, because it copied the environment
+  before cleaning `GOFLAGS`
+  ([#371](https://github.com/belluikit/bellui/issues/371)).
 * `bellui build` and `bellui package` embedded no app metadata for any bellui
   release. Injection was gated on Fyne's version numbers (`>=2.2`, and
   `>=2.3` / `>=2.6` for Release, Custom and Migrations), which no bellui
