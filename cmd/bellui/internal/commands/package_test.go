@@ -210,7 +210,7 @@ func Test_validateAppID(t *testing.T) {
 func Test_buildPackageWasm(t *testing.T) {
 	expected := []mockRunner{
 		{
-			expectedValue: expectedValue{args: []string{"mod", "edit", "-json"}},
+			expectedValue: expectedValue{args: []string{"mod", "edit", "-json"}, dir: "myTest"},
 			mockReturn: mockReturn{
 				ret: []byte("{ \"Module\": { \"Path\": \"github.com/belluikit/bellui\"} }"),
 			},
@@ -244,7 +244,7 @@ func Test_buildPackageWasm(t *testing.T) {
 func Test_PackageWasm(t *testing.T) {
 	expected := []mockRunner{
 		{
-			expectedValue: expectedValue{args: []string{"mod", "edit", "-json"}},
+			expectedValue: expectedValue{args: []string{"mod", "edit", "-json"}, dir: "myTest"},
 			mockReturn: mockReturn{
 				ret: []byte("{ \"Module\": { \"Path\": \"github.com/belluikit/bellui\"} }"),
 			},

@@ -7,26 +7,22 @@ import (
 
 func init() {
 	app.SetMetadata(bellui.AppMetadata{
-		ID: "{{.AppID}}",
-		Name: "{{.Name}}",
-		Version: "{{.AppVersion}}",
+		ID: {{printf "%q" .AppID}},
+		Name: {{printf "%q" .Name}},
+		Version: {{printf "%q" .AppVersion}},
 		Build: {{.AppBuild}},
 		Icon: {{.ResGoString}},
-		{{if .VersionAtLeast2_3}}
 		Release: {{.Release}},
 		Custom: map[string]string{
 			{{range $key, $value := .CustomMetadata}}
-			"{{$key}}": "{{$value}}",
+			{{printf "%q" $key}}: {{printf "%q" $value}},
 			{{end}}
 		},
-		{{end}}
-		{{if .VersionAtLeast2_6}}
 		Migrations: map[string]bool{
         	{{range $key, $value := .Migrations}}
-        	"{{$key}}": {{$value}},
+        	{{printf "%q" $key}}: {{$value}},
         	{{end}}
         },
-		{{end}}
 	})
 }
 

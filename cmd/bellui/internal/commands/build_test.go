@@ -12,7 +12,7 @@ import (
 func Test_BuildWasmVersion(t *testing.T) {
 	expected := []mockRunner{
 		{
-			expectedValue: expectedValue{args: []string{"mod", "edit", "-json"}},
+			expectedValue: expectedValue{args: []string{"mod", "edit", "-json"}, dir: "myTest"},
 			mockReturn: mockReturn{
 				ret: []byte("{ \"Module\": { \"Path\": \"github.com/belluikit/bellui\"} }"),
 			},
@@ -38,7 +38,7 @@ func Test_BuildWasmVersion(t *testing.T) {
 func Test_BuildWasmReleaseVersion(t *testing.T) {
 	expected := []mockRunner{
 		{
-			expectedValue: expectedValue{args: []string{"mod", "edit", "-json"}},
+			expectedValue: expectedValue{args: []string{"mod", "edit", "-json"}, dir: "myTest"},
 			mockReturn: mockReturn{
 				ret: []byte("{ \"Module\": { \"Path\": \"github.com/belluikit/bellui\"} }"),
 			},
@@ -87,7 +87,7 @@ func Test_BuildLinuxReleaseVersion(t *testing.T) {
 
 	expected := []mockRunner{
 		{
-			expectedValue: expectedValue{args: []string{"mod", "edit", "-json"}},
+			expectedValue: expectedValue{args: []string{"mod", "edit", "-json"}, dir: filepath.Join("myTest", relativePath)},
 			mockReturn: mockReturn{
 				ret: []byte("{ \"Module\": { \"Path\": \"github.com/belluikit/bellui\"} }"),
 			},
@@ -117,11 +117,17 @@ type jsonTest struct {
 	json     []byte
 }
 
+// Every bellui release supports embedded metadata, so the init file is written
+// whenever the app builds against bellui, whatever its version. Before the
+// rebrand this was gated on Fyne's version numbers (>=2.2), which no bellui
+// release matches, so no packaged app got its metadata (#337).
 func Test_BelluiGoMod(t *testing.T) {
 	jsonTests := []jsonTest{
-		{false, []byte(`{"Module": {"Path": "github.com/fyne-io/calculator"},"Go": "1.14",	"Require": [ { "Path": "github.com/belluikit/bellui","Version": "v2.1.4"} ] }`)},
+		{true, []byte(`{"Module": {"Path": "example.com/app"},"Go": "1.25", "Require": [ { "Path": "github.com/belluikit/bellui","Version": "v1.0.0"} ] }`)},
+		{true, []byte(`{"Module": {"Path": "example.com/app"},"Go": "1.25", "Require": [ { "Path": "github.com/belluikit/bellui","Version": "v1.1.0"} ] }`)},
+		{true, []byte(`{"Module": {"Path": "example.com/app"},"Go": "1.25", "Require": [ { "Path": "github.com/belluikit/bellui","Version": "v1.1.1-0.20261015101010-abcdef123456"} ] }`)},
 		{true, []byte(`{ "Module": {"Path": "github.com/belluikit/bellui"},"Require": [{ "Path": "test","Version": "v2.1.4"} ] }`)},
-		{true, []byte(`{"Module": {"Path": "github.com/fyne-io/calculator"},"Go": "1.14",	"Require": [ { "Path": "github.com/belluikit/bellui","Version": "v2.2.0"} ] }`)},
+		{false, []byte(`{"Module": {"Path": "example.com/app"},"Go": "1.25", "Require": [ { "Path": "example.com/other","Version": "v1.0.0"} ] }`)},
 	}
 
 	for _, j := range jsonTests {
@@ -135,13 +141,14 @@ func Test_BelluiGoMod(t *testing.T) {
 		called := false
 
 		belluiGoModTest := &testCommandRuns{runs: expected, t: t}
-		injectMetadataIfPossible(belluiGoModTest, "myTest", &appData{},
+		_, err := injectMetadataIfPossible(belluiGoModTest, "myTest", &appData{},
 			func(string, *appData) (func(), error) {
 				called = true
 				return func() {}, nil
 			})
 
-		assert.Equal(t, j.expected, called)
+		assert.Equal(t, j.expected, called, string(j.json))
+		assert.Equal(t, !j.expected, err != nil, string(j.json))
 	}
 }
 
@@ -183,12 +190,4 @@ func Test_ExtractLdFlags(t *testing.T) {
 		assert.Equal(t, test.wantLdFlags, ldFlags)
 		assert.Equal(t, test.wantGoFlags, goFlags)
 	}
-}
-
-func Test_NormaliseVersion(t *testing.T) {
-	assert.Equal(t, "master", normaliseVersion("master"))
-	assert.Equal(t, "2.3.0.0", normaliseVersion("v2.3"))
-	assert.Equal(t, "2.4.0.0", normaliseVersion("v2.4.0"))
-	assert.Equal(t, "2.3.6.0-dev", normaliseVersion("v2.3.6-0.20230711180435-d4b95e1cb1eb"))
-	assert.Equal(t, "2.4.1.0-dev", normaliseVersion("v2.4.1-rc7.0.20230711180435-d4b95e1cb1eb"))
 }

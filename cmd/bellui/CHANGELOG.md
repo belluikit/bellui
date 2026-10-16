@@ -10,6 +10,27 @@
 This file lists the main changes with each version of the Fyne tools project.
 More detailed release notes can be found on the [releases page](https://github.com/fyne-io/tools/releases).
 
+## Unreleased (first release as `cmd/bellui` v1.0.0)
+
+Version numbers restart at 1.0.0 with the first public release of the
+`github.com/belluikit/bellui/cmd/bellui` module; the 3.x entries below are
+the history of the tools project it grew from.
+
+### Fixed
+
+* `bellui build` and `bellui package` embedded no app metadata for any bellui
+  release. Injection was gated on Fyne's version numbers (`>=2.2`, and
+  `>=2.3` / `>=2.6` for Release, Custom and Migrations), which no bellui
+  version matches, so an app relying on `manifest.pxf` for its ID ran with an
+  empty ID and its preferences were not saved. The file is now written
+  whenever the app requires bellui (#337).
+* `bellui init` wrote `w.ShowAndRun()`, which does not compile against
+  bellui; it now writes `bellui.ShowAndRun(w)` (#337).
+* `bellui release -os windows` failed to find `makeappx.exe` and
+  `signtool.exe` when the Windows SDK's bin directory was on `PATH` (#337).
+* On Linux and BSD, the generated Makefile installed `$(AppID).desktop` even
+  when the app has no ID and the `.desktop` file is named after the app (#337).
+
 ## 3.4.2 - 18 Jul 2026
 
 ### Changed

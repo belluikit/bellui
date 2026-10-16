@@ -8,7 +8,6 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/mcuadros/go-version"
 	"github.com/urfave/cli/v2"
 
 	"github.com/belluikit/bellui"
@@ -115,29 +114,32 @@ type goModEdit struct {
 	}
 }
 
-func getBelluiGoModVersion(runner runner) (string, error) {
+// requireBellui reports an error unless the module the runner's directory
+// belongs to is bellui itself or requires it: the metadata init file imports
+// bellui, so it can only be written into an app that builds against it.
+func requireBellui(runner runner) error {
 	dependenciesOutput, err := runner.runOutput("mod", "edit", "-json")
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	var parsed goModEdit
 	err = json.Unmarshal(dependenciesOutput, &parsed)
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	if parsed.Module.Path == "github.com/belluikit/bellui" {
-		return "master", nil
+		return nil
 	}
 
 	for _, dep := range parsed.Require {
 		if dep.Path == "github.com/belluikit/bellui" {
-			return dep.Version, nil
+			return nil
 		}
 	}
 
-	return "", fmt.Errorf("bellui version not found")
+	return fmt.Errorf("the module does not require github.com/belluikit/bellui")
 }
 
 func (b *Builder) build() error {
@@ -164,6 +166,9 @@ func (b *Builder) build() error {
 		}
 	}
 
+	// go mod edit must read the app's go.mod, not the one (if any) of the
+	// directory bellui was started in: --src may point anywhere.
+	belluiGoModRunner.setDir(srcdir)
 	close, err := injectMetadataIfPossible(belluiGoModRunner, srcdir, b.appData, createMetadataInitFile)
 	if err != nil {
 		bellui.LogError("Failed to inject metadata init file, omitting metadata", err)
@@ -332,19 +337,22 @@ func createMetadataInitFile(srcdir string, app *appData) (func(), error) {
 		app.mergeMetadata(data)
 	}
 
-	metadataInitFilePath := filepath.Join(srcdir, "bellui_metadata_init.go")
-	metadataInitFile, err := os.Create(metadataInitFilePath)
-	if err != nil {
-		return func() {}, err
+	// The init file replaces the runtime's metadata wholesale, so an app with
+	// no version or build (no manifest, no flags) must get the same defaults
+	// app.Metadata reports without one, as bellui package already does.
+	if app.AppVersion == "" {
+		app.AppVersion = defaultAppVersion
 	}
-	defer metadataInitFile.Close()
+	if app.AppBuild <= 0 {
+		app.AppBuild = defaultAppBuild
+	}
 
 	app.ResGoString = "nil"
 	if app.icon != "" {
 		res, err := bellui.LoadResourceFromPath(app.icon)
 		if err != nil {
 			bellui.LogError("Unable to load metadata icon file "+app.icon, err)
-			return func() { os.Remove(metadataInitFilePath) }, err
+			return func() {}, err
 		}
 
 		res = metadata.ScaleIcon(res, 512)
@@ -353,35 +361,38 @@ func createMetadataInitFile(srcdir string, app *appData) (func(), error) {
 		app.ResGoString = res.(*bellui.StaticResource).GoString()
 	}
 
-	err = templates.BelluiMetadataInit.Execute(metadataInitFile, app)
+	metadataInitFilePath := filepath.Join(srcdir, "bellui_metadata_init.go")
+	metadataInitFile, err := os.Create(metadataInitFilePath)
 	if err != nil {
-		bellui.LogError("Error executing metadata template", err)
+		return func() {}, err
 	}
 
-	return func() { os.Remove(metadataInitFilePath) }, err
+	err = templates.BelluiMetadataInit.Execute(metadataInitFile, app)
+	if closeErr := metadataInitFile.Close(); err == nil {
+		err = closeErr
+	}
+	if err != nil {
+		// Callers drop the cleanup on error and carry on building, so a
+		// half-written file left here would break this build and every later
+		// one in the user's source tree.
+		bellui.LogError("Error executing metadata template", err)
+		os.Remove(metadataInitFilePath)
+		return func() {}, err
+	}
+
+	return func() { os.Remove(metadataInitFilePath) }, nil
 }
 
+// injectMetadataIfPossible writes the metadata init file into srcdir when the
+// app builds against bellui. Every bellui release supports the whole of
+// AppMetadata (ID, name, version, build, icon, release, custom and migrations),
+// so there is no version to check; an app whose go.mod does not mention bellui
+// at all is reported as an error by requireBellui.
 func injectMetadataIfPossible(runner runner, srcdir string, app *appData,
 	createMetadataInitFile func(srcdir string, app *appData) (func(), error),
 ) (func(), error) {
-	belluiGoModVersion, err := getBelluiGoModVersion(runner)
-	if err != nil {
+	if err := requireBellui(runner); err != nil {
 		return nil, err
-	}
-
-	belluiGoModVersion = normaliseVersion(belluiGoModVersion)
-	belluiGoModVersionConstraint := version.NewConstrainGroupFromString(">=2.2")
-	if belluiGoModVersion != "master" && !belluiGoModVersionConstraint.Match(belluiGoModVersion) {
-		return nil, nil
-	}
-
-	belluiGoModVersionAtLeast2_3 := version.NewConstrainGroupFromString(">=2.3")
-	if belluiGoModVersionAtLeast2_3.Match(belluiGoModVersion) {
-		app.VersionAtLeast2_3 = true
-	}
-	belluiGoModVersionAtLeast2_6 := version.NewConstrainGroupFromString(">=2.6")
-	if belluiGoModVersionAtLeast2_6.Match(belluiGoModVersion) {
-		app.VersionAtLeast2_6 = true
 	}
 
 	return createMetadataInitFile(srcdir, app)
@@ -452,19 +463,4 @@ func extractLdFlags(goFlags string) (string, string) {
 	newGoFlags = strings.TrimSpace(newGoFlags)
 
 	return ldflags, newGoFlags
-}
-
-func normaliseVersion(str string) string {
-	if str == "master" {
-		return str
-	}
-
-	if pos := strings.Index(str, "-0.20"); pos != -1 {
-		str = str[:pos] + "-dev"
-	}
-
-	if pos := strings.Index(str, "-rc"); pos != -1 {
-		str = str[:pos] + "-dev"
-	}
-	return version.Normalize(str)
 }
