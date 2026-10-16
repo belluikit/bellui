@@ -7,7 +7,7 @@ module github.com/belluikit/bellui/x/tables/hack/a11yprobe
 go 1.25.0
 
 require (
-	github.com/belluikit/bellui v1.0.0
+	github.com/belluikit/bellui v1.1.0
 	github.com/belluikit/bellui/x/tables v0.0.0
 )
 
@@ -17,7 +17,7 @@ require (
 	github.com/belluikit/gl-js v0.2.1 // indirect
 	github.com/belluikit/glfw v1.10.0 // indirect
 	github.com/belluikit/glfw-js v1.0.4 // indirect
-	github.com/belluikit/systray v1.12.0 // indirect
+	github.com/belluikit/systray v1.12.1 // indirect
 	github.com/belluikit/typesetting v0.3.6 // indirect
 	github.com/belluikit/webgpu v1.2.0 // indirect
 	github.com/belluikit/webgpu/libs-android v0.0.0-20260731101013-82e3bdc8353b // indirect
