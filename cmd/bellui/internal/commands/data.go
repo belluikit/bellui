@@ -22,8 +22,6 @@ type appData struct {
 	// (details.associated_domains); packageIOS emits them as an Associated
 	// Domains entitlement. Empty on non-iOS packaging.
 	AssociatedDomains []string
-	VersionAtLeast2_3 bool
-	VersionAtLeast2_6 bool
 }
 
 // fileMimeTypes returns the distinct, non-empty MIME types declared across all
