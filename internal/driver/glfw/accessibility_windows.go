@@ -30,12 +30,12 @@ type a11yElement struct {
 type a11yState struct {
 	elements map[core.CanvasObject]a11yElement
 	// virtual holds the elements for nodes keyed by a stable NodeID rather than
-	// a CanvasObject: nodes with no object (RichText headings, #533) and
+	// a CanvasObject: nodes with no object (RichText headings, pre-rebrand tracker #533) and
 	// realized nodes of a virtualized collection whose object is recycled
-	// across records (AccessibleIdentified, #635).
+	// across records (AccessibleIdentified, pre-rebrand tracker #635).
 	virtual map[any]a11yElement
 	// realized holds cells built on demand for a screen reader that has
-	// navigated off the viewport (fyne#637), keyed by the cell's stable NodeID.
+	// navigated off the viewport (pre-rebrand tracker #637), keyed by the cell's stable NodeID.
 	// They are delivered outside the reconcile walk — the walker never emits an
 	// off-viewport cell — so the per-frame seenVirtual sweep never touches them;
 	// they are dropped by FIFO eviction past a cap, when their grid is
@@ -70,7 +70,7 @@ var (
 )
 
 func init() {
-	// Live-region announcements (#525): deliver accessibility.Announce calls
+	// Live-region announcements (pre-rebrand tracker #525): deliver accessibility.Announce calls
 	// as UIA notification events so Narrator/NVDA speak transient status
 	// (Toast, Snackbar) without moving their cursor. Announce runs on the
 	// main goroutine per its contract, which under this driver is the thread
@@ -83,7 +83,7 @@ func init() {
 }
 
 // updateAccessibility synchronises the UIA provider tree for this window
-// with the platform-neutral semantic tree (#484). Elements are keyed by
+// with the platform-neutral semantic tree (pre-rebrand tracker #484). Elements are keyed by
 // canvas object identity and reconciled in place: an unchanged widget keeps
 // its provider across frames, so a screen reader's cursor is not disturbed
 // by unrelated repaints, and UIA events fire only for properties that
@@ -109,7 +109,7 @@ func (w *window) updateAccessibility() {
 	}
 
 	// Only the foreground window's focused widget reports keyboard focus
-	// (#554): each bellui canvas remembers its own focused widget across
+	// (pre-rebrand tracker #554): each bellui canvas remembers its own focused widget across
 	// window switches, but exactly one element system-wide should report
 	// HasKeyboardFocus. processFocused triggers an update on focus changes,
 	// so the property diff re-raises the focus event when this window
@@ -122,7 +122,7 @@ func (w *window) updateAccessibility() {
 	}
 
 	// A focusable container may delegate AT focus to an internal-cursor
-	// descendant (a grid cell, tree/list row) by stable identity (#688); when
+	// descendant (a grid cell, tree/list row) by stable identity (pre-rebrand tracker #688); when
 	// it does, focus resolves to that descendant rather than the container.
 	activeDescendant := a11yActiveDescendant(focusedObj)
 
@@ -144,7 +144,7 @@ func (w *window) updateAccessibility() {
 	var focusedRef C.WinAccessibilityElementRef
 	if activeDescendant != nil {
 		// The container designated a descendant by identity; its element lives
-		// in the identity-keyed map (the #635 virtualized/recycled path). The
+		// in the identity-keyed map (the pre-rebrand tracker #635 virtualized/recycled path). The
 		// SetRoots diff raises UIA_AutomationFocusChangedEventId when this ref
 		// changes, so a cursor move to a different cell announces for free.
 		if el, ok := st.virtual[activeDescendant]; ok {
@@ -155,7 +155,7 @@ func (w *window) updateAccessibility() {
 			focusedRef = el.ref
 		} else if id, ok := focusedObj.(core.AccessibleIdentified); ok {
 			// A focused object of a virtualized collection is keyed by its
-			// stable identity, not its (recycled) pointer (#635).
+			// stable identity, not its (recycled) pointer (pre-rebrand tracker #635).
 			if key := id.AccessibleIdentity(); key != nil {
 				if el, ok := st.virtual[key]; ok {
 					focusedRef = el.ref
@@ -250,9 +250,9 @@ func (w *window) reconcileA11yNode(st *a11yState, n *accessibility.Node, hwnd un
 	switch {
 	case n.NodeID != nil:
 		// Nodes with a stable identity reconcile against it rather than their
-		// CanvasObject: virtual nodes with no object (#533) and realized nodes
+		// CanvasObject: virtual nodes with no object (pre-rebrand tracker #533) and realized nodes
 		// of a virtualized collection whose object is recycled across records
-		// (AccessibleIdentified, #635), so the UIA element tracks the record.
+		// (AccessibleIdentified, pre-rebrand tracker #635), so the UIA element tracks the record.
 		el, exists = st.virtual[n.NodeID]
 		if !exists {
 			if rc, ok := st.realized[n.NodeID]; ok {
@@ -686,7 +686,7 @@ func belluiWinA11ySetFocus(handle C.uintptr_t) {
 // belluiWinA11yRealizeCell is called by the C bridge from IGridProvider::GetItem
 // when the requested cell is not a realized (visible) host: it builds an
 // on-demand provider for the off-viewport cell through the neutral realize seam
-// (fyne#637) so a screen reader can read past the viewport of a virtualized
+// (pre-rebrand tracker #637) so a screen reader can read past the viewport of a virtualized
 // grid. It returns the element (NULL when the container is not a realizer or the
 // coordinates are out of range), keeps it in the per-window realized cache keyed
 // by the cell's stable identity so repeat reads return the same provider, and
@@ -742,7 +742,7 @@ func belluiWinA11yRealizeCell(gridHandle C.uintptr_t, row, col C.int) C.WinAcces
 // belluiWinA11yRealize is called by the C bridge from IVirtualizedItemProvider::
 // Realize on an on-demand cell: it scrolls the cell into the viewport through
 // the neutral seam so it materializes as a real host. Reading a cell has no
-// side effect; only this explicit realize scrolls (fyne#637).
+// side effect; only this explicit realize scrolls (pre-rebrand tracker #637).
 //
 //export belluiWinA11yRealize
 func belluiWinA11yRealize(handle C.uintptr_t) C.bool {

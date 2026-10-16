@@ -196,9 +196,9 @@ func decimalSepRune(dec string) (rune, bool) {
 
 // ReplaceAccessibleSelection filters non-numeric content before applying the
 // edit, so range replacements that bypass TypedRune — the accessibility text
-// protocols and the mobile text-input / IME mirror (#771), which route
+// protocols and the mobile text-input / IME mirror (pre-rebrand tracker #771), which route
 // select-and-replace and paste-like edits through this path — still respect the
-// numeric constraint (#782). An empty replacement (a deletion) passes through;
+// numeric constraint (pre-rebrand tracker #782). An empty replacement (a deletion) passes through;
 // a replacement that filters down to nothing is dropped, matching TypedRune's
 // silent rejection.
 func (e *NumericEntry) ReplaceAccessibleSelection(text string) {

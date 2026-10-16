@@ -11,7 +11,7 @@ import (
 	"github.com/belluikit/bellui/theme"
 )
 
-// TestEntryRenderer_RoundedClip pins the #467 fix: the entry's renderer
+// TestEntryRenderer_RoundedClip pins the pre-rebrand tracker #467 fix: the entry's renderer
 // exposes its background radius through the rounded-clip seam, so the GPU
 // paint walk clips the subtree (notably the scroll bar's square strip) to
 // the entry's rounded outline.

@@ -9,7 +9,7 @@ import (
 
 // TestActivatable_Contract verifies the button-like controls declare keyboard
 // activation via event.Activatable so the driver can fire the central
-// activation signal in parity with a pointer tap (#700). ActivatedByKey must be
+// activation signal in parity with a pointer tap (pre-rebrand tracker #700). ActivatedByKey must be
 // true only for the key the widget actually acts on (Space), not for navigation
 // keys, so analytics never records an activation that did not happen.
 func TestActivatable_Contract(t *testing.T) {

@@ -74,7 +74,7 @@ func TestEntry_Virtualizes_LargeDocument(t *testing.T) {
 		"expected a windowed object count, got %d for %d rows", len(r.origObjs), rows)
 
 	// Row geometry is served analytically for every row (selection/cursor/gutter):
-	// the lazy model (#157) carries no dense per-row array, but RowPositions
+	// the lazy model (pre-rebrand tracker #157) carries no dense per-row array, but RowPositions
 	// synthesises one on demand.
 	yPos, heights := e.RowPositions()
 	assert.Len(t, yPos, rows)
@@ -160,7 +160,7 @@ func TestEntry_Virtual_CursorScrollRewindows(t *testing.T) {
 }
 
 // TestEntry_Virtualizes_WrappedDocument: a large word-wrapping multi-line entry
-// now virtualises too (#139). Wrapped rows share the uniform stride, so only a
+// now virtualises too (pre-rebrand tracker #139). Wrapped rows share the uniform stride, so only a
 // window of visual rows is materialised even though wrapping multiplies the row
 // count well past the logical-line count.
 func TestEntry_Virtualizes_WrappedDocument(t *testing.T) {

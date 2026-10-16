@@ -23,7 +23,7 @@ func selectRange(rt *RichText, rowA, colA, rowB, colB int) string {
 
 // TestSelectable_CopyIncludesInlineSegment verifies that selecting across an
 // inline non-text segment (a HyperlinkSegment) copies that segment's Textual()
-// content, so the copied text matches the highlighted rectangles (issue #46).
+// content, so the copied text matches the highlighted rectangles (pre-rebrand issue #46).
 func TestSelectable_CopyIncludesInlineSegment(t *testing.T) {
 	lang.SetLocaleForTests(t, "en-US")
 	test.NewTempApp(t)

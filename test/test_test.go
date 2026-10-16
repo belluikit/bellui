@@ -159,7 +159,7 @@ func TestDrag(t *testing.T) {
 
 	test.Drag(c, geo.NewPos(15, 15), 17, 42)
 	assert.Equal(t, &event.DragEvent{
-		// AbsolutePosition is populated from pos (#1018) so widgets that
+		// AbsolutePosition is populated from pos (pre-rebrand tracker #1018) so widgets that
 		// resolve the cursor via AbsolutePosition work headlessly.
 		PointEvent: event.PointEvent{Position: geo.Position{X: 5, Y: 5}, AbsolutePosition: geo.Position{X: 15, Y: 15}},
 		Dragged:    geo.NewDelta(17, 42),

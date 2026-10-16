@@ -21,7 +21,7 @@ import (
 
 // TestEntry_PageScrollsViewport verifies that PageDown/PageUp move the scroll
 // viewport (not just the caret) so a large document can be paged through with
-// the keyboard (#377).
+// the keyboard (pre-rebrand tracker #377).
 func TestEntry_PageScrollsViewport(t *testing.T) {
 	test.NewTempApp(t)
 	e := NewMultiLineEntry()
@@ -71,7 +71,7 @@ func TestEntry_Cursor(t *testing.T) {
 
 func TestEntry_HideShadows_SingleVsMultiLine(t *testing.T) {
 	// A single-line entry clips overflowing text and must suppress the scroll's
-	// edge fade-shadows (#357); a multi-line entry keeps them as a "more
+	// edge fade-shadows (pre-rebrand tracker #357); a multi-line entry keeps them as a "more
 	// content" affordance.
 	single := NewEntry()
 	cache.Renderer(single) // build the renderer so e.scroll is created
@@ -304,7 +304,7 @@ func TestEntry_ExpandSelectionWithWordSeparators(t *testing.T) {
 
 func TestEntry_WordRegionNearest(t *testing.T) {
 	// A long-press landing on a whitespace run snaps to the nearest adjacent
-	// word instead of selecting the run itself (#958).
+	// word instead of selecting the run itself (pre-rebrand tracker #958).
 	str := []rune("hello   world")
 
 	start, end := getTextWordRegionNearest(str, 5) // first space: "hello" is nearer
@@ -415,7 +415,7 @@ func TestEntry_ContentSizeAndPlacementWithIcon(t *testing.T) {
 	entry.SetText("SomeText")
 	renderer := entry.CreateRenderer()
 	// Leading icon inset plus one input border: the viewport sits inside the
-	// background box on the X axis too (#467).
+	// background box on the X axis too (pre-rebrand tracker #467).
 	contentPos := geo.NewPos(theme.LineSpacing()+theme.IconInlineSize()+theme.InputBorderSize(), theme.InputBorderSize())
 
 	renderer.Layout(entry.MinSize())
@@ -607,7 +607,7 @@ func getClickPosition(str string, row int) *event.PointEvent {
 // TestEntry_SelectAllReShowsContextMenu verifies that choosing "Select all" from
 // the touch context menu re-presents the menu over the now-full selection, so
 // Cut/Copy stay reachable without a fresh long-press that would move the caret /
-// lose the selection (#1128). Desktop (non-touch) does not re-show.
+// lose the selection (pre-rebrand tracker #1128). Desktop (non-touch) does not re-show.
 func TestEntry_SelectAllReShowsContextMenu(t *testing.T) {
 	test.NewTempApp(t)
 	lang.SetLocaleForTests(t, "en-US")

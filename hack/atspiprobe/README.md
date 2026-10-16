@@ -1,6 +1,6 @@
-# atspiprobe — pure-Go AT-SPI2 provider spike (fyne#489)
+# atspiprobe — pure-Go AT-SPI2 provider spike (pre-rebrand tracker #489)
 
-Research spike for **fyne#489** (a11y Phase 6: Linux screen-reader support).
+Research spike for **pre-rebrand tracker #489** (a11y Phase 6: Linux screen-reader support).
 Proves that a Bellui app can expose an accessible tree to Linux assistive
 technology (Orca) by speaking the `org.a11y.atspi.*` **AT-SPI2** D-Bus protocol
 **directly in pure Go** — via `github.com/godbus/dbus/v5`, already a fork

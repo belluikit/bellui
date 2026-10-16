@@ -15,9 +15,9 @@ func ensureRegularActivationPolicy() {}
 
 // disableGLFWMenubar is a no-op on platforms other than macOS-with-native-menus.
 // Only the macOS native-menu build tells GLFW to skip building its own menu bar
-// (see menu_darwin.go / #831).
+// (see menu_darwin.go / pre-rebrand tracker #831).
 func disableGLFWMenubar() {}
 
 // ensureBelluiMainMenu is a no-op here; only the macOS native-menu build constructs
-// bellui's own main menu bar (see menu_darwin.go / #831).
+// bellui's own main menu bar (see menu_darwin.go / pre-rebrand tracker #831).
 func ensureBelluiMainMenu() {}

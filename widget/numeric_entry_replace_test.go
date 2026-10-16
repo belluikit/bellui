@@ -8,7 +8,7 @@ import (
 	"github.com/belluikit/bellui/test"
 )
 
-// TestNumericEntry_ReplaceAccessibleSelectionFilters guards #782: range
+// TestNumericEntry_ReplaceAccessibleSelectionFilters guards pre-rebrand tracker #782: range
 // replacements that bypass TypedRune (accessibility text protocols, the mobile
 // IME mirror) must still be filtered to numeric content.
 func TestNumericEntry_ReplaceAccessibleSelectionFilters(t *testing.T) {

@@ -158,7 +158,7 @@ func TestTreeData_ExpandAllAndCollapseAll(t *testing.T) {
 	}
 }
 
-// Enter and Space on a focused tree parent toggle it, like a chevron click (#47).
+// Enter and Space on a focused tree parent toggle it, like a chevron click (pre-rebrand tracker #47).
 func TestTreeData_KeyboardTogglesFocusedNode(t *testing.T) {
 	g := newTreeGrid(t, treeFixture())
 
@@ -291,7 +291,7 @@ func newPinnedTreeGrid(t *testing.T, data []map[string]any) *DataGrid {
 
 // With the hierarchy column pinned left, the disclosure chevron sits at the very
 // left of the grid (grid-x 0, no pinned-width offset) and the hit-test toggles
-// from there, shifting right by depth (#50).
+// from there, shifting right by depth (pre-rebrand tracker #50).
 func TestTreeData_PinnedLeftChevronHitZone(t *testing.T) {
 	g := newPinnedTreeGrid(t, treeFixture())
 	g.API().ExpandAllNodes() // Root A, Child A1, Leaf A1a, Child A2, Root B
@@ -347,7 +347,7 @@ func TestTreeData_InactiveIsInert(t *testing.T) {
 
 // TreeRowInfo/IsTreeRow read the right node on pages after the first: TreeNodes
 // is built over the full pre-paginate output, so a page-local display row must be
-// offset by the page start before indexing it (#51).
+// offset by the page start before indexing it (pre-rebrand tracker #51).
 func TestTreeData_MetadataAlignedUnderPagination(t *testing.T) {
 	g := newTreeGrid(t, treeFixture())
 	g.API().ExpandAllNodes() // display: Root A, Child A1, Leaf A1a, Child A2, Root B

@@ -178,19 +178,19 @@ func (w *window) Show() {
 		}
 		view.Show()
 
-		// a native parent/owner relationship (#598) needs both native windows
+		// a native parent/owner relationship (pre-rebrand tracker #598) needs both native windows
 		// to exist; the child is shown after its parent, so apply it now.
 		w.applyParent()
 
-		// native window-modality (#498) is expressed against that parent, so
+		// native window-modality (pre-rebrand tracker #498) is expressed against that parent, so
 		// apply it once both windows exist too.
 		w.applyModal()
 
-		// an attention request (#517) made before the window mapped is honoured
+		// an attention request (pre-rebrand tracker #517) made before the window mapped is honoured
 		// now that a native window exists (no-op on the web target).
 		w.applyAttention()
 
-		// a taskbar progress request (#517) likewise needs the native taskbar
+		// a taskbar progress request (pre-rebrand tracker #517) likewise needs the native taskbar
 		// button, which exists once the window is shown.
 		w.applyProgress()
 
@@ -386,7 +386,7 @@ func (w *window) processMouseMoved(xpos float64, ypos float64) {
 		return hover
 	})
 
-	// While dragging a DnD-opted-in source (#819), force the grabbing cursor over
+	// While dragging a DnD-opted-in source (pre-rebrand tracker #819), force the grabbing cursor over
 	// whatever is under the pointer. Gated on DragImageProvider so ordinary
 	// draggables (sliders, scrollbars) keep their normal cursor; a source wanting
 	// the cursor without a ghost implements it and returns a nil DragImage.
@@ -482,7 +482,7 @@ func (w *window) processMouseMoved(xpos float64, ypos float64) {
 			// this window. End the bellui-side gesture now — otherwise the stale
 			// pressed state keeps emitting Dragged whenever the pointer passes
 			// back over the window, spawning phantom native drags that fight the
-			// real one over the platform drag state (#933). Windows' modal
+			// real one over the platform drag state (pre-rebrand tracker #933). Windows' modal
 			// DoDragDrop already cleared the state via its nested release (see
 			// below), so only the flag is consumed there.
 			if consumeNativeDragOutStarted() && w.mouseDragged != nil {
@@ -545,7 +545,7 @@ func (w *window) mouseOut() {
 // a delay) or hide the current one. Tooltips are suppressed while a mouse button
 // is held or a drag is in progress. Unlike the overlay-based widget.Tooltip,
 // this rides the object's own hover — delivered reliably by the driver — so it
-// works on the desktop driver (#800).
+// works on the desktop driver (pre-rebrand tracker #800).
 func (w *window) updateToolTip(mousePos geo.Position) {
 	var target core.CanvasObject
 	if w.mouseButton == 0 && !w.mouseDragStarted {
@@ -581,7 +581,7 @@ func dragGhostPos(pointer geo.Position) geo.Position {
 }
 
 // startDragGhost paints a follow-the-pointer ghost for a drag source that opts
-// into in-canvas DnD affordances via core.DragImageProvider (#819). A nil image
+// into in-canvas DnD affordances via core.DragImageProvider (pre-rebrand tracker #819). A nil image
 // means the source wants the grab cursor but no ghost.
 func (w *window) startDragGhost(src event.Draggable, pointer geo.Position) {
 	provider, ok := src.(core.DragImageProvider)
@@ -610,7 +610,7 @@ func (w *window) endDragGhost() {
 // beginDragTargeting marks whether the starting drag is an in-canvas DnD drag
 // (the source opted in via DragImageProvider or DragPayloadProvider) and reads
 // the source-declared payload once. Only DnD drags route to DragTargets, so a
-// plain draggable (slider, scrollbar) never triggers drop-target callbacks (#819).
+// plain draggable (slider, scrollbar) never triggers drop-target callbacks (pre-rebrand tracker #819).
 func (w *window) beginDragTargeting(src event.Draggable) {
 	_, hasImage := src.(core.DragImageProvider)
 	pp, hasPayload := src.(core.DragPayloadProvider)
@@ -671,7 +671,7 @@ func (w *window) finishDragTarget(pos geo.Position) {
 // instead of trusting the cached w.mousePos. The click callback carries no
 // coordinates and the cache is only as fresh as the last move callback — which
 // may never have fired (unfocused window, darwin mostly) or may still be in
-// flight when a synthesized click arrives (#482). Driver tests disable this as
+// flight when a synthesized click arrives (pre-rebrand tracker #482). Driver tests disable this as
 // they simulate input by invoking the callbacks directly, where the live OS
 // cursor is unrelated to the simulated positions.
 var refreshCursorOnClick = true
@@ -802,7 +802,7 @@ func (w *window) cancelLongPressOnMove(mousePos geo.Position) {
 // that just went down (#266): a press held stationary for
 // common.TapSecondaryDelay dispatches LongPressed to the LongPressable under
 // the pointer while the button is still down — the desktop counterpart of the
-// touch drivers' hold-fire (#758), sharing their timing and their
+// touch drivers' hold-fire (pre-rebrand tracker #758), sharing their timing and their
 // cancellation (movement past the drag threshold, release, another button).
 // Deliberately for every primary press, mouse included, not just synthesized
 // touch: press-and-hold under a mouse is how touch-first toolkits behave
@@ -865,7 +865,7 @@ func (w *window) fireLongPress(seq int) {
 }
 
 // dismissTapThroughOverlay implements the outside-tap pass-through for
-// tap-through overlays (#472: OverlayContainer.TapThrough; #569: transient
+// tap-through overlays (pre-rebrand tracker #472: OverlayContainer.TapThrough; pre-rebrand tracker #569: transient
 // PopUps like Toast/Snackbar): when the top overlay opted in and a press
 // lands outside its content, the overlay is dismissed before the press is
 // dispatched. Hit testing then resolves the same click against the layer
@@ -1122,7 +1122,7 @@ func (w *window) processKeyPressed(keyName event.KeyName, keyASCII event.KeyName
 	// No shortcut detected, pass down to TypedKey
 	focused := w.canvas.Focused()
 	if focused != nil {
-		// Keyboard-activation parity with pointer taps (#700): if the focused
+		// Keyboard-activation parity with pointer taps (pre-rebrand tracker #700): if the focused
 		// control declares this key an activation (Space/Enter on a button-like
 		// widget), fire the central activation signal, matching the pointer path.
 		if act, ok := focused.(event.Activatable); ok && act.ActivatedByKey(keyEvent) {
@@ -1162,7 +1162,7 @@ func (w *window) processCompose(ev *event.PreeditEvent) {
 func (w *window) processFocused(focus bool) {
 	// Key-window changes alone don't dirty the canvas, so sync the
 	// accessibility tree here: the AXFocused property is gated on this
-	// window being current (#554). A no-op without a screen-reader backend.
+	// window being current (pre-rebrand tracker #554). A no-op without a screen-reader backend.
 	defer w.updateAccessibility()
 
 	if focus {

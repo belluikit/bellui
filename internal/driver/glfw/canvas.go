@@ -50,7 +50,7 @@ func (c *glCanvas) Capture() image.Image {
 	var img image.Image
 	w := c.context.(*window)
 
-	// Capture must contain overlays and menus (#473). Both painters scrape
+	// Capture must contain overlays and menus (pre-rebrand tracker #473). Both painters scrape
 	// rendered frames rather than re-rendering for capture, and on a static
 	// scene no frame may have rendered since the request — the WebGPU
 	// fallback then reads the persistent canvas FBO, which excludes the
@@ -114,7 +114,7 @@ func (c *glCanvas) FindObjectAtPositionMatching(mouse geo.Position, matches func
 	overlay := c.Overlays().Top()
 	// The spatial index is rebuilt during the paint walk, so between a content
 	// change and the next frame it does not reflect the current tree — only
-	// treat it as authoritative while the canvas is clean (#590).
+	// treat it as authoritative while the canvas is clean (pre-rebrand tracker #590).
 	if overlay == nil {
 		if idx := c.SpatialIndex(); idx != nil && !c.IsDirty() {
 			if obj, pos, ok := idx.FindObjectAtPositionMatching(mouse, matches); ok {
@@ -180,7 +180,7 @@ func (c *glCanvas) Resize(size geo.Size) {
 	}
 	for _, overlay := range c.Overlays().List() {
 		if p, ok := overlay.(*widget.PopUp); ok {
-			// TODO: remove this when #707 is being addressed.
+			// TODO: remove this when pre-rebrand tracker #707 is being addressed.
 			// “Notifies” the PopUp of the canvas size change.
 			p.Refresh()
 		} else {
@@ -594,7 +594,7 @@ func (w *glPaintWalk) draw(node *common.RenderCacheNode, pos geo.Position) {
 	// clip-owner (scroll/ClipToBounds/Card) that is itself outside the dirty region
 	// still constrains its descendants. Otherwise a culled clip-owner skips its clip
 	// push while its children — which may extend into the dirty region — get drawn
-	// unclipped, leaking content past the viewport (#333). The clip is intersected
+	// unclipped, leaking content past the viewport (pre-rebrand tracker #333). The clip is intersected
 	// with the seeded dirty-region clip, so a clip-owner outside the region yields an
 	// empty clip and its children draw nothing.
 	if driver.IsClip(obj) {
@@ -681,7 +681,7 @@ func (w *glPaintWalk) afterDraw(node *common.RenderCacheNode, pos geo.Position) 
 	}
 
 	// Tear down clips even when the object was culled: draw establishes them
-	// unconditionally for clip-owners so descendants stay clipped (#333), so the
+	// unconditionally for clip-owners so descendants stay clipped (pre-rebrand tracker #333), so the
 	// push/pop must stay paired regardless of culling.
 	if isRounded, _ := driver.IsRoundedClip(obj); isRounded {
 		w.c.Painter().StopRoundedClipping()

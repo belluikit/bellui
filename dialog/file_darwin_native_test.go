@@ -42,7 +42,7 @@ func TestLegacyExtsFromMimes(t *testing.T) {
 	assert.Nil(t, legacyExtsFromMimes([]string{"application/x-totally-unknown"}))
 
 	// A well-known MIME type maps to at least its canonical extension, dot
-	// stripped, for the pre-macOS-11 setAllowedFileTypes: fallback (#632).
+	// stripped, for the pre-macOS-11 setAllowedFileTypes: fallback (pre-rebrand tracker #632).
 	got := legacyExtsFromMimes([]string{"image/png"})
 	assert.Contains(t, got, "png")
 	for _, ext := range got {

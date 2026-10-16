@@ -30,7 +30,7 @@ import (
 // The Editor manages its own scrolling, overlays and pointer-capture layer, so
 // it must own its viewport: do not wrap it in an outer [container.Scroll]. An
 // outer scroll intercepts pointer gestures, so the editor never receives clicks
-// or focus (#111). Place the Editor directly in its parent (it fills the space
+// or focus (pre-rebrand tracker #111). Place the Editor directly in its parent (it fills the space
 // given) and let it scroll internally; it logs a warning if it detects an outer
 // scrolling ancestor at layout time.
 type Editor struct {
@@ -115,7 +115,7 @@ type Editor struct {
 	UseSpaces bool
 
 	// DeferTextSync defers the per-keystroke materialization of the whole
-	// document into the Entry's Text field (fyne#410), flattening keystroke
+	// document into the Entry's Text field (pre-rebrand tracker #410), flattening keystroke
 	// latency on multi-megabyte documents. With it on, OnChanged fires at sync
 	// points — a newline or deletion, a caret row change, undo/redo, focus
 	// loss, [Editor.Text] — with the full current text, rather than on every
@@ -160,7 +160,7 @@ type Editor struct {
 
 	link                *linkController      // Cmd/Ctrl-hover link affordance (nil-safe)
 	linkDeco            *StaticSpanDecorator // underlines the navigable symbol
-	linkModWatchStop    func()               // removes the driver modifier listener (#155)
+	linkModWatchStop    func()               // removes the driver modifier listener (pre-rebrand tracker #155)
 	onRequestNavigation func(row, col int)   // Cmd/Ctrl+click "go to definition" hook
 
 	protected *protectedController // read-only ranges enforced via entry.BeforeChange
@@ -175,20 +175,20 @@ type Editor struct {
 	chordTimer   *time.Timer // resets chordPending if the second key never comes
 
 	shortcutsInstalled bool // guards one-time KeyMap shortcut registration
-	scrollGuardChecked bool // guards the one-time outer-scroll warning (#111)
+	scrollGuardChecked bool // guards the one-time outer-scroll warning (pre-rebrand tracker #111)
 
 	findVisible        bool
 	suppressChange     bool // true during programmatic SetText
 	suppressCompletion bool // true while applying a completion edit
 
 	// anchorText is the text snapshot the next OnChanged is diffed against to
-	// recover the edit for anchor-tracking (#130); see anchor.go.
+	// recover the edit for anchor-tracking (pre-rebrand tracker #130); see anchor.go.
 	anchorText string
 
-	// deferredSyncPending flags that a gated edit needs a sync point (#129);
+	// deferredSyncPending flags that a gated edit needs a sync point (pre-rebrand tracker #129);
 	// deferredLastRow/deferredLastLines are the caret row and live line count
 	// at the last consumed sync, so a row change or a newline added/removed
-	// also syncs (#149). All live in consumeDeferredSync / noteDeferredEdit.
+	// also syncs (pre-rebrand tracker #149). All live in consumeDeferredSync / noteDeferredEdit.
 	deferredSyncPending bool
 	deferredLastRow     int
 	deferredLastLines   int
@@ -216,7 +216,7 @@ func NewEditor() *Editor {
 	e.entry.OnChanged = func(s string) {
 		e.syncExternalWidgets()
 		e.updateAutoGrow(s)
-		// Anchor-track (#130): shift protected/redaction/fold ranges through the
+		// Anchor-track (pre-rebrand tracker #130): shift protected/redaction/fold ranges through the
 		// edit so line-count changes no longer need a host re-publish. Runs
 		// before the redaction reconcile so the caret-bar offsets are re-derived
 		// from the already-shifted spans.
@@ -231,7 +231,7 @@ func NewEditor() *Editor {
 			e.completion.onTextChanged()
 		}
 		// Signature help refreshes on the same user edits, after completion so the
-		// completion list anchors first and the card places as its companion (#79).
+		// completion list anchors first and the card places as its companion (pre-rebrand tracker #79).
 		if e.signature != nil && !e.suppressChange && !e.suppressCompletion {
 			e.signature.onTextChanged()
 		}
@@ -246,7 +246,7 @@ func NewEditor() *Editor {
 	}
 
 	e.entry.OnCursorChanged = func() {
-		// Deferred-sync pump (#129): fires after every edit (the fork calls this
+		// Deferred-sync pump (pre-rebrand tracker #129): fires after every edit (the fork calls this
 		// from every content refresh), so flagged edits and row changes
 		// materialize here.
 		e.consumeDeferredSync()
@@ -281,7 +281,7 @@ func NewEditor() *Editor {
 	// open; these hooks give the active popover first dibs on keys and dismiss
 	// it on Escape, outside click, or focus loss.
 	e.entry.onKey = func(ev *event.KeyEvent) bool {
-		// The completion popup gets first dibs (#143): it renders in the canvas
+		// The completion popup gets first dibs (pre-rebrand tracker #143): it renders in the canvas
 		// overlay in KeepHostFocus mode, so the Entry stays focused and the
 		// editor offers each key via HandleKey — arrows/Enter/Tab/Escape are
 		// consumed, PageUp/PageDown only while its documentation panel shows,
@@ -340,12 +340,12 @@ func NewEditor() *Editor {
 	e.entry.onKeyDown = func(k *event.KeyEvent) { e.link.onKeyEvent(k.Name, true) }
 	e.entry.onKeyUp = func(k *event.KeyEvent) { e.link.onKeyEvent(k.Name, false) }
 
-	// Electric-character reindent (#136): after the Entry inserts a typed rune,
+	// Electric-character reindent (pre-rebrand tracker #136): after the Entry inserts a typed rune,
 	// an IndentProvider that also implements ReindentProvider may re-indent the
 	// line (e.g. dedent an "else:" clause). Inert without such a provider.
 	e.entry.onRune = e.handleElectricRune
 
-	// Chord handler: Ctrl/Cmd+K then Ctrl/Cmd+I shows hover at the cursor (#29),
+	// Chord handler: Ctrl/Cmd+K then Ctrl/Cmd+I shows hover at the cursor (pre-rebrand tracker #29),
 	// matching VS Code's ⌘K ⌘I. Consumes the leading K; any other shortcut clears
 	// a pending chord and falls through.
 	e.entry.onShortcut = e.handleEditorShortcut
@@ -355,7 +355,7 @@ func NewEditor() *Editor {
 	// path through; allow() returns true immediately when no ranges are set.
 	// Masked redactions veto through the same gate (after protection, so a
 	// protected-range hit reports its callback first) to keep edits off a masked
-	// span's edges — the CaretOpaque field alone permits boundary inserts (#108).
+	// span's edges — the CaretOpaque field alone permits boundary inserts (pre-rebrand tracker #108).
 	e.protected = newProtectedController(e)
 	e.entry.BeforeChange = func(sel widget.TextRange, _ string) bool {
 		if !e.protected.allow(sel) {
@@ -365,7 +365,7 @@ func NewEditor() *Editor {
 			return false
 		}
 		// The edit will apply: flag a per-edit deferred sync when an active
-		// feature needs it (#129). No-op with DeferTextSync off.
+		// feature needs it (pre-rebrand tracker #129). No-op with DeferTextSync off.
 		e.noteDeferredEdit()
 		return true
 	}
@@ -426,7 +426,7 @@ func NewEditor() *Editor {
 	// Span decorator that highlights find matches; fed by the find bar.
 	e.searchSpans = &SearchMatchSpanDecorator{Active: -1}
 
-	// Find bar. The text source synchronises deferred edits (#129) so a search
+	// Find bar. The text source synchronises deferred edits (pre-rebrand tracker #129) so a search
 	// always runs against the live document.
 	e.find = newFindBar(
 		func() string { return e.docText() },
@@ -502,7 +502,7 @@ func (e *Editor) CreateRenderer() core.WidgetRenderer {
 	// so that RowPositions() returns populated data.
 	e.entry.Refresh()
 	e.syncExternalWidgets()
-	// Subscribe the link affordance to driver modifier changes (#155) for the
+	// Subscribe the link affordance to driver modifier changes (pre-rebrand tracker #155) for the
 	// editor's on-canvas lifetime; Destroy removes it and a re-show re-arms.
 	if e.linkModWatchStop == nil && e.link != nil {
 		e.linkModWatchStop = e.link.watchModifiers()
@@ -511,7 +511,7 @@ func (e *Editor) CreateRenderer() core.WidgetRenderer {
 }
 
 // editorRenderer wraps the simple renderer to release canvas-lifetime
-// resources: the driver modifier-change listener (#155) is removed on Destroy
+// resources: the driver modifier-change listener (pre-rebrand tracker #155) is removed on Destroy
 // and re-registered by the next CreateRenderer on re-show.
 type editorRenderer struct {
 	core.WidgetRenderer
@@ -559,7 +559,7 @@ func (e *Editor) installKeyMapShortcuts() {
 // an outer clipping/scrolling ancestor such as a container.Scroll. The Editor
 // manages its own scrolling, overlays and pointer capture and expects to own its
 // viewport; an outer scroll intercepts pointer gestures so clicks never reach the
-// editor and it never focuses (#111). The check only logs a one-time warning and
+// editor and it never focuses (pre-rebrand tracker #111). The check only logs a one-time warning and
 // never alters layout.
 func (e *Editor) Resize(size geo.Size) {
 	e.BaseWidget.Resize(size)
@@ -567,7 +567,7 @@ func (e *Editor) Resize(size geo.Size) {
 }
 
 // warnIfNestedInScroll logs a single warning when the editor is hosted inside an
-// outer clipping/scrolling container (see [Editor.Resize] and #111). It is a
+// outer clipping/scrolling container (see [Editor.Resize] and pre-rebrand tracker #111). It is a
 // no-op until the editor is attached to a canvas — retried on later resizes —
 // and performs its check at most once.
 func (e *Editor) warnIfNestedInScroll() {
@@ -601,7 +601,7 @@ func (e *Editor) warnIfNestedInScroll() {
 // syncExternalWidgets pushes the Entry's row metrics to the gutter widget and
 // decorator overlay and repaints them. Line counts are no longer pushed: both
 // widgets read the live O(1) [widget.Entry.LineCount] via their getLineCount
-// hook (#149), so nothing here forces a deferred-sync materialization (#129)
+// hook (pre-rebrand tracker #149), so nothing here forces a deferred-sync materialization (pre-rebrand tracker #129)
 // and this stays cheap from OnScrolled.
 func (e *Editor) syncExternalWidgets() {
 	topOff, stride := e.entry.RowMetrics()
@@ -626,9 +626,9 @@ func (e *Editor) Text() string {
 
 // SetText replaces the editor content as a document SWAP: it does not fire
 // OnChanged (only user edits trigger the callback), clears the undo history,
-// and leaves anchored ranges (#130) for the host to re-publish. For a
+// and leaves anchored ranges (pre-rebrand tracker #130) for the host to re-publish. For a
 // programmatic REWRITE with user-edit semantics — quick fixes, refactors,
-// formatting — use [Editor.ApplyEdits]/[Editor.ApplyEdit] instead (#160).
+// formatting — use [Editor.ApplyEdits]/[Editor.ApplyEdit] instead (pre-rebrand tracker #160).
 func (e *Editor) SetText(s string) {
 	e.suppressChange = true
 	e.entry.SetText(s)
@@ -861,7 +861,7 @@ func (e *Editor) rebuildHbox() {
 	// below the float layer (so popovers still get their own hover events). It
 	// implements only Hoverable, so taps/drags pass through to the Entry. It is
 	// inset by the scroll bar strips so the bar underneath still receives the
-	// hover that expands it (fyne hover goes to the topmost hoverable, #151).
+	// hover that expands it (fyne hover goes to the topmost hoverable, pre-rebrand tracker #151).
 	if e.hoverCap != nil {
 		objs = append(objs, container.New(hoverCapLayout{}, e.hoverCap))
 	}
@@ -956,7 +956,7 @@ func (e *Editor) ApplyDecorators() {
 // showing a new interactive popover dismisses any other interactive one. A
 // non-interactive companion (the signature-help card) coexists with the
 // interactive popover so call hints and the completion list can show together
-// (#79); when the two cannot be placed without overlapping, the interactive one
+// (pre-rebrand tracker #79); when the two cannot be placed without overlapping, the interactive one
 // yields (see layoutPopovers).
 //
 // It reports false (showing nothing) when the anchor cell is not currently
@@ -986,7 +986,7 @@ func (e *Editor) showPopoverAt(p *popover, row, col int) bool {
 	}
 	e.activePopovers = append(kept, p)
 
-	// One interactive surface at a time across both hosting models (#143): an
+	// One interactive surface at a time across both hosting models (pre-rebrand tracker #143): an
 	// interactive float-layer popover (the hover card) also closes an open
 	// overlay completion popup, as showing completion closes the hover card.
 	if p.interactive && e.completion != nil {
@@ -1062,7 +1062,7 @@ func (e *Editor) removePopover(p *popover) bool {
 // repositionPopover re-anchors the active popovers after a scroll or resize,
 // dismissing any whose anchor cell has scrolled out of the viewport. The
 // overlay completion popup follows the same contract via its own Reposition
-// (#143). It is also the float layer's Layout hook, so it must refresh the
+// (pre-rebrand tracker #143). It is also the float layer's Layout hook, so it must refresh the
 // layer only when the object set actually changes — otherwise Refresh →
 // Layout → reposition loops.
 func (e *Editor) repositionPopover() {
@@ -1101,7 +1101,7 @@ func (e *Editor) layoutPopovers() (changed bool) {
 		return e.removePopover(comp)
 	}
 	// The overlay completion popup is the interactive surface when it is open
-	// (#143): a companion that cannot be placed clear of it yields the same
+	// (pre-rebrand tracker #143): a companion that cannot be placed clear of it yields the same
 	// way, via the popup's OnMoved-reported rectangle in editor-local space.
 	if comp := e.companionPopover(); comp != nil && e.completion != nil &&
 		e.completion.visible() && comp.overlapsRect(e.completion.rect) {
@@ -1171,7 +1171,7 @@ func (e *Editor) popoverContains(pos geo.Position) bool {
 // float layer use). It is the host canvas's content area translated by the
 // editor's offset within the canvas, so a popover may overflow a compact or
 // embedded editor into the surrounding window rather than being clamped to the
-// editor's own bounds (see #19). Nothing in the editor's own widget tree clips,
+// editor's own bounds (see pre-rebrand tracker #19). Nothing in the editor's own widget tree clips,
 // so an in-tree popover positioned beyond the editor still renders and stays
 // interactive; a host that wraps the editor in a container.Scroll will clip the
 // popover to that scroll's viewport (still far larger than a compact editor).
@@ -1203,7 +1203,7 @@ func (e *Editor) popoverBounds() geo.Rectangle {
 
 	// If an ancestor clips the editor — e.g. a host that wraps it in a
 	// container.Scroll — prefer that clip region so the popover isn't positioned
-	// into an area the scroll then clips (#73). Clip bounds are absolute canvas
+	// into an area the scroll then clips (pre-rebrand tracker #73). Clip bounds are absolute canvas
 	// coordinates; translate into editor-local space (− off) and intersect.
 	if clip, ok := driver.ClipBoundsForObject(c, e.entry); ok {
 		clipLocal := geo.NewRectangle(clip.Pos.X-off.X, clip.Pos.Y-off.Y, clip.Size.Width, clip.Size.Height)
@@ -1264,7 +1264,7 @@ const chordTimeout = 1 * time.Second
 // It returns true to consume the shortcut.
 func (e *Editor) handleEditorShortcut(s core.Shortcut) bool {
 	// Undo/redo replay history without passing the BeforeChange gate, so the
-	// deferred-sync classifier never sees them (#129): flag a sync here (the
+	// deferred-sync classifier never sees them (pre-rebrand tracker #129): flag a sync here (the
 	// shortcut falls through to the Entry, and the flag is consumed after the
 	// replayed edit's refresh). Harmless no-op when nothing ends up pending.
 	if e.DeferTextSync {
@@ -1280,7 +1280,7 @@ func (e *Editor) handleEditorShortcut(s core.Shortcut) bool {
 }
 
 // handleDocScrollShortcut scrolls the completion documentation panel on
-// Ctrl/Cmd+Down / Ctrl/Cmd+Up (#89). It consumes the shortcut only when the
+// Ctrl/Cmd+Down / Ctrl/Cmd+Up (pre-rebrand tracker #89). It consumes the shortcut only when the
 // panel is open and actually scrolls, so the keys fall through to normal
 // document navigation whenever completion is closed or the panel can't scroll.
 func (e *Editor) handleDocScrollShortcut(s core.Shortcut) bool {
@@ -1298,7 +1298,7 @@ func (e *Editor) handleDocScrollShortcut(s core.Shortcut) bool {
 }
 
 // handleChordShortcut implements the Ctrl/Cmd+K Ctrl/Cmd+I "show hover" chord
-// (#29). It returns true to consume the shortcut. The leading K is always
+// (pre-rebrand tracker #29). It returns true to consume the shortcut. The leading K is always
 // consumed (and starts the pending window); a following I while pending fires
 // ShowHoverAtCursor; any other shortcut clears the pending chord and falls
 // through to normal handling.
@@ -1362,7 +1362,7 @@ type editorEntry struct {
 	// true to consume the shortcut (used for the keyboard "show hover" chord).
 	onShortcut func(core.Shortcut) bool
 	// onRune observes a typed rune after the Entry has inserted it — the seam
-	// for electric-character reindent (#136), which must see the post-insert line.
+	// for electric-character reindent (pre-rebrand tracker #136), which must see the post-insert line.
 	onRune func(rune)
 	// onFocusLost fires when the Entry loses keyboard focus.
 	onFocusLost func()

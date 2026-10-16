@@ -17,14 +17,14 @@ import (
 	"github.com/belluikit/bellui/internal/scale"
 )
 
-// Web (wasm/js) drag-out via the browser's HTML5 Drag and Drop API (#857).
+// Web (wasm/js) drag-out via the browser's HTML5 Drag and Drop API (pre-rebrand tracker #857).
 //
 // GLFW exposes no drag-source API, and unlike the desktop backends the web
 // backend cannot use the push desktop.StartDrag path: the browser only starts a
 // native drag from a user gesture, and once dragstart fires it stops delivering
 // mousemove/mouseup on the source — so a widget's Dragged handler (the only
 // place the push model produces the payload) never runs during the drag. The
-// web backend is therefore pull-based (#874): a synchronous DOM mousedown
+// web backend is therefore pull-based (pre-rebrand tracker #874): a synchronous DOM mousedown
 // listener hit-tests the bellui tree, and if the deepest event.Draggable under the
 // pointer implements desktop.DragOutProvider it arms the canvas element
 // (draggable=true) for that gesture; dragstart then pulls DragOutData() and
@@ -82,7 +82,7 @@ func installNativeDragOut(w *window) {
 // the deepest draggable implements desktop.DragOutProvider. It runs
 // synchronously in the DOM mousedown callback; the hit-test is pure computation
 // (no channel ops) so it is safe to run inline on the single-threaded web
-// runtime without the runOnMainAsync deadlock the async callbacks avoid (#113).
+// runtime without the runOnMainAsync deadlock the async callbacks avoid (pre-rebrand tracker #113).
 func armDragOut(w *window, canvasEl js.Value, args []js.Value) {
 	// Default to not-a-drag-source so ordinary in-canvas drags are untouched.
 	canvasEl.Set("draggable", false)
@@ -148,12 +148,12 @@ func onDragStart(canvasEl js.Value, args []js.Value) {
 	if paths := filePaths(data.URIs); len(paths) > 0 {
 		// file:// URIs as an RFC 2483 uri-list. A genuine file-to-OS drag needs
 		// the Chromium-only DownloadURL convention plus a fetchable URL, which
-		// the web target has no local file to serve — documented limit (#857).
+		// the web target has no local file to serve — documented limit (pre-rebrand tracker #857).
 		dt.Call("setData", "text/uri-list", string(internalclipboard.EncodeURIList(paths)))
 	}
 
 	// Drag image: an explicit Image wins, else render the DragImageObject ghost
-	// (#842). dataTransfer.setData is string-only, so an image is offered only as
+	// (pre-rebrand tracker #842). dataTransfer.setData is string-only, so an image is offered only as
 	// the drag ghost, not as a droppable image flavor (browser limit).
 	img := data.Image
 	if img == nil && data.DragImageObject != nil {
@@ -191,7 +191,7 @@ func onDragEnd(canvasEl js.Value, args []js.Value) {
 	if data.OnCompleted != nil {
 		cb := data.OnCompleted
 		// runOnMainAsync (not bellui.Do): a synchronous JS callback must not take
-		// bellui.Do's blocking fallback on the single-threaded web runtime (#113).
+		// bellui.Do's blocking fallback on the single-threaded web runtime (pre-rebrand tracker #113).
 		runOnMainAsync(func() { cb(accepted) })
 	}
 }

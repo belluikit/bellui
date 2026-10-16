@@ -11,7 +11,7 @@ import (
 )
 
 // Off-viewport virtualized-cell realize for the mobile screen-reader backends
-// (#817, the mobile half of #637). A virtualized grid publishes only its
+// (pre-rebrand tracker #817, the mobile half of pre-rebrand tracker #637). A virtualized grid publishes only its
 // near-viewport cells through the normal gather; when the platform side needs a
 // cell beyond that window — iOS VoiceOver addressing a data-table cell through
 // UIAccessibilityContainerDataTable — it is realized on demand through the
@@ -37,7 +37,7 @@ const mobileA11yRealizeTimeout = 250 * time.Millisecond
 // through mobileA11yRealizeCellWait.
 //
 // The realized cell keeps its off-viewport bounds (it carries no clip and never
-// meets the #808 viewport clamp): it is addressed, not focused into the reading
+// meets the pre-rebrand tracker #808 viewport clamp): it is addressed, not focused into the reading
 // order, and activating it scrolls it into view rather than tapping it.
 func mobileA11yRealizeCellOnMain(gridHandle uintptr, row, col int) (mobileA11yNode, []uintptr, bool) {
 	t, ok := mobileA11yLookup(gridHandle)

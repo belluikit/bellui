@@ -53,7 +53,7 @@ func watchFile(path string, callback func()) *fsnotify.Watcher {
 		}
 
 		// The Events channel only closes when stopWatching() closes the
-		// watcher, which is the sole owner of Close() (#779). The loop ending
+		// watcher, which is the sole owner of Close() (pre-rebrand tracker #779). The loop ending
 		// therefore means teardown already happened — nothing to do here.
 	}()
 
@@ -75,7 +75,7 @@ func (s *settings) stopWatching() {
 		return
 	}
 
-	// stopWatching owns the single Close() per watcher lifecycle (#779);
+	// stopWatching owns the single Close() per watcher lifecycle (pre-rebrand tracker #779);
 	// closing the Events channel ends watchFile's goroutine.
 	if err := s.watcher.(*fsnotify.Watcher).Close(); err != nil {
 		bellui.LogError("Settings un-watch error:", err)

@@ -15,7 +15,7 @@ import (
 )
 
 // TestArenaDynamicOffsetReadback is a headless, cross-GPU proof of the per-frame
-// arena mechanism (#255): an explicit pipeline layout that declares the uniform
+// arena mechanism (pre-rebrand tracker #255): an explicit pipeline layout that declares the uniform
 // binding with hasDynamicOffset, a uniform "arena" holding two 256-byte blocks
 // (red then green) and a vertex "arena" holding two identical full-target
 // triangles, drawn by indexing the *second* of each via a vertex byte offset and

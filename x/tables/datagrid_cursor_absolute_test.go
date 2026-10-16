@@ -29,7 +29,7 @@ func pinnedCursorGrid(t *testing.T) *DataGrid {
 
 // The keyboard cursor moves in absolute display-column space, so arrow keys
 // traverse pinned-left → main → pinned-right and are bounded by the total
-// visible column count (not the main-only ColumnCount) (#62).
+// visible column count (not the main-only ColumnCount) (pre-rebrand tracker #62).
 func TestKeyboardCursor_MovesInAbsoluteSpace(t *testing.T) {
 	g := pinnedCursorGrid(t)
 
@@ -49,7 +49,7 @@ func TestKeyboardCursor_MovesInAbsoluteSpace(t *testing.T) {
 
 // Keyboard selection records the cursor's ABSOLUTE column, matching the cell
 // hosts' selection reporting (IsSelected(row, absoluteCol)); previously the
-// keyboard path stored a main index, mis-highlighting with pinned columns (#62).
+// keyboard path stored a main index, mis-highlighting with pinned columns (pre-rebrand tracker #62).
 func TestKeyboardSelect_SelCellColIsAbsolute(t *testing.T) {
 	g := pinnedCursorGrid(t)
 
@@ -72,7 +72,7 @@ func TestKeyboardSelect_SelCellColIsAbsolute(t *testing.T) {
 }
 
 // scrollToCell horizontally scrolls only for main columns; pinned columns are
-// always visible, so focusing one leaves the horizontal offset untouched (#62).
+// always visible, so focusing one leaves the horizontal offset untouched (pre-rebrand tracker #62).
 func TestScrollToCell_PinnedColumnSkipsHScroll(t *testing.T) {
 	g := pinnedCursorGrid(t)
 	w := test.NewWindow(g)
@@ -97,7 +97,7 @@ func TestScrollToCell_PinnedColumnSkipsHScroll(t *testing.T) {
 // Editing addresses the cell by its absolute display index and resolves it
 // through visibleCol, so a commit writes the column actually shown there — even
 // when pinning reorders the display relative to the column-definition order
-// (previously resolvedCols[id.Col] wrote the wrong column) (#62).
+// (previously resolvedCols[id.Col] wrote the wrong column) (pre-rebrand tracker #62).
 func TestEdit_WritesDisplayedColumnUnderPinReorder(t *testing.T) {
 	// Definition order [a, b]; b is pinned-left, so display order is [b, a] —
 	// absolute 0 == b, absolute 1 == a (the reverse of resolvedCols).

@@ -118,7 +118,7 @@ func (p *painter) hasTransform() bool {
 // it yields pos + L·localOffset — i.e. the object scales/rotates about its own
 // top-left instead of the canvas origin.
 //
-// This is the fix for #960. The paint walk hands the painter the full
+// This is the fix for pre-rebrand tracker #960. The paint walk hands the painter the full
 // worldTransform, which already carries Translate(pos) (worldTransform =
 // parentWT · Translate(objPos) · objTransform). The draw helpers below feed that
 // matrix the object's *absolute* corners, so applying the raw worldTransform
@@ -150,7 +150,7 @@ func (p *painter) invTransformStd140(pos geo.Position, frame geo.Size) [12]float
 		return Mat3ToStd140(geo.Identity().ToGL())
 	}
 	// Anchor about the object origin so the inverse maps a (correctly-placed)
-	// fragment back to the absolute pixel space the SDF rect_coords live in (#960).
+	// fragment back to the absolute pixel space the SDF rect_coords live in (pre-rebrand tracker #960).
 	wInv, ok := p.anchor(pos).Inverse()
 	if !ok {
 		return Mat3ToStd140(geo.Identity().ToGL())
@@ -594,7 +594,7 @@ func (p *painter) pathVertsToNDCWithAlpha(verts []float32, pos geo.Position, fra
 // Under a non-trivial world transform the alignment offset is carried through
 // the transform's *linear* part before being added to the box origin `pos`, so
 // the scale/rotation keeps pivoting on the true text-box origin rather than the
-// alignment-shifted glyph position (#1086, follow-up to #960). This matches the
+// alignment-shifted glyph position (pre-rebrand tracker #1086, follow-up to pre-rebrand tracker #960). This matches the
 // software painter, which anchors at the box origin (wt.TX/TY) and applies the
 // alignment offset inside the scaled bitmap. With no transform the linear part is
 // the identity, so the offset is added verbatim (behavior identical to before).
@@ -719,7 +719,7 @@ func (p *painter) drawTexture(o core.CanvasObject, raster func(core.CanvasObject
 // texture-coordinate insets (ports the non-transform path of rectCoords). Under a
 // non-trivial world transform it delegates to transformedRectCoords so textured
 // ops (image/text/gradient/raster/StyledText + the Scene3D blit) honor the
-// transform like the GL backend (#233); the `simple` shader needs no per-fragment
+// transform like the GL backend (pre-rebrand tracker #233); the `simple` shader needs no per-fragment
 // inverse — the quad corners carry the transform.
 func (p *painter) rectCoords(size geo.Size, pos geo.Position, frame geo.Size, fill canvas.ImageFill, aspect, pad float32) ([]float32, [4]float32) {
 	if p.hasTransform() {
@@ -749,7 +749,7 @@ func (p *painter) rectCoords(size geo.Size, pos geo.Position, frame geo.Size, fi
 func (p *painter) transformedRectCoords(size geo.Size, pos geo.Position, frame geo.Size, fill canvas.ImageFill, aspect, pad float32) ([]float32, [4]float32) {
 	// Anchor about the object's own origin (before rectInnerCoords shifts pos for
 	// letterboxing) so the scale/rotation pivots on the object, not the canvas
-	// origin — the letterbox inset stays a local offset that scales with it (#960).
+	// origin — the letterbox inset stays a local offset that scales with it (pre-rebrand tracker #960).
 	wt := p.anchor(pos)
 	size, pos = rectInnerCoords(size, pos, fill, aspect)
 

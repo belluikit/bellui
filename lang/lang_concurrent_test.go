@@ -90,7 +90,7 @@ func TestAddTranslations_Concurrent(t *testing.T) {
 }
 
 // TestUpdateLocalizer_EmptyLocaleList guards the C/POSIX-locale startup path
-// (#1148): locale.GetLocales reports an empty list without an error under
+// (pre-rebrand tracker #1148): locale.GetLocales reports an empty list without an error under
 // LANG=C / LC_ALL=C, and updateLocalizer must fall back to "en" instead of
 // panicking on all[0] — the panic ran from this package's init, killing any
 // binary before main on hosts with a stripped locale environment.

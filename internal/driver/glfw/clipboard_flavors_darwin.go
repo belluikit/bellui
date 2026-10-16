@@ -20,7 +20,7 @@ import (
 	"github.com/belluikit/bellui/storage"
 )
 
-// Declare conformity with the optional clipboard flavor interfaces (#513).
+// Declare conformity with the optional clipboard flavor interfaces (pre-rebrand tracker #513).
 var (
 	_ bellui.ImageClipboard       = clipboard{}
 	_ bellui.FileClipboard        = clipboard{}
@@ -121,7 +121,7 @@ func (c clipboard) SetFiles(files []bellui.URI) {
 }
 
 // SetFlavors replaces the clipboard content with every set flavor of content
-// in one pasteboard transaction (#583): one NSPasteboardItem carries the
+// in one pasteboard transaction (pre-rebrand tracker #583): one NSPasteboardItem carries the
 // text/HTML/image flavors, plus one item per file URL.
 func (c clipboard) SetFlavors(content bellui.ClipboardContent) {
 	var cText, cHTML *C.char

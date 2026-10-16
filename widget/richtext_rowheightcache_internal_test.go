@@ -18,7 +18,7 @@ import (
 
 // countingRect is a non-text, non-volatile CanvasObject that counts MinSize
 // calls. It does NOT implement HeightForWidth and is not a *richImage, so rows
-// backed by it are eligible for the per-row height cache (#158 Step 1).
+// backed by it are eligible for the per-row height cache (pre-rebrand tracker #158 Step 1).
 type countingRect struct {
 	*canvas.Rectangle
 	count *int

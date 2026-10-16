@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestEntry_SetText_ClearsSelection is the #154 repro: a wholesale SetText must
+// TestEntry_SetText_ClearsSelection is the pre-rebrand tracker #154 repro: a wholesale SetText must
 // drop any active selection, so the next edit inserts cleanly instead of
 // replacing a phantom range left by the stale (clamped) anchor.
 func TestEntry_SetText_ClearsSelection(t *testing.T) {

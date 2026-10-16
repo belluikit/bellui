@@ -68,7 +68,7 @@ func TestShiftSpan(t *testing.T) {
 	}
 }
 
-// TestAnchor_ProtectedFollowsInsertedLineAbove is the #130 headline: a line
+// TestAnchor_ProtectedFollowsInsertedLineAbove is the pre-rebrand tracker #130 headline: a line
 // inserted above a protected range shifts it without a host re-publish — and
 // protection ENFORCES at the shifted location.
 func TestAnchor_ProtectedFollowsInsertedLineAbove(t *testing.T) {

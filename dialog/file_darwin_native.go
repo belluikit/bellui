@@ -122,7 +122,7 @@ func showNativePanel(d *FileDialog, kind panelKind, multi bool) {
 	// On macOS < 11 the panel can only restrict by bare extension, so MIME
 	// filters are pre-mapped to extensions here (best-effort, mirroring the
 	// Windows backend) and combined with the extension list for the legacy
-	// setAllowedFileTypes: path (#632). The 11+ path ignores this and uses the
+	// setAllowedFileTypes: path (pre-rebrand tracker #632). The 11+ path ignores this and uses the
 	// exts/mimes UTType lists above.
 	legacyExts := append(append([]string(nil), exts...), legacyExtsFromMimes(mimes)...)
 	cLegacy, legacyCount := newCStringArray(legacyExts)
@@ -234,7 +234,7 @@ func belluiFileDialogResponse(handle C.int, cPaths **C.char, count C.int, cancel
 
 // deliverPanelResult wraps the chosen path(s) in the appropriate storage handle
 // and invokes the dialog's typed callback on the main goroutine. A multi-select
-// open dialog delivers the whole slice to the []URIReadCloser callback (#716);
+// open dialog delivers the whole slice to the []URIReadCloser callback (pre-rebrand tracker #716);
 // every other panel uses the first (and only) path.
 func deliverPanelResult(p *pendingPanel, paths []string, cancelled bool) {
 	d := p.dialog

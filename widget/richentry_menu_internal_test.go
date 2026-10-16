@@ -14,7 +14,7 @@ import (
 	"github.com/belluikit/bellui/test"
 )
 
-// RichEntry's context menu (#888): a secondary tap — dispatched by the driver
+// RichEntry's context menu (pre-rebrand tracker #888): a secondary tap — dispatched by the driver
 // to the embedded selectable, the deepest SecondaryTappable — forwards to the
 // editor's own menu, which offers the editing actions the selectable's
 // read-only Copy menu cannot (and whose Select all drives the editor's
@@ -89,7 +89,7 @@ func TestRichEntry_MenuSelectAll_DrivesEditorModel(t *testing.T) {
 
 // TestRichEntry_MenuSelectAll_ReShowsOnTouch verifies that a touch-initiated
 // "Select all" re-presents the context menu over the full selection so Cut/Copy
-// stay reachable, matching Entry and the native toolbar (#1128).
+// stay reachable, matching Entry and the native toolbar (pre-rebrand tracker #1128).
 func TestRichEntry_MenuSelectAll_ReShowsOnTouch(t *testing.T) {
 	test.NewTempApp(t)
 	e := NewRichEntry()

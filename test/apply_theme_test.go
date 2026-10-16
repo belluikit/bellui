@@ -37,7 +37,7 @@ func TestApplyTheme_RestoresPrevious(t *testing.T) {
 
 // TestThemeApplied_Bounded verifies the wait is bounded: it returns true
 // promptly for an already-applied theme and returns false (rather than
-// hanging) once the timeout elapses for a theme that never applies (#37).
+// hanging) once the timeout elapses for a theme that never applies (pre-rebrand tracker #37).
 func TestThemeApplied_Bounded(t *testing.T) {
 	defer bellui.SetCurrentApp(bellui.CurrentApp())
 	a := NewApp().(*app)

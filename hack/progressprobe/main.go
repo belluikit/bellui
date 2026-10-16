@@ -11,7 +11,7 @@ import (
 	"github.com/belluikit/bellui/widget"
 )
 
-// #721 probe: drives desktop.ProgressWindow.SetProgress so the Unity
+// pre-rebrand tracker #721 probe: drives desktop.ProgressWindow.SetProgress so the Unity
 // LauncherEntry progress D-Bus signal can be observed on the session bus.
 func main() {
 	a := app.NewWithID("com.trendvidia.progressprobe")

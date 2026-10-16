@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestWindow_ModalBlocksParentKey verifies the #676 macOS parent-key
+// TestWindow_ModalBlocksParentKey verifies the pre-rebrand tracker #676 macOS parent-key
 // suppression: while a child dialog is modal, the parent NSWindow is prevented
 // from becoming key/main (so the keyboard cannot reach it), and the block is
 // lifted when the dialog stops being modal or is torn down.
@@ -42,7 +42,7 @@ func TestWindow_ModalBlocksParentKey(t *testing.T) {
 	})
 }
 
-// TestWindow_ModalStackedBlocksParentKey verifies the #682 ref-count: two modal
+// TestWindow_ModalStackedBlocksParentKey verifies the pre-rebrand tracker #682 ref-count: two modal
 // dialogs over the same parent keep it blocked until the last one clears — the
 // first closing must not lift the OS-level block while the second is still up.
 func TestWindow_ModalStackedBlocksParentKey(t *testing.T) {

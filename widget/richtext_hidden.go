@@ -61,7 +61,7 @@ func lineRangesEqual(a, b []LineRange) bool {
 // folded set changed (so the caller can decide to relayout).
 func (t *RichText) setHiddenRanges(rs []LineRange) bool {
 	t.hiddenLogical = rs
-	// Folds keep the dense varHeight path: the block-lazy build (#317) declines them
+	// Folds keep the dense varHeight path: the block-lazy build (pre-rebrand tracker #317) declines them
 	// (a fold's collapsed extent needs exact per-row geometry), so a fold appearing
 	// on a block-lazy document forces a rebuild onto the dense model.
 	rebuild := t.blockLazy && len(rs) > 0
@@ -85,7 +85,7 @@ func (t *RichText) applyHiddenRanges() bool {
 	}
 	t.hiddenRanges = norm
 	// The variable-height prefix bakes folded rows in at zero height, so a fold
-	// change must rebuild it (#158).
+	// change must rebuild it (pre-rebrand tracker #158).
 	t.prefixHeightDirty = true
 	return true
 }
@@ -139,7 +139,7 @@ func (t *RichText) rowIsLogicalLineEnd(r int) bool {
 		return t.rowToLine[r] != t.rowToLine[r+1]
 	}
 	// Multi-segment content has no rowToLine map; derive the answer from the row
-	// boundaries — a soft wrap continues the same TextSegment with no newline (#161).
+	// boundaries — a soft wrap continues the same TextSegment with no newline (pre-rebrand tracker #161).
 	_, soft := t.softWrapGap(r)
 	return !soft
 }
@@ -149,7 +149,7 @@ func (t *RichText) rowIsLogicalLineEnd(r int) bool {
 // returns the run word-wrap consumed at that break (a space, or "" for break-wrap,
 // which drops nothing). It returns ("", false) at a hard newline or a segment
 // boundary. Selection copy uses it to rejoin wrapped rows with the original
-// separator instead of dropping it or inserting a spurious newline (#161). The
+// separator instead of dropping it or inserting a spurious newline (pre-rebrand tracker #161). The
 // consumed run is exactly the segment runes in [row r's end, row r+1's begin), which
 // belong to neither row's rendered text.
 func (t *RichText) softWrapGap(r int) (string, bool) {

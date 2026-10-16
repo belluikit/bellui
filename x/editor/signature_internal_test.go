@@ -300,7 +300,7 @@ func TestSignature_PreservesOverloadWhileTyping(t *testing.T) {
 		t.Fatalf("manual cycle should select overload 1, got %d", e.signature.sig)
 	}
 	// Typing another argument char re-queries; the same call must keep the
-	// manually-selected overload (#38).
+	// manually-selected overload (pre-rebrand tracker #38).
 	typeRunes(e, "a")
 	if e.signature.sig != 1 {
 		t.Errorf("manual overload should survive continued typing, got %d", e.signature.sig)

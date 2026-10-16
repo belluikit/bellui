@@ -95,7 +95,7 @@ jobs:
         run: buf lint
 
       - name: Check protobuf breaking changes (advisory)
-        # Non-blocking (#930): these protos back on-disk .pxf stores, so a
+        # Non-blocking (pre-rebrand tracker #930): these protos back on-disk .pxf stores, so a
         # wire-incompatible change (reused field number, changed type) silently
         # corrupts saved settings/preferences. Surface it in the PR log without
         # hard-failing intended schema evolution. WIRE-level rules (buf.yaml).

@@ -96,7 +96,7 @@ func (o *OverlayContainer) Dismiss() {
 }
 
 // TapThroughDismiss implements the drivers' press-time pass-through seam
-// (#472): when the overlay opted in via TapThrough and the press lands
+// (pre-rebrand tracker #472): when the overlay opted in via TapThrough and the press lands
 // outside Content, the overlay is dismissed and true is returned, telling
 // the driver to resolve the same press against the layer beneath. Drivers
 // assert for this method structurally on the top overlay before dispatching

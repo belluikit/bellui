@@ -26,7 +26,7 @@ func captureLog(t *testing.T) *bytes.Buffer {
 }
 
 // TestEditor_WarnsWhenNestedInScroll verifies the editor logs a one-time warning
-// when a host wraps it in an outer container.Scroll (#111).
+// when a host wraps it in an outer container.Scroll (pre-rebrand tracker #111).
 func TestEditor_WarnsWhenNestedInScroll(t *testing.T) {
 	test.NewTempApp(t)
 	buf := captureLog(t)

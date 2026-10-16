@@ -227,7 +227,7 @@ func TestCompletionPopup_InfoIconLeadsTextInRTL(t *testing.T) {
 	assert.Less(t, r.rows[0].info.Position().X, r.rows[0].text.Position().X)
 }
 
-// --- visible-row cap + scrolling (#436) ---
+// --- visible-row cap + scrolling (pre-rebrand tracker #436) ---
 
 func manyItems(n int) []CompletionItem {
 	items := make([]CompletionItem, n)
@@ -382,7 +382,7 @@ func TestCompletionPopup_SetItemsResetsWindow(t *testing.T) {
 	assert.Equal(t, 0, p.top, "new items start at the top of the window")
 }
 
-// --- documentation side panel (#435) ---
+// --- documentation side panel (pre-rebrand tracker #435) ---
 
 func docItems() []CompletionItem {
 	return []CompletionItem{
@@ -498,7 +498,7 @@ func TestCompletionPopup_PageKeysScrollDocPanel(t *testing.T) {
 	assert.False(t, bare.scrollDocPage(true))
 }
 
-// --- final-bounds signal for companion surfaces (#437) ---
+// --- final-bounds signal for companion surfaces (pre-rebrand tracker #437) ---
 
 func TestCompletionPopup_OnMovedReportsFinalPlacement(t *testing.T) {
 	_, p := newTestCompletionPopup(t, sampleItems())
@@ -546,7 +546,7 @@ func TestCompletionPopup_OnMovedSeesFlipAndDismiss(t *testing.T) {
 	assert.Equal(t, geo.Rectangle{}, last)
 }
 
-// --- #442: non-focus-stealing mode for editor hosts ---
+// --- pre-rebrand tracker #442: non-focus-stealing mode for editor hosts ---
 
 func TestCompletionPopup_KeepHostFocusLeavesFocus(t *testing.T) {
 	test.NewTempApp(t)

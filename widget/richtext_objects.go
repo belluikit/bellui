@@ -123,7 +123,7 @@ type HyperlinkSegment struct {
 	OnTapped func() `json:"-"`
 
 	// Style carries optional per-segment styling for the link text — FontSource
-	// (#494/#651), ColorName, SizeName and TextStyle — mirroring TextSegment.Style
+	// (pre-rebrand tracker #494/#651), ColorName, SizeName and TextStyle — mirroring TextSegment.Style
 	// so a link can render in a custom font, color or size rather than always the
 	// theme font/primary color. The zero value is byte-identical to before (theme
 	// font, primary color, theme text size). The segment's own Alignment field
@@ -202,7 +202,7 @@ func (h *HyperlinkSegment) Unselect() {
 // outside the http/https/mailto allowlist (or a relative reference) — e.g.
 // file://, smb://, javascript:, or Windows handler schemes such as search-ms:
 // and ms-msdt: — is dropped (nil), so tapping such a link does nothing rather
-// than invoking a dangerous external handler (#285). Relative references (empty
+// than invoking a dangerous external handler (pre-rebrand tracker #285). Relative references (empty
 // scheme) are preserved as they are inert for OpenURL.
 func parsedLinkURL(raw string) *url.URL {
 	u, err := url.Parse(raw)
@@ -245,7 +245,7 @@ type ImageSegment struct {
 	// InlineImage lays the image out *within* a text row — flowing between the
 	// surrounding text like a large glyph — instead of on its own block row. The
 	// image still occupies exactly one caret position. Zero value (false) keeps
-	// the historical block layout, so existing content is unchanged (#665).
+	// the historical block layout, so existing content is unchanged (pre-rebrand tracker #665).
 	//
 	// Since: 1.0
 	InlineImage bool
@@ -253,7 +253,7 @@ type ImageSegment struct {
 	// allowRemote is set by the embedding RichText from its AllowRemoteContent
 	// policy. When false (the default) the image is not fetched and a
 	// broken-image placeholder is rendered instead, so rendering untrusted
-	// markup cannot trigger network requests or local-file reads (#285).
+	// markup cannot trigger network requests or local-file reads (pre-rebrand tracker #285).
 	allowRemote bool
 }
 
@@ -908,7 +908,7 @@ type RichTextStyle struct {
 }
 
 // isBlockquote reports whether this style is the blockquote preset, ignoring any
-// per-segment FontSource. FontSource (#494) composes with any preset, so a
+// per-segment FontSource. FontSource (pre-rebrand tracker #494) composes with any preset, so a
 // blockquote that also carries a custom font must still be laid out as a
 // blockquote (indented) rather than falling back to a plain paragraph — a whole
 // struct comparison against RichTextStyleBlockquote would miss it.
@@ -1029,7 +1029,7 @@ func newRichImage(u bellui.URI, img image.Image, res bellui.Resource, align bell
 // loadImage returns the canvas image for this segment's source. In-memory
 // sources (Image, Resource) are rendered directly. A remote/local URI source is
 // only fetched when explicitly allowed; otherwise a broken-image placeholder is
-// rendered so nothing is read from the network or disk (#285).
+// rendered so nothing is read from the network or disk (pre-rebrand tracker #285).
 func (r *richImage) loadImage() *canvas.Image {
 	if r.image != nil {
 		return canvas.NewImageFromImage(r.image)

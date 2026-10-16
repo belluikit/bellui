@@ -55,7 +55,7 @@ type RenderCacheNode struct {
 	// EnsureMinSize walk, so this node must re-run its layout when the
 	// post-order walk reaches it. A per-node flag, not a single shared
 	// pending pointer: several subtrees can report changes in one walk, and a
-	// later change must not cancel an earlier sibling's pending update (#1039).
+	// later change must not cancel an earlier sibling's pending update (pre-rebrand tracker #1039).
 	minSizeChanged bool
 	worldTransform geo.Matrix   // accumulated affine transform from root to this node
 	clipPos        geo.Position // effective clip region origin (from nearest Scrollable/ClipToBounds ancestor)

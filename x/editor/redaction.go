@@ -30,7 +30,7 @@ const (
 // host may reveal-but-keep-protected, or mask without separately protecting
 // (masking already vetoes edits silently while masked).
 //
-// Spans are stored as (row, col) and anchor-tracked through edits (#130), like
+// Spans are stored as (row, col) and anchor-tracked through edits (pre-rebrand tracker #130), like
 // protected ranges: an insert or delete above a span shifts it (bar and
 // caret-barring included) with no host re-publish; a programmatic
 // [Editor.SetText] is a document swap and leaves spans as published. Passing
@@ -70,7 +70,7 @@ func (e *Editor) Redactions() []TextRange {
 // redactionController owns the redacted spans and the mask/reveal mode. It is an
 // internal [SpanDecorator] (drawing opaque bars when masked) and the owner of
 // the Entry's CaretOpaque ProtectedRanges — the field reserved for caret-barring
-// masked regions. The plain edit-rejection callback path (#63) goes through
+// masked regions. The plain edit-rejection callback path (pre-rebrand tracker #63) goes through
 // entry.BeforeChange instead; the two mechanisms are independent so redaction
 // and protection compose.
 type redactionController struct {
@@ -132,7 +132,7 @@ func (c *redactionController) apply() {
 // inserts (matching the protected-ranges design where edges stay appendable). A
 // masked secret can't afford that — inserting at the leading edge shifts the
 // secret out from under the opaque bar one keystroke at a time, revealing it
-// (#108). So this vetoes any edit that touches a masked span's interior OR
+// (pre-rebrand tracker #108). So this vetoes any edit that touches a masked span's interior OR
 // either edge, keeping the bar aligned to the secret. The veto is silent;
 // redaction never fires OnProtectedEditAttempt. Returns true (allowing the edit)
 // when revealed or when no spans are set.
@@ -140,7 +140,7 @@ func (c *redactionController) allow(sel widget.TextRange) bool {
 	if c.mode != Masked || len(c.ranges) == 0 {
 		return true
 	}
-	// Synchronise deferred edits (#129): sel indexes the live pre-edit content,
+	// Synchronise deferred edits (pre-rebrand tracker #129): sel indexes the live pre-edit content,
 	// so the spans must be flattened against that same text.
 	text := c.e.docText()
 	for _, r := range c.ranges {
@@ -154,7 +154,7 @@ func (c *redactionController) allow(sel widget.TextRange) bool {
 
 // reconcile re-derives the Entry's CaretOpaque ProtectedRanges from the current
 // redactions and mode against the current text. It is called on every text
-// change, after anchor-tracking has shifted the spans themselves (#130), so the
+// change, after anchor-tracking has shifted the spans themselves (pre-rebrand tracker #130), so the
 // caret-bar offsets always match the spans' current homes.
 func (c *redactionController) reconcile() {
 	c.e.entry.ProtectedRanges = c.protectedRanges()

@@ -1,5 +1,5 @@
 // Command taskbarprobe is a live-verify harness for desktop.ProgressWindow
-// (#517 taskbar progress). It shows a window and drives its taskbar progress
+// (pre-rebrand tracker #517 taskbar progress). It shows a window and drives its taskbar progress
 // indicator so the green fill (Windows), or a documented no-op elsewhere, can
 // be observed. Windows is the flagship platform.
 //

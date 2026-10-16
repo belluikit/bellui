@@ -1,4 +1,4 @@
-// Command repro960 drives the #960 scene (Transform-scaled canvas.Text vs
+// Command repro960 drives the pre-rebrand tracker #960 scene (Transform-scaled canvas.Text vs
 // untransformed and Transform-scaled Rectangles) on a real window. On the
 // OnePlus Pad 2 (Adreno 750, WebGPU default) the transformed text is reported
 // to render as mispositioned fragments / vanish while the rectangles are fine;

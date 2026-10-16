@@ -1,6 +1,6 @@
 package tables
 
-// Issue #16: realized cells and off-screen virtual nodes share one stable,
+// pre-rebrand Issue pre-rebrand tracker #16: realized cells and off-screen virtual nodes share one stable,
 // source-keyed identity channel, so a screen reader's cursor follows a record
 // across sort/filter/scroll rather than the display slot.
 

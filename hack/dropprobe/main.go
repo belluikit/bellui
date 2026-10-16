@@ -1,10 +1,10 @@
-// Command dropprobe is a live-verify harness for #708 (drag-motion hover
+// Command dropprobe is a live-verify harness for pre-rebrand tracker #708 (drag-motion hover
 // feedback for drop targets). It shows a drop zone implementing
 // bellui.DropHoverable: drag a file from the desktop file manager over the window
 // and the zone should highlight on DragEnter, track the pointer on DragOver, and
 // un-highlight on DragLeave — before you even release. Dropping lists the files.
 //
-// Drag-motion is delivered on X11 and macOS (glfw #708); on Windows the zone
+// Drag-motion is delivered on X11 and macOS (glfw pre-rebrand tracker #708); on Windows the zone
 // still receives the drop but no hover phases (WM_DROPFILES has no motion).
 //
 //	go run ./hack/dropprobe

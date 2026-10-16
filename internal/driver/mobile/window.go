@@ -144,7 +144,7 @@ func (w *window) Show() {
 
 	// Re-showing a previously-hidden window makes it current again: un-hide its
 	// native surface layer and bring it back to the front so it covers the window
-	// that was revealed beneath it while hidden (#742). A no-op on first show (the
+	// that was revealed beneath it while hidden (pre-rebrand tracker #742). A no-op on first show (the
 	// layer is created lazily on the first paint).
 	w.driver.setWindowSurfaceHidden(w, false)
 
@@ -166,7 +166,7 @@ func (w *window) Hide() {
 	// later Show can re-reveal it — unlike Close's detach) so it stops covering
 	// the revealed window, and mark the newly-current window dirty (the paint loop
 	// only repaints a dirty canvas) so it is presented rather than this window's
-	// frozen last frame (#742, #645).
+	// frozen last frame (pre-rebrand tracker #742, pre-rebrand tracker #645).
 	w.driver.setWindowSurfaceHidden(w, true)
 	w.driver.refreshCurrentWindow()
 }
@@ -218,12 +218,12 @@ func (w *window) Close() {
 	// window's native surface layer (else it keeps covering the revealed window)
 	// and mark the newly-current window dirty (the paint loop only repaints a
 	// dirty canvas), so the revealed window is presented rather than this one's
-	// frozen last frame (#645).
+	// frozen last frame (pre-rebrand tracker #645).
 	d.detachWindowSurface(w)
 	// A closed window can never own the shared native surface; clear the
 	// ownership here in the platform-neutral path (the per-window surface release
 	// itself is platform-specific, in detachWindowSurface) so the revealed window
-	// reclaims it on its next paint (#753). No-op where surface ownership is
+	// reclaims it on its next paint (pre-rebrand tracker #753). No-op where surface ownership is
 	// unused (iOS per-window layers, GL).
 	if d.surfaceOwner == w {
 		d.surfaceOwner = nil

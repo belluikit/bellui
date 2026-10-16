@@ -15,7 +15,7 @@ import (
 )
 
 // Click hit-testing on rows that mix text with inline image atoms must be
-// atom-aware in both directions (#983): the LTR prefix scan measured *through*
+// atom-aware in both directions (pre-rebrand tracker #983): the LTR prefix scan measured *through*
 // the image (every hit after it one image-width off) and the bidi hit-test
 // returned box-blind text-only columns (consumed as document columns by
 // RichEntry, off by one per preceding atom). These tests click at known x on
@@ -86,7 +86,7 @@ func TestRichEntry_InlineImageHitTestLTR(t *testing.T) {
 	assert.Equal(t, 3, dc, "click on the image's trailing half resolves after it")
 
 	// Click on the text following the image ("c") must land on doc col 3/4, NOT
-	// past the end — the pre-#983 scan measured through the image and overshot.
+	// past the end — the before pre-rebrand tracker #983 scan measured through the image and overshot.
 	cx := x(3) // start of "c"
 	_, dc = hit(cx + 0.5)
 	assert.GreaterOrEqual(t, dc, 3)
@@ -165,7 +165,7 @@ func TestRichEntry_BidiInlineImageHitTest(t *testing.T) {
 // TestSelectableRichText_InlineImageHitTest verifies that a *plain* selectable
 // RichText (host == nil, text-only column model) keeps its text-only columns but
 // hit-tests with atom-aware x: clicking on the text after an inline image lands
-// on that text's column, not one image-width past it (the pre-#983 bug).
+// on that text's column, not one image-width past it (the before pre-rebrand tracker #983 bug).
 func TestSelectableRichText_InlineImageHitTest(t *testing.T) {
 	test.NewTempApp(t)
 	lang.SetLocaleForTests(t, "en-US")

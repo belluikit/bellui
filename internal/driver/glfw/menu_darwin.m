@@ -47,7 +47,7 @@ NSMenu* nativeMainMenu();
 // menu-container chain, so resetDarwinMenu()'s removeItem: (which can run mid
 // key-equivalent routing, or from the very menu action that triggers a rebuild)
 // can deallocate an item while AppKit still holds a raw pointer to it — the
-// use-after-free behind the -[OS_dispatch_mach hasSubmenu] crash (#811). Holding
+// use-after-free behind the -[OS_dispatch_mach hasSubmenu] crash (pre-rebrand tracker #811). Holding
 // our own retain keeps the object alive across that window; the retains are
 // released (deferred to the autorelease pool) only in resetDarwinMenu().
 static NSMutableArray *belluiLiveMenuObjects = nil;
@@ -67,7 +67,7 @@ static void belluiTrackMenuObject(id obj) {
 // standard items — for the whole process lifetime. This is the counterpart to
 // belluiLiveMenuObjects (the per-generation dynamic menus, dropped on every
 // resetDarwinMenu): the scaffolding is never torn down, so nothing here is ever
-// freed underfoot. bellui owns the bar instead of GLFW (#831), so GLFW's orphaned
+// freed underfoot. bellui owns the bar instead of GLFW (pre-rebrand tracker #831), so GLFW's orphaned
 // Services-menu scaffolding — the macOS-26 use-after-free candidate — never exists.
 static NSMutableArray *belluiPermanentMenuObjects = nil;
 static BOOL belluiMainMenuBuilt = NO;
@@ -173,7 +173,7 @@ void createBelluiMainMenu(const char* appNameC) {
 // keyboard input). GLFW does this during glfw.Init(), but only when its own
 // Cocoa menu bar is enabled (cocoa_init.m: `if (_glfw.hints.init.ns.menubar)
 // [NSApp setActivationPolicy:Regular]`). bellui now disables that menu bar
-// (disableGLFWMenubar) to avoid the macOS-26 native-menu use-after-free (#831),
+// (disableGLFWMenubar) to avoid the macOS-26 native-menu use-after-free (pre-rebrand tracker #831),
 // which as a side effect also skipped the activation-policy promotion — leaving
 // an *unbundled* app (run from a terminal, `go run`, a bare binary) as a
 // background/accessory process whose windows cannot take keyboard focus, so
@@ -276,7 +276,7 @@ const void* insertDarwinMenuItem(const void* m, const char* label, const char* k
         [menu addItem:item];
     }
     [item release]; // retained by the menu
-    belluiTrackMenuObject(item); // hold our own strong ref until the next reset (#811)
+    belluiTrackMenuObject(item); // hold our own strong ref until the next reset (pre-rebrand tracker #811)
     return item;
 }
 
@@ -327,7 +327,7 @@ void resetDarwinMenu() {
     // actual deallocation to the next autorelease-pool drain: -autorelease keeps
     // every held NSMenu/NSMenuItem alive past the current run-loop turn, so an
     // object AppKit is still routing a key event through — or the item whose action
-    // triggered this rebuild — is never freed underfoot (#811).
+    // triggered this rebuild — is never freed underfoot (pre-rebrand tracker #811).
     [belluiLiveMenuObjects autorelease];
     belluiLiveMenuObjects = nil; // a fresh array is created lazily by belluiTrackMenuObject
 }

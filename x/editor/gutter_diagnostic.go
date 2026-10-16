@@ -13,14 +13,14 @@ import (
 // line-number gutter via [NewCompositeGutter]. A line's marker takes the color —
 // and shape — of the most severe diagnostic on it. Each severity has a distinct
 // glyph (filled circle = error, triangle = warning, square = info, diamond =
-// hint) so the four severities are distinguishable without relying on color (#56).
+// hint) so the four severities are distinguishable without relying on color (pre-rebrand tracker #56).
 //
 // By default it is non-interactive: jumping to a problem is the problems-list →
 // [Editor.RevealRange] path, not a gutter click. Set [DiagnosticGutter.RevealOnTap]
 // (or call [Editor.SetDiagnosticClickToReveal]) to make a tapped marker reveal
-// the most-severe diagnostic covering that line (#57, #97); enable
+// the most-severe diagnostic covering that line (pre-rebrand tracker #57, pre-rebrand tracker #97); enable
 // [DiagnosticGutter.CycleOnTap] to walk through a line's other diagnostics on
-// repeated taps (#99).
+// repeated taps (pre-rebrand tracker #99).
 //
 // An editor keeps an internal DiagnosticGutter fed automatically from
 // [Editor.SetDiagnostics] — obtain it via [Editor.DiagnosticGutter] and drop it
@@ -60,7 +60,7 @@ type DiagnosticGutter struct {
 	// diagnostics covering it (most-severe first, then set order, wrapping) instead
 	// of always revealing the most severe. The first tap of a line still reveals
 	// the most severe, and tapping a different line restarts the walk. No effect
-	// unless RevealOnTap is set; off by default (#99).
+	// unless RevealOnTap is set; off by default (pre-rebrand tracker #99).
 	CycleOnTap bool
 }
 
@@ -72,8 +72,8 @@ func NewDiagnosticGutter() *DiagnosticGutter {
 // SetDiagnostics rebuilds the per-line maps from diags. Each line a diagnostic's
 // range covers collects that diagnostic; the marker takes the most severe, and
 // the per-line reveal order is most-severe first then set order — index 0 (the
-// marker's diagnostic) is the default reveal target (#97) and the rest is the
-// [DiagnosticGutter.CycleOnTap] walk order (#99). Passing nil clears all markers.
+// marker's diagnostic) is the default reveal target (pre-rebrand tracker #97) and the rest is the
+// [DiagnosticGutter.CycleOnTap] walk order (pre-rebrand tracker #99). Passing nil clears all markers.
 func (g *DiagnosticGutter) SetDiagnostics(diags []Diagnostic) {
 	// Collect, per line, every covering diagnostic in set order.
 	perLine := map[int][]lineDiag{}
@@ -149,7 +149,7 @@ func (g *DiagnosticGutter) Render(line int, size geo.Size, textSize float32) []c
 
 // severityMarker builds the default gutter marker: a distinct shape per severity
 // (filled circle = error, triangle = warning, square = info, diamond = hint) so
-// the four severities read apart without relying on color (#56). The default
+// the four severities read apart without relying on color (pre-rebrand tracker #56). The default
 // 4-gon orientation is a diamond (first vertex at top), so the square is rotated
 // 45°. All shapes share the same diameter and are centered in the cell.
 func severityMarker(sev Severity, size geo.Size, textSize, scale float32) []core.CanvasObject {

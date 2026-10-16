@@ -62,7 +62,7 @@ const defaultFoldPlaceholder = "..."
 // text model, search, diagnostics and LSP positions stay in document
 // coordinates while only the rendered geometry collapses.
 //
-// Regions are expressed in (row, col) and anchor-tracked through edits (#130):
+// Regions are expressed in (row, col) and anchor-tracked through edits (pre-rebrand tracker #130):
 // an insert or delete above a region shifts it (collapsed state and hidden rows
 // included), an edit inside resizes it, and a deletion that swallows a region
 // removes it — no host re-publish needed. A programmatic [Editor.SetText] is a
@@ -446,7 +446,7 @@ func (c *foldController) placeholders() []foldPlaceholder {
 	if len(c.regions) == 0 {
 		return nil
 	}
-	// Raw Text read (#129-safe): placeholders render only while regions are
+	// Raw Text read (pre-rebrand tracker #129-safe): placeholders render only while regions are
 	// collapsed, and active folds disable the fork's deferred edit path, so
 	// Text is always current here.
 	lines := strings.Split(c.e.entry.Text, "\n")

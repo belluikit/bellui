@@ -86,7 +86,7 @@ type fileDialog struct {
 	selectedID int
 	dir        bellui.ListableURI
 
-	// multi-select state (#627): the ordered set of chosen files and the
+	// multi-select state (pre-rebrand tracker #627): the ordered set of chosen files and the
 	// anchor id for Shift-range selection.
 	multiSelected []bellui.URI
 	multiAnchor   int
@@ -97,7 +97,7 @@ type fileDialog struct {
 	// too. It survives navigation, like the set itself.
 	selectionMode bool
 
-	// set while the dialog body is shown in its own native window (#597)
+	// set while the dialog body is shown in its own native window (pre-rebrand tracker #597)
 	hostWin   bellui.Window
 	scrim     *modalScrim
 	body      core.CanvasObject
@@ -133,9 +133,9 @@ type FileDialog struct {
 	showHidden bool
 	// windowed hosts the dialog in a draggable, resizable window frame
 	windowed bool
-	// windowHosted opens the dialog in its own native window (#597)
+	// windowHosted opens the dialog in its own native window (pre-rebrand tracker #597)
 	windowHosted bool
-	// multiSelect allows choosing more than one file (open mode only, #627)
+	// multiSelect allows choosing more than one file (open mode only, pre-rebrand tracker #627)
 	multiSelect bool
 }
 
@@ -1097,8 +1097,8 @@ func (f *FileDialog) Show() {
 		}
 	} else {
 		// Multi-select is honoured natively by every desktop backend and the
-		// mobile pickers (#716, #255); an environment without a multi picker
-		// declines and falls through to the canvas dialog (#627).
+		// mobile pickers (pre-rebrand tracker #716, #255); an environment without a multi picker
+		// declines and falls through to the canvas dialog (pre-rebrand tracker #627).
 		if fileOpenOSOverride(f) {
 			return
 		}

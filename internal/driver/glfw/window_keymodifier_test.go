@@ -30,7 +30,7 @@ func (r *modifierKeyRecorder) KeyDown(ev *event.KeyEvent) {
 func (r *modifierKeyRecorder) KeyUp(*event.KeyEvent) {
 }
 
-// TestWindow_TypedKeyCarriesModifier pins #1042: the KeyEvent delivered to a
+// TestWindow_TypedKeyCarriesModifier pins pre-rebrand tracker #1042: the KeyEvent delivered to a
 // focused widget's TypedKey and to Canvas.SetOnTypedKey reports the modifiers
 // held at event time, so a handler can tell Shift+F11 from F11. Control/Alt/
 // Super combinations keep routing to the shortcut system before TypedKey

@@ -12,15 +12,15 @@ import (
 	"github.com/belluikit/bellui/theme"
 )
 
-// Mobile caret drag-handle for RichEntry (#999, parity with Entry's #943): right
+// Mobile caret drag-handle for RichEntry (pre-rebrand tracker #999, parity with Entry's pre-rebrand tracker #943): right
 // after a plain touch tap places the caret in a focused editor, a single
 // draggable dot hangs below the insertion point so the caret can be repositioned
 // precisely without selecting. It auto-hides after a few seconds of inactivity
 // (native timing), on typing, on focus loss, and as soon as a selection starts
 // (the two selection-edge handles take over). Touch-gated: only a touch Tapped
 // summons it, so desktop behavior and keyboard-driven render masters are
-// unchanged. It reuses the shared magnifier (#942) via the same loupeOwner seam
-// Entry's caret handle uses, so the styled-run loupe path (#888) magnifies the
+// unchanged. It reuses the shared magnifier (pre-rebrand tracker #942) via the same loupeOwner seam
+// Entry's caret handle uses, so the styled-run loupe path (pre-rebrand tracker #888) magnifies the
 // dragged rich row. Everything runs on the main goroutine.
 
 // richEntryCaretHandleTimeout matches Entry's caretHandleTimeout: how long the
@@ -92,7 +92,7 @@ func (e *RichEntry) updateCaretHandle() {
 
 // richEntryCaretHandle is the overlay root. It reports PassesInputThrough, so
 // only the grab-dot child takes input; everywhere else taps, drags and keys
-// reach the UI beneath as if the overlay were not there (the #569 pattern,
+// reach the UI beneath as if the overlay were not there (the pre-rebrand tracker #569 pattern,
 // shared with entrySelectionHandles / entryCaretHandle).
 type richEntryCaretHandle struct {
 	BaseWidget
@@ -105,7 +105,7 @@ type richEntryCaretHandle struct {
 
 	// active marks the handle as armed by a touch tap; shownAt is the last
 	// interaction time driving the inactivity timeout. dragging is true while a
-	// live grab drag holds the dot (it keeps the #942 magnifier up).
+	// live grab drag holds the dot (it keeps the pre-rebrand tracker #942 magnifier up).
 	active   bool
 	dragging bool
 	shownAt  time.Time
@@ -120,7 +120,7 @@ func newRichEntryCaretHandle(e *RichEntry) *richEntryCaretHandle {
 	return h
 }
 
-// loupeHost implements loupeOwner (#942): the caret-handle drag shows the same
+// loupeHost implements loupeOwner (pre-rebrand tracker #942): the caret-handle drag shows the same
 // magnifier as a selection-handle drag, using RichEntry's styled-run path.
 func (h *richEntryCaretHandle) loupeHost() selectionLoupeHost {
 	return h.entry
@@ -213,7 +213,7 @@ func (h *richEntryCaretHandle) sync() {
 	h.loupe.sync()
 }
 
-// startSync arms the per-frame reposition driver (the #417 prefill pattern):
+// startSync arms the per-frame reposition driver (the pre-rebrand tracker #417 prefill pattern):
 // while visible it re-evaluates geometry every frame, tracking movement the
 // editor cannot report — a parent scroll, a window resize, the soft keyboard
 // shifting the layout — and enforces the inactivity timeout.
@@ -333,7 +333,7 @@ func (g *richEntryCaretGrab) TouchCancel(*mobile.TouchEvent) {
 }
 
 // Dragged moves the caret with the dot and shows the magnifier over the drag
-// target (#942).
+// target (pre-rebrand tracker #942).
 func (g *richEntryCaretGrab) Dragged(d *event.DragEvent) {
 	g.owner.dragging = true
 	g.owner.drag(d)

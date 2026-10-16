@@ -1,7 +1,7 @@
 // Package webgpu will host the WebGPU implementation of the backend-neutral
-// gpu.Painter interface (WebGPU migration, issue #198, Phase 2 / #201).
+// gpu.Painter interface (WebGPU migration, pre-rebrand issue #198, Phase 2 / pre-rebrand tracker #201).
 //
-// At this stage the package only carries the WGSL shader ports (#205); the
+// At this stage the package only carries the WGSL shader ports (pre-rebrand tracker #205); the
 // concrete painter is added in Phase 2. The shaders are embedded so the
 // eventual painter can create shader modules without touching the filesystem,
 // mirroring internal/painter/gl/shaders.go.

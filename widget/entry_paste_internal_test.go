@@ -11,7 +11,7 @@ import (
 	"github.com/belluikit/bellui/test"
 )
 
-// TestEntryPasteEmptyClipboardErasesSelection is the #427 regression test:
+// TestEntryPasteEmptyClipboardErasesSelection is the pre-rebrand tracker #427 regression test:
 // pasting an empty clipboard over a selection is a selection deletion — Text
 // must update, OnChanged must fire, and the recorded undo action must stay
 // consistent with the document. Before the fix, Text kept the old value, the

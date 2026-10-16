@@ -249,7 +249,7 @@ func (b *Button) TypedKey(ev *event.KeyEvent) {
 }
 
 // ActivatedByKey reports that Space activates the button, so the driver fires the
-// keyboard-activation signal in parity with a pointer tap (#700).
+// keyboard-activation signal in parity with a pointer tap (pre-rebrand tracker #700).
 func (b *Button) ActivatedByKey(ev *event.KeyEvent) bool {
 	return ev.Name == event.KeySpace
 }

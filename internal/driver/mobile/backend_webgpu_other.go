@@ -19,17 +19,17 @@ func (d *driver) nativeSurfacePresentable() bool { return true }
 func webgpuSurfaceDescriptor(*window) *wgpu.SurfaceDescriptor { return nil }
 
 // syncNativeSurfaceSize is a no-op: there is no native surface on non-mobile
-// builds of this package (only iOS re-sizes its CAMetalLayer, #243).
+// builds of this package (only iOS re-sizes its CAMetalLayer, pre-rebrand tracker #243).
 func syncNativeSurfaceSize(int, int) {}
 
 // detachWindowSurface is a no-op: only the iOS WebGPU backend stacks a
-// per-window CAMetalLayer that must be detached on Close (#645).
+// per-window CAMetalLayer that must be detached on Close (pre-rebrand tracker #645).
 func (d *driver) detachWindowSurface(*window) {}
 
 // claimNativeSurface is a no-op: there is no native window to contend for on
-// non-mobile builds of this package (#753 is Android-specific).
+// non-mobile builds of this package (pre-rebrand tracker #753 is Android-specific).
 func (d *driver) claimNativeSurface(*canvas, *window) {}
 
 // setWindowSurfaceHidden is a no-op: only the iOS WebGPU backend stacks a
-// per-window CAMetalLayer whose visibility must toggle on Hide/Show (#742).
+// per-window CAMetalLayer whose visibility must toggle on Hide/Show (pre-rebrand tracker #742).
 func (d *driver) setWindowSurfaceHidden(*window, bool) {}

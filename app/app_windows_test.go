@@ -10,7 +10,7 @@ import (
 )
 
 // TestNotificationTemplateNoInterpolation guards against re-introducing the
-// PowerShell command-injection hole (#287): notification values must be read
+// PowerShell command-injection hole (pre-rebrand tracker #287): notification values must be read
 // from the environment, never formatted into the script body.
 func TestNotificationTemplateNoInterpolation(t *testing.T) {
 	assert.NotContains(t, notificationTemplate, "%s",

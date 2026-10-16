@@ -149,7 +149,7 @@ func TestFileDialog_SelectionMode_DirsAndSingleSelectInert(t *testing.T) {
 }
 
 // A hold the dialog declines still has to answer the press: neither driver
-// delivers Tapped on the release of a hold-fired press (#758 touch, #266
+// delivers Tapped on the release of a hold-fired press (pre-rebrand tracker #758 touch, #266
 // desktop), so an item that cannot enter selection mode falls back to the
 // plain tap instead of swallowing the click.
 func TestFileDialog_SelectionMode_DeclinedLongPressFallsBackToTap(t *testing.T) {

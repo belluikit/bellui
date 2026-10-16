@@ -17,9 +17,9 @@ import (
 func TestRender(t *testing.T) {
 	obj := widget.NewLabel("Hi")
 	test.AssertImageMatches(t, "label.png", Render(obj, test.Theme()))
-	painter.ClearFontCache() // avoid side effects of the cause of #4937
+	painter.ClearFontCache() // avoid side effects of the cause of pre-rebrand tracker #4937
 	test.AssertImageMatches(t, "label_ugly_theme.png", Render(obj, test.NewTheme()))
-	painter.ClearFontCache() // avoid side effects of the cause of #4937
+	painter.ClearFontCache() // avoid side effects of the cause of pre-rebrand tracker #4937
 }
 
 func TestRender_State(t *testing.T) {

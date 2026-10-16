@@ -50,7 +50,7 @@ func TestNodeStylerAppliesStyle(t *testing.T) {
 }
 
 // A freshly built renderer must carry the style before its first Refresh —
-// otherwise nodes render unstyled until something else refreshes them (#36).
+// otherwise nodes render unstyled until something else refreshes them (pre-rebrand tracker #36).
 func TestNodeStylerAppliedAtConstruction(t *testing.T) {
 	c := newTestCanvas(t)
 	addTestNode(t, c, "a")

@@ -7,7 +7,7 @@ import (
 )
 
 // The Java accessibility overlay (GoNativeActivity) reports TalkBack actions
-// through the accessibilityAction native method, which lands here (#488).
+// through the accessibilityAction native method, which lands here (pre-rebrand tracker #488).
 // The handler is registered by the driver's Android accessibility backend;
 // without the accessibility build tag nothing registers and the up-call is a
 // no-op, so the always-compiled Java/JNI side stays safe to ship.
@@ -30,7 +30,7 @@ func onAccessibilityAction(id C.int, kind C.int) {
 
 // The Java overlay reports which element the screen reader has accessibility
 // focus on through the accessibilityFocusChanged native method, so Bellui can
-// paint its own in-scene focus ring (#759) — the OS ring cannot reach the flat
+// paint its own in-scene focus ring (pre-rebrand tracker #759) — the OS ring cannot reach the flat
 // GPU surface. Registered by the Android accessibility backend; a no-op without
 // the accessibility build tag.
 var accessibilityFocusHandler atomic.Pointer[func(id int32, focused bool)]
@@ -68,7 +68,7 @@ func TouchExplorationEnabled() bool {
 
 // The Java overlay routes the platform virtualized-collection bring-into-view
 // request (AccessibilityAction.ACTION_SCROLL_TO_POSITION on a grid proxy)
-// through the accessibilityActionScrollTo native method (#817). Registered by
+// through the accessibilityActionScrollTo native method (pre-rebrand tracker #817). Registered by
 // the Android accessibility backend; a no-op without the accessibility tag.
 var accessibilityScrollToHandler atomic.Pointer[func(id, row, col int32)]
 
@@ -87,7 +87,7 @@ func onAccessibilityScrollTo(id, row, col C.int) {
 	}
 }
 
-// The Java overlay routes editable-text node actions (#974 option D) — set
+// The Java overlay routes editable-text node actions (pre-rebrand tracker #974 option D) — set
 // selection, granularity caret moves, set text, cut/paste — through the
 // accessibilityTextAction native method after resolving granularity segments
 // and converting UTF-16 offsets to rune offsets. Registered by the Android

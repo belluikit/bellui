@@ -1,4 +1,4 @@
-// Command a796probe verifies #796 (RangeSlider + TimePicker-dial screen-reader
+// Command a796probe verifies pre-rebrand tracker #796 (RangeSlider + TimePicker-dial screen-reader
 // adjust) and the mobile a11y proxy-View reconcile.
 //
 // Adjustable widgets (Slider reference, RangeSlider, TimePicker hour/minute)
@@ -38,13 +38,13 @@ func main() {
 	slider.SetValue(50)
 	slider.OnChanged = func(v float64) { set(fmt.Sprintf("slider = %.0f", v)) }
 
-	// #796 subject: a two-thumb RangeSlider.
+	// pre-rebrand tracker #796 subject: a two-thumb RangeSlider.
 	rs := widget.NewRangeSlider(0, 100)
 	rs.Step = 5
 	rs.SetValues(20, 80)
 	rs.OnChanged = func(lo, hi float64) { set(fmt.Sprintf("range = %.0f..%.0f", lo, hi)) }
 
-	// #796 subject: a TimePicker (hour/minute header fields are adjustable).
+	// pre-rebrand tracker #796 subject: a TimePicker (hour/minute header fields are adjustable).
 	tp := widget.NewTimePicker(10, 30, true, func(h, m int) { set(fmt.Sprintf("time = %02d:%02d", h, m)) })
 
 	// Reconcile subject: a dialog adds an accessible subtree, then removes it on

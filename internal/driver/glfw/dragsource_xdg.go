@@ -13,9 +13,9 @@ import (
 )
 
 // startNativeDrag begins a native drag-and-drop out of the app on Linux and the
-// BSDs (#838, #854, #515 Part B). GLFW exposes no upstream drag-source API, so
+// BSDs (pre-rebrand tracker #838, pre-rebrand tracker #854, pre-rebrand tracker #515 Part B). GLFW exposes no upstream drag-source API, so
 // each backend is hand-rolled. The default linux binary carries both backends
-// and picks one at runtime via build.IsWayland (#542); the BSDs are X11-only, so
+// and picks one at runtime via build.IsWayland (pre-rebrand tracker #542); the BSDs are X11-only, so
 // build.IsWayland is always false there and the X11 source is used:
 //
 //   - X11: a hand-rolled XDND source (dragsource_x11.go / .c) drives the protocol
@@ -26,7 +26,7 @@ import (
 //     is exposed, so DragData.OnCompleted is not delivered on Wayland.
 //
 // Both backends share the flavor codecs below (buildDragFlavors), reusing the
-// #513 clipboard MIME encoders.
+// pre-rebrand tracker #513 clipboard MIME encoders.
 func startNativeDrag(data desktop.DragData, cursorImg image.Image) bool {
 	if build.IsWayland {
 		return startDragWayland(data)
@@ -35,7 +35,7 @@ func startNativeDrag(data desktop.DragData, cursorImg image.Image) bool {
 }
 
 // dragFlavor is one MIME representation of the drag payload, encoded with the
-// shared #513 clipboard codecs and served to the drop target (the X11 XDND
+// shared pre-rebrand tracker #513 clipboard codecs and served to the drop target (the X11 XDND
 // selection or the Wayland wl_data_source) on demand.
 type dragFlavor struct {
 	mime string
@@ -43,10 +43,10 @@ type dragFlavor struct {
 }
 
 // buildDragFlavors encodes the drag payload into the MIME flavors a drop target
-// may request, reusing the shared #513 clipboard codecs. Text is offered under
+// may request, reusing the shared pre-rebrand tracker #513 clipboard codecs. Text is offered under
 // the several target atoms editors ask for; files as text/uri-list plus the
 // GNOME/KDE file-manager flavor; an explicit image as PNG. The drag ghost is NOT
-// included — it is a cursor visual, not a data flavor (#842).
+// included — it is a cursor visual, not a data flavor (pre-rebrand tracker #842).
 func buildDragFlavors(data desktop.DragData) []dragFlavor {
 	var out []dragFlavor
 	if data.Text != "" {

@@ -33,11 +33,11 @@ var goldenPreferences = map[string]any{
 	"keyStringList": []string{"a", "b", "c"},
 }
 
-// TestPreferencesPXF_GoldenDecode is a persisted-format regression guard (#931).
+// TestPreferencesPXF_GoldenDecode is a persisted-format regression guard (pre-rebrand tracker #931).
 // It loads a committed testdata/preferences.pxf — frozen from an earlier run of
 // the writer, i.e. a file an older app version would have written to disk — and
 // asserts preferences_pxf.go still decodes it back to the exact typed map. The
-// buf breaking check (#930) guards the .proto schema against wire-incompatible
+// buf breaking check (pre-rebrand tracker #930) guards the .proto schema against wire-incompatible
 // changes, but it cannot see the conversion code (preferenceValueFromProto);
 // this test closes that gap, so a refactor that silently breaks reading an old
 // on-disk store fails CI instead of corrupting users' saved preferences.

@@ -10,8 +10,8 @@ import (
 	"github.com/belluikit/bellui/theme"
 )
 
-// Mobile magnifier/loupe (#942, a #758 follow-up): while a finger drags a
-// selection handle (or the #943 caret handle) it hides exactly the text
+// Mobile magnifier/loupe (pre-rebrand tracker #942, a pre-rebrand tracker #758 follow-up): while a finger drags a
+// selection handle (or the pre-rebrand tracker #943 caret handle) it hides exactly the text
 // being targeted, so a small bubble above the dragged line shows a magnified
 // view of the row around the target position. The content is the host's own
 // row text re-typeset at zoom × the text size; shaped advances scale
@@ -47,7 +47,7 @@ type selectionLoupeHost interface {
 }
 
 // selectionLoupeStyledHost is the further extension for hosts whose rows mix
-// styles and sizes (the RichText-backed selectable and RichEntry, #888): the
+// styles and sizes (the RichText-backed selectable and RichEntry, pre-rebrand tracker #888): the
 // magnified row copy renders as multi-styled runs (canvas.StyledText) instead
 // of one plain canvas.Text, so bold/heading runs keep their drawn widths and
 // the 1×-measured caret x still lands on the zoomed glyphs. loupeRowRuns
@@ -60,7 +60,7 @@ type selectionLoupeStyledHost interface {
 }
 
 // loupeOwner is the overlay hosting a loupe: the selection-handles overlay
-// and the caret-handle overlay (#943) both qualify. It supplies the drag
+// and the caret-handle overlay (pre-rebrand tracker #943) both qualify. It supplies the drag
 // target and the highlighted range in the host's (row, column) space.
 type loupeOwner interface {
 	core.CanvasObject
@@ -87,7 +87,7 @@ type entryLoupe struct {
 	bg        *canvas.Rectangle
 	highlight *canvas.Rectangle
 	text      *canvas.Text
-	styled    *canvas.StyledText // the multi-styled row copy (styled hosts, #888)
+	styled    *canvas.StyledText // the multi-styled row copy (styled hosts, pre-rebrand tracker #888)
 	caret     *canvas.Rectangle
 
 	lastRow  int // row the text/styled object currently shows
@@ -116,7 +116,7 @@ func newEntryLoupe(owner loupeOwner) *entryLoupe {
 	// with a Transform: go-text shaping scales advances linearly with the
 	// size, so (1× visual x) × zoom still lands on the zoomed glyphs, and
 	// untransformed objects compose with the mobile driver's dirty-region
-	// culling, which culls by untransformed bounds (#945 device finding —
+	// culling, which culls by untransformed bounds (pre-rebrand tracker #945 device finding —
 	// a transformed text was culled/ghosted mid-drag).
 	l.text = canvas.NewText("", th.Color(theme.ColorNameForeground, v))
 	l.styled = canvas.NewStyledText(nil, th.Color(theme.ColorNameForeground, v))
@@ -388,7 +388,7 @@ func (e *Entry) loupeTextStyle() bellui.TextStyle {
 }
 
 // Shared provider-backed loupe geometry for the RichText-hosted surfaces (the
-// standalone selectable and RichEntry, #888).
+// standalone selectable and RichEntry, pre-rebrand tracker #888).
 
 // loupeProviderVisualX maps a column to its visual x within a provider row's
 // drawn text at 1×, stripping the innerPad-inset baseline lineSizeToColumn

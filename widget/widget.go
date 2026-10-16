@@ -67,7 +67,7 @@ type BaseWidget struct {
 	// themeCache is read on the layout path (Theme → MinSize) while Refresh
 	// clears it, potentially from a different goroutine (multiple engine
 	// instances, or a binding-driven refresh overlapping a layout pass), so it
-	// is accessed atomically to stay data-race-free (#604). A plain interface
+	// is accessed atomically to stay data-race-free (pre-rebrand tracker #604). A plain interface
 	// field would tear; atomic.Value can't be used because distinct themes are
 	// distinct concrete types.
 	themeCache atomic.Pointer[bellui.Theme]

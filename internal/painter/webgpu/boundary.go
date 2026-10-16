@@ -11,7 +11,7 @@ import (
 	"github.com/belluikit/bellui/internal/gpu"
 )
 
-// RepaintBoundary FBO caching for WebGPU (#202), implementing gpu.BoundaryPainter.
+// RepaintBoundary FBO caching for WebGPU (pre-rebrand tracker #202), implementing gpu.BoundaryPainter.
 // Mirrors internal/painter/gl/boundary.go, but maps onto the Device's
 // render-target stack: binding a boundary pushes its texture as the render
 // target (a fresh pass cleared to transparent), unbinding pops back to the
@@ -37,7 +37,7 @@ func (p *painter) EnsureBoundaryFBO(obj core.CanvasObject, pixW, pixH int, logic
 	// window, which may not exist on the first paint — painter.Init/SetOutputSize
 	// then no-op). Until it is, return a no-op state (nil tex): Bind/Unbind/Blit
 	// all skip it, so the RepaintBoundary subtree just isn't cached this frame
-	// rather than dereferencing a nil device (#34). Once the device is up, the
+	// rather than dereferencing a nil device (pre-rebrand tracker #34). Once the device is up, the
 	// next paint creates the real FBO. Mirrors the p.dev==nil guard on the paint
 	// ops (painter.go) and the canvas FBO path (canvas_fbo.go).
 	if p.dev == nil {

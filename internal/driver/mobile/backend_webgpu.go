@@ -49,7 +49,7 @@ func (d *driver) initCanvasPainter(c *canvas, w *window) bool {
 // recreateSurface rebuilds the WebGPU surface after the native window changed —
 // Android delivers a fresh ANativeWindow when the app returns from the
 // background, and the painter must rebind or it presents to the destroyed
-// surface (black canvas + ANR, #310). iOS builds the CAMetalLayer from the key
+// surface (black canvas + ANR, pre-rebrand tracker #310). iOS builds the CAMetalLayer from the key
 // window and does not deliver per-handle paint events, so this is effectively
 // Android-only (the handle-change guard in handlePaint never fires on iOS).
 func (d *driver) recreateSurface(c *canvas, w *window) {
@@ -88,7 +88,7 @@ func (d *driver) presentPainter(c *canvas) {
 // setPainterOutputSize tells the WebGPU painter its surface pixel size, which it
 // needs to configure the surface and bring the device up on first paint. It also
 // re-syncs the native surface to the new size where required (the iOS
-// CAMetalLayer on rotation/resize, #243); a no-op on Android/other.
+// CAMetalLayer on rotation/resize, pre-rebrand tracker #243); a no-op on Android/other.
 func (d *driver) setPainterOutputSize(c *canvas, w, h int) {
 	syncNativeSurfaceSize(w, h)
 	c.Painter().SetOutputSize(w, h)

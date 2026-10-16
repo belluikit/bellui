@@ -88,7 +88,7 @@ type CompletionProvider interface {
 //
 // TriggerCharacters is consulted on demand (per edit), so a provider that learns
 // its triggers asynchronously — e.g. an LSP bridge after the initialize
-// handshake — can report them later without reinstalling the provider (#80).
+// handshake — can report them later without reinstalling the provider (pre-rebrand tracker #80).
 type CompletionTriggerProvider interface {
 	TriggerCharacters() []rune
 }
@@ -129,7 +129,7 @@ func runeSet(chars []rune) map[rune]bool {
 // isTriggerChar reports whether r opens completion — declared either on the
 // editor ([Editor.SetCompletionTriggerCharacters]) or by the provider
 // ([CompletionTriggerProvider]). The two sources are unioned, and the provider
-// is consulted on demand so its triggers may change after install (#80).
+// is consulted on demand so its triggers may change after install (pre-rebrand tracker #80).
 func (c *completionController) isTriggerChar(r rune) bool {
 	if c.triggerChars[r] {
 		return true
@@ -167,13 +167,13 @@ func (p *WordListCompletionProvider) Complete(_ context.Context, _, _ int, _ Com
 const maxVisibleCompletions = 8
 
 // completionController owns completion state (session anchor, provider result
-// set, fuzzy filtering) and drives the fork's [widget.CompletionPopup] (#143).
+// set, fuzzy filtering) and drives the fork's [widget.CompletionPopup] (pre-rebrand tracker #143).
 // The popup renders in the canvas overlay stack in KeepHostFocus mode
-// (fyne#442): the Entry keeps keyboard focus — caret, focus-loss logic and
+// (pre-rebrand tracker #442): the Entry keeps keyboard focus — caret, focus-loss logic and
 // window shortcuts survive the popup being open — and the editor's onKey
 // dispatcher offers keys via [widget.CompletionPopup.HandleKey]. The bounded
-// list window (fyne#436), documentation side panel (fyne#435) and the
-// companion-anchoring OnMoved signal (fyne#437) are the popup's own.
+// list window (pre-rebrand tracker #436), documentation side panel (pre-rebrand tracker #435) and the
+// companion-anchoring OnMoved signal (pre-rebrand tracker #437) are the popup's own.
 type completionController struct {
 	e        *Editor
 	provider CompletionProvider
@@ -188,14 +188,14 @@ type completionController struct {
 	all   []CompletionItem // last full result set from the provider
 	shown []CompletionItem // filtered + sorted, currently displayed
 
-	// source → filter → sort is the fork's data/model pipeline (fyne#539)
+	// source → filter → sort is the fork's data/model pipeline (pre-rebrand tracker #539)
 	// behind the popup: each keystroke re-scores c.all into source, the
 	// FilterProxy keeps the fuzzy-matching survivors (one O(n) re-index), and
 	// the SortProxy orders them by score with a locale-aware tie-break
-	// (lang.Compare, fyne#504) instead of a raw byte comparison. The popup
+	// (lang.Compare, pre-rebrand tracker #504) instead of a raw byte comparison. The popup
 	// still renders through SetItems, so this is the data pipeline only — the
 	// identity-stable *highlight* awaits the popup consuming a SelectionModel
-	// directly (the larger rework in #165).
+	// directly (the larger rework in pre-rebrand tracker #165).
 	source *model.SliceModel[scoredCompletion]
 	sorted *model.SortProxy[scoredCompletion]
 
@@ -238,7 +238,7 @@ func newCompletionController(e *Editor) *completionController {
 }
 
 // visible reports whether the completion popup is currently shown. It tracks
-// the OnMoved rectangle (non-zero exactly between Show and Hide, fyne#437)
+// the OnMoved rectangle (non-zero exactly between Show and Hide, pre-rebrand tracker #437)
 // rather than BaseWidget.Visible, which a fresh, never-shown widget reports
 // as true.
 func (c *completionController) visible() bool {
@@ -255,7 +255,7 @@ func (c *completionController) onTextChanged() {
 	if prefix == "" {
 		// A trigger character (e.g. "." for members, "(" for arguments) opens
 		// completion with an empty prefix, anchored at the cursor. The signature
-		// card, if any, shows alongside (#79). Otherwise an empty prefix dismisses.
+		// card, if any, shows alongside (pre-rebrand tracker #79). Otherwise an empty prefix dismisses.
 		if c.isTriggerChar(c.e.charBeforeCursor()) {
 			c.query(c.e.entry.CursorRow, c.e.entry.CursorColumn, CompletionTriggerCharacter)
 			return
@@ -431,7 +431,7 @@ func (c *completionController) ensureUI() bool {
 		return false
 	}
 	p := widget.NewCompletionPopup(cv, nil)
-	// The Entry keeps keyboard focus (fyne#442): caret, focus-loss logic and
+	// The Entry keeps keyboard focus (pre-rebrand tracker #442): caret, focus-loss logic and
 	// window shortcuts survive the popup; the editor's onKey dispatcher offers
 	// keys through HandleKey instead.
 	p.KeepHostFocus = true
@@ -442,7 +442,7 @@ func (c *completionController) ensureUI() bool {
 	return true
 }
 
-// onPopupMoved observes the popup's placement (fyne#437): the rectangle is
+// onPopupMoved observes the popup's placement (pre-rebrand tracker #437): the rectangle is
 // translated into the editor's local space for the signature companion to
 // avoid (see layoutPopovers), and the zero rectangle — the popup hid, whatever
 // hid it (Escape, outside tap, an accepted item, dismiss) — resets the session
@@ -464,9 +464,9 @@ func (c *completionController) onPopupMoved(r geo.Rectangle) {
 }
 
 // scrollDoc pages the popup's documentation panel by dir (±1), leaving the
-// list selection unchanged (#86). It reports whether it consumed the key —
+// list selection unchanged (pre-rebrand tracker #86). It reports whether it consumed the key —
 // false when no documentation panel is showing, so the keystroke falls
-// through to its normal handling. The paging itself is the popup's (fyne#435).
+// through to its normal handling. The paging itself is the popup's (pre-rebrand tracker #435).
 func (c *completionController) scrollDoc(dir float32) bool {
 	if !c.visible() {
 		return false
@@ -609,7 +609,7 @@ func (e *Editor) charBeforeCursor() rune {
 }
 
 // replaceRange applies completion acceptance through the public programmatic
-// edit path (#160): a single undo step, one OnChanged, protection-gated, with
+// edit path (pre-rebrand tracker #160): a single undo step, one OnChanged, protection-gated, with
 // the caret left at the end of the inserted text.
 func (e *Editor) replaceRange(r TextRange, with string) {
 	e.ApplyEdit(r, with)

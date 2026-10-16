@@ -10,7 +10,7 @@ import (
 	"github.com/belluikit/bellui/widget"
 )
 
-// #706 probe: shows a window and sets a taskbar badge. Run with
+// pre-rebrand tracker #706 probe: shows a window and sets a taskbar badge. Run with
 // BELLUI_TASKBAR_DEBUG=1 to log the SetOverlayIcon HRESULT.
 func main() {
 	a := app.NewWithID("com.trendvidia.badgeprobe")

@@ -1,4 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="service_desc">Adb-driven accessibility action client for bellui a11y verification (fyne#951). Sends SCROLL_TO_POSITION / ACCESSIBILITY_FOCUS to the foreground app on adb broadcast.</string>
+    <string name="service_desc">Adb-driven accessibility action client for bellui a11y verification (pre-rebrand tracker #951). Sends SCROLL_TO_POSITION / ACCESSIBILITY_FOCUS to the foreground app on adb broadcast.</string>
 </resources>

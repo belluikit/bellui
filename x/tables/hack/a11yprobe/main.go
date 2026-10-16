@@ -1,5 +1,5 @@
 // Command a11yprobe is a live-verification harness for fytables' DataGrid
-// accessibility (issues #15/#16), mirroring the fyne fork's hack/a11yprobe
+// accessibility (pre-rebrand issues #15/#16), mirroring the fyne fork's hack/a11yprobe
 // pattern. It puts a single grid on screen with everything the grid a11y work
 // touches — pinned columns (left + right), row grouping (group-header rows),
 // and far more rows than fit, so the view virtualizes — then leaves the window
@@ -12,10 +12,10 @@
 //
 //	cd hack/a11yprobe
 //	go build -tags accessibility -o a11yprobe.exe .
-//	./a11yprobe.exe                 # default: #15/#16 model (no checkbox column)
-//	./a11yprobe.exe -checkbox       # #31: leading checkbox-selection column
-//	./a11yprobe.exe -masterdetail   # #45: expandable master-detail rows
-//	./a11yprobe.exe -tree           # #47: hierarchical tree data (RoleTreeItem)
+//	./a11yprobe.exe                 # default: pre-rebrand tracker #15/#16 model (no checkbox column)
+//	./a11yprobe.exe -checkbox       # pre-rebrand tracker #31: leading checkbox-selection column
+//	./a11yprobe.exe -masterdetail   # pre-rebrand tracker #45: expandable master-detail rows
+//	./a11yprobe.exe -tree           # pre-rebrand tracker #47: hierarchical tree data (RoleTreeItem)
 //
 // On Windows, drive it with the fork's UIA clients (uiatree.ps1 <pid>) and the
 // NVDA speech-capture harness; see hack/a11yprobe/windows/ in this repo and the
@@ -26,19 +26,19 @@
 //     count (hundreds, incl. group headers) × ColumnCount = 5 (id + name +
 //     region + score + status, i.e. pinned-left + 3 main + pinned-right),
 //     while only the on-screen cells are materialized as DataItem elements —
-//     the virtualization contract of #16 and the absolute column model of #15;
+//     the virtualization contract of pre-rebrand tracker #16 and the absolute column model of pre-rebrand tracker #15;
 //   - DataItem (cell) elements exposing a GridItem pattern with row/column in
-//     that absolute space, for both main and pinned columns (#15);
+//     that absolute space, for both main and pinned columns (pre-rebrand tracker #15);
 //   - Group elements for the region group-header rows, carrying an
-//     ExpandCollapse pattern (#15). With -checkbox, invoking that pattern's
+//     ExpandCollapse pattern (pre-rebrand tracker #15). With -checkbox, invoking that pattern's
 //     Collapse()/Expand() toggles the group (routed through ToggleGroup) — the
-//     action half of #31 — and works the same without the flag.
+//     action half of pre-rebrand tracker #31 — and works the same without the flag.
 //
 // With -checkbox, the model gains a leading checkbox-selection column at
 // absolute index 0, so the Grid pattern reports 6 columns, every DataItem's
 // GridItem column shifts one place right (pinned-left -> 1 … pinned-right -> 5),
 // and a DataItem at column 0 wraps an interactive CheckBox; the pre-selected
-// rows' column-0 cells report SelectionItem selected=True (#29/#31).
+// rows' column-0 cells report SelectionItem selected=True (pre-rebrand tracker #29/#31).
 package main
 
 import (
@@ -124,24 +124,24 @@ func makeTreeData() []map[string]any {
 }
 
 // tree turns the rows into a hierarchical tree (no grouping) and expands every
-// node, so the platform tree exposes the tree-item disclosure semantics of #47
+// node, so the platform tree exposes the tree-item disclosure semantics of pre-rebrand tracker #47
 // (a RoleTreeItem carrying AccessibleLevel + the ExpandCollapse pattern /
 // StateExpanded routed to ToggleTreeNode) on parent rows at multiple depths.
 // Because the leftmost column ('id') is pinned-left, the disclosure renders on
-// that pinned column — exercising the pinned-hierarchy path of #50.
+// that pinned column — exercising the pinned-hierarchy path of pre-rebrand tracker #50.
 var tree = flag.Bool("tree", false,
 	"enable hierarchical tree data and expand all nodes (issue #47/#50)")
 
 // checkbox enables the leading checkbox-selection column and pre-selects a
 // couple of rows, so the platform tree exposes the checkbox-cell semantics of
-// #29 (a RoleTableCell/DataItem at absolute column 0 carrying the row's
-// selection state, with an interactive CheckBox inside it) that #31 validates.
+// pre-rebrand tracker #29 (a RoleTableCell/DataItem at absolute column 0 carrying the row's
+// selection state, with an interactive CheckBox inside it) that pre-rebrand tracker #31 validates.
 var checkbox = flag.Bool("checkbox", false,
 	"enable the checkbox-selection column and pre-select rows (issue #31)")
 
 // masterDetail turns the rows into expandable master rows (no grouping) and
 // expands a couple, so the platform tree exposes the master-row disclosure
-// semantics of #45 (a Button carrying the ExpandCollapse pattern / StateExpanded
+// semantics of pre-rebrand tracker #45 (a Button carrying the ExpandCollapse pattern / StateExpanded
 // routed to ToggleDetail).
 var masterDetail = flag.Bool("masterdetail", false,
 	"enable expandable master-detail rows and expand a couple (issue #45)")
@@ -190,7 +190,7 @@ func main() {
 		// children with a RoleTreeItem + ExpandCollapse pattern. Expand all nodes
 		// so the tree shows items at every depth (AccessibleLevel 1..3). The
 		// disclosure renders on the pinned-left 'id' column (the leftmost visible
-		// column), exercising #50.
+		// column), exercising pre-rebrand tracker #50.
 		grid.API().SetTreeData(
 			func(row any) any { return row.(map[string]any)["id"] },
 			func(row any) int { return row.(map[string]any)["parent"].(int) },
@@ -217,7 +217,7 @@ func main() {
 
 	// Pre-select two "North" data rows (source rows 0 and 4 both fall in the
 	// first, top-of-view group) so their checkbox cells report StateSelected in
-	// the platform tree — the selection half of #31's checkbox check.
+	// the platform tree — the selection half of pre-rebrand tracker #31's checkbox check.
 	if *checkbox {
 		grid.API().SelectRow(0)
 		grid.API().SelectRow(4)

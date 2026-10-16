@@ -83,7 +83,7 @@ func TestDatePicker_DaySelection(t *testing.T) {
 	})
 	dp.Resize(dp.MinSize())
 
-	// Day cells are real tappable widgets (#521); tap June 20 directly.
+	// Day cells are real tappable widgets (pre-rebrand tracker #521); tap June 20 directly.
 	cell := dayCellFor(t, dp, 20)
 	assert.Equal(t, 20, cell.day)
 	cell.Tapped(&event.PointEvent{})

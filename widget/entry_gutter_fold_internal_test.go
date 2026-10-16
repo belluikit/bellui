@@ -13,7 +13,7 @@ import (
 	"github.com/belluikit/bellui/test"
 )
 
-// TestEntry_NonVirtualGutterAlignsAcrossFold covers #144: in the non-virtualised
+// TestEntry_NonVirtualGutterAlignsAcrossFold covers pre-rebrand tracker #144: in the non-virtualised
 // full-layout path, the built-in line-number gutter and the syntax-highlight
 // fragments must stay correctly numbered and positioned across a fold. A folded
 // row carries no line number, and every visible row's gutter number and text

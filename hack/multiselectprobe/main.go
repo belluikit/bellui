@@ -10,7 +10,7 @@ import (
 	"github.com/belluikit/bellui/widget"
 )
 
-// #716 live probe: opens a native NSOpenPanel with multi-select enabled and logs
+// pre-rebrand tracker #716 live probe: opens a native NSOpenPanel with multi-select enabled and logs
 // the chosen files. Pick two or more and confirm the count/paths.
 func main() {
 	dialog.UseNativeFileDialogs(true)

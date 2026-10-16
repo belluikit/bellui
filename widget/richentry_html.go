@@ -7,7 +7,7 @@ import (
 	"github.com/belluikit/bellui"
 )
 
-// segsToHTML serializes a document fragment to HTML for the clipboard (#666).
+// segsToHTML serializes a document fragment to HTML for the clipboard (pre-rebrand tracker #666).
 // Text runs carry their inline styling (bold/italic/underline/strikethrough) and
 // newlines become <br>; non-text atoms (images) are omitted — a single-image
 // selection is written to the image flavor instead, and mixed image round-trip
@@ -44,7 +44,7 @@ func styleIsBold(st bellui.TextStyle) bool {
 }
 
 // flattenHTMLToInline converts the segments produced by [NewRichTextFromHTML]
-// into RichEntry's inline model (#657): inline text runs keep their style, block
+// into RichEntry's inline model (pre-rebrand tracker #657): inline text runs keep their style, block
 // boundaries (empty non-inline separator segments) become '\n', images pass
 // through as atoms, and any other segment contributes its plain text. A single
 // trailing newline is trimmed so a wrapped paste doesn't add a blank line.

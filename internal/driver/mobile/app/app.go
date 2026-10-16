@@ -132,7 +132,7 @@ func (a *app) Publish() PublishResult {
 	// is vestigial — and, on iOS, executing it requires the GLKView's
 	// drawInRect to have made the context current, which stops happening when a
 	// bare UIView<UITextInput> first responder raises native UI, deadlocking
-	// here (#1124/#1125). Skip the GLES flush under WebGPU; the pure Go
+	// here (pre-rebrand tracker #1124/#1125). Skip the GLES flush under WebGPU; the pure Go
 	// publish/publishResult handshake below still runs (serviced by drawtick
 	// from the CADisplayLink) to keep the frame-pacing barrier.
 	if !webgpuBackend {

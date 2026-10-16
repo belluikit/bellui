@@ -152,15 +152,15 @@ func TestLargeFile_AutoFoldHugeRegion(t *testing.T) {
 	}
 }
 
-// TestLargeFile_HighlighterIsWindowed is the latency guard for #106: SetText of a
+// TestLargeFile_HighlighterIsWindowed is the latency guard for pre-rebrand tracker #106: SetText of a
 // large document must invoke the Highlighter only for the rows the renderer shows,
-// not every line. Before the windowed-highlight fyne stack (fyne#401), SetText
+// not every line. Before the windowed-highlight fyne stack (pre-rebrand tracker #401), SetText
 // chained the LineHighlighter through all 50k lines synchronously — the ~6.5s wasm
 // stall the issue reported (~88% of the large-file freeze). fycoder itself never
 // looped the document; it only wires the LineHighlighter, so this guards that the
 // fyne dependency keeps highlighting O(viewport) on open.
 //
-// The background highlight-chain prefill (fyne#417) is animation-driven and does
+// The background highlight-chain prefill (pre-rebrand tracker #417) is animation-driven and does
 // not tick under the headless test driver, so the count observed here reflects the
 // synchronous on-open window alone.
 func TestLargeFile_HighlighterIsWindowed(t *testing.T) {

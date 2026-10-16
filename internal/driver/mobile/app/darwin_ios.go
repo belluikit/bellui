@@ -246,7 +246,7 @@ func drawloop() {
 // 100 ms) to service the handshake: drawInRect stops being called when a bare
 // UIView<UITextInput> first responder raises the native selection/keyboard UI,
 // which deadlocked the paint goroutine in the (vestigial-under-WebGPU) blocking
-// gl.Flush inside app.Publish (#1124/#1125). render: keeps firing regardless, so
+// gl.Flush inside app.Publish (pre-rebrand tracker #1124/#1125). render: keeps firing regardless, so
 // servicing the handshake here keeps the frame barrier alive — and thus its
 // pacing — without the GLKView dependency.
 //
@@ -329,9 +329,9 @@ func driverShowVirtualKeyboard(keyboard KeyboardType) {
 }
 
 // SetKeyboardState mirrors the focused editor's real text and selection (rune
-// offsets) into the iOS input view's document (#771), so the IME composes marked
-// text against real content (fixes CJK composition, #747) and the field's
-// selection round-trips (fixes type-over-selection, #748). The ObjC side skips
+// offsets) into the iOS input view's document (pre-rebrand tracker #771), so the IME composes marked
+// text against real content (fixes CJK composition, pre-rebrand tracker #747) and the field's
+// selection round-trips (fixes type-over-selection, pre-rebrand tracker #748). The ObjC side skips
 // the write while an IME composition is active (the IME owns the field then, as
 // on Android) and converts the rune offsets to UTF-16 positions.
 func SetKeyboardState(text string, selStart, selEnd int) {
@@ -341,7 +341,7 @@ func SetKeyboardState(text string, selStart, selEnd int) {
 }
 
 // SetKeyboardUndoState mirrors the focused editor's undo/redo availability into
-// the input view's NSUndoManager (#1134, the Flutter FlutterUndoManagerPlugin
+// the input view's NSUndoManager (pre-rebrand tracker #1134, the Flutter FlutterUndoManagerPlugin
 // model): the native manager holds only proxy actions reflecting this state —
 // so the iPad keyboard's undo/redo bar keys, three-finger gestures and
 // shake-to-undo light up — and an invoked proxy calls back into bellui
@@ -357,7 +357,7 @@ func SetKeyboardUndoState(canUndo, canRedo bool) {
 	C.setKeyboardUndoState(C.int(int32(cu)), C.int(int32(cr)))
 }
 
-// KeyboardEditorChanged is a no-op on iOS (#966): BelluiTextInputView keeps no
+// KeyboardEditorChanged is a no-op on iOS (pre-rebrand tracker #966): BelluiTextInputView keeps no
 // per-editor diff state — its whole mirror is reseeded by setKeyboardState —
 // and UIKit ends the marked-text session itself when the served text changes out from under
 // the view, so there is no cross-push session state to reset the way Android's

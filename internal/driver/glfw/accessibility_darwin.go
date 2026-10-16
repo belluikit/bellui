@@ -32,11 +32,11 @@ type a11yState struct {
 	elements map[core.CanvasObject]a11yElement
 	// virtual holds the elements for nodes keyed by a stable NodeID rather than
 	// a CanvasObject: nodes with no object of their own (RichText headings,
-	// #533) and realized nodes of a virtualized collection whose object is
-	// recycled across records (AccessibleIdentified, #635).
+	// pre-rebrand tracker #533) and realized nodes of a virtualized collection whose object is
+	// recycled across records (AccessibleIdentified, pre-rebrand tracker #635).
 	virtual map[any]a11yElement
 	// tableRows holds the bridge-synthesized AXRow elements grouping a
-	// table's realized cells (#574), keyed by table object then 0-based row
+	// table's realized cells (pre-rebrand tracker #574), keyed by table object then 0-based row
 	// index, so a row keeps its element across virtualization scrolls.
 	tableRows map[core.CanvasObject]map[int]a11yElement
 	// prevText/prevSel remember each text element's last published text and
@@ -47,7 +47,7 @@ type a11yState struct {
 	prevText map[core.CanvasObject]string
 	prevSel  map[core.CanvasObject][2]int
 	// realized holds cells built on demand for VoiceOver navigating a
-	// virtualized table past its viewport (fyne#637), keyed by the cell's
+	// virtualized table past its viewport (pre-rebrand tracker #637), keyed by the cell's
 	// stable NodeID. They are delivered outside the reconcile walk (via
 	// accessibilityCellForColumn:row:), so the per-frame sweep never touches
 	// them; they are dropped by FIFO eviction past a cap, when their table is
@@ -82,7 +82,7 @@ var (
 )
 
 func init() {
-	// Live-region announcements (#525): deliver accessibility.Announce calls
+	// Live-region announcements (pre-rebrand tracker #525): deliver accessibility.Announce calls
 	// as NSAccessibilityAnnouncementRequested notifications so VoiceOver
 	// speaks transient status (Toast, Snackbar) without moving its cursor.
 	// Announce runs on the main goroutine per its contract, which under this
@@ -95,7 +95,7 @@ func init() {
 }
 
 // updateAccessibility synchronises the NSAccessibility element tree for this
-// window with the platform-neutral semantic tree (#484). Elements are keyed
+// window with the platform-neutral semantic tree (pre-rebrand tracker #484). Elements are keyed
 // by canvas object identity and reconciled in place: an unchanged widget
 // keeps its NSAccessibilityElement across frames, so VoiceOver's cursor is
 // not disturbed by unrelated repaints, and AX notifications fire only for
@@ -123,7 +123,7 @@ func (w *window) updateAccessibility() {
 		a11yWindows[w] = st
 	}
 
-	// Only the key window's focused widget reports AXFocused (#554): each
+	// Only the key window's focused widget reports AXFocused (pre-rebrand tracker #554): each
 	// bellui canvas remembers its own focused widget across window switches,
 	// but macOS convention is that exactly one element — the key window's
 	// first responder — is focused. processFocused triggers an update on
@@ -137,7 +137,7 @@ func (w *window) updateAccessibility() {
 	}
 
 	// A focusable container may delegate AT focus to an internal-cursor
-	// descendant (a grid cell, tree/list row) by stable identity (#688); when
+	// descendant (a grid cell, tree/list row) by stable identity (pre-rebrand tracker #688); when
 	// it does, AXFocused (and AXFocusedUIElement) resolves to that descendant
 	// rather than the container.
 	activeDescendant := a11yActiveDescendant(focusedObj)
@@ -258,7 +258,7 @@ func (w *window) cleanupAccessibilityForWindow() {
 // node and recurses into its children. ok is false when the node (and its
 // subtree) is culled because it lies entirely outside its clip bounds, e.g.
 // a list row scrolled out of view. The keyboard-focused object is exempt
-// from culling (#501): destroying its element while the user scrolls it out
+// from culling (pre-rebrand tracker #501): destroying its element while the user scrolls it out
 // of view would drop the screen reader's cursor to the window.
 // a11yReconcile bundles the per-update state threaded through the tree
 // reconcile: the window state maps, the native window, the focused object
@@ -268,7 +268,7 @@ type a11yReconcile struct {
 	nsWindow   unsafe.Pointer
 	focusedObj core.CanvasObject
 	// activeDescendant is the stable identity the focused container delegates
-	// AT focus to, or nil when focus stays on focusedObj itself (#688).
+	// AT focus to, or nil when focus stays on focusedObj itself (pre-rebrand tracker #688).
 	activeDescendant any
 	seen             map[core.CanvasObject]bool
 	seenVirtual      map[any]bool
@@ -291,9 +291,9 @@ func (w *window) reconcileA11yNode(rc *a11yReconcile, n *accessibility.Node, cha
 	switch {
 	case n.NodeID != nil:
 		// Nodes with a stable identity reconcile against it rather than their
-		// CanvasObject: virtual nodes (RichText headings, #533) that have no
+		// CanvasObject: virtual nodes (RichText headings, pre-rebrand tracker #533) that have no
 		// object, and realized nodes of a virtualized collection whose object
-		// is recycled across records (AccessibleIdentified, #635). Keying by
+		// is recycled across records (AccessibleIdentified, pre-rebrand tracker #635). Keying by
 		// identity keeps VoiceOver's cursor on the record across sort/scroll.
 		el, exists = rc.st.virtual[n.NodeID]
 		if !exists {
@@ -340,7 +340,7 @@ func (w *window) reconcileA11yNode(rc *a11yReconcile, n *accessibility.Node, cha
 	var childRefs []C.AccessibilityElementRef
 	if n.Role == core.RoleTable || n.Role == core.RoleGrid {
 		// macOS derives table structure from AXRow children — bare cells
-		// read as an empty table (#574). Group the realized cells into
+		// read as an empty table (pre-rebrand tracker #574). Group the realized cells into
 		// bridge-synthesized row elements.
 		childRefs = w.reconcileTableChildren(rc, n, changed)
 	} else {
@@ -362,7 +362,7 @@ func (w *window) reconcileA11yNode(rc *a11yReconcile, n *accessibility.Node, cha
 }
 
 // reconcileTableChildren reconciles a table's children, grouping cell nodes
-// by their 0-based row coordinate into synthetic AXRow elements (#574). The
+// by their 0-based row coordinate into synthetic AXRow elements (pre-rebrand tracker #574). The
 // row elements are keyed by (table, row index) so they stay stable while
 // virtualization realizes and releases cells; non-cell children pass
 // through ungrouped after the rows.
@@ -722,7 +722,7 @@ func belluiAccessibilityPerformPress(handle C.uintptr_t) C.bool {
 	if obj == nil {
 		// An on-demand realized cell has no widget to activate; pressing it
 		// (VO-space on an off-screen cell) brings it into view instead, after
-		// which the real host handles selection (fyne#637).
+		// which the real host handles selection (pre-rebrand tracker #637).
 		return C.bool(t.win.scrollRealizedIntoView(t))
 	}
 	if name := a11yPressAction(t.node); name != "" {
@@ -786,7 +786,7 @@ func belluiAccessibilitySetFocus(handle C.uintptr_t) {
 // belluiAccessibilityRealizeCell is called by the ObjC bridge from a table's
 // accessibilityCellForColumn:row: when the requested cell is not a realized
 // (visible) one: it builds an on-demand element for the off-viewport cell
-// through the neutral realize seam (fyne#637) so VoiceOver can read past the
+// through the neutral realize seam (pre-rebrand tracker #637) so VoiceOver can read past the
 // viewport of a virtualized table. It returns the element (nil when the table
 // is not a realizer or the coordinates are out of range), keeps it in the
 // per-window realized cache keyed by the cell's stable identity so repeat reads

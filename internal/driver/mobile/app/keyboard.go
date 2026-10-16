@@ -62,7 +62,7 @@ func keyboardComposeCommit(str *C.char) {
 
 // keyboardSetSelection forwards an IME-driven selection change (Select All,
 // spacebar cursor control — InputConnection.setSelection) to bellui as rune
-// offsets (#1030). bellui owns the caret: a buffer-only selection is invisible
+// offsets (pre-rebrand tracker #1030). bellui owns the caret: a buffer-only selection is invisible
 // (bellui draws no highlight, the a11y node stays collapsed so Copy/Cut are not
 // offered) and the next bellui→IME state push collapses it.
 //
@@ -78,7 +78,7 @@ func keyboardSetSelection(start, end C.int) {
 // keyboardUndoRedo forwards a native undo/redo invocation — the iPad soft
 // keyboard's undo/redo bar keys, three-finger swipe gestures or shake-to-undo,
 // all fired through the proxy actions bellui registered in the input view's
-// NSUndoManager (#1134) — to the focused editor. redo != 0 requests a redo.
+// NSUndoManager (pre-rebrand tracker #1134) — to the focused editor. redo != 0 requests a redo.
 //
 //export keyboardUndoRedo
 func keyboardUndoRedo(redo C.int) {
@@ -89,7 +89,7 @@ func keyboardUndoRedo(redo C.int) {
 // bellui's key-event path. The soft keyboard's editing-panel arrows arrive via
 // InputConnection.sendKeyEvent, not the native input queue; delegating them
 // to the platform would deliver them to the hidden IME-host EditText, whose
-// empty document swallows them — bellui's caret never moved (#1029).
+// empty document swallows them — bellui's caret never moved (pre-rebrand tracker #1029).
 //
 //export keyboardDelete
 func keyboardDelete() {

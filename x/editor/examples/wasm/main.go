@@ -1,7 +1,7 @@
 // Command wasm is a browser harness for exercising the *complete* fycoder
 // editor under GOOS=js/GOARCH=wasm — the runtime half of the WASM/web-target
 // spike (docs/roadmap/10-wasm-web-target.md) and the acceptance harness for
-// trendvidia/fyne#376.
+// pre-rebrand tracker #376.
 //
 // Compilation is already proven; this harness validates the behaviours that can
 // only be seen in a real browser, one button each:
@@ -255,9 +255,9 @@ func main() {
 
 	// Deep scroll into the big file is now driven by the editor's own keyboard
 	// paging (Ctrl+End / PageDown / PageUp / Ctrl+Home), which reaches the app on
-	// wasm since glfw-js v1.0.2 (fyne#377/#397). The old "Jump to end" button — an
+	// wasm since glfw-js v1.0.2 (pre-rebrand tracker #377/#397). The old "Jump to end" button — an
 	// Editor.RevealRange workaround added when keyboard/wheel deep-scroll was
-	// impossible in the browser (#118) — is retired (#120); RevealRange itself
+	// impossible in the browser (pre-rebrand tracker #118) — is retired (pre-rebrand tracker #120); RevealRange itself
 	// stays exercised by the find-bar/reveal unit tests.
 	toolbar := container.NewHBox(foldAll, unfoldAll, widget.NewSeparator(), maskBtn, bigBtn, widget.NewSeparator(), status)
 

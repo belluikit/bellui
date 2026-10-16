@@ -8,7 +8,7 @@ import (
 )
 
 // TestSettingsSchema_PXFRoundTrip verifies every SettingsSchema field survives a
-// MarshalPXF/UnmarshalPXF round-trip (the settings.pxf store, #872).
+// MarshalPXF/UnmarshalPXF round-trip (the settings.pxf store, pre-rebrand tracker #872).
 func TestSettingsSchema_PXFRoundTrip(t *testing.T) {
 	in := &SettingsSchema{
 		ThemeName:         "dark",

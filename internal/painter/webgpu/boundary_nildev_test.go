@@ -12,7 +12,7 @@ import (
 	"github.com/belluikit/bellui/geo"
 )
 
-// TestBoundaryFBO_NilDevice guards the #34 crash: on mobile the WebGPU device is
+// TestBoundaryFBO_NilDevice guards the pre-rebrand tracker #34 crash: on mobile the WebGPU device is
 // brought up lazily (its surface is built from the native window, absent on the
 // first paint), so the RepaintBoundary path can run while p.dev is nil. The
 // boundary painter methods must degrade to a no-op (subtree simply uncached this

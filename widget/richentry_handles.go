@@ -12,11 +12,11 @@ import (
 	"github.com/belluikit/bellui/theme"
 )
 
-// Mobile touch text selection for RichEntry (#888, parity with Entry's #758
-// and the selectable's #944): a hold-fired long-press selects the word under
+// Mobile touch text selection for RichEntry (pre-rebrand tracker #888, parity with Entry's pre-rebrand tracker #758
+// and the selectable's pre-rebrand tracker #944): a hold-fired long-press selects the word under
 // the finger and summons the shared selection-handle overlay
 // (entry_handles.go); dragging a handle adjusts the selection with the drag
-// magnifier (#942) over the target; the context menu re-appears on lift.
+// magnifier (pre-rebrand tracker #942) over the target; the context menu re-appears on lift.
 // RichEntry adopts the same selectionHandleHost / selectionLoupeHost seams
 // Entry and the selectable implement, mapped onto its offset-based document
 // model. Everything is gated to mobile devices, so desktop behavior and
@@ -46,7 +46,7 @@ func (e *RichEntry) LongPressed(ev *event.PointEvent) {
 	e.caret, e.anchor, e.selecting = off, off, false
 
 	// Nearest-word snap: a press on whitespace selects the adjacent word, not
-	// the whitespace run (#958, matching Entry/selectable long-press).
+	// the whitespace run (pre-rebrand tracker #958, matching Entry/selectable long-press).
 	start, end := getTextWordRegionNearest(e.provider.row(row), col)
 	if start != -1 && end != -1 {
 		e.anchor = e.doc.rowColToOffset(row, start)
@@ -88,7 +88,7 @@ func (e *RichEntry) MouseUp(*desktop.MouseEvent) {
 // TappedSecondary opens the editor's context menu (Undo/Redo when available,
 // Cut, Copy, Paste, Select all) at the tapped position. On mobile it is also
 // re-summoned after a long-press release or a handle adjustment — the native
-// "text toolbar reappears" behavior (#945).
+// "text toolbar reappears" behavior (pre-rebrand tracker #945).
 func (e *RichEntry) TappedSecondary(pe *event.PointEvent) {
 	e.requestFocus()
 	pos := bellui.CurrentApp().Driver().AbsolutePositionForObject(e.super()).Add(pe.Position)
@@ -132,7 +132,7 @@ func (e *RichEntry) showContextMenu(pos geo.Position) {
 			if e.touchPointer {
 				e.markTouchSelection() // Select all from the touch menu gets handles
 				// Re-present the menu over the now-full selection so Cut/Copy
-				// stay reachable (native toolbar parity, #1128); the current
+				// stay reachable (native toolbar parity, pre-rebrand tracker #1128); the current
 				// menu is dismissing as part of this tap.
 				bellui.Do(func() { e.showContextMenu(pos) })
 			}
@@ -143,7 +143,7 @@ func (e *RichEntry) showContextMenu(pos geo.Position) {
 
 // markTouchSelection flags the current selection as touch-initiated and
 // summons the selection handles for it (a no-op off mobile). The caret handle
-// (#999) is dismissed first: both are sibling transient overlays and
+// (pre-rebrand tracker #999) is dismissed first: both are sibling transient overlays and
 // OverlayStack.Remove drops the target plus everything stacked above it, so
 // removing the older caret handle after the newer selection handles were added
 // would take the selection handles with it. Hiding it before they are added
@@ -246,7 +246,7 @@ func (e *RichEntry) dragSelectionHandle(isStart bool, content geo.Position) {
 	}
 }
 
-// RichEntry's selectionLoupeHost implementation (#942): the drag magnifier
+// RichEntry's selectionLoupeHost implementation (pre-rebrand tracker #942): the drag magnifier
 // renders the dragged row as styled runs (loupeRowRuns), so bold/heading runs
 // magnify true to their drawn widths. Rows mixing inline image atoms magnify
 // their text only — the caret marker stays truthful to the real edge, the

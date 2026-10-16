@@ -11,7 +11,7 @@ import (
 	"github.com/belluikit/bellui/widget"
 )
 
-// The one-writer IME reroute (#1061) ignores the redundant native-queue echo of
+// The one-writer IME reroute (pre-rebrand tracker #1061) ignores the redundant native-queue echo of
 // a hardware key the Android IME already applied through its InputConnection —
 // but only for prose fields where Gboard is the writer, never for shortcuts,
 // non-text keys, unfocused input, or password/number fields (where the native
@@ -44,7 +44,7 @@ func TestIMEOwnsNativeKey(t *testing.T) {
 		assert.False(t, (&driver{}).imeOwnsNativeKey(printable), "nil session")
 	})
 	t.Run("shortcut echoes are suppressed in every field type", func(t *testing.T) {
-		// The IME forwards Ctrl/Alt/Meta shortcuts via keyboardShortcut (#1077),
+		// The IME forwards Ctrl/Alt/Meta shortcuts via keyboardShortcut (pre-rebrand tracker #1077),
 		// so the native echo is redundant and must be dropped — in prose AND
 		// password/number fields — or the shortcut dispatches twice.
 		for _, kt := range []mobile.KeyboardType{mobile.DefaultKeyboard, mobile.SingleLineKeyboard, mobile.PasswordKeyboard, mobile.NumberKeyboard} {

@@ -15,7 +15,7 @@ import (
 )
 
 // TestEntry_WrappedVirtual_WindowFollowsScroll: a large word-wrapping entry
-// (#139) materialises only the window, the window tracks the scroll position,
+// (pre-rebrand tracker #139) materialises only the window, the window tracks the scroll position,
 // and every row's geometry stays exact (uniform stride, no folds) even far
 // outside the materialised window.
 func TestEntry_WrappedVirtual_WindowFollowsScroll(t *testing.T) {
@@ -78,7 +78,7 @@ func TestEntry_WrappedVirtual_EditDeepRow(t *testing.T) {
 	require.True(t, e.text.canVirtualize())
 
 	// Map logical line 400 to its first visual row, place the caret there, type.
-	// The lazy model (#157) serves this analytically (no dense rowToLine slice).
+	// The lazy model (pre-rebrand tracker #157) serves this analytically (no dense rowToLine slice).
 	row := e.text.firstRowOfLine(400)
 	require.GreaterOrEqual(t, row, 0, "logical line 400 must have a visual row")
 	require.Less(t, row, e.text.rows())

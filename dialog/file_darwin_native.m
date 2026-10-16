@@ -71,7 +71,7 @@ static void applyFilters(NSSavePanel *panel, const char **exts, int extCount,
 		}
 	} else {
 		// Pre-11 setAllowedFileTypes: takes bare extensions only, so MIME
-		// filters are pre-mapped to extensions on the Go side (#632); use that
+		// filters are pre-mapped to extensions on the Go side (pre-rebrand tracker #632); use that
 		// combined list rather than the extension-only one.
 		NSArray *types = legacyAllowedFileTypes(legacyExts, legacyExtCount);
 		if (types != nil) {
@@ -176,7 +176,7 @@ void belluiShowFilePanel(
 			void (^completion)(NSModalResponse) = ^(NSModalResponse result) {
 				// Collect the chosen file URLs. A save panel and a single-select
 				// open panel expose one URL; a multi-select open panel exposes an
-				// array (#716). Every entry is copied into a C array that lives
+				// array (pre-rebrand tracker #716). Every entry is copied into a C array that lives
 				// only for the duration of the Go callback.
 				NSMutableArray<NSString *> *paths = [NSMutableArray array];
 				if (result == NSModalResponseOK) {

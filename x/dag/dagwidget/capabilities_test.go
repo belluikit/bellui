@@ -180,7 +180,7 @@ func TestSetPropRespectsEditProperties(t *testing.T) {
 
 // Resize handles must react to a mid-session Capabilities flip on the next
 // canvas Refresh, even though children are not individually refreshed
-// (#22 — same staleness the connector handles had before PR #21).
+// (pre-rebrand tracker #22 — same staleness the connector handles had before pre-rebrand PR #21).
 func TestResizeHandlesFollowCapabilities(t *testing.T) {
 	c := newTestCanvas(t)
 	addTestNode(t, c, "a")

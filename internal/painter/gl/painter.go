@@ -175,7 +175,7 @@ func (p *painter) Clear() {
 
 // drawInitFailure renders a clear, intentional diagnostic instead of the blank
 // or garbled output that program-0 draws produce when shader programs fail to
-// build (#300, follow-up to #299). It always clears to the theme background
+// build (pre-rebrand tracker #300, follow-up to pre-rebrand tracker #299). It always clears to the theme background
 // (glClear needs no shader) and, when the base textured-quad ("simple") program
 // survived, centres a "graphics unavailable" message — that program drives both
 // image and text drawing, so it is the one most likely to compile when only the

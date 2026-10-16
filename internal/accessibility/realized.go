@@ -3,13 +3,13 @@
 package accessibility
 
 // Bookkeeping for the on-demand realized-cell caches the platform backends keep
-// for off-viewport virtualized cells (#637): pure helpers shared by the desktop
-// (darwin NSAccessibility, windows UIA) and mobile (#817) bridges, so the cache
+// for off-viewport virtualized cells (pre-rebrand tracker #637): pure helpers shared by the desktop
+// (darwin NSAccessibility, windows UIA) and mobile (pre-rebrand tracker #817) bridges, so the cache
 // bound and FIFO discipline have one definition and are unit-testable without
 // any native element lifecycle.
 
 // RealizedCap bounds the on-demand realized-cell cache each backend keeps for
-// off-viewport virtualized cells (#637). A screen reader reads a handful of
+// off-viewport virtualized cells (pre-rebrand tracker #637). A screen reader reads a handful of
 // cells around its cursor, so a small FIFO is ample; past this the oldest
 // element is disconnected and the client re-fetches it (GridPattern.GetItem on
 // Windows, accessibilityCellForColumn:row: on macOS,

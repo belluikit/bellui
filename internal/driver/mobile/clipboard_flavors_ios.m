@@ -33,7 +33,7 @@ static void registerFlavorData(NSItemProvider *provider, NSString *uti, NSData *
 }
 
 // belluiClipboardSetFlavors replaces the pasteboard content with every present
-// flavor in one transaction (fyne#1142): a single pasteboard item carrying
+// flavor in one transaction (pre-rebrand tracker #1142): a single pasteboard item carrying
 // the HTML/PNG/text representations. The item is published as an
 // NSItemProvider so the representations carry an explicit fidelity order
 // (HTML, then PNG, then plain text) — a bare UIPasteboard items dictionary

@@ -1,5 +1,5 @@
 // Command filedialogprobe live-verifies the platform-native file dialogs
-// (#514), default-on since #226.
+// (pre-rebrand tracker #514), default-on since #226.
 //
 // It builds a small window with buttons that open a native File-Open,
 // Folder-Open and File-Save panel (the native backends start enabled; the

@@ -1,6 +1,6 @@
 package tables
 
-// Issue #15: with pinned columns, the a11y column space is absolute display
+// pre-rebrand Issue pre-rebrand tracker #15: with pinned columns, the a11y column space is absolute display
 // order (pinned-left + main + pinned-right), so dimensions report the total and
 // AccessibleCellText resolves by that absolute index.
 

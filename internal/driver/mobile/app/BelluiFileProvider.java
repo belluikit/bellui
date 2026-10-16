@@ -14,7 +14,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 
 // BelluiFileProvider is a minimal ContentProvider that vends files Bellui has
-// staged for sharing (fyne#711 ShareFile). The androidx FileProvider is not
+// staged for sharing (pre-rebrand tracker #711 ShareFile). The androidx FileProvider is not
 // bundled in a bare gomobile build, so this stands in: it serves read-only
 // files from a single, app-private directory (cacheDir/belluishare), the same
 // directory the Go side copies the shared file into before firing ACTION_SEND.

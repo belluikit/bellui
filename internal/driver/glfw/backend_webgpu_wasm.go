@@ -14,7 +14,7 @@ import (
 // WebGPU rendering backend on wasm — the default wasm build. The browser
 // provides WebGPU directly (no wgpu-native), so the surface is just the canvas
 // element of a context-less glfw-js window. The WebGL gl-js path is the
-// fallback behind `-tags gl` (backend_default.go). (#203/#206.)
+// fallback behind `-tags gl` (backend_default.go). (pre-rebrand tracker #203/#206.)
 
 // needsGLContext is false: the glfw-js window is created with NoAPI and has no
 // WebGL context, so RunWithContext must not call MakeContextCurrent.

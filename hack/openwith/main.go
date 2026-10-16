@@ -1,5 +1,5 @@
 // Command openwith is the live-verify probe for the desktop "open with" events
-// (#510 Phase 1: bellui.OpenHandlerApp — SetOnFileOpened / SetOnURLOpened).
+// (pre-rebrand tracker #510 Phase 1: bellui.OpenHandlerApp — SetOnFileOpened / SetOnURLOpened).
 //
 //	go run ./hack/openwith /tmp/hello.txt     # launch payload -> OnFileOpened
 //	go run ./hack/openwith 'myapp://deep/link' # launch payload -> OnURLOpened

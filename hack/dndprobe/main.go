@@ -1,4 +1,4 @@
-// Command dndprobe live-verifies per-widget drop targets (#515 Part A).
+// Command dndprobe live-verifies per-widget drop targets (pre-rebrand tracker #515 Part A).
 //
 // It shows a window split between a Droppable widget (which logs the files
 // dropped onto it and their position) and a plain area covered by the

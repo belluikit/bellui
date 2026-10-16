@@ -54,7 +54,7 @@ func TestGranToUnit(t *testing.T) {
 	}
 }
 
-// TestBuildTextIndex_PerNodeIndependent guards the #986 aliasing fix at the
+// TestBuildTextIndex_PerNodeIndependent guards the pre-rebrand tracker #986 aliasing fix at the
 // consumer: the Linux backend keeps a per-node text index for every exposed
 // field at once, so building one index must not disturb another (the shared
 // cache accessibility.IndexText returns would alias them — correct only for

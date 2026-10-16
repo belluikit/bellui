@@ -14,7 +14,7 @@ import (
 // canvases that have them, the desktop menu bar and the mobile window head or
 // open menu (#245) — then the content; an input-pass-through overlay (a
 // tooltip, Toast or Snackbar) does not block objects beneath it. This is the
-// "pick" primitive behind the #540 widget inspector, exposed for tooling that
+// "pick" primitive behind the pre-rebrand tracker #540 widget inspector, exposed for tooling that
 // maps a click back to the object that produced it (e.g. a design tool's
 // pick-to-source).
 //

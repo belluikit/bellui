@@ -18,7 +18,7 @@ var (
 // chain. They are part of the compiled-in face set — appended after the theme
 // and emoji faces but before the host locale font — so common symbols (✓, ☐,
 // arrows, ⌘, geometric shapes, …) measure and render identically on every
-// platform instead of resolving through a host system font (#686).
+// platform instead of resolving through a host system font (pre-rebrand tracker #686).
 func symbolsFallbackFaces() []*font.Face {
 	symbolsFacesOnce.Do(func() {
 		for _, res := range theme.DefaultSymbolsFallbackFonts() {

@@ -1,5 +1,5 @@
 // Command systrayprobe live-verifies the system tray tooltip and custom
-// tap-callback extensions (#511).
+// tap-callback extensions (pre-rebrand tracker #511).
 //
 // It configures a tray icon with a hover tooltip (SetSystemTrayTooltip) and a
 // left-click handler (SetSystemTrayOnTapped) that logs each tap, then runs for

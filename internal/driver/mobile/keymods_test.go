@@ -13,7 +13,7 @@ import (
 
 // The mobile driver exposes hardware-keyboard modifiers via
 // desktop.KeyModifierDriver so Entry can extend its selection on Shift+Arrow
-// (#1083). A method-signature drift would break the widget's runtime assertion
+// (pre-rebrand tracker #1083). A method-signature drift would break the widget's runtime assertion
 // silently, so pin the interface at compile time.
 var _ desktop.KeyModifierDriver = (*driver)(nil)
 

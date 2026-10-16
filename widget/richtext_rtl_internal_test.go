@@ -15,7 +15,7 @@ import (
 // newMixedDirRichText builds a RichText whose single row is two inline
 // TextSegments of opposite direction: an LTR Latin span followed by an RTL
 // Arabic span. The row therefore mixes directions across a segment boundary,
-// which is what issue #24 (cross-segment bidi) exercises.
+// which is what pre-rebrand issue #24 (cross-segment bidi) exercises.
 func newMixedDirRichText(t *testing.T) *RichText {
 	t.Helper()
 	ltr := &TextSegment{Text: "abc ", Style: RichTextStyle{Inline: true}}

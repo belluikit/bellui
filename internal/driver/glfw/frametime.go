@@ -13,7 +13,7 @@ import (
 
 // frameProfiler accumulates per-frame paint timings so the partialrepaint
 // optimization can be benchmarked on a real GPU, where the GL/WebGPU paint path
-// runs but the software-painter golden suite cannot reach it (see issue #9). It
+// runs but the software-painter golden suite cannot reach it (see pre-rebrand issue #9). It
 // is gated behind the BELLUI_FRAME_DEBUG environment variable and is otherwise
 // inert — the hot path only pays an atomic-free bool check per frame.
 //
@@ -28,7 +28,7 @@ type frameProfiler struct {
 	mu      sync.Mutex
 	paint   []time.Duration
 	total   []time.Duration
-	gpu     []time.Duration // on-GPU frame time (BELLUI_GPU_PROFILE), #336
+	gpu     []time.Duration // on-GPU frame time (BELLUI_GPU_PROFILE), pre-rebrand tracker #336
 	report  int
 	enabled bool
 }

@@ -40,7 +40,7 @@ func (w *window) doSetParentNative(parent *window) {
 // supporting the protocol blocks input to this window's parent while it is up;
 // compositors without it leave the pure-Go scrim as the only blocker. Modality
 // is expressed against the owner, so a nil parent is a no-op. Must run on the
-// main goroutine (#498).
+// main goroutine (pre-rebrand tracker #498).
 func (w *window) doSetModalNative(parent *window, modal bool) {
 	if parent == nil {
 		return

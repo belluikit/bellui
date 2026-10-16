@@ -148,7 +148,7 @@ type Focusable interface {
 // key (typically Space or Enter) activates the same way a pointer tap does — a
 // button, checkbox, switch, menu item, list row, etc. It lets the driver fire
 // the central activation signal (core.NotifyActivation) for keyboard activation,
-// giving accessibility/analytics parity with the pointer-tap path (#700) without
+// giving accessibility/analytics parity with the pointer-tap path (pre-rebrand tracker #700) without
 // the driver having to guess which keys mean "activate" versus navigation or
 // text input.
 //

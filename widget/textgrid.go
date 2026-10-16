@@ -124,7 +124,7 @@ func (t *TextGrid) CursorLocationForPosition(p geo.Position) (row, col int) {
 // canScroll reports whether the grid has a live, content-backed scroller. It is
 // false for a ScrollNone grid (whose scroller is built with nil Content) and before
 // the first render (scroller not yet created), so the ScrollTo* helpers no-op
-// instead of dereferencing a nil scroller/content (#387). Mirrors the guard SetText
+// instead of dereferencing a nil scroller/content (pre-rebrand tracker #387). Mirrors the guard SetText
 // already applies before touching t.scroll.
 func (t *TextGrid) canScroll() bool {
 	return t.scroll != nil && t.Scroll != bellui.ScrollNone && t.scroll.Content != nil

@@ -5,7 +5,7 @@ package gl
 import "testing"
 
 // TestShaderInitFailure_Classification verifies that a failed shader build is
-// recorded so the paint loop can degrade gracefully (#300): any failure trips
+// recorded so the paint loop can degrade gracefully (pre-rebrand tracker #300): any failure trips
 // InitFailed(), and only a failure of the base textured-quad ("simple") program
 // — which drives the diagnostic message itself — sets baseProgramFailed.
 func TestShaderInitFailure_Classification(t *testing.T) {

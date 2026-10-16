@@ -1,5 +1,5 @@
 // Command xdgforeignprobe verifies the xdg-foreign portal-dialog parenting on
-// Wayland (fyne#626 + belluikit/glfw#7). It prints the window's xdg-foreign
+// Wayland (pre-rebrand tracker #626 + belluikit/glfw#7). It prints the window's xdg-foreign
 // export handle (the fork's (*glfw.Window).ExportWaylandHandle, surfaced on
 // driver.WaylandWindowContext.ExportedHandle) and opens a native file dialog, so
 // a dbus-monitor of org.freedesktop.portal.FileChooser.OpenFile shows its

@@ -10,7 +10,7 @@ import (
 
 // webgpuSurfaceDescriptor builds a Win32 HWND surface descriptor. Hinstance is
 // left nil (wgpu-native resolves the module handle); set it via the win32 API if
-// a backend requires it. NOTE: authored for #215 but not built on this (macOS)
+// a backend requires it. NOTE: authored for pre-rebrand tracker #215 but not built on this (macOS)
 // host — verify on Windows.
 func webgpuSurfaceDescriptor(w *window) *wgpu.SurfaceDescriptor {
 	return &wgpu.SurfaceDescriptor{

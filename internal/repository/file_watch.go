@@ -10,7 +10,7 @@ import (
 	"github.com/belluikit/bellui/storage/repository"
 )
 
-// Declare conformity to the optional watch interface (#454).
+// Declare conformity to the optional watch interface (pre-rebrand tracker #454).
 var _ repository.WatchableRepository = (*FileRepository)(nil)
 
 type fileWatchSub struct {
@@ -24,7 +24,7 @@ type fileWatchSub struct {
 // coalescing bursts (the cap-1 notify channel collapses rapid successive
 // changes into a single call). Running on a per-subscription goroutine means a
 // slow or blocking callback can never stall the shared fsnotify reader or any
-// other subscriber — the flaw behind the #663 dispatch-stall flake.
+// other subscriber — the flaw behind the pre-rebrand tracker #663 dispatch-stall flake.
 func (s *fileWatchSub) run() {
 	for {
 		select {
@@ -69,7 +69,7 @@ func (r *FileRepository) WatchURI(u bellui.URI, fn func()) (cancel func(), err e
 	r.watchLock.Unlock()
 	if needAdd {
 		// Outside watchLock: on Windows, Add round-trips through the fsnotify
-		// reader goroutine, which may be waiting on watchLock (#957). watchOps
+		// reader goroutine, which may be waiting on watchLock (pre-rebrand tracker #957). watchOps
 		// keeps the check-then-Add race-free against other control ops.
 		if err := w.Add(path); err != nil {
 			return nil, err
@@ -103,7 +103,7 @@ func (r *FileRepository) WatchURI(u bellui.URI, fn func()) (cancel func(), err e
 		r.watchLock.Unlock()
 
 		if w != nil {
-			// Outside watchLock, like Add above (#957). The path may already
+			// Outside watchLock, like Add above (pre-rebrand tracker #957). The path may already
 			// be gone (deleted directory) — the watch died with it, so the
 			// error is not actionable.
 			_ = w.Remove(path)
@@ -170,14 +170,14 @@ func (r *FileRepository) closeWatcher() {
 	// takes watchLock in notifyWatchers — so closing under the lock deadlocks
 	// (Close waits for the reader, the reader waits for the lock). With the lock
 	// released, notifyWatchers sees the now-nil subs and returns, the reader
-	// drains and exits, and Close returns (#663). The same rule now covers
-	// Add/Remove in WatchURI and its cancel (#957).
+	// drains and exits, and Close returns (pre-rebrand tracker #663). The same rule now covers
+	// Add/Remove in WatchURI and its cancel (pre-rebrand tracker #957).
 	//
 	// The wait stays bounded as a backstop. It was load-bearing against a
 	// Windows-backend defect where Close could park on its reply forever while
 	// the reader sat in GetQueuedCompletionStatus — the completion packet was
 	// posted but the reader had already swallowed the handshake token in
-	// sendError (#963, and #68 for the diagnosis). That is fixed in
+	// sendError (pre-rebrand tracker #963, and #68 for the diagnosis). That is fixed in
 	// github.com/belluikit/fsnotify, along with the double CloseHandle that
 	// provoked it, so this timeout should now never fire; hack/winwatchprobe
 	// measures exactly that. If it ever does fire, Destroy still proceeds: the

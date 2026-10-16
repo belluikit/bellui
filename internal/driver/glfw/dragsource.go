@@ -8,7 +8,7 @@ import (
 
 // gLDriver satisfies desktop.DragSource on every platform; startNativeDrag is the
 // per-platform bridge (real on macOS, a no-op returning false elsewhere until the
-// Windows/Linux backends land — see docs/design/515-drag-out.md, #515 Part B).
+// Windows/Linux backends land — see docs/design/515-drag-out.md, pre-rebrand tracker #515 Part B).
 var _ desktop.DragSource = (*gLDriver)(nil)
 
 // StartDragging begins a native drag-and-drop out of the app. It returns false
@@ -24,7 +24,7 @@ var _ desktop.DragSource = (*gLDriver)(nil)
 func (d *gLDriver) StartDragging(data desktop.DragData) bool {
 	// Resolve the drag *cursor* image separately from the data flavors. An
 	// explicit DragData.Image doubles as the cursor image AND is offered as an
-	// image data flavor by the backends; the in-canvas ghost (#819
+	// image data flavor by the backends; the in-canvas ghost (pre-rebrand tracker #819
 	// DragImageProvider, rendered here) is a visual ONLY — per DragImageObject's
 	// contract it carries no data flavor, so it must never land in data.Image
 	// (which the backends would then offer as a droppable image, letting the
@@ -43,7 +43,7 @@ func (d *gLDriver) StartDragging(data desktop.DragData) bool {
 
 // nativeDragOutStarted records that StartDragging handed the current pointer
 // gesture to a platform drag session. window.mouseMoved consumes it right after
-// the Dragged dispatch that triggered it, to end the bellui-side gesture (#933).
+// the Dragged dispatch that triggered it, to end the bellui-side gesture (pre-rebrand tracker #933).
 // Main-goroutine confined, like all pointer state.
 var nativeDragOutStarted bool
 

@@ -8,7 +8,7 @@ import (
 	"github.com/belluikit/bellui/widget"
 )
 
-// #827 probe: long-press the button to reveal its tooltip on mobile.
+// pre-rebrand tracker #827 probe: long-press the button to reveal its tooltip on mobile.
 func main() {
 	a := app.New()
 	w := a.NewWindow("tooltip probe")

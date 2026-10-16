@@ -237,7 +237,7 @@ func TestDocTabs_Layout(t *testing.T) {
 			location: container.TabLocationBottom,
 			want:     "doctabs/mobile/layout_bottom_ico.xml",
 		},
-		// TODO: doc tabs support leading/trailing but rendering is currently broken (see #1962)
+		// TODO: doc tabs support leading/trailing but rendering is currently broken (see pre-rebrand tracker #1962)
 		// {
 		// 	name:     "leading: tab with icon and text",
 		// 	item:     container.NewTabItemWithIcon("Text1", theme.CancelIcon(), canvas.NewCircle(theme.Color(theme.ColorNameBackground))),

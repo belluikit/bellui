@@ -13,8 +13,8 @@ import (
 )
 
 // newRTLLinkRichText builds a RichText whose single row mixes an RTL Arabic
-// TextSegment with an inline HyperlinkSegment — the row #41 targets: a non-text
-// segment embedded in bidi text. Before #41 such a row fell back to the legacy
+// TextSegment with an inline HyperlinkSegment — the row pre-rebrand tracker #41 targets: a non-text
+// segment embedded in bidi text. Before pre-rebrand tracker #41 such a row fell back to the legacy
 // logical-prefix path (rowStyledRuns bailed on the non-text segment).
 func newRTLLinkRichText(t *testing.T) *RichText {
 	t.Helper()
@@ -39,7 +39,7 @@ func linkBoxWidth(t *testing.T, rich *RichText) float32 {
 }
 
 // TestRichText_RTLRowWithLink_LayoutResolves confirms a row mixing RTL text and a
-// link now resolves via the bidi visual layout instead of bailing (#41).
+// link now resolves via the bidi visual layout instead of bailing (pre-rebrand tracker #41).
 func TestRichText_RTLRowWithLink_LayoutResolves(t *testing.T) {
 	lang.SetLocaleForTests(t, "en-US")
 	test.NewTempApp(t)

@@ -16,10 +16,10 @@ import (
 // measurement keeps the row count, caret and selection exact and matches the dense
 // path; it is cheap at this scale. Above the threshold, unmeasured lines carry a
 // ceil(runeLen/estCharsPerRow) estimate and are shaped only when the viewport (or a
-// caret/selection operation) reaches them — the #157 windowed-measurement goal.
+// caret/selection operation) reaches them — the pre-rebrand tracker #157 windowed-measurement goal.
 const lazyMeasureAllMaxLines = 2000
 
-// This file implements the lazy/windowed wrap-measurement row model (#157) used
+// This file implements the lazy/windowed wrap-measurement row model (pre-rebrand tracker #157) used
 // when canVirtualize() holds (a single TextSegment, truncation off, scrolled by an
 // Entry). The dense rowBounds path is untouched; the shared accessors in
 // richtext.go branch on t.lazy to serve the structures built here.
@@ -37,7 +37,7 @@ const lazyMeasureAllMaxLines = 2000
 // and width. It does no shaping: it scans newlines for the logical-line starts and
 // estimates each line's wrapped-row count. Lines are shaped on demand later. When
 // folds are active it measures eagerly so the visual fold extent is exact (a folded
-// huge document keeps render windowing but loses measurement laziness — #157).
+// huge document keeps render windowing but loses measurement laziness — pre-rebrand tracker #157).
 func (t *RichText) updateRowBoundsLazy(width float32) {
 	seg, _ := t.singleSegment()
 	th := t.Theme()
@@ -45,7 +45,7 @@ func (t *RichText) updateRowBoundsLazy(width float32) {
 	maxWidth := width - 2*innerPadding + 2*t.inset.Width
 
 	t.lazy = true
-	t.varHeight = false // single-segment uses the uniform-stride model, not varHeight (#158)
+	t.varHeight = false // single-segment uses the uniform-stride model, not varHeight (pre-rebrand tracker #158)
 	t.rowBounds = nil   // dense model is not used in the lazy path
 	t.lazyMaxWidth = maxWidth
 	// Reuse the canonical buffer when it already reflects seg.Text (maintained
@@ -53,12 +53,12 @@ func (t *RichText) updateRowBoundsLazy(width float32) {
 	// content), skipping the O(document) full build. The string compare is O(1)
 	// when seg.Text is the same object the buffer last materialized — the steady
 	// state after an edit — and falls back to a full build on a genuine content
-	// change (#380). lazyFullBuilds counts those rebuilds so tests can assert the
-	// fast edit path never silently degrades to per-keystroke rebuilds (#400).
+	// change (pre-rebrand tracker #380). lazyFullBuilds counts those rebuilds so tests can assert the
+	// fast edit path never silently degrades to per-keystroke rebuilds (pre-rebrand tracker #400).
 	if seg.Text != t.lazyStr || t.buf == nil {
 		t.buf = textbuf.FromString(seg.Text)
 		t.lazyStr = seg.Text    // anchor to this exact object; FromString seeded the memo with it
-		t.deferredDirty = false // an external write wins over any deferred edits (#410)
+		t.deferredDirty = false // an external write wins over any deferred edits (pre-rebrand tracker #410)
 		t.lazyFullBuilds++
 	}
 
@@ -75,7 +75,7 @@ func (t *RichText) updateRowBoundsLazy(width float32) {
 	} else {
 		t.estCharsPerRow = t.computeEstCharsPerRow(seg, maxWidth)
 		// One vectorized buffer walk instead of a per-line LineStart query —
-		// per-line queries cost a chunk scan each on the rope backing (#403).
+		// per-line queries cost a chunk scan each on the rope backing (pre-rebrand tracker #403).
 		t.buf.ForEachLine(func(line, start, end int) bool {
 			t.lineRowCount[line] = t.estimateRowCountForLen(end - start)
 			return true
@@ -85,7 +85,7 @@ func (t *RichText) updateRowBoundsLazy(width float32) {
 	t.prefixDirty = true
 	t.ensurePrefix()
 
-	// Estimation only pays off for genuinely large wrapped documents (#157). Below
+	// Estimation only pays off for genuinely large wrapped documents (pre-rebrand tracker #157). Below
 	// the threshold, or when folds are active (a fold's collapsed extent needs exact
 	// per-line counts), measure every line up front: it is cheap at this size and
 	// keeps the visual-row count, caret and selection exact — identical to the dense
@@ -184,7 +184,7 @@ func (t *RichText) lineRuneLen(line int) int {
 }
 
 // lineText returns logical line i's text (without its newline) from the lazy
-// buffer — a zero-copy Substring against the clean memo (#401).
+// buffer — a zero-copy Substring against the clean memo (pre-rebrand tracker #401).
 func (t *RichText) lineText(line int) string {
 	return t.buf.Substring(t.buf.LineStart(line), t.lineEnd(line))
 }
@@ -257,7 +257,7 @@ func (t *RichText) lazyFirstRowOfLine(line int) int {
 
 // ensureLineMeasured shapes logical line's wrapped sub-rows (exact begin/end and
 // count) if not already measured, replacing its estimate. Idempotent. Shaping one
-// line in isolation reuses lineBoundsForRange (#157 B0).
+// line in isolation reuses lineBoundsForRange (pre-rebrand tracker #157 B0).
 func (t *RichText) ensureLineMeasured(line int) {
 	if line < 0 || line >= len(t.lineRowCount) || t.lineMeasured[line] {
 		return
@@ -269,7 +269,7 @@ func (t *RichText) ensureLineMeasured(line int) {
 	// lineWrap sub-rows are stored LINE-RELATIVE (offsets from the line start), so
 	// retained measurements survive edits earlier in the document without any
 	// offset shifting; lazyRowBoundary / lazyRowColFromTextPos convert back to
-	// absolute at the read points (#400). Materializing the line once into a
+	// absolute at the read points (pre-rebrand tracker #400). Materializing the line once into a
 	// reusable scratch makes the produced bounds line-relative by construction.
 	var subs []rowBoundary
 	if t.Wrapping == bellui.TextWrapOff {
@@ -441,7 +441,7 @@ func (t *RichText) lazyVirtualWidth() float32 {
 	// The widest line is cached (vwLine/vwLen) and maintained incrementally by
 	// repairLazyLineCaches; a full rescan — one vectorized buffer walk — runs
 	// only after a rebuild or when the cached longest line may have shrunk.
-	// Per-line queries here would cost a chunk scan each on the rope (#403).
+	// Per-line queries here would cost a chunk scan each on the rope (pre-rebrand tracker #403).
 	if t.vwDirty {
 		t.vwLen, t.vwLine = -1, 0
 		t.buf.ForEachLine(func(line, start, end int) bool {
@@ -465,7 +465,7 @@ func (t *RichText) lazyVirtualWidth() float32 {
 	return m.Width
 }
 
-// --- Incremental single-segment editing (#380, storage behind textbuf #400) ---
+// --- Incremental single-segment editing (pre-rebrand tracker #380, storage behind textbuf pre-rebrand tracker #400) ---
 //
 // In the lazy single-segment path t.buf (internal/textbuf.Buffer) is the
 // authoritative content buffer and logical-line index. An edit splices it in place
@@ -522,7 +522,7 @@ func (t *RichText) lazySpliceText(low, high int, ins []rune) []rune {
 	t.buf.Splice(low, high, ins)
 
 	if t.deferText {
-		// Deferred text sync (#410): skip the document materialization — the
+		// Deferred text sync (pre-rebrand tracker #410): skip the document materialization — the
 		// one remaining per-keystroke O(document) cost. seg.Text and lazyStr
 		// keep the last-synced string object, so lazyCanEdit's identity gate
 		// still holds (both stale, still equal) and a later syncSegments store
@@ -550,7 +550,7 @@ func (t *RichText) lazySpliceText(low, high int, ins []rune) []rune {
 }
 
 // lazyMaterialize re-anchors seg.Text and lazyStr to the buffer's current
-// materialization after deferred edits (#410) — the one document-sized
+// materialization after deferred edits (pre-rebrand tracker #410) — the one document-sized
 // alloc+memcpy the deferred mode postpones to a sync point. A no-op when
 // nothing is deferred; when the identity chain was broken by an external
 // write the pending edits are already forfeit (the next rebuild resets buf
@@ -572,7 +572,7 @@ func (t *RichText) lazyMaterialize() {
 // repairLazyLineCaches splices/invalidates the per-line measurement slices after
 // the buffer had logical lines [a..z] replaced by (newlines in ins)+1 lines.
 // lineWrap offsets are line-relative, so lines outside the edited span keep their
-// measurement untouched — no offset shifting (#400).
+// measurement untouched — no offset shifting (pre-rebrand tracker #400).
 func (t *RichText) repairLazyLineCaches(a, z int, ins []rune) {
 	insLines := 0
 	for _, r := range ins {
@@ -641,7 +641,7 @@ func (t *RichText) repairLazyLineCaches(a, z int, ins []rune) {
 	t.ensurePrefix()
 
 	// Let per-line caches layered above the provider (Entry's highlight cache)
-	// splice themselves in step with the line index (#401).
+	// splice themselves in step with the line index (pre-rebrand tracker #401).
 	if t.onLazyLinesEdited != nil {
 		t.onLazyLinesEdited(a, z, newCount)
 	}
@@ -651,7 +651,7 @@ func (t *RichText) repairLazyLineCaches(a, z int, ins []rune) {
 // it. The previous row count is kept as the line's estimate: for the common in-line
 // edit it is usually still exact, and leaving it untouched keeps the prefix sums
 // valid so a keystroke pays no O(lines) rebuild; ensureLineMeasured corrects the
-// count (and marks the prefix dirty) if the reshape disagrees (#400).
+// count (and marks the prefix dirty) if the reshape disagrees (pre-rebrand tracker #400).
 func (t *RichText) invalidateLazyLine(line int) {
 	t.lineMeasured[line] = false
 	t.lineWrap[line] = nil

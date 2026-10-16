@@ -1,5 +1,5 @@
 // a11yprobe is the live-verification harness for the accessibility platform
-// backends (epic #490, checked in per #561). It exercises every bridge
+// backends (epic pre-rebrand tracker #490, checked in per pre-rebrand tracker #561). It exercises every bridge
 // feature from two windows so per-window state, focus routing and the full
 // widget coverage can be driven and observed from the outside — on macOS via
 // the raw-AX clients in darwin/ (see the README there for why System Events
@@ -91,7 +91,7 @@ func main() {
 	bEntry := widget.NewEntry()
 	bEntry.SetText("window b text")
 	// A virtualized table: only visible cells realize semantic nodes, while
-	// the container reports the full 20x3 extent (UIA Grid pattern / #487;
+	// the container reports the full 20x3 extent (UIA Grid pattern / pre-rebrand tracker #487;
 	// GridItem coordinates on the realized cells).
 	table := widget.NewTable(
 		func() (int, int) { return 20, 3 },

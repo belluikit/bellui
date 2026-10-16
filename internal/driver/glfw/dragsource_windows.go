@@ -18,11 +18,11 @@ import (
 	internalclipboard "github.com/belluikit/bellui/internal/clipboard"
 )
 
-// This is the Windows drag-out backend for #837 (#515 Part B — see
+// This is the Windows drag-out backend for pre-rebrand tracker #837 (pre-rebrand tracker #515 Part B — see
 // docs/design/515-drag-out.md): it starts a native OLE drag-and-drop out of the
 // app via DoDragDrop, carrying whichever flavors the DragData holds (file list,
 // plain text, image). It is cgo-free, driving COM purely through x/sys/windows
-// syscalls exactly like the native file dialog (#514); the COM objects it hands
+// syscalls exactly like the native file dialog (pre-rebrand tracker #514); the COM objects it hands
 // to the OS live in dragsource_windows_com.go. Runtime verification needs a real
 // Windows session (drop into Explorer / Notepad / a browser); per fork convention
 // COM/native code is CI- and on-box-verified.
@@ -35,7 +35,7 @@ const dropFilesHeaderSize = 20
 // the shell requests) alive and pinned for the lifetime of the blocking
 // DoDragDrop call. Go's GC is non-moving today, but the OS holds raw pointers to
 // these objects, so we pin them defensively (mirroring the file dialog's
-// pinned-pointer hygiene, #514). Only one drag runs at a time — the shared layer
+// pinned-pointer hygiene, pre-rebrand tracker #514). Only one drag runs at a time — the shared layer
 // holds a single OnCompleted callback — so a package-level pointer suffices; it is
 // set and cleared on the dedicated drag goroutine.
 type dragSession struct {
@@ -51,7 +51,7 @@ func (s *dragSession) pin(obj any) {
 var activeDrag *dragSession
 
 // pngFormatID is the registered "PNG" clipboard format id, matching the clipboard
-// flavor writer (#513) so image-aware targets (browsers, editors) can pick up the
+// flavor writer (pre-rebrand tracker #513) so image-aware targets (browsers, editors) can pick up the
 // lossless PNG in preference to CF_DIB. Resolved once, lazily.
 var (
 	pngFormatOnce sync.Once
@@ -75,7 +75,7 @@ func registeredPNGFormat() uint16 {
 // started), false when there is nothing to drag (the caller then keeps its
 // in-app behavior).
 // The cursorImg drag visual is not yet applied on Windows (the custom drag image
-// via IDragSourceHelper is deferred, #850); the image *data* flavor still comes
+// via IDragSourceHelper is deferred, pre-rebrand tracker #850); the image *data* flavor still comes
 // from an explicit DragData.Image in buildDragEntries.
 func startNativeDrag(data desktop.DragData, _ image.Image) bool {
 	formats, payloads := buildDragEntries(data)
@@ -232,7 +232,7 @@ func encodePNG(img image.Image) []byte {
 	return buf.Bytes()
 }
 
-// Drag-image follow-up (#837): DoDragDrop currently shows only the default drag
+// Drag-image follow-up (pre-rebrand tracker #837): DoDragDrop currently shows only the default drag
 // cursors — the custom drag image (data.Image / DragImageObject) is not yet handed
 // to the OS. Supplying it needs a further COM interface (IDragSourceHelper::
 // InitializeFromBitmap) plus an HBITMAP built from the image; that surface is

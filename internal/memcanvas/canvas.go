@@ -247,7 +247,7 @@ func (c *Canvas) doResize(size geo.Size) {
 			ShowAtPosition(geo.Position)
 		}
 		if p, ok := overlay.(popupWidget); ok {
-			// TODO: remove this when #707 is being addressed.
+			// TODO: remove this when pre-rebrand tracker #707 is being addressed.
 			// “Notifies” the PopUp of the canvas size change.
 			p.Refresh()
 		} else {

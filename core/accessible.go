@@ -247,7 +247,7 @@ type AccessibleTexter interface {
 
 // AccessibleTextLayouter is an optional extension of [AccessibleTexter] for
 // text widgets that can expose their visual layout: soft-wrapped (visual)
-// line boundaries and the on-screen geometry of text ranges (#990). Platform
+// line boundaries and the on-screen geometry of text ranges (pre-rebrand tracker #990). Platform
 // bridges use it for line-granularity navigation that matches what the user
 // sees (an [AccessibleTexter] alone yields logical, newline-delimited lines)
 // and for the range-geometry queries behind screen-reader magnifiers and

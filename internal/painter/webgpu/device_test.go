@@ -16,7 +16,7 @@ import (
 // to wgpu descriptor structs. They need the binding (hence the build tag) but no
 // GPU device, so they run under `go test -tags webgpu`.
 
-// TestResolveScissor guards the empty-clip handling behind the #333 fix: an empty
+// TestResolveScissor guards the empty-clip handling behind the pre-rebrand tracker #333 fix: an empty
 // clip (in particular a clip-owner that does not intersect the partial-repaint
 // dirty region) must resolve to a zero-area scissor that culls every draw, not a
 // no-op that leaves the previous scissor — which let clipped content leak through.
@@ -31,7 +31,7 @@ func TestResolveScissor(t *testing.T) {
 	}{
 		{name: "normal in-bounds", x: 10, y: 20, w: 50, h: 30, hasTarget: true, wantOK: true, rx: 10, ry: 20, rw: 50, rh: 30},
 		{name: "clamped to target", x: 180, y: 90, w: 100, h: 100, hasTarget: true, wantOK: true, rx: 180, ry: 90, rw: 20, rh: 10},
-		// The #333 case: a clip that starts below the target / dirty band clamps to
+		// The pre-rebrand tracker #333 case: a clip that starts below the target / dirty band clamps to
 		// empty and must still apply a zero-area scissor (culls all draws), pinned
 		// inside the target so WebGPU accepts it.
 		{name: "empty below target pins to edge", x: 10, y: 120, w: 50, h: 30, hasTarget: true, wantOK: true, rx: 10, ry: th, rw: 0, rh: 0},
@@ -124,7 +124,7 @@ func TestUniformBytes(t *testing.T) {
 	}
 }
 
-// TestResizeSkipsUnchangedSize guards the #262 fix: the mobile paint loop calls
+// TestResizeSkipsUnchangedSize guards the pre-rebrand tracker #262 fix: the mobile paint loop calls
 // SetOutputSize (→ Resize) every frame, so Resize must not reconfigure the
 // surface when the pixel size is unchanged (or non-positive). A reconfigure
 // re-reads the CAMetalLayer view dimensions off the render goroutine on iOS,
@@ -142,7 +142,7 @@ func TestResizeSkipsUnchangedSize(t *testing.T) {
 	}
 }
 
-// TestChooseSurfaceFormat guards the #322 fix: the surface must be configured
+// TestChooseSurfaceFormat guards the pre-rebrand tracker #322 fix: the surface must be configured
 // with a NON-sRGB format so the painter's straight sRGB color writes are not
 // re-encoded (over-brightened) by the GPU, keeping parity with the GL/software
 // backends. macOS Metal reports the sRGB BGRA variant first, so the chooser must
@@ -188,7 +188,7 @@ func TestChooseSurfaceFormat(t *testing.T) {
 	}
 }
 
-// TestChooseSurfaceFormat_SRGBOnlyWarns guards #331: when the surface advertises
+// TestChooseSurfaceFormat_SRGBOnlyWarns guards pre-rebrand tracker #331: when the surface advertises
 // only sRGB formats (no non-sRGB sibling), chooseSurfaceFormat keeps the sRGB
 // format (over-bright risk) and must emit a one-time unconditional warning — not
 // gated behind BELLUI_WEBGPU_DEBUG — so a silent color regression is visible.
@@ -228,7 +228,7 @@ func TestChooseSurfaceFormat_SRGBOnlyWarns(t *testing.T) {
 
 // TestChooseInstanceBackends covers the BELLUI_WEBGPU_BACKENDS parsing that lets a
 // virtual-GPU environment skip a crashing backend (e.g. the WoA GL segfault) by
-// pinning to DX12 up-front (trendvidia/fyne#612). Pure/env-only, so it runs in
+// pinning to DX12 up-front (pre-rebrand tracker #612). Pure/env-only, so it runs in
 // normal CI with no GPU.
 func TestChooseInstanceBackends(t *testing.T) {
 	cases := []struct {

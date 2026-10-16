@@ -2,7 +2,7 @@
 // (#266): the glfw fork's touch callback (belluikit/glfw#1, v1.10.0) feeds
 // the shared TouchHandler, so a Windows (WM_POINTER) or Wayland (wl_touch)
 // touchscreen reaches the mobile gesture vocabulary — tap, drag,
-// double-tap, and hold-fire long-press (#758). On X11 and macOS the callback
+// double-tap, and hold-fire long-press (pre-rebrand tracker #758). On X11 and macOS the callback
 // never fires and touch keeps arriving as an emulated mouse; the pad then
 // logs mouse-path taps only, which is the expected outcome there.
 //

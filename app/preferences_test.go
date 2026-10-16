@@ -36,7 +36,7 @@ func loadPreferences(t *testing.T, id string) *preferences {
 	// tests never share a preferences file. Under -tags ci the config root is a
 	// single process-wide temp dir (os.TempDir()/bellui-test), so every test using
 	// the bare id "dummy" otherwise resolves to the same path — letting one
-	// test's stray save clobber another's data (#94).
+	// test's stray save clobber another's data (pre-rebrand tracker #94).
 	uniqueID := strings.ReplaceAll(t.Name(), "/", "_") + "-" + id
 	p := newPreferences(&belluiApp{uniqueID: uniqueID})
 	p.load()
@@ -48,7 +48,7 @@ func loadPreferences(t *testing.T, id string) *preferences {
 		// Cancel the debounce save timer too: stopWatching only closes the
 		// watcher, but resetSavedRecently re-arms a 100ms time.AfterFunc on every
 		// save. A leaked timer fires during a later test and writes this test's
-		// (possibly stale) data to storage, racing it — the root cause of #94.
+		// (possibly stale) data to storage, racing it — the root cause of pre-rebrand tracker #94.
 		p.prefLock.Lock()
 		if p.debounceTimer != nil {
 			p.debounceTimer.Stop()
@@ -120,7 +120,7 @@ func TestPreferences_Save(t *testing.T) {
 
 // TestPreferences_SaveDiscardsOnError verifies that a failed write does not
 // clobber the existing good preferences file: the in-progress save is aborted
-// (temp file removed, target untouched) rather than committed (#78).
+// (temp file removed, target untouched) rather than committed (pre-rebrand tracker #78).
 func TestPreferences_SaveDiscardsOnError(t *testing.T) {
 	p := loadPreferences(t, "dummy")
 	p.WriteValues(func(val map[string]any) {

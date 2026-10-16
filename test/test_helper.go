@@ -174,7 +174,7 @@ func AssertRendersToMarkup(t *testing.T, masterFilename string, c core.Canvas, m
 // themeApplyTimeout bounds how long the test theme helpers wait for an async
 // theme change to propagate. Theme application normally completes synchronously,
 // but a stuck settings listener could otherwise spin the wait forever; the bound
-// makes such a stall fail fast with a clear message instead of hanging (#37).
+// makes such a stall fail fast with a clear message instead of hanging (pre-rebrand tracker #37).
 const themeApplyTimeout = 5 * time.Second
 
 // themeApplied polls until the app reports want as its applied theme, returning

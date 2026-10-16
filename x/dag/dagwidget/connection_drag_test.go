@@ -13,7 +13,7 @@ import (
 // mountCanvas puts the canvas in a test window so connection drags can be
 // driven through the driver: test.DragSteps hit-tests the drag source and
 // delivers events with real, advancing absolute positions (fyne >= v3.0.0-rc.4,
-// trendvidia/fyne#1018).
+// pre-rebrand tracker #1018).
 func mountCanvas(t *testing.T, c *DAGCanvas) core.Canvas {
 	t.Helper()
 	w := test.NewWindow(c)

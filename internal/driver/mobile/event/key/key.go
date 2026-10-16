@@ -53,7 +53,7 @@ type Event struct {
 	// Native reports that the event came from the platform's raw input queue
 	// (a hardware or injected key) rather than being synthesized from an IME
 	// InputConnection edit (keyboardTyped and friends). The Android driver's
-	// IC-echo dedup (#1057) suppresses a native rune the IME has already
+	// IC-echo dedup (pre-rebrand tracker #1057) suppresses a native rune the IME has already
 	// delivered through its InputConnection; events synthesized FROM those IC
 	// edits must never be candidates, so only the raw-queue entry points set
 	// this.

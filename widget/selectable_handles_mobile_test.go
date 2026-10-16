@@ -16,8 +16,8 @@ import (
 	"github.com/belluikit/bellui/test"
 )
 
-// Mobile touch selection for the read-only selectable surfaces (#944, the
-// #758 follow-up): a hold-fired long-press on a selectable Label/RichText
+// Mobile touch selection for the read-only selectable surfaces (pre-rebrand tracker #944, the
+// pre-rebrand tracker #758 follow-up): a hold-fired long-press on a selectable Label/RichText
 // selects the word under the finger and summons the shared selection-handle
 // overlay; dragging a handle adjusts the selection; keyboard/programmatic
 // selections summon no handles.
@@ -60,7 +60,7 @@ func TestSelectableLabel_LongPressed_WhitespaceSnapsToNearestWord(t *testing.T) 
 	w.Resize(geo.NewSize(300, 60))
 
 	// Long-press inside the space run, nearer its right edge: the following
-	// word is selected — never the space run itself (#958).
+	// word is selected — never the space run itself (pre-rebrand tracker #958).
 	sel := &l.selection.selectable
 	l.selection.LongPressed(&event.PointEvent{Position: sel.selectionHandleCaretRect(0, 7).Pos})
 	assert.Equal(t, "countryside", l.SelectedText(), "whitespace long-press snaps to the nearest word")

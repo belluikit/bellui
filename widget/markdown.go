@@ -51,7 +51,7 @@ func (t *RichText) AppendMarkdown(content string) {
 }
 
 // markdownRenderer accumulates the parsed segments and carries the per-RichText
-// named-font allowlist (#496) through the walk so inline HTML in markdown can
+// named-font allowlist (pre-rebrand tracker #496) through the walk so inline HTML in markdown can
 // resolve custom fonts via the shared HTML parser.
 type markdownRenderer struct {
 	segments []RichTextSegment
@@ -256,7 +256,7 @@ func renderHeadingChildren(source []byte, n ast.Node, blockquote bool, listDepth
 	var textBuf strings.Builder
 	// Track inline <span>/<font> font state across sibling nodes, mirroring
 	// renderChildren, so a bare inline named-font span inside a heading resolves
-	// its font (#870). The buffered text is flushed at each span boundary so the
+	// its font (pre-rebrand tracker #870). The buffered text is flushed at each span boundary so the
 	// font applies to exactly the wrapped run.
 	var fonts mdFontStack
 
@@ -303,7 +303,7 @@ func renderHeadingChildren(source []byte, n ast.Node, blockquote bool, listDepth
 func applyHeadingStyle(segs []RichTextSegment, level int) []RichTextSegment {
 	for _, seg := range segs {
 		if text, ok := seg.(*TextSegment); ok {
-			// Preserve a per-run named font (#870) across the whole-Style
+			// Preserve a per-run named font (pre-rebrand tracker #870) across the whole-Style
 			// assignment below, which would otherwise wipe it.
 			src := text.Style.FontSource
 			switch level {
@@ -330,7 +330,7 @@ func applyHeadingStyle(segs []RichTextSegment, level int) []RichTextSegment {
 
 // renderRawHTML handles inline HTML in markdown by delegating to the HTML parser.
 // Recognised inline <span>/<font> open/close tags are intercepted earlier by
-// renderChildren's font state machine (#652) and never reach here.
+// renderChildren's font state machine (pre-rebrand tracker #652) and never reach here.
 func renderRawHTML(source []byte, n *ast.RawHTML, named map[string]bellui.Resource) []RichTextSegment {
 	return parseHTML(rawHTMLString(source, n), named)
 }
@@ -385,11 +385,11 @@ func suffixSpaceIfAppropriate(text string, n ast.Node) string {
 func renderChildren(source []byte, n ast.Node, blockquote bool, listDepth int, named map[string]bellui.Resource) ([]RichTextSegment, error) {
 	children := make([]RichTextSegment, 0, n.ChildCount())
 	// Track open/close inline-HTML <span>/<font> state across sibling nodes so a
-	// named font (#496) selected by a bare inline <span style="font-family:…"> …
+	// named font (pre-rebrand tracker #496) selected by a bare inline <span style="font-family:…"> …
 	// </span> reaches the markdown Text between the tags. goldmark parses inline
 	// raw HTML as *separate* RawHTML nodes for the open and close tags with the
 	// styled text as an ordinary Text sibling, so per-node delegation to the HTML
-	// parser never nests the style — this small stack bridges that gap (#652).
+	// parser never nests the style — this small stack bridges that gap (pre-rebrand tracker #652).
 	var fonts mdFontStack
 	for child := n.FirstChild(); child != nil; child = child.NextSibling() {
 		if raw, ok := child.(*ast.RawHTML); ok {
@@ -415,7 +415,7 @@ func renderChildren(source []byte, n ast.Node, blockquote bool, listDepth int, n
 }
 
 // mdFontStack is the inline-HTML <span>/<font> font state for one sibling walk
-// (#652). Its top entry is the *effective* font: pushing a span/font tag that
+// (pre-rebrand tracker #652). Its top entry is the *effective* font: pushing a span/font tag that
 // carries no registered family inherits the enclosing font, so open/close pairs
 // stay balanced and nested spans resolve innermost-wins.
 type mdFontStack struct{ stack []bellui.Resource }
@@ -450,7 +450,7 @@ func applyInlineFont(segs []RichTextSegment, src bellui.Resource) {
 			if s.Style.FontSource == nil {
 				s.Style.FontSource = src
 			}
-		case *HyperlinkSegment: // links carry their own style since #651
+		case *HyperlinkSegment: // links carry their own style since pre-rebrand tracker #651
 			if s.Style.FontSource == nil {
 				s.Style.FontSource = src
 			}

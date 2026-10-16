@@ -51,7 +51,7 @@ type Hyperlink struct {
 	ColorName bellui.ThemeColorName
 
 	// FontSource is an optional custom font resource used to render the link
-	// text, matching TextSegment.Style.FontSource (#494). When nil (the zero
+	// text, matching TextSegment.Style.FontSource (pre-rebrand tracker #494). When nil (the zero
 	// value) the theme font is used, so existing links are unchanged. The chosen
 	// font is honoured for measurement as well as rendering.
 	//
@@ -284,7 +284,7 @@ func (hl *Hyperlink) TypedKey(ev *event.KeyEvent) {
 }
 
 // ActivatedByKey reports that Space activates the link, so the driver fires the
-// keyboard-activation signal in parity with a pointer tap (#700).
+// keyboard-activation signal in parity with a pointer tap (pre-rebrand tracker #700).
 func (hl *Hyperlink) ActivatedByKey(ev *event.KeyEvent) bool {
 	return ev.Name == event.KeySpace
 }

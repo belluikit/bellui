@@ -72,7 +72,7 @@ func (t *Text) Hide() {
 // The measurement is memoised per object: while Text, TextSize, TextStyle and
 // FontSource are unchanged (and the theme/font caches have not reset) the last
 // result is returned without consulting the driver, so measure-heavy layouts do
-// not re-hash unchanged strings through the global metrics cache (#923).
+// not re-hash unchanged strings through the global metrics cache (pre-rebrand tracker #923).
 func (t *Text) MinSize() geo.Size {
 	s, _ := t.MinSizeWithBaseline()
 	return s

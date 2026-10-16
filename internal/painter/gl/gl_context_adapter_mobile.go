@@ -1,6 +1,6 @@
 // Speaks the gomobile binding's struct Texture/Program types, so it is gl-only
 // in practice for the same reason as gl_gomobile.go — see the build-tag note
-// there. Carries the uniform package gate; no explicit `gl` term needed. (#251)
+// there. Carries the uniform package gate; no explicit `gl` term needed. (pre-rebrand tracker #251)
 //go:build (gl || (!darwin && !linux && !windows && !wasm)) && (android || ios || mobile)
 
 package gl

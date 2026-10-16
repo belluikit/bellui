@@ -1,5 +1,5 @@
 // Package accessibility builds the platform-neutral semantic tree that
-// screen-reader backends expose to assistive technologies (#484).
+// screen-reader backends expose to assistive technologies (pre-rebrand tracker #484).
 //
 // The semantic layer itself — [core.Accessible], the role vocabulary, state
 // flags and actions — lives in the public core package and is always
@@ -21,7 +21,7 @@
 // presentational": buttons, tabs, sliders, ...) are dropped — those widgets
 // are one semantic unit and their internal accessible widgets only paint
 // them. Text-bearing roles (labels, text inputs, select) use the selective
-// variant instead (NonInteractiveChildrenPresentational, #522): the internal
+// variant instead (NonInteractiveChildrenPresentational, pre-rebrand tracker #522): the internal
 // widgets painting their value are dropped, but embedded interactive
 // controls — an Entry's ActionItem button, hyperlinks inside rich text —
 // stay in the tree, hoisted past any dropped textual wrapper.

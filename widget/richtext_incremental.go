@@ -10,12 +10,12 @@ import (
 	"github.com/belluikit/bellui/theme"
 )
 
-// Edit-incremental dense build + render (#921).
+// Edit-incremental dense build + render (pre-rebrand tracker #921).
 //
 // RichEntry re-syncs its provider on every keystroke, and the dense
 // (full-materialisation) RichText path rebuilt the whole row model, object
 // list and layout each time — O(document) per edit even though an edit changes
-// only one segment (#896 removed the measurement cost; this removes the
+// only one segment (pre-rebrand tracker #896 removed the measurement cost; this removes the
 // bookkeeping).
 //
 // Mechanism: the dense build (denseBuildCtx.iterate) optionally records a
@@ -150,7 +150,7 @@ func (c *denseBuildCtx) iterate(segList []RichTextSegment, cps []denseCheckpoint
 		if _, ok := seg.(*TextSegment); !ok {
 			// A block (non-inline) segment fills the whole line width, so it
 			// cannot share a row with a trailing inline run that was not
-			// terminated by a newline (#207). Close the open inline row first
+			// terminated by a newline (pre-rebrand tracker #207). Close the open inline row first
 			// so the block advances to a fresh row instead of overlapping it.
 			if !seg.Inline() && c.open {
 				c.open = false
@@ -208,7 +208,7 @@ func (c *denseBuildCtx) iterate(segList []RichTextSegment, cps []denseCheckpoint
 			// returns the whole-line split unmeasured). Skipping this trailing-width
 			// measurement in that mode drops the last O(document) per-keystroke
 			// MeasureTextFull for a large wrap-off doc — the dominant residual after
-			// the render memo (#896). It stays exact for wrapping/truncating content.
+			// the render memo (pre-rebrand tracker #896). It stays exact for wrapping/truncating content.
 			if t.Wrapping != bellui.TextWrapOff || t.Truncation != bellui.TextTruncateOff {
 				last := c.bounds[len(c.bounds)-1]
 				begin := 0

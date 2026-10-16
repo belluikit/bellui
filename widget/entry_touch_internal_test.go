@@ -13,7 +13,7 @@ import (
 )
 
 // A touch position is entry-relative, so caret placement must translate it by
-// the internal scroll offset — the touch mirror of MouseDown (#758).
+// the internal scroll offset — the touch mirror of MouseDown (pre-rebrand tracker #758).
 func TestEntry_TouchDown_ScrolledCaretPlacement(t *testing.T) {
 	test.NewTempApp(t)
 	e := NewMultiLineEntry()

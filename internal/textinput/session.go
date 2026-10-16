@@ -1,5 +1,5 @@
 // Package textinput defines the neutral text-input mirror seam shared by every
-// platform's native text-editing / IME integration (#768, epic #490).
+// platform's native text-editing / IME integration (pre-rebrand tracker #768, epic pre-rebrand tracker #490).
 //
 // A [Session] binds the focused editor — any object implementing
 // [core.AccessibleTexter], optionally [event.Composable] — to a native document
@@ -16,7 +16,7 @@
 // appears. Drivers own the [Backend] (the Android shadow EditText, an iOS
 // UITextField document, a desktop accessibility text protocol) and drive the
 // session — calling [Session.Bind] / [Session.Unbind] on focus change and
-// [Session.Sync] after input events. This is Phase 0 of #768: the seam is
+// [Session.Sync] after input events. This is Phase 0 of pre-rebrand tracker #768: the seam is
 // defined and unit-tested, but no driver wires to it yet, so existing behavior
 // is unchanged.
 //
@@ -48,7 +48,7 @@ type Snapshot struct {
 // backends that serve platform text-protocol queries rather than mirror pushes
 // into a native document — the desktop accessibility text protocols — read the
 // editor through [Read] instead of calling the [core.AccessibleTexter] methods
-// ad-hoc, so every backend and the [Session] see one document view (#772).
+// ad-hoc, so every backend and the [Session] see one document view (pre-rebrand tracker #772).
 type View struct {
 	Text     string
 	SelStart int
@@ -74,7 +74,7 @@ func Read(ed core.AccessibleTexter) View {
 // skipping the document text. It is the read to use for a query that needs the
 // selection but not the content — the desktop text protocols that keep rune
 // offsets (the UIA Text pattern) — so a screen reader tracking the caret over a
-// large document does not re-materialize the whole text per query (#789). Use
+// large document does not re-materialize the whole text per query (pre-rebrand tracker #789). Use
 // [Read] where the text itself (or a rune↔code-unit conversion needing it) is
 // required.
 func ReadSelection(ed core.AccessibleTexter) (start, end int) {
@@ -123,12 +123,12 @@ func Select(ed core.AccessibleTexter, start, end int) {
 // The seam matches it structurally (the TapThroughDismiss pattern) so widgets
 // need not import this package.
 //
-// The push side uses it to subtract the preedit before mirroring (#1057): the
+// The push side uses it to subtract the preedit before mirroring (pre-rebrand tracker #1057): the
 // native IME buffer holds committed text plus its own composing span, and every
 // backend judges a push against that committed document — the Android side's
 // composing-echo check and reseed logic are written for committed-only pushes,
 // so a preedit-including push reads as "bellui holds a different document" and
-// reseeds the IME buffer with the preedit baked in, the #1057 hardware-key
+// reseeds the IME buffer with the preedit baked in, the pre-rebrand tracker #1057 hardware-key
 // doubling. The pull side ([Read]) is deliberately untouched: the desktop
 // accessibility text protocols report the live text including marked/preedit
 // text, per platform convention.
@@ -137,7 +137,7 @@ type preeditIncluder interface {
 }
 
 // committedSnapshot reads the editor's push [Snapshot] with any in-progress IME
-// preedit subtracted, so pushes carry committed text only (#1057). Selection
+// preedit subtracted, so pushes carry committed text only (pre-rebrand tracker #1057). Selection
 // offsets inside the preedit collapse to its start (the composition anchor);
 // offsets past it shift left by its length. When the editor does not report a
 // preedit — or its report does not match the document (a split-brain state,
@@ -214,14 +214,14 @@ func NewSession(backend Backend) *Session {
 // Re-binding the editor that is already bound is a no-op, and in particular does
 // NOT force that push: it is not "a different field", and drivers re-Bind the
 // unchanged focus freely — the Android driver does so on every overlay change
-// (#1016) — where a forced push would be pure churn against the native IME.
+// (pre-rebrand tracker #1016) — where a forced push would be pure churn against the native IME.
 //
 // The return value reports whether the bound editor's identity changed (a
 // different field bound, or a bound session unbound) — false for the no-op
 // re-bind. Drivers use it to tell the native input surface the editor changed,
 // so it can tear down any IME session state that belongs to the previous field
 // (Android: composing state, echo filters, and an unconditional restartInput on
-// the seed push — #966; one Gboard editing session must never span two fields).
+// the seed push — pre-rebrand tracker #966; one Gboard editing session must never span two fields).
 func (s *Session) Bind(focused any) (editorChanged bool) {
 	ed, ok := focused.(core.AccessibleTexter)
 	if !ok {
@@ -250,7 +250,7 @@ func (s *Session) Bound() bool { return s.editor != nil }
 // composingReporter is implemented by editors that expose whether an IME
 // composition is currently active (Entry/RichEntry report their composing
 // flag). Matched structurally like [preeditIncluder]. The Android driver uses
-// it to recognize a stale composition finalize (#1057): with hardware
+// it to recognize a stale composition finalize (pre-rebrand tracker #1057): with hardware
 // keyboards Gboard both composes each keystroke through the InputConnection
 // and passes the raw key through, and the raw key commits the preedit
 // editor-side (the desktop-commit TypedRune path) — so by the time Gboard
@@ -277,7 +277,7 @@ func (s *Session) EditorComposing() bool {
 // View captures the bound editor's live document view (see [Read]); ok is
 // false when nothing is bound. Drivers use it to inspect the document around
 // an incoming native edit — e.g. the Android IC-echo dedup diffs a reported
-// replacement range against the pre-edit text (#1057).
+// replacement range against the pre-edit text (pre-rebrand tracker #1057).
 func (s *Session) View() (View, bool) {
 	if s.editor == nil {
 		return View{}, false
@@ -297,7 +297,7 @@ func (s *Session) Invalidate() { s.valid = false }
 //
 // The pushed snapshot carries committed text only: an in-progress IME preedit
 // the editor reflects in its accessible text is subtracted first (see
-// [preeditIncluder], #1057), because the native mirror holds the composition
+// [preeditIncluder], pre-rebrand tracker #1057), because the native mirror holds the composition
 // itself and judges pushes against the committed document.
 //
 // This is the "push" direction; the redundant-push filter is the debounce.

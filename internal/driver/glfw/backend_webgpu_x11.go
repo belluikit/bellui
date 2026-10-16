@@ -11,7 +11,7 @@ import (
 
 // webgpuSurfaceDescriptor builds an Xlib surface descriptor. The uintptr/
 // unsafe.Pointer conversions of the glfw native handles mirror window_x11.go's
-// RunNative. NOTE: authored for #215 but not built on this (macOS) host —
+// RunNative. NOTE: authored for pre-rebrand tracker #215 but not built on this (macOS) host —
 // verify on Linux/X11.
 func webgpuSurfaceDescriptor(w *window) *wgpu.SurfaceDescriptor {
 	return &wgpu.SurfaceDescriptor{

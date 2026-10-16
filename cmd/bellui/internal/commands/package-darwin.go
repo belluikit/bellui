@@ -34,7 +34,7 @@ type darwinData struct {
 // only delivers location/camera/microphone access to a bundle whose Info.plist
 // declares the matching usage string, mirroring the iOS path — the keys are the
 // same NS* keys, so the darwin bundle reuses the app's IOSUsageDescriptions
-// (appviewer#157).
+// (pre-rebrand appviewer tracker #157).
 type darwinUsageDescription struct {
 	Key   string
 	Value string

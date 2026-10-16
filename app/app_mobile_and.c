@@ -70,7 +70,7 @@ static bool notifPermRequested = false;
 // ensureNotificationPermission requests POST_NOTIFICATIONS the first time a
 // notification is posted on Android 13+ (API 33), where it is a *runtime*
 // permission — until it is granted the OS silently drops every notification
-// (fyne#756). Below API 33 the permission is granted at install, so this is a
+// (pre-rebrand tracker #756). Below API 33 the permission is granted at install, so this is a
 // no-op. bellui does not need the grant result: the request is best-effort and
 // the requesting notification may itself be dropped, but the prompt is raised
 // so subsequent notifications post once the user grants.
@@ -134,7 +134,7 @@ void openURL(uintptr_t java_vm, uintptr_t jni_env, uintptr_t ctx, char *url) {
 }
 
 // shareText hands plain text to the Android share sheet via an ACTION_SEND
-// chooser (the "send" half of intent/share integration, fyne#711).
+// chooser (the "send" half of intent/share integration, pre-rebrand tracker #711).
 void shareText(uintptr_t java_vm, uintptr_t jni_env, uintptr_t ctx, char *text) {
 	JNIEnv *env = (JNIEnv*)jni_env;
 	jstring textStr = (*env)->NewStringUTF(env, text);
@@ -167,7 +167,7 @@ void shareText(uintptr_t java_vm, uintptr_t jni_env, uintptr_t ctx, char *text) 
 // shareFile hands a staged local file to the Android share sheet. Building the
 // content:// URI needs BelluiFileProvider.uriForFile, so the ACTION_SEND is
 // assembled in the Java GoNativeActivity.doShareFile rather than here; Go has
-// already copied the file into the provider's share directory (fyne#711).
+// already copied the file into the provider's share directory (pre-rebrand tracker #711).
 //
 // The activity method is resolved from the ctx object's own class via
 // GetObjectClass — FindClass by name would fail here, since this runs on a
@@ -185,7 +185,7 @@ void shareFile(uintptr_t java_vm, uintptr_t jni_env, uintptr_t ctx, char *path, 
 
 // buildBaseNotification creates a Notification$Builder with the bellui channel (on
 // Oreo+), title, body and default small icon set — shared by the plain and rich
-// (fyne#723) paths.
+// (pre-rebrand tracker #723) paths.
 static jobject buildBaseNotification(JNIEnv *env, jobject ctx, jclass cls, jstring titleStr, jstring bodyStr) {
 	jmethodID constructor = find_method(env, cls, "<init>", "(Landroid/content/Context;)V");
 	jobject builder = (*env)->NewObject(env, cls, constructor, ctx);
@@ -251,7 +251,7 @@ int notifReqCode = 1;
 // makeActivityPendingIntent builds a PendingIntent that re-delivers to the
 // running GoNativeActivity (SINGLE_TOP -> onNewIntent) carrying the notification
 // token and action index, so a tap routes back to Go via notificationActivated
-// (fyne#723). action is -1 for the body tap, else the 0-based action index.
+// (pre-rebrand tracker #723). action is -1 for the body tap, else the 0-based action index.
 static jobject makeActivityPendingIntent(JNIEnv *env, jobject ctx, jclass actClass, jlong token, jint action) {
 	jclass intentClass = find_class(env, "android/content/Intent");
 	jmethodID intentCtor = find_method(env, intentClass, "<init>", "(Landroid/content/Context;Ljava/lang/Class;)V");
@@ -280,7 +280,7 @@ static jobject makeActivityPendingIntent(JNIEnv *env, jobject ctx, jclass actCla
 	return (*env)->CallStaticObjectMethod(env, piClass, getActivity, ctx, req, intent, flags);
 }
 
-// sendNotificationWithActions posts a rich notification (fyne#723): a body-tap
+// sendNotificationWithActions posts a rich notification (pre-rebrand tracker #723): a body-tap
 // content PendingIntent plus one PendingIntent per action button, each carrying
 // the notification's token (and action index) back to Go. iconPath, when
 // non-empty, is decoded as the large icon. labels is a labelCount-long array of
