@@ -1,7 +1,7 @@
 github.com/BurntSushi/toml v1.5.0 h1:W5quZX/G/csjUnuI8SUYlsHs9M38FC7znL0lIO+DvMg=
 github.com/BurntSushi/toml v1.5.0/go.mod h1:ukJfTF/6rtPPRCnwkur4qwRxa8vTRFBF0uk2lLoLwho=
-github.com/belluikit/bellui v1.1.0 h1:9rBtjl59eQarbWgzsKjI/PfDfRHAYze1FM5lrDl2PKk=
-github.com/belluikit/bellui v1.1.0/go.mod h1:K7AH6xrBrDt8dS4nrNLfo/h9q7QYU536vCbfXfRS1lA=
+github.com/belluikit/bellui v1.1.1 h1:+Z/403dmziT59nG5itC89rB+UP04GwcmnXou7ruSHXA=
+github.com/belluikit/bellui v1.1.1/go.mod h1:K7AH6xrBrDt8dS4nrNLfo/h9q7QYU536vCbfXfRS1lA=
 github.com/belluikit/fsnotify v1.10.2 h1:Kbop0VxWluUIAKunk+4op1v0KCkHfAFnAGAmVrD3Lc8=
 github.com/belluikit/fsnotify v1.10.2/go.mod h1:Zn9GYvdu+eJ1E+cDTkxZNY53ykn9kVXly2SAPLfPpLk=
 github.com/belluikit/gl-js v0.2.1 h1:DWtRW7ztetpAfztJ3msW9YWFWVaydmMlfT2sa6GrAEY=

@@ -7,7 +7,7 @@ module github.com/belluikit/bellui/x/editor/examples/wasm
 go 1.25.0
 
 require (
-	github.com/belluikit/bellui v1.1.0
+	github.com/belluikit/bellui v1.1.1
 	github.com/belluikit/bellui/x/editor v0.0.0
 )
 
