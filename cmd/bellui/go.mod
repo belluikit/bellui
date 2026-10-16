@@ -10,7 +10,6 @@ require (
 	github.com/josephspurrier/goversioninfo v1.4.0
 	github.com/klauspost/compress v1.19.1
 	github.com/lucor/goinfo v0.9.0
-	github.com/mcuadros/go-version v0.0.0-20190830083331-035f6764e8d2
 	github.com/natefinch/atomic v1.0.1
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/stretchr/testify v1.11.1

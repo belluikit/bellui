@@ -8,7 +8,6 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/mcuadros/go-version"
 	"github.com/urfave/cli/v2"
 
 	"github.com/belluikit/bellui"
@@ -361,27 +360,16 @@ func createMetadataInitFile(srcdir string, app *appData) (func(), error) {
 	return func() { os.Remove(metadataInitFilePath) }, err
 }
 
+// injectMetadataIfPossible writes the metadata init file into srcdir when the
+// app builds against bellui. Every bellui release supports the whole of
+// AppMetadata (ID, name, version, build, icon, release, custom and migrations),
+// so there is no version to check; an app whose go.mod does not mention bellui
+// at all is reported as an error by getBelluiGoModVersion.
 func injectMetadataIfPossible(runner runner, srcdir string, app *appData,
 	createMetadataInitFile func(srcdir string, app *appData) (func(), error),
 ) (func(), error) {
-	belluiGoModVersion, err := getBelluiGoModVersion(runner)
-	if err != nil {
+	if _, err := getBelluiGoModVersion(runner); err != nil {
 		return nil, err
-	}
-
-	belluiGoModVersion = normaliseVersion(belluiGoModVersion)
-	belluiGoModVersionConstraint := version.NewConstrainGroupFromString(">=2.2")
-	if belluiGoModVersion != "master" && !belluiGoModVersionConstraint.Match(belluiGoModVersion) {
-		return nil, nil
-	}
-
-	belluiGoModVersionAtLeast2_3 := version.NewConstrainGroupFromString(">=2.3")
-	if belluiGoModVersionAtLeast2_3.Match(belluiGoModVersion) {
-		app.VersionAtLeast2_3 = true
-	}
-	belluiGoModVersionAtLeast2_6 := version.NewConstrainGroupFromString(">=2.6")
-	if belluiGoModVersionAtLeast2_6.Match(belluiGoModVersion) {
-		app.VersionAtLeast2_6 = true
 	}
 
 	return createMetadataInitFile(srcdir, app)
@@ -452,19 +440,4 @@ func extractLdFlags(goFlags string) (string, string) {
 	newGoFlags = strings.TrimSpace(newGoFlags)
 
 	return ldflags, newGoFlags
-}
-
-func normaliseVersion(str string) string {
-	if str == "master" {
-		return str
-	}
-
-	if pos := strings.Index(str, "-0.20"); pos != -1 {
-		str = str[:pos] + "-dev"
-	}
-
-	if pos := strings.Index(str, "-rc"); pos != -1 {
-		str = str[:pos] + "-dev"
-	}
-	return version.Normalize(str)
 }
