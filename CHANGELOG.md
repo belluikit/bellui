@@ -12,7 +12,13 @@ This file lists the main changes with each version of Bellui. Entries up to
 after them describe the trendvidia fork (github.com/trendvidia/fyne) that
 became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
 
-## Unreleased
+## v1.1.2 — 2026-10-16
+
+Fixes a memory leak that every app had: content removed from a window was
+never freed. Also makes the slider's value indicator keep up while dragging.
+The `x/*` modules are re-released at v1.1.2 unchanged, and the `bellui`
+command is released alongside as `cmd/bellui` v1.0.1 (see
+`cmd/bellui/CHANGELOG.md`).
 
 ### Fixed
 
