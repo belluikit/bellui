@@ -5,34 +5,22 @@
 > and are left verbatim — they refer to the toolkit by its former names (`fyne`,
 > `github.com/trendvidia/fyne`, `fyne.io/fyne`) and to files and flags by the
 > identifiers actually in use at the time (e.g. `FyneApp.toml`, `fyneDo`).
-> Rewriting them would falsify the record. See `docs/REBRAND.md`.
+> Rewriting them would falsify the record.
 
-This file lists the main changes with each version of the Fyne toolkit.
-Entries up to 2.7.3 are inherited from upstream Fyne; later entries describe
-the trendvidia fork (github.com/trendvidia/fyne).
+This file lists the main changes with each version of Bellui. Entries up to
+2.7.3 are inherited from upstream Fyne; 2.8.0, 2.9.0 and the Unreleased section
+after them describe the trendvidia fork (github.com/trendvidia/fyne) that
+became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
 
-## Unreleased
-
-### Fixed
-
-* **Ctrl+Tab moves focus out of a widget that keeps Tab**
-  ([#340](https://github.com/belluikit/bellui/issues/340)). A multi-line
-  `Entry` and the x/dag canvas keep Tab and Shift+Tab for themselves, and every
-  Tab with a modifier went to the shortcut path, so a keyboard-only user who
-  tabbed into one could not leave it (WCAG 2.1.2). Ctrl+Tab and Ctrl+Shift+Tab
-  now move focus to the next and previous widget from any such widget, on the
-  desktop, embedded and mobile drivers. **Behaviour change:** while a widget
-  that keeps Tab is focused, Ctrl+Tab no longer reaches the app's main-menu or
-  widget shortcuts; on every other widget it still does. The web build is not
-  covered yet: browsers keep Ctrl+Tab for themselves
-  ([#357](https://github.com/belluikit/bellui/issues/357)).
-
-## v1.1.0 — 2026-09-10
+## v1.1.0 — 2026-10-16
 
 Android's Storage Access Framework becomes usable, two long-standing cgo
 memory bugs in the Android bridge are fixed, and the test helpers stop
 shipping in production binaries. The minor bump is for the new
-`storage.CreateChild` API; everything else is additive or a fix.
+`storage.CreateChild` API. Apps that use `auth` should read *Changed*:
+sign-in tokens are now kept per app, so users sign in once more after
+upgrading. Everything else is additive or a fix. This is also the first
+release made with the repository public.
 
 ### Added
 
@@ -53,8 +41,41 @@ shipping in production binaries. The minor bump is for the new
   return a nameable type without reaching into `bellui/test`
   ([#304](https://github.com/belluikit/bellui/issues/304)).
 
+### Changed
+
+* **Sign-in tokens are stored per app**
+  ([#335](https://github.com/belluikit/bellui/issues/335)). Every bellui app
+  on a machine shared one `bellui-auth/<provider>.enc`, so one app could read
+  another's sign-in. Tokens now live under `bellui-auth/<app ID>/`, and the
+  app ID is part of the encryption key. **Behaviour change:** tokens saved by
+  an earlier version are not read, so users sign in once more after
+  upgrading; and `SaveToken`, `LoadToken` and `ClearToken` now need an app ID,
+  returning the new `auth.ErrNoAppID` without one (Preferences already need
+  it).
+
 ### Fixed
 
+* **Ctrl+Tab moves focus out of a widget that keeps Tab**
+  ([#340](https://github.com/belluikit/bellui/issues/340)). A multi-line
+  `Entry` and the x/dag canvas keep Tab and Shift+Tab for themselves, and every
+  Tab with a modifier went to the shortcut path, so a keyboard-only user who
+  tabbed into one could not leave it (WCAG 2.1.2). Ctrl+Tab and Ctrl+Shift+Tab
+  now move focus to the next and previous widget from any such widget, on the
+  desktop, embedded and mobile drivers. **Behaviour change:** while a widget
+  that keeps Tab is focused, Ctrl+Tab no longer reaches the app's main-menu or
+  widget shortcuts; on every other widget it still does. The web build is not
+  covered yet: browsers keep Ctrl+Tab for themselves
+  ([#357](https://github.com/belluikit/bellui/issues/357)).
+* **GitHub sign-in asks for GitHub's scopes**
+  ([#335](https://github.com/belluikit/bellui/issues/335)). The OpenID
+  default (`openid email profile`) was applied before the GitHub branch, so
+  GitHub never got its own default of `user:email read:user`.
+* **`desktop.App` is implemented on every desktop platform**
+  ([#338](https://github.com/belluikit/bellui/issues/338)). It gained
+  `SetSystemTrayTooltip` and `SetSystemTrayOnTapped`, but the app did not
+  forward them on macOS, Windows or Linux/BSD, so the documented
+  `if desk, ok := a.(desktop.App); ok { … }` check was always false and an
+  app following it silently got no system tray.
 * **The test helpers no longer ship in production binaries**
   ([#304](https://github.com/belluikit/bellui/issues/304)). `driver/software`
   imported `bellui/test` for one interface and two constructors, and
@@ -120,8 +141,31 @@ harness. The remaining gap is that the run was driven by hand rather than by
 the harness's own script
 ([#314](https://github.com/belluikit/bellui/issues/314)).
 
+### Dependencies
+
+* `github.com/belluikit/systray` v1.12.1: an app's exit callback could run
+  twice when `Quit` raced with the platform's own close handling; it is now
+  guarded so it runs once.
+* `github.com/belluikit/fsnotify` v1.10.2: synced with upstream fsnotify
+  (v1.10.1 plus later fixes), keeping the fork's Windows fixes.
+* `x/mmedia` requires `github.com/belluikit/goffmpeg` v0.4.1, whose prebuilt
+  purego bridges were rebuilt and now expose the device-modes API
+  ([#330](https://github.com/belluikit/bellui/pull/330)).
+
+### Licensing
+
+* The EmojiOne Color font ships with its license file again, and
+  `THIRD_PARTY_NOTICES.md` now covers the fyne-x code and test assets, the
+  vendored packages, every bundled font, the Material Design icons and the
+  sign-in logos ([#325](https://github.com/belluikit/bellui/pull/325)).
+  Attributions the rebrand had rewritten to "bellui-x" name fyne-x again.
+
 ### CI
 
+* CI runs on GitHub-hosted runners with stock Go instead of self-hosted
+  machines and the go-plus toolchain, and installs the system packages those
+  images lack ([#325](https://github.com/belluikit/bellui/pull/325),
+  [#329](https://github.com/belluikit/bellui/pull/329)).
 * `apt-get install` needs `-y`: five Linux legs died the moment apt had an
   upgrade to do ([#307](https://github.com/belluikit/bellui/issues/307)).
 * chromium is launched without `snap-confine`, which had refused to start it
@@ -573,7 +617,9 @@ rc.6 tag (2026-07-31) cut mid-section and shares this entry.
   lines that never shipped on this module path (2.10–2.19, 3.0); all are
   rewritten to the version that actually ships it, `v1.0.0`. Annotations from
   releases that did ship — upstream Fyne 1.0–2.7.3 and the fork's 2.8/2.9 —
-  are unchanged. The mapping is recorded in `docs/REBRAND.md`.
+  are unchanged. (This entry originally pointed to `docs/REBRAND.md` for the
+  mapping; that file is not part of the public repository, and the rule above
+  is the whole mapping.)
 
 * **`driver.ObjectAtPosition`/`ObjectAtPositionMatching` now probe and report
   in the `Driver.AbsolutePositionForObject` space**

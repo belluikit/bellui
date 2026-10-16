@@ -7,28 +7,28 @@ module github.com/belluikit/bellui/x/mmedia/hack/playprobe
 go 1.26.2
 
 require (
-	github.com/belluikit/bellui v1.0.0-rc.6
+	github.com/belluikit/bellui v1.0.0
 	github.com/belluikit/bellui/x/mmedia v0.0.0
 )
 
 require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
-	github.com/belluikit/fsnotify v1.9.1 // indirect
+	github.com/belluikit/fsnotify v1.10.2 // indirect
 	github.com/belluikit/gl-js v0.2.1 // indirect
-	github.com/belluikit/glfw v1.9.0 // indirect
+	github.com/belluikit/glfw v1.10.0 // indirect
 	github.com/belluikit/glfw-js v1.0.4 // indirect
-	github.com/belluikit/goffmpeg v0.4.0 // indirect
-	github.com/belluikit/goffmpeg-libs/android_amd64 v0.3.0 // indirect
-	github.com/belluikit/goffmpeg-libs/android_arm v0.3.0 // indirect
-	github.com/belluikit/goffmpeg-libs/android_arm64 v0.3.0 // indirect
-	github.com/belluikit/goffmpeg-libs/darwin_amd64 v0.3.0 // indirect
-	github.com/belluikit/goffmpeg-libs/darwin_arm64 v0.3.0 // indirect
-	github.com/belluikit/goffmpeg-libs/ios_arm64 v0.3.0 // indirect
-	github.com/belluikit/goffmpeg-libs/iossimulator_arm64 v0.3.0 // indirect
-	github.com/belluikit/goffmpeg-libs/linux_amd64 v0.3.0 // indirect
-	github.com/belluikit/goffmpeg-libs/linux_arm64 v0.3.0 // indirect
-	github.com/belluikit/goffmpeg-libs/windows_amd64 v0.3.0 // indirect
-	github.com/belluikit/goffmpeg-libs/windows_arm64 v0.3.0 // indirect
+	github.com/belluikit/goffmpeg v0.4.1 // indirect
+	github.com/belluikit/goffmpeg-libs/android_amd64 v0.3.1 // indirect
+	github.com/belluikit/goffmpeg-libs/android_arm v0.3.1 // indirect
+	github.com/belluikit/goffmpeg-libs/android_arm64 v0.3.1 // indirect
+	github.com/belluikit/goffmpeg-libs/darwin_amd64 v0.3.1 // indirect
+	github.com/belluikit/goffmpeg-libs/darwin_arm64 v0.3.1 // indirect
+	github.com/belluikit/goffmpeg-libs/ios_arm64 v0.3.1 // indirect
+	github.com/belluikit/goffmpeg-libs/iossimulator_arm64 v0.3.1 // indirect
+	github.com/belluikit/goffmpeg-libs/linux_amd64 v0.3.1 // indirect
+	github.com/belluikit/goffmpeg-libs/linux_arm64 v0.3.1 // indirect
+	github.com/belluikit/goffmpeg-libs/windows_amd64 v0.3.1 // indirect
+	github.com/belluikit/goffmpeg-libs/windows_arm64 v0.3.1 // indirect
 	github.com/belluikit/systray v1.12.0 // indirect
 	github.com/belluikit/typesetting v0.3.6 // indirect
 	github.com/belluikit/webgpu v1.2.0 // indirect
@@ -54,7 +54,7 @@ require (
 	github.com/rymdport/portal v0.4.2 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/trendvidia/protowire-go v1.2.2 // indirect
-	github.com/yuin/goldmark v1.7.8 // indirect
+	github.com/yuin/goldmark v1.8.5 // indirect
 	golang.org/x/image v0.44.0 // indirect
 	golang.org/x/net v0.57.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
