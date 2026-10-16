@@ -691,9 +691,10 @@ func tabEscape(ev *event.KeyEvent) bool {
 func (h *offscreenHost) KeyDown(ev *event.KeyEvent) {
 	if tabEscape(ev) {
 		// Move bellui focus and swallow the key — the page must not see half
-		// an escape. The driver then routes the same press to the canvas
-		// shortcut path (a no-op unless the app registered Ctrl+Tab) and
-		// delivers no TypedKey, so the newly focused widget receives nothing.
+		// an escape. The driver sees that focus moved during KeyDown, treats
+		// the press as handled (it would otherwise make the same Ctrl+Tab
+		// escape itself, for any widget that keeps Tab) and delivers no
+		// TypedKey, so the newly focused widget receives nothing.
 		if c := h.canvas(); c != nil {
 			if ev.Modifier&event.KeyModifierShift != 0 {
 				c.FocusPrevious()

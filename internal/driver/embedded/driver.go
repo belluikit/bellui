@@ -110,14 +110,9 @@ func (n *noosDriver) doRun() {
 					continue // ignore key up in other core events
 				}
 
-				if t.Name == event.KeyTab && t.Modifiers&^event.KeyModifierShift == 0 {
-					captures := false
-
-					if ent, ok := w.Canvas().Focused().(event.Tabbable); ok {
-						captures = ent.AcceptsTab()
-					}
-					if !captures {
-						if t.Modifiers&event.KeyModifierShift != 0 {
+				if t.Name == event.KeyTab {
+					if dir := intdriver.TabDirection(w.Canvas().Focused(), t.Modifiers); dir != 0 {
+						if dir < 0 {
 							w.Canvas().FocusPrevious()
 						} else {
 							w.Canvas().FocusNext()
