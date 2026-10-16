@@ -87,10 +87,10 @@ w := builder.LineChart().
 
 ## Architecture
 
-fycharts is organized into focused packages, each with a single responsibility. The project contains ~50 Go source files and ~10,000 lines of code across 12 packages:
+x/charts is organized into focused packages, each with a single responsibility. The project contains ~50 Go source files and ~10,000 lines of code across 12 packages:
 
 ```
-fycharts/
+charts/
   chart/         Main Chart widget, Option types, renderer pipeline
   series/        Series interface + per-type renderers (21 chart types)
   coord/         Coordinate system abstraction
