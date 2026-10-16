@@ -2,8 +2,8 @@ github.com/BurntSushi/toml v1.5.0 h1:W5quZX/G/csjUnuI8SUYlsHs9M38FC7znL0lIO+DvMg
 github.com/BurntSushi/toml v1.5.0/go.mod h1:ukJfTF/6rtPPRCnwkur4qwRxa8vTRFBF0uk2lLoLwho=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=
 github.com/Microsoft/go-winio v0.6.2/go.mod h1:yd8OoFMLzJbo9gZq8j5qaps8bJ9aShtEA8Ipt1oGCvU=
-github.com/belluikit/fsnotify v1.9.1 h1:Tgp4GeFmk5vqo3AlQfYHvEnbdBo8L5MTaoGqBiJvr6g=
-github.com/belluikit/fsnotify v1.9.1/go.mod h1:Eerjau1+jB7zBYpe753/iAfJd4kWDaGL2DsQH1pqK5c=
+github.com/belluikit/fsnotify v1.10.2 h1:Kbop0VxWluUIAKunk+4op1v0KCkHfAFnAGAmVrD3Lc8=
+github.com/belluikit/fsnotify v1.10.2/go.mod h1:Zn9GYvdu+eJ1E+cDTkxZNY53ykn9kVXly2SAPLfPpLk=
 github.com/belluikit/gl-js v0.2.1 h1:DWtRW7ztetpAfztJ3msW9YWFWVaydmMlfT2sa6GrAEY=
 github.com/belluikit/gl-js v0.2.1/go.mod h1:2/qoK/hK1zTuTBiZ7DYdMS6vapNN3KoYhAfpUb2vh1k=
 github.com/belluikit/glfw v1.10.0 h1:4C7upiPCBTUGgx/FftqPpEJQ9fA4N8TNMkIT11GjxP4=
@@ -12,8 +12,8 @@ github.com/belluikit/glfw-js v1.0.4 h1:E+339oJ3SjI0noviExqKj5GOfTQ5/fKGOi6VeNkSr
 github.com/belluikit/glfw-js v1.0.4/go.mod h1:JYXSw+veF7drhhMre99XhEIGdUHLiyF9JWXEwzd8cZ4=
 github.com/belluikit/gocef v0.5.0 h1:ZfmzCS4CC4EFdvlkPhjSUmEluS+prSbm1iqRUxeGeHI=
 github.com/belluikit/gocef v0.5.0/go.mod h1:TNOi0I+bD7NYO4FdPj7XrgjxMBRNbIf+NnWuY3y1Boc=
-github.com/belluikit/systray v1.12.0 h1:Hnjwerl6gMnmS1JXXaKkWbC9ZPY29UsQgUjktVvSQLw=
-github.com/belluikit/systray v1.12.0/go.mod h1:peb+/O80A/aXu5fUel0gSgeAsAVYz5x01SZF5mnyErU=
+github.com/belluikit/systray v1.12.1 h1:lTFuyhv1azUPgXnrqfQ1NORDwbYCMkUgN3BBtfXrIpc=
+github.com/belluikit/systray v1.12.1/go.mod h1:peb+/O80A/aXu5fUel0gSgeAsAVYz5x01SZF5mnyErU=
 github.com/belluikit/typesetting v0.3.6 h1:M27Rx+fhz1IV2n6Tei3fNhs/Oe9gGAnq3QMrBpAqisY=
 github.com/belluikit/typesetting v0.3.6/go.mod h1:vOvJAyUaoKpOpxqHeDglX6xNuG1zv2C3IOG3yEnHuLQ=
 github.com/belluikit/webgpu v1.2.0 h1:JKzBgxelTB0/MJsXUbeHyDX/PJCcyu4lZXljvPNHcAA=
