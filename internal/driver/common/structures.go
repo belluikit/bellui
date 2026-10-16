@@ -61,6 +61,7 @@ type RenderCacheNode struct {
 	clipPos        geo.Position // effective clip region origin (from nearest Scrollable/ClipToBounds ancestor)
 	clipSize       geo.Size     // effective clip region size
 	isBoundary     bool         // true if this node is a RepaintBoundary
+	walkGen        uint64       // Canvas.walkGen of the last full walk that reached this node
 
 	// partial-repaint bookkeeping: the world-space bounds this node occupied at
 	// the previous paint, so a move/resize can clear where it left as well as
