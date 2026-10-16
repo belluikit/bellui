@@ -99,28 +99,6 @@ func (a *belluiApp) sendNotificationThroughPortal(n *bellui.Notification) error 
 	)
 }
 
-// SetSystemTrayMenu creates a system tray item and attaches the specified menu.
-// By default, this will use the application icon.
-func (a *belluiApp) SetSystemTrayMenu(menu *bellui.Menu) {
-	if desk, ok := a.Driver().(systrayDriver); ok { // don't use this on mobile tag
-		desk.SetSystemTrayMenu(menu)
-	}
-}
-
-// SetSystemTrayIcon sets a custom image for the system tray icon.
-// You should have previously called `SetSystemTrayMenu` to initialise the menu icon.
-func (a *belluiApp) SetSystemTrayIcon(icon bellui.Resource) {
-	if desk, ok := a.Driver().(systrayDriver); ok { // don't use this on mobile tag
-		desk.SetSystemTrayIcon(icon)
-	}
-}
-
-// SetSystemTrayWindow assigns a window to be shown with the system tray menu is tapped.
-// You should have previously called `SetSystemTrayMenu` to initialise the menu icon.
-func (a *belluiApp) SetSystemTrayWindow(w bellui.Window) {
-	a.Driver().(systrayDriver).SetSystemTrayWindow(w)
-}
-
 // SetBadge sets the launcher-entry count badge via the Unity LauncherEntry
 // D-Bus protocol, honoured by KDE Plasma and several other Linux desktops and
 // silently ignored elsewhere. A count <= 0 clears the badge. Part of the
