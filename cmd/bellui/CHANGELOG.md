@@ -10,7 +10,7 @@
 This file lists the main changes with each version of the Fyne tools project.
 More detailed release notes can be found on the [releases page](https://github.com/fyne-io/tools/releases).
 
-## Unreleased
+## v1.0.1 — 2026-10-16
 
 ### Fixed
 
