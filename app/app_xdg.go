@@ -15,6 +15,7 @@ import (
 	"github.com/rymdport/portal/settings/appearance"
 
 	"github.com/belluikit/bellui"
+	"github.com/belluikit/bellui/driver/desktop"
 	internalapp "github.com/belluikit/bellui/internal/app"
 	"github.com/belluikit/bellui/internal/build"
 	"github.com/belluikit/bellui/theme"
@@ -120,6 +121,25 @@ func (a *belluiApp) SetSystemTrayIcon(icon bellui.Resource) {
 func (a *belluiApp) SetSystemTrayWindow(w bellui.Window) {
 	a.Driver().(systrayDriver).SetSystemTrayWindow(w)
 }
+
+// SetSystemTrayTooltip sets the hover text of the system tray icon.
+func (a *belluiApp) SetSystemTrayTooltip(text string) {
+	if desk, ok := a.Driver().(systrayDriver); ok {
+		desk.SetSystemTrayTooltip(text)
+	}
+}
+
+// SetSystemTrayOnTapped sets the function run when the system tray icon is
+// tapped (left-clicked).
+func (a *belluiApp) SetSystemTrayOnTapped(fn func()) {
+	if desk, ok := a.Driver().(systrayDriver); ok {
+		desk.SetSystemTrayOnTapped(fn)
+	}
+}
+
+// The app value is what applications type-assert to desktop.App, so it must
+// carry every method of that interface, not only the driver.
+var _ desktop.App = (*belluiApp)(nil)
 
 // SetBadge sets the launcher-entry count badge via the Unity LauncherEntry
 // D-Bus protocol, honoured by KDE Plasma and several other Linux desktops and
