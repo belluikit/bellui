@@ -1428,16 +1428,8 @@ func runeToPrintable(r rune) rune {
 func (d *driver) typeDownCanvas(canvas *canvas, r rune, code key.Code, mod key.Modifiers) {
 	d.setKeyMods(keyEventModifier(mod))
 	keyName := keyToName(code)
-	switch keyName {
-	case event.KeyTab:
-		switch intdriver.TabDirection(canvas.Focused(), keyEventModifier(mod)) {
-		case 1:
-			canvas.FocusNext()
-			return
-		case -1:
-			canvas.FocusPrevious()
-			return
-		}
+	if keyName == event.KeyTab && intdriver.MoveTabFocus(canvas, keyEventModifier(mod)) {
+		return
 	}
 
 	// Hardware-keyboard editing shortcuts (Ctrl+A/C/V/X/Z/Y). On Android these

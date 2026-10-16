@@ -1877,7 +1877,7 @@ func (s *selfEscapingTabbable) KeyUp(*event.KeyEvent) {}
 func TestWindow_CtrlTabMovesFocusOnceWhenKeyDownAlreadyDid(t *testing.T) {
 	w := createWindow("Test")
 	view := &selfEscapingTabbable{}
-	next := &focusable{id: "next"}
+	next := &tabbable{} // keeps Tab too, so a second escape would leave it
 	last := &focusable{id: "last"}
 	for _, o := range []interface{ SetMinSize(geo.Size) }{view, next, last} {
 		o.SetMinSize(geo.NewSize(10, 10))
@@ -1890,6 +1890,80 @@ func TestWindow_CtrlTabMovesFocusOnceWhenKeyDownAlreadyDid(t *testing.T) {
 	w.keyPressed(nil, glfw.KeyTab, 0, glfw.Press, glfw.ModControl)
 	w.keyPressed(nil, glfw.KeyTab, 0, glfw.Release, glfw.ModControl)
 	assert.Equal(t, next, w.Canvas().Focused())
+}
+
+// A widget that keeps Tab and also takes shortcuts: the Ctrl+Tab escape runs
+// ahead of the shortcut path, so the widget's own Ctrl+Tab binding (and a
+// main-menu one, which the same path serves) never fires while it is focused
+// (#340). The escape is the WCAG 2.1.2 guarantee; an app binding cannot
+// switch it off.
+type tabbableShortcutable struct {
+	typedShortcutable
+}
+
+func (*tabbableShortcutable) AcceptsTab() bool { return true }
+
+func TestWindow_CtrlTabEscapeRunsAheadOfShortcuts(t *testing.T) {
+	w := createWindow("Test")
+	field := &tabbableShortcutable{}
+	after := &typedShortcutable{}
+	for _, o := range []interface{ SetMinSize(geo.Size) }{field, after} {
+		o.SetMinSize(geo.NewSize(10, 10))
+	}
+	w.SetContent(container.NewVBox(field, after))
+	repaintWindow(w)
+
+	w.Canvas().Focus(field)
+	w.keyPressed(nil, glfw.KeyTab, 0, glfw.Press, glfw.ModControl)
+	w.keyPressed(nil, glfw.KeyTab, 0, glfw.Release, glfw.ModControl)
+	assert.Equal(t, after, w.Canvas().Focused())
+	assert.Empty(t, field.capturedShortcuts, "the escape is not also a shortcut")
+	assert.Empty(t, after.capturedShortcuts, "the newly focused widget gets no shortcut")
+
+	// On a widget that does not keep Tab, Ctrl+Tab is still a shortcut.
+	w.keyPressed(nil, glfw.KeyTab, 0, glfw.Press, glfw.ModControl)
+	w.keyPressed(nil, glfw.KeyTab, 0, glfw.Release, glfw.ModControl)
+	assert.Equal(t, after, w.Canvas().Focused())
+	if assert.Len(t, after.capturedShortcuts, 1) {
+		assert.Equal(t, "CustomDesktop:Control+Tab", after.capturedShortcuts[0].ShortcutName())
+	}
+}
+
+// A widget that does NOT keep Tab but moves focus in its own KeyDown, as the
+// Linux web view does when no page is alive: the press is handled there, so
+// the window neither moves focus again nor hands the Ctrl+Tab shortcut to the
+// widget that has just gained focus.
+type selfEscapingFocusable struct {
+	focusable
+	canvas core.Canvas
+}
+
+func (s *selfEscapingFocusable) KeyDown(ev *event.KeyEvent) {
+	if ev.Name == event.KeyTab && ev.Modifier&event.KeyModifierControl != 0 {
+		s.canvas.FocusNext()
+	}
+}
+
+func (s *selfEscapingFocusable) KeyUp(*event.KeyEvent) {}
+
+func TestWindow_TabPressHandledWhenKeyDownMovedFocus(t *testing.T) {
+	w := createWindow("Test")
+	view := &selfEscapingFocusable{}
+	next := &typedShortcutable{}
+	last := &typedShortcutable{}
+	for _, o := range []interface{ SetMinSize(geo.Size) }{view, next, last} {
+		o.SetMinSize(geo.NewSize(10, 10))
+	}
+	w.SetContent(container.NewVBox(view, next, last))
+	repaintWindow(w)
+	view.canvas = w.window.canvas // the raw canvas: KeyDown runs on the main goroutine
+
+	w.Canvas().Focus(view)
+	w.keyPressed(nil, glfw.KeyTab, 0, glfw.Press, glfw.ModControl)
+	w.keyPressed(nil, glfw.KeyTab, 0, glfw.Release, glfw.ModControl)
+	assert.Equal(t, next, w.Canvas().Focused())
+	assert.Empty(t, next.capturedShortcuts)
+	assert.Empty(t, last.capturedShortcuts)
 }
 
 func TestWindow_TabWithModifierToTriggersShortcut(t *testing.T) {

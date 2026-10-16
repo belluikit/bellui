@@ -30,3 +30,25 @@ func TabDirection(focused event.Focusable, mods event.KeyModifier) int {
 	}
 	return 1
 }
+
+// TabFocuser is the part of a canvas MoveTabFocus needs.
+type TabFocuser interface {
+	Focused() event.Focusable
+	FocusNext()
+	FocusPrevious()
+}
+
+// MoveTabFocus moves c's focus as TabDirection says for a Tab press with
+// mods, and reports whether it did. A press it reports false for belongs to
+// the focused widget or the shortcut path.
+func MoveTabFocus(c TabFocuser, mods event.KeyModifier) bool {
+	switch TabDirection(c.Focused(), mods) {
+	case 1:
+		c.FocusNext()
+	case -1:
+		c.FocusPrevious()
+	default:
+		return false
+	}
+	return true
+}

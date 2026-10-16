@@ -110,16 +110,9 @@ func (n *noosDriver) doRun() {
 					continue // ignore key up in other core events
 				}
 
-				if t.Name == event.KeyTab {
-					if dir := intdriver.TabDirection(w.Canvas().Focused(), t.Modifiers); dir != 0 {
-						if dir < 0 {
-							w.Canvas().FocusPrevious()
-						} else {
-							w.Canvas().FocusNext()
-						}
-						n.renderWindow(n.wins[n.current])
-						continue
-					}
+				if t.Name == event.KeyTab && intdriver.MoveTabFocus(w.Canvas(), t.Modifiers) {
+					n.renderWindow(n.wins[n.current])
+					continue
 				}
 
 				// Escape closes the innermost pop-up, menu or dialog unless the

@@ -1065,9 +1065,9 @@ func (w *window) processKeyReleased(keyEvent *event.KeyEvent, pendingMenuToggle,
 
 func (w *window) processKeyPressed(keyName event.KeyName, keyASCII event.KeyName, scancode int, action action, keyDesktopModifier event.KeyModifier) {
 	keyEvent := &event.KeyEvent{Name: keyName, Physical: event.HardwareKey{ScanCode: scancode}, Modifier: keyDesktopModifier}
-	// Remembered so the Tab handling below can tell whether KeyDown already
-	// moved focus (the Linux web view does for its Ctrl+Tab escape).
-	focusedBeforeKeyDown := w.canvas.Focused()
+	// Set when KeyDown moved focus, as the Linux web view's Ctrl+Tab escape
+	// does: the Tab handling below then treats the press as handled.
+	keyDownMovedFocus := false
 
 	pendingMenuToggle := w.menuTogglePending
 	w.menuTogglePending = desktop.KeyNone
@@ -1087,29 +1087,24 @@ func (w *window) processKeyPressed(keyName event.KeyName, keyASCII event.KeyName
 		case event.KeyEscape:
 			w.menuDeactivationPending = keyName
 		}
-		if w.canvas.Focused() != nil {
-			if focused, ok := w.canvas.Focused().(desktop.Keyable); ok {
-				focused.KeyDown(keyEvent)
+		if focused := w.canvas.Focused(); focused != nil {
+			if keyable, ok := focused.(desktop.Keyable); ok {
+				keyable.KeyDown(keyEvent)
+				keyDownMovedFocus = w.canvas.Focused() != focused
 			}
 		} else if w.canvas.onKeyDown != nil {
 			w.canvas.onKeyDown(keyEvent)
+			keyDownMovedFocus = w.canvas.Focused() != nil
 		}
 	default:
 		// key repeat will fall through to TypedKey and TypedShortcut
 	}
 
-	if keyName == event.KeyTab {
-		if dir := driver.TabDirection(focusedBeforeKeyDown, keyDesktopModifier); dir != 0 {
-			// A KeyDown handler that already moved focus has handled the press.
-			if w.canvas.Focused() == focusedBeforeKeyDown {
-				if dir > 0 {
-					w.canvas.FocusNext()
-				} else {
-					w.canvas.FocusPrevious()
-				}
-			}
-			return
-		}
+	// A Tab press whose KeyDown already moved focus is handled: neither a
+	// second focus move nor a shortcut or TypedKey on the widget that has just
+	// gained focus, which never saw the key go down.
+	if keyName == event.KeyTab && (keyDownMovedFocus || driver.MoveTabFocus(w.canvas, keyDesktopModifier)) {
+		return
 	}
 	if w.triggersShortcut(keyName, keyASCII, keyDesktopModifier) {
 		return
