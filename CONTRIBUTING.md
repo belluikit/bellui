@@ -7,9 +7,12 @@ license. Everyone taking part is expected to follow the
 
 ## Asking a question
 
-For help with your own code, or a question about how something works, see the
-[support page](https://bellui.com/support/). The issue tracker is for bugs and
-feature requests.
+For help with your own code, or a question about how something works, ask in
+[Discussions](https://github.com/belluikit/bellui/discussions/categories/q-a)
+(Q&A), or see the [support page](https://bellui.com/support/). Ideas that are
+not yet a concrete feature request belong in
+[Discussions → Ideas](https://github.com/belluikit/bellui/discussions/categories/ideas).
+The issue tracker is for bugs and feature requests.
 
 ## Reporting a bug
 
