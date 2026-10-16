@@ -2,7 +2,7 @@ details {
   icon = "Icon.png"
   name = "Bellui Settings"
   id = "io.bellui.settings"
-  version = "2.6.0"
+  version = "1.0.0"
   build = 2
 }
 migrations = {
