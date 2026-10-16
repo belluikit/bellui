@@ -1430,19 +1430,13 @@ func (d *driver) typeDownCanvas(canvas *canvas, r rune, code key.Code, mod key.M
 	keyName := keyToName(code)
 	switch keyName {
 	case event.KeyTab:
-		capture := false
-		if ent, ok := canvas.Focused().(event.Tabbable); ok {
-			capture = ent.AcceptsTab()
-		}
-		if !capture {
-			switch mod {
-			case 0:
-				canvas.FocusNext()
-				return
-			case key.ModShift:
-				canvas.FocusPrevious()
-				return
-			}
+		switch intdriver.TabDirection(canvas.Focused(), keyEventModifier(mod)) {
+		case 1:
+			canvas.FocusNext()
+			return
+		case -1:
+			canvas.FocusPrevious()
+			return
 		}
 	}
 

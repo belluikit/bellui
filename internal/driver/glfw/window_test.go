@@ -1781,7 +1781,7 @@ func TestWindow_CaptureTypedShortcut(t *testing.T) {
 	assert.Equal(t, "CustomDesktop:Control+F", content.capturedShortcuts[0].ShortcutName())
 }
 
-func TestWindow_OnlyTabAndShiftTabToCapturesTab(t *testing.T) {
+func TestWindow_TabConsultsAcceptsTab(t *testing.T) {
 	w := createWindow("Test")
 	content := &tabbable{}
 	content.SetMinSize(geo.NewSize(10, 10))
@@ -1798,12 +1798,98 @@ func TestWindow_OnlyTabAndShiftTabToCapturesTab(t *testing.T) {
 	w.keyPressed(nil, glfw.KeyTab, 0, glfw.Release, 0)
 	assert.Equal(t, 2, content.acceptTabCallCount)
 
-	// Tab with ctrl or alt is not passed
+	// Ctrl+Tab and Ctrl+Shift+Tab consult it too: on a widget that keeps Tab
+	// they are the way out (#340).
 	w.keyPressed(nil, glfw.KeyTab, 0, glfw.Press, glfw.ModControl)
 	w.keyPressed(nil, glfw.KeyTab, 0, glfw.Release, glfw.ModControl)
 	w.keyPressed(nil, glfw.KeyTab, 0, glfw.Press, glfw.ModControl|glfw.ModShift)
 	w.keyPressed(nil, glfw.KeyTab, 0, glfw.Release, glfw.ModControl|glfw.ModShift)
-	assert.Equal(t, 2, content.acceptTabCallCount)
+	assert.Equal(t, 4, content.acceptTabCallCount)
+
+	// Tab with alt is not passed
+	w.keyPressed(nil, glfw.KeyTab, 0, glfw.Press, glfw.ModAlt)
+	w.keyPressed(nil, glfw.KeyTab, 0, glfw.Release, glfw.ModAlt)
+	assert.Equal(t, 4, content.acceptTabCallCount)
+}
+
+// A widget that keeps Tab (a multi-line Entry) must not trap keyboard users:
+// Ctrl+Tab and Ctrl+Shift+Tab move focus out of it, while plain Tab stays with
+// the widget (#340).
+func TestWindow_CtrlTabLeavesWidgetThatKeepsTab(t *testing.T) {
+	w := createWindow("Test")
+	before := &focusable{id: "before"}
+	field := &tabbable{}
+	after := &focusable{id: "after"}
+	for _, o := range []core.CanvasObject{before, field, after} {
+		o.(interface{ SetMinSize(geo.Size) }).SetMinSize(geo.NewSize(10, 10))
+	}
+	w.SetContent(container.NewVBox(before, field, after))
+	repaintWindow(w)
+
+	w.Canvas().Focus(field)
+	w.keyPressed(nil, glfw.KeyTab, 0, glfw.Press, 0)
+	w.keyPressed(nil, glfw.KeyTab, 0, glfw.Release, 0)
+	assert.Equal(t, field, w.Canvas().Focused(), "plain Tab stays with the field")
+
+	w.keyPressed(nil, glfw.KeyTab, 0, glfw.Press, glfw.ModControl)
+	w.keyPressed(nil, glfw.KeyTab, 0, glfw.Release, glfw.ModControl)
+	assert.Equal(t, after, w.Canvas().Focused(), "Ctrl+Tab moves to the next widget")
+
+	w.Canvas().Focus(field)
+	w.keyPressed(nil, glfw.KeyTab, 0, glfw.Press, glfw.ModControl|glfw.ModShift)
+	w.keyPressed(nil, glfw.KeyTab, 0, glfw.Release, glfw.ModControl|glfw.ModShift)
+	assert.Equal(t, before, w.Canvas().Focused(), "Ctrl+Shift+Tab moves to the previous widget")
+}
+
+// The same escape with a real multi-line Entry and a Button after it.
+func TestWindow_CtrlTabLeavesMultiLineEntry(t *testing.T) {
+	w := createWindow("Test")
+	entry := widget.NewMultiLineEntry()
+	button := widget.NewButton("OK", func() {})
+	w.SetContent(container.NewVBox(entry, button))
+	repaintWindow(w)
+
+	w.Canvas().Focus(entry)
+	w.keyPressed(nil, glfw.KeyTab, 0, glfw.Press, 0)
+	w.keyPressed(nil, glfw.KeyTab, 0, glfw.Release, 0)
+	assert.Equal(t, entry, w.Canvas().Focused(), "Tab is typed into the entry")
+
+	w.keyPressed(nil, glfw.KeyTab, 0, glfw.Press, glfw.ModControl)
+	w.keyPressed(nil, glfw.KeyTab, 0, glfw.Release, glfw.ModControl)
+	assert.Equal(t, button, w.Canvas().Focused(), "Ctrl+Tab leaves the entry")
+}
+
+// A widget whose KeyDown already moves focus on Ctrl+Tab (as the Linux web
+// view does) must not have the window move it a second time.
+type selfEscapingTabbable struct {
+	tabbable
+	canvas core.Canvas
+}
+
+func (s *selfEscapingTabbable) KeyDown(ev *event.KeyEvent) {
+	if ev.Name == event.KeyTab && ev.Modifier&event.KeyModifierControl != 0 {
+		s.canvas.FocusNext()
+	}
+}
+
+func (s *selfEscapingTabbable) KeyUp(*event.KeyEvent) {}
+
+func TestWindow_CtrlTabMovesFocusOnceWhenKeyDownAlreadyDid(t *testing.T) {
+	w := createWindow("Test")
+	view := &selfEscapingTabbable{}
+	next := &focusable{id: "next"}
+	last := &focusable{id: "last"}
+	for _, o := range []interface{ SetMinSize(geo.Size) }{view, next, last} {
+		o.SetMinSize(geo.NewSize(10, 10))
+	}
+	w.SetContent(container.NewVBox(view, next, last))
+	repaintWindow(w)
+	view.canvas = w.window.canvas // the raw canvas: KeyDown runs on the main goroutine
+
+	w.Canvas().Focus(view)
+	w.keyPressed(nil, glfw.KeyTab, 0, glfw.Press, glfw.ModControl)
+	w.keyPressed(nil, glfw.KeyTab, 0, glfw.Release, glfw.ModControl)
+	assert.Equal(t, next, w.Canvas().Focused())
 }
 
 func TestWindow_TabWithModifierToTriggersShortcut(t *testing.T) {

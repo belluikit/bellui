@@ -1039,21 +1039,6 @@ func (w *window) dispatchScroll(pos geo.Position, delta geo.Delta, source event.
 	return false
 }
 
-func (w *window) capturesTab(modifier event.KeyModifier) bool {
-	if ent, ok := w.canvas.Focused().(event.Tabbable); ok && ent.AcceptsTab() {
-		return true
-	}
-
-	switch modifier {
-	case 0:
-		w.canvas.FocusNext()
-	case event.KeyModifierShift:
-		w.canvas.FocusPrevious()
-	}
-
-	return false
-}
-
 // processKeyReleased is the release half of the key callback: menu toggles
 // armed on press fire here, then the raw key-up reaches the focused widget or
 // the canvas hook.
@@ -1080,6 +1065,9 @@ func (w *window) processKeyReleased(keyEvent *event.KeyEvent, pendingMenuToggle,
 
 func (w *window) processKeyPressed(keyName event.KeyName, keyASCII event.KeyName, scancode int, action action, keyDesktopModifier event.KeyModifier) {
 	keyEvent := &event.KeyEvent{Name: keyName, Physical: event.HardwareKey{ScanCode: scancode}, Modifier: keyDesktopModifier}
+	// Remembered so the Tab handling below can tell whether KeyDown already
+	// moved focus (the Linux web view does for its Ctrl+Tab escape).
+	focusedBeforeKeyDown := w.canvas.Focused()
 
 	pendingMenuToggle := w.menuTogglePending
 	w.menuTogglePending = desktop.KeyNone
@@ -1110,11 +1098,20 @@ func (w *window) processKeyPressed(keyName event.KeyName, keyASCII event.KeyName
 		// key repeat will fall through to TypedKey and TypedShortcut
 	}
 
-	modifierOtherThanShift := (keyDesktopModifier & event.KeyModifierControl) |
-		(keyDesktopModifier & event.KeyModifierAlt) |
-		(keyDesktopModifier & event.KeyModifierSuper)
-	if (keyName == event.KeyTab && modifierOtherThanShift == 0 && !w.capturesTab(keyDesktopModifier)) ||
-		w.triggersShortcut(keyName, keyASCII, keyDesktopModifier) {
+	if keyName == event.KeyTab {
+		if dir := driver.TabDirection(focusedBeforeKeyDown, keyDesktopModifier); dir != 0 {
+			// A KeyDown handler that already moved focus has handled the press.
+			if w.canvas.Focused() == focusedBeforeKeyDown {
+				if dir > 0 {
+					w.canvas.FocusNext()
+				} else {
+					w.canvas.FocusPrevious()
+				}
+			}
+			return
+		}
+	}
+	if w.triggersShortcut(keyName, keyASCII, keyDesktopModifier) {
 		return
 	}
 
