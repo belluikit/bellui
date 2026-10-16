@@ -17,7 +17,7 @@ To develop apps using Bellui you will need Go version 1.25 or later, a C compile
 If you're not sure if that's all installed or you don't know how then check out our
 [Getting Started](https://bellui.com/develop/) document.
 
-> **Rendering backend:** this fork renders with **WebGPU** by default (Metal /
+> **Rendering backend:** Bellui renders with **WebGPU** by default (Metal /
 > Vulkan / D3D12 / browser WebGPU). The legacy OpenGL/GLES/WebGL backend remains
 > available with the `gl` build tag (`go build -tags gl ...`). See
 > [docs/webgpu.md](docs/webgpu.md) for build requirements and the platform matrix.
@@ -32,7 +32,7 @@ After importing a new module, run the following command before compiling the cod
 
 # Widget demo
 
-To run a showcase of the features of this fork, build the MD3 gallery from
+To run a showcase of Bellui's features, build the MD3 gallery from
 the sibling repository:
 
     git clone https://github.com/belluikit/gallery.git
