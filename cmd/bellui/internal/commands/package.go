@@ -272,7 +272,7 @@ func (p *Packager) validate() (err error) {
 	if p.icon == "" || p.icon == "Icon.png" {
 		p.icon = filepath.Join(p.srcDir, "Icon.png")
 		if !util.Exists(p.icon) {
-			// No app-provided icon — fall back to the bundled toolkit logo
+			// No app-provided icon — fall back to the bundled default icon
 			// so packaging succeeds out of the box.
 			tmp := filepath.Join(p.tempDir, "default-icon.png")
 			if err := os.WriteFile(tmp, templates.DefaultIcon, 0o644); err != nil {

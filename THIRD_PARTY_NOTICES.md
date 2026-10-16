@@ -102,9 +102,14 @@ Fonts used only by tests:
   [Material Design icons](https://github.com/google/material-design-icons),
   inherited from Fyne. They are licensed under Apache-2.0, which is reproduced in
   `theme/icons/LICENSE-MaterialIcons.txt`.
-- **Go gopher.** `cmd/bellui/internal/templates/data/default-icon.png` shows a
-  gopher. The Go gopher was designed by Renée French and is licensed under
+- **Go gopher.** `default-icon.png`, `spinner_dark.gif` and `spinner_light.gif`
+  in `cmd/bellui/internal/templates/data/` show a gopher. The Go gopher was
+  designed by Renée French and is licensed under
   [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+  `default-icon.png` is AI-generated: it was made with Google Gemini. Google's
+  [Terms of Service](https://policies.google.com/terms/archive/20260730)
+  (effective 30 July 2026) say "Google won't claim ownership" of content
+  generated with its services.
 - **earth.gif.** `widget/testdata/gif/earth.gif` and `earth-once.gif` are CC BY-SA 3.0,
   by Wikipedia user Marvel, derived from NASA imagery
   ([source](https://commons.wikimedia.org/wiki/File:Rotating_earth_(large).gif)).

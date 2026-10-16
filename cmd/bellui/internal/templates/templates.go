@@ -48,14 +48,17 @@ var (
 	// CSSLight is a CSS that define color for element on the web splash screen following the light theme
 	CSSLight = lightCSS
 
-	// DefaultIcon is the toolkit logo, used as the application icon when a
-	// package has no Icon.png of its own (1024x1024 PNG).
+	// DefaultIcon is the bundled default application icon, used when a
+	// package has no Icon.png of its own (1024x1024 PNG). Its origin and the
+	// gopher design credit are in THIRD_PARTY_NOTICES.md.
 	DefaultIcon = defaultIconPNG
 
-	// SpinnerDark is an animated gif of the toolkit logo with a dark background
+	// SpinnerDark is the animated gopher shown on the web splash screen under
+	// the dark theme. It is currently the same transparent GIF as SpinnerLight.
 	SpinnerDark = spinnerDarkGIF
 
-	// SpinnerLight is an animated gif of the toolkit logo with a light background
+	// SpinnerLight is the animated gopher shown on the web splash screen under
+	// the light theme.
 	SpinnerLight = spinnerLightGIF
 
 	// WebGLDebugJs is the content of https://raw.githubusercontent.com/KhronosGroup/WebGLDeveloperTools/b42e702487d02d5278814e0fe2e2888d234893e6/src/debug/webgl-debug.js
