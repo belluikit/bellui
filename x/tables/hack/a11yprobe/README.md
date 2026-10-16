@@ -5,7 +5,7 @@ accessibility tree** (pre-rebrand issues #15/#16) — the layer the Go unit test
 It mirrors the fyne fork's `hack/a11yprobe` pattern and reuses its app-agnostic
 UIA client scripts.
 
-This is a **separate module** (its own `go.mod`, `replace ../..`) so fytables'
+This is a **separate module** (its own `go.mod`, `replace ../..`) so x/tables'
 library `go.mod` stays free of the GL/app dependency tree.
 
 ## What it checks
