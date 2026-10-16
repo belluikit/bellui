@@ -11,6 +11,22 @@ This file lists the main changes with each version of the Fyne toolkit.
 Entries up to 2.7.3 are inherited from upstream Fyne; later entries describe
 the trendvidia fork (github.com/trendvidia/fyne).
 
+## Unreleased
+
+### Fixed
+
+* **Ctrl+Tab moves focus out of a widget that keeps Tab**
+  ([#340](https://github.com/belluikit/bellui/issues/340)). A multi-line
+  `Entry` and the x/dag canvas keep Tab and Shift+Tab for themselves, and every
+  Tab with a modifier went to the shortcut path, so a keyboard-only user who
+  tabbed into one could not leave it (WCAG 2.1.2). Ctrl+Tab and Ctrl+Shift+Tab
+  now move focus to the next and previous widget from any such widget, on the
+  desktop, embedded and mobile drivers. **Behaviour change:** while a widget
+  that keeps Tab is focused, Ctrl+Tab no longer reaches the app's main-menu or
+  widget shortcuts; on every other widget it still does. The web build is not
+  covered yet: browsers keep Ctrl+Tab for themselves
+  ([#357](https://github.com/belluikit/bellui/issues/357)).
+
 ## v1.1.0 — 2026-09-10
 
 Android's Storage Access Framework becomes usable, two long-standing cgo
