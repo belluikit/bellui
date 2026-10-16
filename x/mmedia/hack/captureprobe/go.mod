@@ -7,7 +7,7 @@ module github.com/belluikit/bellui/x/mmedia/hack/captureprobe
 go 1.26.2
 
 require (
-	github.com/belluikit/bellui v1.1.1
+	github.com/belluikit/bellui v1.1.2
 	github.com/belluikit/bellui/x/mmedia v0.0.0
 	github.com/belluikit/goffmpeg v0.4.1
 )
