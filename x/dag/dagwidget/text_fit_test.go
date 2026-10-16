@@ -35,7 +35,8 @@ func TestAnnotationTextFitsAtEveryZoom(t *testing.T) {
 // box clipped it.
 func TestPaletteItemFitsItsText(t *testing.T) {
 	c := newTestCanvas(t)
-	comp := &dag.Component{ID: "t", Name: "Transform",
+	comp := &dag.Component{
+		ID: "t", Name: "Transform",
 		Inputs:  []dag.PortDef{{Name: "in", Direction: dag.PortInput, Stream: dag.StreamType{Name: "rows"}}},
 		Outputs: []dag.PortDef{{Name: "out", Direction: dag.PortOutput, Stream: dag.StreamType{Name: "rows"}}},
 	}
