@@ -12,7 +12,12 @@ This file lists the main changes with each version of Bellui. Entries up to
 after them describe the trendvidia fork (github.com/trendvidia/fyne) that
 became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
 
-## Unreleased
+## v1.1.1 — 2026-10-16
+
+A patch release for x/dag. The toolkit itself is unchanged from v1.1.0; the
+other `x/*` modules are re-released at v1.1.1 to keep one version across the
+repository. The `bellui` command is released alongside as `cmd/bellui` v1.0.0,
+its first tag (see `cmd/bellui/CHANGELOG.md`).
 
 ### Fixed
 
