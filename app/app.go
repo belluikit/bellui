@@ -227,12 +227,3 @@ func newAppWithDriver(d bellui.Driver, clipboard bellui.Clipboard, id string) be
 	repository.Register("https", httpHandler)
 	return newApp
 }
-
-// marker interface to pass system tray to supporting drivers
-type systrayDriver interface {
-	SetSystemTrayMenu(*bellui.Menu)
-	SetSystemTrayIcon(bellui.Resource)
-	SetSystemTrayWindow(bellui.Window)
-	SetSystemTrayTooltip(string)
-	SetSystemTrayOnTapped(func())
-}

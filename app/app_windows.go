@@ -12,7 +12,6 @@ import (
 	"syscall"
 
 	"github.com/belluikit/bellui"
-	"github.com/belluikit/bellui/driver/desktop"
 	internalapp "github.com/belluikit/bellui/internal/app"
 )
 
@@ -61,43 +60,6 @@ func (a *belluiApp) SendNotification(n *bellui.Notification) {
 	}
 	go runScript("notify", notificationTemplate, env)
 }
-
-// SetSystemTrayMenu creates a system tray item and attaches the specified menu.
-// By default, this will use the application icon.
-func (a *belluiApp) SetSystemTrayMenu(menu *bellui.Menu) {
-	a.Driver().(systrayDriver).SetSystemTrayMenu(menu)
-}
-
-// SetSystemTrayIcon sets a custom image for the system tray icon.
-// You should have previously called `SetSystemTrayMenu` to initialise the menu icon.
-func (a *belluiApp) SetSystemTrayIcon(icon bellui.Resource) {
-	a.Driver().(systrayDriver).SetSystemTrayIcon(icon)
-}
-
-// SetSystemTrayWindow assigns a window to be shown with the system tray menu is tapped.
-// You should have previously called `SetSystemTrayMenu` to initialise the menu icon.
-func (a *belluiApp) SetSystemTrayWindow(w bellui.Window) {
-	a.Driver().(systrayDriver).SetSystemTrayWindow(w)
-}
-
-// SetSystemTrayTooltip sets the hover text of the system tray icon.
-func (a *belluiApp) SetSystemTrayTooltip(text string) {
-	if desk, ok := a.Driver().(systrayDriver); ok {
-		desk.SetSystemTrayTooltip(text)
-	}
-}
-
-// SetSystemTrayOnTapped sets the function run when the system tray icon is
-// tapped (left-clicked).
-func (a *belluiApp) SetSystemTrayOnTapped(fn func()) {
-	if desk, ok := a.Driver().(systrayDriver); ok {
-		desk.SetSystemTrayOnTapped(fn)
-	}
-}
-
-// The app value is what applications type-assert to desktop.App, so it must
-// carry every method of that interface, not only the driver.
-var _ desktop.App = (*belluiApp)(nil)
 
 // badgeDriver is implemented by the glfw driver on Windows to draw a taskbar
 // overlay-icon count badge (ITaskbarList3::SetOverlayIcon). Asserted so the app

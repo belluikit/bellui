@@ -15,7 +15,6 @@ import (
 	"github.com/rymdport/portal/settings/appearance"
 
 	"github.com/belluikit/bellui"
-	"github.com/belluikit/bellui/driver/desktop"
 	internalapp "github.com/belluikit/bellui/internal/app"
 	"github.com/belluikit/bellui/internal/build"
 	"github.com/belluikit/bellui/theme"
@@ -99,47 +98,6 @@ func (a *belluiApp) sendNotificationThroughPortal(n *bellui.Notification) error 
 		},
 	)
 }
-
-// SetSystemTrayMenu creates a system tray item and attaches the specified menu.
-// By default, this will use the application icon.
-func (a *belluiApp) SetSystemTrayMenu(menu *bellui.Menu) {
-	if desk, ok := a.Driver().(systrayDriver); ok { // don't use this on mobile tag
-		desk.SetSystemTrayMenu(menu)
-	}
-}
-
-// SetSystemTrayIcon sets a custom image for the system tray icon.
-// You should have previously called `SetSystemTrayMenu` to initialise the menu icon.
-func (a *belluiApp) SetSystemTrayIcon(icon bellui.Resource) {
-	if desk, ok := a.Driver().(systrayDriver); ok { // don't use this on mobile tag
-		desk.SetSystemTrayIcon(icon)
-	}
-}
-
-// SetSystemTrayWindow assigns a window to be shown with the system tray menu is tapped.
-// You should have previously called `SetSystemTrayMenu` to initialise the menu icon.
-func (a *belluiApp) SetSystemTrayWindow(w bellui.Window) {
-	a.Driver().(systrayDriver).SetSystemTrayWindow(w)
-}
-
-// SetSystemTrayTooltip sets the hover text of the system tray icon.
-func (a *belluiApp) SetSystemTrayTooltip(text string) {
-	if desk, ok := a.Driver().(systrayDriver); ok {
-		desk.SetSystemTrayTooltip(text)
-	}
-}
-
-// SetSystemTrayOnTapped sets the function run when the system tray icon is
-// tapped (left-clicked).
-func (a *belluiApp) SetSystemTrayOnTapped(fn func()) {
-	if desk, ok := a.Driver().(systrayDriver); ok {
-		desk.SetSystemTrayOnTapped(fn)
-	}
-}
-
-// The app value is what applications type-assert to desktop.App, so it must
-// carry every method of that interface, not only the driver.
-var _ desktop.App = (*belluiApp)(nil)
 
 // SetBadge sets the launcher-entry count badge via the Unity LauncherEntry
 // D-Bus protocol, honoured by KDE Plasma and several other Linux desktops and
