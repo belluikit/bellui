@@ -606,3 +606,34 @@ func TestSlider_TypedKey_ReportsChangeEnded(t *testing.T) {
 	assert.Equal(t, 6.0, slider.Value)
 	assert.Equal(t, 1, ended)
 }
+
+// Dragging updates one value indicator in place. It used to build a new popup
+// for every drag event, so each move replaced the overlay and restarted the
+// popup's fade-in, and the indicator lagged behind the thumb.
+func TestSlider_ValueIndicatorUpdatesInPlace(t *testing.T) {
+	test.NewTempApp(t)
+	slider := NewSlider(0, 100)
+	slider.Step = 1
+	slider.ShowValueIndicator = true
+	w := test.NewTempWindow(t, slider)
+	w.Resize(geo.NewSize(200, 60))
+	overlays := w.Canvas().Overlays()
+
+	drag := &event.DragEvent{}
+	drag.PointEvent.Position = geo.NewPos(40, 10)
+	slider.Dragged(drag)
+	first := slider.valueIndicator
+	require.NotNil(t, first)
+	assert.Len(t, overlays.List(), 1)
+	text1 := slider.valueIndicatorText.Text
+
+	drag.PointEvent.Position = geo.NewPos(140, 10)
+	slider.Dragged(drag)
+	assert.Same(t, first, slider.valueIndicator, "a drag must reuse the indicator")
+	assert.Len(t, overlays.List(), 1)
+	assert.NotEqual(t, text1, slider.valueIndicatorText.Text)
+	assert.Equal(t, slider.AccessibleValue(), slider.valueIndicatorText.Text)
+
+	slider.DragEnd()
+	assert.Nil(t, slider.valueIndicator)
+}
