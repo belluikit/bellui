@@ -2,7 +2,6 @@ package commands
 
 import (
 	"bytes"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -17,12 +16,23 @@ import (
 func TestMakefileInstallsTheDesktopFileThatWasWritten(t *testing.T) {
 	desktop := unixData{Name: "Notes", AppID: "", Exec: "notes", Icon: "Notes"}
 
-	data := makefileData(desktop, "Notes")
-	assert.Equal(t, "Notes", data.AppID)
-	assert.Equal(t, "Notes.png", data.Icon)
+	var buf bytes.Buffer
+	require.NoError(t, templates.MakefileUNIX.Execute(&buf, makefileData(desktop, "Notes", "notes", "Notes.png")))
+	assert.Contains(t, buf.String(), `AppID := "Notes"`)
+	assert.Contains(t, buf.String(), "share/applications/$(AppID).desktop")
+}
+
+// The desktop entry's Exec carries a field code when the app opens files or
+// URLs, and the icon keeps its source extension; the Makefile installs files,
+// so it must name the binary and the icon packageUNIX actually wrote.
+func TestMakefileInstallsTheBinaryAndIconThatWereWritten(t *testing.T) {
+	desktop := unixData{Name: "Notes", AppID: "com.example.notes", Exec: "notes %U", Icon: "com.example.notes"}
 
 	var buf bytes.Buffer
-	require.NoError(t, templates.MakefileUNIX.Execute(&buf, data))
-	assert.Contains(t, buf.String(), `AppID := "Notes"`)
-	assert.True(t, strings.Contains(buf.String(), "share/applications/$(AppID).desktop"))
+	require.NoError(t, templates.MakefileUNIX.Execute(&buf,
+		makefileData(desktop, "com.example.notes", "notes", "com.example.notes.svg")))
+	out := buf.String()
+	assert.Contains(t, out, `Exec := "notes"`+"\n")
+	assert.Contains(t, out, `Icon := "com.example.notes.svg"`+"\n")
+	assert.NotContains(t, out, "%U")
 }
