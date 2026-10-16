@@ -668,9 +668,9 @@ func (h *offscreenHost) AcceptsTab() bool {
 // traversal — the RawDown/Up pair alone (from KeyDown/KeyUp) moves nothing.
 // Shift arrives in the modifier flags and makes Blink traverse backwards.
 // Every other key stays ignored here: KeyDown/KeyUp carry the key state,
-// TypedRune the text. (Ctrl+Tab never reaches TypedKey — the driver dispatches
-// modifier combos as shortcuts and returns early — so the escape lives in
-// KeyDown.)
+// TypedRune the text. (Ctrl+Tab never reaches TypedKey: KeyDown moves focus
+// on it, and the driver treats a Tab press whose KeyDown moved focus as
+// handled.)
 func (h *offscreenHost) TypedKey(ev *event.KeyEvent) {
 	if ev.Name != event.KeyTab {
 		return
@@ -691,9 +691,11 @@ func tabEscape(ev *event.KeyEvent) bool {
 func (h *offscreenHost) KeyDown(ev *event.KeyEvent) {
 	if tabEscape(ev) {
 		// Move bellui focus and swallow the key — the page must not see half
-		// an escape. The driver then routes the same press to the canvas
-		// shortcut path (a no-op unless the app registered Ctrl+Tab) and
-		// delivers no TypedKey, so the newly focused widget receives nothing.
+		// an escape. The glfw driver sees that focus moved during KeyDown and
+		// treats the press as handled: it does not move focus again (it makes
+		// the same Ctrl+Tab escape itself for any widget that keeps Tab), and
+		// runs no shortcut and no TypedKey, so the newly focused widget
+		// receives nothing. That holds for an inert host too.
 		if c := h.canvas(); c != nil {
 			if ev.Modifier&event.KeyModifierShift != 0 {
 				c.FocusPrevious()

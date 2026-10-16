@@ -81,3 +81,33 @@ func TestNoOSDriver_ShiftTabFocusesPrevious(t *testing.T) {
 
 	assert.Equal(t, first, w.Canvas().Focused())
 }
+
+type noosTabKeeper struct{ noosFocusable }
+
+func (*noosTabKeeper) AcceptsTab() bool { return true }
+
+// Ctrl+Tab leaves a widget that keeps Tab on the embedded driver too (#340).
+func TestNoOSDriver_CtrlTabLeavesWidgetThatKeepsTab(t *testing.T) {
+	queue := make(chan embedded.Event, 1)
+	size := func() geo.Size { return geo.NewSquareSize(100) }
+	d := intNoos.NewNoOSDriver(func(image.Image) {}, func(f func()) { f() }, queue, size)
+	w := d.CreateWindow("Test")
+
+	field := &noosTabKeeper{}
+	after := &noosFocusable{}
+	w.SetContent(container.NewWithoutLayout(field, after))
+
+	var once sync.Once
+	stop := func() { once.Do(func() { close(queue) }) }
+	after.onFocus = stop
+	go func() { // safety net so a regression fails instead of hanging
+		time.Sleep(5 * time.Second)
+		stop()
+	}()
+
+	w.Canvas().Focus(field)
+	queue <- &embedded.KeyEvent{Name: event.KeyTab, Modifiers: event.KeyModifierControl}
+	d.Run()
+
+	assert.Equal(t, after, w.Canvas().Focused())
+}
