@@ -12,7 +12,7 @@ import (
 func Test_BuildWasmVersion(t *testing.T) {
 	expected := []mockRunner{
 		{
-			expectedValue: expectedValue{args: []string{"mod", "edit", "-json"}},
+			expectedValue: expectedValue{args: []string{"mod", "edit", "-json"}, dir: "myTest"},
 			mockReturn: mockReturn{
 				ret: []byte("{ \"Module\": { \"Path\": \"github.com/belluikit/bellui\"} }"),
 			},
@@ -38,7 +38,7 @@ func Test_BuildWasmVersion(t *testing.T) {
 func Test_BuildWasmReleaseVersion(t *testing.T) {
 	expected := []mockRunner{
 		{
-			expectedValue: expectedValue{args: []string{"mod", "edit", "-json"}},
+			expectedValue: expectedValue{args: []string{"mod", "edit", "-json"}, dir: "myTest"},
 			mockReturn: mockReturn{
 				ret: []byte("{ \"Module\": { \"Path\": \"github.com/belluikit/bellui\"} }"),
 			},
@@ -87,7 +87,7 @@ func Test_BuildLinuxReleaseVersion(t *testing.T) {
 
 	expected := []mockRunner{
 		{
-			expectedValue: expectedValue{args: []string{"mod", "edit", "-json"}},
+			expectedValue: expectedValue{args: []string{"mod", "edit", "-json"}, dir: filepath.Join("myTest", relativePath)},
 			mockReturn: mockReturn{
 				ret: []byte("{ \"Module\": { \"Path\": \"github.com/belluikit/bellui\"} }"),
 			},

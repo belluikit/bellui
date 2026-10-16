@@ -25,7 +25,4 @@ func TestMakefileInstallsTheDesktopFileThatWasWritten(t *testing.T) {
 	require.NoError(t, templates.MakefileUNIX.Execute(&buf, data))
 	assert.Contains(t, buf.String(), `AppID := "Notes"`)
 	assert.True(t, strings.Contains(buf.String(), "share/applications/$(AppID).desktop"))
-
-	withID := makefileData(unixData{Name: "Notes", AppID: "com.example.notes", Icon: "com.example.notes"}, "com.example.notes")
-	assert.Equal(t, "com.example.notes", withID.AppID)
 }

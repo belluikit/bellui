@@ -22,5 +22,4 @@ func TestFindWindowsSDKBinFromPath(t *testing.T) {
 	dir, err := findWindowsSDKBin()
 	require.NoError(t, err)
 	assert.Equal(t, sdk, dir)
-	assert.Equal(t, filepath.Join(sdk, "signtool.exe"), filepath.Join(dir, "signtool.exe"))
 }
