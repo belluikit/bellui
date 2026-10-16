@@ -13,7 +13,7 @@ var _ core.CanvasObject = (*Polygon)(nil)
 // Polygon describes a colored regular polygon primitive in a Bellui canvas.
 // The rendered portion will be in the center of the available space.
 //
-// Since: 2.7
+// Since: 1.0
 type Polygon struct {
 	baseObject
 

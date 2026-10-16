@@ -27,7 +27,7 @@ const (
 
 // ColorPickerDialog is a simple dialog window that displays a color picker.
 //
-// Since: 1.4
+// Since: 1.0
 type ColorPickerDialog struct {
 	*dialog
 	Advanced bool
@@ -41,7 +41,7 @@ type ColorPickerDialog struct {
 // Using the returned type you should call Show() and then set its color through SetColor().
 // The callback is triggered when the user selects a color.
 //
-// Since: 1.4
+// Since: 1.0
 func NewColorPicker(title, message string, callback func(c color.Color), parent bellui.Window) *ColorPickerDialog {
 	return &ColorPickerDialog{
 		dialog:   newDialog(title, message, theme.ColorPaletteIcon(), nil /*cancel?*/, parent),
@@ -53,7 +53,7 @@ func NewColorPicker(title, message string, callback func(c color.Color), parent 
 // ShowColorPicker creates and shows a color dialog.
 // The callback is triggered when the user selects a color.
 //
-// Since: 1.4
+// Since: 1.0
 func ShowColorPicker(title, message string, callback func(c color.Color), parent bellui.Window) {
 	NewColorPicker(title, message, callback, parent).Show()
 }

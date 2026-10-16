@@ -18,7 +18,7 @@ import (
 
 // DatePicker is an MD3-compliant date picker with a calendar grid.
 //
-// Since: 2.7
+// Since: 1.0
 type DatePicker struct {
 	BaseWidget
 	Selected  time.Time
@@ -102,7 +102,7 @@ func (d *DatePicker) moveCursor(to time.Time) {
 
 // NewDatePicker creates a new MD3 date picker.
 //
-// Since: 2.7
+// Since: 1.0
 func NewDatePicker(selected time.Time, changed func(time.Time)) *DatePicker {
 	d := &DatePicker{Selected: selected, OnChanged: changed, viewing: selected}
 	if d.viewing.IsZero() {
@@ -197,7 +197,7 @@ func (d *DatePicker) CreateRenderer() core.WidgetRenderer {
 
 // ShowDatePicker shows the date picker as a modal dialog.
 //
-// Since: 2.7
+// Since: 1.0
 func ShowDatePicker(selected time.Time, changed func(time.Time), c core.Canvas) {
 	picker := NewDatePicker(selected, nil)
 

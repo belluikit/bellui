@@ -23,7 +23,7 @@ type overrideScope struct {
 // This should be used sparingly to avoid a jarring user experience.
 // If the object is a container it will theme the children, if it is a canvas primitive it will do nothing.
 //
-// Since: 2.5
+// Since: 1.0
 func OverrideTheme(o core.CanvasObject, th bellui.Theme) {
 	id := overrideCount.Add(1)
 	s := &overrideScope{th: th, cacheID: strconv.Itoa(int(id))}

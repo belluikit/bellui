@@ -16,7 +16,7 @@ import (
 // TabItem represents a single view in a tab view.
 // The Text and Icon are used for the tab button and the Content is shown when the corresponding tab is active.
 //
-// Since: 1.4
+// Since: 1.0
 type TabItem struct {
 	Text    string
 	Icon    bellui.Resource
@@ -29,7 +29,7 @@ type TabItem struct {
 
 // Disabled returns whether or not the TabItem is disabled.
 //
-// Since: 2.3
+// Since: 1.0
 func (ti *TabItem) Disabled() bool {
 	return ti.disabled
 }
@@ -50,7 +50,7 @@ func (ti *TabItem) enable() {
 
 // TabLocation is the location where the tabs of a tab container should be rendered
 //
-// Since: 1.4
+// Since: 1.0
 type TabLocation int
 
 // TabLocation values
@@ -63,14 +63,14 @@ const (
 
 // NewTabItem creates a new item for a tabbed widget - each item specifies the content and a label for its tab.
 //
-// Since: 1.4
+// Since: 1.0
 func NewTabItem(text string, content core.CanvasObject) *TabItem {
 	return &TabItem{Text: text, Content: content}
 }
 
 // NewTabItemWithIcon creates a new item for a tabbed widget - each item specifies the content and a label with an icon for its tab.
 //
-// Since: 1.4
+// Since: 1.0
 func NewTabItemWithIcon(text string, icon bellui.Resource, content core.CanvasObject) *TabItem {
 	return &TabItem{Text: text, Icon: icon, Content: content}
 }

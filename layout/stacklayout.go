@@ -16,7 +16,7 @@ type stackLayout struct{}
 // Having only a single object has no impact as CanvasObjects will
 // fill the available space even without a Stack.
 //
-// Since: 2.4
+// Since: 1.0
 func NewStackLayout() core.Layout {
 	return stackLayout{}
 }

@@ -23,7 +23,7 @@ var (
 
 // SpinBox is a numeric input with increment and decrement buttons.
 //
-// Since: 2.7
+// Since: 1.0
 type SpinBox struct {
 	DisableableWidget
 
@@ -47,7 +47,7 @@ type SpinBox struct {
 
 // NewSpinBox creates a new spin box with the given range and step.
 //
-// Since: 2.7
+// Since: 1.0
 func NewSpinBox(min, max, step float64) *SpinBox {
 	s := &SpinBox{
 		Min:  min,

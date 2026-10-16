@@ -7,7 +7,7 @@ import (
 // DefaultEmojiFont returns the font resource for the built-in emoji font.
 // This may return nil if the application was packaged without an emoji font.
 //
-// Since: 2.4
+// Since: 1.0
 func DefaultEmojiFont() bellui.Resource {
 	return emoji
 }
@@ -49,14 +49,14 @@ func DefaultTextMonospaceFont() bellui.Resource {
 
 // DefaultSymbolFont returns the font resource for the built-in symbol font.
 //
-// Since: 2.2
+// Since: 1.0
 func DefaultSymbolFont() bellui.Resource {
 	return symbol
 }
 
 // Font looks up the font for current theme and text style.
 //
-// Since: 2.5
+// Since: 1.0
 func Font(style bellui.TextStyle) bellui.Resource {
 	return safeFontLookup(style)
 }
@@ -88,7 +88,7 @@ func TextMonospaceFont() bellui.Resource {
 
 // SymbolFont returns the font resource for the symbol font style.
 //
-// Since: 2.4
+// Since: 1.0
 func SymbolFont() bellui.Resource {
 	return safeFontLookup(bellui.TextStyle{Symbol: true})
 }

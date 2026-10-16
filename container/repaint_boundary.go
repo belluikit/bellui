@@ -18,7 +18,7 @@ var _ core.Widget = (*RepaintBoundary)(nil)
 // video players, animated panels) so that refreshing one region does not
 // force a full repaint of the entire canvas.
 //
-// Since: 2.7
+// Since: 1.0
 type RepaintBoundary struct {
 	widget.BaseWidget
 	Content core.CanvasObject
@@ -26,7 +26,7 @@ type RepaintBoundary struct {
 
 // NewRepaintBoundary creates a new RepaintBoundary wrapping the given content.
 //
-// Since: 2.7
+// Since: 1.0
 func NewRepaintBoundary(content core.CanvasObject) *RepaintBoundary {
 	rb := &RepaintBoundary{Content: content}
 	rb.ExtendBaseWidget(rb)

@@ -126,7 +126,7 @@ func (s Size) SubtractWidthHeight(width, height float32) Size {
 // signal "no/invalid rectangle" — e.g. a caret position that is out of range
 // or scrolled out of view.
 //
-// Since: 2.9
+// Since: 1.0
 type Rectangle struct {
 	Pos  Position
 	Size Size
@@ -134,7 +134,7 @@ type Rectangle struct {
 
 // NewRectangle returns a Rectangle at (x, y) with the given width and height.
 //
-// Since: 2.9
+// Since: 1.0
 func NewRectangle(x, y, w, h float32) Rectangle {
 	return Rectangle{Pos: Position{x, y}, Size: Size{w, h}}
 }
@@ -142,7 +142,7 @@ func NewRectangle(x, y, w, h float32) Rectangle {
 // IsZero reports whether the rectangle has both a zero position and zero size,
 // the conventional "no rectangle" sentinel.
 //
-// Since: 2.9
+// Since: 1.0
 func (r Rectangle) IsZero() bool { return r.Pos.IsZero() && r.Size.IsZero() }
 
 // --- Math helpers ---

@@ -9,12 +9,12 @@ import (
 // Scroll defines a container that is smaller than the Content.
 // The Offset is used to determine the position of the child widgets within the container.
 //
-// Since: 1.4
+// Since: 1.0
 type Scroll = widget.Scroll
 
 // ScrollDirection represents the directions in which a Scroll container can scroll its child content.
 //
-// Since: 1.4
+// Since: 1.0
 type ScrollDirection = bellui.ScrollDirection
 
 // Constants for valid values of ScrollDirection.
@@ -27,14 +27,14 @@ const (
 	ScrollVerticalOnly = bellui.ScrollVerticalOnly
 	// ScrollNone turns off scrolling for this container.
 	//
-	// Since: 2.1
+	// Since: 1.0
 	ScrollNone = bellui.ScrollNone
 )
 
 // NewScroll creates a scrollable parent wrapping the specified content.
 // Note that this may cause the MinSize to be smaller than that of the passed object.
 //
-// Since: 1.4
+// Since: 1.0
 func NewScroll(content core.CanvasObject) *Scroll {
 	return widget.NewScroll(content)
 }
@@ -42,7 +42,7 @@ func NewScroll(content core.CanvasObject) *Scroll {
 // NewHScroll create a scrollable parent wrapping the specified content.
 // Note that this may cause the MinSize.Width to be smaller than that of the passed object.
 //
-// Since: 1.4
+// Since: 1.0
 func NewHScroll(content core.CanvasObject) *Scroll {
 	return widget.NewHScroll(content)
 }
@@ -50,7 +50,7 @@ func NewHScroll(content core.CanvasObject) *Scroll {
 // NewVScroll a scrollable parent wrapping the specified content.
 // Note that this may cause the MinSize.Height to be smaller than that of the passed object.
 //
-// Since: 1.4
+// Since: 1.0
 func NewVScroll(content core.CanvasObject) *Scroll {
 	return widget.NewVScroll(content)
 }

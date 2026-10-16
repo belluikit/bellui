@@ -17,7 +17,7 @@ import (
 // DateTimeEntry is an Entry that accepts locale-formatted date+time values
 // with an optional picker popup triggered by an action button.
 //
-// Since: 2.7
+// Since: 1.0
 type DateTimeEntry struct {
 	Entry
 
@@ -38,7 +38,7 @@ type DateTimeEntry struct {
 // The 12h/24h mode is auto-detected from the current locale. Use the
 // DateTimeEntry.OnChanged field (not Entry.OnChanged) to receive parsed values.
 //
-// Since: 2.7
+// Since: 1.0
 func NewDateTimeEntry() *DateTimeEntry {
 	e := &DateTimeEntry{
 		Use24Hour: lang.Prefers24HourClock(),

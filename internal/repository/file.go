@@ -48,7 +48,7 @@ func (f *file) URI() bellui.URI {
 //
 // This repository is suitable to handle the file:// scheme.
 //
-// Since: 2.0
+// Since: 1.0
 type FileRepository struct {
 	// Shared fsnotify watcher backing WatchURI, created on first use (#454).
 	//
@@ -70,14 +70,14 @@ type FileRepository struct {
 // NewFileRepository creates a new FileRepository instance.
 // The caller needs to call repository.Register() with the result of this function.
 //
-// Since: 2.0
+// Since: 1.0
 func NewFileRepository() *FileRepository {
 	return &FileRepository{}
 }
 
 // Exists checks if the given URI exists.
 //
-// Since: 2.0
+// Since: 1.0
 func (r *FileRepository) Exists(u bellui.URI) (bool, error) {
 	p := u.Path()
 	_, err := os.Stat(p)
@@ -92,14 +92,14 @@ func (r *FileRepository) Exists(u bellui.URI) (bool, error) {
 
 // Reader returns a reader for the given URI.
 //
-// Since: 2.0
+// Since: 1.0
 func (r *FileRepository) Reader(u bellui.URI) (bellui.URIReadCloser, error) {
 	return openFile(u, false, false)
 }
 
 // CanRead checks if the given URI can be read.
 //
-// Since: 2.0
+// Since: 1.0
 func (r *FileRepository) CanRead(u bellui.URI) (bool, error) {
 	f, err := os.OpenFile(u.Path(), os.O_RDONLY, 0o666)
 	if err != nil {
@@ -120,21 +120,21 @@ func (r *FileRepository) Destroy(scheme string) {
 
 // Writer returns a truncating writer for the given URI.
 //
-// Since: 2.0
+// Since: 1.0
 func (r *FileRepository) Writer(u bellui.URI) (bellui.URIWriteCloser, error) {
 	return openFile(u, true, true)
 }
 
 // Appender returns a writer that appends to the given URI.
 //
-// Since: 2.6
+// Since: 1.0
 func (r *FileRepository) Appender(u bellui.URI) (bellui.URIWriteCloser, error) {
 	return openFile(u, true, false)
 }
 
 // CanWrite checks if the given URI can be written.
 //
-// Since: 2.0
+// Since: 1.0
 func (r *FileRepository) CanWrite(u bellui.URI) (bool, error) {
 	f, err := os.OpenFile(u.Path(), os.O_WRONLY, 0o666)
 	if err != nil {
@@ -157,21 +157,21 @@ func (r *FileRepository) CanWrite(u bellui.URI) (bool, error) {
 
 // Delete deletes the given URI.
 //
-// Since: 2.0
+// Since: 1.0
 func (r *FileRepository) Delete(u bellui.URI) error {
 	return os.Remove(u.Path())
 }
 
 // DeleteAll deletes the given URI and all its children.
 //
-// Since: 2.7
+// Since: 1.0
 func (r *FileRepository) DeleteAll(u bellui.URI) error {
 	return os.RemoveAll(u.Path())
 }
 
 // Parent returns the parent URI of the given URI.
 //
-// Since: 2.0
+// Since: 1.0
 func (r *FileRepository) Parent(u bellui.URI) (bellui.URI, error) {
 	child := path.Clean(u.Path())
 	if child == "." || // Clean ending up empty returns ".".
@@ -190,14 +190,14 @@ func (r *FileRepository) Parent(u bellui.URI) (bellui.URI, error) {
 
 // Child creates a child URI from the given URI and component.
 //
-// Since: 2.0
+// Since: 1.0
 func (r *FileRepository) Child(u bellui.URI, component string) (bellui.URI, error) {
 	return storage.NewFileURI(path.Join(u.Path(), component)), nil
 }
 
 // List returns a list of all child URIs of the given URI.
 //
-// Since: 2.0
+// Since: 1.0
 func (r *FileRepository) List(u bellui.URI) ([]bellui.URI, error) {
 	p := u.Path()
 	files, err := os.ReadDir(p)
@@ -221,7 +221,7 @@ func (r *FileRepository) CreateListable(u bellui.URI) error {
 
 // CanList checks if the given URI can be listed.
 //
-// Since: 2.0
+// Since: 1.0
 func (r *FileRepository) CanList(u bellui.URI) (bool, error) {
 	p := u.Path()
 	info, err := os.Stat(p)
@@ -262,7 +262,7 @@ func (r *FileRepository) CanList(u bellui.URI) (bool, error) {
 
 // Copy copies the contents of the source URI to the destination URI.
 //
-// Since: 2.0
+// Since: 1.0
 func (r *FileRepository) Copy(source, destination bellui.URI) error {
 	err := fastCopy(destination.Path(), source.Path())
 	if err == nil {
@@ -274,7 +274,7 @@ func (r *FileRepository) Copy(source, destination bellui.URI) error {
 
 // Move moves the contents of the source URI to the destination URI.
 //
-// Since: 2.0
+// Since: 1.0
 func (r *FileRepository) Move(source, destination bellui.URI) error {
 	err := os.Rename(source.Path(), destination.Path())
 	if err == nil {

@@ -23,7 +23,7 @@ import (
 // the enclosing direction, so it is a no-op wrapper; use [DirectionLTR] or
 // [DirectionRTL] to force a direction. Scopes nest, with the innermost winning.
 //
-// Since: 2.8
+// Since: 1.0
 type DirectionScope struct {
 	widget.BaseWidget
 
@@ -42,7 +42,7 @@ type DirectionScope struct {
 // [github.com/belluikit/bellui.DirectionLTR] or [DirectionRTL] to force a
 // direction; [DirectionAuto] inherits the enclosing direction.
 //
-// Since: 2.8
+// Since: 1.0
 func NewDirectionScope(obj core.CanvasObject, dir bellui.Direction) *DirectionScope {
 	d := &DirectionScope{Content: obj, Direction: dir, holder: NewStack(obj)}
 	d.ExtendBaseWidget(d)
@@ -70,7 +70,7 @@ func (d *DirectionScope) ScopedDirection() bellui.Direction {
 // SetDirection updates the ambient direction applied to the content and
 // re-lays-out the subtree. It is a no-op when the direction is unchanged.
 //
-// Since: 2.8
+// Since: 1.0
 func (d *DirectionScope) SetDirection(dir bellui.Direction) {
 	if d.Direction == dir {
 		return

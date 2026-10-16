@@ -12,7 +12,7 @@ import (
 
 // EqualURI returns true if the two URIs are equal.
 //
-// Since: 2.6
+// Since: 1.0
 func EqualURI(t1, t2 bellui.URI) bool {
 	if t1 == nil || t2 == nil {
 		return t1 == t2

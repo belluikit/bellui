@@ -265,7 +265,7 @@ func (w *BaseWidget) Refresh() {
 // Theme returns a cached Theme instance for this widget (or its extending widget).
 // This will be the app theme in most cases, or a widget specific theme if it is inside a ThemeOverride container.
 //
-// Since: 2.5
+// Since: 1.0
 func (w *BaseWidget) Theme() bellui.Theme {
 	if cached := w.themeCache.Load(); cached != nil {
 		return *cached
@@ -364,7 +364,7 @@ func (w *DisableableWidget) Disabled() bool {
 // NewSimpleRenderer creates a new SimpleRenderer to render a widget using a
 // single core.CanvasObject.
 //
-// Since: 2.1
+// Since: 1.0
 func NewSimpleRenderer(object core.CanvasObject) core.WidgetRenderer {
 	return internalWidget.NewSimpleRenderer(object)
 }
@@ -380,7 +380,7 @@ const (
 	// Adaptive will switch between horizontal and vertical layouts according to device orientation.
 	// This orientation is not always supported and interpretation can vary per-widget.
 	//
-	// Since: 2.5
+	// Since: 1.0
 	Adaptive Orientation = 2
 )
 

@@ -15,7 +15,7 @@ import (
 // WeekStartDay returns the first day of the week for the current locale,
 // based on CLDR region data.
 //
-// Since: 2.7
+// Since: 1.0
 func WeekStartDay() time.Weekday {
 	return weekStartForRegion(regionString(getCurrentTag()))
 }
@@ -23,7 +23,7 @@ func WeekStartDay() time.Weekday {
 // DayHeaders returns 7 single-character (narrow) day abbreviations starting
 // from the locale's week start day.
 //
-// Since: 2.7
+// Since: 1.0
 func DayHeaders() []string {
 	start := WeekStartDay()
 	headers := make([]string, 7)
@@ -37,7 +37,7 @@ func DayHeaders() []string {
 // WeekdayOffset returns how many empty cells precede day 1 in a calendar grid
 // that starts on the locale's week start day.
 //
-// Since: 2.7
+// Since: 1.0
 func WeekdayOffset(firstOfMonth time.Time) int {
 	start := WeekStartDay()
 	wd := int(firstOfMonth.Weekday())
@@ -46,7 +46,7 @@ func WeekdayOffset(firstOfMonth time.Time) int {
 
 // FormatMonthYear returns a locale-formatted "Month Year" string.
 //
-// Since: 2.7
+// Since: 1.0
 func FormatMonthYear(t time.Time) string {
 	month := localizedMonthName(t.Month())
 	return fmt.Sprintf("%s %d", month, t.Year())
@@ -54,7 +54,7 @@ func FormatMonthYear(t time.Time) string {
 
 // DecimalSeparator returns the locale's decimal separator (e.g., "." or ",").
 //
-// Since: 2.7
+// Since: 1.0
 func DecimalSeparator() string {
 	sep, _ := detectSeparators()
 	return sep
@@ -62,7 +62,7 @@ func DecimalSeparator() string {
 
 // GroupSeparator returns the locale's grouping/thousands separator (e.g., "," or "." or "\u00a0").
 //
-// Since: 2.7
+// Since: 1.0
 func GroupSeparator() string {
 	_, grp := detectSeparators()
 	return grp
@@ -71,7 +71,7 @@ func GroupSeparator() string {
 // FormatDecimal formats a float64 using the current locale's number formatting.
 // If scale < 0, minimal fractional digits are used (trailing zeros removed).
 //
-// Since: 2.7
+// Since: 1.0
 func FormatDecimal(v float64, scale int) string {
 	tag := resolveTag()
 	p := message.NewPrinter(tag)
@@ -91,7 +91,7 @@ func FormatDecimal(v float64, scale int) string {
 // ParseLocaleFloat parses a locale-formatted number string back to float64.
 // It strips group separators and normalizes the decimal separator to '.'.
 //
-// Since: 2.7
+// Since: 1.0
 func ParseLocaleFloat(s string) (float64, error) {
 	dec := DecimalSeparator()
 	grp := GroupSeparator()
@@ -263,7 +263,7 @@ var saturdayStart = map[string]time.Weekday{
 // DatePattern returns the Go time layout string for the current locale's
 // short date format (e.g. "01/02/2006" for en-US, "02.01.2006" for de-DE).
 //
-// Since: 2.7
+// Since: 1.0
 func DatePattern() string {
 	if p, ok := shortDateFormats[regionString(getCurrentTag())]; ok {
 		return p
@@ -274,14 +274,14 @@ func DatePattern() string {
 // DatePatternHint returns a human-readable placeholder for the locale's date
 // format (e.g. "MM/DD/YYYY" for en-US, "DD.MM.YYYY" for de-DE).
 //
-// Since: 2.7
+// Since: 1.0
 func DatePatternHint() string {
 	return goLayoutToHint(DatePattern())
 }
 
 // FormatDate formats t using the locale's short date pattern.
 //
-// Since: 2.7
+// Since: 1.0
 func FormatDate(t time.Time) string {
 	return t.Format(DatePattern())
 }
@@ -289,7 +289,7 @@ func FormatDate(t time.Time) string {
 // ParseDate parses a locale-formatted date string.
 // It is lenient with single-digit day/month values (e.g. "1/5/2025" matches "01/02/2006").
 //
-// Since: 2.7
+// Since: 1.0
 func ParseDate(s string) (time.Time, error) {
 	pattern := DatePattern()
 	// Try strict parse first.
@@ -304,7 +304,7 @@ func ParseDate(s string) (time.Time, error) {
 // TimePattern returns the Go time layout for the locale's time-of-day format.
 // Returns "3:04 PM" for 12-hour locales or "15:04" for 24-hour locales.
 //
-// Since: 2.7
+// Since: 1.0
 func TimePattern() string {
 	if Prefers24HourClock() {
 		return "15:04"
@@ -315,14 +315,14 @@ func TimePattern() string {
 // TimePatternHint returns a human-readable placeholder for the time format
 // (e.g. "HH:MM" for 24h or "H:MM AM/PM" for 12h).
 //
-// Since: 2.7
+// Since: 1.0
 func TimePatternHint() string {
 	return goLayoutToHint(TimePattern())
 }
 
 // FormatTime formats a time-of-day using the locale's time pattern.
 //
-// Since: 2.7
+// Since: 1.0
 func FormatTime(hour, minute int) string {
 	t := time.Date(0, 1, 1, hour, minute, 0, 0, time.UTC)
 	return t.Format(TimePattern())
@@ -330,7 +330,7 @@ func FormatTime(hour, minute int) string {
 
 // DateTimePattern returns the combined date+time layout for the locale.
 //
-// Since: 2.7
+// Since: 1.0
 func DateTimePattern() string {
 	return DatePattern() + " " + TimePattern()
 }
@@ -338,21 +338,21 @@ func DateTimePattern() string {
 // DateTimePatternHint returns a human-readable placeholder for the combined
 // date+time format (e.g. "MM/DD/YYYY H:MM AM/PM" or "DD.MM.YYYY HH:MM").
 //
-// Since: 2.7
+// Since: 1.0
 func DateTimePatternHint() string {
 	return DatePatternHint() + " " + TimePatternHint()
 }
 
 // FormatDateTime formats t using the locale's combined date+time pattern.
 //
-// Since: 2.7
+// Since: 1.0
 func FormatDateTime(t time.Time) string {
 	return t.Format(DateTimePattern())
 }
 
 // ParseDateTime parses a locale-formatted date+time string.
 //
-// Since: 2.7
+// Since: 1.0
 func ParseDateTime(s string) (time.Time, error) {
 	pattern := DateTimePattern()
 	if t, err := time.Parse(pattern, s); err == nil {
@@ -504,7 +504,7 @@ var shortDateFormats = map[string]string{
 // 24-hour time notation. Most of the world uses 24-hour; the map lists the
 // minority of regions that prefer 12-hour clocks.
 //
-// Since: 2.7
+// Since: 1.0
 func Prefers24HourClock() bool {
 	return !uses12HourClock[regionString(getCurrentTag())]
 }
@@ -525,7 +525,7 @@ var uses12HourClock = map[string]bool{
 // FormatCurrency formats amount using the locale's number formatting and the
 // appropriate currency symbol. currencyCode is an ISO 4217 code (e.g. "USD").
 //
-// Since: 2.7
+// Since: 1.0
 func FormatCurrency(amount float64, currencyCode string) string {
 	sym := CurrencySymbol(currencyCode)
 	negative := amount < 0
@@ -548,7 +548,7 @@ func FormatCurrency(amount float64, currencyCode string) string {
 // CurrencySymbol returns the narrow symbol for an ISO 4217 currency code.
 // For example, "USD" → "$", "EUR" → "€", "GBP" → "£".
 //
-// Since: 2.7
+// Since: 1.0
 func CurrencySymbol(currencyCode string) string {
 	if sym, ok := currencySymbols[currencyCode]; ok {
 		return sym
@@ -559,7 +559,7 @@ func CurrencySymbol(currencyCode string) string {
 // DefaultCurrency returns the ISO 4217 currency code for the current locale's
 // region (e.g. "USD" for en-US, "EUR" for de-DE, "JPY" for ja-JP).
 //
-// Since: 2.7
+// Since: 1.0
 func DefaultCurrency() string {
 	unit, conf := currency.FromTag(resolveTag())
 	if conf >= language.Low {

@@ -2,7 +2,7 @@ package bellui
 
 // ScrollDirection represents the directions in which a scrollable container or widget can scroll its child content.
 //
-// Since: 2.6
+// Since: 1.0
 type ScrollDirection int
 
 // Constants for valid values of ScrollDirection used in containers and widgets.

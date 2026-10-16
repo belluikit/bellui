@@ -48,7 +48,7 @@ type TableCellID struct {
 // Its performance is provided by caching cell templates created with CreateCell and re-using them with UpdateCell.
 // The size of the content rows/columns is returned by the Length callback.
 //
-// Since: 1.4
+// Since: 1.0
 type Table struct {
 	BaseWidget
 
@@ -61,42 +61,42 @@ type Table struct {
 	// ShowHeaderRow specifies that a row should be added to the table with header content.
 	// This will default to an A-Z style content, unless overridden with `CreateHeader` and `UpdateHeader` calls.
 	//
-	// Since: 2.4
+	// Since: 1.0
 	ShowHeaderRow bool
 
 	// ShowHeaderColumn specifies that a column should be added to the table with header content.
 	// This will default to an 1-10 style numeric content, unless overridden with `CreateHeader` and `UpdateHeader` calls.
 	//
-	// Since: 2.4
+	// Since: 1.0
 	ShowHeaderColumn bool
 
 	// CreateHeader is an optional function that allows overriding of the default header widget.
 	// Developers must also override `UpdateHeader`.
 	//
-	// Since: 2.4
+	// Since: 1.0
 	CreateHeader func() core.CanvasObject `json:"-"`
 
 	// UpdateHeader is used with `CreateHeader` to support custom header content.
 	// The `id` parameter will have `-1` value to indicate a header, and `> 0` where the column or row refer to data.
 	//
-	// Since: 2.4
+	// Since: 1.0
 	UpdateHeader func(id TableCellID, template core.CanvasObject) `json:"-"`
 
 	// StickyRowCount specifies how many data rows should not scroll when the content moves.
 	// If `ShowHeaderRow` us `true` then the stuck row will appear immediately underneath.
 	//
-	// Since: 2.4
+	// Since: 1.0
 	StickyRowCount int
 
 	// StickyColumnCount specifies how many data columns should not scroll when the content moves.
 	// If `ShowHeaderColumn` us `true` then the stuck column will appear immediately next to the header.
 	//
-	// Since: 2.4
+	// Since: 1.0
 	StickyColumnCount int
 
 	// HideSeparators hides the separator lines between the table cells
 	//
-	// Since: 2.5
+	// Since: 1.0
 	HideSeparators bool
 
 	currentFocus              TableCellID
@@ -139,7 +139,7 @@ func (t *Table) AccessibleGridDimensions() (rows, cols int) {
 // template objects that can be cached and the third is used to apply data at specified data location to the
 // passed template CanvasObject.
 //
-// Since: 1.4
+// Since: 1.0
 func NewTable(length func() (rows int, cols int), create func() core.CanvasObject, update func(TableCellID, core.CanvasObject)) *Table {
 	t := &Table{Length: length, CreateCell: create, UpdateCell: update}
 	t.ExtendBaseWidget(t)
@@ -152,7 +152,7 @@ func NewTable(length func() (rows int, cols int), create func() core.CanvasObjec
 // passed template CanvasObject.
 // The row and column headers will stick to the leading and top edges of the table and contain "1-10" and "A-Z" formatted labels.
 //
-// Since: 2.4
+// Since: 1.0
 func NewTableWithHeaders(length func() (rows int, cols int), create func() core.CanvasObject, update func(TableCellID, core.CanvasObject)) *Table {
 	t := NewTable(length, create, update)
 	t.ShowHeaderRow = true
@@ -270,7 +270,7 @@ func (t *Table) MouseUp(*desktop.MouseEvent) {
 
 // RefreshItem refreshes a single item, specified by the item ID passed in.
 //
-// Since: 2.4
+// Since: 1.0
 func (t *Table) RefreshItem(id TableCellID) {
 	if t.cells == nil {
 		return
@@ -309,7 +309,7 @@ func (t *Table) Select(id TableCellID) {
 // cell returned from the CreateCell callback. The width parameter uses the same units as a geo.Size type and refers
 // to the internal content width not including the divider size.
 //
-// Since: 1.4.1
+// Since: 1.0
 func (t *Table) SetColumnWidth(id int, width float32) {
 	if id < 0 {
 		if t.headerSize.Width == width {
@@ -333,7 +333,7 @@ func (t *Table) SetColumnWidth(id int, width float32) {
 // cell returned from the CreateCell callback. The height parameter uses the same units as a geo.Size type and refers
 // to the internal content height not including the divider size.
 //
-// Since: 2.3
+// Since: 1.0
 func (t *Table) SetRowHeight(id int, height float32) {
 	if id < 0 {
 		if t.headerSize.Height == height {
@@ -441,7 +441,7 @@ func (t *Table) Unselect(id TableCellID) {
 
 // UnselectAll will mark all cells as unselected.
 //
-// Since: 2.1
+// Since: 1.0
 func (t *Table) UnselectAll() {
 	if t.selectedCell == nil {
 		return
@@ -463,7 +463,7 @@ func (t *Table) UnselectAll() {
 // Attempting to scroll beyond the limits of the table will scroll to
 // the edge of the table instead.
 //
-// Since: 2.1
+// Since: 1.0
 func (t *Table) ScrollTo(id TableCellID) {
 	if t.Length == nil {
 		return
@@ -526,7 +526,7 @@ func (t *Table) ScrollTo(id TableCellID) {
 
 // ScrollToBottom scrolls to the last row in the table
 //
-// Since: 2.1
+// Since: 1.0
 func (t *Table) ScrollToBottom() {
 	if t.Length == nil || t.content == nil {
 		return
@@ -546,7 +546,7 @@ func (t *Table) ScrollToBottom() {
 
 // ScrollToLeading scrolls horizontally to the leading edge of the table
 //
-// Since: 2.1
+// Since: 1.0
 func (t *Table) ScrollToLeading() {
 	if t.content == nil {
 		return
@@ -559,7 +559,7 @@ func (t *Table) ScrollToLeading() {
 
 // ScrollToOffset scrolls the table to a specific position
 //
-// Since: 2.6
+// Since: 1.0
 func (t *Table) ScrollToOffset(off geo.Position) {
 	if t.content == nil {
 		return
@@ -572,7 +572,7 @@ func (t *Table) ScrollToOffset(off geo.Position) {
 
 // ScrollToTop scrolls to the first row in the table
 //
-// Since: 2.1
+// Since: 1.0
 func (t *Table) ScrollToTop() {
 	if t.content == nil {
 		return
@@ -585,7 +585,7 @@ func (t *Table) ScrollToTop() {
 
 // ScrollToTrailing scrolls horizontally to the trailing edge of the table
 //
-// Since: 2.1
+// Since: 1.0
 func (t *Table) ScrollToTrailing() {
 	if t.content == nil || t.Length == nil {
 		return

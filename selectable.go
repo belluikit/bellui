@@ -3,7 +3,7 @@ package bellui
 // SelectableMode represents the window-level selectable mode which can override
 // per-widget Selectable properties for display widgets.
 //
-// Since: 2.8
+// Since: 1.0
 type SelectableMode int
 
 const (

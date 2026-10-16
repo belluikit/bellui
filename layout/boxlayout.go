@@ -29,7 +29,7 @@ func NewHBoxLayout() core.Layout {
 // NewCustomPaddedHBoxLayout returns a layout similar to HBoxLayout that uses a custom
 // amount of padding in between objects instead of the theme.Padding value.
 //
-// Since: 2.5
+// Since: 1.0
 func NewCustomPaddedHBoxLayout(padding float32) core.Layout {
 	return hBoxLayout{
 		paddingFunc: func() float32 { return padding },
@@ -39,7 +39,7 @@ func NewCustomPaddedHBoxLayout(padding float32) core.Layout {
 // NewCustomPaddedVBoxLayout returns a layout similar to VBoxLayout that uses a custom
 // amount of padding in between objects instead of the theme.Padding value.
 //
-// Since: 2.5
+// Since: 1.0
 func NewCustomPaddedVBoxLayout(padding float32) core.Layout {
 	return vBoxLayout{
 		paddingFunc: func() float32 { return padding },

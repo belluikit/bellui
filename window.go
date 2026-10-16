@@ -56,7 +56,7 @@ type Window interface {
 	// SelectableMode returns the window-level selectable mode.
 	// The default value is [SelectablePerWidget].
 	//
-	// Since: 2.8
+	// Since: 1.0
 	SelectableMode() SelectableMode
 	// SetSelectableMode sets the window-level selectable mode which overrides
 	// per-widget Selectable properties for display widgets (e.g. Label).
@@ -64,7 +64,7 @@ type Window interface {
 	// [SelectableNone] forces them to be non-selectable, and
 	// [SelectablePerWidget] (the default) defers to each widget's own setting.
 	//
-	// Since: 2.8
+	// Since: 1.0
 	SetSelectableMode(SelectableMode)
 
 	// Icon returns the window icon, this is used in various ways
@@ -89,7 +89,7 @@ type Window interface {
 	// SetCloseIntercept sets a function that runs instead of closing if defined.
 	// [Window.Close] should be called explicitly in the interceptor to close the window.
 	//
-	// Since: 1.4
+	// Since: 1.0
 	SetCloseIntercept(func())
 
 	// Show the window on screen.

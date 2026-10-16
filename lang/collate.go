@@ -11,7 +11,7 @@ import (
 // between strings. The zero set of options gives the locale's default ordering:
 // case- and accent-sensitive, with runs of digits compared lexically.
 //
-// Since: 2.8
+// Since: 1.0
 type CollatorOption int
 
 const (
@@ -68,7 +68,7 @@ func currentCollationTag() language.Tag {
 // concurrent use — give each goroutine its own, or use the package-level
 // [Compare], which is goroutine-safe.
 //
-// Since: 2.8
+// Since: 1.0
 type Collator struct {
 	c *collate.Collator
 }
@@ -76,7 +76,7 @@ type Collator struct {
 // NewCollator returns a [Collator] for the active locale (see [CurrentLocale])
 // with the given options applied.
 //
-// Since: 2.8
+// Since: 1.0
 func NewCollator(opts ...CollatorOption) *Collator {
 	return &Collator{c: collate.New(currentCollationTag(), collateOptions(opts)...)}
 }
@@ -84,14 +84,14 @@ func NewCollator(opts ...CollatorOption) *Collator {
 // Compare returns -1, 0 or +1 as a sorts before, equal to, or after b under the
 // collator's locale and options.
 //
-// Since: 2.8
+// Since: 1.0
 func (c *Collator) Compare(a, b string) int {
 	return c.c.CompareString(a, b)
 }
 
 // SortStrings sorts s in place under the collator's locale and options.
 //
-// Since: 2.8
+// Since: 1.0
 func (c *Collator) SortStrings(s []string) {
 	c.c.SortStrings(s)
 }
@@ -137,7 +137,7 @@ var (
 // Note: referencing collation links the golang.org/x/text/collate tables
 // (~1.75 MB); binaries that never call into this file do not pay that cost.
 //
-// Since: 2.8
+// Since: 1.0
 func Compare(a, b string) int {
 	return compareVia(&comparePool, nil, a, b)
 }
@@ -146,7 +146,7 @@ func Compare(a, b string) int {
 // user-facing search and matching (for example filtering a list as the user
 // types). It is safe for concurrent use.
 //
-// Since: 2.8
+// Since: 1.0
 func CompareFold(a, b string) int {
 	return compareVia(&compareFoldPool, []CollatorOption{CollateIgnoreCase, CollateIgnoreDiacritics}, a, b)
 }

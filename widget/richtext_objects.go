@@ -19,7 +19,7 @@ import (
 var (
 	// RichTextStyleBlockquote represents a quote presented in an indented block.
 	//
-	// Since: 2.1
+	// Since: 1.0
 	RichTextStyleBlockquote = RichTextStyle{
 		ColorName: theme.ColorNameOnSurfaceVariant,
 		Inline:    false,
@@ -28,7 +28,7 @@ var (
 	}
 	// RichTextStyleCodeBlock represents a code blog segment.
 	//
-	// Since: 2.1
+	// Since: 1.0
 	RichTextStyleCodeBlock = RichTextStyle{
 		ColorName: theme.ColorNameOnSurface,
 		Inline:    false,
@@ -37,7 +37,7 @@ var (
 	}
 	// RichTextStyleCodeInline represents an inline code segment.
 	//
-	// Since: 2.1
+	// Since: 1.0
 	RichTextStyleCodeInline = RichTextStyle{
 		ColorName: theme.ColorNameOnSurface,
 		Inline:    true,
@@ -46,7 +46,7 @@ var (
 	}
 	// RichTextStyleEmphasis represents regular text with emphasis.
 	//
-	// Since: 2.1
+	// Since: 1.0
 	RichTextStyleEmphasis = RichTextStyle{
 		ColorName: theme.ColorNameOnSurface,
 		Inline:    true,
@@ -55,7 +55,7 @@ var (
 	}
 	// RichTextStyleHeading represents a heading text that stands on its own line.
 	//
-	// Since: 2.1
+	// Since: 1.0
 	RichTextStyleHeading = RichTextStyle{
 		ColorName:    theme.ColorNameOnSurface,
 		Inline:       false,
@@ -65,7 +65,7 @@ var (
 	}
 	// RichTextStyleInline represents standard text that can be surrounded by other elements.
 	//
-	// Since: 2.1
+	// Since: 1.0
 	RichTextStyleInline = RichTextStyle{
 		ColorName: theme.ColorNameOnSurface,
 		Inline:    true,
@@ -73,7 +73,7 @@ var (
 	}
 	// RichTextStyleParagraph represents standard text that should appear separate from other text.
 	//
-	// Since: 2.1
+	// Since: 1.0
 	RichTextStyleParagraph = RichTextStyle{
 		ColorName: theme.ColorNameOnSurface,
 		Inline:    false,
@@ -81,7 +81,7 @@ var (
 	}
 	// RichTextStylePassword represents standard sized text where the characters are obscured.
 	//
-	// Since: 2.1
+	// Since: 1.0
 	RichTextStylePassword = RichTextStyle{
 		ColorName: theme.ColorNameOnSurface,
 		Inline:    true,
@@ -90,7 +90,7 @@ var (
 	}
 	// RichTextStyleStrong represents regular text with a strong emphasis.
 	//
-	// Since: 2.1
+	// Since: 1.0
 	RichTextStyleStrong = RichTextStyle{
 		ColorName: theme.ColorNameOnSurface,
 		Inline:    true,
@@ -99,7 +99,7 @@ var (
 	}
 	// RichTextStyleSubHeading represents a sub-heading text that stands on its own line.
 	//
-	// Since: 2.1
+	// Since: 1.0
 	RichTextStyleSubHeading = RichTextStyle{
 		ColorName:    theme.ColorNameOnSurface,
 		Inline:       false,
@@ -111,7 +111,7 @@ var (
 
 // HyperlinkSegment represents a hyperlink within a rich text widget.
 //
-// Since: 2.1
+// Since: 1.0
 type HyperlinkSegment struct {
 	Alignment bellui.TextAlign
 	Text      string
@@ -119,7 +119,7 @@ type HyperlinkSegment struct {
 
 	// OnTapped overrides the default `bellui.OpenURL` call when the link is tapped
 	//
-	// Since: 2.4
+	// Since: 1.0
 	OnTapped func() `json:"-"`
 
 	// Style carries optional per-segment styling for the link text — FontSource
@@ -218,7 +218,7 @@ func parsedLinkURL(raw string) *url.URL {
 
 // ImageSegment represents an image within a rich text widget.
 //
-// Since: 2.3
+// Since: 1.0
 type ImageSegment struct {
 	Source bellui.URI
 	Title  string
@@ -239,7 +239,7 @@ type ImageSegment struct {
 	Resource bellui.Resource
 
 	// Alignment specifies the horizontal alignment of this image segment
-	// Since: 2.4
+	// Since: 1.0
 	Alignment bellui.TextAlign
 
 	// InlineImage lays the image out *within* a text row — flowing between the
@@ -309,7 +309,7 @@ func (i *ImageSegment) Unselect() {
 
 // ListSegment includes an itemised list with the content set using the Items field.
 //
-// Since: 2.1
+// Since: 1.0
 type ListSegment struct {
 	Items   []RichTextSegment
 	Ordered bool
@@ -327,14 +327,14 @@ type ListSegment struct {
 // SetStartNumber sets the starting number for an ordered list.
 // Unordered lists are not affected.
 //
-// Since: 2.7
+// Since: 1.0
 func (l *ListSegment) SetStartNumber(s int) {
 	l.startIndex = s - 1
 }
 
 // StartNumber return the starting number for an ordered list.
 //
-// Since: 2.7
+// Since: 1.0
 func (l *ListSegment) StartNumber() int {
 	return l.startIndex + 1
 }
@@ -396,7 +396,7 @@ func (l *ListSegment) Unselect() {
 // ParagraphSegment wraps a number of text elements in a paragraph.
 // It is similar to using a list of text elements when the final style is RichTextStyleParagraph.
 //
-// Since: 2.1
+// Since: 1.0
 type ParagraphSegment struct {
 	Texts []RichTextSegment
 }
@@ -440,7 +440,7 @@ func (p *ParagraphSegment) Unselect() {
 
 // TableSegment includes a table parsed from markdown in a rich text widget.
 //
-// Since: 2.7
+// Since: 1.0
 type TableSegment struct {
 	Header     []string
 	Rows       [][]string
@@ -839,7 +839,7 @@ func (r *richTableRenderer) Destroy() {
 
 // SeparatorSegment includes a horizontal separator in a rich text widget.
 //
-// Since: 2.1
+// Since: 1.0
 type SeparatorSegment struct {
 	_ bool // Without this a pointer to SeparatorSegment will always be the same.
 }
@@ -878,7 +878,7 @@ func (s *SeparatorSegment) Unselect() {
 
 // RichTextStyle describes the details of a text object inside a RichText widget.
 //
-// Since: 2.1
+// Since: 1.0
 type RichTextStyle struct {
 	Alignment bellui.TextAlign
 	ColorName bellui.ThemeColorName
@@ -919,7 +919,7 @@ func (s RichTextStyle) isBlockquote() bool {
 
 // RichTextSegment describes any element that can be rendered in a RichText widget.
 //
-// Since: 2.1
+// Since: 1.0
 type RichTextSegment interface {
 	Inline() bool
 	Textual() string
@@ -933,7 +933,7 @@ type RichTextSegment interface {
 
 // TextSegment represents the styling for a segment of rich text.
 //
-// Since: 2.1
+// Since: 1.0
 type TextSegment struct {
 	Style RichTextStyle
 	Text  string

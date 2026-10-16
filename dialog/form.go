@@ -9,7 +9,7 @@ import (
 
 // FormDialog is a simple dialog window for displaying FormItems inside a form.
 //
-// Since: 2.4
+// Since: 1.0
 type FormDialog struct {
 	*dialog
 	items   []*widget.FormItem
@@ -19,7 +19,7 @@ type FormDialog struct {
 
 // Submit will submit the form and then hide the dialog if validation passes.
 //
-// Since: 2.4
+// Since: 1.0
 func (d *FormDialog) Submit() {
 	if d.confirm.Disabled() {
 		return
@@ -46,7 +46,7 @@ func (d *FormDialog) setSubmitState(err error) {
 // button will be disabled. The initial state of the confirm button will reflect the initial
 // validation state of the items added to the form dialog.
 //
-// Since: 2.0
+// Since: 1.0
 func NewForm(title, confirm, dismiss string, items []*widget.FormItem, callback func(bool), parent bellui.Window) *FormDialog {
 	form := widget.NewForm(items...)
 
@@ -83,7 +83,7 @@ func NewForm(title, confirm, dismiss string, items []*widget.FormItem, callback 
 // validation state of the items added to the form dialog.
 // The MinSize() of the CanvasObject passed will be used to set the size of the window.
 //
-// Since: 2.0
+// Since: 1.0
 func ShowForm(title, confirm, dismiss string, content []*widget.FormItem, callback func(bool), parent bellui.Window) {
 	NewForm(title, confirm, dismiss, content, callback, parent).Show()
 }

@@ -34,7 +34,7 @@ package lang
 // window title, a permanent toolbar button) may simply leave it for the app
 // lifetime.
 //
-// Since: 2.8
+// Since: 1.0
 func BindText(key string, apply func(string), data ...any) (remove func()) {
 	apply(Localize(key, data...))
 	return AddLocaleChangeListener(func() {

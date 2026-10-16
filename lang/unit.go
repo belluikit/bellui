@@ -20,7 +20,7 @@ const (
 // length and mass units a UI typically needs — and is extended on demand rather
 // than mirroring the full CLDR unit grid.
 //
-// Since: 2.7
+// Since: 1.0
 type Unit int
 
 // Supported units. Length and mass only for now.
@@ -56,7 +56,7 @@ var unitPattern = map[Unit]struct{ key, fallback string }{
 // form of the label is chosen. The caller chooses the unit; use
 // PreferredLengthUnit to pick km vs mi from the locale first.
 //
-// Since: 2.7
+// Since: 1.0
 func FormatUnit(value float64, unit Unit) string {
 	num := FormatDecimal(value, -1)
 	p, ok := unitPattern[unit]
@@ -99,7 +99,7 @@ func pluralCount(value float64) any {
 // LR, MM), UnitKilometer everywhere else (the CLDR default). Callers pass the
 // result to FormatUnit after converting the magnitude themselves.
 //
-// Since: 2.7
+// Since: 1.0
 func PreferredLengthUnit() Unit {
 	if _, ok := mileRegions[regionString(getCurrentTag())]; ok {
 		return UnitMile
@@ -120,7 +120,7 @@ var mileRegions = map[string]bool{
 // 1 km and kilometres above; imperial locales (see PreferredLengthUnit) get feet
 // below 1 mile and miles above. The converted value is rounded to two decimals.
 //
-// Since: 2.7
+// Since: 1.0
 func FormatDistance(meters float64) string {
 	if PreferredLengthUnit() == UnitMile {
 		if math.Abs(meters) < metersPerMile {
@@ -139,7 +139,7 @@ func FormatDistance(meters float64) string {
 // locales get grams below 1 kg and kilograms above. The converted value is
 // rounded to two decimals.
 //
-// Since: 2.7
+// Since: 1.0
 func FormatMass(grams float64) string {
 	if _, imperial := mileRegions[regionString(getCurrentTag())]; imperial {
 		return FormatUnit(round2(grams/gramsPerPound), UnitPound)

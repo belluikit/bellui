@@ -136,7 +136,7 @@ var _ KeyboardShortcut = (*ShortcutUndo)(nil)
 
 // ShortcutUndo describes a shortcut undo action.
 //
-// Since: 2.5
+// Since: 1.0
 type ShortcutUndo struct{}
 
 // Key returns the [event.KeyName] for this shortcut.
@@ -158,7 +158,7 @@ var _ KeyboardShortcut = (*ShortcutRedo)(nil)
 
 // ShortcutRedo describes a shortcut redo action.
 //
-// Since: 2.5
+// Since: 1.0
 type ShortcutRedo struct{}
 
 // Key returns the [event.KeyName] for this shortcut.

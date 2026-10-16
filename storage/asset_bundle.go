@@ -25,7 +25,7 @@ func isWithinDir(dir, path string) bool {
 //
 // AssetBundle is safe for concurrent use.
 //
-// Since: 2.7
+// Since: 1.0
 type AssetBundle struct {
 	root  string
 	cache sync.Map // name -> *bellui.LazyResource
@@ -34,7 +34,7 @@ type AssetBundle struct {
 // NewAssetBundle creates a new AssetBundle rooted at the given filesystem
 // directory. The directory must exist.
 //
-// Since: 2.7
+// Since: 1.0
 func NewAssetBundle(dir string) (*AssetBundle, error) {
 	clean := filepath.Clean(dir)
 	info, err := os.Stat(clean)
@@ -54,7 +54,7 @@ func NewAssetBundle(dir string) (*AssetBundle, error) {
 //
 // Returns nil if the file does not exist.
 //
-// Since: 2.7
+// Since: 1.0
 func (b *AssetBundle) Resource(name string) bellui.Resource {
 	if v, ok := b.cache.Load(name); ok {
 		return v.(*bellui.LazyResource)
@@ -77,7 +77,7 @@ func (b *AssetBundle) Resource(name string) bellui.Resource {
 
 // MustResource is like [Resource] but panics if the named asset does not exist.
 //
-// Since: 2.7
+// Since: 1.0
 func (b *AssetBundle) MustResource(name string) bellui.Resource {
 	res := b.Resource(name)
 	if res == nil {
@@ -89,7 +89,7 @@ func (b *AssetBundle) MustResource(name string) bellui.Resource {
 // List returns the names of all files in the bundle root directory
 // (non-recursive). Directory entries are excluded.
 //
-// Since: 2.7
+// Since: 1.0
 func (b *AssetBundle) List() ([]string, error) {
 	entries, err := os.ReadDir(b.root)
 	if err != nil {
@@ -108,7 +108,7 @@ func (b *AssetBundle) List() ([]string, error) {
 // ReleaseAll frees all cached resource content. The resources remain valid
 // and will re-load their content on the next [bellui.Resource.Content] call.
 //
-// Since: 2.7
+// Since: 1.0
 func (b *AssetBundle) ReleaseAll() {
 	b.cache.Range(func(_, value any) bool {
 		value.(*bellui.LazyResource).Release()

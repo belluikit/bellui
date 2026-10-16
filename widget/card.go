@@ -26,7 +26,7 @@ const (
 
 // Card widget groups title, subtitle with content and a header image
 //
-// Since: 1.4
+// Since: 1.0
 type Card struct {
 	BaseWidget
 	Title, Subtitle string
@@ -46,7 +46,7 @@ func (c *Card) AccessibleLabel() string { return c.Title }
 
 // NewCard creates a new card widget with the specified title, subtitle and content (all optional).
 //
-// Since: 1.4
+// Since: 1.0
 func NewCard(title, subtitle string, content core.CanvasObject) *Card {
 	card := &Card{
 		Title:    title,

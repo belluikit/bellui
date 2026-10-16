@@ -22,7 +22,7 @@ type FormItem struct {
 	Text   string
 	Widget core.CanvasObject
 
-	// Since: 2.0
+	// Since: 1.0
 	HintText string
 
 	validationError error
@@ -60,7 +60,7 @@ type Form struct {
 	// Orientation allows a form to be vertical (a single column), horizontal (default, label then input)
 	// or to adapt according to the orientation of the mobile device (adaptive).
 	//
-	// Since: 2.5
+	// Since: 1.0
 	Orientation Orientation
 
 	itemGrid     *bellui.Container
@@ -126,7 +126,7 @@ func (f *Form) Refresh() {
 
 // Enable enables submitting this form.
 //
-// Since: 2.1
+// Since: 1.0
 func (f *Form) Enable() {
 	f.disabled = false
 	f.cancelButton.Enable()
@@ -135,7 +135,7 @@ func (f *Form) Enable() {
 
 // Disable disables submitting this form.
 //
-// Since: 2.1
+// Since: 1.0
 func (f *Form) Disable() {
 	f.disabled = true
 	f.submitButton.Disable()
@@ -146,7 +146,7 @@ func (f *Form) Disable() {
 // Note that, if the form fails validation, the submit button may be
 // disabled even if this method returns true.
 //
-// Since: 2.1
+// Since: 1.0
 func (f *Form) Disabled() bool {
 	return f.disabled
 }

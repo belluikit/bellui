@@ -52,7 +52,7 @@ type TextGridStyle interface {
 
 // CustomTextGridStyle is a utility type for those not wanting to define their own style types.
 type CustomTextGridStyle struct {
-	// Since: 2.5
+	// Since: 1.0
 	TextStyle        bellui.TextStyle
 	FGColor, BGColor color.Color
 }
@@ -87,14 +87,14 @@ type TextGrid struct {
 
 	// Scroll can be used to turn off the scrolling of our TextGrid.
 	//
-	// Since: 2.6
+	// Since: 1.0
 	Scroll bellui.ScrollDirection
 }
 
 // Append will add new lines to the end of this TextGrid.
 // The first character will be at the beginning of a new line and any newline characters will split the text further.
 //
-// Since: 2.6
+// Since: 1.0
 func (t *TextGrid) Append(text string) {
 	rows := t.parseRows(text)
 
@@ -106,7 +106,7 @@ func (t *TextGrid) Append(text string) {
 // requested position. If the grid is scrolled the position will refer to the visible offset and not the distance
 // from the top left of the overall document.
 //
-// Since: 2.6
+// Since: 1.0
 func (t *TextGrid) CursorLocationForPosition(p geo.Position) (row, col int) {
 	y := p.Y
 	x := p.X
@@ -132,7 +132,7 @@ func (t *TextGrid) canScroll() bool {
 
 // ScrollToTop will scroll content to container top
 //
-// Since: 2.7
+// Since: 1.0
 func (t *TextGrid) ScrollToTop() {
 	if !t.canScroll() {
 		return
@@ -143,7 +143,7 @@ func (t *TextGrid) ScrollToTop() {
 
 // ScrollToBottom will scroll content to container bottom - to show latest info which end user just added
 //
-// Since: 2.7
+// Since: 1.0
 func (t *TextGrid) ScrollToBottom() {
 	if !t.canScroll() {
 		return
@@ -156,7 +156,7 @@ func (t *TextGrid) ScrollToBottom() {
 // If the grid has been scrolled this will be taken into account so that the position compared to top left will
 // refer to the requested location.
 //
-// Since: 2.6
+// Since: 1.0
 func (t *TextGrid) PositionForCursorLocation(row, col int) geo.Position {
 	y := float32(row) * t.content.cellSize.Height
 	x := float32(col) * t.content.cellSize.Width

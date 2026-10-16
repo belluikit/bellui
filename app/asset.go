@@ -13,7 +13,7 @@ var globalBundle atomic.Pointer[storage.AssetBundle]
 // This allows resources to be loaded by name from an external directory
 // instead of being compiled into the binary.
 //
-// Since: 2.7
+// Since: 1.0
 func SetAssetBundle(bundle *storage.AssetBundle) {
 	globalBundle.Store(bundle)
 }
@@ -21,7 +21,7 @@ func SetAssetBundle(bundle *storage.AssetBundle) {
 // Asset returns a resource from the registered asset bundle.
 // Returns nil if no bundle is registered or the named asset does not exist.
 //
-// Since: 2.7
+// Since: 1.0
 func Asset(name string) bellui.Resource {
 	b := globalBundle.Load()
 	if b == nil {

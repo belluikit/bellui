@@ -4,24 +4,24 @@ import "github.com/belluikit/bellui/event"
 
 // KeyDirection specifies the press/release of a key event
 //
-// Since: 2.7
+// Since: 1.0
 type KeyDirection uint8
 
 const (
 	// KeyPressed specifies that a key was pushed down.
 	//
-	// Since: 2.7
+	// Since: 1.0
 	KeyPressed KeyDirection = iota
 
 	// KeyReleased indicates a key was let back up.
 	//
-	// Since: 2.7
+	// Since: 1.0
 	KeyReleased
 )
 
 // KeyEvent is an event from keyboard actions occurring in an embedded device keyboard.
 //
-// Since: 2.7
+// Since: 1.0
 type KeyEvent struct {
 	Name      event.KeyName
 	Direction KeyDirection
@@ -39,7 +39,7 @@ func (d *KeyEvent) isEvent() {}
 
 // CharacterEvent is an event specifying that a character was created by a hardware or virtual keyboard.
 //
-// Since: 2.7
+// Since: 1.0
 type CharacterEvent struct {
 	Rune rune
 }

@@ -22,7 +22,7 @@ func NewMenu(label string, items ...*MenuItem) *Menu {
 
 // Refresh will instruct this menu to update its display.
 //
-// Since: 2.2
+// Since: 1.0
 func (m *Menu) Refresh() {
 	for _, w := range CurrentApp().Driver().AllWindows() {
 		main := w.MainMenu()
@@ -46,18 +46,18 @@ func (m *Menu) Refresh() {
 // MenuItem is a single item within any menu, it contains a display Label and Action function that is called when tapped.
 type MenuItem struct {
 	ChildMenu *Menu
-	// Since: 2.1
+	// Since: 1.0
 	IsQuit      bool
 	IsSeparator bool
 	Label       string
 	Action      func() `json:"-"`
-	// Since: 2.1
+	// Since: 1.0
 	Disabled bool
-	// Since: 2.1
+	// Since: 1.0
 	Checked bool
-	// Since: 2.2
+	// Since: 1.0
 	Icon Resource
-	// Since: 2.2
+	// Since: 1.0
 	Shortcut core.Shortcut
 }
 
@@ -68,7 +68,7 @@ func NewMenuItem(label string, action func()) *MenuItem {
 
 // NewMenuItemWithIcon creates a new menu item from the passed label, icon, and action parameters.
 //
-// Since: 2.7
+// Since: 1.0
 func NewMenuItemWithIcon(label string, icon Resource, action func()) *MenuItem {
 	return &MenuItem{Label: label, Icon: icon, Action: action}
 }
@@ -91,7 +91,7 @@ func NewMainMenu(items ...*Menu) *MainMenu {
 
 // Refresh will instruct any rendered menus using this struct to update their display.
 //
-// Since: 2.2
+// Since: 1.0
 func (m *MainMenu) Refresh() {
 	for _, w := range CurrentApp().Driver().AllWindows() {
 		menu := w.MainMenu()

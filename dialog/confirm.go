@@ -17,7 +17,7 @@ type ConfirmDialog struct {
 
 // Confirm instructs the dialog to close agreeing with whatever content was displayed.
 //
-// Since: 2.6
+// Since: 1.0
 func (d *ConfirmDialog) Confirm() {
 	d.hideWithResponse(true)
 }
@@ -30,7 +30,7 @@ func (d *ConfirmDialog) SetConfirmText(label string) {
 
 // SetConfirmImportance sets the importance level of the confirm button.
 //
-// Since 2.4
+// Since: 1.0
 func (d *ConfirmDialog) SetConfirmImportance(importance widget.Importance) {
 	d.confirm.Importance = importance
 }

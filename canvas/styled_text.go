@@ -15,7 +15,7 @@ var _ core.CanvasObject = (*StyledText)(nil)
 // TextRun defines a run of text with its own styling properties.
 // Fields left at their zero value inherit from the parent StyledText.
 //
-// Since: 2.7
+// Since: 1.0
 type TextRun struct {
 	Text       string           // The string content of this run
 	Color      color.Color      // Color for this run; nil means use StyledText.Color
@@ -28,7 +28,7 @@ type TextRun struct {
 // Each run can have independent color, size, style, and font.
 // This is a single-line primitive; use widget.RichText for wrapping.
 //
-// Since: 2.7
+// Since: 1.0
 type StyledText struct {
 	baseObject
 	Alignment bellui.TextAlign // The alignment of the text content
@@ -100,7 +100,7 @@ func (st *StyledText) Refresh() {
 
 // NewStyledText returns a new StyledText with the given runs and default color.
 //
-// Since: 2.7
+// Since: 1.0
 func NewStyledText(runs []TextRun, defaultColor color.Color) *StyledText {
 	return &StyledText{
 		Color:    defaultColor,

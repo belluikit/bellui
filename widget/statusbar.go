@@ -120,7 +120,7 @@ func (s *StatusBarSeparator) StatusBarObject() core.CanvasObject {
 // bar's minimum size (#1041). Other items keep their minimum width and
 // [StatusBarSpacer] absorbs any leftover space.
 //
-// Since: 2.7
+// Since: 1.0
 type StatusBar struct {
 	BaseWidget
 	Items []StatusBarItem
@@ -128,7 +128,7 @@ type StatusBar struct {
 
 // NewStatusBar creates a new status bar widget.
 //
-// Since: 2.7
+// Since: 1.0
 func NewStatusBar(items ...StatusBarItem) *StatusBar {
 	sb := &StatusBar{Items: items}
 	sb.ExtendBaseWidget(sb)

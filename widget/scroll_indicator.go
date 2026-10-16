@@ -21,7 +21,7 @@ var _ core.Widget = (*ScrollIndicator)(nil)
 // Attach it to a Scroll container using NewScrollIndicator, which automatically
 // registers a scroll listener (via Scroll.AddScrollListener) to stay in sync.
 //
-// Since: 2.7
+// Since: 1.0
 type ScrollIndicator struct {
 	BaseWidget
 
@@ -70,7 +70,7 @@ const (
 //
 //	container.NewStack(scroll, widget.NewScrollIndicator(scroll))
 //
-// Since: 2.7
+// Since: 1.0
 func NewScrollIndicator(scroll *iwidget.Scroll) *ScrollIndicator {
 	si := &ScrollIndicator{
 		Scroll:    scroll,

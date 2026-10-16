@@ -11,11 +11,11 @@ import (
 const (
 	// DurationStandard is the time a standard interface animation will run.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	DurationStandard = time.Millisecond * 300
 	// DurationShort is the time a subtle or small transition should use.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	DurationShort = time.Millisecond * 150
 
 	// MD3 duration tokens.
@@ -36,7 +36,7 @@ const (
 // The content of fn should apply the color values to an object and refresh it.
 // You should call Start() on the returned animation to start it.
 //
-// Since: 2.0
+// Since: 1.0
 func NewColorRGBAAnimation(start, stop color.Color, d time.Duration, fn func(color.Color)) *bellui.Animation {
 	r1, g1, b1, a1 := start.RGBA()
 	r2, g2, b2, a2 := stop.RGBA()
@@ -65,7 +65,7 @@ func NewColorRGBAAnimation(start, stop color.Color, d time.Duration, fn func(col
 // the specified Duration. The content of fn should apply the position value to an object for the change
 // to be visible. You should call Start() on the returned animation to start it.
 //
-// Since: 2.0
+// Since: 1.0
 func NewPositionAnimation(start, stop geo.Position, d time.Duration, fn func(geo.Position)) *bellui.Animation {
 	xDelta := stop.X - start.X
 	yDelta := stop.Y - start.Y
@@ -82,7 +82,7 @@ func NewPositionAnimation(start, stop geo.Position, d time.Duration, fn func(geo
 // the specified Duration. The content of fn should apply the size value to an object for the change
 // to be visible. You should call Start() on the returned animation to start it.
 //
-// Since: 2.0
+// Since: 1.0
 func NewSizeAnimation(start, stop geo.Size, d time.Duration, fn func(geo.Size)) *bellui.Animation {
 	widthDelta := stop.Width - start.Width
 	heightDelta := stop.Height - start.Height
