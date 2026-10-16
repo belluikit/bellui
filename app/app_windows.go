@@ -61,24 +61,6 @@ func (a *belluiApp) SendNotification(n *bellui.Notification) {
 	go runScript("notify", notificationTemplate, env)
 }
 
-// SetSystemTrayMenu creates a system tray item and attaches the specified menu.
-// By default, this will use the application icon.
-func (a *belluiApp) SetSystemTrayMenu(menu *bellui.Menu) {
-	a.Driver().(systrayDriver).SetSystemTrayMenu(menu)
-}
-
-// SetSystemTrayIcon sets a custom image for the system tray icon.
-// You should have previously called `SetSystemTrayMenu` to initialise the menu icon.
-func (a *belluiApp) SetSystemTrayIcon(icon bellui.Resource) {
-	a.Driver().(systrayDriver).SetSystemTrayIcon(icon)
-}
-
-// SetSystemTrayWindow assigns a window to be shown with the system tray menu is tapped.
-// You should have previously called `SetSystemTrayMenu` to initialise the menu icon.
-func (a *belluiApp) SetSystemTrayWindow(w bellui.Window) {
-	a.Driver().(systrayDriver).SetSystemTrayWindow(w)
-}
-
 // badgeDriver is implemented by the glfw driver on Windows to draw a taskbar
 // overlay-icon count badge (ITaskbarList3::SetOverlayIcon). Asserted so the app
 // package stays free of the COM/GDI backend and non-glfw drivers no-op.
