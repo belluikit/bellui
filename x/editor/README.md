@@ -98,4 +98,4 @@ go run ../gallery
 
 ## Dependencies
 
-Requires the [trendvidia/fyne](https://github.com/trendvidia/fyne) fork, which adds `OnScrolled`, `SuppressGutter`, and `RowMetrics()` to `widget.Entry` for external gutter synchronization.
+Uses `OnScrolled`, `SuppressGutter` and `RowMetrics()` on Bellui's `widget.Entry` for external gutter synchronization; nothing beyond the toolkit is required.

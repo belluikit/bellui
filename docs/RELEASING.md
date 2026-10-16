@@ -141,7 +141,7 @@ writing this:
   `go mod tidy` resolve real imports is what produces a complete `go.sum` — the
   same failure mode as the `x/charts` one in step 4, seen from the consumer
   side.
-- **`bellui.ShowAndRun(w)` is a package-level function** in this fork, not
+- **`bellui.ShowAndRun(w)` is a package-level function** in Bellui, not
   `w.ShowAndRun()`, and the program therefore imports the root package. Getting
   that wrong is the usual way this smoke test "fails" for the wrong reason.
 
