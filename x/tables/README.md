@@ -1,8 +1,8 @@
-# fytables
+# Bellui X — tables
 
 An AG Grid-equivalent data table widget for the [Bellui](https://bellui.com) GUI framework.
 
-fytables provides a high-performance, feature-rich data grid with virtual scrolling, column sorting/filtering, cell editing, sparklines, column pinning/grouping, row grouping with aggregation, pagination, pivot tables, and more.
+x/tables provides a high-performance, feature-rich data grid with virtual scrolling, column sorting/filtering, cell editing, sparklines, column pinning/grouping, row grouping with aggregation, pagination, pivot tables, and more.
 
 ## Features
 
