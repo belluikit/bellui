@@ -79,20 +79,25 @@ func (a *AnnotationWidget) annotation() *dag.Annotation {
 }
 
 // contentMinSize returns the smallest box that fits the annotation text, in
-// graph units: text is measured at the base (unzoomed) size, matching the
-// renderer's zoom-scaled layout.
+// graph units. The text is measured at the size the renderer draws it
+// (annotationTextSize × zoom) and converted back to graph units: text does not
+// scale exactly with its size (a fractional size renders like the next whole
+// pixel size), so measuring once at the base size and scaling the box by the
+// zoom let the text overflow at some zoom levels.
 func (a *AnnotationWidget) contentMinSize() geo.Size {
 	w, h := annotationMinW, annotationMinH
 	ann := a.annotation()
 	if ann == nil {
 		return geo.NewSize(w, h)
 	}
+	z := a.zoom()
 	lines := strings.Split(ann.Text, "\n")
 	lineH := annotationTextSize + 4 // keep in sync with annotationRenderer.Layout
 	needH := float32(len(lines))*lineH + 2*annotationPadding
 	needW := float32(0)
 	for _, line := range lines {
-		if lw := bellui.MeasureText(line, annotationTextSize, bellui.TextStyle{}).Width; lw > needW {
+		lw := bellui.MeasureText(line, annotationTextSize*z, bellui.TextStyle{}).Width / z
+		if lw > needW {
 			needW = lw
 		}
 	}
