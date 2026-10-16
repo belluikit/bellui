@@ -7,7 +7,7 @@ module github.com/belluikit/bellui/x/tables/hack/a11yprobe
 go 1.25.0
 
 require (
-	github.com/belluikit/bellui v1.1.0
+	github.com/belluikit/bellui v1.1.1
 	github.com/belluikit/bellui/x/tables v0.0.0
 )
 
