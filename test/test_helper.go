@@ -62,7 +62,7 @@ func AssertCanvasTappableAt(t *testing.T, c core.Canvas, pos geo.Position) bool 
 // sized container and use [AssertRendersToImage]), and use bellui's clipping API
 // (e.g. container.NewClip) to opt a subtree into clipping.
 //
-// Since 2.3
+// Since: 1.0
 func AssertObjectRendersToImage(t *testing.T, masterFilename string, o core.CanvasObject, msgAndArgs ...any) bool {
 	c := NewCanvasWithPainter(software.NewPainter())
 	c.SetPadded(false)
@@ -88,7 +88,7 @@ func AssertObjectRendersToImage(t *testing.T, masterFilename string, o core.Canv
 // bounds, so markup for content drawn outside those bounds is not captured. Render the object inside
 // a larger canvas (via [AssertRendersToMarkup]) to observe overflow.
 //
-// Since 2.3
+// Since: 1.0
 func AssertObjectRendersToMarkup(t *testing.T, masterFilename string, o core.CanvasObject, msgAndArgs ...any) bool {
 	c := NewCanvas()
 	c.SetPadded(false)
@@ -114,7 +114,7 @@ func AssertImageMatches(t *testing.T, masterFilename string, img image.Image, ms
 // In this case the given image is written into a file in `testdata/failed/<masterFilename>` (relative to the test).
 // This path is also reported, thus the file can be used as new master.
 //
-// Since 2.3
+// Since: 1.0
 func AssertRendersToImage(t *testing.T, masterFilename string, c core.Canvas, msgAndArgs ...any) bool {
 	return AssertImageMatches(t, masterFilename, c.Capture(), msgAndArgs...)
 }
@@ -130,7 +130,7 @@ func AssertRendersToImage(t *testing.T, masterFilename string, c core.Canvas, ms
 // Closing elements stand on their own line, too, using the same indentation as the opening element.
 // The only exception to this are text elements which do not contain line breaks unless the text includes them.
 //
-// Since: 2.0
+// Since: 1.0
 func AssertRendersToMarkup(t *testing.T, masterFilename string, c core.Canvas, msgAndArgs ...any) bool {
 	wd, err := os.Getwd()
 	require.NoError(t, err)
@@ -219,7 +219,7 @@ func ApplyTheme(t *testing.T, theme bellui.Theme) {
 // This can be used for verifying correctness of rendered components for a widget in unit tests.
 // The widget renderer is automatically destroyed when the test ends.
 //
-// Since: 2.5
+// Since: 1.0
 func TempWidgetRenderer(t *testing.T, wid core.Widget) core.WidgetRenderer {
 	t.Cleanup(func() { cache.DestroyRenderer(wid) })
 	return cache.Renderer(wid)

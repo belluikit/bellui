@@ -2,7 +2,7 @@ package widget
 
 // Importance represents how prominent the widget should appear
 //
-// Since: 2.4
+// Since: 1.0
 type Importance int
 
 const (
@@ -15,15 +15,15 @@ const (
 
 	// DangerImportance applies an error theme to the widget.
 	//
-	// Since: 2.3
+	// Since: 1.0
 	DangerImportance
 	// WarningImportance applies a warning theme to the widget.
 	//
-	// Since: 2.3
+	// Since: 1.0
 	WarningImportance
 
 	// SuccessImportance applies a success theme to the widget.
 	//
-	// Since: 2.4
+	// Since: 1.0
 	SuccessImportance
 )

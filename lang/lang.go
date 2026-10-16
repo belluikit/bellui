@@ -1,6 +1,6 @@
 // Package lang introduces a translation and localisation API for Bellui applications
 //
-// Since 2.5
+// Since: 1.0
 package lang
 
 import (
@@ -261,7 +261,7 @@ func SetLocaleForTests(t interface{ Cleanup(func()) }, locale string) {
 // [github.com/belluikit/bellui/data/binding.NewLocalizedString] (or another
 // [AddLocaleChangeListener] subscriber) instead of a pre-resolved string.
 //
-// Since: 2.8
+// Since: 1.0
 func SetLocale(l bellui.Locale) {
 	prev := getCurrentTag()
 

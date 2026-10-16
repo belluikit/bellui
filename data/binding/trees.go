@@ -12,7 +12,7 @@ const DataTreeRootID = ""
 
 // Tree supports binding a tree of values with type T.
 //
-// Since: 2.7
+// Since: 1.0
 type Tree[T any] interface {
 	DataTree
 
@@ -27,7 +27,7 @@ type Tree[T any] interface {
 
 // ExternalTree supports binding a tree of values, of type T, from an external variable.
 //
-// Since: 2.7
+// Since: 1.0
 type ExternalTree[T any] interface {
 	Tree[T]
 
@@ -36,7 +36,7 @@ type ExternalTree[T any] interface {
 
 // NewTree returns a bindable tree of values with type T.
 //
-// Since: 2.7
+// Since: 1.0
 func NewTree[T any](comparator func(T, T) bool) Tree[T] {
 	return newTree[T](comparator)
 }
@@ -45,14 +45,14 @@ func NewTree[T any](comparator func(T, T) bool) Tree[T] {
 // The ids map specifies how each item relates to its parent (with id ""), with the values being in the v map.
 // If your code changes the content of the maps this refers to you should call Reload() to inform the bindings.
 //
-// Since: 2.7
+// Since: 1.0
 func BindTree[T any](ids *map[string][]string, v *map[string]T, comparator func(T, T) bool) ExternalTree[T] {
 	return bindTree(ids, v, comparator)
 }
 
 // DataTree is the base interface for all bindable data trees.
 //
-// Since: 2.4
+// Since: 1.0
 type DataTree interface {
 	DataItem
 	GetItem(id string) (DataItem, error)
@@ -61,17 +61,17 @@ type DataTree interface {
 
 // BoolTree supports binding a tree of bool values.
 //
-// Since: 2.4
+// Since: 1.0
 type BoolTree = Tree[bool]
 
 // ExternalBoolTree supports binding a tree of bool values from an external variable.
 //
-// Since: 2.4
+// Since: 1.0
 type ExternalBoolTree = ExternalTree[bool]
 
 // NewBoolTree returns a bindable tree of bool values.
 //
-// Since: 2.4
+// Since: 1.0
 func NewBoolTree() Tree[bool] {
 	return newTreeComparable[bool]()
 }
@@ -80,24 +80,24 @@ func NewBoolTree() Tree[bool] {
 // The ids map specifies how each item relates to its parent (with id ""), with the values being in the v map.
 // If your code changes the content of the maps this refers to you should call Reload() to inform the bindings.
 //
-// Since: 2.4
+// Since: 1.0
 func BindBoolTree(ids *map[string][]string, v *map[string]bool) ExternalTree[bool] {
 	return bindTreeComparable(ids, v)
 }
 
 // BytesTree supports binding a tree of []byte values.
 //
-// Since: 2.4
+// Since: 1.0
 type BytesTree = Tree[[]byte]
 
 // ExternalBytesTree supports binding a tree of []byte values from an external variable.
 //
-// Since: 2.4
+// Since: 1.0
 type ExternalBytesTree = ExternalTree[[]byte]
 
 // NewBytesTree returns a bindable tree of []byte values.
 //
-// Since: 2.4
+// Since: 1.0
 func NewBytesTree() Tree[[]byte] {
 	return newTree(bytes.Equal)
 }
@@ -106,24 +106,24 @@ func NewBytesTree() Tree[[]byte] {
 // The ids map specifies how each item relates to its parent (with id ""), with the values being in the v map.
 // If your code changes the content of the maps this refers to you should call Reload() to inform the bindings.
 //
-// Since: 2.4
+// Since: 1.0
 func BindBytesTree(ids *map[string][]string, v *map[string][]byte) ExternalTree[[]byte] {
 	return bindTree(ids, v, bytes.Equal)
 }
 
 // FloatTree supports binding a tree of float64 values.
 //
-// Since: 2.4
+// Since: 1.0
 type FloatTree = Tree[float64]
 
 // ExternalFloatTree supports binding a tree of float64 values from an external variable.
 //
-// Since: 2.4
+// Since: 1.0
 type ExternalFloatTree = ExternalTree[float64]
 
 // NewFloatTree returns a bindable tree of float64 values.
 //
-// Since: 2.4
+// Since: 1.0
 func NewFloatTree() Tree[float64] {
 	return newTreeComparable[float64]()
 }
@@ -132,24 +132,24 @@ func NewFloatTree() Tree[float64] {
 // The ids map specifies how each item relates to its parent (with id ""), with the values being in the v map.
 // If your code changes the content of the maps this refers to you should call Reload() to inform the bindings.
 //
-// Since: 2.4
+// Since: 1.0
 func BindFloatTree(ids *map[string][]string, v *map[string]float64) ExternalTree[float64] {
 	return bindTreeComparable(ids, v)
 }
 
 // IntTree supports binding a tree of int values.
 //
-// Since: 2.4
+// Since: 1.0
 type IntTree = Tree[int]
 
 // ExternalIntTree supports binding a tree of int values from an external variable.
 //
-// Since: 2.4
+// Since: 1.0
 type ExternalIntTree = ExternalTree[int]
 
 // NewIntTree returns a bindable tree of int values.
 //
-// Since: 2.4
+// Since: 1.0
 func NewIntTree() Tree[int] {
 	return newTreeComparable[int]()
 }
@@ -158,24 +158,24 @@ func NewIntTree() Tree[int] {
 // The ids map specifies how each item relates to its parent (with id ""), with the values being in the v map.
 // If your code changes the content of the maps this refers to you should call Reload() to inform the bindings.
 //
-// Since: 2.4
+// Since: 1.0
 func BindIntTree(ids *map[string][]string, v *map[string]int) ExternalTree[int] {
 	return bindTreeComparable(ids, v)
 }
 
 // RuneTree supports binding a tree of rune values.
 //
-// Since: 2.4
+// Since: 1.0
 type RuneTree = Tree[rune]
 
 // ExternalRuneTree supports binding a tree of rune values from an external variable.
 //
-// Since: 2.4
+// Since: 1.0
 type ExternalRuneTree = ExternalTree[rune]
 
 // NewRuneTree returns a bindable tree of rune values.
 //
-// Since: 2.4
+// Since: 1.0
 func NewRuneTree() Tree[rune] {
 	return newTreeComparable[rune]()
 }
@@ -184,24 +184,24 @@ func NewRuneTree() Tree[rune] {
 // The ids map specifies how each item relates to its parent (with id ""), with the values being in the v map.
 // If your code changes the content of the maps this refers to you should call Reload() to inform the bindings.
 //
-// Since: 2.4
+// Since: 1.0
 func BindRuneTree(ids *map[string][]string, v *map[string]rune) ExternalTree[rune] {
 	return bindTreeComparable(ids, v)
 }
 
 // StringTree supports binding a tree of string values.
 //
-// Since: 2.4
+// Since: 1.0
 type StringTree = Tree[string]
 
 // ExternalStringTree supports binding a tree of string values from an external variable.
 //
-// Since: 2.4
+// Since: 1.0
 type ExternalStringTree = ExternalTree[string]
 
 // NewStringTree returns a bindable tree of string values.
 //
-// Since: 2.4
+// Since: 1.0
 func NewStringTree() Tree[string] {
 	return newTreeComparable[string]()
 }
@@ -210,24 +210,24 @@ func NewStringTree() Tree[string] {
 // The ids map specifies how each item relates to its parent (with id ""), with the values being in the v map.
 // If your code changes the content of the maps this refers to you should call Reload() to inform the bindings.
 //
-// Since: 2.4
+// Since: 1.0
 func BindStringTree(ids *map[string][]string, v *map[string]string) ExternalTree[string] {
 	return bindTreeComparable(ids, v)
 }
 
 // UntypedTree supports binding a tree of any values.
 //
-// Since: 2.5
+// Since: 1.0
 type UntypedTree = Tree[any]
 
 // ExternalUntypedTree supports binding a tree of any values from an external variable.
 //
-// Since: 2.5
+// Since: 1.0
 type ExternalUntypedTree = ExternalTree[any]
 
 // NewUntypedTree returns a bindable tree of any values.
 //
-// Since: 2.5
+// Since: 1.0
 func NewUntypedTree() Tree[any] {
 	return newTree(func(a1, a2 any) bool { return a1 == a2 })
 }
@@ -236,24 +236,24 @@ func NewUntypedTree() Tree[any] {
 // The ids map specifies how each item relates to its parent (with id ""), with the values being in the v map.
 // If your code changes the content of the maps this refers to you should call Reload() to inform the bindings.
 //
-// Since: 2.4
+// Since: 1.0
 func BindUntypedTree(ids *map[string][]string, v *map[string]any) ExternalTree[any] {
 	return bindTree(ids, v, func(a1, a2 any) bool { return a1 == a2 })
 }
 
 // URITree supports binding a tree of bellui.URI values.
 //
-// Since: 2.4
+// Since: 1.0
 type URITree = Tree[bellui.URI]
 
 // ExternalURITree supports binding a tree of bellui.URI values from an external variable.
 //
-// Since: 2.4
+// Since: 1.0
 type ExternalURITree = ExternalTree[bellui.URI]
 
 // NewURITree returns a bindable tree of bellui.URI values.
 //
-// Since: 2.4
+// Since: 1.0
 func NewURITree() Tree[bellui.URI] {
 	return newTree(storage.EqualURI)
 }
@@ -262,7 +262,7 @@ func NewURITree() Tree[bellui.URI] {
 // The ids map specifies how each item relates to its parent (with id ""), with the values being in the v map.
 // If your code changes the content of the maps this refers to you should call Reload() to inform the bindings.
 //
-// Since: 2.4
+// Since: 1.0
 func BindURITree(ids *map[string][]string, v *map[string]bellui.URI) ExternalTree[bellui.URI] {
 	return bindTree(ids, v, storage.EqualURI)
 }

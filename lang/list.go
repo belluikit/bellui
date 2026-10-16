@@ -13,7 +13,7 @@ import "strings"
 // so they react to lang.SetLocale like the other formatters. Items are inserted
 // verbatim (already-final strings); no templating is applied to them.
 //
-// Since: 2.7
+// Since: 1.0
 func FormatList(items []string) string {
 	switch len(items) {
 	case 0:

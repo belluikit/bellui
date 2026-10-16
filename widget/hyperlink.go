@@ -35,12 +35,12 @@ type Hyperlink struct {
 
 	// The truncation mode of the hyperlink
 	//
-	// Since: 2.5
+	// Since: 1.0
 	Truncation bellui.TextTruncation
 
 	// The theme size name for the text size of the hyperlink
 	//
-	// Since: 2.5
+	// Since: 1.0
 	SizeName bellui.ThemeSizeName
 
 	// ColorName is the theme color used to render the link text, its hover
@@ -60,7 +60,7 @@ type Hyperlink struct {
 
 	// OnTapped overrides the default `bellui.OpenURL` call when the link is tapped
 	//
-	// Since: 2.2
+	// Since: 1.0
 	OnTapped func() `json:"-"`
 
 	textSize         geo.Size // updated in syncSegments

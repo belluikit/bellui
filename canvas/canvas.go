@@ -12,7 +12,7 @@ import (
 const (
 	// RadiusMaximum can be applied to a canvas corner radius to achieve fully rounded corners.
 	// This constant represents the maximum possible corner radius, resulting in a circular appearance.
-	// Since: 2.7
+	// Since: 1.0
 	RadiusMaximum float32 = math.MaxFloat32
 )
 
@@ -37,7 +37,7 @@ func Refresh(obj core.CanvasObject) {
 // If an error occurs, the returned content will be the original un-modified content,
 // and a non-nil error is returned.
 //
-// Since: 2.6
+// Since: 1.0
 func RecolorSVG(svgContent []byte, color color.Color) ([]byte, error) {
 	return svg.Colorize(svgContent, color)
 }

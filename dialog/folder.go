@@ -13,7 +13,7 @@ var folderFilter = storage.NewMimeTypeFileFilter([]string{"application/x-directo
 //
 // The dialog will appear over the window specified when Show() is called.
 //
-// Since: 1.4
+// Since: 1.0
 func NewFolderOpen(callback func(bellui.ListableURI, error), parent bellui.Window) *FileDialog {
 	dialog := &FileDialog{}
 	dialog.callback = callback
@@ -29,7 +29,7 @@ func NewFolderOpen(callback func(bellui.ListableURI, error), parent bellui.Windo
 //
 // The dialog will appear over the window specified.
 //
-// Since: 1.4
+// Since: 1.0
 func ShowFolderOpen(callback func(bellui.ListableURI, error), parent bellui.Window) {
 	dialog := NewFolderOpen(callback, parent)
 	if fileOpenOSOverride(dialog) {

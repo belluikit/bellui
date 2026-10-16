@@ -13,7 +13,7 @@ import (
 // Containers will be traversed and all child widgets will reflect the theme in this container.
 // This should be used sparingly to avoid a jarring user experience.
 //
-// Since: 2.5
+// Since: 1.0
 type ThemeOverride struct {
 	widget.BaseWidget
 
@@ -32,7 +32,7 @@ type ThemeOverride struct {
 // If the content `obj` of this theme override is a container and items are later added to the container or any
 // sub-containers ensure that you call `Refresh()` on this `ThemeOverride` to ensure the new items match the theme.
 //
-// Since: 2.5
+// Since: 1.0
 func NewThemeOverride(obj core.CanvasObject, th bellui.Theme) *ThemeOverride {
 	t := &ThemeOverride{Content: obj, Theme: th, holder: NewStack(obj)}
 	t.ExtendBaseWidget(t)
@@ -63,7 +63,7 @@ func (t *ThemeOverride) Refresh() {
 // This will impact containers such as AppTabs and DocTabs, and more in the future, to display a layout
 // that would automatically be used for a mobile device runtime.
 //
-// Since: 2.6
+// Since: 1.0
 func (t *ThemeOverride) SetDeviceIsMobile(on bool) {
 	t.mobile = on
 	t.BaseWidget.Refresh()

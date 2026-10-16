@@ -34,7 +34,7 @@ type Device interface {
 
 	// Locale returns the information about this device's language and region.
 	//
-	// Since: 2.5
+	// Since: 1.0
 	Locale() Locale
 }
 

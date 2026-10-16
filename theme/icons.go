@@ -11,497 +11,497 @@ import (
 const (
 	// IconNameCancel is the name of theme lookup for cancel icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameCancel bellui.ThemeIconName = "cancel"
 
 	// IconNameConfirm is the name of theme lookup for confirm icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameConfirm bellui.ThemeIconName = "confirm"
 
 	// IconNameDelete is the name of theme lookup for delete icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameDelete bellui.ThemeIconName = "delete"
 
 	// IconNameSearch is the name of theme lookup for search icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameSearch bellui.ThemeIconName = "search"
 
 	// IconNameSearchReplace is the name of theme lookup for search and replace icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameSearchReplace bellui.ThemeIconName = "searchReplace"
 
 	// IconNameMenu is the name of theme lookup for menu icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameMenu bellui.ThemeIconName = "menu"
 
 	// IconNameMenuExpand is the name of theme lookup for menu expansion icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameMenuExpand bellui.ThemeIconName = "menuExpand"
 
 	// IconNameCheckButton is the name of theme lookup for unchecked check button icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameCheckButton bellui.ThemeIconName = "unchecked"
 
 	// IconNameCheckButtonChecked is the name of theme lookup for checked check button icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameCheckButtonChecked bellui.ThemeIconName = "checked"
 
 	// IconNameCheckButtonFill is the name of theme lookup for filled check button icon.
 	//
-	// Since: 2.5
+	// Since: 1.0
 	IconNameCheckButtonFill bellui.ThemeIconName = "iconNameCheckButtonFill"
 
 	// IconNameCheckButtonPartial is the name of theme lookup for "partially" checked check button icon.
 	//
-	// Since: 2.6
+	// Since: 1.0
 	IconNameCheckButtonPartial bellui.ThemeIconName = "partial"
 
 	// IconNameRadioButton is the name of theme lookup for radio button unchecked icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameRadioButton bellui.ThemeIconName = "radioButton"
 
 	// IconNameRadioButtonChecked is the name of theme lookup for radio button checked icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameRadioButtonChecked bellui.ThemeIconName = "radioButtonChecked"
 
 	// IconNameRadioButtonFill is the name of theme lookup for filled radio button icon.
 	//
-	// Since: 2.5
+	// Since: 1.0
 	IconNameRadioButtonFill bellui.ThemeIconName = "iconNameRadioButtonFill"
 
 	// IconNameColorAchromatic is the name of theme lookup for greyscale color icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameColorAchromatic bellui.ThemeIconName = "colorAchromatic"
 
 	// IconNameColorChromatic is the name of theme lookup for full color icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameColorChromatic bellui.ThemeIconName = "colorChromatic"
 
 	// IconNameColorPalette is the name of theme lookup for color palette icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameColorPalette bellui.ThemeIconName = "colorPalette"
 
 	// IconNameContentAdd is the name of theme lookup for content add icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameContentAdd bellui.ThemeIconName = "contentAdd"
 
 	// IconNameContentRemove is the name of theme lookup for content remove icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameContentRemove bellui.ThemeIconName = "contentRemove"
 
 	// IconNameContentCut is the name of theme lookup for content cut icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameContentCut bellui.ThemeIconName = "contentCut"
 
 	// IconNameContentCopy is the name of theme lookup for content copy icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameContentCopy bellui.ThemeIconName = "contentCopy"
 
 	// IconNameContentPaste is the name of theme lookup for content paste icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameContentPaste bellui.ThemeIconName = "contentPaste"
 
 	// IconNameContentClear is the name of theme lookup for content clear icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameContentClear bellui.ThemeIconName = "contentClear"
 
 	// IconNameContentRedo is the name of theme lookup for content redo icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameContentRedo bellui.ThemeIconName = "contentRedo"
 
 	// IconNameContentUndo is the name of theme lookup for content undo icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameContentUndo bellui.ThemeIconName = "contentUndo"
 
 	// IconNameInfo is the name of theme lookup for info icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameInfo bellui.ThemeIconName = "info"
 
 	// IconNameQuestion is the name of theme lookup for question icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameQuestion bellui.ThemeIconName = "question"
 
 	// IconNameWarning is the name of theme lookup for warning icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameWarning bellui.ThemeIconName = "warning"
 
 	// IconNameError is the name of theme lookup for error icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameError bellui.ThemeIconName = "error"
 
 	// IconNameBrokenImage is the name of the theme lookup for broken-image icon.
 	//
-	// Since: 2.4
+	// Since: 1.0
 	IconNameBrokenImage bellui.ThemeIconName = "broken-image"
 
 	// IconNameDocument is the name of theme lookup for document icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameDocument bellui.ThemeIconName = "document"
 
 	// IconNameDocumentCreate is the name of theme lookup for document create icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameDocumentCreate bellui.ThemeIconName = "documentCreate"
 
 	// IconNameDocumentPrint is the name of theme lookup for document print icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameDocumentPrint bellui.ThemeIconName = "documentPrint"
 
 	// IconNameDocumentSave is the name of theme lookup for document save icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameDocumentSave bellui.ThemeIconName = "documentSave"
 
 	// IconNameDragCornerIndicator is the name of the icon used in inner windows to indicate a draggable corner.
 	//
-	// Since: 2.5
+	// Since: 1.0
 	IconNameDragCornerIndicator bellui.ThemeIconName = "dragCornerIndicator"
 
 	// IconNameMoreHorizontal is the name of theme lookup for horizontal more.
 	//
-	// Since 2.0
+	// Since: 1.0
 	IconNameMoreHorizontal bellui.ThemeIconName = "moreHorizontal"
 
 	// IconNameMoreVertical is the name of theme lookup for vertical more.
 	//
-	// Since 2.0
+	// Since: 1.0
 	IconNameMoreVertical bellui.ThemeIconName = "moreVertical"
 
 	// IconNameMailAttachment is the name of theme lookup for mail attachment icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameMailAttachment bellui.ThemeIconName = "mailAttachment"
 
 	// IconNameMailCompose is the name of theme lookup for mail compose icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameMailCompose bellui.ThemeIconName = "mailCompose"
 
 	// IconNameMailForward is the name of theme lookup for mail forward icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameMailForward bellui.ThemeIconName = "mailForward"
 
 	// IconNameMailReply is the name of theme lookup for mail reply icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameMailReply bellui.ThemeIconName = "mailReply"
 
 	// IconNameMailReplyAll is the name of theme lookup for mail reply-all icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameMailReplyAll bellui.ThemeIconName = "mailReplyAll"
 
 	// IconNameMailSend is the name of theme lookup for mail send icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameMailSend bellui.ThemeIconName = "mailSend"
 
 	// IconNameMediaMusic is the name of theme lookup for media music icon.
 	//
-	// Since: 2.1
+	// Since: 1.0
 	IconNameMediaMusic bellui.ThemeIconName = "mediaMusic"
 
 	// IconNameMediaPhoto is the name of theme lookup for media photo icon.
 	//
-	// Since: 2.1
+	// Since: 1.0
 	IconNameMediaPhoto bellui.ThemeIconName = "mediaPhoto"
 
 	// IconNameMediaVideo is the name of theme lookup for media video icon.
 	//
-	// Since: 2.1
+	// Since: 1.0
 	IconNameMediaVideo bellui.ThemeIconName = "mediaVideo"
 
 	// IconNameMediaFastForward is the name of theme lookup for media fast-forward icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameMediaFastForward bellui.ThemeIconName = "mediaFastForward"
 
 	// IconNameMediaFastRewind is the name of theme lookup for media fast-rewind icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameMediaFastRewind bellui.ThemeIconName = "mediaFastRewind"
 
 	// IconNameMediaPause is the name of theme lookup for media pause icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameMediaPause bellui.ThemeIconName = "mediaPause"
 
 	// IconNameMediaPlay is the name of theme lookup for media play icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameMediaPlay bellui.ThemeIconName = "mediaPlay"
 
 	// IconNameMediaRecord is the name of theme lookup for media record icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameMediaRecord bellui.ThemeIconName = "mediaRecord"
 
 	// IconNameMediaReplay is the name of theme lookup for media replay icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameMediaReplay bellui.ThemeIconName = "mediaReplay"
 
 	// IconNameMediaSkipNext is the name of theme lookup for media skip next icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameMediaSkipNext bellui.ThemeIconName = "mediaSkipNext"
 
 	// IconNameMediaSkipPrevious is the name of theme lookup for media skip previous icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameMediaSkipPrevious bellui.ThemeIconName = "mediaSkipPrevious"
 
 	// IconNameMediaStop is the name of theme lookup for media stop icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameMediaStop bellui.ThemeIconName = "mediaStop"
 
 	// IconNameMoveDown is the name of theme lookup for move down icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameMoveDown bellui.ThemeIconName = "arrowDown"
 
 	// IconNameMoveUp is the name of theme lookup for move up icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameMoveUp bellui.ThemeIconName = "arrowUp"
 
 	// IconNameNavigateBack is the name of theme lookup for navigate back icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameNavigateBack bellui.ThemeIconName = "arrowBack"
 
 	// IconNameNavigateNext is the name of theme lookup for navigate next icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameNavigateNext bellui.ThemeIconName = "arrowForward"
 
 	// IconNameArrowDropDown is the name of theme lookup for drop-down arrow icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameArrowDropDown bellui.ThemeIconName = "arrowDropDown"
 
 	// IconNameArrowDropUp is the name of theme lookup for drop-up arrow icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameArrowDropUp bellui.ThemeIconName = "arrowDropUp"
 
 	// IconNameFile is the name of theme lookup for file icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameFile bellui.ThemeIconName = "file"
 
 	// IconNameFileApplication is the name of theme lookup for file application icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameFileApplication bellui.ThemeIconName = "fileApplication"
 
 	// IconNameFileAudio is the name of theme lookup for file audio icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameFileAudio bellui.ThemeIconName = "fileAudio"
 
 	// IconNameFileImage is the name of theme lookup for file image icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameFileImage bellui.ThemeIconName = "fileImage"
 
 	// IconNameFileText is the name of theme lookup for file text icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameFileText bellui.ThemeIconName = "fileText"
 
 	// IconNameFileVideo is the name of theme lookup for file video icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameFileVideo bellui.ThemeIconName = "fileVideo"
 
 	// IconNameFolder is the name of theme lookup for folder icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameFolder bellui.ThemeIconName = "folder"
 
 	// IconNameFolderNew is the name of theme lookup for folder new icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameFolderNew bellui.ThemeIconName = "folderNew"
 
 	// IconNameFolderOpen is the name of theme lookup for folder open icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameFolderOpen bellui.ThemeIconName = "folderOpen"
 
 	// IconNameHelp is the name of theme lookup for help icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameHelp bellui.ThemeIconName = "help"
 
 	// IconNameHistory is the name of theme lookup for history icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameHistory bellui.ThemeIconName = "history"
 
 	// IconNameHome is the name of theme lookup for home icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameHome bellui.ThemeIconName = "home"
 
 	// IconNameSettings is the name of theme lookup for settings icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameSettings bellui.ThemeIconName = "settings"
 
 	// IconNameStorage is the name of theme lookup for storage icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameStorage bellui.ThemeIconName = "storage"
 
 	// IconNameUpload is the name of theme lookup for upload icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameUpload bellui.ThemeIconName = "upload"
 
 	// IconNameViewFullScreen is the name of theme lookup for view fullscreen icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameViewFullScreen bellui.ThemeIconName = "viewFullScreen"
 
 	// IconNameViewRefresh is the name of theme lookup for view refresh icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameViewRefresh bellui.ThemeIconName = "viewRefresh"
 
 	// IconNameViewZoomFit is the name of theme lookup for view zoom fit icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameViewZoomFit bellui.ThemeIconName = "viewZoomFit"
 
 	// IconNameViewZoomIn is the name of theme lookup for view zoom in icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameViewZoomIn bellui.ThemeIconName = "viewZoomIn"
 
 	// IconNameViewZoomOut is the name of theme lookup for view zoom out icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameViewZoomOut bellui.ThemeIconName = "viewZoomOut"
 
 	// IconNameViewRestore is the name of theme lookup for view restore icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameViewRestore bellui.ThemeIconName = "viewRestore"
 
 	// IconNameVisibility is the name of theme lookup for visibility icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameVisibility bellui.ThemeIconName = "visibility"
 
 	// IconNameVisibilityOff is the name of theme lookup for invisibility icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameVisibilityOff bellui.ThemeIconName = "visibilityOff"
 
 	// IconNameVolumeDown is the name of theme lookup for volume down icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameVolumeDown bellui.ThemeIconName = "volumeDown"
 
 	// IconNameVolumeMute is the name of theme lookup for volume mute icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameVolumeMute bellui.ThemeIconName = "volumeMute"
 
 	// IconNameVolumeUp is the name of theme lookup for volume up icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameVolumeUp bellui.ThemeIconName = "volumeUp"
 
 	// IconNameDownload is the name of theme lookup for download icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameDownload bellui.ThemeIconName = "download"
 
 	// IconNameComputer is the name of theme lookup for computer icon.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	IconNameComputer bellui.ThemeIconName = "computer"
 
 	// IconNameDesktop is the name of theme lookup for desktop icon.
 	//
-	// Since: 2.5
+	// Since: 1.0
 	IconNameDesktop bellui.ThemeIconName = "desktop"
 
 	// IconNameAccount is the name of theme lookup for account icon.
 	//
-	// Since: 2.1
+	// Since: 1.0
 	IconNameAccount bellui.ThemeIconName = "account"
 
 	// IconNameCalendar is the name of theme lookup for calendar icon.
 	//
-	// Since: 2.6
+	// Since: 1.0
 	IconNameCalendar bellui.ThemeIconName = "calendar"
 
 	// IconNameLogin is the name of theme lookup for login icon.
 	//
-	// Since: 2.1
+	// Since: 1.0
 	IconNameLogin bellui.ThemeIconName = "login"
 
 	// IconNameLogout is the name of theme lookup for logout icon.
 	//
-	// Since: 2.1
+	// Since: 1.0
 	IconNameLogout bellui.ThemeIconName = "logout"
 
 	// IconNameList is the name of theme lookup for list icon.
 	//
-	// Since: 2.1
+	// Since: 1.0
 	IconNameList bellui.ThemeIconName = "list"
 
 	// IconNameGrid is the name of theme lookup for grid icon.
 	//
-	// Since: 2.1
+	// Since: 1.0
 	IconNameGrid bellui.ThemeIconName = "grid"
 
 	// IconNameWindowClose is the name of theme lookup for window close icon.
 	//
-	// Since: 2.5
+	// Since: 1.0
 	IconNameWindowClose bellui.ThemeIconName = "windowClose"
 
 	// IconNameWindowMaximize is the name of theme lookup for window maximize icon.
 	//
-	// Since: 2.5
+	// Since: 1.0
 	IconNameWindowMaximize bellui.ThemeIconName = "windowMaximize"
 
 	// IconNameWindowMinimize is the name of theme lookup for window minimize icon.
 	//
-	// Since: 2.5
+	// Since: 1.0
 	IconNameWindowMinimize bellui.ThemeIconName = "windowMinimize"
 )
 
@@ -627,7 +627,7 @@ var icons = map[bellui.ThemeIconName]bellui.Resource{
 
 // Icon looks up the specified icon for current theme.
 //
-// Since: 2.5
+// Since: 1.0
 func Icon(name bellui.ThemeIconName) bellui.Resource {
 	return safeIconLookup(name)
 }
@@ -635,7 +635,7 @@ func Icon(name bellui.ThemeIconName) bellui.Resource {
 // IconForWidget looks up the specified icon for requested widget using the current theme.
 // If the widget theme has been overridden that theme will be used.
 //
-// Since: 2.5
+// Since: 1.0
 func IconForWidget(name bellui.ThemeIconName, w core.Widget) bellui.Resource {
 	return CurrentForWidget(w).Icon(name)
 }
@@ -653,14 +653,14 @@ type ThemedResource struct {
 
 	// ColorName specifies which theme colour should be used to theme the resource
 	//
-	// Since: 2.3
+	// Since: 1.0
 	ColorName bellui.ThemeColorName
 }
 
 // NewColoredResource creates a resource that adapts to the current theme setting using
 // the color named in the constructor.
 //
-// Since: 2.4
+// Since: 1.0
 func NewColoredResource(src bellui.Resource, name bellui.ThemeColorName) *ThemedResource {
 	return &ThemedResource{
 		source:    src,
@@ -670,7 +670,7 @@ func NewColoredResource(src bellui.Resource, name bellui.ThemeColorName) *Themed
 
 // NewSuccessThemedResource creates a resource that adapts to the current theme success color.
 //
-// Since: 2.4
+// Since: 1.0
 func NewSuccessThemedResource(src bellui.Resource) *ThemedResource {
 	return &ThemedResource{
 		source:    src,
@@ -688,7 +688,7 @@ func NewThemedResource(src bellui.Resource) *ThemedResource {
 
 // NewWarningThemedResource creates a resource that adapts to the current theme warning color.
 //
-// Since: 2.4
+// Since: 1.0
 func NewWarningThemedResource(src bellui.Resource) *ThemedResource {
 	return &ThemedResource{
 		source:    src,
@@ -786,7 +786,7 @@ func (res *ErrorThemedResource) Original() bellui.Resource {
 
 // ThemeColorName returns the bellui.ThemeColorName that is used as foreground color.
 //
-// Since: 2.6
+// Since: 1.0
 func (res *ErrorThemedResource) ThemeColorName() bellui.ThemeColorName {
 	return ColorNameError
 }
@@ -821,7 +821,7 @@ func (res *PrimaryThemedResource) Original() bellui.Resource {
 
 // ThemeColorName returns the bellui.ThemeColorName that is used as foreground color.
 //
-// Since: 2.6
+// Since: 1.0
 func (res *PrimaryThemedResource) ThemeColorName() bellui.ThemeColorName {
 	return ColorNamePrimary
 }
@@ -846,7 +846,7 @@ func (res *DisabledResource) Content() []byte {
 
 // ThemeColorName returns the bellui.ThemeColorName that is used as foreground color.
 //
-// Since: 2.6
+// Since: 1.0
 func (res *DisabledResource) ThemeColorName() bellui.ThemeColorName {
 	return ColorNameDisabled
 }
@@ -905,7 +905,7 @@ func CheckButtonCheckedIcon() bellui.Resource {
 
 // CheckButtonFillIcon returns a resource containing the filled checkbox icon for the current theme.
 //
-// Since: 2.5
+// Since: 1.0
 func CheckButtonFillIcon() bellui.Resource {
 	return safeIconLookup(IconNameCheckButtonFill)
 }
@@ -922,7 +922,7 @@ func RadioButtonCheckedIcon() bellui.Resource {
 
 // RadioButtonFillIcon returns a resource containing the filled checkbox icon for the current theme.
 //
-// Since: 2.5
+// Since: 1.0
 func RadioButtonFillIcon() bellui.Resource {
 	return safeIconLookup(IconNameRadioButtonFill)
 }
@@ -1034,7 +1034,7 @@ func ErrorIcon() bellui.Resource {
 
 // BrokenImageIcon returns a resource containing an icon to specify a broken or missing image
 //
-// Since: 2.4
+// Since: 1.0
 func BrokenImageIcon() bellui.Resource {
 	return safeIconLookup(IconNameBrokenImage)
 }
@@ -1136,21 +1136,21 @@ func MailSendIcon() bellui.Resource {
 
 // MediaMusicIcon returns a resource containing the standard media music icon for the current theme
 //
-// Since: 2.1
+// Since: 1.0
 func MediaMusicIcon() bellui.Resource {
 	return safeIconLookup(IconNameMediaMusic)
 }
 
 // MediaPhotoIcon returns a resource containing the standard media photo icon for the current theme
 //
-// Since: 2.1
+// Since: 1.0
 func MediaPhotoIcon() bellui.Resource {
 	return safeIconLookup(IconNameMediaPhoto)
 }
 
 // MediaVideoIcon returns a resource containing the standard media video icon for the current theme
 //
-// Since: 2.1
+// Since: 1.0
 func MediaVideoIcon() bellui.Resource {
 	return safeIconLookup(IconNameMediaVideo)
 }
@@ -1317,7 +1317,7 @@ func AccountIcon() bellui.Resource {
 
 // CalendarIcon returns a resource containing the standard account icon for the current theme
 //
-// Since: 2.6
+// Since: 1.0
 func CalendarIcon() bellui.Resource {
 	return safeIconLookup(IconNameCalendar)
 }
@@ -1344,21 +1344,21 @@ func GridIcon() bellui.Resource {
 
 // WindowCloseIcon returns a resource containing the window close icon for the current theme
 //
-// Since: 2.5
+// Since: 1.0
 func WindowCloseIcon() bellui.Resource {
 	return safeIconLookup(IconNameWindowClose)
 }
 
 // WindowMaximizeIcon returns a resource containing the window maximize icon for the current theme
 //
-// Since: 2.5
+// Since: 1.0
 func WindowMaximizeIcon() bellui.Resource {
 	return safeIconLookup(IconNameWindowMaximize)
 }
 
 // WindowMinimizeIcon returns a resource containing the window minimize icon for the current theme
 //
-// Since: 2.5
+// Since: 1.0
 func WindowMinimizeIcon() bellui.Resource {
 	return safeIconLookup(IconNameWindowMinimize)
 }

@@ -29,7 +29,7 @@ type PopUpMenu struct {
 
 // NewPopUpMenu creates a new, reusable popup menu. You can show it using ShowAtPosition.
 //
-// Since: 2.0
+// Since: 1.0
 func NewPopUpMenu(menu *bellui.Menu, c core.Canvas) *PopUpMenu {
 	m := &Menu{}
 	m.setMenu(menu)
@@ -56,7 +56,7 @@ func ShowPopUpMenuAtPosition(menu *bellui.Menu, c core.Canvas, pos geo.Position)
 // ShowPopUpMenuAtRelativePosition creates a PopUp menu populated with menu items from the passed menu structure.
 // It will automatically be positioned at the given position relative to stated object and shown as an overlay on the specified canvas.
 //
-// Since 2.4
+// Since: 1.0
 func ShowPopUpMenuAtRelativePosition(menu *bellui.Menu, c core.Canvas, rel geo.Position, to core.CanvasObject) {
 	withRelativePosition(rel, to, func(pos geo.Position) {
 		ShowPopUpMenuAtPosition(menu, c, pos)
@@ -107,7 +107,7 @@ func (p *PopUpMenu) ShowAtPosition(pos geo.Position) {
 
 // ShowAtRelativePosition shows the pop-up menu at the position relative to given object.
 //
-// Since 2.4
+// Since: 1.0
 func (p *PopUpMenu) ShowAtRelativePosition(rel geo.Position, to core.CanvasObject) {
 	withRelativePosition(rel, to, p.ShowAtPosition)
 }

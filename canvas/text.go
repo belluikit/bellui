@@ -36,7 +36,7 @@ type Text struct {
 	// When a font source is set the `TextStyle` may not be effective, as it will be limited to the styles
 	// present in the data provided.
 	//
-	// Since: 2.5
+	// Since: 1.0
 	FontSource bellui.Resource
 
 	rotation float32 // rotation in degrees, applied around text center

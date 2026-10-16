@@ -12,175 +12,175 @@ import (
 const (
 	// ColorRed is the red primary color name.
 	//
-	// Since: 1.4
+	// Since: 1.0
 	ColorRed = internaltheme.ColorRed
 	// ColorOrange is the orange primary color name.
 	//
-	// Since: 1.4
+	// Since: 1.0
 	ColorOrange = internaltheme.ColorOrange
 	// ColorYellow is the yellow primary color name.
 	//
-	// Since: 1.4
+	// Since: 1.0
 	ColorYellow = internaltheme.ColorYellow
 	// ColorGreen is the green primary color name.
 	//
-	// Since: 1.4
+	// Since: 1.0
 	ColorGreen = internaltheme.ColorGreen
 	// ColorBlue is the blue primary color name.
 	//
-	// Since: 1.4
+	// Since: 1.0
 	ColorBlue = internaltheme.ColorBlue
 	// ColorPurple is the purple primary color name.
 	//
-	// Since: 1.4
+	// Since: 1.0
 	ColorPurple = internaltheme.ColorPurple
 	// ColorBrown is the brown primary color name.
 	//
-	// Since: 1.4
+	// Since: 1.0
 	ColorBrown = internaltheme.ColorBrown
 	// ColorGray is the gray primary color name.
 	//
-	// Since: 1.4
+	// Since: 1.0
 	ColorGray = internaltheme.ColorGray
 
 	// ColorNameBackground is the name of theme lookup for background color.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	ColorNameBackground bellui.ThemeColorName = "background"
 
 	// ColorNameButton is the name of theme lookup for button color.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	ColorNameButton bellui.ThemeColorName = "button"
 
 	// ColorNameDisabledButton is the name of theme lookup for disabled button color.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	ColorNameDisabledButton bellui.ThemeColorName = "disabledButton"
 
 	// ColorNameDisabled is the name of theme lookup for disabled foreground color.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	ColorNameDisabled bellui.ThemeColorName = "disabled"
 
 	// ColorNameError is the name of theme lookup for error color.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	ColorNameError bellui.ThemeColorName = "error"
 
 	// ColorNameFocus is the name of theme lookup for focus color.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	ColorNameFocus bellui.ThemeColorName = "focus"
 
 	// ColorNameForeground is the name of theme lookup for foreground color.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	ColorNameForeground bellui.ThemeColorName = "foreground"
 
 	// ColorNameForegroundOnError is the name of theme lookup for a contrast color to the error color.
 	//
-	// Since: 2.5
+	// Since: 1.0
 	ColorNameForegroundOnError bellui.ThemeColorName = "foregroundOnError"
 
 	// ColorNameForegroundOnPrimary is the name of theme lookup for a contrast color to the primary color.
 	//
-	// Since: 2.5
+	// Since: 1.0
 	ColorNameForegroundOnPrimary bellui.ThemeColorName = "foregroundOnPrimary"
 
 	// ColorNameForegroundOnSuccess is the name of theme lookup for a contrast color to the success color.
 	//
-	// Since: 2.5
+	// Since: 1.0
 	ColorNameForegroundOnSuccess bellui.ThemeColorName = "foregroundOnSuccess"
 
 	// ColorNameForegroundOnWarning is the name of theme lookup for a contrast color to the warning color.
 	//
-	// Since: 2.5
+	// Since: 1.0
 	ColorNameForegroundOnWarning bellui.ThemeColorName = "foregroundOnWarning"
 
 	// ColorNameHeaderBackground is the name of theme lookup for background color of a collection header.
 	//
-	// Since: 2.4
+	// Since: 1.0
 	ColorNameHeaderBackground bellui.ThemeColorName = "headerBackground"
 
 	// ColorNameHover is the name of theme lookup for hover color.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	ColorNameHover bellui.ThemeColorName = "hover"
 
 	// ColorNameHyperlink is the name of theme lookup for hyperlink color.
 	//
-	// Since: 2.4
+	// Since: 1.0
 	ColorNameHyperlink bellui.ThemeColorName = "hyperlink"
 
 	// ColorNameInputBackground is the name of theme lookup for background color of an input field.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	ColorNameInputBackground bellui.ThemeColorName = "inputBackground"
 
 	// ColorNameInputBorder is the name of theme lookup for border color of an input field.
 	//
-	// Since: 2.3
+	// Since: 1.0
 	ColorNameInputBorder bellui.ThemeColorName = "inputBorder"
 
 	// ColorNameMenuBackground is the name of theme lookup for background color of menus.
 	//
-	// Since: 2.3
+	// Since: 1.0
 	ColorNameMenuBackground bellui.ThemeColorName = "menuBackground"
 
 	// ColorNameOverlayBackground is the name of theme lookup for background color of overlays like dialogs.
 	//
-	// Since: 2.3
+	// Since: 1.0
 	ColorNameOverlayBackground bellui.ThemeColorName = "overlayBackground"
 
 	// ColorNamePlaceHolder is the name of theme lookup for placeholder text color.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	ColorNamePlaceHolder bellui.ThemeColorName = "placeholder"
 
 	// ColorNamePressed is the name of theme lookup for the tap overlay color.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	ColorNamePressed bellui.ThemeColorName = "pressed"
 
 	// ColorNamePrimary is the name of theme lookup for primary color.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	ColorNamePrimary bellui.ThemeColorName = "primary"
 
 	// ColorNameScrollBar is the name of theme lookup for scrollbar color.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	ColorNameScrollBar bellui.ThemeColorName = "scrollBar"
 
 	// ColorNameScrollBarBackground is the name of theme lookup for scrollbar background color.
 	//
-	// Since: 2.6
+	// Since: 1.0
 	ColorNameScrollBarBackground bellui.ThemeColorName = "scrollBarBackground"
 
 	// ColorNameSelection is the name of theme lookup for selection color.
 	//
-	// Since: 2.1
+	// Since: 1.0
 	ColorNameSelection bellui.ThemeColorName = "selection"
 
 	// ColorNameSeparator is the name of theme lookup for separator bars.
 	//
-	// Since: 2.3
+	// Since: 1.0
 	ColorNameSeparator bellui.ThemeColorName = "separator"
 
 	// ColorNameShadow is the name of theme lookup for shadow color.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	ColorNameShadow bellui.ThemeColorName = "shadow"
 
 	// ColorNameSuccess is the name of theme lookup for success color.
 	//
-	// Since: 2.3
+	// Since: 1.0
 	ColorNameSuccess bellui.ThemeColorName = "success"
 
 	// ColorNameWarning is the name of theme lookup for warning color.
 	//
-	// Since: 2.3
+	// Since: 1.0
 	ColorNameWarning bellui.ThemeColorName = "warning"
 
 	// ColorNameCardBackground is the name of theme lookup for card surface background color.
@@ -326,7 +326,7 @@ var (
 
 // Color looks up the named colour for current theme and variant.
 //
-// Since: 2.5
+// Since: 1.0
 func Color(name bellui.ThemeColorName) color.Color {
 	return safeColorLookup(name, currentVariant())
 }
@@ -334,14 +334,14 @@ func Color(name bellui.ThemeColorName) color.Color {
 // ColorForWidget looks up the named colour for the requested widget using the current theme and variant.
 // If the widget theme has been overridden that theme will be used.
 //
-// Since: 2.5
+// Since: 1.0
 func ColorForWidget(name bellui.ThemeColorName, w core.Widget) color.Color {
 	return CurrentForWidget(w).Color(name, currentVariant())
 }
 
 // PrimaryColorNames returns a list of the standard primary color options.
 //
-// Since: 1.4
+// Since: 1.0
 func PrimaryColorNames() []string {
 	return []string{ColorRed, ColorOrange, ColorYellow, ColorGreen, ColorBlue, ColorPurple, ColorBrown, ColorGray}
 }

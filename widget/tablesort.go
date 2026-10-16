@@ -12,7 +12,7 @@ import (
 
 // SortDirection is the order a column is sorted in by a [TableSorter].
 //
-// Since: 2.8
+// Since: 1.0
 type SortDirection int
 
 const (
@@ -36,7 +36,7 @@ const (
 // A nil Less makes the column inert (its header is shown but clicking it does
 // nothing), which is convenient for display-only columns.
 //
-// Since: 2.8
+// Since: 1.0
 type SortableColumn[T any] struct {
 	Title string
 	Less  func(a, b T) bool
@@ -44,7 +44,7 @@ type SortableColumn[T any] struct {
 
 // ColumnSort reports one active sort key: the column index and its direction.
 //
-// Since: 2.8
+// Since: 1.0
 type ColumnSort struct {
 	Column    int
 	Direction SortDirection
@@ -70,7 +70,7 @@ type tableSortKey struct {
 // A TableSorter mutates widget state; call its methods on the main goroutine
 // (use [bellui.Do] from a background goroutine), the same rule the widgets follow.
 //
-// Since: 2.8
+// Since: 1.0
 type TableSorter[T any] struct {
 	table *Table
 	proxy *model.SortProxy[T]
@@ -95,7 +95,7 @@ type TableSorter[T any] struct {
 // ([TableSorter.SortByColumn], [TableSorter.Clear]) and reports the current
 // state ([TableSorter.Sorts], [TableSorter.DirectionOf]).
 //
-// Since: 2.8
+// Since: 1.0
 func BindTableSort[T any](t *Table, proxy *model.SortProxy[T], cols []SortableColumn[T]) *TableSorter[T] {
 	s := &TableSorter[T]{table: t, proxy: proxy, cols: cols}
 

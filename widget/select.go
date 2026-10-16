@@ -33,7 +33,7 @@ type Select struct {
 
 	// Alignment sets the text alignment of the select and its list of options.
 	//
-	// Since: 2.1
+	// Since: 1.0
 	Alignment   bellui.TextAlign
 	Selected    string
 	Options     []string
@@ -68,7 +68,7 @@ func NewSelect(options []string, changed func(string)) *Select {
 
 // NewSelectWithData returns a new select widget connected to the specified data source.
 //
-// Since: 2.6
+// Since: 1.0
 func NewSelectWithData(options []string, data binding.String) *Select {
 	sel := NewSelect(options, nil)
 	sel.Bind(data)
@@ -103,7 +103,7 @@ func (s *Select) AccessibleState() core.AccessibleState {
 // The public [Select.OnChanged] field is left alone: binding and an app change
 // handler coexist, and OnChanged may be assigned before or after Bind.
 //
-// Since: 2.6
+// Since: 1.0
 func (s *Select) Bind(data binding.String) {
 	s.binder.SetCallback(s.updateFromData)
 	s.binder.Bind(data)
@@ -226,7 +226,7 @@ func (s *Select) SelectedIndex() int {
 
 // SetOptions updates the list of options available and refreshes the widget
 //
-// Since: 2.4
+// Since: 1.0
 func (s *Select) SetOptions(options []string) {
 	onMain(func() {
 		s.Options = options
@@ -322,7 +322,7 @@ func (s *Select) TypedRune(_ rune) {
 // Any [Select.OnChanged] handler the app installed is left in place -- Unbind
 // only clears the write-back it installed itself.
 //
-// Since: 2.6
+// Since: 1.0
 func (s *Select) Unbind() {
 	s.onChangedInternal = nil
 	s.binder.Unbind()

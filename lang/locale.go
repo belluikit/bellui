@@ -40,7 +40,7 @@ func SystemLocale() bellui.Locale {
 // It is the same locale source that [IsRTL] (and therefore the default text base
 // direction) consults, so text shaping, direction and formatting stay in step.
 //
-// Since: 2.8
+// Since: 1.0
 func CurrentLocale() bellui.Locale {
 	tag := getCurrentTag()
 	if tag == (language.Tag{}) { // no override and not yet initialised

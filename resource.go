@@ -21,7 +21,7 @@ type Resource interface {
 // ThemedResource is a version of a resource that can be updated to match a certain theme color.
 // The [ThemeColorName] will be used to look up the color for the current theme and colorize the resource.
 //
-// Since: 2.5
+// Since: 1.0
 type ThemedResource interface {
 	Resource
 	ThemeColorName() ThemeColorName
@@ -35,7 +35,7 @@ type ThemedResource interface {
 // (reading all bytes into memory), but Open() provides an [io.ReadCloser]
 // for streaming consumption without buffering the entire content.
 //
-// Since: 2.7
+// Since: 1.0
 type StreamingResource interface {
 	Resource
 	Open() (io.ReadCloser, error)
@@ -53,7 +53,7 @@ type StreamingResource interface {
 //
 // LazyResource is safe for concurrent use.
 //
-// Since: 2.7
+// Since: 1.0
 type LazyResource struct {
 	name   string
 	loader func() ([]byte, error)
@@ -122,7 +122,7 @@ func (r *LazyResource) Release() {
 // using the provided loader function. The loader will be called at most once
 // unless [LazyResource.Release] is called.
 //
-// Since: 2.7
+// Since: 1.0
 func NewLazyResource(name string, loader func() ([]byte, error)) *LazyResource {
 	return &LazyResource{
 		name:   name,
@@ -134,7 +134,7 @@ func NewLazyResource(name string, loader func() ([]byte, error)) *LazyResource {
 // access using the provided loader function, and supports streaming via
 // [StreamingResource.Open] using the provided opener function.
 //
-// Since: 2.7
+// Since: 1.0
 func NewStreamingLazyResource(name string, loader func() ([]byte, error), opener func() (io.ReadCloser, error)) *LazyResource {
 	return &LazyResource{
 		name:   name,
@@ -147,7 +147,7 @@ func NewStreamingLazyResource(name string, loader func() ([]byte, error), opener
 // filesystem path on first access. It also supports streaming via [StreamingResource.Open],
 // which opens the file directly without caching the bytes.
 //
-// Since: 2.7
+// Since: 1.0
 func NewLazyResourceFromPath(path string) *LazyResource {
 	cleanPath := filepath.Clean(path)
 	return &LazyResource{

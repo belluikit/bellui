@@ -25,7 +25,7 @@ const (
 	ScrollVerticalOnly
 	// ScrollNone turns off scrolling for this container.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	ScrollNone
 )
 
@@ -555,7 +555,7 @@ type Scroll struct {
 	// OnScrolled can be set to be notified when the Scroll has changed position.
 	// You should not update the Scroll.Offset from this method.
 	//
-	// Since: 2.0
+	// Since: 1.0
 	OnScrolled func(geo.Position) `json:"-"`
 
 	// ReserveBarSpace, when true, reduces the content width (or height)
@@ -687,7 +687,7 @@ func (s *Scroll) Resize(sz geo.Size) {
 
 // ScrollToOffset will update the location of the content of this scroll container.
 //
-// Since: 2.6
+// Since: 1.0
 func (s *Scroll) ScrollToOffset(p geo.Position) {
 	if s.Offset == p {
 		return

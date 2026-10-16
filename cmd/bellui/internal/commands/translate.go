@@ -21,7 +21,7 @@ import (
 
 // Translate returns the cli command to scan for new translation strings.
 //
-// Since: 2.6
+// Since: 1.0
 func Translate() *cli.Command {
 	return &cli.Command{
 		Name:      "translate",

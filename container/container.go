@@ -8,14 +8,14 @@ import (
 
 // New returns a new Container instance holding the specified CanvasObjects which will be laid out according to the specified Layout.
 //
-// Since: 2.0
+// Since: 1.0
 func New(layout core.Layout, objects ...core.CanvasObject) *bellui.Container {
 	return &bellui.Container{Layout: layout, Objects: objects}
 }
 
 // NewWithoutLayout returns a new Container instance holding the specified CanvasObjects that are manually arranged.
 //
-// Since: 2.0
+// Since: 1.0
 func NewWithoutLayout(objects ...core.CanvasObject) *bellui.Container {
 	return &bellui.Container{Objects: objects}
 }

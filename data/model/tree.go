@@ -18,7 +18,7 @@ import (
 // and sorts it with tree semantics a flat proxy cannot express: ancestor-keeping
 // filtering and per-sibling-group ordering.
 //
-// Since: 2.8
+// Since: 1.0
 type TreeSource interface {
 	// Root returns the id of the root node. widget.Tree treats the root itself
 	// as invisible and shows its children as the top level.
@@ -42,7 +42,7 @@ type callbackTreeSource struct {
 // behind a [TreeProxy] without a new data structure. Nil callbacks are treated as
 // "no children" / "not a branch".
 //
-// Since: 2.8
+// Since: 1.0
 func NewTreeSource(root string, children func(uid string) []string, isBranch func(uid string) bool) TreeSource {
 	return &callbackTreeSource{root: root, children: children, isBranch: isBranch}
 }
@@ -92,7 +92,7 @@ func (s *callbackTreeSource) IsBranch(uid string) bool {
 // an observable [Model], so when the underlying data changes call
 // [TreeProxy.Refresh] to rebuild and notify.
 //
-// Since: 2.8
+// Since: 1.0
 type TreeProxy struct {
 	listeners
 
@@ -120,7 +120,7 @@ var (
 // [TreeProxy.SetLess] children keep their source order, and until a predicate is
 // set with [TreeProxy.SetPredicate] every node is visible.
 //
-// Since: 2.8
+// Since: 1.0
 func NewTreeProxy(src TreeSource) *TreeProxy {
 	return &TreeProxy{src: src, childCache: map[string][]string{}}
 }

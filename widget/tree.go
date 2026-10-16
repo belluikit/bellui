@@ -34,14 +34,14 @@ var (
 // Tree widget displays hierarchical data.
 // Each node of the tree must be identified by a Unique TreeNodeID.
 //
-// Since: 1.4
+// Since: 1.0
 type Tree struct {
 	BaseWidget
 	Root TreeNodeID
 
 	// HideSeparators hides the separators between tree nodes
 	//
-	// Since: 2.5
+	// Since: 1.0
 	HideSeparators bool
 
 	ChildUIDs      func(uid TreeNodeID) (c []TreeNodeID)                     `json:"-"` // Return a sorted slice of Children TreeNodeIDs for the given Node TreeNodeID
@@ -77,7 +77,7 @@ func (t *Tree) AccessibleLabel() string { return "" }
 // create returns a new template object that can be cached.
 // update is used to apply data at specified data location to the passed template CanvasObject.
 //
-// Since: 1.4
+// Since: 1.0
 func NewTree(childUIDs func(TreeNodeID) []TreeNodeID, isBranch func(TreeNodeID) bool, create func(bool) core.CanvasObject, update func(TreeNodeID, bool, core.CanvasObject)) *Tree {
 	t := &Tree{ChildUIDs: childUIDs, IsBranch: isBranch, CreateNode: create, UpdateNode: update}
 	t.ExtendBaseWidget(t)
@@ -86,7 +86,7 @@ func NewTree(childUIDs func(TreeNodeID) []TreeNodeID, isBranch func(TreeNodeID) 
 
 // NewTreeWithData creates a new tree widget that will display the contents of the provided data.
 //
-// Since: 2.4
+// Since: 1.0
 func NewTreeWithData(data binding.DataTree, createItem func(bool) core.CanvasObject, updateItem func(binding.DataItem, bool, core.CanvasObject)) *Tree {
 	t := NewTree(
 		data.ChildIDs,
@@ -112,7 +112,7 @@ func NewTreeWithData(data binding.DataTree, createItem func(bool) core.CanvasObj
 // NewTreeWithStrings creates a new tree with the given string map.
 // Data must contain a mapping for the root, which defaults to empty string ("").
 //
-// Since: 1.4
+// Since: 1.0
 func NewTreeWithStrings(data map[string][]string) (t *Tree) {
 	t = &Tree{
 		ChildUIDs: func(uid string) (c []string) {
@@ -207,7 +207,7 @@ func (t *Tree) MinSize() geo.Size {
 
 // RefreshItem refreshes a single item, specified by the item ID passed in.
 //
-// Since: 2.4
+// Since: 1.0
 func (t *Tree) RefreshItem(id TreeNodeID) {
 	t.flatNodesDirty = true
 	if t.scroller == nil {
@@ -278,7 +278,7 @@ func (t *Tree) Resize(size geo.Size) {
 
 // ScrollToBottom scrolls to the bottom of the tree.
 //
-// Since 2.1
+// Since: 1.0
 func (t *Tree) ScrollToBottom() {
 	if t.scroller == nil {
 		return
@@ -291,7 +291,7 @@ func (t *Tree) ScrollToBottom() {
 // ScrollTo scrolls to the node with the given id.
 // If the node is inside a closed branch, all ancestor branches are opened first.
 //
-// Since 2.1
+// Since: 1.0
 func (t *Tree) ScrollTo(uid TreeNodeID) {
 	if t.scroller == nil {
 		return
@@ -317,7 +317,7 @@ func (t *Tree) ScrollTo(uid TreeNodeID) {
 
 // ScrollToOffset scrolls the tree to the given offset position.
 //
-// Since: 2.6
+// Since: 1.0
 func (t *Tree) ScrollToOffset(offset float32) {
 	if t.scroller == nil {
 		return
@@ -332,7 +332,7 @@ func (t *Tree) ScrollToOffset(offset float32) {
 
 // ScrollToTop scrolls to the top of the tree.
 //
-// Since 2.1
+// Since: 1.0
 func (t *Tree) ScrollToTop() {
 	if t.scroller == nil {
 		return
@@ -449,7 +449,7 @@ func (t *Tree) Unselect(uid TreeNodeID) {
 
 // UnselectAll sets all nodes to be not selected.
 //
-// Since: 2.1
+// Since: 1.0
 func (t *Tree) UnselectAll() {
 	if len(t.selected) == 0 {
 		return

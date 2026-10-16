@@ -19,7 +19,7 @@ import "github.com/belluikit/bellui"
 // crashing. Callers that must know whether a write is possible should assert the
 // concrete source type, or wrap a [SliceModel] at the base of the proxy chain.
 //
-// Since: 2.8
+// Since: 1.0
 type MutableModel[T any] interface {
 	Model[T]
 
@@ -39,7 +39,7 @@ var (
 // to and notifies listeners. It is a no-op (with a logged error) when i is out of
 // range or the source is not a [MutableModel]. See [MutableModel].
 //
-// Since: 2.8
+// Since: 1.0
 func (p *SortProxy[T]) SetItem(i int, item T) {
 	writeThrough[T]("model.SortProxy.SetItem", p.src, p.SourceIndex(i), item)
 }
@@ -48,7 +48,7 @@ func (p *SortProxy[T]) SetItem(i int, item T) {
 // to and notifies listeners. It is a no-op (with a logged error) when i is out of
 // range or the source is not a [MutableModel]. See [MutableModel].
 //
-// Since: 2.8
+// Since: 1.0
 func (p *FilterProxy[T]) SetItem(i int, item T) {
 	writeThrough[T]("model.FilterProxy.SetItem", p.src, p.SourceIndex(i), item)
 }

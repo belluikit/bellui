@@ -25,14 +25,14 @@ var (
 
 // GridWrapItemID is the ID of an individual item in the GridWrap widget.
 //
-// Since: 2.4
+// Since: 1.0
 type GridWrapItemID = int
 
 // GridWrap is a widget with an API very similar to widget.List,
 // that lays out items in a scrollable wrapping grid similar to container.NewGridWrap.
 // It caches and reuses widgets for performance.
 //
-// Since: 2.4
+// Since: 1.0
 type GridWrap struct {
 	BaseWidget
 
@@ -71,7 +71,7 @@ type GridWrap struct {
 // NewGridWrap creates and returns a GridWrap widget for displaying items in
 // a wrapping grid layout with scrolling and caching for performance.
 //
-// Since: 2.4
+// Since: 1.0
 func NewGridWrap(length func() int, createItem func() core.CanvasObject, updateItem func(GridWrapItemID, core.CanvasObject)) *GridWrap {
 	gwList := &GridWrap{Length: length, CreateItem: createItem, UpdateItem: updateItem}
 	gwList.ExtendBaseWidget(gwList)
@@ -86,7 +86,7 @@ func (l *GridWrap) AccessibleLabel() string { return "" }
 
 // NewGridWrapWithData creates a new GridWrap widget that will display the contents of the provided data.
 //
-// Since: 2.4
+// Since: 1.0
 func NewGridWrapWithData(data binding.DataList, createItem func() core.CanvasObject, updateItem func(binding.DataItem, core.CanvasObject)) *GridWrap {
 	gwList := NewGridWrap(
 		data.Length,
@@ -158,7 +158,7 @@ func (l *GridWrap) scrollTo(id GridWrapItemID) {
 
 // RefreshItem refreshes a single item, specified by the item ID passed in.
 //
-// Since: 2.4
+// Since: 1.0
 func (l *GridWrap) RefreshItem(id GridWrapItemID) {
 	l.minSizeCache = geo.Size{}
 	if l.scroller == nil {
@@ -687,7 +687,7 @@ func (l *gridWrapLayout) setupGridItem(li *gridWrapItem, id GridWrapItemID, focu
 // ColumnCount returns the number of columns that are/will be shown
 // in this GridWrap, based on the widget's current width.
 //
-// Since: 2.5
+// Since: 1.0
 func (l *GridWrap) ColumnCount() int {
 	if l.colCountCache < 1 {
 		padding := l.Theme().Size(theme.SizeNamePadding)

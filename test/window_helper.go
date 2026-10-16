@@ -12,7 +12,7 @@ import (
 // NewTempWindow creates and registers a new window for test purposes.
 // This window will get removed automatically once the running test ends.
 //
-// Since: 2.5
+// Since: 1.0
 func NewTempWindow(t testing.TB, content core.CanvasObject) bellui.Window {
 	window := NewWindow(content)
 	t.Cleanup(window.Close)

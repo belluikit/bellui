@@ -149,7 +149,7 @@ func (t *RichText) AccessibleVirtualNodes() []core.AccessibleVirtualNode {
 
 // RichText represents the base element for a rich text-based widget.
 //
-// Since: 2.1
+// Since: 1.0
 type RichText struct {
 	BaseWidget
 	Segments []RichTextSegment
@@ -158,7 +158,7 @@ type RichText struct {
 
 	// The truncation mode of the text
 	//
-	// Since: 2.4
+	// Since: 1.0
 	Truncation bellui.TextTruncation
 
 	// AllowRemoteContent opts this RichText into loading image segments whose
@@ -169,7 +169,7 @@ type RichText struct {
 	// placeholder instead of being fetched. Set it to true only for content you
 	// trust (e.g. local documentation or your own markdown).
 	//
-	// Since: 2.7
+	// Since: 1.0
 	AllowRemoteContent bool
 
 	// Virtualize opts a scrollable RichText (Scroll != ScrollNone) into row
@@ -237,7 +237,7 @@ type RichText struct {
 	// SelectableMode is SelectableAll. Default false — internal RichText
 	// widgets (e.g. inside Button) leave this false so they remain non-selectable.
 	//
-	// Since: 2.7
+	// Since: 1.0
 	Selectable bool
 
 	selection *focusSelectable // overlay for text selection (created in CreateRenderer)
@@ -410,7 +410,7 @@ const varHeightMinRows = 2000
 // NewRichText returns a new RichText widget that renders the given text and segments.
 // If no segments are specified it will be converted to a single segment using the default text settings.
 //
-// Since: 2.1
+// Since: 1.0
 func NewRichText(segments ...RichTextSegment) *RichText {
 	t := &RichText{Segments: segments}
 	t.Scroll = widget.ScrollNone
@@ -421,7 +421,7 @@ func NewRichText(segments ...RichTextSegment) *RichText {
 // NewRichTextWithText returns a new RichText widget that renders the given text.
 // The string will be converted to a single text segment using the default text settings.
 //
-// Since: 2.1
+// Since: 1.0
 func NewRichTextWithText(text string) *RichText {
 	return NewRichText(&TextSegment{
 		Style: RichTextStyleInline,
@@ -491,7 +491,7 @@ func (t *RichText) isSelectable() bool {
 // SelectedText returns the text currently selected in this RichText.
 // Only works when Selectable is true and the window's SelectableMode permits it.
 //
-// Since: 2.7
+// Since: 1.0
 func (t *RichText) SelectedText() string {
 	if !t.isSelectable() || t.selection == nil {
 		return ""
@@ -2082,7 +2082,7 @@ func (t *RichText) updateRowBoundsInner() bool {
 
 // RichTextBlock is an extension of a text segment that contains other segments
 //
-// Since: 2.1
+// Since: 1.0
 type RichTextBlock interface {
 	Segments() []RichTextSegment
 }

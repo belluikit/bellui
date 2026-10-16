@@ -4,7 +4,7 @@ import "strings"
 
 // Locale represents a user's locale (language, region and script)
 //
-// Since: 2.5
+// Since: 1.0
 type Locale string
 
 // LanguageString returns a version of the local without the script portion.

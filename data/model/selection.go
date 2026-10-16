@@ -8,7 +8,7 @@ import (
 
 // SelectionMode controls how many items a [SelectionModel] may hold selected.
 //
-// Since: 2.8
+// Since: 1.0
 type SelectionMode int
 
 const (
@@ -32,7 +32,7 @@ const (
 // on every change) when the selected set changes — for example to refresh a
 // bound widget's highlight.
 //
-// Since: 2.8
+// Since: 1.0
 type SelectionModel[T any, K comparable] struct {
 	listeners
 
@@ -49,7 +49,7 @@ type SelectionModel[T any, K comparable] struct {
 // NewSelectionModel returns a selection tracker over m, keying items by id.
 // The default mode is [SelectSingle]; change it with [SelectionModel.SetMode].
 //
-// Since: 2.8
+// Since: 1.0
 func NewSelectionModel[T any, K comparable](m Model[T], id func(T) K) *SelectionModel[T, K] {
 	return &SelectionModel[T, K]{
 		m:    m,

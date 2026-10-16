@@ -39,7 +39,7 @@ func (l *List) AccessibleLabel() string { return "" }
 // By default, List requires that all items are the same size, but specific
 // rows can have their heights set with SetItemHeight.
 //
-// Since: 1.4
+// Since: 1.0
 type List struct {
 	BaseWidget
 
@@ -66,7 +66,7 @@ type List struct {
 
 	// HideSeparators hides the separators between list rows
 	//
-	// Since: 2.5
+	// Since: 1.0
 	HideSeparators bool
 
 	currentFocus  ListItemID
@@ -83,7 +83,7 @@ type List struct {
 // NewList creates and returns a list widget for displaying items in
 // a vertical layout with scrolling and caching for performance.
 //
-// Since: 1.4
+// Since: 1.0
 func NewList(length func() int, createItem func() core.CanvasObject, updateItem func(ListItemID, core.CanvasObject)) *List {
 	list := &List{Length: length, CreateItem: createItem, UpdateItem: updateItem}
 	list.ExtendBaseWidget(list)
@@ -92,7 +92,7 @@ func NewList(length func() int, createItem func() core.CanvasObject, updateItem 
 
 // NewListWithData creates a new list widget that will display the contents of the provided data.
 //
-// Since: 2.0
+// Since: 1.0
 func NewListWithData(data binding.DataList, createItem func() core.CanvasObject, updateItem func(binding.DataItem, core.CanvasObject)) *List {
 	l := NewList(
 		data.Length,
@@ -148,7 +148,7 @@ func (l *List) MinSize() geo.Size {
 
 // RefreshItem refreshes a single item, specified by the item ID passed in.
 //
-// Since: 2.4
+// Since: 1.0
 func (l *List) RefreshItem(id ListItemID) {
 	l.minSizeCache = geo.Size{}
 	if l.scroller == nil {
@@ -187,7 +187,7 @@ func (l *List) focusedItemObject() core.CanvasObject {
 // returned from the CreateItem callback. The height parameter uses the same units as a geo.Size type and refers
 // to the internal content height not including the divider size.
 //
-// Since: 2.3
+// Since: 1.0
 func (l *List) SetItemHeight(id ListItemID, height float32) {
 	if l.itemHeights == nil {
 		l.itemHeights = make(map[ListItemID]float32)
@@ -274,7 +274,7 @@ func (l *List) Select(id ListItemID) {
 
 // ScrollTo scrolls to the item represented by id
 //
-// Since: 2.1
+// Since: 1.0
 func (l *List) ScrollTo(id ListItemID) {
 	length := 0
 	if f := l.Length; f != nil {
@@ -289,7 +289,7 @@ func (l *List) ScrollTo(id ListItemID) {
 
 // ScrollToBottom scrolls to the end of the list
 //
-// Since: 2.1
+// Since: 1.0
 func (l *List) ScrollToBottom() {
 	l.scroller.ScrollToBottom()
 	l.offsetUpdated(l.scroller.Offset)
@@ -297,7 +297,7 @@ func (l *List) ScrollToBottom() {
 
 // ScrollToTop scrolls to the start of the list
 //
-// Since: 2.1
+// Since: 1.0
 func (l *List) ScrollToTop() {
 	l.scroller.ScrollToTop()
 	l.offsetUpdated(l.scroller.Offset)
@@ -305,7 +305,7 @@ func (l *List) ScrollToTop() {
 
 // ScrollToOffset scrolls the list to the given offset position.
 //
-// Since: 2.5
+// Since: 1.0
 func (l *List) ScrollToOffset(offset float32) {
 	if l.scroller == nil {
 		return
@@ -326,7 +326,7 @@ func (l *List) ScrollToOffset(offset float32) {
 
 // GetScrollOffset returns the current scroll offset position
 //
-// Since: 2.5
+// Since: 1.0
 func (l *List) GetScrollOffset() float32 {
 	return l.offsetY
 }
@@ -381,7 +381,7 @@ func (l *List) Unselect(id ListItemID) {
 
 // UnselectAll removes all items from the selection.
 //
-// Since: 2.1
+// Since: 1.0
 func (l *List) UnselectAll() {
 	if len(l.selected) == 0 {
 		return

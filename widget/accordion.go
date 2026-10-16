@@ -110,7 +110,7 @@ func (a *Accordion) OpenAll() {
 
 // Prepend adds the given item to the beginning of this Accordion.
 //
-// Since: 2.6
+// Since: 1.0
 func (a *Accordion) Prepend(item *AccordionItem) {
 	a.Items = append([]*AccordionItem{item}, a.Items...)
 

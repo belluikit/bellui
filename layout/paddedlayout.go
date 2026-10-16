@@ -39,7 +39,7 @@ func (l paddedLayout) MinSize(objects []core.CanvasObject) (min geo.Size) {
 
 // NewPaddedLayout creates a new PaddedLayout instance
 //
-// Since: 1.4
+// Since: 1.0
 func NewPaddedLayout() core.Layout {
 	return paddedLayout{}
 }

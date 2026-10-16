@@ -16,7 +16,7 @@ import "github.com/belluikit/bellui"
 // never make the tray the only route to a feature — always keep a window or
 // menu path (see the "Show Window" advice on SetSystemTrayWindow).
 //
-// Since: 2.2
+// Since: 1.0
 type App interface {
 	// SetSystemTrayMenu sets a menu to be shown from the system tray icon.
 	// On Linux, see the tray-delivery note on the App interface: the menu is
@@ -39,7 +39,7 @@ type App interface {
 	// (stock GNOME requires the AppIndicator extension; XEmbed-only trays are unsupported), so the icon
 	// may never appear and the window needs another way to be reached.
 	//
-	// Since: 2.7
+	// Since: 1.0
 	SetSystemTrayWindow(bellui.Window)
 
 	// SetSystemTrayTooltip sets the hover tooltip text shown for the system tray icon.

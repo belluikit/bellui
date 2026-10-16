@@ -111,7 +111,7 @@ type ProgressBar struct {
 	// TextFormatter can be used to have a custom format of progress text.
 	// If set, it overrides the percentage readout and runs each time the value updates.
 	//
-	// Since: 1.4
+	// Since: 1.0
 	TextFormatter func() string `json:"-"`
 
 	binder basicBinder
@@ -143,7 +143,7 @@ func (p *ProgressBar) AccessibleRange() (min, max, current float64) {
 // Bind connects the specified data source to this ProgressBar.
 // The current value will be displayed and any changes in the data will cause the widget to update.
 //
-// Since: 2.0
+// Since: 1.0
 func (p *ProgressBar) Bind(data binding.Float) {
 	p.binder.SetCallback(p.updateFromData)
 	p.binder.Bind(data)
@@ -184,7 +184,7 @@ func (p *ProgressBar) CreateRenderer() core.WidgetRenderer {
 // Unbind disconnects any configured data source from this ProgressBar.
 // The current value will remain at the last value of the data source.
 //
-// Since: 2.0
+// Since: 1.0
 func (p *ProgressBar) Unbind() {
 	p.binder.Unbind()
 }
@@ -200,7 +200,7 @@ func NewProgressBar() *ProgressBar {
 
 // NewProgressBarWithData returns a progress bar connected with the specified data source.
 //
-// Since: 2.0
+// Since: 1.0
 func NewProgressBarWithData(data binding.Float) *ProgressBar {
 	p := NewProgressBar()
 	p.Bind(data)

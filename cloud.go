@@ -3,7 +3,7 @@ package bellui
 // CloudProvider specifies the identifying information of a cloud provider.
 // This information is mostly used by the [fyne.io/cloud.ShowSettings] user flow.
 //
-// Since: 2.3
+// Since: 1.0
 type CloudProvider interface {
 	// ProviderDescription returns a more detailed description of this cloud provider.
 	ProviderDescription() string
@@ -23,7 +23,7 @@ type CloudProvider interface {
 // CloudProviderPreferences interface defines the functionality that a cloud provider will include if it is capable
 // of synchronizing user preferences.
 //
-// Since: 2.3
+// Since: 1.0
 type CloudProviderPreferences interface {
 	// CloudPreferences returns a preference provider that will sync values to the cloud this provider uses.
 	CloudPreferences(App) Preferences
@@ -32,7 +32,7 @@ type CloudProviderPreferences interface {
 // CloudProviderStorage interface defines the functionality that a cloud provider will include if it is capable
 // of synchronizing user documents.
 //
-// Since: 2.3
+// Since: 1.0
 type CloudProviderStorage interface {
 	// CloudStorage returns a storage provider that will sync documents to the cloud this provider uses.
 	CloudStorage(App) Storage

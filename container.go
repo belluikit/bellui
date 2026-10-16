@@ -23,7 +23,7 @@ type Container struct {
 // Add appends the specified object to the items this container manages.
 // It is safe to call from any goroutine.
 //
-// Since: 1.4
+// Since: 1.0
 func (c *Container) Add(add core.CanvasObject) {
 	RunOnMain(func() {
 		if add == nil {
@@ -108,7 +108,7 @@ func (c *Container) Remove(rem core.CanvasObject) {
 
 // RemoveAll updates the contents of this container to no longer include any objects.
 //
-// Since: 2.2
+// Since: 1.0
 func (c *Container) RemoveAll() {
 	c.Objects = nil
 	c.layout()

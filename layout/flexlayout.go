@@ -16,7 +16,7 @@ import (
 // default; the optional MinHeight/MaxHeight arrays clamp a child's height
 // instead (start/top-aligned within the freed space).
 //
-// Since: 2.7
+// Since: 1.0
 type FlexHBoxLayout struct {
 	Flex      []float32 // flex grow factor per child (0 = fixed size)
 	MinWidth  []float32 // minimum width per child (0 = use MinSize)
@@ -146,7 +146,7 @@ func (l *FlexHBoxLayout) Layout(objects []core.CanvasObject, size geo.Size) {
 // default; the optional MinWidth/MaxWidth arrays clamp a child's width instead
 // (start/left-aligned within the freed space).
 //
-// Since: 2.7
+// Since: 1.0
 type FlexVBoxLayout struct {
 	Flex      []float32 // flex grow factor per child
 	MinHeight []float32 // minimum height per child
