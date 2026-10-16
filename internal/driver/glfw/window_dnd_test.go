@@ -27,7 +27,7 @@ func (d *droppableObject) Dropped(ev *bellui.DropEvent) {
 }
 
 // hoverDroppableObject additionally implements bellui.DropHoverable and records the
-// drag-motion phases it receives, for the #708 hover-routing tests.
+// drag-motion phases it receives, for the pre-rebrand tracker #708 hover-routing tests.
 type hoverDroppableObject struct {
 	*canvas.Rectangle
 	dropped               *bellui.DropEvent

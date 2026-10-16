@@ -16,7 +16,7 @@ import (
 	"github.com/belluikit/glfw"
 )
 
-// payloadDraggable is a drag source declaring an in-app payload (#819).
+// payloadDraggable is a drag source declaring an in-app payload (pre-rebrand tracker #819).
 type payloadDraggable struct {
 	*canvas.Rectangle
 	draggable

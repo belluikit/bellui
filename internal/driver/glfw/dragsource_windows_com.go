@@ -12,8 +12,8 @@ import (
 )
 
 // This file implements the OLE COM objects the Windows drag-out backend hands to
-// the OS (#837, #515 Part B — see docs/design/515-drag-out.md). Unlike the native
-// file dialog (#514, dialog/file_windows_native.go), where bellui CALLS COM
+// the OS (pre-rebrand tracker #837, pre-rebrand tracker #515 Part B — see docs/design/515-drag-out.md). Unlike the native
+// file dialog (pre-rebrand tracker #514, dialog/file_windows_native.go), where bellui CALLS COM
 // interfaces the shell implements, here we IMPLEMENT the interfaces DoDragDrop
 // consumes: an IDataObject (with its IEnumFORMATETC) carrying the drag flavors and
 // a minimal IDropSource driving the drag loop. Everything is cgo-free — the

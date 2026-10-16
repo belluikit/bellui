@@ -12,10 +12,10 @@ import (
 
 // TestResolveLanguage checks the per-text language override resolves to the
 // TextStyle.Language tag when set, and otherwise falls back to the active
-// locale (issues #22, #69).
+// locale (pre-rebrand issues #22, pre-rebrand tracker #69).
 func TestResolveLanguage(t *testing.T) {
 	// The zero value follows the active (override-aware) locale, so a locale
-	// override drives shaping language — not just the OS locale (#69).
+	// override drives shaping language — not just the OS locale (pre-rebrand tracker #69).
 	lang.SetLocaleForTests(t, "ru-RU")
 	assert.Equal(t, language.NewLanguage("ru-RU"), resolveLanguage(bellui.TextStyle{}),
 		"empty Language should follow the active locale override")

@@ -23,7 +23,7 @@ func mimes(flavors []dragFlavor) []string {
 }
 
 // TestBuildX11Flavors_Text offers plain text under the several target atoms an
-// XDND editor may request, all carrying the same UTF-8 bytes (#838).
+// XDND editor may request, all carrying the same UTF-8 bytes (pre-rebrand tracker #838).
 func TestBuildX11Flavors_Text(t *testing.T) {
 	flavors := buildDragFlavors(desktop.DragData{Text: "hi"})
 	assert.Equal(t, []string{"text/plain;charset=utf-8", "UTF8_STRING", "text/plain", "STRING"}, mimes(flavors))

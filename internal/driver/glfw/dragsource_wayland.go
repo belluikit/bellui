@@ -10,7 +10,7 @@ import (
 )
 
 // startDragWayland begins a native Wayland drag-out via the belluikit/glfw fork's
-// StartWaylandDrag (v1.7.0+, #838 / glfw#10): GLFW creates the wl_data_source,
+// StartWaylandDrag (v1.7.0+, pre-rebrand tracker #838 / glfw#10): GLFW creates the wl_data_source,
 // offers each flavor's MIME type and calls wl_data_device.start_drag against the
 // source surface using the private pointer button serial. It must run on the main
 // goroutine during the button gesture — bellui dispatches Dragged there, and the

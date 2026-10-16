@@ -75,7 +75,7 @@ type dialog struct {
 	dismiss *widget.Button
 	parent  bellui.Window
 
-	// set while the dialog body is shown in its own native window (#498)
+	// set while the dialog body is shown in its own native window (pre-rebrand tracker #498)
 	hostWin bellui.Window
 	scrim   *modalScrim
 

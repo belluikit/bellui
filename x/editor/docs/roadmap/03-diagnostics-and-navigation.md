@@ -31,15 +31,15 @@ go-to-definition.
 >   - **✅** [#46](https://github.com/belluikit/bellui/x/editor/issues/46) /
 >     [#53](https://github.com/belluikit/bellui/x/editor/pull/53) — `RevealRange`
 >     (scroll + select); the `Diagnostics()`/`OnDiagnosticsChanged` accessors
->     landed with #43.
+>     landed with pre-rebrand tracker #43.
 > - **Deliverable 3 — navigation — ✅ shipped:**
 >   - **✅** [#47](https://github.com/belluikit/bellui/x/editor/issues/47) /
 >     [#60](https://github.com/belluikit/bellui/x/editor/pull/60) — `OnRequestNavigation`
 >     (Cmd/Ctrl+click → host go-to-def hook) + `SetLinkProvider`/`WordLinkProvider`
 >     + **link decorations** (Cmd/Ctrl-hover lights a solid underline + pointer
->     cursor over a navigable symbol). Reuses `RevealRange` (#46).
+>     cursor over a navigable symbol). Reuses `RevealRange` (pre-rebrand tracker #46).
 >
-> Shipped order: #43 → (#44, #45, #46 in parallel) → #47, all merged + #52.
+> Shipped order: pre-rebrand tracker #43 → (pre-rebrand tracker #44, pre-rebrand tracker #45, pre-rebrand tracker #46 in parallel) → pre-rebrand tracker #47, all merged + pre-rebrand tracker #52.
 > **Follow-ups — ✅ shipped** (bundled via [#94](https://github.com/belluikit/bellui/x/editor/pull/94)):
 > severity-distinct gutter marker shapes
 > ([#56](https://github.com/belluikit/bellui/x/editor/issues/56)) — circle/triangle/square/diamond
@@ -51,7 +51,7 @@ go-to-definition.
 > unions all matched ranges.
 > **Follow-up — ✅ shipped** (via [#96](https://github.com/belluikit/bellui/x/editor/pull/96)):
 > column-aware `CompositeGutter` tap routing
-> ([#95](https://github.com/belluikit/bellui/x/editor/issues/95)) — surfaced by #57; a tap
+> ([#95](https://github.com/belluikit/bellui/x/editor/issues/95)) — surfaced by pre-rebrand tracker #57; a tap
 > now reaches only the clicked column (`CompositeGutter.TappedAtX`), so
 > click-to-reveal and an interactive `BreakpointGutter` no longer both fire on one
 > tap.
@@ -66,14 +66,14 @@ go-to-definition.
 > `DiagnosticGutter.CycleOnTap`; the first tap reveals the most severe, repeats walk
 > the rest (severity order, wrapping), and a different line restarts the walk.
 >
-> The diagnostic-gutter/hover follow-up chain (#56 → #57 → #58 → #95 → #97 → #99) is
+> The diagnostic-gutter/hover follow-up chain (pre-rebrand tracker #56 → pre-rebrand tracker #57 → pre-rebrand tracker #58 → pre-rebrand tracker #95 → pre-rebrand tracker #97 → pre-rebrand tracker #99) is
 > now **fully closed**.
 > **Released:** fycoder **[v0.2.0](https://github.com/belluikit/bellui/x/editor/releases/tag/v0.2.0)**
 > (Phase 2 + Phase 3) is tagged, and the gallery Code Editor page now demos the
 > Phase 2/3 features ([#22](https://github.com/belluikit/bellui/x/editor/issues/22) via
-> [gallery#4](https://github.com/trendvidia/gallery/pull/4)) — completion, hover,
+> pre-rebrand gallery tracker #4) — completion, hover,
 > signature help (with overload control), diagnostics (squiggle + severity-shaped
-> gutter markers + hover + click-to-reveal), and Cmd/Ctrl-click navigation. #22
+> gutter markers + hover + click-to-reveal), and Cmd/Ctrl-click navigation. pre-rebrand tracker #22
 > stays open only for a manual live-GL pass (link cursor/focus path, off-screen
 > `RevealRange` scroll, overload-arrow focus preservation).
 

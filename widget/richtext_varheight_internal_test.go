@@ -126,7 +126,7 @@ func TestRichText_VarHeight_WindowFollowsScroll(t *testing.T) {
 
 // TestRichText_VarHeight_ScrollDrivesWindow exercises the standalone-scroll
 // integration: a scrollable RichText auto-enables virtualisation and drives its
-// own window from the internal scroll offset (#158).
+// own window from the internal scroll offset (pre-rebrand tracker #158).
 func TestRichText_VarHeight_ScrollDrivesWindow(t *testing.T) {
 	test.NewTempApp(t)
 	var segs []RichTextSegment
@@ -136,7 +136,7 @@ func TestRichText_VarHeight_ScrollDrivesWindow(t *testing.T) {
 	rich := NewRichText(segs...)
 	rich.Wrapping = bellui.TextWrapWord
 	rich.Scroll = intWidget.ScrollVerticalOnly
-	rich.Virtualize = true // opt in (#169)
+	rich.Virtualize = true // opt in (pre-rebrand tracker #169)
 	rich.Resize(geo.NewSize(400, 600))
 
 	r := cache.Renderer(rich).(*textRenderer)
@@ -171,7 +171,7 @@ func TestRichText_VarHeight_FoldCollapsesHeight(t *testing.T) {
 	require.True(t, rich.blockLazy, "starts on the windowed block build")
 
 	// Folding a block-lazy document forces the dense varHeight model: a fold's
-	// collapsed extent needs exact per-row geometry, so block-lazy declines folds (#317).
+	// collapsed extent needs exact per-row geometry, so block-lazy declines folds (pre-rebrand tracker #317).
 	rich.setHiddenRanges([]LineRange{{Start: 0, End: 1}})
 	require.True(t, rich.varHeight, "a fold switches to the dense varHeight model")
 	require.False(t, rich.blockLazy)
@@ -235,9 +235,9 @@ func scrollableRichText(t *testing.T, n int, wrap bellui.TextWrap) *RichText {
 	return rich
 }
 
-// TestRichText_Virtualize_OptIn confirms the #169 decision: a scrollable RichText
+// TestRichText_Virtualize_OptIn confirms the pre-rebrand tracker #169 decision: a scrollable RichText
 // virtualises only when Virtualize is set; the default leaves a large scrolling
-// document on the (pre-#158) full-materialisation path.
+// document on the (before pre-rebrand tracker #158) full-materialisation path.
 func TestRichText_Virtualize_OptIn(t *testing.T) {
 	test.NewTempApp(t)
 
@@ -259,7 +259,7 @@ func TestRichText_Virtualize_OptIn(t *testing.T) {
 	assert.True(t, on.canVirtualize())
 }
 
-// TestRichText_VarHeight_VirtualWidth_BoundedSample guards #170: the wrap-off
+// TestRichText_VarHeight_VirtualWidth_BoundedSample guards pre-rebrand tracker #170: the wrap-off
 // widest-row estimate scans only a bounded sample plus the materialised window, so
 // a deep wide row outside both is not reflected until it scrolls into view — at
 // which point the extent grows and stays grown (monotonic).

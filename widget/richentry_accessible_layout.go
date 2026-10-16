@@ -5,8 +5,8 @@ import (
 	"github.com/belluikit/bellui/geo"
 )
 
-// RichEntry exposes its visual layout to assistive technologies (#1116, Phase 1
-// of #1115): the rendered (visual) line structure the user sees and the
+// RichEntry exposes its visual layout to assistive technologies (pre-rebrand tracker #1116, Phase 1
+// of pre-rebrand tracker #1115): the rendered (visual) line structure the user sees and the
 // on-screen geometry of text ranges. Platform bridges consume this through
 // [core.AccessibleTextLayouter] for what-you-see line navigation and for the
 // range-geometry queries behind the VoiceOver editing ring, screen-reader

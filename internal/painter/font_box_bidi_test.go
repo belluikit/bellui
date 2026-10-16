@@ -10,7 +10,7 @@ import (
 )
 
 // TestStyledLineLayoutBoxCaretXLTR pins the insertion points around a box in
-// plain left-to-right flow: before = left edge, after = right edge (#913).
+// plain left-to-right flow: before = left edge, after = right edge (pre-rebrand tracker #913).
 func TestStyledLineLayoutBoxCaretXLTR(t *testing.T) {
 	lang.SetLocaleForTests(t, "en-US")
 

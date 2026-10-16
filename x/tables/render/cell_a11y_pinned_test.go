@@ -24,7 +24,7 @@ func testViewport(g *fakeGrid) *Viewport {
 }
 
 // Pinned-column cells are wrapped in accessible hosts carrying RoleTableCell,
-// the cell label, and their ABSOLUTE display coordinate (issue #15).
+// the cell label, and their ABSOLUTE display coordinate (pre-rebrand issue #15).
 func TestPinnedCells_WrappedAsAccessibleHosts(t *testing.T) {
 	test.NewTempApp(t)
 	// One pinned-left column (absolute index 0), two main columns (1,2).
@@ -57,7 +57,7 @@ func TestPinnedCells_WrappedAsAccessibleHosts(t *testing.T) {
 // When the first visible column is pinned-left, the tree disclosure (chevron +
 // depth indent + RoleTreeItem overlay) is rendered by the pinned region on that
 // column, and every pinned-left cell content is indented by its row's tree indent
-// (#50). Parent rows get a chevron + overlay; leaf rows are indented only.
+// (pre-rebrand tracker #50). Parent rows get a chevron + overlay; leaf rows are indented only.
 func TestPinnedCells_TreeDisclosure(t *testing.T) {
 	test.NewTempApp(t)
 	g := &fakeGrid{
@@ -141,7 +141,7 @@ func TestCellsRenderer_TreeDisclosureSkippedWhenPinnedLeft(t *testing.T) {
 // When the first visible column is pinned-left, the master-detail disclosure
 // (chevron + reserved indent + Button a11y overlay) renders in the pinned region
 // on that column: master rows get a chevron + overlay, and every pinned-left cell
-// is indented by the toggle width for alignment (#53, mirroring #50 for trees).
+// is indented by the toggle width for alignment (pre-rebrand tracker #53, mirroring pre-rebrand tracker #50 for trees).
 func TestPinnedCells_MasterDetailDisclosure(t *testing.T) {
 	test.NewTempApp(t)
 	g := &fakeGrid{

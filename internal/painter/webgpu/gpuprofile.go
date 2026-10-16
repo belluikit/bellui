@@ -9,11 +9,11 @@ import (
 	"github.com/belluikit/bellui"
 )
 
-// GPU-time profiling (issue #336). When BELLUI_GPU_PROFILE is set, EndFrame forces
+// GPU-time profiling (pre-rebrand issue #336). When BELLUI_GPU_PROFILE is set, EndFrame forces
 // the GPU to drain after presenting each frame and records the wall-clock time
 // that drain took — a serialized proxy for the frame's on-GPU execution time,
 // which the CPU-side paint() profiler (draw-call issuance, pipelined away from
-// GPU work) cannot see. This is the measurement #336 needs to judge whether
+// GPU work) cannot see. This is the measurement pre-rebrand tracker #336 needs to judge whether
 // partial repaint's fill-rate savings actually pay off.
 //
 // It is implemented as a blocking device drain (Poll(true)) rather than

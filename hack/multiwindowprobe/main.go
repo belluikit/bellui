@@ -1,4 +1,4 @@
-// Command multiwindowprobe verifies mobile multi-window stack UX (#645, a #499
+// Command multiwindowprobe verifies mobile multi-window stack UX (pre-rebrand tracker #645, a pre-rebrand tracker #499
 // follow-up): opening a second NewWindow().Show() over a visible one pushes a
 // child window that covers the parent and carries a titlebar with a close (X)
 // button; closing it pops back to the parent.

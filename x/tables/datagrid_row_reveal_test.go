@@ -78,7 +78,7 @@ func TestDataGrid_ScrollToRow(t *testing.T) {
 	assert.Equal(t, before, g.scrollContent.Offset(), "out-of-range rows ignored")
 }
 
-// The two-way sync the issue was filed for (goed#67's replay scrubber): an
+// The two-way sync the issue was filed for (pre-rebrand goed tracker #67's replay scrubber): an
 // external caller holding a stable source index selects and reveals that row
 // after a sort has permuted the view.
 func TestDataGrid_DisplayRowThenScrollToRow_RevealsSortedRow(t *testing.T) {

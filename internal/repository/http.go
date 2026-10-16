@@ -17,7 +17,7 @@ var _ repository.Repository = (*HTTPRepository)(nil)
 
 // maxRemoteSize caps how many bytes are read from a remote resource, guarding
 // against unbounded-download memory exhaustion when rendering untrusted content
-// (#285).
+// (pre-rebrand tracker #285).
 const maxRemoteSize = 64 << 20 // 64 MiB
 
 // safeClient is a hardened http.Client used for all remote repository access.
@@ -25,7 +25,7 @@ const maxRemoteSize = 64 << 20 // 64 MiB
 // unspecified addresses — most importantly the 169.254.169.254 cloud-metadata
 // endpoint — so that fetching a resource referenced by content cannot be turned
 // into a probe of those never-legitimate targets, both for the initial request
-// and for any redirect, since DialContext runs for every connection (#285).
+// and for any redirect, since DialContext runs for every connection (pre-rebrand tracker #285).
 //
 // Loopback and RFC 1918 / ULA private ranges are deliberately NOT blocked here:
 // desktop apps legitimately talk to localhost and LAN services through the

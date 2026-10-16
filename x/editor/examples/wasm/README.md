@@ -4,8 +4,8 @@ A browser harness for exercising the *complete* fycoder editor under
 `GOOS=js GOARCH=wasm`. It backs the runtime half of
 [`docs/roadmap/10-wasm-web-target.md`](../../docs/roadmap/10-wasm-web-target.md)
 and is the acceptance harness for the F1–F5 browser-verify
-([trendvidia/fyne#376](https://github.com/trendvidia/fyne/issues/376),
-[#150](https://github.com/trendvidia/fyne/issues/150)).
+(pre-rebrand tracker #376,
+pre-rebrand tracker #150).
 
 **Why this exists:** compilation to WASM is already proven. What a compiler
 *cannot* tell us is whether Bellui's **web layer** carries a real code editor —
@@ -39,7 +39,7 @@ redaction. Toolbar: **Fold all · Unfold all | Reveal/Mask secret ·
 Load 50000 lines** and a status label. (Deep scroll is driven by the editor's
 own keyboard paging — see below — not a button; the old "Jump to end"
 `RevealRange` workaround was retired once glfw-js v1.0.2 let paging keys reach
-the browser, #120.)
+the browser, pre-rebrand tracker #120.)
 
 Run each on **both** backends — `make serve` (WebGPU default) and
 `make serve TAGS=gl` (WebGL fallback):
@@ -58,11 +58,11 @@ Run each on **both** backends — `make serve` (WebGPU default) and
       `VETOED: line 8 is protected (read-only)`. The text does not change.
 - [ ] **Large file + virtualisation** — click **Load 50000 lines**; the document
       renders promptly (scrollbar shows the full 50k extent) and `SetText` does
-      not stall — the highlighter is windowed to the visible rows (#106). Press
+      not stall — the highlighter is windowed to the visible rows (pre-rebrand tracker #106). Press
       **Ctrl+End** to jump to the last line — the gutter reads ~49965–50001 with
       highlighting intact, proving rows are windowed to the viewport, not
       materialised whole.
-- [ ] **Keyboard paging** (#120, needs glfw-js ≥ v1.0.2) — in the 50k doc:
+- [ ] **Keyboard paging** (pre-rebrand tracker #120, needs glfw-js ≥ v1.0.2) — in the 50k doc:
       **PageDown**/**PageUp** move the caret by a viewport screenful (preserving
       the column, not one line); **Ctrl+Home**/**Ctrl+End** (macOS **Cmd+↑/↓**)
       jump to document start/end; **Shift+** variants extend the selection. Each
@@ -70,7 +70,7 @@ Run each on **both** backends — `make serve` (WebGPU default) and
 - [ ] **IME composition** *(interactive only)* — type into a string with a
       CJK IME; composition preview shows and the commit lands correctly.
 
-Record results back in the Phase 10 doc / on #376.
+Record results back in the Phase 10 doc / on pre-rebrand tracker #376.
 
 ## Notes
 

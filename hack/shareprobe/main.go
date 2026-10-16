@@ -1,8 +1,8 @@
 // Command shareprobe verifies the mobile intent/share integration:
-//   - #711 share-out: "Share Text" / "Share File" hand content to the OS share
+//   - pre-rebrand tracker #711 share-out: "Share Text" / "Share File" hand content to the OS share
 //     sheet via bellui.ShareText / bellui.ShareFile (Android ACTION_SEND chooser via
 //     BelluiFileProvider for files / iOS UIActivityViewController).
-//   - #622 open-with: a registered bellui.OpenHandlerApp receives file-association
+//   - pre-rebrand tracker #622 open-with: a registered bellui.OpenHandlerApp receives file-association
 //     and custom-URL-scheme ("shareprobe://") launches; the received payload is
 //     shown in the UI. Drive it on Android with:
 //     adb shell am start -a android.intent.action.VIEW \
@@ -30,7 +30,7 @@ func main() {
 	status := widget.NewLabel("tap a button")
 	opened := widget.NewLabel("open-with: (none yet)")
 
-	// #622 — receive "open with" file / deep-link launches.
+	// pre-rebrand tracker #622 — receive "open with" file / deep-link launches.
 	if oh, ok := a.(bellui.OpenHandlerApp); ok {
 		oh.SetOnFileOpened(func(u bellui.URI) {
 			opened.SetText("FILE opened: " + u.String())
@@ -70,8 +70,8 @@ func main() {
 	// iOS has no adb-style touch injection, so drive the two flows on a timer:
 	//   t+3s — self-deliver a custom-scheme URL. iOS routes shareprobe:// back to
 	//          this app's application:openURL: (it is the registered handler), so
-	//          this exercises the exact #622 receiving path end-to-end.
-	//   t+9s — auto-open the share sheet for a file (#711).
+	//          this exercises the exact pre-rebrand tracker #622 receiving path end-to-end.
+	//   t+9s — auto-open the share sheet for a file (pre-rebrand tracker #711).
 	if runtime.GOOS == "ios" {
 		time.AfterFunc(3*time.Second, func() {
 			bellui.Do(func() {

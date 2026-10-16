@@ -8,7 +8,7 @@ import (
 	"github.com/belluikit/bellui/core"
 )
 
-// fakeActioner declares a configurable accessible-action set (#1134).
+// fakeActioner declares a configurable accessible-action set (pre-rebrand tracker #1134).
 type fakeActioner struct {
 	actions   []core.AccessibleAction
 	performed []string
@@ -19,9 +19,9 @@ func (f *fakeActioner) PerformAccessibleAction(name string) {
 	f.performed = append(f.performed, name)
 }
 
-// The iOS undo-state mirror (#1134) derives canUndo/canRedo from the focused
+// The iOS undo-state mirror (pre-rebrand tracker #1134) derives canUndo/canRedo from the focused
 // editor's declared accessible actions — the same gated declarations assistive
-// tech sees (#1025) — and reports none for non-actioners.
+// tech sees (pre-rebrand tracker #1025) — and reports none for non-actioners.
 func TestUndoActionsState(t *testing.T) {
 	canUndo, canRedo := undoActionsState(nil)
 	assert.False(t, canUndo)

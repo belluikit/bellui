@@ -70,7 +70,7 @@ func posLess(r1, c1, r2, c2 int) bool {
 const largeDocRowThreshold = 4000
 
 // lineCount returns the document's logical-line count via the fork's O(1)
-// [widget.Entry.LineCount] (#149, fyne#459) — read from the buffer's line
+// [widget.Entry.LineCount] (pre-rebrand tracker #149, pre-rebrand tracker #459) — read from the buffer's line
 // index, so it is live even between [Editor.DeferTextSync] sync points and
 // never scans the document.
 func (e *Editor) lineCount() int {
@@ -206,7 +206,7 @@ func (e *Editor) positionAtPoint(pos geo.Position) (row, col int, ok bool) {
 		return 0, 0, false
 	}
 
-	// Raw read (#129): this is the hover/pointer render path, so it tolerates
+	// Raw read (pre-rebrand tracker #129): this is the hover/pointer render path, so it tolerates
 	// the deferred mode's bounded staleness (same-row, newline-free edits) —
 	// only the actively edited row's column mapping can be momentarily off.
 	lines := strings.Split(e.entry.Text, "\n")
@@ -238,7 +238,7 @@ func (e *Editor) RangeRects(r TextRange) []geo.Rectangle {
 	if r.IsEmpty() {
 		return nil
 	}
-	// Raw read (#129): decorator render path — see positionAtPoint.
+	// Raw read (pre-rebrand tracker #129): decorator render path — see positionAtPoint.
 	lines := strings.Split(e.entry.Text, "\n")
 
 	var rects []geo.Rectangle

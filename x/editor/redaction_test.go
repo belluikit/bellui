@@ -123,7 +123,7 @@ func TestRedaction_MaskedEditVetoedSilently(t *testing.T) {
 	}
 }
 
-// --- masked spans are atomic: edge inserts can't shift the secret (#108) -
+// --- masked spans are atomic: edge inserts can't shift the secret (pre-rebrand tracker #108) -
 
 // A masked span must be atomic: the fork's CaretOpaque ProtectedRanges vetoes
 // edits strictly inside but permits boundary inserts, which would shift the

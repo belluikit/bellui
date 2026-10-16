@@ -1,6 +1,6 @@
 package webgpu
 
-// Backend-neutral geometry and uniform helpers for Scene3D (#202/#224), ported
+// Backend-neutral geometry and uniform helpers for Scene3D (pre-rebrand tracker #202/#224), ported
 // from internal/painter/gl/draw_scene3d.go. They are pure canvas/geo math (no
 // wgpu binding) so they compile everywhere and unit-test without a GPU — the
 // //go:build webgpu painter (draw_scene3d.go) drives the GPU render on top.

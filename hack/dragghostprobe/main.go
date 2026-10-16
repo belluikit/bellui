@@ -1,4 +1,4 @@
-// Command dragghostprobe live-verifies the in-canvas drag affordances (#819
+// Command dragghostprobe live-verifies the in-canvas drag affordances (pre-rebrand tracker #819
 // PR-1): a grab/grabbing cursor for the duration of a drag and a ghost image
 // following the pointer. Drag the coloured box around.
 package main
@@ -16,7 +16,7 @@ import (
 	"github.com/belluikit/bellui/widget"
 )
 
-// paletteItem is a minimal drag source: Draggable + DragImageProvider (#819).
+// paletteItem is a minimal drag source: Draggable + DragImageProvider (pre-rebrand tracker #819).
 type paletteItem struct {
 	widget.BaseWidget
 }

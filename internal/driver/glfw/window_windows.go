@@ -82,7 +82,7 @@ func (w *window) doSetParentNative(parent *window) {
 // goroutine. A nil parent is a no-op — modality is expressed against the owner.
 func (w *window) doSetModalNative(parent *window, modal bool) {
 	if parent == nil || !w.blockParentModal(parent, modal) {
-		return // nil parent, or another modal child already blocks it (#682)
+		return // nil parent, or another modal child already blocks it (pre-rebrand tracker #682)
 	}
 	parentHWND := uintptr(unsafe.Pointer(parent.view().GetWin32Window()))
 

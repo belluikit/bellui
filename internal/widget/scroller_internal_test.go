@@ -24,7 +24,7 @@ func TestNewScroll(t *testing.T) {
 	bar := cache.Renderer(barArea).(*scrollBarAreaRenderer).bar
 	assert.Equal(t, float32(0), scroll.Offset.Y)
 	// The hit area (and the bar widget inside it) is permanently the full bar
-	// width on every device (#449); the idle visual is a thin strip drawn by
+	// width on every device (pre-rebrand tracker #449); the idle visual is a thin strip drawn by
 	// the bar's renderer, asserted in TestScrollBar_ThinVisualWideHit.
 	assert.Equal(t, theme.ScrollBarSize(), barArea.Size().Width)
 	assert.Equal(t, theme.ScrollBarSize(), bar.Size().Width)
@@ -33,7 +33,7 @@ func TestNewScroll(t *testing.T) {
 }
 
 func TestScrollBar_ThinVisualWideHit(t *testing.T) {
-	// Originally the touch-only #17 behaviour; #449 extends the thin idle
+	// Originally the touch-only pre-rebrand tracker #17 behaviour; pre-rebrand tracker #449 extends the thin idle
 	// visual over a wide invisible hit area to every device.
 	require.Less(t, theme.ScrollBarSmallSize(), theme.ScrollBarSize())
 
@@ -435,7 +435,7 @@ func TestScrollContainer_ScrollBarIsSmall(t *testing.T) {
 	require.True(t, areaVert.Visible())
 	require.Less(t, theme.ScrollBarSmallSize(), theme.ScrollBarSize())
 
-	// The hit area stays full width (#449); the idle *visual* is the small
+	// The hit area stays full width (pre-rebrand tracker #449); the idle *visual* is the small
 	// strip, drawn flush to the trailing edge inside the wide bar widget.
 	assert.Equal(t, theme.ScrollBarSize(), areaHoriz.Size().Height)
 	assert.Equal(t, theme.ScrollBarSize(), areaVert.Size().Width)
@@ -464,7 +464,7 @@ func TestScrollContainer_ScrollBarGrowsAndShrinksOnMouseInAndMouseOut(t *testing
 	require.True(t, barHoriz.Visible())
 	require.Less(t, theme.ScrollBarSmallSize(), theme.ScrollBarSize())
 
-	// The hit area and bar widget no longer change size on hover (#449) —
+	// The hit area and bar widget no longer change size on hover (pre-rebrand tracker #449) —
 	// only the drawn visual toggles between the thin strip and full width,
 	// so hovering can never re-wrap content that reserves bar space.
 	require.Equal(t, theme.ScrollBarSize(), areaHoriz.Size().Height)
@@ -630,7 +630,7 @@ func TestScrollBarRenderer_BarSize(t *testing.T) {
 
 func TestScrollBarRenderer_MinimumThumbLength(t *testing.T) {
 	// On very long content the proportional thumb would be sub-pixel; the
-	// theme floor keeps it grabbable (#449).
+	// theme floor keeps it grabbable (pre-rebrand tracker #449).
 	rect := canvas.NewRectangle(color.Black)
 	rect.SetMinSize(geo.NewSize(100, 100000))
 	scroll := NewScroll(rect)
@@ -768,7 +768,7 @@ func TestScrollContainerRenderer_SetMinSize_Direction(t *testing.T) {
 }
 
 // Drag tests use a 200 viewport over 500 content: the proportional thumb is
-// 200*(200/500) = 80, above the minimum-thumb floor (#449), so the mapping is
+// 200*(200/500) = 80, above the minimum-thumb floor (pre-rebrand tracker #449), so the mapping is
 // track = 200-80 = 120 over a 300 scroll range — a factor of exactly 2.5.
 
 func TestScrollBar_Dragged_ClickedInside(t *testing.T) {

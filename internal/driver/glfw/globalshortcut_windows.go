@@ -15,7 +15,7 @@ import (
 	"github.com/belluikit/bellui/event"
 )
 
-// This is the Windows global-hotkey backend for #518. It drives the Win32
+// This is the Windows global-hotkey backend for pre-rebrand tracker #518. It drives the Win32
 // RegisterHotKey / UnregisterHotKey API purely through x/sys/windows syscalls
 // (no cgo), mirroring the native file-dialog style. WM_HOTKEY is a thread
 // message delivered to whichever thread called RegisterHotKey, so registration

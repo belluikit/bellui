@@ -18,12 +18,12 @@ import (
 	"github.com/belluikit/bellui/internal/textinput"
 )
 
-// This file is the Go half of the NSAccessibility text protocol (#501):
+// This file is the Go half of the NSAccessibility text protocol (pre-rebrand tracker #501):
 // VoiceOver text navigation and editing ask the focused text field for its
 // character count, selection, caret line and sub-ranges, and write back a
 // selection or replacement text. The ObjC bridge forwards each query to the
 // exports below, which resolve the element's editor and read or edit its
-// document through the shared text-input seam ([textinput], #772) — one live
+// document through the shared text-input seam ([textinput], pre-rebrand tracker #772) — one live
 // document view, no snapshot staleness — converting between the widget's rune
 // offsets and the UTF-16 code units NSAccessibility ranges are expressed in.
 //
@@ -41,7 +41,7 @@ func a11yTexter(handle C.uintptr_t) core.AccessibleTexter {
 }
 
 // a11yTextTarget resolves the editor behind an element handle and captures its
-// document view through the shared seam ([textinput.Read], #772), so every text
+// document view through the shared seam ([textinput.Read], pre-rebrand tracker #772), so every text
 // query reads one document view. ok is false when the handle has no editor.
 func a11yTextTarget(handle C.uintptr_t) (core.AccessibleTexter, textinput.View, bool) {
 	tx := a11yTexter(handle)
@@ -93,7 +93,7 @@ func belluiAccessibilityTextForRange(handle C.uintptr_t, loc, length C.long) *C.
 	return C.CString(ix.Substring(ix.RuneFromUTF16(int(loc)), ix.RuneFromUTF16(int(loc+length)))) // freed by the ObjC caller
 }
 
-// a11yTextLayout resolves the optional visual-layout extension (#990) behind
+// a11yTextLayout resolves the optional visual-layout extension (pre-rebrand tracker #990) behind
 // an element handle, or nil when the editor exposes no layout — line queries
 // then fall back to logical (newline-delimited) lines from the text index.
 func a11yTextLayout(handle C.uintptr_t) core.AccessibleTextLayouter {
@@ -148,7 +148,7 @@ func belluiAccessibilityTextRangeForLine(handle C.uintptr_t, line C.long, loc, l
 	return C.bool(true)
 }
 
-// belluiAccessibilityTextFrameForRange resolves AXBoundsForRange (#990): the
+// belluiAccessibilityTextFrameForRange resolves AXBoundsForRange (pre-rebrand tracker #990): the
 // on-screen bounds of a UTF-16 character range, answered in the same
 // window-local coordinate space (top-left origin, points) as the element's
 // localFrame — the ObjC side converts to the screen exactly as
@@ -180,7 +180,7 @@ func belluiAccessibilityTextFrameForRange(handle C.uintptr_t, loc, length C.long
 		u = unionRect(u, r)
 	}
 	// Widget-local dp → absolute canvas dp, then trimmed to the node's
-	// ancestor clip (#1003): a field half-scrolled out of a parent Scroll must
+	// ancestor clip (pre-rebrand tracker #1003): a field half-scrolled out of a parent Scroll must
 	// not report range geometry past the scroll container, consistent with the
 	// element-frame Clip culling in the reconcile.
 	abs := geo.Rectangle{Pos: geo.NewPos(t.node.Pos.X+u.Pos.X, t.node.Pos.Y+u.Pos.Y), Size: u.Size}

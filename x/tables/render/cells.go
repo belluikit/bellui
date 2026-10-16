@@ -44,7 +44,7 @@ type GridAccess interface {
 	// cursor cell — the moving cell a screen reader should announce as the cursor
 	// travels. It backs the cell host's core.StateFocused, mirroring IsSelected
 	// for StateSelected, and pairs with the DataGrid designating that same cell as
-	// its AT-focused descendant (fyne#688). row/col are display + absolute column
+	// its AT-focused descendant (pre-rebrand tracker #688). row/col are display + absolute column
 	// coordinates, matching IsSelected.
 	IsFocused(row, col int) bool
 	// SelectCell selects the cell at the given display row and absolute (layout)

@@ -111,7 +111,7 @@ func (m *Menu) CreateRenderer() core.WidgetRenderer {
 	m.ExtendBaseWidget(m)
 	box := newMenuBox(m.Items)
 	// Scroll in both directions so a menu larger than the canvas (too tall or
-	// too wide) stays reachable instead of being clipped (#293). Bars overlay
+	// too wide) stays reachable instead of being clipped (pre-rebrand tracker #293). Bars overlay
 	// rather than reserve space, so a tall menu doesn't gain a spurious
 	// horizontal bar from the vertical bar shrinking the content width.
 	scroll := widget.NewScroll(box)

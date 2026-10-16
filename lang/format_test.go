@@ -249,7 +249,7 @@ func TestParseDate_Invalid(t *testing.T) {
 
 func TestDatePattern_PersianFallsBackToISO(t *testing.T) {
 	// fa-IR has no entry in the short-date table, so it silently falls back to
-	// the ISO 8601 layout rather than panicking (#291).
+	// the ISO 8601 layout rather than panicking (pre-rebrand tracker #291).
 	setupLang("fa-IR")
 	assert.Equal(t, "2006-01-02", DatePattern())
 
@@ -266,7 +266,7 @@ func TestDatePattern_PersianFallsBackToISO(t *testing.T) {
 
 func TestDatePattern_ArabicRegionPattern(t *testing.T) {
 	// ar-SA (an RTL locale) does have a day/month/year pattern entry; it must
-	// format and round-trip correctly (#291).
+	// format and round-trip correctly (pre-rebrand tracker #291).
 	setupLang("ar-SA")
 	assert.Equal(t, "02/01/2006", DatePattern())
 

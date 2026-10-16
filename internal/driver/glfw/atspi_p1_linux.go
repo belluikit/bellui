@@ -10,7 +10,7 @@ import (
 	"github.com/belluikit/bellui/internal/accessibility"
 )
 
-// P1 of the Linux AT-SPI2 backend (#986): the Action, Value, Text and
+// P1 of the Linux AT-SPI2 backend (pre-rebrand tracker #986): the Action, Value, Text and
 // EditableText interfaces layered on the P0 provider. Reads are served from
 // snapshots captured on the main goroutine during reconcile (atspiNode.text /
 // actions / val*), so a D-Bus query on a godbus goroutine never touches a live
@@ -219,7 +219,7 @@ func (n *atspiNode) RemoveSelection(num int32) (bool, *dbus.Error) {
 
 // GetCharacterExtents / GetRangeExtents are best-effort: per-glyph geometry is
 // not tracked, so a caret-height rect at the node origin is returned. Orca uses
-// these for braille/magnifier follow, not speech. (Refinement tracked in #986.)
+// these for braille/magnifier follow, not speech. (Refinement tracked in pre-rebrand tracker #986.)
 func (n *atspiNode) GetCharacterExtents(offset int32, coord uint32) (int32, int32, int32, int32, *dbus.Error) {
 	n.p.mu.Lock()
 	defer n.p.mu.Unlock()

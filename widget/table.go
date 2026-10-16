@@ -123,7 +123,7 @@ func (t *Table) AccessibleLabel() string { return "" }
 
 // AccessibleGridDimensions returns the table's row and column count from the
 // Length callback. Only realized (visible) cells produce semantic nodes, so
-// this is how assistive technologies learn the full extent (#487). Table has
+// this is how assistive technologies learn the full extent (pre-rebrand tracker #487). Table has
 // no built-in sort or filter, so the presented extent equals the data extent;
 // a widget that reorders or filters rows returns its current-view count (see
 // [core.AccessibleGridDimensioner]).
@@ -373,7 +373,7 @@ func (t *Table) TypedKey(ev *event.KeyEvent) {
 		t.Select(t.currentFocus)
 		// Keyboard activation targets the focused cell; report the realized
 		// cell object (not the Table) so autocapture sees RoleTableCell,
-		// matching the pointer path which selects the hit-tested cell (#851).
+		// matching the pointer path which selects the hit-tested cell (pre-rebrand tracker #851).
 		if cell := t.realizedCell(t.currentFocus); cell != nil {
 			core.NotifyActivation(cell, true)
 		}
@@ -630,7 +630,7 @@ func (t *Table) Tapped(e *event.PointEvent) {
 	id := TableCellID{row, col}
 	t.Select(id)
 	// Report the realized cell object (RoleTableCell) so pointer activation is
-	// captured at cell granularity, matching the keyboard path (#851).
+	// captured at cell granularity, matching the keyboard path (pre-rebrand tracker #851).
 	if cell := t.realizedCell(id); cell != nil {
 		core.NotifyActivation(cell, false)
 	}
@@ -638,7 +638,7 @@ func (t *Table) Tapped(e *event.PointEvent) {
 
 // realizedCell returns the currently visible cell host for id, or nil when the
 // cell is not realized. Used to report the cell object to autocapture on
-// activation (#851); the realized cells live in the tableCells renderer.
+// activation (pre-rebrand tracker #851); the realized cells live in the tableCells renderer.
 func (t *Table) realizedCell(id TableCellID) core.CanvasObject {
 	if t.cells == nil {
 		return nil
@@ -1192,7 +1192,7 @@ func (t *tableRenderer) calculateHeaderSizes(th bellui.Theme) {
 }
 
 // tableCellHost wraps a pooled cell template so each realized cell is an
-// accessible semantic node carrying its coordinates (#524). It is
+// accessible semantic node carrying its coordinates (pre-rebrand tracker #524). It is
 // deliberately not Tappable/Hoverable: the Table's own hit-testing keeps
 // handling input, and UpdateCell still receives the bare template via
 // unwrapTableCell.

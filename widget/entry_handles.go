@@ -12,14 +12,14 @@ import (
 	"github.com/belluikit/bellui/theme"
 )
 
-// Mobile selection handles (#758): while a focused text widget on a mobile
+// Mobile selection handles (pre-rebrand tracker #758): while a focused text widget on a mobile
 // device has a non-empty selection, an input-pass-through canvas overlay
 // shows two draggable grab handles hanging below the selection edges — the
 // native touch affordance for adjusting a selection started by long-press,
 // double-tap or Select all. Dragging a handle moves that edge of the
 // selection (in an editor the caret follows the dragged edge, so it
 // auto-scrolls to keep it visible); the other edge stays pinned and the two
-// can never cross. The overlay is generic over selectionHandleHost (#944):
+// can never cross. The overlay is generic over selectionHandleHost (pre-rebrand tracker #944):
 // Entry and the read-only selectable (Label/RichText) implement it — see
 // text_sel_handles.go. Everything runs on the main goroutine.
 
@@ -67,7 +67,7 @@ func newEntrySelectionHandles(host selectionHandleHost) *entrySelectionHandles {
 	return h
 }
 
-// loupeHost implements loupeOwner (#942): the drag magnifier is available
+// loupeHost implements loupeOwner (pre-rebrand tracker #942): the drag magnifier is available
 // when the host implements the optional selectionLoupeHost extension.
 func (h *entrySelectionHandles) loupeHost() selectionLoupeHost {
 	if lh, ok := h.host.(selectionLoupeHost); ok {
@@ -100,7 +100,7 @@ func (h *entrySelectionHandles) loupeSelection() (rowA, colA, rowB, colB int, ok
 }
 
 // PassesInputThrough marks the overlay input-transparent outside the handles
-// (the Toast/Snackbar pattern, #569); it also keeps the overlay from owning
+// (the Toast/Snackbar pattern, pre-rebrand tracker #569); it also keeps the overlay from owning
 // the keyboard focus, which stays on the entry.
 func (h *entrySelectionHandles) PassesInputThrough() bool {
 	return true
@@ -174,7 +174,7 @@ func (h *entrySelectionHandles) sync() {
 	h.loupe.sync()
 }
 
-// startSync arms the per-frame reposition driver (the #417 prefill pattern):
+// startSync arms the per-frame reposition driver (the pre-rebrand tracker #417 prefill pattern):
 // while the handles are visible it re-evaluates geometry every frame, so
 // they track movement the host cannot report — a parent scroll, a window
 // resize, the soft keyboard shifting the layout.
@@ -234,7 +234,7 @@ func (h *entrySelectionHandles) dragHandle(hd *entrySelectionHandle, d *event.Dr
 
 // showHostMenu re-summons the host's context menu at a handle's selection
 // edge — the native "text toolbar reappears" behavior after a handle
-// adjustment or a plain tap on a handle (#945 device feedback: without it an
+// adjustment or a plain tap on a handle (pre-rebrand tracker #945 device feedback: without it an
 // adjusted selection offered no way to act on it). The menu is the host's
 // own TappedSecondary, so an editable Entry offers Cut/Copy/Paste and the
 // read-only selectable its Copy menu.
@@ -272,7 +272,7 @@ type entrySelectionHandle struct {
 	// drag lifts the lookup point back into the controlled line from where
 	// the finger actually grabbed (a finger aims at the visible dot in the
 	// target's upper half — assuming a center grab overshot the row above,
-	// a #945 device finding). -1 = unknown (synthetic drags without a
+	// a pre-rebrand tracker #945 device finding). -1 = unknown (synthetic drags without a
 	// touch-down), falling back to the target-center assumption.
 	grabY float32
 }
@@ -321,7 +321,7 @@ func (s *entrySelectionHandle) TouchCancel(*mobile.TouchEvent) {
 }
 
 // Dragged moves this handle's selection edge and shows the magnifier over
-// the drag target (#942).
+// the drag target (pre-rebrand tracker #942).
 func (s *entrySelectionHandle) Dragged(d *event.DragEvent) {
 	s.owner.dragging = s
 	s.owner.dragHandle(s, d)

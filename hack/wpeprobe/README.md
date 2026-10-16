@@ -118,7 +118,7 @@ something an app shares with a running desktop); Wayland means negotiating
 zero-copy only while running under a dma-buf-capable Wayland compositor, and
 would silently fall back to CPU copies on X11 or anywhere the negotiation fails
 — performance depending on the user's session type at runtime. That is the same
-silent-degradation shape that ruled out X11-only reparenting in #542, and it is
+silent-degradation shape that ruled out X11-only reparenting in pre-rebrand tracker #542, and it is
 one of the reasons WPE was rejected.
 
 ## Distro availability, which bears on the licensing argument

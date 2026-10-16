@@ -1,6 +1,6 @@
 package editor
 
-// Anchor-tracking (#130): protected ranges, redactions and fold regions are all
+// Anchor-tracking (pre-rebrand tracker #130): protected ranges, redactions and fold regions are all
 // caller-managed (row, col) ranges. Before this file, fycoder re-derived their
 // rune offsets from the current text on each edit — robust to edits that keep
 // the line count, but an insert/delete of a line above a range drifted it until
@@ -18,7 +18,7 @@ package editor
 // Programmatic SetText is a document swap, not an edit: tracking resets and
 // the host re-publishes ranges as before.
 //
-// Gravity at range boundaries follows #108's atomic-edge behavior: a range
+// Gravity at range boundaries follows pre-rebrand tracker #108's atomic-edge behavior: a range
 // does not absorb text inserted exactly at its start or end (the insert lands
 // outside; the range shifts or stays), while an edit strictly inside a range
 // resizes it. A deletion that swallows a range drops it; one that eats its

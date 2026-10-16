@@ -269,7 +269,7 @@ func (c *Check) TypedRune(r rune) {
 		// Check activates via a rune (space), not TypedKey, so the driver's
 		// event.Activatable hook (on the key path) does not cover it — emit the
 		// central activation signal here so keyboard toggles reach autocapture,
-		// matching the pointer path (#834, #700).
+		// matching the pointer path (pre-rebrand tracker #834, pre-rebrand tracker #700).
 		core.NotifyActivation(c, true)
 	}
 }

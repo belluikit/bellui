@@ -56,8 +56,8 @@ func TestWatchFile(t *testing.T) {
 	watcher := watchFile(path, func() {
 		// Non-blocking: fsnotify can deliver more events than the buffer
 		// holds, and the test driver serializes bellui.Do callbacks under a
-		// mutex (#480) — a blocked send here would hold that mutex and
-		// starve every later bellui.Do in the package (#492).
+		// mutex (pre-rebrand tracker #480) — a blocked send here would hold that mutex and
+		// starve every later bellui.Do in the package (pre-rebrand tracker #492).
 		select {
 		case called <- true:
 		default:
@@ -68,7 +68,7 @@ func TestWatchFile(t *testing.T) {
 		return
 	}
 	// Close the watcher so its callback cannot fire into later tests that
-	// reuse the same path (#492).
+	// reuse the same path (pre-rebrand tracker #492).
 	defer watcher.Close()
 
 	file, _ := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o644)
@@ -93,7 +93,7 @@ func TestFileWatcher_FileDeleted(t *testing.T) {
 		// Non-blocking for the same reason as in TestWatchFile: the
 		// delete→recreate sequence can deliver several events, and a send
 		// blocked inside bellui.Do would hold the test driver's Do mutex
-		// forever (#492) — watcher.Close cannot unblock a channel send.
+		// forever (pre-rebrand tracker #492) — watcher.Close cannot unblock a channel send.
 		select {
 		case called <- true:
 		default:

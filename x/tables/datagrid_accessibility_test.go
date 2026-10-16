@@ -32,7 +32,7 @@ func TestDataGrid_AccessibleLabel(t *testing.T) {
 
 // Without an explicit ValueFormatter, AccessibleCellText matches the visible
 // cell's formatting (Date layout, Number format) instead of a raw fmt.Sprint,
-// so a screen reader announces what is shown (#28).
+// so a screen reader announces what is shown (pre-rebrand tracker #28).
 func TestDataGrid_AccessibleCellText_MatchesRenderedFormat(t *testing.T) {
 	ts := time.Date(2026, 7, 7, 13, 30, 0, 0, time.UTC)
 	data := []map[string]any{{"d": ts, "n": 3.14159, "b": true}}

@@ -10,7 +10,7 @@
 // ClipboardManager) needs app classes that FindClass can't reach on a
 // JVM-attached native thread, so it lives in the Java GoNativeActivity
 // (doSetClipboardImage / doGetClipboardImage). These shims resolve those methods
-// from the ctx object's own class and call them (#580), mirroring shareFile.
+// from the ctx object's own class and call them (pre-rebrand tracker #580), mirroring shareFile.
 
 void belluiClipboardSetImage(uintptr_t java_vm, uintptr_t jni_env, uintptr_t ctx, char *path) {
 	JNIEnv *env = (JNIEnv*)jni_env;
@@ -27,7 +27,7 @@ void belluiClipboardSetImage(uintptr_t java_vm, uintptr_t jni_env, uintptr_t ctx
 }
 
 // belluiClipboardSetFlavors forwards a multi-flavor clipboard write to the Java
-// doSetClipboardFlavors (fyne#1142). NULL C strings travel as null jstrings so
+// doSetClipboardFlavors (pre-rebrand tracker #1142). NULL C strings travel as null jstrings so
 // the Java side can tell an absent flavor from an empty one.
 void belluiClipboardSetFlavors(uintptr_t java_vm, uintptr_t jni_env, uintptr_t ctx,
                              char *text, char *html, char *imagePath) {

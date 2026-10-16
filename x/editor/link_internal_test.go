@@ -278,7 +278,7 @@ func TestGoToDefinition_ModifiedChordRoutesShortcut(t *testing.T) {
 	}
 }
 
-// TestLink_UnfocusedDriverModifierLightsLink verifies the #132 affordance: with
+// TestLink_UnfocusedDriverModifierLightsLink verifies the pre-rebrand tracker #132 affordance: with
 // the window-wide modifier state reporting Cmd/Ctrl held, a hover lights the
 // link WITHOUT the Entry ever seeing a key event (i.e. while unfocused).
 func TestLink_UnfocusedDriverModifierLightsLink(t *testing.T) {
@@ -311,7 +311,7 @@ func TestLink_UnfocusedDriverModifierLightsLink(t *testing.T) {
 
 // TestLink_DriverUnavailableKeepsTrackedState verifies the graceful degradation:
 // when the driver cannot report modifiers (wasm/mobile/tests), the Entry-focused
-// KeyDown/Up tracking stands — the pre-#132 behavior.
+// KeyDown/Up tracking stands — the before pre-rebrand tracker #132 behavior.
 func TestLink_DriverUnavailableKeepsTrackedState(t *testing.T) {
 	test.NewTempApp(t)
 	e := renderedPopoverEditor(t, "foobar baz")
@@ -349,7 +349,7 @@ func TestLink_DriverOverridesStaleTrackedState(t *testing.T) {
 	}
 }
 
-// TestLink_ModifierChangeReactsWithoutMove (#155): the driver modifier-change
+// TestLink_ModifierChangeReactsWithoutMove (pre-rebrand tracker #155): the driver modifier-change
 // callback lights and clears the link at the resting pointer position — no
 // mouse move, no Entry key events (i.e. it works unfocused).
 func TestLink_ModifierChangeReactsWithoutMove(t *testing.T) {

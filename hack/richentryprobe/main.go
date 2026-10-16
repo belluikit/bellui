@@ -1,16 +1,16 @@
-// Command richentryprobe is the live-verify harness for widget.RichEntry (#667),
-// the editable rich-text surface (epic #648). RichEntry had only unit tests and
+// Command richentryprobe is the live-verify harness for widget.RichEntry (pre-rebrand tracker #667),
+// the editable rich-text surface (epic pre-rebrand tracker #648). RichEntry had only unit tests and
 // software-rendered masters — this drives it in a running app on the default
 // WebGPU/Metal painter so the things golden masters can't fully vouch for get a
 // human eye: the caret across style runs and at image rows, the empty-field
-// caret + MD3 chrome (#749), selection highlights spanning runs, in-memory image
+// caret + MD3 chrome (pre-rebrand tracker #749), selection highlights spanning runs, in-memory image
 // rendering, per-run restyle (ApplyStyle), and undo/redo.
 //
 // Needs a human:
 //   - Type into the seeded editor; confirm the caret tracks correctly across the
 //     bold/italic/colored runs and sits at the LEADING edge of the empty field
-//     below (not stranded at the trailing edge — the #749 iPad symptom).
-//   - Select across runs (shift-arrows, or drag once #750 lands) → the highlight
+//     below (not stranded at the trailing edge — the pre-rebrand tracker #749 iPad symptom).
+//   - Select across runs (shift-arrows, or drag once pre-rebrand tracker #750 lands) → the highlight
 //     should span the whole selection, not just one run.
 //   - Toolbar: Bold/Italic/Underline/Strike restyle the selection (or set the
 //     typing style with no selection); Image inserts a generated block image at
@@ -32,7 +32,7 @@ import (
 	"strings"
 	"time"
 
-	// Bundle the CJK fallback font so the IME live-verify (#674) shows real
+	// Bundle the CJK fallback font so the IME live-verify (pre-rebrand tracker #674) shows real
 	// glyphs on every target — wasm has no system fonts to scan, so composed
 	// CJK commits render as tofu without it.
 	_ "github.com/belluikit/bellui/theme/cjk"
@@ -106,7 +106,7 @@ func main() {
 		widget.NewButton("Redo", func() { re.Redo(); logf("Redo") }),
 	)
 
-	// Chrome toggle: eyeball filled vs outlined MD3 chrome (#749).
+	// Chrome toggle: eyeball filled vs outlined MD3 chrome (pre-rebrand tracker #749).
 	styleToggle := widget.NewButton("Chrome: Filled", nil)
 	styleToggle.OnTapped = func() {
 		if re.Style == widget.EntryStyleFilled {
@@ -121,7 +121,7 @@ func main() {
 	}
 
 	// A second, empty RichEntry: verify the empty-field caret sits at the LEADING
-	// edge and the chrome renders (the #749 regressions).
+	// edge and the chrome renders (the pre-rebrand tracker #749 regressions).
 	empty := widget.NewRichEntry()
 
 	w.SetContent(container.NewVBox(

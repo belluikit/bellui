@@ -10,7 +10,7 @@ import (
 	"github.com/belluikit/bellui/test"
 )
 
-// TestSoftwareGolden renders the #1086 aligned scene through the software painter
+// TestSoftwareGolden renders the pre-rebrand tracker #1086 aligned scene through the software painter
 // (the always-correct reference — it anchors at the box origin and applies the
 // alignment offset inside the scaled bitmap) and writes software_golden.png for
 // side-by-side comparison with the on-GPU screenshot. Run with:

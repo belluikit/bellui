@@ -1,7 +1,7 @@
 //go:build !ci && !ios && !wasm && !mobile && !tinygo
 
 // app_badge_darwin.go holds the macOS-only pieces split out of app_darwin.go in
-// #739: the AppKit dock-tile badge and the osascript notification fallback. It
+// pre-rebrand tracker #739: the AppKit dock-tile badge and the osascript notification fallback. It
 // carries the -framework AppKit link flag so the shared app_darwin.go (and the
 // iOS build) need not pull AppKit in.
 

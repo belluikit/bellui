@@ -9,7 +9,7 @@ import (
 	"github.com/belluikit/bellui/geo"
 )
 
-// Wire the driver-level tooltip seam (#800). A driver calls core.NotifyToolTip
+// Wire the driver-level tooltip seam (pre-rebrand tracker #800). A driver calls core.NotifyToolTip
 // as the hovered ToolTipable target changes; this controller owns the show
 // delay, the bubble overlay and its teardown. Installed once when the widget
 // package initializes, which any app using widgets imports.

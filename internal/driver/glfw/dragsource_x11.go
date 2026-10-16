@@ -18,8 +18,8 @@ import (
 	"github.com/belluikit/bellui/driver/desktop"
 )
 
-// startDragX11 begins a hand-rolled XDND source drag out of the app (#838,
-// #515 Part B). GLFW exposes no drag-source API, so the C side (dragsource_x11.c)
+// startDragX11 begins a hand-rolled XDND source drag out of the app (pre-rebrand tracker #838,
+// pre-rebrand tracker #515 Part B). GLFW exposes no drag-source API, so the C side (dragsource_x11.c)
 // drives the protocol on a private Xlib connection: it owns the XdndSelection,
 // polls the pointer, negotiates with the window under it and serves the payload.
 // The whole drag runs on a dedicated locked OS thread with its own Display
@@ -28,7 +28,7 @@ import (
 // caller keeps its in-app drag behaviour; otherwise it returns true immediately
 // and reports the drop outcome via notifyDragOutCompleted when the drag ends.
 // cursorImg, when set, is drawn in a click-through window that trails the pointer
-// for the whole drag (#865) — the visual feedback plain XDND lacks; it carries no
+// for the whole drag (pre-rebrand tracker #865) — the visual feedback plain XDND lacks; it carries no
 // data flavor (the image *data* flavor still comes from an explicit
 // DragData.Image in buildDragFlavors).
 func startDragX11(data desktop.DragData, cursorImg image.Image) bool {

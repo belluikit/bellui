@@ -34,7 +34,7 @@ func (r *keyModRecorder) TypedKey(ev *event.KeyEvent) {
 	r.keys = append(r.keys, ev)
 }
 
-// Test_mobileDriver_TypedKeyCarriesModifier pins #1042 on the mobile driver:
+// Test_mobileDriver_TypedKeyCarriesModifier pins pre-rebrand tracker #1042 on the mobile driver:
 // hardware-keyboard modifiers reported by the platform reach TypedKey.
 func Test_mobileDriver_TypedKeyCarriesModifier(t *testing.T) {
 	d := &driver{}

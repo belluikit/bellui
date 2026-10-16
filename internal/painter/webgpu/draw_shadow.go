@@ -9,16 +9,16 @@ import (
 	"github.com/belluikit/bellui/geo"
 )
 
-// Box shadows and backdrop blur for WebGPU (#223), porting the GL painter's
+// Box shadows and backdrop blur for WebGPU (pre-rebrand tracker #223), porting the GL painter's
 // drawBoxShadow / drawBackdropBlur / blurTexture. Both reuse the Device's
-// render-target stack (#218) and the ported `blur` WGSL (separable 9-tap,
+// render-target stack (pre-rebrand tracker #218) and the ported `blur` WGSL (separable 9-tap,
 // fs_main_h / fs_main_v) — the GL FBO ping-pong becomes off-screen render
 // targets, the GL CopyTexSubImage2D framebuffer grab becomes CopyActiveTargetRegion.
 //
 // The off-screen shape / blur passes are pushed with PushOffscreenTarget so they
 // get a dedicated depth-stencil attachment — never the shared size-keyed one —
 // so their clearing passes can't wipe an enclosing canvas stencil clip when the
-// off-screen pixel size happens to match the canvas (the #231 hazard). The blur
+// off-screen pixel size happens to match the canvas (the pre-rebrand tracker #231 hazard). The blur
 // content is premultiplied (the shape is rendered into a transparent target, and
 // captured content is already composited), so it composites via the simple
 // shader's premultiplied blend, matching the GL backend.

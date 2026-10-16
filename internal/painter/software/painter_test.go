@@ -361,7 +361,7 @@ func TestPainter_paintPolygon(t *testing.T) {
 	test.AssertImageMatches(t, "draw_polygon_6_rounded_stroke.png", p.Paint(c))
 }
 
-// TestPainter_paintPathZeroSize covers #1011: a canvas.Path whose segments use
+// TestPainter_paintPathZeroSize covers pre-rebrand tracker #1011: a canvas.Path whose segments use
 // absolute coordinates but whose object is never Resized (Size 0x0 — the pattern
 // a widget renderer drawing in canvas space uses) must still rasterize. Before
 // the fix the software painter derived its raster rect from Size() alone, so the
@@ -396,7 +396,7 @@ func TestPainter_paintPathZeroSize(t *testing.T) {
 	}
 }
 
-// TestPainter_paintPathNegativeCoords covers #1013: a canvas.Path whose segments
+// TestPainter_paintPathNegativeCoords covers pre-rebrand tracker #1013: a canvas.Path whose segments
 // reach into negative path-local coordinates (above/left of the object origin)
 // must still rasterize. Before the fix the software raster started at path-local
 // 0, so negative coordinates were clipped; the GL/WebGPU painters render them.

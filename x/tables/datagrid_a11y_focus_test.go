@@ -1,6 +1,6 @@
 package tables
 
-// Issue #42: the grid's keyboard cursor (currentFocus) is exposed to assistive
+// pre-rebrand Issue pre-rebrand tracker #42: the grid's keyboard cursor (currentFocus) is exposed to assistive
 // technology. The focused cell reports StateFocused (via IsFocused) and the grid
 // designates it as its AT-focused descendant (AccessibleActiveDescendant), so a
 // screen reader follows arrow-key navigation and announces the focused cell. The

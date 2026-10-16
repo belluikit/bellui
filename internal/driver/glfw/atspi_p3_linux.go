@@ -10,14 +10,14 @@ import (
 	"github.com/belluikit/bellui/internal/accessibility"
 )
 
-// P3 of the Linux AT-SPI2 backend (#988): the Selection, Table and TableCell
+// P3 of the Linux AT-SPI2 backend (pre-rebrand tracker #988): the Selection, Table and TableCell
 // interfaces plus tree relations, layered on the P0 provider the same way P1
-// (#986) layered Action/Value/Text. Collection structure is served from
+// (pre-rebrand tracker #986) layered Action/Value/Text. Collection structure is served from
 // snapshots captured during reconcile (grid dimensions, cell coordinates, the
 // per-row relation set), so D-Bus reads on godbus goroutines never touch a
 // live widget. The one deliberate exception is Table.GetAccessibleAt for an
 // off-viewport cell: it hops to the main goroutine (bellui.DoAndWait) to realize
-// the cell through the neutral seam (accessibility.RealizeCell, #637) —
+// the cell through the neutral seam (accessibility.RealizeCell, pre-rebrand tracker #637) —
 // mirroring the darwin accessibilityCell(forColumn:row:) and UIA
 // IGridProvider::GetItem paths, whose callbacks arrive on the main thread.
 

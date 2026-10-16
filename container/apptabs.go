@@ -278,8 +278,8 @@ func (r *appTabsRenderer) buildOverflowTabsButton() (overflow *widget.Button) {
 		items := make([]*bellui.MenuItem, 0, itemLen-objLen)
 		for i := objLen; i < itemLen; i++ {
 			index := i // capture
-			// FIXME MenuItem doesn't support icons (#1752)
-			// FIXME MenuItem can't show if it is the currently selected tab (#1753)
+			// FIXME MenuItem doesn't support icons (pre-rebrand tracker #1752)
+			// FIXME MenuItem can't show if it is the currently selected tab (pre-rebrand tracker #1753)
 			ti := r.appTabs.Items[i]
 			mi := bellui.NewMenuItem(ti.Text, func() {
 				r.appTabs.SelectIndex(index)
@@ -299,7 +299,7 @@ func (r *appTabsRenderer) buildOverflowTabsButton() (overflow *widget.Button) {
 
 	// Extend before the renderer Hide()/Show()/Refresh()/SetIcon()s it during setup —
 	// otherwise those calls hit BaseWidget.super() with a nil impl and log a spurious
-	// "ExtendBaseWidget not called" warning (#388). Mirrors the tab/close buttons.
+	// "ExtendBaseWidget not called" warning (pre-rebrand tracker #388). Mirrors the tab/close buttons.
 	overflow.ExtendBaseWidget(overflow)
 	return overflow
 }

@@ -25,10 +25,10 @@ import (
 )
 
 // mobileClipboard carries raster images on Android via the system
-// ClipboardManager (#580) and writes combined flavors in one transaction
-// (#1142). Because Android cannot place a raw bitmap on the clipboard, the
+// ClipboardManager (pre-rebrand tracker #580) and writes combined flavors in one transaction
+// (pre-rebrand tracker #1142). Because Android cannot place a raw bitmap on the clipboard, the
 // image travels as a content:// URI: the PNG is staged in the
-// BelluiFileProvider share directory (the #711 provider) and the ClipData carries
+// BelluiFileProvider share directory (the pre-rebrand tracker #711 provider) and the ClipData carries
 // its URI. FileClipboard stays unimplemented on mobile (matching wasm) — the
 // assertion for it fails.
 var (
@@ -80,7 +80,7 @@ func (c mobileClipboard) SetImage(img image.Image) {
 }
 
 // SetFlavors replaces the clipboard content with every set flavor of content
-// in one transaction (#1142): a single ClipData item natively carries text +
+// in one transaction (pre-rebrand tracker #1142): a single ClipData item natively carries text +
 // HTML + an image content:// URI, with each present MIME listed in the
 // ClipDescription. Files are skipped with a logged error — mobile has no
 // file-list clipboard flavor (FileClipboard is unimplemented).

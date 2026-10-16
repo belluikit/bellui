@@ -29,7 +29,7 @@ const (
 // TestVisualBaseline renders a fixed multi-primitive scene through the WebGPU
 // pipeline offscreen and compares the whole image, within a small tolerance for
 // GPU anti-aliasing differences, against a committed golden render. It is a
-// per-platform visual baseline (#204): a shader/pipeline/blend regression on any
+// per-platform visual baseline (pre-rebrand tracker #204): a shader/pipeline/blend regression on any
 // backend (Metal, Vulkan, D3D12) changes solid-fill interiors far beyond the
 // tolerance, so it is caught. Edge anti-aliasing differs slightly between GPUs,
 // which the per-pixel + total-fraction tolerance absorbs.

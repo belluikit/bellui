@@ -11,7 +11,7 @@ import (
 	"github.com/belluikit/bellui/internal/cache"
 )
 
-// Scene3D for WebGPU (#224), porting internal/painter/gl/draw_scene3d.go. The GL
+// Scene3D for WebGPU (pre-rebrand tracker #224), porting internal/painter/gl/draw_scene3d.go. The GL
 // path renders the mesh into an FBO with a depth texture then draws that color
 // texture as a canvas quad; here we render into an off-screen color target with
 // the shared depth-stencil attachment (hardware z-buffering via the depth-enabled
@@ -113,7 +113,7 @@ func (p *painter) renderScene(scene *canvas.Scene3D, pixW, pixH int) *Texture {
 	}
 
 	// Render into the off-screen target (its own dedicated depth buffer, cleared
-	// to far — never the canvas pass's shared one, #231), then pop back to the
+	// to far — never the canvas pass's shared one, pre-rebrand tracker #231), then pop back to the
 	// enclosing pass so the caller can blit the result.
 	p.dev.PushOffscreenTarget(target, pixW, pixH, clear)
 	u := sceneUniforms(scene, pixW, pixH)

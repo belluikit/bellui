@@ -34,7 +34,7 @@ func TestLoadAppMetadata(t *testing.T) {
 // TestLoadAppMetadata_UnknownExtensionField verifies that a manifest carrying a
 // packaging-tool extension field the runtime schema does not model (here
 // details.ios_usage_descriptions) still loads the known fields without a parse
-// error. See #1020.
+// error. See pre-rebrand tracker #1020.
 func TestLoadAppMetadata_UnknownExtensionField(t *testing.T) {
 	const manifest = `website = "https://apps.bellui.io"
 details {

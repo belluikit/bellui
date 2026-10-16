@@ -1,4 +1,4 @@
-// Command a11yprogprobe verifies #763: the Android IME state-mirror (the hidden
+// Command a11yprogprobe verifies pre-rebrand tracker #763: the Android IME state-mirror (the hidden
 // shadow EditText that TalkBack reads) must track a *programmatic* Entry text
 // change while the Entry holds focus — SetText / binding write / undo /
 // autocomplete — not just keystrokes.
@@ -6,7 +6,7 @@
 // It keeps a single Entry focused and, on a repeating timer, programmatically
 // rewrites its text WITHOUT moving focus (so the shadow EditText stays visible
 // and the keyboard stays up). The per-frame syncKeyboardState() in the mobile
-// driver (#771) should push each new value into the shadow within one paint
+// driver (pre-rebrand tracker #771) should push each new value into the shadow within one paint
 // frame.
 //
 // adb verification (no human TalkBack needed — the mechanism is TalkBack-

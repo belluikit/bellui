@@ -92,7 +92,7 @@ func TestOverlayStack(t *testing.T) {
 	assert.Empty(t, s.ListFocusManagers())
 }
 
-// TestOverlayStack_FocusTransparent pins the #442 seam: a focus-transparent
+// TestOverlayStack_FocusTransparent pins the pre-rebrand tracker #442 seam: a focus-transparent
 // OverlayContainer is skipped by TopFocusManager, so the layer beneath keeps
 // keyboard focus; opaque overlays above or below participate as usual.
 func TestOverlayStack_FocusTransparent(t *testing.T) {

@@ -33,7 +33,7 @@ func TestEntry_composedDisplay(t *testing.T) {
 
 // AccessiblePreedit is the seam the text-input mirror uses to subtract the
 // spliced preedit from its pushes so the native IME buffer only ever sees
-// committed text (#1057). It must report exactly the span composedDisplay /
+// committed text (pre-rebrand tracker #1057). It must report exactly the span composedDisplay /
 // the provider splice occupy within AccessibleText, and clear on commit and
 // cancel.
 func TestEntry_AccessiblePreedit(t *testing.T) {
@@ -73,7 +73,7 @@ func TestEntry_AccessiblePreedit(t *testing.T) {
 
 // AccessibleComposing tracks the composition lifecycle — including the
 // desktop-commit TypedRune path, which is what makes an Android hardware-key
-// word-finalize stale (#1057).
+// word-finalize stale (pre-rebrand tracker #1057).
 func TestEntry_AccessibleComposing(t *testing.T) {
 	test.NewTempApp(t)
 	e := NewEntry()
@@ -160,7 +160,7 @@ func TestEntry_styleRunsForRow_NotComposing(t *testing.T) {
 	assert.Nil(t, e.styleRunsForRow(0))
 }
 
-// TestEntry_DesktopCommit_ClearsComposition covers #354: on the desktop driver
+// TestEntry_DesktopCommit_ClearsComposition covers pre-rebrand tracker #354: on the desktop driver
 // the committed text arrives via TypedRune while composing. It must finalize the
 // composition (drop the preedit, clear `composing`) so the visible text is the
 // committed string — not the preedit spliced alongside it, which is the あ→ああ
@@ -182,7 +182,7 @@ func TestEntry_DesktopCommit_ClearsComposition(t *testing.T) {
 	assert.Equal(t, "あ", e.composedDisplay(), "no lingering preedit → no ああ doubling (#354)")
 }
 
-// TestEntry_EscapeClearsComposition: Esc discards an active composition (#354).
+// TestEntry_EscapeClearsComposition: Esc discards an active composition (pre-rebrand tracker #354).
 func TestEntry_EscapeClearsComposition(t *testing.T) {
 	test.NewTempApp(t)
 	e := NewEntry()
@@ -199,7 +199,7 @@ func TestEntry_EscapeClearsComposition(t *testing.T) {
 // TestEntry_EscapeCompositionPrecedesOnEscape: while composing, Esc discards
 // the composition only — OnEscape fires on the next, composition-free Esc, so
 // rejecting an IME suggestion cannot dismiss the surrounding inline editor
-// (#1052).
+// (pre-rebrand tracker #1052).
 func TestEntry_EscapeCompositionPrecedesOnEscape(t *testing.T) {
 	test.NewTempApp(t)
 	escaped := 0
@@ -216,7 +216,7 @@ func TestEntry_EscapeCompositionPrecedesOnEscape(t *testing.T) {
 	assert.Equal(t, 1, escaped, "the next Esc reaches OnEscape")
 }
 
-// TestEntry_FocusLostClearsComposition: focus-out discards an active composition (#354).
+// TestEntry_FocusLostClearsComposition: focus-out discards an active composition (pre-rebrand tracker #354).
 func TestEntry_FocusLostClearsComposition(t *testing.T) {
 	test.NewTempApp(t)
 	e := NewEntry()

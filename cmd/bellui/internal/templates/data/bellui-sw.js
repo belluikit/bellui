@@ -1,4 +1,4 @@
-// Bellui notification service worker (#724).
+// Bellui notification service worker (pre-rebrand tracker #724).
 //
 // The page-context Notification constructor cannot render action buttons, and
 // action clicks are delivered to a service worker's notificationclick event, not

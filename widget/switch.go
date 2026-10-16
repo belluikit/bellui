@@ -117,7 +117,7 @@ func (s *Switch) TypedKey(ev *event.KeyEvent) {
 
 // ActivatedByKey reports that Space activates the switch, so the driver fires
 // the central keyboard-activation signal in parity with a pointer tap
-// (#834, #700).
+// (pre-rebrand tracker #834, pre-rebrand tracker #700).
 func (s *Switch) ActivatedByKey(ev *event.KeyEvent) bool {
 	return ev.Name == event.KeySpace
 }

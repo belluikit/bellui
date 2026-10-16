@@ -71,7 +71,7 @@ func TestNoOSWindow_RequestFocus(t *testing.T) {
 
 	w := d.CreateWindow("Test")
 	count = 0
-	// RequestFocus must not panic and should render the focused window (#293).
+	// RequestFocus must not panic and should render the focused window (pre-rebrand tracker #293).
 	assert.NotPanics(t, w.RequestFocus)
 	assert.Equal(t, 1, count, "RequestFocus renders the now-focused window")
 }

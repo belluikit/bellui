@@ -121,7 +121,7 @@ func TestEntry_ComposeCommitEmpty(t *testing.T) {
 
 // TestEntry_ComposeCommit_PreservesExternalCaret verifies a bare caret placed
 // OUTSIDE the preedit after composition started (an external mid-composition
-// caret move — on iOS a tap finalizes the composition through this path, #1118)
+// caret move — on iOS a tap finalizes the composition through this path, pre-rebrand tracker #1118)
 // survives the commit: the committed text lands at the anchor and the caret
 // stays where the user put it, remapped for the preedit→committed swap.
 func TestEntry_ComposeCommit_PreservesExternalCaret(t *testing.T) {
@@ -210,7 +210,7 @@ func TestEntry_Compose_MultiLine(t *testing.T) {
 }
 
 // TestEntry_DesktopCommitReplacesPreedit covers the desktop IME commit path
-// (#354): the finalized text arrives as char events (TypedRune) while a
+// (pre-rebrand tracker #354): the finalized text arrives as char events (TypedRune) while a
 // composition is active, and must REPLACE the inline preedit, not be appended
 // next to it (which produced duplication like あ -> ああ).
 func TestEntry_DesktopCommitReplacesPreedit(t *testing.T) {
@@ -233,7 +233,7 @@ func TestEntry_DesktopCommitReplacesPreedit(t *testing.T) {
 }
 
 // TestEntry_DesktopCommitMultiRune covers a multi-rune commit delivered as
-// successive char events while composing (#354).
+// successive char events while composing (pre-rebrand tracker #354).
 func TestEntry_DesktopCommitMultiRune(t *testing.T) {
 	test.NewTempApp(t)
 	entry := widget.NewEntry()
@@ -248,7 +248,7 @@ func TestEntry_DesktopCommitMultiRune(t *testing.T) {
 }
 
 // TestEntry_EscapeCancelsComposition verifies Esc discards an in-progress
-// composition so the user can ignore the suggestion (#354).
+// composition so the user can ignore the suggestion (pre-rebrand tracker #354).
 func TestEntry_EscapeCancelsComposition(t *testing.T) {
 	test.NewTempApp(t)
 	entry := widget.NewEntry()
@@ -263,7 +263,7 @@ func TestEntry_EscapeCancelsComposition(t *testing.T) {
 }
 
 // TestEntry_FocusLostCancelsComposition verifies a composition is dropped on
-// focus-out rather than left live to be implicitly committed (#354).
+// focus-out rather than left live to be implicitly committed (pre-rebrand tracker #354).
 func TestEntry_FocusLostCancelsComposition(t *testing.T) {
 	test.NewTempApp(t)
 	entry := widget.NewEntry()
@@ -280,7 +280,7 @@ func TestEntry_FocusLostCancelsComposition(t *testing.T) {
 
 // A selection made after composition started — a mid-composition long-press
 // word-select on mobile — must survive ComposeCommit: the committed text
-// lands at the composition anchor, never over the newer selection (#945
+// lands at the composition anchor, never over the newer selection (pre-rebrand tracker #945
 // device finding: the anchor-restored caret paired with the selection's
 // anchor deleted everything in between).
 func TestEntry_ComposeCommit_AfterMidCompositionSelection(t *testing.T) {

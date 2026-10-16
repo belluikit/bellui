@@ -33,7 +33,7 @@ func ptrEqual[T comparable](a, b *T) bool {
 	return *a == *b
 }
 
-// richEntryDoc is the editable document model behind [RichEntry] (#648, Phase 1).
+// richEntryDoc is the editable document model behind [RichEntry] (pre-rebrand tracker #648, Phase 1).
 //
 // The document is an ordered list of *inline* [TextSegment]s. A position is a
 // global rune offset over their concatenated text; the helpers segAt/styleAt
@@ -52,19 +52,19 @@ type richEntryDoc struct {
 	// wrapRows, when non-nil, is a wrapping-aware row model derived from the
 	// provider's real rowBounds (soft-wrap splits over multi-segment rows), used
 	// instead of the pure newline-count rowModel when RichEntry.Wrapping is on
-	// (#653). It is rebuilt from the provider after each layout; nil means the
+	// (pre-rebrand tracker #653). It is rebuilt from the provider after each layout; nil means the
 	// fast wrap-off path.
 	wrapRows []richRow
 
 	// rowModelMemo caches the wrap-off rowModel between edits; the caret/selection
 	// mapping calls activeRowModel several times per keystroke, and rebuilding the
 	// O(segments) model each call was a needless per-keystroke cost on large
-	// documents (#671). Invalidated by normalize on any content change; the
-	// in-place typing paths patch it via rowsShiftText instead (#975).
+	// documents (pre-rebrand tracker #671). Invalidated by normalize on any content change; the
+	// in-place typing paths patch it via rowsShiftText instead (pre-rebrand tracker #975).
 	rowModelMemo  []richRow
 	rowModelValid bool
 
-	// posIndex memoizes each segment's cumulative start position (#975):
+	// posIndex memoizes each segment's cumulative start position (pre-rebrand tracker #975):
 	// posIndex[i] is the position of segs[i]'s first caret slot and
 	// posIndex[len(segs)] the document length, so segAt is a binary search and
 	// len is O(1) instead of every position walk re-counting each segment's
@@ -173,7 +173,7 @@ func (d *richEntryDoc) segments() []RichTextSegment {
 
 // segPositions is the number of caret positions a segment occupies: one per rune
 // for a text segment, and exactly one for any non-text atom (e.g. an image). It
-// is the unit of the document's position space (#655).
+// is the unit of the document's position space (pre-rebrand tracker #655).
 func segPositions(seg RichTextSegment) int {
 	if ts, ok := seg.(*TextSegment); ok {
 		return len([]rune(ts.Text))
@@ -213,7 +213,7 @@ func (d *richEntryDoc) segAt(offset int) (idx, local int) {
 	}
 	p := d.positions()
 	// First segment whose end exceeds the offset — right-biased at segment
-	// boundaries, exactly like the linear walk this replaces (#975).
+	// boundaries, exactly like the linear walk this replaces (pre-rebrand tracker #975).
 	i := sort.Search(n, func(i int) bool { return offset < p[i+1] })
 	if i == n {
 		// offset at or past the end: end of the last segment.
@@ -252,7 +252,7 @@ func (d *richEntryDoc) insertText(offset int, runes []rune, style RichTextStyle)
 		ts.Text = string(concatRunes(r[:local], runes, r[local:]))
 		// An in-place splice cannot change the merge structure (no segment is
 		// emptied, no styles change), so the full normalize walk is unnecessary
-		// — patch the derived memos instead (#975).
+		// — patch the derived memos instead (pre-rebrand tracker #975).
 		d.spliceInLine(idx, offset, len(runes), runes)
 		return offset + len(runes)
 	}
@@ -301,7 +301,7 @@ func (d *richEntryDoc) deleteRange(from, to int) []rune {
 	if from >= to {
 		return nil
 	}
-	// In-place fast path (#975): the range lies inside one text segment and
+	// In-place fast path (pre-rebrand tracker #975): the range lies inside one text segment and
 	// does not empty it — trim without the full segment walk + normalize (a
 	// mid-segment trim cannot change the merge structure).
 	if idx, local := d.segAt(from); idx < len(d.segs) {
@@ -520,7 +520,7 @@ func (d *richEntryDoc) rowModel() []richRow {
 		}
 		if seg.Inline() {
 			// Inline image: flows within the current row as one position, opening a
-			// row if none is (an image at line start), never breaking it (#665).
+			// row if none is (an image at line start), never breaking it (pre-rebrand tracker #665).
 			if !open {
 				rowStart, open = pos, true
 			}
@@ -545,7 +545,7 @@ func (d *richEntryDoc) rowModel() []richRow {
 }
 
 // activeRowModel is the row model the caret/selection mapping resolves against:
-// the wrapping-aware model built from the provider when wrapping is on (#653),
+// the wrapping-aware model built from the provider when wrapping is on (pre-rebrand tracker #653),
 // else the fast newline-count model. Both use the same [start, end] convention —
 // a row spans caret columns 0..end-start and any separator consumed between two
 // rows (a '\n', or the space a soft wrap drops) sits in the one-position gap
@@ -564,7 +564,7 @@ func (d *richEntryDoc) setWrapRows(rows []richRow) {
 }
 
 // buildWrapRows derives the wrapping-aware row model from the provider's laid-out
-// rowBounds (#653). Each visual row's document range is
+// rowBounds (pre-rebrand tracker #653). Each visual row's document range is
 // [segBase(firstSegment)+begin, +rowLength) — begin is the row's rune offset into
 // its first segment and segBase is that segment's cumulative document position, so
 // this handles soft-wrap splits within a run and multi-segment inline rows alike.
@@ -598,7 +598,7 @@ func (d *richEntryDoc) buildWrapRows(p *RichText) []richRow {
 		// contributes the runes in its row slice ([begin, end) for the first/last
 		// segment, the whole run in between); an atom (inline image) contributes
 		// exactly one — never trust rowBoundary.end for a trailing atom, where it
-		// carries a stale text offset (#665).
+		// carries a stale text offset (pre-rebrand tracker #665).
 		positions := 0
 		last := len(b.segments) - 1
 		for i, seg := range b.segments {

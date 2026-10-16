@@ -1,5 +1,5 @@
 // Command a11yrealizeprobe is a live-verify harness for the off-viewport
-// virtualized-cell realize seam (fyne#637). It shows a window holding one
+// virtualized-cell realize seam (pre-rebrand tracker #637). It shows a window holding one
 // widget that reports a huge grid extent (AccessibleGridDimensioner) but
 // realizes only a small visible window of cells up front
 // (AccessibleVirtualNodes); every other cell is built on demand through
@@ -7,7 +7,7 @@
 // client (hack/a11yprobe/windows/uiarealize.ps1), a raw AX client
 // (hack/a11yprobe/darwin/axcell) or a screen reader can then read a cell far
 // past the viewport via GridPattern.GetItem / AXCellForColumnAndRow, which the
-// bridge routes through the realize seam. On mobile (#817; package with
+// bridge routes through the realize seam. On mobile (pre-rebrand tracker #817; package with
 // `bellui package --tags accessibility`) the grid publishes as a virtualized
 // collection: VoiceOver addresses cells through the data-table container
 // (vertical navigation from a visible cell realizes the off-viewport target),
@@ -61,7 +61,7 @@ func main() {
 			"every other cell realizes on demand through the a11y seam.",
 	)
 	// An editable field on the same screen as the grid, so the mobile pass can
-	// confirm the screen-reader text-input proxy swap (fyne#570) still works
+	// confirm the screen-reader text-input proxy swap (pre-rebrand tracker #570) still works
 	// with a data-table container present. Multiline + pre-filled so VoiceOver
 	// caret navigation (characters/words/lines rotor) has content to traverse.
 	single := widget.NewEntry()
@@ -69,7 +69,7 @@ func main() {
 	entry := widget.NewMultiLineEntry()
 	entry.SetText("Line one alpha\nLine two bravo\nLine three charlie")
 	// A RichEntry beside the plain Entry: it rides the same AccessibleTexter /
-	// text-input mirror seam (#773) and declares rotor custom actions (#1025),
+	// text-input mirror seam (pre-rebrand tracker #773) and declares rotor custom actions (pre-rebrand tracker #1025),
 	// so the screen-reader pass covers the rich editor path too.
 	rich := widget.NewRichEntry()
 	rich.SetSegments([]widget.RichTextSegment{
@@ -77,7 +77,7 @@ func main() {
 		&widget.TextSegment{Text: "Rich plain line", Style: widget.RichTextStyleParagraph},
 	})
 
-	// On-device trace console (#951 diagnosis): tails the bellui951 NSLog
+	// On-device trace console (pre-rebrand tracker #951 diagnosis): tails the bellui951 NSLog
 	// instrumentation emitted by the iOS a11y bridge, so the VO query/answer
 	// conversation is visible on the iPad while gesturing.
 	console := newTraceConsole()
@@ -194,7 +194,7 @@ func (c *traceConsole) ingest(line string) {
 // widget.Table / fytables DataGrid would), so the accessibility bridge can
 // reach any other cell only through the realize seam — or by scrolling the
 // window (event.Scrollable), the path mobile screen readers actually use
-// (#952/#953): a VoiceOver three-finger / TalkBack two-finger swipe pages
+// (pre-rebrand tracker #952/#953): a VoiceOver three-finger / TalkBack two-finger swipe pages
 // winOffset and the new window's cells are realized as they are walked.
 // This is the minimal stand-in for fytables' DataGrid (which implements the
 // same core interfaces).
@@ -279,8 +279,8 @@ func (g *virtualGrid) setWindow(off int) {
 }
 
 // Scrolled implements event.Scrollable: the screen-reader scroll gesture
-// (VoiceOver three-finger swipe via accessibilityScroll:, #953; TalkBack
-// two-finger swipe, #762) arrives as a synthetic page-sized ScrollEvent and
+// (VoiceOver three-finger swipe via accessibilityScroll:, pre-rebrand tracker #953; TalkBack
+// two-finger swipe, pre-rebrand tracker #762) arrives as a synthetic page-sized ScrollEvent and
 // slides the window — the scroll-driven on-demand realization path.
 func (g *virtualGrid) Scrolled(ev *event.ScrollEvent) {
 	rows := int(-ev.Scrolled.DY / cellH)
@@ -330,7 +330,7 @@ func (g *virtualGrid) AccessibleRealizeCell(row, col int) (core.AccessibleVirtua
 func (g *virtualGrid) cellNode(row, col int) (core.AccessibleVirtualNode, bool) {
 	// BELLUI951_NO_ACTIONS strips the cells' custom action: VoiceOver's
 	// "Actions Available" hint machinery engages only after the main
-	// announcement completes — inside the slow-flick failure window (#951).
+	// announcement completes — inside the slow-flick failure window (pre-rebrand tracker #951).
 	var actions []core.AccessibleAction
 	if os.Getenv("BELLUI951_NO_ACTIONS") == "" {
 		actions = []core.AccessibleAction{{Name: core.ActionSelect, Description: "Select this cell"}}

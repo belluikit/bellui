@@ -137,7 +137,7 @@ func TestRichTextHTML_MixedInline(t *testing.T) {
 	assert.GreaterOrEqual(t, len(r.Segments), 3)
 
 	// The single spaces around the nested <i> sit at inline run boundaries and
-	// must survive parsing (#668) — otherwise the line renders "boldbold-italicbold".
+	// must survive parsing (pre-rebrand tracker #668) — otherwise the line renders "boldbold-italicbold".
 	if text, ok := r.Segments[0].(*TextSegment); ok {
 		assert.Equal(t, "bold ", text.Text)
 		assert.True(t, text.Style.TextStyle.Bold)
@@ -191,7 +191,7 @@ func TestRichTextHTML_CodeBlock(t *testing.T) {
 
 func TestRichTextHTML_LinkSchemeAllowlist(t *testing.T) {
 	// Links from untrusted markup are only honoured for safe schemes; dangerous
-	// schemes are dropped so tapping them cannot invoke an external handler (#285).
+	// schemes are dropped so tapping them cannot invoke an external handler (pre-rebrand tracker #285).
 	allowed := map[string]bool{
 		`<a href="https://bellui.io/">x</a>`:  true,
 		`<a href="http://bellui.io/">x</a>`:   true,
@@ -467,7 +467,7 @@ It stretches over two lines and contains some <code>inline code</code>.</p></blo
 }
 
 // segTextsOf returns the Text of each TextSegment (in order), ignoring other
-// segment kinds — a helper for asserting inline whitespace handling (#668).
+// segment kinds — a helper for asserting inline whitespace handling (pre-rebrand tracker #668).
 func segTextsOf(r *RichText) []string {
 	var out []string
 	for _, seg := range r.Segments {
@@ -478,7 +478,7 @@ func segTextsOf(r *RichText) []string {
 	return out
 }
 
-// TestRichTextHTML_BoundarySpacePreserved is the #668 fix: a single space at an
+// TestRichTextHTML_BoundarySpacePreserved is the pre-rebrand tracker #668 fix: a single space at an
 // inline style boundary survives parsing instead of being trimmed away.
 func TestRichTextHTML_BoundarySpacePreserved(t *testing.T) {
 	r := NewRichTextFromHTML("<p>x <b>y</b> z</p>")
@@ -521,7 +521,7 @@ func TestRichTextHTML_SpaceBeforeBlockTrimmed(t *testing.T) {
 	assert.Equal(t, []string{"a", "b", ""}, segTextsOf(r))
 }
 
-// TestRichTextHTML_NbspPreserved is the #876 fix: a non-breaking space (&nbsp;,
+// TestRichTextHTML_NbspPreserved is the pre-rebrand tracker #876 fix: a non-breaking space (&nbsp;,
 // U+00A0) is content, not collapsible whitespace, so it survives parsing instead
 // of being collapsed or trimmed like an ordinary space.
 func TestRichTextHTML_NbspPreserved(t *testing.T) {
@@ -560,8 +560,8 @@ func TestRichTextHTML_OrdinarySpaceStillCollapses(t *testing.T) {
 	assert.Equal(t, []string{"a b", ""}, segTextsOf(r))
 }
 
-// TestRichTextHTML_TableCellNbspNotTrimmed is the #914 fix: an edge &nbsp; in a
-// table cell survives, consistent with internal &nbsp; (#876). Cells are trimmed
+// TestRichTextHTML_TableCellNbspNotTrimmed is the pre-rebrand tracker #914 fix: an edge &nbsp; in a
+// table cell survives, consistent with internal &nbsp; (pre-rebrand tracker #876). Cells are trimmed
 // of collapsible whitespace only.
 func TestRichTextHTML_TableCellNbspNotTrimmed(t *testing.T) {
 	r := NewRichTextFromHTML("<table><tr><td>&nbsp;lead</td><td>a&nbsp;b</td></tr></table>")

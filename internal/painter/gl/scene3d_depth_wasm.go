@@ -9,7 +9,7 @@ import "github.com/belluikit/gl-js"
 //
 // WebGL 1.0 has no core depth-texture support — a depth *texture* attachment
 // needs the WEBGL_depth_texture extension, and without it the FBO is left
-// incomplete so the Scene3D pass renders nothing (#136). A depth renderbuffer
+// incomplete so the Scene3D pass renders nothing (pre-rebrand tracker #136). A depth renderbuffer
 // (DEPTH_COMPONENT16) is core in WebGL 1.0 and is all that is needed here: the
 // depth buffer is only used for z-buffering this pass and is never sampled.
 //

@@ -9,9 +9,9 @@ import (
 	"github.com/belluikit/bellui/test"
 )
 
-// Multi-segment String() memoization (#560): the returned object keeps its
+// Multi-segment String() memoization (pre-rebrand tracker #560): the returned object keeps its
 // identity while content is unchanged, so identity-keyed consumers (the AX
-// text index, #555) hit their caches; content changes through the supported
+// text index, pre-rebrand tracker #555) hit their caches; content changes through the supported
 // mutation paths invalidate it.
 
 func sameStringData(a, b string) bool {
@@ -50,7 +50,7 @@ func TestRichTextString_MultiSegmentMemo(t *testing.T) {
 func TestRichTextString_SingleSegmentKeepsIdentity(t *testing.T) {
 	// The single-segment path must stay verbatim: the lazy edit path's
 	// seg.Text == lazyStr guard depends on the returned object being the
-	// segment's own string (#380), never a memo copy.
+	// segment's own string (pre-rebrand tracker #380), never a memo copy.
 	rt := NewRichTextWithText("stable")
 	seg := rt.Segments[0].(*TextSegment)
 	assert.True(t, sameStringData(seg.Text, rt.String()))

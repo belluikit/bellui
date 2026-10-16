@@ -1,6 +1,6 @@
 //go:build accessibility && windows && !wasm && !test_web_driver
 
-// UI Automation provider bridge for the bellui accessibility layer (#487).
+// UI Automation provider bridge for the bellui accessibility layer (pre-rebrand tracker #487).
 //
 // The Go side (accessibility_windows.go) reconciles the platform-neutral
 // semantic tree into a forest of BelluiUIAElement providers attached to each
@@ -142,7 +142,7 @@ struct BelluiUIAElement {
     BOOL hasCell;
     int cellRow, cellCol;
     // A cell realized on demand for a screen reader that navigated off the
-    // viewport (fyne#637): it is not part of its grid's child structure — its
+    // viewport (pre-rebrand tracker #637): it is not part of its grid's child structure — its
     // parent is set directly to the grid so fragment navigation resolves — and
     // it exposes the VirtualizedItem pattern so the client can Realize (scroll)
     // it into view.
@@ -1008,7 +1008,7 @@ static HRESULT STDMETHODCALLTYPE GR_GetItem(IGridProvider* This, int row, int co
         return E_INVALIDARG;
     }
     // Visible cells exist in the tree already; a cell scrolled off the viewport
-    // is realized on demand through the neutral seam (fyne#637) so a screen
+    // is realized on demand through the neutral seam (pre-rebrand tracker #637) so a screen
     // reader can read past the viewport in a million-row grid without
     // materializing the rows between.
     BelluiUIAElement* cell = findCell(e, row, column);
@@ -1097,7 +1097,7 @@ static HRESULT STDMETHODCALLTYPE GI_get_ContainingGrid(IGridItemProvider* This, 
 // real host: the client (a screen reader moving its cursor into an off-screen
 // cell) calls this, and Go routes it to the grid's AccessibleScrollCellIntoView
 // through the neutral realize seam. Reading the cell has no side effect; only
-// this explicit realize scrolls (fyne#637).
+// this explicit realize scrolls (pre-rebrand tracker #637).
 static HRESULT STDMETHODCALLTYPE VI_Realize(IVirtualizedItemProvider* This) {
     BelluiUIAElement* e = ELEM_FROM(This, vitem);
     if (e->disconnected) {
@@ -1242,7 +1242,7 @@ static HRESULT STDMETHODCALLTYPE R_GetBoundingRectangles(ITextRangeProvider* Thi
     if (!pRetVal) {
         return E_POINTER;
     }
-    // Per-range geometry (#990): Go answers one l,t,w,h rectangle per visible
+    // Per-range geometry (pre-rebrand tracker #990): Go answers one l,t,w,h rectangle per visible
     // visual line of the range in client pixels (widgets without layout
     // geometry answer none); offset by the window origin into screen
     // coordinates. An empty array tells the client to fall back to the
@@ -1716,7 +1716,7 @@ WinAccessibilityElementRef WinAccessibilityElementCreate(uintptr_t handle, void*
 }
 
 // WinAccessibilityRealizedElementConfigure finishes an element realized on
-// demand for an off-viewport cell (fyne#637): it is not part of its grid's
+// demand for an off-viewport cell (pre-rebrand tracker #637): it is not part of its grid's
 // child structure, so Go sets its parent directly to the grid element here (so
 // fragment navigation up to the fragment root resolves) and marks it as
 // exposing the VirtualizedItem pattern. The parent link is not ref-counted, in

@@ -32,7 +32,7 @@ func defaultDetailCfg(detailH float32) MasterDetailConfig {
 }
 
 // Enter and Space on a focused master row toggle its detail band, like a click
-// on the disclosure chevron (#45).
+// on the disclosure chevron (pre-rebrand tracker #45).
 func TestMasterDetail_KeyboardTogglesFocusedDetail(t *testing.T) {
 	data := []map[string]any{{"name": "A"}, {"name": "B"}}
 	g := newMasterDetailGrid(t, data, defaultDetailCfg(60))

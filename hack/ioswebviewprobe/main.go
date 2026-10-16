@@ -13,7 +13,7 @@
 //     focus and bellui release its canvas focus;
 //   - tap the bellui Entry → the probe watches the web view resign.
 //
-// The spinner top-right animates for the whole run: the #1124 lesson is a
+// The spinner top-right animates for the whole run: the pre-rebrand tracker #1124 lesson is a
 // CAMetalLayer render stall when the view is hosted wrongly, and a frozen
 // spinner IS that failure (the web view must be a sibling of the GLKView,
 // never a subview).
@@ -79,7 +79,7 @@ func main() {
 	entry := widget.NewEntry()
 	entry.SetPlaceHolder("bellui Entry — tap when asked")
 
-	spinner := widget.NewProgressBarInfinite() // frozen == the #1124 stall
+	spinner := widget.NewProgressBarInfinite() // frozen == the pre-rebrand tracker #1124 stall
 
 	w.SetContent(container.NewBorder(
 		container.NewBorder(nil, nil, nil, spinner, widget.NewLabel("#75 webview pass")),

@@ -18,7 +18,7 @@ import (
 
 // tallInlineSegment is a non-text inline RichTextSegment whose visual is taller
 // than the surrounding text, standing in for an inline image taller than the row's
-// text (issue #47). Its width is small so it shares a row with adjacent text.
+// text (pre-rebrand issue #47). Its width is small so it shares a row with adjacent text.
 type tallInlineSegment struct {
 	height float32
 }
@@ -39,12 +39,12 @@ func (s *tallInlineSegment) Unselect()                         {}
 
 // TestRichText_MixedRow_CaretHeightIncludesNonText verifies that a row whose
 // tallest element is a non-text segment reports that height, so rtlCaretX draws
-// the caret at the full row height rather than the text height (issue #47).
+// the caret at the full row height rather than the text height (pre-rebrand issue #47).
 func TestRichText_MixedRow_CaretHeightIncludesNonText(t *testing.T) {
 	lang.SetLocaleForTests(t, "en-US")
 	test.NewTempApp(t)
 
-	// RTL text so rtlCaretX engages (the bidi caret path #47 targets), plus an
+	// RTL text so rtlCaretX engages (the bidi caret path pre-rebrand tracker #47 targets), plus an
 	// inline non-text segment deliberately taller than the text.
 	txt := &TextSegment{Text: "مرحبا", Style: RichTextStyle{Inline: true}}
 	tall := &tallInlineSegment{height: 100}

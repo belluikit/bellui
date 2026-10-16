@@ -13,9 +13,9 @@ import (
 // rejected edit never reaches the undo stack and cannot be re-introduced by
 // undo/redo.
 //
-// Ranges are stored as (row, col) and anchor-tracked through edits (#130): an
+// Ranges are stored as (row, col) and anchor-tracked through edits (pre-rebrand tracker #130): an
 // insert or delete above a range shifts it, text inserted exactly at a range's
-// start or end lands outside it (the range does not grow, matching #108's
+// start or end lands outside it (the range does not grow, matching pre-rebrand tracker #108's
 // atomic-edge behavior), and undo/redo shift ranges back — no host re-publish
 // needed. A programmatic [Editor.SetText] is a document swap, not an edit:
 // ranges are left as published and the host supplies ranges for the new
@@ -78,7 +78,7 @@ func (c *protectedController) allow(sel widget.TextRange) bool {
 	if len(c.ranges) == 0 {
 		return true
 	}
-	// Synchronise deferred edits (#129): sel indexes the live pre-edit content,
+	// Synchronise deferred edits (pre-rebrand tracker #129): sel indexes the live pre-edit content,
 	// so the ranges must be flattened against that same text.
 	text := c.e.docText()
 	for _, r := range c.ranges {
@@ -148,7 +148,7 @@ func editTouchesRange(start, end, ps, pe int) bool {
 // boundary (start >= ps && start <= pe, not just strictly inside) so text cannot
 // grow up against — and shift — a masked secret. Plain protected ranges
 // deliberately allow boundary inserts so callers can append next to a read-only
-// span; a masked span cannot, or the secret slides out from under its bar (#108).
+// span; a masked span cannot, or the secret slides out from under its bar (pre-rebrand tracker #108).
 func editTouchesRangeAtomic(start, end, ps, pe int) bool {
 	if ps >= pe {
 		return false // an empty span protects nothing

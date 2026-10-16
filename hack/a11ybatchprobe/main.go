@@ -1,13 +1,13 @@
 // Command a11ybatchprobe is the on-device verification harness for the Android
-// a11y/IME polish batch: IME batch-edit coalescing (#1015), partial
-// extracted-text updates (#1009) and the visual-layout sidecar (#995). Tracked
-// by #1071.
+// a11y/IME polish batch: IME batch-edit coalescing (pre-rebrand tracker #1015), partial
+// extracted-text updates (pre-rebrand tracker #1009) and the visual-layout sidecar (pre-rebrand tracker #995). Tracked
+// by pre-rebrand tracker #1071.
 //
-// It shows one multiline widget.Entry (soft-wrapped, so #995 visual LINE and
+// It shows one multiline widget.Entry (soft-wrapped, so pre-rebrand tracker #995 visual LINE and
 // the magnifier have something to bite on) plus controls that surface the
 // otherwise-invisible acceptance signals:
 //
-//   - "Undo once"    — the #1015 granularity test. Select all in the field,
+//   - "Undo once"    — the pre-rebrand tracker #1015 granularity test. Select all in the field,
 //     type a character, then tap this ONCE. Coalesced (fixed):
 //     the ORIGINAL text returns. Two-step (bug): the field
 //     goes EMPTY (the delete-all intermediate), and a second
@@ -17,8 +17,8 @@
 //     changing and reports how many steps it took. After
 //     select-all + type one char, a coalesced edit is ONE
 //     step; the bug is two (with an empty intermediate).
-//   - "Load big doc" — fills the field with ~200 KB so #1009's partial-extract
-//     path and #1015's diff run against a large document
+//   - "Load big doc" — fills the field with ~200 KB so pre-rebrand tracker #1009's partial-extract
+//     path and pre-rebrand tracker #1015's diff run against a large document
 //     (watch logcat for TransactionTooLargeException — the
 //     whole-document ExtractedText push would blow the binder
 //     limit; the partial update must not).
@@ -30,15 +30,15 @@
 // HUMAN device pass (adb bypasses the soft keyboard, so the IME/TalkBack paths
 // can only be driven by hand):
 //  1. adb logcat -c ; adb logcat | grep -E "BelluiBatch|Bellui|TransactionTooLarge"
-//  2. #1015: focus the field, Select all (long-press ▸ Select all, or the
+//  2. pre-rebrand tracker #1015: focus the field, Select all (long-press ▸ Select all, or the
 //     handle menu), type "X", tap "Undo once" → expect the ORIGINAL text, not
 //     an empty field. Repeat with "Count undos" → expect 1 step.
-//  3. #1015 CJK regression: switch Gboard to Pinyin, compose a word inline
+//  3. pre-rebrand tracker #1015 CJK regression: switch Gboard to Pinyin, compose a word inline
 //     (underline), pick a candidate — must still work; "Count undos" of the
 //     committed word is one step.
-//  4. #1009: "Load big doc", type a few chars, keep predictive text /
+//  4. pre-rebrand tracker #1009: "Load big doc", type a few chars, keep predictive text /
 //     suggestion strip working; logcat must show NO TransactionTooLargeException.
-//  5. #995 (TalkBack on): explore the field, use character/word granularity —
+//  5. pre-rebrand tracker #995 (TalkBack on): explore the field, use character/word granularity —
 //     the magnifier/highlight box must track each glyph; a soft-wrapped line
 //     reads as one visual line.
 package main

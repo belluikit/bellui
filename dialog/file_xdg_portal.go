@@ -61,7 +61,7 @@ func openFile(parentWindowHandle string, options *filechooser.OpenFileOptions) (
 }
 
 // openFiles is the multi-select counterpart of openFile: the portal returns
-// every chosen URI and each is opened as a reader, first error aborting (#716).
+// every chosen URI and each is opened as a reader, first error aborting (pre-rebrand tracker #716).
 func openFiles(parentWindowHandle string, options *filechooser.OpenFileOptions) ([]bellui.URIReadCloser, error) {
 	title := lang.L("Open") + " " + lang.L("File")
 	uris, err := filechooser.OpenFile(parentWindowHandle, title, options)
@@ -133,7 +133,7 @@ func fileOpenOSOverride(d *FileDialog) bool {
 
 	options := &filechooser.OpenFileOptions{
 		Directory:   d.isDirectory(),
-		Multiple:    d.multiSelect && !d.isDirectory(), // multi-select is file-open only (#716)
+		Multiple:    d.multiSelect && !d.isDirectory(), // multi-select is file-open only (pre-rebrand tracker #716)
 		AcceptLabel: d.confirmText,
 	}
 	if d.startingLocation != nil {

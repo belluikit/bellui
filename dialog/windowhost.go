@@ -1,6 +1,6 @@
 package dialog
 
-// Window-hosted dialogs (#498, Phase 1): an opt-in mode where Show opens the
+// Window-hosted dialogs (pre-rebrand tracker #498, Phase 1): an opt-in mode where Show opens the
 // dialog body in its own native window instead of an overlay popup inside the
 // parent window's canvas. The dialog window can be moved and resized freely by
 // the OS window manager and appears in the window switcher, while the parent
@@ -153,7 +153,7 @@ func removeScrim(parent bellui.Window, s *modalScrim) {
 }
 
 // adoptParentWindow gives the host window a native parent/owner relationship
-// with its dialog's parent when the driver supports it (#598, desktop.
+// with its dialog's parent when the driver supports it (pre-rebrand tracker #598, desktop.
 // ChildWindow): the window manager then keeps the dialog above its parent and
 // minimizes them together, complementing the pure-Go modal scrim. A no-op on
 // drivers without the capability (mobile/web).
@@ -164,7 +164,7 @@ func adoptParentWindow(child, parent bellui.Window) {
 }
 
 // adoptModal asks the driver to enforce native window-modality of the host
-// window against its dialog's parent when supported (#498, desktop.ModalWindow):
+// window against its dialog's parent when supported (pre-rebrand tracker #498, desktop.ModalWindow):
 // the OS then blocks input to the parent while the dialog is up, matching the
 // pure-Go scrim. A no-op on drivers without the capability, where the scrim is
 // the only blocker. The parent must already be adopted (adoptParentWindow), and
@@ -177,7 +177,7 @@ func adoptModal(child, parent bellui.Window) {
 }
 
 // centerWindowOver requests the child window be positioned centered over the
-// parent window, on platforms that reveal window positions (#497). childSize
+// parent window, on platforms that reveal window positions (pre-rebrand tracker #497). childSize
 // is the expected child window size in device-independent pixels; the parent
 // canvas scale approximates the child's, which is unknown before first show.
 func centerWindowOver(child, parent bellui.Window, childSize geo.Size) {

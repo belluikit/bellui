@@ -14,7 +14,7 @@ import (
 )
 
 // TestHyperlinkSegment_Style_Propagates verifies HyperlinkSegment.Visual and
-// Update thread the per-segment Style (#651) onto the backing Hyperlink widget,
+// Update thread the per-segment Style (pre-rebrand tracker #651) onto the backing Hyperlink widget,
 // so a link can render in a custom font/color/size like a TextSegment.
 func TestHyperlinkSegment_Style_Propagates(t *testing.T) {
 	src := distinctFont()

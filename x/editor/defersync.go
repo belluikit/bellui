@@ -1,6 +1,6 @@
 package editor
 
-// Deferred text sync (#129, fyne#410). The fork's Entry.DeferTextSync mode
+// Deferred text sync (pre-rebrand tracker #129, pre-rebrand tracker #410). The fork's Entry.DeferTextSync mode
 // stops materializing the whole document into Entry.Text on every keystroke:
 // edits update only the internal buffer, and Text — with its OnChanged,
 // Validator and binding notifications — is refreshed at sync points instead.
@@ -18,19 +18,19 @@ package editor
 //     field; their staleness is bounded to the caret's row between sync
 //     points. Geometry counts never go stale at all: lineCount and the
 //     gutter/overlay row counts read the fork's live O(1) Entry.LineCount
-//     (#149, fyne#459), not the Text field.
+//     (pre-rebrand tracker #149, pre-rebrand tracker #459), not the Text field.
 //
 // Sync triggers, consumed in [Editor.consumeDeferredSync] from the Entry's
 // OnCursorChanged (which the fork fires from every content refresh, i.e.
 // after every edit):
 //
-//   - a caret row change — bounds the anchor-tracking diff (#130) to edits
+//   - a caret row change — bounds the anchor-tracking diff (pre-rebrand tracker #130) to edits
 //     within a single row, so the coalesced splice stays contiguous;
 //   - a live line-count change — an edit added or removed a newline (Enter,
 //     line-join backspace/delete, multi-line paste or selection replace), so
 //     anchors and decorations re-derive against the new line structure. The
 //     comparison is O(1) via Entry.LineCount, so mid-row deletions no longer
-//     sync at all (#149) — held-down Backspace/Delete stays flat;
+//     sync at all (pre-rebrand tracker #149) — held-down Backspace/Delete stays flat;
 //   - [Editor.noteDeferredEdit], flagged from the BeforeChange gate when an
 //     active feature needs the full current text on every edit
 //     (completion/signature providers, protected ranges, masked redactions,
@@ -70,7 +70,7 @@ func (e *Editor) docText() string {
 // protected/redaction vetoes have passed, and flags a sync when an active
 // feature needs the full current text on every edit. Line-structure changes
 // need no flagging here: the pump compares the live Entry.LineCount after the
-// edit applies (#149), which is both cheaper and exact — the pre-#149
+// edit applies (pre-rebrand tracker #149), which is both cheaper and exact — the before pre-rebrand tracker #149
 // classification conservatively synced on every deletion because the gate
 // could not tell whether a newline was dying.
 func (e *Editor) noteDeferredEdit() {
@@ -112,9 +112,9 @@ func (e *Editor) deferredPerEditSync() bool {
 // consumeDeferredSync is the sync-point pump, called from the Entry's
 // OnCursorChanged (which the fork fires from every content refresh, after
 // every edit). It synchronises when an edit was flagged by noteDeferredEdit,
-// when the caret changed rows (bounding the #130 anchor-tracking diff to a
+// when the caret changed rows (bounding the pre-rebrand tracker #130 anchor-tracking diff to a
 // single row), or when the live line count changed — the O(1) Entry.LineCount
-// comparison that lets mid-row deletions stay deferred (#149) while an edit
+// comparison that lets mid-row deletions stay deferred (pre-rebrand tracker #149) while an edit
 // that actually adds or removes a newline syncs immediately. SyncText is a
 // cheap no-op when nothing is pending, and the bookkeeping is updated before
 // syncing so the OnChanged pipeline re-entering this function cannot loop.

@@ -10,12 +10,12 @@ import (
 	"github.com/belluikit/bellui/test"
 )
 
-// Regression gate for the virtualised-RichText cold-build cost (#317). A
+// Regression gate for the virtualised-RichText cold-build cost (pre-rebrand tracker #317). A
 // multi-segment varHeight RichText windows its *rendering* (Scroll10k below is
 // O(window)) but currently shapes every row up front in updateRowBounds to
 // compute wrap boundaries — O(n) HarfBuzz, ~2s on a Pixel 7 Pro for 10k rows and
 // the dominant startup-ANR margin. Build10k is the number Phase C must bring down
-// (target <100ms desktop); Lazy_Build10k is the single-segment lazy path (#157)
+// (target <100ms desktop); Lazy_Build10k is the single-segment lazy path (pre-rebrand tracker #157)
 // for contrast (no up-front shaping). Run:
 //
 //	go test -run xxx -bench RichText_VarHeight -benchmem ./widget/
@@ -43,7 +43,7 @@ func tenKMixedSegments(n int) []RichTextSegment {
 }
 
 // BenchmarkRichText_VarHeight_Build10k is the regression gate for the first-paint
-// build cost of a 10k mixed virtualised RichText (#317) — the full cold build a
+// build cost of a 10k mixed virtualised RichText (pre-rebrand tracker #317) — the full cold build a
 // real app pays before the first frame.
 func BenchmarkRichText_VarHeight_Build10k(b *testing.B) {
 	test.NewTempApp(b)
@@ -62,7 +62,7 @@ func BenchmarkRichText_VarHeight_Build10k(b *testing.B) {
 	}
 }
 
-// BenchmarkRichText_Lazy_Build10k is the single-segment lazy path (#157) for the
+// BenchmarkRichText_Lazy_Build10k is the single-segment lazy path (pre-rebrand tracker #157) for the
 // same row count — the contrast to the multi-segment dense build. A 10k-line plain
 // document does no up-front shaping here.
 func BenchmarkRichText_Lazy_Build10k(b *testing.B) {
@@ -88,7 +88,7 @@ func BenchmarkRichText_Lazy_Build10k(b *testing.B) {
 
 // BenchmarkRichText_VarHeight_Scroll10k measures the per-scroll-step cost once
 // built — exercises computeWindowRowsVar. Confirms the scroll window is O(window)
-// and not part of the #317 cold-build problem.
+// and not part of the pre-rebrand tracker #317 cold-build problem.
 func BenchmarkRichText_VarHeight_Scroll10k(b *testing.B) {
 	test.NewTempApp(b)
 	rich := NewRichText(tenKMixedSegments(10000)...)

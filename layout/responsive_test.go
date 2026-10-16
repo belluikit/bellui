@@ -179,7 +179,7 @@ func TestResponsiveLayout_MinSize(t *testing.T) {
 // actually painted. The original wrapper embedded bellui.Container in a custom
 // type, which the exact-type switch in the object-tree walker does not match —
 // wrapped children were laid out but never walked, so they did not paint, were
-// not hit-testable and panicked the markup renderer (#767).
+// not hit-testable and panicked the markup renderer (pre-rebrand tracker #767).
 func TestResponsive_ChildRenders(t *testing.T) {
 	test.NewTempApp(t)
 	red := color.NRGBA{R: 0xff, A: 0xff}
@@ -202,7 +202,7 @@ func TestResponsive_ChildRenders(t *testing.T) {
 }
 
 // TestResponsive_MarkupRender locks in that a [Responsive] wrapper renders as a
-// plain container in the test markup renderer instead of panicking (#767).
+// plain container in the test markup renderer instead of panicking (pre-rebrand tracker #767).
 func TestResponsive_MarkupRender(t *testing.T) {
 	test.NewTempApp(t)
 	rect := canvas.NewRectangle(color.NRGBA{R: 0xff, A: 0xff})

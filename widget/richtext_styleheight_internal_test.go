@@ -15,7 +15,7 @@ import (
 )
 
 // TestRichText_StyleHeightCache verifies the per-(size,style) ASCII line-height
-// memoisation (#313) keeps the variable-height geometry correct: distinct styles
+// memoisation (pre-rebrand tracker #313) keeps the variable-height geometry correct: distinct styles
 // (headings vs body) keep distinct row heights — the cache must not collapse them
 // — and the height prefix is identical whether built cold or warm (transparent).
 func TestRichText_StyleHeightCache(t *testing.T) {

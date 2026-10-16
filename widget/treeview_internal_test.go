@@ -74,7 +74,7 @@ func TestTreeViewItem_HoverOverLabel_ShowsActions(t *testing.T) {
 }
 
 // Rename/delete are hover-only buttons on the row, so they are also offered
-// as accessible actions when the tree allows them (#544) — otherwise
+// as accessible actions when the tree allows them (pre-rebrand tracker #544) — otherwise
 // screen-reader and keyboard users could never reach them.
 func TestTreeViewItem_RenameDeleteAccessibleActions(t *testing.T) {
 	test.NewTempApp(t)

@@ -42,7 +42,7 @@ func visibleLabelTexts(r *timePickerRenderer) []string {
 
 // TestTimePicker_24hInnerRing verifies the MD3 24-hour dial renders both a
 // full-radius outer ring (1–12) and an inner ring (13–23 and 00), and that the
-// inner ring is only present in 24h hour-selection mode (#804).
+// inner ring is only present in 24h hour-selection mode (pre-rebrand tracker #804).
 func TestTimePicker_24hInnerRing(t *testing.T) {
 	test.NewTempApp(t)
 	tp := NewTimePicker(23, 0, true, nil)
@@ -70,7 +70,7 @@ func TestTimePicker_24hInnerRing(t *testing.T) {
 
 // TestTimePicker_24hInnerRingSelection checks that inner-ring hours (0 and
 // 13–23) place the selector arm at the inner radius and highlight the inner
-// label, and that tapping the inner ring selects an inner hour (#804).
+// label, and that tapping the inner ring selects an inner hour (pre-rebrand tracker #804).
 func TestTimePicker_24hInnerRingSelection(t *testing.T) {
 	test.NewTempApp(t)
 
@@ -186,7 +186,7 @@ func TestTimePicker_AMPMToggle(t *testing.T) {
 
 	r := test.TempWidgetRenderer(t, tp).(*timePickerRenderer)
 
-	// The AM/PM fields are widgets that receive their own taps (#543).
+	// The AM/PM fields are widgets that receive their own taps (pre-rebrand tracker #543).
 	r.pmBtn.Tapped(&event.PointEvent{})
 	assert.Equal(t, 21, tp.Hour) // 9 AM + 12 = 21
 

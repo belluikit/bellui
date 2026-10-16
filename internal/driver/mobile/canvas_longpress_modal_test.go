@@ -17,7 +17,7 @@ import (
 
 // The canvas file dialog's touch selection mode (#259) rides this dispatch
 // geometry: its file items sit inside a scroll container inside a modal
-// pop-up, and the hold-fire long-press (#758) must resolve the innermost
+// pop-up, and the hold-fire long-press (pre-rebrand tracker #758) must resolve the innermost
 // LongPressable there — not the scroll, not the pop-up. The release of a
 // hold-fired touch must also stay tap-free: in a toggle-on-tap mode a release
 // tap would immediately undo the selection the hold just made.

@@ -55,7 +55,7 @@ func BenchmarkSpliceTail(b *testing.B) {
 
 // BenchmarkStringAfterSplice measures the per-keystroke materialization cost a
 // widget edit pays: one splice followed by String(). With the flat backing the
-// splice maintains the memo eagerly; the rope backing (#403) moves the same
+// splice maintains the memo eagerly; the rope backing (pre-rebrand tracker #403) moves the same
 // O(n) into the String() miss — either way this is the mandated per-keystroke
 // floor to compare against.
 func BenchmarkStringAfterSplice(b *testing.B) {

@@ -1,7 +1,7 @@
 //go:build windows
 
 // Command winhoverprobe live-verifies Windows drag-motion hover feedback
-// (bellui #926 / glfw OLE IDropTarget). It starts a REAL OLE drag from its own
+// (bellui pre-rebrand tracker #926 / glfw OLE IDropTarget). It starts a REAL OLE drag from its own
 // window via desktop.StartDrag (a file payload, so the full CF_HDROP drop path
 // runs) and walks the cursor across a DropHoverable widget with synthetic
 // input: in (enter+over), out (leave), back in, release (drop). Events land in

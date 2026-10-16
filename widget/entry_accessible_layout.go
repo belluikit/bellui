@@ -7,7 +7,7 @@ import (
 	"github.com/belluikit/bellui/geo"
 )
 
-// Entry exposes its visual layout to assistive technologies (#990): the
+// Entry exposes its visual layout to assistive technologies (pre-rebrand tracker #990): the
 // soft-wrapped line structure the user actually sees, and on-screen geometry
 // for text ranges. Platform bridges consume this through
 // [core.AccessibleTextLayouter] for what-you-see line navigation and for the
@@ -94,7 +94,7 @@ func (e *Entry) AccessibleRangeBounds(start, end int) []geo.Rectangle {
 	var out []geo.Rectangle
 	for row := first; row <= endRow && row < rows; row++ {
 		if provider.rowHidden(row) {
-			continue // a folded row is not visible (#141)
+			continue // a folded row is not visible (pre-rebrand tracker #141)
 		}
 		colFrom := 0
 		if row == startRow {

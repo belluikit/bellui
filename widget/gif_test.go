@@ -106,7 +106,7 @@ func TestAnimatedGif_CatchUpResync(t *testing.T) {
 	g.Stop()
 }
 
-// TestAnimatedGif_RendererLifecycle pins the #28-style lifecycle: a renderer
+// TestAnimatedGif_RendererLifecycle pins the pre-rebrand tracker #28-style lifecycle: a renderer
 // Destroy (discarded widget, or cache eviction of a hidden one) stops the
 // frame driver so its closure no longer holds the widget alive, and
 // CreateRenderer re-arms playback on re-show.

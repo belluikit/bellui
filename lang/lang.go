@@ -403,7 +403,7 @@ func applyUserLocales(all []string) {
 	tags := parseUserLocales(all)
 	if len(tags) == 0 {
 		// GetLocales reports an empty list without an error in a C/POSIX
-		// locale environment (e.g. LANG=C; #1148), and a failed or fully
+		// locale environment (e.g. LANG=C; pre-rebrand tracker #1148), and a failed or fully
 		// unparseable lookup (#271) degrades the same way: English, keeping
 		// tags[0] below valid.
 		tags = []language.Tag{language.English}

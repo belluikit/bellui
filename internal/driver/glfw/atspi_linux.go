@@ -14,12 +14,12 @@ import (
 	"github.com/belluikit/bellui/internal/accessibility"
 )
 
-// This file implements a pure-Go AT-SPI2 accessibility provider (#981), the
-// Linux counterpart of the macOS NSAccessibility (#485) and Windows UIA (#487)
+// This file implements a pure-Go AT-SPI2 accessibility provider (pre-rebrand tracker #981), the
+// Linux counterpart of the macOS NSAccessibility (pre-rebrand tracker #485) and Windows UIA (pre-rebrand tracker #487)
 // backends. It speaks the org.a11y.atspi.* D-Bus protocol directly over
 // github.com/godbus/dbus/v5 — no cgo, no Rust/AccessKit — reusing the
 // platform-neutral semantic tree (internal/accessibility) exactly as the other
-// backends do. The route was de-risked by the hack/atspiprobe spike (#489/#982).
+// backends do. The route was de-risked by the hack/atspiprobe spike (pre-rebrand tracker #489/#982).
 //
 // One AT-SPI application root exists per process (the toolkit is one accessible
 // application); each bellui window contributes a "frame" subtree beneath it. The
@@ -121,7 +121,7 @@ type atspiNode struct {
 	selEnd   int
 	caret    int
 
-	// P3 snapshots (#988), captured like the P1 ones.
+	// P3 snapshots (pre-rebrand tracker #988), captured like the P1 ones.
 	hasSelection bool // org.a11y.atspi.Selection (item containers)
 	hasGridDims  bool // org.a11y.atspi.Table (grids reporting full extent)
 	gridRows     int
@@ -458,9 +458,9 @@ type atspiWinState struct {
 	focused  *atspiNode
 	active   bool
 
-	// On-demand realized cells for off-viewport grid coordinates (#988), keyed
+	// On-demand realized cells for off-viewport grid coordinates (pre-rebrand tracker #988), keyed
 	// by the cell's stable identity with FIFO eviction — the AT-SPI mirror of
-	// the darwin/UIA realized caches (#637). Entries live outside the
+	// the darwin/UIA realized caches (pre-rebrand tracker #637). Entries live outside the
 	// reconcile walk (never pruned as unseen); a cell scrolling into view is
 	// promoted into virtual, keeping its exported path.
 	realized      map[any]*atspiNode
@@ -510,7 +510,7 @@ func newAtspiProvider() *atspiProvider {
 	p.nodes[atspiRootPath] = root
 	p.exportNode(root)
 
-	// The AT-SPI cache (#987): Orca prefers one GetItems round-trip over walking
+	// The AT-SPI cache (pre-rebrand tracker #987): Orca prefers one GetItems round-trip over walking
 	// the tree property-by-property. Exported at the well-known cache path.
 	conn.Export(&atspiCache{p: p}, atspiCachePath, ifaceCache)
 
@@ -580,7 +580,7 @@ func (p *atspiProvider) newPath() dbus.ObjectPath {
 }
 
 // emitStateChanged emits object:state-changed:<detail> in the modern siiv a{sv}
-// wire format (verified against live gnome events in the #489 spike). Caller
+// wire format (verified against live gnome events in the pre-rebrand tracker #489 spike). Caller
 // must NOT hold p.mu (Emit can block).
 func (p *atspiProvider) emitStateChanged(path dbus.ObjectPath, detail string, on int32) {
 	_ = p.conn.Emit(path, ifaceEventObject+".StateChanged",

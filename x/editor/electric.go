@@ -6,12 +6,12 @@ import (
 	"github.com/belluikit/bellui/widget"
 )
 
-// Electric characters / reindent-on-type (#136) — "layer 2" of the indentation
+// Electric characters / reindent-on-type (pre-rebrand tracker #136) — "layer 2" of the indentation
 // family: typing a character that changes the current line's meaning (a closing
 // brace in C-like languages, the ':' of an "else:" clause in Python-like ones)
 // re-indents that line immediately.
 //
-// The mechanism mirrors #134/#135: fycoder owns the hook (editorEntry.TypedRune
+// The mechanism mirrors pre-rebrand tracker #134/#135: fycoder owns the hook (editorEntry.TypedRune
 // → Editor.handleElectricRune, after the Entry has inserted the char), the
 // language rule is the provider's. The rule is the optional [ReindentProvider]
 // extension of [IndentProvider], so electric behavior is opt-in per provider:
@@ -51,7 +51,7 @@ func (e *Editor) handleElectricRune(r rune) {
 		return
 	}
 
-	// Synchronise deferred edits (#129): the just-typed rune must be in the
+	// Synchronise deferred edits (pre-rebrand tracker #129): the just-typed rune must be in the
 	// inspected line for the reindent decision.
 	row, col := e.entry.CursorRow, e.entry.CursorColumn
 	lines := strings.Split(e.docText(), "\n")

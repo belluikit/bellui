@@ -1,5 +1,5 @@
 // Command modelprobe is the live-verify demo for the data/model sort/filter/
-// selection layer (#539): a 100k-row list with a live search box, a locale-aware
+// selection layer (pre-rebrand tracker #539): a 100k-row list with a live search box, a locale-aware
 // sort toggle, and multi-selection that survives re-sort and re-filter.
 //
 //	go run ./hack/modelprobe

@@ -11,7 +11,7 @@ import (
 	"github.com/belluikit/bellui"
 )
 
-// Declare conformity with the optional clipboard flavor interfaces (#513).
+// Declare conformity with the optional clipboard flavor interfaces (pre-rebrand tracker #513).
 // FileClipboard is deliberately not implemented: browsers expose no portable
 // file-list clipboard flavor, so the capability assertion fails on wasm.
 var (
@@ -34,7 +34,7 @@ func jsClipboard() js.Value {
 // transient user activation). The whole promise chain lives in JS callbacks
 // so the read starts synchronously in the caller's (post-gesture) turn; the
 // calling goroutine blocks on a buffered channel, which yields to the JS
-// event loop, and the callbacks never block (#113).
+// event loop, and the callbacks never block (pre-rebrand tracker #113).
 func readClipboardData(mime string) []byte {
 	cb := jsClipboard()
 	if !cb.Truthy() {
@@ -174,7 +174,7 @@ func (c clipboard) SetHTML(html, plainFallback string) {
 }
 
 // SetFlavors replaces the clipboard content with one ClipboardItem carrying
-// every set flavor of content (#583). Browsers expose no portable file-list
+// every set flavor of content (pre-rebrand tracker #583). Browsers expose no portable file-list
 // clipboard flavor, so Files is skipped with a logged error.
 func (c clipboard) SetFlavors(content bellui.ClipboardContent) {
 	if len(content.Files) > 0 {

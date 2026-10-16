@@ -26,7 +26,7 @@ func wrappedRichEntry(t *testing.T, segs []RichTextSegment) (*RichEntry, bellui.
 	return e, w
 }
 
-// TestRichEntry_WrapRowModelMatchesProvider is the core #653 invariant: the
+// TestRichEntry_WrapRowModelMatchesProvider is the core pre-rebrand tracker #653 invariant: the
 // wrapping-aware row model tracks the provider's real rowBounds exactly — same
 // row count, starting at 0, covering every position, contiguous with at most the
 // one consumed separator between rows.
@@ -78,7 +78,7 @@ func TestRichEntry_WrapOffsetRoundTrip(t *testing.T) {
 
 // TestRichEntry_WrapCaretDownUpNavigatesVisualRows verifies arrow Down/Up move
 // the caret between *visual* rows of one wrapped logical line, rather than jumping
-// to the document end (the pre-#653 newline-count behaviour, which saw one row).
+// to the document end (the before pre-rebrand tracker #653 newline-count behaviour, which saw one row).
 func TestRichEntry_WrapCaretDownUpNavigatesVisualRows(t *testing.T) {
 	test.NewTempApp(t)
 	e, w := wrappedRichEntry(t, []RichTextSegment{
@@ -181,7 +181,7 @@ func TestRichEntry_WrapOffStillNewlineModel(t *testing.T) {
 	assert.Equal(t, 3, e.doc.rowCount(), "one row per newline-separated line")
 }
 
-// TestRichEntry_RowModelMemoInvalidatesOnEdit guards the #671 wrap-off row-model
+// TestRichEntry_RowModelMemoInvalidatesOnEdit guards the pre-rebrand tracker #671 wrap-off row-model
 // memo: after an edit that changes the row structure, the cached model must be
 // rebuilt, not served stale.
 func TestRichEntry_RowModelMemoInvalidatesOnEdit(t *testing.T) {
@@ -204,7 +204,7 @@ func TestRichEntry_RowModelMemoInvalidatesOnEdit(t *testing.T) {
 	assert.Equal(t, 1, e.doc.rowCount(), "removing the newline collapses back to one row")
 }
 
-// TestRichEntry_IMECaretOnWrappedRow is the #891 fix: while composing in a
+// TestRichEntry_IMECaretOnWrappedRow is the pre-rebrand tracker #891 fix: while composing in a
 // wrapped document, the caret (and thus the IME candidate window) must resolve to
 // the correct visual row, not row 0. Before, caretDoc used a wrap-off temp doc
 // during composition, so a no-newline wrapped line collapsed to one row and the

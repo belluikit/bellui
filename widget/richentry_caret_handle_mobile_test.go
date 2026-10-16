@@ -15,7 +15,7 @@ import (
 	"github.com/belluikit/bellui/geo"
 )
 
-// The mobile caret drag-handle for RichEntry (#999, parity with Entry's #943):
+// The mobile caret drag-handle for RichEntry (pre-rebrand tracker #999, parity with Entry's pre-rebrand tracker #943):
 // a plain touch tap placing the caret shows a single draggable dot below the
 // insertion point; dragging it moves the caret without selecting; it hides on
 // typing, focus loss, selection start and after an inactivity timeout.

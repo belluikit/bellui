@@ -10,11 +10,11 @@ import (
 	"github.com/belluikit/bellui/geo"
 )
 
-// TestRectCoordsTransform covers #233/#960: under a non-trivial world transform
+// TestRectCoordsTransform covers pre-rebrand tracker #233/#960: under a non-trivial world transform
 // the textured quad (rectCoords) carries the transform on its corners, but
 // anchored about the object's own origin — the worldTransform the paint walk
 // hands the painter already contains Translate(pos), so the object must
-// scale/rotate about its top-left, not the canvas origin (#960). With no
+// scale/rotate about its top-left, not the canvas origin (pre-rebrand tracker #960). With no
 // transform it stays on the pixel-snapped axis-aligned path.
 func TestRectCoordsTransform(t *testing.T) {
 	const fw, fh = 200, 100

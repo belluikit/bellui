@@ -1,4 +1,4 @@
-// Command clipimageprobe live-verifies mobile image clipboard (#580,
+// Command clipimageprobe live-verifies mobile image clipboard (pre-rebrand tracker #580,
 // bellui.ImageClipboard on Android/iOS): a generated pattern is copied to the
 // system clipboard with SetClipboardImage, then read back with ClipboardImage
 // and displayed — a full round-trip through the OS ClipboardManager /

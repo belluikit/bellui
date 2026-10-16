@@ -16,12 +16,12 @@ import (
 	"github.com/belluikit/webgpu/wgpu"
 )
 
-// These tests guard #322 end-to-end on a real GPU adapter (Metal / Vulkan /
+// These tests guard pre-rebrand tracker #322 end-to-end on a real GPU adapter (Metal / Vulkan /
 // D3D12 in the webgpu_tests CI job). They render a known theme-dark color
 // through the painter's solid-color path (the `path` pipeline, the same one
 // fragColor feeds) into an offscreen target and read the pixel back.
 //
-// The mechanism behind #322: the painter writes straight sRGB-encoded color
+// The mechanism behind pre-rebrand tracker #322: the painter writes straight sRGB-encoded color
 // values and does NO gamma encoding in its shaders. If the render target is an
 // sRGB format, the GPU treats those writes as linear and re-encodes them to
 // sRGB on store, so a dark color comes back far brighter than authored. The fix
@@ -44,15 +44,15 @@ import (
 // The RGBA family is used (RGBA8Unorm / RGBA8UnormSrgb) so the read-back bytes
 // are in image-native order with no channel swap; the sRGB re-encode mechanism
 // is identical across the BGRA/RGBA families. Real-surface, per-backend BGRA
-// verification is the manual Phase 2 sweep (#325 task 1).
+// verification is the manual Phase 2 sweep (pre-rebrand tracker #325 task 1).
 
-// darkColor is the theme-dark sample from #322 (#121216); on an sRGB target it
+// darkColor is the theme-dark sample from pre-rebrand tracker #322 (#121216); on an sRGB target it
 // was observed to read back as #4b4b53.
 var darkColor = color.NRGBA{R: 0x12, G: 0x12, B: 0x16, A: 0xff}
 
 func TestSurfaceFormatColorFidelity(t *testing.T) {
 	// The Metal-style caps list: the sRGB variant is advertised first, the
-	// non-sRGB sibling second — exactly the case #322 fixes.
+	// non-sRGB sibling second — exactly the case pre-rebrand tracker #322 fixes.
 	caps := []wgpu.TextureFormat{wgpu.TextureFormatRGBA8UnormSrgb, wgpu.TextureFormatRGBA8Unorm}
 	format := chooseSurfaceFormat(caps)
 	if format != wgpu.TextureFormatRGBA8Unorm {

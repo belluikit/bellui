@@ -13,7 +13,7 @@ import (
 	"github.com/belluikit/bellui/test"
 )
 
-// TestText_MinSizeMemo verifies the per-object measurement memo (#923): a
+// TestText_MinSizeMemo verifies the per-object measurement memo (pre-rebrand tracker #923): a
 // repeated MinSize of an unchanged object is served from the memo, any change
 // to a measurement input forces a fresh measurement, and a theme/font cache
 // reset drops the memo so it can never serve a stale size.
@@ -63,7 +63,7 @@ func TestText_MinSizeMemo(t *testing.T) {
 }
 
 // BenchmarkTextMinSize measures the memo hit path — the per-relayout cost of
-// measuring an unchanged text object (#923). Before the memo this cost
+// measuring an unchanged text object (pre-rebrand tracker #923). Before the memo this cost
 // O(len(Text)) hashing per call even on a global-cache hit.
 func BenchmarkTextMinSize(b *testing.B) {
 	test.NewTempApp(b)

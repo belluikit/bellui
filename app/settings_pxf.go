@@ -6,8 +6,8 @@ import (
 )
 
 // MarshalPXF encodes the global settings to PXF bytes — the textual format of the
-// settings.pxf store that replaced the legacy settings.json (#872, mirroring the
-// preferences.pxf migration in #824). It maps SettingsSchema field-for-field via
+// settings.pxf store that replaced the legacy settings.json (pre-rebrand tracker #872, mirroring the
+// preferences.pxf migration in pre-rebrand tracker #824). It maps SettingsSchema field-for-field via
 // the settingspb.Settings proto. Exported because the writer lives in a separate
 // package (cmd/bellui_settings) from the reader (app).
 func (sc *SettingsSchema) MarshalPXF() ([]byte, error) {

@@ -24,7 +24,7 @@ func caretXAt(e *RichEntry, offset int) float32 {
 
 // TestRichEntry_InlineImageStaysInRow verifies an inline image flows within the
 // text row (text — image — text on one row) rather than forcing its own row, and
-// that the document position space counts it as exactly one position (#665).
+// that the document position space counts it as exactly one position (pre-rebrand tracker #665).
 func TestRichEntry_InlineImageStaysInRow(t *testing.T) {
 	test.NewTempApp(t)
 	e := NewRichEntry()
@@ -150,7 +150,7 @@ func TestRichEntry_BlockImageStillOwnsRow(t *testing.T) {
 	assert.True(t, e.doc.rowIsImage(1), "the middle row is a block image row")
 }
 
-// TestRichEntry_SelectionHighlightSpansInlineImage is the #893 fix: a selection
+// TestRichEntry_SelectionHighlightSpansInlineImage is the pre-rebrand tracker #893 fix: a selection
 // that crosses an inline image highlights the image's full width. Before, the
 // highlight went through lineSizeToColumn (text-rune columns) and mis-measured a
 // document-space selection, ending short by the image's width.

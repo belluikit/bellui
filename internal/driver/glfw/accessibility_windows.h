@@ -59,7 +59,7 @@ typedef struct {
 
 WinAccessibilityElementRef WinAccessibilityElementCreate(uintptr_t handle, void* hwnd);
 bool WinAccessibilityElementUpdate(WinAccessibilityElementRef elem, WinAccessibilityElementProps* props);
-// Configures an element realized on demand for an off-viewport cell (fyne#637):
+// Configures an element realized on demand for an off-viewport cell (pre-rebrand tracker #637):
 // parents it to the grid element for fragment navigation and exposes the
 // VirtualizedItem pattern. Called after WinAccessibilityElementUpdate.
 void WinAccessibilityRealizedElementConfigure(WinAccessibilityElementRef elem, WinAccessibilityElementRef grid);
@@ -74,7 +74,7 @@ bool WinAccessibilityWindowSetRoots(void* hwnd, WinAccessibilityElementRef* root
 void WinAccessibilityWindowCleanup(void* hwnd);
 
 // Raises a UIA notification event so a running screen reader speaks the text
-// without the user navigating to it (live region, #525). assertive maps to
+// without the user navigating to it (live region, pre-rebrand tracker #525). assertive maps to
 // NotificationProcessing_ImportantAll (interrupts current speech), polite to
 // NotificationProcessing_All.
 void WinAccessibilityAnnounce(const char* text, bool assertive);

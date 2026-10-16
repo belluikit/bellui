@@ -67,14 +67,14 @@ func TestProtected_BoundaryInsertAllowed(t *testing.T) {
 	if e.Text() != "Hello XWorld!" {
 		t.Errorf("insertion at the leading boundary should be allowed, got %q", e.Text())
 	}
-	// Anchor-tracking (#130): the boundary insert lands outside the span, which
+	// Anchor-tracking (pre-rebrand tracker #130): the boundary insert lands outside the span, which
 	// shifts right to keep protecting "World" (it used to drift onto "XWorl").
 	if got := e.ProtectedRanges(); len(got) != 1 || got[0] != (TextRange{StartRow: 0, StartCol: 7, EndRow: 0, EndCol: 12}) {
 		t.Errorf("the span should shift right of the boundary insert, got %v", got)
 	}
 
 	// SetText is a document swap: ranges are left as published, so re-publish
-	// for the restored document (the #130 contract).
+	// for the restored document (the pre-rebrand tracker #130 contract).
 	e.SetText(protSample)
 	e.SetProtectedRanges([]TextRange{worldRange})
 	e.entry.CursorColumn = 11 // exactly at the trailing boundary
@@ -365,7 +365,7 @@ func TestEditTouchesRange(t *testing.T) {
 
 // editTouchesRangeAtomic backs masked redactions: identical to editTouchesRange
 // except a boundary insertion is also a touch, so a masked span freezes at its
-// edges and the secret can't be shifted out from under its bar (#108).
+// edges and the secret can't be shifted out from under its bar (pre-rebrand tracker #108).
 func TestEditTouchesRangeAtomic(t *testing.T) {
 	// Masked span [6, 11).
 	tests := []struct {

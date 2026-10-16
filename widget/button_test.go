@@ -25,7 +25,7 @@ func TestButton_MinSize(t *testing.T) {
 	assert.Greater(t, min.Height, theme.InnerPadding())
 }
 
-// TestButton_LocalizedText is the #92 scenario: a button label bound via
+// TestButton_LocalizedText is the pre-rebrand tracker #92 scenario: a button label bound via
 // lang.BindText re-translates on a live SetLocale, with no manual rebuild.
 func TestButton_LocalizedText(t *testing.T) {
 	test.NewApp()

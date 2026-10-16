@@ -6,7 +6,7 @@ import "github.com/belluikit/bellui/geo"
 // when a drag begins the driver paints the returned object as a "ghost" that
 // follows the pointer, and removes it when the drag ends. Return nil for no
 // ghost. It gives in-canvas drag-and-drop a visual affordance without every app
-// hand-rolling a following overlay (#819).
+// hand-rolling a following overlay (pre-rebrand tracker #819).
 //
 // Since: 1.0
 type DragImageProvider interface {
@@ -29,7 +29,7 @@ type DragPayloadProvider interface {
 }
 
 // DragTargetEvent carries the in-app drag payload and the pointer position to a
-// [DragTarget] during an in-canvas drag (#819). Position is relative to the
+// [DragTarget] during an in-canvas drag (pre-rebrand tracker #819). Position is relative to the
 // target's top-left; AbsolutePosition is in canvas coordinates.
 //
 // Since: 1.0

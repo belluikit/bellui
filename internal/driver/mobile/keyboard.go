@@ -18,7 +18,7 @@ func (d *device) hideVirtualKeyboard() {
 		d.keyboardShown = false
 
 		// Detach the text-input mirror; nothing should be pushed while no field
-		// is focused (#770). The next focus rebinds via showVirtualKeyboard.
+		// is focused (pre-rebrand tracker #770). The next focus rebinds via showVirtualKeyboard.
 		if drv.textInput != nil {
 			drv.textInput.Unbind()
 		}
@@ -51,12 +51,12 @@ func (d *device) showVirtualKeyboard(keyboard mobile.KeyboardType) {
 		d.keyboardShown = true
 		// Remember the field type so the one-writer IME reroute only suppresses
 		// native text-key echoes for prose fields, where Gboard writes through
-		// the InputConnection (#1061). Password/number fields have no IC writer.
+		// the InputConnection (pre-rebrand tracker #1061). Password/number fields have no IC writer.
 		drv.keyboardType = keyboard
 		drv.app.ShowVirtualKeyboard(app.KeyboardType(keyboard))
 
 		// Bind the newly focused field to the text-input mirror and push its real
-		// content into the native IME shadow (#572 → #770 seam). Bind forces the
+		// content into the native IME shadow (pre-rebrand tracker #572 → pre-rebrand tracker #770 seam). Bind forces the
 		// next Sync to push even when a field with the same text as the previous
 		// focus (e.g. another empty entry) is focused; a non-texter focus unbinds.
 		//
@@ -64,7 +64,7 @@ func (d *device) showVirtualKeyboard(keyboard mobile.KeyboardType) {
 		// (ordered ahead of the seed push on the same op queue): the IME session
 		// state it holds — composing word, echo filters — belongs to the previous
 		// field, and the seed push for the new field must never be swallowed by
-		// it or leave the old session running (#966: one Gboard editing session
+		// it or leave the old session running (pre-rebrand tracker #966: one Gboard editing session
 		// spanning two fields sprayed the password across them).
 		if drv.textInput != nil {
 			if w := drv.currentWindow(); w != nil {

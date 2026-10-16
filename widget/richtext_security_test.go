@@ -12,7 +12,7 @@ import (
 // TestRichText_AllowRemoteContentGate verifies that an image segment is only
 // fetched when the embedding RichText opts into remote content; otherwise it
 // renders a broken-image placeholder and touches neither the network nor the
-// disk (#285).
+// disk (pre-rebrand tracker #285).
 func TestRichText_AllowRemoteContentGate(t *testing.T) {
 	test.NewTempApp(t)
 
@@ -48,7 +48,7 @@ func TestRichText_AllowRemoteContentGate(t *testing.T) {
 }
 
 // TestParsedLinkURL covers the link-scheme allowlist applied to links taken from
-// untrusted markup (#285).
+// untrusted markup (pre-rebrand tracker #285).
 func TestParsedLinkURL(t *testing.T) {
 	for _, tt := range []struct {
 		raw     string

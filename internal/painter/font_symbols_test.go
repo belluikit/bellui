@@ -10,7 +10,7 @@ import (
 )
 
 // TestBundledFacesCoverCommonSymbols locks in host-independent text metrics
-// for common UI symbols (#686): every rune here must be covered by a
+// for common UI symbols (pre-rebrand tracker #686): every rune here must be covered by a
 // compiled-in face — the theme fonts, the emoji font or the bundled symbol
 // fallbacks — so it can never fall through to the host system-font scan,
 // where per-OS fonts would give per-OS metrics (and tofu on wasm).

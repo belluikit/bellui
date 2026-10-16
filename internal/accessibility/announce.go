@@ -10,7 +10,7 @@ var (
 )
 
 // Announce pushes a transient status message to every registered screen-reader
-// backend (a "live region" announcement, #525). Widgets that show text the
+// backend (a "live region" announcement, pre-rebrand tracker #525). Widgets that show text the
 // user did not navigate to — a Toast, a Snackbar — call it when the message
 // appears, because assistive technology would otherwise only discover the
 // node if the user happened to walk the tree before it auto-dismisses.

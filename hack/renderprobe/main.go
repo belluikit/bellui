@@ -1,5 +1,5 @@
 // Command renderprobe is an on-device verification harness for the GPU render
-// pipeline (roadmap §6 / #34): it puts a rotating 3D cube (canvas.Scene3D), an
+// pipeline (roadmap §6 / pre-rebrand tracker #34): it puts a rotating 3D cube (canvas.Scene3D), an
 // elevated Card (canvas.BoxShadow), and a RepaintBoundary-wrapped animated
 // widget on screen at once, so a device screenshot confirms shadows, 3D
 // rasterization+compositing, and boundary-cached subtrees all render correctly
@@ -60,18 +60,18 @@ func main() {
 	a := app.New()
 	w := a.NewWindow("Render Probe (#34)")
 
-	// #34 — Scene3D: a rotating cube, animated (also drives dirty-region).
+	// pre-rebrand tracker #34 — Scene3D: a rotating cube, animated (also drives dirty-region).
 	scene := canvas.NewScene3D()
 	scene.Background = color.RGBA{18, 18, 28, 255}
 	scene.Meshes = []canvas.Mesh3D{cubeMesh()}
 	scene.Resize(geo.NewSize(300, 300))
 	scene.Move(geo.NewPos(30, 200))
 
-	// #34 — BoxShadow via an elevated Card (shadow + fill).
+	// pre-rebrand tracker #34 — BoxShadow via an elevated Card (shadow + fill).
 	card := widget.NewCard("Elevated Card", "canvas.BoxShadow behind me",
 		widget.NewLabel("soft Gaussian shadow"))
 
-	// #34 — RepaintBoundary-cached subtree with a live-updating label inside.
+	// pre-rebrand tracker #34 — RepaintBoundary-cached subtree with a live-updating label inside.
 	tick := widget.NewLabelWithStyle("t=0.00", bellui.TextAlignCenter, bellui.TextStyle{Bold: true})
 	boundary := container.NewRepaintBoundary(container.NewVBox(
 		widget.NewLabel("RepaintBoundary subtree:"), tick,

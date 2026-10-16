@@ -6,5 +6,5 @@ package gl
 // to off-screen framebuffer objects. The WebGL backend drives the real
 // framebuffer API (see gl_wasm.go) and the blur shader programs are
 // initialised in Init, so FBO-dependent effects (Gaussian-blur drop shadows,
-// backdrop blur) work on the web target — see issue #118 / #7.
+// backdrop blur) work on the web target — see pre-rebrand issue #118 / pre-rebrand tracker #7.
 const framebufferSupported = true

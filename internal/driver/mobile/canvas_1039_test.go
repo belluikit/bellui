@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Regression test for #1039: Border side objects must keep their laid-out
+// Regression test for pre-rebrand tracker #1039: Border side objects must keep their laid-out
 // width after the Border is detached from the window tree and re-attached
 // (the goed App Map toggle shape).
 func Test_canvas_BorderSideAfterReattach(t *testing.T) {
@@ -51,7 +51,7 @@ func Test_canvas_BorderSideAfterReattach(t *testing.T) {
 	assert.GreaterOrEqual(t, side.Size().Width, float32(240), "after re-attachment")
 }
 
-// #1039: a min-size change must re-lay-out its parent even when another
+// pre-rebrand tracker #1039: a min-size change must re-lay-out its parent even when another
 // min-size change happens in a later sibling's subtree in the same frame.
 // The old EnsureMinSize kept a single pending-parent pointer, so the later
 // (deeper) change overwrote the earlier sibling's pending parent update; if

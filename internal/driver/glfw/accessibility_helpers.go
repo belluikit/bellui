@@ -9,7 +9,7 @@ import (
 )
 
 // Platform-neutral helpers shared by the screen-reader backends (darwin
-// NSAccessibility #485, windows UIA #487). They interpret the semantic
+// NSAccessibility pre-rebrand tracker #485, windows UIA pre-rebrand tracker #487). They interpret the semantic
 // node's action list and geometry; nothing here touches a platform API.
 
 // a11yPressAction picks the accessible action a press (AXPress, UIA Invoke)
@@ -27,7 +27,7 @@ func a11yPressAction(n *accessibility.Node) string {
 // a11yActiveDescendant returns the stable identity key of the AT-focused
 // descendant designated by a focusable container, or nil when the object does
 // not delegate — canvas focus then stays on the object itself. It carries the
-// aria-activedescendant channel (#688): a data grid, tree or virtualized list
+// aria-activedescendant channel (pre-rebrand tracker #688): a data grid, tree or virtualized list
 // moves an internal cursor across descendant items and names the focused one,
 // so the platform bridge resolves AT focus (and raises the focus-change event)
 // to that descendant instead of the whole container.
@@ -43,7 +43,7 @@ func a11yActiveDescendant(obj core.CanvasObject) any {
 
 // a11yNodeFocused reports whether node n should carry AT keyboard focus.
 // Normally exactly the canvas-focused object is focused; when that object
-// delegates to an active descendant (#688), focus moves off the container onto
+// delegates to an active descendant (pre-rebrand tracker #688), focus moves off the container onto
 // the descendant node whose stable identity matches the designated key — or one
 // that explicitly reports [core.StateFocused], the node-level focus flag that
 // makes HasKeyboardFocus/IsKeyboardFocusable correct for the cell the cursor is

@@ -15,7 +15,7 @@ import (
 
 // newMultiSizeRichText builds a RichText whose single row is two inline
 // TextSegments of different sizes (body + large title), so the row's true width
-// differs from any single-style measurement — the condition issue #42 is about.
+// differs from any single-style measurement — the condition pre-rebrand issue #42 is about.
 func newMultiSizeRichText(t *testing.T) *RichText {
 	t.Helper()
 	small := &TextSegment{Text: "abc ", Style: RichTextStyle{Inline: true, SizeName: theme.SizeNameBodyMedium}}
@@ -29,7 +29,7 @@ func newMultiSizeRichText(t *testing.T) *RichText {
 
 // TestSelectable_AlignOffsetMultiSegment verifies that the alignment offset for a
 // center/trailing-aligned row is derived from the per-segment measured width, not
-// a single-style measurement that drifts when segments differ in size (#42).
+// a single-style measurement that drifts when segments differ in size (pre-rebrand tracker #42).
 func TestSelectable_AlignOffsetMultiSegment(t *testing.T) {
 	lang.SetLocaleForTests(t, "en-US")
 	test.NewTempApp(t)
@@ -48,7 +48,7 @@ func TestSelectable_AlignOffsetMultiSegment(t *testing.T) {
 	assert.InDelta(t, wantWidth, rich.rowWidth(0, textSize), 0.01,
 		"rowWidth must sum each segment's own-style measurement")
 
-	// The naive single-style measurement (the pre-#42 behaviour) is smaller here,
+	// The naive single-style measurement (the before pre-rebrand tracker #42 behaviour) is smaller here,
 	// because the large segment is measured at the default size.
 	naiveWidth := bellui.MeasureText(string(rich.row(0)), textSize, bellui.TextStyle{}).Width
 	require.Greater(t, wantWidth, naiveWidth+1,
@@ -82,7 +82,7 @@ func TestSelectable_AlignOffsetMultiSegment(t *testing.T) {
 }
 
 // TestSelectable_AlignOffsetLeadingZero confirms leading alignment still returns a
-// zero offset (the default path is unaffected by #42).
+// zero offset (the default path is unaffected by pre-rebrand tracker #42).
 func TestSelectable_AlignOffsetLeadingZero(t *testing.T) {
 	lang.SetLocaleForTests(t, "en-US")
 	test.NewTempApp(t)

@@ -7,7 +7,7 @@ package gl
 //
 // Desktop and mobile GL use a depth *texture*: core in desktop GL and widely
 // available on GLES, and the original cross-platform path. WebGL 1.0 is the
-// exception and uses a renderbuffer instead (see scene3d_depth_wasm.go, #136).
+// exception and uses a renderbuffer instead (see scene3d_depth_wasm.go, pre-rebrand tracker #136).
 // The depth buffer is only used for z-buffering and is never sampled.
 func (p *painter) attachSceneDepth(pixW, pixH int) func() {
 	depthTex := p.ctx.CreateTexture()

@@ -126,7 +126,7 @@ func TestNumericEntry_OnValueChanged_NotFiredFromValidate(t *testing.T) {
 	assert.Positive(t, base, "OnValueChanged should fire on edit")
 
 	// Validation may be called speculatively/repeatedly; it must not re-fire
-	// the user callback (regression for #290).
+	// the user callback (regression for pre-rebrand tracker #290).
 	e.Validate()
 	e.SetBounds(0, 100) // calls Validate internally
 	assert.Equal(t, base, count, "OnValueChanged must not fire from validation")
@@ -176,7 +176,7 @@ func TestNumericEntry_PasteMultipleDecimals(t *testing.T) {
 }
 
 // TestNumericEntry_PasteViaMemoryClipboard confirms the filtered-entry paste
-// path stays intact after the #581 flavor negotiation: NumericEntry re-dispatches
+// path stays intact after the pre-rebrand tracker #581 flavor negotiation: NumericEntry re-dispatches
 // through an internal memoryClipboard that implements NEITHER bellui.HTMLClipboard
 // NOR bellui.ImageClipboard, so Entry's flavor assertions must fall through
 // (ok == false) and paste the plain, filtered text.

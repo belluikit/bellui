@@ -45,7 +45,7 @@ func ensureCanvasSizeOrSkip(t *testing.T, w *safeWindow, size geo.Size) {
 // test that runs in CI is offscreen texture readback — none creates a real
 // surface, calls presentWindow, or goes through Canvas().Capture() on a live
 // window, so the surface-configure / present / capture-fallback path has zero
-// automated coverage (#329). This drives that path on a real window (Metal on
+// automated coverage (pre-rebrand tracker #329). This drives that path on a real window (Metal on
 // macOS, Vulkan/lavapipe on Linux, D3D12 on Windows) and asserts a known solid
 // color survives a present→capture round-trip within tolerance.
 //
@@ -87,7 +87,7 @@ func TestWindowedSurfaceCapture(t *testing.T) {
 	r, g, bl, _ := img.At(sx, sy).RGBA()
 	gr, gg, gb := int(r>>8), int(g>>8), int(bl>>8)
 
-	const tol = 16 // WebGPU writes straight sRGB into a non-sRGB surface (#322), so near-exact.
+	const tol = 16 // WebGPU writes straight sRGB into a non-sRGB surface (pre-rebrand tracker #322), so near-exact.
 	if absInt(gr-int(want.R)) > tol || absInt(gg-int(want.G)) > tol || absInt(gb-int(want.B)) > tol {
 		t.Fatalf("captured pixel (%d,%d) = R%d G%d B%d, want ~R%d G%d B%d — real-surface present/capture regression (#329)",
 			sx, sy, gr, gg, gb, want.R, want.G, want.B)
@@ -95,9 +95,9 @@ func TestWindowedSurfaceCapture(t *testing.T) {
 }
 
 // TestWindowedSurfaceCaptureResizeStorm drives a burst of resizes interleaved with
-// repaints before capturing, to provoke the surface-acquire recovery path (#385):
+// repaints before capturing, to provoke the surface-acquire recovery path (pre-rebrand tracker #385):
 // on software Vulkan (lavapipe) a resize the swapchain hasn't reconfigured for makes
-// the next GetCurrentTexture return Outdated. Before #384/#385 that aborted; now
+// the next GetCurrentTexture return Outdated. Before pre-rebrand tracker #384/#385 that aborted; now
 // BeginFrame reconfigures and re-acquires, so frames must keep landing. This asserts
 // a known solid color still survives present→capture after the storm — the
 // integration coverage the static TestWindowedSurfaceCapture doesn't provide, since a
@@ -162,7 +162,7 @@ func absInt(x int) int {
 	return x
 }
 
-// TestWindowedSurfaceCaptureOverlays pins the #473 fix: Canvas().Capture()
+// TestWindowedSurfaceCaptureOverlays pins the pre-rebrand tracker #473 fix: Canvas().Capture()
 // must include the overlay pass — a shown PopUp was previously invisible to
 // programmatic screenshots (the WebGPU per-frame copy never refreshed on a
 // static scene and the fallback read the overlay-less canvas FBO).

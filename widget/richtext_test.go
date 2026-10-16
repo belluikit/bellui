@@ -1280,7 +1280,7 @@ func TestText_lineBounds_narrowFirstLine(t *testing.T) {
 	}
 }
 
-// Regression test (#1156): a long run whose first line starts mid-row (a
+// Regression test (pre-rebrand tracker #1156): a long run whose first line starts mid-row (a
 // previous inline segment consumed part of the width) must wrap its
 // continuation rows at the full width. Before the fix the binary-search width
 // checker stayed frozen at the narrow first-line width, so every later row was
@@ -1313,7 +1313,7 @@ func TestText_lineBounds_narrowFirstLine_longRun(t *testing.T) {
 	}
 }
 
-// Widget-level regression for #1156: an inline text run, an inline code
+// Widget-level regression for pre-rebrand tracker #1156: an inline text run, an inline code
 // segment, then a long trailing run. The trailing run's continuation rows must
 // wrap at the paragraph width, not at the width left over after the code
 // segment on the shared first row.
@@ -1354,7 +1354,7 @@ func TestRichText_WrapWordAfterInlineCode(t *testing.T) {
 }
 
 // TestText_lineBoundsForRange_isolatedMatchesFull verifies the lazy/windowed
-// measurement invariant (#157): wrapping a single logical line in isolation (a
+// measurement invariant (pre-rebrand tracker #157): wrapping a single logical line in isolation (a
 // fresh lineWrapState, full-width first row) produces the same visual sub-row
 // begin/end offsets as that line's slice of a full-document lineBounds pass. Only
 // begin/end/ellipsis are compared — firstSegmentReuse is a document-wide counter
@@ -1456,7 +1456,7 @@ func TestRichText_CleanVisualCache_SameCount(t *testing.T) {
 
 // The heading virtual nodes report widget-relative bounds even when the
 // RichText virtualizes behind its internal scroller: the scroll offset is
-// subtracted and rows outside the viewport are dropped (#545).
+// subtracted and rows outside the viewport are dropped (pre-rebrand tracker #545).
 func TestRichText_AccessibleVirtualNodes_InternalScroll(t *testing.T) {
 	test.NewTempApp(t)
 	rt := NewRichTextFromMarkdown("# Title\n\nbody")

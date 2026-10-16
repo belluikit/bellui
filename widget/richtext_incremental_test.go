@@ -14,7 +14,7 @@ import (
 	"github.com/belluikit/bellui/test"
 )
 
-// Tests for the edit-incremental dense build + render (#921). The core safety
+// Tests for the edit-incremental dense build + render (pre-rebrand tracker #921). The core safety
 // net is an equivalence oracle: after an edit, the incrementally spliced row
 // model, object list and geometry must be indistinguishable from a fresh
 // widget built from scratch with the same content. Test-hook counters assert

@@ -11,7 +11,7 @@ import (
 )
 
 // The a11y walker keys a virtual cell node's scroll target on its provider
-// widget implementing event.Scrollable (fyne#953) — losing this assertion
+// widget implementing event.Scrollable (pre-rebrand tracker #953) — losing this assertion
 // makes assistive-tech scroll gestures inert over the grid again (#82).
 var _ event.Scrollable = (*DataGrid)(nil)
 

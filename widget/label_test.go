@@ -37,7 +37,7 @@ func TestLabel_Binding(t *testing.T) {
 	assert.Equal(t, "Updated", label.Text)
 }
 
-// TestLabel_LocalizedBinding is the end-to-end scenario from #90: a Label whose
+// TestLabel_LocalizedBinding is the end-to-end scenario from pre-rebrand tracker #90: a Label whose
 // text comes from a localized binding re-translates on a live SetLocale, with no
 // manual rebuild.
 func TestLabel_LocalizedBinding(t *testing.T) {

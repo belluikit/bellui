@@ -4,7 +4,7 @@
 #define BELLUI_DRAGSOURCE_X11_H
 
 // BelluiDragFlavor is one MIME representation of the drag payload, encoded in Go
-// with the shared #513 clipboard codecs and served to the XDND target when it
+// with the shared pre-rebrand tracker #513 clipboard codecs and served to the XDND target when it
 // converts the XdndSelection. mime is a NUL-terminated MIME/target name (also
 // used as the X11 target-atom name); data/len is the payload bytes.
 typedef struct {
@@ -23,11 +23,11 @@ int belluiX11Available(void);
 // target accepted the drop, else 0. It opens its own Xlib connection, owns the
 // XdndSelection, polls the pointer to find the XDND-aware window under it,
 // negotiates via XdndEnter/Position/Status, serves SelectionRequests for the
-// flavors, and reports the XdndFinished outcome. See #838 / #515 Part B.
+// flavors, and reports the XdndFinished outcome. See pre-rebrand tracker #838 / pre-rebrand tracker #515 Part B.
 //
 // iconARGB (optional, may be NULL) is a drag-icon image drawn in a small,
 // click-through window that trails the pointer for the whole drag, giving the
-// visual feedback plain XDND lacks (#865). It is iconW×iconH pixels of
+// visual feedback plain XDND lacks (pre-rebrand tracker #865). It is iconW×iconH pixels of
 // premultiplied BGRA (one 32-bit little-endian 0xAARRGGBB word per pixel, row
 // major, top-down); it is copied before the drag and need not outlive the call.
 int belluiStartDragX11(BelluiDragFlavor* flavors, int count,

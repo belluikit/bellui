@@ -215,7 +215,7 @@ func TestTranslationsVisitor(t *testing.T) {
 	}
 }
 
-// forkSeamSource exercises the fork's live-retranslation entry points (#503):
+// forkSeamSource exercises the fork's live-retranslation entry points (pre-rebrand tracker #503):
 // lang.BindText plus the binding.NewLocalized* constructors, which the upstream
 // scanner silently missed.
 const forkSeamSource = `
@@ -291,7 +291,7 @@ func TestTranslateForkSeams(t *testing.T) {
 	}
 }
 
-// selectSeamSource exercises the grammatical-select seams (#505). The selector
+// selectSeamSource exercises the grammatical-select seams (pre-rebrand tracker #505). The selector
 // is a runtime variable in the common case, and a string literal in the second.
 const selectSeamSource = `
 package main

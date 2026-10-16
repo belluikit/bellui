@@ -1,7 +1,7 @@
 package webgpu
 
 // StencilMode selects the depth-stencil state baked into a pipeline (stencil
-// clipping + path fill, #202/#222). Every pipeline carries one so it validates
+// clipping + path fill, pre-rebrand tracker #202/#222). Every pipeline carries one so it validates
 // against the depth-stencil attachment now present on every render pass; the
 // default StencilNone disables stencil entirely (compare Always, no write) and
 // writes color, matching the pre-stencil behaviour. The painter switches mode
@@ -34,7 +34,7 @@ const (
 // PipelineKey identifies a unique render pipeline (PSO). A pipeline is keyed by
 // the shader module, the fragment entry point (so blur's fs_main_h / fs_main_v
 // get distinct pipelines), the blend mode, the depth-stencil mode, whether
-// hardware depth testing is enabled (Scene3D z-buffering, #224), and the
+// hardware depth testing is enabled (Scene3D z-buffering, pre-rebrand tracker #224), and the
 // render-target texture format (kept as a neutral uint32 so this file stays free
 // of GPU binding types).
 type PipelineKey struct {

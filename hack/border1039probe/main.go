@@ -1,4 +1,4 @@
-// Live-verify probe for #1039 (EnsureMinSize dropped-update fix).
+// Live-verify probe for pre-rebrand tracker #1039 (EnsureMinSize dropped-update fix).
 //
 // Two scenarios on the real glfw driver:
 //  1. Re-attach: a Border with a min-size side scroll is swapped out of and

@@ -10,7 +10,7 @@ import (
 )
 
 // webgpuSurfaceDescriptor builds a Wayland surface descriptor. The conversions
-// mirror window_wayland.go's RunNative. NOTE: authored for #215 but not built on
+// mirror window_wayland.go's RunNative. NOTE: authored for pre-rebrand tracker #215 but not built on
 // this (macOS) host — verify on Linux/Wayland.
 func webgpuSurfaceDescriptor(w *window) *wgpu.SurfaceDescriptor {
 	return &wgpu.SurfaceDescriptor{

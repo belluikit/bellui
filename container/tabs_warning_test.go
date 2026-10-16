@@ -13,7 +13,7 @@ import (
 
 // assertNoExtendBaseWidgetWarning builds and renders a widget while capturing the
 // global logger, failing if the "used before ExtendBaseWidget was called" warning
-// (widget/widget.go super()) fires. Guards #388: the tab renderers' overflow/all
+// (widget/widget.go super()) fires. Guards pre-rebrand tracker #388: the tab renderers' overflow/all
 // action button was built as a bare literal and Hide()/Show()/Refresh()/SetIcon()'d
 // before ExtendBaseWidget, logging a spurious warning on every app that uses tabs.
 //
@@ -23,7 +23,7 @@ import (
 func assertNoExtendBaseWidgetWarning(t *testing.T, render func()) {
 	t.Helper()
 	// Clear the process-global warn-once de-dup so the assertion observes the
-	// warning fresh regardless of what earlier tests in this package tripped (#394);
+	// warning fresh regardless of what earlier tests in this package tripped (pre-rebrand tracker #394);
 	// otherwise a reintroduced bug could be masked in-suite.
 	widget.ResetExtendWarningsForTests(t)
 

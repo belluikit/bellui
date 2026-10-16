@@ -11,7 +11,7 @@ import (
 	"github.com/belluikit/bellui/geo"
 )
 
-// Entry's core.AccessibleTextLayouter implementation (#990): visual
+// Entry's core.AccessibleTextLayouter implementation (pre-rebrand tracker #990): visual
 // (soft-wrapped) line structure plus on-screen range geometry for the
 // platform accessibility bridges.
 

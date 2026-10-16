@@ -22,7 +22,7 @@ type SettingsSchema struct {
 }
 
 // StoragePath returns the location of the settings storage — the PXF store
-// (settings.pxf) that replaced the legacy settings.json (#872).
+// (settings.pxf) that replaced the legacy settings.json (pre-rebrand tracker #872).
 func (sc *SettingsSchema) StoragePath() string {
 	return filepath.Join(app.RootConfigDir(), "settings.pxf")
 }

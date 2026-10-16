@@ -814,7 +814,7 @@ func (ti *treeViewItem) AccessibleState() core.AccessibleState {
 // AccessibleActions returns "select", plus "expand"/"collapse" for branches
 // and "rename"/"delete" when the tree allows them — the on-row buttons for
 // those are hover-only, so without these actions they would be unreachable
-// for assistive technology and keyboard users (#544).
+// for assistive technology and keyboard users (pre-rebrand tracker #544).
 func (ti *treeViewItem) AccessibleActions() []core.AccessibleAction {
 	actions := []core.AccessibleAction{{Name: core.ActionSelect, Description: "Select this item"}}
 	if ti.isBranch {

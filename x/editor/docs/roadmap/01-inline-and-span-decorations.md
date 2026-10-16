@@ -15,10 +15,10 @@ overlays (P4), semantic-token overlays.
 > [#8](https://github.com/belluikit/bellui/x/editor/pull/8)); and the gallery
 > squiggle+redaction demo on the Code Editor page
 > ([#6](https://github.com/belluikit/bellui/x/editor/issues/6) →
-> [gallery#1](https://github.com/trendvidia/gallery/pull/1)).
+> pre-rebrand gallery tracker #1).
 > **Released as [v0.1.0](https://github.com/belluikit/bellui/x/editor/releases/tag/v0.1.0)**
 > ([#9](https://github.com/belluikit/bellui/x/editor/issues/9)); the gallery now consumes
-> the tag with no local `replace` ([gallery#3](https://github.com/trendvidia/gallery/pull/3)).
+> the tag with no local `replace` (pre-rebrand gallery tracker #3).
 > Phase 1 is complete — next is [Phase 2](02-floating-ui-primitives.md)
 > ([#10](https://github.com/belluikit/bellui/x/editor/issues/10)).
 

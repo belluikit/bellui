@@ -56,7 +56,7 @@ func TestApplyUserLocales_MalformedLeadingEntry(t *testing.T) {
 	assert.Equal(t, "fr-FR", CurrentLocale().String())
 
 	// Nothing parseable at all degrades to English, like the C/POSIX empty
-	// list (#1148) — not to an und tag.
+	// list (pre-rebrand tracker #1148) — not to an und tag.
 	applyUserLocales([]string{""})
 	assert.Equal(t, "en", getCurrentTag().String())
 }

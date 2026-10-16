@@ -155,7 +155,7 @@ func (c *Canvas) EnsureMinSize() bool {
 			if node.parent != nil {
 				// Flag the parent for re-layout when the post-order walk
 				// reaches it. Per-node, so changes reported from several
-				// subtrees in the same walk all apply (#1039).
+				// subtrees in the same walk all apply (pre-rebrand tracker #1039).
 				node.parent.minSizeChanged = true
 			} else {
 				windowNeedsMinSizeUpdate = true
@@ -256,7 +256,7 @@ func (c *Canvas) FocusNext() {
 	// Fire the driver focus hook like Canvas.Focus does: keyboard traversal is
 	// a focus change like any other, and skipping the hook left every OnFocus
 	// consumer stale on a Tab switch — the mobile driver never rebound the IME
-	// mirror to the new field (so one Gboard session spanned both, #966), the
+	// mirror to the new field (so one Gboard session spanned both, pre-rebrand tracker #966), the
 	// desktop driver never toggled IME mode, wasm never re-aimed its hidden
 	// input.
 	if c.OnFocus != nil {

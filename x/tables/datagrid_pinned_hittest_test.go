@@ -31,7 +31,7 @@ func pinnedHitGrid(t *testing.T) *DataGrid {
 // A pinned-left column is drawn fixed at the left edge, so a tap on it must
 // resolve to that column regardless of the main band's horizontal scroll —
 // previously the scroll offset was wrongly added, leaking the tap into a main
-// column (#54).
+// column (pre-rebrand tracker #54).
 func TestCellAtPosition_PinnedLeftFixedUnderHScroll(t *testing.T) {
 	g := pinnedHitGrid(t)
 	y := g.HeaderHeight() + 5
@@ -73,7 +73,7 @@ func TestCellAtPosition_MainBandTracksHScroll(t *testing.T) {
 // cellAtPosition returns an absolute display-column index, so it must be bounded
 // by the total visible column count, not the main-only ColumnCount() — otherwise
 // pinned-right cells and the tail main columns (when pinned-left exists) are
-// wrongly rejected as no-hits (#59).
+// wrongly rejected as no-hits (pre-rebrand tracker #59).
 func TestCellAtPosition_PinnedCellsNotRejected(t *testing.T) {
 	data := make([]map[string]any, 10)
 	for i := range data {
@@ -113,7 +113,7 @@ func TestCellAtPosition_PinnedCellsNotRejected(t *testing.T) {
 }
 
 // The tree disclosure on a pinned-left column is fixed, so its chevron hit-test
-// ignores the main band's horizontal scroll (#54).
+// ignores the main band's horizontal scroll (pre-rebrand tracker #54).
 func TestTreeData_PinnedChevronIgnoresHScroll(t *testing.T) {
 	g := newPinnedTreeGrid(t, treeFixture())
 	y := g.HeaderHeight() + 5
@@ -125,8 +125,8 @@ func TestTreeData_PinnedChevronIgnoresHScroll(t *testing.T) {
 }
 
 // Master-detail disclosure on a pinned-left column: the chevron sits at the very
-// left (grid-x 0), a tap toggles it, and horizontal scroll does not move it (#53
-// + #54).
+// left (grid-x 0), a tap toggles it, and horizontal scroll does not move it (pre-rebrand tracker #53
+// + pre-rebrand tracker #54).
 func TestMasterDetail_PinnedLeftChevron(t *testing.T) {
 	data := []map[string]any{{"id": 1, "name": "A"}, {"id": 2, "name": "B"}}
 	g := newTestGrid(t, data, []*ColumnDef{

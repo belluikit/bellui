@@ -15,7 +15,7 @@ import (
 	"github.com/belluikit/bellui/test"
 )
 
-// The drag magnifier (#942): while a finger drags a selection handle, a
+// The drag magnifier (pre-rebrand tracker #942): while a finger drags a selection handle, a
 // loupe bubble above the dragged line magnifies the text around the target
 // caret position; it follows the drag and disappears on release.
 

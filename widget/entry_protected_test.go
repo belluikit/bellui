@@ -242,7 +242,7 @@ func TestEntry_Protected_UndoDoesNotResurrect(t *testing.T) {
 	assert.Equal(t, protSample, e.Text, "undo must not resurrect a vetoed edit")
 }
 
-// TestEntry_Protected_UndoRedoReplaysHistory pins policy (a) for #146: undo/redo
+// TestEntry_Protected_UndoRedoReplaysHistory pins policy (a) for pre-rebrand tracker #146: undo/redo
 // replay recorded history verbatim and are NOT re-gated against ProtectedRanges,
 // even when a range is added after the edit was recorded. Protection applies to
 // new interactive edits, not history replay.
@@ -320,7 +320,7 @@ func TestEntry_CaretOpaque_ClickSnapsToBoundary(t *testing.T) {
 		"a click inside a caret-opaque span must snap to a boundary, got col %d", e.CursorColumn)
 }
 
-// TestEntry_CaretOpaque_TouchSnapsToBoundary covers #147: the mobile tap-to-
+// TestEntry_CaretOpaque_TouchSnapsToBoundary covers pre-rebrand tracker #147: the mobile tap-to-
 // position path (TouchDown -> updateMousePointer) enforces CaretOpaque just like
 // a desktop click. A tap strictly inside a caret-opaque span snaps to a boundary.
 func TestEntry_CaretOpaque_TouchSnapsToBoundary(t *testing.T) {

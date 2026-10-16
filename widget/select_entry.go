@@ -21,7 +21,7 @@ type SelectEntry struct {
 	// after OnChanged). It lets a consumer treat a pick as a complete edit —
 	// e.g. an inline table cell editor committing on pick — which a plain
 	// OnChanged cannot distinguish from free-text typing. Typing never
-	// triggers it, even when the typed text equals an option (#1047).
+	// triggers it, even when the typed text equals an option (pre-rebrand tracker #1047).
 	//
 	// Since: 1.0
 	OnOptionSelected func(string)

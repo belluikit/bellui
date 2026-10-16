@@ -12,7 +12,7 @@ import (
 	"github.com/belluikit/bellui/test"
 )
 
-// TestRichText_rowAtY_LazyAnalytic (#160) checks the lazy row-at-Y inverse is exact
+// TestRichText_rowAtY_LazyAnalytic (pre-rebrand tracker #160) checks the lazy row-at-Y inverse is exact
 // and O(1) — it returns the row whose uniform-stride band contains y without shaping
 // any additional lines (the click/gutter-tap hot path on a huge document).
 func TestRichText_rowAtY_LazyAnalytic(t *testing.T) {
@@ -37,7 +37,7 @@ func TestRichText_rowAtY_LazyAnalytic(t *testing.T) {
 		"rowAtY must not shape any additional lines (O(1), no full scan)")
 }
 
-// TestRichText_rowAtY_SkipsFolds (#160) checks the inverse maps onto the visible-row
+// TestRichText_rowAtY_SkipsFolds (pre-rebrand tracker #160) checks the inverse maps onto the visible-row
 // axis: folded rows collapse to zero height, so a y past a fold lands on the first
 // visible row after it, matching the layout.
 func TestRichText_rowAtY_SkipsFolds(t *testing.T) {
@@ -74,7 +74,7 @@ func fullSelect(t *testing.T, prov *RichText, sel *focusSelectable) {
 	sel.cursorColumn = prov.rowLength(last)
 }
 
-// TestLabel_SelectAcrossWrap_PreservesSpace (#161) checks that copying a word-wrapped
+// TestLabel_SelectAcrossWrap_PreservesSpace (pre-rebrand tracker #161) checks that copying a word-wrapped
 // selection preserves the space word-wrap consumes at the wrap point — selecting the
 // whole label yields the original text, not a run with the wrap-space dropped.
 func TestLabel_SelectAcrossWrap_PreservesSpace(t *testing.T) {
@@ -95,7 +95,7 @@ func TestLabel_SelectAcrossWrap_PreservesSpace(t *testing.T) {
 		"copying a wrapped selection preserves the consumed wrap-point spaces")
 }
 
-// TestRichText_SelectAcrossWrap_PreservesSpace (#161) is the same guard for a
+// TestRichText_SelectAcrossWrap_PreservesSpace (pre-rebrand tracker #161) is the same guard for a
 // single-segment selectable RichText (not just Label).
 func TestRichText_SelectAcrossWrap_PreservesSpace(t *testing.T) {
 	test.NewTempApp(t)
@@ -114,7 +114,7 @@ func TestRichText_SelectAcrossWrap_PreservesSpace(t *testing.T) {
 	assert.Equal(t, text, rt.SelectedText())
 }
 
-// TestRichText_MixedSegment_SelectAcrossWrap_PreservesSpace (#161) is the remaining
+// TestRichText_MixedSegment_SelectAcrossWrap_PreservesSpace (pre-rebrand tracker #161) is the remaining
 // mixed-segment case: a selectable RichText with two inline TextSegments whose
 // second run word-wraps. Copying the whole selection must preserve the spaces the
 // wrap consumes inside that run (the single-segment fast path does not apply here,
@@ -139,13 +139,13 @@ func TestRichText_MixedSegment_SelectAcrossWrap_PreservesSpace(t *testing.T) {
 		"mixed-segment wrapped copy preserves the consumed wrap-point spaces")
 }
 
-// TestRichText_MixedSegment_SelectAcrossWrap_WidthSweep (#164) guards multi-segment
+// TestRichText_MixedSegment_SelectAcrossWrap_WidthSweep (pre-rebrand tracker #164) guards multi-segment
 // wrapped selection copy across many widths and segment shapes — including inline
 // runs that carry trailing spaces and embedded newlines. A full-document selection
 // must always reconstruct exactly the concatenation of the segment texts: word-wrap
 // must not drop a consumed space nor insert a spurious newline at any wrap point.
 //
-// This also documents the #164 investigation: the cross-segment-boundary case it
+// This also documents the pre-rebrand tracker #164 investigation: the cross-segment-boundary case it
 // feared (a row ending segment A while the next row starts segment B mid logical
 // line) does not arise for inline content — an inline run always begins on the
 // current row, so the wrap stays inside one segment and softWrapGap already handles

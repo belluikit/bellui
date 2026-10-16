@@ -15,7 +15,7 @@ import (
 	"github.com/belluikit/bellui/widget"
 )
 
-// Drag-target latching (#945 device finding): a drag latches onto the
+// Drag-target latching (pre-rebrand tracker #945 device finding): a drag latches onto the
 // Draggable under the gesture ORIGIN, matching the desktop driver — a fast
 // first move can jump clear across a small Draggable (a selection handle, a
 // slider thumb) and must not start dragging whatever lies beyond it.

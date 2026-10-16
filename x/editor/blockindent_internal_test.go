@@ -162,7 +162,7 @@ func TestTabDedent_ProtectedRangeVetoesWholeBatch(t *testing.T) {
 
 // TestTabIndent_ProtectedBoundaryInsertAllowed documents that block indent
 // composes with plain protected ranges exactly like a manual edit at each line
-// start: an insert at a protected range's start boundary is allowed (#108's
+// start: an insert at a protected range's start boundary is allowed (pre-rebrand tracker #108's
 // edge-append rule) and shifts the span — where the old whole-region replace
 // over-vetoed any block containing a protected character.
 func TestTabIndent_ProtectedBoundaryInsertAllowed(t *testing.T) {

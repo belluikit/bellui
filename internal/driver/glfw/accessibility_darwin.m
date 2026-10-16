@@ -257,7 +257,7 @@ static IMP originalFocusedIMP = NULL;
     return self.contentView;
 }
 
-// Table structure (#574): macOS derives a table's shape from its AXRow
+// Table structure (pre-rebrand tracker #574): macOS derives a table's shape from its AXRow
 // children — without them VoiceOver announces "empty table". The bridge
 // synthesizes row elements grouping the realized cells (virtualized tables
 // only expose visible rows; the full extent travels in AXRowCount).
@@ -266,7 +266,7 @@ static IMP originalFocusedIMP = NULL;
 // advertises every implemented selector as an attribute, and a static text
 // or tree row that suddenly reports AXIndex, AXRowIndexRange and AXSelected
 // (with NSNotFound values) stops being announced by VoiceOver at all — the
-// regression the first cut of #574 shipped.
+// regression the first cut of pre-rebrand tracker #574 shipped.
 static void belluiAXCollectRows(NSArray* children, NSMutableArray* into) {
     for (BelluiAccessibleElement* c in children) {
         if (c.role == BelluiAXRoleRow) {
@@ -345,7 +345,7 @@ static void belluiAXCollectRows(NSArray* children, NSMutableArray* into) {
 // VoiceOver's table navigation addresses cells by coordinate through this
 // method (the NSAccessibilityCellForColumnAndRow attribute). For a virtualized
 // table only the visible cells exist as real elements, so a coordinate past the
-// viewport is realized on demand through the neutral seam (fyne#637) — the
+// viewport is realized on demand through the neutral seam (pre-rebrand tracker #637) — the
 // macOS analog of the UIA GridPattern.GetItem path. A visible cell already in a
 // synthetic row is returned directly so its AX identity stays stable.
 - (id)accessibilityCellForColumn:(NSInteger)column row:(NSInteger)row {
@@ -390,7 +390,7 @@ static void belluiAXCollectRows(NSArray* children, NSMutableArray* into) {
     // expressed through AXDisclosedRows/AXDisclosedByRow links and the
     // disclosure level — never by nesting row elements inside each other.
     // Nested rows reachable both through AXRows and through their parent
-    // row's children send VoiceOver's traversal in circles (#485
+    // row's children send VoiceOver's traversal in circles (pre-rebrand tracker #485
     // walkthrough: the tree worked once, then VoiceOver wedged).
     if (self.role == BelluiAXRoleOutline) {
         NSMutableArray* flat = [NSMutableArray array];
@@ -548,7 +548,7 @@ static void belluiAXCollectRows(NSArray* children, NSMutableArray* into) {
     if (selector == @selector(accessibilityRows) ||
         selector == @selector(accessibilityVisibleRows) ||
         selector == @selector(accessibilityRowCount)) {
-        // Table structure (#574): tables and outlines carry the row shape.
+        // Table structure (pre-rebrand tracker #574): tables and outlines carry the row shape.
         // The row list must be COMPLETE — the flattened visible set with
         // nested outline rows included; a partial list traps VoiceOver's
         // cursor on the container (it cannot navigate out), and no list at
@@ -559,7 +559,7 @@ static void belluiAXCollectRows(NSArray* children, NSMutableArray* into) {
         return self.role == BelluiAXRoleTable;
     }
     if (selector == @selector(accessibilityCellForColumn:row:)) {
-        // Off-viewport cell realize (fyne#637): only tables answer it.
+        // Off-viewport cell realize (pre-rebrand tracker #637): only tables answer it.
         return self.role == BelluiAXRoleTable;
     }
     if (selector == @selector(accessibilityIndex)) {
@@ -582,7 +582,7 @@ static void belluiAXCollectRows(NSArray* children, NSMutableArray* into) {
     return self.customActions;
 }
 
-// --- disclosure (tree rows, #501) -----------------------------------------
+// --- disclosure (tree rows, pre-rebrand tracker #501) -----------------------------------------
 
 - (BOOL)isAccessibilityDisclosed {
     return self.disclosed == 1;
@@ -600,7 +600,7 @@ static void belluiAXCollectRows(NSArray* children, NSMutableArray* into) {
     return self.level > 0 ? self.level - 1 : 0;
 }
 
-// --- NSAccessibility text protocol (#501) --------------------------------
+// --- NSAccessibility text protocol (pre-rebrand tracker #501) --------------------------------
 // Every query resolves live against the widget through the
 // belluiAccessibilityText* callbacks; ranges are UTF-16 code units, converted
 // on the Go side. Gated per element by isAccessibilitySelectorAllowed.
@@ -660,7 +660,7 @@ static void belluiAXCollectRows(NSArray* children, NSMutableArray* into) {
     return NSMakeRange(loc, len);
 }
 
-// AXBoundsForRange (#990): the screen bounds of a character range, behind
+// AXBoundsForRange (pre-rebrand tracker #990): the screen bounds of a character range, behind
 // VoiceOver's cursor tracking and magnifier box. Go answers in the same
 // window-local space as localFrame (top-left origin, points); convert to the
 // bottom-left-origin screen exactly as accessibilityFrame does. An editor
@@ -794,7 +794,7 @@ AccessibilityElementRef AccessibilityElementCreate(uintptr_t handle, void* nsWin
 }
 
 // AccessibilityRealizedElementConfigure parents a cell realized on demand for an
-// off-viewport table coordinate (fyne#637) to the table element, so its
+// off-viewport table coordinate (pre-rebrand tracker #637) to the table element, so its
 // accessibilityParent (and lazy screen-frame resolution) works even though it is
 // not one of the table's synthetic-row children. parentElement is an assign (weak)
 // back-reference — Go owns the sole strong reference to a realized cell and
@@ -929,7 +929,7 @@ bool AccessibilityElementUpdate(AccessibilityElementRef ref, AccessibilityElemen
             changed = true;
             if (!fresh && becameSelected) {
                 // Tell VoiceOver a selection happened so it speaks the newly
-                // selected item (#574): cells-changed on an enclosing table,
+                // selected item (pre-rebrand tracker #574): cells-changed on an enclosing table,
                 // rows-changed on an enclosing outline (tree rows).
                 id t = e.parentElement;
                 while (t != nil && ((BelluiAccessibleElement*)t).role != BelluiAXRoleTable &&

@@ -1,4 +1,4 @@
-// axcell: off-viewport virtualized-cell realize verification for #637 Stage 4.
+// axcell: off-viewport virtualized-cell realize verification for pre-rebrand tracker #637 Stage 4.
 //
 // It finds the AXTable in the target process and requests a cell far past the
 // viewport via the AXCellForColumnAndRow parameterized attribute (which the

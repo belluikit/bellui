@@ -16,7 +16,7 @@ import (
 )
 
 // Compile-time ABI assertions for the COM structs shared verbatim with the OS:
-// each index must be 0, else the package fails to compile (#837).
+// each index must be 0, else the package fails to compile (pre-rebrand tracker #837).
 var (
 	_ = [1]struct{}{}[unsafe.Sizeof(formatEtc{})-32]
 	_ = [1]struct{}{}[unsafe.Offsetof(formatEtc{}.ptd)-8]

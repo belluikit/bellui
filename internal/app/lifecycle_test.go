@@ -59,7 +59,7 @@ func TestLifecycle(t *testing.T) {
 	assert.True(t, called)
 }
 
-// TestLifecycle_ShutdownWithoutQueue pins the #470 hardening: a Lifecycle
+// TestLifecycle_ShutdownWithoutQueue pins the pre-rebrand tracker #470 hardening: a Lifecycle
 // whose event queue was never initialized (driver init failed before the
 // queue existed) must shut down cleanly instead of panicking — the CI-runner
 // failure mode was a SIGSEGV in WaitForEvents on top of the real error.

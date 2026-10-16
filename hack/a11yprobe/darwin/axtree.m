@@ -1,4 +1,4 @@
-// axtree: outline/tree-row verification for #501.
+// axtree: outline/tree-row verification for pre-rebrand tracker #501.
 #import <Cocoa/Cocoa.h>
 #import <ApplicationServices/ApplicationServices.h>
 

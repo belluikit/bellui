@@ -197,7 +197,7 @@ func (d *gLDriver) processEventTick() {
 
 func (d *gLDriver) destroyWindow(w *window, index int) {
 	w.visible = false
-	w.releaseModal() // re-enable a natively-blocked parent before teardown (#498)
+	w.releaseModal() // re-enable a natively-blocked parent before teardown (pre-rebrand tracker #498)
 	w.cleanupAccessibilityForWindow()
 	w.viewport.Destroy()
 	w.destroy(d)

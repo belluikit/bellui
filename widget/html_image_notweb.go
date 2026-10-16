@@ -17,7 +17,7 @@ func parseHTMLImage(n *html.Node) []RichTextSegment {
 	}
 	// A schemeless src (e.g. "/etc/passwd" or a relative path) is NOT turned
 	// into a file:// URI: that fallback let untrusted markup read arbitrary
-	// local files (#285). Such an image renders as a placeholder; embed an
+	// local files (pre-rebrand tracker #285). Such an image renders as a placeholder; embed an
 	// explicit file:// URI if a local image is genuinely intended.
 	u, err := storage.ParseURI(src)
 	if err != nil {

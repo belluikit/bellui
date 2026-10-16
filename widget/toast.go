@@ -96,7 +96,7 @@ func (t *Toast) Show() {
 	t.mu.Lock()
 	t.popUp = NewPopUp(content, t.canvas)
 	// A toast is a transient notification, not a dialog: it must not block
-	// taps, scrolling or typing aimed at the UI beneath it (#569).
+	// taps, scrolling or typing aimed at the UI beneath it (pre-rebrand tracker #569).
 	t.popUp.passThrough = true
 	t.mu.Unlock()
 
@@ -104,7 +104,7 @@ func (t *Toast) Show() {
 	t.popUp.ShowAtPosition(pos)
 
 	// A toast auto-dismisses before a screen-reader user would discover it in
-	// the tree, so push the text as a live-region announcement (#525). Danger
+	// the tree, so push the text as a live-region announcement (pre-rebrand tracker #525). Danger
 	// and warning toasts interrupt current speech; the rest queue politely.
 	assertive := t.Importance == DangerImportance || t.Importance == WarningImportance
 	accessibility.Announce(t.Text, assertive)

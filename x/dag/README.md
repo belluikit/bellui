@@ -44,7 +44,7 @@ only codegen dependencies are `google.golang.org/protobuf` and
 
 ## Provenance
 
-Extracted from `trendvidia/fydag` per epic trendvidia/fyne#732. Only `dagwidget`
+Extracted from `trendvidia/fydag` per epic pre-rebrand tracker #732. Only `dagwidget`
 and its data dependency `dag` moved here; the fydag repo remains a working PoC
 and keeps its gRPC/api/app/monitor subsystem.
 

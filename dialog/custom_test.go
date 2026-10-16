@@ -32,7 +32,7 @@ func TestShowCustom_ApplyTheme(t *testing.T) {
 
 	test.ApplyTheme(t, test.NewTheme())
 	w.Resize(d.MinSize().Add(geo.NewSize(shadowPad, shadowPad)))
-	d.Resize(d.MinSize()) // TODO remove once #707 is resolved
+	d.Resize(d.MinSize()) // TODO remove once pre-rebrand tracker #707 is resolved
 	test.AssertRendersToImage(t, "dialog-custom-ugly.png", w.Canvas())
 }
 

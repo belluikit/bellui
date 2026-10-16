@@ -9,7 +9,7 @@
 // false on every real mobile target — `GOOS=android` sets the `linux` build
 // tag and `GOOS=ios` sets `darwin`. The only way to reach this file without
 // `gl` is `-tags mobile` on a non-mobile GOOS, a
-// nonsensical combo no build uses. (#251)
+// nonsensical combo no build uses. (pre-rebrand tracker #251)
 //go:build (gl || (!darwin && !linux && !windows && !wasm)) && (android || ios || mobile)
 
 package gl

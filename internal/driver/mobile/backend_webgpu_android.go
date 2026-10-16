@@ -41,11 +41,11 @@ func webgpuSurfaceDescriptor(w *window) *wgpu.SurfaceDescriptor {
 
 // syncNativeSurfaceSize is a no-op on Android: the ANativeWindow is sized by the
 // system and the Vulkan surface follows it; only the iOS CAMetalLayer needs an
-// explicit re-size on rotation (#243).
+// explicit re-size on rotation (pre-rebrand tracker #243).
 func syncNativeSurfaceSize(int, int) {}
 
 // claimNativeSurface makes w the sole owner of the single ANativeWindow surface
-// before it paints (#753). All Android windows share one native window, but each
+// before it paints (pre-rebrand tracker #753). All Android windows share one native window, but each
 // window's canvas builds its own wgpu surface + swapchain on it; two configured
 // Vulkan swapchains on one native window can't both present, so opening a second
 // window over a visible one left the newcomer's frames going nowhere (freeze).
@@ -74,7 +74,7 @@ func (d *driver) claimNativeSurface(c *canvas, w *window) {
 // detachWindowSurface releases a closed/hidden window's surface so it stops
 // holding the shared ANativeWindow; the caller (window close, shared path) then
 // drops surface ownership so the revealed window reclaims it on its next paint
-// (#753). The iOS backend detaches a per-window CAMetalLayer here instead (#645).
+// (pre-rebrand tracker #753). The iOS backend detaches a per-window CAMetalLayer here instead (pre-rebrand tracker #645).
 func (d *driver) detachWindowSurface(w *window) {
 	if d.surfaceOwner != w {
 		return
@@ -85,5 +85,5 @@ func (d *driver) detachWindowSurface(w *window) {
 }
 
 // setWindowSurfaceHidden is a no-op: only the iOS WebGPU backend stacks a
-// per-window CAMetalLayer whose visibility must toggle on Hide/Show (#742).
+// per-window CAMetalLayer whose visibility must toggle on Hide/Show (pre-rebrand tracker #742).
 func (d *driver) setWindowSurfaceHidden(*window, bool) {}

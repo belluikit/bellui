@@ -51,7 +51,7 @@ enum {
 	BELLUI_A11Y_DISMISS         = 4,
 	BELLUI_A11Y_SCROLL_FORWARD  = 6,
 	BELLUI_A11Y_SCROLL_BACKWARD = 7,
-	// Custom-action kind block (#1027): a declared widget action with no
+	// Custom-action kind block (pre-rebrand tracker #1027): a declared widget action with no
 	// standard iOS semantic dispatches as base + its Go registry id. Keep in
 	// sync with accessibility.go's mobileA11yActionCustom.
 	BELLUI_A11Y_ACTION_CUSTOM   = 0x1000,
@@ -66,7 +66,7 @@ extern uintptr_t belluiMobileA11yRealizeCell(uintptr_t grid, long row, long col,
 // the canvas focus, the bridge publishes this real UITextField in its place:
 // iOS raises the software keyboard only when VoiceOver focus sits on the
 // actual first responder, so a synthetic element can never start editing
-// (#570 — the same substitution Flutter performs for its text fields).
+// (pre-rebrand tracker #570 — the same substitution Flutter performs for its text fields).
 extern UIView *belluiKeyboardInputView(void);
 
 // Arms the proxy's one-shot responder cycle, performed when VoiceOver focus
@@ -74,7 +74,7 @@ extern UIView *belluiKeyboardInputView(void);
 // keyboard.
 extern void belluiKeyboardExpectRaise(void);
 
-// Pushes the focused editable node's visual-layout sidecar (#1107) into the
+// Pushes the focused editable node's visual-layout sidecar (pre-rebrand tracker #1107) into the
 // input proxy so it answers VoiceOver's per-line/caret geometry from bellui's
 // real per-character rectangles rather than the proxy's own UITextView layout.
 // wire is the L:/C' encoding (mobileA11yTextLayout); originX/originY are the
@@ -85,18 +85,18 @@ extern void belluiKeyboardExpectRaise(void);
 extern void belluiInputViewSetTextLayout(const char *wire, double originX, double originY, double scale);
 
 // The element that stands in for the focused entry while VoiceOver edits it
-// (app/darwin_ios.m, #1124): the BelluiTextInputView input view itself, which is
+// (app/darwin_ios.m, pre-rebrand tracker #1124): the BelluiTextInputView input view itself, which is
 // both the first responder and the VoiceOver-focused element (the same-object
 // model native text fields use, required for VoiceOver
 // to drive the insertion point). nil when there is no input view.
 extern id belluiTextEditingA11yElement(void);
 
-// Overlays the input view on the edited entry (#1124): a real on-screen frame
+// Overlays the input view on the edited entry (pre-rebrand tracker #1124): a real on-screen frame
 // (VoiceOver refuses to focus a zero-frame view) with a clear caret tint.
 extern void belluiPrepareSwapSurrogateFrame(CGRect entryFrameInView);
 
 // Parks the input view again after editing: zero frame and invisible to
-// accessibility (#951) — a parked view must not linger as a stray zero-frame
+// accessibility (pre-rebrand tracker #951) — a parked view must not linger as a stray zero-frame
 // text-input element beside the real element tree.
 extern void belluiParkSwapSurrogate(void);
 
@@ -132,7 +132,7 @@ static void belluiA11yApplyProps(BelluiA11yElement *elem, int role, int flags,
 	uintptr_t gridHandle, long cellRow, long cellCol, long rowCount, long colCount);
 
 // BelluiA11yCustomAction carries the Go-side registry id of a declared widget
-// action (#1027) so the rotor handler can dispatch it without a lookup table.
+// action (pre-rebrand tracker #1027) so the rotor handler can dispatch it without a lookup table.
 @interface BelluiA11yCustomAction : UIAccessibilityCustomAction {
 @public
 	uintptr_t elemHandle;
@@ -153,13 +153,13 @@ static void belluiA11yApplyProps(BelluiA11yElement *elem, int role, int flags,
 	BOOL adjustable;
 	BOOL dismissable;
 	BOOL scrollable;
-	uintptr_t gridHandle; // enclosing BELLUI_ROLE_GRID element, 0 when none (#817)
+	uintptr_t gridHandle; // enclosing BELLUI_ROLE_GRID element, 0 when none (pre-rebrand tracker #817)
 	long cellRow, cellCol; // display grid coordinates, -1 when not a grid item
-	// Visual-layout sidecar (#1107), retained so it can be re-pushed to the input
+	// Visual-layout sidecar (pre-rebrand tracker #1107), retained so it can be re-pushed to the input
 	// proxy on the frame the swap actually happens (when the swapped handle is
 	// only established later, in BelluiA11ySetElements). "" for non-text elements.
 	NSString *textLayoutWire;
-	// Last-applied custom-actions wire (#951): the rotor entries are rebuilt
+	// Last-applied custom-actions wire (pre-rebrand tracker #951): the rotor entries are rebuilt
 	// only when this changes, so an unrelated repaint never churns the focused
 	// element's action objects.
 	NSString *customActsWire;
@@ -216,9 +216,9 @@ static void belluiA11yApplyProps(BelluiA11yElement *elem, int role, int flags,
 	return YES;
 }
 
-// VoiceOver's three-finger scroll (#952): an element inside a scroll area
+// VoiceOver's three-finger scroll (pre-rebrand tracker #952): an element inside a scroll area
 // routes the gesture to its nearest scroller, which pages by ~a screenful —
-// the iOS mirror of TalkBack's ACTION_SCROLL_FORWARD/BACKWARD (#762). A swipe
+// the iOS mirror of TalkBack's ACTION_SCROLL_FORWARD/BACKWARD (pre-rebrand tracker #762). A swipe
 // up (or left / "next") reveals the content beyond the viewport, matching a
 // physical one-finger swipe without VoiceOver. Returning NO on non-scrollable
 // elements lets UIKit bubble the request to an ancestor.
@@ -250,10 +250,10 @@ static void belluiA11yApplyProps(BelluiA11yElement *elem, int role, int flags,
 }
 
 // VoiceOver focus entering or leaving this element drives the in-scene focus
-// ring (#798): the OS ring cannot draw over Bellui's flat Metal surface, so Bellui
+// ring (pre-rebrand tracker #798): the OS ring cannot draw over Bellui's flat Metal surface, so Bellui
 // paints its own over the focused element — the iOS mirror of the Android
 // accessibilityFocusChanged hook. Text elements are represented by the real
-// input view while editing (#570), which VoiceOver rings natively, so this
+// input view while editing (pre-rebrand tracker #570), which VoiceOver rings natively, so this
 // covers the non-text elements that have no real view to outline.
 - (void)accessibilityElementDidBecomeFocused {
 	belluiMobileA11ySetFocus(handle, 1);
@@ -263,7 +263,7 @@ static void belluiA11yApplyProps(BelluiA11yElement *elem, int role, int flags,
 	belluiMobileA11ySetFocus(handle, 0);
 }
 
-// VoiceOver actions-rotor handler (#1027): dispatch the picked custom action
+// VoiceOver actions-rotor handler (pre-rebrand tracker #1027): dispatch the picked custom action
 // back to Go as kind = custom base + registry id. The Go side re-validates
 // against the node's current declaration, so a stale rotor pick is a no-op.
 - (BOOL)belluiPerformCustomAction:(BelluiA11yCustomAction *)action {
@@ -274,10 +274,10 @@ static void belluiA11yApplyProps(BelluiA11yElement *elem, int role, int flags,
 @end
 
 // BelluiA11yCellElement is an element that is a cell of a virtualized grid
-// (#817). Only cells adopt UIAccessibilityContainerDataTableCell — protocol
+// (pre-rebrand tracker #817). Only cells adopt UIAccessibilityContainerDataTableCell — protocol
 // conformance is class-level, and a non-cell element that conforms (answering
 // NSNotFound for its ranges) reads to VoiceOver as a malformed table cell,
-// derailing its whole flick-navigation pass (#951: every flick rejection-
+// derailing its whole flick-navigation pass (pre-rebrand tracker #951: every flick rejection-
 // beeped while the base class carried the protocol).
 @interface BelluiA11yCellElement : BelluiA11yElement <UIAccessibilityContainerDataTableCell>
 @end
@@ -303,7 +303,7 @@ static void belluiA11yApplyProps(BelluiA11yElement *elem, int role, int flags,
 @end
 
 // belluiA11yParseCustomActions builds the rotor entries from the encoded wire
-// string (#1027): goId U+001F label entries separated by U+001E — the same
+// string (pre-rebrand tracker #1027): goId U+001F label entries separated by U+001E — the same
 // form the Android bridge parses. Returns nil when the node offers none.
 // target is the element whose handler dispatches; malformed entries are
 // skipped.
@@ -336,7 +336,7 @@ static NSArray<UIAccessibilityCustomAction *> *belluiA11yParseCustomActions(
 	return actions.count > 0 ? actions : nil;
 }
 
-// BelluiA11yGridElement is the container element for a virtualized grid (#817):
+// BelluiA11yGridElement is the container element for a virtualized grid (pre-rebrand tracker #817):
 // the one container the flat sequence keeps. It adopts
 // UIAccessibilityContainerDataTable so VoiceOver hears the full logical extent
 // (accessibilityRowCount x accessibilityColumnCount) and can address any cell —
@@ -475,7 +475,7 @@ static UIAccessibilityTraits belluiA11yTraits(int role, int flags) {
 	return traits;
 }
 
-// belluiPushTextLayout hands the element's sidecar to the input proxy (#1107),
+// belluiPushTextLayout hands the element's sidecar to the input proxy (pre-rebrand tracker #1107),
 // mapping its canvas-pixel rects into the proxy's point-space via the node
 // origin and native scale. Called for the swapped (edited) element only.
 static void belluiPushTextLayout(BelluiA11yElement *elem) {
@@ -488,7 +488,7 @@ static void belluiPushTextLayout(BelluiA11yElement *elem) {
 	}
 	const char *wire = elem->textLayoutWire.length > 0 ? [elem->textLayoutWire UTF8String] : NULL;
 	// The focused editing element is the real input view, positioned at the
-	// entry (elem->frameInView, #1124). Its UITextInput geometry is therefore
+	// entry (elem->frameInView, pre-rebrand tracker #1124). Its UITextInput geometry is therefore
 	// view-local: map canvas-pixel rects to the view's own coordinate space via
 	// the node origin.
 	belluiInputViewSetTextLayout(wire, elem->layoutOriginX, elem->layoutOriginY, scale);
@@ -496,9 +496,9 @@ static void belluiPushTextLayout(BelluiA11yElement *elem) {
 
 // belluiA11yStringEq reports whether two property strings are equal (nil-safe),
 // so setters below run only on a real change. The desktop bridges diff props
-// in C/ObjC so the AT cursor survives unrelated repaints (#485/#487); the same
+// in C/ObjC so the AT cursor survives unrelated repaints (pre-rebrand tracker #485/#487); the same
 // discipline applies here — without it every repaint reassigned the focused
-// element's label/traits and rebuilt its custom-action objects (#951).
+// element's label/traits and rebuilt its custom-action objects (pre-rebrand tracker #951).
 static BOOL belluiA11yStringEq(NSString *a, NSString *b) {
 	return (a == b) || (a != nil && b != nil && [a isEqualToString:b]);
 }
@@ -513,7 +513,7 @@ static void belluiA11yApplyProps(BelluiA11yElement *elem, int role, int flags,
 	if (!belluiA11yStringEq(elem.accessibilityLabel, label)) {
 		elem.accessibilityLabel = label;
 	}
-	// Declared widget actions ride VoiceOver's actions rotor (#1027). Rebuild
+	// Declared widget actions ride VoiceOver's actions rotor (pre-rebrand tracker #1027). Rebuild
 	// the action objects only when the declaration wire actually changed.
 	if (!belluiA11yStringEq(elem->customActsWire, customActs)) {
 		[elem->customActsWire release];
@@ -569,7 +569,7 @@ static void belluiA11yApplyProps(BelluiA11yElement *elem, int role, int flags,
 		// The entry being edited moved, relabeled or changed its action set:
 		// keep the swap element glued to it — including the rotor entries, so
 		// an availability flip (canUndo/canRedo) mid-edit reaches VoiceOver
-		// (#1027).
+		// (pre-rebrand tracker #1027).
 		id swap = belluiTextEditingA11yElement();
 		if (swap != nil) {
 			[swap setAccessibilityLabel:label];
@@ -577,7 +577,7 @@ static void belluiA11yApplyProps(BelluiA11yElement *elem, int role, int flags,
 			[swap setAccessibilityFrame:[elem accessibilityFrame]];
 			belluiPrepareSwapSurrogateFrame(elem->frameInView);
 		}
-		// Keep the proxy's per-line/caret geometry in step with the caret (#1107):
+		// Keep the proxy's per-line/caret geometry in step with the caret (pre-rebrand tracker #1107):
 		// the sidecar re-encodes on every caret move (its window follows selEnd).
 		belluiPushTextLayout(elem);
 	}
@@ -619,7 +619,7 @@ void BelluiA11yUpdateElement(uintptr_t handle, BelluiA11yProps props) {
 				// A cell inside a virtualized grid parents to the grid element
 				// (published before its cells, so it already exists); everything
 				// else parents to the root view. The container drives VoiceOver's
-				// data-table traversal (#817).
+				// data-table traversal (pre-rebrand tracker #817).
 				id container = nil;
 				if (gridHandle != 0) {
 					container = belluiA11yElements[
@@ -660,7 +660,7 @@ void BelluiA11ySetElements(uintptr_t *handles, int count) {
 			// represented by the real UITextField input proxy instead of its
 			// synthetic element, overlaid on the entry — VoiceOver can then
 			// sit on the genuine first responder, which is what makes iOS
-			// raise (and keep) the software keyboard (#570). Only while
+			// raise (and keep) the software keyboard (pre-rebrand tracker #570). Only while
 			// VoiceOver runs: without it the overlay would intercept real
 			// touches meant for the canvas, and the keyboard rises normally
 			// anyway.
@@ -668,11 +668,11 @@ void BelluiA11ySetElements(uintptr_t *handles, int count) {
 			BOOL voRunning = UIAccessibilityIsVoiceOverRunning();
 			UIView *inputView = belluiKeyboardInputView();
 
-			// Cells inside a virtualized grid (#817) nest under their grid
+			// Cells inside a virtualized grid (pre-rebrand tracker #817) nest under their grid
 			// element instead of the root list, so VoiceOver traverses them as
 			// a data table; gridCells collects them per grid handle in order.
 			NSMutableArray *elems = [NSMutableArray arrayWithCapacity:keys.count];
-			// The editing proxy added this frame (#1124), for the focus handshake.
+			// The editing proxy added this frame (pre-rebrand tracker #1124), for the focus handshake.
 			id swapView = nil;
 			NSMutableDictionary<NSNumber *, NSMutableArray *> *gridCells =
 				[NSMutableDictionary dictionary];
@@ -700,7 +700,7 @@ void BelluiA11ySetElements(uintptr_t *handles, int count) {
 					(elem->flags & BELLUI_FLAG_FOCUSED) != 0) {
 					swapped = elem->handle;
 					// Represent the focused entry by the real input view itself
-					// (#1124): first responder and VoiceOver-focused element must
+					// (pre-rebrand tracker #1124): first responder and VoiceOver-focused element must
 					// be the same object for insertion-point navigation.
 					id swap = belluiTextEditingA11yElement();
 					if (swap == nil) {
@@ -709,7 +709,7 @@ void BelluiA11ySetElements(uintptr_t *handles, int count) {
 					[swap setAccessibilityLabel:elem.accessibilityLabel];
 					[swap setAccessibilityHint:elem.accessibilityHint];
 					// The rotor must keep offering the entry's declared actions
-					// while the proxy stands in (#1027).
+					// while the proxy stands in (pre-rebrand tracker #1027).
 					[swap setAccessibilityCustomActions:elem.accessibilityCustomActions];
 					[swap setAccessibilityFrame:[elem accessibilityFrame]];
 					// Overlay the input view on the entry with a real frame
@@ -717,7 +717,7 @@ void BelluiA11ySetElements(uintptr_t *handles, int count) {
 					belluiPrepareSwapSurrogateFrame(elem->frameInView);
 					// Seed the proxy with bellui's real per-line/caret geometry so
 					// VoiceOver's line ring is correct from the first edited frame
-					// (#1107), not just after the first caret move.
+					// (pre-rebrand tracker #1107), not just after the first caret move.
 					belluiPushTextLayout(elem);
 					swapView = swap;
 					[elems addObject:swap];
@@ -773,11 +773,11 @@ void BelluiA11ySetElements(uintptr_t *handles, int count) {
 				BOOL hadCursor = parkElem != nil &&
 					UIAccessibilityFocusedElement(UIAccessibilityNotificationVoiceOverIdentifier) == parkElem;
 				if (inputView != nil) {
-					// Park the input view (zero frame, a11y-invisible, #951)
+					// Park the input view (zero frame, a11y-invisible, pre-rebrand tracker #951)
 					// and drop the sidecar so a later focus on a field without
 					// one (single-line, or a widget with no
 					// AccessibleTextLayouter) falls back to the proxy's native
-					// geometry (#1107).
+					// geometry (pre-rebrand tracker #1107).
 					belluiParkSwapSurrogate();
 					inputView.tintColor = nil;
 					belluiInputViewSetTextLayout(NULL, 0, 0, 1);

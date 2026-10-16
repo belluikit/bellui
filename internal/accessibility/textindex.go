@@ -14,12 +14,12 @@ import (
 // protocols: the decoded rune slice plus the rune offsets of newlines and of
 // astral (non-BMP) runes — the only ones occupying two UTF-16 code units —
 // built in a single pass. Every query then runs in O(log) instead of
-// re-scanning the document (#555): with a screen reader tracking the caret,
+// re-scanning the document (pre-rebrand tracker #555): with a screen reader tracking the caret,
 // several queries fire per keystroke, and on multi-megabyte documents
 // per-query O(n) decoding dwarfed the sub-millisecond edit path.
 //
 // It started life inside the glfw driver (shared by the macOS NSAccessibility
-// and Windows UIA text backends) and was hoisted here (#992) once follow-up
+// and Windows UIA text backends) and was hoisted here (pre-rebrand tracker #992) once follow-up
 // work needed a neutral home; any adapter computing text boundaries in Go
 // (web, AT-SPI) consumes this same index rather than growing its own.
 type TextIndex struct {
@@ -28,7 +28,7 @@ type TextIndex struct {
 	newlines []int // rune offsets of '\n', ascending
 	astral   []int // rune offsets of runes >= 0x10000, ascending
 
-	// Grapheme-cluster boundaries for the character unit (#991), built
+	// Grapheme-cluster boundaries for the character unit (pre-rebrand tracker #991), built
 	// lazily on the first character-unit query. maybeClusters is set during
 	// the index build when any rune could join a multi-rune cluster
 	// (combining marks, ZWJ, variation selectors, regional indicators,
@@ -193,7 +193,7 @@ func (ix *TextIndex) graphemeStarts() []int {
 
 // GraphemeBounds returns the rune range [start, end) of the grapheme cluster
 // containing the clamped offset — the character unit of the platform text
-// protocols (#991): screen-reader character navigation must step one user-
+// protocols (pre-rebrand tracker #991): screen-reader character navigation must step one user-
 // perceived character (an emoji ZWJ family, a letter plus combining marks),
 // never land inside a cluster. At the end of the text it returns the empty
 // (len, len) range.
@@ -217,7 +217,7 @@ func (ix *TextIndex) GraphemeBounds(off int) (start, end int) {
 	return start, end
 }
 
-// --- text units (UIA Text pattern, #487) ----------------------------------
+// --- text units (UIA Text pattern, pre-rebrand tracker #487) ----------------------------------
 // The UIA text protocol navigates by abstract units (character, word, line,
 // document) rather than exposing offsets to the client, so the bridge keeps
 // range endpoints as rune offsets and resolves unit boundaries here.
@@ -304,7 +304,7 @@ func (ix *TextIndex) UnitStep(unit, off, count int) (newOff, moved int) {
 	step := func(dir int) (int, bool) {
 		switch unit {
 		case UnitCharacter:
-			// One character = one grapheme cluster (#991): forward moves to
+			// One character = one grapheme cluster (pre-rebrand tracker #991): forward moves to
 			// the end of the cluster containing the offset, backward to the
 			// start of the cluster containing the previous rune — both snap
 			// an intra-cluster offset out to a cluster boundary.

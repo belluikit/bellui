@@ -72,7 +72,7 @@ func (w webData) packageWebInternal(appDir string, exeWasmSrc string, icon strin
 		return err
 	}
 
-	// Notification service worker for rich-notification action buttons (#724).
+	// Notification service worker for rich-notification action buttons (pre-rebrand tracker #724).
 	swFile := filepath.Join(appDir, "bellui-sw.js")
 	err = util.WriteFile(swFile, templates.WebServiceWorker)
 	if err != nil {

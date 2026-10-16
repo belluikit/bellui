@@ -50,7 +50,7 @@ func fileOpenOSOverride(f *FileDialog) bool {
 		return false
 	}
 	if f.multiSelect {
-		return false // multi-select falls back to the canvas dialog on web (#716)
+		return false // multi-select falls back to the canvas dialog on web (pre-rebrand tracker #716)
 	}
 
 	cb, ok := f.callback.(func(bellui.URIReadCloser, error))

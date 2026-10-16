@@ -6,7 +6,7 @@ import (
 	"github.com/belluikit/bellui/event"
 )
 
-// Issue #72: SourceRow / DisplayRowData map a display-space row (as delivered in
+// pre-rebrand Issue pre-rebrand tracker #72: SourceRow / DisplayRowData map a display-space row (as delivered in
 // CellID.Row by the click callbacks) back to the underlying source row/data, so
 // consumers can act on the clicked row after a sort/filter permutes the view.
 func TestDataGrid_SourceRowAndDisplayRowData_AcrossSort(t *testing.T) {
@@ -46,7 +46,7 @@ func TestDataGrid_SourceRow_OutOfRange(t *testing.T) {
 	}
 }
 
-// Issue #73: Enter/Return and Space on a focused data row fire OnRowActivated
+// pre-rebrand Issue pre-rebrand tracker #73: Enter/Return and Space on a focused data row fire OnRowActivated
 // with the row's stable source index (like OnSelectionChanged), after a sort has
 // permuted display<->source.
 func TestDataGrid_OnRowActivated_KeyboardEnterAndSpace(t *testing.T) {
