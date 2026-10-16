@@ -36,7 +36,8 @@ type OIDCConfig struct {
 	// ClientID is the OAuth 2.0 client identifier.
 	ClientID string
 
-	// Scopes to request. Defaults to ["openid", "email", "profile"].
+	// Scopes to request. Defaults to ["openid", "email", "profile"], or to
+	// ["user:email", "read:user"] for GitHub.
 	Scopes []string
 
 	// Timeout for the entire flow. Defaults to 5 minutes.
