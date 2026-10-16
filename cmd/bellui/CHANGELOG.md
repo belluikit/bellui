@@ -10,6 +10,15 @@
 This file lists the main changes with each version of the Fyne tools project.
 More detailed release notes can be found on the [releases page](https://github.com/fyne-io/tools/releases).
 
+## Unreleased
+
+### Fixed
+
+* The page `bellui package -os web` and `bellui serve` write now reports a
+  failed download of the app's `.wasm` (a 404, a network error) as
+  "Could not load the application: …" instead of showing
+  "Downloading web assembly file" forever.
+
 ## v1.0.0 — 2026-10-16
 
 Version numbers restart at 1.0.0 with the first public release of the
