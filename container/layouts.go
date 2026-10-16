@@ -12,7 +12,7 @@ import (
 // When in a horizontal arrangement the rowcols parameter will specify the column count, when in vertical
 // it will specify the rows. On mobile this will dynamically refresh when device is rotated.
 //
-// Since: 1.4
+// Since: 1.0
 func NewAdaptiveGrid(rowcols int, objects ...core.CanvasObject) *bellui.Container {
 	return New(layout.NewAdaptiveGridLayout(rowcols), objects...)
 }
@@ -24,7 +24,7 @@ func NewAdaptiveGrid(rowcols int, objects ...core.CanvasObject) *bellui.Containe
 // remaining in the middle.
 // Parameters 6 onwards will be stacked over the middle content in the specified order as a Stack container.
 //
-// Since: 1.4
+// Since: 1.0
 func NewBorder(top, bottom, left, right core.CanvasObject, objects ...core.CanvasObject) *bellui.Container {
 	all := objects
 	if top != nil {
@@ -49,7 +49,7 @@ func NewBorder(top, bottom, left, right core.CanvasObject, objects ...core.Canva
 
 // NewCenter creates a new container with the specified objects centered in the available space.
 //
-// Since: 1.4
+// Since: 1.0
 func NewCenter(objects ...core.CanvasObject) *bellui.Container {
 	return New(layout.NewCenterLayout(), objects...)
 }
@@ -57,7 +57,7 @@ func NewCenter(objects ...core.CanvasObject) *bellui.Container {
 // NewGridWithColumns creates a new container with the specified objects and using the grid layout with
 // a specified number of columns. The number of rows will depend on how many children are in the container.
 //
-// Since: 1.4
+// Since: 1.0
 func NewGridWithColumns(cols int, objects ...core.CanvasObject) *bellui.Container {
 	return New(layout.NewGridLayoutWithColumns(cols), objects...)
 }
@@ -65,7 +65,7 @@ func NewGridWithColumns(cols int, objects ...core.CanvasObject) *bellui.Containe
 // NewGridWithRows creates a new container with the specified objects and using the grid layout with
 // a specified number of rows. The number of columns will depend on how many children are in the container.
 //
-// Since: 1.4
+// Since: 1.0
 func NewGridWithRows(rows int, objects ...core.CanvasObject) *bellui.Container {
 	return New(layout.NewGridLayoutWithRows(rows), objects...)
 }
@@ -74,7 +74,7 @@ func NewGridWithRows(rows int, objects ...core.CanvasObject) *bellui.Container {
 // Every element will be resized to the size parameter and the content will arrange along a row and flow to a
 // new row if the elements don't fit.
 //
-// Since: 1.4
+// Since: 1.0
 func NewGridWrap(size geo.Size, objects ...core.CanvasObject) *bellui.Container {
 	return New(layout.NewGridWrapLayout(size), objects...)
 }
@@ -84,14 +84,14 @@ func NewGridWrap(size geo.Size, objects ...core.CanvasObject) *bellui.Container 
 // at their horizontal MinSize. Use a different layout if the objects are intended
 // to be larger then their horizontal MinSize.
 //
-// Since: 1.4
+// Since: 1.0
 func NewHBox(objects ...core.CanvasObject) *bellui.Container {
 	return New(layout.NewHBoxLayout(), objects...)
 }
 
 // NewPadded creates a new container with the specified objects inset by standard padding size.
 //
-// Since: 1.4
+// Since: 1.0
 func NewPadded(objects ...core.CanvasObject) *bellui.Container {
 	return New(layout.NewPaddedLayout(), objects...)
 }
@@ -101,7 +101,7 @@ func NewPadded(objects ...core.CanvasObject) *bellui.Container {
 // Having only a single object has no impact as CanvasObjects will
 // fill the available space even without a Stack.
 //
-// Since: 2.4
+// Since: 1.0
 func NewStack(objects ...core.CanvasObject) *bellui.Container {
 	return New(layout.NewStackLayout(), objects...)
 }
@@ -111,7 +111,7 @@ func NewStack(objects ...core.CanvasObject) *bellui.Container {
 // at their vertical MinSize. Use a different layout if the objects are intended
 // to be larger then their vertical MinSize.
 //
-// Since: 1.4
+// Since: 1.0
 func NewVBox(objects ...core.CanvasObject) *bellui.Container {
 	return New(layout.NewVBoxLayout(), objects...)
 }

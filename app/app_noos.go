@@ -16,7 +16,7 @@ func NewWithID(id string) bellui.App {
 // SetDriverDetails provides the required information to our app to run without a standard
 // driver. This is useful for embedded devices like GOOS=tamago, tinygo or noos.
 //
-// Since: 2.7
+// Since: 1.0
 func SetDriverDetails(a bellui.App, d embedded.Driver) {
 	a.(*belluiApp).Settings().SetTheme(theme.DefaultTheme())
 	a.(*belluiApp).driver = intNoos.NewNoOSDriver(d.Render, d.Run, d.Queue(), d.ScreenSize)

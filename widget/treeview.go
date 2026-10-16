@@ -73,7 +73,7 @@ type TreeView struct {
 	// Delete entries with a separator between the two groups. Leaving it nil
 	// — or returning no items — gives exactly the built-in menu.
 	//
-	// Since: 2.7
+	// Since: 1.0
 	ContextActions func(id TreeViewNodeID) []*bellui.MenuItem `json:"-"`
 
 	// Event callbacks
@@ -889,7 +889,7 @@ func (tv *TreeView) RenameNode(id TreeViewNodeID, newName string) {
 // user's own rename gestures and does not apply here: calling this is the
 // application asking for the editor.
 //
-// Since: 2.7
+// Since: 1.0
 func (tv *TreeView) BeginRename(id TreeViewNodeID) {
 	tv.mu.RLock()
 	_, known := tv.nodeMap[id]

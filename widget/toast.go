@@ -17,7 +17,7 @@ const defaultToastDuration = 3 * time.Second
 // ShowToast shows a transient notification at the bottom of the canvas.
 // The toast auto-dismisses after 3 seconds.
 //
-// Since: 2.7
+// Since: 1.0
 func ShowToast(text string, c core.Canvas) *Toast {
 	return ShowToastWithImportance(text, MediumImportance, c)
 }
@@ -27,7 +27,7 @@ func ShowToast(text string, c core.Canvas) *Toast {
 // auto-dismiss timer keeps running otherwise, so callers that tear the
 // canvas down before Duration elapses (e.g. tests) should call Dismiss.
 //
-// Since: 2.7
+// Since: 1.0
 func ShowToastWithImportance(text string, importance Importance, c core.Canvas) *Toast {
 	t := newToast(text, importance, c)
 	t.Show()
@@ -44,7 +44,7 @@ func (t *Toast) AccessibleLabel() string { return t.Text }
 
 // Toast is a transient notification that appears briefly and auto-dismisses.
 //
-// Since: 2.7
+// Since: 1.0
 type Toast struct {
 	BaseWidget
 

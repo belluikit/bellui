@@ -46,7 +46,7 @@ type Driver interface {
 	// The driver provides the implementation normally accessed through [bellui.Do].
 	// This is required when background tasks want to execute code safely in the graphical context.
 	//
-	// Since: 2.6
+	// Since: 1.0
 	DoFromGoroutine(fn func(), wait bool)
 }
 

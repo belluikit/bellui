@@ -65,19 +65,19 @@ type App interface {
 
 	// Lifecycle returns a type that allows apps to hook in to lifecycle events.
 	//
-	// Since: 2.1
+	// Since: 1.0
 	Lifecycle() Lifecycle
 
 	// Metadata returns the application metadata that was set at compile time.
 	// The items of metadata are available after "bellui package" or when running "go run"
 	// Building with "go build" may cause this to be unavailable.
 	//
-	// Since: 2.2
+	// Since: 1.0
 	Metadata() AppMetadata
 
 	// Clipboard returns the system clipboard.
 	//
-	// Since: 2.6
+	// Since: 1.0
 	Clipboard() Clipboard
 }
 
@@ -282,7 +282,7 @@ func CurrentApp() App {
 
 // AppMetadata captures the build metadata for an application.
 //
-// Since: 2.2
+// Since: 1.0
 type AppMetadata struct {
 	// ID is the unique ID of this application, used by many distribution platforms.
 	ID string
@@ -295,19 +295,19 @@ type AppMetadata struct {
 	// Icon contains, if present, a resource of the icon that was bundled at build time.
 	Icon Resource
 	// Release if true this binary was build in release mode
-	// Since: 2.3
+	// Since: 1.0
 	Release bool
 	// Custom contain the custom metadata defined either in manifest.pxf or on the compile command line
-	// Since: 2.3
+	// Since: 1.0
 	Custom map[string]string
 	// Migrations allows an app to opt into features before they are standard
-	// Since: 2.6
+	// Since: 1.0
 	Migrations map[string]bool
 }
 
 // Lifecycle represents the various phases that an app can transition through.
 //
-// Since: 2.1
+// Since: 1.0
 type Lifecycle interface {
 	// SetOnEnteredForeground hooks into the app becoming foreground and gaining focus.
 	SetOnEnteredForeground(func())

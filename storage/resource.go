@@ -32,7 +32,7 @@ func LoadResourceFromURI(u bellui.URI) (bellui.Resource, error) {
 // The returned resource also supports streaming via [bellui.StreamingResource.Open],
 // which opens the URI directly without caching the bytes.
 //
-// Since: 2.7
+// Since: 1.0
 func NewLazyResourceFromURI(u bellui.URI) *bellui.LazyResource {
 	return bellui.NewStreamingLazyResource(
 		u.Name(),

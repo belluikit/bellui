@@ -31,7 +31,7 @@ var _ core.Widget = (*InnerWindow)(nil)
 // InnerWindow defines a container that wraps content in a window border - that can then be placed inside
 // a regular container/canvas.
 //
-// Since: 2.5
+// Since: 1.0
 type InnerWindow struct {
 	widget.BaseWidget
 
@@ -43,7 +43,7 @@ type InnerWindow struct {
 	// Alignment allows an inner window to specify if the buttons should be on the left
 	// (`ButtonAlignLeading`) or right of the window border.
 	//
-	// Since: 2.6
+	// Since: 1.0
 	Alignment widget.ButtonAlign
 
 	title     string
@@ -54,7 +54,7 @@ type InnerWindow struct {
 // NewInnerWindow creates a new window border around the given `content`, displaying the `title` along the top.
 // This will behave like a normal contain and will probably want to be added to a `MultipleWindows` parent.
 //
-// Since: 2.5
+// Since: 1.0
 func NewInnerWindow(title string, content core.CanvasObject) *InnerWindow {
 	w := &InnerWindow{title: title, content: NewPadded(content)}
 	w.ExtendBaseWidget(w)
@@ -148,7 +148,7 @@ func (w *InnerWindow) SetContent(obj core.CanvasObject) {
 
 // SetMaximized tells the window if the maximized state should be set or not.
 //
-// Since: 2.6
+// Since: 1.0
 func (w *InnerWindow) SetMaximized(max bool) {
 	w.maximized = max
 	w.Refresh()

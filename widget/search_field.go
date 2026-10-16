@@ -17,7 +17,7 @@ var (
 // OnChanged fires on every keystroke for live filtering.
 // OnSearched fires when the user presses Enter/Return.
 //
-// Since: 2.7
+// Since: 1.0
 type SearchField struct {
 	Entry
 
@@ -32,7 +32,7 @@ type SearchField struct {
 
 // NewSearchField creates a search input with the given callback fired on each text change.
 //
-// Since: 2.7
+// Since: 1.0
 func NewSearchField(changed func(string)) *SearchField {
 	sf := &SearchField{}
 	sf.OnChanged = changed

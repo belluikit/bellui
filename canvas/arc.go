@@ -17,7 +17,7 @@ var _ core.CanvasObject = (*Arc)(nil)
 // 0°/360 is top, 90° is right, 180° is bottom, 270° is left
 // 0°/-360 is top, -90° is left, -180° is bottom, -270° is right
 //
-// Since: 2.7
+// Since: 1.0
 type Arc struct {
 	baseObject
 

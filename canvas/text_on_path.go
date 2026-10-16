@@ -16,7 +16,7 @@ var _ core.CanvasObject = (*TextOnPath)(nil)
 // TextOnPath describes text that follows a path, with each glyph
 // positioned and rotated along the path's arc length.
 //
-// Since: 2.7
+// Since: 1.0
 type TextOnPath struct {
 	baseObject
 
@@ -169,7 +169,7 @@ func (t *TextOnPath) updateBoundsForPoint(x, y float32) {
 
 // NewTextOnPath creates a new TextOnPath and calls the build function to construct the path.
 //
-// Since: 2.7
+// Since: 1.0
 func NewTextOnPath(text string, color color.Color, buildPath func(*TextOnPath)) *TextOnPath {
 	t := &TextOnPath{
 		Color:    color,

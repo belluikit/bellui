@@ -10,7 +10,7 @@ import (
 // ListerForURI will attempt to use the application's driver to convert a
 // standard URI into a listable URI.
 //
-// Since: 1.4
+// Since: 1.0
 func ListerForURI(uri bellui.URI) (bellui.ListableURI, error) {
 	listable, err := CanList(uri)
 	if err != nil {

@@ -11,7 +11,7 @@ import (
 // Changes to the Bool will be pushed to the String and setting the string will parse and set the
 // Bool if the parse was successful.
 //
-// Since: 2.0
+// Since: 1.0
 func BoolToString(v Bool) String {
 	return toStringComparable(v, formatBool, parseBool)
 }
@@ -20,7 +20,7 @@ func BoolToString(v Bool) String {
 // presented using the specified format. Changes to the Bool will be pushed to the String and setting
 // the string will parse and set the Bool if the string matches the format and its parse was successful.
 //
-// Since: 2.0
+// Since: 1.0
 func BoolToStringWithFormat(v Bool, format string) String {
 	return toStringWithFormatComparable[bool](v, format, "%t", formatBool, parseBool)
 }
@@ -29,7 +29,7 @@ func BoolToStringWithFormat(v Bool, format string) String {
 // Changes to the Float will be pushed to the String and setting the string will parse and set the
 // Float if the parse was successful.
 //
-// Since: 2.0
+// Since: 1.0
 func FloatToString(v Float) String {
 	return toStringComparable(v, formatFloat, parseFloat)
 }
@@ -38,14 +38,14 @@ func FloatToString(v Float) String {
 // presented using the specified format. Changes to the Float will be pushed to the String and setting
 // the string will parse and set the Float if the string matches the format and its parse was successful.
 //
-// Since: 2.0
+// Since: 1.0
 func FloatToStringWithFormat(v Float, format string) String {
 	return toStringWithFormatComparable(v, format, "%f", formatFloat, parseFloat)
 }
 
 // IntToFloat creates a binding that connects an Int data item to a Float.
 //
-// Since: 2.5
+// Since: 1.0
 func IntToFloat(val Int) Float {
 	v := &fromIntTo[float64]{from: val, parser: internalFloatToInt, formatter: internalIntToFloat}
 	val.AddListener(v)
@@ -54,7 +54,7 @@ func IntToFloat(val Int) Float {
 
 // FloatToInt creates a binding that connects a Float data item to an Int.
 //
-// Since: 2.5
+// Since: 1.0
 func FloatToInt(v Float) Int {
 	i := &toInt[float64]{from: v, parser: internalFloatToInt, formatter: internalIntToFloat}
 	v.AddListener(i)
@@ -65,7 +65,7 @@ func FloatToInt(v Float) Int {
 // Changes to the Int will be pushed to the String and setting the string will parse and set the
 // Int if the parse was successful.
 //
-// Since: 2.0
+// Since: 1.0
 func IntToString(v Int) String {
 	return toStringComparable(v, formatInt, parseInt)
 }
@@ -74,7 +74,7 @@ func IntToString(v Int) String {
 // presented using the specified format. Changes to the Int will be pushed to the String and setting
 // the string will parse and set the Int if the string matches the format and its parse was successful.
 //
-// Since: 2.0
+// Since: 1.0
 func IntToStringWithFormat(v Int, format string) String {
 	return toStringWithFormatComparable(v, format, "%d", formatInt, parseInt)
 }
@@ -83,7 +83,7 @@ func IntToStringWithFormat(v Int, format string) String {
 // Changes to the URI will be pushed to the String and setting the string will parse and set the
 // URI if the parse was successful.
 //
-// Since: 2.1
+// Since: 1.0
 func URIToString(v URI) String {
 	return toString(v, uriToString, storage.EqualURI, uriFromString)
 }
@@ -92,7 +92,7 @@ func URIToString(v URI) String {
 // Changes to the String will be parsed and pushed to the Bool if the parse was successful, and setting
 // the Bool update the String binding.
 //
-// Since: 2.0
+// Since: 1.0
 func StringToBool(str String) Bool {
 	v := &fromStringTo[bool]{from: str, formatter: parseBool, parser: formatBool}
 	str.AddListener(v)
@@ -104,7 +104,7 @@ func StringToBool(str String) Bool {
 // the parse is successful it will be pushed to the String. Setting the Bool will push a formatted value
 // into the String.
 //
-// Since: 2.0
+// Since: 1.0
 func StringToBoolWithFormat(str String, format string) Bool {
 	if format == "%t" { // Same as not using custom format.
 		return StringToBool(str)
@@ -119,7 +119,7 @@ func StringToBoolWithFormat(str String, format string) Bool {
 // Changes to the String will be parsed and pushed to the Float if the parse was successful, and setting
 // the Float update the String binding.
 //
-// Since: 2.0
+// Since: 1.0
 func StringToFloat(str String) Float {
 	v := &fromStringTo[float64]{from: str, formatter: parseFloat, parser: formatFloat}
 	str.AddListener(v)
@@ -131,7 +131,7 @@ func StringToFloat(str String) Float {
 // the parse is successful it will be pushed to the String. Setting the Float will push a formatted value
 // into the String.
 //
-// Since: 2.0
+// Since: 1.0
 func StringToFloatWithFormat(str String, format string) Float {
 	if format == "%f" { // Same as not using custom format.
 		return StringToFloat(str)
@@ -146,7 +146,7 @@ func StringToFloatWithFormat(str String, format string) Float {
 // Changes to the String will be parsed and pushed to the Int if the parse was successful, and setting
 // the Int update the String binding.
 //
-// Since: 2.0
+// Since: 1.0
 func StringToInt(str String) Int {
 	v := &fromStringTo[int]{from: str, parser: formatInt, formatter: parseInt}
 	str.AddListener(v)
@@ -158,7 +158,7 @@ func StringToInt(str String) Int {
 // the parse is successful it will be pushed to the String. Setting the Int will push a formatted value
 // into the String.
 //
-// Since: 2.0
+// Since: 1.0
 func StringToIntWithFormat(str String, format string) Int {
 	if format == "%d" { // Same as not using custom format.
 		return StringToInt(str)
@@ -173,7 +173,7 @@ func StringToIntWithFormat(str String, format string) Int {
 // Changes to the String will be parsed and pushed to the URI if the parse was successful, and setting
 // the URI update the String binding.
 //
-// Since: 2.1
+// Since: 1.0
 func StringToURI(str String) URI {
 	v := &fromStringTo[bellui.URI]{from: str, parser: uriToString, formatter: uriFromString}
 	str.AddListener(v)

@@ -36,7 +36,7 @@ func NewCanvasWithPainter(painter SoftwarePainter) WindowlessCanvas {
 // NewTransparentCanvasWithPainter allows creation of an in-memory canvas with a specific painter without a background color.
 // The painter will be used to render in the Capture() call.
 //
-// Since: 2.2
+// Since: 1.0
 func NewTransparentCanvasWithPainter(painter SoftwarePainter) WindowlessCanvas {
 	return memcanvas.NewTransparentWithPainter(painter)
 }

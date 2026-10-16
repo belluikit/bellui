@@ -8,7 +8,7 @@ import (
 // WindowlessCanvas is a canvas that renders without a window.
 // It is the same type as test.WindowlessCanvas.
 //
-// Since: 2.7
+// Since: 1.1
 type WindowlessCanvas = memcanvas.WindowlessCanvas
 
 // NewCanvas creates a new canvas in memory that can render without hardware support.
@@ -18,7 +18,7 @@ func NewCanvas() WindowlessCanvas {
 
 // NewTransparentCanvas creates a new canvas in memory that can render without hardware support without a background color.
 //
-// Since: 2.2
+// Since: 1.0
 func NewTransparentCanvas() WindowlessCanvas {
 	return memcanvas.NewTransparentWithPainter(software.NewPainter())
 }

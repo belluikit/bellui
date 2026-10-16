@@ -24,7 +24,7 @@ var layoutDirectionRefresh atomic.Pointer[func()]
 // main goroutine. If no app is running the new direction simply takes effect
 // for UI built or refreshed afterwards.
 //
-// Since: 2.8
+// Since: 1.0
 func SetLayoutDirection(d Direction) {
 	if Direction(layoutDirection.Swap(int32(d))) == d {
 		return // unchanged: nothing to refresh
@@ -40,7 +40,7 @@ func SetLayoutDirection(d Direction) {
 // [DirectionAuto], which defers to the active locale; use lang.IsRTLDirection
 // for the resolved right-to-left boolean.
 //
-// Since: 2.8
+// Since: 1.0
 func CurrentLayoutDirection() Direction {
 	return Direction(layoutDirection.Load())
 }

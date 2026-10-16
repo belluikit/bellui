@@ -26,7 +26,7 @@ func (t *AppTabs) AccessibleLabel() string { return "" }
 // The tabs contain text and/or an icon and allow the user to switch between the content specified in each TabItem.
 // Each item is represented by a button at the edge of the container.
 //
-// Since: 1.4
+// Since: 1.0
 type AppTabs struct {
 	widget.BaseWidget
 
@@ -44,7 +44,7 @@ type AppTabs struct {
 
 // NewAppTabs creates a new tab container that allows the user to choose between different areas of an app.
 //
-// Since: 1.4
+// Since: 1.0
 func NewAppTabs(items ...*TabItem) *AppTabs {
 	tabs := &AppTabs{Items: items}
 	tabs.BaseWidget.ExtendBaseWidget(tabs)
@@ -83,28 +83,28 @@ func (t *AppTabs) Append(item *TabItem) {
 
 // DisableIndex disables the TabItem at the specified index.
 //
-// Since: 2.3
+// Since: 1.0
 func (t *AppTabs) DisableIndex(i int) {
 	disableIndex(t, i)
 }
 
 // DisableItem disables the specified TabItem.
 //
-// Since: 2.3
+// Since: 1.0
 func (t *AppTabs) DisableItem(item *TabItem) {
 	disableItem(t, item)
 }
 
 // EnableIndex enables the TabItem at the specified index.
 //
-// Since: 2.3
+// Since: 1.0
 func (t *AppTabs) EnableIndex(i int) {
 	enableIndex(t, i)
 }
 
 // EnableItem enables the specified TabItem.
 //
-// Since: 2.3
+// Since: 1.0
 func (t *AppTabs) EnableItem(item *TabItem) {
 	enableItem(t, item)
 }

@@ -71,7 +71,7 @@ type Button struct {
 	Icon bellui.Resource
 	// Specify how prominent the button should be, High will highlight the button and Low will remove some decoration.
 	//
-	// Since: 1.4
+	// Since: 1.0
 	Importance Importance
 	// Style sets the MD3 visual variant. When ButtonStyleDefault, the Importance
 	// field controls colors. Other styles override Importance for color selection.

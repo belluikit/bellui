@@ -11,7 +11,7 @@ var _ core.Layout = (*CustomPaddedLayout)(nil)
 // CustomPaddedLayout is a layout similar to PaddedLayout, but uses
 // custom values for padding on each side, rather than the theme padding value.
 //
-// Since: 2.5
+// Since: 1.0
 type CustomPaddedLayout struct {
 	TopPadding    float32
 	BottomPadding float32
@@ -22,7 +22,7 @@ type CustomPaddedLayout struct {
 // NewCustomPaddedLayout creates a new CustomPaddedLayout instance
 // with the specified paddings.
 //
-// Since: 2.5
+// Since: 1.0
 func NewCustomPaddedLayout(padTop, padBottom, padLeft, padRight float32) core.Layout {
 	return CustomPaddedLayout{
 		TopPadding:    padTop,

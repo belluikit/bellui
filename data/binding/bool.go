@@ -9,7 +9,7 @@ var _ Bool = (*not)(nil)
 // Not returns a Bool binding that invert the value of the given data binding.
 // This is providing the logical Not boolean operation as a data binding.
 //
-// Since 2.4
+// Since: 1.0
 func Not(data Bool) Bool {
 	return &not{Bool: data}
 }
@@ -34,7 +34,7 @@ var _ Bool = (*and)(nil)
 // Bool bindings. This binding is two way. In case of a Set, it will propagate the value
 // identically to all the Bool bindings used for its construction.
 //
-// Since 2.4
+// Since: 1.0
 func And(data ...Bool) Bool {
 	return &and{booleans: booleans{data: data}}
 }
@@ -73,7 +73,7 @@ var _ Bool = (*or)(nil)
 // Bool bindings. This binding is two way. In case of a Set, it will propagate the value
 // identically to all the Bool bindings used for its construction.
 //
-// Since 2.4
+// Since: 1.0
 func Or(data ...Bool) Bool {
 	return &or{booleans: booleans{data: data}}
 }

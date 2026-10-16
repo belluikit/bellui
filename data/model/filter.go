@@ -12,7 +12,7 @@ import (
 // of surviving source indices and rebuilds it once whenever the source changes or
 // the predicate is replaced — an O(n) pass, never per displayed item.
 //
-// Since: 2.8
+// Since: 1.0
 type FilterProxy[T any] struct {
 	listeners
 
@@ -27,7 +27,7 @@ type FilterProxy[T any] struct {
 // NewFilterProxy returns a proxy over src. Until a predicate is set with
 // [FilterProxy.SetPredicate] every item passes.
 //
-// Since: 2.8
+// Since: 1.0
 func NewFilterProxy[T any](src Model[T]) *FilterProxy[T] {
 	p := &FilterProxy[T]{src: src}
 	l := binding.NewDataListener(p.onSourceChanged)
@@ -96,7 +96,7 @@ func (p *FilterProxy[T]) Item(i int) T {
 // SourceIndex maps a display index to the corresponding index in the source
 // model, or -1 if i is out of range.
 //
-// Since: 2.8
+// Since: 1.0
 func (p *FilterProxy[T]) SourceIndex(i int) int {
 	p.mu.RLock()
 	defer p.mu.RUnlock()

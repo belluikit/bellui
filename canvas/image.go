@@ -40,7 +40,7 @@ const (
 	// ImageFillCover maintains the image aspect ratio whilst filling the space.
 	// The image content will be centered on the available space meaning that an equal amount of top and bottom
 	// or left and right will be clipped if the output aspect ratio does not match the source image.
-	// Since: 2.7
+	// Since: 1.0
 	ImageFillCover
 )
 
@@ -54,7 +54,7 @@ const (
 	ImageScalePixels
 	// ImageScaleFastest will scale the image using hardware GPU if available
 	//
-	// Since: 2.0
+	// Since: 1.0
 	ImageScaleFastest
 )
 
@@ -84,7 +84,7 @@ type Image struct {
 
 	// CornerRadius specifies a radius to apply to round corners of the image.
 	//
-	// Since: 2.7
+	// Since: 1.0
 	CornerRadius float32
 }
 
@@ -97,7 +97,7 @@ func (i *Image) Alpha() float64 {
 // Aspect will return the original content aspect after it was last refreshed.
 // Aspect is safe for concurrent use.
 //
-// Since: 2.4
+// Since: 1.0
 func (i *Image) Aspect() float32 {
 	i.propMu.RLock()
 	a := i.aspect
@@ -258,7 +258,7 @@ func NewImageFromFile(file string) *Image {
 // Images returned from this method will scale to fit the canvas object.
 // The method for scaling can be set using the Fill field.
 //
-// Since: 2.0
+// Since: 1.0
 func NewImageFromURI(uri bellui.URI) *Image {
 	if uri.Scheme() == "file" && len(uri.String()) > 7 {
 		return NewImageFromFile(uri.Path())
@@ -282,7 +282,7 @@ func NewImageFromURI(uri bellui.URI) *Image {
 // Images returned from this method will scale to fit the canvas object.
 // The method for scaling can be set using the Fill field.
 //
-// Since: 2.0
+// Since: 1.0
 func NewImageFromReader(read io.Reader, name string) *Image {
 	data, err := io.ReadAll(read)
 	if err != nil {

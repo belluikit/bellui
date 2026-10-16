@@ -14,7 +14,7 @@ import (
 
 // DateTimePicker combines DatePicker and TimePicker in a tabbed interface.
 //
-// Since: 2.7
+// Since: 1.0
 type DateTimePicker struct {
 	BaseWidget
 	Selected  time.Time
@@ -45,7 +45,7 @@ func (dt *DateTimePicker) AccessibleRange() (min, max, current float64) { return
 
 // NewDateTimePicker creates a new combined date+time picker.
 //
-// Since: 2.7
+// Since: 1.0
 func NewDateTimePicker(selected time.Time, use24h bool, changed func(time.Time)) *DateTimePicker {
 	dt := &DateTimePicker{
 		Selected:  selected,
@@ -110,7 +110,7 @@ func (dt *DateTimePicker) CreateRenderer() core.WidgetRenderer {
 // NewAutoDateTimePicker creates a combined date+time picker that auto-detects
 // 12h/24h mode from the current locale.
 //
-// Since: 2.7
+// Since: 1.0
 func NewAutoDateTimePicker(selected time.Time, changed func(time.Time)) *DateTimePicker {
 	return NewDateTimePicker(selected, lang.Prefers24HourClock(), changed)
 }
@@ -118,14 +118,14 @@ func NewAutoDateTimePicker(selected time.Time, changed func(time.Time)) *DateTim
 // ShowAutoDateTimePicker shows a combined date+time picker modal that
 // auto-detects 12h/24h mode from the current locale.
 //
-// Since: 2.7
+// Since: 1.0
 func ShowAutoDateTimePicker(selected time.Time, changed func(time.Time), c core.Canvas) {
 	ShowDateTimePicker(selected, lang.Prefers24HourClock(), changed, c)
 }
 
 // ShowDateTimePicker shows the combined picker as a modal dialog.
 //
-// Since: 2.7
+// Since: 1.0
 func ShowDateTimePicker(selected time.Time, use24h bool, changed func(time.Time), c core.Canvas) {
 	picker := NewDateTimePicker(selected, use24h, nil)
 

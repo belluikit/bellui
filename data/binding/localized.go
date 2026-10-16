@@ -38,7 +38,7 @@ type localizedString struct {
 // Any template data is forwarded to lang.Localize on every (re-)evaluation, so
 // pass values, not pre-formatted strings, for them to localize correctly.
 //
-// Since: 2.8
+// Since: 1.0
 func NewLocalizedString(key string, data ...any) String {
 	return newLocalized(key, key, nil, data)
 }
@@ -51,7 +51,7 @@ func NewLocalizedString(key string, data ...any) String {
 // Use this when your message IDs are distinct from the default text, the common
 // pattern for larger translation catalogues.
 //
-// Since: 2.8
+// Since: 1.0
 func NewLocalizedStringWithKey(key, fallback string, data ...any) String {
 	return newLocalized(key, fallback, nil, data)
 }
@@ -65,7 +65,7 @@ func NewLocalizedStringWithKey(key, fallback string, data ...any) String {
 // count is an [Int] binding so the plural form tracks a live count; for a fixed
 // count, pass a [NewInt] you Set once.
 //
-// Since: 2.8
+// Since: 1.0
 func NewLocalizedPlural(key string, count Int, data ...any) String {
 	return newLocalized(key, key, count, data)
 }
@@ -74,7 +74,7 @@ func NewLocalizedPlural(key string, count Int, data ...any) String {
 // [NewLocalizedPlural], resolving via [lang.LocalizePluralKey] (i.e. the same
 // lookup as lang.XN).
 //
-// Since: 2.8
+// Since: 1.0
 func NewLocalizedPluralWithKey(key, fallback string, count Int, data ...any) String {
 	return newLocalized(key, fallback, count, data)
 }

@@ -19,7 +19,7 @@
 // originates on a background goroutine), matching how widget.List and FileTree
 // already expect their callbacks to be driven.
 //
-// Since: 2.8
+// Since: 1.0
 package model
 
 import (
@@ -35,7 +35,7 @@ import (
 // contents change, so a widget adapter can subscribe and render the current
 // state in one step.
 //
-// Since: 2.8
+// Since: 1.0
 type Model[T any] interface {
 	binding.DataItem
 
@@ -52,7 +52,7 @@ type Model[T any] interface {
 //
 //	proxy.SetLess(model.StringLess)
 //
-// Since: 2.8
+// Since: 1.0
 func StringLess(a, b string) bool {
 	return lang.Compare(a, b) < 0
 }
@@ -111,7 +111,7 @@ func (s *listeners) notify() {
 // SliceModel is a [Model] backed by an in-memory slice of T. Its mutators
 // (Set, Append, SetItem) notify listeners; call them on the main goroutine.
 //
-// Since: 2.8
+// Since: 1.0
 type SliceModel[T any] struct {
 	listeners
 
@@ -121,7 +121,7 @@ type SliceModel[T any] struct {
 
 // NewSliceModel returns a [SliceModel] seeded with the given items.
 //
-// Since: 2.8
+// Since: 1.0
 func NewSliceModel[T any](items ...T) *SliceModel[T] {
 	m := &SliceModel[T]{}
 	m.items = append(m.items, items...)
@@ -180,7 +180,7 @@ type dataListModel struct {
 // The model holds a listener on the source for its lifetime; it is meant to live
 // as long as the binding it wraps.
 //
-// Since: 2.8
+// Since: 1.0
 func FromDataList(l binding.DataList) Model[binding.DataItem] {
 	m := &dataListModel{src: l}
 	l.AddListener(binding.NewDataListener(m.notify))

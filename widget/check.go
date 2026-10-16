@@ -30,7 +30,7 @@ type Check struct {
 	// Turning this on will override the checked state and show a dash icon (neither checked nor unchecked).
 	// The user interaction cannot turn this on, tapping a partial check state will set `Checked` to true.
 	//
-	// Since: 2.6
+	// Since: 1.0
 	Partial bool
 
 	OnChanged func(bool) `json:"-"`
@@ -63,7 +63,7 @@ func NewCheck(label string, changed func(bool)) *Check {
 
 // NewCheckWithData returns a check widget connected with the specified data source.
 //
-// Since: 2.0
+// Since: 1.0
 func NewCheckWithData(label string, data binding.Bool) *Check {
 	check := NewCheck(label, nil)
 	check.Bind(data)
@@ -78,7 +78,7 @@ func NewCheckWithData(label string, data binding.Bool) *Check {
 // The public [Check.OnChanged] field is left alone: binding and an app change
 // handler coexist, and OnChanged may be assigned before or after Bind.
 //
-// Since: 2.0
+// Since: 1.0
 func (c *Check) Bind(data binding.Bool) {
 	c.binder.SetCallback(c.updateFromData)
 	c.binder.Bind(data)
@@ -279,7 +279,7 @@ func (c *Check) TypedKey(key *event.KeyEvent) {}
 
 // SetText sets the text of the Check
 //
-// Since: 2.4
+// Since: 1.0
 func (c *Check) SetText(text string) {
 	c.Text = text
 	c.Refresh()
@@ -291,7 +291,7 @@ func (c *Check) SetText(text string) {
 // Any [Check.OnChanged] handler the app installed is left in place -- Unbind
 // only clears the write-back it installed itself.
 //
-// Since: 2.0
+// Since: 1.0
 func (c *Check) Unbind() {
 	c.onChangedInternal = nil
 	c.binder.Unbind()

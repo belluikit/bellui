@@ -10,7 +10,7 @@ import (
 // RadioGroup widget has a list of text labels and checks check icons next to each.
 // Changing the selection (only one can be selected) will trigger the changed func.
 //
-// Since: 1.4
+// Since: 1.0
 type RadioGroup struct {
 	DisableableWidget
 	Horizontal bool
@@ -38,7 +38,7 @@ func (r *RadioGroup) AccessibleLabel() string { return r.Selected }
 
 // NewRadioGroup creates a new radio group widget with the set options and change handler
 //
-// Since: 1.4
+// Since: 1.0
 func NewRadioGroup(options []string, changed func(string)) *RadioGroup {
 	r := &RadioGroup{
 		Options:   options,

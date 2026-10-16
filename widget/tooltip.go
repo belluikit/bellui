@@ -63,7 +63,7 @@ func newToolTipBubble(th bellui.Theme, v bellui.ThemeVariant, text string) core.
 // content, ensuring the tooltip receives hover events even when the content
 // widget (e.g. Button) handles hover internally.
 //
-// Since: 2.7
+// Since: 1.0
 type Tooltip struct {
 	BaseWidget
 
@@ -79,7 +79,7 @@ type Tooltip struct {
 
 // NewTooltip creates a new tooltip wrapper around the given content.
 //
-// Since: 2.7
+// Since: 1.0
 func NewTooltip(content core.CanvasObject, text string) *Tooltip {
 	t := &Tooltip{Content: content, Text: text}
 	t.overlay = newHoverOverlay(t)

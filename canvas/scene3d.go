@@ -2,7 +2,7 @@
 // It contains meshes, a camera, and lights, and renders them into a 2D image
 // using software rasterization with perspective projection and z-buffering.
 //
-// Since: 2.7
+// Since: 1.0
 package canvas
 
 import (
@@ -124,7 +124,7 @@ var _ core.CanvasObject = (*Scene3D)(nil)
 // projection and z-buffering. It integrates with the Bellui rendering pipeline as a
 // standard CanvasObject.
 //
-// Since: 2.7
+// Since: 1.0
 type Scene3D struct {
 	baseObject
 
@@ -143,7 +143,7 @@ type Scene3D struct {
 
 // NewScene3D creates a Scene3D with a default camera and light.
 //
-// Since: 2.7
+// Since: 1.0
 func NewScene3D() *Scene3D {
 	return &Scene3D{
 		Camera: DefaultCamera(),

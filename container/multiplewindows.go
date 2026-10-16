@@ -12,7 +12,7 @@ import (
 // MultipleWindows is a container that handles multiple `InnerWindow` containers.
 // Each inner window can be dragged, resized and the stacking will change when the title bar is tapped.
 //
-// Since: 2.5
+// Since: 1.0
 type MultipleWindows struct {
 	widget.BaseWidget
 
@@ -26,7 +26,7 @@ type MultipleWindows struct {
 // You can add new more windows to this container by calling `Add` or updating the `Windows`
 // field and calling `Refresh`.
 //
-// Since: 2.5
+// Since: 1.0
 func NewMultipleWindows(wins ...*InnerWindow) *MultipleWindows {
 	m := &MultipleWindows{Windows: wins}
 	m.ExtendBaseWidget(m)

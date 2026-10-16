@@ -17,7 +17,7 @@ import (
 //	// catalog: profile_updated.female / .male / .other
 //	lang.LSelect("profile_updated", gender, map[string]any{"Name": name})
 //
-// Since: 2.7
+// Since: 1.0
 func LSelect(keyPrefix, selector string, data ...any) string {
 	var d0 any
 	if len(data) > 0 {
@@ -43,7 +43,7 @@ func LSelect(keyPrefix, selector string, data ...any) string {
 //	// catalog: items_updated.female = {one, other}, .male = {…}, .other = {…}
 //	lang.LSelectPlural("items_updated", gender, n, map[string]any{"Count": n})
 //
-// Since: 2.7
+// Since: 1.0
 func LSelectPlural(keyPrefix, selector string, count int, data ...any) string {
 	var d0 any
 	if len(data) > 0 {

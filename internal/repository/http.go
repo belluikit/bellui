@@ -94,13 +94,13 @@ func (f *remoteFile) URI() bellui.URI {
 //
 // This repository is suitable to handle the http:// and https:// scheme.
 //
-// Since: 2.1
+// Since: 1.0
 type HTTPRepository struct{}
 
 // NewHTTPRepository creates a new HTTPRepository instance.
 // The caller needs to call repository.Register() with the result of this function.
 //
-// Since: 2.1
+// Since: 1.0
 func NewHTTPRepository() *HTTPRepository {
 	return &HTTPRepository{}
 }
@@ -108,7 +108,7 @@ func NewHTTPRepository() *HTTPRepository {
 // Exists checks whether the resource at u returns a
 // non "404 NOT FOUND" response header.
 //
-// Since: 2.1
+// Since: 1.0
 func (r *HTTPRepository) Exists(u bellui.URI) (bool, error) {
 	resp, err := safeClient.Head(u.String())
 	if err != nil {
@@ -125,7 +125,7 @@ func (r *HTTPRepository) Exists(u bellui.URI) (bool, error) {
 // Reader provides a interface for reading the body of the response received
 // from the request to u.
 //
-// Since: 2.1
+// Since: 1.0
 func (r *HTTPRepository) Reader(u bellui.URI) (bellui.URIReadCloser, error) {
 	resp, err := safeClient.Get(u.String())
 	if err != nil {
@@ -138,7 +138,7 @@ func (r *HTTPRepository) Reader(u bellui.URI) (bellui.URIReadCloser, error) {
 // from the remote server.
 // Any response status code apart from 2xx is considered to be invalid.
 //
-// Since: 2.1
+// Since: 1.0
 func (r *HTTPRepository) CanRead(u bellui.URI) (bool, error) {
 	resp, err := safeClient.Head(u.String())
 	if err != nil {
@@ -154,7 +154,7 @@ func (r *HTTPRepository) CanRead(u bellui.URI) (bool, error) {
 
 // Destroy satisfies the repository.Repository interface.
 //
-// Since: 2.1
+// Since: 1.0
 func (r *HTTPRepository) Destroy(string) {
 	// do nothing
 }

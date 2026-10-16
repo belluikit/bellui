@@ -16,7 +16,7 @@ import (
 // NumericEntry is an Entry that only accepts numeric input.
 // Text is right-aligned by default. Non-numeric keystrokes are silently rejected.
 //
-// Since: 2.7
+// Since: 1.0
 type NumericEntry struct {
 	Entry
 
@@ -50,7 +50,7 @@ type NumericEntry struct {
 
 // NewNumericEntry creates a new right-aligned entry that accepts floating point numbers.
 //
-// Since: 2.7
+// Since: 1.0
 func NewNumericEntry() *NumericEntry {
 	e := &NumericEntry{
 		AllowFloat:    true,
@@ -66,7 +66,7 @@ func NewNumericEntry() *NumericEntry {
 
 // NewIntegerEntry creates a new right-aligned entry that accepts integers only.
 //
-// Since: 2.7
+// Since: 1.0
 func NewIntegerEntry() *NumericEntry {
 	e := &NumericEntry{
 		AllowFloat:    false,

@@ -6,7 +6,7 @@ package driver
 // This is mostly useful for Android where the JVM provides functionality that is not accessible directly in CGo.
 // The call for most platforms will just execute passing an `UnknownContext` and returning any error reported.
 //
-// Since: 2.3
+// Since: 1.0
 func RunNative(fn func(any) error) error {
 	return fn(&UnknownContext{})
 }

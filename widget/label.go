@@ -40,29 +40,29 @@ type Label struct {
 
 	// The truncation mode of the text
 	//
-	// Since: 2.4
+	// Since: 1.0
 	Truncation bellui.TextTruncation
 	// Importance informs how the label should be styled, i.e. warning or disabled
 	//
-	// Since: 2.4
+	// Since: 1.0
 	Importance Importance
 
 	// The theme size name for the text size of the label
 	//
-	// Since: 2.6
+	// Since: 1.0
 	SizeName bellui.ThemeSizeName
 
 	// If set to true, Selectable indicates that this label should support select interaction
 	// to allow the text to be copied.
 	//
-	//Since: 2.6
+	//Since: 1.0
 	Selectable bool
 
 	// ShowTooltipWhenTruncated, when true, shows a hover tooltip with the full
 	// text when the label is truncated. Only effective when Truncation is set to
 	// a non-off mode (e.g. TextTruncateEllipsis or TextTruncateClip).
 	//
-	// Since: 2.7
+	// Since: 1.0
 	ShowTooltipWhenTruncated bool
 
 	provider  *RichText
@@ -82,7 +82,7 @@ func NewLabel(text string) *Label {
 
 // NewLabelWithData returns a Label widget connected to the specified data source.
 //
-// Since: 2.0
+// Since: 1.0
 func NewLabelWithData(data binding.String) *Label {
 	label := NewLabel("")
 	label.Bind(data)
@@ -151,7 +151,7 @@ func (l *Label) ReplaceAccessibleSelection(string) {}
 // Bind connects the specified data source to this Label.
 // The current value will be displayed and any changes in the data will cause the widget to update.
 //
-// Since: 2.0
+// Since: 1.0
 func (l *Label) Bind(data binding.String) {
 	l.binder.SetCallback(l.updateFromData) // This could only be done once, maybe in ExtendBaseWidget?
 	l.binder.Bind(data)
@@ -218,7 +218,7 @@ func (l *Label) SyncState() {
 // window-level [SelectableMode]) it will return an empty string.
 // If there is no selection it will return the empty string.
 //
-// Since: 2.6
+// Since: 1.0
 func (l *Label) SelectedText() string {
 	if !l.isSelectable() || l.selection == nil {
 		return ""
@@ -254,7 +254,7 @@ func (l *Label) SetText(text string) {
 // Unbind disconnects any configured data source from this Label.
 // The current value will remain at the last value of the data source.
 //
-// Since: 2.0
+// Since: 1.0
 func (l *Label) Unbind() {
 	l.binder.Unbind()
 }

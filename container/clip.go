@@ -11,7 +11,7 @@ var _ core.Widget = (*Clip)(nil)
 
 // Clip describes a rectangular region  that will clip anything outside its bounds.
 //
-// Since: 2.7
+// Since: 1.0
 type Clip struct {
 	widget.BaseWidget
 	Content core.CanvasObject
@@ -19,7 +19,7 @@ type Clip struct {
 
 // NewClip returns a new rectangular clipping object.
 //
-// Since: 2.7
+// Since: 1.0
 func NewClip(content core.CanvasObject) *Clip {
 	c := &Clip{Content: content}
 	c.ExtendBaseWidget(c)

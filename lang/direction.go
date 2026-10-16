@@ -30,7 +30,7 @@ var rtlScripts = map[string]struct{}{
 // app-level locale override. It is the locale source used for
 // [github.com/belluikit/bellui.TextDirectionAuto].
 //
-// Since: 2.8
+// Since: 1.0
 func IsRTL() bool {
 	// currentTag is only populated once a locale is initialised — lazily by the
 	// formatting helpers, or eagerly by an override. Before that it is the zero
@@ -50,7 +50,7 @@ func IsRTL() bool {
 // the language (for example "ar" implies the Arabic script). Unknown or
 // unparseable locales are treated as left-to-right.
 //
-// Since: 2.8
+// Since: 1.0
 func IsRTLLocale(l bellui.Locale) bool {
 	tag, err := language.Parse(l.String())
 	if err != nil {
@@ -73,7 +73,7 @@ func IsRTLLocale(l bellui.Locale) bool {
 // inside a right-to-left application. When no scope is active the resolution is
 // unchanged, so the common path stays a single global read.
 //
-// Since: 2.8
+// Since: 1.0
 func IsRTLDirection() bool {
 	if d, ok := uidir.Current(); ok {
 		return d == bellui.DirectionRTL
@@ -96,7 +96,7 @@ func IsRTLDirection() bool {
 // [github.com/belluikit/bellui.TextAlignCenter] is unaffected. Under the
 // default left-to-right layout the alignment is returned unchanged.
 //
-// Since: 2.8
+// Since: 1.0
 func ResolveAlign(a bellui.TextAlign) bellui.TextAlign {
 	if !IsRTLDirection() {
 		return a

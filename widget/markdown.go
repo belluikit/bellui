@@ -18,7 +18,7 @@ import (
 
 // NewRichTextFromMarkdown configures a RichText widget by parsing the provided markdown content.
 //
-// Since: 2.1
+// Since: 1.0
 func NewRichTextFromMarkdown(content string) *RichText {
 	return NewRichText(parseMarkdown(content, nil)...)
 }
@@ -42,7 +42,7 @@ func (t *RichText) ParseMarkdown(content string) {
 // standalone fragments, and should not be used to parse a single
 // markdown document piecewise.
 //
-// Since: 2.5
+// Since: 1.0
 func (t *RichText) AppendMarkdown(content string) {
 	t.Segments = append(t.Segments, parseMarkdown(content, t.namedFonts)...)
 	t.markdownCache = "" // invalidate — content no longer matches a single source

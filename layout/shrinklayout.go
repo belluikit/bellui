@@ -18,7 +18,7 @@ type shrinkLayout struct{}
 // when a resizable parent (Split, Scroll, AppTabs) must be able to shrink
 // below the natural minimum size of its content.
 //
-// Since: 2.7
+// Since: 1.0
 func NewShrinkLayout() core.Layout {
 	return &shrinkLayout{}
 }

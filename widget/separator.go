@@ -14,7 +14,7 @@ var _ core.Widget = (*Separator)(nil)
 
 // Separator is a widget for displaying a separator with themeable color.
 //
-// Since: 1.4
+// Since: 1.0
 type Separator struct {
 	BaseWidget
 
@@ -23,7 +23,7 @@ type Separator struct {
 
 // NewSeparator creates a new separator.
 //
-// Since: 1.4
+// Since: 1.0
 func NewSeparator() *Separator {
 	s := &Separator{}
 	s.ExtendBaseWidget(s)

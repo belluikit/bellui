@@ -48,7 +48,7 @@ func RegisterLocaleChangeRefresh(fn func()) {
 // The canonical user is [github.com/belluikit/bellui/data/binding.NewLocalizedString].
 // fn runs on whichever goroutine calls SetLocale (documented to be the main one).
 //
-// Since: 2.8
+// Since: 1.0
 func AddLocaleChangeListener(fn func()) (remove func()) {
 	listenersMu.Lock()
 	id := nextLocaleListener

@@ -14,7 +14,7 @@ import (
 // edited through a single-line [Entry]: Text seeds the editor when editing begins
 // and Commit turns the edited text back into an item.
 //
-// Since: 2.8
+// Since: 1.0
 type CellEditor[T any] struct {
 	// Text returns the string to seed the editor with when editing begins.
 	Text func(item T) string
@@ -108,7 +108,7 @@ func focusEditor(e *editEntry) {
 //
 // Call all methods on the main goroutine, like every widget mutation.
 //
-// Since: 2.8
+// Since: 1.0
 type ListEditor[T any] struct {
 	// EditOnActivate begins editing a row when it is selected (the default). Set
 	// it to false to drive editing yourself — for example from a
@@ -140,7 +140,7 @@ type ListEditor[T any] struct {
 // binding. Mutate the model on the main goroutine (use [bellui.Do] from a
 // background goroutine), the same rule the widgets already follow.
 //
-// Since: 2.8
+// Since: 1.0
 func BindListEditing[T any](list *List, m model.MutableModel[T],
 	createDisplay func() core.CanvasObject,
 	updateDisplay func(item T, display core.CanvasObject),
@@ -262,7 +262,7 @@ func (ed *ListEditor[T]) Editing() (row int, ok bool) {
 //
 // Call all methods on the main goroutine.
 //
-// Since: 2.8
+// Since: 1.0
 type TableEditor[T any] struct {
 	// EditOnActivate begins editing a cell when it is selected (the default). Set
 	// it to false to drive editing yourself via [TableEditor.Edit].
@@ -292,7 +292,7 @@ type TableEditor[T any] struct {
 // The returned [TableEditor] is the controller; the returned function detaches
 // the binding.
 //
-// Since: 2.8
+// Since: 1.0
 func BindTableEditing[T any](t *Table, m model.MutableModel[T], cols int,
 	createDisplay func() core.CanvasObject,
 	updateDisplay func(item T, col int, display core.CanvasObject),

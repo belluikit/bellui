@@ -18,7 +18,7 @@ const (
 // TextTruncation controls how a `Label` or `Entry` will truncate its text.
 // The default value is `TextTruncateOff` which will not truncate.
 //
-// Since: 2.4
+// Since: 1.0
 type TextTruncation int
 
 const (
@@ -30,7 +30,7 @@ const (
 	// TextTruncateEllipsis is like regular truncation except that an ellipses (…) will be inserted
 	// wherever text has been shortened to fit.
 	//
-	// Since: 2.4
+	// Since: 1.0
 	TextTruncateEllipsis
 )
 
@@ -40,7 +40,7 @@ const (
 // leading/trailing alignment) and the base writing direction of text (see
 // [TextStyle.Direction] via the [TextDirection] alias).
 //
-// Since: 2.8
+// Since: 1.0
 type Direction int
 
 const (
@@ -49,15 +49,15 @@ const (
 	// active locale (right-to-left for Arabic, Hebrew and similar locales). It
 	// is the default (zero) value.
 	//
-	// Since: 2.8
+	// Since: 1.0
 	DirectionAuto Direction = iota
 	// DirectionLTR forces a left-to-right direction regardless of locale.
 	//
-	// Since: 2.8
+	// Since: 1.0
 	DirectionLTR
 	// DirectionRTL forces a right-to-left direction regardless of locale.
 	//
-	// Since: 2.8
+	// Since: 1.0
 	DirectionRTL
 )
 
@@ -72,21 +72,21 @@ const (
 // are the same concept, so [TextStyle.Direction] left at the default
 // [TextDirectionAuto] follows the same ambient direction that mirrors layouts.
 //
-// Since: 2.8
+// Since: 1.0
 type TextDirection = Direction
 
 const (
 	// TextDirectionAuto is an alias for [DirectionAuto].
 	//
-	// Since: 2.8
+	// Since: 1.0
 	TextDirectionAuto = DirectionAuto
 	// TextDirectionLTR is an alias for [DirectionLTR].
 	//
-	// Since: 2.8
+	// Since: 1.0
 	TextDirectionLTR = DirectionLTR
 	// TextDirectionRTL is an alias for [DirectionRTL].
 	//
-	// Since: 2.8
+	// Since: 1.0
 	TextDirectionRTL = DirectionRTL
 )
 
@@ -142,11 +142,11 @@ type TextStyle struct {
 	Bold      bool // Should text be bold
 	Italic    bool // Should text be italic
 	Monospace bool // Use the system monospace font instead of regular
-	// Since: 2.2
+	// Since: 1.0
 	Symbol bool // Use the system symbol font.
-	// Since: 2.1
+	// Since: 1.0
 	TabWidth int // Width of tabs in spaces
-	// Since: 2.5
+	// Since: 1.0
 	Underline bool // Should text be underlined.
 
 	// Strikethrough draws a line through the middle of the text. Like
@@ -179,7 +179,7 @@ type TextStyle struct {
 	// runs) is always detected from the text content regardless of this field;
 	// Direction only controls the base ordering of runs and neutral characters.
 	//
-	// Since: 2.8
+	// Since: 1.0
 	Direction TextDirection
 
 	// Language overrides the language tag used when shaping this text. It
@@ -193,7 +193,7 @@ type TextStyle struct {
 	// alternates, localized glyph forms); it does not change which font face is
 	// selected or the bidi ordering.
 	//
-	// Since: 2.8
+	// Since: 1.0
 	Language string
 }
 
