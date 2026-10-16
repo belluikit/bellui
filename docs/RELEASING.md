@@ -46,6 +46,10 @@ git tag -a v1.0.0-rc.7 -m "v1.0.0-rc.7"
 git push origin v1.0.0-rc.7
 ```
 
+The changelog entry was dated when it was written in step 1. If that is not
+the date you are tagging on, correct it in a commit first and wait for its
+checks — the entry, the tag and the GitHub Release should name the same day.
+
 Confirm the proxy can see it before continuing — this is what step 4 depends on:
 
 ```sh
@@ -78,7 +82,24 @@ the rebased WebGPU bindings pull in per-OS `wgpu-native` libs modules whose
 ([#13 comment](https://github.com/belluikit/bellui/issues/13#issuecomment-5091126506)).
 `go mod tidy` is what fixes that class, which is why it is in the loop above.
 
-Commit the five `go.mod`/`go.sum` changes together, push.
+Then tidy the nested modules that build against an `x/*` checkout through
+`replace ../..` (today `x/editor/examples/wasm`, `x/mmedia/hack/*` and
+`x/tables/hack/a11yprobe`):
+
+```sh
+for d in $(find x -mindepth 3 -name go.mod -exec dirname {} \;); do
+  (cd "$d" && go mod tidy && go build -o "$(mktemp -d)/" ./... && go vet ./...) || echo "FAILED: $d"
+done
+```
+
+Nothing else resolves them: the loop above names only the five modules, and
+`x_tests.yml` never enters these directories. Whenever an `x/*` module's
+requirements move, each of them stops resolving (`go: updates to go.mod
+needed`) until it is tidied — v1.1.0's fsnotify bump did that to
+`x/editor/examples/wasm`. The wasm example builds for `GOOS=js GOARCH=wasm`;
+build it that way too.
+
+Commit all of these `go.mod`/`go.sum` changes together, push.
 
 > This step will still be needed after
 > [#13](https://github.com/belluikit/bellui/issues/13) closes. #13 is about CI

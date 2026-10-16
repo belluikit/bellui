@@ -1,0 +1,3 @@
+# Built probe binary — this is a live-verification harness, not a shipped artifact.
+a11yprobe
+a11yprobe.exe
