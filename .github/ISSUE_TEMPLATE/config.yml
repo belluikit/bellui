@@ -1,6 +1,9 @@
 contact_links:
-  - name: Ask a question
+  - name: Ask a question in Discussions
+    url: https://github.com/belluikit/bellui/discussions/categories/q-a
+    about: Questions about using Bellui, and help with your code
+  - name: Support page
     url: https://bellui.com/support/
-    about: For a toolkit question or help with your code go to our support page
+    about: Documentation, examples and other ways to get help
 
 blank_issues_enabled: false
