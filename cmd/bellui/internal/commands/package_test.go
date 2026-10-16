@@ -2,6 +2,7 @@ package commands
 
 import (
 	"image"
+	"image/draw"
 	"os"
 	"path/filepath"
 	"testing"
@@ -123,7 +124,13 @@ func Test_processMacOSIcon(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	processed := processMacOSIcon(icon)
+	// The icon has a transparent background, so its corners would read as
+	// cut out whether or not the mask is applied. Flatten it onto an opaque
+	// background so that only the mask can make the corners transparent.
+	opaque := image.NewRGBA(icon.Bounds())
+	draw.Draw(opaque, opaque.Bounds(), image.White, image.Point{}, draw.Src)
+	draw.Draw(opaque, opaque.Bounds(), icon, icon.Bounds().Min, draw.Over)
+	processed := processMacOSIcon(opaque)
 
 	assert.Equal(t, 1024, processed.Bounds().Dx())
 	assert.Equal(t, 1024, processed.Bounds().Dy())

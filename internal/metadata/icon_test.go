@@ -11,7 +11,7 @@ import (
 )
 
 func TestScaleIcon(t *testing.T) {
-	data, err := bellui.LoadResourceFromPath("./testdata/bellui.png")
+	data, err := bellui.LoadResourceFromPath("../../theme/testdata/bellui.png")
 	assert.Nil(t, err)
 
 	assert.Equal(t, "bellui.png", data.Name())
