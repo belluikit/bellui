@@ -404,10 +404,17 @@ func (r *Releaser) zipAlign(path string) error {
 	return os.Remove(unaligned)
 }
 
+// lookPath is exec.LookPath, replaceable in tests.
+var lookPath = exec.LookPath
+
+// findWindowsSDKBin returns the directory holding makeappx.exe (and, beside
+// it, signtool.exe): the one on PATH if there is one, else the first match
+// under the standard Windows Kits install location. Callers join the tool
+// names onto it.
 func findWindowsSDKBin() (string, error) {
-	inPath, err := exec.LookPath("makeappx.exe")
+	inPath, err := lookPath("makeappx.exe")
 	if err == nil {
-		return inPath, nil
+		return filepath.Dir(inPath), nil
 	}
 
 	matches, err := filepath.Glob("C:\\Program Files (x86)\\Windows Kits\\*\\bin\\*\\*\\makeappx.exe")
