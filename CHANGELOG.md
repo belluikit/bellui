@@ -7,9 +7,10 @@
 > identifiers actually in use at the time (e.g. `FyneApp.toml`, `fyneDo`).
 > Rewriting them would falsify the record.
 
-This file lists the main changes with each version of the Fyne toolkit.
-Entries up to 2.7.3 are inherited from upstream Fyne; later entries describe
-the trendvidia fork (github.com/trendvidia/fyne).
+This file lists the main changes with each version of Bellui. Entries up to
+2.7.3 are inherited from upstream Fyne; 2.8.0, 2.9.0 and the Unreleased section
+after them describe the trendvidia fork (github.com/trendvidia/fyne) that
+became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
 
 ## v1.1.0 — 2026-10-16
 
@@ -616,7 +617,9 @@ rc.6 tag (2026-07-31) cut mid-section and shares this entry.
   lines that never shipped on this module path (2.10–2.19, 3.0); all are
   rewritten to the version that actually ships it, `v1.0.0`. Annotations from
   releases that did ship — upstream Fyne 1.0–2.7.3 and the fork's 2.8/2.9 —
-  are unchanged. The mapping is recorded in `docs/REBRAND.md`.
+  are unchanged. (This entry originally pointed to `docs/REBRAND.md` for the
+  mapping; that file is not part of the public repository, and the rule above
+  is the whole mapping.)
 
 * **`driver.ObjectAtPosition`/`ObjectAtPositionMatching` now probe and report
   in the `Driver.AbsolutePositionForObject` space**
