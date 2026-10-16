@@ -58,10 +58,8 @@ type OIDCResult struct {
 // It opens the system browser, waits for the callback, exchanges the
 // code for tokens, and returns the user's claims.
 func Authenticate(cfg OIDCConfig) (*OIDCResult, error) {
-	// Apply defaults.
-	if len(cfg.Scopes) == 0 {
-		cfg.Scopes = []string{"openid", "email", "profile"}
-	}
+	// Apply defaults. Scopes are defaulted after the GitHub branch below:
+	// GitHub is OAuth 2.0, not OpenID Connect, and has its own defaults.
 	if cfg.Timeout == 0 {
 		cfg.Timeout = 5 * time.Minute
 	}
@@ -75,6 +73,10 @@ func Authenticate(cfg OIDCConfig) (*OIDCResult, error) {
 	// GitHub uses a custom OAuth flow, not OIDC.
 	if cfg.Provider == "github" {
 		return authenticateGitHub(cfg)
+	}
+
+	if len(cfg.Scopes) == 0 {
+		cfg.Scopes = []string{"openid", "email", "profile"}
 	}
 
 	if cfg.Issuer == "" {
