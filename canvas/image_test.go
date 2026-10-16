@@ -1,6 +1,9 @@
 package canvas_test
 
 import (
+	"image"
+	"image/draw"
+	"image/png"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -96,12 +99,24 @@ func TestNewImageFromURI_File(t *testing.T) {
 func TestImage_CornerRadius(t *testing.T) {
 	pwd, _ := os.Getwd()
 	path := filepath.Join(filepath.Dir(pwd), "theme", "testdata", "bellui.png")
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		t.Fatal("source image not found")
+	f, err := os.Open(path)
+	if err != nil {
+		t.Fatal(err)
 	}
+	defer f.Close()
+	logo, err := png.Decode(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The logo has a transparent background, so its corners look the same
+	// with or without rounding. Flatten it onto an opaque background so the
+	// goldens show where the corners are clipped.
+	opaque := image.NewRGBA(logo.Bounds())
+	draw.Draw(opaque, opaque.Bounds(), image.White, image.Point{}, draw.Src)
+	draw.Draw(opaque, opaque.Bounds(), logo, logo.Bounds().Min, draw.Over)
 
 	i := &canvas.Image{
-		File:         path,
+		Image:        opaque,
 		CornerRadius: 25,
 	}
 	c := software.NewCanvas()
