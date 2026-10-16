@@ -26,6 +26,9 @@ type belluiApp struct {
 	clipboard bellui.Clipboard
 	icon      bellui.Resource
 	uniqueID  string
+	// uniqueIDMu guards uniqueID inside UniqueID, which fills it in on first
+	// call and is called from any goroutine (auth.SaveToken, for one).
+	uniqueIDMu sync.Mutex
 
 	cloud     bellui.CloudProvider
 	lifecycle app.Lifecycle
@@ -72,6 +75,8 @@ func (a *belluiApp) SetIcon(icon bellui.Resource) {
 }
 
 func (a *belluiApp) UniqueID() string {
+	a.uniqueIDMu.Lock()
+	defer a.uniqueIDMu.Unlock()
 	if a.uniqueID != "" {
 		return a.uniqueID
 	}
@@ -80,7 +85,9 @@ func (a *belluiApp) UniqueID() string {
 	}
 
 	bellui.LogError("Preferences API requires a unique ID, use app.NewWithID() or the manifest.pxf ID field", nil)
-	a.uniqueID = "missing-id-" + strconv.FormatInt(time.Now().Unix(), 10) // This is a fake unique - it just has to not be reused...
+	// This is a fake unique - it just has to not be reused... The auth package
+	// treats the "missing-id-" prefix as no ID; TestUniqueID_MissingIDPrefix pins it.
+	a.uniqueID = "missing-id-" + strconv.FormatInt(time.Now().Unix(), 10)
 	return a.uniqueID
 }
 

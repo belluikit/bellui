@@ -36,7 +36,8 @@ type AuthButton struct {
 	Issuer string
 
 	// Scopes is a space-separated list of OAuth scopes.
-	// Defaults to "openid email profile" for OIDC providers.
+	// Defaults to "openid email profile" for OIDC providers and to
+	// "user:email read:user" for GitHub.
 	Scopes string
 
 	// Text overrides the button label. Defaults to the provider preset.
@@ -132,9 +133,10 @@ func (b *AuthButton) authenticate(ctx context.Context) {
 			return
 		}
 
-		// Persist refresh token for silent re-auth. Authentication itself
-		// succeeded, so a persistence failure is logged (not routed to
-		// OnError) — the user is signed in but won't get silent re-auth.
+		// Persist the refresh token so the app can read it back with
+		// auth.LoadToken (exchanging it for new tokens is up to the app; the
+		// auth package does not do it). Authentication itself succeeded, so a
+		// persistence failure is logged, not routed to OnError.
 		if res.result.RefreshToken != "" {
 			if err := auth.SaveToken(b.Provider, res.result.RefreshToken, res.result.Email); err != nil {
 				bellui.LogError("auth: failed to persist refresh token", err)

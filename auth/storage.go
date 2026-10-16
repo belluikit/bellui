@@ -5,12 +5,25 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
+
+	"github.com/belluikit/bellui"
 )
+
+// ErrNoAppID is returned by SaveToken, LoadToken and ClearToken when the
+// running app has no unique ID. Tokens are stored per app, so an app that
+// signs users in must be created with app.NewWithID (or have an ID in its
+// manifest.pxf), as Preferences already require.
+var ErrNoAppID = errors.New("auth: storing a sign-in token needs an app ID; create the app with app.NewWithID")
 
 // storedToken is the serialized form of a refresh token.
 type storedToken struct {
@@ -19,13 +32,15 @@ type storedToken struct {
 	Email        string `json:"email"`
 }
 
-// SaveToken encrypts and persists a refresh token for a provider.
+// SaveToken encrypts and persists a refresh token for a provider. Tokens are
+// stored per app (by the running app's unique ID), so two apps that sign in
+// with the same provider keep separate tokens.
 func SaveToken(provider, refreshToken, email string) error {
-	dir, err := tokenDir()
+	path, appID, err := tokenPath(provider)
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(dir, 0o700); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
 
@@ -39,7 +54,7 @@ func SaveToken(provider, refreshToken, email string) error {
 		return err
 	}
 
-	key, err := deriveKey(provider)
+	key, err := deriveKey(appID, provider)
 	if err != nil {
 		return err
 	}
@@ -48,19 +63,17 @@ func SaveToken(provider, refreshToken, email string) error {
 		return err
 	}
 
-	path := filepath.Join(dir, provider+".enc")
 	return os.WriteFile(path, ciphertext, 0o600)
 }
 
-// LoadToken reads and decrypts a stored refresh token for a provider.
-// Returns empty strings if no token is stored.
+// LoadToken reads and decrypts the running app's stored refresh token for a
+// provider. Returns empty strings if no token is stored.
 func LoadToken(provider string) (refreshToken, email string, err error) {
-	dir, err := tokenDir()
+	path, appID, err := tokenPath(provider)
 	if err != nil {
 		return "", "", err
 	}
 
-	path := filepath.Join(dir, provider+".enc")
 	ciphertext, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -69,7 +82,7 @@ func LoadToken(provider string) (refreshToken, email string, err error) {
 		return "", "", err
 	}
 
-	key, err := deriveKey(provider)
+	key, err := deriveKey(appID, provider)
 	if err != nil {
 		return "", "", err
 	}
@@ -89,13 +102,12 @@ func LoadToken(provider string) (refreshToken, email string, err error) {
 	return st.RefreshToken, st.Email, nil
 }
 
-// ClearToken removes a stored token for a provider.
+// ClearToken removes the running app's stored token for a provider.
 func ClearToken(provider string) error {
-	dir, err := tokenDir()
+	path, _, err := tokenPath(provider)
 	if err != nil {
 		return err
 	}
-	path := filepath.Join(dir, provider+".enc")
 	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 		return err
 	}
@@ -106,7 +118,32 @@ func ClearToken(provider string) error {
 // package variable so tests can redirect token storage to a temp dir.
 var userConfigDir = os.UserConfigDir
 
-// tokenDir returns the directory for storing encrypted tokens.
+// currentAppID returns the running app's unique ID, or "" when there is no app
+// or it has no ID. It is a package variable so tests can set an ID.
+var currentAppID = func() string {
+	return appIDOf(bellui.CurrentApp())
+}
+
+// missingIDPrefix starts the stand-in ID an app created without one reports
+// from UniqueID (see belluiApp.UniqueID in the app package). The stand-in
+// changes on every launch, so a token stored under it could never be read
+// back: it counts as no ID.
+const missingIDPrefix = "missing-id-"
+
+// appIDOf returns a's unique ID, or "" when a is nil or has no ID of its own.
+func appIDOf(a bellui.App) string {
+	if a == nil {
+		return ""
+	}
+	id := a.UniqueID()
+	if strings.HasPrefix(id, missingIDPrefix) {
+		return ""
+	}
+	return id
+}
+
+// tokenDir returns the bellui-auth directory, which holds the machine key and
+// one subdirectory of tokens per app.
 func tokenDir() (string, error) {
 	configDir, err := userConfigDir()
 	if err != nil {
@@ -115,8 +152,53 @@ func tokenDir() (string, error) {
 	return filepath.Join(configDir, "bellui-auth"), nil
 }
 
-// deriveKey produces a 32-byte AES key for a provider, bound to a per-machine
-// master secret (see masterSecret).
+// plainName matches names used as a file or directory name as they are. They
+// are lower case, so two names that differ only in case cannot share a file on
+// a case-insensitive file system (macOS and Windows by default), and they do
+// not end in a dot, which Windows drops.
+var plainName = regexp.MustCompile(`^[a-z0-9]([a-z0-9._-]*[a-z0-9_-])?$`)
+
+// windowsDeviceName matches the device names Windows reserves in every
+// directory, with or without an extension.
+var windowsDeviceName = regexp.MustCompile(`^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\.|$)`)
+
+// storageName returns the file or directory name that stores s: s itself when
+// it is a plain name, otherwise its SHA-256 in hex. So an app ID or provider
+// can never point outside its directory, collide with another by case, or
+// name the machine key.
+func storageName(s string) string {
+	if plainName.MatchString(s) && !windowsDeviceName.MatchString(s) && s != "machine.key" {
+		return s
+	}
+	sum := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(sum[:])
+}
+
+// appTokenDir returns the running app's token directory and its app ID.
+func appTokenDir() (dir, appID string, err error) {
+	appID = currentAppID()
+	if appID == "" {
+		return "", "", ErrNoAppID
+	}
+	base, err := tokenDir()
+	if err != nil {
+		return "", "", err
+	}
+	return filepath.Join(base, storageName(appID)), appID, nil
+}
+
+// tokenPath returns the file holding the running app's token for provider,
+// and the app's ID.
+func tokenPath(provider string) (path, appID string, err error) {
+	dir, appID, err := appTokenDir()
+	if err != nil {
+		return "", "", err
+	}
+	return filepath.Join(dir, storageName(provider)+".enc"), appID, nil
+}
+
+// deriveKey produces a 32-byte AES key for an app and provider, bound to a
+// per-machine master secret (see masterSecret).
 //
 // Security model: the master secret is held in the OS secret store
 // (Keychain/DPAPI/libsecret), which is process/credential/ACL gated by the OS,
@@ -126,15 +208,21 @@ func tokenDir() (string, error) {
 // defence in depth, where protection reduces to the file permissions. Either
 // way the secret is machine-local, so *.enc files do not transfer between
 // machines. See [masterSecret] and [secretStore].
-func deriveKey(provider string) ([]byte, error) {
+func deriveKey(appID, provider string) ([]byte, error) {
 	secret, err := masterSecret()
 	if err != nil {
 		return nil, err
 	}
 	h := sha256.New()
-	h.Write([]byte("bellui-auth-v2:"))
-	h.Write([]byte(provider))
-	h.Write([]byte(":"))
+	h.Write([]byte("bellui-auth-v3:"))
+	// Each field is length-prefixed, so no two (appID, provider) pairs hash
+	// the same bytes, whatever characters they contain.
+	for _, field := range []string{appID, provider} {
+		var n [8]byte
+		binary.BigEndian.PutUint64(n[:], uint64(len(field)))
+		h.Write(n[:])
+		h.Write([]byte(field))
+	}
 	h.Write(secret)
 	return h.Sum(nil), nil
 }
