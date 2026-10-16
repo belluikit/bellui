@@ -355,7 +355,7 @@ static void belluiWebViewEnsureHosted(BelluiWebViewClip *clip) {
     }
     // Added to the WINDOW, as a sibling of the GLKView, never as its subview.
     // A view hosted inside the GLKView entangles with its CAMetalLayer and
-    // stalls rendering — the #1124 lesson from BelluiTextInputView, which is
+    // stalls rendering — the pre-rebrand tracker #1124 lesson from BelluiTextInputView, which is
     // hosted here for the same reason.
     [window addSubview:clip];
 }

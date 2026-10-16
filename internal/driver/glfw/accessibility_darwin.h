@@ -96,13 +96,13 @@ typedef struct {
     // 0-based AXIndex for synthetic table rows; -1 when not applicable.
     int axIndex;
     // AXSelected: -1 not selectable, 0 not selected, 1 selected. A 0→1 flip
-    // posts AXSelectedCellsChanged on the enclosing table (#574).
+    // posts AXSelectedCellsChanged on the enclosing table (pre-rebrand tracker #574).
     int selected;
 } AccessibilityElementProps;
 
 AccessibilityElementRef AccessibilityElementCreate(uintptr_t handle, void* nsWindow);
 // Parents a cell realized on demand for an off-viewport table coordinate
-// (fyne#637) to the table element for AX navigation; it is not one of the
+// (pre-rebrand tracker #637) to the table element for AX navigation; it is not one of the
 // table's synthetic-row children. Called after AccessibilityElementUpdate.
 void AccessibilityRealizedElementConfigure(AccessibilityElementRef elem, AccessibilityElementRef table);
 bool AccessibilityElementUpdate(AccessibilityElementRef elem, AccessibilityElementProps* props);
@@ -119,7 +119,7 @@ void AccessibilityViewNotifyLayoutChanged(void* nsWindow);
 void AccessibilityElementPostTextChanged(AccessibilityElementRef elem, bool selChanged, bool valueChanged);
 
 // Posts an AX announcement so a running screen reader speaks the text
-// without the user navigating to it (live region, #525). assertive maps to
+// without the user navigating to it (live region, pre-rebrand tracker #525). assertive maps to
 // high priority (interrupts current speech), polite to medium.
 void AccessibilityAnnounce(const char* text, bool assertive);
 

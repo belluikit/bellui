@@ -1,4 +1,4 @@
-// Command echoprobe966 is the on-device verification harness for #966
+// Command echoprobe966 is the on-device verification harness for pre-rebrand tracker #966
 // (shadow-EditText echo bugs): hardware-key double insertion, and the
 // password mask leaking into the next field on focus switch.
 //

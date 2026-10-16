@@ -8,9 +8,9 @@ import (
 )
 
 // selectionHandleHost is the seam between a text widget and the mobile
-// selection-handle overlay (#758, generalized in #944). Entry, the
+// selection-handle overlay (pre-rebrand tracker #758, generalized in pre-rebrand tracker #944). Entry, the
 // standalone read-only selectable (Label.Selectable / RichText.Selectable)
-// and RichEntry (#888) implement it — the interface deliberately exposes
+// and RichEntry (pre-rebrand tracker #888) implement it — the interface deliberately exposes
 // only what the overlay needs (selection edges and caret geometry in the
 // host's own (row, column) space, a scroll offset, and an apply-drag hook),
 // so an editor with its own document model can join without sharing the
@@ -53,7 +53,7 @@ type selectionHandleHost interface {
 // Driver.AbsolutePositionForObject reports positions relative to the canvas
 // interactive area (the mobile driver subtracts the display inset), while
 // overlay children and touch events use canvas-absolute coordinates — a
-// mismatch the #945 device pass exposed (handles drawn one status-bar too
+// mismatch the pre-rebrand tracker #945 device pass exposed (handles drawn one status-bar too
 // high, handle drags landing one status-bar too low). Adding the
 // interactive-area origin back restores canvas-absolute; a no-op on
 // inset-free drivers. The test driver's deliberate non-zero inset keeps
@@ -97,7 +97,7 @@ func syncSelectionHandles(host selectionHandleHost, h **entrySelectionHandles, s
 	(*h).showOn(cnv)
 }
 
-// Entry's selectionHandleHost implementation (#758). The gating half lives
+// Entry's selectionHandleHost implementation (pre-rebrand tracker #758). The gating half lives
 // in Entry.updateSelectionHandles (entry_handles.go).
 
 var _ selectionHandleHost = (*Entry)(nil)

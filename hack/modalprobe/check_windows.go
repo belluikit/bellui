@@ -13,7 +13,7 @@ import (
 	"github.com/belluikit/bellui/widget"
 )
 
-// runWindowsCheck drives a same-process verification of the #498/#682 Windows
+// runWindowsCheck drives a same-process verification of the pre-rebrand tracker #498/#682 Windows
 // native block: it opens a window-hosted modal over w, reads the parent HWND
 // (via RunNative) and asserts IsWindowEnabled is FALSE while the dialog is up
 // and TRUE again after it closes. Runs over plain SSH (no window-station issue

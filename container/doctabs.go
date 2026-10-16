@@ -294,7 +294,7 @@ func (r *docTabsRenderer) buildAllTabsButton() (all *widget.Button) {
 		items := make([]*bellui.MenuItem, len(r.docTabs.Items))
 		for i := 0; i < len(r.docTabs.Items); i++ {
 			index := i // capture
-			// FIXME MenuItem doesn't support icons (#1752)
+			// FIXME MenuItem doesn't support icons (pre-rebrand tracker #1752)
 			items[i] = bellui.NewMenuItem(r.docTabs.Items[i].Text, func() {
 				r.docTabs.SelectIndex(index)
 				if r.docTabs.popUpMenu != nil {
@@ -310,7 +310,7 @@ func (r *docTabsRenderer) buildAllTabsButton() (all *widget.Button) {
 
 	// Extend before the renderer Hide()/Show()/Refresh()/SetIcon()s it during setup —
 	// otherwise those calls hit BaseWidget.super() with a nil impl and log a spurious
-	// "ExtendBaseWidget not called" warning (#388). Mirrors the tab/close buttons.
+	// "ExtendBaseWidget not called" warning (pre-rebrand tracker #388). Mirrors the tab/close buttons.
 	all.ExtendBaseWidget(all)
 	return all
 }

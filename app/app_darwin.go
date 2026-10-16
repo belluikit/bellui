@@ -4,7 +4,7 @@
 // UNUserNotificationCenter (available on both). AppKit-only concerns (the dock
 // badge, the osascript fallback) live in app_badge_darwin.{go,m} (macOS) and the
 // UIKit badge in app_badge_ios.{go,m}; each platform supplies its own
-// fallbackNotification. See #739.
+// fallbackNotification. See pre-rebrand tracker #739.
 
 package app
 

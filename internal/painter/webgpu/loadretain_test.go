@@ -14,7 +14,7 @@ import (
 	"github.com/belluikit/webgpu/wgpu"
 )
 
-// TestLoadOpRetainsAcrossSubmits is the decisive #238 probe: does LoadOp=Load on a
+// TestLoadOpRetainsAcrossSubmits is the decisive pre-rebrand tracker #238 probe: does LoadOp=Load on a
 // render texture retain content written by a PREVIOUS, separately-submitted
 // command buffer? Submit 1 clears the texture red and stores; submit 2 opens a
 // LoadOp=Load pass that draws nothing and stores; the readback must still be red.

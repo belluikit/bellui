@@ -12,7 +12,7 @@ import (
 	"github.com/belluikit/bellui/lang"
 )
 
-// TestAlignedTextPos_AnchorsOnBoxOrigin covers #1086 (follow-up to #960) in the
+// TestAlignedTextPos_AnchorsOnBoxOrigin covers pre-rebrand tracker #1086 (follow-up to pre-rebrand tracker #960) in the
 // GL painter: a center/trailing-aligned canvas.Text whose container is larger
 // than its content, under a non-trivial world transform, must scale/rotate about
 // the text-box origin — NOT about the alignment-shifted glyph position.
@@ -82,7 +82,7 @@ func TestAlignedTextPos_AnchorsOnBoxOrigin(t *testing.T) {
 // box-origin-anchored draw position into transformedRectCoords must land every
 // glyph-quad corner exactly where the software painter puts it —
 // boxOrigin + L·(alignOffset + localCorner) — for center/trailing-aligned text
-// in an oversized container (#1086).
+// in an oversized container (pre-rebrand tracker #1086).
 func TestAlignedText_GlyphCornersMatchSoftwareModel(t *testing.T) {
 	lang.SetLocaleForTests(t, "en-US")
 

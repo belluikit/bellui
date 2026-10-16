@@ -27,7 +27,7 @@ func customNames(n *accessibility.Node) []string {
 }
 
 func TestA11yCustomActions(t *testing.T) {
-	// A tree row (#544): AXPress consumes "select", increment/decrement do
+	// A tree row (pre-rebrand tracker #544): AXPress consumes "select", increment/decrement do
 	// not apply, everything else surfaces as a custom action in order.
 	row := actionNode(core.ActionSelect, core.ActionExpand, core.ActionRename, core.ActionDelete)
 	assert.Equal(t, []string{core.ActionExpand, core.ActionRename, core.ActionDelete}, customNames(row))

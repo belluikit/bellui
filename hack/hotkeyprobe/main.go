@@ -1,5 +1,5 @@
 // Command hotkeyprobe live-verifies global (system-wide) hotkey registration
-// (#518).
+// (pre-rebrand tracker #518).
 //
 // It registers Cmd+Shift+9 (Ctrl+Shift+9 on non-macOS) as a global shortcut
 // that logs when it fires — even while the probe window is unfocused. Press the

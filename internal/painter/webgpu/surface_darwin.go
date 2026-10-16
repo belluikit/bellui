@@ -20,7 +20,7 @@ import (
 // and returns it, so wgpu can create a Metal-backed surface. This is the same
 // bridge wgpuglfw uses, reproduced here so it works against the belluikit/glfw
 // fork (whose GetCocoaWindow returns the NSWindow) instead of the upstream
-// go-gl/glfw that wgpuglfw is hard-wired to. (WebGPU Phase 0 spike, #199.)
+// go-gl/glfw that wgpuglfw is hard-wired to. (WebGPU Phase 0 spike, pre-rebrand tracker #199.)
 static void* metalLayerFromNSWindow(void* nsWindowPtr) {
 	NSWindow* nsWindow = (__bridge NSWindow*)nsWindowPtr;
 	[nsWindow.contentView setWantsLayer:YES];

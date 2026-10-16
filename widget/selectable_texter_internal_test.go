@@ -13,7 +13,7 @@ import (
 )
 
 // The read-only core.AccessibleTexter seam on selectable Label / RichText
-// (#556): screen readers read the selection through it; editing is a no-op.
+// (pre-rebrand tracker #556): screen readers read the selection through it; editing is a no-op.
 
 func newShownSelectableLabel(t *testing.T, text string) *Label {
 	t.Helper()

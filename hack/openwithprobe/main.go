@@ -1,7 +1,7 @@
-// Command openwithprobe verifies iOS "open with" / deep-link delivery (#622):
+// Command openwithprobe verifies iOS "open with" / deep-link delivery (pre-rebrand tracker #622):
 // bellui.OpenHandlerApp's SetOnURLOpened / SetOnFileOpened firing from the native
 // application:openURL: delegate, end to end including the packaging metadata
-// (CFBundleURLTypes emitted from manifest.pxf URLSchemes = ["belluiopen"], tools#4).
+// (CFBundleURLTypes emitted from manifest.pxf URLSchemes = ["belluiopen"], pre-rebrand tools tracker #4).
 //
 // It self-verifies: a few seconds after launch it calls bellui.OpenURL on its own
 // registered scheme (belluiopen://selftest). iOS resolves the scheme back to this
@@ -45,7 +45,7 @@ func main() {
 		})
 		oh.SetOnFileOpened(func(uri bellui.URI) {
 			logf("✅ SetOnFileOpened fired: %s", uri.String())
-			// Prove the handed-over file is actually READABLE (the #622
+			// Prove the handed-over file is actually READABLE (the pre-rebrand tracker #622
 			// security-scoped-resource point) — read + show a preview.
 			rc, err := storage.Reader(uri)
 			if err != nil {

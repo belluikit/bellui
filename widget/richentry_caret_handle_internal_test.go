@@ -14,7 +14,7 @@ import (
 )
 
 // The RichEntry caret drag-handle is touch-gated like the selection handles
-// (#999, parity with Entry's #943): off mobile a touch tap summons no overlay,
+// (pre-rebrand tracker #999, parity with Entry's pre-rebrand tracker #943): off mobile a touch tap summons no overlay,
 // keeping desktop behavior and the shared render masters unchanged.
 func TestRichEntry_CaretHandle_NotShownOffMobile(t *testing.T) {
 	test.NewTempApp(t)

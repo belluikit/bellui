@@ -304,7 +304,7 @@ func TestVBoxLayout_MiddleSpacer(t *testing.T) {
 	assert.Equal(t, cell3Pos, obj3.Position())
 }
 
-// Test for issue #4259 - spacer in HBox with hidden item causing add'l trailing padding
+// Test for pre-rebrand issue #4259 - spacer in HBox with hidden item causing add'l trailing padding
 func TestHBoxLayout_MiddleSpacerHiddenItem(t *testing.T) {
 	cellSize := geo.NewSize(100, 50)
 

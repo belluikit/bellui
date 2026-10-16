@@ -1,4 +1,4 @@
-// Command adrenorepro reproduces #310 (Android Adreno/Vulkan WebGPU black canvas
+// Command adrenorepro reproduces pre-rebrand tracker #310 (Android Adreno/Vulkan WebGPU black canvas
 // after first interaction). Matches the original harness: AppTabs across widgets,
 // RichText, and an FBO-heavy effects tab (gradients + RepaintBoundary + Card) —
 // the canvas-FBO / re-present path the issue implicated. Tab switching is the

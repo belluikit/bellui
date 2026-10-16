@@ -1,6 +1,6 @@
 package tables
 
-// Tests for issue #9: with pagination, the interaction cursor follows its source
+// Tests for pre-rebrand issue #9: with pagination, the interaction cursor follows its source
 // row to whatever page it lands on after a re-sort (Option A), and still clears
 // when the row is filtered out of every page.
 

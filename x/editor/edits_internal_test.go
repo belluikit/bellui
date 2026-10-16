@@ -7,7 +7,7 @@ import (
 	"github.com/belluikit/bellui/test"
 )
 
-// TestApplyEdit_UserEditSemantics pins the #160 contract for a single splice:
+// TestApplyEdit_UserEditSemantics pins the pre-rebrand tracker #160 contract for a single splice:
 // the host OnChanged fires once with the full new text, the caret lands after
 // the replacement, and ONE undo restores the original (SetText would have
 // cleared the history instead).
@@ -75,7 +75,7 @@ func TestApplyEdits_ProtectedRangeVetoesWholeBatch(t *testing.T) {
 }
 
 // TestApplyEdit_AnchorTracksRanges: an insert above a protected range shifts
-// it (#130) — no host re-publish, unlike SetText's document-swap contract.
+// it (pre-rebrand tracker #130) — no host re-publish, unlike SetText's document-swap contract.
 func TestApplyEdit_AnchorTracksRanges(t *testing.T) {
 	test.NewTempApp(t)
 	e := renderedPopoverEditor(t, "aaa\nSECRET\nccc")

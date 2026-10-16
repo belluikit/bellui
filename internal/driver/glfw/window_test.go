@@ -1205,7 +1205,7 @@ func TestWindow_Tapped(t *testing.T) {
 // A stationary primary press held past common.TapSecondaryDelay hold-fires
 // LongPressed while the button is still down, and the release of a hold-fired
 // press is not a tap (#266) — the desktop mirror of the touch drivers'
-// hold-fire dispatch (#758), minus the lift-secondary.
+// hold-fire dispatch (pre-rebrand tracker #758), minus the lift-secondary.
 func TestWindow_LongPress_FiresWhileHeld(t *testing.T) {
 	w := createWindow("Test")
 	prop := canvas.NewRectangle(color.White)
@@ -1743,7 +1743,7 @@ func TestWindow_PreeditInput_DropsRedundantEmptyPreedits(t *testing.T) {
 	w.SetContent(e)
 	w.Canvas().Focus(e)
 
-	// Idle empty preedits (e.g. the Wayland done-event echo, #414) must not
+	// Idle empty preedits (e.g. the Wayland done-event echo, pre-rebrand tracker #414) must not
 	// reach the widget as ComposeCancel.
 	runOnMain(func() {
 		w.preeditInput(w.viewport, nil, nil, 0, 0)
@@ -2096,7 +2096,7 @@ func TestWindow_CloseInterception(t *testing.T) {
 
 		assert.False(t, onIntercepted, "the interceptor should not have been called")
 		assert.True(t, onClosed, "the on closed handler should have been called")
-		assert.True(t, w.viewport.ShouldClose()) // For #2694
+		assert.True(t, w.viewport.ShouldClose()) // For pre-rebrand tracker #2694
 		w.destroy(d)
 	})
 

@@ -12,7 +12,7 @@ import (
 // TestStyledLineLayoutBoxWidth confirms an opaque box (a non-text segment such as
 // a link or image) consumes its width in the line's visual order while adding no
 // caret column: carets stay text-only and the caret after the box jumps by the
-// box width (issue #41).
+// box width (pre-rebrand issue #41).
 func TestStyledLineLayoutBoxWidth(t *testing.T) {
 	lang.SetLocaleForTests(t, "en-US")
 

@@ -25,7 +25,7 @@ func richEntryChrome(t *testing.T, e *RichEntry) *richEntryRenderer {
 
 // TestRichEntry_ChromeFilledDefault verifies the default (filled) RichEntry now
 // draws MD3 chrome: a filled rounded background box behind the content and a
-// bordered outline drawn on top (#749) — no longer a bare underline.
+// bordered outline drawn on top (pre-rebrand tracker #749) — no longer a bare underline.
 func TestRichEntry_ChromeFilledDefault(t *testing.T) {
 	test.NewTempApp(t)
 	e := NewRichEntry()
@@ -74,7 +74,7 @@ func TestRichEntry_ChromeOutlined(t *testing.T) {
 	assert.Equal(t, th.Color(theme.ColorNameOutline, v), r.border.StrokeColor, "outlined border color")
 }
 
-// TestRichEntry_EmptyFieldCaretAtLeadingEdge is the #749 caret fix: an empty
+// TestRichEntry_EmptyFieldCaretAtLeadingEdge is the pre-rebrand tracker #749 caret fix: an empty
 // RichEntry places its caret at the leading content edge (where col 0 of a text
 // row renders), not stranded at the trailing edge.
 func TestRichEntry_EmptyFieldCaretAtLeadingEdge(t *testing.T) {

@@ -6,7 +6,7 @@ import "sync/atomic"
 
 // The Java activity (GoNativeActivity) reports an "open with" launch or new
 // intent — a VIEW/EDIT data Uri from a file association or custom URL scheme /
-// deep link — through the openIntent native method, which lands here (fyne#622).
+// deep link — through the openIntent native method, which lands here (pre-rebrand tracker #622).
 //
 // The handler is registered by the bellui app package's Android launch-open path.
 // A launch intent is read in the Java onCreate, which may run before the app

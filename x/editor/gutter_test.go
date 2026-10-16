@@ -86,7 +86,7 @@ func TestLineNumberGutterMinDigits(t *testing.T) {
 
 // TestCompositeGutter_ColumnAwareTapRouting verifies a tap reaches only the
 // interactive provider whose column was clicked, so click-to-reveal and an
-// interactive breakpoint gutter in the same composite don't both fire (#95).
+// interactive breakpoint gutter in the same composite don't both fire (pre-rebrand tracker #95).
 func TestCompositeGutter_ColumnAwareTapRouting(t *testing.T) {
 	test.NewTempApp(t)
 	bp := NewBreakpointGutter(nil)
@@ -128,7 +128,7 @@ func TestCompositeGutter_ColumnAwareTapRouting(t *testing.T) {
 }
 
 // TestGutterWidget_RoutesTapByColumn verifies the gutter widget prefers the
-// column-aware path, so an end-to-end tap lands in the clicked column only (#95).
+// column-aware path, so an end-to-end tap lands in the clicked column only (pre-rebrand tracker #95).
 func TestGutterWidget_RoutesTapByColumn(t *testing.T) {
 	test.NewTempApp(t)
 	bp := NewBreakpointGutter(nil)
@@ -168,7 +168,7 @@ func TestGutterWidget_RoutesTapByColumn(t *testing.T) {
 // TestCompositeGutter_MarginTapTogglesBreakpoint verifies that in the common
 // [line numbers, diagnostic, breakpoint] composition, a tap on the wide
 // non-interactive line-number margin toggles the breakpoint (VS Code-style),
-// while the diagnostic marker column still reveals only — no double-fire (#109).
+// while the diagnostic marker column still reveals only — no double-fire (pre-rebrand tracker #109).
 func TestCompositeGutter_MarginTapTogglesBreakpoint(t *testing.T) {
 	test.NewTempApp(t)
 	ln := NewLineNumberGutter()

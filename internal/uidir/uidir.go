@@ -29,7 +29,7 @@ var goroutineStacks sync.Map // map[uint64][]bellui.Direction
 // Current/Mark can skip identifying the goroutine (thread.GoroutineID calls the
 // expensive runtime.Stack) when no DirectionScope is in effect — the common
 // case, hit once per direction resolution i.e. per text measurement. Mirrors the
-// theme stack's activeOverrides (#138).
+// theme stack's activeOverrides (pre-rebrand tracker #138).
 var activeScopes atomic.Int64
 
 // Current returns the ambient direction override in effect on the calling

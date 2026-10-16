@@ -81,7 +81,7 @@
 // -auto needs to be able to read the screen. On macOS that means Screen
 // Recording permission for the terminal running it (System Settings > Privacy
 // & Security > Screen Recording); on Windows it means an interactive session,
-// not the session-0 window station an SSH command lands in (#487's trap —
+// not the session-0 window station an SSH command lands in (pre-rebrand tracker #487's trap —
 // schtasks /IT is the way out). Without it the capture comes back blank and the
 // probe says so rather than measuring bellui's surface against itself.
 package main

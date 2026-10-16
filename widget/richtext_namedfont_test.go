@@ -134,7 +134,7 @@ func mdFontOfText(t *testing.T, r *RichText, want string) bellui.Resource {
 	return nil
 }
 
-// TestRichText_NamedFont_MarkdownInlineSpan is the #652 fix: a *bare inline*
+// TestRichText_NamedFont_MarkdownInlineSpan is the pre-rebrand tracker #652 fix: a *bare inline*
 // <span style="font-family: …"> interspersed with markdown text — which goldmark
 // splits into separate RawHTML open/close nodes around an ordinary markdown Text
 // node — now resolves the named font on the wrapped text.
@@ -179,7 +179,7 @@ func TestRichText_NamedFont_MarkdownInlineSpanComposesBold(t *testing.T) {
 }
 
 // TestRichText_NamedFont_MarkdownInlineSpanLink confirms the inline span font
-// reaches a link inside it — exercising HyperlinkSegment.Style.FontSource (#651).
+// reaches a link inside it — exercising HyperlinkSegment.Style.FontSource (pre-rebrand tracker #651).
 func TestRichText_NamedFont_MarkdownInlineSpanLink(t *testing.T) {
 	src := distinctFont()
 	r := NewRichText()
@@ -248,7 +248,7 @@ func TestRichText_RegisterNamedFont_NilRemoves(t *testing.T) {
 	assert.Nil(t, r.lookupNamedFont(""))
 }
 
-// TestRichText_NamedFont_MarkdownHeadingInlineSpan is the #870 fix: a bare inline
+// TestRichText_NamedFont_MarkdownHeadingInlineSpan is the pre-rebrand tracker #870 fix: a bare inline
 // <span style="font-family: …"> inside a markdown heading now resolves the named
 // font on the wrapped text, and the heading styling (level, bold) still applies.
 func TestRichText_NamedFont_MarkdownHeadingInlineSpan(t *testing.T) {

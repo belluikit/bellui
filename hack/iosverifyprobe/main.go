@@ -1,10 +1,10 @@
 // Command iosverifyprobe is a combined on-device verification harness for the
 // iOS-device-dependent fixes landed together:
 //
-//   - #739 iOS SendNotification / SendNotificationWithOptions + SetBadge
-//   - #742 iOS Hide-based multi-window pop-back (CAMetalLayer show/hide)
-//   - #645 iOS Close-based multi-window pop-back (already landed via #741)
-//   - #580 iOS clipboard image paste (ImageClipboard)
+//   - pre-rebrand tracker #739 iOS SendNotification / SendNotificationWithOptions + SetBadge
+//   - pre-rebrand tracker #742 iOS Hide-based multi-window pop-back (CAMetalLayer show/hide)
+//   - pre-rebrand tracker #645 iOS Close-based multi-window pop-back (already landed via pre-rebrand tracker #741)
+//   - pre-rebrand tracker #580 iOS clipboard image paste (ImageClipboard)
 //
 // On mobile there is no programmatic tap injection, so the flow self-drives on a
 // timer and appends every result to an on-screen log (screenshots ARE the log).
@@ -62,7 +62,7 @@ func main() {
 	pasted.FillMode = canvas.ImageFillContain
 	pasted.SetMinSize(geo.NewSize(72, 72))
 
-	// #739 — notifications + badge.
+	// pre-rebrand tracker #739 — notifications + badge.
 	doNotify := func() {
 		_, plain := a.(bellui.NotifierApp)
 		_, rich := a.(bellui.NotifierWithOptionsApp)
@@ -81,7 +81,7 @@ func main() {
 		logf("#739 notification requested (allow prompt if shown)")
 	}
 
-	// #580 — clipboard image round-trip.
+	// pre-rebrand tracker #580 — clipboard image round-trip.
 	doClipboard := func() {
 		ok := bellui.SetClipboardImage(makeTestImage())
 		logf("#580 SetClipboardImage supported=%v", ok)
@@ -95,7 +95,7 @@ func main() {
 		logf("#580 ClipboardImage read back %dx%d — round-trip OK", b.Dx(), b.Dy())
 	}
 
-	// #645 — Close-based pop-back.
+	// pre-rebrand tracker #645 — Close-based pop-back.
 	openCloseChild := func() {
 		child := a.NewWindow("Close Child")
 		child.SetContent(container.NewVBox(
@@ -110,7 +110,7 @@ func main() {
 		})
 	}
 
-	// #742 — Hide-based pop-back + re-show.
+	// pre-rebrand tracker #742 — Hide-based pop-back + re-show.
 	openHideChild := func() {
 		child := a.NewWindow("Hide Child")
 		child.SetContent(container.NewVBox(

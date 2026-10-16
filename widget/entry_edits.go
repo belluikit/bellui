@@ -6,9 +6,9 @@ import (
 )
 
 // This file holds Entry's programmatic editing surface: the selection-range
-// accessor (#431), the insert-at-caret primitive (#432), the atomic
-// multi-range edit with its compound undo action (#433) and the logical
-// line-count accessor (#459). All exist so a host (e.g. a code editor doing
+// accessor (pre-rebrand tracker #431), the insert-at-caret primitive (pre-rebrand tracker #432), the atomic
+// multi-range edit with its compound undo action (pre-rebrand tracker #433) and the logical
+// line-count accessor (pre-rebrand tracker #459). All exist so a host (e.g. a code editor doing
 // block indent/dedent or sizing a gutter) can read and mutate the content
 // through the same gated, undo-recorded paths interactive edits use.
 
@@ -22,7 +22,7 @@ import (
 // Since: 1.0
 func (e *Entry) LineCount() int {
 	p := &e.text
-	// The identity chain (#400/#410) keeps Entry.Text and the buffer's
+	// The identity chain (pre-rebrand tracker #400/#410) keeps Entry.Text and the buffer's
 	// string anchor as the same object while the buffer is current —
 	// including between DeferTextSync sync points, where the anchor is the
 	// last-synced string and the buffer runs ahead with the live edits. A
@@ -191,7 +191,7 @@ func (e *Entry) applyEdits(edits []TextEdit) bool {
 	batch.caretUndo = last.End
 	e.undoStack.Add(batch)
 
-	// Deferred text sync (#410): the splices stayed in the buffer, so skip the
+	// Deferred text sync (pre-rebrand tracker #410): the splices stayed in the buffer, so skip the
 	// document materialization and its notifications until the next sync point.
 	deferred := e.editDeferred()
 	var content string

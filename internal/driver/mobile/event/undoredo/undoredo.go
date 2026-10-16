@@ -2,7 +2,7 @@
 // mobile driver to carry a platform-initiated undo or redo — the iPad soft
 // keyboard's undo/redo bar keys, the three-finger swipe gestures or
 // shake-to-undo, all of which drive the first responder's NSUndoManager — from
-// the platform layer to the focused editor (#1134). The native side holds only
+// the platform layer to the focused editor (pre-rebrand tracker #1134). The native side holds only
 // proxy undo actions (the Flutter FlutterUndoManagerPlugin model): state and
 // invocations cross this seam, never the edit history, which stays owned by
 // the bellui editor.

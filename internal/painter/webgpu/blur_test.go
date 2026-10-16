@@ -16,7 +16,7 @@ import (
 
 // TestBlurSpreadReadback drives the `blur` shader (horizontal pass, fs_main_h) +
 // BlurUniforms + premultiplied blend through an offscreen pass, the core of the
-// box-shadow / backdrop-blur port (#223). The source is a hard vertical edge:
+// box-shadow / backdrop-blur port (pre-rebrand tracker #223). The source is a hard vertical edge:
 // the left half opaque red, the right half transparent. After a horizontal blur
 // the edge softens — a pixel just right of center (originally transparent) gains
 // alpha as red bleeds across, while the far corners keep their original extremes.

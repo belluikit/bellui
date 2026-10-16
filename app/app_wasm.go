@@ -133,7 +133,7 @@ func (a *belluiApp) notificationIconDataURL(iconRes bellui.Resource) string {
 	return fmt.Sprintf("data:%s;base64,%s", http.DetectContentType(icon), base64Str)
 }
 
-// ---- Service Worker rich-notification path (#724) --------------------------
+// ---- Service Worker rich-notification path (pre-rebrand tracker #724) --------------------------
 
 // notifyActionPrefixWasm labels a showNotification action so its click can be
 // mapped back to the bellui action index.

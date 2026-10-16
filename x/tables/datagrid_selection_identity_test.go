@@ -21,7 +21,7 @@ func displayRowOf(g *DataGrid, sourceRow int) int {
 
 // TestSelection_RowSurvivesReSort verifies that a row selection tracks the
 // underlying source data across a re-sort instead of sticking to a display
-// position (the bug in issue #2).
+// position (the bug in pre-rebrand issue #2).
 func TestSelection_RowSurvivesReSort(t *testing.T) {
 	data := []map[string]any{
 		{"name": "Charlie"}, // source 0
@@ -157,7 +157,7 @@ func TestSelection_SurvivesFilter(t *testing.T) {
 }
 
 // TestSort_LocaleAwareStrings verifies string columns sort by locale collation
-// (issue #2, part 2): 'ä' collates near 'a' (before 'z'), not in byte order
+// (pre-rebrand issue #2, part 2): 'ä' collates near 'a' (before 'z'), not in byte order
 // where its code point (228) would sort after 'z' (122).
 func TestSort_LocaleAwareStrings(t *testing.T) {
 	lang.SetLocaleForTests(t, "en")

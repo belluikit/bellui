@@ -21,7 +21,7 @@ type activationRecord struct {
 
 // captureActivations installs a core.OnActivation hook recording every
 // activation, restoring the previous hook on cleanup. It is the analytics
-// autocapture seam (#700/#834) observed directly.
+// autocapture seam (pre-rebrand tracker #700/#834) observed directly.
 func captureActivations(t *testing.T) *[]activationRecord {
 	t.Helper()
 	prev := core.OnActivation
@@ -42,7 +42,7 @@ func roleOf(obj core.CanvasObject) core.AccessibleRole {
 
 // TestCheck_KeyboardActivationSignal verifies Check fires the central activation
 // signal on a space rune (it activates via TypedRune, not TypedKey, so the
-// driver's Activatable key-hook does not cover it) (#834).
+// driver's Activatable key-hook does not cover it) (pre-rebrand tracker #834).
 func TestCheck_KeyboardActivationSignal(t *testing.T) {
 	test.NewTempApp(t)
 	recs := captureActivations(t)
@@ -65,7 +65,7 @@ func TestCheck_KeyboardActivationSignal(t *testing.T) {
 
 // TestSwitch_KeyboardActivation verifies the Switch is now keyboard-operable
 // (Space toggles) and declares itself Activatable so the driver fires the signal
-// in parity with a pointer tap (#834).
+// in parity with a pointer tap (pre-rebrand tracker #834).
 func TestSwitch_KeyboardActivation(t *testing.T) {
 	test.NewTempApp(t)
 
@@ -90,7 +90,7 @@ func TestSwitch_KeyboardActivation(t *testing.T) {
 
 // TestList_KeyboardActivationReportsItem verifies List keyboard activation
 // reports the realized item (RoleListItem) rather than the List (RoleList), so
-// autocapture's role→verb mapping matches the pointer path (#834).
+// autocapture's role→verb mapping matches the pointer path (pre-rebrand tracker #834).
 func TestList_KeyboardActivationReportsItem(t *testing.T) {
 	test.NewTempApp(t)
 	recs := captureActivations(t)
@@ -114,7 +114,7 @@ func TestList_KeyboardActivationReportsItem(t *testing.T) {
 }
 
 // TestTree_KeyboardActivationReportsItem verifies Tree keyboard activation
-// reports the realized node (RoleTreeItem) (#834).
+// reports the realized node (RoleTreeItem) (pre-rebrand tracker #834).
 func TestTree_KeyboardActivationReportsItem(t *testing.T) {
 	test.NewTempApp(t)
 	recs := captureActivations(t)
@@ -149,7 +149,7 @@ func TestTree_KeyboardActivationReportsItem(t *testing.T) {
 
 // TestTable_KeyboardActivationReportsCell verifies Table keyboard activation
 // (Space on the focused cell) reports the realized cell object (RoleTableCell),
-// not the container, so autocapture captures it at cell granularity (#851).
+// not the container, so autocapture captures it at cell granularity (pre-rebrand tracker #851).
 func TestTable_KeyboardActivationReportsCell(t *testing.T) {
 	test.NewTempApp(t)
 	recs := captureActivations(t)
@@ -174,7 +174,7 @@ func TestTable_KeyboardActivationReportsCell(t *testing.T) {
 
 // TestTable_PointerActivationReportsCell verifies a tap on a Table cell reports
 // the realized cell object (RoleTableCell), matching the keyboard path so both
-// activation paths agree at cell granularity (#851).
+// activation paths agree at cell granularity (pre-rebrand tracker #851).
 func TestTable_PointerActivationReportsCell(t *testing.T) {
 	test.NewTempApp(t)
 	recs := captureActivations(t)

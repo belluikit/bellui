@@ -1,5 +1,5 @@
 // Command ring1107probe verifies the iOS VoiceOver per-line ring alignment fix
-// (#1107) on a real iPad. It shows a multi-line widget.Entry pre-filled with
+// (pre-rebrand tracker #1107) on a real iPad. It shows a multi-line widget.Entry pre-filled with
 // several short, distinct lines so line-by-line VoiceOver navigation is easy to
 // follow and the cursor ring position per line is visually checkable.
 //
@@ -48,7 +48,7 @@ func main() {
 	))
 	w.Resize(geo.NewSize(700, 640))
 
-	// Autonomous repro for the bare-view render deadlock (#1124/#1125): with
+	// Autonomous repro for the bare-view render deadlock (pre-rebrand tracker #1124/#1125): with
 	// BELLUI_PROBE_AUTOFOCUS set, programmatically focus the multi-line Entry and
 	// select a word a moment after launch — reproducing the tap→focus→
 	// keyboard/selection path that wedges bellui's renderer under the bare
@@ -63,7 +63,7 @@ func main() {
 					// Faithful real-tap touch path: focus + word-select + touch
 					// selection handles (LongPressed is what the driver dispatches
 					// on a mobile hold). The plain Focus/Select modes skip this and
-					// so miss the freeze the real tap hits (#1124).
+					// so miss the freeze the real tap hits (pre-rebrand tracker #1124).
 					multi.LongPressed(&event.PointEvent{Position: geo.NewPos(40, 20)})
 				case "select":
 					// Word selection + native edit menu, minus the touch handles.

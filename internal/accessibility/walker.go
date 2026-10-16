@@ -39,7 +39,7 @@ type Node struct {
 	// scroller of a List/Tree/Table — or nil when the node is not inside a
 	// scroll area. Scroll containers are not themselves accessible nodes, so
 	// this is the only handle a flat mobile backend has to route a screen
-	// reader's scroll gesture to the right scroller (#762). Backends that do
+	// reader's scroll gesture to the right scroller (pre-rebrand tracker #762). Backends that do
 	// not scroll (desktop, where the AT scrolls by following focus) ignore it.
 	ScrollAncestor core.CanvasObject
 }
@@ -115,11 +115,11 @@ func BuildTree(roots ...core.CanvasObject) []*Node {
 					top.Children = keepInteractiveDescendants(top.Children)
 				}
 				if vp, isProvider := obj.(core.AccessibleVirtualNodeProvider); isProvider {
-					// Virtual nodes (e.g. headings inside RichText, #533) are
+					// Virtual nodes (e.g. headings inside RichText, pre-rebrand tracker #533) are
 					// appended after the prune so it cannot drop them, then the
 					// children are re-sorted by position so sequential AT
 					// navigation reads headings and links in document order
-					// rather than all real nodes first (#545).
+					// rather than all real nodes first (pre-rebrand tracker #545).
 					virtual := vp.AccessibleVirtualNodes()
 					for _, v := range virtual {
 						// The near-viewport window nodes inherit the provider's
@@ -165,7 +165,7 @@ func virtualToNode(parent *Node, v core.AccessibleVirtualNode) *Node {
 	// provider itself when that handles scroll events, else the provider's own
 	// nearest enclosing scroller. Without this a virtual cell/heading has no
 	// ScrollAncestor at all — the walk only stacks real ancestors — so the
-	// mobile backends' AT scroll gesture (#762 Android, #952 iOS) would find
+	// mobile backends' AT scroll gesture (pre-rebrand tracker #762 Android, pre-rebrand tracker #952 iOS) would find
 	// nothing to page.
 	scrollAnc := parent.ScrollAncestor
 	if _, ok := parent.Object.(event.Scrollable); ok {

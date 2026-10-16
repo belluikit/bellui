@@ -128,7 +128,7 @@ func forgetView(token uint64) {
 //
 // Blocking here instead — pumping messages until the controller exists — would
 // re-enter the driver's own window procedure from inside a widget lifecycle
-// call, which is the deadlock shape #973 cost Android; the queue is the same
+// call, which is the deadlock shape pre-rebrand tracker #973 cost Android; the queue is the same
 // answer the other backends reached.
 func (w *WebView) attachRaw(win bellui.Window) error {
 	native, ok := win.(driver.NativeWindow)

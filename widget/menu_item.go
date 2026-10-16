@@ -234,7 +234,7 @@ func (i *menuItem) triggerLast() {
 	// Keyboard activation (Enter) reaches the item through the menu's own key
 	// routing, not the driver's tap dispatch, so emit the central activation
 	// signal here to match the pointer path (menuItem.Tapped is covered by the
-	// driver) (#834, #700).
+	// driver) (pre-rebrand tracker #834, pre-rebrand tracker #700).
 	core.NotifyActivation(i, true)
 	i.trigger()
 }

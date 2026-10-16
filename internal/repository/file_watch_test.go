@@ -100,7 +100,7 @@ func TestFileRepository_WatchURI_MultipleSubscribers(t *testing.T) {
 	cancelB()
 }
 
-// TestFileRepository_WatchURI_SlowSubscriberDoesNotStallOthers guards #663: a
+// TestFileRepository_WatchURI_SlowSubscriberDoesNotStallOthers guards pre-rebrand tracker #663: a
 // subscriber whose callback blocks must never stall delivery to another
 // subscriber (previously all callbacks ran synchronously on the single dispatch
 // goroutine, so one blocked callback wedged every watch to the test timeout).
@@ -154,7 +154,7 @@ func TestFileRepository_WatchURI_CancelTwiceSafe(t *testing.T) {
 	})
 }
 
-// TestFileRepository_WatchURI_ConcurrentControlOps guards #957: WatchURI /
+// TestFileRepository_WatchURI_ConcurrentControlOps guards pre-rebrand tracker #957: WatchURI /
 // cancel / Destroy must never hold the lock the event dispatcher needs across
 // an fsnotify call (on Windows Add/Remove/Close round-trip through fsnotify's
 // reader goroutine, which can itself be waiting to deliver an event into

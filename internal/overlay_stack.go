@@ -29,7 +29,7 @@ func (s *OverlayStack) Add(overlay core.CanvasObject) {
 
 	s.overlays = append(s.overlays, overlay)
 
-	// TODO this should probably apply to all once #707 is addressed
+	// TODO this should probably apply to all once pre-rebrand tracker #707 is addressed
 	if _, ok := overlay.(*widget.OverlayContainer); ok {
 		safePos, safeSize := s.Canvas.InteractiveArea()
 
@@ -115,7 +115,7 @@ func (s *OverlayStack) TopFocusManager() *app.FocusManager {
 	for i := len(s.focusManagers) - 1; i >= 0; i-- {
 		if pt, ok := s.overlays[i].(interface{ PassesInputThrough() bool }); ok && pt.PassesInputThrough() {
 			// Input-pass-through overlays (Toast, Snackbar, tooltips) never
-			// own the keyboard either (#569).
+			// own the keyboard either (pre-rebrand tracker #569).
 			continue
 		}
 		if oc, ok := s.overlays[i].(*widget.OverlayContainer); ok && oc.FocusTransparent {

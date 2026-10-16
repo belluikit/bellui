@@ -10,7 +10,7 @@ import (
 	"github.com/belluikit/webgpu/wgpu"
 )
 
-// TestClassifyAcquire locks the BeginFrame surface-acquire recovery table (#385):
+// TestClassifyAcquire locks the BeginFrame surface-acquire recovery table (pre-rebrand tracker #385):
 // Outdated → reconfigure+retry, Lost/Error → fatal (log+skip), everything else
 // (Timeout, Occluded, an unexpected Success, wrapping, or a non-status error)
 // → plain skip. The real reconfigure round-trip is box-only (lavapipe); this covers

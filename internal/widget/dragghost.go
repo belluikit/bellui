@@ -7,7 +7,7 @@ import (
 )
 
 // DragGhost is an input-pass-through overlay that paints a drag image following
-// the pointer during an in-canvas drag (#819). It spans the canvas but draws
+// the pointer during an in-canvas drag (pre-rebrand tracker #819). It spans the canvas but draws
 // only its content at the tracked position, and reports PassesInputThrough so
 // the driver's hit-testing falls straight through to the UI beneath — the drag
 // dispatch and any drop-target routing must resolve the objects under the

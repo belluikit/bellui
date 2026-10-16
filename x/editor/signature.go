@@ -289,7 +289,7 @@ func (s *signatureController) visible() bool {
 // onTextChanged is called after a user edit. It (re)queries signature help when
 // the user enters or moves within a call. The card is a non-interactive
 // companion: it shows alongside an open completion list rather than yielding to
-// it (#79), sitting above the line while completion sits below.
+// it (pre-rebrand tracker #79), sitting above the line while completion sits below.
 func (s *signatureController) onTextChanged() {
 	if s.provider == nil {
 		return

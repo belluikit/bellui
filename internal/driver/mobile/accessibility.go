@@ -20,8 +20,8 @@ import (
 	"github.com/belluikit/bellui/internal/textinput"
 )
 
-// Platform-neutral half of the mobile screen-reader backends (#488): flattens
-// the semantic tree (#484) into the flat element lists VoiceOver and TalkBack
+// Platform-neutral half of the mobile screen-reader backends (pre-rebrand tracker #488): flattens
+// the semantic tree (pre-rebrand tracker #484) into the flat element lists VoiceOver and TalkBack
 // consume, and owns the handle registry the platform bridges dispatch actions
 // through. Nothing here touches a platform API, so it compiles (and is
 // tested) in the host slice of the mobile driver too.
@@ -62,7 +62,7 @@ const (
 	// sequence keeps, so the platform side can hang the native
 	// virtualized-collection pattern off it — iOS
 	// UIAccessibilityContainerDataTable, Android CollectionInfo +
-	// ACTION_SCROLL_TO_POSITION (#817). Plain containers still contribute no
+	// ACTION_SCROLL_TO_POSITION (pre-rebrand tracker #817). Plain containers still contribute no
 	// element.
 	mobileRoleGrid = 22
 )
@@ -79,7 +79,7 @@ const (
 	mobileA11yFlagFocused                   // holds the canvas keyboard focus
 	mobileA11yFlagScrollable                // inside a scroll area: AT scroll gesture pages it
 	mobileA11yFlagLongPressable             // AT long-press maps to LongPressed/TappedSecondary
-	mobileA11yFlagTextEditable              // editable-text node protocol enabled (#974 option D)
+	mobileA11yFlagTextEditable              // editable-text node protocol enabled (pre-rebrand tracker #974 option D)
 )
 
 // Action kinds the bridges send back through the dispatch exports. 5 is the
@@ -94,7 +94,7 @@ const (
 	mobileA11yActionLongPress      = 8
 
 	// mobileA11yActionCustom is the base of the custom-action kind block
-	// (#1025): a declared widget action with no native semantic (undo, redo,
+	// (pre-rebrand tracker #1025): a declared widget action with no native semantic (undo, redo,
 	// expand, rename, ...) is dispatched as kind = base + its registry id
 	// (a11yCustomActionIDs). Keep in sync with GoNativeActivity.java's
 	// A11Y_ACTION_CUSTOM.
@@ -102,7 +102,7 @@ const (
 )
 
 // Text-edit action kinds an editable-text node's bridge sends back through the
-// text-action dispatch (#974 option D). Offsets a/b are rune indices into the
+// text-action dispatch (pre-rebrand tracker #974 option D). Offsets a/b are rune indices into the
 // node's document — the platform side converts from its own code-unit space —
 // and every edit lands on the editor's gated, undo-recorded paths via the
 // internal/textinput primitives, exactly like the desktop backends.
@@ -127,7 +127,7 @@ type mobileA11yNode struct {
 
 	// gridHandle is the handle of the enclosing mobileRoleGrid container
 	// element, 0 when the element is not inside a virtualized grid. The
-	// bridges use it to associate cells with their collection (#817).
+	// bridges use it to associate cells with their collection (pre-rebrand tracker #817).
 	gridHandle uintptr
 	// cellRow/cellCol are the element's display grid coordinates
 	// (core.AccessibleGridItem space), -1 when it is not a grid item.
@@ -137,7 +137,7 @@ type mobileA11yNode struct {
 	rowCount, colCount int
 
 	// customActs are the node's declared actions that no native semantic
-	// consumes (#1025) — undo/redo on an editor, expand/rename/delete on a
+	// consumes (pre-rebrand tracker #1025) — undo/redo on an editor, expand/rename/delete on a
 	// tree row — offered to the AT as platform custom actions (TalkBack's
 	// actions menu; the iOS mapping is a follow-up). Labels are the actions'
 	// human-readable descriptions; ids index the process-wide name registry
@@ -145,7 +145,7 @@ type mobileA11yNode struct {
 	customActs []mobileA11yCustomAct
 
 	// text/selStart/selEnd carry the editable document for a text-input node
-	// whose object implements core.AccessibleTexter (#974 option D): text is
+	// whose object implements core.AccessibleTexter (pre-rebrand tracker #974 option D): text is
 	// AccessibleText — the live document, the mask for a password field —
 	// which can differ from the spoken value (AccessibleValue is empty for
 	// passwords and lags the live content under Entry.DeferTextSync), and
@@ -155,7 +155,7 @@ type mobileA11yNode struct {
 	selStart, selEnd int
 
 	// textLayout is the visual-layout sidecar of the FOCUSED editable node
-	// (#995), "" for every other node: a bounded window of visual
+	// (pre-rebrand tracker #995), "" for every other node: a bounded window of visual
 	// (soft-wrapped) line boundaries around the caret plus per-character
 	// rectangles around the selection, encoded by mobileA11yTextLayout. The
 	// Android bridge consumes it for legacy-TalkBack LINE granularity and the
@@ -166,7 +166,7 @@ type mobileA11yNode struct {
 
 // a11yTarget is what a dispatched action resolves against: the window the
 // element belongs to and its node snapshot from the most recent gather. For
-// an on-demand realized cell (#817) grid holds the handle of the virtualized
+// an on-demand realized cell (pre-rebrand tracker #817) grid holds the handle of the virtualized
 // container it was realized from — the cell has no CanvasObject, so activating
 // it routes back to the grid's scroll-into-view instead.
 type a11yTarget struct {
@@ -176,16 +176,16 @@ type a11yTarget struct {
 }
 
 // a11yWindowState keys the stable handles by object identity, or by a stable
-// NodeID for nodes that opt into it (virtual nodes with no object, #533, and
+// NodeID for nodes that opt into it (virtual nodes with no object, pre-rebrand tracker #533, and
 // realized nodes of a virtualized collection whose object is recycled across
-// records, AccessibleIdentified #635), so an element keeps its handle across
+// records, AccessibleIdentified pre-rebrand tracker #635), so an element keeps its handle across
 // frames and the screen reader's cursor survives unrelated repaints.
 type a11yWindowState struct {
 	handles map[core.CanvasObject]uintptr
 	virtual map[any]uintptr
 
 	// realized holds elements built on demand for a screen reader navigating a
-	// virtualized grid past its viewport (#817), keyed by the cell's stable
+	// virtualized grid past its viewport (pre-rebrand tracker #817), keyed by the cell's stable
 	// NodeID. They are delivered outside the gather walk, so the sweep never
 	// sees them: they leave by FIFO eviction, by promotion into virtual when
 	// the same NodeID scrolls into the walked window, or with the window.
@@ -206,7 +206,7 @@ var (
 	a11yTargets    = map[uintptr]a11yTarget{}
 	a11yNextHandle uintptr
 
-	// Process-wide custom-action name registry (#1025): each non-standard
+	// Process-wide custom-action name registry (pre-rebrand tracker #1025): each non-standard
 	// declared action name gets a small stable id the platform bridges carry
 	// in place of the string, so the action up-call stays the existing
 	// (handle, int-kind) channel. Append-only, so an id never changes meaning
@@ -279,8 +279,8 @@ func (w *window) mobileA11yGather() (nodes []mobileA11yNode, removed []uintptr) 
 // everything beneath it inert, so the sequence contains only that overlay and
 // any transient (pass-through) overlays stacked above it — matching native
 // modal semantics and the input hit-test barrier
-// (internal/driver.FindObjectAtPositionMatching, #569). Without this the content
-// under a dialog stays focusable and activatable by a screen reader (#807).
+// (internal/driver.FindObjectAtPositionMatching, pre-rebrand tracker #569). Without this the content
+// under a dialog stays focusable and activatable by a screen reader (pre-rebrand tracker #807).
 // Toast/Snackbar overlays pass input through, so they are not barriers and the
 // content below stays reachable.
 func (w *window) mobileA11yRoots() []core.CanvasObject {
@@ -317,7 +317,7 @@ func overlayA11yPassesThrough(o core.CanvasObject) bool {
 // is culled with its subtree, like the desktop backends. gridHandle is the
 // handle of the nearest enclosing virtualized-grid element (0 outside one);
 // a virtualized grid keeps a container element of its own — the one container
-// the flat sequence preserves — and its descendants carry its handle (#817).
+// the flat sequence preserves — and its descendants carry its handle (pre-rebrand tracker #817).
 func (w *window) flattenA11yNode(n *accessibility.Node, st *a11yWindowState, focusedObj core.CanvasObject,
 	seen map[core.CanvasObject]bool, seenVirtual map[any]bool, gridHandle uintptr, out []mobileA11yNode,
 ) []mobileA11yNode {
@@ -343,7 +343,7 @@ func (w *window) a11yWireNode(n *accessibility.Node, st *a11yWindowState, focuse
 	role, ok := mobileA11yRole(n)
 	if !ok {
 		// A virtualized grid container is the one container role that keeps an
-		// element: the platform virtualized-collection patterns (#817) hang off
+		// element: the platform virtualized-collection patterns (pre-rebrand tracker #817) hang off
 		// it. Gated on the realize seam plus a reported extent, so plain
 		// tables/lists keep the flat container-free sequence.
 		if _, realizer := n.Object.(core.AccessibleVirtualCellRealizer); realizer && n.HasGridDims {
@@ -358,8 +358,8 @@ func (w *window) a11yWireNode(n *accessibility.Node, st *a11yWindowState, focuse
 	// realized just past the fold (overscan) partially overlaps its scroll clip,
 	// so it survives the subtree cull, but its full bounds run below the viewport
 	// and under the system nav bar. Reporting the clipped bounds keeps the screen
-	// reader (and the in-scene focus ring, #759) inside the usable area, and a
-	// row wholly outside it is dropped from the focus order (#808).
+	// reader (and the in-scene focus ring, pre-rebrand tracker #759) inside the usable area, and a
+	// row wholly outside it is dropped from the focus order (pre-rebrand tracker #808).
 	bounds, visible := w.a11yVisibleBounds(n)
 	if !visible {
 		return mobileA11yNode{}, false
@@ -370,12 +370,12 @@ func (w *window) a11yWireNode(n *accessibility.Node, st *a11yWindowState, focuse
 	switch {
 	case n.NodeID != nil:
 		// Nodes with a stable identity reconcile against it rather than their
-		// CanvasObject: virtual nodes with no object (#533) and realized nodes
+		// CanvasObject: virtual nodes with no object (pre-rebrand tracker #533) and realized nodes
 		// of a virtualized collection whose object is recycled across records
-		// (AccessibleIdentified, #635), so the element tracks the record.
+		// (AccessibleIdentified, pre-rebrand tracker #635), so the element tracks the record.
 		handle, exists = st.virtual[n.NodeID]
 		if !exists {
-			// Promotion (#817): a cell realized on demand while off-viewport
+			// Promotion (pre-rebrand tracker #817): a cell realized on demand while off-viewport
 			// has scrolled into the walked window. Reuse its element so the
 			// screen reader's cursor survives the realize → visible transition.
 			if h, ok := st.realized[n.NodeID]; ok {
@@ -432,7 +432,7 @@ func (w *window) a11yWireNode(n *accessibility.Node, st *a11yWindowState, focuse
 	node.customActs = mobileA11yCustomActions(n)
 	// A text-input node backed by a core.AccessibleTexter publishes its live
 	// document and selection so the platform side can run the native editable-
-	// text protocol against it (#974 option D). Reading the document is cheap
+	// text protocol against it (pre-rebrand tracker #974 option D). Reading the document is cheap
 	// per frame: Entry's provider memoizes the materialized string between
 	// edits. Read-only and disabled editors keep the document (the AT can
 	// still read and select) but do not enable the edit protocol.
@@ -445,7 +445,7 @@ func (w *window) a11yWireNode(n *accessibility.Node, st *a11yWindowState, focuse
 				node.flags |= mobileA11yFlagTextEditable
 			}
 			// The focused editor additionally publishes its visual layout
-			// (#995) when the widget exposes one (core.AccessibleTextLayouter,
+			// (pre-rebrand tracker #995) when the widget exposes one (core.AccessibleTextLayouter,
 			// Entry does) — bounded around the caret, so the per-frame cost
 			// stays O(window) however large the document.
 			if node.flags&mobileA11yFlagFocused != 0 && node.text != "" && node.selStart >= 0 {
@@ -460,7 +460,7 @@ func (w *window) a11yWireNode(n *accessibility.Node, st *a11yWindowState, focuse
 	return node, true
 }
 
-// Bounds of the per-frame visual-layout sidecar (#995): visual lines fed
+// Bounds of the per-frame visual-layout sidecar (pre-rebrand tracker #995): visual lines fed
 // either side of the caret line, and the per-character rectangle window
 // around the selection. Both keep the sidecar O(window) per dirty frame on
 // arbitrarily large documents; a granularity move outside the line window
@@ -483,7 +483,7 @@ type a11yVisualLayout interface {
 }
 
 // mobileA11yTextLayout encodes the focused editable node's visual-layout
-// sidecar (#995). Two sections, '\n'-separated:
+// sidecar (pre-rebrand tracker #995). Two sections, '\n'-separated:
 //
 //	L:<b0>,<b1>,...   — UTF-16 boundary offsets of consecutive visual lines
 //	                    [caretLine-window, caretLine+window]: line i of the
@@ -537,11 +537,11 @@ func mobileA11yTextLayout(lay a11yVisualLayout, text string,
 	// Character rectangles: the visual lines around the selection, capped at
 	// mobileA11yCharWindowMax chars around the free cursor (selEnd). The span
 	// matches the L: line window (±mobileA11yLineWindow) rather than only the
-	// caret's line ±1: iOS answers VoiceOver's per-line ring (#1107) from these
+	// caret's line ±1: iOS answers VoiceOver's per-line ring (pre-rebrand tracker #1107) from these
 	// rects via selectionRectsForRange:, and VoiceOver queries the ring for any
 	// nearby line the user taps or navigates to — not just the caret's — so a
 	// ±1-line window left every other line to fall back to the proxy's
-	// mismatched geometry (#1113). Android's granular highlight/magnifier only
+	// mismatched geometry (pre-rebrand tracker #1113). Android's granular highlight/magnifier only
 	// reads the caret's own line, so the wider (still 256-char-capped) window is
 	// harmless there.
 	selLo, selHi := selStart, selEnd
@@ -599,7 +599,7 @@ func mobileA11yTextInputRole(role int) bool {
 // (HasClip) is bounded by its clip intersected with the canvas interactive area
 // (the safe viewport minus system insets / nav bar and the window head), so an
 // overscan row never reports focus bounds past the viewport or under system UI
-// (#808). Unclipped nodes — the window head, top-level content, dialogs — keep
+// (pre-rebrand tracker #808). Unclipped nodes — the window head, top-level content, dialogs — keep
 // their full bounds (clipping the head to the interactive area, which excludes
 // it, would make the back button unfocusable).
 func (w *window) a11yVisibleBounds(n *accessibility.Node) (geo.Rectangle, bool) {
@@ -679,7 +679,7 @@ func mobileA11yRole(n *accessibility.Node) (int, bool) {
 		return mobileRoleCell, true
 	case core.RoleTableRow:
 		// A labeled row is a real reading stop — a grid group header
-		// ("West (125)" with expand/collapse actions, fyne#951) — while an
+		// ("West (125)" with expand/collapse actions, pre-rebrand tracker #951) — while an
 		// unlabeled row is just a container and stays dropped like the other
 		// container roles. Heading, not plain text: TalkBack/VoiceOver then
 		// announce it as a heading and offer heading navigation, which is
@@ -695,7 +695,7 @@ func mobileA11yRole(n *accessibility.Node) (int, bool) {
 // widget subtree in full, then the main cells subtree), so without this a
 // linear swipe walks the whole pinned column before crossing into the row's
 // remaining cells, and lateral navigation out of a pinned cell falls off the
-// collection (#951). Within one row band two grid items order by their display
+// collection (pre-rebrand tracker #951). Within one row band two grid items order by their display
 // column coordinate (visual/current-view space, so RTL presentations keep
 // their reading order); a non-item row node (a group header spanning the band
 // alone) falls back to the mirrored x bounds.
@@ -750,7 +750,7 @@ func mobileA11yFlags(n *accessibility.Node) int {
 	if mobileA11yHasAction(n, core.ActionDismiss) {
 		flags |= mobileA11yFlagDismissable
 	}
-	// Expose the AT scroll gesture (#762). A screen reader (TalkBack, VoiceOver)
+	// Expose the AT scroll gesture (pre-rebrand tracker #762). A screen reader (TalkBack, VoiceOver)
 	// scrolls a scrollable *container*, not a leaf inside it — so the node that
 	// IS the scroller (its object implements event.Scrollable: a Scroll, List,
 	// grid, …) must carry the flag, else the two-finger scroll gesture finds no
@@ -794,11 +794,11 @@ func mobileA11yPressAction(n *accessibility.Node) string {
 
 // mobileA11yCustomActions returns the node's declared actions that no native
 // mobile semantic consumes, in declaration order, as (registry id, label)
-// wire pairs (#1025): the press-mapped action, the increment/decrement pair
+// wire pairs (pre-rebrand tracker #1025): the press-mapped action, the increment/decrement pair
 // (the adjustable gesture) and dismiss (the scrub/back gesture) are excluded;
 // everything else — undo, redo, expand, collapse, rename, delete, and any
 // future names — is offered as a platform custom action. The mobile mirror of
-// the darwin backend's a11yCustomActions (#501). Caller must hold a11yMu (the
+// the darwin backend's a11yCustomActions (pre-rebrand tracker #501). Caller must hold a11yMu (the
 // registry is shared with the dispatch path).
 func mobileA11yCustomActions(n *accessibility.Node) []mobileA11yCustomAct {
 	press := mobileA11yPressAction(n)
@@ -825,7 +825,7 @@ func mobileA11yCustomActions(n *accessibility.Node) []mobileA11yCustomAct {
 
 // mobileA11yNodesEqual reports whether two wire nodes are identical — the
 // per-frame diff the iOS bridge elides unchanged ObjC dispatch with. A plain
-// == stopped compiling when the node gained the customActs slice (#1036).
+// == stopped compiling when the node gained the customActs slice (pre-rebrand tracker #1036).
 // KEEP IN SYNC with mobileA11yNode: a field added there must be compared
 // here, or the iOS bridge silently stops propagating its changes.
 func mobileA11yNodesEqual(a, b mobileA11yNode) bool {
@@ -842,7 +842,7 @@ func mobileA11yNodesEqual(a, b mobileA11yNode) bool {
 }
 
 // a11yEncodeCustomActs flattens the (registry id, label) custom-action pairs
-// (#1025) into the single-string wire form the platform bridges parse
+// (pre-rebrand tracker #1025) into the single-string wire form the platform bridges parse
 // (GoNativeActivity.java and accessibility_ios.m): entries separated by
 // U+001E (record separator), id from label by U+001F (unit separator) —
 // labels are arbitrary human text, so no printable delimiter is safe. Empty
@@ -956,7 +956,7 @@ func mobileA11yDispatchOnMain(handle uintptr, action int) {
 		return
 	}
 	n := t.node
-	// A custom action (#1025): resolve the registry id back to its name and
+	// A custom action (pre-rebrand tracker #1025): resolve the registry id back to its name and
 	// perform it — mobileA11yPerform re-validates against the node's current
 	// declaration, so a stale menu pick (the action list changed while the
 	// AT's menu was open) is a no-op rather than a misfire.
@@ -970,7 +970,7 @@ func mobileA11yDispatchOnMain(handle uintptr, action int) {
 	case mobileA11yActionActivate:
 		// An on-demand realized cell has no widget to activate; pressing it
 		// (a double-tap on an off-viewport cell) brings it into view
-		// instead, after which the real host handles selection (#817, the
+		// instead, after which the real host handles selection (pre-rebrand tracker #817, the
 		// mobile mirror of the desktop bridges' press-on-realized path).
 		if n.Object == nil && t.grid != 0 && n.HasCellPosition {
 			if gt, ok := mobileA11yLookup(t.grid); ok {
@@ -1023,12 +1023,12 @@ func mobileA11yDispatchOnMain(handle uintptr, action int) {
 }
 
 // mobileA11yTextDispatch performs a bridge text-edit action against a handle
-// on the main goroutine (#974 option D): the platform side resolves granularity
+// on the main goroutine (pre-rebrand tracker #974 option D): the platform side resolves granularity
 // segments and code-unit offsets itself and sends rune offsets here, where the
 // edit lands on the editor's own gated, undo-recorded paths via the
 // internal/textinput primitives — the same seam the macOS and Windows text
 // protocols consume. The next gather republishes the node's text + selection
-// (the wire node, not the severed shadow EditText — #1006 Phase 3), so the
+// (the wire node, not the severed shadow EditText — pre-rebrand tracker #1006 Phase 3), so the
 // platform's optimistically-applied state reconciles against widget truth.
 func mobileA11yTextDispatch(handle uintptr, kind, a, b int, text string) {
 	mobileA11yQueue(func() {
@@ -1060,7 +1060,7 @@ func mobileA11yTextDispatchOnMain(handle uintptr, kind, a, b int, text string) {
 }
 
 // mobileA11yScroll pages the node's nearest scroller by ~a screenful in
-// response to a screen reader's scroll gesture (#762). Forward reveals content
+// response to a screen reader's scroll gesture (pre-rebrand tracker #762). Forward reveals content
 // further along (down / trailing); the scroller's own axis handling maps a
 // vertical delta to a horizontal-only scroller.
 func mobileA11yScroll(n *accessibility.Node, forward bool) {
@@ -1128,7 +1128,7 @@ func mobileA11yPerform(n *accessibility.Node, name string) {
 // accessibility focus on, or 0 when none. Set from the platform focus callback
 // (Android TalkBack a11y-focus event; iOS is a follow-up) on an OS thread and
 // read on the main goroutine at paint time, so it is atomic. It drives the
-// in-scene focus ring (#759): TalkBack's own green highlight cannot reach
+// in-scene focus ring (pre-rebrand tracker #759): TalkBack's own green highlight cannot reach
 // Bellui's flat GPU (WebGPU/Vulkan) surface — the a11y layer is a parallel tree
 // of invisible zero-pixel proxy Views — so Bellui paints its own ring over the
 // focused element instead, the way Flutter does under NativeActivity.
@@ -1161,7 +1161,7 @@ func mobileA11ySetFocus(handle uintptr, focused bool) {
 
 // a11yFocusRing returns the canvas-space bounds (device-independent units) of
 // the element the screen reader currently has accessibility focus on within
-// this window, for the in-scene focus ring (#759). ok is false when nothing is
+// this window, for the in-scene focus ring (pre-rebrand tracker #759). ok is false when nothing is
 // focused, the focus is in another window, or the focused element has left the
 // tree since the last gather.
 func (w *window) a11yFocusRing() (geo.Rectangle, bool) {
@@ -1174,7 +1174,7 @@ func (w *window) a11yFocusRing() (geo.Rectangle, bool) {
 		return geo.Rectangle{}, false
 	}
 	// Clip the ring to the usable viewport so it never draws over the system nav
-	// bar for an overscan row (#808).
+	// bar for an overscan row (pre-rebrand tracker #808).
 	return w.a11yVisibleBounds(t.node)
 }
 

@@ -44,7 +44,7 @@ func headerLabelX(t *testing.T, g *DataGrid) map[string]float32 {
 
 // The header shares the body's region layout: under horizontal scroll the main
 // header labels translate by -offset.X while the pinned-left/right labels stay
-// fixed (#58). This verifies the rendering (label geometry), complementing the
+// fixed (pre-rebrand tracker #58). This verifies the rendering (label geometry), complementing the
 // hit-test round-trip tests.
 func TestHeaderRender_MainScrollsPinnedFixed(t *testing.T) {
 	data := make([]map[string]any, 10)

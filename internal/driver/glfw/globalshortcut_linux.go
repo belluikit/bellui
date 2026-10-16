@@ -20,7 +20,7 @@ var (
 )
 
 // RegisterGlobalShortcut implements desktop.GlobalShortcutApp. The backend is
-// chosen at runtime by display server (build.IsWayland, see #542): Wayland uses
+// chosen at runtime by display server (build.IsWayland, see pre-rebrand tracker #542): Wayland uses
 // the org.freedesktop.portal.GlobalShortcuts portal (which may prompt the user
 // for consent — a nil return means the request was accepted, not necessarily
 // that the binding is live), X11 grabs the key on the root window with XGrabKey.

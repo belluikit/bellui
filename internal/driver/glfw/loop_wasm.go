@@ -27,7 +27,7 @@ func (d *gLDriver) pollEvents() {
 // 60Hz ticker (glfw-js has no PostEmptyEvent/WaitEventsTimeout).
 func wakeMainLoop() {}
 
-// runEventLoop is the wasm main loop: the pre-#576 ticker+select model,
+// runEventLoop is the wasm main loop: the before pre-rebrand tracker #576 ticker+select model,
 // kept as-is because the browser runtime has no native event wait to sit in.
 func (d *gLDriver) runEventLoop() {
 	eventTick := time.NewTicker(time.Second / 60)
@@ -59,7 +59,7 @@ func (d *gLDriver) runEventLoop() {
 // then takes async.EnsureMain's blocking fallback (bellui.DoAndWait) on the first
 // Refresh. For the synchronous listeners that parks the single-threaded wasm JS
 // thread inside the callback, so runGL can never drain funcQueue to signal
-// completion → deadlock (#113). Posting without waiting lets the JS callback
+// completion → deadlock (pre-rebrand tracker #113). Posting without waiting lets the JS callback
 // return immediately while the handler still runs on the main goroutine, in
 // funcQueue (FIFO) order — matching desktop GLFW, which invokes callbacks
 // synchronously on main inside pollEvents.

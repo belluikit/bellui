@@ -30,7 +30,7 @@ func headerHitGrid(t *testing.T) *DataGrid {
 // The header now scrolls horizontally in sync with the body (all columns are
 // non-pinned here), so header column identification is region-aware and tracks
 // the scroll offset — a tap resolves to the column currently drawn under it
-// (#58). This supersedes the static-header mapping from #56.
+// (pre-rebrand tracker #58). This supersedes the static-header mapping from pre-rebrand tracker #56.
 func TestHeaderHitTest_TracksHScroll(t *testing.T) {
 	g := headerHitGrid(t)
 	yHead := g.HeaderHeight() / 2 // inside the header row
@@ -51,7 +51,7 @@ func TestHeaderHitTest_TracksHScroll(t *testing.T) {
 
 // Starting a column reorder from the header picks the column currently drawn
 // under the cursor, using the same region-aware mapping the header renderer uses
-// (#58): under horizontal scroll that is columnAtX, not a raw-X mapping.
+// (pre-rebrand tracker #58): under horizontal scroll that is columnAtX, not a raw-X mapping.
 func TestHeaderReorder_PicksColumnUnderHScroll(t *testing.T) {
 	g := headerHitGrid(t)
 	yHead := g.HeaderHeight() / 2
@@ -75,7 +75,7 @@ func TestHeaderReorder_PicksColumnUnderHScroll(t *testing.T) {
 
 // With pinned-left and pinned-right bands, header taps resolve to the same
 // absolute columns the body does: the pinned bands are fixed (unaffected by
-// horizontal scroll) while the main band tracks the scroll offset (#58). A
+// horizontal scroll) while the main band tracks the scroll offset (pre-rebrand tracker #58). A
 // header tap shares the body's region model, so cellAtPosition in the header
 // row (Row == -1) mirrors hitRegions.
 func TestHeaderHitTest_RegionsUnderHScroll(t *testing.T) {

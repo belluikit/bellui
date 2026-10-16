@@ -16,14 +16,14 @@ edit-guard — one of pxfed's defining features.
 > - [#65](https://github.com/belluikit/bellui/x/editor/issues/65) — **`ClassifySpanChanges`**
 >   (port of pxfed `secret-changes.ts`). Pure helper. ✅ ([#67](https://github.com/belluikit/bellui/x/editor/pull/67))
 >
-> **F3 consumed via a pre-release pin:** F3 ([fyne#140](https://github.com/trendvidia/fyne/issues/140))
+> **F3 consumed via a pre-release pin:** F3 (pre-rebrand tracker #140)
 > is merged to the `trendvidia/fyne` fork but **not yet in a tagged release**.
 > Rather than wait, fycoder's go.mod pins a **pseudo-version of the fork commit**
-> (`v2.9.1-0.…`); #63/#64 are validated locally (the project has no CI —
+> (`v2.9.1-0.…`); pre-rebrand tracker #63/#64 are validated locally (the project has no CI —
 > `GOWORK=off go build/vet/test ./...` green against the pin via the Go proxy).
 > Swap to the real tag (e.g. v2.10.0) with a one-line go.mod bump once fyne cuts
 > it. A gitignored `go.work` remains as a local convenience pointing at a fork
-> checkout. #65 was fork-independent and landed earlier with no pin.
+> checkout. pre-rebrand tracker #65 was fork-independent and landed earlier with no pin.
 >
 > **Addressing is all rune-based** (verified): (row,col) columns are rune indices
 > and F3 uses flat **rune offsets** into Text — the only conversion is a structural
@@ -34,7 +34,7 @@ edit-guard — one of pxfed's defining features.
 > `OnProtectedEditAttempt` can fire (caret still allowed); masked redactions use
 > `ProtectedRanges{CaretOpaque}` (caret barred, silent veto — the bar covers them).
 >
-> Shipped order: #65 → pre-release pin → #63 → #64. Remaining: swap the pin for
+> Shipped order: pre-rebrand tracker #65 → pre-release pin → pre-rebrand tracker #63 → pre-rebrand tracker #64. Remaining: swap the pin for
 > the fyne v2.10.0 tag when released; gallery demo (deferred, post-release).
 
 pxfed protects decrypted secret values with a **three-layer edit guard**

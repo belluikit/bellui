@@ -2,7 +2,7 @@
 
 #import <stdbool.h>
 
-// NSPasteboard bridge for the clipboard flavor interfaces (#513).
+// NSPasteboard bridge for the clipboard flavor interfaces (pre-rebrand tracker #513).
 // Ownership contract: every pointer returned to Go is a malloc'd copy that
 // Go frees; pointers passed in are borrowed and copied before returning.
 

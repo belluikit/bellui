@@ -17,12 +17,12 @@ import (
 // joinWord is three Arabic beh, a dual-joining letter, so the word connects
 // cursively across any split point — the seam glyphs take medial forms that are
 // distinct (and narrower) from the isolated/initial/final forms a run shaped on
-// its own would use. Issue #26.
+// its own would use. pre-rebrand Issue pre-rebrand tracker #26.
 const joinWord = "ببب"
 
 // TestStyledLineVisualLayoutCrossRunJoining verifies that an Arabic word split
 // across two same-face style runs is shaped with cursive joining preserved, so
-// the split layout matches shaping the whole word as a single run (issue #26).
+// the split layout matches shaping the whole word as a single run (pre-rebrand issue #26).
 func TestStyledLineVisualLayoutCrossRunJoining(t *testing.T) {
 	lang.SetLocaleForTests(t, "en-US")
 	rs := []rune(joinWord)
@@ -50,7 +50,7 @@ func TestStyledLineVisualLayoutCrossRunJoining(t *testing.T) {
 
 // TestDrawStyledRunsCrossRunJoining is an end-to-end check that the same word,
 // split across two same-colour same-face runs, renders pixel-identically to the
-// whole word — i.e. DrawStyledRuns shapes the runs together (issue #26).
+// whole word — i.e. DrawStyledRuns shapes the runs together (pre-rebrand issue #26).
 func TestDrawStyledRunsCrossRunJoining(t *testing.T) {
 	lang.SetLocaleForTests(t, "en-US")
 	rs := []rune(joinWord)

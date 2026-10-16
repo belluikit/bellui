@@ -492,7 +492,7 @@ func resolveElements(elms []*Element, pool, bxPool *Pool) {
 
 		if el.Name.Resolve(bxPool) == "application" {
 			// The android manifest seems to be very delicate - though it may be code in this package
-			// set the order very carefully... #2653 and others
+			// set the order very carefully... pre-rebrand tracker #2653 and others
 			sort.Slice(el.attrs, func(i, j int) bool {
 				a := el.attrs[i].Name.Resolve(bxPool)
 				if a == "configChanges" || a == "debuggable" {

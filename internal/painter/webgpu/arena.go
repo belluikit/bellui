@@ -1,8 +1,8 @@
 package webgpu
 
-// Per-frame vertex/uniform arena bookkeeping (#255).
+// Per-frame vertex/uniform arena bookkeeping (pre-rebrand tracker #255).
 //
-// The slot pool (#245) reuses a vertex buffer, a uniform buffer and a bind group
+// The slot pool (pre-rebrand tracker #245) reuses a vertex buffer, a uniform buffer and a bind group
 // per draw across frames, but still issues two queue.WriteBuffer calls per draw
 // (vertex + uniform), so a frame with N draws makes ~2N WriteBuffer cgo calls.
 // The arena instead accumulates every draw's vertex data into one CPU staging

@@ -18,7 +18,7 @@ func TestRichEntry_AccessibleText_Memoized(t *testing.T) {
 	b := e.AccessibleText()
 	assert.Equal(t, "hello world", a)
 	// Repeated reads return the same string object, not a rebuilt one — this is
-	// what keeps the per-paint-frame mobile sync O(1) (#783).
+	// what keeps the per-paint-frame mobile sync O(1) (pre-rebrand tracker #783).
 	assert.True(t, unsafe.StringData(a) == unsafe.StringData(b),
 		"AccessibleText should be memoized between reads")
 
@@ -36,7 +36,7 @@ func TestRichEntry_AccessibleText_Memoized(t *testing.T) {
 	assert.Equal(t, "new", e.AccessibleText())
 }
 
-// IME composition and repaints must NOT drop the AccessibleText memo (#794):
+// IME composition and repaints must NOT drop the AccessibleText memo (pre-rebrand tracker #794):
 // the preedit is excluded from the committed rune stream, so a screen reader
 // tracking the caret during CJK composition would otherwise rebuild the whole
 // string on every preedit keystroke over a large document. Only a committed edit
@@ -98,7 +98,7 @@ func TestRichEntry_AccessibleTexter_ReplaceSelection(t *testing.T) {
 	e := NewRichEntry()
 	e.SetSegments([]RichTextSegment{&TextSegment{Text: "hello world"}})
 
-	// Replace the "world" range (#748 replace-selection semantics).
+	// Replace the "world" range (pre-rebrand tracker #748 replace-selection semantics).
 	e.SetAccessibleSelection(6, 11)
 	e.ReplaceAccessibleSelection("there")
 	assert.Equal(t, "hello there", e.AccessibleText())

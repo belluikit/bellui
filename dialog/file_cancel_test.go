@@ -15,7 +15,7 @@ import (
 // multi-select shape was missing, so cancelling a canvas-served multi-select
 // dialog panicked with an interface-conversion error (#253) — found live in
 // the #239 iPad pass, where mobile serves multi-select through the canvas
-// dialog (#716).
+// dialog (pre-rebrand tracker #716).
 func TestFileDialog_CancelReportsEveryCallbackShape(t *testing.T) {
 	test.NewTempApp(t)
 	w := test.NewWindow(widget.NewLabel("x"))

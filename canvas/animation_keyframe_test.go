@@ -100,7 +100,7 @@ func TestPositionKeyframeAnimation(t *testing.T) {
 
 func TestKeyframeAnimation_EpsilonEndpoints(t *testing.T) {
 	// Float-computed endpoints that land just shy of 0.0/1.0 must not panic the
-	// public constructor (#289).
+	// public constructor (pre-rebrand tracker #289).
 	kf := []Keyframe{
 		{Progress: 0.0000001, Value: 0},
 		{Progress: 0.9999998, Value: 100},

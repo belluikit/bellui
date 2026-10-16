@@ -1,5 +1,5 @@
 # uiarealize.ps1 <pid> [row] [col] - exercise the off-viewport virtualized-cell
-# realize seam (fyne#637, Stage 3) against a running a11yrealizeprobe.
+# realize seam (pre-rebrand tracker #637, Stage 3) against a running a11yrealizeprobe.
 #
 # It finds the process's grid element (the one exposing the UIA Grid pattern),
 # reports its full extent, then calls GridPattern.GetItem(row, col) for a cell

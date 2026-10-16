@@ -17,12 +17,12 @@ type TextEdit struct {
 // ApplyEdits applies a batch of splices to the document as one atomic edit
 // with user-edit semantics — the programmatic counterpart to a keystroke, and
 // the API hosts should use for quick fixes, refactors, formatting and other
-// tool-driven rewrites (#160):
+// tool-driven rewrites (pre-rebrand tracker #160):
 //
 //   - one undo step, one [Editor.OnChanged] call with the full new text;
 //   - gated like a manual edit: a splice touching a protected range or masked
 //     redaction vetoes the WHOLE batch (nothing is applied, reported false);
-//   - anchor-tracked (#130): protected/redaction/fold ranges shift through the
+//   - anchor-tracked (pre-rebrand tracker #130): protected/redaction/fold ranges shift through the
 //     edit, no host re-publish needed;
 //   - the caret lands at the end of the last splice's replacement text;
 //   - a sync point under [Editor.DeferTextSync].

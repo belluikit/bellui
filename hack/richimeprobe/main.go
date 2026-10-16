@@ -1,6 +1,6 @@
 // Command richimeprobe verifies widget.RichEntry IME composition on real targets
-// (#674), side by side with a plain widget.Entry as the control. Both share the
-// same native mobile IME seam (#126, iOS GoInputView = a UITextField subclass),
+// (pre-rebrand tracker #674), side by side with a plain widget.Entry as the control. Both share the
+// same native mobile IME seam (pre-rebrand tracker #126, iOS GoInputView = a UITextField subclass),
 // so comparing them isolates whether a missing Pinyin candidate bar / conversion
 // is RichEntry-specific or a shared mobile-IME gap.
 //
@@ -23,7 +23,7 @@ import (
 	// Register a bundled CJK font so committed Chinese/Japanese/Korean text
 	// renders as real glyphs instead of tofu boxes (the bundled default fonts
 	// are Latin-only; iOS system-font scan is unreliable). This isolates IME
-	// correctness from font coverage when verifying #771/#773.
+	// correctness from font coverage when verifying pre-rebrand tracker #771/#773.
 	_ "github.com/belluikit/bellui/theme/cjk"
 )
 
@@ -47,12 +47,12 @@ func main() {
 		bellui.Do(func() { logLbl.SetText(out) })
 	}
 
-	// Control: plain Entry (its iOS IME was validated in #126).
+	// Control: plain Entry (its iOS IME was validated in pre-rebrand tracker #126).
 	entry := widget.NewEntry()
 	entry.SetPlaceHolder("A) plain Entry — type Pinyin here")
 	entry.OnChanged = func(s string) { logf("Entry.OnChanged=%q", s) }
 
-	// Pre-filled so #748 (select-all + type replaces, not appends) is testable:
+	// Pre-filled so pre-rebrand tracker #748 (select-all + type replaces, not appends) is testable:
 	// long-press → Select All → type a char; expect the field to become that char.
 	entry.SetText("select me and type")
 
@@ -62,7 +62,7 @@ func main() {
 		logf("RichEntry.String()=%q", re.String())
 	}
 
-	// Regression guard for the iOS mirror (#771): plain caret input still routes
+	// Regression guard for the iOS mirror (pre-rebrand tracker #771): plain caret input still routes
 	// through TypedRune, so NumericEntry's filter must reject letters.
 	num := widget.NewNumericEntry()
 	num.SetPlaceHolder("C) NumericEntry — letters must be rejected")

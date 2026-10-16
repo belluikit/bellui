@@ -28,9 +28,9 @@ type TimePicker struct {
 	selectingMinute bool
 
 	focused    bool
-	focusField int // keyboard cursor: which header field is focused (#543)
+	focusField int // keyboard cursor: which header field is focused (pre-rebrand tracker #543)
 
-	// Direct digit-entry buffer (#549): the pending tens digit of a two-digit
+	// Direct digit-entry buffer (pre-rebrand tracker #549): the pending tens digit of a two-digit
 	// value being typed into the focused hour/minute field. hasPartial gates
 	// it so a buffered 0 is distinguishable from "no partial".
 	partial    int
@@ -65,7 +65,7 @@ func (t *TimePicker) FocusLost() {
 	t.Refresh()
 }
 
-// TypedRune drives direct digit entry (#549): typed digits accumulate into the
+// TypedRune drives direct digit entry (pre-rebrand tracker #549): typed digits accumulate into the
 // focused hour or minute field. A first digit that could still be the tens place
 // of a valid two-digit value (hour "1"/"2" in 24h, "0"/"1" in 12h; minute "0".."5")
 // is buffered to await a second digit; any other digit commits immediately as a
@@ -196,7 +196,7 @@ func (t *TimePicker) clearPartial() {
 	t.hasPartial = false
 }
 
-// TypedKey drives the picker from the keyboard (#543): Left/Right move
+// TypedKey drives the picker from the keyboard (pre-rebrand tracker #543): Left/Right move
 // between the hour, minute and (12h mode) AM/PM fields, Up/Down adjust the
 // focused field — hour and minute wrap, AM/PM toggles — and Enter/Space
 // activates it like a tap (switching the dial or setting the meridiem).
@@ -224,7 +224,7 @@ func (t *TimePicker) TypedKey(ev *event.KeyEvent) {
 			t.setMeridiem(true)
 		}
 	case event.KeyEscape:
-		// Discard a partial digit entry (#549); the committed value and the
+		// Discard a partial digit entry (pre-rebrand tracker #549); the committed value and the
 		// dial that follows it are left untouched.
 		t.clearPartial()
 		t.Refresh()
@@ -232,7 +232,7 @@ func (t *TimePicker) TypedKey(ev *event.KeyEvent) {
 }
 
 func (t *TimePicker) moveFocusField(dir int) {
-	t.clearPartial() // moving the cursor discards a pending digit (#549)
+	t.clearPartial() // moving the cursor discards a pending digit (pre-rebrand tracker #549)
 	last := tpFieldMinute
 	if !t.Use24Hour {
 		last = tpFieldPM
@@ -322,7 +322,7 @@ func (t *TimePicker) CreateRenderer() core.WidgetRenderer {
 	bg := canvas.NewRectangle(color.Transparent)
 	titleLabel := canvas.NewText(lang.L("Select time"), color.White)
 
-	// Hour/minute display buttons (#543): real widgets, so they are
+	// Hour/minute display buttons (pre-rebrand tracker #543): real widgets, so they are
 	// accessible nodes and receive their own taps.
 	hourBtn := newTimePickerButton(core.RoleTab, lang.L("Hour"), func() {
 		t.selectingMinute = false
@@ -330,7 +330,7 @@ func (t *TimePicker) CreateRenderer() core.WidgetRenderer {
 		t.Refresh()
 	})
 	// Screen-reader adjust (TalkBack / VoiceOver swipe up-down) on the hour
-	// field, mirroring the keyboard Up/Down path (#796). The hour wraps through
+	// field, mirroring the keyboard Up/Down path (pre-rebrand tracker #796). The hour wraps through
 	// the full 0–23 range in both 12h and 24h modes, matching adjustFocusField.
 	hourBtn.onAdjust = func(delta int) {
 		t.Hour = (t.Hour + delta + 24) % 24
@@ -372,7 +372,7 @@ func (t *TimePicker) CreateRenderer() core.WidgetRenderer {
 	centerDot := &canvas.Circle{}
 
 	// Number labels on the clock. 24 slots so the 24-hour dial can render two
-	// concentric rings (outer 1–12, inner 00 and 13–23, #804); the 12h and
+	// concentric rings (outer 1–12, inner 00 and 13–23, pre-rebrand tracker #804); the 12h and
 	// minute dials use only the first 12 and hide the rest.
 	clockLabels := make([]*canvas.Text, 24)
 	for i := range clockLabels {
@@ -415,7 +415,7 @@ func (t *TimePicker) CreateRenderer() core.WidgetRenderer {
 }
 
 // Tapped handles taps on the clock face; the header fields (hour, minute,
-// AM/PM) are widgets that receive their own taps (#543).
+// AM/PM) are widgets that receive their own taps (pre-rebrand tracker #543).
 func (t *TimePicker) Tapped(e *event.PointEvent) {
 	if e == nil {
 		return
@@ -592,7 +592,7 @@ func ShowTimePicker(hour, minute int, use24h bool, changed func(hour, minute int
 // timePickerButton is one tap target in the time picker header — the hour
 // and minute displays and the AM/PM toggles. Promoting them to widgets
 // makes each an accessible semantic node and a real hit-test target
-// instead of picker-level coordinate math (#543).
+// instead of picker-level coordinate math (pre-rebrand tracker #543).
 type timePickerButton struct {
 	BaseWidget
 	bg    *canvas.Rectangle
@@ -662,7 +662,7 @@ func (b *timePickerButton) AccessibleState() core.AccessibleState {
 
 // AccessibleActions returns the "select" action, plus "increment"/"decrement"
 // for value fields (hour/minute) so a screen reader can adjust the time without
-// the clock dial or a physical keyboard (#796).
+// the clock dial or a physical keyboard (pre-rebrand tracker #796).
 func (b *timePickerButton) AccessibleActions() []core.AccessibleAction {
 	actions := []core.AccessibleAction{{Name: core.ActionSelect, Description: "Select this field"}}
 	if b.onAdjust != nil {
@@ -1020,7 +1020,7 @@ func (r *timePickerRenderer) Refresh() {
 	}
 
 	// Keyboard field cursor: focus ring over whichever look the field has,
-	// mirrored to the buttons' accessible focus state (#543).
+	// mirrored to the buttons' accessible focus state (pre-rebrand tracker #543).
 	focusColor := th.Color(theme.ColorNameFocus, v)
 	buttons := [...]*timePickerButton{r.hourBtn, r.minuteBtn, r.amBtn, r.pmBtn}
 	for field, btn := range buttons {

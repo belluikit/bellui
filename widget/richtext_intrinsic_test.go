@@ -176,7 +176,7 @@ func TestEntry_IntrinsicSize(t *testing.T) {
 		"intrinsic height should span the three lines")
 }
 
-// TestRichText_IntrinsicSize_EllipsisRoundTrip is the #1045 repro: a truncating
+// TestRichText_IntrinsicSize_EllipsisRoundTrip is the pre-rebrand tracker #1045 repro: a truncating
 // (ellipsis) RichText resized to exactly its own IntrinsicSize().Width must render
 // the full text, not a truncated "…" form. The bug was that the available width was
 // floored to an int before wrapping, while the measured intrinsic width kept its
@@ -198,7 +198,7 @@ func TestRichText_IntrinsicSize_EllipsisRoundTrip(t *testing.T) {
 		"text sized to its own intrinsic width must not be truncated")
 }
 
-// TestLabel_IntrinsicSize_EllipsisRoundTrip is the #1045 repro at the Label level:
+// TestLabel_IntrinsicSize_EllipsisRoundTrip is the pre-rebrand tracker #1045 repro at the Label level:
 // the documented pattern of sizing a container/tooltip to a truncating label's
 // IntrinsicSize must show the full text.
 func TestLabel_IntrinsicSize_EllipsisRoundTrip(t *testing.T) {

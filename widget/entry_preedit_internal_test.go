@@ -11,7 +11,7 @@ import (
 )
 
 // PreeditCursorRectangle reports where an IME candidate window should sit. It
-// must track the caret column and subtract the entry's scroll offset (#291).
+// must track the caret column and subtract the entry's scroll offset (pre-rebrand tracker #291).
 
 func TestEntry_PreeditCursorRectangle_TracksColumn(t *testing.T) {
 	test.NewTempApp(t)

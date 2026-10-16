@@ -219,7 +219,7 @@ func (t *Tree) RefreshItem(id TreeNodeID) {
 // focusedItemObject returns the realized tree node (branch or leaf) for the
 // currently focused row, or nil when it is not currently laid out. It lets
 // keyboard activation report the same node object the pointer path hit-tests
-// (#834).
+// (pre-rebrand tracker #834).
 func (t *Tree) focusedItemObject() core.CanvasObject {
 	if t.scroller == nil {
 		return nil
@@ -388,7 +388,7 @@ func (t *Tree) TypedKey(ev *event.KeyEvent) {
 	case event.KeySpace:
 		t.Select(t.currentFocus)
 		// Report the realized tree node (RoleTreeItem) so keyboard activation
-		// matches the pointer path, which hit-tests the node (#834, #700).
+		// matches the pointer path, which hit-tests the node (pre-rebrand tracker #834, pre-rebrand tracker #700).
 		if node := t.focusedItemObject(); node != nil {
 			core.NotifyActivation(node, true)
 		}

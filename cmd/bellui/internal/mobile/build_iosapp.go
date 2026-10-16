@@ -77,7 +77,7 @@ func goIOSBuild(pkg *packages.Package, bundleID string, archs []string,
 	}
 
 	// Emit an Associated Domains entitlement so Universal Links (tapped
-	// https://<domain>/… links) route to the app (fyne#622). Signed in via
+	// https://<domain>/… links) route to the app (pre-rebrand tracker #622). Signed in via
 	// CODE_SIGN_ENTITLEMENTS; xcodebuild -allowProvisioningUpdates registers the
 	// capability with the App ID under automatic signing.
 	if projData.Entitlements {
@@ -305,7 +305,7 @@ type infoplistTmplData struct {
 	// UsageDescriptions are the iOS Info.plist usage-description entries
 	// (NSCameraUsageDescription, …), pre-sorted by key for deterministic output.
 	UsageDescriptions []plistEntry
-	// URLSchemes declares custom URL schemes the app handles (fyne#622), emitted
+	// URLSchemes declares custom URL schemes the app handles (pre-rebrand tracker #622), emitted
 	// as CFBundleURLTypes so iOS routes myapp:// deep links to the app.
 	URLSchemes []string
 	// MimeTypes declares the document MIME types the app can open, emitted as a
@@ -314,7 +314,7 @@ type infoplistTmplData struct {
 	// ContentTypes are the UTIs (derived from MimeTypes) emitted as
 	// LSItemContentTypes. iOS 14+ routes "Open in…" / share-sheet document
 	// targets by UTI, not the legacy CFBundleTypeMIMETypes, so without these the
-	// app never surfaces as a file handler (fyne#622).
+	// app never surfaces as a file handler (pre-rebrand tracker #622).
 	ContentTypes []string
 }
 
@@ -403,7 +403,7 @@ func sortedPlistEntries(m map[string]string) []plistEntry {
 }
 
 // entitlementsTmpl renders the iOS code-signing entitlements from the list of
-// associated domains (fyne#622 Universal Links). The template data is the
+// associated domains (pre-rebrand tracker #622 Universal Links). The template data is the
 // []string of domains (without the "applinks:" prefix).
 var entitlementsTmpl = template.Must(template.New("entitlements").Parse(`<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

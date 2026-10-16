@@ -17,13 +17,13 @@ import (
 	"github.com/belluikit/bellui/internal/textinput"
 )
 
-// This file is the Go half of the UIA Text pattern (#487): Narrator/NVDA
+// This file is the Go half of the UIA Text pattern (pre-rebrand tracker #487): Narrator/NVDA
 // text navigation asks the focused text field for its content, selection and
 // unit boundaries, and writes back a selection. The C bridge keeps range
 // endpoints as rune offsets — UIA text units are abstract, so no platform
 // code-unit space ever reaches the client — and forwards each query to the
 // exports below, which resolve the element's editor and read or edit its
-// document through the shared text-input seam ([textinput], #772) — one live
+// document through the shared text-input seam ([textinput], pre-rebrand tracker #772) — one live
 // document view, no snapshot staleness — on top of the shared accessibility.TextIndex.
 //
 // All exports run on the main thread / main goroutine, like the other UIA
@@ -40,7 +40,7 @@ func a11yTexter(handle C.uintptr_t) core.AccessibleTexter {
 }
 
 // a11yTextTarget resolves the editor behind an element handle and captures its
-// document view through the shared seam ([textinput.Read], #772), so every text
+// document view through the shared seam ([textinput.Read], pre-rebrand tracker #772), so every text
 // query reads one document view. ok is false when the handle has no editor.
 func a11yTextTarget(handle C.uintptr_t) (core.AccessibleTexter, textinput.View, bool) {
 	tx := a11yTexter(handle)
@@ -84,7 +84,7 @@ func belluiWinA11yTextSelection(handle C.uintptr_t, start, end *C.long) {
 		return
 	}
 	// UIA keeps rune offsets, so the selection needs no text; read selection
-	// only to avoid re-materializing a large document per caret query (#789).
+	// only to avoid re-materializing a large document per caret query (pre-rebrand tracker #789).
 	s, e := textinput.ReadSelection(tx)
 	*start = C.long(s)
 	*end = C.long(e)
@@ -99,7 +99,7 @@ func belluiWinA11yTextSetSelection(handle C.uintptr_t, start, end C.long) {
 	textinput.Select(tx, int(start), int(end))
 }
 
-// a11yTextLayout resolves the optional visual-layout extension (#990) behind
+// a11yTextLayout resolves the optional visual-layout extension (pre-rebrand tracker #990) behind
 // an element handle, or nil when the editor exposes no layout — the line unit
 // then falls back to logical (newline-delimited) lines from the text index.
 func a11yTextLayout(handle C.uintptr_t) core.AccessibleTextLayouter {
@@ -146,7 +146,7 @@ func a11yVisualLineStep(lay core.AccessibleTextLayouter, off, count int) (newOff
 // belluiWinA11yTextUnitBounds returns the rune range [start, end) of the UIA
 // text unit containing the offset (see accessibility.TextIndex.UnitBounds for the
 // unit semantics). The line unit resolves against the widget's visual
-// (soft-wrapped) layout when it exposes one (#990); paragraph stays logical.
+// (soft-wrapped) layout when it exposes one (pre-rebrand tracker #990); paragraph stays logical.
 //
 //export belluiWinA11yTextUnitBounds
 func belluiWinA11yTextUnitBounds(handle C.uintptr_t, unit C.int, off C.long, start, end *C.long) {
@@ -171,7 +171,7 @@ func belluiWinA11yTextUnitBounds(handle C.uintptr_t, unit C.int, off C.long, sta
 // belluiWinA11yTextUnitStep moves a rune offset by count units (negative =
 // backwards), reporting the units actually crossed through moved. The line
 // unit steps visual (soft-wrapped) lines when the widget exposes its layout
-// (#990).
+// (pre-rebrand tracker #990).
 //
 //export belluiWinA11yTextUnitStep
 func belluiWinA11yTextUnitStep(handle C.uintptr_t, unit C.int, off C.long, count C.int, moved *C.int) C.long {
@@ -193,7 +193,7 @@ func belluiWinA11yTextUnitStep(handle C.uintptr_t, unit C.int, off C.long, count
 }
 
 // belluiWinA11yTextRangeRects answers the Text pattern's GetBoundingRectangles
-// (#990): one rectangle per visible visual line of the rune range [start,
+// (pre-rebrand tracker #990): one rectangle per visible visual line of the rune range [start,
 // end), as l,t,w,h quadruples in CLIENT-area pixels — the widget's viewport
 // clipping already dropped scrolled-out lines, and the C side offsets by the
 // window's screen origin before packing the SAFEARRAY. Returns the rectangle
@@ -216,7 +216,7 @@ func belluiWinA11yTextRangeRects(handle C.uintptr_t, start, end C.long, out **C.
 		return 0
 	}
 	// Widget-local dp → absolute canvas dp, trimmed to the node's ancestor
-	// clip (#1003): a field half-scrolled out of a parent Scroll must not
+	// clip (pre-rebrand tracker #1003): a field half-scrolled out of a parent Scroll must not
 	// report line rectangles past the scroll container, consistent with the
 	// element-bounds Clip culling in the reconcile. Lines clipped away
 	// entirely are dropped.

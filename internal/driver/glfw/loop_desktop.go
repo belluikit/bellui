@@ -39,7 +39,7 @@ func (d *gLDriver) initGLFW() {
 	// On macOS, stop GLFW from building its own basic menu bar / Services menu
 	// during glfw.Init(): bellui owns and constructs the native main menu instead
 	// (ensureBelluiMainMenu below), so GLFW's orphaned scaffolding — the macOS-26
-	// use-after-free candidate (#831) — is never created. No-op elsewhere and
+	// use-after-free candidate (pre-rebrand tracker #831) — is never created. No-op elsewhere and
 	// under -tags no_native_menus.
 	disableGLFWMenubar()
 
@@ -57,9 +57,9 @@ func (d *gLDriver) initGLFW() {
 
 	// GLFW promoted an unbundled process to a foreground UI app (activation policy
 	// Regular) during init, but only when its Cocoa menu bar was enabled — which
-	// disableGLFWMenubar just turned off (#831). That promotion is what lets a
+	// disableGLFWMenubar just turned off (pre-rebrand tracker #831). That promotion is what lets a
 	// terminal-launched (unbundled) app take keyboard focus, so bellui, now the
-	// owner of the menu bar, must set the policy itself (#901). No-op elsewhere and
+	// owner of the menu bar, must set the policy itself (pre-rebrand tracker #901). No-op elsewhere and
 	// for a bundled .app (already Regular).
 	ensureRegularActivationPolicy()
 
@@ -89,7 +89,7 @@ func wakeMainLoop() {
 // runEventLoop is the desktop main loop. The main thread spends its idle
 // time inside glfw.WaitEventsTimeout — with the native event/runloop pump
 // live — rather than parked in a Go select between 60Hz poll ticks. This is
-// what keeps the platform's accessibility IPC responsive (#576): macOS
+// what keeps the platform's accessibility IPC responsive (pre-rebrand tracker #576): macOS
 // delivers AX requests on the main runloop and assistive technologies issue
 // dozens of sequential round-trips per element, so serialising them on a
 // 16ms tick made VoiceOver time out mid-element ("application is not

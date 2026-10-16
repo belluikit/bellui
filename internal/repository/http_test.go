@@ -52,7 +52,7 @@ func TestHTTPRepositoryBlocksMetadataEndpoint(t *testing.T) {
 	registerRepositories()
 
 	// The cloud-metadata / link-local endpoint must never be reachable, even
-	// before any network round-trip (#285).
+	// before any network round-trip (pre-rebrand tracker #285).
 	u, err := storage.ParseURI("http://169.254.169.254/latest/meta-data/")
 	assert.Nil(t, err)
 

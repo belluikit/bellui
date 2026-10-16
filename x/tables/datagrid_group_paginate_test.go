@@ -9,7 +9,7 @@ import (
 // the group metadata for the row actually shown on the current page. GroupRows is
 // built over the full pre-paginate output, so a page-local display row is offset
 // into it by the page start; without that offset, pages after the first report a
-// stale row's group state (#51).
+// stale row's group state (pre-rebrand tracker #51).
 //
 // Oracle: pipeline.RowIndex.SourceRow(displayRow) is negative exactly for
 // synthetic group-header rows, independent of the GroupRows-indexing path under

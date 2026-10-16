@@ -6,12 +6,12 @@ import "sync/atomic"
 
 // The Java activity (GoNativeActivity) reports a rich-notification activation —
 // the body tap or an action button — through the notificationActivated native
-// method, which lands here (fyne#723). The PendingIntent that Android delivers
+// method, which lands here (pre-rebrand tracker #723). The PendingIntent that Android delivers
 // on tap carries the notification's token and, for an action button, the action
 // index (the body tap uses -1).
 //
 // The handler is registered by the bellui app package's Android launch path.
-// Notification callbacks are session-scoped (#516): they fire only while the
+// Notification callbacks are session-scoped (pre-rebrand tracker #516): they fire only while the
 // sending process is still running, so a payload that arrives before the handler
 // is registered (a cold launch from the notification) is simply dropped — the
 // callback registry of the freshly-started process is empty anyway.

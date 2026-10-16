@@ -15,12 +15,12 @@ import (
 )
 
 // TestRichText_VarHeight_MixedMarkdownWindows verifies the variable-height
-// multi-segment virtualisation (#158) end-to-end on genuinely MIXED content —
+// multi-segment virtualisation (pre-rebrand tracker #158) end-to-end on genuinely MIXED content —
 // headings, paragraphs, blockquotes, syntax-highlighted code blocks, GFM tables
 // and lists, which have differing per-row heights (the existing varheight tests
 // use uniform text segments). A large markdown RichText with Virtualize opted in
 // must window its rows (bounded object count, not one per row) and re-window to
-// deep rows on scroll. Closes the #168 verification.
+// deep rows on scroll. Closes the pre-rebrand tracker #168 verification.
 func TestRichText_VarHeight_MixedMarkdownWindows(t *testing.T) {
 	test.NewTempApp(t)
 

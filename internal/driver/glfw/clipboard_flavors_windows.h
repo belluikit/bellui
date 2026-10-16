@@ -1,6 +1,6 @@
 //go:build windows && !wasm && !test_web_driver
 
-// Win32 clipboard bridge for the clipboard flavor interfaces (#513).
+// Win32 clipboard bridge for the clipboard flavor interfaces (pre-rebrand tracker #513).
 // Ownership contract: every pointer returned to Go is a malloc'd copy that
 // Go frees; pointers passed in are borrowed and copied before returning.
 //

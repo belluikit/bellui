@@ -130,7 +130,7 @@ func TestIntersectRect(t *testing.T) {
 		return geo.Rectangle{Pos: geo.NewPos(x, y), Size: geo.NewSize(w, h)}
 	}
 
-	// Partial overlap trims to the shared area — the #1003 case of a range
+	// Partial overlap trims to the shared area — the pre-rebrand tracker #1003 case of a range
 	// rectangle extending past the node's ancestor clip.
 	got, ok := intersectRect(rect(10, 10, 100, 40), rect(0, 0, 60, 30))
 	assert.True(t, ok)

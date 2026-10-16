@@ -1,5 +1,5 @@
 // Command modalprobe live-verifies native window-modality for window-hosted
-// dialogs (#498/#681). It opens a parent window with interactive content, then
+// dialogs (pre-rebrand tracker #498/#681). It opens a parent window with interactive content, then
 // a window-hosted modal dialog over it. While the dialog is up the OS should
 // block the parent: on Windows its title bar greys and it rejects input
 // (EnableWindow), on X11 the dialog carries _NET_WM_STATE_MODAL, on Wayland an

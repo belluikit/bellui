@@ -58,7 +58,7 @@ func (e *Editor) DiagnosticGutter() *DiagnosticGutter {
 }
 
 // SetDiagnosticClickToReveal toggles click-to-reveal on the editor's internal
-// [DiagnosticGutter] (#57). When enabled, tapping a gutter line that carries a
+// [DiagnosticGutter] (pre-rebrand tracker #57). When enabled, tapping a gutter line that carries a
 // diagnostic scrolls to and selects the first diagnostic covering that line via
 // [Editor.RevealRange]. It is disabled by default, keeping the gutter
 // non-interactive so it composes alongside an interactive [BreakpointGutter].

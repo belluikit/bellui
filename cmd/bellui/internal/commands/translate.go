@@ -355,14 +355,14 @@ func translateCall(v *visitor, node ast.Node) stateFn {
 		return translateKey
 	case "XN", "LocalizePluralKey":
 		return translateKey
-	// Fork localization seams (#92/#90/#93). Key-only forms where the key
+	// Fork localization seams (pre-rebrand tracker #92/#90/#93). Key-only forms where the key
 	// doubles as the fallback, mirroring lang.L/N:
 	case "BindText", "NewLocalizedString", "NewLocalizedPlural":
 		return translateLocalize
 	// Explicit key+fallback forms, mirroring lang.X/XN:
 	case "NewLocalizedStringWithKey", "NewLocalizedPluralWithKey":
 		return translateKey
-	// Grammatical-select seams (#505): the first arg is the key *prefix*, the
+	// Grammatical-select seams (pre-rebrand tracker #505): the first arg is the key *prefix*, the
 	// second is the selector (usually a runtime variable). We seed the mandatory
 	// "<prefix>.other" variant, plus any literal selector variant.
 	case "LSelect", "LSelectPlural":

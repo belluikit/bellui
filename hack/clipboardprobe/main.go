@@ -1,5 +1,5 @@
 // Command clipboardprobe live-verifies the clipboard flavor interfaces
-// (#513) against the real system clipboard.
+// (pre-rebrand tracker #513) against the real system clipboard.
 //
 // CLI mode (desktop): run one operation and exit, e.g.
 //
@@ -229,10 +229,10 @@ func runCLI(cb bellui.Clipboard, op string, args []string) int {
 	return 0
 }
 
-// setMultiOp writes one multi-flavor transaction (#583). "set-multi" is the
+// setMultiOp writes one multi-flavor transaction (pre-rebrand tracker #583). "set-multi" is the
 // full set — text + HTML + image, plus a file per given path; the pairwise
 // variants isolate which flavor combination a paste target mishandles (used
-// to diagnose the iOS Notes empty-paste of the three-flavor item, #1144).
+// to diagnose the iOS Notes empty-paste of the three-flavor item, pre-rebrand tracker #1144).
 func setMultiOp(cb bellui.Clipboard, op string, paths []string) bool {
 	c, ok := cb.(bellui.MultiFlavorClipboard)
 	if !ok {

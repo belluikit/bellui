@@ -117,7 +117,7 @@ func lookupFaces(theme, fallback, emoji bellui.Resource, family string, style be
 	}
 	// Bundled UI-symbol fallbacks (✓, ☐, arrows, ⌘, geometric shapes, …) sit
 	// before the host locale face so these glyphs keep identical metrics on
-	// every platform instead of resolving through a host system font (#686).
+	// every platform instead of resolving through a host system font (pre-rebrand tracker #686).
 	addSymbolsFallbackFaces(faces)
 
 	local := lookupLangFont(family, aspect)
@@ -401,7 +401,7 @@ func DrawStyledRuns(dst draw.Image, runs []canvas.TextRun, defaultColor color.Co
 	// (bidi) order so that runs spanning both directions are placed correctly
 	// rather than in raw array order. Adjacent runs that share a face (size,
 	// style, font) and may contain RTL text are shaped together so cursive
-	// joining is preserved across the run boundary (issue #26); each shaped glyph
+	// joining is preserved across the run boundary (pre-rebrand issue #26); each shaped glyph
 	// is then drawn in its originating run's colour. Runs that differ in face, or
 	// pure-LTR runs, keep the legacy one-run-at-a-time shaping.
 	groups := groupStyledRunsForDraw(runs, defaultColor, defaultSize)
@@ -443,7 +443,7 @@ func DrawStyledRuns(dst draw.Image, runs []canvas.TextRun, defaultColor color.Co
 // styledDrawGroup is a maximal span of adjacent canvas.TextRuns that share a
 // face (size, style, font) and may join cursively, concatenated for single-pass
 // shaping. colors holds the resolved draw colour of each rune so the joined
-// glyphs can still be drawn in their originating run's colour. See issue #26.
+// glyphs can still be drawn in their originating run's colour. See pre-rebrand issue #26.
 type styledDrawGroup struct {
 	runes  []rune
 	colors []color.Color
@@ -541,7 +541,7 @@ func drawColoredOutput(r *render.Renderer, out shaping.Output, dst draw.Image, s
 // is exact for single-direction runs (the normal case). A run that is itself
 // internally mixed is ordered atomically by its leftmost rune. Cross-run cursive
 // joining is handled before this by grouping adjacent same-face runs (see
-// groupStyledRunsForDraw / issue #26); this function only orders the resulting
+// groupStyledRunsForDraw / pre-rebrand issue #26); this function only orders the resulting
 // groups, so a group's runes are already shaped together.
 func styledRunVisualOrder(runs []canvas.TextRun) []int {
 	idx := make([]int, 0, len(runs))
@@ -677,7 +677,7 @@ func walkString(faces shaping.Fontmap, s string, textSize fixed.Int26_6, style b
 	// before calling it (see splitLines). Any '\n' that reaches here belongs to a
 	// single-line primitive (canvas.Text, TextOnPath, StyledText), so collapse it
 	// to a space: it stays on one line and keeps a sensible advance. Upstream
-	// typesetting #257 stopped mapping such control chars to .notdef, so without
+	// typesetting pre-rebrand tracker #257 stopped mapping such control chars to .notdef, so without
 	// this they would otherwise shape to near-zero width.
 	s = strings.ReplaceAll(s, "\n", " ")
 
@@ -711,7 +711,7 @@ func walkString(faces shaping.Fontmap, s string, textSize fixed.Int26_6, style b
 
 	// Line metrics start from the primary face (via the shaped space) as a floor,
 	// then grow to cover every run on the line. Fallback faces — notably the
-	// bundled CJK font (#314) — have taller ascent/descent than the Latin default;
+	// bundled CJK font (pre-rebrand tracker #314) — have taller ascent/descent than the Latin default;
 	// measuring the line box from the primary face alone left it too short, so CJK
 	// glyphs clipped at the bottom of an Entry and mixed-script baselines shifted.
 	// Union each run's LineBounds so the box fits the tallest glyph on the line,
@@ -852,7 +852,7 @@ type LineLayout struct {
 	rtl bool
 	// boxes holds the opaque inline boxes (non-text segments) interleaved into the
 	// line's visual order; nil for a line of pure text. SelectionSpans uses them
-	// to fill a box that falls inside a selection (issue #41).
+	// to fill a box that falls inside a selection (pre-rebrand issue #41).
 	boxes []boxExtent
 }
 
@@ -975,7 +975,7 @@ func (l LineLayout) SelectionSpans(start, end int) [][2]float32 {
 // SelectionSpansBoxes is SelectionSpans with the box-inclusion decision
 // supplied by the caller: boxSelected is asked once per opaque box, indexed in
 // logical (run-supply) order. It serves selection models where an inline atom
-// occupies its own selectable position (e.g. RichEntry's document space, #913)
+// occupies its own selectable position (e.g. RichEntry's document space, pre-rebrand tracker #913)
 // rather than riding its preceding rune — including an atom-only selection
 // with an empty text range.
 func (l LineLayout) SelectionSpansBoxes(start, end int, boxSelected func(int) bool) [][2]float32 {
@@ -1036,7 +1036,7 @@ func (l LineLayout) BoxCount() int { return len(l.boxes) }
 // before (after=false) or after (after=true) the line's box-th opaque box, in
 // logical (run-supply) order. The "before" side is the edge facing the
 // logically-preceding content — the right edge when the bidi flow around the
-// box runs right-to-left (#913). Out-of-range indices clamp to the line edges.
+// box runs right-to-left (pre-rebrand tracker #913). Out-of-range indices clamp to the line edges.
 func (l LineLayout) BoxCaretX(box int, after bool) float32 {
 	for _, b := range l.boxes {
 		if b.logical != box {
@@ -1055,7 +1055,7 @@ func (l LineLayout) BoxCaretX(box int, after bool) float32 {
 }
 
 // HitTestBoxes maps a visual x to the nearest insertion point, considering both
-// text carets and the edges of opaque inline boxes (#983) — the box-aware
+// text carets and the edges of opaque inline boxes (pre-rebrand tracker #983) — the box-aware
 // inverse of BoxCaretX, extending HitTestAffinity so a click on or beside an
 // inline atom resolves to the atom's own boundary rather than snapping to the
 // nearest text caret (which HitTestAffinity does, being box-blind).
@@ -1251,7 +1251,7 @@ type StyledRun struct {
 	// as a HyperlinkSegment or image) of width BoxWidth. It occupies one slot in
 	// the line's bidi visual order but contributes no caret columns; its Runes are
 	// ignored. This lets a bidi row interleave non-text segments with RTL text
-	// while keeping the text-only column model (issue #41).
+	// while keeping the text-only column model (pre-rebrand issue #41).
 	Box      bool
 	BoxWidth float32
 }
@@ -1271,7 +1271,7 @@ const objectReplacement = '￼'
 // line's boxes in logical (run-supply) order, and beforeRight reports which
 // visual edge faces the logically-preceding content: true when the bidi flow
 // around the box runs right-to-left, so an insertion point "before" the box
-// sits at its right edge (#913).
+// sits at its right edge (pre-rebrand tracker #913).
 type boxExtent struct {
 	owner       int
 	left, right float32
@@ -1282,7 +1282,7 @@ type boxExtent struct {
 // joinAdjacentStyledRuns merges neighbouring text runs that share a face (size,
 // style, font) and both may contain RTL text into a single run, so the line is
 // shaped with cursive joining preserved across the original run boundary (issue
-// #26). Boxes, face changes and pure-LTR neighbours are left as separate runs,
+// pre-rebrand tracker #26). Boxes, face changes and pure-LTR neighbours are left as separate runs,
 // so the text-only caret model (boxes keep their own slot) and the legacy
 // pure-LTR path are unchanged. The concatenation order and total rune count are
 // preserved, so the caller's global text-offset indexing is unaffected.
@@ -1316,7 +1316,7 @@ func joinAdjacentStyledRuns(runs []StyledRun) []StyledRun {
 // Adjacent text runs that share a face (size, style, font) and both may contain
 // RTL text are merged before shaping (joinAdjacentStyledRuns), so cursive
 // joining is preserved across an Arabic word split into two same-font segments
-// (issue #26). Runs differing in face, boxes, and pure-LTR neighbours are still
+// (pre-rebrand issue #26). Runs differing in face, boxes, and pure-LTR neighbours are still
 // shaped separately. The line must not contain newlines, and tabs are not
 // expanded — callers gate on HasRTL and keep the legacy path for pure-LTR text,
 // exactly as for LineVisualLayout.
@@ -1383,7 +1383,7 @@ func StyledLineVisualLayout(runs []StyledRun) LineLayout {
 			// The side facing the logically-preceding content follows the bidi
 			// flow around the placeholder: when a logical neighbour sits on the
 			// visually opposite side of what left-to-right order would give, the
-			// flow there is right-to-left and "before" is the right edge (#913).
+			// flow there is right-to-left and "before" is the right edge (pre-rebrand tracker #913).
 			p := bidiOffsets[i]
 			beforeRight := baseDir.Progression() == di.TowardTopLeft
 			if p > 0 {
@@ -1610,7 +1610,7 @@ type dynamicFontMap struct {
 // resolution escaped the chain's compiled-in faces — to the host locale face,
 // an app-registered fallback or the host system-font scan. The first and last
 // are host-dependent: text containing such runes measures differently per OS
-// (the #686 diagnostic).
+// (the pre-rebrand tracker #686 diagnostic).
 var debugFontEscape = os.Getenv("BELLUI_DEBUG_FONTESCAPE") != ""
 
 func (d *dynamicFontMap) ResolveFace(r rune) *font.Face {

@@ -35,18 +35,18 @@ func (d *driver) presentPainter(*canvas) {}
 func (d *driver) setPainterOutputSize(*canvas, int, int) {}
 
 // recreateSurface is a no-op for GL: gomobile owns the EGL surface lifecycle and
-// re-creates the GL context across background/resume itself (#310 is WebGPU-only).
+// re-creates the GL context across background/resume itself (pre-rebrand tracker #310 is WebGPU-only).
 func (d *driver) recreateSurface(*canvas, *window) {}
 
 // detachWindowSurface is a no-op: only the iOS WebGPU backend stacks a
-// per-window CAMetalLayer that must be detached on Close (#645).
+// per-window CAMetalLayer that must be detached on Close (pre-rebrand tracker #645).
 func (d *driver) detachWindowSurface(*window) {}
 
 // claimNativeSurface is a no-op for GL: gomobile owns the single EGL surface and
 // every window's canvas paints through the shared GL context, so there is no
-// per-window swapchain contention on the native window (#753 is WebGPU-only).
+// per-window swapchain contention on the native window (pre-rebrand tracker #753 is WebGPU-only).
 func (d *driver) claimNativeSurface(*canvas, *window) {}
 
 // setWindowSurfaceHidden is a no-op: only the iOS WebGPU backend stacks a
-// per-window CAMetalLayer whose visibility must toggle on Hide/Show (#742).
+// per-window CAMetalLayer whose visibility must toggle on Hide/Show (pre-rebrand tracker #742).
 func (d *driver) setWindowSurfaceHidden(*window, bool) {}

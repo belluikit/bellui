@@ -39,7 +39,7 @@ func init() {
 	app.SetAccessibilityActionHandler(func(id, kind int32) {
 		if kind == mobileA11yActionStateChanged {
 			// Fired on both enable and disable. Clear any in-scene focus ring
-			// (#759) before the repaint — on disable no _FOCUS_CLEARED reaches
+			// (pre-rebrand tracker #759) before the repaint — on disable no _FOCUS_CLEARED reaches
 			// the torn-down proxies, so the ring would otherwise stay painted;
 			// on enable the focus is empty, so this is a no-op.
 			a11yFocusedHandle.Store(0)
@@ -51,7 +51,7 @@ func init() {
 
 	// An accessibility service asking a virtualized grid proxy to bring a
 	// (row, col) cell into view (AccessibilityAction.ACTION_SCROLL_TO_POSITION,
-	// #817 — TalkBack has no point-addressed cell read, so scroll-into-view is
+	// pre-rebrand tracker #817 — TalkBack has no point-addressed cell read, so scroll-into-view is
 	// Android's realize analog: the cell then enters the walked window as a
 	// normal element). Arrives on the Android UI thread; the widget call is
 	// queued to the main goroutine inside mobileA11yScrollCellIntoView.
@@ -59,7 +59,7 @@ func init() {
 		mobileA11yScrollCellIntoView(uintptr(id), int(row), int(col))
 	})
 
-	// Editable-text node actions (#974 option D): the Java protocol layer
+	// Editable-text node actions (pre-rebrand tracker #974 option D): the Java protocol layer
 	// resolves granularity segments and UTF-16 offsets itself, applies the
 	// result optimistically, and sends the edit here as rune offsets. Arrives
 	// on the Android UI thread; the dispatch queues onto the main goroutine
@@ -68,7 +68,7 @@ func init() {
 		mobileA11yTextDispatch(uintptr(id), int(kind), int(a), int(b), text)
 	})
 
-	// TalkBack accessibility-focus changes drive the in-scene focus ring (#759):
+	// TalkBack accessibility-focus changes drive the in-scene focus ring (pre-rebrand tracker #759):
 	// the OS ring cannot reach the flat GPU surface, so Bellui paints its own over
 	// the focused element. The callback arrives on the Android UI thread;
 	// mobileA11ySetFocus stores the handle atomically and queues the repaint.
@@ -76,7 +76,7 @@ func init() {
 		mobileA11ySetFocus(uintptr(id), focused)
 	})
 
-	// Live-region announcements (#525): deliver accessibility.Announce calls
+	// Live-region announcements (pre-rebrand tracker #525): deliver accessibility.Announce calls
 	// via View.announceForAccessibility so TalkBack speaks transient status
 	// (Toast, Snackbar) without moving its focus.
 	accessibility.AddAnnouncementListener(func(text string, assertive bool) {
@@ -106,7 +106,7 @@ func (w *window) updateAccessibility() {
 	})
 	if !enabled {
 		// No assistive technology running; skip the gather entirely. Also drop
-		// any stale in-scene focus ring (#759) so it can't outlive the screen
+		// any stale in-scene focus ring (pre-rebrand tracker #759) so it can't outlive the screen
 		// reader if the state-change event was ever missed — cleared here, gone
 		// on the next repaint.
 		a11yFocusedHandle.Store(0)

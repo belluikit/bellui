@@ -83,8 +83,8 @@ type Entry struct {
 
 	// OnEscape will be called when the user presses Escape while the entry is
 	// focused — the cancel counterpart of OnSubmitted, letting a host dismiss
-	// an inline editor (#1052). An in-progress IME composition keeps
-	// precedence: Escape discards the composition (#354) and reaches this
+	// an inline editor (pre-rebrand tracker #1052). An in-progress IME composition keeps
+	// precedence: Escape discards the composition (pre-rebrand tracker #354) and reaches this
 	// hook only once no composition is pending. Nil ignores the key.
 	//
 	// Since: 1.0
@@ -178,11 +178,11 @@ type Entry struct {
 	// full chain is the first jump deep into freshly-set content (e.g.
 	// restoring a scroll position after SetText), which must run the
 	// highlighter from line 0 up to the viewport once. After SetText that
-	// chain is prefilled in the background in per-frame time slices (#417),
+	// chain is prefilled in the background in per-frame time slices (pre-rebrand tracker #417),
 	// so a deep jump only pays synchronously for the gap the prefill has not
 	// reached yet. Edits stay cheap even far above the viewport: re-chaining
 	// stops as soon as the state converges back into the already-highlighted
-	// stretch (#412).
+	// stretch (pre-rebrand tracker #412).
 	//
 	// Since: 1.0
 	LineHighlighter func(line string, state int) ([]StyleRun, int) `json:"-"`
@@ -262,11 +262,11 @@ type Entry struct {
 	// RowPositions/RowMetrics report visible-row geometry, the scroll extent
 	// shrinks by the folded height, and caret navigation skips folded rows.
 	// Ranges past the end of the document are clamped/ignored. Empty == today's
-	// behavior. Composes with row virtualisation (#119).
+	// behavior. Composes with row virtualisation (pre-rebrand tracker #119).
 	//
 	// Ranges are in logical lines (newline-delimited), not visual rows. When a
 	// logical line wraps to several visual rows, folding that line hides all of
-	// its wrapped rows (#145). For wrap-off content a line is a single row, so
+	// its wrapped rows (pre-rebrand tracker #145). For wrap-off content a line is a single row, so
 	// the two coincide.
 	//
 	// Since: 1.0
@@ -279,7 +279,7 @@ type Entry struct {
 	text    RichText
 	// Per-line highlight cache. Kept index-aligned with the provider's logical
 	// lines (noteLazyLinesEdited) and filled on demand in the lazy model
-	// (ensureHighlightedThrough); eager for the dense model (#401).
+	// (ensureHighlightedThrough); eager for the dense model (pre-rebrand tracker #401).
 	hlCache []hlCacheLine
 	// hlComputedThrough is the count of leading lines whose highlight state
 	// chain is current; ensureHighlightedThrough extends it on demand.
@@ -291,16 +291,16 @@ type Entry struct {
 	// an entering state equal to the recorded stateIn, determinism makes every
 	// entry in it valid, so the walk jumps over it instead of re-reading each
 	// line — an edit above a deep viewport re-chains O(edit + convergence +
-	// window), not O(document) (#412). Tracking several stretches keeps a
+	// window), not O(document) (pre-rebrand tracker #412). Tracking several stretches keeps a
 	// batch of scattered edits between renders bounded the same way: each edit
-	// splits rather than discards the chained lines around it (#418).
+	// splits rather than discards the chained lines around it (pre-rebrand tracker #418).
 	hlTrusted []hlStretch
 	// hlWalkSteps counts per-line iterations of ensureHighlightedThrough's
-	// chain walk (test hook, like lazyFullBuilds): pins the #412 trusted-
+	// chain walk (test hook, like lazyFullBuilds): pins the pre-rebrand tracker #412 trusted-
 	// stretch jump so deep re-chains stay edit-local.
 	hlWalkSteps int
 	// hlPrefillRepaints counts how many times the background prefill requested a
-	// text repaint because its watermark crossed the visible viewport (#693). A
+	// text repaint because its watermark crossed the visible viewport (pre-rebrand tracker #693). A
 	// test hook: it pins that a deep visible row converges from the prefill's own
 	// repaint rather than depending on the animation frame cadence or a later
 	// unrelated refresh.
@@ -308,7 +308,7 @@ type Entry struct {
 	// hlBuf is the provider buffer the chain was computed against; a different
 	// object means the content was replaced wholesale and the chain restarts.
 	hlBuf *textbuf.Buffer
-	// hlPrefill drives the post-SetText background chain (#417): a content
+	// hlPrefill drives the post-SetText background chain (pre-rebrand tracker #417): a content
 	// replacement voids all prior highlight state, so this frame-tick
 	// animation advances hlComputedThrough in small time-boxed slices on the
 	// main goroutine until the chain reaches the end of the document. A later
@@ -332,9 +332,9 @@ type Entry struct {
 
 	sel        *selectable
 	popUp      *PopUpMenu
-	selHandles *entrySelectionHandles // mobile selection-handle overlay (#758)
+	selHandles *entrySelectionHandles // mobile selection-handle overlay (pre-rebrand tracker #758)
 
-	caretHandle *entryCaretHandle // mobile caret drag-handle overlay (#943)
+	caretHandle *entryCaretHandle // mobile caret drag-handle overlay (pre-rebrand tracker #943)
 
 	// touchPointer notes whether the most recent pointer-down was a touch;
 	// touchSelection marks the current selection as touch-initiated, which is
@@ -401,7 +401,7 @@ type Entry struct {
 	preeditAnchor int    // rune offset into Text where the preedit is displayed
 	preeditCursor int    // caret rune offset within preeditText
 	// preeditApplied is the number of preedit runes currently spliced into the
-	// provider's buffer at preeditAnchor (lazy fast path, #402); 0 when the
+	// provider's buffer at preeditAnchor (lazy fast path, pre-rebrand tracker #402); 0 when the
 	// preedit is rendered via the composedDisplay string fallback instead.
 	preeditApplied int
 	composing      bool
@@ -471,7 +471,7 @@ type hlCacheLine struct {
 }
 
 // hlStretch is one trusted stretch [from,to) of hlCache entries: see the
-// hlTrusted field on Entry (#412, #418).
+// hlTrusted field on Entry (pre-rebrand tracker #412, pre-rebrand tracker #418).
 type hlStretch struct {
 	from, to int
 }
@@ -565,7 +565,7 @@ func (e *Entry) AccessibleState() core.AccessibleState {
 }
 
 // AccessibleActions declares the entry's undo/redo actions so assistive
-// technology can reach them without the long-press context menu (#1025) —
+// technology can reach them without the long-press context menu (pre-rebrand tracker #1025) —
 // they have no standard platform action, so backends surface them as custom
 // actions (VoiceOver's actions rotor, TalkBack's actions menu, AT-SPI
 // Action). Gated on availability like the context menu: none while read-only
@@ -594,7 +594,7 @@ func (e *Entry) PerformAccessibleAction(name string) {
 		// document and the undo history. Replaying history under it leaves
 		// an orphaned preedit whose position context the undo invalidated;
 		// a later IME convergence then commits it at a bogus offset
-		// (#1034). Cancel it first: an uncommitted preedit is recent
+		// (pre-rebrand tracker #1034). Cancel it first: an uncommitted preedit is recent
 		// typing, which is what undo removes anyway.
 		e.ComposeCancel()
 		if name == core.ActionUndo {
@@ -622,7 +622,7 @@ func (e *Entry) AccessibleText() string {
 // where it is spliced into [Entry.AccessibleText]; ok is false while no preedit
 // is shown. The text-input mirror seam matches this method structurally to
 // subtract the preedit from its pushes, so the native IME buffer is only ever
-// seeded with committed text (#1057) — Entry, unlike RichEntry, splices the
+// seeded with committed text (pre-rebrand tracker #1057) — Entry, unlike RichEntry, splices the
 // preedit through its provider, so the accessible text alone cannot tell
 // committed from composing runes.
 func (e *Entry) AccessiblePreedit() (text string, start int, ok bool) {
@@ -635,7 +635,7 @@ func (e *Entry) AccessiblePreedit() (text string, start int, ok bool) {
 // AccessibleComposing reports whether an IME composition is currently active
 // (a preedit is being shown — including an empty one). The text-input mirror
 // seam matches this method structurally to recognize a stale composition
-// finalize (#1057): a hardware keystroke commits the preedit as typed text
+// finalize (pre-rebrand tracker #1057): a hardware keystroke commits the preedit as typed text
 // (see TypedKey's desktop-commit path), so an IME commit arriving after that
 // would insert content the document already holds.
 func (e *Entry) AccessibleComposing() bool {
@@ -732,8 +732,8 @@ func (e *Entry) CreateRenderer() core.WidgetRenderer {
 	e.placeholderProvider()
 	e.syncSelectable()
 
-	// Re-arm an unfinished background highlight chain (#417) after a renderer
-	// Destroy stopped it (#421): eviction also hits live, temporarily-hidden
+	// Re-arm an unfinished background highlight chain (pre-rebrand tracker #417) after a renderer
+	// Destroy stopped it (pre-rebrand tracker #421): eviction also hits live, temporarily-hidden
 	// widgets, and on re-show the buffer object is unchanged, so neither
 	// arming seam (updateText, the fresh-buffer branch of
 	// ensureHighlightedThrough) fires again — and a repaint can serve
@@ -760,14 +760,14 @@ func (e *Entry) CreateRenderer() core.WidgetRenderer {
 	e.scroll = widget.NewScroll(nil)
 	// A single-line text field clips its overflowing text at the edge rather
 	// than fading it; suppress the scroll's edge fade-shadows so they don't dim
-	// the text (or the border) at the scrolled edge (#357). Multi-line entries
+	// the text (or the border) at the scrolled edge (pre-rebrand tracker #357). Multi-line entries
 	// keep their vertical fade-shadow as a genuine "more content" affordance.
 	e.scroll.HideShadows = !e.MultiLine
 	// The border is drawn after the content/scroll so its stroke always
 	// composites crisply on top. The scroll viewport spans the full width and
 	// shows edge fade-shadows when text overflows; drawing it under the border
 	// stops those shadows from dimming the rounded border stroke/corners as the
-	// scroll offset flips between edges (#353).
+	// scroll offset flips between edges (pre-rebrand tracker #353).
 	objects := []core.CanvasObject{box}
 	if e.Wrapping != bellui.TextWrapOff || e.Scroll != widget.ScrollNone {
 		e.scroll.Content = e.content
@@ -839,7 +839,7 @@ func (e *Entry) CaretRect(row, col int) geo.Rectangle {
 		return geo.Rectangle{}
 	}
 	if provider.rowHidden(row) {
-		return geo.Rectangle{} // a folded row is not visible (#141)
+		return geo.Rectangle{} // a folded row is not visible (pre-rebrand tracker #141)
 	}
 	return e.caretRect(row, col, true)
 }
@@ -878,7 +878,7 @@ func (e *Entry) caretRect(row, col int, downstream bool) geo.Rectangle {
 	xPos := size.Width + provider.GutterWidth
 
 	// Row top: prefer the cached per-row Y from the last layout, which already
-	// accounts for folded rows collapsing to zero height (#141). Fall back to the
+	// accounts for folded rows collapsing to zero height (pre-rebrand tracker #141). Fall back to the
 	// uniform-stride estimate before the first layout. The cached rowYPos values
 	// are in the same content-coordinate base as the historical estimate
 	// (innerPad - inputBorder + row*height), since the Entry's text inset height
@@ -941,7 +941,7 @@ func (e *Entry) Cursor() desktop.Cursor {
 // using the same cached row geometry as text selection hit-testing.
 func (e *Entry) gutterRowAt(y float32) int {
 	numRows := e.text.rows()
-	// O(1) analytic inverse for the lazy model (#160); cached-geometry scan otherwise.
+	// O(1) analytic inverse for the lazy model (pre-rebrand tracker #160); cached-geometry scan otherwise.
 	if row := e.text.rowAtY(y); row >= 0 {
 		return row
 	}
@@ -1001,7 +1001,7 @@ func (e *Entry) selectWordAtCursor() {
 }
 
 // LongPressed implements [event.LongPressable]. A touch held on the entry
-// selects the word under the finger, the native mobile gesture (#758); the
+// selects the word under the finger, the native mobile gesture (pre-rebrand tracker #758); the
 // release that follows opens the context menu via TappedSecondary. Desktop
 // right-click is unaffected (it dispatches TappedSecondary directly).
 func (e *Entry) LongPressed(ev *event.PointEvent) {
@@ -1023,7 +1023,7 @@ func (e *Entry) LongPressed(ev *event.PointEvent) {
 
 // selectNearestWordAtCursor is the long-press variant of selectWordAtCursor:
 // a press landing on a whitespace/separator run selects the nearest adjacent
-// word instead of the run itself, matching the native mobile gesture (#958).
+// word instead of the run itself, matching the native mobile gesture (pre-rebrand tracker #958).
 // Double-tap keeps the run selection (desktop double-click convention).
 func (e *Entry) selectNearestWordAtCursor() {
 	row := e.textProvider().row(e.CursorRow)
@@ -1061,7 +1061,7 @@ func (e *Entry) DragEnd() {
 	}
 
 	// A finished touch drag-select offers the context menu for the new
-	// selection, like a handle adjustment (native toolbar parity, #945).
+	// selection, like a handle adjustment (native toolbar parity, pre-rebrand tracker #945).
 	// This also covers the hold-fire long-press that keeps moving: its
 	// release ends as a drag, so the driver's release-time TappedSecondary
 	// never fires for it. Touch-gated: desktop mouse selection is unchanged.
@@ -1121,13 +1121,13 @@ func (e *Entry) FocusGained() {
 func (e *Entry) FocusLost() {
 	if e.composing {
 		// Discard any in-progress IME composition on focus-out rather than leaving
-		// it live to be implicitly committed by the next interaction (#354).
+		// it live to be implicitly committed by the next interaction (pre-rebrand tracker #354).
 		e.ComposeCancel()
 	}
 	e.focused = false
 	e.selectKeyDown = false
 
-	// Focus loss is a deferred-mode sync point (#410): the composition was
+	// Focus loss is a deferred-mode sync point (pre-rebrand tracker #410): the composition was
 	// cancelled above, so pending edits materialize into Text here and the
 	// deferred OnChanged/Validator/binding write observe the final text.
 	if e.text.deferredDirty {
@@ -1296,11 +1296,11 @@ func (e *Entry) Redo() {
 // applyUndoAction replays (redo) or reverses (undo) a recorded action by
 // splicing the provider directly — O(edit) through the lazy fast path instead
 // of reconstructing the whole document string, which also keeps the identity
-// chain intact so the next layout pass reuses the incremental row model (#401).
+// chain intact so the next layout pass reuses the incremental row model (pre-rebrand tracker #401).
 func (e *Entry) applyUndoAction(action entryUndoAction, redo bool) {
 	provider := e.textProvider()
 	pos := action.Apply(provider, redo)
-	// Deferred text sync (#410): history replay defers like any other edit.
+	// Deferred text sync (pre-rebrand tracker #410): history replay defers like any other edit.
 	if e.editDeferred() {
 		e.CursorRow, e.CursorColumn = e.rowColFromTextPos(pos)
 		e.syncSelectable()
@@ -1351,7 +1351,7 @@ func (e *Entry) SelectedText() string {
 	// Reconstruct from the source text by offset rather than from visual rows: a
 	// single text segment has the full text, so slicing it preserves characters that
 	// word-wrap consumes at a wrap point (a space dropped from both adjacent visual
-	// rows) and is exact under the lazy/windowed row model (#157), where rebuilding
+	// rows) and is exact under the lazy/windowed row model (pre-rebrand tracker #157), where rebuilding
 	// the text from per-row boundaries would be both lossy and measurement-heavy.
 	provider := e.textProvider()
 	a := textPosFromRowCol(e.sel.selectRow, e.sel.selectColumn, provider)
@@ -1359,7 +1359,7 @@ func (e *Entry) SelectedText() string {
 	if a == b {
 		return ""
 	}
-	// Read the range from the provider's buffer (no full-document decode, #401)
+	// Read the range from the provider's buffer (no full-document decode, pre-rebrand tracker #401)
 	// when it reflects the committed Text — the O(1) steady-state compare. During
 	// IME composition seg.Text carries the preedit while Text does not, so fall
 	// back to slicing Text directly to keep preedit out of the selection.
@@ -1465,7 +1465,7 @@ func (e *Entry) SetMinRowsVisible(count int) {
 //
 // Since: 1.0
 func (e *Entry) RowMetrics() (topOffset, stride float32) {
-	// Lazy model (#157): uniform stride, analytic Y — serve from RowGeometry of the
+	// Lazy model (pre-rebrand tracker #157): uniform stride, analytic Y — serve from RowGeometry of the
 	// first visible row instead of the (absent) dense rowYPos array.
 	if e.text.lazy {
 		stride = e.text.stride()
@@ -1477,7 +1477,7 @@ func (e *Entry) RowMetrics() (topOffset, stride float32) {
 		return
 	}
 	// Use cached geometry from the last layout pass when available. With folded
-	// rows (#141) the stride is the uniform visible-row advance and the offset is
+	// rows (pre-rebrand tracker #141) the stride is the uniform visible-row advance and the offset is
 	// the first non-folded row's top, so a stale fold on row 0 does not yield a
 	// zero stride. Without folds this matches rowYPos[1]-rowYPos[0] exactly.
 	if len(e.text.rowYPos) >= 2 {
@@ -1509,7 +1509,7 @@ func (e *Entry) RowMetrics() (topOffset, stride float32) {
 //
 // Since: 1.0
 func (e *Entry) RowPositions() (yPositions []float32, heights []float32) {
-	// Lazy model (#157): no dense geometry array — synthesise positions analytically
+	// Lazy model (pre-rebrand tracker #157): no dense geometry array — synthesise positions analytically
 	// (uniform stride, fold-aware). O(rows); external gutters on very large documents
 	// should prefer the O(1) RowMetrics. Matches the dense rowYPos/rowHeight values.
 	if e.text.lazy {
@@ -1539,7 +1539,7 @@ func (e *Entry) RowPositions() (yPositions []float32, heights []float32) {
 
 // updateTextViewport feeds the current scroll viewport to the virtualised text
 // provider and, when the materialised row window changes, triggers a cheap
-// window-sized re-render. No-op unless row virtualisation is active (#119). It
+// window-sized re-render. No-op unless row virtualisation is active (pre-rebrand tracker #119). It
 // must not recompute row bounds, scroll, or re-enter Entry.Refresh.
 func (e *Entry) updateTextViewport() {
 	if e.scroll == nil || !e.text.canVirtualize() {
@@ -1582,7 +1582,7 @@ func (e *Entry) setText(text string, fromBinding bool) {
 	e.Theme() // setup theme cache before locking
 	// A wholesale text replacement invalidates any selection's offsets, so drop
 	// it before re-laying-out — otherwise a stale anchor survives and the next
-	// edit replaces a phantom range (#154).
+	// edit replaces a phantom range (pre-rebrand tracker #154).
 	cleared := e.clearSelection()
 	e.updateTextAndRefresh(text, fromBinding)
 	e.updateCursorAndSelection()
@@ -1601,7 +1601,7 @@ func (e *Entry) Append(text string) {
 		provider := e.textProvider()
 		provider.insertAt(provider.len(), []rune(text))
 		e.undoStack.Clear()
-		// Deferred text sync (#410): programmatic appends defer too, so bulk
+		// Deferred text sync (pre-rebrand tracker #410): programmatic appends defer too, so bulk
 		// appends to a huge document stay O(edit) per call.
 		if e.editDeferred() {
 			e.Refresh()
@@ -1628,7 +1628,7 @@ func (e *Entry) Tapped(ev *event.PointEvent) {
 		e.sel.selecting = false
 	}
 	// A tap that collapsed a selection re-reveals the caret handle armed by
-	// the preceding TouchDown (#943); a no-op when no handle is armed.
+	// the preceding TouchDown (pre-rebrand tracker #943); a no-op when no handle is armed.
 	e.updateCaretHandle()
 }
 
@@ -1669,7 +1669,7 @@ func (e *Entry) showContextMenu(pos geo.Position) {
 			// Re-present the menu over the now-full selection so Cut/Copy are
 			// immediately usable, matching native iOS/Android; without this the
 			// menu just vanished and re-summoning it needed a fresh tap that
-			// moved the caret / lost the selection (#1128). The current menu is
+			// moved the caret / lost the selection (pre-rebrand tracker #1128). The current menu is
 			// dismissing as part of this tap, so re-show on the next event cycle.
 			bellui.Do(func() { e.showContextMenu(pos) })
 		}
@@ -1726,7 +1726,7 @@ func (e *Entry) TouchDown(ev *mobile.TouchEvent) {
 	e.updateMousePointer(ev.Position.Add(e.scroll.Offset), false)
 
 	// A plain touch tap placing the caret summons the draggable caret
-	// handle (#943); a tap that grows into a drag-select or long-press
+	// handle (pre-rebrand tracker #943); a tap that grows into a drag-select or long-press
 	// selection hides it again as the selection handles take over.
 	e.showCaretHandle()
 }
@@ -1747,7 +1747,7 @@ func (e *Entry) TouchCancel(*mobile.TouchEvent) {
 // entryKeyHandlers dispatches a navigation/edit key to its handler. Returning
 // false aborts TypedKey before the shared text-update/refresh tail. Keeping the
 // table here (rather than a large switch in TypedKey) holds that method's
-// cyclomatic complexity under the CI limit (#293).
+// cyclomatic complexity under the CI limit (pre-rebrand tracker #293).
 var entryKeyHandlers = map[event.KeyName]func(e *Entry, provider *RichText, multiLine bool) bool{
 	event.KeyBackspace: func(e *Entry, p *RichText, _ bool) bool { return e.typedKeyBackspace(p) },
 	event.KeyDelete:    func(e *Entry, p *RichText, _ bool) bool { return e.typedKeyDelete(p) },
@@ -1782,16 +1782,16 @@ func (e *Entry) TypedKey(key *event.KeyEvent) {
 	if e.Disabled() {
 		return
 	}
-	// Keyboard interaction dismisses the mobile caret drag-handle (#943).
+	// Keyboard interaction dismisses the mobile caret drag-handle (pre-rebrand tracker #943).
 	e.hideCaretHandle()
 	if key.Name == event.KeyEscape {
 		if e.composing {
 			// Esc discards an in-progress IME composition without committing,
-			// giving the user a way to reject the suggested composition (#354).
+			// giving the user a way to reject the suggested composition (pre-rebrand tracker #354).
 			e.ComposeCancel()
 		} else if e.OnEscape != nil {
 			// The cancel counterpart of OnSubmitted — lets a host dismiss an
-			// inline editor (#1052).
+			// inline editor (pre-rebrand tracker #1052).
 			e.OnEscape()
 		}
 		return
@@ -1812,7 +1812,7 @@ func (e *Entry) TypedKey(key *event.KeyEvent) {
 	// Check shift state via driver modifiers (more reliable than KeyDown events).
 	// Assert the narrower KeyModifierDriver (not desktop.Driver) so the mobile
 	// driver — which tracks hardware-keyboard modifiers but is not a full desktop
-	// driver — also drives Shift+Arrow selection (#1083); glfw satisfies both.
+	// driver — also drives Shift+Arrow selection (pre-rebrand tracker #1083); glfw satisfies both.
 	if dd, ok := bellui.CurrentApp().Driver().(desktop.KeyModifierDriver); ok {
 		e.selectKeyDown = dd.CurrentKeyModifiers()&event.KeyModifierShift != 0
 		if e.selectKeyDown && !e.sel.selecting {
@@ -1841,14 +1841,14 @@ func (e *Entry) TypedKey(key *event.KeyEvent) {
 		return
 	}
 
-	// Skip folded rows (#141), biased to the direction of travel, so caret
+	// Skip folded rows (pre-rebrand tracker #141), biased to the direction of travel, so caret
 	// navigation never lands on a hidden line.
 	e.skipHiddenRowForKey(key.Name)
-	// Keep the caret out of caret-opaque protected spans (#140), biased to the
+	// Keep the caret out of caret-opaque protected spans (pre-rebrand tracker #140), biased to the
 	// same direction so the span is skipped in a single keypress.
 	e.clampCaretFromOpaqueForKey(key.Name)
 
-	// Deferred text sync (#410): an editing key's splice stayed in the buffer
+	// Deferred text sync (pre-rebrand tracker #410): an editing key's splice stayed in the buffer
 	// (for a pure navigation key this simply skips a no-op materialization
 	// while a sync is pending); notifications wait for the next sync point.
 	if e.editDeferred() {
@@ -2125,7 +2125,7 @@ func (e *Entry) deleteWord(right bool) {
 	if !right {
 		e.CursorColumn = cursorCol - (end - start)
 	}
-	// Deferred text sync (#410): the word-delete splice stayed in the buffer.
+	// Deferred text sync (pre-rebrand tracker #410): the word-delete splice stayed in the buffer.
 	if e.editDeferred() {
 		e.Refresh()
 		return
@@ -2151,7 +2151,7 @@ func (e *Entry) isReadOnly() bool {
 }
 
 func (e *Entry) TypedRune(r rune) {
-	// Typing dismisses the mobile caret drag-handle (#943).
+	// Typing dismisses the mobile caret drag-handle (pre-rebrand tracker #943).
 	e.hideCaretHandle()
 	if e.composing {
 		// Desktop IME commit: the finalized character arrives as a normal char
@@ -2159,7 +2159,7 @@ func (e *Entry) TypedRune(r rune) {
 		// delivered via ComposeCommit on the desktop driver). Route it through the
 		// commit path so the preedit glyphs are dropped and the caret restored to
 		// the anchor first — otherwise the committed text is inserted next to the
-		// still-visible composition, appending instead of replacing it (#354).
+		// still-visible composition, appending instead of replacing it (pre-rebrand tracker #354).
 		e.ComposeCommit(string(r))
 		return
 	}
@@ -2197,7 +2197,7 @@ func (e *Entry) insertRunesAtCursor(runes []rune) {
 	provider := e.textProvider()
 	provider.insertAt(pos, runes)
 
-	// Deferred text sync (#410): the splice stayed in the buffer, so skip the
+	// Deferred text sync (pre-rebrand tracker #410): the splice stayed in the buffer, so skip the
 	// document materialization and its notifications until the next sync point.
 	deferred := e.editDeferred()
 	var content string
@@ -2230,7 +2230,7 @@ func (e *Entry) insertRunesAtCursor(runes []rune) {
 // composing it is simply Text.
 //
 // When the preedit was spliced into the provider's buffer (the lazy fast path,
-// #402) this returns the buffer's memoized materialization — the same string
+// pre-rebrand tracker #402) this returns the buffer's memoized materialization — the same string
 // object seg.Text already holds, so syncSegments performs a no-op store and
 // the incremental row model survives every composition update. The string
 // concatenation below is the fallback for non-lazy providers.
@@ -2254,7 +2254,7 @@ func (e *Entry) composedDisplay() string {
 // applyPreeditToProvider splices the preedit runes into the provider's buffer
 // in place of the previously applied ones, so composition updates ride the
 // incremental fast path instead of rebuilding the whole row model per event
-// (#402). Reports false when the fast path is unavailable (non-lazy provider,
+// (pre-rebrand tracker #402). Reports false when the fast path is unavailable (non-lazy provider,
 // folds, or an external write broke the identity chain mid-composition); the
 // caller then relies on the composedDisplay string fallback.
 func (e *Entry) applyPreeditToProvider(runes []rune) bool {
@@ -2319,7 +2319,7 @@ func (e *Entry) Compose(ev *event.PreeditEvent) {
 		e.preeditCursor = pc
 
 		// Splice the preedit into the provider's buffer so this update rides the
-		// incremental fast path (#402); falls back to the composedDisplay string
+		// incremental fast path (pre-rebrand tracker #402); falls back to the composedDisplay string
 		// path for non-lazy providers.
 		e.applyPreeditToProvider(newRunes)
 
@@ -2356,7 +2356,7 @@ func (e *Entry) ComposeCommit(text string) {
 		// preedit was shown — never over that newer selection. Left active,
 		// the anchor-restored caret below would pair with the selection's
 		// anchor into an accidental giant range that the insert then
-		// replaces (#945 device finding: committing after a long-press
+		// replaces (pre-rebrand tracker #945 device finding: committing after a long-press
 		// deleted everything between the selection and the anchor).
 		selStart, selEnd := -1, -1
 		if composing && e.sel != nil && e.sel.selecting {
@@ -2366,7 +2366,7 @@ func (e *Entry) ComposeCommit(text string) {
 
 		// Likewise a bare caret placed OUTSIDE the preedit after composition
 		// started (an external mid-composition caret move — on iOS a VoiceOver
-		// tap lands on the native view and is forwarded here, #1118) must
+		// tap lands on the native view and is forwarded here, pre-rebrand tracker #1118) must
 		// survive the commit: the committed text still lands at the anchor,
 		// and the caret returns to where the user put it, remapped below the
 		// same way a preserved selection is. A caret inside the preedit (the
@@ -2403,7 +2403,7 @@ func (e *Entry) ComposeCommit(text string) {
 		// Remap a preserved selection or caret from the preedit-including display
 		// space it was captured in: `removed` preedit runes came out at the
 		// anchor and the committed runes went in there. The selection branch
-		// (#945) was captured against the spliced provider, so its removed
+		// (pre-rebrand tracker #945) was captured against the spliced provider, so its removed
 		// length is preeditApplied; the caret branch uses the display span.
 		n := len([]rune(text))
 		adjustBy := func(o, removed int) int {
@@ -2549,7 +2549,7 @@ func (e *Entry) styleRunsForRow(row int) []StyleRun {
 }
 
 // overlayRunsForRow composites the host style overlay (StyleOverlayForRow,
-// #1079) onto the base runs for a display row. The overlay's runs tile the row
+// pre-rebrand tracker #1079) onto the base runs for a display row. The overlay's runs tile the row
 // from rune 0 by Text length; each styled run is merged over its range via
 // overlaySubrange, zero-valued runs are spacers. When the row has no base runs
 // (no LineHighlighter) a base run covering the row is synthesized, since the
@@ -2704,7 +2704,7 @@ func (e *Entry) cutToClipboard(clipboard bellui.Clipboard) {
 
 	e.copyToClipboard(clipboard)
 	e.eraseSelectionAndUpdate()
-	// Deferred text sync (#410): notifications wait for the sync point.
+	// Deferred text sync (pre-rebrand tracker #410): notifications wait for the sync point.
 	if e.text.deferredDirty {
 		e.Refresh()
 		return
@@ -2761,7 +2761,7 @@ func (e *Entry) eraseSelectionAndUpdate() {
 		}
 	}
 	if e.eraseSelection() {
-		// Deferred text sync (#410): the erase splice stayed in the buffer.
+		// Deferred text sync (pre-rebrand tracker #410): the erase splice stayed in the buffer.
 		if e.editDeferred() {
 			return
 		}
@@ -2777,10 +2777,10 @@ func (e *Entry) pasteFromClipboard(clipboard bellui.Clipboard) {
 	}
 	e.syncSelectable()
 
-	// Clipboard-flavor negotiation (#581). Entry is a plain-text surface: it
+	// Clipboard-flavor negotiation (pre-rebrand tracker #581). Entry is a plain-text surface: it
 	// deliberately degrades the richer clipboard flavors rather than pretending
 	// to support them. Editable rich-text/image paste is a separate widget
-	// tracked in #648 and is intentionally NOT built here.
+	// tracked in pre-rebrand tracker #648 and is intentionally NOT built here.
 	//
 	// HTML flavor: Entry never parses or strips markup. Per the clipboard
 	// contract (clipboard.go), SetHTML always writes a plain-text fallback in the
@@ -2792,13 +2792,13 @@ func (e *Entry) pasteFromClipboard(clipboard bellui.Clipboard) {
 	// Image flavor: an image-only clipboard carries no plain text
 	// (Content() == ""). A plain Entry has nowhere to put a raster image, so
 	// pasting one is a documented no-op — not an error (editable image paste
-	// into rich content lives in #648). Asserted explicitly so the intent is
+	// into rich content lives in pre-rebrand tracker #648). Asserted explicitly so the intent is
 	// clear and the early return is robust to later changes in the plain-text
 	// branch below.
 	if text == "" && !e.sel.selecting {
 		if ic, ok := clipboard.(bellui.ImageClipboard); ok {
 			if _, has := ic.Image(); has {
-				return // Nothing plain-text to paste; image paste deferred to #648.
+				return // Nothing plain-text to paste; image paste deferred to pre-rebrand tracker #648.
 			}
 		}
 	}
@@ -2818,8 +2818,8 @@ func (e *Entry) pasteFromClipboard(clipboard bellui.Clipboard) {
 		// the standard update-and-notify tail. Leaving Text stale here made the
 		// following refresh restore the pre-erase content from it while the
 		// undo stack kept the recorded deletion — reverting the erase on screen
-		// and corrupting the history (#427).
-		if e.editDeferred() { // deferred lazy-Text mode (#410)
+		// and corrupting the history (pre-rebrand tracker #427).
+		if e.editDeferred() { // deferred lazy-Text mode (pre-rebrand tracker #410)
 			e.Refresh()
 			return
 		}
@@ -2858,7 +2858,7 @@ func (e *Entry) pasteFromClipboard(clipboard bellui.Clipboard) {
 		Position: pos,
 		Text:     runes,
 	})
-	// Deferred text sync (#410): the paste splice stayed in the buffer.
+	// Deferred text sync (pre-rebrand tracker #410): the paste splice stayed in the buffer.
 	deferred := e.editDeferred()
 	var content string
 	if !deferred {
@@ -3002,7 +3002,7 @@ func (e *Entry) registerShortcut() {
 	// Document-jump shortcuts: Ctrl+Home/Ctrl+End (Cmd+ArrowUp/ArrowDown on
 	// macOS) move the caret to the very start/end of the document, with Shift
 	// variants extending the selection. This complements PageUp/PageDown, which
-	// page by a viewport screenful (#377).
+	// page by a viewport screenful (pre-rebrand tracker #377).
 	docJump := func(toEnd, selecting bool) func(core.Shortcut) {
 		return func(core.Shortcut) {
 			if selecting {
@@ -3085,7 +3085,7 @@ func (e *Entry) selectingKeyHandler(key *event.KeyEvent) bool {
 	case event.KeyBackspace, event.KeyDelete:
 		// clears the selection -- return handled
 		e.eraseSelectionAndUpdate()
-		// Deferred text sync (#410): notifications wait for the sync point.
+		// Deferred text sync (pre-rebrand tracker #410): notifications wait for the sync point.
 		if e.text.deferredDirty {
 			e.Refresh()
 			return true
@@ -3139,7 +3139,7 @@ func (e *Entry) selectingKeyHandler(key *event.KeyEvent) bool {
 // In the lazy single-segment model the cache is filled on demand instead:
 // HighlightRunsForRow drives ensureHighlightedThrough for the rows the renderer
 // actually shows, so a SetText of a huge document highlights one screenful, not
-// every line (#401). Edits keep the cache aligned via noteLazyLinesEdited.
+// every line (pre-rebrand tracker #401). Edits keep the cache aligned via noteLazyLinesEdited.
 func (e *Entry) updateHighlightCache() {
 	if e.LineHighlighter == nil {
 		e.hlCache = nil
@@ -3187,7 +3187,7 @@ func (e *Entry) updateHighlightCache() {
 // noteLazyLinesEdited keeps hlCache index-aligned with the provider's logical
 // lines after an incremental edit replaced lines [a..z] with newCount lines,
 // and lowers the computed watermark so ensureHighlightedThrough re-chains from
-// the edit. Wired to RichText.onLazyLinesEdited (#401).
+// the edit. Wired to RichText.onLazyLinesEdited (pre-rebrand tracker #401).
 func (e *Entry) noteLazyLinesEdited(a, z, newCount int) {
 	if e.LineHighlighter == nil || len(e.hlCache) == 0 {
 		return
@@ -3218,8 +3218,8 @@ func (e *Entry) noteLazyLinesEdited(a, z, newCount int) {
 	}
 	if e.hlComputedThrough < oldW {
 		// The edit lowered the watermark, so a tail of rows now needs
-		// re-chaining. Since the synchronous chain is capped (#167), the
-		// background prefill (#417) is the path that reconverges rows far below
+		// re-chaining. Since the synchronous chain is capped (pre-rebrand tracker #167), the
+		// background prefill (pre-rebrand tracker #417) is the path that reconverges rows far below
 		// the watermark — a deep viewport can no longer pull them all in one
 		// render — so (re-)arm it here in case a prior chain had already
 		// completed and stopped it. Idempotent when still running; a no-op when
@@ -3227,10 +3227,10 @@ func (e *Entry) noteLazyLinesEdited(a, z, newCount int) {
 		e.startHlPrefill()
 	}
 
-	// Keep the trusted stretches aligned with the splice (#412): shift each
+	// Keep the trusted stretches aligned with the splice (pre-rebrand tracker #412): shift each
 	// stretch above the edit, split one the edit lands inside — both halves
 	// stay text-current and chain-consistent, so scattered batch edits between
-	// renders each leave their own stretch instead of discarding half (#418).
+	// renders each leave their own stretch instead of discarding half (pre-rebrand tracker #418).
 	if len(e.hlTrusted) == 0 && oldW <= a {
 		return // nothing tracked and nothing newly chained below the edit
 	}
@@ -3239,7 +3239,7 @@ func (e *Entry) noteLazyLinesEdited(a, z, newCount int) {
 	// text-current and chain-consistent ([0, watermark) is splice-free by
 	// construction): record them as a trusted stretch a later re-chain can
 	// jump over, so an edit far above a deep viewport re-runs the highlighter
-	// only until the state converges (#412). Every existing stretch sits above
+	// only until the state converges (pre-rebrand tracker #412). Every existing stretch sits above
 	// the old watermark, so prepending keeps the list sorted and disjoint.
 	if from, to := a+newCount, oldW+delta; to > from {
 		next = append(next, hlStretch{from, to})
@@ -3275,13 +3275,13 @@ func (e *Entry) noteLazyLinesEdited(a, z, newCount int) {
 // logical lines [hlComputedThrough, target] in the lazy model, reusing cached
 // entries whose (stateIn, text) still match so an edit re-runs the highlighter
 // only until the state chain converges. Line text is read from the provider's
-// buffer — no document-wide split (#401). Once the chain converges into a
+// buffer — no document-wide split (pre-rebrand tracker #401). Once the chain converges into a
 // trusted stretch left by an earlier edit, the walk jumps over it wholesale,
 // so re-chaining to a deep viewport touches O(edits + convergence + window)
-// lines even after scattered batch edits between renders (#412, #418); only
+// lines even after scattered batch edits between renders (pre-rebrand tracker #412, pre-rebrand tracker #418); only
 // the very first deep jump after a content replacement (SetText)
 // has to chain from line 0, since no prior state is known for fresh content —
-// and the background prefill (#417) usually gets there first, leaving only
+// and the background prefill (pre-rebrand tracker #417) usually gets there first, leaving only
 // the gap above its watermark to chain synchronously.
 func (e *Entry) ensureHighlightedThrough(target int) {
 	if e.LineHighlighter == nil || !e.text.lazy || e.text.buf == nil {
@@ -3292,9 +3292,9 @@ func (e *Entry) ensureHighlightedThrough(target int) {
 	// external write); restart the chain — cached entries still shortcut
 	// unchanged prefixes via the per-line compare below, but the trusted
 	// stretch is void: its text-currency was verified against the old buffer,
-	// so a deep jump into fresh content chains from line 0 (#412). Kick off
+	// so a deep jump into fresh content chains from line 0 (pre-rebrand tracker #412). Kick off
 	// the background prefill so that first chain rarely happens synchronously:
-	// idle frame ticks advance the watermark until it reaches the end (#417).
+	// idle frame ticks advance the watermark until it reaches the end (pre-rebrand tracker #417).
 	if e.hlBuf != p.buf {
 		e.hlBuf = p.buf
 		e.hlComputedThrough = 0
@@ -3321,12 +3321,12 @@ func (e *Entry) ensureHighlightedThrough(target int) {
 		target = L - 1
 	}
 	i := e.hlComputedThrough
-	// Bound the synchronous chain (#167). A render request for a row far below the
+	// Bound the synchronous chain (pre-rebrand tracker #167). A render request for a row far below the
 	// highlight watermark — a fold that collapses a huge region so its footer row
 	// jumps into view, or a scroll that lands deep before the prefill has caught up
 	// — would otherwise chain the whole prefix in one blocking pass (auto-folding a
 	// 437k-row @dataset hitched ~1.15s). Cap how far a single call chains: the
-	// requested row renders unstyled for now, and the background prefill (#417) —
+	// requested row renders unstyled for now, and the background prefill (pre-rebrand tracker #417) —
 	// whose slice target stays within hlPrefillSliceLines of the watermark, well
 	// under this cap, so it is never clamped — converges the remainder over frames.
 	// Its running animation keeps repainting the window, so the deep row picks up
@@ -3343,10 +3343,10 @@ func (e *Entry) ensureHighlightedThrough(target int) {
 	}
 	ti := 0 // hlTrusted is sorted and i only grows, so this never rescans
 	for i <= target {
-		// Jump over a trusted stretch (#412): its entries hold current text
+		// Jump over a trusted stretch (pre-rebrand tracker #412): its entries hold current text
 		// and a pairwise-consistent chain, so an entering state that matches
 		// the recorded one revalidates the whole stretch at once. With several
-		// stretches tracked (#418) each is jumped as the walk reaches it.
+		// stretches tracked (pre-rebrand tracker #418) each is jumped as the walk reaches it.
 		for ti < len(e.hlTrusted) && e.hlTrusted[ti].to <= i {
 			ti++
 		}
@@ -3379,7 +3379,7 @@ func (e *Entry) ensureHighlightedThrough(target int) {
 	}
 }
 
-// Background highlight prefill (#417): after a content replacement the state
+// Background highlight prefill (pre-rebrand tracker #417): after a content replacement the state
 // chain restarts at line 0, so the first deep jump would have to chain the
 // whole document synchronously. hlPrefillTick runs once per rendered frame
 // (driven by a repeat-forever animation, i.e. on the main goroutine between
@@ -3391,7 +3391,7 @@ const hlPrefillSliceLines = 256
 
 // maxSyncHighlightChain caps how many lines a single synchronous
 // ensureHighlightedThrough call will chain when a render request lands far below
-// the highlight watermark (#167). It sits well above any realistic viewport jump
+// the highlight watermark (pre-rebrand tracker #167). It sits well above any realistic viewport jump
 // (a viewport is tens of rows) so ordinary scrolling and editing still highlight
 // synchronously and exactly, and only the pathological far jump — a collapsed
 // fold's footer, a deep scroll before the prefill has caught up — is bounded,
@@ -3399,11 +3399,11 @@ const hlPrefillSliceLines = 256
 // hlPrefillSliceLines so a prefill slice, whose target stays within that many
 // lines of the watermark, is never itself clamped.
 //
-// Tuned down from 20000 (#693): the one-time synchronous apply of a collapsed
+// Tuned down from 20000 (pre-rebrand tracker #693): the one-time synchronous apply of a collapsed
 // huge fold scales with this cap (~7µs/line, so ~139ms at 20000 vs ~55ms here),
 // and the prefill now repaints the deep row itself as its watermark reaches the
 // viewport (repaintIfPrefillReachedViewport), so convergence no longer depends on
-// the cap being large. Kept above the deepest fixed deep-jump test (#412) so that
+// the cap being large. Kept above the deepest fixed deep-jump test (pre-rebrand tracker #412) so that
 // exact-chaining assertion stays valid without churn.
 const maxSyncHighlightChain = 8000
 
@@ -3449,7 +3449,7 @@ func (e *Entry) stopHlPrefill() {
 // per-frame budget is spent, stopping the driver once the watermark reaches
 // the end of the document (or the lazy highlight path no longer applies).
 // Edits below the watermark simply lower it — the next tick resumes from the
-// edit and re-converges over the trusted stretch (#412), so no explicit
+// edit and re-converges over the trusted stretch (pre-rebrand tracker #412), so no explicit
 // restart is needed; a SetText swaps the buffer and the tick re-chains from
 // line 0 against the new content.
 func (e *Entry) hlPrefillTick() {
@@ -3457,7 +3457,7 @@ func (e *Entry) hlPrefillTick() {
 		return // synchronous tick from inside Start; wait for a real frame
 	}
 	// Repaint the text if this tick's newly-highlighted lines cover a visible row
-	// (#693). The prefill advances only the highlight *state*; without an explicit
+	// (pre-rebrand tracker #693). The prefill advances only the highlight *state*; without an explicit
 	// repaint, dirty-region culling leaves a deep visible row (e.g. a collapsed
 	// fold's footer above the watermark) showing unstyled until some unrelated
 	// refresh, since the running animation does not mark the entry dirty. Bounding
@@ -3493,7 +3493,7 @@ func (e *Entry) hlPrefillTick() {
 
 // repaintIfPrefillReachedViewport refreshes the text region when the prefill
 // watermark advanced from `before` to now across (or into) the visible rows, so
-// those rows re-render with their freshly-computed highlight (#693). It is a
+// those rows re-render with their freshly-computed highlight (pre-rebrand tracker #693). It is a
 // no-op when the watermark did not advance (an edit lowered it, or the buffer
 // reset), or when the newly-highlighted band [before, now) does not overlap the
 // viewport — so the passage of the watermark past the viewport costs at most a
@@ -3526,7 +3526,7 @@ func (e *Entry) HighlightRunsForRow(row int) []StyleRun {
 	if row >= len(e.hlCache) {
 		return nil
 	}
-	// A deep render jump caps the synchronous chain (#167), so the row may sit
+	// A deep render jump caps the synchronous chain (pre-rebrand tracker #167), so the row may sit
 	// above the verified watermark. Its cache entry is then either untouched
 	// (nil, unstyled) or a leftover from a prior pass whose upstream highlighter
 	// state has since changed (a trusted stretch the capped walk never reached to
@@ -3551,7 +3551,7 @@ func (e *Entry) syncSegments() {
 	text := e.textProvider()
 	text.Wrapping = wrap
 
-	// Enable row virtualisation (#119, #139) for multi-line content that lives
+	// Enable row virtualisation (pre-rebrand tracker #119, pre-rebrand tracker #139) for multi-line content that lives
 	// inside the scroll container — the single-segment, uniform-height case where
 	// a large document would otherwise materialise (and shape) every row. This
 	// now covers word/break wrapping too: wrapped rows share the same uniform
@@ -3560,11 +3560,11 @@ func (e *Entry) syncSegments() {
 	scrollActive := e.Wrapping != bellui.TextWrapOff || e.Scroll != widget.ScrollNone
 	text.virtualize = e.MultiLine && scrollActive
 
-	// Deferred text sync (#410): pushed to the provider like virtualize, so the
+	// Deferred text sync (pre-rebrand tracker #410): pushed to the provider like virtualize, so the
 	// lazy splice path knows whether to skip the per-edit materialization.
 	text.deferText = e.DeferTextSync
 
-	// Push folded ranges (#141) to the provider; it normalises and clamps them to
+	// Push folded ranges (pre-rebrand tracker #141) to the provider; it normalises and clamps them to
 	// the current row count, so ranges left dangling by a shrunken document are
 	// reconciled here on every text change.
 	text.setHiddenRanges(e.HiddenRanges)
@@ -3624,7 +3624,7 @@ func (e *Entry) syncSelectable() {
 	// rectangles (and drag hit-testing, via alignOffsetX) track the text edge
 	// under center/trailing alignment — e.g. a right-aligned NumericEntry. Without
 	// this the selectable defaults to leading and draws the highlight on the left
-	// while the text sits on the right (#781).
+	// while the text sits on the right (pre-rebrand tracker #781).
 	e.sel.alignment = e.Alignment
 }
 
@@ -3757,7 +3757,7 @@ func (e *Entry) updateText(text string, fromBinding bool) bool {
 	// A wholesale replacement voids the highlight chain: Entry.SetText resets
 	// the cache before reaching here (the buffer object may survive when the
 	// new text is value-identical), and a binding write swaps the buffer
-	// without resetting. Arm the background prefill (#417) at this seam rather
+	// without resetting. Arm the background prefill (pre-rebrand tracker #417) at this seam rather
 	// than only from the render path — a repaint can serve already-materialized
 	// rows without consulting the highlighter, so a render-side hook is not
 	// guaranteed to run. Ordinary edits keep their cache (noteLazyLinesEdited)
@@ -3800,7 +3800,7 @@ func (e *Entry) updateTextAndRefresh(text string, fromBinding bool) {
 }
 
 // editDeferred finishes an interactive edit whose provider splice was deferred
-// (DeferTextSync, #410): it reports true when the buffer is ahead of Text so
+// (DeferTextSync, pre-rebrand tracker #410): it reports true when the buffer is ahead of Text so
 // the caller skips the materializing tail (updateText, Validator, OnChanged,
 // binding write) — all deferred to the next sync point. False means the edit
 // took the normal path (mode off, or the fast path did not apply) and the
@@ -3813,7 +3813,7 @@ func (e *Entry) editDeferred() bool {
 	return true
 }
 
-// syncDeferredText is the deferred-mode (#410) materialization: it re-anchors
+// syncDeferredText is the deferred-mode (pre-rebrand tracker #410) materialization: it re-anchors
 // the provider's identity chain to the buffer's current content and updates
 // Text (and, via updateText, any bound value). It reports the current text and
 // whether it differed from the last-synced Text. Cheap no-op when nothing is
@@ -3886,7 +3886,7 @@ func (e *Entry) typedKeyReturn(provider *RichText, multiLine bool) {
 	onSubmitted := e.OnSubmitted
 	selectDown := e.selectKeyDown
 	text := e.Text
-	// Submission is a deferred-mode sync point (#410): OnSubmitted must see
+	// Submission is a deferred-mode sync point (pre-rebrand tracker #410): OnSubmitted must see
 	// the current text, and the pending OnChanged/Validator run first.
 	if onSubmitted != nil && (!multiLine || selectDown) && e.text.deferredDirty {
 		text = e.syncDeferredTextNotify()
@@ -3943,7 +3943,7 @@ type entryRenderer struct {
 func (r *entryRenderer) Destroy() {
 	// Stop the background highlight prefill: its animation closure would
 	// otherwise keep a discarded Entry (rope buffer, hlCache) alive and
-	// ticking until the chain reaches the end of the document (#421). Destroy
+	// ticking until the chain reaches the end of the document (pre-rebrand tracker #421). Destroy
 	// also fires on cache eviction of a live, temporarily-hidden widget, so
 	// CreateRenderer re-arms an unfinished chain on re-show.
 	r.entry.stopHlPrefill()
@@ -3955,16 +3955,16 @@ func (r *entryRenderer) Destroy() {
 
 // RoundedClipCornerRadius implements the rounded clipping interface (the
 // same seam Card uses), so the scroll bar — whose square-cornered strip
-// otherwise paints past the rounded outline, obvious since the #449
+// otherwise paints past the rounded outline, obvious since the pre-rebrand tracker #449
 // grab-target work — and any content at the corners stay inside the drawn
-// shape (#467).
+// shape (pre-rebrand tracker #467).
 //
 // The clip applies at the widget bounds, but the visible box is inset by one
 // input border. Offsetting the box's rounded rect outward by that border
 // gives exactly the widget rect with radius+border (same arc centers), so
 // this radius makes the clip's arc concentric with the box's; the remaining
 // one-border band between the two arcs is covered by the border stroke,
-// which draws on top (#353). The radius tracks the box, which Refresh
+// which draws on top (pre-rebrand tracker #353). The radius tracks the box, which Refresh
 // re-themes.
 func (r *entryRenderer) RoundedClipCornerRadius() float32 {
 	return r.box.CornerRadius + r.entry.Theme().Size(theme.SizeNameInputBorder)
@@ -4047,7 +4047,7 @@ func (r *entryRenderer) Layout(size geo.Size) {
 	// The viewport sits inside the background box on all four sides: it was
 	// always inset vertically, but horizontally it used to span the full
 	// widget, leaving the scroll bar riding over the border stroke and
-	// poking an inputBorder past the box's edge (#467).
+	// poking an inputBorder past the box's edge (pre-rebrand tracker #467).
 	entrySize := size.Subtract(geo.NewSize(r.trailingInset()+r.leadingInset()+inputBorder*2, inputBorder*2))
 	entryYOffset := inputBorder
 	// Vertically center text content for single-line entries that are taller than min height.
@@ -4092,7 +4092,7 @@ func (r *entryRenderer) Layout(size geo.Size) {
 	}
 
 	// The scroll viewport is now sized: re-window the virtualised text for the
-	// initial layout and any resize (OnScrolled alone misses both). (#119)
+	// initial layout and any resize (OnScrolled alone misses both). (pre-rebrand tracker #119)
 	r.entry.updateTextViewport()
 }
 
@@ -4192,7 +4192,7 @@ func (r *entryRenderer) Refresh() {
 
 // refreshScrollWrapping corrects the scroll wrappers if the wrap mode changed.
 // The viewport rect must match entryRenderer.Layout: inset by one input
-// border on every side of the background box (#467).
+// border on every side of the background box (pre-rebrand tracker #467).
 func (r *entryRenderer) refreshScrollWrapping(content core.CanvasObject, wrapping bellui.TextWrap, scroll widget.ScrollDirection, inputBorder float32) {
 	entrySize := r.entry.Size().Subtract(geo.NewSize(r.trailingInset()+r.leadingInset()+inputBorder*2, inputBorder*2))
 	entryPos := geo.NewPos(r.leadingInset()+inputBorder, inputBorder)
@@ -4567,7 +4567,7 @@ func getTextWhitespaceRegion(row []rune, col int, expand bool) (int, int) {
 // getTextWordRegionNearest returns the selection region for a long-press at
 // col: the word under the position or — when the position lands on a run of
 // whitespace/separators — the nearest adjacent word, because the native
-// mobile long-press never selects the space itself (#958). The word whose
+// mobile long-press never selects the space itself (pre-rebrand tracker #958). The word whose
 // edge is closer to the pressed column wins; ties go to the preceding word.
 // A row consisting only of separators keeps the run selection.
 func getTextWordRegionNearest(row []rune, col int) (int, int) {
@@ -4606,7 +4606,7 @@ type entryUndoAction interface {
 	// Apply performs the recorded action on the provider — redo replays the
 	// original edit, undo (redo=false) reverses it — and returns the caret rune
 	// offset after the application. Splicing the provider directly keeps the
-	// per-action cost O(edit) instead of O(document) (#401).
+	// per-action cost O(edit) instead of O(document) (pre-rebrand tracker #401).
 	Apply(p *RichText, redo bool) (caretPos int)
 }
 

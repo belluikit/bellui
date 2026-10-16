@@ -1,5 +1,5 @@
 // Command webgpuwaylandprobe verifies that the default (WebGPU) painter creates
-// and renders to a native Wayland surface (#608, a #542 follow-up).
+// and renders to a native Wayland surface (pre-rebrand tracker #608, a pre-rebrand tracker #542 follow-up).
 //
 // The WebGPU backend's Wayland surface descriptor
 // (SurfaceSourceWaylandSurface, backend_webgpu_x11wayland.go, gated on

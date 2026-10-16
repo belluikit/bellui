@@ -95,7 +95,7 @@ func TestDiagnosticGutter_ComposesWithLineNumbers(t *testing.T) {
 }
 
 // shapeOf names the marker silhouette a severity renders, so the test asserts the
-// four severities are distinguishable by shape alone — not color (#56).
+// four severities are distinguishable by shape alone — not color (pre-rebrand tracker #56).
 func shapeOf(t *testing.T, obj core.CanvasObject) string {
 	t.Helper()
 	switch o := obj.(type) {
@@ -190,7 +190,7 @@ func TestDiagnosticGutter_ClickToRevealOptIn(t *testing.T) {
 
 // TestDiagnosticGutter_RevealTargetsMostSevere verifies click-to-reveal jumps to
 // the most-severe diagnostic on a line — the one the marker represents — even when
-// a less-severe one appears first in set order, with ties broken by set order (#97).
+// a less-severe one appears first in set order, with ties broken by set order (pre-rebrand tracker #97).
 func TestDiagnosticGutter_RevealTargetsMostSevere(t *testing.T) {
 	g := NewDiagnosticGutter()
 	hint := Diagnostic{Range: TextRange{StartRow: 0, StartCol: 0, EndRow: 0, EndCol: 2}, Severity: SeverityHint}
@@ -221,7 +221,7 @@ func TestDiagnosticGutter_RevealTargetsMostSevere(t *testing.T) {
 
 // TestDiagnosticGutter_CycleOnTap verifies repeated taps of a multi-diagnostic
 // line walk through its diagnostics (most-severe first, then set order, wrapping)
-// when CycleOnTap is set, and that a different line restarts the walk (#99).
+// when CycleOnTap is set, and that a different line restarts the walk (pre-rebrand tracker #99).
 func TestDiagnosticGutter_CycleOnTap(t *testing.T) {
 	g := NewDiagnosticGutter()
 	errR := TextRange{StartRow: 0, StartCol: 0, EndRow: 0, EndCol: 3}

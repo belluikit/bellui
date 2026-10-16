@@ -10,7 +10,7 @@ import (
 	"github.com/belluikit/bellui/core"
 )
 
-// Entry's core.AccessibleTexter implementation (#501): the seam platform
+// Entry's core.AccessibleTexter implementation (pre-rebrand tracker #501): the seam platform
 // accessibility bridges use for screen-reader text navigation and editing.
 
 func TestEntryAccessibleText(t *testing.T) {

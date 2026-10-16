@@ -18,7 +18,7 @@ import (
 
 // fakeVirtualGrid models a virtualized table (fytables DataGrid): a huge
 // logical extent via AccessibleGridDimensioner, a bounded near-viewport window
-// of virtual cell nodes, and the #637 point-addressed realize seam for
+// of virtual cell nodes, and the pre-rebrand tracker #637 point-addressed realize seam for
 // everything beyond it.
 type fakeVirtualGrid struct {
 	widget.BaseWidget
@@ -83,7 +83,7 @@ func (g *fakeVirtualGrid) AccessibleScrollCellIntoView(row, col int) {
 }
 
 // Scrolled makes the grid its own scroll handler (event.Scrollable), so its
-// virtual cells inherit it as their scroll target (#952).
+// virtual cells inherit it as their scroll target (pre-rebrand tracker #952).
 func (g *fakeVirtualGrid) Scrolled(ev *event.ScrollEvent) { g.lastScroll = ev }
 
 func newRealizeTestWindow(t *testing.T) (*window, *fakeVirtualGrid) {
@@ -266,7 +266,7 @@ func TestMobileA11yDispatch_ActivateRealizedCellScrollsIntoView(t *testing.T) {
 }
 
 // The AT scroll gesture over a virtualized grid's cells pages the grid itself:
-// virtual cells inherit the Scrollable provider as their scroll target (#952 —
+// virtual cells inherit the Scrollable provider as their scroll target (pre-rebrand tracker #952 —
 // the iOS accessibilityScroll: path and Android's per-item scroll actions both
 // dispatch through this), and forward reveals the content below.
 func TestMobileA11yScroll_VirtualCellPagesGrid(t *testing.T) {

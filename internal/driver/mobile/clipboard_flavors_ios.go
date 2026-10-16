@@ -24,8 +24,8 @@ import (
 	"github.com/belluikit/bellui"
 )
 
-// mobileClipboard carries raster images on iOS via UIPasteboard (#580) and
-// writes combined flavors in one transaction (#1142). FileClipboard stays
+// mobileClipboard carries raster images on iOS via UIPasteboard (pre-rebrand tracker #580) and
+// writes combined flavors in one transaction (pre-rebrand tracker #1142). FileClipboard stays
 // unimplemented on mobile (matching wasm) — the assertion for it fails.
 var (
 	_ bellui.ImageClipboard       = mobileClipboard{}
@@ -56,7 +56,7 @@ func (c mobileClipboard) Image() (image.Image, bool) {
 }
 
 // SetFlavors replaces the pasteboard content with every set flavor of content
-// in one transaction (#1142): a single UIPasteboard item mapping UTIs to the
+// in one transaction (pre-rebrand tracker #1142): a single UIPasteboard item mapping UTIs to the
 // text/HTML/PNG representations. Files are skipped with a logged error —
 // mobile has no file-list clipboard flavor (FileClipboard is unimplemented).
 func (c mobileClipboard) SetFlavors(content bellui.ClipboardContent) {

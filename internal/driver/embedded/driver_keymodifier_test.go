@@ -31,7 +31,7 @@ func (f *noosFocusable) FocusLost()               {}
 func (f *noosFocusable) TypedRune(rune)           {}
 func (f *noosFocusable) TypedKey(*event.KeyEvent) {}
 
-// TestNoOSDriver_TypedKeyCarriesModifier pins #1042 on the embedded driver:
+// TestNoOSDriver_TypedKeyCarriesModifier pins pre-rebrand tracker #1042 on the embedded driver:
 // the Modifiers reported on an embedded.KeyEvent reach the delivered
 // event.KeyEvent.
 func TestNoOSDriver_TypedKeyCarriesModifier(t *testing.T) {

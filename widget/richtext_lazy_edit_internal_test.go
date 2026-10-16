@@ -30,7 +30,7 @@ func authoritativeLineStarts(t *RichText) []int {
 }
 
 // TestLazyEdit_IncrementalMatchesRebuild drives the single-segment lazy fast edit
-// path (#380) through inserts and deletes — single-line, newline-splitting,
+// path (pre-rebrand tracker #380) through inserts and deletes — single-line, newline-splitting,
 // multibyte, whole-document — and after each edit asserts the incrementally
 // maintained buffer and line index agree with a full rebuild from seg.Text.
 func TestLazyEdit_IncrementalMatchesRebuild(t *testing.T) {

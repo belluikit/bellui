@@ -20,7 +20,7 @@ import (
 //
 // Run it from an interactive session. A window in the session-0 window station
 // an SSH command lands in is not on any desktop, so the capture is of nothing —
-// the same trap #487's UIA verification hit (schtasks /IT is the way out).
+// the same trap pre-rebrand tracker #487's UIA verification hit (schtasks /IT is the way out).
 func captureScreen(r screenshotRegion, path string) error {
 	script := fmt.Sprintf(`
 $ErrorActionPreference = 'Stop'

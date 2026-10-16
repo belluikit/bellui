@@ -125,7 +125,7 @@ func (n *noosDriver) doRun() {
 				// No shortcut detected, pass down to TypedKey
 				focused := w.c.Focused()
 				if focused != nil {
-					// Keyboard-activation parity with taps (#700).
+					// Keyboard-activation parity with taps (pre-rebrand tracker #700).
 					if act, ok := focused.(event.Activatable); ok && act.ActivatedByKey(keyEvent) {
 						if co, ok := focused.(core.CanvasObject); ok {
 							core.NotifyActivation(co, true)

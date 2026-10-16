@@ -71,26 +71,26 @@ type driver struct {
 	// surfaceOwner is the window whose WebGPU painter currently holds the
 	// configured surface on the shared Android ANativeWindow. Only one window may
 	// own it at a time (two Vulkan swapchains on one native window can't both
-	// present, #753), so claimNativeSurface hands it over on a current-window
+	// present, pre-rebrand tracker #753), so claimNativeSurface hands it over on a current-window
 	// change. Android-only; nil/unused on iOS (per-window CAMetalLayers) and GL.
 	surfaceOwner *window
 
 	// nativeWindow is the shared Android ANativeWindow handle, captured from the
 	// last hardware paint event. All windows share it, but a window opened over
 	// another only ever receives handle-less draw-ticker paint events, so it
-	// inherits this handle to become renderable (#753). Android-only.
+	// inherits this handle to become renderable (pre-rebrand tracker #753). Android-only.
 	nativeWindow uintptr
 
-	// textInput is the neutral text-input mirror (#768/#770). It binds the
+	// textInput is the neutral text-input mirror (pre-rebrand tracker #768/#770). It binds the
 	// focused core.AccessibleTexter on focus change and pushes its (text,
 	// selection) into the native IME shadow via keyboardStateBackend — the
-	// seam-driven successor to the bespoke pushKeyboardState cache (#572). It
+	// seam-driven successor to the bespoke pushKeyboardState cache (pre-rebrand tracker #572). It
 	// also routes IME composition back to the editor's event.Composable.
 	textInput   *textinput.Session
 	queuedFuncs *async.UnboundedChan[func()]
 
 	// keyboardType is the mobile.KeyboardType of the field the soft keyboard was
-	// last shown for, tracked so the one-writer IME reroute (#1061) can tell a
+	// last shown for, tracked so the one-writer IME reroute (pre-rebrand tracker #1061) can tell a
 	// prose field (Gboard composes and commits hardware keys through the
 	// InputConnection) from a password/number field (no composition — hardware
 	// keys arrive only on the native queue and must not be suppressed). Set by
@@ -98,26 +98,26 @@ type driver struct {
 	keyboardType mobile.KeyboardType
 
 	// tbPass gates raw touch streams while an explore-by-touch screen reader
-	// owns the touchscreen — see exploreTouch (#1104).
+	// owns the touchscreen — see exploreTouch (pre-rebrand tracker #1104).
 	tbPass tbPassthrough
 
 	// keyMods is the hardware-keyboard modifier set carried by the most recent
 	// key event, exposed via CurrentKeyModifiers so Entry can extend its
-	// selection on Shift+Arrow (#1083) — the mobile driver satisfies
+	// selection on Shift+Arrow (pre-rebrand tracker #1083) — the mobile driver satisfies
 	// desktop.KeyModifierDriver. keyModListeners are notified on change. Both are
 	// touched only on the event goroutine at key dispatch.
 	keyMods         event.KeyModifier
 	keyModListeners []func(event.KeyModifier)
 
 	// lastCanUndo/lastCanRedo/undoStatePushed dedupe the per-repaint iOS
-	// undo-state mirror (#1134): SetKeyboardUndoState is called only when the
+	// undo-state mirror (pre-rebrand tracker #1134): SetKeyboardUndoState is called only when the
 	// focused editor's declared undo/redo availability changes. Event-goroutine
 	// only, like the keyboard-state sync that drives it.
 	lastCanUndo, lastCanRedo bool
 	undoStatePushed          bool
 
 	// a11yRing / a11yRingCore are the reusable stroke-only rectangles painted
-	// over the element a screen reader has accessibility-focused (#759). The
+	// over the element a screen reader has accessibility-focused (pre-rebrand tracker #759). The
 	// OS-drawn focus ring cannot reach Bellui's flat GPU surface, so the driver
 	// paints its own after the content walk, as a high-contrast double ring (a
 	// light outer halo + a dark inner core) so it stays legible over content of
@@ -201,7 +201,7 @@ func (d *driver) currentWindow() *window {
 // refreshCurrentWindow marks the current (top) window's content dirty so the
 // next paint tick repaints it. Called after Hide/Close reveals the window
 // beneath in the stack, since handlePaint only repaints a dirty canvas and would
-// otherwise keep presenting the hidden/closed window's last frame (#645).
+// otherwise keep presenting the hidden/closed window's last frame (pre-rebrand tracker #645).
 func (d *driver) refreshCurrentWindow() {
 	cur := d.currentWindow()
 	if cur == nil {
@@ -361,10 +361,10 @@ func (d *driver) Run() {
 					// touches still reach the native input queue, but they are a
 					// mix the framework never disambiguates for us: explore
 					// hovers (which must not focus or activate anything — the
-					// #572 device finding) and genuine PASSTHROUGH interactions
+					// pre-rebrand tracker #572 device finding) and genuine PASSTHROUGH interactions
 					// the app is expected to handle natively — the two-finger
 					// scroll gesture and everything after double-tap-and-hold
-					// (#1104). exploreTouch suppresses the former and routes
+					// (pre-rebrand tracker #1104). exploreTouch suppresses the former and routes
 					// qualified passthrough streams into the normal pipeline.
 					if app.TouchExplorationEnabled() {
 						d.exploreTouch(current, e)
@@ -385,7 +385,7 @@ func (d *driver) Run() {
 				case textedit.Event:
 					d.handleTextEdit(e) // committed native edit → seam Replace (auto-syncs)
 				case undoredo.Event:
-					d.handleUndoRedo(e) // native undo/redo key/gesture → editor's accessible action (#1134)
+					d.handleUndoRedo(e) // native undo/redo key/gesture → editor's accessible action (pre-rebrand tracker #1134)
 				}
 			}
 		}
@@ -393,7 +393,7 @@ func (d *driver) Run() {
 }
 
 // dispatchKeyEvent is the event-loop entry for a key event. It applies the
-// one-writer IME reroute (#1061), then dispatches and syncs the native
+// one-writer IME reroute (pre-rebrand tracker #1061), then dispatches and syncs the native
 // keyboard state.
 func (d *driver) dispatchKeyEvent(c *canvas, e key.Event) {
 	if d.suppressNativeTextKey(e) {
@@ -405,7 +405,7 @@ func (d *driver) dispatchKeyEvent(c *canvas, e key.Event) {
 
 // suppressNativeTextKey reports whether a raw native-queue key event is the
 // redundant echo of a text edit the Android IME has already delivered through
-// its InputConnection, so bellui must ignore it (#1061, the one-writer reroute).
+// its InputConnection, so bellui must ignore it (pre-rebrand tracker #1061, the one-writer reroute).
 //
 // When a text editor is focused the IME is the single writer: Gboard applies
 // every printable key and Backspace to the bellui-owned IME buffer
@@ -415,7 +415,7 @@ func (d *driver) dispatchKeyEvent(c *canvas, e key.Event) {
 // → handleTextEdit / handleComposition, or the non-native keyboardDelete /
 // keyboardTyped key events). The same hardware key still traverses the
 // NativeActivity input queue a few ms later tagged Native; applying it a second
-// time was the dual write that doubled characters (#1057) and left a spurious
+// time was the dual write that doubled characters (pre-rebrand tracker #1057) and left a spurious
 // space after autocorrected words, and it also dropped word-boundary
 // autocorrections because the two writers had to be reconciled by guesswork.
 // Ignoring the native echo makes the IC the sole writer, so autocorrect /
@@ -442,7 +442,7 @@ func (d *driver) imeOwnsNativeKey(e key.Event) bool {
 		return false // no focused editor → no IC writer, native key is the only delivery
 	}
 	// A shortcut combination (Ctrl/Alt/Meta held) is forwarded to the focused
-	// editor by the IME through sendKeyEvent → keyboardShortcut (#1077), in every
+	// editor by the IME through sendKeyEvent → keyboardShortcut (pre-rebrand tracker #1077), in every
 	// field type, so the raw native key is a redundant echo — suppress it here or
 	// the shortcut dispatches twice (device-verified: Ctrl+V pasted the clipboard
 	// twice, since the paste is not idempotent). The forwarded (non-native) key
@@ -474,11 +474,11 @@ func (d *driver) handleKeyEvent(c *canvas, e key.Event) {
 }
 
 // handleComposition dispatches an IME composition event to the focused editor
-// through the text-input mirror's compose ops (#770). Session.Compose/Commit
+// through the text-input mirror's compose ops (pre-rebrand tracker #770). Session.Compose/Commit
 // route to the bound event.Composable — a no-op when the focus does not support
 // composition — and each auto-syncs the native shadow afterwards.
 //
-// The Android one-writer reroute (#1061) suppresses the raw-key echoes of
+// The Android one-writer reroute (pre-rebrand tracker #1061) suppresses the raw-key echoes of
 // hardware typing (suppressNativeTextKey), so the IME's InputConnection is the
 // sole writer here. Gboard's hardware-keyboard latin editing arrives as
 // committed edits (commitText / setComposingRegion → handleTextEdit), and a
@@ -497,9 +497,9 @@ func (d *driver) handleComposition(e composition.Event) {
 
 // handleTextEdit applies a committed native keyboard/IME edit — a replacement of
 // the [Start, End) rune range with Text — to the focused editor through the
-// text-input mirror's Replace op (#771). Reporting the full range (rather than a
+// text-input mirror's Replace op (pre-rebrand tracker #771). Reporting the full range (rather than a
 // caret-relative delta) lets typing over a selection replace it in one gated,
-// undo-recorded edit instead of appending (#748). Session.Replace auto-syncs the
+// undo-recorded edit instead of appending (pre-rebrand tracker #748). Session.Replace auto-syncs the
 // native document afterwards. iOS drives this from its input view; a no-op when
 // the focus is not an editor.
 func (d *driver) handleTextEdit(e textedit.Event) {
@@ -515,7 +515,7 @@ func (d *driver) handleTextEdit(e textedit.Event) {
 
 // keyboardStateBackend mirrors the focused editor's (text, selection) into the
 // native input surface via app.SetKeyboardState — the iOS input-view document
-// (#771) and the Android bellui-owned IME buffer (#1006 Phase 4) — so the native
+// (pre-rebrand tracker #771) and the Android bellui-owned IME buffer (pre-rebrand tracker #1006 Phase 4) — so the native
 // IME reads real content and the selection round-trips. It is a no-op on desktop
 // (build-tagged stub).
 type keyboardStateBackend struct{}
@@ -525,9 +525,9 @@ func (keyboardStateBackend) SetState(s textinput.Snapshot) {
 }
 
 // syncKeyboardState pushes the bound editor's current text + selection into the
-// native input surface via the text-input mirror (#770/#771 seam), skipping
+// native input surface via the text-input mirror (pre-rebrand tracker #770/#771 seam), skipping
 // redundant native pushes. Active on the two platforms with a real backend: iOS
-// (the input-view document) and, since #1006 Phase 4, Android (the bellui-owned
+// (the input-view document) and, since pre-rebrand tracker #1006 Phase 4, Android (the bellui-owned
 // IME buffer the soft keyboard's InputConnection reads). The read is elided on
 // desktop/host where the backend is a no-op anyway. Both platforms ignore the
 // push during an active IME composition (so it never clobbers the composing
@@ -546,11 +546,11 @@ func (d *driver) syncKeyboardState() {
 }
 
 // syncKeyboardUndoState mirrors the focused editor's undo/redo availability
-// into the iOS input view's NSUndoManager (#1134), so the iPad keyboard's
+// into the iOS input view's NSUndoManager (pre-rebrand tracker #1134), so the iPad keyboard's
 // undo/redo bar keys (and the system undo gestures) reflect bellui's history.
 // Availability is read from the editor's declared accessible actions —
 // Entry/RichEntry declare ActionUndo/ActionRedo gated on history/read-only/
-// password exactly as assistive tech sees them (#1025) — and pushed only on
+// password exactly as assistive tech sees them (pre-rebrand tracker #1025) — and pushed only on
 // change. A native invocation comes back as an undoredo.Event.
 func (d *driver) syncKeyboardUndoState() {
 	var focused any
@@ -587,7 +587,7 @@ func undoActionsState(obj any) (canUndo, canRedo bool) {
 
 // handleUndoRedo applies a native undo/redo invocation (the iPad keyboard's
 // undo/redo keys or system undo gestures, fired through the proxy actions in
-// the input view's NSUndoManager, #1134) to the focused editor via its
+// the input view's NSUndoManager, pre-rebrand tracker #1134) to the focused editor via its
 // accessible undo/redo action — the same gated path assistive tech uses.
 func (d *driver) handleUndoRedo(e undoredo.Event) {
 	cur := d.currentWindow()
@@ -634,7 +634,7 @@ func (d *driver) handleLifecycle(e lifecycle.Event, w *window) {
 		// no longer load-stable on tiled GPUs, even when reallocated), so
 		// dirty-region frames lose everything they don't redraw and static UI
 		// vanishes. Fall back to full repaint for the rest of the session — correct,
-		// at the cost of the optimization (#342). No-op when not using the FBO path.
+		// at the cost of the optimization (pre-rebrand tracker #342). No-op when not using the FBO path.
 		if m, ok := c.Painter().(interface{ MarkCanvasFBORetentionUnreliable() }); ok {
 			m.MarkCanvasFBORetentionUnreliable()
 		}
@@ -689,7 +689,7 @@ func (d *driver) handlePaint(e paint.Event, w *window) {
 		// without ever receiving a hardware paint event — only handle-less
 		// draw-ticker events — so it never learns the ANativeWindow and stays
 		// unrenderable (renderReady is false). All Android windows share one
-		// native window, so inherit it here so the newcomer can paint (#753).
+		// native window, so inherit it here so the newcomer can paint (pre-rebrand tracker #753).
 		w.handle = d.nativeWindow
 	}
 	d.painting = false
@@ -712,7 +712,7 @@ func (d *driver) handlePaint(e paint.Event, w *window) {
 		return
 	}
 	// Hand the shared Android native surface to the window about to paint,
-	// releasing whatever window held it before (#753). No-op on iOS/GL.
+	// releasing whatever window held it before (pre-rebrand tracker #753). No-op on iOS/GL.
 	d.claimNativeSurface(c, w)
 	if !c.initialized {
 		// Retry until the native surface is ready (iOS builds it from the key
@@ -736,11 +736,11 @@ func (d *driver) handlePaint(e paint.Event, w *window) {
 		d.paintWindow(w, newSize)
 		d.presentPainter(c)
 		d.app.Publish()
-		// Sync the screen-reader tree with what was just presented (#488);
+		// Sync the screen-reader tree with what was just presented (pre-rebrand tracker #488);
 		// a no-op stub without the accessibility tag.
 		w.updateAccessibility()
 		// Mirror the focused editor's (text, selection) into the native IME
-		// document each repaint (#771). Key-event syncs alone miss selection
+		// document each repaint (pre-rebrand tracker #771). Key-event syncs alone miss selection
 		// changes that don't go through a key — e.g. Select All from the edit
 		// menu, or a tap that moves the caret — which would leave the native
 		// field's selection stale so a following keystroke replaces the wrong
@@ -900,7 +900,7 @@ func (w *mobileTreeWalker) draw(node *common.RenderCacheNode, pos geo.Position) 
 	// Establish this object's clips BEFORE the dirty-region cull check, so a culled
 	// clip-owner (scroll/ClipToBounds) still constrains its descendants; otherwise
 	// its children that extend into the dirty region draw unclipped, leaking content
-	// past the viewport (#333). afterDraw tears these down regardless of culling.
+	// past the viewport (pre-rebrand tracker #333). afterDraw tears these down regardless of culling.
 	if intdriver.IsClip(obj) {
 		inner := w.clips.Push(paintPos, obj.Size())
 		w.c.Painter().StartClipping(inner.Rect())
@@ -952,7 +952,7 @@ func (w *mobileTreeWalker) afterDraw(node *common.RenderCacheNode, pos geo.Posit
 	culled := w.activeBoundary() == nil && w.shouldSkipForDirtyRegion(pos, node.Obj().Size())
 
 	// Tear down clips even when culled: draw establishes them unconditionally for
-	// clip-owners so descendants stay clipped (#333), so push/pop must stay paired.
+	// clip-owners so descendants stay clipped (pre-rebrand tracker #333), so push/pop must stay paired.
 	if isRounded, _ := intdriver.IsRoundedClip(obj); isRounded {
 		w.c.Painter().StopRoundedClipping()
 	}
@@ -1034,7 +1034,7 @@ func (d *driver) paintWindow(win bellui.Window, size geo.Size) {
 
 	c.WalkTrees(walk.draw, walk.afterDraw)
 
-	// In-scene screen-reader focus ring (#759): the OS-drawn highlight cannot
+	// In-scene screen-reader focus ring (pre-rebrand tracker #759): the OS-drawn highlight cannot
 	// reach the flat GPU surface, so paint our own over the accessibility-focused
 	// element, on top of the content. No-op (ok=false) without the accessibility
 	// bridge or when nothing is focused.
@@ -1066,7 +1066,7 @@ var (
 
 // paintA11yFocusRing draws the high-contrast double ring over ring (in
 // canvas-space device-independent units), on top of the just-painted content,
-// as the in-scene screen-reader focus indicator (#759). A light halo with a
+// as the in-scene screen-reader focus indicator (pre-rebrand tracker #759). A light halo with a
 // dark core centred on the same bounds reads as a focus ring against content of
 // any colour — one of the two edges always contrasts (the approach VoiceOver
 // uses), and unlike a theme-coloured stroke it never vanishes into a
@@ -1126,7 +1126,7 @@ func (d *driver) setTheme(dark bool) {
 }
 
 // tbPassthrough is the raw-touch gate state while an explore-by-touch screen
-// reader (TalkBack) owns the touchscreen (#1104). One stream is considered at
+// reader (TalkBack) owns the touchscreen (pre-rebrand tracker #1104). One stream is considered at
 // a time: a Begin-led stream is buffered until it proves intentional, then
 // flows to the canvas; everything else is suppressed.
 type tbPassthrough struct {
@@ -1148,9 +1148,9 @@ type tbPassthrough struct {
 //     accessibility tree, and an explore touch must never focus or activate.
 //   - Quick stationary taps: older TalkBack/Android versions deliver a plain
 //     explore tap as a full Begin/End stream, which used to activate widgets
-//     (#572). Still suppressed: a stream that ends before qualifying is
+//     (pre-rebrand tracker #572). Still suppressed: a stream that ends before qualifying is
 //     swallowed whole.
-//   - PASSTHROUGH interactions the app must handle natively (#1104): the
+//   - PASSTHROUGH interactions the app must handle natively (pre-rebrand tracker #1104): the
 //     two-finger scroll gesture (TalkBack requests two-finger passthrough,
 //     so the gesture arrives as a real single-pointer drag and the framework
 //     expects the app to scroll) and everything after double-tap-and-hold
@@ -1159,7 +1159,7 @@ type tbPassthrough struct {
 // A Begin-led stream qualifies as passthrough once it moves past the tap slop
 // (scroll/drag intent) or stays down for the long-press delay (hold intent);
 // it then enters the normal touch pipeline at its original Begin position, so
-// drag deltas stay exact and bellui's own scroll, hold-fire long-press (#758)
+// drag deltas stay exact and bellui's own scroll, hold-fire long-press (pre-rebrand tracker #758)
 // and drag semantics apply natively from there.
 func (d *driver) exploreTouch(w *window, e touch.Event) {
 	t := &d.tbPass
@@ -1204,7 +1204,7 @@ func (d *driver) exploreTouch(w *window, e touch.Event) {
 			return
 		}
 		if t.tracking && e.Sequence == t.seq {
-			t.tracking = false // unqualified quick tap: suppressed (#572)
+			t.tracking = false // unqualified quick tap: suppressed (pre-rebrand tracker #572)
 		}
 	}
 }
@@ -1399,7 +1399,7 @@ func keyToName(code key.Code) event.KeyName {
 }
 
 // keyEventModifier converts the gomobile modifier bitmask into the
-// cross-platform event.KeyModifier carried on event.KeyEvent (#1042).
+// cross-platform event.KeyModifier carried on event.KeyEvent (pre-rebrand tracker #1042).
 func keyEventModifier(mod key.Modifiers) event.KeyModifier {
 	var m event.KeyModifier
 	if mod&key.ModShift != 0 {
@@ -1434,10 +1434,10 @@ func (d *driver) typeDownCanvas(canvas *canvas, r rune, code key.Code, mod key.M
 
 	// Hardware-keyboard editing shortcuts (Ctrl+A/C/V/X/Z/Y). On Android these
 	// arrive via the IME's sendKeyEvent, forwarded through keyboardShortcut(...)
-	// as a modified key event (#1077) — the mobile mirror of the desktop
+	// as a modified key event (pre-rebrand tracker #1077) — the mobile mirror of the desktop
 	// driver's triggersShortcut. Fire only when the modifier is EXACTLY the
 	// shortcut modifier (Control, or Meta/Cmd), never combined with Shift — so a
-	// Shift+Ctrl+key combo still reaches TypedKey with its modifier (#1042).
+	// Shift+Ctrl+key combo still reaches TypedKey with its modifier (pre-rebrand tracker #1042).
 	// Dispatch to the focused Shortcutable and stop, so it never also fires
 	// TypedKey/TypedRune.
 	if mod == key.ModControl || mod == key.ModMeta {
@@ -1488,7 +1488,7 @@ func (d *driver) typeDownCanvas(canvas *canvas, r rune, code key.Code, mod key.M
 
 	if canvas.Focused() != nil {
 		if keyName != "" {
-			// Keyboard-activation parity with taps (#700).
+			// Keyboard-activation parity with taps (pre-rebrand tracker #700).
 			if act, ok := canvas.Focused().(event.Activatable); ok && act.ActivatedByKey(keyEvent) {
 				if co, ok := canvas.Focused().(core.CanvasObject); ok {
 					core.NotifyActivation(co, true)
@@ -1518,7 +1518,7 @@ func (d *driver) typeUpCanvas(_ *canvas, _ rune, _ key.Code, _ key.Modifiers) {
 
 // CurrentKeyModifiers reports the hardware-keyboard modifier set carried by the
 // most recent key event, so widgets can read the live Shift/Ctrl/... state
-// (e.g. Entry's Shift+Arrow selection, #1083). Implements
+// (e.g. Entry's Shift+Arrow selection, pre-rebrand tracker #1083). Implements
 // desktop.KeyModifierDriver on mobile.
 func (d *driver) CurrentKeyModifiers() event.KeyModifier {
 	return d.keyMods
@@ -1558,7 +1558,7 @@ func (d *driver) DoubleTapDelay() time.Duration {
 
 // AnnounceToScreenReader implements the optional bellui.AccessibilityAnnouncer
 // interface by fanning the message out to the registered accessibility
-// backends (#525). Until the mobile backends land (#488) no listener is
+// backends (pre-rebrand tracker #525). Until the mobile backends land (pre-rebrand tracker #488) no listener is
 // registered, so this is a structural no-op kept for API uniformity.
 func (d *driver) AnnounceToScreenReader(text string, assertive bool) {
 	accessibility.Announce(text, assertive)
@@ -1572,7 +1572,7 @@ func NewGoMobileDriver() bellui.Driver {
 	// and this constructor is the first bellui call on it (app.New, before any UI
 	// is built), so registering now means every subsequent GUI mutation the app
 	// makes during setup is recognised as on-main. Registering later (in Run's
-	// loop) left the whole initial build tripping the bellui.Do guard (#193). This
+	// loop) left the whole initial build tripping the bellui.Do guard (pre-rebrand tracker #193). This
 	// mirrors the desktop driver, which registers in init(). The Run loop also
 	// runs on this goroutine (see app.main under WebGPU), so it re-registers the
 	// same goroutine harmlessly.

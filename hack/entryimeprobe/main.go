@@ -1,5 +1,5 @@
 // Command entryimeprobe is the diagnostic harness for the Android TalkBack
-// text-editing bugs (#572: stuck caret + phantom "space deleted").
+// text-editing bugs (pre-rebrand tracker #572: stuck caret + phantom "space deleted").
 //
 // It shows a single widget.Entry and logs the bellui-side editing state (text +
 // caret row/col) on every change, tagged "BelluiEntry". Paired with the native
@@ -12,7 +12,7 @@
 //  3. Focus the Entry, type one char (e.g. "a"), then a second ("b"),
 //     then Backspace twice. Speak/observe the caret.
 //  4. The paired BelluiIME (native calls) + BelluiEntry (bellui text/caret) log is
-//     the exact sequence to design the real InputConnection against (#572).
+//     the exact sequence to design the real InputConnection against (pre-rebrand tracker #572).
 package main
 
 import (

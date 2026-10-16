@@ -170,7 +170,7 @@ type AppDetails struct {
 	// the "applinks:" prefix (e.g. "example.com"). The packaging tool emits an
 	// Associated Domains entitlement (com.apple.developer.associated-domains =
 	// applinks:<domain>) on iOS so tapped https://<domain>/… links (Universal
-	// Links) route to the app via application:continueUserActivity: (fyne#622),
+	// Links) route to the app via application:continueUserActivity: (pre-rebrand tracker #622),
 	// and the matching intent-filter autoVerify on Android.
 	AssociatedDomains []string `protobuf:"bytes,9,rep,name=associated_domains,json=associatedDomains,proto3" json:"associated_domains,omitempty"`
 	unknownFields     protoimpl.UnknownFields

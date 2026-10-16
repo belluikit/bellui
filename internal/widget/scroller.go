@@ -52,7 +52,7 @@ func (r *scrollBarRenderer) Layout(size geo.Size) {
 		// only a thin visual strip is drawn flush to the trailing edge. This
 		// decouples the grabbable hit area from the drawn bar, so the wide
 		// target neither obscures the content's edge nor needs a pixel-exact
-		// approach flight to hit (#17, #449).
+		// approach flight to hit (pre-rebrand tracker #17, pre-rebrand tracker #449).
 		thin := theme.CurrentForWidget(r.scrollBar).Size(theme.SizeNameScrollBarSmall)
 		switch r.scrollBar.orientation {
 		case scrollBarOrientationHorizontal:
@@ -80,7 +80,7 @@ func (r *scrollBarRenderer) Refresh() {
 	r.background.CornerRadius = th.Size(theme.SizeNameScrollBarRadius)
 	// The bar widget size no longer changes on hover (the hit area is
 	// permanently wide), so re-run the layout here to toggle between the
-	// thin idle visual and the full-width hovered one (#449).
+	// thin idle visual and the full-width hovered one (pre-rebrand tracker #449).
 	r.Layout(r.scrollBar.Size())
 	r.background.Refresh()
 }
@@ -172,9 +172,9 @@ func newScrollBar(area *scrollBarArea) *scrollBar {
 //
 // The *hit area* is a separate concern and is always full width on every
 // device: a small (~3px) target is nearly impossible to hit with a finger
-// (#17) and needs a pixel-exact approach with a mouse — wasm-in-browser
+// (pre-rebrand tracker #17) and needs a pixel-exact approach with a mouse — wasm-in-browser
 // especially, where the idle grab strip was ~6px before hover could grow it
-// (#449). The renderers draw the thin idle visual inside the wide widget, so
+// (pre-rebrand tracker #449). The renderers draw the thin idle visual inside the wide widget, so
 // the wide target no longer obscures the content's edge.
 func (a *scrollBarArea) expanded() bool {
 	if bellui.CurrentDevice().IsMobile() {
@@ -219,7 +219,7 @@ func (r *scrollBarAreaRenderer) MinSize() geo.Size {
 	// The area is permanently the full bar width: the hit target stays
 	// grabbable without a hover dance, and layouts that reserve bar space
 	// (Scroll.ReserveBarSpace) no longer re-wrap when a hover used to grow
-	// the area (#449).
+	// the area (pre-rebrand tracker #449).
 	barSize := theme.CurrentForWidget(r.area).Size(theme.SizeNameScrollBar)
 	return geo.NewSquareSize(barSize)
 }
@@ -230,7 +230,7 @@ func (r *scrollBarAreaRenderer) Refresh() {
 	r.background.FillColor = th.Color(theme.ColorNameScrollBarBackground, bellui.CurrentApp().Settings().ThemeVariant())
 	// The full-width track shows only while the bar draws expanded; over the
 	// thin idle (and touch) visual it would re-obscure the content edge the
-	// wide invisible hit area just freed (#17).
+	// wide invisible hit area just freed (pre-rebrand tracker #17).
 	r.background.Hidden = !r.area.expanded()
 	r.layoutWithTheme(th, r.area.Size())
 	canvas.Refresh(r.bar)
@@ -244,7 +244,7 @@ func (r *scrollBarAreaRenderer) barSizeAndOffset(th bellui.Theme, contentOffset,
 		length = float32(int(scrollLength)) * portion
 		// Keep the thumb grabbable however long the content is: on a 50k-line
 		// document the proportional length is sub-pixel, and platform
-		// scrollbars all apply a floor (#449). Themes without the token fall
+		// scrollbars all apply a floor (pre-rebrand tracker #449). Themes without the token fall
 		// back to the historical floor of one bar width. The floor is capped
 		// at half the track so a short scroll area always keeps room to drag.
 		minThumb := th.Size(theme.SizeNameScrollBarMinThumb)
@@ -259,7 +259,7 @@ func (r *scrollBarAreaRenderer) barSizeAndOffset(th bellui.Theme, contentOffset,
 		lengthOffset = (scrollLength - length) * (contentOffset / (contentLength - scrollLength))
 	}
 	// The bar widget is always full width — the wide hit target — while the
-	// thin idle visual is drawn inside it by the bar's renderer (#449).
+	// thin idle visual is drawn inside it by the bar's renderer (pre-rebrand tracker #449).
 	width = scrollBarSize
 	return length, width, lengthOffset, widthOffset
 }
@@ -568,7 +568,7 @@ type Scroll struct {
 	// set this: a text field clips its overflowing text at the edge rather
 	// than fading it, and the fade-shadow gradient otherwise dims content
 	// (and, when the viewport overlaps it, the surrounding border) at the
-	// scrolled edge — see #353 / #357.
+	// scrolled edge — see pre-rebrand tracker #353 / pre-rebrand tracker #357.
 	HideShadows bool
 
 	// rtlPinned records that the initial right-edge position has been applied (or

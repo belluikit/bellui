@@ -1,5 +1,5 @@
 // Command winposprobe reports where the OS/GLFW places bellui windows that never
-// ask for a position (#955). Modes (first arg):
+// ask for a position (pre-rebrand tracker #955). Modes (first arg):
 //
 //	one <tag>  – create one window, report its position, exit (run it several
 //	             times in a row to model a CI run's sequential test binaries,
@@ -13,7 +13,7 @@
 //
 // Expected behavior: the first window of a process with no visible sibling is
 // centered on every desktop platform — GLFW centers it on macOS, bellui seats it
-// on Windows (#955), and X11/Wayland window managers apply their own policy.
+// on Windows (pre-rebrand tracker #955), and X11/Wayland window managers apply their own policy.
 // Additional concurrent windows cascade (Cocoa's cascade point on macOS, the
 // OS default placement on Windows).
 package main

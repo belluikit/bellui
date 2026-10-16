@@ -36,7 +36,7 @@ func TestIsRTL(t *testing.T) {
 
 // TestIsRTLColdStart covers the pre-initialisation state where currentTag is
 // the zero (undefined) tag. IsRTL must then follow the system locale rather
-// than mis-report und as LTR (#74). The assertion is system-locale-derived (so
+// than mis-report und as LTR (pre-rebrand tracker #74). The assertion is system-locale-derived (so
 // it holds on any host); without the fix IsRTL would ignore the system locale
 // and always return false on this branch.
 func TestIsRTLColdStart(t *testing.T) {

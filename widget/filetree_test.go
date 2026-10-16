@@ -121,7 +121,7 @@ func TestFileTree_OpenBranchReLists(t *testing.T) {
 	assert.Len(t, tree.ChildUIDs(id), 3, "closing a branch marks its listing stale, reopening re-lists")
 }
 
-// --- #454: file-system watching ---
+// --- pre-rebrand tracker #454: file-system watching ---
 
 func TestFileTree_WatchDisabledByDefault(t *testing.T) {
 	test.NewTempApp(t)

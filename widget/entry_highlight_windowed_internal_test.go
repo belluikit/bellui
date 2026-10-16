@@ -47,7 +47,7 @@ func newHighlightedBigEntry(t *testing.T, lines int) (*Entry, *int) {
 	return e, calls
 }
 
-// TestHighlight_SetTextIsWindowed is the fycoder#106 / #401 acceptance: setting
+// TestHighlight_SetTextIsWindowed is the pre-rebrand fycoder tracker #106 / pre-rebrand tracker #401 acceptance: setting
 // a large document runs the app-supplied highlighter only for the rows actually
 // requested (one screenful), not for every line up front.
 func TestHighlight_SetTextIsWindowed(t *testing.T) {
@@ -65,7 +65,7 @@ func TestHighlight_SetTextIsWindowed(t *testing.T) {
 // TestHighlight_KeystrokeIsBounded pins the per-edit highlight cost: after the
 // visible band is computed, a keystroke re-runs the highlighter only until the
 // state chain converges (the edited line, in the common case) — never a
-// document-wide re-scan (#401, kills the strings.Split-per-keystroke).
+// document-wide re-scan (pre-rebrand tracker #401, kills the strings.Split-per-keystroke).
 func TestHighlight_KeystrokeIsBounded(t *testing.T) {
 	e, calls := newHighlightedBigEntry(t, 5000)
 	for row := 0; row < 40; row++ {
@@ -126,7 +126,7 @@ func TestHighlight_ChainedStateAcrossEdit(t *testing.T) {
 	assert.False(t, e.HighlightRunsForRow(3)[0].Bold, "upstream lines untouched")
 }
 
-// TestHighlight_DeepEditAboveViewportIsBounded is the #412 acceptance: with a
+// TestHighlight_DeepEditAboveViewportIsBounded is the pre-rebrand tracker #412 acceptance: with a
 // deep viewport already chained (the one-time first-jump cost), an edit far
 // above it re-chains only until the state converges back into the trusted
 // stretch, then jumps — O(edit + convergence + window) walk steps, never a
@@ -153,7 +153,7 @@ func TestHighlight_DeepEditAboveViewportIsBounded(t *testing.T) {
 	assert.Equal(t, "somex code line with tokens", e.hlCache[5].text)
 }
 
-// TestHighlight_DeepJumpNeverServesStaleState proves the #412 jump is gated on
+// TestHighlight_DeepJumpNeverServesStaleState proves the pre-rebrand tracker #412 jump is gated on
 // state convergence: an edit that flips downstream state re-runs the
 // highlighter through every affected line (no jump over stale entries), and
 // once a CLOSE line restores the state the walk converges there — deep lines
@@ -209,7 +209,7 @@ func TestHighlight_DeepJumpNeverServesStaleState(t *testing.T) {
 // TestHighlight_DeepJumpSurvivesNewlineSplices pins the trusted-stretch index
 // maintenance across line-count changes: splitting and merging lines above a
 // chained deep viewport shifts the stretch, so the jump stays aligned and the
-// deep cache entries keep matching their logical lines (#412).
+// deep cache entries keep matching their logical lines (pre-rebrand tracker #412).
 func TestHighlight_DeepJumpSurvivesNewlineSplices(t *testing.T) {
 	e, _ := newHighlightedBigEntry(t, 5000)
 	for row := 4960; row < 5000; row++ {
@@ -246,7 +246,7 @@ func TestHighlight_DeepJumpSurvivesNewlineSplices(t *testing.T) {
 // single text sync and render — the programmatic batch-edit shape (undo
 // replay, find-replace-all, a formatter patch list) where no viewport
 // re-chain runs between the splices, unlike interactive typing where every
-// keystroke's refresh re-verifies the prefix (#418). Rows must be descending
+// keystroke's refresh re-verifies the prefix (pre-rebrand tracker #418). Rows must be descending
 // so earlier splices don't shift later positions.
 func batchSpliceRows(e *Entry, rows []int, col int, insert string) {
 	p := e.textProvider()
@@ -257,10 +257,10 @@ func batchSpliceRows(e *Entry, rows []int, col int, insert string) {
 	e.Refresh()
 }
 
-// TestHighlight_ScatteredBatchEditsStayBounded is the #418 acceptance: K
+// TestHighlight_ScatteredBatchEditsStayBounded is the pre-rebrand tracker #418 acceptance: K
 // scattered edits landing between renders each leave their own trusted
 // stretch, so the next deep re-chain walks O(K·convergence + window) lines —
-// the single-stretch #412 bookkeeping kept only the largest fragment and fell
+// the single-stretch pre-rebrand tracker #412 bookkeeping kept only the largest fragment and fell
 // back to a per-line compare walk over the rest.
 func TestHighlight_ScatteredBatchEditsStayBounded(t *testing.T) {
 	e, _ := newHighlightedBigEntry(t, 5000)
@@ -288,7 +288,7 @@ func TestHighlight_ScatteredBatchEditsStayBounded(t *testing.T) {
 // flips downstream state re-runs the highlighter through the first stretch's
 // lines until a CLOSE restores the state, then jumps mid-stretch — and the
 // second stretch (above the other batch edit) is still jumped, never serving
-// stale runs (#418).
+// stale runs (pre-rebrand tracker #418).
 func TestHighlight_ScatteredEditsNeverServeStaleState(t *testing.T) {
 	test.NewTempApp(t)
 	e := NewMultiLineEntry()
@@ -365,7 +365,7 @@ func TestHighlight_TrustedStretchListIsBounded(t *testing.T) {
 }
 
 // zeroPrefillBudget pins hlPrefillTick to exactly one slice per call so the
-// #417 tests advance deterministically regardless of machine speed.
+// pre-rebrand tracker #417 tests advance deterministically regardless of machine speed.
 func zeroPrefillBudget(t *testing.T) {
 	t.Helper()
 	old := hlPrefillFrameBudget
@@ -373,7 +373,7 @@ func zeroPrefillBudget(t *testing.T) {
 	t.Cleanup(func() { hlPrefillFrameBudget = old })
 }
 
-// drainHlPrefill drives the background prefill (#417) to completion the way
+// drainHlPrefill drives the background prefill (pre-rebrand tracker #417) to completion the way
 // frame ticks would on a real driver (the test driver never ticks animations),
 // asserting the progress guarantee: every tick either advances the watermark
 // or stops the driver, so prefill always terminates.
@@ -389,7 +389,7 @@ func drainHlPrefill(t *testing.T, e *Entry) {
 	}
 }
 
-// TestHighlight_PrefillCompletesAfterSetText is the #417 acceptance: after
+// TestHighlight_PrefillCompletesAfterSetText is the pre-rebrand tracker #417 acceptance: after
 // SetText the background prefill chains the whole document in bounded slices,
 // so a later deep jump finds the watermark already past it and walks nothing.
 func TestHighlight_PrefillCompletesAfterSetText(t *testing.T) {
@@ -480,7 +480,7 @@ func TestHighlight_PrefillRestartsOnIdenticalSetText(t *testing.T) {
 
 // TestHighlight_PrefillSurvivesEditBelowWatermark pins mid-prefill edits: an
 // edit lowers the watermark (the refresh's own re-chain then jumps the trusted
-// stretch, #412), and subsequent ticks resume and still finish with a correct,
+// stretch, pre-rebrand tracker #412), and subsequent ticks resume and still finish with a correct,
 // fully-chained cache — no restart bookkeeping needed.
 func TestHighlight_PrefillSurvivesEditBelowWatermark(t *testing.T) {
 	zeroPrefillBudget(t)
@@ -527,7 +527,7 @@ func TestHighlight_PrefillStopsWithoutHighlighter(t *testing.T) {
 	assert.Nil(t, e.hlPrefill, "tick stops when the highlighter is gone")
 }
 
-// TestHighlight_PrefillStopsOnRendererDestroy is the #421 acceptance: a
+// TestHighlight_PrefillStopsOnRendererDestroy is the pre-rebrand tracker #421 acceptance: a
 // renderer Destroy (discarded widget, or cache eviction of a hidden one)
 // stops the prefill driver, so its animation closure no longer holds the
 // Entry — rope buffer, hlCache and all — alive until the chain completes.
@@ -542,9 +542,9 @@ func TestHighlight_PrefillStopsOnRendererDestroy(t *testing.T) {
 }
 
 // TestHighlight_PrefillReArmsOnReShow pins the Destroy-stop's mandatory twin
-// (#421): eviction also hits live, temporarily-hidden widgets, and on re-show
+// (pre-rebrand tracker #421): eviction also hits live, temporarily-hidden widgets, and on re-show
 // the buffer object is unchanged so no other arming seam fires — without the
-// CreateRenderer re-arm the #417 fix regresses and the next deep jump stalls.
+// CreateRenderer re-arm the pre-rebrand tracker #417 fix regresses and the next deep jump stalls.
 // The chain resumes from the watermark; a completed chain does not re-arm.
 func TestHighlight_PrefillReArmsOnReShow(t *testing.T) {
 	zeroPrefillBudget(t)
@@ -615,7 +615,7 @@ func TestHighlight_NewlineEditKeepsAlignment(t *testing.T) {
 	}
 }
 
-// TestHighlight_DeepJumpChainIsCapped is the #167 guard: a render request for a
+// TestHighlight_DeepJumpChainIsCapped is the pre-rebrand tracker #167 guard: a render request for a
 // row far below the highlight watermark — a collapsed fold's footer jumping into
 // view, or a deep scroll before the prefill has caught up — must not chain the
 // whole prefix synchronously. Auto-folding a 437k-row @dataset exposed its footer
@@ -644,10 +644,10 @@ func TestHighlight_DeepJumpChainIsCapped(t *testing.T) {
 		"the deep row is highlighted once the prefill has converged")
 }
 
-// TestHighlight_CappedDeepRowIsNotStale guards the #167 cap's correctness
+// TestHighlight_CappedDeepRowIsNotStale guards the pre-rebrand tracker #167 cap's correctness
 // contract: a deep row above the (capped) watermark must render *unstyled*, never
 // with stale runs left in the cache from a prior pass. The synchronous chain is
-// bounded before it can reach and revalidate a downstream trusted stretch (#412),
+// bounded before it can reach and revalidate a downstream trusted stretch (pre-rebrand tracker #412),
 // so an upstream state-changing edit that invalidates that stretch's entering
 // state must not leak its now-wrong cached runs to the renderer — the row reports
 // nil until the background prefill re-chains it. Encoded via Bold = entering state
@@ -701,7 +701,7 @@ func TestHighlight_CappedDeepRowIsNotStale(t *testing.T) {
 	assert.True(t, runs[0].Bold, "deep row reflects the opened state once re-chained")
 }
 
-// TestHighlight_PrefillRepaintsWhenCrossingViewport is the #693 refinement: the
+// TestHighlight_PrefillRepaintsWhenCrossingViewport is the pre-rebrand tracker #693 refinement: the
 // background prefill advances only highlight *state*, so a deep visible row above
 // the watermark (e.g. a collapsed fold's footer) stays unstyled until a repaint.
 // The prefill must request that repaint itself as its watermark climbs across the

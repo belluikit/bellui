@@ -48,7 +48,7 @@ func newNodeRenderer(n *NodeWidget) *nodeRenderer {
 		accent:    accent,
 	}
 	// Sync the style now so a freshly built widget renders styled on its
-	// first paint (#36); the framework's initial Layout places the parts.
+	// first paint (pre-rebrand tracker #36); the framework's initial Layout places the parts.
 	r.syncStyle()
 	r.applyTheme()
 	return r

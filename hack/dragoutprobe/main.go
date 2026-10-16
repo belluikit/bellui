@@ -1,12 +1,12 @@
-// Command dragoutprobe is a live-verify harness for #515 Part B (drag-out to
+// Command dragoutprobe is a live-verify harness for pre-rebrand tracker #515 Part B (drag-out to
 // other applications). It shows a box you can drag OUT of the bellui window into
 // Finder (drops a .txt file) or a text editor (drops the text).
 //
 // On desktop the box uses the push path (desktop.StartDrag from Dragged); macOS,
 // Windows and Linux have native backends, other desktops log that StartDrag
 // returned false. On the web target (GOOS=js GOARCH=wasm) drag-out is pull-based
-// (#874): the box also implements desktop.DragOutProvider, which the wasm HTML5
-// Drag-and-Drop backend consults at drag start (#857). Build the web version
+// (pre-rebrand tracker #874): the box also implements desktop.DragOutProvider, which the wasm HTML5
+// Drag-and-Drop backend consults at drag start (pre-rebrand tracker #857). Build the web version
 // with the bellui CLI and drag the box onto a browser drop zone or another app.
 //
 //	go run ./hack/dragoutprobe                       # desktop
@@ -53,11 +53,11 @@ func (b *dragBox) dragData() desktop.DragData {
 
 	data := desktop.DragData{
 		Text: "Hello from a bellui drag-out (#515 Part B)",
-		// #842: supply a CanvasObject ghost instead of a raster image — it is
+		// pre-rebrand tracker #842: supply a CanvasObject ghost instead of a raster image — it is
 		// software-rendered to the drag image so one visual serves in-canvas and
 		// drag-out.
 		DragImageObject: dragGhost(),
-		// #841: react to the drop outcome on the main goroutine.
+		// pre-rebrand tracker #841: react to the drop outcome on the main goroutine.
 		OnCompleted: func(accepted bool) {
 			log.Printf("drag-out completed: accepted=%v", accepted)
 		},
@@ -85,8 +85,8 @@ func (b *dragBox) Dragged(*event.DragEvent) {
 	}
 }
 
-// DragOutData is the pull-based drag-out seam (#874) the web backend consults at
-// drag start (#857); on desktop it is inert (the push path above is used).
+// DragOutData is the pull-based drag-out seam (pre-rebrand tracker #874) the web backend consults at
+// drag start (pre-rebrand tracker #857); on desktop it is inert (the push path above is used).
 func (b *dragBox) DragOutData() (desktop.DragData, bool) {
 	data := b.dragData()
 	log.Printf("drag-out started (pull): text=%q file=%q", data.Text, b.file)
@@ -95,7 +95,7 @@ func (b *dragBox) DragOutData() (desktop.DragData, bool) {
 
 func (b *dragBox) DragEnd() { b.started = false }
 
-// dragGhost builds a small labeled pill used as the drag-out image (#842): a
+// dragGhost builds a small labeled pill used as the drag-out image (pre-rebrand tracker #842): a
 // core.CanvasObject the toolkit software-renders to the native drag image.
 func dragGhost() core.CanvasObject {
 	bg := canvas.NewRectangle(theme.Color(theme.ColorNameSecondary))

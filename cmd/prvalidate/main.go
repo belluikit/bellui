@@ -1,13 +1,13 @@
 // Command prvalidate is the on-device validation harness for the dirty-region
-// partial-repaint optimization (#340 — mobile validation gate). It reproduces the
-// conditions that leaked on desktop before #334 in a form that is unmistakable on
+// partial-repaint optimization (pre-rebrand tracker #340 — mobile validation gate). It reproduces the
+// conditions that leaked on desktop before pre-rebrand tracker #334 in a form that is unmistakable on
 // a phone screen, and animates continuously so partial repaints fire every frame.
 //
 // Scene: a tall BRIGHT MAGENTA rectangle inside a vertical Scroll whose viewport
 // is shorter than the rectangle, so the rectangle overflows the viewport and only
 // the scroll's clip cuts it. Below the scroll sits a status label on a dark band
 // that updates every frame (driving a localized dirty region). If the scroll clip
-// leaks under partial-repaint culling (the #333 bug, fixed in #334 for the mobile
+// leaks under partial-repaint culling (the pre-rebrand tracker #333 bug, fixed in pre-rebrand tracker #334 for the mobile
 // mobileTreeWalker), magenta bleeds into the bottom band; a green divider marks
 // the viewport edge so any bleed past it is obvious.
 //

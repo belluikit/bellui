@@ -4,7 +4,7 @@
 host that links its backend in-process or over a socket · **Status:**
 exploratory target, not on the pxfed-parity critical path.
 
-**Tracking:** [trendvidia/fyne#95](https://github.com/trendvidia/fyne/issues/95)
+**Tracking:** pre-rebrand tracker #95
 (umbrella — "make the WebGL backend render a real UI") ·
 [trendvidia/gl-js#1](https://github.com/trendvidia/gl-js/pull/1)
 (fix for blocker #1) · harness: [`examples/wasm`](../../examples/wasm).
@@ -203,8 +203,8 @@ of how complete the editor core becomes.
 Done via the `examples/wasm` harness in headed Chrome (DPR2, dark) on **both**
 web backends — WebGPU (default) and the `-tags gl` WebGL fallback — rendering
 **pixel-identically**, no wasm-specific rendering issues. Tracking:
-[trendvidia/fyne#376](https://github.com/trendvidia/fyne/issues/376) (closed) ·
-[#150](https://github.com/trendvidia/fyne/issues/150) (closed).
+pre-rebrand tracker #376 (closed) ·
+pre-rebrand tracker #150 (closed).
 
 All five Phase 4/5 acceptance scenarios pass:
 
@@ -221,33 +221,33 @@ All five Phase 4/5 acceptance scenarios pass:
 
 **Caveats / follow-ups:**
 
-- **Scroll input** ([fyne#377](https://github.com/trendvidia/fyne/issues/377)):
+- **Scroll input** (pre-rebrand tracker #377):
   neither mouse-wheel (Chrome treats the canvas wheel handler as passive) nor
   `PageDown`/`PageUp` scrolled the viewport deep into the doc — the harness uses
   a programmatic `Editor.RevealRange` ("Jump to end") to drive deep scroll.
   Rendering/virtualisation itself is unaffected.
-- **Initial `SetText` cost** ([fycoder#106](https://github.com/belluikit/bellui/x/editor/issues/106)):
+- **Initial `SetText` cost** ([pre-rebrand fycoder tracker #106](https://github.com/belluikit/bellui/x/editor/issues/106)):
   previously loading the 50k doc blocked the main thread ~9 s because the
   highlighter ran over the whole document synchronously on `SetText`. **Fixed by
   bumping to `trendvidia/fyne v2.13.0`**, which windows the highlight cache
-  ([fyne#401](https://github.com/trendvidia/fyne/issues/401)) — `HighlightRunsForRow`
+  (pre-rebrand tracker #401) — `HighlightRunsForRow`
   drives an on-demand, forward-chained build for just the rendered rows, with a
   per-frame background prefill of the state chain
-  ([fyne#417](https://github.com/trendvidia/fyne/issues/417)) and trusted-stretch
-  deep jumps ([fyne#412](https://github.com/trendvidia/fyne/issues/412)). fycoder
+  (pre-rebrand tracker #417) and trusted-stretch
+  deep jumps (pre-rebrand tracker #412). fycoder
   itself never looped the document (it only wires `LineHighlighter`), so no app
   code changed; `TestLargeFile_HighlighterIsWindowed` guards that a `SetText` of
   50k lines highlights ~one screenful (43 calls), not every line. Sibling of
-  [fyne#375](https://github.com/trendvidia/fyne/issues/375) (Entry per-keystroke
+  pre-rebrand tracker #375 (Entry per-keystroke
   relayout O(document)). **Live browser verification done (2026-07-02,
-  fycoder#133, against fyne v2.14.0, BOTH backends — WebGPU and `TAGS=gl`
+  pre-rebrand fycoder tracker #133, against fyne v2.14.0, BOTH backends — WebGPU and `TAGS=gl`
   WebGL):** "Load 50000 lines" renders promptly with no multi-second
   main-thread stall, and keyboard paging reaches the app —
   `PageDown`/`PageUp` move by a viewport screenful preserving the column,
   Ctrl+Home/Ctrl+End (macOS Cmd+↑/↓) jump to document start/end, Shift
-  variants extend the selection (fyne#377 + glfw-js v1.0.2 confirmed live).
+  variants extend the selection (pre-rebrand tracker #377 + glfw-js v1.0.2 confirmed live).
   Feedback from the session: on a 50k-line document the scrollbar thumb is
   too small to grab and drag (tracked as a fork scroller follow-up).
 - **IME composition on wasm** stays an interactive-only check (the automated
-  harness can't drive a native IME); the desktop path is verified (fyne#130) and
-  the wasm composition seam is wired (fyne#128).
+  harness can't drive a native IME); the desktop path is verified (pre-rebrand tracker #130) and
+  the wasm composition seam is wired (pre-rebrand tracker #128).

@@ -62,7 +62,7 @@ func TestApplyThemeCalledChild(t *testing.T) {
 }
 
 // themeRaceWidget is a minimal BaseWidget-backed widget used to exercise the
-// #604 theme-cache race in isolation.
+// pre-rebrand tracker #604 theme-cache race in isolation.
 type themeRaceWidget struct {
 	BaseWidget
 }
@@ -72,7 +72,7 @@ func (w *themeRaceWidget) CreateRenderer() core.WidgetRenderer {
 	return internalWidget.NewSimpleRenderer(&bellui.Container{})
 }
 
-// TestBaseWidgetThemeRefreshRace reproduces the #604 data race: a layout pass
+// TestBaseWidgetThemeRefreshRace reproduces the pre-rebrand tracker #604 data race: a layout pass
 // reads BaseWidget.themeCache through Theme()/MinSize() on one goroutine while
 // Refresh() clears the same field on another. With the plain-interface field
 // this trips the race detector at widget.go:244; the atomic.Pointer field keeps

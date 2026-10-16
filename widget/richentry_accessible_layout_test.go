@@ -11,7 +11,7 @@ import (
 	"github.com/belluikit/bellui/test"
 )
 
-// RichEntry's core.AccessibleTextLayouter implementation (#1116): visual
+// RichEntry's core.AccessibleTextLayouter implementation (pre-rebrand tracker #1116): visual
 // (rendered) row structure plus on-screen range geometry for the platform
 // accessibility bridges (the iOS VoiceOver editing ring).
 

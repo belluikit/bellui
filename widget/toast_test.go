@@ -128,7 +128,7 @@ func TestToast_DoesNotBlockContentBeneath(t *testing.T) {
 	toast.Show()
 	t.Cleanup(toast.Dismiss)
 
-	// A tap aimed at the button beneath the toast reaches it (#569)...
+	// A tap aimed at the button beneath the toast reaches it (pre-rebrand tracker #569)...
 	btnCenter := btn.Position().Add(geo.NewPos(btn.Size().Width/2, btn.Size().Height/2))
 	test.TapCanvas(c, btnCenter)
 	assert.Equal(t, 1, tapped, "tap passes through the transient toast")
@@ -150,7 +150,7 @@ func TestToast_DoesNotStealFocus(t *testing.T) {
 	t.Cleanup(toast.Dismiss)
 
 	// Typing while the toast is visible still reaches the focused entry:
-	// the pass-through pop-up never owns the canvas focus routing (#569).
+	// the pass-through pop-up never owns the canvas focus routing (pre-rebrand tracker #569).
 	test.Type(entry, "hi")
 	assert.Equal(t, "hi", entry.Text)
 	assert.Equal(t, entry, c.Focused())

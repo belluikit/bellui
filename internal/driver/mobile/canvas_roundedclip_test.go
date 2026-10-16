@@ -20,7 +20,7 @@ import (
 )
 
 // The mobile paint walk must honor the RoundedClipCornerRadius renderer seam
-// with stencil clipping, like the glfw walk — not clip rectangularly (#959).
+// with stencil clipping, like the glfw walk — not clip rectangularly (pre-rebrand tracker #959).
 
 // clipRecordingPainter is a gpu.Painter that records the clip-related call
 // sequence; every other operation is a no-op.
@@ -59,7 +59,7 @@ func (p *clipRecordingPainter) ClearGroupOpacity()                              
 func (p *clipRecordingPainter) SetTransform(geo.Matrix)                                      {}
 
 // roundedClipTestWidget's renderer offers RoundedClipCornerRadius, the seam
-// Card, the Entry corners (#467) and the #942 loupe bubble rely on.
+// Card, the Entry corners (pre-rebrand tracker #467) and the pre-rebrand tracker #942 loupe bubble rely on.
 type roundedClipTestWidget struct {
 	widget.BaseWidget
 

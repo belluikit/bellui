@@ -1,11 +1,11 @@
 # a11yprobe — accessibility backend live-verify harness
 
 The probe app plus platform client drivers used to verify the screen-reader
-backends (epic #490) against a real windowing system, from the outside, the
+backends (epic pre-rebrand tracker #490) against a real windowing system, from the outside, the
 way assistive technology sees them. Golden tests cover the neutral semantic
 layer; this harness covers what they cannot: the platform bridge, per-window
 state, focus routing and action dispatch. Backends: macOS NSAccessibility
-(#485), Windows UIA (#487), Linux AT-SPI2 (#981).
+(pre-rebrand tracker #485), Windows UIA (pre-rebrand tracker #487), Linux AT-SPI2 (pre-rebrand tracker #981).
 
 ## Probe app
 
@@ -19,7 +19,7 @@ secure-field subrole), markdown headings (virtual nodes / heading rotor),
 selectable label (read-only text protocol), TreeView with rename + delete
 (outline rows, disclosure, custom actions), Toast/Snackbar triggers
 (live-region announcements). **Probe B** is minimal and exists to verify
-disjoint per-window element trees and key-window focus gating (#554).
+disjoint per-window element trees and key-window focus gating (pre-rebrand tracker #554).
 
 Widget callbacks print `PROBE`-prefixed lines to stdout so a driver can
 confirm an action reached the widget, not just the bridge.
@@ -31,7 +31,7 @@ confirm an action reached the widget, not just the bridge.
 ./hack/a11yprobe/darwin/axset  $(pgrep -f a11yprobe | head -1)  # entry text protocol
 ./hack/a11yprobe/darwin/axtree $(pgrep -f a11yprobe | head -1)  # outline rows + disclosure
 ./hack/a11yprobe/darwin/axsel  $(pgrep -f a11yprobe | head -1)  # selectable-label selection
-# off-viewport virtualized-cell realize (#637 Stage 4) — needs a11yrealizeprobe:
+# off-viewport virtualized-cell realize (pre-rebrand tracker #637 Stage 4) — needs a11yrealizeprobe:
 go run -tags accessibility ./hack/a11yrealizeprobe &                    # note its pid
 ./hack/a11yprobe/darwin/axcell $(pgrep -f a11yrealizeprobe) 500000 1    # AXCellForColumnAndRow
 ```
@@ -79,7 +79,7 @@ permission: System Settings → Privacy & Security → Accessibility.
 ## Windows clients (`windows/`)
 
 PowerShell UIA clients over `System.Windows.Automation` (no install needed),
-used to verify the UIA backend (#487) the way Narrator/NVDA query it:
+used to verify the UIA backend (pre-rebrand tracker #487) the way Narrator/NVDA query it:
 
 ```powershell
 # from the repo root, with the probe running:
@@ -99,7 +99,7 @@ Value.SetValue on the first element matching a Name; `uiatext` walks the
 Text pattern (document range, word/line units, settable selection).
 Cross-check the `PROBE` stdout lines to confirm actions reached the widget.
 
-### Off-viewport cell realize (`uiarealize.ps1`, #637 Stage 3)
+### Off-viewport cell realize (`uiarealize.ps1`, pre-rebrand tracker #637 Stage 3)
 
 `uiarealize.ps1` verifies the virtualized-cell realize seam: a UIA client asks
 a grid's `GridPattern.GetItem(row, col)` for a cell **far past the viewport**
@@ -132,7 +132,7 @@ queries it. `nvda_speechcapture.ps1` goes one layer further: it runs the real
 logs every queued utterance via `speech.extensions.pre_speechQueued`), drives
 a scripted walk over Probe A + Probe B, and merges NVDA's speech with per-step
 markers into a diffable transcript. This turns the human "does it sound right"
-listen (#566) into a reproducible artifact.
+listen (pre-rebrand tracker #566) into a reproducible artifact.
 
 ```powershell
 # one-time: a portable NVDA copy (any recent version)
@@ -154,7 +154,7 @@ behaviour reached by **arrow keys** (slider increment, tree-row navigation,
 caret motion). NVDA installs a low-level keyboard hook that filters
 *synthetically injected* keystrokes, so those steps behave differently than a
 real keypress (injected character keys, e.g. typing into an entry, *do* reach
-the widget). That residual is the human half of #566; the provider side of
+the widget). That residual is the human half of pre-rebrand tracker #566; the provider side of
 those same behaviours is already covered by `uiaact`/`uiatext` above.
 
 Same physical-session requirement as the UIA clients: over SSH the app's
@@ -163,7 +163,7 @@ foreground), so focus tracking never engages. Use RDP or the console.
 
 ## Linux clients (AT-SPI2, `busctl`)
 
-The pure-Go AT-SPI2 backend (#981) speaks the `org.a11y.atspi.*` D-Bus
+The pure-Go AT-SPI2 backend (pre-rebrand tracker #981) speaks the `org.a11y.atspi.*` D-Bus
 protocol, so **any** AT client reads it — no bespoke driver binaries needed.
 `busctl` walks the exact methods Orca calls; no audio required.
 
@@ -196,7 +196,7 @@ busctl --address "$A11Y" call $NAME /org/a11y/atspi/accessible/10 \
 busctl --address "$A11Y" call $NAME /org/a11y/atspi/accessible/9 \
   org.a11y.atspi.Component GrabFocus           # -> b true
 
-# --- P1 (#986): Text / Value / Action / EditableText -----------------------
+# --- P1 (pre-rebrand tracker #986): Text / Value / Action / EditableText -----------------------
 # GetInterfaces reports which of these a node supports; query accordingly.
 ENTRY=/org/a11y/atspi/accessible/10; SLIDER=/org/a11y/atspi/accessible/9
 
@@ -219,7 +219,7 @@ busctl --address "$A11Y" call $NAME /org/a11y/atspi/accessible/17 \
 busctl --address "$A11Y" call $NAME $ENTRY \
   org.a11y.atspi.EditableText InsertText isi 0 "X" 1          # -> b true
 
-# --- P2 (#987): Cache fast path -------------------------------------------
+# --- P2 (pre-rebrand tracker #987): Cache fast path -------------------------------------------
 # One round-trip snapshot of the whole tree (what Orca prefers over walking):
 busctl --address "$A11Y" call $NAME /org/a11y/atspi/cache \
   org.a11y.atspi.Cache GetItems                              # -> a((so)(so)(so)iiassusau) N ...

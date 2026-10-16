@@ -57,7 +57,7 @@ func TestDriver_DoFromGoroutineNested(t *testing.T) {
 // keeps calling bellui.Do against the previous test app's driver while the next
 // test's work runs on a fresh driver instance. The Do mutex is package-level,
 // shared across driver instances, so those callbacks are still serialized and
-// carry happens-before edges (#1049).
+// carry happens-before edges (pre-rebrand tracker #1049).
 func TestDriver_DoFromGoroutineSerializedAcrossInstances(t *testing.T) {
 	d1 := NewDriver()
 	d2 := NewDriver()

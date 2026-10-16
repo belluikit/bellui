@@ -39,13 +39,13 @@ the history of the tools project it grew from.
   toolkit: `GoNativeActivity`'s `FyneInputConnection` forwards Ctrl/Alt/Meta
   shortcut combinations (Ctrl+A/C/V/X/Z/Y) into fyne via the new
   `keyboardShortcut(keyCode, metaState)` native, so they reach the editor
-  instead of the inert host EditText (trendvidia/fyne#1077); and
+  instead of the inert host EditText (pre-rebrand tracker #1077); and
   `keyboardArrow` now takes a `metaState` argument so Shift+Arrow extends an
-  editor's selection from a hardware keyboard (trendvidia/fyne#1083). Also
+  editor's selection from a hardware keyboard (pre-rebrand tracker #1083). Also
   consolidates the trendvidia dex line's IME session-restart at field
-  boundaries (trendvidia/fyne#966) and the bounded per-frame text-layout
+  boundaries (pre-rebrand tracker #966) and the bounded per-frame text-layout
   sidecar that feeds TalkBack character/line geometry on the focused editor
-  (trendvidia/fyne#995/#1009). Requires a fyne at or after #1083 (the
+  (pre-rebrand tracker #995/#1009). Requires a fyne at or after pre-rebrand tracker #1083 (the
   `keyboardArrow` native signature changed).
 
 
@@ -57,12 +57,12 @@ the history of the tools project it grew from.
   the 3.4.0 IME transport: `setSelection` commits an active fyne preedit
   before forwarding, so Select All during composition marks the whole
   document instead of coming up short by the preedit length
-  (trendvidia/fyne#1032); and the fyne→IME state push now distinguishes
+  (pre-rebrand tracker #1032); and the fyne→IME state push now distinguishes
   per-keystroke composing echoes from genuine out-of-band document changes
   (undo/redo from the accessibility actions menu), converging via
   restartInput instead of silently skipping — fixing the stale display and
   the orphaned preedit landing at the start of the document after an undo
-  mid-composition (trendvidia/fyne#1034).
+  mid-composition (pre-rebrand tracker #1034).
 
 
 ## 3.4.0 - 16 Jul 2026
@@ -70,18 +70,18 @@ the history of the tools project it grew from.
 ### Changed
 
 * Regenerated the embedded Android dex with the custom-accessibility-action
-  and IME-transport work from the toolkit (trendvidia/tools#31):
+  and IME-transport work from the toolkit (pre-rebrand tools tracker #31):
   `GoNativeActivity` gains `addAccessibilityNodeV4` carrying declared widget
   actions with no standard Android semantic — Entry/RichEntry Undo/Redo —
   registered as custom `AccessibilityAction`s in TalkBack's actions menu and
-  dispatched through the existing action up-call (trendvidia/fyne#1025);
+  dispatched through the existing action up-call (pre-rebrand tracker #1025);
   the `keyboardArrow` native, so the soft keyboard's editing-panel arrow keys
   move the fyne caret instead of being swallowed by the hidden IME-host
-  EditText (trendvidia/fyne#1029); and the `keyboardSetSelection` native plus
+  EditText (pre-rebrand tracker #1029); and the `keyboardSetSelection` native plus
   the `updateSelection` acknowledgement, so an IME-driven Select All is
   visible, offers Copy/Cut to assistive technology, and typing commits over
-  the selection (trendvidia/fyne#1030). Also drops the #974 epic's debug
-  instrumentation from the shipped dex (trendvidia/fyne#1010). Additive
+  the selection (pre-rebrand tracker #1030). Also drops the pre-rebrand tracker #974 epic's debug
+  instrumentation from the shipped dex (pre-rebrand tracker #1010). Additive
   protocol: the native library's V4 lookup falls back to V3 against an older
   dex, and apps built against an older fyne simply don't use the new node
   variant.
@@ -102,19 +102,19 @@ the history of the tools project it grew from.
 ### Changed
 
 * Regenerated the embedded Android dex with the editable-text accessibility
-  protocol (trendvidia/fyne#974): `GoNativeActivity` gains
+  protocol (pre-rebrand tracker #974): `GoNativeActivity` gains
   `addAccessibilityNodeV3` carrying the document text + selection,
   granularity/selection/clipboard accessibility-action handling with event
   synthesis, and the `accessibilityTextAction` native up-call — the Java half
   of TalkBack cursor movement, selection and clipboard actions on text
-  fields (trendvidia/fyne#965). Also includes the shadow-EditText
+  fields (pre-rebrand tracker #965). Also includes the shadow-EditText
   accessibility-event swallowing + touch-exploration re-query stopgaps
-  (trendvidia/fyne#968) and the UI-thread `hideKeyboard` discipline that
-  fixes the second-text-field deadlock under TalkBack (trendvidia/fyne#973).
+  (pre-rebrand tracker #968) and the UI-thread `hideKeyboard` discipline that
+  fixes the second-text-field deadlock under TalkBack (pre-rebrand tracker #973).
   Additive protocol: apps built against an older fyne simply don't use the
-  new node variant (trendvidia/tools#29).
+  new node variant (pre-rebrand tools tracker #29).
 * Bumped `github.com/trendvidia/protowire-go` to v1.2.2, matching the
-  toolkit (trendvidia/fyne#979).
+  toolkit (pre-rebrand tracker #979).
 
 
 ## 3.2.1 - 14 Jul 2026
@@ -122,10 +122,10 @@ the history of the tools project it grew from.
 ### Fixed
 
 * **Regression in 3.2.0:** the embedded Android dex was regenerated from a
-  fyne branch that predated the #817 virtualized-grid accessibility work, so
+  fyne branch that predated the pre-rebrand tracker #817 virtualized-grid accessibility work, so
   3.2.0 silently dropped `accessibilityActionScrollTo` and
   `addAccessibilityNodeV2` (TalkBack data-table support shipped in 3.1.0).
-  Regenerated from the correct combined `GoNativeActivity.java` (the #817
+  Regenerated from the correct combined `GoNativeActivity.java` (the pre-rebrand tracker #817
   grid support **and** the 3.2.0 CJK/announce fixes). Upgrade from 3.2.0.
 
 
@@ -136,18 +136,18 @@ the history of the tools project it grew from.
 * `fyne package` injected a `fyne_metadata_init.go` (and the `hello_world`
   template) that still imported `github.com/trendvidia/fyne/v2` after the v3
   migration, so packaging a fyne/v3 app failed to build. Both templates now
-  import /v3 (trendvidia/tools#27, #28).
+  import /v3 (pre-rebrand tools tracker #27, pre-rebrand tracker #28).
 
 ### Changed
 
 * Regenerated the embedded Android dex from fyne's updated
-  `GoNativeActivity.java` for two on-device fixes (trendvidia/fyne#945): the
+  `GoNativeActivity.java` for two on-device fixes (pre-rebrand tracker #945): the
   shadow `EditText` inputType now advertises a real text class
   (`TYPE_CLASS_TEXT`) so input methods engage inline composition — a
   class-less inputType previously read as `TYPE_NULL` and disabled CJK
   composition; and `setKeyboardState` is now a strict no-op on unchanged
   state, ending the TalkBack announce-loop caused by redundant selection
-  events (#28).
+  events (pre-rebrand tracker #28).
 
 
 ## 3.1.0 - 13 Jul 2026
@@ -156,10 +156,10 @@ the history of the tools project it grew from.
 
 * Regenerated the embedded Android dex from fyne's updated
   `GoNativeActivity.java` to carry the TalkBack virtualized-collection
-  support (trendvidia/fyne#948, fyne#817): `addAccessibilityNodeV2` with grid
+  support (pre-rebrand tracker #948, pre-rebrand tracker #817): `addAccessibilityNodeV2` with grid
   association, a ViewGroup grid proxy exposing `CollectionInfo` and nested
   `CollectionItemInfo` cells, and `ACTION_SCROLL_TO_POSITION` routed to the
-  new `accessibilityActionScrollTo` native method (#26). Backward compatible
+  new `accessibilityActionScrollTo` native method (pre-rebrand tracker #26). Backward compatible
   both ways: the V1 `addAccessibilityNode` wrapper remains for older native
   libraries, and fyne's C shim falls back to V1 when packaged with an older
   dex.
@@ -171,14 +171,14 @@ the history of the tools project it grew from.
 
 * **Breaking:** the tools now build apps against Fyne v3
   (`github.com/trendvidia/fyne/v3`, currently v3.0.0-rc.2), following the
-  v2 → v3 import-path move and the removal of all deprecated public API (#24).
+  v2 → v3 import-path move and the removal of all deprecated public API (pre-rebrand tracker #24).
   Projects packaged with these tools must themselves be on fyne/v3.
 
 ### Security
 
 * Bumped `golang.org/x/image` to v0.44.0 to clear the high-severity
   dependabot alert for excessive resource consumption in the tiff package's
-  PackBits decoding (#25). The moderate `golang.org/x/net` HTML-parser alert
+  PackBits decoding (pre-rebrand tracker #25). The moderate `golang.org/x/net` HTML-parser alert
   is also cleared: fyne/v3 no longer pulls x/net into the module graph at all.
 
 
@@ -188,7 +188,7 @@ the history of the tools project it grew from.
 
 * The web package now serves a notification service worker (`fyne-sw.js`) so
   rich notifications can render action buttons on the web target
-  (trendvidia/fyne#724). The page-context browser `Notification` cannot render
+  (pre-rebrand tracker #724). The page-context browser `Notification` cannot render
   actions — only a service worker's `registration.showNotification` can, and
   action clicks are delivered to the worker rather than the page. Fyne's wasm
   runtime registers the worker lazily and only for notifications carrying
@@ -201,7 +201,7 @@ the history of the tools project it grew from.
 ### Added
 
 * `fyne translate` now recognizes the grammatical-select localization seams
-  `lang.LSelect` and `lang.LSelectPlural` (trendvidia/fyne#505). Because the
+  `lang.LSelect` and `lang.LSelectPlural` (pre-rebrand tracker #505). Because the
   selector is usually a runtime variable, the scanner seeds the mandatory
   `<prefix>.other` key (and any literal selector variant), never the bare prefix,
   so an existing key is never clobbered; `LSelectPlural` seeds a `{"other": …}`
@@ -217,9 +217,9 @@ the history of the tools project it grew from.
   word-backspace via `setComposingRegion`, and the TalkBack text mirror
   (`setKeyboardState`, replacing the one-space sentinel so the screen reader
   announces real content and backspace deletes real characters;
-  trendvidia/fyne#760), plus the explore-by-touch tap gate that gives
+  pre-rebrand tracker #760), plus the explore-by-touch tap gate that gives
   single-vs-double-tap semantics under TalkBack (`setTouchExploration`;
-  trendvidia/fyne#761). Both were verified end-to-end on a physical device
+  pre-rebrand tracker #761). Both were verified end-to-end on a physical device
   (OnePlus Pad 2, Adreno 750, Android 15).
 
 
@@ -234,8 +234,8 @@ the history of the tools project it grew from.
   `Info.plist` declares the matching usage string — the iOS path already sourced
   these, the darwin desktop path did not, so a packaged app using desktop GPS
   never prompted and never got a fix. The same `NS*` keys work for both platforms
-  (trendvidia/appviewer#157). Enables desktop CoreLocation GPS on a packaged
-  macOS app (trendvidia/appviewer#159).
+  (pre-rebrand appviewer tracker #157). Enables desktop CoreLocation GPS on a packaged
+  macOS app (pre-rebrand appviewer tracker #159).
 
 
 ## 2.5.0 - 10 Jul 2026
@@ -246,16 +246,16 @@ the history of the tools project it grew from.
   Without it, on Android 13+ (targetSdk 33+) the OS silently drops every
   notification an app posts (`POST_NOTIFICATION` app-op stays `ignore`), so the
   Fyne notification API — plain and rich — never appeared. Found while verifying
-  rich-notification callbacks on a real device (trendvidia/fyne#723). Runtime
+  rich-notification callbacks on a real device (pre-rebrand tracker #723). Runtime
   requesting of the permission is a separate Fyne-side follow-up
-  (trendvidia/fyne#756).
+  (pre-rebrand tracker #756).
 
 ### Changed
 
 * Regenerated the embedded Android dex from `GoNativeActivity.java` to carry the
   new native bridges for two Fyne features: rich-notification click/action
-  callbacks (`notificationActivated`; trendvidia/fyne#723) and image clipboard
-  (`doSetClipboardImage`/`doGetClipboardImage`; trendvidia/fyne#580). Both were
+  callbacks (`notificationActivated`; pre-rebrand tracker #723) and image clipboard
+  (`doSetClipboardImage`/`doGetClipboardImage`; pre-rebrand tracker #580). Both were
   verified end-to-end on a physical device (OnePlus Pad 2, Adreno 750, Android 15).
 
 
@@ -268,7 +268,7 @@ the history of the tools project it grew from.
   `applinks:<domain>`), wired in via `CODE_SIGN_ENTITLEMENTS`. This is the
   packaging half of iOS Universal Links — `xcodebuild -allowProvisioningUpdates`
   registers the capability with the App ID under automatic signing
-  (trendvidia/fyne#622). Verified on device: the app installs with the
+  (pre-rebrand tracker #622). Verified on device: the app installs with the
   entitlement and Apple's AASA CDN validates a matching
   `apple-app-site-association`.
 
@@ -278,7 +278,7 @@ the history of the tools project it grew from.
   declared file-association MIME types) alongside the legacy
   `CFBundleTypeMIMETypes`. iOS 14+ routes "Open in…" / share-sheet document
   targets by UTI, so without this the app never surfaced as a file handler
-  (trendvidia/fyne#622). Verified on device: a shared `.txt`/`.md` now opens the
+  (pre-rebrand tracker #622). Verified on device: a shared `.txt`/`.md` now opens the
   app.
 
 
@@ -318,7 +318,7 @@ the history of the tools project it grew from.
 ### Added
 
 * Mobile file-share and open-with packaging — the OS side of `fyne.SharerApp` and
-  `fyne.OpenHandlerApp` on mobile (fyne #711 / #622). `fyne package`:
+  `fyne.OpenHandlerApp` on mobile (fyne pre-rebrand tracker #711 / pre-rebrand tracker #622). `fyne package`:
   * **Android** — declares a `<provider>` for the bundled `FyneFileProvider`
     (authority `<appId>.fileprovider`), so `ShareFile` can hand a file to the system
     chooser as a `content://` URI. The regenerated dex ships that provider plus the
@@ -356,7 +356,7 @@ the history of the tools project it grew from.
   per-platform handler declarations (macOS `CFBundleDocumentTypes`/`CFBundleURLTypes`,
   Android `ACTION_VIEW` intent-filters, Linux desktop `MimeType`/`x-scheme-handler`,
   Windows registry keys) that route matching files and URLs to the app — the OS side
-  of `fyne.OpenHandlerApp` (fyne #510).
+  of `fyne.OpenHandlerApp` (fyne pre-rebrand tracker #510).
 
 ### Changed
 
@@ -371,40 +371,40 @@ the history of the tools project it grew from.
 
 ### Changed
 
-* Compatibility mode for fyne-cross-images (#130)
+* Compatibility mode for fyne-cross-images (fyne-io/tools#130)
 
 ### Fixed
 
-* Pass flag to compiler instead of preprocessor directly (#129)
-* Build with compilers missing support flow-control protection (#133)
+* Pass flag to compiler instead of preprocessor directly (fyne-io/tools#129)
+* Build with compilers missing support flow-control protection (fyne-io/tools#133)
 
 
 ## 1.7.1 - 12 Apr 2026
 
 ### Added
 
-* Start support for open with in metadata (#104)
-* Support for adaptive and themed android icons (#115)
-* Parsing of concatenated strings with fyne translate (#117)
+* Start support for open with in metadata (fyne-io/tools#104)
+* Support for adaptive and themed android icons (fyne-io/tools#115)
+* Parsing of concatenated strings with fyne translate (fyne-io/tools#117)
 
 ### Changed
 
-* Apply hardening C/LD-FLAGS and optimize (#100)
-* Improve help to show that at least one file is needed (#102)
-* Set StartupWMClass in Unix/Linux .desktop files (#112)
-* gendex: Sort directory names in findLast (#123)
+* Apply hardening C/LD-FLAGS and optimize (fyne-io/tools#100)
+* Improve help to show that at least one file is needed (fyne-io/tools#102)
+* Set StartupWMClass in Unix/Linux .desktop files (fyne-io/tools#112)
+* gendex: Sort directory names in findLast (fyne-io/tools#123)
 
 ### Fixed
 
-* Update Fyne version (#97)
-* Don't generate Migration code for pre-2.6 library usage (#98)
-* Support remote install with icons that are simply Icon.png (#99)
-* Fix release flags not being set for WASM (#101)
-* Don't make tarbombs (#105)
-* Fallback to app name if AppID is not present for package_unix (#114)
-* Update Android to API 21 in to keep the builds for Play Store happy (#119)
-* Make sure that CGO is not enabled when building in WASM mode (#121)
-* fyne serve: fix blank wasm loading screen while app is starting (#122)
+* Update Fyne version (fyne-io/tools#97)
+* Don't generate Migration code for pre-2.6 library usage (fyne-io/tools#98)
+* Support remote install with icons that are simply Icon.png (fyne-io/tools#99)
+* Fix release flags not being set for WASM (fyne-io/tools#101)
+* Don't make tarbombs (fyne-io/tools#105)
+* Fallback to app name if AppID is not present for package_unix (fyne-io/tools#114)
+* Update Android to API 21 in to keep the builds for Play Store happy (fyne-io/tools#119)
+* Make sure that CGO is not enabled when building in WASM mode (fyne-io/tools#121)
+* fyne serve: fix blank wasm loading screen while app is starting (fyne-io/tools#122)
 
 ### New Contributors
 

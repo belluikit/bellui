@@ -12,7 +12,7 @@ import (
 	"github.com/belluikit/bellui/test"
 )
 
-// Desktop-leg coverage for the #944 selectable long-press machinery: the
+// Desktop-leg coverage for the pre-rebrand tracker #944 selectable long-press machinery: the
 // word-select path is device-independent, while the handle overlay is
 // mobile-only (see selectable_handles_mobile_test.go for the overlay tests).
 

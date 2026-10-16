@@ -29,7 +29,7 @@ func newBigDocEntry(t *testing.T, lines int, wrap bellui.TextWrap) *Entry {
 	return e
 }
 
-// TestLazyEdit_NoFullRebuildPerKeystroke pins the #380/#400 identity chain: after
+// TestLazyEdit_NoFullRebuildPerKeystroke pins the pre-rebrand tracker #380/#400 identity chain: after
 // the initial build, interactive edits (typing, backspace, delete, newline) go
 // through the incremental fast path and never trigger a full content rebuild of
 // the lazy model. A regression here is a silent perf cliff, not a correctness
@@ -56,7 +56,7 @@ func TestLazyEdit_NoFullRebuildPerKeystroke(t *testing.T) {
 	assert.True(t, p.lazyCanEdit(), "fast edit path must survive the edits")
 }
 
-// TestLazyEdit_UndoRedoStaysIncremental pins the #401 delta-native undo replay:
+// TestLazyEdit_UndoRedoStaysIncremental pins the pre-rebrand tracker #401 delta-native undo replay:
 // undo and redo splice the provider through the fast path, so they trigger no
 // full rebuild of the lazy model (each used to force one per application), and
 // still reproduce the exact text and caret of the string-replay implementation.
@@ -84,7 +84,7 @@ func TestLazyEdit_UndoRedoStaysIncremental(t *testing.T) {
 	assert.True(t, p.lazyCanEdit(), "fast edit path must survive undo/redo")
 }
 
-// TestLazyEdit_ComposeStaysIncremental pins the #402 preedit-through-the-buffer
+// TestLazyEdit_ComposeStaysIncremental pins the pre-rebrand tracker #402 preedit-through-the-buffer
 // path: IME composition updates, commits and cancels splice the provider's
 // buffer, so composing on a large document triggers no full rebuild per event
 // (each used to force one), while Text/undo stay untouched until commit.
@@ -137,7 +137,7 @@ func TestLazyEdit_SetTextRebuildsOnce(t *testing.T) {
 // random edit sequence on a wrapped document, every visual row's absolute
 // boundary equals what a from-scratch rebuild computes. This pins the
 // line-relative -> absolute conversion in lazyRowBoundary and the retained
-// measurements of lines outside the edited span (#400).
+// measurements of lines outside the edited span (pre-rebrand tracker #400).
 func TestLazyEdit_RowBoundsMatchRebuild(t *testing.T) {
 	e := newBigDocEntry(t, 300, bellui.TextWrapWord) // below eager threshold: all lines measured
 	p := e.textProvider()

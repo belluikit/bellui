@@ -169,7 +169,7 @@ func TestSnapshotAccessible(t *testing.T) {
 }
 
 // mockIdentified is an accessible object that advertises a stable data
-// identity (AccessibleIdentified, #635).
+// identity (AccessibleIdentified, pre-rebrand tracker #635).
 type mockIdentified struct {
 	mockAccessible
 	identity any
@@ -260,7 +260,7 @@ func TestAccessibleRole_ChildrenPresentational(t *testing.T) {
 	assert.False(t, RoleForm.ChildrenPresentational())
 
 	// Text-bearing roles moved to the selective treatment: only their
-	// non-interactive descendants are presentational (#522).
+	// non-interactive descendants are presentational (pre-rebrand tracker #522).
 	for _, r := range []AccessibleRole{
 		RoleLabel, RoleTextBox, RoleMultiLineTextBox, RolePasswordField,
 		RoleSearchField, RoleComboBox,

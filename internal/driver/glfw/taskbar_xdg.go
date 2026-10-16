@@ -9,7 +9,7 @@ import (
 )
 
 // applyProgressNative drives launcher/taskbar progress on Linux and the BSDs via
-// the Unity LauncherEntry D-Bus protocol (#721) — the same channel App.SetBadge
+// the Unity LauncherEntry D-Bus protocol (pre-rebrand tracker #721) — the same channel App.SetBadge
 // uses for the count badge. It is honoured by KDE Plasma and several other
 // desktops and silently ignored elsewhere.
 //

@@ -23,7 +23,7 @@ import (
 // AccessibleGridDimensions also reports — the visual/current-view frame
 // documented on core.AccessibleGridItem — so they change on sort/filter. Stable
 // source identity travels on a separate channel (see the AccessibleIdentified
-// follow-up, fyne #635); it is intentionally not this position.
+// follow-up, fyne pre-rebrand tracker #635); it is intentionally not this position.
 type cellHost struct {
 	widget.BaseWidget
 
@@ -87,7 +87,7 @@ func (h *cellHost) AccessibleCellPosition() (row, col int) {
 // AccessibleState reports StateSelected when the cell is selected and
 // StateFocused when it is the grid's keyboard-focus cursor cell. The focused
 // cell is also designated the grid's AT-focused descendant (see
-// DataGrid.AccessibleActiveDescendant / fyne#688); reporting StateFocused here
+// DataGrid.AccessibleActiveDescendant / pre-rebrand tracker #688); reporting StateFocused here
 // keeps the node's own UIA focus property consistent with that designation.
 func (h *cellHost) AccessibleState() core.AccessibleState {
 	var st core.AccessibleState

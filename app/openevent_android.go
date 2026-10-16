@@ -9,14 +9,14 @@ import (
 	"github.com/belluikit/bellui/storage"
 )
 
-// platformLaunchOpen wires the Android "open with" intent seam (fyne#622) to the
+// platformLaunchOpen wires the Android "open with" intent seam (pre-rebrand tracker #622) to the
 // shared open-event delivery. The mobile driver reports a VIEW/EDIT data Uri
 // (file association or custom URL scheme / deep link) — buffered until now if it
 // arrived as the launch intent — and we classify it into a file or URL open.
 func platformLaunchOpen(a *belluiApp) {
 	mobileapp.SetOpenIntentHandler(a.deliverAndroidOpen)
 
-	// Route rich-notification taps/actions (fyne#723) back to the session
+	// Route rich-notification taps/actions (pre-rebrand tracker #723) back to the session
 	// callback registry. action -1 is the body tap; >=0 is the action index.
 	mobileapp.SetNotificationActivatedHandler(func(token int64, action int) {
 		if action < 0 {

@@ -29,7 +29,7 @@ func newDeferSyncEntry(t *testing.T, text string) (*Entry, bellui.Window) {
 	return e, w
 }
 
-// TestEntryDeferTextSync_TypingDefersAndSyncs pins the core #410 contract:
+// TestEntryDeferTextSync_TypingDefersAndSyncs pins the core pre-rebrand tracker #410 contract:
 // with the mode on, typing leaves Text/OnChanged/Validator untouched (the
 // buffer and rendering carry the live content) and SyncText materializes,
 // notifies once, and restores the identity chain for further fast edits.
@@ -279,7 +279,7 @@ func TestEntryDeferTextSync_WrappedTyping(t *testing.T) {
 	assert.Equal(t, "someX words that wrap around the narrow view\nsecond line", e.SyncText())
 }
 
-// TestEntryDeferTextSync_PasteEmptyClipboardDefers pins the #427 fix's
+// TestEntryDeferTextSync_PasteEmptyClipboardDefers pins the pre-rebrand tracker #427 fix's
 // deferred branch: an empty-clipboard paste over a selection erases through
 // the buffer and defers Text/OnChanged to the next sync point.
 func TestEntryDeferTextSync_PasteEmptyClipboardDefers(t *testing.T) {

@@ -29,7 +29,7 @@ func (t *Tooltip) AccessibleLabel() string { return t.Text }
 
 var _ core.ToolTipable = (*Tooltip)(nil)
 
-// ToolTip returns the tooltip text, so the driver-level tooltip path (#800)
+// ToolTip returns the tooltip text, so the driver-level tooltip path (pre-rebrand tracker #800)
 // shows this wrapper's text on the glfw desktop driver where the internal
 // hover-catcher overlay never receives hover events.
 func (t *Tooltip) ToolTip() string { return t.Text }

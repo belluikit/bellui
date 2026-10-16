@@ -1,10 +1,10 @@
 //go:build !gl
 
 // Package webgpu provides a WebGPU implementation of the backend-neutral
-// gpu.Painter (WebGPU migration, #198). The shader ports and the
+// gpu.Painter (WebGPU migration, pre-rebrand tracker #198). The shader ports and the
 // device-independent pipeline/uniform/layout foundation compile on every
 // platform; the GPU-facing painter here pulls in the cgo wgpu-native binding and
-// is now the default backend (Phase 5, #204). The legacy OpenGL painter is the
+// is now the default backend (Phase 5, pre-rebrand tracker #204). The legacy OpenGL painter is the
 // fallback behind the `gl` build tag.
 //
 // Default build uses this painter; for the GL fallback build with: go build -tags gl ...
@@ -72,7 +72,7 @@ type painter struct {
 	canvasFBO *canvasFBOState
 
 	// fboRetentionUnreliable forces full repaint for the session once the canvas
-	// FBO is known not to retain across frames (after an Android resume, #342).
+	// FBO is known not to retain across frames (after an Android resume, pre-rebrand tracker #342).
 	fboRetentionUnreliable bool
 }
 
@@ -93,13 +93,13 @@ func NewPainter(c core.Canvas, ctx driver.WithContext) gpu.Painter {
 func (p *painter) SetSurfaceDescriptor(sd *wgpu.SurfaceDescriptor) { p.sd = sd }
 
 // RecreateSurface rebuilds the presentation surface from a new native-window
-// descriptor (e.g. Android delivers a fresh ANativeWindow on resume, #310).
+// descriptor (e.g. Android delivers a fresh ANativeWindow on resume, pre-rebrand tracker #310).
 // Before the device is up it just records the descriptor for Init to use.
 func (p *painter) RecreateSurface(sd *wgpu.SurfaceDescriptor) {
 	p.sd = sd
 	if p.dev != nil {
 		// Drop any frame still holding a texture from the old surface before it is
-		// released and rebuilt (same SurfaceOutput hazard as SetOutputSize, #337).
+		// released and rebuilt (same SurfaceOutput hazard as SetOutputSize, pre-rebrand tracker #337).
 		if p.framing && p.dev.HasOpenFrame() {
 			p.dev.DiscardFrame()
 			p.framing = false
@@ -110,10 +110,10 @@ func (p *painter) RecreateSurface(sd *wgpu.SurfaceDescriptor) {
 
 // ReleaseSurface drops the presentation surface while keeping the device, so
 // another window can own the shared native window (Android's single
-// ANativeWindow hosts one configured surface at a time, #753). A later
+// ANativeWindow hosts one configured surface at a time, pre-rebrand tracker #753). A later
 // RecreateSurface rebinds this painter to the native window. A dangling
 // un-presented frame is discarded first (same SurfaceOutput hazard as
-// SetOutputSize, #337). No-op before the device is up.
+// SetOutputSize, pre-rebrand tracker #337). No-op before the device is up.
 func (p *painter) ReleaseSurface() {
 	if p.dev == nil {
 		return
@@ -154,7 +154,7 @@ func (p *painter) SetOutputSize(width, height int) {
 		// A frame begun by paint() but never presented (the driver skips Present for
 		// a non-visible window) still holds the surface texture; reconfiguring the
 		// surface with that SurfaceOutput live is a fatal WebGPU validation error, so
-		// discard the dangling frame before resizing (#337).
+		// discard the dangling frame before resizing (pre-rebrand tracker #337).
 		if p.framing && p.dev.HasOpenFrame() {
 			p.dev.DiscardFrame()
 			p.framing = false
@@ -209,7 +209,7 @@ func backgroundColor() [4]float32 {
 }
 
 // GPUFrameNanos returns the most recent frame's measured GPU execution time in
-// nanoseconds (BELLUI_GPU_PROFILE, #336), and whether a measurement is available.
+// nanoseconds (BELLUI_GPU_PROFILE, pre-rebrand tracker #336), and whether a measurement is available.
 // The driver's frame profiler reads it via a type assertion.
 func (p *painter) GPUFrameNanos() (uint64, bool) {
 	if p.dev == nil {
@@ -263,7 +263,7 @@ func (p *painter) Free(obj core.CanvasObject) {
 
 // EnableCapture arms the device's per-frame capture copy without reading a
 // frame back. The driver calls it before forcing the fresh pre-capture repaint
-// (#473), so that repaint's EndFrame copies the presented surface — overlays
+// (pre-rebrand tracker #473), so that repaint's EndFrame copies the presented surface — overlays
 // included — for the Capture that follows.
 func (p *painter) EnableCapture() {
 	if p.dev != nil {
@@ -273,7 +273,7 @@ func (p *painter) EnableCapture() {
 
 func (p *painter) Capture(c core.Canvas) image.Image {
 	if p.dev != nil {
-		// Maintain the per-frame capture copy from now on (#219); the copy is
+		// Maintain the per-frame capture copy from now on (pre-rebrand tracker #219); the copy is
 		// skipped until the first capture request to save per-frame GPU cost.
 		p.dev.EnableCapture()
 		if img := p.dev.CaptureImage(); img != nil {
@@ -326,7 +326,7 @@ func (p *painter) StartRoundedClipping(pos geo.Position, size geo.Size, cornerRa
 	// The shader keeps every fragment with any anti-aliasing coverage
 	// (alpha > 0), so a stamp at the exact geometry would mark one
 	// edge-softness band BEYOND the shape — clipped content then pokes past
-	// the visibly drawn arc by a couple of hidpi pixels (#469). Inset the
+	// the visibly drawn arc by a couple of hidpi pixels (pre-rebrand tracker #469). Inset the
 	// stamp by 1.5 softness (concentric radius): its coverage then ends half
 	// a band INSIDE the geometric boundary — the midpoint of the drawn
 	// edge's own anti-aliasing, which is where the eye reads the outline.

@@ -19,7 +19,7 @@ import (
 // provider (atspi_linux.go): it reconciles the platform-neutral semantic tree
 // (internal/accessibility) into the exported D-Bus object tree once per dirty
 // frame, exactly as the darwin/windows backends do, and registers the
-// live-region announcement listener (#525).
+// live-region announcement listener (pre-rebrand tracker #525).
 
 var (
 	atspiOnce sync.Once
@@ -35,7 +35,7 @@ func ensureAtspi() *atspiProvider {
 }
 
 func init() {
-	// Deliver accessibility.Announce (Toast/Snackbar live regions, #525) as an
+	// Deliver accessibility.Announce (Toast/Snackbar live regions, pre-rebrand tracker #525) as an
 	// AT-SPI Announcement event from the application root. Announce runs on the
 	// main goroutine per its contract. Only emit once a provider already exists;
 	// an announcement never forces the bus connection up on its own.
@@ -237,7 +237,7 @@ func (p *atspiProvider) reconcileWindowLocked(w *window, events *[]func()) {
 		}
 	}
 
-	// Drop on-demand realized cells whose grid was torn down this frame (#988):
+	// Drop on-demand realized cells whose grid was torn down this frame (pre-rebrand tracker #988):
 	// their coordinates are meaningless without the owning table, and nothing
 	// else prunes them (they live outside the reconcile walk by design).
 	for id, n := range ws.realized {
@@ -292,7 +292,7 @@ func (p *atspiProvider) reconcileWindowLocked(w *window, events *[]func()) {
 // node and recurses into its children. It returns nil when the node is culled
 // for lying entirely outside its clip bounds (a row scrolled out of view) — the
 // keyboard-focused node is exempt so the AT cursor is not dropped. table is the
-// nearest enclosing grid (#988), threaded down so cells learn their owning
+// nearest enclosing grid (pre-rebrand tracker #988), threaded down so cells learn their owning
 // Table's exported path at any nesting depth. Caller holds p.mu.
 func (p *atspiProvider) reconcileNodeLocked(rc *atspiReconcile, sn *accessibility.Node, parent, table *atspiNode) *atspiNode {
 	focused := a11yNodeFocused(sn, rc.focusedObj, rc.activeDescendant)
@@ -323,7 +323,7 @@ func (p *atspiProvider) reconcileNodeLocked(rc *atspiReconcile, sn *accessibilit
 	}
 	p.setChildrenLocked(n, childPaths, rc.events)
 
-	// Tree outline (#988): rows are flat siblings with levels; derive their
+	// Tree outline (pre-rebrand tracker #988): rows are flat siblings with levels; derive their
 	// NODE_CHILD_OF / NODE_PARENT_OF relations once the child list is final.
 	if n.role == atspiRoleTree {
 		p.computeTreeRelationsLocked(n)
@@ -340,7 +340,7 @@ func (p *atspiProvider) nodeForLocked(rc *atspiReconcile, sn *accessibility.Node
 		if n, ok := rc.ws.virtual[sn.NodeID]; ok {
 			return n
 		}
-		// A cell realized on demand (#988) that scrolled into view: promote it
+		// A cell realized on demand (pre-rebrand tracker #988) that scrolled into view: promote it
 		// into the reconcile-owned map so its exported path — and the AT
 		// cursor on it — survive the realize→visible transition. It leaves the
 		// realized cache and reconciles normally from here.
@@ -381,7 +381,7 @@ func (p *atspiProvider) newNodeLocked(w *window) *atspiNode {
 }
 
 // applyNodeLocked maps a semantic node's fields onto its exported object.
-// table is the nearest enclosing grid (nil outside one), for TableCell (#988).
+// table is the nearest enclosing grid (nil outside one), for TableCell (pre-rebrand tracker #988).
 func (p *atspiProvider) applyNodeLocked(rc *atspiReconcile, n *atspiNode, sn *accessibility.Node, parent, table *atspiNode, focused bool) {
 	n.role, n.roleName = atspiRole(sn.Role)
 	n.name = sn.Label

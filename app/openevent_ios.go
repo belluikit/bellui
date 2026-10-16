@@ -6,7 +6,7 @@ import (
 	mobileapp "github.com/belluikit/bellui/internal/driver/mobile/app"
 )
 
-// platformLaunchOpen wires the iOS "open with" seam (fyne#622) to the shared
+// platformLaunchOpen wires the iOS "open with" seam (pre-rebrand tracker #622) to the shared
 // open-event delivery. The mobile driver reports the URL from
 // application:openURL: (custom scheme or file://) or continueUserActivity: (a
 // Universal Link) — buffered until now if it arrived as the launch URL — which

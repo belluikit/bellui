@@ -164,7 +164,7 @@ func (l *List) RefreshItem(id ListItemID) {
 
 // focusedItemObject returns the realized listItem for the currently focused row,
 // or nil when it is not currently laid out. It lets keyboard activation report
-// the same item object the pointer path hit-tests (#834).
+// the same item object the pointer path hit-tests (pre-rebrand tracker #834).
 func (l *List) focusedItemObject() core.CanvasObject {
 	if l.scroller == nil {
 		return nil
@@ -338,7 +338,7 @@ func (l *List) TypedKey(ev *event.KeyEvent) {
 		l.Select(l.currentFocus)
 		// Keyboard activation targets the focused item; report the realized
 		// item object (not the List) so autocapture sees RoleListItem, matching
-		// the pointer path which hit-tests the item (#834, #700).
+		// the pointer path which hit-tests the item (pre-rebrand tracker #834, pre-rebrand tracker #700).
 		if item := l.focusedItemObject(); item != nil {
 			core.NotifyActivation(item, true)
 		}

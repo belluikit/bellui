@@ -6,7 +6,7 @@ import (
 	"github.com/belluikit/webgpu/wgpu"
 )
 
-// Persistent full-canvas FBO for dirty-region culling (#202), implementing
+// Persistent full-canvas FBO for dirty-region culling (pre-rebrand tracker #202), implementing
 // gpu.DirtyRegionPainter. It mirrors internal/painter/gl/canvas_fbo.go but maps
 // onto the Device's render-target stack: content is rendered into a persistent
 // off-screen texture (kept across frames so partial repaints can retain pixels
@@ -53,7 +53,7 @@ func (p *painter) EnsureCanvasFBO(pixW, pixH int) {
 // After a mobile background→resume the persistent off-screen FBO stops retaining
 // its contents across frames on tiled GPUs (LoadOp=Load loads undefined even for a
 // freshly allocated texture), so any frame that redraws only a dirty region loses
-// all the retained pixels and static UI flickers/vanishes (#342). Falling back to
+// all the retained pixels and static UI flickers/vanishes (pre-rebrand tracker #342). Falling back to
 // full repaint — which never relies on retention and is already the safe default —
 // keeps rendering correct at the cost of the optimization for the rest of the
 // session.
@@ -133,7 +133,7 @@ func (p *painter) HasCanvasFBO() bool {
 // CanvasFBONeedsFullClear reports that the FBO must be cleared fully this frame:
 // either it was just created/resized (no valid previous content), or FBO
 // retention has been marked unreliable after a resume so partial repaint is
-// disabled for the rest of the session (#342).
+// disabled for the rest of the session (pre-rebrand tracker #342).
 func (p *painter) CanvasFBONeedsFullClear() bool {
 	return p.fboRetentionUnreliable || (p.canvasFBO != nil && !p.canvasFBO.initialClear)
 }

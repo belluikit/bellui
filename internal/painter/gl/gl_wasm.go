@@ -270,7 +270,7 @@ func (p *painter) enableAttribArrays(pState ProgramState, names ...string) {
 // later draw leaves an enabled attribute unfed. We track which attribute
 // locations are enabled and which were fed since the last UseProgram, and
 // disable any enabled-but-unfed array right before each draw — giving WebGL the
-// per-draw vertex-attribute state it requires. See trendvidia/fyne#102.
+// per-draw vertex-attribute state it requires. See pre-rebrand tracker #102.
 type xjsContext struct {
 	enabledAttribs map[Attribute]bool // attribute arrays currently enabled in GL
 	fedAttribs     map[Attribute]bool // attributes given a buffer since the last UseProgram

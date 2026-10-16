@@ -343,7 +343,7 @@ func TestEntry_CursorColumn_Wrap2(t *testing.T) {
 
 	w := test.NewTempWindow(t, entry)
 	// Window sizes are 2dp wider than they historically were: the viewport
-	// now sits inside the background box (#467), and the extra width keeps
+	// now sits inside the background box (pre-rebrand tracker #467), and the extra width keeps
 	// the text wrapping at the exact columns this scenario asserts.
 	w.Resize(geo.NewSize(68, 64))
 
@@ -1133,7 +1133,7 @@ func TestEntry_PageUpDown(t *testing.T) {
 
 func TestEntry_DocumentJump(t *testing.T) {
 	// Ctrl+Home/Ctrl+End (Cmd+ArrowUp/ArrowDown on macOS) jump to document
-	// start/end, with Shift variants extending the selection (#377).
+	// start/end, with Shift variants extending the selection (pre-rebrand tracker #377).
 	docStart := event.KeyHome
 	docEnd := event.KeyEnd
 	if runtime.GOOS == "darwin" {
@@ -1213,7 +1213,7 @@ func TestEntry_PasteUnicode(t *testing.T) {
 
 // flavorClipboard is a test clipboard implementing the optional flavor
 // interfaces (bellui.HTMLClipboard + bellui.ImageClipboard) so Entry's
-// assert-and-degrade paste path (#581) can be exercised.
+// assert-and-degrade paste path (pre-rebrand tracker #581) can be exercised.
 type flavorClipboard struct {
 	content string
 	html    string
@@ -1239,7 +1239,7 @@ var (
 
 // TestEntry_PasteHTMLFlavor: a clipboard carrying an HTML flavor pastes the
 // plain-text fallback into the plain-text Entry — it never parses/strips the
-// markup itself (rich HTML paste is #648).
+// markup itself (rich HTML paste is pre-rebrand tracker #648).
 func TestEntry_PasteHTMLFlavor(t *testing.T) {
 	e := widget.NewEntry()
 
@@ -1251,7 +1251,7 @@ func TestEntry_PasteHTMLFlavor(t *testing.T) {
 }
 
 // TestEntry_PasteImageFlavorNoOp: an image-only clipboard (Content() == "")
-// pastes nothing into a plain Entry and does not panic (image paste is #648).
+// pastes nothing into a plain Entry and does not panic (image paste is pre-rebrand tracker #648).
 func TestEntry_PasteImageFlavorNoOp(t *testing.T) {
 	e := widget.NewEntry()
 	e.SetText("keep")
@@ -1895,7 +1895,7 @@ func TestEntry_Submit(t *testing.T) {
 }
 
 // TestEntry_OnEscape: Escape fires the cancel hook — the counterpart of
-// OnSubmitted for dismissing an inline editor (#1052).
+// OnSubmitted for dismissing an inline editor (pre-rebrand tracker #1052).
 func TestEntry_OnEscape(t *testing.T) {
 	t.Run("Callback", func(t *testing.T) {
 		escaped := 0

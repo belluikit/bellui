@@ -121,7 +121,7 @@ func newLinkController(e *Editor) *linkController {
 // tracked from the window's key callbacks (and pointer events on the web
 // target), so it is current regardless of which widget (if any) has focus.
 // The GLFW driver implements [desktop.KeyModifierDriver] on desktop AND wasm
-// (fyne#460, since v1.0). ok is false when the running driver has no such
+// (pre-rebrand tracker #460, since v1.0). ok is false when the running driver has no such
 // state (mobile, tests), in which case the caller keeps the Entry-focused
 // KeyDown/Up tracking.
 func driverKeyModifiers() (event.KeyModifier, bool) {
@@ -136,7 +136,7 @@ func driverKeyModifiers() (event.KeyModifier, bool) {
 }
 
 // watchModifiers subscribes to the driver's modifier-change notifications
-// (#155, fyne#460): pressing or releasing Cmd/Ctrl re-evaluates the link at
+// (pre-rebrand tracker #155, pre-rebrand tracker #460): pressing or releasing Cmd/Ctrl re-evaluates the link at
 // the pointer's resting position the moment it happens — no hover-move
 // polling lag — regardless of focus, in the browser too. It returns the
 // listener's remove func, or nil when the driver has no modifier tracking
@@ -180,10 +180,10 @@ func (l *linkController) onMouseMoved(pos geo.Position) {
 }
 
 // syncModifierState refreshes modDown from the driver's window-wide modifier
-// state (#132), so a Cmd/Ctrl-hover lights links while the editor is UNFOCUSED
+// state (pre-rebrand tracker #132), so a Cmd/Ctrl-hover lights links while the editor is UNFOCUSED
 // — the Entry KeyDown/Up tracking only observes the modifier with focus. When
 // the driver cannot report modifiers (mobile/tests) the tracked state stands.
-// With the modifier-change listener registered (watchModifiers, #155) this
+// With the modifier-change listener registered (watchModifiers, pre-rebrand tracker #155) this
 // per-move sync is a cheap belt-and-braces re-read of the same state — the
 // listener already reacts to presses/releases the instant they happen.
 func (l *linkController) syncModifierState() {

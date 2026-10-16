@@ -27,7 +27,7 @@ var (
 
 // AccessibleRole returns [core.RoleGroup]: a range slider is a container of two
 // independently adjustable thumbs — the low and high sliders — each exposed as
-// its own accessible child ([rangeSliderThumb], #810) rather than a single
+// its own accessible child ([rangeSliderThumb], pre-rebrand tracker #810) rather than a single
 // slider. Mobile screen readers flatten the group away and surface the two thumb
 // sliders directly; desktop screen readers present them within the group.
 func (s *RangeSlider) AccessibleRole() core.AccessibleRole { return core.RoleGroup }
@@ -76,7 +76,7 @@ func (s *RangeSlider) adjustThumb(high bool, delta float64) {
 
 // rangeSliderThumb is an accessibility-only proxy for one thumb of a
 // [RangeSlider], exposing the low and high thumbs as two independently
-// adjustable sliders (#810). The earlier single-node model moved an "active"
+// adjustable sliders (pre-rebrand tracker #810). The earlier single-node model moved an "active"
 // thumb and switched it with the primary activation, but Android/TalkBack offers
 // no double-tap-activate on a seek control, so the switch was unreachable and the
 // second thumb could not be adjusted. Two child sliders need no mode switch and
@@ -654,7 +654,7 @@ type rangeSliderRenderer struct {
 	// focusIndicator is drawn behind whichever thumb the arrow keys move, so a
 	// keyboard user can see which of the two they are adjusting.
 	focusIndicator *canvas.Circle
-	// Accessibility-only proxies positioned over each thumb (#810).
+	// Accessibility-only proxies positioned over each thumb (pre-rebrand tracker #810).
 	lowProxy, highProxy *rangeSliderThumb
 	slider              *RangeSlider
 }
@@ -720,7 +720,7 @@ func (r *rangeSliderRenderer) Layout(size geo.Size) {
 	}
 
 	// Keep the accessibility proxies aligned with their thumbs so a screen
-	// reader's focus lands on each thumb (#810).
+	// reader's focus lands on each thumb (pre-rebrand tracker #810).
 	r.lowProxy.Move(r.lowThumb.Position())
 	r.lowProxy.Resize(r.lowThumb.Size())
 	r.highProxy.Move(r.highThumb.Position())

@@ -425,7 +425,7 @@ func TestGlCanvas_PixelCoordinateAtPosition(t *testing.T) {
 	assert.Equal(t, 20, y)
 }
 
-// TODO: this can be removed when #707 is addressed
+// TODO: this can be removed when pre-rebrand tracker #707 is addressed
 func TestGlCanvas_ResizeWithOtherOverlay(t *testing.T) {
 	w := createWindow("Test")
 	w.SetPadded(false)
@@ -438,7 +438,7 @@ func TestGlCanvas_ResizeWithOtherOverlay(t *testing.T) {
 		c.Overlays().Add(over)
 	})
 	ensureCanvasSize(t, w, geo.NewSize(69, 36))
-	// TODO: address #707; overlays should always be canvas size
+	// TODO: address pre-rebrand tracker #707; overlays should always be canvas size
 	size := w.Canvas().Size()
 	runOnMain(func() {
 		over.Resize(size)
@@ -489,7 +489,7 @@ func TestGlCanvas_ResizeWithOverlays(t *testing.T) {
 	assert.Equal(t, size, o3.Size(), "canvas overlay 3 is resized")
 }
 
-// TODO: this can be removed when #707 is addressed
+// TODO: this can be removed when pre-rebrand tracker #707 is addressed
 func TestGlCanvas_ResizeWithPopUpOverlay(t *testing.T) {
 	w := createWindow("Test")
 	w.SetPadded(false)

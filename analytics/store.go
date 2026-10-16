@@ -43,7 +43,7 @@ func (s *BelluiStore) Save(data []byte) error {
 	// bellui.Storage.Save only reopens an *existing* document (it returns
 	// ErrNotExists otherwise), so the very first checkpoint must Create the
 	// spool file. Without this the spool is never written and crash-safe
-	// spooling / next-launch drain silently never happen (#699).
+	// spooling / next-launch drain silently never happen (pre-rebrand tracker #699).
 	w, err := s.storage.Save(s.name)
 	if errors.Is(err, storage.ErrNotExists) {
 		w, err = s.storage.Create(s.name)

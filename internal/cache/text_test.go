@@ -26,7 +26,7 @@ func TestTextCacheGet(t *testing.T) {
 
 // TestThemeCacheGeneration verifies the generation counter is bumped by every
 // ResetThemeCaches so a widget-level measurement memo can invalidate in lock-step
-// with the global metrics cache (#896).
+// with the global metrics cache (pre-rebrand tracker #896).
 func TestThemeCacheGeneration(t *testing.T) {
 	before := ThemeCacheGeneration()
 	ResetThemeCaches()
@@ -40,7 +40,7 @@ func TestThemeCacheGeneration(t *testing.T) {
 
 // TestTextCacheKeyShapingFields ensures TextStyle fields that influence shaping
 // (and thus measurement) are part of the cache key, so styles differing only by
-// one of them do not collide. Covers Direction (#70) and Language (#22).
+// one of them do not collide. Covers Direction (pre-rebrand tracker #70) and Language (pre-rebrand tracker #22).
 func TestTextCacheKeyShapingFields(t *testing.T) {
 	ResetThemeCaches()
 
@@ -65,7 +65,7 @@ func TestTextCacheKeyShapingFields(t *testing.T) {
 
 // TestTextCacheKeyDecorations guards that the underline and strikethrough
 // decoration bits are part of the cache key, so a toggled decoration is not
-// served a stale texture from an otherwise-identical entry (the #70 lesson).
+// served a stale texture from an otherwise-identical entry (the pre-rebrand tracker #70 lesson).
 func TestTextCacheKeyDecorations(t *testing.T) {
 	ResetThemeCaches()
 

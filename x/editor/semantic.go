@@ -112,7 +112,7 @@ func DefaultSemanticStyles() map[string]bellui.ThemeColorName {
 
 // semanticOverlay holds the published whole-document foreground overlay and
 // builds the per-row [widget.StyleRun] tiling the fork composites over the line
-// highlighter (fork StyleOverlayForRow, trendvidia/fyne#1079). It is pull-based:
+// highlighter (fork StyleOverlayForRow, pre-rebrand tracker #1079). It is pull-based:
 // the fork calls runsForRow only for the rows it materialises, so cost is
 // O(tokens on the visible rows), not O(document).
 type semanticOverlay struct {

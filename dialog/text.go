@@ -35,7 +35,7 @@ func newTextDialog(title, message string, icon bellui.Resource, parent bellui.Wi
 // - maxTextDialogAbsoluteWidth
 // - current window width * maxTextDialogWinPcntWidth
 func createBeforeShowHook(d *dialog, message string) func() {
-	// Until issue #4648 is resolved, we need to create a label here
+	// Until pre-rebrand issue #4648 is resolved, we need to create a label here
 	// rather than just using bellui.MeasureText, because the label's minsize
 	// also depends on the internal padding that label adds, which is unknown here
 	noWrapWidth := widget.NewLabel(message).MinSize().Width + padWidth + theme.Padding()*2

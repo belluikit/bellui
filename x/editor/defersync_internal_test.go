@@ -114,7 +114,7 @@ func TestDeferSync_BackspaceLineJoinSyncs(t *testing.T) {
 
 // TestDeferSync_DeleteForwardAtEOLSyncs: deleting the newline at end of line
 // joins two rows with the caret static at (0, 3) — the live line-count
-// comparison (#149) catches it and syncs, even though neither the caret row
+// comparison (pre-rebrand tracker #149) catches it and syncs, even though neither the caret row
 // nor any BeforeChange flag signals it.
 func TestDeferSync_DeleteForwardAtEOLSyncs(t *testing.T) {
 	test.NewTempApp(t)
@@ -131,7 +131,7 @@ func TestDeferSync_DeleteForwardAtEOLSyncs(t *testing.T) {
 	}
 }
 
-// TestDeferSync_DeleteForwardMidRowStaysDeferred (#149): a mid-row
+// TestDeferSync_DeleteForwardMidRowStaysDeferred (pre-rebrand tracker #149): a mid-row
 // delete-forward removes no newline, so it stays deferred — before the live
 // line-count comparison every deletion synced conservatively, making
 // held-down Delete O(document) per repeat.
@@ -153,7 +153,7 @@ func TestDeferSync_DeleteForwardMidRowStaysDeferred(t *testing.T) {
 	}
 }
 
-// TestDeferSync_GutterLineCountLiveWhileDeferred (#149): the gutter's row
+// TestDeferSync_GutterLineCountLiveWhileDeferred (pre-rebrand tracker #149): the gutter's row
 // count reads the live Entry.LineCount, so it is exact even while the Text
 // field is stale between sync points.
 func TestDeferSync_GutterLineCountLiveWhileDeferred(t *testing.T) {
@@ -324,7 +324,7 @@ func TestDeferSync_OffByDefault(t *testing.T) {
 }
 
 // benchmarkKeystroke measures the full editor per-keystroke path (entry edit +
-// OnChanged pipeline when it fires) on a ~1 MB, 50k-line document — the #129
+// OnChanged pipeline when it fires) on a ~1 MB, 50k-line document — the pre-rebrand tracker #129
 // latency check comparing deferred and default modes.
 func benchmarkKeystroke(b *testing.B, deferSync bool) {
 	test.NewTempApp(b)
@@ -347,7 +347,7 @@ func BenchmarkKeystroke_Deferred(b *testing.B) { benchmarkKeystroke(b, true) }
 func BenchmarkKeystroke_Default(b *testing.B)  { benchmarkKeystroke(b, false) }
 
 // benchmarkBackspace measures held-down Backspace through normal-length rows
-// (line joins included) — the #149 case: with the live line-count comparison
+// (line joins included) — the pre-rebrand tracker #149 case: with the live line-count comparison
 // replacing the conservative any-deletion sync, only the presses that
 // actually remove a newline materialize; the mid-row majority stays O(edit).
 // The default mode materializes the whole document on every press.

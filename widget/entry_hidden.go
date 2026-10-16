@@ -17,7 +17,7 @@ func (e *Entry) skipHiddenRowForKey(key event.KeyName) {
 }
 
 // skipHiddenRow moves the caret off a folded row onto the nearest visible row in
-// the direction of travel (#141): dir > 0 (down / forward) lands on the first
+// the direction of travel (pre-rebrand tracker #141): dir > 0 (down / forward) lands on the first
 // visible row after the fold, dir <= 0 (up / backward) on the last visible row
 // before it. The column is clamped to the destination row. It is a no-op when no
 // rows are folded or the caret is already on a visible row.

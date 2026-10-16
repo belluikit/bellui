@@ -37,7 +37,7 @@ type PopUp struct {
 	innerSize         geo.Size
 	modal             bool
 	modalDismissOnTap bool // when true, modal popups dismiss on outside tap (for drawers)
-	passThrough       bool // when true, input outside the content passes to the UI beneath (#569)
+	passThrough       bool // when true, input outside the content passes to the UI beneath (pre-rebrand tracker #569)
 	overlayShown      bool
 	bgColor           color.Color // custom background color; nil = use overlay background
 	noPadding         bool        // when true, skip inner padding (used for tooltips)
@@ -76,7 +76,7 @@ func (p *PopUp) Hide() {
 }
 
 // PassesInputThrough marks pass-through pop-ups (transient surfaces like
-// Toast and Snackbar, #569) as input-transparent for the driver hit tests
+// Toast and Snackbar, pre-rebrand tracker #569) as input-transparent for the driver hit tests
 // and the canvas focus routing: taps, scrolls and keyboard input outside
 // the content reach the UI beneath as if the pop-up were not there, per the
 // MD3 rule that transient notifications never block interaction. Taps on

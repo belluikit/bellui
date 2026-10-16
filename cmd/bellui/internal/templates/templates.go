@@ -66,6 +66,6 @@ var (
 
 	// WebServiceWorker is the notification service worker served alongside the web
 	// package; it renders rich-notification action buttons and forwards clicks to
-	// the app (#724).
+	// the app (pre-rebrand tracker #724).
 	WebServiceWorker = belluiServiceWorker
 )

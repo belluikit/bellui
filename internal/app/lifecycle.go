@@ -89,7 +89,7 @@ func (l *Lifecycle) OnStopped() func() {
 
 // DestroyEventQueue destroys the event queue. A no-op when the queue was
 // never initialized — driver initialization can fail before the queue exists,
-// and shutdown must not panic on top of the real error (#470).
+// and shutdown must not panic on top of the real error (pre-rebrand tracker #470).
 func (l *Lifecycle) DestroyEventQueue() {
 	if l.eventQueue == nil {
 		return
@@ -119,7 +119,7 @@ func (l *Lifecycle) RunEventQueue(run func(func(), bool)) {
 
 // WaitForEvents wait for all the events. A no-op when the queue was never
 // initialized: there is nothing to drain, and an init-failed driver's
-// shutdown path must exit cleanly instead of dereferencing a nil queue (#470).
+// shutdown path must exit cleanly instead of dereferencing a nil queue (pre-rebrand tracker #470).
 func (l *Lifecycle) WaitForEvents() {
 	if l.eventQueue == nil {
 		return

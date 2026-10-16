@@ -35,7 +35,7 @@ func TestFormatList_Locale(t *testing.T) {
 }
 
 // TestFormatList_LocaleCoverage locks in the CLDR list connectors for every
-// bundled locale (#860) — the conjunction word and separator are per-locale
+// bundled locale (pre-rebrand tracker #860) — the conjunction word and separator are per-locale
 // data, so a regression here means the wrong language is rendered. Values are
 // the CLDR "standard" list patterns; " "/" " are the non-breaking and
 // narrow-no-break spaces CLDR mandates for cs/fr.
@@ -69,7 +69,7 @@ func TestFormatList_LocaleCoverage(t *testing.T) {
 
 // TestFormatUnit_LocaleCoverage spot-checks locales whose unit labels are NOT
 // the international abbreviation — Cyrillic км, Greek χλμ., Chinese 公里, Tamil
-// கி.மீ., French narrow-NBSP (#860).
+// கி.மீ., French narrow-NBSP (pre-rebrand tracker #860).
 func TestFormatUnit_LocaleCoverage(t *testing.T) {
 	for _, tt := range []struct {
 		locale string

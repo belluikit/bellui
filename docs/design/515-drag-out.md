@@ -1,17 +1,17 @@
-# #515 Part B — Drag-out to other applications (design + macOS spike)
+# pre-rebrand tracker #515 Part B — Drag-out to other applications (design + macOS spike)
 
 Status: **spike** — public API defined, macOS proof implemented, Windows/Linux
-designed-on-paper. Tracks bellui #515 Part B.
+designed-on-paper. Tracks bellui pre-rebrand tracker #515 Part B.
 
 ## Problem
 
 Bellui's drag-and-drop is receive-only: `bellui.Droppable` / `DroppableWindow`
-deliver OS file drops *into* a widget/window (#515 Part A, shipped). There is no
+deliver OS file drops *into* a widget/window (pre-rebrand tracker #515 Part A, shipped). There is no
 way to drag a file, a text selection, or an image *out* of a bellui app into
 Finder/Explorer, a text editor, or a browser. GLFW exposes **no drag-source
 API**, so every backend must be hand-rolled against the native window handle —
-the same way the fork already hand-rolls clipboard flavors (#513), native file
-dialogs (#514) and window modality (#498) via `RunNative`.
+the same way the fork already hand-rolls clipboard flavors (pre-rebrand tracker #513), native file
+dialogs (pre-rebrand tracker #514) and window modality (pre-rebrand tracker #498) via `RunNative`.
 
 This is the outbound counterpart of the inbound `Droppable`.
 
@@ -93,12 +93,12 @@ drag, so bellui's event loop is not stalled.
 - `DoDragDrop(pDataObject, pDropSource, effects, &effect)` **blocks in a modal
   loop** until the drop completes — so it must NOT run on the render/UI thread.
   Run it on a dedicated `runtime.LockOSThread` goroutine that `OleInitialize`s
-  (STA), exactly like the #514 native-dialog COM thread; marshal the result back
+  (STA), exactly like the pre-rebrand tracker #514 native-dialog COM thread; marshal the result back
   with `bellui.Do`.
 - Implement `IDataObject` (SetData `CF_HDROP` for files, `CF_UNICODETEXT` for
   text, `CF_DIB`/`"PNG"` for image — reuse the `internal/clipboard` DIB/PNG
-  codecs from #513) and a minimal `IDropSource` (`QueryContinueDrag` /
-  `GiveFeedback`). cgo-free via `x/sys/windows` COM syscalls, as #514 did for the
+  codecs from pre-rebrand tracker #513) and a minimal `IDropSource` (`QueryContinueDrag` /
+  `GiveFeedback`). cgo-free via `x/sys/windows` COM syscalls, as pre-rebrand tracker #514 did for the
   file dialog.
 - The drag image uses `IDragSourceHelper::InitializeFromBitmap`.
 
@@ -109,16 +109,16 @@ drag, so bellui's event loop is not stalled.
   window under the pointer (found by walking from the root), answer
   `XdndStatus`, serve `SelectionRequest` for the negotiated MIME types
   (`text/uri-list`, `text/plain;charset=utf-8`, `image/png`) — the same MIME
-  codecs as the #513 clipboard.
+  codecs as the pre-rebrand tracker #513 clipboard.
 - Needs the X11 `Display`/`Window` from the glfw fork's `GetX11Window/Display`
-  (already used by #513/#598). A grab + motion-tracking loop drives it.
+  (already used by pre-rebrand tracker #513/#598). A grab + motion-tracking loop drives it.
 
 ### Wayland — `wl_data_device.start_drag` (design)
 
 - Create a `wl_data_source`, `offer` each MIME type, `wl_data_device.start_drag`
   with the origin surface + an icon surface, and answer the `send` events with
   the payload. Needs a serial from a real input event (the mouse-down) — same
-  focus/serial constraint as the #513 Wayland clipboard. Route through the glfw
+  focus/serial constraint as the pre-rebrand tracker #513 Wayland clipboard. Route through the glfw
   fork's Wayland accessors.
 
 ## Threading & lifecycle
@@ -127,10 +127,10 @@ drag, so bellui's event loop is not stalled.
   (AppKit / the compositor drive the drag); **Windows blocks**, so it offloads
   to a dedicated COM-STA goroutine and reports completion via `bellui.Do`.
 - The drag image is supplied by `DragData.Image` (already an `image.Image`); a
-  future refinement can render a `core.CanvasObject` ghost (the #819
+  future refinement can render a `core.CanvasObject` ghost (the pre-rebrand tracker #819
   `DragImageProvider` shape) to an image and reuse it here.
 
-## Completion reporting (#841, done)
+## Completion reporting (pre-rebrand tracker #841, done)
 
 `DragData.OnCompleted func(accepted bool)` reports the final drop outcome,
 fired on the main goroutine via `bellui.Do`. The shared
@@ -142,34 +142,34 @@ calls it from its native completion signal:
 `cancelled` (Wayland), `XdndFinished` (X11). `accepted` is true when the
 operation is anything other than none.
 
-## CanvasObject drag image (#842, done)
+## CanvasObject drag image (pre-rebrand tracker #842, done)
 
 `DragData.DragImageObject core.CanvasObject` bridges the in-canvas drag ghost
-(#819 `core.DragImageProvider`): the shared `StartDragging` software-renders it
+(pre-rebrand tracker #819 `core.DragImageProvider`): the shared `StartDragging` software-renders it
 (`driver/software.Render`) to supply the drag image when `DragData.Image` is
 nil, so a widget declares one drag visual for both in-canvas DnD and drag-out.
 A raw `Image` always wins.
 
 ## Composition
 
-- Complements the inbound `bellui.Droppable` (#515 Part A) — an app can be both a
+- Complements the inbound `bellui.Droppable` (pre-rebrand tracker #515 Part A) — an app can be both a
   drop target and a drag source.
-- Reuses the #513 clipboard-flavor payload codecs (uri-list, DIB/PNG) on
+- Reuses the pre-rebrand tracker #513 clipboard-flavor payload codecs (uri-list, DIB/PNG) on
   Windows/Linux, so the flavor encoders have one definition.
 
 ## Follow-ups
 
-- **Windows `DoDragDrop`** (OLE, COM-STA thread) — #837.
-- **Linux X11 XDND source** — #838.
-- **Linux Wayland `wl_data_device.start_drag`** — #838.
-- ~~Completion callback (`DragData.OnCompleted`)~~ — done (#841).
-- ~~`core.CanvasObject` drag-image rendering (bridge to #819 `DragImageProvider`)~~ — done (#842).
-- Human GUI verification of the macOS proof (drag into Finder / TextEdit) — #843.
+- **Windows `DoDragDrop`** (OLE, COM-STA thread) — pre-rebrand tracker #837.
+- **Linux X11 XDND source** — pre-rebrand tracker #838.
+- **Linux Wayland `wl_data_device.start_drag`** — pre-rebrand tracker #838.
+- ~~Completion callback (`DragData.OnCompleted`)~~ — done (pre-rebrand tracker #841).
+- ~~`core.CanvasObject` drag-image rendering (bridge to pre-rebrand tracker #819 `DragImageProvider`)~~ — done (pre-rebrand tracker #842).
+- Human GUI verification of the macOS proof (drag into Finder / TextEdit) — pre-rebrand tracker #843.
 
 ### Platform backend files
 
 `startNativeDrag` is partitioned per GOOS so each backend owns one file:
-`dragsource_darwin.{go,m,h}` (done), `dragsource_windows.go` (#837),
-`dragsource_linux.go` (#838), and `dragsource_other.go`
+`dragsource_darwin.{go,m,h}` (done), `dragsource_windows.go` (pre-rebrand tracker #837),
+`dragsource_linux.go` (pre-rebrand tracker #838), and `dragsource_other.go`
 (`(!darwin || ios || wasm || js) && !windows && !linux`) declining on every
 other platform (ios/wasm/js and the BSDs — a later XDND follow-up).

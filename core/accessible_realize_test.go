@@ -9,7 +9,7 @@ import (
 )
 
 // fakeVirtualGrid is a rows×cols virtualized grid that realizes off-viewport
-// cells on demand — the shape a real DataGrid adapter (#637) implements. It
+// cells on demand — the shape a real DataGrid adapter (pre-rebrand tracker #637) implements. It
 // backs the whole extent by a formula rather than materialized objects, proving
 // AccessibleRealizeCell can answer for any coordinate without a per-cell object.
 type fakeVirtualGrid struct {

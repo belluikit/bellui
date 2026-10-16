@@ -321,7 +321,7 @@ func Test_canvas_Tapped(t *testing.T) {
 
 func Test_canvas_LongPressToolTip(t *testing.T) {
 	// Capture the driver-level tooltip seam so the assertions don't wait on the
-	// real controller's 500ms show delay (#827).
+	// real controller's 500ms show delay (pre-rebrand tracker #827).
 	origShow, origHide := core.ShowToolTip, core.HideToolTip
 	t.Cleanup(func() { core.ShowToolTip, core.HideToolTip = origShow, origHide })
 	var shown core.CanvasObject

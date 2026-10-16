@@ -37,7 +37,7 @@ func mixedBlockSegments(paras int) []RichTextSegment {
 	return segs
 }
 
-// TestRichText_BlockLazy_ShapeMatchesDense is the core correctness guarantee (#317):
+// TestRichText_BlockLazy_ShapeMatchesDense is the core correctness guarantee (pre-rebrand tracker #317):
 // shaping every block on demand must reproduce the dense build's rowBounds exactly
 // (begin/end/ellipsis/firstSegmentReuse and segment identity), so the windowed build
 // renders identically.
@@ -127,7 +127,7 @@ func TestRichText_BlockLazy_WindowedBuild(t *testing.T) {
 	assert.Less(t, len(r.origObjs), 400, "windowed object count")
 }
 
-// TestRichText_BlockLazy_NonASCIIBuildIsLazy guards the #313/#317 interaction: the
+// TestRichText_BlockLazy_NonASCIIBuildIsLazy guards the pre-rebrand tracker #313/#317 interaction: the
 // cold build must not shape per block even for non-ASCII (CJK) content, where line
 // height cannot be served from the ASCII style cache. Heights are estimated from the
 // style's ASCII proxy and only the viewport's blocks are shaped on demand.

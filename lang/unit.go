@@ -116,7 +116,7 @@ var mileRegions = map[string]bool{
 // FormatDistance renders a distance given in **metres** using the current
 // locale's measurement system, converting the magnitude and picking a size-
 // appropriate unit — so callers don't hand-roll the km-vs-mi + conversion dance
-// that FormatUnit alone leaves to them (#861). Metric locales get metres below
+// that FormatUnit alone leaves to them (pre-rebrand tracker #861). Metric locales get metres below
 // 1 km and kilometres above; imperial locales (see PreferredLengthUnit) get feet
 // below 1 mile and miles above. The converted value is rounded to two decimals.
 //
@@ -135,7 +135,7 @@ func FormatDistance(meters float64) string {
 }
 
 // FormatMass renders a mass given in **grams** using the current locale's
-// measurement system (#861): imperial locales (US/GB/LR/MM) get pounds; metric
+// measurement system (pre-rebrand tracker #861): imperial locales (US/GB/LR/MM) get pounds; metric
 // locales get grams below 1 kg and kilograms above. The converted value is
 // rounded to two decimals.
 //

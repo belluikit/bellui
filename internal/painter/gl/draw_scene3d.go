@@ -38,7 +38,7 @@ func (p *painter) drawScene3D(scene *canvas.Scene3D, pos geo.Position, frame geo
 		// attachSceneDepth, which is platform-specific: a depth texture on
 		// desktop/mobile GL, but a depth renderbuffer on WebGL 1.0 where depth
 		// textures need the WEBGL_depth_texture extension and would otherwise
-		// leave the FBO incomplete (#136). The depth buffer is only used for
+		// leave the FBO incomplete (pre-rebrand tracker #136). The depth buffer is only used for
 		// z-buffering this pass and is never sampled.
 		fbo := p.ctx.CreateFramebuffer()
 

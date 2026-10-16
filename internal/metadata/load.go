@@ -23,7 +23,7 @@ const ManifestFile = "manifest.pxf"
 // schema does not model. The runtime only reads a handful of known fields (ID,
 // name, version, build, icon), so an unrecognised extension field must not fail
 // the whole load — otherwise the best-effort dev-mode fallback in
-// app.checkLocalMetadata would spam a parse error on every launch (#1020). The
+// app.checkLocalMetadata would spam a parse error on every launch (pre-rebrand tracker #1020). The
 // strict, schema-validating loader used by the packaging CLI lives in a
 // separate copy (cmd/bellui/internal/metadata) and is unaffected.
 func Load(r io.Reader) (*BelluiApp, error) {

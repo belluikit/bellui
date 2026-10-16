@@ -63,7 +63,7 @@ func (w *window) doSetParentNative(parent *window) {
 // Wayland it drives xdg_dialog_v1 (compositors without the protocol leave the
 // scrim as the only blocker) — both via the glfw fork. Modality is expressed
 // against the owner, so a nil parent is a no-op. Must run on the main goroutine
-// (#498).
+// (pre-rebrand tracker #498).
 func (w *window) doSetModalNative(parent *window, modal bool) {
 	if parent == nil {
 		return

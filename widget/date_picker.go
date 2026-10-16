@@ -27,7 +27,7 @@ type DatePicker struct {
 	viewing time.Time // month being displayed
 
 	focused bool
-	cursor  time.Time // keyboard focus within the day grid (#534)
+	cursor  time.Time // keyboard focus within the day grid (pre-rebrand tracker #534)
 }
 
 var _ event.Focusable = (*DatePicker)(nil)
@@ -238,7 +238,7 @@ func ShowDatePicker(selected time.Time, changed func(time.Time), c core.Canvas) 
 // --- internal types ---
 
 // dateDayCell is one day in the calendar grid: a tappable, accessible
-// widget so screen readers can reach and activate individual days (#521).
+// widget so screen readers can reach and activate individual days (pre-rebrand tracker #521).
 type dateDayCell struct {
 	BaseWidget
 	bg    *canvas.Circle
@@ -481,7 +481,7 @@ func (r *datePickerRenderer) Refresh() {
 				cell.label.Color = th.Color(theme.ColorNameOnSurface, v)
 			}
 			// The keyboard cursor draws a focus ring on top of any of the
-			// three looks above (#534).
+			// three looks above (pre-rebrand tracker #534).
 			if isFocused {
 				cell.bg.StrokeWidth = 2
 				cell.bg.StrokeColor = th.Color(theme.ColorNameFocus, v)

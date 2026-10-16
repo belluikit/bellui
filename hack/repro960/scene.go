@@ -1,4 +1,4 @@
-// Package main hosts the #960 repro scene: a Transform-scaled canvas.Text next
+// Package main hosts the pre-rebrand tracker #960 repro scene: a Transform-scaled canvas.Text next
 // to an untransformed Rectangle and a Transform-scaled Rectangle, laid out at
 // explicit (non-zero) positions so any position-dependent transform error is
 // visible. The three cases together answer: is the fault text-specific or
@@ -33,7 +33,7 @@ func label(s string, pos geo.Position) *canvas.Text {
 }
 
 // scaledText returns a canvas.Text at pos with a Scale(reproScale) transform —
-// the exact construct the #942 loupe used and the primary suspect.
+// the exact construct the pre-rebrand tracker #942 loupe used and the primary suspect.
 func scaledText(s string, pos geo.Position, clr color.Color) *canvas.Text {
 	t := canvas.NewText(s, clr)
 	t.TextSize = 20

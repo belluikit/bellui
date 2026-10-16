@@ -19,7 +19,7 @@ import (
 // interpolating them into the script body. PowerShell does not re-evaluate the
 // contents of an environment variable, so attacker-influenced notification text
 // (e.g. "$(Start-Process calc.exe)") is treated as literal data instead of an
-// expression — closing the command-injection hole (#287).
+// expression — closing the command-injection hole (pre-rebrand tracker #287).
 const notificationTemplate = `$title = $env:BELLUI_NOTIFY_TITLE
 $content = $env:BELLUI_NOTIFY_CONTENT
 $iconPath = "file:///" + $env:BELLUI_NOTIFY_ICON
@@ -51,7 +51,7 @@ func (a *belluiApp) SendNotification(n *bellui.Notification) {
 	}
 
 	// Values are passed to the script via the environment so that PowerShell
-	// treats them as inert data, never as code (#287).
+	// treats them as inert data, never as code (pre-rebrand tracker #287).
 	env := []string{
 		"BELLUI_NOTIFY_TITLE=" + n.Title,
 		"BELLUI_NOTIFY_CONTENT=" + n.Content,
@@ -69,7 +69,7 @@ type badgeDriver interface {
 }
 
 // SetBadge draws a count badge on the app's taskbar button(s) via the Windows
-// overlay-icon affordance (#706), part of the [bellui.BadgeApp] optional interface.
+// overlay-icon affordance (pre-rebrand tracker #706), part of the [bellui.BadgeApp] optional interface.
 // A count <= 0 clears it. Best-effort: unsupported drivers no-op.
 func (a *belluiApp) SetBadge(count int) {
 	if d, ok := a.Driver().(badgeDriver); ok {

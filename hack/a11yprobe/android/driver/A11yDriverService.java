@@ -13,7 +13,7 @@ import android.view.accessibility.AccessibilityNodeInfo;
 
 /**
  * Adb-driven accessibility client for exercising a11y actions that no
- * TalkBack gesture can send (the "UIA-style test service" of fyne#951).
+ * TalkBack gesture can send (the "UIA-style test service" of pre-rebrand tracker #951).
  *
  * Enable (append to any existing services, colon-separated):
  *   adb shell settings put secure enabled_accessibility_services \

@@ -4,7 +4,7 @@ package app
 
 // BELLUI_WEBGPU is defined for the Objective-C sources (darwin_ios.m) by default
 // (and absent under the -tags gl fallback), so they can #ifdef out the GLKView/GLES draw path
-// (which is the broken path on the iOS Simulator, #195). cgo merges the CFLAGS
+// (which is the broken path on the iOS Simulator, pre-rebrand tracker #195). cgo merges the CFLAGS
 // of every cgo file in the package into the C/.m compile.
 //
 // The blank line below is required: it separates this prose from the cgo

@@ -12,7 +12,7 @@ import (
 )
 
 // TestSettings_SaveLoadPXF exercises the real writer path: saveToFile writes the
-// PXF store, and app's loadFromFile reads it back (#872).
+// PXF store, and app's loadFromFile reads it back (pre-rebrand tracker #872).
 func TestSettings_SaveLoadPXF(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "settings.pxf")
@@ -40,7 +40,7 @@ func TestSettings_SaveLoadPXF(t *testing.T) {
 }
 
 // TestSettings_SaveRemovesLegacyJSON verifies a stale settings.json left by the
-// pre-#872 build is deleted once the PXF store is written.
+// before pre-rebrand tracker #872 build is deleted once the PXF store is written.
 func TestSettings_SaveRemovesLegacyJSON(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "settings.pxf")

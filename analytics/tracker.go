@@ -214,7 +214,7 @@ func (t *tracker) persistLocked() {
 	// Best-effort checkpoint. A failure here means the spool is not durable
 	// (crash-safety / next-launch drain won't work), so surface it once rather
 	// than swallowing it silently — a silent swallow hid the store creation bug
-	// in #699.
+	// in pre-rebrand tracker #699.
 	if err := t.cfg.store.Save(data); err != nil {
 		t.persistErrer.Do(func() {
 			bellui.LogError("analytics: failed to persist spool (offline durability disabled)", err)

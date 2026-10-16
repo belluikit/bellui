@@ -110,7 +110,7 @@ func (e *Editor) handleEnterAutoIndent() bool {
 
 // insertTextAtCursor inserts s at the caret (replacing any active selection) as a
 // single atomic edit: one BeforeChange gate, one undo step, and one OnChanged.
-// Entry.InsertText (fyne v2.14.0, fyne#432) is exactly that primitive; this
+// Entry.InsertText (fyne v2.14.0, pre-rebrand tracker #432) is exactly that primitive; this
 // wrapper survives as the editor's single seam for caret inserts.
 func (e *Editor) insertTextAtCursor(s string) {
 	e.entry.InsertText(s)

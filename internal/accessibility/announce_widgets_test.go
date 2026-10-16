@@ -12,7 +12,7 @@ import (
 )
 
 // The transient status widgets must push their text through the announcement
-// seam when shown (#525): a screen reader only discovers tree nodes the user
+// seam when shown (pre-rebrand tracker #525): a screen reader only discovers tree nodes the user
 // navigates to, and these auto-dismiss first.
 
 type announcement struct {

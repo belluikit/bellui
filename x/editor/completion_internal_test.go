@@ -177,7 +177,7 @@ func (p *itemProvider) Complete(_ context.Context, _, _ int, _ CompletionTrigger
 	return p.items, nil
 }
 
-// TestCompletion_ScoredLessTieBreak pins the SortProxy comparator (#165): score
+// TestCompletion_ScoredLessTieBreak pins the SortProxy comparator (pre-rebrand tracker #165): score
 // wins first, then SortText, then label — the string tie-breaks resolved by the
 // active locale's collation (lang.Compare) rather than raw byte order.
 func TestCompletion_ScoredLessTieBreak(t *testing.T) {
@@ -448,7 +448,7 @@ func TestCompletion_ParenTriggerCompletesWithoutSignatureProvider(t *testing.T) 
 }
 
 // docProvider returns a fixed candidate list, used to exercise the documentation
-// side panel (#24).
+// side panel (pre-rebrand tracker #24).
 type docProvider struct{ items []CompletionItem }
 
 func (p *docProvider) Complete(_ context.Context, _, _ int, _ CompletionTrigger) ([]CompletionItem, error) {
@@ -467,7 +467,7 @@ func (p *countingProvider) Complete(_ context.Context, _, _ int, _ CompletionTri
 	return p.items, nil
 }
 
-// Regression for the downstream symptom of #108. Before masked spans were
+// Regression for the downstream symptom of pre-rebrand tracker #108. Before masked spans were
 // atomic, a boundary insert at a masked secret's edge was the one edit inside
 // the secret region the editor allowed, so every keystroke there fired
 // OnChanged -> a completion query, flashing a popup over the secret per
@@ -506,7 +506,7 @@ func TestCompletion_MaskedSecretEdgeDoesNotTrigger(t *testing.T) {
 
 // Documentation-panel rendering (content, markdown parsing, min height,
 // selection-follow) is the fork popup's own behavior, tested in
-// widget/completion_popup_internal_test.go (fyne#435). fycoder asserts its
+// widget/completion_popup_internal_test.go (pre-rebrand tracker #435). fycoder asserts its
 // side of the contract: docs are mapped through to the popup, and the paging
 // keys are consumed exactly when a documentation panel is showing.
 
@@ -587,7 +587,7 @@ func TestCompletion_DocPanelShortcutScroll(t *testing.T) {
 	down := &desktop.CustomShortcut{KeyName: event.KeyDown, Modifier: event.KeyModifierShortcutDefault}
 
 	// The chord routes via onShortcut → handleDocScrollShortcut → scrollDoc,
-	// consumed exactly while the doc panel shows (#89).
+	// consumed exactly while the doc panel shows (pre-rebrand tracker #89).
 	if !e.handleDocScrollShortcut(down) {
 		t.Error("Ctrl/Cmd+Down should page the doc panel while it shows")
 	}

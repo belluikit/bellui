@@ -10,7 +10,7 @@ import (
 	"github.com/belluikit/bellui"
 )
 
-// Oracle tests for the richEntryDoc derived memos (#975): after every edit the
+// Oracle tests for the richEntryDoc derived memos (pre-rebrand tracker #975): after every edit the
 // patched position index and wrap-off row model must equal a from-scratch
 // recomputation over the same segments, and segAt must agree with the linear
 // reference walk it replaced.
@@ -43,7 +43,7 @@ func assertDocIndex(t *testing.T, d *richEntryDoc, step string) {
 	}
 }
 
-// docSegAtReference is the pre-#975 linear segAt.
+// docSegAtReference is the before pre-rebrand tracker #975 linear segAt.
 func docSegAtReference(d *richEntryDoc, offset int) (idx, local int) {
 	if offset < 0 {
 		offset = 0

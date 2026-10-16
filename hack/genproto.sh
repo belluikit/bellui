@@ -1,7 +1,7 @@
 #!/bin/sh
 # Regenerate every protobuf binding in the repo from its .proto source.
 #
-# Single reproducible entry point for proto codegen (#905): runs `buf generate`
+# Single reproducible entry point for proto codegen (pre-rebrand tracker #905): runs `buf generate`
 # in every directory that owns a buf.yaml/buf.gen.yaml pair, then `gofumpt -w`
 # on the output, because buf's protoc-gen-go groups imports differently from
 # gofumpt (the repo's formatter, enforced in CI) so the generated files are not

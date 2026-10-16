@@ -8,7 +8,7 @@ import (
 	"github.com/belluikit/bellui/event"
 )
 
-// TestGLDriver_KeyModifierListeners pins the #460 notification contract:
+// TestGLDriver_KeyModifierListeners pins the pre-rebrand tracker #460 notification contract:
 // listeners fire in registration order on actual state changes only, and a
 // remove function detaches exactly its own listener.
 func TestGLDriver_KeyModifierListeners(t *testing.T) {

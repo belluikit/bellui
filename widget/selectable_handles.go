@@ -12,7 +12,7 @@ import (
 )
 
 // Mobile touch text selection for the read-only selectable surfaces —
-// Label.Selectable / RichText.Selectable (#944, the #758 follow-up). A
+// Label.Selectable / RichText.Selectable (pre-rebrand tracker #944, the pre-rebrand tracker #758 follow-up). A
 // hold-fired long-press selects the word under the finger and summons the
 // shared selection-handle overlay (entry_handles.go); the release then still
 // opens the Copy context menu via TappedSecondary, per the hold-fire
@@ -52,7 +52,7 @@ func (s *selectable) LongPressed(ev *event.PointEvent) {
 }
 
 // selectWordAtCursor selects the word under the cursor — snapping to the
-// nearest adjacent word when the press lands on whitespace (#958) — anchoring
+// nearest adjacent word when the press lands on whitespace (pre-rebrand tracker #958) — anchoring
 // the selection at its start; the selectable analog of Entry's long-press
 // selection (selectNearestWordAtCursor).
 func (s *selectable) selectWordAtCursor() {
@@ -146,7 +146,7 @@ func (s *selectable) selectionHandleCaretRect(row, col int) geo.Rectangle {
 	sz := prov.lineSizeToColumn(col, row, textSize, innerPad, true)
 	x := sz.Width
 	// A row with an inline image atom counts columns in document-position
-	// space; use the atom-aware walk for the x when available (#893).
+	// space; use the atom-aware walk for the x when available (pre-rebrand tracker #893).
 	if ix, ok := prov.inlineColumnX(row, col, textSize, innerPad); ok {
 		x = ix
 	}
@@ -220,8 +220,8 @@ func (s *selectable) dragSelectionHandle(isStart bool, content geo.Position) {
 	}
 }
 
-// The selectable's selectionLoupeHost implementation (#942, adopted with the
-// #888 parity work): the drag magnifier over a selectable Label/RichText
+// The selectable's selectionLoupeHost implementation (pre-rebrand tracker #942, adopted with the
+// pre-rebrand tracker #888 parity work): the drag magnifier over a selectable Label/RichText
 // renders the dragged row as styled runs, so multi-styled RichText rows
 // magnify true to their drawn widths.
 

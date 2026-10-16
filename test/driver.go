@@ -33,7 +33,7 @@ type driver struct {
 // happens-before edges that make background→UI flows testable under -race.
 //
 // It is package-level — shared across driver instances — rather than
-// per-driver (#1049): tests in a package each create their own test app, so a
+// per-driver (pre-rebrand tracker #1049): tests in a package each create their own test app, so a
 // goroutine leaked from (or still in flight at the end of) one test would
 // otherwise hold the previous driver's mutex while the next test's work holds
 // the new driver's, and nothing serializes the two. Tests are inherently
