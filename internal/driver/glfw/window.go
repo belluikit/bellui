@@ -1039,21 +1039,6 @@ func (w *window) dispatchScroll(pos geo.Position, delta geo.Delta, source event.
 	return false
 }
 
-func (w *window) capturesTab(modifier event.KeyModifier) bool {
-	if ent, ok := w.canvas.Focused().(event.Tabbable); ok && ent.AcceptsTab() {
-		return true
-	}
-
-	switch modifier {
-	case 0:
-		w.canvas.FocusNext()
-	case event.KeyModifierShift:
-		w.canvas.FocusPrevious()
-	}
-
-	return false
-}
-
 // processKeyReleased is the release half of the key callback: menu toggles
 // armed on press fire here, then the raw key-up reaches the focused widget or
 // the canvas hook.
@@ -1080,6 +1065,9 @@ func (w *window) processKeyReleased(keyEvent *event.KeyEvent, pendingMenuToggle,
 
 func (w *window) processKeyPressed(keyName event.KeyName, keyASCII event.KeyName, scancode int, action action, keyDesktopModifier event.KeyModifier) {
 	keyEvent := &event.KeyEvent{Name: keyName, Physical: event.HardwareKey{ScanCode: scancode}, Modifier: keyDesktopModifier}
+	// Set when KeyDown moved focus, as the Linux web view's Ctrl+Tab escape
+	// does: the Tab handling below then treats the press as handled.
+	keyDownMovedFocus := false
 
 	pendingMenuToggle := w.menuTogglePending
 	w.menuTogglePending = desktop.KeyNone
@@ -1099,22 +1087,26 @@ func (w *window) processKeyPressed(keyName event.KeyName, keyASCII event.KeyName
 		case event.KeyEscape:
 			w.menuDeactivationPending = keyName
 		}
-		if w.canvas.Focused() != nil {
-			if focused, ok := w.canvas.Focused().(desktop.Keyable); ok {
-				focused.KeyDown(keyEvent)
+		if focused := w.canvas.Focused(); focused != nil {
+			if keyable, ok := focused.(desktop.Keyable); ok {
+				keyable.KeyDown(keyEvent)
+				keyDownMovedFocus = w.canvas.Focused() != focused
 			}
 		} else if w.canvas.onKeyDown != nil {
 			w.canvas.onKeyDown(keyEvent)
+			keyDownMovedFocus = w.canvas.Focused() != nil
 		}
 	default:
 		// key repeat will fall through to TypedKey and TypedShortcut
 	}
 
-	modifierOtherThanShift := (keyDesktopModifier & event.KeyModifierControl) |
-		(keyDesktopModifier & event.KeyModifierAlt) |
-		(keyDesktopModifier & event.KeyModifierSuper)
-	if (keyName == event.KeyTab && modifierOtherThanShift == 0 && !w.capturesTab(keyDesktopModifier)) ||
-		w.triggersShortcut(keyName, keyASCII, keyDesktopModifier) {
+	// A Tab press whose KeyDown already moved focus is handled: neither a
+	// second focus move nor a shortcut or TypedKey on the widget that has just
+	// gained focus, which never saw the key go down.
+	if keyName == event.KeyTab && (keyDownMovedFocus || driver.MoveTabFocus(w.canvas, keyDesktopModifier)) {
+		return
+	}
+	if w.triggersShortcut(keyName, keyASCII, keyDesktopModifier) {
 		return
 	}
 
