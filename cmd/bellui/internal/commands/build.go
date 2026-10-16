@@ -177,9 +177,11 @@ func (b *Builder) build() error {
 	}
 
 	args := []string{"build"}
-	env := os.Environ()
 
+	// Take the environment only after -ldflags has been moved out of GOFLAGS,
+	// or the child go build still sees the original GOFLAGS (#371).
 	ldFlags := extractLdflagsFromGoFlags()
+	env := os.Environ()
 	if goos == "windows" {
 		ldFlags += " -H=windowsgui"
 	}

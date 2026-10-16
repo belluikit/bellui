@@ -35,6 +35,36 @@ func Test_BuildWasmVersion(t *testing.T) {
 	wasmBuildTest.verifyExpectation()
 }
 
+// -ldflags in GOFLAGS moves to the command line; the child go build must not
+// also see it in its environment, where it would override the merged flags
+// (#371).
+func Test_BuildGoFlagsLdflagsLeaveTheEnvironment(t *testing.T) {
+	t.Setenv("GOFLAGS", "-mod=mod -ldflags=-X=main.v=1")
+	expected := []mockRunner{
+		{
+			expectedValue: expectedValue{args: []string{"mod", "edit", "-json"}, dir: "myTest"},
+			mockReturn: mockReturn{
+				ret: []byte("{ \"Module\": { \"Path\": \"github.com/belluikit/bellui\"} }"),
+			},
+		},
+		{
+			expectedValue: expectedValue{
+				args:  []string{"build", "-ldflags", "-X=main.v=1"},
+				env:   []string{"GOARCH=wasm", "GOOS=js", "CGO_ENABLED=0"},
+				osEnv: true,
+				dir:   "myTest",
+			},
+			mockReturn: mockReturn{ret: []byte("")},
+		},
+	}
+
+	runs := &testCommandRuns{runs: expected, t: t}
+	b := &Builder{appData: &appData{}, os: "wasm", srcdir: "myTest", runner: runs}
+	assert.Nil(t, b.build())
+	runs.verifyExpectation()
+	assert.Equal(t, "-mod=mod", os.Getenv("GOFLAGS"))
+}
+
 func Test_BuildWasmReleaseVersion(t *testing.T) {
 	expected := []mockRunner{
 		{
