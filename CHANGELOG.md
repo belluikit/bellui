@@ -32,7 +32,9 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
   queue held 120 frames whatever their size: about 1 GB at 1080p and 4 GB at
   4K. It is now sized to a 128 MB budget, between 8 and 120 frames, so small
   videos are unchanged. Playing a 1080p clip peaked at 2.1 GB of memory and
-  now peaks at about 470 MB, with no more dropped frames.
+  now peaks at about 470 MB on a Mac, with no more frames dropped than
+  before. A shallower queue tolerates a shorter decode stall (about half a
+  second at 1080p30); that has not yet been measured on a phone.
 
 * **x/charts: charts no longer rebuild on every frame**
   ([#396](https://github.com/belluikit/bellui/issues/396)). Every layout rebuilt

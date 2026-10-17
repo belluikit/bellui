@@ -99,7 +99,8 @@ type Pipeline struct {
 
 	// Decode-ahead buffer: pre-allocated frames cycle through
 	// frameQueue (decode→display) and frameRecycle (display→decode).
-	// All RGBA frames are allocated once at startup — zero GC pressure.
+	// The pool's RGBA frames are allocated once, when the geometry is set; the
+	// source still hands over a freshly decoded frame that is copied into one.
 	frameQueue   chan timedFrame
 	frameRecycle chan *image.RGBA
 }
@@ -234,7 +235,7 @@ func (p *Pipeline) adoptSource(src source.Source) {
 		p.framerate = src.Framerate()
 		// Only rebuild the pool when the geometry actually moved. A swap between
 		// two cameras of the same resolution — the common case — then costs
-		// nothing, which matters when the pool is as large as it is (#110).
+		// nothing, where a rebuild would drop and reallocate the whole pool.
 		if w != p.videoWidth || h != p.videoHeight || p.frameQueue == nil {
 			p.videoWidth, p.videoHeight = w, h
 			p.allocFramePool(w, h)
@@ -285,7 +286,8 @@ func (p *Pipeline) adoptSource(src source.Source) {
 
 // allocFramePool builds the decode-ahead buffer: all RGBA frames are allocated
 // once, then cycle frameRecycle → decode → frameQueue → display → frameRecycle,
-// so steady-state playback allocates nothing.
+// so the queue itself allocates nothing in steady state. (The FFmpeg source
+// still allocates each decoded frame before it is copied into the pool.)
 //
 // The old pool is dropped before the new one is built rather than after, so a
 // device switch never holds two of them at once.
