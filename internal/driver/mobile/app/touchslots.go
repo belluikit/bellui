@@ -17,13 +17,15 @@ import "github.com/belluikit/bellui/internal/driver/mobile/event/touch"
 // last resort when every slot is taken.
 type touchSlots [11]uintptr
 
-// id returns the id of the touch ptr for an event of type t. fresh reports
-// that no other touch is down. An ended or cancelled touch's slot is freed.
-func (s *touchSlots) id(ptr uintptr, t touch.Type, fresh bool) int {
-	if t == touch.TypeBegin && fresh {
-		*s = touchSlots{} // anything still held is a touch whose end was lost
-	}
+// reset frees every slot. The iOS side calls it once when touches begin with
+// no other touch down, before any of them is given an id: anything still held
+// then is a touch whose end was lost. Calling it per touch instead gave two
+// fingers that landed in the same event the same id.
+func (s *touchSlots) reset() { *s = touchSlots{} }
 
+// id returns the id of the touch ptr for an event of type t. An ended or
+// cancelled touch's slot is freed.
+func (s *touchSlots) id(ptr uintptr, t touch.Type) int {
 	id := s.find(ptr)
 	if id < 0 {
 		id = s.find(0)
