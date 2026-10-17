@@ -32,7 +32,8 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
   stored per app, the old shared `bellui-auth/<provider>.enc` was no longer
   read, but nothing removed it, and signing out did not either, so a refresh
   token that still decrypts stayed on disk. It is now deleted the first time
-  any app saves or clears a token for that provider.
+  any app saves or clears a token for that provider, even when that save or
+  clear fails, as it does for an app without an ID.
 
 * **x/charts: charts no longer rebuild on every frame**
   ([#396](https://github.com/belluikit/bellui/issues/396)). Every layout rebuilt
