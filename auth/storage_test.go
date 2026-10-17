@@ -6,6 +6,9 @@
 package auth
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -98,12 +101,12 @@ func TestMachineKey_PersistsAndIsSecret(t *testing.T) {
 func TestDeriveKey_DiffersPerProvider(t *testing.T) {
 	redirectStorage(t)
 
-	a, err := deriveKey("com.example.test", "google")
+	a, err := deriveKey("com.example.test", "google", "")
 	require.NoError(t, err)
-	b, err := deriveKey("com.example.test", "github")
+	b, err := deriveKey("com.example.test", "github", "")
 	require.NoError(t, err)
 	assert.NotEqual(t, a, b)
-	c, err := deriveKey("com.example.other", "google")
+	c, err := deriveKey("com.example.other", "google", "")
 	require.NoError(t, err)
 	assert.NotEqual(t, a, c, "the key is per app too")
 }
@@ -264,9 +267,9 @@ func TestTokenPath_ProviderStaysInsideAppDir(t *testing.T) {
 func TestDeriveKey_FieldsAreSeparate(t *testing.T) {
 	redirectStorage(t)
 
-	a, err := deriveKey("a:b", "c")
+	a, err := deriveKey("a:b", "c", "")
 	require.NoError(t, err)
-	b, err := deriveKey("a", "b:c")
+	b, err := deriveKey("a", "b:c", "")
 	require.NoError(t, err)
 	assert.NotEqual(t, a, b)
 }
@@ -305,23 +308,110 @@ func TestTokensPerIssuer(t *testing.T) {
 // issuers existed, so tokens saved by v1.1 still load.
 func TestTokenWithoutIssuerIsUnchanged(t *testing.T) {
 	dir := redirectStorage(t)
+	appDir := filepath.Join(dir, "bellui-auth", "com.example.test")
 	path, _, err := tokenPath("google", "")
 	require.NoError(t, err)
-	assert.Equal(t, filepath.Join(dir, "bellui-auth", "com.example.test", "google.enc"), path)
+	assert.Equal(t, filepath.Join(appDir, "google.enc"), path)
 
-	before, err := deriveKey("com.example.test", "google")
+	// The key as v1.1 derived it, written out rather than through deriveKey,
+	// so a change to deriveKey's two-field form cannot pass unnoticed.
+	secret, err := masterSecret()
 	require.NoError(t, err)
-	empty, err := deriveKey("com.example.test", "google", "")
+	h := sha256.New()
+	h.Write([]byte("bellui-auth-v3:"))
+	for _, field := range []string{"com.example.test", "google"} {
+		var n [8]byte
+		binary.BigEndian.PutUint64(n[:], uint64(len(field)))
+		h.Write(n[:])
+		h.Write([]byte(field))
+	}
+	h.Write(secret)
+	key, err := deriveKey("com.example.test", "google", "")
 	require.NoError(t, err)
-	assert.Equal(t, before, empty)
+	assert.Equal(t, h.Sum(nil), key)
 
-	withIssuer, err := deriveKey("com.example.test", "google", "https://accounts.google.com")
+	withIssuer, err := deriveKey("com.example.test", "keycloak", "https://sso.example.com/realms/a")
 	require.NoError(t, err)
-	assert.NotEqual(t, before, withIssuer)
+	withoutIssuer, err := deriveKey("com.example.test", "keycloak", "")
+	require.NoError(t, err)
+	assert.NotEqual(t, withoutIssuer, withIssuer)
 
-	issuerPath, _, err := tokenPath("google", "https://accounts.google.com")
+	issuerPath, _, err := tokenPath("keycloak", "https://sso.example.com/realms/a")
 	require.NoError(t, err)
-	assert.NotEqual(t, path, issuerPath)
-	assert.Equal(t, filepath.Join(dir, "bellui-auth", "com.example.test"), filepath.Dir(issuerPath),
+	assert.Equal(t, filepath.Join(appDir, issuerDir), filepath.Dir(issuerPath),
 		"an issuer's token stays in the app's folder")
+}
+
+// No two (provider, issuer) pairs share a file, and no issuer's token shares a
+// provider's own: LoadTokenFor deletes a file it cannot decrypt, so a shared
+// file would let one token's read delete the other.
+func TestTokenPath_IssuerNamesDoNotCollide(t *testing.T) {
+	redirectStorage(t)
+	paths := map[string]string{}
+	for _, pair := range [][2]string{
+		{"a", "b\x00c"}, {"a\x00b", "c"}, // a bare separator joined these
+		{"a", "b"}, {"a\x00b", ""}, // and these, the second a provider's own
+		{"issuers", ""}, // a provider named like the issuers folder
+		// A provider whose name is the bytes an issuer token's name hashes:
+		// only the issuers folder keeps these two apart.
+		{string(lengthPrefixed("keycloak", "x")), ""}, {"keycloak", "x"},
+	} {
+		path, _, err := tokenPath(pair[0], pair[1])
+		require.NoError(t, err)
+		if prev, ok := paths[path]; ok {
+			t.Errorf("%q and %q share %s", prev, pair, path)
+		}
+		paths[path] = fmt.Sprintf("%q", pair)
+	}
+}
+
+// A preset issuer keys like no issuer: a button that names Google's issuer and
+// one that leaves Issuer empty share the token LoadToken("google") reads. A
+// Microsoft tenant is not the preset's issuer, so it gets a token of its own.
+func TestTokenFor_PresetIssuerIsTheProvidersToken(t *testing.T) {
+	redirectStorage(t)
+	google := Providers["google"].Issuer
+	const tenant = "https://login.microsoftonline.com/0000-tenant/v2.0"
+
+	require.NoError(t, SaveTokenFor("google", google, "refresh-g", "g@example.com"))
+	refresh, _, err := LoadToken("google")
+	require.NoError(t, err)
+	assert.Equal(t, "refresh-g", refresh)
+	refresh, _, err = LoadTokenFor("google", "")
+	require.NoError(t, err)
+	assert.Equal(t, "refresh-g", refresh)
+
+	require.NoError(t, SaveTokenFor("microsoft", tenant, "refresh-t", "t@example.com"))
+	refresh, _, err = LoadToken("microsoft")
+	require.NoError(t, err)
+	assert.Empty(t, refresh, "a tenant's token is not the provider's")
+	refresh, _, err = LoadTokenFor("microsoft", tenant)
+	require.NoError(t, err)
+	assert.Equal(t, "refresh-t", refresh)
+
+	require.NoError(t, ClearTokenFor("google", google))
+	refresh, _, _ = LoadToken("google")
+	assert.Empty(t, refresh, "ClearTokenFor with the preset issuer is ClearToken")
+}
+
+// Upgrading from v1.1: a token saved under the provider alone stays where
+// LoadToken finds it, a new issuer token does not replace it, and ClearToken
+// leaves the issuer token alone (an app signs out of an issuer with
+// ClearTokenFor).
+func TestTokenFor_ProviderTokenFromBeforeIssuers(t *testing.T) {
+	redirectStorage(t)
+	const realm = "https://sso.example.com/realms/a"
+	require.NoError(t, SaveToken("keycloak", "old", "old@example.com"))
+
+	refresh, _, err := LoadTokenFor("keycloak", realm)
+	require.NoError(t, err)
+	assert.Empty(t, refresh, "no issuer token before the first sign-in to it")
+
+	require.NoError(t, SaveTokenFor("keycloak", realm, "new", "new@example.com"))
+	refresh, _, _ = LoadToken("keycloak")
+	assert.Equal(t, "old", refresh)
+
+	require.NoError(t, ClearToken("keycloak"))
+	refresh, _, _ = LoadTokenFor("keycloak", realm)
+	assert.Equal(t, "new", refresh)
 }
