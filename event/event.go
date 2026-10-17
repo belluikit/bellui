@@ -155,7 +155,10 @@ type PinchEvent struct {
 // midpoint when the second finger landed receives Pinched for each move and
 // PinchEnded once after the last one, when either finger lifts. Two fingers
 // moving together are a pan instead, delivered as touch-sourced scrolling.
-// Neither finger of a two-finger gesture produces taps or drags.
+// Where the driver has no touch scrolling (native mobile apps, for now), two
+// fingers over a Pinchable always pinch, and a move that keeps their distance
+// reports the new focus with Scale 1. Neither finger of a two-finger gesture
+// produces taps or drags.
 //
 // Since: 1.2
 type Pinchable interface {
