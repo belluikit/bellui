@@ -50,7 +50,9 @@ func (p *painter) EnsureBoundaryFBO(obj core.CanvasObject, pixW, pixH int, logic
 		s.logical = logicalSize
 		return s
 	} else if ok {
-		s.tex.Release() // resizing
+		// Resizing: the old target may already be sampled by this frame's
+		// commands, so free it once the frame is submitted.
+		p.dev.ReleaseTextureAfterFrame(s.tex)
 		delete(p.boundaries, obj)
 	}
 

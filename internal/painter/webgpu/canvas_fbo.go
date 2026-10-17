@@ -38,7 +38,8 @@ func (p *painter) EnsureCanvasFBO(pixW, pixH int) {
 		return
 	}
 	if p.canvasFBO != nil && p.canvasFBO.tex != nil {
-		p.canvasFBO.tex.Release()
+		// The old target may already be used by this frame's commands.
+		p.dev.ReleaseTextureAfterFrame(p.canvasFBO.tex)
 	}
 	tex, err := p.dev.CreateRenderTexture(pixW, pixH)
 	if err != nil {
