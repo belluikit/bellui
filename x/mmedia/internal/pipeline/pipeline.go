@@ -335,6 +335,10 @@ func queueDepth(w, h int) int {
 // prerollTarget is how many queued frames Play waits for before it starts the
 // display: prerollFrames, or the whole queue when the queue is shorter. Waiting
 // for more than the queue holds would only ever end on the 2 s timeout.
+//
+// A whole queue is reachable because nothing but the decoder holds a pool frame
+// before the display starts, and a stop returns every frame to the pool
+// (TestStopReturnsEveryFrameToThePool).
 func (p *Pipeline) prerollTarget() int {
 	return min(prerollFrames, cap(p.frameQueue))
 }
@@ -825,6 +829,11 @@ func (p *Pipeline) decodeAhead(stop <-chan struct{}) {
 			select {
 			case p.frameQueue <- timedFrame{img: p.pendingFrame, pts: p.pendingPTS}:
 			case <-stop:
+				// The frame never reached the queue, so halt's drain cannot
+				// return it. Losing it would leave the decoder one frame short
+				// for good: with the display holding one and the queue full,
+				// every decode then finds the pool empty and drops its frame.
+				p.RecycleFrame(p.pendingFrame)
 				return
 			}
 		}
