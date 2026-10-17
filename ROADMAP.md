@@ -1,6 +1,6 @@
 # Roadmap
 
-Structural gaps and improvements for the Fyne fork, ordered by priority.
+Structural gaps and improvements for Bellui, ordered by priority.
 Accessibility items are tracked separately in [ACCESSIBILITY.md](ACCESSIBILITY.md).
 
 ## 1. Thread Safety
