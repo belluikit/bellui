@@ -270,3 +270,42 @@ func TestDeriveKey_FieldsAreSeparate(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEqual(t, a, b)
 }
+
+// The token an app stored before tokens were kept per app is deleted the first
+// time any app saves or clears a token for that provider: no app reads it, but
+// it still decrypts (#355).
+func TestLegacySharedTokenIsRemoved(t *testing.T) {
+	for name, trigger := range map[string]func() error{
+		"sign-in":  func() error { return SaveToken("google", "refresh", "a@example.com") },
+		"sign-out": func() error { return ClearToken("google") },
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := redirectStorage(t)
+			old := filepath.Join(dir, "bellui-auth", "google.enc")
+			other := filepath.Join(dir, "bellui-auth", "github.enc")
+			require.NoError(t, os.MkdirAll(filepath.Dir(old), 0o700))
+			require.NoError(t, os.WriteFile(old, []byte("old token"), 0o600))
+			require.NoError(t, os.WriteFile(other, []byte("old token"), 0o600))
+
+			require.NoError(t, trigger())
+			assert.NoFileExists(t, old)
+			assert.FileExists(t, other, "only the provider that was used is cleaned up")
+		})
+	}
+}
+
+// Cleaning up never leaves bellui-auth and never removes a directory: a
+// provider name with a separator stored nothing there, and under the per-app
+// layout a directory named <x>.enc is an app's token directory.
+func TestLegacyTokenCleanupStaysInPlace(t *testing.T) {
+	dir := redirectStorage(t)
+	outside := filepath.Join(dir, "victim.enc")
+	require.NoError(t, os.WriteFile(outside, []byte("x"), 0o600))
+	appDir := filepath.Join(dir, "bellui-auth", "github.enc")
+	require.NoError(t, os.MkdirAll(appDir, 0o700))
+
+	removeLegacyToken("../victim")
+	removeLegacyToken("github")
+	assert.FileExists(t, outside)
+	assert.DirExists(t, appDir)
+}
