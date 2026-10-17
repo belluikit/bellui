@@ -27,6 +27,12 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
   
 ### Fixed
 
+* **x/charts: charts no longer rebuild on every frame**
+  ([#396](https://github.com/belluikit/bellui/issues/396)). Every layout rebuilt
+  the chart, and the rebuild triggered another layout, so idle charts were
+  rebuilt about 60 times a second. For 3D charts each rebuild allocated a new
+  GPU texture, which took a phone browser's GPU memory past 4 GB in seconds and
+  crashed it. A chart now rebuilds only when its size or content changes.
 * **Web: a page wider than the screen no longer squeezes the whole UI**
   ([#387](https://github.com/belluikit/bellui/issues/387)). When content needed
   more room than the browser viewport, the canvas grew past it and the frame
