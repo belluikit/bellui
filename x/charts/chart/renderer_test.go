@@ -335,6 +335,28 @@ func TestFollowLatest_SnapsToEnd(t *testing.T) {
 	}
 }
 
+// A pinch on a zoomable chart zooms its data window around the focus (#379).
+func TestChart_PinchZoomsDataWindow(t *testing.T) {
+	_ = test.NewApp()
+	c := New(Option{
+		DataZoom: &interact.ZoomConfig{Enabled: true, MinSpan: 0.01, MaxSpan: 1, ZoomSensitivity: 0.05},
+		Series: []series.Series{
+			&series.LineSeries{SeriesName: "A", Data: []float64{10, 20, 30, 40, 50}},
+		},
+	})
+	c.Resize(fyne800x600())
+	var notified int
+	c.OnZoomChange = func(interact.DataWindow) { notified++ }
+
+	c.Pinched(&event.PinchEvent{PointEvent: event.PointEvent{Position: geo.NewPos(400, 300)}, Scale: 2})
+	if w := c.ZoomWindow(); w.Span() < 0.49 || w.Span() > 0.51 {
+		t.Errorf("a 2x pinch should halve the visible span, got %v", w.Span())
+	}
+	if notified != 1 {
+		t.Errorf("OnZoomChange should fire once, got %d", notified)
+	}
+}
+
 func TestKeyboardEvents(t *testing.T) {
 	_ = test.NewApp()
 

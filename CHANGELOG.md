@@ -14,6 +14,17 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
 
 ## Unreleased
 
+### Added
+
+* **Pinch-to-zoom** ([#379](https://github.com/belluikit/bellui/issues/379)).
+  New `event.Pinchable` (`Pinched(*PinchEvent)`, `PinchEnded()`): two fingers
+  on a Pinchable widget report the change in their distance and the point
+  between them, on phones, tablets and desktop touchscreens. The web follows
+  once the browser driver handles touch input
+  ([#378](https://github.com/belluikit/bellui/issues/378)). The x/dag canvas
+  zooms on pinch and pans with the fingers; x/charts (data window, 3D camera
+  and maps) zooms on pinch.
+  
 ### Fixed
 
 * **Web: a page wider than the screen no longer squeezes the whole UI**
