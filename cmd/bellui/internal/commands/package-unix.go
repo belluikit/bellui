@@ -165,8 +165,16 @@ func (p *Packager) packageUNIX() error {
 	parent := filepath.Dir(outDir)
 	defer os.RemoveAll(parent)
 
-	makefile, _ := os.Create(filepath.Join(outDir, "Makefile"))
+	// The Makefile is closed before tar reads it: it was left open, which
+	// also kept Windows from removing the staging directory afterwards.
+	makefile, err := os.Create(filepath.Join(outDir, "Makefile"))
+	if err != nil {
+		return fmt.Errorf("failed to create Makefile: %w", err)
+	}
 	err = templates.MakefileUNIX.Execute(makefile, makefileData(tplData, appIDOrName, filepath.Base(p.exe), iconName))
+	if cerr := makefile.Close(); err == nil {
+		err = cerr
+	}
 	if err != nil {
 		return fmt.Errorf("failed to write Makefile string: %w", err)
 	}
