@@ -24,6 +24,31 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
   ([#378](https://github.com/belluikit/bellui/issues/378)). The x/dag canvas
   zooms on pinch and pans with the fingers; x/charts (data window, 3D camera
   and maps) zooms on pinch.
+  
+### Fixed
+
+* **Web: a page wider than the screen no longer squeezes the whole UI**
+  ([#387](https://github.com/belluikit/bellui/issues/387)). When content needed
+  more room than the browser viewport, the canvas grew past it and the frame
+  was drawn squeezed sideways until the next window resize. In the browser the
+  canvas now stays the size of the viewport and wider content is clipped, as
+  on mobile.
+  
+* **Web: touch works on phones and tablets**
+  ([#378](https://github.com/belluikit/bellui/issues/378)). Only the click a
+  browser synthesises after a tap reached the app, so nothing could be scrolled
+  or dragged by finger. Finger contacts now go through the same gesture
+  handler as the mobile driver — drags, flick scrolling, long-press and
+  double-tap — and the page no longer pans or zooms under the app.
+  
+* **Web: GPU memory was never freed, so Android killed the tab**
+  ([#385](https://github.com/belluikit/bellui/issues/385)). In the browser,
+  releasing a WebGPU texture or buffer did nothing; its memory waited for
+  JavaScript's garbage collector, which ignores GPU memory pressure. The
+  shadow, off-screen and per-frame resources bellui creates piled up — on a
+  Pixel 9a Chrome's GPU memory reached 2.1 GB and the tab crashed within 40
+  seconds. They are now destroyed when bellui is done with them; the same
+  test ran 3 minutes with GPU memory bounded at 600–750 MB.
 
 ## v1.1.2 — 2026-10-16
 

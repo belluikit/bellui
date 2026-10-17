@@ -257,7 +257,7 @@ func (ds *depthStencil) Release() {
 		ds.view = nil
 	}
 	if ds.tex != nil {
-		ds.tex.Release()
+		destroyTexture(ds.tex)
 		ds.tex = nil
 	}
 }
@@ -280,16 +280,33 @@ func (t *Texture) View() *wgpu.TextureView { return t.view }
 // Size reports the texture's allocated pixel dimensions.
 func (t *Texture) Size() (w, h int) { return t.w, t.h }
 
-// Release frees the texture and its view.
+// Release frees the texture and its view, including its GPU memory.
 func (t *Texture) Release() {
 	if t.view != nil {
 		t.view.Release()
 		t.view = nil
 	}
 	if t.tex != nil {
-		t.tex.Release()
+		destroyTexture(t.tex)
 		t.tex = nil
 	}
+}
+
+// destroyTexture and destroyBuffer free a resource's GPU memory and drop the
+// handle. Release alone is not enough: in the browser it is a no-op, and the
+// memory stays allocated until JavaScript's garbage collector reclaims the
+// wrapper, which it does not do under GPU memory pressure. Per-frame shadow
+// targets and buffers piled up until Android killed the tab (#385). Destroy is
+// safe for anything already submitted: WebGPU frees it once that work is done.
+// Call them only for resources no unsubmitted command still uses.
+func destroyTexture(t *wgpu.Texture) {
+	t.Destroy()
+	t.Release()
+}
+
+func destroyBuffer(b *wgpu.Buffer) {
+	b.Destroy()
+	b.Release()
 }
 
 // renderTarget is one entry of the Device's render-target stack: a color view,
@@ -590,7 +607,7 @@ func (d *Device) ReleaseSurface() {
 func (d *Device) releaseDepthStencils() {
 	for k, ds := range d.depthStencils {
 		ds.view.Release()
-		ds.tex.Release()
+		destroyTexture(ds.tex)
 		delete(d.depthStencils, k)
 	}
 }
@@ -907,7 +924,7 @@ func (d *Device) buildLayouts() error {
 func (d *Device) ensureArenas() error {
 	if d.vtxArenaCap < d.arenaMaxVtx {
 		if d.vtxArena != nil {
-			d.vtxArena.Release()
+			destroyBuffer(d.vtxArena)
 		}
 		size := roundUpBuffer(d.arenaMaxVtx)
 		buf, err := d.device.TryCreateBuffer(&wgpu.BufferDescriptor{
@@ -922,7 +939,7 @@ func (d *Device) ensureArenas() error {
 
 	if d.uniArenaCap < d.arenaMaxUni {
 		if d.uniArena != nil {
-			d.uniArena.Release()
+			destroyBuffer(d.uniArena)
 		}
 		size := roundUpBuffer(d.arenaMaxUni)
 		buf, err := d.device.TryCreateBuffer(&wgpu.BufferDescriptor{
@@ -1764,7 +1781,7 @@ func (d *Device) EndFrame() error {
 	// submitted; wgpu refcounts keep the native resources alive until the GPU is
 	// done, so releasing the Go handles now is safe.
 	for _, buf := range d.frameBuffers {
-		buf.Release()
+		destroyBuffer(buf)
 	}
 	d.frameBuffers = d.frameBuffers[:0]
 	for _, bind := range d.frameBinds {
@@ -1812,7 +1829,7 @@ func (d *Device) ensureCaptureTex() bool {
 		return true
 	}
 	if d.captureTex != nil {
-		d.captureTex.Release()
+		destroyTexture(d.captureTex)
 		d.captureTex = nil
 	}
 	tex, err := d.device.TryCreateTexture(&wgpu.TextureDescriptor{
@@ -1930,15 +1947,15 @@ func (d *Device) Destroy() {
 	// overflow resources.
 	d.invalidateUniformBinds()
 	if d.vtxArena != nil {
-		d.vtxArena.Release()
+		destroyBuffer(d.vtxArena)
 		d.vtxArena = nil
 	}
 	if d.uniArena != nil {
-		d.uniArena.Release()
+		destroyBuffer(d.uniArena)
 		d.uniArena = nil
 	}
 	for _, buf := range d.frameBuffers {
-		buf.Release()
+		destroyBuffer(buf)
 	}
 	d.frameBuffers = nil
 	for _, bind := range d.frameBinds {
@@ -1959,7 +1976,7 @@ func (d *Device) Destroy() {
 	d.bglUniform, d.bglTextured = nil, nil
 	d.releaseDepthStencils()
 	if d.captureTex != nil {
-		d.captureTex.Release()
+		destroyTexture(d.captureTex)
 		d.captureTex = nil
 	}
 	d.config = nil
