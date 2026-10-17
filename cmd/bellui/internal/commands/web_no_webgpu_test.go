@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -45,10 +46,18 @@ func TestIndexChecksTheRendererTheBuildNeeds(t *testing.T) {
 	assert.Contains(t, page, "if (webgl_support()) {")
 }
 
+// Stubs that make the browser lack WebGPU the two ways the issue saw, set
+// before the page's own scripts run. Chrome's --disable-features=WebGPU alone
+// is not dependable: on CI's macOS machines navigator.gpu stayed and the
+// adapter request never settled.
+const (
+	stubNoWebGPU  = `Object.defineProperty(Navigator.prototype, "gpu", {get() { return undefined; }, configurable: true});`
+	stubNoAdapter = `Object.defineProperty(Navigator.prototype, "gpu", {get() { return {requestAdapter: async () => null}; }, configurable: true});`
+)
+
 // In a browser with no WebGPU, the page of a WebGPU build says so instead of
-// staying blank (#384). It runs the real page in headless Chrome with WebGPU
-// disabled; the message appears before the page would fetch anything, so no
-// wasm is needed.
+// staying blank (#384). It runs the real page in headless Chrome; the message
+// appears before the page would fetch anything, so no wasm is needed.
 func TestIndexReportsMissingWebGPUInChrome(t *testing.T) {
 	chrome := findChrome()
 	if chrome == "" {
@@ -57,21 +66,24 @@ func TestIndexReportsMissingWebGPUInChrome(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		webgpu bool
+		stub   string
 		want   bool
 	}{
-		{"WebGPU build", true, true},
-		{"WebGL build", false, false},
+		{"WebGPU build, no navigator.gpu", true, stubNoWebGPU, true},
+		{"WebGPU build, gpu but no adapter", true, stubNoAdapter, true},
+		{"WebGL build", false, stubNoWebGPU, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
+			page := strings.Replace(renderIndex(t, tc.webgpu), "<head>", "<head><script>"+tc.stub+"</script>", 1)
 			index := filepath.Join(dir, "index.html")
-			require.NoError(t, os.WriteFile(index, []byte(renderIndex(t, tc.webgpu)), 0o644))
+			require.NoError(t, os.WriteFile(index, []byte(page), 0o644))
 
 			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 			defer cancel()
 			out, err := exec.CommandContext(ctx, chrome, "--headless=new", "--disable-gpu",
-				"--disable-features=WebGPU", "--user-data-dir="+filepath.Join(dir, "profile"),
-				"--virtual-time-budget=5000", "--dump-dom", "file://"+index).Output()
+				"--user-data-dir="+filepath.Join(dir, "profile"),
+				"--virtual-time-budget=3000", "--dump-dom", "file://"+index).Output()
 			require.NoError(t, err)
 			require.Contains(t, string(out), `id="action"`, "Chrome rendered the page")
 			assert.Equal(t, tc.want, bytes.Contains(out, []byte(noWebGPUMessage)))
