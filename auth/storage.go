@@ -36,6 +36,7 @@ type storedToken struct {
 // stored per app (by the running app's unique ID), so two apps that sign in
 // with the same provider keep separate tokens.
 func SaveToken(provider, refreshToken, email string) error {
+	removeLegacyToken(provider)
 	path, appID, err := tokenPath(provider)
 	if err != nil {
 		return err
@@ -63,11 +64,7 @@ func SaveToken(provider, refreshToken, email string) error {
 		return err
 	}
 
-	if err := os.WriteFile(path, ciphertext, 0o600); err != nil {
-		return err
-	}
-	removeLegacyToken(provider)
-	return nil
+	return os.WriteFile(path, ciphertext, 0o600)
 }
 
 // LoadToken reads and decrypts the running app's stored refresh token for a
@@ -108,6 +105,7 @@ func LoadToken(provider string) (refreshToken, email string, err error) {
 
 // ClearToken removes the running app's stored token for a provider.
 func ClearToken(provider string) error {
+	removeLegacyToken(provider)
 	path, _, err := tokenPath(provider)
 	if err != nil {
 		return err
@@ -115,7 +113,6 @@ func ClearToken(provider string) error {
 	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	removeLegacyToken(provider)
 	return nil
 }
 
@@ -123,16 +120,17 @@ func ClearToken(provider string) error {
 // were kept per app: bellui-auth/<provider>.enc, shared by every app. No app
 // reads it any more, but it still holds a refresh token that decrypts, so it
 // is removed the first time any app saves or clears a token for that provider
-// (#355). It is best effort: a file that cannot be removed must not fail the
-// sign-in or sign-out that triggered it.
+// (#355). It runs before anything that can fail, so an app without an ID, or a
+// save or clear that fails, still removes it. It is best effort: a file that
+// cannot be removed must not fail the sign-in or sign-out that triggered it.
 //
-// Only a regular file directly inside bellui-auth is removed. A provider name
-// that is not a single path element never stored one there, and a directory of
-// that name is an app's token directory under the current layout.
+// Only a regular file directly inside bellui-auth is removed, as the old code
+// named it: a provider name that is not a single path element never stored one
+// there, and a directory of that name is an app's token directory under the
+// current layout.
 func removeLegacyToken(provider string) {
 	name := provider + ".enc"
-	if provider == "" || provider == "." || provider == ".." ||
-		strings.ContainsAny(provider, `/\`) || filepath.Base(name) != name {
+	if !filepath.IsLocal(name) || filepath.Base(name) != name {
 		return
 	}
 	dir, err := tokenDir()
@@ -141,7 +139,10 @@ func removeLegacyToken(provider string) {
 	}
 	path := filepath.Join(dir, name)
 	if fi, err := os.Lstat(path); err == nil && fi.Mode().IsRegular() {
-		_ = os.Remove(path)
+		// Not os.Remove: it also removes an empty directory, and an app's
+		// token directory of this name may have replaced the file since the
+		// Lstat.
+		_ = removeFile(path)
 	}
 }
 
