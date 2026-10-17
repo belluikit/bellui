@@ -6,8 +6,6 @@ import (
 	"context"
 	"time"
 
-	intdriver "github.com/belluikit/bellui/internal/driver"
-
 	_ "image/png" // for the icon
 
 	"github.com/belluikit/bellui/internal/driver/common"
@@ -20,6 +18,7 @@ import (
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/cache"
+	intdriver "github.com/belluikit/bellui/internal/driver"
 	"github.com/belluikit/bellui/internal/scale"
 	internalWidget "github.com/belluikit/bellui/internal/widget"
 
