@@ -115,3 +115,51 @@ func TestWindow_EscapeClosesAPopUpBeforeItFreesTab(t *testing.T) {
 	w.press(event.KeyTab, 0)
 	assert.Equal(t, after, c.Focused(), "a second Escape does")
 }
+
+// On the web letter keys reach processKeyPressed with no name, the same ""
+// an unnamed modifier has; the character that follows is what cancels the way
+// out. And a held Escape's repeats do not undo the press.
+func TestWindow_EscapeThenTabEdges(t *testing.T) {
+	field := &escKeepsTab{}
+	after := &escFocusable{name: "after"}
+	w := keyWindow(field, after)
+	c := w.canvas
+
+	c.Focus(field)
+	w.press(event.KeyEscape, 0)
+	w.press(event.KeyUnknown, 0) // a letter on the web
+	w.processCharInput('a')
+	w.press(event.KeyTab, 0)
+	assert.Equal(t, field, c.Focused(), "typing after Escape cancels the way out")
+
+	w.press(event.KeyEscape, 0)
+	w.processKeyPressed(event.KeyEscape, event.KeyEscape, 0, repeat, 0)
+	w.processKeyPressed(event.KeyEscape, event.KeyEscape, 0, repeat, 0)
+	w.press(event.KeyTab, 0)
+	assert.Equal(t, after, c.Focused(), "a held Escape still frees Tab")
+
+	other := &escKeepsTab{}
+	w = keyWindow(field, other, after)
+	c = w.canvas
+	c.Focus(field)
+	w.press(event.KeyEscape, 0)
+	c.Focus(other) // a click, not a key
+	w.press(event.KeyTab, 0)
+	assert.Equal(t, other, c.Focused(), "an Escape in one field does not free Tab in another")
+	assert.Equal(t, 1, other.tabs)
+}
+
+// Leaving the window, or the browser tab, between Escape and Tab cancels it.
+func TestWindow_EscapeThenFocusLossKeepsTab(t *testing.T) {
+	field := &escKeepsTab{}
+	after := &escFocusable{name: "after"}
+	w := keyWindow(field, after)
+	c := w.canvas
+
+	c.Focus(field)
+	w.press(event.KeyEscape, 0)
+	w.processFocused(false)
+	c.Focus(field)
+	w.press(event.KeyTab, 0)
+	assert.Equal(t, field, c.Focused())
+}

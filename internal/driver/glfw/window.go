@@ -1104,10 +1104,13 @@ func (w *window) processKeyPressed(keyName event.KeyName, keyASCII event.KeyName
 	// second focus move nor a shortcut or TypedKey on the widget that has just
 	// gained focus, which never saw the key go down.
 	if keyName == event.KeyTab && keyDownMovedFocus {
-		w.tabEscape = driver.TabEscape{}
+		w.tabEscape.Disarm()
 		return
 	}
-	if w.tabEscape.MoveTabFocus(w.canvas, keyName, keyDesktopModifier) {
+	// A held Escape repeats, but it is still the one Escape whose press set
+	// the way out, so its repeats leave the state alone.
+	if !(action == repeat && keyName == event.KeyEscape) &&
+		w.tabEscape.MoveTabFocus(w.canvas, keyName, keyDesktopModifier) {
 		return
 	}
 	if w.triggersShortcut(keyName, keyASCII, keyDesktopModifier) {
@@ -1148,6 +1151,7 @@ func (w *window) processKeyPressed(keyName event.KeyName, keyASCII event.KeyName
 //
 // Characters do not map 1:1 to physical keys, as a key may produce zero, one or more characters.
 func (w *window) processCharInput(char rune) {
+	w.tabEscape.Disarm()
 	if focused := w.canvas.Focused(); focused != nil {
 		focused.TypedRune(char)
 	} else if w.canvas.onTypedRune != nil {
@@ -1161,6 +1165,7 @@ func (w *window) processCharInput(char rune) {
 // (device_wasm.go). The commit and cancel companions live in the platform files
 // where each is used (window_wasm.go / window_desktop.go).
 func (w *window) processCompose(ev *event.PreeditEvent) {
+	w.tabEscape.Disarm()
 	if c, ok := w.canvas.Focused().(event.Composable); ok {
 		c.Compose(ev)
 	}
@@ -1182,6 +1187,7 @@ func (w *window) processFocused(focus bool) {
 		w.canvas.FocusGained()
 	} else {
 		w.canvas.FocusLost()
+		w.tabEscape.Disarm()
 		w.mousePos = geo.Position{}
 		// Avoid triggering menu on Alt+Tab: glfw sends a fake "alt key released" event immediately after
 		// unfocusing the window, and it should be ignored.
