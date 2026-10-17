@@ -55,6 +55,11 @@ type yRange struct{ min, max float64 }
 
 // chartRenderer implements core.WidgetRenderer for the Chart widget.
 type chartRenderer struct {
+	// laidOut and layoutSize remember the last Layout, so a Layout at the
+	// same size does not rebuild (see Layout).
+	laidOut    bool
+	layoutSize geo.Size
+
 	chart      *Chart
 	objects    []core.CanvasObject
 	rebuilding bool // re-entrancy guard to prevent refresh feedback loops
@@ -82,7 +87,17 @@ func newChartRenderer(c *Chart) *chartRenderer {
 	return r
 }
 
+// Layout rebuilds the chart only when its size changed. A rebuild replaces
+// every child object, and the canvas lays the chart out again when its
+// children change — so rebuilding on every Layout made a loop that rebuilt
+// every chart on every frame. For 3D charts each rebuild is a new Scene3D with
+// a new GPU texture, which ran a phone's browser out of GPU memory in seconds
+// (#396). Content changes go through Refresh and its dirty flags.
 func (r *chartRenderer) Layout(size geo.Size) {
+	if r.laidOut && size == r.layoutSize {
+		return
+	}
+	r.laidOut, r.layoutSize = true, size
 	r.fullRebuild(size)
 }
 

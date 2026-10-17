@@ -505,3 +505,30 @@ func TestPartialRefresh_SizeChangeForcesFullRebuild(t *testing.T) {
 func fyne800x600() geo.Size {
 	return geo.NewSize(800, 600)
 }
+
+// Layout at an unchanged size must not rebuild the chart. It used to, and a
+// rebuild relays the chart out, so every chart rebuilt on every frame — for 3D
+// charts a new Scene3D and GPU texture per frame (#396).
+func TestChartRenderer_LayoutSameSizeDoesNotRebuild(t *testing.T) {
+	_ = test.NewApp()
+	c := New(Option{Series: []series.Series{&series.Bar3DSeries{SeriesName: "S", Data: []series.Bar3DData{{X: 0, Z: 0, Value: 1}, {X: 1, Z: 1, Value: 2}}}}})
+	r := c.CreateRenderer().(*chartRenderer)
+	size := geo.NewSize(400, 300)
+	c.Resize(size)
+	r.Layout(size)
+	scene := c.scene3D
+	if scene == nil {
+		t.Fatal("expected a 3D scene after the first layout")
+	}
+
+	r.Layout(size)
+	r.Layout(size)
+	if c.scene3D != scene {
+		t.Error("a same-size Layout rebuilt the chart (new Scene3D)")
+	}
+
+	r.Layout(geo.NewSize(500, 300))
+	if c.scene3D == scene {
+		t.Error("a resize must still rebuild the chart")
+	}
+}
