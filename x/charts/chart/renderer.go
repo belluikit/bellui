@@ -817,6 +817,7 @@ func (r *chartRenderer) render3DSeries(
 	noneCoord := coord.NewNone()
 	noneCoord.SetBounds(plotRect)
 
+	var shared *canvas.Scene3D // the chart's single 3D scene, from the first series that renders one
 	for _, s := range threeDSeries {
 		idx := r.seriesIndex(s)
 		c := resolver.SeriesColor(idx)
@@ -828,11 +829,25 @@ func (r *chartRenderer) render3DSeries(
 		}
 		ctx := r.seriesRenderContext(s, noneCoord, plotRect, c, idx, animActive, animProgress)
 		rendered := renderer.Render(ctx)
-		objects = append(objects, rendered...)
+
+		// All 3D series share one scene: a later series adds its meshes to
+		// the first series' scene instead of drawing a scene of its own. With
+		// a scene per series, orbiting moved only the last one and the series
+		// could not occlude each other in depth (#399).
+		kept := rendered[:0:0]
+		for _, obj := range rendered {
+			if scene, ok := obj.(*canvas.Scene3D); ok && shared != nil {
+				shared.Meshes = append(shared.Meshes, scene.Meshes...)
+				continue
+			}
+			kept = append(kept, obj)
+		}
+		objects = append(objects, kept...)
 
 		// Capture 3D scene for orbit controls
-		for _, obj := range rendered {
+		for _, obj := range kept {
 			if scene, ok := obj.(*canvas.Scene3D); ok {
+				shared = scene
 				r.chart.mu.Lock()
 				if r.chart.orbitCam != nil {
 					// Preserve existing orbit state across rebuilds
