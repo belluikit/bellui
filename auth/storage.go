@@ -35,9 +35,23 @@ type storedToken struct {
 // SaveToken encrypts and persists a refresh token for a provider. Tokens are
 // stored per app (by the running app's unique ID), so two apps that sign in
 // with the same provider keep separate tokens.
+//
+// One token is kept per provider name. For a provider whose issuer the app
+// chooses ("okta", "keycloak", "custom"), use SaveTokenFor, so that two
+// issuers under one provider name keep separate tokens.
 func SaveToken(provider, refreshToken, email string) error {
+	return SaveTokenFor(provider, "", refreshToken, email)
+}
+
+// SaveTokenFor is SaveToken for one issuer of a provider: tokens for two
+// issuers under the same provider name, such as two Keycloak realms, are kept
+// apart (#356). An empty issuer is the same as SaveToken. widget.AuthButton
+// saves this way when its Issuer is the app's own.
+//
+// Since: 1.2
+func SaveTokenFor(provider, issuer, refreshToken, email string) error {
 	removeLegacyToken(provider)
-	path, appID, err := tokenPath(provider)
+	path, appID, err := tokenPath(provider, issuer)
 	if err != nil {
 		return err
 	}
@@ -55,7 +69,7 @@ func SaveToken(provider, refreshToken, email string) error {
 		return err
 	}
 
-	key, err := deriveKey(appID, provider)
+	key, err := deriveKey(appID, provider, issuer)
 	if err != nil {
 		return err
 	}
@@ -70,7 +84,15 @@ func SaveToken(provider, refreshToken, email string) error {
 // LoadToken reads and decrypts the running app's stored refresh token for a
 // provider. Returns empty strings if no token is stored.
 func LoadToken(provider string) (refreshToken, email string, err error) {
-	path, appID, err := tokenPath(provider)
+	return LoadTokenFor(provider, "")
+}
+
+// LoadTokenFor reads back the token SaveTokenFor stored for one issuer of a
+// provider. An empty issuer is the same as LoadToken.
+//
+// Since: 1.2
+func LoadTokenFor(provider, issuer string) (refreshToken, email string, err error) {
+	path, appID, err := tokenPath(provider, issuer)
 	if err != nil {
 		return "", "", err
 	}
@@ -83,7 +105,7 @@ func LoadToken(provider string) (refreshToken, email string, err error) {
 		return "", "", err
 	}
 
-	key, err := deriveKey(appID, provider)
+	key, err := deriveKey(appID, provider, issuer)
 	if err != nil {
 		return "", "", err
 	}
@@ -105,8 +127,16 @@ func LoadToken(provider string) (refreshToken, email string, err error) {
 
 // ClearToken removes the running app's stored token for a provider.
 func ClearToken(provider string) error {
+	return ClearTokenFor(provider, "")
+}
+
+// ClearTokenFor removes the token SaveTokenFor stored for one issuer of a
+// provider. An empty issuer is the same as ClearToken.
+//
+// Since: 1.2
+func ClearTokenFor(provider, issuer string) error {
 	removeLegacyToken(provider)
-	path, _, err := tokenPath(provider)
+	path, _, err := tokenPath(provider, issuer)
 	if err != nil {
 		return err
 	}
@@ -202,6 +232,10 @@ func storageName(s string) string {
 	if plainName.MatchString(s) && !windowsDeviceName.MatchString(s) && s != "machine.key" {
 		return s
 	}
+	return hashedName(s)
+}
+
+func hashedName(s string) string {
 	sum := sha256.Sum256([]byte(s))
 	return hex.EncodeToString(sum[:])
 }
@@ -221,12 +255,21 @@ func appTokenDir() (dir, appID string, err error) {
 
 // tokenPath returns the file holding the running app's token for provider,
 // and the app's ID.
-func tokenPath(provider string) (path, appID string, err error) {
+//
+// A token for one issuer is named after the provider and the issuer together.
+// The issuer is a URL, so that name is never a plain name and is always
+// hashed: it cannot collide with a provider's own file.
+func tokenPath(provider, issuer string) (path, appID string, err error) {
 	dir, appID, err := appTokenDir()
 	if err != nil {
 		return "", "", err
 	}
-	return filepath.Join(dir, storageName(provider)+".enc"), appID, nil
+	name := provider
+	if issuer != "" {
+		name = provider + "\x00" + issuer
+		return filepath.Join(dir, hashedName(name)+".enc"), appID, nil
+	}
+	return filepath.Join(dir, storageName(name)+".enc"), appID, nil
 }
 
 // deriveKey produces a 32-byte AES key for an app and provider, bound to a
@@ -240,7 +283,11 @@ func tokenPath(provider string) (path, appID string, err error) {
 // defence in depth, where protection reduces to the file permissions. Either
 // way the secret is machine-local, so *.enc files do not transfer between
 // machines. See [masterSecret] and [secretStore].
-func deriveKey(appID, provider string) ([]byte, error) {
+//
+// A token for one issuer adds the issuer as a third field. Without an issuer
+// the fields, and so the key, are what they were before issuers existed, so
+// tokens saved by earlier versions still decrypt.
+func deriveKey(appID, provider string, issuer ...string) ([]byte, error) {
 	secret, err := masterSecret()
 	if err != nil {
 		return nil, err
@@ -249,7 +296,11 @@ func deriveKey(appID, provider string) ([]byte, error) {
 	h.Write([]byte("bellui-auth-v3:"))
 	// Each field is length-prefixed, so no two (appID, provider) pairs hash
 	// the same bytes, whatever characters they contain.
-	for _, field := range []string{appID, provider} {
+	fields := []string{appID, provider}
+	if len(issuer) > 0 && issuer[0] != "" {
+		fields = append(fields, issuer[0])
+	}
+	for _, field := range fields {
 		var n [8]byte
 		binary.BigEndian.PutUint64(n[:], uint64(len(field)))
 		h.Write(n[:])
