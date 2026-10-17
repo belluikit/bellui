@@ -56,7 +56,9 @@ func TestIconCreditReachesEveryDesktopPackage(t *testing.T) {
 	// macOS: Info.plist, shown in the app's About box.
 	var plist bytes.Buffer
 	require.NoError(t, templates.InfoPlistDarwin.Execute(&plist, p.darwinInfo("notes")))
-	assert.Contains(t, plist.String(), "<key>NSHumanReadableCopyright</key>\n\t<string>"+templates.GopherCredit+"</string>")
+	// Separately, not as one string: Windows checks the template out with CRLF.
+	assert.Contains(t, plist.String(), "<key>NSHumanReadableCopyright</key>")
+	assert.Contains(t, plist.String(), "<string>"+templates.GopherCredit+"</string>")
 
 	// Windows: the exe's version resource, shown in its Properties.
 	assert.Equal(t, templates.GopherCredit, p.windowsVersionInfo("i.ico", "m.manifest").StringFileInfo.Comments)
