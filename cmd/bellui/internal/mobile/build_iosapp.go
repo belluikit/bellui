@@ -34,20 +34,7 @@ func goIOSBuild(pkg *packages.Package, bundleID string, archs []string,
 	}
 
 	projPbxproj := new(bytes.Buffer)
-	projData := projPbxprojTmplData{
-		BitcodeEnabled: bitcodeEnabled,
-		BundleID:       bundleID,
-		Certificate:    cert,
-		Debug:          !release,
-		Profile:        profile,
-		TeamID:         teamID,
-		Type:           "Manual",
-		Entitlements:   len(buildAssociatedDomains) > 0,
-	}
-	if profile == "" {
-		projData.Certificate = "iPhone Developer"
-		projData.Type = "Auto"
-	}
+	projData := iosProjectData(bundleID, cert, profile, teamID, release)
 	if err := projPbxprojTmpl.Execute(projPbxproj, projData); err != nil {
 		return nil, err
 	}
@@ -545,6 +532,27 @@ var infoplistTmpl = template.Must(template.New("infoplist").Parse(`<?xml version
 </plist>
 `))
 
+// iosProjectData is the data for the generated Xcode project, from the
+// arguments and the build settings (IOSDeploymentTarget among them).
+func iosProjectData(bundleID, cert, profile, teamID string, release bool) projPbxprojTmplData {
+	projData := projPbxprojTmplData{
+		BitcodeEnabled:   bitcodeEnabled,
+		BundleID:         bundleID,
+		Certificate:      cert,
+		Debug:            !release,
+		Profile:          profile,
+		TeamID:           teamID,
+		Type:             "Manual",
+		Entitlements:     len(buildAssociatedDomains) > 0,
+		DeploymentTarget: IOSDeploymentTarget(),
+	}
+	if profile == "" {
+		projData.Certificate = "iPhone Developer"
+		projData.Type = "Auto"
+	}
+	return projData
+}
+
 type projPbxprojTmplData struct {
 	BitcodeEnabled bool
 	BundleID       string
@@ -555,6 +563,10 @@ type projPbxprojTmplData struct {
 	// Entitlements is true when a main/main.entitlements file is generated (e.g.
 	// for Associated Domains / Universal Links) and must be code-signed in.
 	Entitlements bool
+	// DeploymentTarget is the lowest iOS version the app runs on, from
+	// IOSDeploymentTarget. It used to be a fixed 14.0, which Xcode 27 rejects
+	// (#410).
+	DeploymentTarget string
 }
 
 var projPbxprojTmpl = template.Must(template.New("projPbxproj").Parse(`// !$*UTF8*$!
@@ -712,7 +724,7 @@ var projPbxprojTmpl = template.Must(template.New("projPbxproj").Parse(`// !$*UTF
         GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
         GCC_WARN_UNUSED_FUNCTION = YES;
         GCC_WARN_UNUSED_VARIABLE = YES;
-        IPHONEOS_DEPLOYMENT_TARGET = 14.0;
+        IPHONEOS_DEPLOYMENT_TARGET = {{.DeploymentTarget}};
         MTL_ENABLE_DEBUG_INFO = {{if .Debug}}YES{{else}}NO{{end}};
         PRODUCT_BUNDLE_IDENTIFIER = {{.BundleID}};
         PROVISIONING_PROFILE_SPECIFIER = "{{.Profile}}";
