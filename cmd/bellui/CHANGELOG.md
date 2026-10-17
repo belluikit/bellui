@@ -10,6 +10,16 @@
 This file lists the main changes with each version of the Fyne tools project.
 More detailed release notes can be found on the [releases page](https://github.com/fyne-io/tools/releases).
 
+## Unreleased
+
+### Fixed
+
+* The web page `bellui package -os web` and `bellui serve` write now has a
+  viewport meta tag. Without it, phone browsers laid the app out 980 CSS px
+  wide, so it showed as a shrunken desktop page with a canvas of about six
+  times the pixels it needed (2940×6393 instead of 1206×2622 on a 402×874
+  @3x iPhone).
+
 ## v1.0.1 — 2026-10-16
 
 ### Fixed
