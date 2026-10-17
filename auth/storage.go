@@ -63,7 +63,11 @@ func SaveToken(provider, refreshToken, email string) error {
 		return err
 	}
 
-	return os.WriteFile(path, ciphertext, 0o600)
+	if err := os.WriteFile(path, ciphertext, 0o600); err != nil {
+		return err
+	}
+	removeLegacyToken(provider)
+	return nil
 }
 
 // LoadToken reads and decrypts the running app's stored refresh token for a
@@ -111,7 +115,34 @@ func ClearToken(provider string) error {
 	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 		return err
 	}
+	removeLegacyToken(provider)
 	return nil
+}
+
+// removeLegacyToken deletes the token bellui stored for provider before tokens
+// were kept per app: bellui-auth/<provider>.enc, shared by every app. No app
+// reads it any more, but it still holds a refresh token that decrypts, so it
+// is removed the first time any app saves or clears a token for that provider
+// (#355). It is best effort: a file that cannot be removed must not fail the
+// sign-in or sign-out that triggered it.
+//
+// Only a regular file directly inside bellui-auth is removed. A provider name
+// that is not a single path element never stored one there, and a directory of
+// that name is an app's token directory under the current layout.
+func removeLegacyToken(provider string) {
+	name := provider + ".enc"
+	if provider == "" || provider == "." || provider == ".." ||
+		strings.ContainsAny(provider, `/\`) || filepath.Base(name) != name {
+		return
+	}
+	dir, err := tokenDir()
+	if err != nil {
+		return
+	}
+	path := filepath.Join(dir, name)
+	if fi, err := os.Lstat(path); err == nil && fi.Mode().IsRegular() {
+		_ = os.Remove(path)
+	}
 }
 
 // userConfigDir is the source of the per-user config directory. It is a
