@@ -16,6 +16,14 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
 
 ### Added
 
+* **Two-finger pan scrolls**
+  ([#398](https://github.com/belluikit/bellui/issues/398)). Two fingers moving
+  together scroll what is under them, in both directions, on the web and on
+  desktop touchscreens. A page of charts or 3D views, which take one-finger drags
+  for themselves, can now be scrolled past them. Charts pass two-finger
+  scrolling on to the page; the x/dag canvas pans with it. Two fingers moving
+  apart or together over a Pinchable are still a pinch.
+
 * **Pinch-to-zoom** ([#379](https://github.com/belluikit/bellui/issues/379)).
   New `event.Pinchable` (`Pinched(*PinchEvent)`, `PinchEnded()`): two fingers
   on a Pinchable widget report the change in their distance and the point
