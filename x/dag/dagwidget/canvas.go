@@ -144,6 +144,7 @@ var (
 	_ event.SecondaryTappable = (*DAGCanvas)(nil)
 	_ event.Focusable         = (*DAGCanvas)(nil)
 	_ event.Scrollable        = (*DAGCanvas)(nil)
+	_ event.Pinchable         = (*DAGCanvas)(nil)
 	_ bellui.Shortcutable     = (*DAGCanvas)(nil)
 )
 
@@ -1704,8 +1705,22 @@ func (c *DAGCanvas) DragEnd() {
 
 // Scrolled handles zoom.
 func (c *DAGCanvas) Scrolled(ev *event.ScrollEvent) {
+	c.zoomAround(ev.Position, 1.0+ev.Scrolled.DY*0.002)
+}
+
+// Pinched zooms by the pinch's scale around the point between the fingers.
+func (c *DAGCanvas) Pinched(ev *event.PinchEvent) {
+	c.zoomAround(ev.Position, ev.Scale)
+}
+
+// PinchEnded is part of event.Pinchable; the zoom is already applied.
+func (c *DAGCanvas) PinchEnded() {}
+
+// zoomAround multiplies the zoom by factor, clamped to 0.1–3.0, keeping the
+// graph point under pos (in canvas coordinates) where it is.
+func (c *DAGCanvas) zoomAround(pos geo.Position, factor float32) {
 	oldZoom := c.Zoom
-	c.Zoom *= 1.0 + ev.Scrolled.DY*0.002
+	c.Zoom *= factor
 	if c.Zoom < 0.1 {
 		c.Zoom = 0.1
 	}
@@ -1713,10 +1728,9 @@ func (c *DAGCanvas) Scrolled(ev *event.ScrollEvent) {
 		c.Zoom = 3.0
 	}
 
-	// Zoom centered on cursor
-	cursorGraph := c.screenToGraphWithZoom(ev.Position, oldZoom)
-	c.Offset.X = cursorGraph.X - ev.Position.X/c.Zoom
-	c.Offset.Y = cursorGraph.Y - ev.Position.Y/c.Zoom
+	focus := c.screenToGraphWithZoom(pos, oldZoom)
+	c.Offset.X = focus.X - pos.X/c.Zoom
+	c.Offset.Y = focus.Y - pos.Y/c.Zoom
 	c.Refresh()
 }
 
