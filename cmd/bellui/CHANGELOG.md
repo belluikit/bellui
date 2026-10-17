@@ -14,6 +14,14 @@ More detailed release notes can be found on the [releases page](https://github.c
 
 ### Fixed
 
+* `bellui package -os iossimulator` links again
+  ([#10](https://github.com/belluikit/bellui/issues/10)). Go builds the device
+  and the Simulator alike, so the WebGPU libraries pick their archive by the
+  `iossimulator` build tag, which the CLI never set: Simulator builds linked
+  the device archive and failed with "building for 'iOS-simulator', but
+  linking in object file … built for 'iOS'". The tag is now added for every
+  build against the Simulator SDK.
+
 * The web page `bellui package -os web` and `bellui serve` write now has a
   viewport meta tag. Without it, phone browsers laid the app out 980 CSS px
   wide, so it showed as a shrunken desktop page with a canvas of about six
