@@ -63,6 +63,15 @@ func TestIndexReportsMissingWebGPUInChrome(t *testing.T) {
 	if chrome == "" {
 		t.Skip("needs Chrome")
 	}
+	// The first run of a freshly installed Chrome on CI's macOS machines took
+	// 70-80 s, whatever the flags, while every later run took under a second:
+	// the system checks the app on its first launch. Pay that once, untimed by
+	// the cases below, and record it.
+	warm, cancelWarm := context.WithTimeout(context.Background(), 4*time.Minute)
+	start := time.Now()
+	_ = exec.CommandContext(warm, chrome, "--version").Run()
+	cancelWarm()
+	t.Logf("Chrome warm-up (--version) took %v", time.Since(start).Round(time.Millisecond))
 	for _, tc := range []struct {
 		name   string
 		webgpu bool
