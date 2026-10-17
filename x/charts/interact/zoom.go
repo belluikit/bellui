@@ -57,9 +57,22 @@ func (z *ZoomState) ZoomAt(delta float64, centerNorm float64) bool {
 	if !z.Config.Enabled {
 		return false
 	}
+	return z.zoomToSpan(z.Window.Span()*(1-delta*z.Config.ZoomSensitivity), centerNorm)
+}
 
+// ZoomBy zooms by factor around centerNorm (0..1 across the chart): above 1
+// zooms in, showing span/factor of the data, below 1 zooms out. Used for
+// pinch gestures, whose scale is a factor rather than a scroll delta.
+// Returns true if the window changed.
+func (z *ZoomState) ZoomBy(factor float64, centerNorm float64) bool {
+	if !z.Config.Enabled || factor <= 0 {
+		return false
+	}
+	return z.zoomToSpan(z.Window.Span()/factor, centerNorm)
+}
+
+func (z *ZoomState) zoomToSpan(newSpan float64, centerNorm float64) bool {
 	span := z.Window.Span()
-	newSpan := span * (1 - delta*z.Config.ZoomSensitivity)
 	newSpan = mathutil.Clamp(newSpan, z.Config.MinSpan, z.Config.MaxSpan)
 
 	// Use epsilon comparison to avoid floating-point precision trapping
