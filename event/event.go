@@ -136,6 +136,30 @@ type Draggable interface {
 	DragEnd()
 }
 
+// PinchEvent describes one step of a two-finger pinch. Position and
+// AbsolutePosition are the focus, the midpoint between the fingers, relative
+// to the receiving object and to the canvas. Scale is relative to the previous
+// event of the same pinch: above 1 the fingers moved apart (zoom in), below 1
+// they moved together. Multiply successive values for the total.
+//
+// Since: 1.2
+type PinchEvent struct {
+	PointEvent
+	Scale float32
+}
+
+// Pinchable is implemented by objects that respond to a two-finger pinch, such
+// as zoomable canvases. The object under the midpoint of the two fingers when
+// the second one lands receives Pinched for each move and PinchEnded once when
+// either finger lifts. While a pinch runs, neither finger produces taps,
+// drags or scrolling.
+//
+// Since: 1.2
+type Pinchable interface {
+	Pinched(*PinchEvent)
+	PinchEnded()
+}
+
 // Focusable describes any CanvasObject that can respond to being focused.
 type Focusable interface {
 	FocusGained()

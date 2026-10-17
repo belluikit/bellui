@@ -103,6 +103,13 @@ type TouchHandler struct {
 	longPressGen   int          // monotonic arm generation, never reused
 	longPressArmed map[int]int  // generation of the pending fire per touch; dropping it cancels the fire
 	longPressFired map[int]bool // hold-fire happened for this touch
+
+	// contacts, pinch and pinchSpent recognise two-finger pinches (pinch.go,
+	// #379): every contact that is down, the pinch in progress, and the
+	// contacts used up by a pinch, whose release must not produce a tap.
+	contacts   map[int]geo.Position
+	pinch      *pinchState
+	pinchSpent map[int]bool
 }
 
 // InitTouchHandler initializes the maps. Call from the canvas constructor.
@@ -118,6 +125,10 @@ func (h *TouchHandler) InitTouchHandler(finder ObjectFinder) {
 
 // TapDown handles a pointer-down event.
 func (h *TouchHandler) TapDown(pos geo.Position, tapID int) {
+	h.trackContact(tapID, pos)
+	if h.startPinch(tapID) {
+		return
+	}
 	h.LastTapDown[tapID] = time.Now()
 	h.LastTapDownPos[tapID] = pos
 	h.Dragging = nil
@@ -262,6 +273,9 @@ func (h *TouchHandler) hideToolTip() {
 func (h *TouchHandler) TapMove(pos geo.Position, tapID int,
 	dragCallback func(event.Draggable, *event.DragEvent),
 ) {
+	if h.pinchMove(pos, tapID) {
+		return
+	}
 	previousPos := h.LastTapDownPos[tapID]
 	deltaX := pos.X - previousPos.X
 	deltaY := pos.Y - previousPos.Y
@@ -368,6 +382,9 @@ func (h *TouchHandler) TapUp(pos geo.Position, tapID int,
 	doubleTapCallback func(event.DoubleTappable, *event.PointEvent),
 	dragCallback func(event.Draggable, *event.DragEvent),
 ) {
+	if h.pinchRelease(tapID) {
+		return
+	}
 	// The gesture is over: dismiss any long-press tooltip it summoned (pre-rebrand tracker #827)
 	// and cancel any pending hold-fire, whatever kind of tap/drag it turns
 	// out to be.
@@ -488,6 +505,9 @@ func (h *TouchHandler) TapUp(pos geo.Position, tapID int,
 // platform does not report one, so it is used for the cancel event only, never
 // for hit testing.
 func (h *TouchHandler) TapCancel(pos geo.Position, tapID int) {
+	if h.pinchRelease(tapID) {
+		return
+	}
 	h.hideToolTip()
 	h.cancelLongPress(tapID)
 	h.TouchCancelLock.Lock()
