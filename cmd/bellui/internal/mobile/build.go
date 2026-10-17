@@ -305,13 +305,17 @@ func RunNewBuild(target, appID, icon, name, version string, build int, release, 
 	return runBuild(cmd)
 }
 
+// MinIOSVersion is the lowest iOS version bellui apps support, the default of
+// -iosversion. Xcode 27 builds for nothing older than iOS 15 (#410).
+const MinIOSVersion = "15.0"
+
 func addBuildFlags(cmd *command) {
 	cmd.Flag.StringVar(&buildO, "o", "", "")
 	cmd.Flag.StringVar(&buildGcflags, "gcflags", "", "")
 	cmd.Flag.StringVar(&buildLdflags, "ldflags", "", "")
 	cmd.Flag.StringVar(&buildTarget, "os", "android", "")
 	cmd.Flag.StringVar(&buildBundleID, "bundleid", "", "")
-	cmd.Flag.StringVar(&buildIOSVersion, "iosversion", "14.0", "")
+	cmd.Flag.StringVar(&buildIOSVersion, "iosversion", MinIOSVersion, "")
 	cmd.Flag.IntVar(&buildAndroidAPI, "androidapi", minAndroidAPI, "")
 
 	cmd.Flag.BoolVar(&buildA, "a", false, "")

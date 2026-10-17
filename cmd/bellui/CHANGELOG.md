@@ -12,6 +12,16 @@ More detailed release notes can be found on the [releases page](https://github.c
 
 ## Unreleased
 
+### Changed
+
+* **iOS apps now need iOS 15 or later**
+  ([#410](https://github.com/belluikit/bellui/issues/410)). Xcode 27 builds
+  for nothing older, and every `bellui package -os ios` or `-os iossimulator`
+  failed with "The iOS deployment target … is set to 14.0, but the range of
+  supported deployment target versions is 15.0 to 27.1.x". `-iosversion` now
+  defaults to 15.0, and the generated Xcode project uses it; it used to be
+  fixed at 14.0 whatever the flag said.
+
 ### Fixed
 
 * The web page `bellui package -os web` and `bellui serve` write now has a
