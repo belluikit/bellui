@@ -12,6 +12,17 @@ This file lists the main changes with each version of Bellui. Entries up to
 after them describe the trendvidia fork (github.com/trendvidia/fyne) that
 became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
 
+## Unreleased
+
+### Fixed
+
+* **Web: touch works on phones and tablets**
+  ([#378](https://github.com/belluikit/bellui/issues/378)). Only the click a
+  browser synthesises after a tap reached the app, so nothing could be scrolled
+  or dragged by finger. Finger contacts now go through the same gesture
+  handler as the mobile driver — drags, flick scrolling, long-press and
+  double-tap — and the page no longer pans or zooms under the app.
+
 ## v1.1.2 — 2026-10-16
 
 Fixes a memory leak that every app had: content removed from a window was
