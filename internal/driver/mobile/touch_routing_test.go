@@ -138,3 +138,36 @@ func Test_driver_ExploreTouchInAClosedWindowDoesNotTap(t *testing.T) {
 	assert.Zero(t, underTaps.Load())
 	assert.Nil(t, d.tbPass.win, "the stream no longer holds the closed window")
 }
+
+// A touch stays on the path it began on when a screen reader is switched on
+// or off while the finger is down. Its release used to go to the other path,
+// which never saw it go down and ignored it, so nothing ended it.
+func Test_driver_TouchKeepsItsPathWhenExplorationToggles(t *testing.T) {
+	d := &driver{}
+	w := d.CreateWindow("toggle").(*window)
+	rec := newCancelRecorder()
+	w.SetContent(rec)
+	w.Show()
+	w.canvas.Resize(geo.NewSize(200, 200))
+	closeOnCleanup(t, w)
+	m := middle(w)
+
+	// Began with exploration off, ends with it on: the release still ends it.
+	d.routeTouch(w, touch.Event{X: m, Y: m, Sequence: 0, Type: touch.TypeBegin}, false)
+	d.routeTouch(w, touch.Event{X: m, Y: m, Sequence: 0, Type: touch.TypeEnd}, true)
+	assert.Equal(t, 1, rec.touchUp, "the release reached the canvas")
+	assert.Empty(t, d.touchWindows)
+
+	// Began as a passthrough stream with exploration on, ends with it off:
+	// the stream's release reaches the canvas too, and the stream is over.
+	d.routeTouch(w, touch.Event{X: m, Y: m, Sequence: 0, Type: touch.TypeBegin}, true)
+	d.tbHoldQualify(d.tbPass.gen)
+	d.routeTouch(w, touch.Event{X: m, Y: m, Sequence: 0, Type: touch.TypeEnd}, false)
+	assert.Equal(t, 2, rec.touchUp, "the stream's release reached the canvas")
+	assert.False(t, d.tbPass.dispatched, "the stream ended")
+
+	// A begin takes the path the screen reader's state says.
+	d.routeTouch(w, touch.Event{X: m, Y: m, Sequence: 0, Type: touch.TypeBegin}, true)
+	assert.True(t, d.tbPass.tracking, "a touch that begins under the screen reader is gated")
+	assert.Empty(t, d.touchWindows)
+}
