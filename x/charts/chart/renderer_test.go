@@ -532,3 +532,24 @@ func TestChartRenderer_LayoutSameSizeDoesNotRebuild(t *testing.T) {
 		t.Error("a resize must still rebuild the chart")
 	}
 }
+
+// A touch scroll — a two-finger pan — passes through a chart to the page
+// around it; a wheel scroll still zooms (#398).
+func TestChart_TouchScrollPassesThrough(t *testing.T) {
+	_ = test.NewApp()
+	c := New(Option{
+		DataZoom: &interact.ZoomConfig{Enabled: true, MinSpan: 0.01, MaxSpan: 1, ZoomSensitivity: 0.05},
+		Series:   []series.Series{&series.LineSeries{SeriesName: "A", Data: []float64{1, 2, 3, 4}}},
+	})
+	c.Resize(fyne800x600())
+	at := event.PointEvent{Position: geo.NewPos(400, 300)}
+	if c.TryScrolled(&event.ScrollEvent{PointEvent: at, Scrolled: geo.NewDelta(0, 3), Source: event.ScrollSourceTouch}) {
+		t.Error("a touch scroll must not be consumed by the chart")
+	}
+	if w := c.ZoomWindow(); w.Span() < 0.999 {
+		t.Errorf("a touch scroll must not zoom, span %v", w.Span())
+	}
+	if !c.TryScrolled(&event.ScrollEvent{PointEvent: at, Scrolled: geo.NewDelta(0, 3), Source: event.ScrollSourceMouseWheel}) {
+		t.Error("a wheel scroll should still zoom the chart")
+	}
+}

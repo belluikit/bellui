@@ -25,12 +25,40 @@ import (
 // fresh down on an id clears whatever that id was spent on before — and ends
 // the pinch it belonged to, whose release was lost.
 
+// Two fingers make a two-finger gesture whether or not a Pinchable is under
+// them, classified once the fingers have moved (#398): once their distance or
+// their midpoint has moved twoFingerSlop, a distance change at least as large
+// as the midpoint's movement makes it a pinch (over a Pinchable; a one-handed
+// pinch moves one finger, so the midpoint moves half as far as the distance
+// changes), and anything else a pan, which scrolls like a one-finger flick
+// (ScrollCallback, ScrollEndCallback) from the gesture's starting point.
+// Scrolls pass from the widget under the fingers out to the scroll containers
+// around it, so two fingers scroll a page past a widget that keeps one-finger
+// drags for itself (a chart, the data grid).
 type pinchState struct {
-	target event.Pinchable
+	target event.Pinchable // nil when no Pinchable is under the fingers
 	ids    [2]int
-	dist   float32      // finger distance at the previous Pinched
+	dist   float32      // finger distance at the previous Pinched (fixed while undecided)
 	origin geo.Position // canvas position of the target's origin
+
+	mode    twoFingerMode
+	down    [2]geo.Position // where each finger was when the second one landed
+	start   geo.Position    // midpoint when the second finger landed: the pan's scroll origin
+	lastMid geo.Position    // midpoint at the previous pan step
+	lastPan geo.Delta       // the previous pan step, the momentum seed on release
 }
+
+type twoFingerMode int
+
+const (
+	twoFingerUndecided twoFingerMode = iota
+	twoFingerPinch
+	twoFingerPan
+)
+
+// twoFingerSlop is how far the finger distance or the midpoint must move
+// before a two-finger gesture is classified as a pinch or a pan.
+const twoFingerSlop = 10
 
 // trackContact records a contact that went down, for pinch recognition. A
 // down on an id means any earlier contact with that id is over, whether or not
@@ -52,12 +80,19 @@ func (h *TouchHandler) endPinchOf(tapID int) {
 	h.pinch = nil
 	delete(h.contacts, p.ids[0])
 	delete(h.contacts, p.ids[1])
-	p.target.PinchEnded()
+	switch p.mode {
+	case twoFingerPinch:
+		p.target.PinchEnded()
+	case twoFingerPan:
+		if h.ScrollEndCallback != nil {
+			h.ScrollEndCallback(p.start, p.lastPan)
+		}
+	}
 }
 
 // startPinch turns the contact that just went down and the one already down
-// into a pinch, if there are exactly two and a Pinchable is under their
-// midpoint. It reports whether it did.
+// into a two-finger gesture, if there are exactly two. It reports whether it
+// did. A Pinchable under their midpoint, if any, is the pinch target.
 func (h *TouchHandler) startPinch(tapID int) bool {
 	if h.pinch != nil || len(h.contacts) != 2 {
 		return false
@@ -74,8 +109,11 @@ func (h *TouchHandler) startPinch(tapID int) bool {
 		_, ok := o.(event.Pinchable)
 		return ok
 	})
-	target, ok := co.(event.Pinchable)
-	if !ok {
+	target, _ := co.(event.Pinchable)
+	// Without a Pinchable the gesture can only pan, and a first finger that
+	// already latched its own drag or scroll keeps it: a second contact then
+	// (a palm, a resting thumb) must not take the drag away.
+	if target == nil && ((h.Dragging != nil && h.draggingID == other) || (h.scrolling && h.scrollingID == other)) {
 		return false
 	}
 
@@ -100,21 +138,60 @@ func (h *TouchHandler) startPinch(tapID int) bool {
 	}
 
 	h.pinch = &pinchState{
-		target: target,
-		ids:    [2]int{other, tapID},
-		dist:   distance(a, b),
-		origin: mid.Subtract(objPos),
+		target:  target,
+		ids:     [2]int{other, tapID},
+		dist:    distance(a, b),
+		origin:  mid.Subtract(objPos),
+		down:    [2]geo.Position{a, b},
+		start:   mid,
+		lastMid: mid,
 	}
 	h.pinchSpent[other] = true
 	h.pinchSpent[tapID] = true
 	return true
 }
 
-// movePinch dispatches one Pinched for a move of either pinch finger. A move
-// that does not change the distance still reports the new focus, with scale 1.
-func (h *TouchHandler) movePinch() {
+// movePinch handles a move of either finger of the two-finger gesture:
+// classifying it on the first decisive move, then pinching or panning. It
+// reports false when the gesture dissolved instead — the move must then be
+// handled as an ordinary single-finger one.
+func (h *TouchHandler) movePinch() bool {
 	p := h.pinch
 	a, b := h.contacts[p.ids[0]], h.contacts[p.ids[1]]
+	mid := midpoint(a, b)
+	if p.mode == twoFingerUndecided {
+		spread := float32(math.Abs(float64(distance(a, b) - p.dist)))
+		moved := distance(mid, p.start)
+		switch {
+		case spread < twoFingerSlop && moved < twoFingerSlop:
+			return true
+		case p.target != nil && spread >= moved:
+			p.mode = twoFingerPinch
+		case p.target != nil || movedTogether(p.down[0], a, p.down[1], b):
+			p.mode = twoFingerPan
+		default:
+			// No Pinchable and only one finger moving: not a two-finger
+			// gesture after all (a resting palm or thumb beside a dragging
+			// finger). Hand both contacts back to single-finger handling.
+			h.dissolveTwoFinger()
+			return false
+		}
+	}
+	if p.mode == twoFingerPan {
+		delta := geo.Delta{DX: mid.X - p.lastMid.X, DY: mid.Y - p.lastMid.Y}
+		p.lastMid = mid
+		if delta == (geo.Delta{}) {
+			return true
+		}
+		p.lastPan = delta
+		if h.ScrollCallback != nil {
+			h.ScrollCallback(p.start, delta)
+		}
+		return true
+	}
+
+	// A pinch. A move that does not change the distance still reports the new
+	// focus, with scale 1, so the content follows the fingers.
 	scale := float32(1)
 	if d := distance(a, b); d > 0 {
 		if p.dist > 0 {
@@ -122,11 +199,11 @@ func (h *TouchHandler) movePinch() {
 		}
 		p.dist = d // fingers that landed together are measured from here
 	}
-	mid := midpoint(a, b)
 	p.target.Pinched(&event.PinchEvent{
 		PointEvent: event.PointEvent{AbsolutePosition: mid, Position: mid.Subtract(p.origin)},
 		Scale:      scale,
 	})
+	return true
 }
 
 // pinchMove handles a move of a contact that is, or was, part of a pinch, and
@@ -136,8 +213,9 @@ func (h *TouchHandler) pinchMove(pos geo.Position, tapID int) bool {
 		h.contacts[tapID] = pos
 	}
 	if p := h.pinch; p != nil && (tapID == p.ids[0] || tapID == p.ids[1]) {
-		h.movePinch()
-		return true
+		if h.movePinch() {
+			return true
+		}
 	}
 	return h.pinchSpent[tapID]
 }
@@ -159,6 +237,30 @@ func (h *TouchHandler) pinchRelease(tapID int) bool {
 	h.TouchCancelLock.Unlock()
 	h.forgetTouch(tapID)
 	return true
+}
+
+// dissolveTwoFinger abandons an undecided two-finger gesture: both contacts
+// stop being spent and go down again as single contacts where they first
+// touched, so the moving one drags or scrolls as it would have alone.
+func (h *TouchHandler) dissolveTwoFinger() {
+	p := h.pinch
+	h.pinch = nil
+	for i, id := range p.ids {
+		delete(h.pinchSpent, id)
+		h.tapDownSingle(p.down[i], id)
+	}
+}
+
+// movedTogether reports whether both fingers moved, in roughly the same
+// direction — a pan — rather than one moving beside a resting one.
+func movedTogether(a0, a, b0, b geo.Position) bool {
+	ax, ay := a.X-a0.X, a.Y-a0.Y
+	bx, by := b.X-b0.X, b.Y-b0.Y
+	half := float32(twoFingerSlop / 2)
+	if distance(a0, a) < half || distance(b0, b) < half {
+		return false
+	}
+	return ax*bx+ay*by > 0
 }
 
 func midpoint(a, b geo.Position) geo.Position {
