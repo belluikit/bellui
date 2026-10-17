@@ -131,6 +131,12 @@ func (h *TouchHandler) TapDown(pos geo.Position, tapID int) {
 	if h.startPinch(tapID) {
 		return
 	}
+	h.tapDownSingle(pos, tapID)
+}
+
+// tapDownSingle is TapDown for a contact handled on its own, not as part of a
+// two-finger gesture — also used when such a gesture dissolves (pinch.go).
+func (h *TouchHandler) tapDownSingle(pos geo.Position, tapID int) {
 	h.LastTapDown[tapID] = time.Now()
 	h.LastTapDownPos[tapID] = pos
 	h.Dragging = nil

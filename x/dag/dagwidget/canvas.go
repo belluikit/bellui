@@ -1707,7 +1707,21 @@ func (c *DAGCanvas) DragEnd() {
 
 // Scrolled handles zoom.
 func (c *DAGCanvas) Scrolled(ev *event.ScrollEvent) {
+	c.TryScrolled(ev)
+}
+
+// TryScrolled zooms on a wheel or touchpad scroll. A touch scroll — a
+// two-finger pan (#398) — pans the graph with the fingers instead, the way a
+// one-finger drag does; on touch the canvas zooms by pinch.
+func (c *DAGCanvas) TryScrolled(ev *event.ScrollEvent) bool {
+	if ev.Source == event.ScrollSourceTouch {
+		c.Offset.X -= ev.Scrolled.DX / c.Zoom
+		c.Offset.Y -= ev.Scrolled.DY / c.Zoom
+		c.Refresh()
+		return true
+	}
 	c.zoomAround(ev.Position, ev.Position, 1.0+ev.Scrolled.DY*0.002)
+	return true
 }
 
 // Pinched zooms by the pinch's scale around the point between the fingers,
