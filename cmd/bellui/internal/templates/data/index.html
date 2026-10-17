@@ -63,63 +63,93 @@
 				}
 			}
 
+			// webgpu_support resolves to whether the browser can give this page a
+			// WebGPU adapter. navigator.gpu alone is not enough: some browsers
+			// (and iOS in Lockdown Mode) expose it and then return no adapter,
+			// which used to leave a blank page (#384).
+			async function webgpu_support() {
+				try {
+					return !!navigator.gpu && !!(await navigator.gpu.requestAdapter());
+				} catch(e) {
+					return false;
+				}
+			}
+
+			function report_error(message) {
+				var action = document.getElementById("action");
+				action.innerHTML = message;
+				action.className = "action-error";
+			}
+
 			function download_application() {
+{{- if .WebGPU}}
+				webgpu_support().then(function(ok) {
+					if (ok) {
+						start_application();
+					} else {
+						report_error("This browser does not support WebGPU, which this application needs. Try a recent version of Chrome, Edge or Safari.");
+					}
+				});
+{{- else}}
+				if (webgl_support()) {
+					start_application();
+				} else {
+					report_error("WebGL is not supported in your browser");
+				}
+{{- end}}
+			}
+
+			function start_application() {
 				var action = document.getElementById("action");
 				var main = document.getElementById("main");
 
-				if (webgl_support()) {
-					if (WebAssembly) {
-						action.innerHTML = "Downloading wasm_exec.js"
-						async_load("wasm_exec.js", function(){
-							// WebAssembly.instantiateStreaming is not currently available in Safari
-							if (WebAssembly && !WebAssembly.instantiateStreaming) { // polyfill
-								WebAssembly.instantiateStreaming = async (resp, importObject) => {
-									const source = await (await resp).arrayBuffer();
-									return await WebAssembly.instantiate(source, importObject);
-								};
+				if (WebAssembly) {
+					action.innerHTML = "Downloading wasm_exec.js"
+					async_load("wasm_exec.js", function(){
+						// WebAssembly.instantiateStreaming is not currently available in Safari
+						if (WebAssembly && !WebAssembly.instantiateStreaming) { // polyfill
+							WebAssembly.instantiateStreaming = async (resp, importObject) => {
+								const source = await (await resp).arrayBuffer();
+								return await WebAssembly.instantiate(source, importObject);
+							};
+						}
+
+						action.innerHTML = "Downloading web assembly file.";
+
+						const go = new Go();
+
+						// Hide the loading screen when Bellui creates its canvas
+						var observer = new MutationObserver(function(mutations) {
+							if (document.querySelector("canvas")) {
+								main.style.display = "none";
+								observer.disconnect();
 							}
-
-							action.innerHTML = "Downloading web assembly file.";
-
-							const go = new Go();
-
-							// Hide the loading screen when Bellui creates its canvas
-							var observer = new MutationObserver(function(mutations) {
-								if (document.querySelector("canvas")) {
-									main.style.display = "none";
-									observer.disconnect();
-								}
-							});
-							observer.observe(document.body, {childList: true, subtree: true});
-							// Reject a failed download (404, network error) so the page
-							// reports it instead of showing "Downloading" forever.
-							const wasmResponse = fetch("{{.WasmFile}}").then((resp) => {
-								if (!resp.ok) {
-									throw new Error("HTTP " + resp.status + " for {{.WasmFile}}");
-								}
-								return resp;
-							});
-							WebAssembly.instantiateStreaming(wasmResponse, go.importObject).then((result) => {
-								action.innerHTML = "Starting application.";
-								// The WebGPU backend's zero-copy JS bridge reads
-								// globalThis.wasm.instance.exports.mem.buffer, so the instance
-								// must be exposed as window.wasm before the app runs (see
-								// docs/webgpu.md). Harmless for the WebGL (-tags gl) build.
-								window.wasm = result;
-								go.run(result.instance);
-							}).catch((err) => {
-								console.error(err);
-								action.innerHTML = "Could not load the application: " + err.message;
-								action.className = "action-error";
-							});
-						})
-					} else {
-						action.innerHTML = "WebAssembly is not supported in your browser";
-						action.className = "action-error"
-					}
+						});
+						observer.observe(document.body, {childList: true, subtree: true});
+						// Reject a failed download (404, network error) so the page
+						// reports it instead of showing "Downloading" forever.
+						const wasmResponse = fetch("{{.WasmFile}}").then((resp) => {
+							if (!resp.ok) {
+								throw new Error("HTTP " + resp.status + " for {{.WasmFile}}");
+							}
+							return resp;
+						});
+						WebAssembly.instantiateStreaming(wasmResponse, go.importObject).then((result) => {
+							action.innerHTML = "Starting application.";
+							// The WebGPU backend's zero-copy JS bridge reads
+							// globalThis.wasm.instance.exports.mem.buffer, so the instance
+							// must be exposed as window.wasm before the app runs (see
+							// docs/webgpu.md). Harmless for the WebGL (-tags gl) build.
+							window.wasm = result;
+							go.run(result.instance);
+						}).catch((err) => {
+							console.error(err);
+							action.innerHTML = "Could not load the application: " + err.message;
+							action.className = "action-error";
+						});
+					})
 				} else {
-					action.innerHTML = "WebGL is not supported in your browser";
-					action.className = "action-error"
+					report_error("WebAssembly is not supported in your browser");
 				}
 			}
 		</script>
