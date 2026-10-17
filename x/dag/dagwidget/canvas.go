@@ -96,6 +96,8 @@ type DAGCanvas struct {
 	pendingEdge      *pendingConnection
 	pendingGroupLink *pendingGroupEdge
 	pendingNodeLink  *pendingNodeLink
+	pinching         bool         // a pinch is running; pinchFocus is its last focus
+	pinchFocus       geo.Position // canvas position between the fingers at the last Pinched
 
 	// Undo/redo. NewDAGCanvas installs a stack whose OnChange is wired to
 	// OnGraphChanged; a consumer replacing the stack should re-wire OnChange
@@ -1705,20 +1707,31 @@ func (c *DAGCanvas) DragEnd() {
 
 // Scrolled handles zoom.
 func (c *DAGCanvas) Scrolled(ev *event.ScrollEvent) {
-	c.zoomAround(ev.Position, 1.0+ev.Scrolled.DY*0.002)
+	c.zoomAround(ev.Position, ev.Position, 1.0+ev.Scrolled.DY*0.002)
 }
 
-// Pinched zooms by the pinch's scale around the point between the fingers.
+// Pinched zooms by the pinch's scale around the point between the fingers,
+// and pans with them: the graph point that was between the fingers at the
+// previous step is moved to where they are now.
 func (c *DAGCanvas) Pinched(ev *event.PinchEvent) {
-	c.zoomAround(ev.Position, ev.Scale)
+	from := ev.Position
+	if c.pinching {
+		from = c.pinchFocus
+	}
+	c.pinching = true
+	c.pinchFocus = ev.Position
+	c.zoomAround(from, ev.Position, ev.Scale)
 }
 
 // PinchEnded is part of event.Pinchable; the zoom is already applied.
-func (c *DAGCanvas) PinchEnded() {}
+func (c *DAGCanvas) PinchEnded() {
+	c.pinching = false
+}
 
-// zoomAround multiplies the zoom by factor, clamped to 0.1–3.0, keeping the
-// graph point under pos (in canvas coordinates) where it is.
-func (c *DAGCanvas) zoomAround(pos geo.Position, factor float32) {
+// zoomAround multiplies the zoom by factor, clamped to 0.1–3.0, and moves the
+// graph point under from to under pos (both in canvas coordinates); with from
+// equal to pos that point stays where it is.
+func (c *DAGCanvas) zoomAround(from, pos geo.Position, factor float32) {
 	oldZoom := c.Zoom
 	c.Zoom *= factor
 	if c.Zoom < 0.1 {
@@ -1728,7 +1741,7 @@ func (c *DAGCanvas) zoomAround(pos geo.Position, factor float32) {
 		c.Zoom = 3.0
 	}
 
-	focus := c.screenToGraphWithZoom(pos, oldZoom)
+	focus := c.screenToGraphWithZoom(from, oldZoom)
 	c.Offset.X = focus.X - pos.X/c.Zoom
 	c.Offset.Y = focus.Y - pos.Y/c.Zoom
 	c.Refresh()

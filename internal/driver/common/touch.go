@@ -121,6 +121,8 @@ func (h *TouchHandler) InitTouchHandler(finder ObjectFinder) {
 	h.Touched = make(map[int]mobile.Touchable)
 	h.longPressArmed = make(map[int]int)
 	h.longPressFired = make(map[int]bool)
+	h.contacts = make(map[int]geo.Position)
+	h.pinchSpent = make(map[int]bool)
 }
 
 // TapDown handles a pointer-down event.

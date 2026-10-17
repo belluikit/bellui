@@ -140,7 +140,8 @@ type Draggable interface {
 // AbsolutePosition are the focus, the midpoint between the fingers, relative
 // to the receiving object and to the canvas. Scale is relative to the previous
 // event of the same pinch: above 1 the fingers moved apart (zoom in), below 1
-// they moved together. Multiply successive values for the total.
+// they moved together, and exactly 1 when they moved without spreading or
+// closing (the focus moved). Multiply successive values for the total.
 //
 // Since: 1.2
 type PinchEvent struct {
