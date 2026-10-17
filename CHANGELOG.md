@@ -29,11 +29,19 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
   well as a provider, so an app that signs in to two issuers under one provider
   name (two Keycloak realms, two Okta tenants) keeps a token for each; with
   one token per provider name, the second sign-in replaced the first.
-  `widget.AuthButton` saves this way when its `Issuer` is the app's own.
-  **Behaviour change:** a token saved by an "okta", "keycloak" or "custom"
-  button with an `Issuer` is read back with `auth.LoadTokenFor(provider,
-  issuer)`, not `auth.LoadToken(provider)`. Google, Microsoft, Apple and
-  GitHub buttons are unchanged, and tokens already on disk still load.
+  `widget.AuthButton` saves this way with its `Issuer`; an empty `Issuer`, or
+  the provider preset's own, is the same as no issuer.
+  **Behaviour change:** a button whose `Issuer` is not the preset's (every
+  "okta", "keycloak" and "custom" button, and a "microsoft" button set to one
+  tenant) saves a token that is read back with `auth.LoadTokenFor(provider,
+  issuer)` and removed with `auth.ClearTokenFor(provider, issuer)`.
+  `auth.LoadToken(provider)` no longer finds it and `auth.ClearToken(provider)`
+  no longer removes it, so an app that signs out with `ClearToken` leaves the
+  refresh token on disk until it switches. A token saved before upgrading
+  stays in the provider's old file, where `LoadToken` still reads it; an app
+  that switches to `LoadTokenFor` can remove it with one `ClearToken` call.
+  Buttons on a preset issuer (Google, Apple, GitHub, Microsoft's common
+  endpoint) are unchanged.
 
 * **Pinch-to-zoom** ([#379](https://github.com/belluikit/bellui/issues/379)).
   New `event.Pinchable` (`Pinched(*PinchEvent)`, `PinchEnded()`): two fingers
