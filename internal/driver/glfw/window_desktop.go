@@ -169,6 +169,8 @@ type window struct {
 	// every TouchBegin, and momentum ticks stop when their generation is no
 	// longer current. Main-goroutine state, like the long-press fields below.
 	touchScrollGen int
+	// touchScroll is the current touch gesture's scroll chain (#416).
+	touchScroll touchScrollLatch
 
 	// Press-and-hold long-press dispatch (#266) on the mouse path — real
 	// mouse holds, and emulated touch where the touch callback never fires
