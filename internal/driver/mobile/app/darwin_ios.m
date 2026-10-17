@@ -430,29 +430,40 @@ continueUserActivity:(NSUserActivity *)userActivity
 #define TOUCH_TYPE_BEGIN 0 // touch.TypeBegin
 #define TOUCH_TYPE_MOVE  1 // touch.TypeMove
 #define TOUCH_TYPE_END   2 // touch.TypeEnd
+#define TOUCH_TYPE_CANCEL 3 // touch.TypeCancel
 
-static void sendTouches(int change, NSSet* touches) {
+// sendTouches reports touches to Go. fresh says that no other touch is down:
+// every touch of the event is one of these, so any id Go still holds is from a
+// touch whose end UIKit never reported, and can be freed (#392).
+static void sendTouches(int change, NSSet* touches, UIEvent* event) {
 	CGFloat scale = [UIScreen mainScreen].nativeScale;
+	BOOL fresh = YES;
+	for (UITouch* t in [event allTouches]) {
+		if (![touches containsObject:t]) {
+			fresh = NO;
+			break;
+		}
+	}
 	for (UITouch* touch in touches) {
 		CGPoint p = [touch locationInView:touch.view];
-		sendTouch((GoUintptr)touch, (GoUintptr)change, p.x*scale, p.y*scale);
+		sendTouch((GoUintptr)touch, (GoUintptr)change, p.x*scale, p.y*scale, fresh ? 1 : 0);
 	}
 }
 
 - (void)touchesBegan:(NSSet*)touches withEvent:(UIEvent*)event {
-	sendTouches(TOUCH_TYPE_BEGIN, touches);
+	sendTouches(TOUCH_TYPE_BEGIN, touches, event);
 }
 
 - (void)touchesMoved:(NSSet*)touches withEvent:(UIEvent*)event {
-	sendTouches(TOUCH_TYPE_MOVE, touches);
+	sendTouches(TOUCH_TYPE_MOVE, touches, event);
 }
 
 - (void)touchesEnded:(NSSet*)touches withEvent:(UIEvent*)event {
-	sendTouches(TOUCH_TYPE_END, touches);
+	sendTouches(TOUCH_TYPE_END, touches, event);
 }
 
 - (void)touchesCanceled:(NSSet*)touches withEvent:(UIEvent*)event {
-    sendTouches(TOUCH_TYPE_END, touches);
+    sendTouches(TOUCH_TYPE_CANCEL, touches, event);
 }
 
 - (void) traitCollectionDidChange: (UITraitCollection *) previousTraitCollection {

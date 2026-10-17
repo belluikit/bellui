@@ -55,6 +55,9 @@ type ConfiguredDriver interface {
 }
 
 type driver struct {
+	// touchWindows is the window each touch that is down began in (#392).
+	touchWindows map[touch.Sequence]*window
+
 	app   app.App
 	glctx gl.Context
 
@@ -370,14 +373,7 @@ func (d *driver) Run() {
 						d.exploreTouch(current, e)
 						break
 					}
-					switch e.Type {
-					case touch.TypeBegin:
-						d.tapDownCanvas(current, e.X, e.Y, e.Sequence)
-					case touch.TypeMove:
-						d.tapMoveCanvas(current, e.X, e.Y, e.Sequence)
-					case touch.TypeEnd:
-						d.tapUpCanvas(current, e.X, e.Y, e.Sequence)
-					}
+					d.handleTouch(current, e)
 				case key.Event:
 					d.dispatchKeyEvent(c, e)
 				case composition.Event:
@@ -1197,10 +1193,14 @@ func (d *driver) exploreTouch(w *window, e touch.Event) {
 		t.dispatched = true
 		d.tapDownCanvas(w, t.startX, t.startY, t.seq)
 		d.tapMoveCanvas(w, e.X, e.Y, e.Sequence)
-	case touch.TypeEnd:
+	case touch.TypeEnd, touch.TypeCancel:
 		if t.dispatched && e.Sequence == t.seq {
 			t.dispatched = false
-			d.tapUpCanvas(w, e.X, e.Y, e.Sequence)
+			if e.Type == touch.TypeCancel {
+				d.tapCancelCanvas(w, e.X, e.Y, e.Sequence)
+			} else {
+				d.tapUpCanvas(w, e.X, e.Y, e.Sequence)
+			}
 			return
 		}
 		if t.tracking && e.Sequence == t.seq {
@@ -1233,6 +1233,41 @@ func (d *driver) tbPastSlop(w *window, x, y float32) bool {
 	dx := scale.ToBelluiCoordinate(w.canvas, int(x)) - scale.ToBelluiCoordinate(w.canvas, int(t.startX))
 	dy := scale.ToBelluiCoordinate(w.canvas, int(y)) - scale.ToBelluiCoordinate(w.canvas, int(t.startY))
 	return math.Abs(float64(dx)) >= common.TapMoveThreshold || math.Abs(float64(dy)) >= common.TapMoveThreshold
+}
+
+// handleTouch delivers a touch event to the window it began in. A touch keeps
+// its window for its whole sequence: if the current window changes while a
+// finger is down, its moves and release still reach the canvas that saw it go
+// down, whose touch handler is waiting for them (#392).
+func (d *driver) handleTouch(current *window, e touch.Event) {
+	w := current
+	if began, ok := d.touchWindows[e.Sequence]; ok {
+		w = began
+	}
+	switch e.Type {
+	case touch.TypeBegin:
+		if d.touchWindows == nil {
+			d.touchWindows = make(map[touch.Sequence]*window)
+		}
+		d.touchWindows[e.Sequence] = current
+		d.tapDownCanvas(current, e.X, e.Y, e.Sequence)
+	case touch.TypeMove:
+		d.tapMoveCanvas(w, e.X, e.Y, e.Sequence)
+	case touch.TypeEnd:
+		delete(d.touchWindows, e.Sequence)
+		d.tapUpCanvas(w, e.X, e.Y, e.Sequence)
+	case touch.TypeCancel:
+		delete(d.touchWindows, e.Sequence)
+		d.tapCancelCanvas(w, e.X, e.Y, e.Sequence)
+	}
+}
+
+// tapCancelCanvas ends a touch the system took away: no tap, long press or
+// drag completes (#392).
+func (d *driver) tapCancelCanvas(w *window, x, y float32, tapID touch.Sequence) {
+	tapX := scale.ToBelluiCoordinate(w.canvas, int(x))
+	tapY := scale.ToBelluiCoordinate(w.canvas, int(y))
+	w.canvas.TapCancel(geo.NewPos(tapX, tapY+tapYOffset), int(tapID))
 }
 
 func (d *driver) tapDownCanvas(w *window, x, y float32, tapID touch.Sequence) {
