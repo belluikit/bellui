@@ -893,8 +893,9 @@ func (c *Chart) Scrolled(e *event.ScrollEvent) {
 	c.TryScrolled(e)
 }
 
-// Pinched zooms like the scroll wheel does — DataZoom window, 3D camera or
-// map — by the pinch's scale, around the point between the fingers.
+// Pinched zooms like the scroll wheel does, by the pinch's scale: a DataZoom
+// window around the point between the fingers, or the 3D camera or map around
+// their centre, as the wheel zooms them.
 func (c *Chart) Pinched(e *event.PinchEvent) {
 	c.applyScrollResult(c.resolvePinch(e))
 }
@@ -903,42 +904,18 @@ func (c *Chart) Pinched(e *event.PinchEvent) {
 func (c *Chart) PinchEnded() {}
 
 // resolvePinch is resolveScroll for a pinch: the same three zoom modes,
-// driven by a scale factor instead of a wheel delta.
+// driven by a scale factor instead of a wheel delta. A step that only moved
+// the fingers (scale 1) changes nothing.
 func (c *Chart) resolvePinch(e *event.PinchEvent) scrollResult {
-	c.mu.Lock()
-	defer c.mu.Unlock()
 	scale := float64(e.Scale)
-	if scale <= 0 {
+	if scale <= 0 || scale == 1 {
 		return scrollResult{}
 	}
-
-	if c.is3D && c.orbitCam != nil && c.scene3D != nil {
-		c.orbitCam.Zoom(float32(1 / scale)) // spreading the fingers moves the camera closer
-		c.scene3D.Camera = c.orbitCam.Camera(c.scene3D.Camera.FOV, c.scene3D.Camera.Near, c.scene3D.Camera.Far)
-		return scrollResult{kind: "3d", scene: c.scene3D}
-	}
-
-	if c.isGeo && c.geoCoord != nil {
-		c.geoCoord.Zoom += float32(math.Log2(scale)) // map zoom levels double per step
-		if c.geoCoord.Zoom < 1 {
-			c.geoCoord.Zoom = 1
-		}
-		if c.geoCoord.Zoom > 18 {
-			c.geoCoord.Zoom = 18
-		}
-		c.updateGeoSeriesCoords()
-		return scrollResult{kind: "geo"}
-	}
-
-	if c.zoomState == nil {
-		return scrollResult{}
-	}
-	centerNorm := float64(e.Position.X) / float64(c.Size().Width)
-	if c.zoomState.ZoomBy(scale, centerNorm) {
-		c.zoomState.FollowLatest = false
-		return scrollResult{kind: "zoom", window: c.zoomState.Window, onZoom: c.OnZoomChange}
-	}
-	return scrollResult{}
+	return c.resolveZoom(e.Position.X, zoomStep{
+		camera: float32(1 / scale),        // spreading the fingers moves the camera closer
+		levels: float32(math.Log2(scale)), // map zoom levels double per step
+		window: func(z *interact.ZoomState, centerNorm float64) bool { return z.ZoomBy(scale, centerNorm) },
+	})
 }
 
 // TryScrolled implements driver.ScrollConsumer. Returns true if the chart
@@ -970,32 +947,58 @@ func (c *Chart) applyScrollResult(result scrollResult) bool {
 
 // resolveScroll processes scroll input under a single lock. Mutates 3D/geo/zoom state.
 func (c *Chart) resolveScroll(e *event.ScrollEvent) scrollResult {
+	delta := e.Scrolled.DY
+	camera := float32(1.0)
+	if delta > 0 {
+		camera = 0.9
+	} else if delta < 0 {
+		camera = 1.1
+	}
+	levels := float32(0) // geo map zoom — smooth fractional steps
+	if delta > 0 {
+		levels = 0.15
+	} else if delta < 0 {
+		levels = -0.15
+	}
+	// Normalize scroll delta: clamp magnitude to [0, 5] to avoid extreme
+	// jumps while preserving proportional feel from trackpad and mouse wheel.
+	windowDelta := float64(delta)
+	if windowDelta > 5 {
+		windowDelta = 5
+	} else if windowDelta < -5 {
+		windowDelta = -5
+	}
+	return c.resolveZoom(e.Position.X, zoomStep{
+		camera: camera,
+		levels: levels,
+		window: func(z *interact.ZoomState, centerNorm float64) bool { return z.ZoomAt(windowDelta, centerNorm) },
+	})
+}
+
+// zoomStep is one zoom input — a wheel notch or a pinch step — expressed for
+// each of the chart's zoom modes.
+type zoomStep struct {
+	camera float32                                              // 3D orbit camera distance factor; below 1 moves closer
+	levels float32                                              // map zoom levels to add
+	window func(z *interact.ZoomState, centerNorm float64) bool // DataZoom window change
+}
+
+// resolveZoom applies a zoom step to whichever zoom mode the chart has — 3D
+// orbit camera, geo map, or DataZoom window around canvas x — and says what
+// to refresh or notify.
+func (c *Chart) resolveZoom(x float32, s zoomStep) scrollResult {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	// 3D orbit zoom — update camera on existing Scene3D, no full rebuild
 	if c.is3D && c.orbitCam != nil && c.scene3D != nil {
-		delta := float64(e.Scrolled.DY)
-		factor := float32(1.0)
-		if delta > 0 {
-			factor = 0.9
-		} else if delta < 0 {
-			factor = 1.1
-		}
-		c.orbitCam.Zoom(factor)
+		c.orbitCam.Zoom(s.camera)
 		c.scene3D.Camera = c.orbitCam.Camera(c.scene3D.Camera.FOV, c.scene3D.Camera.Near, c.scene3D.Camera.Far)
 		return scrollResult{kind: "3d", scene: c.scene3D}
 	}
 
-	// Geo map zoom — smooth fractional zoom
 	if c.isGeo && c.geoCoord != nil {
-		delta := float64(e.Scrolled.DY)
-		step := float32(0.15)
-		if delta > 0 {
-			c.geoCoord.Zoom += step
-		} else if delta < 0 {
-			c.geoCoord.Zoom -= step
-		}
+		c.geoCoord.Zoom += s.levels
 		if c.geoCoord.Zoom < 1 {
 			c.geoCoord.Zoom = 1
 		}
@@ -1009,18 +1012,8 @@ func (c *Chart) resolveScroll(e *event.ScrollEvent) scrollResult {
 	if c.zoomState == nil {
 		return scrollResult{}
 	}
-
-	size := c.Size()
-	centerNorm := float64(e.Position.X) / float64(size.Width)
-	// Normalize scroll delta: clamp magnitude to [0, 5] to avoid extreme
-	// jumps while preserving proportional feel from trackpad and mouse wheel.
-	delta := float64(e.Scrolled.DY)
-	if delta > 5 {
-		delta = 5
-	} else if delta < -5 {
-		delta = -5
-	}
-	if c.zoomState.ZoomAt(delta, centerNorm) {
+	centerNorm := float64(x) / float64(c.Size().Width)
+	if s.window(c.zoomState, centerNorm) {
 		c.zoomState.FollowLatest = false
 		return scrollResult{kind: "zoom", window: c.zoomState.Window, onZoom: c.OnZoomChange}
 	}
