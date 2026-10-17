@@ -309,6 +309,14 @@ func RunNewBuild(target, appID, icon, name, version string, build int, release, 
 // -iosversion. Xcode 27 builds for nothing older than iOS 15 (#410).
 const MinIOSVersion = "15.0"
 
+// IOSDeploymentTarget is the iOS version this build targets: -iosversion,
+// which RunNewBuild never parses, so bellui package always gets MinIOSVersion.
+// The Xcode project, the clang version-min flags and actool all read it here,
+// so a build cannot state two different minimums.
+func IOSDeploymentTarget() string {
+	return buildIOSVersion
+}
+
 func addBuildFlags(cmd *command) {
 	cmd.Flag.StringVar(&buildO, "o", "", "")
 	cmd.Flag.StringVar(&buildGcflags, "gcflags", "", "")
