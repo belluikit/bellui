@@ -1,7 +1,7 @@
 # Bellui session protocol
 
-- Read the `docs/notes/` file for each area before changing it; the Fork
-  Conventions in CLAUDE.md are binding.
+- Read the `docs/notes/` file for each area before changing it; the repository
+  guide's Fork Conventions are binding.
 - Verify before committing: `gofumpt -d -e .` and `goimports -e -d .` clean on
   changed files; `go vet ./...`; scoped `go test -race -tags ci` for the
   affected packages plus anything that imports them (the `x/` submodules are
@@ -11,8 +11,8 @@
 - Follow-up issues you file are auto-added to the backlog project by the
   add-to-project workflow: put suggested Workstream/Priority/Tranche in the
   issue body so triage can set the fields.
-- A platform-bridge change is not verified by unit tests alone (CLAUDE.md:
-  live-verify harnesses in `hack/*probe`). If your change touches a platform
+- A platform-bridge change is not verified by unit tests alone (the repository
+  guide: live-verify harnesses in `hack/*probe`). If your change touches a platform
   bridge and you cannot run the matching probe on the required
   device/GPU/session, say so explicitly in the PR body instead of claiming
   verification.
