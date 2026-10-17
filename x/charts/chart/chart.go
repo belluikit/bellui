@@ -6,6 +6,7 @@ import (
 	"image/color"
 	"image/png"
 	"log"
+	"math"
 	"sync"
 	"time"
 
@@ -98,6 +99,7 @@ var (
 	_ core.Widget      = (*Chart)(nil)
 	_ event.Tappable   = (*Chart)(nil)
 	_ event.Scrollable = (*Chart)(nil)
+	_ event.Pinchable  = (*Chart)(nil)
 	_ event.Draggable  = (*Chart)(nil)
 	_ event.Focusable  = (*Chart)(nil)
 	_ event.Hoverable  = (*Chart)(nil)
@@ -891,13 +893,65 @@ func (c *Chart) Scrolled(e *event.ScrollEvent) {
 	c.TryScrolled(e)
 }
 
+// Pinched zooms like the scroll wheel does — DataZoom window, 3D camera or
+// map — by the pinch's scale, around the point between the fingers.
+func (c *Chart) Pinched(e *event.PinchEvent) {
+	c.applyScrollResult(c.resolvePinch(e))
+}
+
+// PinchEnded is part of event.Pinchable; each step is already applied.
+func (c *Chart) PinchEnded() {}
+
+// resolvePinch is resolveScroll for a pinch: the same three zoom modes,
+// driven by a scale factor instead of a wheel delta.
+func (c *Chart) resolvePinch(e *event.PinchEvent) scrollResult {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	scale := float64(e.Scale)
+	if scale <= 0 {
+		return scrollResult{}
+	}
+
+	if c.is3D && c.orbitCam != nil && c.scene3D != nil {
+		c.orbitCam.Zoom(float32(1 / scale)) // spreading the fingers moves the camera closer
+		c.scene3D.Camera = c.orbitCam.Camera(c.scene3D.Camera.FOV, c.scene3D.Camera.Near, c.scene3D.Camera.Far)
+		return scrollResult{kind: "3d", scene: c.scene3D}
+	}
+
+	if c.isGeo && c.geoCoord != nil {
+		c.geoCoord.Zoom += float32(math.Log2(scale)) // map zoom levels double per step
+		if c.geoCoord.Zoom < 1 {
+			c.geoCoord.Zoom = 1
+		}
+		if c.geoCoord.Zoom > 18 {
+			c.geoCoord.Zoom = 18
+		}
+		c.updateGeoSeriesCoords()
+		return scrollResult{kind: "geo"}
+	}
+
+	if c.zoomState == nil {
+		return scrollResult{}
+	}
+	centerNorm := float64(e.Position.X) / float64(c.Size().Width)
+	if c.zoomState.ZoomBy(scale, centerNorm) {
+		c.zoomState.FollowLatest = false
+		return scrollResult{kind: "zoom", window: c.zoomState.Window, onZoom: c.OnZoomChange}
+	}
+	return scrollResult{}
+}
+
 // TryScrolled implements driver.ScrollConsumer. Returns true if the chart
 // consumed the scroll event (for zoom/pan). Returns false if the chart has
 // no use for the event, allowing Fyne's driver to propagate it to the
 // parent Scroll container.
 func (c *Chart) TryScrolled(e *event.ScrollEvent) bool {
-	result := c.resolveScroll(e)
+	return c.applyScrollResult(c.resolveScroll(e))
+}
 
+// applyScrollResult refreshes or notifies for a resolved zoom, reporting
+// whether it consumed the input.
+func (c *Chart) applyScrollResult(result scrollResult) bool {
 	switch result.kind {
 	case "3d":
 		result.scene.Refresh()
