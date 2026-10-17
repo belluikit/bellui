@@ -113,8 +113,10 @@ func TestWebSplashCreditsTheSpinner(t *testing.T) {
 }
 
 // packageUNIX itself ships the credits file and the Makefile line that
-// installs it, under the app ID or, without one, the app's name. FreeBSD
-// skips the Linux-only CEF check, so any file will do as the executable.
+// installs it, under the app ID or, without one, the app's name. It leaves no
+// staging directory behind, which takes every file it wrote being closed on
+// Windows. FreeBSD skips the Linux-only CEF check, so any file will do as the
+// executable.
 func TestUnixArchiveCarriesTheCredits(t *testing.T) {
 	if _, err := exec.LookPath("tar"); err != nil {
 		t.Skip("needs tar")
@@ -135,6 +137,7 @@ func TestUnixArchiveCarriesTheCredits(t *testing.T) {
 				os:      "freebsd", dir: dir, exe: exe, defaultIcon: true,
 			}
 			require.NoError(t, p.packageUNIX())
+			assert.NoDirExists(t, filepath.Join(dir, "tmp-pkg"))
 
 			var list bytes.Buffer
 			cmd := exec.Command("tar", "-tJf", filepath.Join(dir, "Notes.tar.xz"))
