@@ -4,6 +4,7 @@ import (
 	"math"
 
 	"github.com/belluikit/bellui/core"
+	"github.com/belluikit/bellui/driver/mobile"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
 )
@@ -14,7 +15,15 @@ import (
 // whatever the first finger had started (drag, scroll, pending long-press) is
 // cancelled, moves of either finger dispatch Pinched with the change in their
 // distance, and lifting or cancelling either one dispatches PinchEnded. Both
-// contacts are then spent — neither produces a tap, drag or scroll afterwards.
+// contacts are then spent — neither produces a tap, drag or scroll afterwards,
+// and neither counts as down any more, so the surviving finger cannot start a
+// second pinch with a finger that lands later.
+//
+// Contacts are counted, so a release the platform never delivers would leave
+// a contact down for good and pair it with every later finger. The pinch's
+// own fingers are therefore dropped from contacts as soon as it ends, and a
+// fresh down on an id clears whatever that id was spent on before — and ends
+// the pinch it belonged to, whose release was lost.
 
 type pinchState struct {
 	target event.Pinchable
@@ -23,13 +32,27 @@ type pinchState struct {
 	origin geo.Position // canvas position of the target's origin
 }
 
-// trackContact records where a contact is, for pinch recognition.
+// trackContact records a contact that went down, for pinch recognition. A
+// down on an id means any earlier contact with that id is over, whether or not
+// its release arrived: a pinch it was part of has ended, and the id is no
+// longer spent.
 func (h *TouchHandler) trackContact(tapID int, pos geo.Position) {
-	if h.contacts == nil {
-		h.contacts = map[int]geo.Position{}
-		h.pinchSpent = map[int]bool{}
-	}
+	h.endPinchOf(tapID)
+	delete(h.pinchSpent, tapID)
 	h.contacts[tapID] = pos
+}
+
+// endPinchOf ends the pinch in progress if tapID is one of its fingers. Both
+// fingers stop counting as down; they stay spent until they are released.
+func (h *TouchHandler) endPinchOf(tapID int) {
+	p := h.pinch
+	if p == nil || (tapID != p.ids[0] && tapID != p.ids[1]) {
+		return
+	}
+	h.pinch = nil
+	delete(h.contacts, p.ids[0])
+	delete(h.contacts, p.ids[1])
+	p.target.PinchEnded()
 }
 
 // startPinch turns the contact that just went down and the one already down
@@ -59,6 +82,13 @@ func (h *TouchHandler) startPinch(tapID int) bool {
 	// The first finger's gesture is over: it is now half of a pinch.
 	h.hideToolTip()
 	h.cancelLongPress(other)
+	if wid := h.Touched[other]; wid != nil {
+		touchEv := &mobile.TouchEvent{}
+		touchEv.Position = a
+		touchEv.AbsolutePosition = a
+		wid.TouchCancel(touchEv)
+		h.Touched[other] = nil
+	}
 	if h.Dragging != nil && h.draggingID == other {
 		h.Dragging.DragEnd()
 		h.Dragging = nil
@@ -80,16 +110,18 @@ func (h *TouchHandler) startPinch(tapID int) bool {
 	return true
 }
 
-// movePinch dispatches one Pinched for a move of either pinch finger.
+// movePinch dispatches one Pinched for a move of either pinch finger. A move
+// that does not change the distance still reports the new focus, with scale 1.
 func (h *TouchHandler) movePinch() {
 	p := h.pinch
 	a, b := h.contacts[p.ids[0]], h.contacts[p.ids[1]]
-	d := distance(a, b)
-	if p.dist <= 0 || d <= 0 || d == p.dist {
-		return
+	scale := float32(1)
+	if d := distance(a, b); d > 0 {
+		if p.dist > 0 {
+			scale = d / p.dist
+		}
+		p.dist = d // fingers that landed together are measured from here
 	}
-	scale := d / p.dist
-	p.dist = d
 	mid := midpoint(a, b)
 	p.target.Pinched(&event.PinchEvent{
 		PointEvent: event.PointEvent{AbsolutePosition: mid, Position: mid.Subtract(p.origin)},
@@ -115,10 +147,7 @@ func (h *TouchHandler) pinchMove(pos geo.Position, tapID int) bool {
 // pinch (its release must then not produce a tap, drag end or scroll).
 func (h *TouchHandler) pinchRelease(tapID int) bool {
 	delete(h.contacts, tapID)
-	if p := h.pinch; p != nil && (tapID == p.ids[0] || tapID == p.ids[1]) {
-		h.pinch = nil
-		p.target.PinchEnded()
-	}
+	h.endPinchOf(tapID)
 	if !h.pinchSpent[tapID] {
 		return false
 	}
