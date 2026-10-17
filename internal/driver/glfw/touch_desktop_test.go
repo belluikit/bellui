@@ -322,3 +322,68 @@ func TestWindow_TouchScrollFlickMomentum(t *testing.T) {
 		w.touchEvent(w.viewport, 2, glfw.TouchEnd, 50, 50)
 	})
 }
+
+// touchScrollTaker accepts touch scrolls, as the x/dag canvas does since #400.
+type touchScrollTaker struct {
+	canvas.Rectangle
+	taken int
+}
+
+func (t *touchScrollTaker) Scrolled(ev *event.ScrollEvent) { t.TryScrolled(ev) }
+
+func (t *touchScrollTaker) TryScrolled(ev *event.ScrollEvent) bool {
+	if ev.Source != event.ScrollSourceTouch {
+		return false
+	}
+	t.taken++
+	return true
+}
+
+// A touch scroll keeps the scrollables under its origin for the whole gesture
+// and its momentum (#416). It used to look them up again for every move, so a
+// widget that takes touch scrolls, sliding under the origin as the page
+// scrolled, took over the rest of the gesture: scrolling a page past a DAG
+// canvas started panning the graph instead.
+func TestWindow_TouchScrollKeepsItsTargetForTheGesture(t *testing.T) {
+	w := createWindow("Test")
+	prop := canvas.NewRectangle(color.White)
+	prop.SetMinSize(geo.NewSize(100, 100))
+	above := canvas.NewRectangle(color.White)
+	above.SetMinSize(geo.NewSize(100, 95)) // the taker starts just below the finger
+	taker := &touchScrollTaker{}
+	taker.SetMinSize(geo.NewSize(100, 200)) // still under the origin when the momentum runs
+	below := canvas.NewRectangle(color.White)
+	below.SetMinSize(geo.NewSize(100, 2000))
+	scroll := container.NewVScroll(container.NewVBox(above, taker, below))
+	w.SetContent(container.NewStack(prop, scroll))
+	repaintWindow(w)
+
+	runOnMain(func() {
+		w.touchEvent(w.viewport, 1, glfw.TouchBegin, 50, 90)
+		for y := 80; y >= 10; y -= 10 { // the taker slides up under (50, 90)
+			w.touchEvent(w.viewport, 1, glfw.TouchMove, 50, float64(y))
+		}
+		assert.Equal(t, float32(80), scroll.Offset.Y, "the page follows the finger the whole way")
+		assert.Zero(t, taker.taken, "the widget that slid under the origin took nothing")
+		w.touchEvent(w.viewport, 1, glfw.TouchEnd, 50, 10)
+	})
+
+	// The flick's momentum scrolls the page too, not the widget now under the origin.
+	deadline := time.Now().Add(3 * time.Second)
+	coasted := false
+	for time.Now().Before(deadline) {
+		var off float32
+		runOnMain(func() { off = scroll.Offset.Y })
+		if off > 100 {
+			coasted = true
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	assert.True(t, coasted, "momentum keeps scrolling the page")
+	runOnMain(func() {
+		assert.Zero(t, taker.taken, "momentum went to the page, not the widget")
+		w.touchEvent(w.viewport, 2, glfw.TouchBegin, 50, 50) // stop the momentum
+		w.touchEvent(w.viewport, 2, glfw.TouchEnd, 50, 50)
+	})
+}
