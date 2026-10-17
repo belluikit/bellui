@@ -63,15 +63,17 @@ func TestIndexReportsMissingWebGPUInChrome(t *testing.T) {
 	if chrome == "" {
 		t.Skip("needs Chrome")
 	}
-	// The first run of a freshly installed Chrome on CI's macOS machines took
-	// 70-80 s, whatever the flags, while every later run took under a second:
-	// the system checks the app on its first launch. Pay that once, untimed by
-	// the cases below, and record it.
+	// The first browser start on CI's macOS machines took 70-80 s, whichever
+	// case ran first, while every later start took under a second (locally
+	// 5 s, then 0.4 s). Starting Chrome without a page (--version) is not
+	// enough. Pay that cost once on a blank page, with a generous limit, and
+	// record it.
+	warmDir := t.TempDir()
 	warm, cancelWarm := context.WithTimeout(context.Background(), 4*time.Minute)
 	start := time.Now()
-	_ = exec.CommandContext(warm, chrome, "--version").Run()
+	_ = exec.CommandContext(warm, chrome, append(chromeFlags(warmDir), "--dump-dom", "about:blank")...).Run()
 	cancelWarm()
-	t.Logf("Chrome warm-up (--version) took %v", time.Since(start).Round(time.Millisecond))
+	t.Logf("Chrome warm-up (blank page) took %v", time.Since(start).Round(time.Millisecond))
 	for _, tc := range []struct {
 		name   string
 		webgpu bool
@@ -90,19 +92,22 @@ func TestIndexReportsMissingWebGPUInChrome(t *testing.T) {
 
 			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 			defer cancel()
-			// Without the first-run and keychain flags, Chrome's first launch on
-			// a fresh macOS CI machine stalled past the 60 s limit (the later
-			// launches were fast): it waits on first-run work and the login
-			// keychain, neither of which a test page needs.
-			out, err := exec.CommandContext(ctx, chrome, "--headless=new", "--disable-gpu",
-				"--no-first-run", "--no-default-browser-check", "--use-mock-keychain",
-				"--password-store=basic", "--disable-component-update",
-				"--user-data-dir="+filepath.Join(dir, "profile"),
-				"--virtual-time-budget=3000", "--dump-dom", "file://"+index).Output()
+			out, err := exec.CommandContext(ctx, chrome,
+				append(chromeFlags(dir), "--virtual-time-budget=3000", "--dump-dom", "file://"+index)...).Output()
 			require.NoError(t, err)
 			require.Contains(t, string(out), `id="action"`, "Chrome rendered the page")
 			assert.Equal(t, tc.want, bytes.Contains(out, []byte(noWebGPUMessage)))
 		})
+	}
+}
+
+// chromeFlags runs Chrome headless with a fresh profile in dir, skipping
+// first-run work and the login keychain, which a test page needs neither of.
+func chromeFlags(dir string) []string {
+	return []string{
+		"--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check",
+		"--use-mock-keychain", "--password-store=basic", "--disable-component-update",
+		"--user-data-dir=" + filepath.Join(dir, "profile"),
 	}
 }
 
