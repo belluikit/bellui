@@ -40,6 +40,12 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
   be scrolled on phones and tablets. Drags without a mouse button down now
   scroll the body; mouse drags still don't.
   
+* **x/charts: a 3D chart with several series rotates as a whole**
+  ([#399](https://github.com/belluikit/bellui/issues/399)). Each 3D series drew
+  its own scene, so orbiting or zooming moved only one of them and the series
+  could not hide each other in depth. All 3D series of a chart now share one
+  scene and one camera.
+
 * **Web: a page wider than the screen no longer squeezes the whole UI**
   ([#387](https://github.com/belluikit/bellui/issues/387)). When content needed
   more room than the browser viewport, the canvas grew past it and the frame
