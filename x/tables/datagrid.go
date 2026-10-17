@@ -159,6 +159,10 @@ type DataGrid struct {
 	reorderFromCol   int          // column being dragged to reorder (-1 = none)
 	dragStartPos     geo.Position // mouse position at drag start
 	lastMousePos     geo.Position
+	// mousePressed is set while a mouse button is down. Drags without it
+	// come from touch, where the mouse gestures (resize, reorder, row drag)
+	// cannot start, and scroll the grid instead.
+	mousePressed bool
 }
 
 // filterState holds the active filter for a column.
@@ -1843,6 +1847,17 @@ func (g *DataGrid) Dragged(e *event.DragEvent) {
 		g.lastMousePos = e.Position
 		return
 	}
+
+	// A touch drag: the grid latches it as a Draggable, so the touch
+	// handler's scroll path never runs — scroll the body here, like a finger
+	// on any other scrollable content. Mouse drags never scroll the body.
+	if !g.mousePressed {
+		g.scrollContent.Scroll.Scrolled(&event.ScrollEvent{
+			PointEvent: e.PointEvent,
+			Scrolled:   e.Dragged,
+			Source:     event.ScrollSourceTouch,
+		})
+	}
 }
 
 func (g *DataGrid) DragEnd() {
@@ -1868,6 +1883,7 @@ func (g *DataGrid) DragEnd() {
 	g.dragCol = -1
 	g.resizeCol = -1
 	g.nearResizeBorder = false
+	g.mousePressed = false
 }
 
 // Scrolled implements event.Scrollable by forwarding the delta to the grid's
@@ -1887,6 +1903,7 @@ func (g *DataGrid) Scrolled(ev *event.ScrollEvent) {
 
 func (g *DataGrid) MouseDown(e *desktop.MouseEvent) {
 	g.lastModifier = e.Modifier
+	g.mousePressed = true
 
 	// Check for column resize or reorder drag start. The header shares the body's
 	// region layout (pinned bands fixed, main band scrolled by g.offset.X), so
@@ -1941,7 +1958,7 @@ func (g *DataGrid) MouseDown(e *desktop.MouseEvent) {
 	}
 }
 
-func (g *DataGrid) MouseUp(e *desktop.MouseEvent) {}
+func (g *DataGrid) MouseUp(e *desktop.MouseEvent) { g.mousePressed = false }
 
 func (g *DataGrid) HoverIn(e *event.HoverEvent) {}
 
