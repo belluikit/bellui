@@ -369,11 +369,7 @@ func (d *driver) Run() {
 					// scroll gesture and everything after double-tap-and-hold
 					// (pre-rebrand tracker #1104). exploreTouch suppresses the former and routes
 					// qualified passthrough streams into the normal pipeline.
-					if app.TouchExplorationEnabled() {
-						d.exploreTouch(current, e)
-						break
-					}
-					d.handleTouch(current, e)
+					d.routeTouch(current, e, app.TouchExplorationEnabled())
 				case key.Event:
 					d.dispatchKeyEvent(c, e)
 				case composition.Event:
@@ -1235,6 +1231,30 @@ func (d *driver) tbPastSlop(w *window, x, y float32) bool {
 	dx := scale.ToBelluiCoordinate(w.canvas, int(x)) - scale.ToBelluiCoordinate(w.canvas, int(t.startX))
 	dy := scale.ToBelluiCoordinate(w.canvas, int(y)) - scale.ToBelluiCoordinate(w.canvas, int(t.startY))
 	return math.Abs(float64(dx)) >= common.TapMoveThreshold || math.Abs(float64(dy)) >= common.TapMoveThreshold
+}
+
+// routeTouch sends a touch event to exploreTouch while an explore-by-touch
+// screen reader is on, and to handleTouch otherwise. The choice is made when
+// a touch begins and holds for the rest of it: a screen reader switched on or
+// off mid-touch would otherwise send the touch's release to the path that
+// never saw it go down, which ignores it, and leave the touch latched as down
+// (a drag, a scroll or a pending long press) in the path that did.
+func (d *driver) routeTouch(current *window, e touch.Event, exploring bool) {
+	if e.Type != touch.TypeBegin {
+		if _, ok := d.touchWindows[e.Sequence]; ok {
+			d.handleTouch(current, e)
+			return
+		}
+		if t := &d.tbPass; (t.tracking || t.dispatched) && t.seq == e.Sequence {
+			d.exploreTouch(current, e)
+			return
+		}
+	}
+	if exploring {
+		d.exploreTouch(current, e)
+		return
+	}
+	d.handleTouch(current, e)
 }
 
 // handleTouch delivers a touch event to the window it began in. A touch keeps
