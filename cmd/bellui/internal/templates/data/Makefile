@@ -38,7 +38,8 @@ uninstall:
 	-rm $(DESTDIR)$(PREFIX)/bin/$(Exec)
 	-rm $(DESTDIR)$(PREFIX)/share/pixmaps/$(Icon)
 {{- if .Credits}}
-	-rm -r $(DESTDIR)$(PREFIX)/share/doc/$(AppID)
+	-rm $(DESTDIR)$(PREFIX)/share/doc/$(AppID)/CREDITS
+	-rmdir $(DESTDIR)$(PREFIX)/share/doc/$(AppID)
 {{- end}}
 {{- if .BundleCEF}}
 	-rm -r $(DESTDIR)$(PREFIX)/bin/cef
@@ -64,7 +65,8 @@ user-uninstall:
 	-rm $(DESTDIR)$(HOME)/.local/bin/$(Exec)
 	-rm $(DESTDIR)$(HOME)/.local/share/icons/$(Icon)
 {{- if .Credits}}
-	-rm -r $(DESTDIR)$(HOME)/.local/share/doc/$(AppID)
+	-rm $(DESTDIR)$(HOME)/.local/share/doc/$(AppID)/CREDITS
+	-rmdir $(DESTDIR)$(HOME)/.local/share/doc/$(AppID)
 {{- end}}
 {{- if .BundleCEF}}
 	-rm -r $(DESTDIR)$(HOME)/.local/bin/cef
