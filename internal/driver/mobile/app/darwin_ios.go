@@ -160,10 +160,13 @@ func updateConfig(width, height, orientation int32) {
 // small, stable ids the rest of bellui sees.
 var touchIDs touchSlots
 
+//export touchesFresh
+func touchesFresh() { touchIDs.reset() }
+
 //export sendTouch
-func sendTouch(cTouch, cTouchType uintptr, x, y float32, fresh uintptr) {
+func sendTouch(cTouch, cTouchType uintptr, x, y float32) {
 	t := touch.Type(cTouchType)
-	id := touchIDs.id(cTouch, t, fresh != 0)
+	id := touchIDs.id(cTouch, t)
 
 	theApp.events.In() <- touch.Event{
 		X:        x,

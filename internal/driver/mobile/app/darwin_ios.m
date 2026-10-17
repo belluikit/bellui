@@ -432,21 +432,28 @@ continueUserActivity:(NSUserActivity *)userActivity
 #define TOUCH_TYPE_END   2 // touch.TypeEnd
 #define TOUCH_TYPE_CANCEL 3 // touch.TypeCancel
 
-// sendTouches reports touches to Go. fresh says that no other touch is down:
-// every touch of the event is one of these, so any id Go still holds is from a
-// touch whose end UIKit never reported, and can be freed (#392).
+// sendTouches reports touches to Go. When touches begin and no other touch is
+// down (every touch of the event is one of these), any id Go still holds is
+// from a touch whose end UIKit never reported: touchesFresh frees them, once,
+// before the first of these touches is given an id. Freeing them per touch
+// gave two fingers that landed together the same id (#392).
 static void sendTouches(int change, NSSet* touches, UIEvent* event) {
 	CGFloat scale = [UIScreen mainScreen].nativeScale;
-	BOOL fresh = YES;
-	for (UITouch* t in [event allTouches]) {
-		if (![touches containsObject:t]) {
-			fresh = NO;
-			break;
+	if (change == TOUCH_TYPE_BEGIN) {
+		BOOL fresh = YES;
+		for (UITouch* t in [event allTouches]) {
+			if (![touches containsObject:t]) {
+				fresh = NO;
+				break;
+			}
+		}
+		if (fresh) {
+			touchesFresh();
 		}
 	}
 	for (UITouch* touch in touches) {
 		CGPoint p = [touch locationInView:touch.view];
-		sendTouch((GoUintptr)touch, (GoUintptr)change, p.x*scale, p.y*scale, fresh ? 1 : 0);
+		sendTouch((GoUintptr)touch, (GoUintptr)change, p.x*scale, p.y*scale);
 	}
 }
 
