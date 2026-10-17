@@ -115,15 +115,6 @@ func (p *Packager) packageUNIX() error {
 		openWith = " %U"
 	}
 
-	appsDir := util.EnsureSubDir(shareDir, "applications")
-	desktop := filepath.Join(appsDir, appIDOrName+".desktop")
-	deskFile, err := os.Create(desktop)
-	if err != nil {
-		return fmt.Errorf("failed to create desktop file: %w", err)
-	}
-
-	defer deskFile.Close()
-
 	credit := p.iconCredit()
 	linuxBSD := metadata.LinuxAndBSD{}
 	if p.linuxAndBSDMetadata != nil {
@@ -154,7 +145,17 @@ func (p *Packager) packageUNIX() error {
 		tplData.SourceDir = p.sourceMetadata.Dir
 	}
 
+	// Closed before the deferred RemoveAll below runs, like the Makefile:
+	// Windows cannot remove a staging directory holding an open file.
+	appsDir := util.EnsureSubDir(shareDir, "applications")
+	deskFile, err := os.Create(filepath.Join(appsDir, appIDOrName+".desktop"))
+	if err != nil {
+		return fmt.Errorf("failed to create desktop file: %w", err)
+	}
 	err = templates.DesktopFileUNIX.Execute(deskFile, tplData)
+	if cerr := deskFile.Close(); err == nil {
+		err = cerr
+	}
 	if err != nil {
 		return fmt.Errorf("failed to write desktop entry string: %w", err)
 	}
