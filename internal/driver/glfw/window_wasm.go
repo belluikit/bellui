@@ -4,8 +4,11 @@ package glfw
 
 import (
 	"context"
-	_ "image/png" // for the icon
 	"time"
+
+	_ "image/png" // for the icon
+
+	"github.com/belluikit/bellui/internal/driver/common"
 
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/container"
@@ -53,12 +56,18 @@ type window struct {
 	closing   bool
 	fixedSize bool
 
-	cursor   desktop.Cursor
-	canvas   *glCanvas
-	driver   *gLDriver
-	title    string
-	icon     bellui.Resource
-	mainmenu *bellui.MainMenu
+	cursor desktop.Cursor
+	canvas *glCanvas
+
+	// touch, touchActive and touchScrollGen are the touch gesture state fed
+	// by touch_wasm.go (#378); see the desktop window for the same fields.
+	touch          common.TouchHandler
+	touchActive    map[int]bool
+	touchScrollGen int
+	driver         *gLDriver
+	title          string
+	icon           bellui.Resource
+	mainmenu       *bellui.MainMenu
 
 	master              bool
 	fullScreen          bool
@@ -664,6 +673,7 @@ func (w *window) create() {
 	win.SetFocusCallback(w.focused)
 
 	installNativeDragOut(w) // HTML5 drag-and-drop out of the canvas (pre-rebrand tracker #857/#874)
+	installTouchInput(w)    // finger input via Pointer Events (#378)
 
 	w.canvas.detectedScale = w.detectScale()
 	w.canvas.scale = w.calculatedScale()

@@ -16,6 +16,13 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
 
 ### Fixed
 
+* **Web: touch works on phones and tablets**
+  ([#378](https://github.com/belluikit/bellui/issues/378)). Only the click a
+  browser synthesises after a tap reached the app, so nothing could be scrolled
+  or dragged by finger. Finger contacts now go through the same gesture
+  handler as the mobile driver — drags, flick scrolling, long-press and
+  double-tap — and the page no longer pans or zooms under the app.
+  
 * **Web: GPU memory was never freed, so Android killed the tab**
   ([#385](https://github.com/belluikit/bellui/issues/385)). In the browser,
   releasing a WebGPU texture or buffer did nothing; its memory waited for
