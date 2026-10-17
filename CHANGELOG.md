@@ -23,6 +23,17 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
   for themselves, can now be scrolled past them. Charts pass two-finger
   scrolling on to the page; the x/dag canvas pans with it. Two fingers moving
   apart or together over a Pinchable are still a pinch.
+* **Sign-in tokens per issuer**
+  ([#356](https://github.com/belluikit/bellui/issues/356)). New
+  `auth.SaveTokenFor`, `LoadTokenFor` and `ClearTokenFor` take an issuer as
+  well as a provider, so an app that signs in to two issuers under one provider
+  name (two Keycloak realms, two Okta tenants) keeps a token for each; with
+  one token per provider name, the second sign-in replaced the first.
+  `widget.AuthButton` saves this way when its `Issuer` is the app's own.
+  **Behaviour change:** a token saved by an "okta", "keycloak" or "custom"
+  button with an `Issuer` is read back with `auth.LoadTokenFor(provider,
+  issuer)`, not `auth.LoadToken(provider)`. Google, Microsoft, Apple and
+  GitHub buttons are unchanged, and tokens already on disk still load.
 
 * **Pinch-to-zoom** ([#379](https://github.com/belluikit/bellui/issues/379)).
   New `event.Pinchable` (`Pinched(*PinchEvent)`, `PinchEnded()`): two fingers
