@@ -56,6 +56,13 @@ type Canvas struct {
 
 	mWindowHeadTree, contentTree, menuTree *renderCacheTree
 
+	// FixedSize is set by drivers whose window cannot grow to fit its content
+	// (the browser, where the window is the page's viewport). Content larger
+	// than the canvas is then clipped instead of the canvas growing past the
+	// window: a canvas laid out wider than the viewport was drawn squeezed
+	// into it until the next window resize (#387).
+	FixedSize bool
+
 	// nodeMap provides O(1) lookup from CanvasObject to its RenderCacheNode.
 	// Used for dirty propagation to find the nearest ancestor RepaintBoundary.
 	nodeMap async.Map[core.CanvasObject, *RenderCacheNode]
@@ -188,7 +195,7 @@ func (c *Canvas) EnsureMinSize() bool {
 	c.WalkTrees(setup, ensureMinSize)
 	uidir.Pop(c.layoutDir)
 
-	shouldResize := windowNeedsMinSizeUpdate && (csize.Width < min.Width || csize.Height < min.Height)
+	shouldResize := !c.FixedSize && windowNeedsMinSizeUpdate && (csize.Width < min.Width || csize.Height < min.Height)
 	if shouldResize {
 		c.impl.Resize(csize.Max(min))
 	}
