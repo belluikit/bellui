@@ -12,6 +12,17 @@ This file lists the main changes with each version of Bellui. Entries up to
 after them describe the trendvidia fork (github.com/trendvidia/fyne) that
 became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
 
+## Unreleased
+
+### Added
+
+* **Pinch-to-zoom** ([#379](https://github.com/belluikit/bellui/issues/379)).
+  New `event.Pinchable` (`Pinched(*PinchEvent)`, `PinchEnded()`): two fingers
+  on a Pinchable widget report the change in their distance and the point
+  between them, on phones, tablets, desktop touchscreens and (with touch input
+  in the browser) the web. The x/dag canvas and x/charts (data window, 3D
+  camera and maps) zoom on pinch.
+
 ## v1.1.2 — 2026-10-16
 
 Fixes a memory leak that every app had: content removed from a window was
