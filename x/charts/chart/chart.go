@@ -923,6 +923,11 @@ func (c *Chart) resolvePinch(e *event.PinchEvent) scrollResult {
 // no use for the event, allowing Fyne's driver to propagate it to the
 // parent Scroll container.
 func (c *Chart) TryScrolled(e *event.ScrollEvent) bool {
+	// A touch scroll is a two-finger pan (#398): it scrolls the page around
+	// the chart. On touch, a chart zooms by pinch.
+	if e.Source == event.ScrollSourceTouch {
+		return false
+	}
 	return c.applyScrollResult(c.resolveScroll(e))
 }
 

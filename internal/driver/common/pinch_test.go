@@ -70,10 +70,45 @@ func TestTouchHandler_TwoFingersPinch(t *testing.T) {
 func TestTouchHandler_SecondFingerWithoutPinchable(t *testing.T) {
 	target := &tappableRect{Rectangle: canvas.NewRectangle(color.Black)}
 	h := newPinchHandler(target)
+	var scrolls []geo.Delta
+	h.ScrollCallback = func(_ geo.Position, d geo.Delta) { scrolls = append(scrolls, d) }
 	h.TapDown(geo.NewPos(100, 100), 1)
 	h.TapDown(geo.NewPos(200, 100), 2)
-	assert.Nil(t, h.pinch)
+	for y := float32(105); y <= 140; y += 5 { // both fingers move down together
+		h.TapMove(geo.NewPos(100, y), 1, nil)
+		h.TapMove(geo.NewPos(200, y), 2, nil)
+	}
+	require.NotEmpty(t, scrolls, "two fingers moving together without a Pinchable pan")
+	pinchTapUp(h, geo.NewPos(100, 140), 1)
+	pinchTapUp(h, geo.NewPos(200, 140), 2)
 	assert.Empty(t, h.pinchSpent)
+}
+
+// draggableRect records drags, for the dissolve case.
+type draggableRect struct {
+	*canvas.Rectangle
+	dragged, ended int
+}
+
+func (d *draggableRect) Dragged(*event.DragEvent) { d.dragged++ }
+func (d *draggableRect) DragEnd()                 { d.ended++ }
+
+// Without a Pinchable, a finger moving beside a resting one (a palm, a thumb)
+// is not a two-finger gesture: it drags as it would alone.
+func TestTouchHandler_RestingFingerDoesNotStopADrag(t *testing.T) {
+	target := &draggableRect{Rectangle: canvas.NewRectangle(color.Black)}
+	h := newPinchHandler(target)
+	var scrolls int
+	h.ScrollCallback = func(geo.Position, geo.Delta) { scrolls++ }
+	drag := func(w event.Draggable, e *event.DragEvent) { w.Dragged(e) }
+	h.TapDown(geo.NewPos(21, 21), 0) // resting
+	h.TapDown(geo.NewPos(100, 100), 1)
+	for x := float32(110); x <= 160; x += 10 {
+		h.TapMove(geo.NewPos(x, 100), 1, drag)
+	}
+	assert.Positive(t, target.dragged, "the moving finger drags")
+	assert.Zero(t, scrolls, "and does not pan")
+	assert.Nil(t, h.pinch)
 }
 
 // A pinch's fingers are released from the contact count when it ends, and a
@@ -88,6 +123,7 @@ func TestTouchHandler_LostPinchReleaseHeals(t *testing.T) {
 
 	h.TapDown(geo.NewPos(100, 100), 1)
 	h.TapDown(geo.NewPos(200, 100), 2)
+	h.TapMove(geo.NewPos(260, 100), 2, nil) // a pinch: the fingers spread
 	require.NotNil(t, h.pinch)
 	pinchTapUp(h, geo.NewPos(100, 100), 1) // finger 2's release never arrives
 	assert.Equal(t, 1, target.ended)
@@ -96,7 +132,7 @@ func TestTouchHandler_LostPinchReleaseHeals(t *testing.T) {
 	h.TapDown(geo.NewPos(150, 150), 3)
 	assert.Nil(t, h.pinch, "a finger lost by the platform must not start a pinch")
 	h.TapMove(geo.NewPos(300, 150), 3, nil)
-	assert.Empty(t, target.pinches)
+	assert.Len(t, target.pinches, 1)
 	pinchTapUp(h, geo.NewPos(300, 150), 3)
 	assert.Equal(t, 1, target.taps, "the later finger taps")
 
@@ -114,6 +150,7 @@ func TestTouchHandler_PinchSurvivorDoesNotPinchAgain(t *testing.T) {
 	h := newPinchHandler(target)
 	h.TapDown(geo.NewPos(100, 100), 1)
 	h.TapDown(geo.NewPos(200, 100), 2)
+	h.TapMove(geo.NewPos(260, 100), 2, nil) // a pinch: the fingers spread
 	pinchTapUp(h, geo.NewPos(100, 100), 1)
 
 	h.TapDown(geo.NewPos(150, 100), 3) // finger 2 is still down
@@ -138,17 +175,55 @@ func TestTouchHandler_PinchFromCoincidentFingers(t *testing.T) {
 	assert.InDelta(t, 2.0, target.pinches[1].Scale, 1e-6, "from 100 to 200 apart")
 }
 
-// A move that keeps the distance still reports where the fingers are, so a
-// widget can pan with them.
-func TestTouchHandler_PinchReportsFocusAtEqualDistance(t *testing.T) {
+// Two fingers moving together over a Pinchable are a pan (#398): they scroll
+// from where the gesture started, with momentum on release, and the target
+// gets no Pinched — the scroll reaches it first, so a widget can pan itself or
+// let the scroll pass to the page around it.
+func TestTouchHandler_TwoFingersTogetherPan(t *testing.T) {
 	target := &pinchRect{Rectangle: canvas.NewRectangle(color.Black)}
 	h := newPinchHandler(target)
+	var origins []geo.Position
+	var scrolls []geo.Delta
+	var ended int
+	h.ScrollCallback = func(o geo.Position, d geo.Delta) { origins = append(origins, o); scrolls = append(scrolls, d) }
+	h.ScrollEndCallback = func(geo.Position, geo.Delta) { ended++ }
+
 	h.TapDown(geo.NewPos(100, 100), 1)
 	h.TapDown(geo.NewPos(200, 100), 2)
-	h.TapMove(geo.NewPos(100, 200), 2, nil) // still 100 from finger 1
-	require.Len(t, target.pinches, 1)
-	assert.InDelta(t, 1.0, target.pinches[0].Scale, 1e-6)
-	assert.Equal(t, geo.NewPos(100, 150), target.pinches[0].AbsolutePosition)
+	for y := float32(110); y <= 160; y += 10 { // both fingers move up the screen together
+		h.TapMove(geo.NewPos(100, y), 1, nil)
+		h.TapMove(geo.NewPos(200, y), 2, nil)
+	}
+	require.NotEmpty(t, scrolls)
+	var total float32
+	for _, d := range scrolls {
+		total += d.DY
+	}
+	assert.InDelta(t, 60, total, 1e-3, "the scroll follows the midpoint, 100 -> 160")
+	assert.Equal(t, geo.NewPos(150, 100), origins[0], "scrolls from where the gesture started")
+	assert.Empty(t, target.pinches, "moving together is not a pinch")
+
+	pinchTapUp(h, geo.NewPos(100, 160), 1)
+	pinchTapUp(h, geo.NewPos(200, 160), 2)
+	assert.Equal(t, 1, ended, "the pan ends once, seeding momentum")
+	assert.Zero(t, target.ended)
+	assert.Zero(t, target.taps)
+}
+
+// A one-handed pinch keeps one finger still: the midpoint moves half as far as
+// the distance changes, which must still read as a pinch, not a pan.
+func TestTouchHandler_OneHandedPinchIsAPinch(t *testing.T) {
+	target := &pinchRect{Rectangle: canvas.NewRectangle(color.Black)}
+	h := newPinchHandler(target)
+	var scrolls int
+	h.ScrollCallback = func(geo.Position, geo.Delta) { scrolls++ }
+	h.TapDown(geo.NewPos(100, 100), 1)
+	h.TapDown(geo.NewPos(200, 100), 2)
+	for x := float32(205); x <= 260; x += 5 {
+		h.TapMove(geo.NewPos(x, 100), 2, nil) // finger 1 stays put
+	}
+	assert.NotEmpty(t, target.pinches)
+	assert.Zero(t, scrolls)
 }
 
 // pinchTouchRect is a Touchable Pinchable, for the first finger's touch.
@@ -182,13 +257,14 @@ func TestTouchHandler_DownOnPinchFingerEndsLostPinch(t *testing.T) {
 	target := &pinchRect{Rectangle: canvas.NewRectangle(color.Black)}
 	h := newPinchHandler(target)
 	h.TapDown(geo.NewPos(100, 100), 1)
-	h.TapDown(geo.NewPos(200, 100), 2) // neither release arrives
+	h.TapDown(geo.NewPos(200, 100), 2)      // neither release arrives
+	h.TapMove(geo.NewPos(260, 100), 2, nil) // a pinch: the fingers spread
 
 	h.TapDown(geo.NewPos(150, 150), 1)
 	assert.Equal(t, 1, target.ended, "the lost pinch ends")
 	assert.Nil(t, h.pinch)
 	h.TapMove(geo.NewPos(400, 150), 1, nil)
-	assert.Empty(t, target.pinches, "the new finger does not pinch against the lost one")
+	assert.Len(t, target.pinches, 1, "the new finger does not pinch against the lost one")
 	pinchTapUp(h, geo.NewPos(400, 150), 1)
 	assert.Equal(t, 1, target.taps)
 	assert.Equal(t, 1, target.ended)
