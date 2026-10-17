@@ -6,6 +6,8 @@ import (
 	"context"
 	"time"
 
+	intdriver "github.com/belluikit/bellui/internal/driver"
+
 	_ "image/png" // for the icon
 
 	"github.com/belluikit/bellui/internal/driver/common"
@@ -50,6 +52,9 @@ const (
 var _ bellui.Window = (*window)(nil)
 
 type window struct {
+	// tabEscape is the Escape-then-Tab way out of a widget that keeps Tab (#357).
+	tabEscape intdriver.TabEscape
+
 	viewport  *glfw.Window
 	created   bool
 	decorate  bool
