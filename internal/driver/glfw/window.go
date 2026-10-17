@@ -1103,7 +1103,11 @@ func (w *window) processKeyPressed(keyName event.KeyName, keyASCII event.KeyName
 	// A Tab press whose KeyDown already moved focus is handled: neither a
 	// second focus move nor a shortcut or TypedKey on the widget that has just
 	// gained focus, which never saw the key go down.
-	if keyName == event.KeyTab && (keyDownMovedFocus || driver.MoveTabFocus(w.canvas, keyDesktopModifier)) {
+	if keyName == event.KeyTab && keyDownMovedFocus {
+		w.tabEscape = driver.TabEscape{}
+		return
+	}
+	if w.tabEscape.MoveTabFocus(w.canvas, keyName, keyDesktopModifier) {
 		return
 	}
 	if w.triggersShortcut(keyName, keyASCII, keyDesktopModifier) {
@@ -1115,8 +1119,11 @@ func (w *window) processKeyPressed(keyName event.KeyName, keyASCII event.KeyName
 	// because a canvas-hosted dialog focuses nothing, so there is no widget for
 	// the key to reach — and where one is focused, a text field would otherwise
 	// swallow the key and trap the user in the dialog.
-	if action == press && keyName == event.KeyEscape && driver.HandleEscape(w.canvas) {
-		return
+	if action == press && keyName == event.KeyEscape {
+		if driver.HandleEscape(w.canvas) {
+			return
+		}
+		w.tabEscape.EscapeNotConsumed(w.canvas.Focused())
 	}
 
 	// No shortcut detected, pass down to TypedKey

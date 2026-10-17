@@ -27,6 +27,15 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
   
 ### Fixed
 
+* **Web: keyboard users can leave a multi-line field**
+  ([#357](https://github.com/belluikit/bellui/issues/357)). A multi-line
+  `Entry` and the x/dag canvas keep Tab for themselves, and the way out,
+  Ctrl+Tab, never reaches a web page because browsers use it to switch tabs, so
+  a keyboard-only user was trapped (WCAG 2.1.2). Escape followed by Tab or
+  Shift+Tab now moves focus out of such a widget, on every platform. Escape
+  still closes a pop-up or dialog first; the Escape after that frees the next
+  Tab.
+
 * **x/charts: charts no longer rebuild on every frame**
   ([#396](https://github.com/belluikit/bellui/issues/396)). Every layout rebuilt
   the chart, and the rebuild triggered another layout, so idle charts were

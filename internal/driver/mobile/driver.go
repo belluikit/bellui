@@ -55,6 +55,9 @@ type ConfiguredDriver interface {
 }
 
 type driver struct {
+	// tabEscape is the Escape-then-Tab way out of a widget that keeps Tab (#357).
+	tabEscape intdriver.TabEscape
+
 	app   app.App
 	glctx gl.Context
 
@@ -1428,7 +1431,7 @@ func runeToPrintable(r rune) rune {
 func (d *driver) typeDownCanvas(canvas *canvas, r rune, code key.Code, mod key.Modifiers) {
 	d.setKeyMods(keyEventModifier(mod))
 	keyName := keyToName(code)
-	if keyName == event.KeyTab && intdriver.MoveTabFocus(canvas, keyEventModifier(mod)) {
+	if d.tabEscape.MoveTabFocus(canvas, keyName, keyEventModifier(mod)) {
 		return
 	}
 
@@ -1473,6 +1476,9 @@ func (d *driver) typeDownCanvas(canvas *canvas, r rune, code key.Code, mod key.M
 	if keyName == event.KeyEscape || keyName == mobile.KeyBack {
 		if intdriver.HandleEscape(canvas) {
 			return
+		}
+		if keyName == event.KeyEscape {
+			d.tabEscape.EscapeNotConsumed(canvas.Focused())
 		}
 		// The walk declines when the focused widget claims the Escape meaning
 		// for a state of its own (event.EscapeHandler) — but such widgets act

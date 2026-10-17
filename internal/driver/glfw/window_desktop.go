@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	intdriver "github.com/belluikit/bellui/internal/driver"
+
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/container"
@@ -109,6 +111,9 @@ var (
 )
 
 type window struct {
+	// tabEscape is the Escape-then-Tab way out of a widget that keeps Tab (#357).
+	tabEscape intdriver.TabEscape
+
 	viewport  *glfw.Window
 	created   bool
 	decorate  bool
