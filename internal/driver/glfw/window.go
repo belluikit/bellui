@@ -1362,6 +1362,7 @@ func (d *gLDriver) createWindow(title string, decorate bool) bellui.Window {
 
 	ret = &window{title: title, decorate: decorate, driver: d}
 	ret.canvas = newCanvas()
+	ret.canvas.FixedSize = canvasFixedSize
 	ret.canvas.context = ret
 	ret.SetIcon(ret.icon)
 	d.addWindow(ret)
