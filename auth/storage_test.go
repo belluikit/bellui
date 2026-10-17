@@ -250,11 +250,11 @@ func TestTokenPath_ProviderStaysInsideAppDir(t *testing.T) {
 	appDir := filepath.Join(dir, "bellui-auth", "com.example.test")
 
 	for _, provider := range []string{"../com.example.mail/google", "a/b", "..", "Google"} {
-		got, _, err := tokenPath(provider)
+		got, _, err := tokenPath(provider, "")
 		require.NoError(t, err)
 		assert.Equal(t, appDir, filepath.Dir(got), provider)
 	}
-	got, _, err := tokenPath("google")
+	got, _, err := tokenPath("google", "")
 	require.NoError(t, err)
 	assert.Equal(t, filepath.Join(appDir, "google.enc"), got)
 }
@@ -269,4 +269,59 @@ func TestDeriveKey_FieldsAreSeparate(t *testing.T) {
 	b, err := deriveKey("a", "b:c")
 	require.NoError(t, err)
 	assert.NotEqual(t, a, b)
+}
+
+// Two issuers under one provider name keep separate tokens: two Keycloak
+// realms used to share keycloak.enc, so the second sign-in overwrote the
+// first (#356).
+func TestTokensPerIssuer(t *testing.T) {
+	redirectStorage(t)
+	const realmA = "https://sso.example.com/realms/a"
+	const realmB = "https://sso.example.com/realms/b"
+
+	require.NoError(t, SaveTokenFor("keycloak", realmA, "refresh-a", "a@example.com"))
+	require.NoError(t, SaveTokenFor("keycloak", realmB, "refresh-b", "b@example.com"))
+
+	refresh, email, err := LoadTokenFor("keycloak", realmA)
+	require.NoError(t, err)
+	assert.Equal(t, "refresh-a", refresh)
+	assert.Equal(t, "a@example.com", email)
+	refresh, _, err = LoadTokenFor("keycloak", realmB)
+	require.NoError(t, err)
+	assert.Equal(t, "refresh-b", refresh)
+
+	refresh, _, err = LoadToken("keycloak")
+	require.NoError(t, err)
+	assert.Empty(t, refresh, "the provider-only token is a third, separate one")
+
+	require.NoError(t, ClearTokenFor("keycloak", realmA))
+	refresh, _, _ = LoadTokenFor("keycloak", realmA)
+	assert.Empty(t, refresh, "signing out of realm a removes its token")
+	refresh, _, _ = LoadTokenFor("keycloak", realmB)
+	assert.Equal(t, "refresh-b", refresh, "and leaves realm b's")
+}
+
+// A token without an issuer keeps the file name and key it had before
+// issuers existed, so tokens saved by v1.1 still load.
+func TestTokenWithoutIssuerIsUnchanged(t *testing.T) {
+	dir := redirectStorage(t)
+	path, _, err := tokenPath("google", "")
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(dir, "bellui-auth", "com.example.test", "google.enc"), path)
+
+	before, err := deriveKey("com.example.test", "google")
+	require.NoError(t, err)
+	empty, err := deriveKey("com.example.test", "google", "")
+	require.NoError(t, err)
+	assert.Equal(t, before, empty)
+
+	withIssuer, err := deriveKey("com.example.test", "google", "https://accounts.google.com")
+	require.NoError(t, err)
+	assert.NotEqual(t, before, withIssuer)
+
+	issuerPath, _, err := tokenPath("google", "https://accounts.google.com")
+	require.NoError(t, err)
+	assert.NotEqual(t, path, issuerPath)
+	assert.Equal(t, filepath.Join(dir, "bellui-auth", "com.example.test"), filepath.Dir(issuerPath),
+		"an issuer's token stays in the app's folder")
 }
