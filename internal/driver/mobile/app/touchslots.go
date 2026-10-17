@@ -15,24 +15,40 @@ import "github.com/belluikit/bellui/internal/driver/mobile/event/touch"
 // slot is freed, and the slots of touches whose end was never reported are
 // reclaimed instead: when a gesture starts with no other finger down, and as a
 // last resort when every slot is taken.
+//
+// A reclaimed id is reported as a cancel. The driver and the canvas still hold
+// that touch as down (a contact a pinch can pair with, a window it routes to),
+// and only an end or a cancel lets them forget it.
 type touchSlots [11]uintptr
 
-// reset frees every slot. The iOS side calls it once when touches begin with
-// no other touch down, before any of them is given an id: anything still held
-// then is a touch whose end was lost. Calling it per touch instead gave two
-// fingers that landed in the same event the same id.
-func (s *touchSlots) reset() { *s = touchSlots{} }
+// reset frees every slot and returns a cancel for each id that was held. The
+// iOS side calls it once when touches begin with no other touch down, before
+// any of them is given an id: anything still held then is a touch whose end
+// was lost. Calling it per touch instead gave two fingers that landed in the
+// same event the same id.
+func (s *touchSlots) reset() []touch.Event {
+	var lost []touch.Event
+	for i, v := range s {
+		if v != 0 {
+			lost = append(lost, touch.Event{Sequence: touch.Sequence(i), Type: touch.TypeCancel})
+		}
+	}
+	*s = touchSlots{}
+	return lost
+}
 
-// id returns the id of the touch ptr for an event of type t. An ended or
-// cancelled touch's slot is freed.
-func (s *touchSlots) id(ptr uintptr, t touch.Type) int {
+// events returns what to deliver for an event of type t on the touch ptr at
+// (x, y): a cancel for each id reclaimed to make room for it, then the event
+// itself under the touch's id. An ended or cancelled touch's slot is freed.
+func (s *touchSlots) events(ptr uintptr, t touch.Type, x, y float32) []touch.Event {
+	var out []touch.Event
 	id := s.find(ptr)
 	if id < 0 {
 		id = s.find(0)
 		if id < 0 {
 			// Every slot holds a touch, which cannot all be down: reclaim them
 			// rather than panic.
-			*s = touchSlots{}
+			out = s.reset()
 			id = 0
 		}
 		s[id] = ptr
@@ -41,7 +57,7 @@ func (s *touchSlots) id(ptr uintptr, t touch.Type) int {
 	if t == touch.TypeEnd || t == touch.TypeCancel {
 		s[id] = 0
 	}
-	return id
+	return append(out, touch.Event{X: x, Y: y, Sequence: touch.Sequence(id), Type: t})
 }
 
 func (s *touchSlots) find(ptr uintptr) int {

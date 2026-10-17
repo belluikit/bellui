@@ -30,11 +30,13 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
 * **Mobile: touches are no longer lost or renumbered mid-gesture**
   ([#392](https://github.com/belluikit/bellui/issues/392)). On iOS, lifting one
   finger gave a finger still down a new id, so after a pinch the remaining
-  finger could pan or tap. On Android, a touch the system cancelled (the
-  notification shade pulled down mid-touch) was reported as a move and never
+  finger could pan or tap. On Android, a touch the system cancelled (another
+  app opened on top while the finger was down) was reported as a move and never
   ended. iOS now keeps each touch's id until it ends, Android and iOS report a
   cancelled touch as a cancel (no tap, no long press), and a touch keeps the
-  window it began in if another window opens while the finger is down.
+  window it began in if another window opens while the finger is down. If its
+  window closes instead, the touch is cancelled there, and it no longer taps
+  the closed window's content.
 
 * **x/charts: charts no longer rebuild on every frame**
   ([#396](https://github.com/belluikit/bellui/issues/396)). Every layout rebuilt

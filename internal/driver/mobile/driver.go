@@ -1175,31 +1175,33 @@ func (d *driver) exploreTouch(w *window, e touch.Event) {
 		time.AfterFunc(common.TapSecondaryDelay, func() {
 			bellui.Do(func() { d.tbHoldQualify(gen) })
 		})
+	// Past its Begin, a stream goes to the window it began in (t.win), like
+	// any other touch (#392): the current window may have changed since.
 	case touch.TypeMove:
 		if t.dispatched && e.Sequence == t.seq {
-			d.tapMoveCanvas(w, e.X, e.Y, e.Sequence)
+			d.tapMoveCanvas(t.win, e.X, e.Y, e.Sequence)
 			return
 		}
 		if !t.tracking || e.Sequence != t.seq {
 			return // explore hover (never began) or a second finger
 		}
 		t.lastX, t.lastY = e.X, e.Y
-		if !d.tbPastSlop(w, e.X, e.Y) {
+		if !d.tbPastSlop(t.win, e.X, e.Y) {
 			return
 		}
 		// Passthrough scroll/drag: enter the pipeline at the Begin point so
 		// the accumulated delta is preserved, then continue live.
 		t.tracking = false
 		t.dispatched = true
-		d.tapDownCanvas(w, t.startX, t.startY, t.seq)
-		d.tapMoveCanvas(w, e.X, e.Y, e.Sequence)
+		d.tapDownCanvas(t.win, t.startX, t.startY, t.seq)
+		d.tapMoveCanvas(t.win, e.X, e.Y, e.Sequence)
 	case touch.TypeEnd, touch.TypeCancel:
 		if t.dispatched && e.Sequence == t.seq {
 			t.dispatched = false
 			if e.Type == touch.TypeCancel {
-				d.tapCancelCanvas(w, e.X, e.Y, e.Sequence)
+				d.tapCancelCanvas(t.win, e.X, e.Y, e.Sequence)
 			} else {
-				d.tapUpCanvas(w, e.X, e.Y, e.Sequence)
+				d.tapUpCanvas(t.win, e.X, e.Y, e.Sequence)
 			}
 			return
 		}
@@ -1240,60 +1242,86 @@ func (d *driver) tbPastSlop(w *window, x, y float32) bool {
 // finger is down, its moves and release still reach the canvas that saw it go
 // down, whose touch handler is waiting for them (#392).
 func (d *driver) handleTouch(current *window, e touch.Event) {
-	w := current
-	if began, ok := d.touchWindows[e.Sequence]; ok {
-		w = began
-	}
-	switch e.Type {
-	case touch.TypeBegin:
+	if e.Type == touch.TypeBegin {
 		if d.touchWindows == nil {
 			d.touchWindows = make(map[touch.Sequence]*window)
 		}
 		d.touchWindows[e.Sequence] = current
 		d.tapDownCanvas(current, e.X, e.Y, e.Sequence)
+		return
+	}
+
+	w, ok := d.touchWindows[e.Sequence]
+	if !ok {
+		w = current
+	}
+	if e.Type != touch.TypeMove {
+		delete(d.touchWindows, e.Sequence)
+	}
+	if w == nil {
+		return // the window it began in closed, which cancelled the touch
+	}
+	switch e.Type {
 	case touch.TypeMove:
 		d.tapMoveCanvas(w, e.X, e.Y, e.Sequence)
 	case touch.TypeEnd:
-		delete(d.touchWindows, e.Sequence)
 		d.tapUpCanvas(w, e.X, e.Y, e.Sequence)
 	case touch.TypeCancel:
-		delete(d.touchWindows, e.Sequence)
 		d.tapCancelCanvas(w, e.X, e.Y, e.Sequence)
 	}
+}
+
+// cancelWindowTouches ends every touch that began in w, which is closing: its
+// canvas cancels them while its widgets still exist, and the rest of each
+// sequence is dropped. Delivered there, a release would hit-test the closed
+// window's content and could tap a button nobody can see; delivered to the
+// current window, it would reach a handler that never saw the touch go down.
+func (d *driver) cancelWindowTouches(w *window) {
+	for seq, began := range d.touchWindows {
+		if began == w {
+			w.canvas.TapCancel(geo.Position{}, int(seq))
+			d.touchWindows[seq] = nil
+		}
+	}
+
+	t := &d.tbPass
+	if t.win != w {
+		return
+	}
+	if t.dispatched {
+		w.canvas.TapCancel(geo.Position{}, int(t.seq))
+	}
+	// The rest of the stream is ignored like a second finger's.
+	t.tracking, t.dispatched = false, false
+	t.win = nil
+}
+
+// canvasPos converts a touch position in device pixels to a position on w's
+// canvas.
+func canvasPos(w *window, x, y float32) geo.Position {
+	tapX := scale.ToBelluiCoordinate(w.canvas, int(x))
+	tapY := scale.ToBelluiCoordinate(w.canvas, int(y))
+	return geo.NewPos(tapX, tapY+tapYOffset)
 }
 
 // tapCancelCanvas ends a touch the system took away: no tap, long press or
 // drag completes (#392).
 func (d *driver) tapCancelCanvas(w *window, x, y float32, tapID touch.Sequence) {
-	tapX := scale.ToBelluiCoordinate(w.canvas, int(x))
-	tapY := scale.ToBelluiCoordinate(w.canvas, int(y))
-	w.canvas.TapCancel(geo.NewPos(tapX, tapY+tapYOffset), int(tapID))
+	w.canvas.TapCancel(canvasPos(w, x, y), int(tapID))
 }
 
 func (d *driver) tapDownCanvas(w *window, x, y float32, tapID touch.Sequence) {
-	tapX := scale.ToBelluiCoordinate(w.canvas, int(x))
-	tapY := scale.ToBelluiCoordinate(w.canvas, int(y))
-	pos := geo.NewPos(tapX, tapY+tapYOffset)
-
-	w.canvas.TapDown(pos, int(tapID))
+	w.canvas.TapDown(canvasPos(w, x, y), int(tapID))
 }
 
 func (d *driver) tapMoveCanvas(w *window, x, y float32, tapID touch.Sequence) {
-	tapX := scale.ToBelluiCoordinate(w.canvas, int(x))
-	tapY := scale.ToBelluiCoordinate(w.canvas, int(y))
-	pos := geo.NewPos(tapX, tapY+tapYOffset)
-
-	w.canvas.TapMove(pos, int(tapID), func(wid event.Draggable, ev *event.DragEvent) {
+	w.canvas.TapMove(canvasPos(w, x, y), int(tapID), func(wid event.Draggable, ev *event.DragEvent) {
 		wid.Dragged(ev)
 	})
 }
 
 func (d *driver) tapUpCanvas(w *window, x, y float32, tapID touch.Sequence) {
-	tapX := scale.ToBelluiCoordinate(w.canvas, int(x))
-	tapY := scale.ToBelluiCoordinate(w.canvas, int(y))
-	pos := geo.NewPos(tapX, tapY+tapYOffset)
-
-	w.canvas.TapUp(pos, int(tapID), func(wid event.Tappable, ev *event.PointEvent) {
+	w.canvas.TapUp(canvasPos(w, x, y), int(tapID), func(wid event.Tappable, ev *event.PointEvent) {
 		wid.Tapped(ev)
 		if co, ok := wid.(core.CanvasObject); ok {
 			core.NotifyActivation(co, false)

@@ -749,8 +749,9 @@ func processEvent(env *C.JNIEnv, e *C.AInputEvent) {
 		case C.AMOTION_EVENT_ACTION_UP, C.AMOTION_EVENT_ACTION_POINTER_UP:
 			upDownType = touch.TypeEnd
 		case C.AMOTION_EVENT_ACTION_CANCEL:
-			// The system took the whole gesture (the shade was pulled, focus
-			// was taken): every pointer in it ends without completing. It
+			// The system took the whole gesture (another window opened on
+			// top, focus was taken): every pointer in it ends without
+			// completing. It
 			// used to fall through to a move, so the release was never seen
 			// (#392).
 			cancelled = true
