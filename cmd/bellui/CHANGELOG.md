@@ -14,6 +14,18 @@ More detailed release notes can be found on the [releases page](https://github.c
 
 ### Fixed
 
+* Packages now credit the gopher artwork they ship
+  ([#362](https://github.com/belluikit/bellui/issues/362)). The default icon
+  (used when an app has no `Icon.png`) and the web splash spinner are based on
+  the Go gopher, which is CC BY 4.0 and must be credited wherever it is
+  shared, but no package said so. The web splash screen now shows "Gopher
+  artwork based on the Go gopher by Renée French, CC BY 4.0" under the spinner. A package that uses the default
+  icon carries the credit in its macOS or iOS Info.plist (shown in About), its
+  Windows version resource (shown in Properties), its Android manifest, or a
+  `share/doc/<app>/CREDITS` file in Linux and BSD archives. `bellui package`
+  also says so when it falls back to the default icon, and warns when an
+  Android app's own `AndroidManifest.xml` leaves the credit out.
+
 * The web page `bellui package -os web` and `bellui serve` write now has a
   viewport meta tag. Without it, phone browsers laid the app out 980 CSS px
   wide, so it showed as a shrunken desktop page with a canvas of about six
