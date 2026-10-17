@@ -22,12 +22,12 @@ func (p *Packager) packageAndroid(arch string, tags []string) error {
 	}
 
 	return mobile.RunNewBuild(arch, p.AppID, p.icon, p.Name, p.AppVersion, p.AppBuild, p.release, p.distribution,
-		"", "", tags, iconFG, iconBG, iconMono, p.URLSchemes, p.fileMimeTypes(), nil, p.AssociatedDomains)
+		"", "", tags, iconFG, iconBG, iconMono, p.URLSchemes, p.fileMimeTypes(), nil, p.AssociatedDomains, p.iconCredit())
 }
 
 func (p *Packager) packageIOS(target string, tags []string) error {
 	err := mobile.RunNewBuild(target, p.AppID, p.icon, p.Name, p.AppVersion, p.AppBuild, p.release, p.distribution,
-		p.certificate, p.profile, tags, "", "", "", p.URLSchemes, p.fileMimeTypes(), p.IOSUsageDescriptions, p.AssociatedDomains)
+		p.certificate, p.profile, tags, "", "", "", p.URLSchemes, p.fileMimeTypes(), p.IOSUsageDescriptions, p.AssociatedDomains, p.iconCredit())
 	if err != nil {
 		return err
 	}

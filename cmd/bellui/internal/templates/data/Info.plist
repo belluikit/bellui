@@ -24,6 +24,10 @@
 	<true/>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
+	{{- if .Credit}}
+	<key>NSHumanReadableCopyright</key>
+	<string>{{.Credit}}</string>
+	{{- end}}
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	{{- if .Languages}}
