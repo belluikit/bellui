@@ -75,6 +75,7 @@ type Packager struct {
 	certificate, profile           string // optional flags for releasing
 	tags, category                 string
 	tempDir                        string
+	defaultIcon                    bool // the bundled gopher icon is in use (#362)
 	langs                          []string
 
 	customMetadata      keyValueFlag
@@ -278,8 +279,10 @@ func (p *Packager) validate() (err error) {
 			if err := os.WriteFile(tmp, templates.DefaultIcon, 0o644); err != nil {
 				return fmt.Errorf("failed to write default application icon: %w", err)
 			}
-			log.Println("No Icon.png found — using the default toolkit icon; provide an Icon.png or --icon for a custom one")
+			log.Println("No Icon.png found — using the default toolkit icon, a gopher image under CC BY 4.0; " +
+				"its credit is added to the package. Provide an Icon.png or --icon for a custom one")
 			p.icon = tmp
+			p.defaultIcon = true
 		}
 	}
 	if !util.Exists(p.icon) {
@@ -471,4 +474,13 @@ func hasGoCode(dir string) bool {
 		return errStopWalking
 	})
 	return found
+}
+
+// iconCredit returns the attribution the package's icon needs: the gopher
+// credit when the bundled default icon is used, otherwise "" (#362).
+func (p *Packager) iconCredit() string {
+	if p.defaultIcon {
+		return templates.GopherCredit
+	}
+	return ""
 }

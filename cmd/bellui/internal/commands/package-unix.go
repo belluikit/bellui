@@ -31,6 +31,10 @@ type unixData struct {
 	// the Makefile installs it and sets up the sandbox helper (#107).
 	BundleCEF bool
 
+	// Credits marks a package carrying share/doc/<AppID>/CREDITS: the
+	// attribution the default gopher icon needs (#362).
+	Credits bool
+
 	SourceRepo, SourceDir string
 }
 
@@ -138,6 +142,10 @@ func (p *Packager) packageUNIX() error {
 		MimeTypes:      mimes,
 		StartupWMClass: p.Name,
 		BundleCEF:      bundledCEF,
+		Credits:        p.iconCredit() != "",
+	}
+	if err := writeUnixCredits(shareDir, appIDOrName, p.iconCredit()); err != nil {
+		return err
 	}
 
 	if p.sourceMetadata != nil {
@@ -234,4 +242,18 @@ func makefileData(desktop unixData, appIDOrName, exe, iconName string) unixData 
 	desktop.Exec = exe
 	desktop.Icon = iconName
 	return desktop
+}
+
+// writeUnixCredits writes share/doc/<appIDOrName>/CREDITS when credit is not
+// empty: the default icon's attribution, shipped in the archive and installed
+// by the Makefile (#362).
+func writeUnixCredits(shareDir, appIDOrName, credit string) error {
+	if credit == "" {
+		return nil
+	}
+	docDir := util.EnsureSubDir(util.EnsureSubDir(shareDir, "doc"), appIDOrName)
+	if err := os.WriteFile(filepath.Join(docDir, "CREDITS"), []byte(credit+"\n"), 0o644); err != nil {
+		return fmt.Errorf("failed to write the icon credits: %w", err)
+	}
+	return nil
 }
