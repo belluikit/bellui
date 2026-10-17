@@ -250,11 +250,11 @@ func TestTokenPath_ProviderStaysInsideAppDir(t *testing.T) {
 	appDir := filepath.Join(dir, "bellui-auth", "com.example.test")
 
 	for _, provider := range []string{"../com.example.mail/google", "a/b", "..", "Google"} {
-		got, _, err := tokenPath(provider)
+		got, _, err := tokenPath(provider, "")
 		require.NoError(t, err)
 		assert.Equal(t, appDir, filepath.Dir(got), provider)
 	}
-	got, _, err := tokenPath("google")
+	got, _, err := tokenPath("google", "")
 	require.NoError(t, err)
 	assert.Equal(t, filepath.Join(appDir, "google.enc"), got)
 }
@@ -275,19 +275,28 @@ func TestDeriveKey_FieldsAreSeparate(t *testing.T) {
 // time any app saves or clears a token for that provider: no app reads it, but
 // it still decrypts (#355). That holds even when the save or clear itself
 // fails: for an app with no ID (which could store tokens before per-app
-// storage), and when the app's token file cannot be written or removed.
+// storage), and when the app's token file cannot be written or removed. The
+// legacy file was per provider, so a save or clear for one issuer of that
+// provider removes it too.
 func TestLegacySharedTokenIsRemoved(t *testing.T) {
-	triggers := map[string]func() error{
-		"sign-in":  func() error { return SaveToken("google", "refresh", "a@example.com") },
-		"sign-out": func() error { return ClearToken("google") },
+	const issuer = "https://sso.example.com/realms/a"
+	issuerFile := hashedName("google\x00"+issuer) + ".enc"
+	triggers := map[string]struct {
+		run  func() error
+		file string // the app's token file the trigger writes or removes
+	}{
+		"sign-in":             {func() error { return SaveToken("google", "refresh", "a@example.com") }, "google.enc"},
+		"sign-out":            {func() error { return ClearToken("google") }, "google.enc"},
+		"sign-in for issuer":  {func() error { return SaveTokenFor("google", issuer, "refresh", "a@example.com") }, issuerFile},
+		"sign-out for issuer": {func() error { return ClearTokenFor("google", issuer) }, issuerFile},
 	}
 	states := map[string]struct {
-		setup   func(t *testing.T, base string)
+		setup   func(t *testing.T, base, file string)
 		wantErr bool
 	}{
-		"app with an ID": {setup: func(*testing.T, string) {}},
+		"app with an ID": {setup: func(*testing.T, string, string) {}},
 		"app without an ID": {
-			setup:   func(*testing.T, string) { currentAppID = func() string { return "" } },
+			setup:   func(*testing.T, string, string) { currentAppID = func() string { return "" } },
 			wantErr: true,
 		},
 		// A non-empty directory where the app's token file belongs: saving
@@ -295,8 +304,8 @@ func TestLegacySharedTokenIsRemoved(t *testing.T) {
 		// the app's directory a file instead does not fail a clear on Windows,
 		// which reports the path as not found.)
 		"token path unusable": {
-			setup: func(t *testing.T, base string) {
-				blocker := filepath.Join(base, "com.example.test", "google.enc")
+			setup: func(t *testing.T, base, file string) {
+				blocker := filepath.Join(base, "com.example.test", file)
 				require.NoError(t, os.MkdirAll(blocker, 0o700))
 				require.NoError(t, os.WriteFile(filepath.Join(blocker, "keep"), nil, 0o600))
 			},
@@ -313,9 +322,9 @@ func TestLegacySharedTokenIsRemoved(t *testing.T) {
 				require.NoError(t, os.MkdirAll(base, 0o700))
 				require.NoError(t, os.WriteFile(old, []byte("old token"), 0o600))
 				require.NoError(t, os.WriteFile(other, []byte("old token"), 0o600))
-				state.setup(t, base)
+				state.setup(t, base, trigger.file)
 
-				err := trigger()
+				err := trigger.run()
 				if state.wantErr {
 					require.Error(t, err, "the state must make the trigger fail")
 				} else {
@@ -384,4 +393,59 @@ func TestLegacyTokenCleanupStaysInPlace(t *testing.T) {
 	// empty token directory took its name before the removal runs.
 	require.Error(t, removeFile(emptyAppDir))
 	assert.DirExists(t, emptyAppDir)
+}
+
+// Two issuers under one provider name keep separate tokens: two Keycloak
+// realms used to share keycloak.enc, so the second sign-in overwrote the
+// first (#356).
+func TestTokensPerIssuer(t *testing.T) {
+	redirectStorage(t)
+	const realmA = "https://sso.example.com/realms/a"
+	const realmB = "https://sso.example.com/realms/b"
+
+	require.NoError(t, SaveTokenFor("keycloak", realmA, "refresh-a", "a@example.com"))
+	require.NoError(t, SaveTokenFor("keycloak", realmB, "refresh-b", "b@example.com"))
+
+	refresh, email, err := LoadTokenFor("keycloak", realmA)
+	require.NoError(t, err)
+	assert.Equal(t, "refresh-a", refresh)
+	assert.Equal(t, "a@example.com", email)
+	refresh, _, err = LoadTokenFor("keycloak", realmB)
+	require.NoError(t, err)
+	assert.Equal(t, "refresh-b", refresh)
+
+	refresh, _, err = LoadToken("keycloak")
+	require.NoError(t, err)
+	assert.Empty(t, refresh, "the provider-only token is a third, separate one")
+
+	require.NoError(t, ClearTokenFor("keycloak", realmA))
+	refresh, _, _ = LoadTokenFor("keycloak", realmA)
+	assert.Empty(t, refresh, "signing out of realm a removes its token")
+	refresh, _, _ = LoadTokenFor("keycloak", realmB)
+	assert.Equal(t, "refresh-b", refresh, "and leaves realm b's")
+}
+
+// A token without an issuer keeps the file name and key it had before
+// issuers existed, so tokens saved by v1.1 still load.
+func TestTokenWithoutIssuerIsUnchanged(t *testing.T) {
+	dir := redirectStorage(t)
+	path, _, err := tokenPath("google", "")
+	require.NoError(t, err)
+	assert.Equal(t, filepath.Join(dir, "bellui-auth", "com.example.test", "google.enc"), path)
+
+	before, err := deriveKey("com.example.test", "google")
+	require.NoError(t, err)
+	empty, err := deriveKey("com.example.test", "google", "")
+	require.NoError(t, err)
+	assert.Equal(t, before, empty)
+
+	withIssuer, err := deriveKey("com.example.test", "google", "https://accounts.google.com")
+	require.NoError(t, err)
+	assert.NotEqual(t, before, withIssuer)
+
+	issuerPath, _, err := tokenPath("google", "https://accounts.google.com")
+	require.NoError(t, err)
+	assert.NotEqual(t, path, issuerPath)
+	assert.Equal(t, filepath.Join(dir, "bellui-auth", "com.example.test"), filepath.Dir(issuerPath),
+		"an issuer's token stays in the app's folder")
 }
