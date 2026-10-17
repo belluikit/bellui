@@ -14,6 +14,15 @@ More detailed release notes can be found on the [releases page](https://github.c
 
 ### Fixed
 
+* A web app in a browser without WebGPU now says so instead of showing a
+  blank page ([#384](https://github.com/belluikit/bellui/issues/384)). The
+  page `bellui package -os web` and `bellui serve` write checked only for
+  WebGL, so where WebGPU was missing (older iOS, Firefox, Lockdown Mode, some
+  Android GPUs) the app loaded, failed to start and left the page blank. A
+  WebGPU build's page now asks the browser for a WebGPU adapter first and
+  shows "This browser does not support WebGPU, which this application needs"
+  when there is none. A `-tags gl` build keeps its WebGL check.
+
 * The web page `bellui package -os web` and `bellui serve` write now has a
   viewport meta tag. Without it, phone browsers laid the app out 980 CSS px
   wide, so it showed as a shrunken desktop page with a canvas of about six

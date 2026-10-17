@@ -17,6 +17,7 @@ func (p *Packager) packageWasm() error {
 		AppVersion: p.AppVersion,
 		WasmFile:   p.Name + ".wasm",
 		IsReleased: p.release,
+		WebGPU:     usesWebGPU(p.tags),
 	}
 
 	return tpl.packageWebInternal(appDir, p.exe, p.icon, p.release)
@@ -27,6 +28,22 @@ type webData struct {
 	AppVersion string
 	WasmFile   string
 	IsReleased bool
+
+	// WebGPU says the build renders with WebGPU, the default, rather than
+	// WebGL (-tags gl). The page checks for the one the build needs before
+	// loading it, and says so when the browser lacks it (#384).
+	WebGPU bool
+}
+
+// usesWebGPU reports whether a build with these comma-separated tags renders
+// with WebGPU: every web build does unless it is tagged gl.
+func usesWebGPU(tags string) bool {
+	for _, t := range strings.FieldsFunc(tags, func(r rune) bool { return r == ',' || r == ' ' }) {
+		if t == "gl" {
+			return false
+		}
+	}
+	return true
 }
 
 func (w webData) packageWebInternal(appDir string, exeWasmSrc string, icon string, release bool) error {
