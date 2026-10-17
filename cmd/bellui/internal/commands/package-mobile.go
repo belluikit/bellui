@@ -3,6 +3,7 @@ package commands
 import (
 	"bytes"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -21,8 +22,20 @@ func (p *Packager) packageAndroid(arch string, tags []string) error {
 		iconMono = p.appData.AdaptiveIcon.Monochrome
 	}
 
+	p.warnOwnManifestDropsCredit()
 	return mobile.RunNewBuild(arch, p.AppID, p.icon, p.Name, p.AppVersion, p.AppBuild, p.release, p.distribution,
 		"", "", tags, iconFG, iconBG, iconMono, p.URLSchemes, p.fileMimeTypes(), nil, p.AssociatedDomains, p.iconCredit())
+}
+
+// warnOwnManifestDropsCredit says when the default icon's credit cannot reach
+// the package: it goes into the AndroidManifest.xml bellui generates, and an
+// app with its own manifest is built from that one unchanged (#362).
+func (p *Packager) warnOwnManifestDropsCredit() {
+	if p.iconCredit() == "" || !util.Exists(filepath.Join(p.srcDir, "AndroidManifest.xml")) {
+		return
+	}
+	log.Println("The app's own AndroidManifest.xml is used, so the default icon's credit is not added to it. " +
+		"Add an Icon.png, or credit the icon in the manifest: " + p.iconCredit())
 }
 
 func (p *Packager) packageIOS(target string, tags []string) error {
