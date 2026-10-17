@@ -12,6 +12,19 @@ This file lists the main changes with each version of Bellui. Entries up to
 after them describe the trendvidia fork (github.com/trendvidia/fyne) that
 became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
 
+## Unreleased
+
+### Fixed
+
+* **Web: GPU memory was never freed, so Android killed the tab**
+  ([#385](https://github.com/belluikit/bellui/issues/385)). In the browser,
+  releasing a WebGPU texture or buffer did nothing; its memory waited for
+  JavaScript's garbage collector, which ignores GPU memory pressure. The
+  shadow, off-screen and per-frame resources bellui creates piled up — on a
+  Pixel 9a Chrome's GPU memory reached 2.1 GB and the tab crashed within 40
+  seconds. They are now destroyed when bellui is done with them; the same
+  test ran 3 minutes with GPU memory bounded at 600–750 MB.
+
 ## v1.1.2 — 2026-10-16
 
 Fixes a memory leak that every app had: content removed from a window was
