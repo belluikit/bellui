@@ -533,7 +533,7 @@ var infoplistTmpl = template.Must(template.New("infoplist").Parse(`<?xml version
 `))
 
 // iosProjectData is the data for the generated Xcode project, from the
-// arguments and the build settings (-iosversion among them).
+// arguments and the build settings (IOSDeploymentTarget among them).
 func iosProjectData(bundleID, cert, profile, teamID string, release bool) projPbxprojTmplData {
 	projData := projPbxprojTmplData{
 		BitcodeEnabled:   bitcodeEnabled,
@@ -544,7 +544,7 @@ func iosProjectData(bundleID, cert, profile, teamID string, release bool) projPb
 		TeamID:           teamID,
 		Type:             "Manual",
 		Entitlements:     len(buildAssociatedDomains) > 0,
-		DeploymentTarget: buildIOSVersion,
+		DeploymentTarget: IOSDeploymentTarget(),
 	}
 	if profile == "" {
 		projData.Certificate = "iPhone Developer"
@@ -564,7 +564,8 @@ type projPbxprojTmplData struct {
 	// for Associated Domains / Universal Links) and must be code-signed in.
 	Entitlements bool
 	// DeploymentTarget is the lowest iOS version the app runs on, from
-	// -iosversion. It used to be a fixed 14.0, which Xcode 27 rejects (#410).
+	// IOSDeploymentTarget. It used to be a fixed 14.0, which Xcode 27 rejects
+	// (#410).
 	DeploymentTarget string
 }
 

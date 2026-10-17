@@ -189,14 +189,14 @@ func envInit() (err error) {
 		case "arm64":
 			if buildTarget == "ios" {
 				clang, cflags, err = envClang("iphoneos")
-				cflags += " -miphoneos-version-min=" + buildIOSVersion
+				cflags += iosVersionMinFlag("iphoneos")
 			} else { // iossimulator
 				clang, cflags, err = envClang("iphonesimulator")
-				cflags += " -mios-simulator-version-min=" + buildIOSVersion
+				cflags += iosVersionMinFlag("iphonesimulator")
 			}
 		case "386", "amd64":
 			clang, cflags, err = envClang("iphonesimulator")
-			cflags += " -mios-simulator-version-min=" + buildIOSVersion
+			cflags += iosVersionMinFlag("iphonesimulator")
 		default:
 			panic(fmt.Errorf("unknown GOARCH: %q", arch))
 		}
@@ -329,6 +329,15 @@ func envClang(sdkName string) (clang, cflags string, err error) {
 	}
 	sdk := strings.TrimSpace(string(out))
 	return clang, "-isysroot " + sdk, nil
+}
+
+// iosVersionMinFlag is the clang flag stating the deployment target for an
+// iOS SDK, the same IOSDeploymentTarget the Xcode project and actool use.
+func iosVersionMinFlag(sdkName string) string {
+	if sdkName == "iphoneos" {
+		return " -miphoneos-version-min=" + IOSDeploymentTarget()
+	}
+	return " -mios-simulator-version-min=" + IOSDeploymentTarget()
 }
 
 func archClang(goarch string) string {
