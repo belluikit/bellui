@@ -124,6 +124,7 @@ func (p *Packager) packageUNIX() error {
 
 	defer deskFile.Close()
 
+	credit := p.iconCredit()
 	linuxBSD := metadata.LinuxAndBSD{}
 	if p.linuxAndBSDMetadata != nil {
 		linuxBSD = *p.linuxAndBSDMetadata
@@ -142,9 +143,9 @@ func (p *Packager) packageUNIX() error {
 		MimeTypes:      mimes,
 		StartupWMClass: p.Name,
 		BundleCEF:      bundledCEF,
-		Credits:        p.iconCredit() != "",
+		Credits:        credit != "",
 	}
-	if err := writeUnixCredits(shareDir, appIDOrName, p.iconCredit()); err != nil {
+	if err := writeUnixCredits(shareDir, appIDOrName, credit); err != nil {
 		return err
 	}
 

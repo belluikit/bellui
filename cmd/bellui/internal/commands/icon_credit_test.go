@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"image"
 	"image/png"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -74,6 +75,15 @@ func TestIconCreditReachesEveryDesktopPackage(t *testing.T) {
 		makefileData(unixData{Name: "Notes", Credits: true}, "com.example.notes", "notes", "com.example.notes.png")))
 	assert.Contains(t, mk.String(), "share/doc/$(AppID)/CREDITS $(DESTDIR)$(PREFIX)/share/doc/$(AppID)/CREDITS")
 	assert.Contains(t, mk.String(), "share/doc/$(AppID)/CREDITS $(DESTDIR)$(HOME)/.local/share/doc/$(AppID)/CREDITS")
+	// Uninstall removes only what install put there: without an app ID the
+	// directory is named after the app, and may be another package's docs.
+	// Line by line, not as one string: Windows checks the template out with CRLF.
+	assert.Contains(t, mk.String(), "\t-rm $(DESTDIR)$(PREFIX)/share/doc/$(AppID)/CREDITS")
+	assert.Contains(t, mk.String(), "\t-rmdir $(DESTDIR)$(PREFIX)/share/doc/$(AppID)")
+	assert.Contains(t, mk.String(), "\t-rm $(DESTDIR)$(HOME)/.local/share/doc/$(AppID)/CREDITS")
+	assert.Contains(t, mk.String(), "\t-rmdir $(DESTDIR)$(HOME)/.local/share/doc/$(AppID)")
+	assert.NotContains(t, mk.String(), "rm -r $(DESTDIR)$(PREFIX)/share/doc")
+	assert.NotContains(t, mk.String(), "rm -r $(DESTDIR)$(HOME)/.local/share/doc")
 }
 
 func TestOwnIconAddsNoCredit(t *testing.T) {
@@ -97,38 +107,81 @@ func TestOwnIconAddsNoCredit(t *testing.T) {
 func TestWebSplashCreditsTheSpinner(t *testing.T) {
 	var buf bytes.Buffer
 	require.NoError(t, templates.IndexHTML.Execute(&buf, webData{AppName: "Notes", AppVersion: "1.0.0"}))
-	assert.Contains(t, buf.String(), "Gopher by Renée French")
+	// CC BY 4.0 asks to say when the work was adapted, as GopherCredit does.
+	assert.Contains(t, buf.String(), "Gopher artwork based on the Go gopher by Renée French")
 	assert.Contains(t, buf.String(), `href="https://creativecommons.org/licenses/by/4.0/"`)
 }
 
 // packageUNIX itself ships the credits file and the Makefile line that
-// installs it. FreeBSD skips the Linux-only CEF check, so any file will do as
-// the executable.
+// installs it, under the app ID or, without one, the app's name. FreeBSD
+// skips the Linux-only CEF check, so any file will do as the executable.
 func TestUnixArchiveCarriesTheCredits(t *testing.T) {
 	if _, err := exec.LookPath("tar"); err != nil {
 		t.Skip("needs tar")
 	}
-	dir := t.TempDir()
-	exe := filepath.Join(dir, "notes")
-	require.NoError(t, os.WriteFile(exe, []byte("not a real binary"), 0o755))
-	icon := filepath.Join(dir, "icon.png")
-	require.NoError(t, os.WriteFile(icon, templates.DefaultIcon, 0o644))
+	for _, tc := range []struct{ appID, docDir string }{
+		{"com.example.notes", "com.example.notes"},
+		{"", "Notes"},
+	} {
+		t.Run("doc dir "+tc.docDir, func(t *testing.T) {
+			dir := t.TempDir()
+			exe := filepath.Join(dir, "notes")
+			require.NoError(t, os.WriteFile(exe, []byte("not a real binary"), 0o755))
+			icon := filepath.Join(dir, "icon.png")
+			require.NoError(t, os.WriteFile(icon, templates.DefaultIcon, 0o644))
 
-	p := &Packager{
-		appData: &appData{Name: "Notes", AppID: "com.example.notes", icon: icon},
-		os:      "freebsd", dir: dir, exe: exe, defaultIcon: true,
+			p := &Packager{
+				appData: &appData{Name: "Notes", AppID: tc.appID, icon: icon},
+				os:      "freebsd", dir: dir, exe: exe, defaultIcon: true,
+			}
+			require.NoError(t, p.packageUNIX())
+
+			var list bytes.Buffer
+			cmd := exec.Command("tar", "-tJf", filepath.Join(dir, "Notes.tar.xz"))
+			cmd.Stdout = &list
+			require.NoError(t, cmd.Run())
+			assert.Contains(t, list.String(), "share/doc/"+tc.docDir+"/CREDITS")
+
+			var mk bytes.Buffer
+			cmd = exec.Command("tar", "-xOJf", filepath.Join(dir, "Notes.tar.xz"), "notes/Makefile")
+			cmd.Stdout = &mk
+			require.NoError(t, cmd.Run())
+			assert.Contains(t, mk.String(), "AppID := \""+tc.docDir+"\"")
+			assert.Contains(t, mk.String(), "share/doc/$(AppID)/CREDITS")
+		})
 	}
-	require.NoError(t, p.packageUNIX())
+}
 
-	var list bytes.Buffer
-	cmd := exec.Command("tar", "-tJf", filepath.Join(dir, "Notes.tar.xz"))
-	cmd.Stdout = &list
-	require.NoError(t, cmd.Run())
-	assert.Regexp(t, `share/doc/com\.example\.notes/CREDITS`, list.String())
+// The credit goes into the manifest bellui generates. An Android app with its
+// own AndroidManifest.xml is built from that one, so packaging says the credit
+// is missing rather than claiming it was added (#362).
+func TestOwnAndroidManifestWarnsTheCreditIsMissing(t *testing.T) {
+	for _, tc := range []struct {
+		name                     string
+		defaultIcon, ownManifest bool
+		warns                    bool
+	}{
+		{"default icon, own manifest", true, true, true},
+		{"default icon, generated manifest", true, false, false},
+		{"own icon, own manifest", false, true, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			if tc.ownManifest {
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "AndroidManifest.xml"), []byte("<manifest/>"), 0o644))
+			}
+			var out bytes.Buffer
+			log.SetOutput(&out)
+			t.Cleanup(func() { log.SetOutput(os.Stderr) })
 
-	var mk bytes.Buffer
-	cmd = exec.Command("tar", "-xOJf", filepath.Join(dir, "Notes.tar.xz"), "notes/Makefile")
-	cmd.Stdout = &mk
-	require.NoError(t, cmd.Run())
-	assert.Contains(t, mk.String(), "share/doc/$(AppID)/CREDITS")
+			p := &Packager{appData: &appData{}, srcDir: dir, defaultIcon: tc.defaultIcon}
+			p.warnOwnManifestDropsCredit()
+			if tc.warns {
+				assert.Contains(t, out.String(), "credit is not added")
+				assert.Contains(t, out.String(), templates.GopherCredit)
+			} else {
+				assert.Empty(t, out.String())
+			}
+		})
+	}
 }
