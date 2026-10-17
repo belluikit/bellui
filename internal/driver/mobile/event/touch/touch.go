@@ -58,8 +58,9 @@ const (
 	// On iOS, this is a call to touchesEnded.
 	TypeEnd
 
-	// TypeCancel is the system taking a touch away before it ended: the
-	// notification shade pulled down, an incoming call, a system gesture.
+	// TypeCancel is the system taking a touch away before it ended: another
+	// app or system window opening on top while the finger is down, or a
+	// system gesture.
 	// It ends the sequence like TypeEnd, but nothing the touch was doing
 	// completes: no tap, no long press.
 	//

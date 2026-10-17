@@ -161,18 +161,16 @@ func updateConfig(width, height, orientation int32) {
 var touchIDs touchSlots
 
 //export touchesFresh
-func touchesFresh() { touchIDs.reset() }
+func touchesFresh() { sendTouchEvents(touchIDs.reset()) }
 
 //export sendTouch
 func sendTouch(cTouch, cTouchType uintptr, x, y float32) {
-	t := touch.Type(cTouchType)
-	id := touchIDs.id(cTouch, t)
+	sendTouchEvents(touchIDs.events(cTouch, touch.Type(cTouchType), x, y))
+}
 
-	theApp.events.In() <- touch.Event{
-		X:        x,
-		Y:        y,
-		Sequence: touch.Sequence(id),
-		Type:     t,
+func sendTouchEvents(events []touch.Event) {
+	for _, e := range events {
+		theApp.events.In() <- e
 	}
 }
 
