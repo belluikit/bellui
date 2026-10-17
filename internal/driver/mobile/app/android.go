@@ -742,16 +742,25 @@ func processEvent(env *C.JNIEnv, e *C.AInputEvent) {
 		// At most one of the events in this batch is an up or down event; get its index and change.
 		upDownIndex := C.size_t(C.AMotionEvent_getAction(e)&C.AMOTION_EVENT_ACTION_POINTER_INDEX_MASK) >> C.AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT
 		upDownType := touch.TypeMove
+		cancelled := false
 		switch C.AMotionEvent_getAction(e) & C.AMOTION_EVENT_ACTION_MASK {
 		case C.AMOTION_EVENT_ACTION_DOWN, C.AMOTION_EVENT_ACTION_POINTER_DOWN:
 			upDownType = touch.TypeBegin
 		case C.AMOTION_EVENT_ACTION_UP, C.AMOTION_EVENT_ACTION_POINTER_UP:
 			upDownType = touch.TypeEnd
+		case C.AMOTION_EVENT_ACTION_CANCEL:
+			// The system took the whole gesture (the shade was pulled, focus
+			// was taken): every pointer in it ends without completing. It
+			// used to fall through to a move, so the release was never seen
+			// (#392).
+			cancelled = true
 		}
 
 		for i, n := C.size_t(0), C.AMotionEvent_getPointerCount(e); i < n; i++ {
 			t := touch.TypeMove
-			if i == upDownIndex {
+			if cancelled {
+				t = touch.TypeCancel
+			} else if i == upDownIndex {
 				t = upDownType
 			}
 			theApp.events.In() <- touch.Event{

@@ -57,6 +57,15 @@ const (
 	// On Android, this is a AMOTION_EVENT_ACTION_UP.
 	// On iOS, this is a call to touchesEnded.
 	TypeEnd
+
+	// TypeCancel is the system taking a touch away before it ended: the
+	// notification shade pulled down, an incoming call, a system gesture.
+	// It ends the sequence like TypeEnd, but nothing the touch was doing
+	// completes: no tap, no long press.
+	//
+	// On Android, this is a AMOTION_EVENT_ACTION_CANCEL, which cancels every
+	// pointer of the gesture. On iOS, this is a call to touchesCancelled.
+	TypeCancel
 )
 
 func (t Type) String() string {
@@ -65,6 +74,8 @@ func (t Type) String() string {
 		return "begin"
 	case TypeMove:
 		return "move"
+	case TypeCancel:
+		return "cancel"
 	case TypeEnd:
 		return "end"
 	}
