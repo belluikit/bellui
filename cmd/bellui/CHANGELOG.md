@@ -14,6 +14,15 @@ More detailed release notes can be found on the [releases page](https://github.c
 
 ### Fixed
 
+* A `manifest.pxf` that does not parse now stops `bellui build` and
+  `bellui package` with an error naming the file
+  ([#360](https://github.com/belluikit/bellui/issues/360)). It used to be
+  treated as no manifest: `build` succeeded and silently left out the app's
+  ID, name, version and migrations, and `package` wrote a bundle with a
+  placeholder identity (`com.example.…`, build 1) before failing with an
+  error such as `7:1: expected '}', got EOF` that did not say which file was
+  wrong. A missing `manifest.pxf` is still optional.
+
 * The web page `bellui package -os web` and `bellui serve` write now has a
   viewport meta tag. Without it, phone browsers laid the app out 980 CSS px
   wide, so it showed as a shrunken desktop page with a canvas of about six
