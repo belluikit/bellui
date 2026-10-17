@@ -8,32 +8,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// The button keys its saved token by the app's own issuer, so two buttons for
-// one provider with different issuers keep separate tokens (#356). A preset
-// issuer is not part of the key, which keeps Google, Microsoft and Apple
-// tokens where auth.LoadToken has always found them.
-func TestAuthButton_TokenIssuer(t *testing.T) {
-	for _, tc := range []struct {
-		name     string
-		provider string
-		issuer   string
-		want     string
-	}{
-		{"google, preset issuer", "google", "", ""},
-		{"google, the preset's own issuer", "google", "https://accounts.google.com", ""},
-		{"keycloak realm", "keycloak", "https://sso.example.com/realms/a", "https://sso.example.com/realms/a"},
-		{"okta tenant", "okta", "https://example.okta.com", "https://example.okta.com"},
-		{"custom", "custom", "https://id.example.com", "https://id.example.com"},
-		{"github, no issuer", "github", "", ""},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			b := &AuthButton{Provider: tc.provider, Issuer: tc.issuer}
-			assert.Equal(t, tc.want, b.tokenIssuer())
-		})
-	}
-}
-
-// The button saves through SaveTokenFor with that issuer.
+// The button saves its token through SaveTokenFor with its own Issuer, so two
+// buttons for one provider with different issuers keep separate tokens
+// (#356); auth decides that a preset issuer keys like no issuer.
 func TestAuthButton_SavesTokenUnderItsIssuer(t *testing.T) {
 	prevAuth, prevSave := authenticate, saveToken
 	t.Cleanup(func() { authenticate, saveToken = prevAuth, prevSave })

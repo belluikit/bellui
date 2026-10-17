@@ -35,11 +35,12 @@ type AuthButton struct {
 	// "keycloak", and "custom" providers.
 	//
 	// When the button saves a refresh token, an Issuer of the app's own (any
-	// value other than the provider preset's) is part of the token's key, so
-	// two buttons for one provider with different issuers, such as two
-	// Keycloak realms, keep separate tokens. Read such a token back with
-	// auth.LoadTokenFor(Provider, Issuer); for a preset issuer, auth.LoadToken
-	// (Provider) is enough.
+	// value other than the provider preset's, a Microsoft tenant included) is
+	// part of the token's key, so two buttons for one provider with different
+	// issuers, such as two Keycloak realms, keep separate tokens. Read a
+	// button's token back with auth.LoadTokenFor(Provider, Issuer) and remove
+	// it with auth.ClearTokenFor; for an empty or preset Issuer,
+	// auth.LoadToken(Provider) finds the same token.
 	Issuer string
 
 	// Scopes is a space-separated list of OAuth scopes.
@@ -146,7 +147,7 @@ func (b *AuthButton) authenticate(ctx context.Context) {
 		// itself succeeded, so a persistence failure is logged, not routed to
 		// OnError.
 		if res.result.RefreshToken != "" {
-			if err := saveToken(b.Provider, b.tokenIssuer(), res.result.RefreshToken, res.result.Email); err != nil {
+			if err := saveToken(b.Provider, b.Issuer, res.result.RefreshToken, res.result.Email); err != nil {
 				bellui.LogError("auth: failed to persist refresh token", err)
 			}
 		}
@@ -165,15 +166,6 @@ var (
 	authenticate = auth.Authenticate
 	saveToken    = auth.SaveTokenFor
 )
-
-// tokenIssuer is the issuer the button's saved token is keyed by: the app's
-// own Issuer, or "" when the button uses the provider preset's (#356).
-func (b *AuthButton) tokenIssuer() string {
-	if b.Issuer == "" || b.Issuer == b.preset().Issuer {
-		return ""
-	}
-	return b.Issuer
-}
 
 func (b *AuthButton) preset() auth.ProviderPreset {
 	if p, ok := auth.Providers[b.Provider]; ok {

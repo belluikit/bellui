@@ -19,8 +19,9 @@ import (
 	"github.com/belluikit/bellui"
 )
 
-// ErrNoAppID is returned by SaveToken, LoadToken and ClearToken when the
-// running app has no unique ID. Tokens are stored per app, so an app that
+// ErrNoAppID is returned by SaveToken, LoadToken and ClearToken, and by
+// SaveTokenFor, LoadTokenFor and ClearTokenFor, when the running app has no
+// unique ID. Tokens are stored per app, so an app that
 // signs users in must be created with app.NewWithID (or have an ID in its
 // manifest.pxf), as Preferences already require.
 var ErrNoAppID = errors.New("auth: storing a sign-in token needs an app ID; create the app with app.NewWithID")
@@ -45,12 +46,14 @@ func SaveToken(provider, refreshToken, email string) error {
 
 // SaveTokenFor is SaveToken for one issuer of a provider: tokens for two
 // issuers under the same provider name, such as two Keycloak realms, are kept
-// apart (#356). An empty issuer is the same as SaveToken. widget.AuthButton
-// saves this way when its Issuer is the app's own.
+// apart (#356). An empty issuer, or the provider preset's own (see
+// [Providers]), is the same as SaveToken. widget.AuthButton saves this way,
+// with its Issuer.
 //
 // Since: 1.2
 func SaveTokenFor(provider, issuer, refreshToken, email string) error {
 	removeLegacyToken(provider)
+	issuer = keyIssuer(provider, issuer)
 	path, appID, err := tokenPath(provider, issuer)
 	if err != nil {
 		return err
@@ -88,10 +91,12 @@ func LoadToken(provider string) (refreshToken, email string, err error) {
 }
 
 // LoadTokenFor reads back the token SaveTokenFor stored for one issuer of a
-// provider. An empty issuer is the same as LoadToken.
+// provider. An empty issuer, or the provider preset's own, is the same as
+// LoadToken.
 //
 // Since: 1.2
 func LoadTokenFor(provider, issuer string) (refreshToken, email string, err error) {
+	issuer = keyIssuer(provider, issuer)
 	path, appID, err := tokenPath(provider, issuer)
 	if err != nil {
 		return "", "", err
@@ -125,18 +130,21 @@ func LoadTokenFor(provider, issuer string) (refreshToken, email string, err erro
 	return st.RefreshToken, st.Email, nil
 }
 
-// ClearToken removes the running app's stored token for a provider.
+// ClearToken removes the running app's stored token for a provider. It does
+// not remove the tokens SaveTokenFor keeps for the provider's issuers: sign
+// out of one of those with ClearTokenFor.
 func ClearToken(provider string) error {
 	return ClearTokenFor(provider, "")
 }
 
 // ClearTokenFor removes the token SaveTokenFor stored for one issuer of a
-// provider. An empty issuer is the same as ClearToken.
+// provider. An empty issuer, or the provider preset's own, is the same as
+// ClearToken.
 //
 // Since: 1.2
 func ClearTokenFor(provider, issuer string) error {
 	removeLegacyToken(provider)
-	path, _, err := tokenPath(provider, issuer)
+	path, _, err := tokenPath(provider, keyIssuer(provider, issuer))
 	if err != nil {
 		return err
 	}
@@ -253,23 +261,49 @@ func appTokenDir() (dir, appID string, err error) {
 	return filepath.Join(base, storageName(appID)), appID, nil
 }
 
+// keyIssuer is the issuer a token is kept under: "" for a provider preset's
+// own issuer, so that a button that names its preset's issuer and one that
+// leaves Issuer empty share the provider's token, and the issuer otherwise.
+func keyIssuer(provider, issuer string) string {
+	if p, ok := Providers[provider]; ok && issuer == p.Issuer {
+		return ""
+	}
+	return issuer
+}
+
 // tokenPath returns the file holding the running app's token for provider,
 // and the app's ID.
 //
-// A token for one issuer is named after the provider and the issuer together.
-// The issuer is a URL, so that name is never a plain name and is always
-// hashed: it cannot collide with a provider's own file.
+// A token for one issuer is kept in the app's issuerDir, named by the SHA-256
+// of the provider and the issuer, each length-prefixed. So no two (provider,
+// issuer) pairs share a file, whatever characters they contain, and none
+// shares a provider's own file, which is never in that directory.
 func tokenPath(provider, issuer string) (path, appID string, err error) {
 	dir, appID, err := appTokenDir()
 	if err != nil {
 		return "", "", err
 	}
-	name := provider
 	if issuer != "" {
-		name = provider + "\x00" + issuer
-		return filepath.Join(dir, hashedName(name)+".enc"), appID, nil
+		sum := sha256.Sum256(lengthPrefixed(provider, issuer))
+		return filepath.Join(dir, issuerDir, hex.EncodeToString(sum[:])+".enc"), appID, nil
 	}
-	return filepath.Join(dir, storageName(name)+".enc"), appID, nil
+	return filepath.Join(dir, storageName(provider)+".enc"), appID, nil
+}
+
+// issuerDir is the directory, inside an app's token directory, that holds its
+// tokens for one issuer. A provider's own token is a file ending in .enc, so it
+// is never this directory.
+const issuerDir = "issuers"
+
+// lengthPrefixed joins fields, each after its length as 8 big-endian bytes,
+// so that no two lists of fields give the same bytes.
+func lengthPrefixed(fields ...string) []byte {
+	var b []byte
+	for _, field := range fields {
+		b = binary.BigEndian.AppendUint64(b, uint64(len(field)))
+		b = append(b, field...)
+	}
+	return b
 }
 
 // deriveKey produces a 32-byte AES key for an app and provider, bound to a
@@ -285,9 +319,9 @@ func tokenPath(provider, issuer string) (path, appID string, err error) {
 // machines. See [masterSecret] and [secretStore].
 //
 // A token for one issuer adds the issuer as a third field. Without an issuer
-// the fields, and so the key, are what they were before issuers existed, so
-// tokens saved by earlier versions still decrypt.
-func deriveKey(appID, provider string, issuer ...string) ([]byte, error) {
+// (issuer == "") the fields, and so the key, are what they were before issuers
+// existed, so tokens saved by earlier versions still decrypt.
+func deriveKey(appID, provider, issuer string) ([]byte, error) {
 	secret, err := masterSecret()
 	if err != nil {
 		return nil, err
@@ -297,15 +331,10 @@ func deriveKey(appID, provider string, issuer ...string) ([]byte, error) {
 	// Each field is length-prefixed, so no two (appID, provider) pairs hash
 	// the same bytes, whatever characters they contain.
 	fields := []string{appID, provider}
-	if len(issuer) > 0 && issuer[0] != "" {
-		fields = append(fields, issuer[0])
+	if issuer != "" {
+		fields = append(fields, issuer)
 	}
-	for _, field := range fields {
-		var n [8]byte
-		binary.BigEndian.PutUint64(n[:], uint64(len(field)))
-		h.Write(n[:])
-		h.Write([]byte(field))
-	}
+	h.Write(lengthPrefixed(fields...))
 	h.Write(secret)
 	return h.Sum(nil), nil
 }
