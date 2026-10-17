@@ -40,6 +40,7 @@ type manifestTmplData struct {
 	AdaptiveIcon bool
 	URLSchemes   []string
 	MimeTypes    []string
+	Credit       string // the default icon's attribution, as a meta-data entry
 }
 
 // androidManifestData returns the AndroidManifest.xml bytes for the build: the
@@ -71,6 +72,7 @@ func androidManifestData(dir, bundleID, appName, libName, version string, build 
 			AdaptiveIcon: adaptive,
 			URLSchemes:   buildURLSchemes,
 			MimeTypes:    buildFileMimeTypes,
+			Credit:       buildIconCredit,
 		})
 		if err != nil {
 			return nil, libName, err
