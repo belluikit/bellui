@@ -16,6 +16,13 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
 
 ### Fixed
 
+* **Web: a page wider than the screen no longer squeezes the whole UI**
+  ([#387](https://github.com/belluikit/bellui/issues/387)). When content needed
+  more room than the browser viewport, the canvas grew past it and the frame
+  was drawn squeezed sideways until the next window resize. In the browser the
+  canvas now stays the size of the viewport and wider content is clipped, as
+  on mobile.
+  
 * **Web: touch works on phones and tablets**
   ([#378](https://github.com/belluikit/bellui/issues/378)). Only the click a
   browser synthesises after a tap reached the app, so nothing could be scrolled
