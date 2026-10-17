@@ -12,6 +12,17 @@ This file lists the main changes with each version of Bellui. Entries up to
 after them describe the trendvidia fork (github.com/trendvidia/fyne) that
 became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
 
+## Unreleased
+
+### Fixed
+
+* **Web: a page wider than the screen no longer squeezes the whole UI**
+  ([#387](https://github.com/belluikit/bellui/issues/387)). When content needed
+  more room than the browser viewport, the canvas grew past it and the frame
+  was drawn squeezed sideways until the next window resize. In the browser the
+  canvas now stays the size of the viewport and wider content is clipped, as
+  on mobile.
+
 ## v1.1.2 — 2026-10-16
 
 Fixes a memory leak that every app had: content removed from a window was
