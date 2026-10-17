@@ -1693,10 +1693,15 @@ func (c *DAGCanvas) Dragged(ev *event.DragEvent) {
 		c.dragState = dragPanning
 	}
 	if c.dragState == dragPanning {
-		c.Offset.X -= ev.Dragged.DX / c.Zoom
-		c.Offset.Y -= ev.Dragged.DY / c.Zoom
-		c.Refresh()
+		c.panBy(ev.Dragged)
 	}
+}
+
+// panBy moves the view with a finger or pointer that moved by d on screen.
+func (c *DAGCanvas) panBy(d geo.Delta) {
+	c.Offset.X -= d.DX / c.Zoom
+	c.Offset.Y -= d.DY / c.Zoom
+	c.Refresh()
 }
 
 func (c *DAGCanvas) DragEnd() {
@@ -1715,9 +1720,7 @@ func (c *DAGCanvas) Scrolled(ev *event.ScrollEvent) {
 // one-finger drag does; on touch the canvas zooms by pinch.
 func (c *DAGCanvas) TryScrolled(ev *event.ScrollEvent) bool {
 	if ev.Source == event.ScrollSourceTouch {
-		c.Offset.X -= ev.Scrolled.DX / c.Zoom
-		c.Offset.Y -= ev.Scrolled.DY / c.Zoom
-		c.Refresh()
+		c.panBy(ev.Scrolled)
 		return true
 	}
 	c.zoomAround(ev.Position, ev.Position, 1.0+ev.Scrolled.DY*0.002)
