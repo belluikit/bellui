@@ -81,7 +81,13 @@ func TestIndexReportsMissingWebGPUInChrome(t *testing.T) {
 
 			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 			defer cancel()
+			// Without the first-run and keychain flags, Chrome's first launch on
+			// a fresh macOS CI machine stalled past the 60 s limit (the later
+			// launches were fast): it waits on first-run work and the login
+			// keychain, neither of which a test page needs.
 			out, err := exec.CommandContext(ctx, chrome, "--headless=new", "--disable-gpu",
+				"--no-first-run", "--no-default-browser-check", "--use-mock-keychain",
+				"--password-store=basic", "--disable-component-update",
 				"--user-data-dir="+filepath.Join(dir, "profile"),
 				"--virtual-time-budget=3000", "--dump-dom", "file://"+index).Output()
 			require.NoError(t, err)
