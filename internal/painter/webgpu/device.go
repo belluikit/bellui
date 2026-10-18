@@ -83,13 +83,17 @@ func logSurfaceFormats(where string, formats []wgpu.TextureFormat, chosen wgpu.T
 // mingw foreign-exception code — not the access violation it resembles). There
 // is no error to catch on the far side of Configure, so the only defence is to
 // not call it with something already known to be unusable.
-func surfaceConfig(caps wgpu.SurfaceCapabilities, width, height int, where string) (*wgpu.SurfaceConfiguration, error) {
+//
+// The size is capped at maxDim (the adapter's maxTextureDimension2D; 0 means no
+// cap) in each dimension: see capSurfaceSize.
+func surfaceConfig(caps wgpu.SurfaceCapabilities, width, height int, maxDim uint32, where string) (*wgpu.SurfaceConfiguration, error) {
 	if len(caps.Formats) == 0 || len(caps.AlphaModes) == 0 {
 		return nil, fmt.Errorf("%s: surface advertises no usable capabilities (formats=%d alpha modes=%d) — "+
 			"it cannot present on this adapter", where, len(caps.Formats), len(caps.AlphaModes))
 	}
 	format := chooseSurfaceFormat(caps.Formats)
 	logSurfaceFormats(where, caps.Formats, format)
+	width, height = capSurfaceSize(width, height, maxDim)
 	return &wgpu.SurfaceConfiguration{
 		Usage:       wgpu.TextureUsageRenderAttachment | wgpu.TextureUsageCopySrc, // CopySrc enables Capture
 		Format:      format,
@@ -98,6 +102,19 @@ func surfaceConfig(caps wgpu.SurfaceCapabilities, width, height int, where strin
 		PresentMode: choosePresentMode(caps.PresentModes),
 		AlphaMode:   caps.AlphaModes[0],
 	}, nil
+}
+
+// capSurfaceSize caps a surface size at maxDim pixels in each dimension (no cap
+// when maxDim is 0). wgpuSurfaceConfigure rejects a surface larger than the
+// device's maxTextureDimension2D, and that rejection is fatal inside wgpu-native
+// (#437: a window whose content asks for 52006 px aborted at startup). A capped
+// surface draws the window's top-left part; anything past the limit is off any
+// screen anyway.
+func capSurfaceSize(width, height int, maxDim uint32) (int, int) {
+	if maxDim == 0 {
+		return width, height
+	}
+	return min(width, int(maxDim)), min(height, int(maxDim))
 }
 
 // capturePixelsSwapped reports whether a readback of a surface in this format
@@ -122,6 +139,9 @@ type Device struct {
 	queue    *wgpu.Queue
 	surface  *wgpu.Surface
 	config   *wgpu.SurfaceConfiguration
+	// maxSurfaceDim is the adapter's maxTextureDimension2D, the largest surface
+	// width or height wgpu accepts; every configure caps to it (#437).
+	maxSurfaceDim uint32
 
 	modules   map[string]*wgpu.ShaderModule
 	pipelines *PipelineCache[*wgpu.RenderPipeline]
@@ -438,10 +458,11 @@ func NewDevice(sd *wgpu.SurfaceDescriptor, width, height int) (d *Device, err er
 		return d, fmt.Errorf("request device: %w", err)
 	}
 	d.queue = d.device.GetQueue()
+	d.maxSurfaceDim = d.device.GetLimits().MaxTextureDimension2D
 	d.initGPUProfiling() // BELLUI_GPU_PROFILE, pre-rebrand tracker #336
 
 	caps := d.surface.GetCapabilities(d.adapter)
-	d.config, err = surfaceConfig(caps, width, height, "surface configure")
+	d.config, err = surfaceConfig(caps, width, height, d.maxSurfaceDim, "surface configure")
 	if err != nil {
 		return d, err
 	}
@@ -546,6 +567,7 @@ func (d *Device) Resize(width, height int) {
 	if width <= 0 || height <= 0 {
 		return
 	}
+	width, height = capSurfaceSize(width, height, d.maxSurfaceDim)
 	if uint32(width) == d.config.Width && uint32(height) == d.config.Height {
 		return
 	}
@@ -574,7 +596,7 @@ func (d *Device) RecreateSurface(sd *wgpu.SurfaceDescriptor) {
 	// Re-derive format/alpha from the new surface's caps (same adapter, so
 	// normally identical to before) and reconfigure at the current size.
 	caps := d.surface.GetCapabilities(d.adapter)
-	cfg, err := surfaceConfig(caps, int(d.config.Width), int(d.config.Height), "surface recreate")
+	cfg, err := surfaceConfig(caps, int(d.config.Width), int(d.config.Height), d.maxSurfaceDim, "surface recreate")
 	if err != nil {
 		// The new native window cannot present on this adapter. Leave the surface
 		// unconfigured rather than configuring one wgpu has declared unusable —
