@@ -53,17 +53,8 @@ func goIOSBuild(pkg *packages.Package, bundleID string, archs []string,
 	}
 
 	infoplist := new(bytes.Buffer)
-	if err := infoplistTmpl.Execute(infoplist, infoplistTmplData{
-		BundleID:          bundleID,
-		Name:              strings.Title(appName), //lint:ignore SA1019 It is fine for our uses.
-		Version:           version,
-		Build:             build,
-		Legacy:            len(allArchs["ios"]) > 2,
-		UsageDescriptions: sortedPlistEntries(usageDescriptions),
-		URLSchemes:        buildURLSchemes,
-		MimeTypes:         buildFileMimeTypes,
-		ContentTypes:      mimeTypesToUTIs(buildFileMimeTypes),
-	}); err != nil {
+	if err := infoplistTmpl.Execute(infoplist,
+		iosInfoPlistData(bundleID, appName, version, build, len(allArchs["ios"]) > 2, usageDescriptions)); err != nil {
 		return nil, err
 	}
 
@@ -296,12 +287,33 @@ func lookupCertNamed(name string) ([]byte, error) {
 	return cmd.Output()
 }
 
+// iosInfoPlistData is the data for the app's Info.plist, from the arguments
+// and the build settings RunNewBuild fills.
+func iosInfoPlistData(bundleID, appName, version string, build int, legacy bool,
+	usageDescriptions map[string]string,
+) infoplistTmplData {
+	return infoplistTmplData{
+		BundleID:          bundleID,
+		Credit:            buildIconCredit,        // the default icon's attribution (#362)
+		Name:              strings.Title(appName), //lint:ignore SA1019 It is fine for our uses.
+		Version:           version,
+		Build:             build,
+		Legacy:            legacy,
+		UsageDescriptions: sortedPlistEntries(usageDescriptions),
+		URLSchemes:        buildURLSchemes,
+		MimeTypes:         buildFileMimeTypes,
+		ContentTypes:      mimeTypesToUTIs(buildFileMimeTypes),
+	}
+}
+
 type infoplistTmplData struct {
 	BundleID string
 	Name     string
 	Version  string
 	Build    int
 	Legacy   bool
+	// Credit is the default icon's attribution (NSHumanReadableCopyright).
+	Credit string
 	// UsageDescriptions are the iOS Info.plist usage-description entries
 	// (NSCameraUsageDescription, …), pre-sorted by key for deterministic output.
 	UsageDescriptions []plistEntry
@@ -431,6 +443,10 @@ var infoplistTmpl = template.Must(template.New("infoplist").Parse(`<?xml version
   <string>{{.BundleID}}</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
+  {{- if .Credit}}
+  <key>NSHumanReadableCopyright</key>
+  <string>{{.Credit}}</string>
+  {{- end}}
   <key>CFBundleName</key>
   <string>{{.Name}}</string>
   <key>CFBundlePackageType</key>

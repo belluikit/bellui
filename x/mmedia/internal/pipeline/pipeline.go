@@ -99,7 +99,8 @@ type Pipeline struct {
 
 	// Decode-ahead buffer: pre-allocated frames cycle through
 	// frameQueue (decode→display) and frameRecycle (display→decode).
-	// All RGBA frames are allocated once at startup — zero GC pressure.
+	// The pool's RGBA frames are allocated once, when the geometry is set; the
+	// source still hands over a freshly decoded frame that is copied into one.
 	frameQueue   chan timedFrame
 	frameRecycle chan *image.RGBA
 }
@@ -234,7 +235,7 @@ func (p *Pipeline) adoptSource(src source.Source) {
 		p.framerate = src.Framerate()
 		// Only rebuild the pool when the geometry actually moved. A swap between
 		// two cameras of the same resolution — the common case — then costs
-		// nothing, which matters when the pool is as large as it is (#110).
+		// nothing, where a rebuild would drop and reallocate the whole pool.
 		if w != p.videoWidth || h != p.videoHeight || p.frameQueue == nil {
 			p.videoWidth, p.videoHeight = w, h
 			p.allocFramePool(w, h)
@@ -285,14 +286,12 @@ func (p *Pipeline) adoptSource(src source.Source) {
 
 // allocFramePool builds the decode-ahead buffer: all RGBA frames are allocated
 // once, then cycle frameRecycle → decode → frameQueue → display → frameRecycle,
-// so steady-state playback allocates nothing.
+// so the queue itself allocates nothing in steady state. (The FFmpeg source
+// still allocates each decoded frame before it is copied into the pool.)
 //
-// The old pool is dropped before the new one is built rather than after. The
-// pool is sized in frames rather than bytes, so at 1080p it is around a
-// gigabyte (#110); holding two of them across a device switch would double
-// that at exactly the moment the user is watching.
+// The old pool is dropped before the new one is built rather than after, so a
+// device switch never holds two of them at once.
 func (p *Pipeline) allocFramePool(w, h int) {
-	const bufSize = 120
 	if w <= 0 {
 		w = 640
 	}
@@ -305,11 +304,43 @@ func (p *Pipeline) allocFramePool(w, h int) {
 	p.pendingFrame = nil
 	p.framePending = false
 
+	bufSize := queueDepth(w, h)
 	p.frameQueue = make(chan timedFrame, bufSize)
 	p.frameRecycle = make(chan *image.RGBA, bufSize+2)
 	for i := 0; i < bufSize+2; i++ {
 		p.frameRecycle <- image.NewRGBA(image.Rect(0, 0, w, h))
 	}
+}
+
+// The decode-ahead queue is sized by memory, not by frame count (#110). A fixed
+// 120 frames was 37 MB at 320x240 but about 1 GB at 1080p and 4 GB at 4K, for a
+// depth whose only job is to absorb decode jitter, which does not grow with the
+// resolution.
+const (
+	framePoolBudget = 128 << 20 // bytes of queued RGBA frames
+	maxQueuedFrames = 120       // the old fixed depth: small videos keep it
+	minQueuedFrames = 8         // floor for 4K and up, where the budget buys ~4
+	prerollFrames   = 30        // Play waits for this many (~1s) before display
+)
+
+// queueDepth returns how many decoded frames of w x h are queued ahead of the
+// display: as many as fit in framePoolBudget, kept between minQueuedFrames and
+// maxQueuedFrames. The pool holds two more, for the frame being decoded into
+// and the one on screen.
+func queueDepth(w, h int) int {
+	n := framePoolBudget / (w * h * 4)
+	return max(minQueuedFrames, min(maxQueuedFrames, n))
+}
+
+// prerollTarget is how many queued frames Play waits for before it starts the
+// display: prerollFrames, or the whole queue when the queue is shorter. Waiting
+// for more than the queue holds would only ever end on the 2 s timeout.
+//
+// A whole queue is reachable because nothing but the decoder holds a pool frame
+// before the display starts, and a stop returns every frame to the pool
+// (TestStopReturnsEveryFrameToThePool).
+func (p *Pipeline) prerollTarget() int {
+	return min(prerollFrames, cap(p.frameQueue))
 }
 
 // SetOnFrame sets the callback for new video frames.
@@ -385,8 +416,8 @@ func (p *Pipeline) Play() {
 	// time, so waiting for a second of them buys no smoothness and costs a second
 	// of latency on a feed whose whole value is being current.
 	if p.hasVideo && p.frameQueue != nil && !p.live {
-		target := 30               // buffer ~1 second before starting display
-		for i := 0; i < 200; i++ { // up to ~2s max wait
+		target := p.prerollTarget() // ~1 second, or a full queue at high resolution
+		for i := 0; i < 200; i++ {  // up to ~2s max wait
 			if len(p.frameQueue) >= target || p.audioAheadFull() {
 				break
 			}
@@ -798,6 +829,11 @@ func (p *Pipeline) decodeAhead(stop <-chan struct{}) {
 			select {
 			case p.frameQueue <- timedFrame{img: p.pendingFrame, pts: p.pendingPTS}:
 			case <-stop:
+				// The frame never reached the queue, so halt's drain cannot
+				// return it. Losing it would leave the decoder one frame short
+				// for good: with the display holding one and the queue full,
+				// every decode then finds the pool empty and drops its frame.
+				p.RecycleFrame(p.pendingFrame)
 				return
 			}
 		}

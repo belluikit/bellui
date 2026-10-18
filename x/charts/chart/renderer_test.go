@@ -3,6 +3,7 @@ package chart
 import (
 	"testing"
 
+	fynecanvas "github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/test"
@@ -530,5 +531,59 @@ func TestChartRenderer_LayoutSameSizeDoesNotRebuild(t *testing.T) {
 	r.Layout(geo.NewSize(500, 300))
 	if c.scene3D == scene {
 		t.Error("a resize must still rebuild the chart")
+	}
+}
+
+// A touch scroll — a two-finger pan — passes through a chart to the page
+// around it; a wheel scroll still zooms (#398).
+func TestChart_TouchScrollPassesThrough(t *testing.T) {
+	_ = test.NewApp()
+	c := New(Option{
+		DataZoom: &interact.ZoomConfig{Enabled: true, MinSpan: 0.01, MaxSpan: 1, ZoomSensitivity: 0.05},
+		Series:   []series.Series{&series.LineSeries{SeriesName: "A", Data: []float64{1, 2, 3, 4}}},
+	})
+	c.Resize(fyne800x600())
+	at := event.PointEvent{Position: geo.NewPos(400, 300)}
+	if c.TryScrolled(&event.ScrollEvent{PointEvent: at, Scrolled: geo.NewDelta(0, 3), Source: event.ScrollSourceTouch}) {
+		t.Error("a touch scroll must not be consumed by the chart")
+	}
+	if w := c.ZoomWindow(); w.Span() < 0.999 {
+		t.Errorf("a touch scroll must not zoom, span %v", w.Span())
+	}
+	if !c.TryScrolled(&event.ScrollEvent{PointEvent: at, Scrolled: geo.NewDelta(0, 3), Source: event.ScrollSourceMouseWheel}) {
+		t.Error("a wheel scroll should still zoom the chart")
+	}
+}
+
+// A multi-series 3D chart is one scene holding every series' meshes, so
+// orbiting moves the whole chart and the series occlude each other (#399).
+func TestChart_MultiSeries3DIsOneScene(t *testing.T) {
+	_ = test.NewApp()
+	z := func(v float64) *float64 { return &v }
+	line := func(name string, depth float64) *series.Line3DSeries {
+		return &series.Line3DSeries{SeriesName: name, Data: []float64{0, 1, 1, 2, 2, 1}, ZPosition: z(depth)}
+	}
+	single := New(Option{Series: []series.Series{line("A", 0)}})
+	sr := single.CreateRenderer().(*chartRenderer)
+	single.Resize(geo.NewSize(400, 300))
+	sr.Layout(geo.NewSize(400, 300))
+	perSeries := len(single.scene3D.Meshes)
+
+	c := New(Option{Series: []series.Series{line("A", 0), line("B", 1), line("C", 2)}})
+	r := c.CreateRenderer().(*chartRenderer)
+	c.Resize(geo.NewSize(400, 300))
+	r.Layout(geo.NewSize(400, 300))
+
+	scenes := 0
+	for _, o := range r.Objects() {
+		if _, ok := o.(*fynecanvas.Scene3D); ok {
+			scenes++
+		}
+	}
+	if scenes != 1 {
+		t.Fatalf("expected one Scene3D for three 3D series, got %d", scenes)
+	}
+	if got := len(c.scene3D.Meshes); got != 3*perSeries {
+		t.Errorf("the shared scene should hold all three series' meshes: got %d, want %d", got, 3*perSeries)
 	}
 }

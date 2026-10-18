@@ -257,6 +257,11 @@ var (
 	// into the generated iOS Associated Domains entitlement (applinks:<domain>).
 	// Ignored for Android for now. No command-line flag.
 	buildAssociatedDomains []string
+
+	// buildIconCredit is the attribution the app's icon needs, or "" (#362):
+	// set when the package uses the default gopher icon. It goes into the
+	// generated AndroidManifest.xml and iOS Info.plist. No command-line flag.
+	buildIconCredit string
 )
 
 // RunNewBuild executes a new mobile build for the specified configuration
@@ -274,7 +279,7 @@ var (
 // "package --release" ship a debug-manifested APK.
 func RunNewBuild(target, appID, icon, name, version string, build int, release, distribution bool, cert, profile string,
 	tags []string, iconFG, iconBG, iconMono string, urlSchemes, fileMimeTypes []string,
-	iosUsageDescriptions map[string]string, associatedDomains []string,
+	iosUsageDescriptions map[string]string, associatedDomains []string, iconCredit string,
 ) error {
 	buildTarget = target
 	buildBundleID = appID
@@ -285,6 +290,7 @@ func RunNewBuild(target, appID, icon, name, version string, build int, release, 
 	buildFileMimeTypes = fileMimeTypes
 	buildIOSUsageDescriptions = iosUsageDescriptions
 	buildAssociatedDomains = associatedDomains
+	buildIconCredit = iconCredit
 	if release {
 		buildLdflags = "-w"
 		buildTrimpath = true

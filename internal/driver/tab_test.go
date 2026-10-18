@@ -59,3 +59,115 @@ func TestTabDirection(t *testing.T) {
 		})
 	}
 }
+
+// fakeFocuser records focus moves.
+type fakeFocuser struct {
+	focused    event.Focusable
+	next, prev int
+}
+
+func (f *fakeFocuser) Focused() event.Focusable { return f.focused }
+func (f *fakeFocuser) FocusNext()               { f.next++ }
+func (f *fakeFocuser) FocusPrevious()           { f.prev++ }
+
+type escapeUser struct{ keepsTab }
+
+func (escapeUser) HandlesEscape() bool { return true }
+
+// Escape, then Tab or Shift+Tab, leaves a widget that keeps Tab: the way out
+// that works where Ctrl+Tab never arrives, the web (#357).
+func TestTabEscape(t *testing.T) {
+	field := keepsTab{keep: true}
+	shift := event.KeyModifierShift
+
+	t.Run("Tab alone stays", func(t *testing.T) {
+		var e TabEscape
+		c := &fakeFocuser{focused: field}
+		assert.False(t, e.MoveTabFocus(c, event.KeyTab, 0))
+		assert.Zero(t, c.next)
+	})
+	t.Run("Escape then Tab moves forward, once", func(t *testing.T) {
+		var e TabEscape
+		c := &fakeFocuser{focused: field}
+		assert.False(t, e.MoveTabFocus(c, event.KeyEscape, 0))
+		e.EscapeNotConsumed(field)
+		assert.True(t, e.MoveTabFocus(c, event.KeyTab, 0))
+		assert.Equal(t, 1, c.next)
+		assert.False(t, e.MoveTabFocus(c, event.KeyTab, 0), "used once")
+	})
+	t.Run("Escape, Shift, Shift+Tab moves back", func(t *testing.T) {
+		var e TabEscape
+		c := &fakeFocuser{focused: field}
+		e.MoveTabFocus(c, event.KeyEscape, 0)
+		e.EscapeNotConsumed(field)
+		e.MoveTabFocus(c, "LeftShift", shift)
+		assert.True(t, e.MoveTabFocus(c, event.KeyTab, shift))
+		assert.Equal(t, 1, c.prev)
+	})
+	t.Run("an unnamed modifier key does not disarm", func(t *testing.T) {
+		var e TabEscape
+		c := &fakeFocuser{focused: field}
+		e.EscapeNotConsumed(field)
+		e.MoveTabFocus(c, "", shift)
+		assert.True(t, e.MoveTabFocus(c, event.KeyTab, shift))
+	})
+	t.Run("another key disarms", func(t *testing.T) {
+		var e TabEscape
+		c := &fakeFocuser{focused: field}
+		e.EscapeNotConsumed(field)
+		e.MoveTabFocus(c, event.KeyA, 0)
+		assert.False(t, e.MoveTabFocus(c, event.KeyTab, 0))
+	})
+	t.Run("Alt+Tab after Escape still does not move", func(t *testing.T) {
+		var e TabEscape
+		c := &fakeFocuser{focused: field}
+		e.EscapeNotConsumed(field)
+		assert.False(t, e.MoveTabFocus(c, event.KeyTab, event.KeyModifierAlt))
+	})
+	t.Run("a widget using Escape itself does not arm", func(t *testing.T) {
+		var e TabEscape
+		w := escapeUser{keepsTab{keep: true}}
+		c := &fakeFocuser{focused: w}
+		e.EscapeNotConsumed(w)
+		assert.False(t, e.MoveTabFocus(c, event.KeyTab, 0))
+	})
+	t.Run("a typed character disarms, though its key has no name", func(t *testing.T) {
+		var e TabEscape
+		c := &fakeFocuser{focused: field}
+		e.EscapeNotConsumed(field)
+		e.MoveTabFocus(c, "", 0) // a letter key on the web
+		e.Disarm()               // its character
+		assert.False(t, e.MoveTabFocus(c, event.KeyTab, 0))
+	})
+	t.Run("a focus change disarms", func(t *testing.T) {
+		var e TabEscape
+		other := &keepsTab{keep: true}
+		c := &fakeFocuser{focused: field}
+		e.EscapeNotConsumed(field)
+		c.focused = other // clicked into another field that keeps Tab
+		assert.False(t, e.MoveTabFocus(c, event.KeyTab, 0))
+		assert.Zero(t, c.next)
+	})
+	t.Run("nothing focused does not arm", func(t *testing.T) {
+		var e TabEscape
+		c := &fakeFocuser{}
+		e.EscapeNotConsumed(nil)
+		c.focused = field
+		assert.False(t, e.MoveTabFocus(c, event.KeyTab, 0))
+	})
+	t.Run("a widget that stopped keeping Tab gets plain Tab", func(t *testing.T) {
+		var e TabEscape
+		w := &keepsTab{keep: true}
+		c := &fakeFocuser{focused: w}
+		e.EscapeNotConsumed(w)
+		w.keep = false // a multi-line Entry made single-line
+		assert.True(t, e.MoveTabFocus(c, event.KeyTab, 0))
+		assert.Equal(t, 1, c.next)
+	})
+	t.Run("Ctrl+Tab still works without Escape", func(t *testing.T) {
+		var e TabEscape
+		c := &fakeFocuser{focused: field}
+		assert.True(t, e.MoveTabFocus(c, event.KeyTab, event.KeyModifierControl))
+		assert.Equal(t, 1, c.next)
+	})
+}

@@ -50,3 +50,18 @@ func TestDAGCanvas_PinchPansWithFingers(t *testing.T) {
 	c.Pinched(&event.PinchEvent{PointEvent: event.PointEvent{Position: start}, Scale: 1})
 	assert.Equal(t, offset, c.Offset, "a new pinch starts where its fingers are")
 }
+
+// A two-finger pan arrives as a touch scroll and pans the graph with the
+// fingers; a wheel scroll still zooms (#398).
+func TestDAGCanvas_TouchScrollPans(t *testing.T) {
+	c := newTestCanvas(t)
+	c.Zoom = 2
+	c.Offset = geo.NewPos(0, 0)
+	ok := c.TryScrolled(&event.ScrollEvent{Scrolled: geo.NewDelta(40, -20), Source: event.ScrollSourceTouch})
+	assert.True(t, ok)
+	assert.InDelta(t, 2.0, c.Zoom, 1e-6, "a touch scroll does not zoom")
+	assert.Equal(t, geo.NewPos(-20, 10), c.Offset, "the graph moves with the fingers")
+
+	c.TryScrolled(&event.ScrollEvent{Scrolled: geo.NewDelta(0, 100), Source: event.ScrollSourceMouseWheel})
+	assert.Greater(t, c.Zoom, float32(2), "a wheel scroll still zooms")
+}

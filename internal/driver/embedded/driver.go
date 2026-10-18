@@ -95,6 +95,7 @@ func (n *noosDriver) doRun() {
 
 			switch t := e.(type) {
 			case *embedded.CharacterEvent:
+				w.tabEscape.Disarm()
 				if focused := w.c.Focused(); focused != nil {
 					focused.TypedRune(t.Rune)
 				} else if tr := w.c.OnTypedRune(); tr != nil {
@@ -110,16 +111,19 @@ func (n *noosDriver) doRun() {
 					continue // ignore key up in other core events
 				}
 
-				if t.Name == event.KeyTab && intdriver.MoveTabFocus(w.Canvas(), t.Modifiers) {
+				if w.tabEscape.MoveTabFocus(w.Canvas(), t.Name, t.Modifiers) {
 					n.renderWindow(n.wins[n.current])
 					continue
 				}
 
 				// Escape closes the innermost pop-up, menu or dialog unless the
 				// focused widget is using it for a state of its own.
-				if keyEvent.Name == event.KeyEscape && intdriver.HandleEscape(w.c) {
-					n.renderWindow(n.wins[n.current])
-					continue
+				if keyEvent.Name == event.KeyEscape {
+					if intdriver.HandleEscape(w.c) {
+						n.renderWindow(n.wins[n.current])
+						continue
+					}
+					w.tabEscape.EscapeNotConsumed(w.c.Focused())
 				}
 
 				// No shortcut detected, pass down to TypedKey

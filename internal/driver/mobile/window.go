@@ -189,6 +189,7 @@ func (w *window) Close() {
 	}
 
 	d := w.driver
+	d.cancelWindowTouches(w)
 	pos := -1
 	for i, win := range d.windows {
 		if win == w {

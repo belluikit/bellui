@@ -55,6 +55,9 @@ type ConfiguredDriver interface {
 }
 
 type driver struct {
+	// touchWindows is the window each touch that is down began in (#392).
+	touchWindows map[touch.Sequence]*window
+
 	app   app.App
 	glctx gl.Context
 
@@ -366,18 +369,7 @@ func (d *driver) Run() {
 					// scroll gesture and everything after double-tap-and-hold
 					// (pre-rebrand tracker #1104). exploreTouch suppresses the former and routes
 					// qualified passthrough streams into the normal pipeline.
-					if app.TouchExplorationEnabled() {
-						d.exploreTouch(current, e)
-						break
-					}
-					switch e.Type {
-					case touch.TypeBegin:
-						d.tapDownCanvas(current, e.X, e.Y, e.Sequence)
-					case touch.TypeMove:
-						d.tapMoveCanvas(current, e.X, e.Y, e.Sequence)
-					case touch.TypeEnd:
-						d.tapUpCanvas(current, e.X, e.Y, e.Sequence)
-					}
+					d.routeTouch(current, e, app.TouchExplorationEnabled())
 				case key.Event:
 					d.dispatchKeyEvent(c, e)
 				case composition.Event:
@@ -1179,28 +1171,34 @@ func (d *driver) exploreTouch(w *window, e touch.Event) {
 		time.AfterFunc(common.TapSecondaryDelay, func() {
 			bellui.Do(func() { d.tbHoldQualify(gen) })
 		})
+	// Past its Begin, a stream goes to the window it began in (t.win), like
+	// any other touch (#392): the current window may have changed since.
 	case touch.TypeMove:
 		if t.dispatched && e.Sequence == t.seq {
-			d.tapMoveCanvas(w, e.X, e.Y, e.Sequence)
+			d.tapMoveCanvas(t.win, e.X, e.Y, e.Sequence)
 			return
 		}
 		if !t.tracking || e.Sequence != t.seq {
 			return // explore hover (never began) or a second finger
 		}
 		t.lastX, t.lastY = e.X, e.Y
-		if !d.tbPastSlop(w, e.X, e.Y) {
+		if !d.tbPastSlop(t.win, e.X, e.Y) {
 			return
 		}
 		// Passthrough scroll/drag: enter the pipeline at the Begin point so
 		// the accumulated delta is preserved, then continue live.
 		t.tracking = false
 		t.dispatched = true
-		d.tapDownCanvas(w, t.startX, t.startY, t.seq)
-		d.tapMoveCanvas(w, e.X, e.Y, e.Sequence)
-	case touch.TypeEnd:
+		d.tapDownCanvas(t.win, t.startX, t.startY, t.seq)
+		d.tapMoveCanvas(t.win, e.X, e.Y, e.Sequence)
+	case touch.TypeEnd, touch.TypeCancel:
 		if t.dispatched && e.Sequence == t.seq {
 			t.dispatched = false
-			d.tapUpCanvas(w, e.X, e.Y, e.Sequence)
+			if e.Type == touch.TypeCancel {
+				d.tapCancelCanvas(t.win, e.X, e.Y, e.Sequence)
+			} else {
+				d.tapUpCanvas(t.win, e.X, e.Y, e.Sequence)
+			}
 			return
 		}
 		if t.tracking && e.Sequence == t.seq {
@@ -1235,30 +1233,115 @@ func (d *driver) tbPastSlop(w *window, x, y float32) bool {
 	return math.Abs(float64(dx)) >= common.TapMoveThreshold || math.Abs(float64(dy)) >= common.TapMoveThreshold
 }
 
-func (d *driver) tapDownCanvas(w *window, x, y float32, tapID touch.Sequence) {
+// routeTouch sends a touch event to exploreTouch while an explore-by-touch
+// screen reader is on, and to handleTouch otherwise. The choice is made when
+// a touch begins and holds for the rest of it: a screen reader switched on or
+// off mid-touch would otherwise send the touch's release to the path that
+// never saw it go down, which ignores it, and leave the touch latched as down
+// (a drag, a scroll or a pending long press) in the path that did.
+func (d *driver) routeTouch(current *window, e touch.Event, exploring bool) {
+	if e.Type != touch.TypeBegin {
+		if _, ok := d.touchWindows[e.Sequence]; ok {
+			d.handleTouch(current, e)
+			return
+		}
+		if t := &d.tbPass; (t.tracking || t.dispatched) && t.seq == e.Sequence {
+			d.exploreTouch(current, e)
+			return
+		}
+	}
+	if exploring {
+		d.exploreTouch(current, e)
+		return
+	}
+	d.handleTouch(current, e)
+}
+
+// handleTouch delivers a touch event to the window it began in. A touch keeps
+// its window for its whole sequence: if the current window changes while a
+// finger is down, its moves and release still reach the canvas that saw it go
+// down, whose touch handler is waiting for them (#392).
+func (d *driver) handleTouch(current *window, e touch.Event) {
+	if e.Type == touch.TypeBegin {
+		if d.touchWindows == nil {
+			d.touchWindows = make(map[touch.Sequence]*window)
+		}
+		d.touchWindows[e.Sequence] = current
+		d.tapDownCanvas(current, e.X, e.Y, e.Sequence)
+		return
+	}
+
+	w, ok := d.touchWindows[e.Sequence]
+	if !ok {
+		w = current
+	}
+	if e.Type != touch.TypeMove {
+		delete(d.touchWindows, e.Sequence)
+	}
+	if w == nil {
+		return // the window it began in closed, which cancelled the touch
+	}
+	switch e.Type {
+	case touch.TypeMove:
+		d.tapMoveCanvas(w, e.X, e.Y, e.Sequence)
+	case touch.TypeEnd:
+		d.tapUpCanvas(w, e.X, e.Y, e.Sequence)
+	case touch.TypeCancel:
+		d.tapCancelCanvas(w, e.X, e.Y, e.Sequence)
+	}
+}
+
+// cancelWindowTouches ends every touch that began in w, which is closing: its
+// canvas cancels them while its widgets still exist, and the rest of each
+// sequence is dropped. Delivered there, a release would hit-test the closed
+// window's content and could tap a button nobody can see; delivered to the
+// current window, it would reach a handler that never saw the touch go down.
+func (d *driver) cancelWindowTouches(w *window) {
+	for seq, began := range d.touchWindows {
+		if began == w {
+			w.canvas.TapCancel(geo.Position{}, int(seq))
+			d.touchWindows[seq] = nil
+		}
+	}
+
+	t := &d.tbPass
+	if t.win != w {
+		return
+	}
+	if t.dispatched {
+		w.canvas.TapCancel(geo.Position{}, int(t.seq))
+	}
+	// The rest of the stream is ignored like a second finger's.
+	t.tracking, t.dispatched = false, false
+	t.win = nil
+}
+
+// canvasPos converts a touch position in device pixels to a position on w's
+// canvas.
+func canvasPos(w *window, x, y float32) geo.Position {
 	tapX := scale.ToBelluiCoordinate(w.canvas, int(x))
 	tapY := scale.ToBelluiCoordinate(w.canvas, int(y))
-	pos := geo.NewPos(tapX, tapY+tapYOffset)
+	return geo.NewPos(tapX, tapY+tapYOffset)
+}
 
-	w.canvas.TapDown(pos, int(tapID))
+// tapCancelCanvas ends a touch the system took away: no tap, long press or
+// drag completes (#392).
+func (d *driver) tapCancelCanvas(w *window, x, y float32, tapID touch.Sequence) {
+	w.canvas.TapCancel(canvasPos(w, x, y), int(tapID))
+}
+
+func (d *driver) tapDownCanvas(w *window, x, y float32, tapID touch.Sequence) {
+	w.canvas.TapDown(canvasPos(w, x, y), int(tapID))
 }
 
 func (d *driver) tapMoveCanvas(w *window, x, y float32, tapID touch.Sequence) {
-	tapX := scale.ToBelluiCoordinate(w.canvas, int(x))
-	tapY := scale.ToBelluiCoordinate(w.canvas, int(y))
-	pos := geo.NewPos(tapX, tapY+tapYOffset)
-
-	w.canvas.TapMove(pos, int(tapID), func(wid event.Draggable, ev *event.DragEvent) {
+	w.canvas.TapMove(canvasPos(w, x, y), int(tapID), func(wid event.Draggable, ev *event.DragEvent) {
 		wid.Dragged(ev)
 	})
 }
 
 func (d *driver) tapUpCanvas(w *window, x, y float32, tapID touch.Sequence) {
-	tapX := scale.ToBelluiCoordinate(w.canvas, int(x))
-	tapY := scale.ToBelluiCoordinate(w.canvas, int(y))
-	pos := geo.NewPos(tapX, tapY+tapYOffset)
-
-	w.canvas.TapUp(pos, int(tapID), func(wid event.Tappable, ev *event.PointEvent) {
+	w.canvas.TapUp(canvasPos(w, x, y), int(tapID), func(wid event.Tappable, ev *event.PointEvent) {
 		wid.Tapped(ev)
 		if co, ok := wid.(core.CanvasObject); ok {
 			core.NotifyActivation(co, false)
@@ -1428,7 +1511,7 @@ func runeToPrintable(r rune) rune {
 func (d *driver) typeDownCanvas(canvas *canvas, r rune, code key.Code, mod key.Modifiers) {
 	d.setKeyMods(keyEventModifier(mod))
 	keyName := keyToName(code)
-	if keyName == event.KeyTab && intdriver.MoveTabFocus(canvas, keyEventModifier(mod)) {
+	if canvas.tabEscape.MoveTabFocus(canvas, keyName, keyEventModifier(mod)) {
 		return
 	}
 
@@ -1462,6 +1545,9 @@ func (d *driver) typeDownCanvas(canvas *canvas, r rune, code key.Code, mod key.M
 	}
 
 	r = runeToPrintable(r)
+	if r > 0 {
+		canvas.tabEscape.Disarm() // the key may have no name, but it typed text
+	}
 	keyEvent := &event.KeyEvent{Name: keyName, Modifier: keyEventModifier(mod)}
 
 	// Escape closes the innermost pop-up, menu or dialog — the same default the
@@ -1473,6 +1559,9 @@ func (d *driver) typeDownCanvas(canvas *canvas, r rune, code key.Code, mod key.M
 	if keyName == event.KeyEscape || keyName == mobile.KeyBack {
 		if intdriver.HandleEscape(canvas) {
 			return
+		}
+		if keyName == event.KeyEscape {
+			canvas.tabEscape.EscapeNotConsumed(canvas.Focused())
 		}
 		// The walk declines when the focused widget claims the Escape meaning
 		// for a state of its own (event.EscapeHandler) — but such widgets act

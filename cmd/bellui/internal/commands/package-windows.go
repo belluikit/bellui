@@ -77,14 +77,7 @@ func (p *Packager) packageWindows(tags []string) error {
 	// launch rsrc to generate the object file
 	outPath := filepath.Join(p.srcDir, "bellui.syso")
 
-	vi := &goversioninfo.VersionInfo{}
-	vi.ProductName = p.Name
-	vi.IconPath = icoPath
-	vi.ManifestPath = manifest
-	vi.StringFileInfo.ProductVersion = p.combinedVersion()
-	vi.StringFileInfo.FileDescription = p.Name
-	vi.FixedFileInfo.FileVersion = fixedVersionInfo(p.combinedVersion())
-
+	vi := p.windowsVersionInfo(icoPath, manifest)
 	vi.Build()
 	vi.Walk()
 
@@ -190,4 +183,19 @@ func setVersionField(to *int, ver string) {
 	}
 
 	*to = num
+}
+
+// windowsVersionInfo is the exe's version resource. Its Comments carry the
+// default icon's attribution, which Windows shows in the file's Properties
+// (#362).
+func (p *Packager) windowsVersionInfo(icoPath, manifest string) *goversioninfo.VersionInfo {
+	vi := &goversioninfo.VersionInfo{}
+	vi.ProductName = p.Name
+	vi.IconPath = icoPath
+	vi.ManifestPath = manifest
+	vi.StringFileInfo.ProductVersion = p.combinedVersion()
+	vi.StringFileInfo.FileDescription = p.Name
+	vi.StringFileInfo.Comments = p.iconCredit()
+	vi.FixedFileInfo.FileVersion = fixedVersionInfo(p.combinedVersion())
+	return vi
 }
