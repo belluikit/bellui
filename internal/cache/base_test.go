@@ -194,6 +194,31 @@ func Test_expiringCache(t *testing.T) {
 	assert.True(t, c.isExpired(tm.now))
 }
 
+// After a long idle, the paint that comes before Clean keeps the widgets on
+// screen alive with the sample taken before the idle. Clean must not destroy
+// their renderers; a widget nothing touches still expires (#458).
+func TestCleanKeepsWidgetsTouchedAfterIdle(t *testing.T) {
+	testClearAll()
+	tm := &timeMock{}
+	tm.setTime(10, 0)
+	lastClean.Store(tm.now)
+	destroyed := 0
+	shown := &dummyWidget{onDestroy: func() { destroyed++ }}
+	Renderer(shown)
+
+	// Two minutes without a frame, then a paint touches the widget.
+	tm.now = tm.createTime(12, 0)
+	Renderer(shown)
+	Clean(true)
+	assert.Zero(t, destroyed)
+	assert.Equal(t, 1, renderers.Len())
+
+	tm.setTime(13, 30)
+	Clean(true)
+	assert.Equal(t, 1, destroyed)
+	assert.Zero(t, renderers.Len())
+}
+
 type dummyCanvas struct {
 	core.Canvas
 }
@@ -240,11 +265,14 @@ func (t *timeMock) createTime(min, sec int) time.Time {
 	return time.Date(2021, time.June, 15, 2, min, sec, 0, time.UTC)
 }
 
+// setTime moves the clock and takes the per-frame sample at that time, as if a
+// frame had been cleaned then.
 func (t *timeMock) setTime(min, sec int) {
 	t.now = time.Date(2021, time.June, 15, 2, min, sec, 0, time.UTC)
 	timeNow = func() time.Time {
 		return t.now
 	}
+	cachedNow.Store(t.now.UnixNano())
 }
 
 func testClearAll() {
@@ -256,4 +284,5 @@ func testClearAll() {
 	objectTextures.Clear()
 	renderers.Clear()
 	timeNow = time.Now
+	cachedNow.Store(time.Now().UnixNano())
 }

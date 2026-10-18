@@ -59,6 +59,12 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
   timed each frame from the moment it woke up, so every slightly late wake-up
   pushed all later frames back. Animations ran at about 57.6 fps on macOS even
   with time to spare. Frames now stay on a 1/60 s grid.
+  
+* **Less CPU per frame on screens with many widgets**
+  ([#458](https://github.com/belluikit/bellui/issues/458)). Every frame read
+  the system clock once for each widget, to keep its cached renderer alive. It
+  now reads it once per frame. A static screen of 500 cards uses about 15% less
+  CPU per frame on an M3 Max.
 
 * **Mobile: touches are no longer lost or renumbered mid-gesture**
   ([#392](https://github.com/belluikit/bellui/issues/392)). On iOS, lifting one
