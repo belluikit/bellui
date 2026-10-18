@@ -23,10 +23,10 @@ Backlog.
   - **Non-Gregorian calendars are an explicit non-goal** of `lang.FormatDate`/`widget.DatePicker` (pre-rebrand tracker #506): Go's stdlib has no calendar-system support and `DatePicker` assumes Gregorian month/era structure throughout. Buddhist/Japanese-era/Hijri/Hebrew/Persian calendars are declined-unless-demanded — revisit only with a concrete consumer + vetted dependency.
 
 ### MD3 Gallery App
-The Material Design 3 component showcase lives in its own repository at `github.com/trendvidia/gallery` (checked out as a sibling of this repo, resolved via the workspace go.work). NavigationDrawer navigation, TopAppBar header, category pages demonstrating all MD3 components with interactive examples. Use it to manually verify widget/theme/rendering changes.
+The Material Design 3 component showcase lives in its own repository at `github.com/belluikit/gallery` (checked out as a sibling of this repo, resolved via the workspace go.work). NavigationDrawer navigation, TopAppBar header, category pages demonstrating all MD3 components with interactive examples. Use it to manually verify widget/theme/rendering changes.
 
 ### Custom Default Theme & Render Style System
-The fork replaces Bellui's default theme with `enhancedTheme` (`theme/enhanced.go`), which implements Material Design 3 (MD3) color system and typography:
+The fork replaces Fyne's default theme with `enhancedTheme` (`theme/enhanced.go`), which implements Material Design 3 (MD3) color system and typography:
 
 **MD3 Color System**: Colors are generated dynamically from the primary color using HCT (Hue-Chroma-Tone) tonal palettes (`theme/hct.go`). The `CorePalettesFromPrimary()` function generates 6 palettes (Primary, Secondary, Tertiary, Error, Neutral, NeutralVariant) from the selected primary color. `MD3Scheme` (`theme/md3_scheme.go`) maps these palettes to ~30 named color roles with proper tone assignments for dark/light variants.
 
@@ -53,7 +53,7 @@ Legacy Bellui color names (Background, Foreground, Button, etc.) are mapped to t
 Pre-built `TextStyle` presets in `theme/typography.go` bundle weight, line-height scale, and letter spacing per MD3 spec (e.g., `TypographyBodyMedium`, `TypographyTitleMedium`).
 
 **Render Style Selection**: Themes can implement the typed `internal/theme.RenderStyleTheme` interface (`RenderStyle() RenderStyle`) to select a visual style; a separate `internal/theme.MobileTheme` (`DeviceIsMobile() bool`) overrides the form factor. These replaced the old type-erased `FeatureTheme.Feature(name) any` lookup (#39), following the codebase's optional-interface pattern (`CloudApp`, `MasterWindow`, etc.) so callers no longer assert at runtime. Widget renderers check `internaltheme.RenderStyleForWidget(w)` and adjust visuals:
-- `RenderStyleClassic` (default for themes without `RenderStyleTheme`) — original Bellui look
+- `RenderStyleClassic` (default for themes without `RenderStyleTheme`) — the original Fyne look
 - `RenderStyleModern` — gradient button backgrounds, card background fills, deeper shadows
 
 `DarkTheme()`/`LightTheme()` still return the original `builtinTheme` for backward compatibility. Only `DefaultTheme()` returns the `enhancedTheme`.
