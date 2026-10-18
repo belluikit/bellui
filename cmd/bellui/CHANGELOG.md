@@ -14,6 +14,14 @@ More detailed release notes can be found on the [releases page](https://github.c
 
 ### Fixed
 
+* `bellui package -os iossimulator` links again
+  ([#10](https://github.com/belluikit/bellui/issues/10)). Go builds the device
+  and the Simulator alike, so the WebGPU libraries pick their archive by the
+  `iossimulator` build tag, which the CLI never set: Simulator builds linked
+  the device archive and failed with "building for 'iOS-simulator', but
+  linking in object file … built for 'iOS'". The tag is now added for every
+  build against the Simulator SDK.
+  
 * Packages now credit the gopher artwork they ship
   ([#362](https://github.com/belluikit/bellui/issues/362)). The default icon
   (used when an app has no `Icon.png`) and the web splash spinner are based on
