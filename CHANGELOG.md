@@ -54,6 +54,14 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
   
 ### Fixed
 
+* **Scrolled content out of view no longer costs GPU encoding**
+  ([#427](https://github.com/belluikit/bellui/issues/427)). A scroll container
+  paints all its content every frame, and the WebGPU painter encoded a draw for
+  every object, even the ones the clip hides. It now skips a draw that lies
+  wholly outside the clip. A static screen of 500 cards uses 20% less CPU per
+  frame on an M3 Max, and 500 cards updating every frame 31% less. The pixels
+  drawn are unchanged.
+
 * **Mobile: touches are no longer lost or renumbered mid-gesture**
   ([#392](https://github.com/belluikit/bellui/issues/392)). On iOS, lifting one
   finger gave a finger still down a new id, so after a pinch the remaining
