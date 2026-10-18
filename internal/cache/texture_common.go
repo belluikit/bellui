@@ -40,7 +40,7 @@ func GetTexture(obj core.CanvasObject) (TextureType, bool) {
 // Note: If this is used to free textures, then it should be called inside a current
 // gl context to ensure textures are deleted from gl.
 func RangeExpiredTexturesFor(canvas core.Canvas, f func(core.CanvasObject)) {
-	now := timeNow()
+	now := sampledNow()
 
 	textTextures.Range(func(key FontCacheEntry, tinfo *textureInfo) bool {
 		// Just free text directly when that string/style combo is done.
