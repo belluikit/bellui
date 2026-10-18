@@ -12,6 +12,16 @@ More detailed release notes can be found on the [releases page](https://github.c
 
 ## Unreleased
 
+### Changed
+
+* **iOS apps now need iOS 15 or later**
+  ([#410](https://github.com/belluikit/bellui/issues/410)). Xcode 27 builds
+  for nothing older, and every `bellui package -os ios` or `-os iossimulator`
+  failed with "The iOS deployment target … is set to 14.0, but the range of
+  supported deployment target versions is 15.0 to 27.1.x". The generated
+  Xcode project, the compiler flags and the app icon's asset catalog now all
+  target 15.0; they said 14.0, 14.0 and 9.0.
+
 ### Fixed
 
 * A web app in a browser without WebGPU now says so instead of showing a
