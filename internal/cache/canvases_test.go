@@ -25,3 +25,14 @@ func TestSetCanvasForObject(t *testing.T) {
 	SetCanvasForObject(obj, c, setup)
 	assert.Equal(t, 2, called)
 }
+
+// TestSetCanvasForObjectRegisteredDoesNotAllocate: the paint walk calls this
+// for every object every frame, so the already-registered case must not
+// allocate (#435).
+func TestSetCanvasForObjectRegisteredDoesNotAllocate(t *testing.T) {
+	c := &dummyCanvas{}
+	obj := &dummyWidget{}
+	SetCanvasForObject(obj, c, nil)
+
+	assert.Zero(t, testing.AllocsPerRun(100, func() { SetCanvasForObject(obj, c, nil) }))
+}
