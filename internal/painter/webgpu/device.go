@@ -921,11 +921,13 @@ func (d *Device) buildLayouts() error {
 // until the GPU is done. When uniArena is recreated every cached bind group over
 // it is invalidated, so arenaBindUniform and the texBinds are released and the
 // uniform bind group is rebuilt over the new buffer.
+//
+// The new buffer is created before the old one is released, and swapped in only
+// on success: a failed regrow (a lost device, #436) leaves the old arena and its
+// capacity in place, so the next frame retries the grow instead of destroying a
+// buffer that was already released, which aborts inside wgpu-native.
 func (d *Device) ensureArenas() error {
 	if d.vtxArenaCap < d.arenaMaxVtx {
-		if d.vtxArena != nil {
-			destroyBuffer(d.vtxArena)
-		}
 		size := roundUpBuffer(d.arenaMaxVtx)
 		buf, err := d.device.TryCreateBuffer(&wgpu.BufferDescriptor{
 			Size:  uint64(size),
@@ -934,13 +936,13 @@ func (d *Device) ensureArenas() error {
 		if err != nil {
 			return err
 		}
+		if d.vtxArena != nil {
+			destroyBuffer(d.vtxArena)
+		}
 		d.vtxArena, d.vtxArenaCap = buf, size
 	}
 
 	if d.uniArenaCap < d.arenaMaxUni {
-		if d.uniArena != nil {
-			destroyBuffer(d.uniArena)
-		}
 		size := roundUpBuffer(d.arenaMaxUni)
 		buf, err := d.device.TryCreateBuffer(&wgpu.BufferDescriptor{
 			Size:  uint64(size),
@@ -948,6 +950,9 @@ func (d *Device) ensureArenas() error {
 		})
 		if err != nil {
 			return err
+		}
+		if d.uniArena != nil {
+			destroyBuffer(d.uniArena)
 		}
 		d.uniArena, d.uniArenaCap = buf, size
 		d.invalidateUniformBinds()
