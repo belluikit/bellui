@@ -235,6 +235,11 @@ type Device struct {
 	// without this an enclosing clip would be lost across a boundary/scene/shadow
 	// off-screen pass. The off-screen passes themselves run unclipped (full).
 	scissor scissorRect
+	// passClip is the rect draws on the open pass are actually confined to: the
+	// whole target for a fresh pass, the scissor once one is applied to it. It
+	// can differ from scissor (a pass opened by a push runs unclipped while an
+	// enclosing scissor is still remembered), and Culls answers from it (#434).
+	passClip scissorRect
 
 	// stencilRef is the active stencil reference value (painter clip / fill ops).
 	// Like scissor, it is render-pass state that a fresh RenderPassEncoder resets,
@@ -1387,7 +1392,21 @@ func (d *Device) SetScissor(x, y, w, h int) {
 	d.scissor = scissorRect{x: rx, y: ry, w: rw, h: rh, active: true}
 	if d.pass != nil {
 		d.pass.SetScissorRect(uint32(rx), uint32(ry), uint32(rw), uint32(rh))
+		d.passClip = d.scissor
 	}
+}
+
+// Culls reports whether a draw covering the pixel rect (x, y, w, h) of the
+// active render target would produce no pixels, because the rect lies wholly
+// outside the clip the open pass applies. It answers false when no pass is
+// open: nothing is known, so nothing may be skipped.
+func (d *Device) Culls(x, y, w, h int) bool {
+	if d.pass == nil || !d.passClip.active {
+		return false
+	}
+	c := d.passClip
+	return c.w <= 0 || c.h <= 0 || w <= 0 || h <= 0 ||
+		x >= c.x+c.w || x+w <= c.x || y >= c.y+c.h || y+h <= c.y
 }
 
 // resolveScissor computes the scissor rect to apply for a requested clip within a
@@ -1458,6 +1477,7 @@ func (d *Device) ClearScissor() {
 	}
 	t := d.targets[len(d.targets)-1]
 	d.pass.SetScissorRect(0, 0, uint32(t.w), uint32(t.h))
+	d.passClip = scissorRect{w: t.w, h: t.h, active: true}
 }
 
 // BeginFrame acquires the next surface texture and opens a clearing render pass
@@ -1625,6 +1645,7 @@ func (d *Device) beginTopPass() {
 		}
 	}
 	d.pass = d.encoder.BeginRenderPass(desc)
+	d.passClip = scissorRect{w: t.w, h: t.h, active: true}
 }
 
 // ensureDepthStencil returns a depth+stencil attachment view sized w×h, creating
@@ -1744,6 +1765,7 @@ func (d *Device) popTarget() {
 	if d.pass != nil {
 		if d.scissor.active {
 			d.pass.SetScissorRect(uint32(d.scissor.x), uint32(d.scissor.y), uint32(d.scissor.w), uint32(d.scissor.h))
+			d.passClip = d.scissor
 		}
 		// Restore the stencil reference: the off-screen pass left it at the new
 		// pass's default (0), but an enclosing rounded/path clip set it (pre-rebrand tracker #305).
