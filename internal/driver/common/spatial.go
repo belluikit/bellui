@@ -1,6 +1,7 @@
 package common
 
 import (
+	"slices"
 	"sync/atomic"
 
 	"github.com/belluikit/bellui/core"
@@ -26,49 +27,73 @@ type spatialEntry struct {
 
 // SpatialIndex provides O(1) broadphase hit testing via a uniform grid.
 //
-// The canvas is divided into cells of fixed size. Each cell contains a list
-// of [spatialEntry] values whose screen-space AABB overlaps that cell.
-// Entries are inserted in DFS order during the tree walk so that within
-// each cell the last matching entry is the deepest (innermost) object —
-// matching the existing "last match wins" semantics.
+// The canvas is divided into cells of fixed size. Each cell lists the
+// [spatialEntry] values whose screen-space AABB overlaps that cell. Entries
+// are inserted in DFS order during the tree walk so that within each cell the
+// last matching entry is the deepest (innermost) object — matching the
+// existing "last match wins" semantics.
+//
+// Each entry is stored once, in entries; a cell holds int32 indices into it,
+// all cells packed into one items slice (cell i is items[cellStart[i]:
+// cellStart[i+1]]). Copying the entry into every cell it overlapped made a
+// full-window background ~510 entry copies, and with the slices regrown from
+// zero each paint the rebuild was 81% of a static frame's allocation (#435).
+// The slices are reused by reset, so a canvas rebuilding every paint
+// allocates only when the scene outgrows them.
 //
 // The index is immutable once built and safe for concurrent reads.
 type SpatialIndex struct {
 	cellW, cellH float32
 	cols, rows   int
-	cells        [][]spatialEntry
+
+	entries   []spatialEntry
+	cellStart []int32
+	items     []int32
+
+	// spans holds each entry's cell range between add and finish.
+	spans []cellSpan
 }
+
+// cellSpan is the inclusive range of grid cells one entry overlaps.
+type cellSpan struct{ colMin, colMax, rowMin, rowMax int32 }
 
 // spatialIndexBuilder collects entries during a tree walk and finalises them
 // into a [SpatialIndex].
 type spatialIndexBuilder struct {
-	cellW, cellH float32
-	cols, rows   int
-	cells        [][]spatialEntry
+	idx *SpatialIndex
 }
 
 func newSpatialIndexBuilder(canvasW, canvasH float32) *spatialIndexBuilder {
-	cellW := defaultCellSize
-	cellH := defaultCellSize
-	cols := int(canvasW/cellW) + 1
-	rows := int(canvasH/cellH) + 1
-	if cols < 1 {
-		cols = 1
-	}
-	if rows < 1 {
-		rows = 1
-	}
-	return &spatialIndexBuilder{
-		cellW: cellW, cellH: cellH,
-		cols: cols, rows: rows,
-		cells: make([][]spatialEntry, cols*rows),
-	}
+	idx := &SpatialIndex{}
+	idx.reset(canvasW, canvasH)
+	return &spatialIndexBuilder{idx: idx}
+}
+
+// reset empties the index for a canvas of the given size, keeping its slices'
+// capacity for the rebuild.
+func (idx *SpatialIndex) reset(canvasW, canvasH float32) {
+	idx.cellW, idx.cellH = defaultCellSize, defaultCellSize
+	idx.cols = max(1, int(canvasW/idx.cellW)+1)
+	idx.rows = max(1, int(canvasH/idx.cellH)+1)
+	idx.entries = idx.entries[:0]
+	idx.spans = idx.spans[:0]
+	idx.items = idx.items[:0]
+	idx.cellStart = idx.cellStart[:0]
 }
 
 // add inserts an object into the grid. The world transform, local size, and
 // effective clip bounds are used to compute the screen-space AABB and
 // determine which cells the object overlaps.
 func (b *spatialIndexBuilder) add(
+	obj core.CanvasObject,
+	wt geo.Matrix,
+	w, h float32,
+	clipPos geo.Position, clipSize geo.Size,
+) {
+	b.idx.add(obj, wt, w, h, clipPos, clipSize)
+}
+
+func (idx *SpatialIndex) add(
 	obj core.CanvasObject,
 	wt geo.Matrix,
 	w, h float32,
@@ -92,32 +117,76 @@ func (b *spatialIndexBuilder) add(
 		return
 	}
 
-	entry := spatialEntry{
+	// The grid cells that the screen AABB overlaps.
+	colMin := max(0, int(sMinX/idx.cellW))
+	colMax := min(idx.cols-1, int(sMaxX/idx.cellW))
+	rowMin := max(0, int(sMinY/idx.cellH))
+	rowMax := min(idx.rows-1, int(sMaxY/idx.cellH))
+	if colMin > colMax || rowMin > rowMax {
+		return
+	}
+
+	idx.entries = append(idx.entries, spatialEntry{
 		obj: obj, wt: wt, w: w, h: h,
 		screenMinX: sMinX, screenMinY: sMinY, screenMaxX: sMaxX, screenMaxY: sMaxY,
 		clipMinX: cMinX, clipMinY: cMinY, clipMaxX: cMaxX, clipMaxY: cMaxY,
-	}
-
-	// Insert into every grid cell that the screen AABB overlaps.
-	colMin := max(0, int(sMinX/b.cellW))
-	colMax := min(b.cols-1, int(sMaxX/b.cellW))
-	rowMin := max(0, int(sMinY/b.cellH))
-	rowMax := min(b.rows-1, int(sMaxY/b.cellH))
-
-	for r := rowMin; r <= rowMax; r++ {
-		for c := colMin; c <= colMax; c++ {
-			idx := r*b.cols + c
-			b.cells[idx] = append(b.cells[idx], entry)
-		}
-	}
+	})
+	idx.spans = append(idx.spans, cellSpan{int32(colMin), int32(colMax), int32(rowMin), int32(rowMax)})
 }
 
 func (b *spatialIndexBuilder) build() *SpatialIndex {
-	return &SpatialIndex{
-		cellW: b.cellW, cellH: b.cellH,
-		cols: b.cols, rows: b.rows,
-		cells: b.cells,
+	b.idx.finish()
+	return b.idx
+}
+
+// finish packs the added entries' indices into the cells, in insertion (DFS)
+// order within each cell: count each cell, turn the counts into start offsets,
+// then place each entry's index at its cells' running write positions.
+func (idx *SpatialIndex) finish() {
+	n := idx.cols * idx.rows
+	idx.cellStart = slices.Grow(idx.cellStart[:0], n+1)[:n+1]
+	clear(idx.cellStart)
+	for _, sp := range idx.spans {
+		for r := sp.rowMin; r <= sp.rowMax; r++ {
+			row := int(r) * idx.cols
+			for c := sp.colMin; c <= sp.colMax; c++ {
+				idx.cellStart[row+int(c)+1]++
+			}
+		}
 	}
+	for i := 1; i <= n; i++ {
+		idx.cellStart[i] += idx.cellStart[i-1]
+	}
+	total := int(idx.cellStart[n])
+	idx.items = slices.Grow(idx.items[:0], total)[:total]
+
+	// Fill: cellStart[i] doubles as cell i's write position, which leaves it at
+	// the start of cell i+1; shifting it back one cell restores the starts.
+	for e, sp := range idx.spans {
+		for r := sp.rowMin; r <= sp.rowMax; r++ {
+			row := int(r) * idx.cols
+			for c := sp.colMin; c <= sp.colMax; c++ {
+				i := row + int(c)
+				idx.items[idx.cellStart[i]] = int32(e)
+				idx.cellStart[i]++
+			}
+		}
+	}
+	copy(idx.cellStart[1:], idx.cellStart[:n])
+	idx.cellStart[0] = 0
+	idx.spans = idx.spans[:0]
+}
+
+// cell returns the entry indices of the cell holding mouse, or nil (false)
+// when mouse lies outside the grid.
+func (idx *SpatialIndex) cell(mouse geo.Position) ([]int32, bool) {
+	col := int(mouse.X / idx.cellW)
+	row := int(mouse.Y / idx.cellH)
+	if col < 0 || col >= idx.cols || row < 0 || row >= idx.rows {
+		return nil, false
+	}
+	i := row*idx.cols + col
+	return idx.items[idx.cellStart[i]:idx.cellStart[i+1]], true
 }
 
 // FindObjectAtPositionMatching finds the deepest object at mouse whose
@@ -131,19 +200,16 @@ func (idx *SpatialIndex) FindObjectAtPositionMatching(
 	mouse geo.Position,
 	matches func(core.CanvasObject) bool,
 ) (core.CanvasObject, geo.Position, bool) {
-	col := int(mouse.X / idx.cellW)
-	row := int(mouse.Y / idx.cellH)
-	if col < 0 || col >= idx.cols || row < 0 || row >= idx.rows {
+	cell, ok := idx.cell(mouse)
+	if !ok {
 		return nil, geo.Position{}, false
 	}
-
-	cell := idx.cells[row*idx.cols+col]
 
 	var found core.CanvasObject
 	var foundPos geo.Position
 
-	for i := range cell {
-		e := &cell[i]
+	for _, i := range cell {
+		e := &idx.entries[i]
 
 		if !e.obj.Visible() {
 			continue
@@ -186,17 +252,15 @@ func (idx *SpatialIndex) FindAllObjectsAtPositionMatching(
 	mouse geo.Position,
 	matches func(core.CanvasObject) bool,
 ) []driver.ObjectAtPosition {
-	col := int(mouse.X / idx.cellW)
-	row := int(mouse.Y / idx.cellH)
-	if col < 0 || col >= idx.cols || row < 0 || row >= idx.rows {
+	cell, ok := idx.cell(mouse)
+	if !ok {
 		return nil
 	}
 
-	cell := idx.cells[row*idx.cols+col]
 	var results []driver.ObjectAtPosition
 
-	for i := range cell {
-		e := &cell[i]
+	for _, i := range cell {
+		e := &idx.entries[i]
 
 		if !e.obj.Visible() {
 			continue
