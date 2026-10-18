@@ -86,6 +86,13 @@ type Canvas struct {
 	// spatialIdx provides O(1) broadphase hit testing. Built during
 	// WalkTrees and read during mouse/touch event processing.
 	spatialIdx spatialIndexHolder
+	// spatialBufs are the two indexes RebuildSpatialIndex alternates between,
+	// reusing their slices (#435): each rebuild fills the one not published,
+	// so the index a reader just loaded is not touched until the rebuild
+	// after next. Every reader runs on the goroutine that paints (the event
+	// loop, or bellui.Do), so none holds an index across two rebuilds.
+	spatialBufs [2]*SpatialIndex
+	spatialNext int
 
 	// layoutDir is the per-canvas user-interface direction. The zero value
 	// (DirectionAuto) defers to the process-global setting; an explicit value
@@ -652,7 +659,13 @@ func (c *Canvas) RebuildSpatialIndex() {
 		return
 	}
 
-	b := newSpatialIndexBuilder(size.Width, size.Height)
+	b := c.spatialBufs[c.spatialNext]
+	if b == nil {
+		b = &SpatialIndex{}
+		c.spatialBufs[c.spatialNext] = b
+	}
+	c.spatialNext ^= 1
+	b.reset(size.Width, size.Height)
 
 	addTree := func(tree *renderCacheTree) {
 		if tree == nil || tree.root == nil {
@@ -668,12 +681,13 @@ func (c *Canvas) RebuildSpatialIndex() {
 		addTree(tree)
 	}
 
-	c.spatialIdx.Store(b.build())
+	b.finish()
+	c.spatialIdx.Store(b)
 }
 
 // walkCacheNodeDFS visits a render cache subtree in depth-first order,
 // adding each visible, non-zero-sized object to the spatial index builder.
-func (c *Canvas) walkCacheNodeDFS(node *RenderCacheNode, b *spatialIndexBuilder) {
+func (c *Canvas) walkCacheNodeDFS(node *RenderCacheNode, b *SpatialIndex) {
 	if node == nil {
 		return
 	}
@@ -785,8 +799,13 @@ func (c *Canvas) walkTree(
 		node.clipPos = clipPos
 		node.clipSize = clipSize
 
-		// Populate the object→node lookup map and cache boundary status.
-		c.nodeMap.Store(obj, node)
+		// Populate the object→node lookup map and cache boundary status. Store
+		// only a changed mapping: storing over an existing key allocates a new
+		// entry, which for every node every paint was 23% of a static frame's
+		// allocation once the spatial index stopped allocating (#435).
+		if cur, ok := c.nodeMap.Load(obj); !ok || cur != node {
+			c.nodeMap.Store(obj, node)
+		}
 		node.walkGen = c.walkGen
 		node.isBoundary = driver.IsRepaintBoundary(obj)
 
