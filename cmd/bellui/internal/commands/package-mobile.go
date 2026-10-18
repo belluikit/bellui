@@ -75,9 +75,11 @@ func (p *Packager) packageIOS(target string, tags []string) error {
 // iosActoolArgs compiles the app icon asset catalog into appDir, for the same
 // deployment target as the binary and the Xcode project.
 func iosActoolArgs(appDir string) []string {
-	return []string{"actool", "Images.xcassets", "--compile", appDir, "--platform",
+	return []string{
+		"actool", "Images.xcassets", "--compile", appDir, "--platform",
 		"iphoneos", "--target-device", "iphone", "--minimum-deployment-target", mobile.IOSDeploymentTarget(), "--app-icon", "AppIcon",
-		"--output-format", "human-readable-text", "--output-partial-info-plist", "/dev/null"}
+		"--output-format", "human-readable-text", "--output-partial-info-plist", "/dev/null",
+	}
 }
 
 func copyResizeIcon(size int, dir, source string) error {
