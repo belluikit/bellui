@@ -23,9 +23,32 @@ import (
 // captured content is already composited), so it composites via the simple
 // shader's premultiplied blend, matching the GL backend.
 
+// shadowKey is everything that decides a blurred shadow texture's pixels. Where
+// the shadow is drawn (its position and offset) is not part of it, so every
+// shadow of the same shape, size and elevation shares one texture.
+type shadowKey struct {
+	r, g, b, a    uint32
+	corner, blur  float32
+	width, height float32
+	pixScale      float32
+	opacity       float32 // the group opacity, which the shape draw applies
+}
+
+// shadowEntry is a cached blurred shadow and the frame it was last drawn in.
+type shadowEntry struct {
+	tex  *Texture
+	used uint64
+}
+
 // drawBoxShadow renders a canvas.BoxShadow: the shadow shape (a rounded rect in
 // the shadow color, padded for the blur spread) is drawn into an off-screen
 // target, separably blurred, then drawn behind the widget. Ports gl.drawBoxShadow.
+//
+// The blurred texture is cached (shadowTexture), and a shadow the open pass
+// clips away entirely is skipped before anything is rendered: rendering every
+// shadow afresh every frame cost three off-screen passes and two textures per
+// shadow, on screen or not, and past ~680 shadows exhausted Metal's command
+// buffers (#434).
 func (p *painter) drawBoxShadow(shadow *canvas.BoxShadow, pos geo.Position, frame geo.Size) {
 	if shadow.BlurRadius <= 0 {
 		return
@@ -42,8 +65,8 @@ func (p *painter) drawBoxShadow(shadow *canvas.BoxShadow, pos geo.Position, fram
 		return
 	}
 
-	shapeTex, err := p.dev.CreateRenderTexture(texW, texH)
-	if err != nil {
+	shadowPos := geo.NewPos(pos.X+shadow.OffsetX-spread, pos.Y+shadow.OffsetY-spread)
+	if p.dev.Culls(int(p.textureScale(shadowPos.X)), int(p.textureScale(shadowPos.Y)), texW, texH) {
 		return
 	}
 
@@ -56,6 +79,30 @@ func (p *painter) drawBoxShadow(shadow *canvas.BoxShadow, pos geo.Position, fram
 		p.transform = prevTransform
 		p.stencilMode = prevStencil
 	}()
+
+	blurred := p.shadowTexture(shadow, spread, shadowW, shadowH, texW, texH)
+	if blurred == nil {
+		return
+	}
+
+	// Draw the blurred texture as a quad behind the widget (premultiplied content).
+	p.blitTextureAlpha(blurred.View(), geo.NewSize(shadowW, shadowH), shadowPos, frame, p.effectiveAlpha(1))
+}
+
+// shadowTexture returns the blurred shadow texture for shadow, from the cache or
+// rendered into it. The texture stays owned by the cache. Returns nil when it
+// cannot be rendered.
+func (p *painter) shadowTexture(shadow *canvas.BoxShadow, spread, shadowW, shadowH float32, texW, texH int) *Texture {
+	key := p.shadowKeyFor(shadow)
+	if e, ok := p.shadows[key]; ok {
+		e.used = p.frame
+		return e.tex
+	}
+
+	shapeTex, err := p.dev.CreateRenderTexture(texW, texH)
+	if err != nil {
+		return nil
+	}
 
 	// Render the solid rounded rect into the (transparent) shape target.
 	p.dev.PushOffscreenTarget(shapeTex, texW, texH, wgpu.Color{})
@@ -70,13 +117,43 @@ func (p *painter) drawBoxShadow(shadow *canvas.BoxShadow, pos geo.Position, fram
 	blurred := p.blurTexture(shapeTex.View(), texW, texH, blurRadius)
 	p.dev.ReleaseTextureAfterFrame(shapeTex)
 	if blurred == nil {
-		return
+		return nil
 	}
-	p.dev.ReleaseTextureAfterFrame(blurred)
+	if p.shadows == nil {
+		p.shadows = map[shadowKey]*shadowEntry{}
+	}
+	p.shadows[key] = &shadowEntry{tex: blurred, used: p.frame}
+	return blurred
+}
 
-	// Draw the blurred texture as a quad behind the widget (premultiplied content).
-	shadowPos := geo.NewPos(pos.X+shadow.OffsetX-spread, pos.Y+shadow.OffsetY-spread)
-	p.blitTextureAlpha(blurred.View(), geo.NewSize(shadowW, shadowH), shadowPos, frame, p.effectiveAlpha(1))
+// shadowKeyFor returns the cache key of shadow's blurred texture as this
+// painter would render it now.
+func (p *painter) shadowKeyFor(shadow *canvas.BoxShadow) shadowKey {
+	var r, g, b, a uint32
+	if shadow.Color != nil {
+		r, g, b, a = shadow.Color.RGBA()
+	}
+	return shadowKey{
+		r: r, g: g, b: b, a: a,
+		corner: shadow.CornerRadius, blur: shadow.BlurRadius,
+		width: shadow.Size().Width, height: shadow.Size().Height,
+		pixScale: p.pixScale, opacity: p.groupOpacity,
+	}
+}
+
+// evictShadows releases the cached shadows that the previous frame did not
+// draw, at the start of a frame. A shadow drawn every frame is kept; one that
+// changed shape (an elevation animation's intermediate steps), scrolled out
+// of view or went away is dropped a frame later, so the cache holds about one
+// frame's distinct shadows. Release waits for the frame's submit, as the
+// previous frame's commands may still sample the texture.
+func (p *painter) evictShadows() {
+	for k, e := range p.shadows {
+		if e.used+1 < p.frame {
+			p.dev.ReleaseTextureAfterFrame(e.tex)
+			delete(p.shadows, k)
+		}
+	}
 }
 
 // drawBackdropBlur renders a canvas.BackdropBlur: the already-rendered content
