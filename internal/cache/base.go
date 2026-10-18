@@ -26,12 +26,19 @@ var (
 	// ClearFontCache with ResetThemeCaches) never serves stale sizes (pre-rebrand tracker #896).
 	themeCacheGen atomic.Uint64
 
+	// cachedNow is the clock sample, in Unix nanoseconds, that setAlive stamps
+	// entries with. The paint walk keeps every widget alive every frame, so
+	// reading the clock there cost about 15% of a frame's CPU (#458). Clean
+	// takes a new sample, once per frame on desktop and the web.
+	cachedNow atomic.Int64
+
 	// testing purpose only
 	timeNow = time.Now
 )
 
 func init() {
 	lastClean.Store(time.Time{})
+	cachedNow.Store(time.Now().UnixNano())
 	if t, err := time.ParseDuration(os.Getenv("BELLUI_CACHE")); err == nil {
 		ValidDuration = t
 		cleanTaskInterval = ValidDuration / 2
@@ -45,9 +52,20 @@ func getLastClean() time.Time {
 	return time.Time{}
 }
 
+// sampledNow returns the clock sample entries are currently stamped with.
+func sampledNow() time.Time {
+	return time.Unix(0, cachedNow.Load())
+}
+
 // Clean run cache clean task, it should be called on paint events.
 func Clean(canvasRefreshed bool) {
+	// Expire against the sample entries were stamped with, not the clock. The
+	// mobile driver cleans only after a paint: after a long idle, that paint
+	// stamps the widgets on screen with the old sample, and a cutoff taken
+	// from the clock would destroy their renderers while they are shown.
+	cutoff := sampledNow()
 	now := timeNow()
+	cachedNow.Store(now.UnixNano())
 	last := getLastClean()
 	// do not run clean task too fast
 	if now.Sub(last) < 10*time.Second {
@@ -62,14 +80,14 @@ func Clean(canvasRefreshed bool) {
 	if !canvasRefreshed && now.Sub(last) < cleanTaskInterval {
 		return
 	}
-	destroyExpiredSvgs(now)
-	destroyExpiredFontMetrics(now)
+	destroyExpiredSvgs(cutoff)
+	destroyExpiredFontMetrics(cutoff)
 	if canvasRefreshed {
 		// Destroy renderers on canvas refresh to avoid flickering screen.
-		destroyExpiredRenderers(now)
+		destroyExpiredRenderers(cutoff)
 		// canvases cache should be invalidated only on canvas refresh, otherwise there wouldn't
 		// be a way to recover them later
-		destroyExpiredCanvases(now)
+		destroyExpiredCanvases(cutoff)
 	}
 	for _, hook := range CleanHooks {
 		hook()
@@ -103,7 +121,7 @@ func CleanCanvas(canvas core.Canvas) {
 	})
 
 	// Sweep any expired renderers that lost their canvas association.
-	destroyExpiredRenderers(timeNow())
+	destroyExpiredRenderers(sampledNow())
 }
 
 // ResetThemeCaches clears all the svg and text size cache maps
@@ -159,5 +177,5 @@ func (c *expiringCache) isExpired(now time.Time) bool {
 
 // setAlive updates expiration time.
 func (c *expiringCache) setAlive() {
-	c.expires.Store(timeNow().Add(ValidDuration).UnixNano())
+	c.expires.Store(cachedNow.Load() + ValidDuration.Nanoseconds())
 }
