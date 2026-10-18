@@ -54,6 +54,12 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
   
 ### Fixed
 
+* **Desktop windows animate at a steady 60 fps**
+  ([#427](https://github.com/belluikit/bellui/issues/427)). The event loop
+  timed each frame from the moment it woke up, so every slightly late wake-up
+  pushed all later frames back. Animations ran at about 57.6 fps on macOS even
+  with time to spare. Frames now stay on a 1/60 s grid.
+
 * **Mobile: touches are no longer lost or renumbered mid-gesture**
   ([#392](https://github.com/belluikit/bellui/issues/392)). On iOS, lifting one
   finger gave a finger still down a new id, so after a pinch the remaining
