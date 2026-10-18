@@ -150,10 +150,15 @@ type PinchEvent struct {
 }
 
 // Pinchable is implemented by objects that respond to a two-finger pinch, such
-// as zoomable canvases. The object under the midpoint of the two fingers when
-// the second one lands receives Pinched for each move and PinchEnded once when
-// either finger lifts. While a pinch runs, neither finger produces taps,
-// drags or scrolling.
+// as zoomable canvases. Two fingers whose distance changes at least as much as
+// their midpoint moves, over a Pinchable, are a pinch: the object under the
+// midpoint when the second finger landed receives Pinched for each move and
+// PinchEnded once after the last one, when either finger lifts. Two fingers
+// moving together are a pan instead, delivered as touch-sourced scrolling.
+// Where the driver has no touch scrolling (native mobile apps, for now), two
+// fingers over a Pinchable always pinch, and a move that keeps their distance
+// reports the new focus with Scale 1. Neither finger of a two-finger gesture
+// produces taps or drags.
 //
 // Since: 1.2
 type Pinchable interface {
