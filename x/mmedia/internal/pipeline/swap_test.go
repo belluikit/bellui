@@ -109,8 +109,8 @@ func TestSwapSourceResizesTheFramePool(t *testing.T) {
 }
 
 // TestSwapSourceKeepsThePoolWhenGeometryIsUnchanged is the other half: swapping
-// between two cameras of the same resolution must not rebuild a pool that is
-// around a gigabyte at 1080p (#110).
+// between two cameras of the same resolution must not drop and reallocate the
+// whole pool.
 func TestSwapSourceKeepsThePoolWhenGeometryIsUnchanged(t *testing.T) {
 	p := newPipelineForSource(newShapedSource(16, 16), Config{})
 	pool := p.frameRecycle

@@ -988,6 +988,12 @@ func (w *window) processMouseScrolled(xoff float64, yoff float64) {
 // scroll, so touch momentum can stop dead at a boundary instead of decaying
 // against it.
 func (w *window) dispatchScroll(pos geo.Position, delta geo.Delta, source event.ScrollSource) bool {
+	return w.dispatchScrollChain(w.scrollablesAt(pos), pos, delta, source, false)
+}
+
+// scrollablesAt returns the scrollables under pos, innermost first: the
+// propagation chain a scroll there is offered to.
+func (w *window) scrollablesAt(pos geo.Position) []driver.ObjectAtPosition {
 	isScrollable := func(object core.CanvasObject) bool {
 		_, ok := object.(event.Scrollable)
 		return ok
@@ -1013,6 +1019,14 @@ func (w *window) dispatchScroll(pos geo.Position, delta geo.Delta, source event.
 			nil, w.canvas.menu, w.canvas.Content())
 	}
 
+	return scrollables
+}
+
+// dispatchScrollChain offers a scroll at pos to the scrollables of chain,
+// innermost first, until one consumes it. With relocate, each one's relative
+// position is worked out again from where it is now: a chain kept for a whole
+// touch gesture moves while the gesture scrolls it.
+func (w *window) dispatchScrollChain(scrollables []driver.ObjectAtPosition, pos geo.Position, delta geo.Delta, source event.ScrollSource, relocate bool) bool {
 	if len(scrollables) == 0 {
 		return false
 	}
@@ -1024,6 +1038,9 @@ func (w *window) dispatchScroll(pos geo.Position, delta geo.Delta, source event.
 
 	for _, oap := range scrollables {
 		ev.Position = oap.Position
+		if relocate {
+			ev.Position = pos.Subtract(driver.AbsolutePositionForObject(oap.Object, w.canvas.ObjectTrees()))
+		}
 		if consumer, ok := oap.Object.(driver.ScrollConsumer); ok {
 			if consumer.TryScrolled(ev) {
 				return true
@@ -1103,7 +1120,14 @@ func (w *window) processKeyPressed(keyName event.KeyName, keyASCII event.KeyName
 	// A Tab press whose KeyDown already moved focus is handled: neither a
 	// second focus move nor a shortcut or TypedKey on the widget that has just
 	// gained focus, which never saw the key go down.
-	if keyName == event.KeyTab && (keyDownMovedFocus || driver.MoveTabFocus(w.canvas, keyDesktopModifier)) {
+	if keyName == event.KeyTab && keyDownMovedFocus {
+		w.tabEscape.Disarm()
+		return
+	}
+	// A held Escape repeats, but it is still the one Escape whose press set
+	// the way out, so its repeats leave the state alone.
+	if !(action == repeat && keyName == event.KeyEscape) &&
+		w.tabEscape.MoveTabFocus(w.canvas, keyName, keyDesktopModifier) {
 		return
 	}
 	if w.triggersShortcut(keyName, keyASCII, keyDesktopModifier) {
@@ -1115,8 +1139,11 @@ func (w *window) processKeyPressed(keyName event.KeyName, keyASCII event.KeyName
 	// because a canvas-hosted dialog focuses nothing, so there is no widget for
 	// the key to reach — and where one is focused, a text field would otherwise
 	// swallow the key and trap the user in the dialog.
-	if action == press && keyName == event.KeyEscape && driver.HandleEscape(w.canvas) {
-		return
+	if action == press && keyName == event.KeyEscape {
+		if driver.HandleEscape(w.canvas) {
+			return
+		}
+		w.tabEscape.EscapeNotConsumed(w.canvas.Focused())
 	}
 
 	// No shortcut detected, pass down to TypedKey
@@ -1141,6 +1168,7 @@ func (w *window) processKeyPressed(keyName event.KeyName, keyASCII event.KeyName
 //
 // Characters do not map 1:1 to physical keys, as a key may produce zero, one or more characters.
 func (w *window) processCharInput(char rune) {
+	w.tabEscape.Disarm()
 	if focused := w.canvas.Focused(); focused != nil {
 		focused.TypedRune(char)
 	} else if w.canvas.onTypedRune != nil {
@@ -1154,6 +1182,7 @@ func (w *window) processCharInput(char rune) {
 // (device_wasm.go). The commit and cancel companions live in the platform files
 // where each is used (window_wasm.go / window_desktop.go).
 func (w *window) processCompose(ev *event.PreeditEvent) {
+	w.tabEscape.Disarm()
 	if c, ok := w.canvas.Focused().(event.Composable); ok {
 		c.Compose(ev)
 	}
@@ -1175,6 +1204,7 @@ func (w *window) processFocused(focus bool) {
 		w.canvas.FocusGained()
 	} else {
 		w.canvas.FocusLost()
+		w.tabEscape.Disarm()
 		w.mousePos = geo.Position{}
 		// Avoid triggering menu on Alt+Tab: glfw sends a fake "alt key released" event immediately after
 		// unfocusing the window, and it should be ignored.
