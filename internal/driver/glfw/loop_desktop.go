@@ -121,7 +121,7 @@ func (d *gLDriver) runEventLoop() {
 		if !now.Before(nextFrame) {
 			d.pollEvents()
 			d.processEventTick()
-			nextFrame = now.Add(frame)
+			nextFrame = nextFrameAfter(nextFrame, now, frame)
 			continue
 		}
 
