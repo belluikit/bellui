@@ -68,10 +68,12 @@ type window struct {
 	touch          common.TouchHandler
 	touchActive    map[int]bool
 	touchScrollGen int
-	driver         *gLDriver
-	title          string
-	icon           bellui.Resource
-	mainmenu       *bellui.MainMenu
+	// touchScroll is the current touch gesture's scroll chain (#416).
+	touchScroll touchScrollLatch
+	driver      *gLDriver
+	title       string
+	icon        bellui.Resource
+	mainmenu    *bellui.MainMenu
 
 	master              bool
 	fullScreen          bool

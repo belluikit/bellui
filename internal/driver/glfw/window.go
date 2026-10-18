@@ -988,6 +988,12 @@ func (w *window) processMouseScrolled(xoff float64, yoff float64) {
 // scroll, so touch momentum can stop dead at a boundary instead of decaying
 // against it.
 func (w *window) dispatchScroll(pos geo.Position, delta geo.Delta, source event.ScrollSource) bool {
+	return w.dispatchScrollChain(w.scrollablesAt(pos), pos, delta, source, false)
+}
+
+// scrollablesAt returns the scrollables under pos, innermost first: the
+// propagation chain a scroll there is offered to.
+func (w *window) scrollablesAt(pos geo.Position) []driver.ObjectAtPosition {
 	isScrollable := func(object core.CanvasObject) bool {
 		_, ok := object.(event.Scrollable)
 		return ok
@@ -1013,6 +1019,14 @@ func (w *window) dispatchScroll(pos geo.Position, delta geo.Delta, source event.
 			nil, w.canvas.menu, w.canvas.Content())
 	}
 
+	return scrollables
+}
+
+// dispatchScrollChain offers a scroll at pos to the scrollables of chain,
+// innermost first, until one consumes it. With relocate, each one's relative
+// position is worked out again from where it is now: a chain kept for a whole
+// touch gesture moves while the gesture scrolls it.
+func (w *window) dispatchScrollChain(scrollables []driver.ObjectAtPosition, pos geo.Position, delta geo.Delta, source event.ScrollSource, relocate bool) bool {
 	if len(scrollables) == 0 {
 		return false
 	}
@@ -1024,6 +1038,9 @@ func (w *window) dispatchScroll(pos geo.Position, delta geo.Delta, source event.
 
 	for _, oap := range scrollables {
 		ev.Position = oap.Position
+		if relocate {
+			ev.Position = pos.Subtract(driver.AbsolutePositionForObject(oap.Object, w.canvas.ObjectTrees()))
+		}
 		if consumer, ok := oap.Object.(driver.ScrollConsumer); ok {
 			if consumer.TryScrolled(ev) {
 				return true

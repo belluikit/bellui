@@ -15,3 +15,7 @@ body {
 .action-error {
     color: red;
 }
+.credit, .credit a {
+    color: #616161;
+    font-size: 11px;
+}

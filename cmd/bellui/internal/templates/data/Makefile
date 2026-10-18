@@ -22,6 +22,9 @@ install:
 	install -Dm00644 usr/{{.Local}}share/applications/$(AppID).desktop $(DESTDIR)$(PREFIX)/share/applications/$(AppID).desktop
 	install -Dm00755 usr/{{.Local}}bin/$(Exec) $(DESTDIR)$(PREFIX)/bin/$(Exec)
 	install -Dm00644 usr/{{.Local}}share/pixmaps/$(Icon) $(DESTDIR)$(PREFIX)/share/pixmaps/$(Icon)
+{{- if .Credits}}
+	install -Dm00644 usr/{{.Local}}share/doc/$(AppID)/CREDITS $(DESTDIR)$(PREFIX)/share/doc/$(AppID)/CREDITS
+{{- end}}
 {{- if .BundleCEF}}
 	# The CEF payload: the web engine this application bundles (bellui #107).
 	mkdir -p $(DESTDIR)$(PREFIX)/bin/cef
@@ -34,6 +37,10 @@ uninstall:
 	-rm $(DESTDIR)$(PREFIX)/share/applications/$(AppID).desktop
 	-rm $(DESTDIR)$(PREFIX)/bin/$(Exec)
 	-rm $(DESTDIR)$(PREFIX)/share/pixmaps/$(Icon)
+{{- if .Credits}}
+	-rm $(DESTDIR)$(PREFIX)/share/doc/$(AppID)/CREDITS
+	-rmdir $(DESTDIR)$(PREFIX)/share/doc/$(AppID)
+{{- end}}
 {{- if .BundleCEF}}
 	-rm -r $(DESTDIR)$(PREFIX)/bin/cef
 {{- end}}
@@ -43,6 +50,9 @@ user-install:
 	install -Dm00755 usr/{{.Local}}bin/$(Exec) $(DESTDIR)$(HOME)/.local/bin/$(Exec)
 	install -Dm00644 usr/{{.Local}}share/pixmaps/$(Icon) $(DESTDIR)$(HOME)/.local/share/icons/$(Icon)
 	sed -i -e "s,Exec=$(Exec),Exec=$(DESTDIR)$(HOME)/.local/bin/$(Exec),g" $(DESTDIR)$(HOME)/.local/share/applications/$(AppID).desktop
+{{- if .Credits}}
+	install -Dm00644 usr/{{.Local}}share/doc/$(AppID)/CREDITS $(DESTDIR)$(HOME)/.local/share/doc/$(AppID)/CREDITS
+{{- end}}
 {{- if .BundleCEF}}
 	# A user install cannot make the sandbox helper setuid root; the
 	# application runs with the CEF sandbox disabled and says so.
@@ -54,6 +64,10 @@ user-uninstall:
 	-rm $(DESTDIR)$(HOME)/.local/share/applications/$(AppID).desktop
 	-rm $(DESTDIR)$(HOME)/.local/bin/$(Exec)
 	-rm $(DESTDIR)$(HOME)/.local/share/icons/$(Icon)
+{{- if .Credits}}
+	-rm $(DESTDIR)$(HOME)/.local/share/doc/$(AppID)/CREDITS
+	-rmdir $(DESTDIR)$(HOME)/.local/share/doc/$(AppID)
+{{- end}}
 {{- if .BundleCEF}}
 	-rm -r $(DESTDIR)$(HOME)/.local/bin/cef
 {{- end}}
