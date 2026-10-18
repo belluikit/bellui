@@ -33,6 +33,14 @@ type AuthButton struct {
 
 	// Issuer overrides the OIDC discovery URL. Required for "okta",
 	// "keycloak", and "custom" providers.
+	//
+	// When the button saves a refresh token, an Issuer of the app's own (any
+	// value other than the provider preset's, a Microsoft tenant included) is
+	// part of the token's key, so two buttons for one provider with different
+	// issuers, such as two Keycloak realms, keep separate tokens. Read a
+	// button's token back with auth.LoadTokenFor(Provider, Issuer) and remove
+	// it with auth.ClearTokenFor; for an empty or preset Issuer,
+	// auth.LoadToken(Provider) finds the same token.
 	Issuer string
 
 	// Scopes is a space-separated list of OAuth scopes.
@@ -115,7 +123,7 @@ func (b *AuthButton) authenticate(ctx context.Context) {
 	}
 	ch := make(chan authResult, 1)
 	go func() {
-		result, err := auth.Authenticate(cfg)
+		result, err := authenticate(cfg)
 		ch <- authResult{result, err}
 	}()
 
@@ -134,11 +142,12 @@ func (b *AuthButton) authenticate(ctx context.Context) {
 		}
 
 		// Persist the refresh token so the app can read it back with
-		// auth.LoadToken (exchanging it for new tokens is up to the app; the
-		// auth package does not do it). Authentication itself succeeded, so a
-		// persistence failure is logged, not routed to OnError.
+		// auth.LoadToken or auth.LoadTokenFor (exchanging it for new tokens is
+		// up to the app; the auth package does not do it). Authentication
+		// itself succeeded, so a persistence failure is logged, not routed to
+		// OnError.
 		if res.result.RefreshToken != "" {
-			if err := auth.SaveToken(b.Provider, res.result.RefreshToken, res.result.Email); err != nil {
+			if err := saveToken(b.Provider, b.Issuer, res.result.RefreshToken, res.result.Email); err != nil {
 				bellui.LogError("auth: failed to persist refresh token", err)
 			}
 		}
@@ -149,6 +158,14 @@ func (b *AuthButton) authenticate(ctx context.Context) {
 		}
 	}
 }
+
+// authenticate and saveToken are the auth package's sign-in and token store,
+// replaceable in tests so that no browser opens and no token is written to the
+// user's config directory.
+var (
+	authenticate = auth.Authenticate
+	saveToken    = auth.SaveTokenFor
+)
 
 func (b *AuthButton) preset() auth.ProviderPreset {
 	if p, ok := auth.Providers[b.Provider]; ok {
