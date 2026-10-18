@@ -4,11 +4,15 @@ import (
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	intdriver "github.com/belluikit/bellui/internal/driver"
 )
 
 type noosWindow struct {
 	c *touchCanvas
 	d *noosDriver
+
+	// tabEscape is the Escape-then-Tab way out of a widget that keeps Tab (#357).
+	tabEscape intdriver.TabEscape
 
 	title string
 }

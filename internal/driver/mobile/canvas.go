@@ -30,6 +30,9 @@ type canvas struct {
 	size           geo.Size
 	windowHead     core.CanvasObject
 
+	// tabEscape is the Escape-then-Tab way out of a widget that keeps Tab (#357).
+	tabEscape intdriver.TabEscape
+
 	onTypedKey  func(ev *event.KeyEvent)
 	onTypedRune func(rune)
 }

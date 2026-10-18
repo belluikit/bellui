@@ -7,6 +7,7 @@ import (
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/driver"
 	"github.com/belluikit/bellui/internal/driver/common"
 )
 
@@ -72,9 +73,31 @@ func (w *window) ensureTouchHandler() {
 		wid.LongPressed(ev)
 	}
 	w.touch.ScrollCallback = func(origin geo.Position, delta geo.Delta) {
-		w.dispatchScroll(origin, delta, event.ScrollSourceTouch)
+		w.dispatchTouchScroll(origin, delta)
 	}
 	w.touch.ScrollEndCallback = w.startTouchScrollMomentum
+}
+
+// touchScrollLatch is the chain of scrollables one touch gesture scrolls.
+// It is looked up under the gesture's origin at its first scroll and kept for
+// the rest of the gesture and its momentum. Looking it up again on every move
+// let a widget that consumes touch scrolls, sliding under the origin as the
+// page scrolled, take the rest of the gesture: two fingers scrolling a page
+// past a DAG canvas started panning the graph instead (#416).
+type touchScrollLatch struct {
+	gen   int // the touchScrollGen it was taken in; a new contact starts a new gesture
+	ok    bool
+	chain []driver.ObjectAtPosition
+}
+
+// dispatchTouchScroll delivers one step of a touch scroll to the gesture's
+// latched chain, taking the chain on the gesture's first step.
+func (w *window) dispatchTouchScroll(origin geo.Position, delta geo.Delta) bool {
+	l := &w.touchScroll
+	if !l.ok || l.gen != w.touchScrollGen {
+		*l = touchScrollLatch{gen: w.touchScrollGen, ok: true, chain: w.scrollablesAt(origin)}
+	}
+	return w.dispatchScrollChain(l.chain, origin, delta, event.ScrollSourceTouch, true)
 }
 
 // startTouchScrollMomentum continues a flick's scrolling past the release with
@@ -90,6 +113,7 @@ func (w *window) startTouchScrollMomentum(origin geo.Position, delta geo.Delta) 
 		return // a controlled drag's release, not a flick
 	}
 	gen := w.touchScrollGen
+	chain := w.touchScroll.chain // the momentum belongs to the gesture's scrollables
 	go func() {
 		for {
 			time.Sleep(time.Millisecond * 16)
@@ -103,7 +127,7 @@ func (w *window) startTouchScrollMomentum(origin geo.Position, delta geo.Delta) 
 					stop = true
 					return
 				}
-				if !w.dispatchScroll(origin, delta, event.ScrollSourceTouch) {
+				if !w.dispatchScrollChain(chain, origin, delta, event.ScrollSourceTouch, true) {
 					stop = true
 				}
 			})

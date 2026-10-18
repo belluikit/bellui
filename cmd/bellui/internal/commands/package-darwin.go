@@ -24,6 +24,7 @@ type darwinData struct {
 	Build         int
 	Category      string
 	Languages     []string
+	Credit        string // NSHumanReadableCopyright: the default icon's attribution
 
 	FileAssociations  []darwinFileAssociation
 	URLSchemes        []string
@@ -122,13 +123,7 @@ func (p *Packager) packageDarwin() (err error) {
 		}
 	}()
 
-	tplData := darwinData{
-		Name: p.Name, ExeName: exeName, AppID: p.AppID, Version: p.AppVersion, Build: p.AppBuild,
-		Category: strings.ToLower(p.category), Languages: darwinLangs(p.langs),
-		FileAssociations: darwinFileAssociations(p.FileAssociations), URLSchemes: p.URLSchemes,
-		UsageDescriptions: darwinUsageDescriptions(p.IOSUsageDescriptions),
-	}
-	if err := templates.InfoPlistDarwin.Execute(infoFile, tplData); err != nil {
+	if err := templates.InfoPlistDarwin.Execute(infoFile, p.darwinInfo(exeName)); err != nil {
 		return fmt.Errorf("failed to write plist template: %w", err)
 	}
 
@@ -188,4 +183,15 @@ func processMacOSIcon(in image.Image) image.Image {
 	dc.DrawImage(sized, border, border)
 
 	return dc.Image()
+}
+
+// darwinInfo is the data for the bundle's Info.plist.
+func (p *Packager) darwinInfo(exeName string) darwinData {
+	return darwinData{
+		Name: p.Name, ExeName: exeName, AppID: p.AppID, Version: p.AppVersion, Build: p.AppBuild,
+		Category: strings.ToLower(p.category), Languages: darwinLangs(p.langs),
+		FileAssociations: darwinFileAssociations(p.FileAssociations), URLSchemes: p.URLSchemes,
+		UsageDescriptions: darwinUsageDescriptions(p.IOSUsageDescriptions),
+		Credit:            p.iconCredit(), // the default icon's attribution (#362)
+	}
 }
