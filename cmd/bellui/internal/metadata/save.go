@@ -2,6 +2,7 @@ package metadata
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -55,7 +56,7 @@ func BumpBuildStandard(dir string) error {
 
 	cur, err := Load(bytes.NewReader(src))
 	if err != nil {
-		return err
+		return fmt.Errorf("%s: %w", path, err)
 	}
 
 	r, err := pxf.NewRewriter(src)
