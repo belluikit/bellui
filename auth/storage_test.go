@@ -270,3 +270,118 @@ func TestDeriveKey_FieldsAreSeparate(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEqual(t, a, b)
 }
+
+// The token an app stored before tokens were kept per app is deleted the first
+// time any app saves or clears a token for that provider: no app reads it, but
+// it still decrypts (#355). That holds even when the save or clear itself
+// fails: for an app with no ID (which could store tokens before per-app
+// storage), and when the app's token file cannot be written or removed.
+func TestLegacySharedTokenIsRemoved(t *testing.T) {
+	triggers := map[string]func() error{
+		"sign-in":  func() error { return SaveToken("google", "refresh", "a@example.com") },
+		"sign-out": func() error { return ClearToken("google") },
+	}
+	states := map[string]struct {
+		setup   func(t *testing.T, base string)
+		wantErr bool
+	}{
+		"app with an ID": {setup: func(*testing.T, string) {}},
+		"app without an ID": {
+			setup:   func(*testing.T, string) { currentAppID = func() string { return "" } },
+			wantErr: true,
+		},
+		// A non-empty directory where the app's token file belongs: saving
+		// cannot write it and clearing cannot remove it, on every OS. (Making
+		// the app's directory a file instead does not fail a clear on Windows,
+		// which reports the path as not found.)
+		"token path unusable": {
+			setup: func(t *testing.T, base string) {
+				blocker := filepath.Join(base, "com.example.test", "google.enc")
+				require.NoError(t, os.MkdirAll(blocker, 0o700))
+				require.NoError(t, os.WriteFile(filepath.Join(blocker, "keep"), nil, 0o600))
+			},
+			wantErr: true,
+		},
+	}
+	for trigName, trigger := range triggers {
+		for stateName, state := range states {
+			t.Run(trigName+"/"+stateName, func(t *testing.T) {
+				dir := redirectStorage(t)
+				base := filepath.Join(dir, "bellui-auth")
+				old := filepath.Join(base, "google.enc")
+				other := filepath.Join(base, "github.enc")
+				require.NoError(t, os.MkdirAll(base, 0o700))
+				require.NoError(t, os.WriteFile(old, []byte("old token"), 0o600))
+				require.NoError(t, os.WriteFile(other, []byte("old token"), 0o600))
+				state.setup(t, base)
+
+				err := trigger()
+				if state.wantErr {
+					require.Error(t, err, "the state must make the trigger fail")
+				} else {
+					require.NoError(t, err)
+				}
+				assert.NoFileExists(t, old)
+				assert.FileExists(t, other, "only the provider that was used is cleaned up")
+			})
+		}
+	}
+}
+
+// On a fresh machine there is no bellui-auth directory at all; signing out
+// there is not an error.
+func TestClearToken_FreshMachine(t *testing.T) {
+	dir := redirectStorage(t)
+	require.NoError(t, ClearToken("google"))
+	assert.NoDirExists(t, filepath.Join(dir, "bellui-auth"))
+}
+
+// The old code stored a provider under its name as a file name, so on Unix a
+// provider with a backslash had a token there too, and it is removed.
+func TestLegacyTokenWithBackslashIsRemoved(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("a backslash separates path elements on Windows")
+	}
+	dir := redirectStorage(t)
+	old := filepath.Join(dir, "bellui-auth", `corp\sso.enc`)
+	require.NoError(t, os.MkdirAll(filepath.Dir(old), 0o700))
+	require.NoError(t, os.WriteFile(old, []byte("old token"), 0o600))
+
+	require.NoError(t, ClearToken(`corp\sso`))
+	assert.NoFileExists(t, old)
+}
+
+// Cleaning up never leaves bellui-auth and never removes a directory: a
+// provider name that is not a single path element stored nothing there, and
+// under the per-app layout a directory named <x>.enc is an app's token
+// directory, whether it holds tokens yet or not.
+func TestLegacyTokenCleanupStaysInPlace(t *testing.T) {
+	dir := redirectStorage(t)
+	base := filepath.Join(dir, "bellui-auth")
+	outside := filepath.Join(dir, "victim.enc")
+	require.NoError(t, os.WriteFile(outside, []byte("x"), 0o600))
+	appDir := filepath.Join(base, "github.enc")
+	require.NoError(t, os.MkdirAll(appDir, 0o700))
+	emptyAppDir := filepath.Join(base, "gitlab.enc")
+	require.NoError(t, os.MkdirAll(emptyAppDir, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(appDir, "google.enc"), nil, 0o600))
+	appToken := filepath.Join(base, "com.example.notes", "google.enc")
+	require.NoError(t, os.MkdirAll(filepath.Dir(appToken), 0o700))
+	require.NoError(t, os.WriteFile(appToken, nil, 0o600))
+
+	for _, p := range []string{"../victim", "sub/../../victim", `..\victim`, `C:..\victim`, filepath.Join(dir, "victim")} {
+		removeLegacyToken(p)
+	}
+	removeLegacyToken("com.example.notes/google")
+	removeLegacyToken("github")
+	removeLegacyToken("gitlab")
+	assert.FileExists(t, outside)
+	assert.FileExists(t, appToken, "another app's current token is not a legacy one")
+	assert.DirExists(t, appDir)
+	assert.DirExists(t, emptyAppDir)
+
+	// The race the Lstat check cannot close: the file is gone and an app's
+	// empty token directory took its name before the removal runs.
+	require.Error(t, removeFile(emptyAppDir))
+	assert.DirExists(t, emptyAppDir)
+}
