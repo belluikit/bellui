@@ -54,6 +54,14 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
   
 ### Fixed
 
+* **Screens that update many widgets are up to 4× faster**
+  ([#457](https://github.com/belluikit/bellui/issues/457)). Every widget
+  setter checks that it runs on the main goroutine, and the check took a stack
+  trace, which cost most of a busy frame's CPU. It now reads the goroutine's
+  ID directly on amd64 and arm64, in about 2 ns instead of 1.4 µs. On an M3
+  Max, 2000 labels re-texted every frame went from 10 to 47 fps, and 500
+  updating cards from 16 to 50–54 fps.
+
 * **Mobile: touches are no longer lost or renumbered mid-gesture**
   ([#392](https://github.com/belluikit/bellui/issues/392)). On iOS, lifting one
   finger gave a finger still down a new id, so after a pinch the remaining
