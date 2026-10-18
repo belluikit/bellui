@@ -35,6 +35,15 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
   
 ### Fixed
 
+* **Web: keyboard users can leave a multi-line field**
+  ([#357](https://github.com/belluikit/bellui/issues/357)). A multi-line
+  `Entry` and the x/dag canvas keep Tab for themselves, and the way out,
+  Ctrl+Tab, never reaches a web page because browsers use it to switch tabs, so
+  a keyboard-only user was trapped (WCAG 2.1.2). Escape followed by Tab or
+  Shift+Tab now moves focus out of such a widget, on every platform. Escape
+  still closes a pop-up or dialog first; the Escape after that frees the next
+  Tab.
+  
 * **x/mmedia: video playback uses far less memory at high resolution**
   ([#110](https://github.com/belluikit/bellui/issues/110)). The decode-ahead
   queue held 120 frames whatever their size: about 1 GB at 1080p and 4 GB at

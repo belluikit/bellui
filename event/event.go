@@ -260,6 +260,12 @@ type Hoverable interface {
 }
 
 // Tabbable describes any object that needs to accept Tab key presses.
+//
+// While an object whose AcceptsTab reports true is focused, plain Tab and
+// Shift+Tab reach it instead of moving focus. So that keyboard users are never
+// trapped, two key sequences still move focus out of it: Ctrl+Tab /
+// Ctrl+Shift+Tab, and Escape followed by Tab / Shift+Tab. Browsers keep
+// Ctrl+Tab for themselves, so on the web only the second one works.
 type Tabbable interface {
 	AcceptsTab() bool
 }
