@@ -6,6 +6,10 @@
 
 	<application android:label="{{.Name}}" android:debuggable="{{.Debug}}"
 				 {{if .AdaptiveIcon}}android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round"{{end}}>
+	{{- if .Credit}}
+	<!-- The default icon is CC BY 4.0 artwork, which must be credited (bellui #362). -->
+	<meta-data android:name="bellui.icon_credit" android:value="{{.Credit}}" />
+	{{- end}}
 	<!-- configChanges locale|layoutDirection: the pair that lets an Android
 	     13+ per-app language change reach the app as onConfigurationChanged
 	     instead of an in-process activity recreation (#283) - the framework

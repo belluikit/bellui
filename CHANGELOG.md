@@ -16,6 +16,14 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
 
 ### Added
 
+* **Two-finger pan scrolls**
+  ([#398](https://github.com/belluikit/bellui/issues/398)). Two fingers moving
+  together scroll what is under them, in both directions, on the web and on
+  desktop touchscreens. A page of charts or 3D views, which take one-finger drags
+  for themselves, can now be scrolled past them. Charts pass two-finger
+  scrolling on to the page; the x/dag canvas pans with it. Two fingers moving
+  apart or together over a Pinchable are still a pinch.
+
 * **Pinch-to-zoom** ([#379](https://github.com/belluikit/bellui/issues/379)).
   New `event.Pinchable` (`Pinched(*PinchEvent)`, `PinchEnded()`): two fingers
   on a Pinchable widget report the change in their distance and the point
@@ -35,6 +43,23 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
   Shift+Tab now moves focus out of such a widget, on every platform. Escape
   still closes a pop-up or dialog first; the Escape after that frees the next
   Tab.
+  
+* **x/mmedia: video playback uses far less memory at high resolution**
+  ([#110](https://github.com/belluikit/bellui/issues/110)). The decode-ahead
+  queue held 120 frames whatever their size: about 1 GB at 1080p and 4 GB at
+  4K. It is now sized to a 128 MB budget, between 8 and 120 frames, so small
+  videos are unchanged. Playing a 1080p clip peaked at 2.1 GB of memory and
+  now peaks at about 470 MB on a Mac, with no more frames dropped than
+  before. A shallower queue tolerates a shorter decode stall (about half a
+  second at 1080p30); that has not yet been measured on a phone.
+  
+* **Sign-in tokens from before v1.1.0 are deleted**
+  ([#355](https://github.com/belluikit/bellui/issues/355)). Since tokens are
+  stored per app, the old shared `bellui-auth/<provider>.enc` was no longer
+  read, but nothing removed it, and signing out did not either, so a refresh
+  token that still decrypts stayed on disk. It is now deleted the first time
+  any app saves or clears a token for that provider, even when that save or
+  clear fails, as it does for an app without an ID.
 
 * **x/charts: charts no longer rebuild on every frame**
   ([#396](https://github.com/belluikit/bellui/issues/396)). Every layout rebuilt
@@ -49,6 +74,12 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
   be scrolled on phones and tablets. Drags without a mouse button down now
   scroll the body; mouse drags still don't.
   
+* **x/charts: a 3D chart with several series rotates as a whole**
+  ([#399](https://github.com/belluikit/bellui/issues/399)). Each 3D series drew
+  its own scene, so orbiting or zooming moved only one of them and the series
+  could not hide each other in depth. All 3D series of a chart now share one
+  scene and one camera.
+
 * **Web: a page wider than the screen no longer squeezes the whole UI**
   ([#387](https://github.com/belluikit/bellui/issues/387)). When content needed
   more room than the browser viewport, the canvas grew past it and the frame
