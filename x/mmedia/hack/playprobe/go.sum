@@ -40,8 +40,8 @@ github.com/belluikit/systray v1.12.1 h1:lTFuyhv1azUPgXnrqfQ1NORDwbYCMkUgN3BBtfXr
 github.com/belluikit/systray v1.12.1/go.mod h1:peb+/O80A/aXu5fUel0gSgeAsAVYz5x01SZF5mnyErU=
 github.com/belluikit/typesetting v0.3.6 h1:M27Rx+fhz1IV2n6Tei3fNhs/Oe9gGAnq3QMrBpAqisY=
 github.com/belluikit/typesetting v0.3.6/go.mod h1:vOvJAyUaoKpOpxqHeDglX6xNuG1zv2C3IOG3yEnHuLQ=
-github.com/belluikit/webgpu v1.2.1 h1:rRI0b7EnV24Xrff6I7F+1NMNP/DOOg1cbh/GYuIQ38E=
-github.com/belluikit/webgpu v1.2.1/go.mod h1:IH6esvULcllU5qyAAdCg+YQAmN4zGDhDv1ol2YtV7jM=
+github.com/belluikit/webgpu v1.2.2 h1:8dOgdNHrvvYz+rhdMUDg5yKxCmwBrbT+xMrxv3aZQDM=
+github.com/belluikit/webgpu v1.2.2/go.mod h1:IH6esvULcllU5qyAAdCg+YQAmN4zGDhDv1ol2YtV7jM=
 github.com/belluikit/webgpu/libs-android v0.0.0-20260731101013-82e3bdc8353b h1:VfSbjwooB/L8QxcHIuGtIDFWVuV5rwAvVIlZGWWU70k=
 github.com/belluikit/webgpu/libs-android v0.0.0-20260731101013-82e3bdc8353b/go.mod h1:7SKumYToQp8dWW7oHl0JNZ7fnGW6LR212OGLdvp84y8=
 github.com/belluikit/webgpu/libs-darwin v0.0.0-20260731101014-ce4f86d4438c h1:W2TN0K8ICa/4n/VKJzIeO9FjEZzaPu0QMZ1zjlkFh6A=
