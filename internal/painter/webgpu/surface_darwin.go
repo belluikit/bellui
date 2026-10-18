@@ -28,6 +28,12 @@ static void* metalLayerFromNSWindow(void* nsWindowPtr) {
 	[nsWindow.contentView setLayer:layer];
 	return (__bridge void*)layer;
 }
+
+// newBareMetalLayer returns a CAMetalLayer attached to no window, retained for
+// the life of the process (owned via alloc/init; this file is not built with ARC).
+static void* newBareMetalLayer(void) {
+	return (void*)[[CAMetalLayer alloc] init];
+}
 */
 import "C"
 
@@ -40,5 +46,14 @@ func SurfaceDescriptorForWindow(w *glfw.Window) *wgpu.SurfaceDescriptor {
 	layer := C.metalLayerFromNSWindow(unsafe.Pointer(nsWindow))
 	return &wgpu.SurfaceDescriptor{
 		MetalLayer: &wgpu.SurfaceSourceMetalLayer{Layer: unsafe.Pointer(layer)},
+	}
+}
+
+// bareMetalLayerSurfaceDescriptor builds a surface descriptor over a CAMetalLayer
+// attached to no window, so a test can configure and present a real Metal
+// surface without opening one (#437).
+func bareMetalLayerSurfaceDescriptor() *wgpu.SurfaceDescriptor {
+	return &wgpu.SurfaceDescriptor{
+		MetalLayer: &wgpu.SurfaceSourceMetalLayer{Layer: unsafe.Pointer(C.newBareMetalLayer())},
 	}
 }

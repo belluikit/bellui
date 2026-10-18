@@ -31,7 +31,7 @@ func TestSurfaceConfigRejectsDegenerateCaps(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			cfg, err := surfaceConfig(c.caps, 640, 480, "test")
+			cfg, err := surfaceConfig(c.caps, 640, 480, 0, "test")
 			if err == nil {
 				t.Fatalf("surfaceConfig accepted degenerate capabilities, returning %+v", cfg)
 			}
@@ -56,7 +56,7 @@ func TestSurfaceConfigFromCaps(t *testing.T) {
 		AlphaModes:   []wgpu.CompositeAlphaMode{wgpu.CompositeAlphaModeOpaque, wgpu.CompositeAlphaModePremultiplied},
 		PresentModes: []wgpu.PresentMode{wgpu.PresentModeFifo},
 	}
-	cfg, err := surfaceConfig(caps, 800, 600, "test")
+	cfg, err := surfaceConfig(caps, 800, 600, 0, "test")
 	if err != nil {
 		t.Fatalf("surfaceConfig: %v", err)
 	}
@@ -80,5 +80,48 @@ func TestSurfaceConfigFromCaps(t *testing.T) {
 	}
 	if capturePixelsSwapped(wgpu.TextureFormatRGBA8Unorm) {
 		t.Error("capturePixelsSwapped reported a swap for an RGBA surface")
+	}
+}
+
+// TestCapSurfaceSize pins the #437 cap: each dimension is capped at the device
+// limit on its own, and a zero limit (none reported) leaves the size alone.
+func TestCapSurfaceSize(t *testing.T) {
+	for _, c := range []struct {
+		w, h, wantW, wantH int
+		maxDim             uint32
+	}{
+		{1920, 52006, 1920, 8192, 8192},
+		{60000, 1080, 8192, 1080, 8192},
+		{9000, 9000, 8192, 8192, 8192},
+		{8192, 8192, 8192, 8192, 8192},
+		{1920, 52006, 1920, 52006, 0},
+	} {
+		w, h := capSurfaceSize(c.w, c.h, c.maxDim)
+		if w != c.wantW || h != c.wantH {
+			t.Errorf("capSurfaceSize(%d, %d, %d) = %dx%d, want %dx%d", c.w, c.h, c.maxDim, w, h, c.wantW, c.wantH)
+		}
+	}
+
+	caps := wgpu.SurfaceCapabilities{
+		Formats:    []wgpu.TextureFormat{wgpu.TextureFormatBGRA8Unorm},
+		AlphaModes: []wgpu.CompositeAlphaMode{wgpu.CompositeAlphaModeOpaque},
+	}
+	cfg, err := surfaceConfig(caps, 1920, 52006, 8192, "test")
+	if err != nil {
+		t.Fatalf("surfaceConfig: %v", err)
+	}
+	if cfg.Width != 1920 || cfg.Height != 8192 {
+		t.Errorf("surfaceConfig size = %dx%d, want 1920x8192", cfg.Width, cfg.Height)
+	}
+}
+
+// TestResizeCapsToDeviceLimit: a resize past the limit lands on the capped size,
+// so one already configured at that size does not reconfigure. The surface is
+// nil, so a Configure call would panic.
+func TestResizeCapsToDeviceLimit(t *testing.T) {
+	d := &Device{config: &wgpu.SurfaceConfiguration{Width: 1920, Height: 8192}, maxSurfaceDim: 8192}
+	d.Resize(1920, 52006)
+	if d.config.Width != 1920 || d.config.Height != 8192 {
+		t.Fatalf("config size = %dx%d, want 1920x8192", d.config.Width, d.config.Height)
 	}
 }
