@@ -1,6 +1,7 @@
 package metadata
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -52,4 +53,24 @@ details {
 // has no manifest to update, matching the previous packaging behaviour.
 func TestBumpBuildStandardNoManifest(t *testing.T) {
 	assert.NoError(t, BumpBuildStandard(t.TempDir()))
+}
+
+// A manifest that does not parse is an error that names the file, from both
+// the loader and the build-number bump, not a bare "7:1: expected '}'" (#360).
+func TestManifestParseErrorsNameTheFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, ManifestFile)
+	require.NoError(t, os.WriteFile(path, []byte("details {\n  build = 1\n"), 0o644))
+
+	_, err := LoadStandard(dir)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), path)
+	assert.False(t, errors.Is(err, os.ErrNotExist), "a broken manifest is not a missing one")
+
+	err = BumpBuildStandard(dir)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), path)
+
+	_, err = LoadStandard(t.TempDir())
+	assert.True(t, errors.Is(err, os.ErrNotExist), "a missing manifest must stay recognisable")
 }
