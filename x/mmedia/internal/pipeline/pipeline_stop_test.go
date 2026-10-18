@@ -66,3 +66,31 @@ func TestPipeline_CloseDuringPlayback(t *testing.T) {
 		t.Error("source was not closed")
 	}
 }
+
+// TestStopReturnsEveryFrameToThePool covers a Stop that lands while the queue
+// is full, which is where the decoder sits for most of playback: blocked
+// handing over a frame it has already taken from the pool. That frame used to
+// be lost, and with one frame short the next Play found the pool empty on every
+// decode and dropped about twenty million frames in 300 ms.
+func TestStopReturnsEveryFrameToThePool(t *testing.T) {
+	src := &stubSource{frame: image.NewRGBA(image.Rect(0, 0, 16, 16))}
+	p := newPipelineForSource(src, Config{})
+	p.SetOnFrame(func(*image.RGBA) {})
+	defer p.Close()
+	pool := cap(p.frameRecycle)
+
+	for cycle := 0; cycle < 2; cycle++ {
+		p.Play()
+		deadline := time.Now().Add(2 * time.Second)
+		for len(p.frameQueue) < cap(p.frameQueue) && time.Now().Before(deadline) {
+			time.Sleep(5 * time.Millisecond)
+		}
+		if len(p.frameQueue) < cap(p.frameQueue) {
+			t.Fatalf("cycle %d: queue never filled (%d of %d)", cycle, len(p.frameQueue), cap(p.frameQueue))
+		}
+		p.Stop()
+		if got := len(p.frameRecycle) + len(p.frameQueue); got != pool {
+			t.Errorf("cycle %d: %d of %d frames back in the pool after Stop", cycle, got, pool)
+		}
+	}
+}

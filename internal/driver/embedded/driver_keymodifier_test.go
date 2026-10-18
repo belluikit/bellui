@@ -111,3 +111,73 @@ func TestNoOSDriver_CtrlTabLeavesWidgetThatKeepsTab(t *testing.T) {
 
 	assert.Equal(t, after, w.Canvas().Focused())
 }
+
+// Escape then Tab leaves a widget that keeps Tab on the embedded driver (#357).
+func TestNoOSDriver_EscapeThenTabLeavesWidgetThatKeepsTab(t *testing.T) {
+	queue := make(chan embedded.Event, 2)
+	size := func() geo.Size { return geo.NewSquareSize(100) }
+	d := intNoos.NewNoOSDriver(func(image.Image) {}, func(f func()) { f() }, queue, size)
+	w := d.CreateWindow("Test")
+
+	field := &noosTabKeeper{}
+	after := &noosFocusable{}
+	w.SetContent(container.NewWithoutLayout(field, after))
+
+	var once sync.Once
+	stop := func() { once.Do(func() { close(queue) }) }
+	after.onFocus = stop
+	go func() { // safety net so a regression fails instead of hanging
+		time.Sleep(5 * time.Second)
+		stop()
+	}()
+
+	w.Canvas().Focus(field)
+	queue <- &embedded.KeyEvent{Name: event.KeyEscape}
+	queue <- &embedded.KeyEvent{Name: event.KeyTab}
+	d.Run()
+
+	assert.Equal(t, after, w.Canvas().Focused())
+}
+
+type noosTabCounter struct {
+	noosTabKeeper
+	tabs int
+}
+
+func (k *noosTabCounter) TypedKey(ev *event.KeyEvent) {
+	if ev.Name == event.KeyTab {
+		k.tabs++
+	}
+}
+
+// Text typed after Escape cancels the way out, also when it arrives as a
+// CharacterEvent with no key event at all.
+func TestNoOSDriver_CharacterAfterEscapeKeepsTab(t *testing.T) {
+	queue := make(chan embedded.Event, 5)
+	size := func() geo.Size { return geo.NewSquareSize(100) }
+	d := intNoos.NewNoOSDriver(func(image.Image) {}, func(f func()) { f() }, queue, size)
+	w := d.CreateWindow("Test")
+
+	field := &noosTabCounter{}
+	after := &noosFocusable{}
+	w.SetContent(container.NewWithoutLayout(field, after))
+
+	var once sync.Once
+	stop := func() { once.Do(func() { close(queue) }) }
+	after.onFocus = stop
+	go func() { // safety net so a regression fails instead of hanging
+		time.Sleep(5 * time.Second)
+		stop()
+	}()
+
+	w.Canvas().Focus(field)
+	queue <- &embedded.KeyEvent{Name: event.KeyEscape}
+	queue <- &embedded.CharacterEvent{Rune: 'a'}
+	queue <- &embedded.KeyEvent{Name: event.KeyTab} // typed into the field
+	queue <- &embedded.KeyEvent{Name: event.KeyEscape}
+	queue <- &embedded.KeyEvent{Name: event.KeyTab} // leaves, and ends the run
+	d.Run()
+
+	assert.Equal(t, after, w.Canvas().Focused())
+	assert.Equal(t, 1, field.tabs, "the Tab after the typed character stayed in the field")
+}
