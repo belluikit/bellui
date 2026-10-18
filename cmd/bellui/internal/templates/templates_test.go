@@ -34,8 +34,8 @@ func TestIndexHTMLHasViewport(t *testing.T) {
 	var out bytes.Buffer
 	require.NoError(t, IndexHTML.Execute(&out, struct {
 		AppName, AppVersion, WasmFile string
-		IsReleased                    bool
-	}{"App", "1.0.0", "App.wasm", true}))
+		IsReleased, WebGPU            bool
+	}{"App", "1.0.0", "App.wasm", true, true}))
 	assert.Contains(t, out.String(), `<meta name="viewport" content="width=device-width, initial-scale=1`)
 }
 
