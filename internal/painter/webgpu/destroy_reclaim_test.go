@@ -94,23 +94,40 @@ func TestSubmitFrameReclaimsDestroyedTextures(t *testing.T) {
 			binds[i].Release()
 			destroyTexture(tex)
 		}
-		// Give the GPU time to finish the frame, as a display's refresh does.
-		time.Sleep(time.Millisecond)
 	}
 
-	// Resident size first climbs to a plateau while Metal and the allocator
-	// keep freed memory for reuse (~1000 frames on an M3 Max), so measure past
-	// it. From there it grows about 2 MB per 1000 frames with the poll, and
-	// grows ~60 MB without it.
-	for range 1000 {
+	// The frames must not outrun the GPU. Until the GPU finishes a frame, its
+	// destroyed targets stay allocated however often the device is polled, so
+	// a loop that submits faster than the GPU completes reads the growing
+	// backlog as a leak. That happened on a Mac whose GPU was shared with
+	// virtual machines (#461). So time the GPU first and pace each frame to
+	// twice that. The pacing sleeps rather than polls: a poll here would free
+	// what a missing poll in submitFrame leaks, and hide the bug.
+	start := time.Now()
+	for range 20 {
 		frame()
+		d.device.Poll(true, nil)
+	}
+	gpuFrame := time.Since(start) / 20
+	if gpuFrame > 25*time.Millisecond {
+		t.Skipf("the GPU takes %v per frame here; paced, the test would run for minutes", gpuFrame)
+	}
+	pace := max(2*gpuFrame, time.Millisecond)
+
+	// Resident size first climbs to a plateau while Metal and the allocator
+	// keep freed memory for reuse, so measure past it. From there it grows
+	// under 1 MB per 500 frames with the poll, and about 40 MB without it.
+	for range 500 {
+		frame()
+		time.Sleep(pace)
 	}
 	before := residentBytes(t)
-	for range 1000 {
+	for range 500 {
 		frame()
+		time.Sleep(pace)
 	}
 	grown := float64(residentBytes(t)) - float64(before)
-	t.Logf("resident size grew %.1f MB over 1000 frames", grown/(1<<20))
+	t.Logf("resident size grew %.1f MB over 500 frames, paced at %v", grown/(1<<20), pace)
 	require.Less(t, grown, float64(8<<20), "destroyed targets are not being freed")
 }
 
