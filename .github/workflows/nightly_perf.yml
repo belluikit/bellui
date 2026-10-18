@@ -1,0 +1,143 @@
+name: Nightly Performance
+
+# Runs every Go benchmark (root module and the x/ modules) plus the whole-app
+# scenes in hack/perfscenes, every night on main, and compares them with the
+# previous night's run. Nothing ran the benchmarks before this, so a slowdown
+# reached users unmeasured (#427).
+#
+# It reports and never fails on a slowdown: shared CI runners are too noisy to
+# gate a merge on timings. The summary shows benchstat's comparison with the
+# last successful nightly run; the raw results are kept as an artifact for 90
+# days, so any two nights can be compared by hand with benchstat.
+#
+# One runner type for every run (macos-15, Apple silicon): results are only
+# comparable on the same hardware, and macOS runners have Metal, so the
+# default WebGPU painter and the windowed scenes run for real.
+
+on:
+  schedule:
+    - cron: "17 7 * * *"
+  workflow_dispatch:
+  # Run on the PRs that change this workflow or the scenes, so a change to the
+  # job is proven before it lands.
+  pull_request:
+    paths:
+      - .github/workflows/nightly_perf.yml
+      - hack/perfscenes/**
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+  # gh run download of the previous night's artifact.
+  actions: read
+
+jobs:
+  perf:
+    runs-on: macos-15
+    timeout-minutes: 240
+    env:
+      X_MODULES: "charts dag editor mmedia tables"
+      # Each benchmark runs this many times, the minimum benchstat needs for a
+      # confidence interval worth reading.
+      BENCH_COUNT: "6"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+
+      # Same as x_tests.yml: grade the x/ modules against this checkout, not
+      # the toolkit release they pin. Never committed.
+      - name: Resolve the toolkit from this checkout
+        run: |
+          set -e
+          for m in $X_MODULES; do
+            (cd "x/$m" && go mod edit -replace github.com/belluikit/bellui=../..)
+          done
+
+      - name: Install benchstat
+        run: go install golang.org/x/perf/cmd/benchstat@v0.0.0-20261009192801-be2c69fb417e
+
+      # -run '^$' runs no tests, only benchmarks. -tags ci: the headless test
+      # driver, as every other test leg on this runner uses.
+      - name: Benchmarks
+        run: |
+          set -o pipefail
+          mkdir -p perf
+          go test -run '^$' -bench . -benchmem -count "$BENCH_COUNT" -tags ci -timeout 150m ./... | tee perf/bench.txt
+          for m in $X_MODULES; do
+            echo "::group::x/$m"
+            (cd "x/$m" && go test -run '^$' -bench . -benchmem -count "$BENCH_COUNT" -tags ci -timeout 30m ./...) | tee -a perf/bench.txt
+            echo "::endgroup::"
+          done
+          n=$(grep -c '^Benchmark' perf/bench.txt || true)
+          echo "Benchmark result lines: ${n}"
+          # A run that silently built nothing would compare as "no change".
+          # Measured 2026-10-17: the root module alone prints 123 result lines
+          # per repetition, the x/ modules about 25 more.
+          if [ "${n}" -lt $((120 * BENCH_COUNT)) ]; then
+            echo "::error::only ${n} benchmark result lines; expected about $((148 * BENCH_COUNT))"
+            exit 1
+          fi
+
+      # Whole-app scenes in a real window (#427). Each scene runs three times;
+      # the RESULT lines go to the summary and the artifact.
+      - name: Scenes
+        run: |
+          set -e
+          go build -o perfscenes ./hack/perfscenes
+          : > perf/scenes.txt
+          for run in 1 2 3; do
+            for scene in "shapes 0" "labels 0" "tiles 100" "spinner 100"; do
+              set -- $scene
+              if ! out=$(./perfscenes -scene "$1" -n "$2" -secs 8 -warm 2 2> perf/scene-err.txt); then
+                echo "::warning::scene $1 n=$2 failed (run $run)"
+                tail -n 20 perf/scene-err.txt
+              fi
+              echo "$out" | grep '^RESULT' | sed "s/^RESULT /run=${run} /" | tee -a perf/scenes.txt || true
+            done
+          done
+          rm -f perf/scene-err.txt
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: perf-${{ github.run_id }}
+          path: perf/
+          retention-days: 90
+
+      - name: Compare with the previous nightly run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          {
+            echo "## Benchmarks"
+            prev=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow nightly_perf.yml --branch main \
+              --event schedule --status success --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+            if [ -n "$prev" ] && gh run download "$prev" --repo "$GITHUB_REPOSITORY" --pattern 'perf-*' --dir prev; then
+              old=$(find prev -name bench.txt | head -n 1)
+              echo "Compared with nightly run [$prev]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$prev)."
+              echo
+              echo '```'
+              benchstat "$old" perf/bench.txt
+              echo '```'
+            else
+              echo "No previous successful nightly run to compare with."
+              echo
+              echo '```'
+              benchstat perf/bench.txt
+              echo '```'
+            fi
+            echo
+            echo "## Scenes (hack/perfscenes, 1920×1080)"
+            echo
+            echo '```'
+            cat perf/scenes.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
