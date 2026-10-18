@@ -31,6 +31,10 @@ type unixData struct {
 	// the Makefile installs it and sets up the sandbox helper (#107).
 	BundleCEF bool
 
+	// Credits marks a package carrying share/doc/<AppID>/CREDITS: the
+	// attribution the default gopher icon needs (#362).
+	Credits bool
+
 	SourceRepo, SourceDir string
 }
 
@@ -111,15 +115,7 @@ func (p *Packager) packageUNIX() error {
 		openWith = " %U"
 	}
 
-	appsDir := util.EnsureSubDir(shareDir, "applications")
-	desktop := filepath.Join(appsDir, appIDOrName+".desktop")
-	deskFile, err := os.Create(desktop)
-	if err != nil {
-		return fmt.Errorf("failed to create desktop file: %w", err)
-	}
-
-	defer deskFile.Close()
-
+	credit := p.iconCredit()
 	linuxBSD := metadata.LinuxAndBSD{}
 	if p.linuxAndBSDMetadata != nil {
 		linuxBSD = *p.linuxAndBSDMetadata
@@ -138,6 +134,10 @@ func (p *Packager) packageUNIX() error {
 		MimeTypes:      mimes,
 		StartupWMClass: p.Name,
 		BundleCEF:      bundledCEF,
+		Credits:        credit != "",
+	}
+	if err := writeUnixCredits(shareDir, appIDOrName, credit); err != nil {
+		return err
 	}
 
 	if p.sourceMetadata != nil {
@@ -145,7 +145,17 @@ func (p *Packager) packageUNIX() error {
 		tplData.SourceDir = p.sourceMetadata.Dir
 	}
 
+	// Closed before the deferred RemoveAll below runs, like the Makefile:
+	// Windows cannot remove a staging directory holding an open file.
+	appsDir := util.EnsureSubDir(shareDir, "applications")
+	deskFile, err := os.Create(filepath.Join(appsDir, appIDOrName+".desktop"))
+	if err != nil {
+		return fmt.Errorf("failed to create desktop file: %w", err)
+	}
 	err = templates.DesktopFileUNIX.Execute(deskFile, tplData)
+	if cerr := deskFile.Close(); err == nil {
+		err = cerr
+	}
 	if err != nil {
 		return fmt.Errorf("failed to write desktop entry string: %w", err)
 	}
@@ -157,8 +167,16 @@ func (p *Packager) packageUNIX() error {
 	parent := filepath.Dir(outDir)
 	defer os.RemoveAll(parent)
 
-	makefile, _ := os.Create(filepath.Join(outDir, "Makefile"))
+	// The Makefile is closed before tar reads it: it was left open, which
+	// also kept Windows from removing the staging directory afterwards.
+	makefile, err := os.Create(filepath.Join(outDir, "Makefile"))
+	if err != nil {
+		return fmt.Errorf("failed to create Makefile: %w", err)
+	}
 	err = templates.MakefileUNIX.Execute(makefile, makefileData(tplData, appIDOrName, filepath.Base(p.exe), iconName))
+	if cerr := makefile.Close(); err == nil {
+		err = cerr
+	}
 	if err != nil {
 		return fmt.Errorf("failed to write Makefile string: %w", err)
 	}
@@ -234,4 +252,18 @@ func makefileData(desktop unixData, appIDOrName, exe, iconName string) unixData 
 	desktop.Exec = exe
 	desktop.Icon = iconName
 	return desktop
+}
+
+// writeUnixCredits writes share/doc/<appIDOrName>/CREDITS when credit is not
+// empty: the default icon's attribution, shipped in the archive and installed
+// by the Makefile (#362).
+func writeUnixCredits(shareDir, appIDOrName, credit string) error {
+	if credit == "" {
+		return nil
+	}
+	docDir := util.EnsureSubDir(util.EnsureSubDir(shareDir, "doc"), appIDOrName)
+	if err := os.WriteFile(filepath.Join(docDir, "CREDITS"), []byte(credit+"\n"), 0o644); err != nil {
+		return fmt.Errorf("failed to write the icon credits: %w", err)
+	}
+	return nil
 }

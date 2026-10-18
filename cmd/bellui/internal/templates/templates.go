@@ -2,6 +2,14 @@ package templates
 
 import "text/template"
 
+// GopherCredit is the attribution the gopher artwork needs wherever it is
+// shipped: CC BY 4.0 requires credit for the material and for adaptations of
+// it (#362). bellui package puts it into every package that uses DefaultIcon;
+// the web splash screen's caption under the spinner says the same in short.
+// The templates insert it unescaped into XML, so it must hold no character
+// that needs escaping there; TestGopherCreditNeedsNoEscaping checks that.
+const GopherCredit = "Gopher artwork based on the Go gopher, designed by Renée French and licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)."
+
 var (
 	// MakefileUNIX is the template for the makefile on UNIX systems like Linux and BSD
 	MakefileUNIX = template.Must(template.New("Makefile").Parse(makefile))
