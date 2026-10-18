@@ -99,6 +99,7 @@ func TestAaptDumpTemplateManifest(t *testing.T) {
 		"AdaptiveIcon": false,
 		"URLSchemes":   []string{"bellui"},
 		"MimeTypes":    []string{"text/plain"},
+		"Credit":       templates.GopherCredit, // the default icon's attribution (#362)
 	}))
 
 	// the package-wide test init suppresses the uses-sdk and icon synthesis;
@@ -127,6 +128,9 @@ func TestAaptDumpTemplateManifest(t *testing.T) {
 	out, err := exec.Command(aapt, "dump", "xmltree", apk, "AndroidManifest.xml").CombinedOutput()
 	r.NoError(err, "aapt dump xmltree failed:\n%s", out)
 	dump := string(out)
+	r.Contains(dump, "bellui.icon_credit", "the icon credit meta-data survives the binary encoding")
+	// The value too: it is the manifest's one non-ASCII string (the é).
+	r.Contains(dump, `="`+templates.GopherCredit+`"`, "the icon credit's value survives the binary encoding")
 
 	tbl, err := OpenTable()
 	r.NoError(err)
