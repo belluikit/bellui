@@ -67,6 +67,13 @@ type painter struct {
 	// pixel size it was rendered at (so a resize re-renders). See draw_scene3d.go.
 	scenes map[core.CanvasObject]*sceneState
 
+	// shadows caches blurred box-shadow textures by everything that decides
+	// their pixels, so an unchanged shadow is blitted, not re-rendered, and
+	// equal shadows share one texture. frame counts begun frames, for eviction.
+	// See draw_shadow.go (#434).
+	shadows map[shadowKey]*shadowEntry
+	frame   uint64
+
 	// canvasFBO is the persistent full-canvas render target for dirty-region
 	// culling (gpu.DirtyRegionPainter); nil when not allocated. See canvas_fbo.go.
 	canvasFBO *canvasFBOState
@@ -195,6 +202,8 @@ func (p *painter) beginFrame() {
 		return
 	}
 	p.framing = true
+	p.frame++
+	p.evictShadows()
 }
 
 // backgroundColor returns the theme background as straight RGBA in 0..1.
