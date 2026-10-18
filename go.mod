@@ -18,7 +18,7 @@ require (
 	// rebuild (#1) — and, as of v1.2.0, to source all five platform libs
 	// modules from branches that carry the wgpu-native MIT-OR-Apache-2.0
 	// notice, which upstream's binary-asset modules lack (#21).
-	github.com/belluikit/webgpu v1.2.1
+	github.com/belluikit/webgpu v1.2.2
 	github.com/fredbi/uri v1.1.1
 	github.com/go-gl/gl v0.0.0-20231021071112-07e5d0ea2e71
 	github.com/godbus/dbus/v5 v5.2.2
