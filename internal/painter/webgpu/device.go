@@ -309,6 +309,18 @@ func destroyBuffer(b *wgpu.Buffer) {
 	b.Release()
 }
 
+// submitFrame submits a frame's commands and then polls the device without
+// waiting. The poll is what frees destroyed resources on native: destroying a
+// texture or buffer leaves its views and bind groups on a list in wgpu-core
+// that only a device poll drains, not a submit. Without it, every
+// destroyTexture and destroyBuffer leaked native memory for the life of the
+// window, about 10 MB a second in a scene of 100 shadowed cards (#452). In
+// the browser the poll is a no-op.
+func (d *Device) submitFrame(cmd *wgpu.CommandBuffer) {
+	d.queue.Submit(cmd)
+	d.device.Poll(false, nil)
+}
+
 // renderTarget is one entry of the Device's render-target stack: a color view,
 // its pixel size, the clear value for its first pass, and whether that first
 // (clearing) pass has already opened.
@@ -1765,7 +1777,7 @@ func (d *Device) EndFrame() error {
 	if err != nil {
 		return err
 	}
-	d.queue.Submit(cmd)
+	d.submitFrame(cmd)
 	cmd.Release()
 	d.encoder.Release()
 	d.encoder = nil
