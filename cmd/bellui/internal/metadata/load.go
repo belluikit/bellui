@@ -1,6 +1,7 @@
 package metadata
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -31,14 +32,20 @@ func Load(r io.Reader) (*BelluiApp, error) {
 }
 
 // LoadStandard attempts to read a BelluiApp metadata from the `manifest.pxf` file in the specified dir.
-// If the file cannot be found or parsed an error will be returned.
+// If the file cannot be found or parsed an error will be returned; it names the
+// file, and wraps os.ErrNotExist when there is no manifest, so a caller can
+// treat a missing manifest as optional and every other error as fatal.
 func LoadStandard(dir string) (*BelluiApp, error) {
 	path := filepath.Join(dir, ManifestFile)
 	r, err := os.Open(path)
 	if err != nil {
-		return nil, err
+		return nil, err // *PathError: names the file
 	}
 
 	defer r.Close()
-	return Load(r)
+	data, err := Load(r)
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", path, err)
+	}
+	return data, nil
 }
