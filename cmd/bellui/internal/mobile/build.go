@@ -348,16 +348,9 @@ func goCmd(subcmd string, srcs []string, env []string, args ...string) error {
 
 func goCmdAt(at string, subcmd string, srcs []string, env []string, args ...string) error {
 	cmd := exec.Command("go", subcmd)
-	tags := buildTags
-	targetOS, _, err := parseBuildTarget(buildTarget)
+	tags, err := goBuildTags(env)
 	if err != nil {
 		return err
-	}
-	if targetOS == "darwin" {
-		tags = append(tags, "ios")
-	}
-	if buildRelease {
-		tags = append(tags, "release")
 	}
 	if len(tags) > 0 {
 		cmd.Args = append(cmd.Args, "-tags", strings.Join(tags, " "))
@@ -388,6 +381,43 @@ func goCmdAt(at string, subcmd string, srcs []string, env []string, args ...stri
 	cmd.Env = append([]string{}, env...)
 	cmd.Dir = at
 	return runCmd(cmd)
+}
+
+// goBuildTags returns the -tags for a go command run with env: the user's
+// tags, "ios" for an Apple mobile target, "iossimulator" when env builds
+// against the iOS Simulator SDK, and "release".
+//
+// Go builds the device and the Simulator both as GOOS=ios GOARCH=arm64, but
+// their Mach-O platforms differ, so the wgpu-native libraries select their
+// archive on the iossimulator tag. Without it a Simulator build linked the
+// device archive and failed (#10). The tag follows the SDK env.go chose for
+// this arch, read from its compiler flags.
+func goBuildTags(env []string) ([]string, error) {
+	tags := append([]string{}, buildTags...) // never append into the flag's slice
+	targetOS, _, err := parseBuildTarget(buildTarget)
+	if err != nil {
+		return nil, err
+	}
+	if targetOS == "darwin" {
+		tags = append(tags, "ios")
+		if simulatorEnv(env) {
+			tags = append(tags, "iossimulator")
+		}
+	}
+	if buildRelease {
+		tags = append(tags, "release")
+	}
+	return tags, nil
+}
+
+// simulatorEnv reports whether env builds C code for the iOS Simulator.
+func simulatorEnv(env []string) bool {
+	for _, kv := range env {
+		if strings.HasPrefix(kv, "CGO_CFLAGS=") && strings.Contains(kv, "-mios-simulator-version-min=") {
+			return true
+		}
+	}
+	return false
 }
 
 func parseBuildTarget(buildTarget string) (os string, archs []string, _ error) {
