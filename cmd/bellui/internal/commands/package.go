@@ -75,6 +75,7 @@ type Packager struct {
 	certificate, profile           string // optional flags for releasing
 	tags, category                 string
 	tempDir                        string
+	defaultIcon                    bool // the bundled gopher icon is in use (#362)
 	langs                          []string
 
 	customMetadata      keyValueFlag
@@ -165,7 +166,9 @@ func (p *Packager) doPackage(runner runner) error {
 	}
 	if util.IsMobile(p.os) { // we don't use the normal build command for mobile so inject before gomobile...
 		close, err := injectMetadataIfPossible(newCommand("go"), p.dir, p.appData, createMetadataInitFile)
-		if err != nil {
+		if isManifestError(err) {
+			return err
+		} else if err != nil {
 			bellui.LogError("Failed to inject metadata init file, omitting metadata", err)
 		} else if close != nil {
 			defer close()
@@ -237,6 +240,9 @@ func (p *Packager) validate() (err error) {
 	p.appData.Release = p.release
 
 	data, err := metadata.LoadStandard(p.srcDir)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err // a manifest that does not parse must not package as if absent (#360)
+	}
 	if err == nil {
 		// When icon path specified in metadata file, we should make it relative to metadata file
 		if data.Details.Icon != "" {
@@ -278,8 +284,10 @@ func (p *Packager) validate() (err error) {
 			if err := os.WriteFile(tmp, templates.DefaultIcon, 0o644); err != nil {
 				return fmt.Errorf("failed to write default application icon: %w", err)
 			}
-			log.Println("No Icon.png found — using the default toolkit icon; provide an Icon.png or --icon for a custom one")
+			log.Println("No Icon.png found — using the default toolkit icon, a gopher image under CC BY 4.0; " +
+				"its credit is added to the package. Provide an Icon.png or --icon for a custom one")
 			p.icon = tmp
+			p.defaultIcon = true
 		}
 	}
 	if !util.Exists(p.icon) {
@@ -471,4 +479,13 @@ func hasGoCode(dir string) bool {
 		return errStopWalking
 	})
 	return found
+}
+
+// iconCredit returns the attribution the package's icon needs: the gopher
+// credit when the bundled default icon is used, otherwise "" (#362).
+func (p *Packager) iconCredit() string {
+	if p.defaultIcon {
+		return templates.GopherCredit
+	}
+	return ""
 }
