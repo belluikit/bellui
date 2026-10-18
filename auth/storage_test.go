@@ -275,7 +275,7 @@ func TestDeriveKey_FieldsAreSeparate(t *testing.T) {
 // time any app saves or clears a token for that provider: no app reads it, but
 // it still decrypts (#355). That holds even when the save or clear itself
 // fails: for an app with no ID (which could store tokens before per-app
-// storage), and when the app's token directory cannot be used.
+// storage), and when the app's token file cannot be written or removed.
 func TestLegacySharedTokenIsRemoved(t *testing.T) {
 	triggers := map[string]func() error{
 		"sign-in":  func() error { return SaveToken("google", "refresh", "a@example.com") },
@@ -290,9 +290,15 @@ func TestLegacySharedTokenIsRemoved(t *testing.T) {
 			setup:   func(*testing.T, string) { currentAppID = func() string { return "" } },
 			wantErr: true,
 		},
-		"app directory unusable": {
+		// A non-empty directory where the app's token file belongs: saving
+		// cannot write it and clearing cannot remove it, on every OS. (Making
+		// the app's directory a file instead does not fail a clear on Windows,
+		// which reports the path as not found.)
+		"token path unusable": {
 			setup: func(t *testing.T, base string) {
-				require.NoError(t, os.WriteFile(filepath.Join(base, "com.example.test"), nil, 0o600))
+				blocker := filepath.Join(base, "com.example.test", "google.enc")
+				require.NoError(t, os.MkdirAll(blocker, 0o700))
+				require.NoError(t, os.WriteFile(filepath.Join(blocker, "keep"), nil, 0o600))
 			},
 			wantErr: true,
 		},
