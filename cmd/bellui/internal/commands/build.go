@@ -2,6 +2,7 @@ package commands
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -170,7 +171,9 @@ func (b *Builder) build() error {
 	// directory bellui was started in: --src may point anywhere.
 	belluiGoModRunner.setDir(srcdir)
 	close, err := injectMetadataIfPossible(belluiGoModRunner, srcdir, b.appData, createMetadataInitFile)
-	if err != nil {
+	if isManifestError(err) {
+		return err
+	} else if err != nil {
 		bellui.LogError("Failed to inject metadata init file, omitting metadata", err)
 	} else if close != nil {
 		defer close()
@@ -328,8 +331,25 @@ func (b *Builder) applyCAndLDFlags(env *[]string, goos string) {
 	appendEnv(env, "CGO_LDFLAGS", strings.Join(ldflags, " "))
 }
 
+// manifestError is a manifest.pxf that exists but cannot be read or parsed.
+// Other metadata injection failures are logged and the build goes on without
+// metadata; this one stops it, or the app would ship with none of the
+// manifest's ID, name or version and no sign of why (#360).
+type manifestError struct{ err error }
+
+func (e manifestError) Error() string { return e.err.Error() }
+func (e manifestError) Unwrap() error { return e.err }
+
+func isManifestError(err error) bool {
+	var m manifestError
+	return errors.As(err, &m)
+}
+
 func createMetadataInitFile(srcdir string, app *appData) (func(), error) {
 	data, err := metadata.LoadStandard(srcdir)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, manifestError{err}
+	}
 	if err == nil {
 		// When icon path specified in metadata file, we should make it relative to metadata file
 		if data.Details.Icon != "" {

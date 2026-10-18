@@ -110,6 +110,10 @@ Fonts used only by tests:
   [Terms of Service](https://policies.google.com/terms/archive/20260730)
   (effective 30 July 2026) say "Google won't claim ownership" of content
   generated with its services.
+  `bellui package` credits the gopher in what it ships: under the spinner on
+  the web splash screen, and, when an app uses `default-icon.png`, in the
+  macOS and iOS Info.plist, the Windows version resource, the Android manifest
+  and a `share/doc/<app>/CREDITS` file in Linux and BSD packages (#362).
 - **earth.gif.** `widget/testdata/gif/earth.gif` and `earth-once.gif` are CC BY-SA 3.0,
   by Wikipedia user Marvel, derived from NASA imagery
   ([source](https://commons.wikimedia.org/wiki/File:Rotating_earth_(large).gif)).
