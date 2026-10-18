@@ -38,7 +38,7 @@ func TestGLDriver_StartAnimation(t *testing.T) {
 }
 
 func TestGLDriver_StopAnimation(t *testing.T) {
-	done := make(chan float32)
+	done := make(chan float32, 1)
 	run := &Runner{}
 	a := &bellui.Animation{
 		Duration: time.Second * 10,
@@ -48,13 +48,22 @@ func TestGLDriver_StopAnimation(t *testing.T) {
 	}
 
 	run.Start(a)
-	go tick(run) // simulate a graphics draw loop
+	frameDone := make(chan struct{})
+	go func() { // simulate a graphics draw loop
+		tick(run)
+		close(frameDone)
+	}()
 	select {
 	case d := <-done:
 		assert.Greater(t, d, float32(0))
 	case <-time.After(time.Second):
 		t.Error("animation was not ticked")
 	}
+	// Stop between frames. Tick runs mid-frame, and an animation stopped
+	// before its frame ends stays listed until the next frame (see
+	// TestGLDriver_StopAnimationImmediatelyAndInsideTick), which made this
+	// assertion flaky.
+	<-frameDone
 	run.Stop(a)
 	run.animationMutex.RLock()
 	assert.Zero(t, len(run.animations))
