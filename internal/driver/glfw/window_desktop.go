@@ -22,6 +22,7 @@ import (
 	"github.com/belluikit/bellui/internal/async"
 	"github.com/belluikit/bellui/internal/build"
 	"github.com/belluikit/bellui/internal/cache"
+	intdriver "github.com/belluikit/bellui/internal/driver"
 	"github.com/belluikit/bellui/internal/driver/common"
 	"github.com/belluikit/bellui/internal/painter"
 	"github.com/belluikit/bellui/internal/scale"
@@ -109,6 +110,9 @@ var (
 )
 
 type window struct {
+	// tabEscape is the Escape-then-Tab way out of a widget that keeps Tab (#357).
+	tabEscape intdriver.TabEscape
+
 	viewport  *glfw.Window
 	created   bool
 	decorate  bool
@@ -169,6 +173,8 @@ type window struct {
 	// every TouchBegin, and momentum ticks stop when their generation is no
 	// longer current. Main-goroutine state, like the long-press fields below.
 	touchScrollGen int
+	// touchScroll is the current touch gesture's scroll chain (#416).
+	touchScroll touchScrollLatch
 
 	// Press-and-hold long-press dispatch (#266) on the mouse path — real
 	// mouse holds, and emulated touch where the touch callback never fires

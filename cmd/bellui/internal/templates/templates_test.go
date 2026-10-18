@@ -2,6 +2,7 @@ package templates
 
 import (
 	"bytes"
+	"html"
 	"image/gif"
 	"image/png"
 	"testing"
@@ -36,4 +37,10 @@ func TestIndexHTMLHasViewport(t *testing.T) {
 		IsReleased                    bool
 	}{"App", "1.0.0", "App.wasm", true}))
 	assert.Contains(t, out.String(), `<meta name="viewport" content="width=device-width, initial-scale=1`)
+}
+
+// The templates put GopherCredit into XML (Info.plist, AndroidManifest.xml)
+// without escaping it, so it must not need any.
+func TestGopherCreditNeedsNoEscaping(t *testing.T) {
+	assert.Equal(t, html.EscapeString(GopherCredit), GopherCredit)
 }
