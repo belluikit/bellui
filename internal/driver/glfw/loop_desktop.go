@@ -102,7 +102,6 @@ func wakeMainLoop() {
 // events and wakeMainLoop end the wait early as before, and as soon as
 // something needs a frame the next tick is the frame grid's (#427).
 func (d *gLDriver) runEventLoop() {
-	const frame = time.Second / 60
 	now := time.Now()
 	nextFrame, lastTick := now, now
 	for {
@@ -124,6 +123,7 @@ func (d *gLDriver) runEventLoop() {
 	drained:
 
 		now := time.Now()
+		frame := d.frameInterval(now)
 		nextTick := nextTickDue(nextFrame, lastTick, d.idle())
 		if !now.Before(nextTick) {
 			d.pollEvents()
@@ -141,6 +141,50 @@ func (d *gLDriver) runEventLoop() {
 			glfw.WaitEventsTimeout(wait.Seconds())
 		}
 	}
+}
+
+// frameRecheck is how often the loop looks again at which monitors the windows
+// are on: finding a window's monitor costs GLFW calls, and a window dragged to
+// another display can wait half a second for its new pace.
+const frameRecheck = 500 * time.Millisecond
+
+// frameInterval is how far apart frames are: one refresh of the fastest
+// monitor a visible window is on, so a 120 or 144 Hz display gets every
+// frame it can show (#480). It is recomputed every frameRecheck.
+func (d *gLDriver) frameInterval(now time.Time) time.Duration {
+	if d.frameDur != 0 && now.Sub(d.frameChecked) < frameRecheck {
+		return d.frameDur
+	}
+	d.frameChecked = now
+	var rates []int
+	for _, win := range d.windowList() {
+		w := win.(*window)
+		if w.viewport == nil || !w.visible {
+			continue
+		}
+		if m := w.getMonitorForWindow(); m != nil {
+			if mode := m.GetVideoMode(); mode != nil {
+				rates = append(rates, mode.RefreshRate)
+			}
+		}
+	}
+	d.frameDur = frameForRates(rates)
+	return d.frameDur
+}
+
+// frameForRates returns the frame duration for the fastest of the monitors'
+// refresh rates in Hz: 60 Hz when none is known, and kept to 30–240 Hz, since
+// a monitor can report 0 or nonsense.
+func frameForRates(rates []int) time.Duration {
+	best := 0
+	for _, r := range rates {
+		best = max(best, r)
+	}
+	if best <= 0 {
+		best = 60
+	}
+	best = min(max(best, 30), 240)
+	return time.Second / time.Duration(best)
 }
 
 // idleTick is how far apart ticks are while the app is idle. Ticks then only
