@@ -54,6 +54,13 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
   
 ### Fixed
 
+* **Idle apps no longer use CPU**
+  ([#470](https://github.com/belluikit/bellui/issues/470)). The desktop event
+  loop woke 60 times a second even when nothing changed. While no window needs
+  painting and no animation runs, it now wakes once a second for housekeeping;
+  input and work from other goroutines still wake it at once. On an M3 Max, a
+  small idle window went from 170 ms of CPU per 10 s to under 10 ms.
+  
 * **Cards cost less memory and CPU on WebGPU**
   ([#466](https://github.com/belluikit/bellui/issues/466)). Each card clips its
   content to its rounded corners, and every clip cleared the whole window's
