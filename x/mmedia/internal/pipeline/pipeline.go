@@ -74,6 +74,15 @@ type Pipeline struct {
 	// goroutine and Seek, which both touch the decoder.
 	decodeMu sync.Mutex
 
+	// seekGen counts seeks. Every frame carries the generation it was decoded
+	// in, and the display drops a frame from an earlier one: after a seek, the
+	// frame the display was holding and the one the decoder was handing over
+	// both belong to the old position (#501). seekWake tells a display waiting
+	// on such a frame to look again now rather than when its time comes, which
+	// after a backward seek can be seconds away.
+	seekGen  atomic.Uint64
+	seekWake chan struct{}
+
 	videoWidth  int
 	videoHeight int
 	duration    time.Duration
@@ -112,6 +121,7 @@ type Pipeline struct {
 type timedFrame struct {
 	img *image.RGBA
 	pts time.Duration
+	gen uint64 // the seek generation it was decoded in (see Pipeline.seekGen)
 }
 
 // NewPipeline creates a new playback pipeline from a reader.
@@ -186,6 +196,7 @@ func newPipelineForSource(src source.Source, cfg Config) *Pipeline {
 		state:    NewStateMachine(nil),
 		hasVideo: src.HasVideo(),
 		hasAudio: src.HasAudio(),
+		seekWake: make(chan struct{}, 1),
 	}
 
 	if p.hasAudio {
@@ -668,6 +679,7 @@ func (p *Pipeline) Seek(pos time.Duration) {
 
 	p.decodeMu.Lock()
 	p.src.Seek(pos)
+	p.seekGen.Add(1) // under decodeMu: no frame decoded before the seek gets the new generation
 	p.decodeMu.Unlock()
 
 	// Discard everything decoded before the seek: queued video frames and
@@ -688,6 +700,11 @@ func (p *Pipeline) Seek(pos time.Duration) {
 		p.audioOutput.Rebase(pos)
 	}
 	p.clock.Seek(pos)
+
+	select {
+	case p.seekWake <- struct{}{}:
+	default: // a wake is already pending
+	}
 }
 
 // RecycleFrame returns a displayed frame to the pre-allocated pool for reuse.
@@ -800,6 +817,7 @@ func (p *Pipeline) decodeAhead(stop <-chan struct{}) {
 		p.decodeMu.Lock()
 		p.framePending = false
 		p.src.Decode(step)
+		gen := p.seekGen.Load()
 		// Read under decodeMu: Seek clears the source's end flag while holding it.
 		ended := p.src.HasEnded()
 		p.decodeMu.Unlock()
@@ -829,7 +847,7 @@ func (p *Pipeline) decodeAhead(stop <-chan struct{}) {
 			p.framesDecoded.Add(1)
 			// Blocks if buffer is full (back-pressure from display rate).
 			select {
-			case p.frameQueue <- timedFrame{img: p.pendingFrame, pts: p.pendingPTS}:
+			case p.frameQueue <- timedFrame{img: p.pendingFrame, pts: p.pendingPTS, gen: gen}:
 			case <-stop:
 				// The frame never reached the queue, so halt's drain cannot
 				// return it. Losing it would leave the decoder one frame short
@@ -868,8 +886,8 @@ func (p *Pipeline) displayLoop(stop <-chan struct{}) {
 				return
 			}
 
-			if !p.state.IsPlaying() {
-				p.RecycleFrame(tf.img)
+			if !p.state.IsPlaying() || tf.gen != p.seekGen.Load() {
+				p.RecycleFrame(tf.img) // paused, or decoded before the latest seek
 				continue
 			}
 
@@ -881,6 +899,7 @@ func (p *Pipeline) displayLoop(stop <-chan struct{}) {
 			//
 			// Re-read the clock after each sleep — Seek moves it concurrently,
 			// and waiting on a stale deadline would stall the display.
+			stale := false
 			for {
 				ahead := tf.pts - p.clock.Time()
 				if ahead <= 2*time.Millisecond {
@@ -893,8 +912,17 @@ func (p *Pipeline) displayLoop(stop <-chan struct{}) {
 				case <-stop:
 					p.RecycleFrame(tf.img)
 					return
+				case <-p.seekWake:
 				case <-time.After(ahead):
 				}
+				if tf.gen != p.seekGen.Load() {
+					stale = true
+					break
+				}
+			}
+			if stale {
+				p.RecycleFrame(tf.img)
+				continue
 			}
 
 			// Late by more than two frames: skip ahead, but only when a fresher
