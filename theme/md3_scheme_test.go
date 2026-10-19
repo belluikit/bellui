@@ -56,3 +56,23 @@ func TestMd3SchemeColor_UnknownName(t *testing.T) {
 	c := md3SchemeColor(s, "nonExistentColorName")
 	assert.Nil(t, c)
 }
+
+// TestSchemeSurfaceTonesFollowMD3 pins the surface, outline and on-surface
+// tones to the MD3 scheme's (#494). The light tones had drifted 2 to 10 tones
+// darker than the spec, which made light fields and containers grey.
+func TestSchemeSurfaceTonesFollowMD3(t *testing.T) {
+	type tones struct {
+		surface, dim, bright, lowest, low, container, high, highest int
+		onSurface, onSurfaceVariant, outline, outlineVariant        int
+	}
+	of := func(m toneMap) tones {
+		return tones{
+			m.surface, m.surfaceDim, m.surfaceBright,
+			m.surfaceContainerLowest, m.surfaceContainerLow, m.surfaceContainer,
+			m.surfaceContainerHigh, m.surfaceContainerHighest,
+			m.onSurface, m.onSurfaceVariant, m.outline, m.outlineVariant,
+		}
+	}
+	assert.Equal(t, tones{98, 87, 98, 100, 96, 94, 92, 90, 10, 30, 50, 80}, of(lightTones), "light")
+	assert.Equal(t, tones{6, 6, 24, 4, 10, 12, 17, 22, 90, 80, 60, 30}, of(darkTones), "dark")
+}

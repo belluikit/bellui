@@ -52,12 +52,12 @@ var darkTones = toneMap{
 var lightTones = toneMap{
 	role: 40, onRole: 100, container: 90, onContainer: 10,
 
-	surface: 96, surfaceDim: 82, surfaceBright: 96,
-	surfaceContainerLowest: 98, surfaceContainerLow: 92, surfaceContainer: 88,
-	surfaceContainerHigh: 84, surfaceContainerHighest: 80,
+	surface: 98, surfaceDim: 87, surfaceBright: 98,
+	surfaceContainerLowest: 100, surfaceContainerLow: 96, surfaceContainer: 94,
+	surfaceContainerHigh: 92, surfaceContainerHighest: 90,
 
-	onSurface: 10, onSurfaceVariant: 25,
-	outline: 40, outlineVariant: 65,
+	onSurface: 10, onSurfaceVariant: 30,
+	outline: 50, outlineVariant: 80,
 
 	inverseSurface: 20, inverseOnSurface: 95, inversePrimary: 80,
 }
