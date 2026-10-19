@@ -90,8 +90,12 @@ func newVideoPlayerFromPipeline(pipe *pipeline.Pipeline, o *options) (*VideoPlay
 
 	pipe.SetOnEnd(func() {
 		if vp.loop {
-			vp.pipe.Stop()
-			vp.pipe.Play()
+			// Off the pipeline's goroutine, which Stop waits for (#502; see
+			// MediaPlayer).
+			go func() {
+				vp.pipe.Stop()
+				vp.pipe.Play()
+			}()
 			return
 		}
 		if o.onEnd != nil {

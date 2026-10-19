@@ -504,7 +504,13 @@ func (p *Pipeline) Stop() {
 func (p *Pipeline) halt() bool {
 	p.mu.Lock()
 
-	if p.state.IsStopped() {
+	// Stopped with the goroutines' channel still open is a stream that played
+	// to its end (reportEnd sets the state; nothing has joined the goroutines
+	// or reset the clock yet), and that still needs bringing to rest: a Stop
+	// after the end returned early here, so it rewound nothing and a looping
+	// player restarted on a source that had already ended, over and over
+	// (#502).
+	if p.state.IsStopped() && p.stopCh == nil {
 		p.mu.Unlock()
 		return false
 	}
