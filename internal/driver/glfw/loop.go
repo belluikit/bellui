@@ -61,6 +61,19 @@ func runOnMainWithWait(f func(), wait bool) {
 	}
 }
 
+// nextFrameAfter returns when the frame after one due at due should run, the
+// due frame having run at now. Frames stay on the 1/60 s grid when the wake-up
+// comes late, as a ticker's would. Scheduling from the wake-up time instead put
+// frames 1/60 s plus each wake-up's lateness apart: 57.6 fps on macOS (#427).
+// After a stall of a frame or more, the grid restarts from now, so missed
+// frames are not run back to back.
+func nextFrameAfter(due, now time.Time, frame time.Duration) time.Time {
+	if next := due.Add(frame); next.After(now) {
+		return next
+	}
+	return now.Add(frame)
+}
+
 func (d *gLDriver) drawSingleFrame() {
 	refreshed := false
 	for _, win := range d.windowList() {

@@ -1074,6 +1074,9 @@ func (d *Device) Record(dc DrawCall) error {
 	if len(dc.Uniform) > uniformBlockStride {
 		return fmt.Errorf("uniform block %d bytes exceeds arena stride %d", len(dc.Uniform), uniformBlockStride)
 	}
+	if d.clipsAway(dc) {
+		return nil
+	}
 	pipe, err := d.Pipeline(dc.Key)
 	if err != nil {
 		return err
@@ -1419,6 +1422,67 @@ func (d *Device) Culls(x, y, w, h int) bool {
 	c := d.passClip
 	return c.w <= 0 || c.h <= 0 || w <= 0 || h <= 0 ||
 		x >= c.x+c.w || x+w <= c.x || y >= c.y+c.h || y+h <= c.y
+}
+
+// clipPosition says where a shader's clip-space position comes from: the vertex
+// is stride floats long, and its x and y are the floats at x (plus x+offset when
+// offset is not zero) and x+1 (plus x+1+offset).
+type clipPosition struct {
+	stride, offset int
+}
+
+// clipPositions lists the shaders whose output position is computed from the
+// vertex data alone. line is missing because it widens each vertex by a width
+// from the uniform block, and scene3d because it projects by a matrix there.
+var clipPositions = map[string]clipPosition{
+	"rectangle":       {stride: 4, offset: 2}, // vert + normal
+	"round_rectangle": {stride: 4, offset: 2},
+	"polygon":         {stride: 4, offset: 2},
+	"arc":             {stride: 4, offset: 2},
+	"ripple":          {stride: 4, offset: 2},
+	"simple":          {stride: 5}, // vert.xy
+	"blur":            {stride: 5},
+	"path":            {stride: 3},
+}
+
+// clipsAway reports whether dc lies wholly outside the clip the open pass
+// applies, so the scissor test would discard every fragment it makes: color,
+// depth and stencil alike. Skipping such a draw changes no pixel and saves
+// encoding it. A scroll container paints all its content every frame, and the
+// rows scrolled out of view made most of a frame's draws (#427).
+func (d *Device) clipsAway(dc DrawCall) bool {
+	cp, ok := clipPositions[dc.Key.Shader]
+	if !ok || d.pass == nil || !d.passClip.active {
+		return false
+	}
+	tw, th, ok := d.activeTargetSize()
+	if !ok || dc.VertexCount*cp.stride > len(dc.Vertices) {
+		return false
+	}
+	vertex := func(i int) (x, y float32) {
+		v := dc.Vertices[i*cp.stride:]
+		x, y = v[0], v[1]
+		if cp.offset != 0 {
+			x += v[cp.offset]
+			y += v[cp.offset+1]
+		}
+		return x, y
+	}
+	minX, minY := vertex(0)
+	maxX, maxY := minX, minY
+	for i := 1; i < dc.VertexCount; i++ {
+		x, y := vertex(i)
+		minX, maxX = min(minX, x), max(maxX, x)
+		minY, maxY = min(minY, y), max(maxY, y)
+	}
+	// Clip space to target pixels; clip-space y points up. One pixel of slack
+	// keeps a draw whose edge rounds onto the clip.
+	const slack = 1
+	left, right := (minX+1)/2*float32(tw), (maxX+1)/2*float32(tw)
+	top, bottom := (1-maxY)/2*float32(th), (1-minY)/2*float32(th)
+	c := d.passClip
+	return right < float32(c.x)-slack || left > float32(c.x+c.w)+slack ||
+		bottom < float32(c.y)-slack || top > float32(c.y+c.h)+slack
 }
 
 // resolveScissor computes the scissor rect to apply for a requested clip within a
