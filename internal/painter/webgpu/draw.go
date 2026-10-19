@@ -518,6 +518,7 @@ func (p *painter) drawPath(path *canvas.Path, pos geo.Position, frame geo.Size) 
 func (p *painter) drawPathFillStencil(path *canvas.Path, fanTris []float32, subpaths [][]geo.Position, fringeWidth float32, pos geo.Position, frame geo.Size) {
 	// Pass 1: winding / even-odd into the stencil, color masked off.
 	p.clearStencil()
+	p.markStencilDirty()
 	p.dev.SetStencilRef(0)
 	if path.FillRule == canvas.FillRuleEvenOdd {
 		p.stencilMode = StencilWriteInvert
