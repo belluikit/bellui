@@ -800,9 +800,11 @@ func (p *Pipeline) decodeAhead(stop <-chan struct{}) {
 		p.decodeMu.Lock()
 		p.framePending = false
 		p.src.Decode(step)
+		// Read under decodeMu: Seek clears the source's end flag while holding it.
+		ended := p.src.HasEnded()
 		p.decodeMu.Unlock()
 
-		if p.src.HasEnded() {
+		if ended {
 			if p.frameQueue != nil {
 				select {
 				case p.frameQueue <- timedFrame{}: // nil img: end of stream
