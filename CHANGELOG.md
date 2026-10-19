@@ -62,6 +62,20 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
   visible area. On an M3 Max, a grid of 500 cards uses about 33 MB less memory
   and 5–10% less CPU per frame.
 
+* **Desktop windows animate at a steady 60 fps**
+  ([#427](https://github.com/belluikit/bellui/issues/427)). The event loop
+  timed each frame from the moment it woke up, so every slightly late wake-up
+  pushed all later frames back. Animations ran at about 57.6 fps on macOS even
+  with time to spare. Frames now stay on a 1/60 s grid.
+  
+* **Scrolled content out of view no longer costs GPU encoding**
+  ([#427](https://github.com/belluikit/bellui/issues/427)). A scroll container
+  paints all its content every frame, and the WebGPU painter encoded a draw for
+  every object, even the ones the clip hides. It now skips a draw that lies
+  wholly outside the clip. A static screen of 500 cards uses 20% less CPU per
+  frame on an M3 Max, and 500 cards updating every frame 31% less. The pixels
+  drawn are unchanged.
+  
 * **Screens that update many widgets are up to 4× faster**
   ([#457](https://github.com/belluikit/bellui/issues/457)). Every widget
   setter checks that it runs on the main goroutine, and the check took a stack
