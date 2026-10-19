@@ -3,6 +3,8 @@ package widget
 import (
 	"time"
 
+	"github.com/belluikit/bellui/internal/cache"
+
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
@@ -133,6 +135,11 @@ func (p *ProgressBarInfinite) Hide() {
 	p.running = false
 
 	p.BaseWidget.Hide()
+	// BaseWidget.Hide refreshes only the canvas; the renderer must hear of it
+	// to stop the animation, which would otherwise run on while hidden (#497).
+	if cache.IsRendered(p) {
+		cache.Renderer(p).Refresh()
+	}
 }
 
 // Start the infinite progress bar animation
@@ -190,6 +197,7 @@ func (p *ProgressBarInfinite) CreateRenderer() core.WidgetRenderer {
 	render.SetObjects([]core.CanvasObject{&render.background, &render.bar})
 
 	p.running = true
+	render.start() // nothing else refreshes a new renderer to start it (#497)
 	return render
 }
 
