@@ -54,6 +54,14 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
   
 ### Fixed
 
+* **Apps use about 25 MB less memory, and allocate 60 MB less at startup**
+  ([#469](https://github.com/belluikit/bellui/issues/469)). Measuring the
+  first text scanned every font installed on the system, to find one for the
+  user's language, even when the bundled fonts covered all the text. The scan
+  now runs only when text needs a character the bundled fonts lack. On an M3
+  Max, a small window allocates 15 MB at startup instead of 77 MB, and idles
+  at 52 MB instead of 76–79 MB.
+
 * **Screens that update many widgets are up to 4× faster**
   ([#457](https://github.com/belluikit/bellui/issues/457)). Every widget
   setter checks that it runs on the main goroutine, and the check took a stack
