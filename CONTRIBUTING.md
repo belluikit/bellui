@@ -87,8 +87,9 @@ The renderer also has an OpenGL build; if you touch rendering code, run
 - Everything new gets a unit test where that is possible.
 - New public API has a doc comment ending in a `Since:` line with the version
   it first appears in.
-- A user-visible change gets an entry under `## Unreleased` in
-  [CHANGELOG.md](CHANGELOG.md) (or `cmd/bellui/CHANGELOG.md` for the command
-  line tool).
+- A user-visible change gets a changelog entry: one file in
+  [`changelog.d/`](changelog.d/README.md) (or `cmd/bellui/changelog.d/` for the
+  command line tool), not an edit to `CHANGELOG.md`, so that open pull
+  requests do not conflict there.
 - Breaking changes need a deprecation path, or an issue where they were agreed
   first.

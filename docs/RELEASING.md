@@ -32,7 +32,17 @@ it. Do not try to make them share a commit.
 
 ### 1. Changelog
 
-Write the entry, commit as `docs: changelog for <version>`.
+Entries for the release are files in `changelog.d/` (#511). Fold them into
+`CHANGELOG.md`, which also deletes them:
+
+```sh
+go run ./hack/changelog release v1.0.0-rc.7
+```
+
+Then write the section's opening summary under its heading, as earlier
+releases have one, and commit as `docs: changelog for <version>`. When the
+`bellui` command is released alongside, do the same for its changelog with
+`-C cmd/bellui` and its own version.
 
 ### 2. Green CI on main
 
@@ -178,7 +188,7 @@ consumer. For an rc:
 ```sh
 gh release create v1.0.0-rc.7 --verify-tag --prerelease \
   --title "v1.0.0-rc.7" \
-  --notes "Release candidate — see the Unreleased section of CHANGELOG.md."
+  --notes "Release candidate — see the v1.0.0-rc.7 section of CHANGELOG.md."
 ```
 
 For a stable, mark it **latest** and carry the changelog entry as the notes
