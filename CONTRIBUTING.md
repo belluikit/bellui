@@ -5,11 +5,6 @@ pull request you agree that your contribution is released under the same
 license. Everyone taking part is expected to follow the
 [code of conduct](CODE_OF_CONDUCT.md).
 
-Much of Bellui is written by AI coding agents under the maintainer's direction;
-[the README](README.md#why-bellui-and-how-it-is-built) explains how. Contributions
-made with AI tools are welcome on the same terms as any other: you are
-responsible for the change, and it has to pass the same checks.
-
 ## Asking a question
 
 For help with your own code, or a question about how something works, ask in
