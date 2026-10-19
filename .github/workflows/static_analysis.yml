@@ -60,6 +60,13 @@ jobs:
             exit 1
           fi
 
+      # Changelog entries are one file per change under changelog.d/ (#511).
+      # This validates their names and contents, and refuses entries written
+      # into an Unreleased section, as a keep-both merge resolution restores
+      # them. It does not require a pull request to add one.
+      - name: Changelog fragments
+        run: go run ./hack/changelog check
+
       - name: Get dependencies
         run: |
           sudo apt-get update
