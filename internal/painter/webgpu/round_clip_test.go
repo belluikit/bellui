@@ -132,8 +132,8 @@ func (o *offscreenPainter) fill() {
 }
 
 func pixel(img *image.RGBA, x, y int) color.NRGBA {
-	c := img.RGBAAt(x, y)
-	return color.NRGBA{R: c.R, G: c.G, B: c.B, A: c.A}
+	// The tests compare opaque pixels, whose RGBA and NRGBA bytes are equal.
+	return color.NRGBA(img.RGBAAt(x, y))
 }
 
 // TestRoundedClipConfinesDraws checks the clip itself: a fill inside it lands
