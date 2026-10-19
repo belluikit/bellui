@@ -3,7 +3,7 @@ package canvas
 import (
 	"image/color"
 	"math"
-	"sync/atomic"
+	"sync"
 
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/core"
@@ -41,10 +41,14 @@ type Text struct {
 
 	rotation float32 // rotation in degrees, applied around text center
 
-	// measureMemo holds the last driver measurement (see MinSizeWithBaseline).
-	// Atomic so concurrent MinSize reads stay race-free — MinSize was a pure
-	// read before the memo and callers may treat it as one.
-	measureMemo atomic.Pointer[textMeasureMemo]
+	// measureMemo holds the last driver measurement (see MinSizeWithBaseline),
+	// valid once measured is set. Guarded by measureMu so concurrent MinSize
+	// reads stay race-free (MinSize was a pure read before the memo and callers
+	// may treat it as one). Held inline rather than behind a pointer: a fresh
+	// memo per measurement was a quarter of a labels frame's garbage (#492).
+	measureMu   sync.Mutex
+	measured    bool
+	measureMemo textMeasureMemo
 }
 
 // textMeasureMemo is one memoised text measurement: the inputs it depends on,
@@ -57,6 +61,7 @@ type textMeasureMemo struct {
 	gen      uint64
 	size     geo.Size
 	baseline float32
+	seq      uint64 // counts the measurements taken, for tests
 }
 
 // Hide will set this text to not be visible
@@ -90,16 +95,24 @@ func (t *Text) MinSize() geo.Size {
 // Since: 1.0
 func (t *Text) MinSizeWithBaseline() (geo.Size, float32) {
 	gen := cache.ThemeCacheGeneration()
-	if m := t.measureMemo.Load(); m != nil && m.gen == gen &&
+	t.measureMu.Lock()
+	if m := &t.measureMemo; t.measured && m.gen == gen &&
 		m.text == t.Text && m.textSize == t.TextSize &&
 		m.style == t.TextStyle && m.source == t.FontSource {
-		return m.size, m.baseline
+		size, base := m.size, m.baseline
+		t.measureMu.Unlock()
+		return size, base
 	}
+	t.measureMu.Unlock()
+
 	size, base := bellui.MeasureTextFull(t.Text, t.TextSize, t.TextStyle, t.FontSource)
-	t.measureMemo.Store(&textMeasureMemo{
+	t.measureMu.Lock()
+	t.measureMemo = textMeasureMemo{
 		text: t.Text, textSize: t.TextSize, style: t.TextStyle, source: t.FontSource,
-		gen: gen, size: size, baseline: base,
-	})
+		gen: gen, size: size, baseline: base, seq: t.measureMemo.seq + 1,
+	}
+	t.measured = true
+	t.measureMu.Unlock()
 	return size, base
 }
 
