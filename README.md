@@ -11,6 +11,29 @@ D3D12, browser WebGPU) with an OpenGL fallback behind the `gl` build tag. See `d
 (per-area design detail) and `ROADMAP.md` for details.
 Module path: `github.com/belluikit/bellui`
 
+# Why Bellui, and how it is built
+
+Bellui exists to make building apps simpler and more predictable:
+
+- **One stack.** One language from the UI to the tooling, and one standard way
+  to encode data and write configuration.
+- **Typed data everywhere.** Types are enforced throughout, so mistakes show up
+  when you build, not when your users run the app.
+- **The same behaviour on every platform**, as far as each platform allows.
+- **Real gaps filled**, such as screen-reader accessibility, input methods for
+  Chinese, Japanese and Korean, native file dialogs, and an embedded web view.
+
+No company is behind Bellui. It is one person's effort, given back to the
+community in the hope of better software.
+
+**Bellui is built with heavy AI assistance.** Most of the code, tests, and
+written analysis in issues and pull requests are produced by AI coding agents
+working under the maintainer's direction. The maintainer decides what gets
+built, reviews each change and the measurements behind it, and does every
+merge and release. The checks in CI and the evidence posted on each pull
+request are the quality bar, whoever wrote the change. Commits written by an AI
+agent carry a `Co-Authored-By` trailer naming it.
+
 # Prerequisites
 
 To develop apps using Bellui you will need Go version 1.25 or later, a C compiler and your system's development tools.
