@@ -54,6 +54,12 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
   
 ### Fixed
 
+* **Infinite progress bars animate again**
+  ([#497](https://github.com/belluikit/bellui/issues/497)). A
+  `ProgressBarInfinite` drew a still bar: nothing started its animation once
+  it was created. It now starts when the bar is first drawn, and stops while
+  the bar is hidden instead of running on unseen.
+
 * **Default widgets follow the Material 3 spec more closely**
   ([#494](https://github.com/belluikit/bellui/issues/494)). The light theme's
   surfaces were 2 to 10 tones darker than Material's, so fields and containers

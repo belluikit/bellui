@@ -99,3 +99,24 @@ func TestInfiniteProgressRenderer_Layout(t *testing.T) {
 
 	bar.Hide()
 }
+
+// TestProgressBarInfinite_Animates pins #497: a shown bar starts its
+// animation, a hidden one stops it, and a re-shown one starts it again. The
+// Running flag alone said yes while nothing moved. The test driver runs no
+// animations, so this checks the renderer's animation state.
+func TestProgressBarInfinite_Animates(t *testing.T) {
+	test.NewTempApp(t)
+	bar := NewProgressBarInfinite()
+	win := test.NewWindow(bar)
+	defer win.Close()
+	win.Resize(geo.NewSize(200, 40))
+	r := cache.Renderer(bar).(*infProgressRenderer)
+
+	assert.True(t, r.wasRunning, "a shown bar animates")
+
+	bar.Hide()
+	assert.False(t, r.wasRunning, "a hidden bar stops")
+
+	bar.Show()
+	assert.True(t, r.wasRunning, "a re-shown bar animates again")
+}
