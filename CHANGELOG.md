@@ -60,6 +60,14 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
   painting and no animation runs, it now wakes once a second for housekeeping;
   input and work from other goroutines still wake it at once. On an M3 Max, a
   small idle window went from 170 ms of CPU per 10 s to under 10 ms.
+  
+* **Apps use about 25 MB less memory, and allocate 60 MB less at startup**
+  ([#469](https://github.com/belluikit/bellui/issues/469)). Measuring the
+  first text scanned every font installed on the system, to find one for the
+  user's language, even when the bundled fonts covered all the text. The scan
+  now runs only when text needs a character the bundled fonts lack. On an M3
+  Max, a small window allocates 15 MB at startup instead of 77 MB, and idles
+  at 52 MB instead of 76–79 MB.
 
 * **Desktop windows animate at a steady 60 fps**
   ([#427](https://github.com/belluikit/bellui/issues/427)). The event loop
