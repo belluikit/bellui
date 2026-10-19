@@ -14,6 +14,7 @@ import (
 	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/async"
 	"github.com/belluikit/bellui/internal/gpu"
 	"github.com/belluikit/bellui/test"
 	"github.com/belluikit/bellui/theme"
@@ -448,6 +449,12 @@ func BenchmarkRefresh(b *testing.B) {
 
 	for i := uint64(1); i < 1<<15; i *= 2 {
 		b.Run(fmt.Sprintf("#%d", i), func(b *testing.B) {
+			// Each sub-benchmark runs on a goroutine of its own. Make it the
+			// main goroutine, as a driver's event loop is, or every Refresh
+			// takes the wrong-thread path: it logs a warning and its caller,
+			// and the benchmark measures that (two log lines per Refresh, a
+			// 340 MB CI log that ran the nightly job out of time, #439).
+			async.SetMainGoroutine()
 			b.ReportAllocs()
 
 			for j := 0; j < b.N; j++ {
