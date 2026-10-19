@@ -174,11 +174,15 @@ func newMediaPlayerFromPipeline(pipe *pipeline.Pipeline, o *options, previewURL 
 			mp.controls.SetPlaying(false)
 		})
 		if mp.loop {
-			mp.pipe.Stop()
-			mp.pipe.Play()
-			bellui.Do(func() {
-				mp.controls.SetPlaying(true)
-			})
+			// Not on this goroutine: OnEnd runs on the pipeline's display
+			// goroutine, and Stop waits for it to finish (#502).
+			go func() {
+				mp.pipe.Stop()
+				mp.pipe.Play()
+				bellui.Do(func() {
+					mp.controls.SetPlaying(true)
+				})
+			}()
 			return
 		}
 		if o.onEnd != nil {

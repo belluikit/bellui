@@ -54,6 +54,18 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
   
 ### Fixed
 
+* **Video seeking, looping and the end of playback**
+  ([#501](https://github.com/belluikit/bellui/issues/501),
+  [#502](https://github.com/belluikit/bellui/issues/502)). In `x/mmedia`:
+  * Seeking back no longer freezes the picture until playback catches up.
+    On a real clip the picture now moves within 0.2 s of any seek, where
+    backward seeks used to freeze it for 1 to over 5 seconds.
+  * A looping player keeps playing after it wraps. Before, the picture froze
+    at the end, the time kept counting, and pause left the player "playing".
+  * Clips shorter than a second play instead of showing nothing.
+  * The progress bar reaches the end when a video finishes, and the time stops
+    there instead of running on.
+    
 * **Typing into a large text field no longer leaks memory**
   ([#508](https://github.com/belluikit/bellui/issues/508)). Each keystroke in
   a multi-line `Entry` kept a full copy of the document in memory: about 30 MB
