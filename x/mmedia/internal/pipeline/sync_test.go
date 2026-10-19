@@ -79,3 +79,65 @@ func TestEndOfStreamSentinel(t *testing.T) {
 		t.Error("zero timedFrame must represent end of stream")
 	}
 }
+
+// TestClockSmoothsSteppedAudioPosition pins #504: the audio position moves in
+// steps of what the mixer pulls per callback (about 90 ms for 44.1 kHz mono)
+// and is sampled at irregular times. The clock used to snap to each sample and
+// lurched by up to 50 ms, so video paced on it dropped frames as late. It must
+// run smoothly and still track the audio.
+func TestClockSmoothsSteppedAudioPosition(t *testing.T) {
+	const step = 90 * time.Millisecond
+	c := NewClock()
+	c.Start()
+	start := time.Now()
+	c.SetAudioTime(0)
+
+	// Measure from the first step on: until the audio moves, the clock holds
+	// at the start and then jumps to it once, as intended (see
+	// TestClockWaitsForTheAudioToStart).
+	worst := time.Duration(0)
+	prevClock, prevWall := c.Time(), time.Now()
+	nextUpdate := start
+	for i := 0; time.Since(start) < 1500*time.Millisecond; i++ {
+		time.Sleep(2 * time.Millisecond)
+		now := time.Now()
+		if now.After(nextUpdate) {
+			// The device's position: real elapsed time, in whole steps.
+			pos := now.Sub(start) / step * step
+			c.SetAudioTime(pos)
+			nextUpdate = now.Add(time.Duration(15+i%3*10) * time.Millisecond) // irregular, 15-35 ms
+		}
+		clock, wall := c.Time(), time.Now()
+		if wall.Sub(start) < 2*step { // not under way yet
+			prevClock, prevWall = clock, wall
+			continue
+		}
+		if dev := (clock - prevClock) - wall.Sub(prevWall); dev > worst {
+			worst = dev
+		} else if -dev > worst {
+			worst = -dev
+		}
+		prevClock, prevWall = clock, wall
+	}
+	if worst > 5*time.Millisecond {
+		t.Errorf("clock lurched by %v against wall time between 2 ms samples; want it smooth", worst)
+	}
+	if lag := time.Since(start) - c.Time(); lag > 2*step || lag < -step {
+		t.Errorf("clock is %v behind real time; want it to track the audio within a step or two", lag)
+	}
+}
+
+// TestClockWaitsForTheAudioToStart: until the device starts playing it reports
+// the start position, and a clock that ran on from there put the picture ahead
+// of the sound for the first second or two (#504).
+func TestClockWaitsForTheAudioToStart(t *testing.T) {
+	c := NewClock()
+	c.Start()
+	for i := 0; i < 20; i++ { // 200 ms of a device that has not started
+		c.SetAudioTime(0)
+		time.Sleep(10 * time.Millisecond)
+	}
+	if got := c.Time(); got > 30*time.Millisecond {
+		t.Errorf("clock at %v while the audio has not started; want it held near 0", got)
+	}
+}

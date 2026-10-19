@@ -11,7 +11,6 @@ import (
 const (
 	defaultSampleRate = 44100
 	defaultChannels   = 2
-	defaultBufferSize = 8192 * 16 // ~190ms at 44100Hz stereo 16-bit
 )
 
 // Output manages audio playback via ebitengine/oto.
@@ -64,36 +63,49 @@ func NewOutput(sampleRate, channels int) *Output {
 	}
 
 	ctx := initOto(sampleRate, channels)
-	buf := NewRingBuffer(defaultBufferSize)
+	return newOutput(ctx, sampleRate, channels, otoSampleRate, otoChannels)
+}
 
+// newOutput builds an Output for a stream of streamRate and channels played on
+// a device fixed at deviceRate and deviceChannels (0: not known, take the
+// stream's).
+//
+// sampleRate is the rate of the bytes the Output holds and plays, which is the
+// device's: a stream at another rate is resampled to it before it reaches the
+// ring. Everything that turns bytes into time (the playback position, the ring
+// and pull sizes) uses it. The position used to divide device-rate bytes by
+// the stream's rate, so a 48 kHz stream on a device the process had opened at
+// 44.1 kHz played at 0.918x (#506).
+func newOutput(ctx *oto.Context, streamRate, channels, deviceRate, deviceChannels int) *Output {
 	// oto's context is created once per process, so the first stream fixes the
 	// device's channel count for every stream after it. Unlike a sample-rate
 	// mismatch, which the resampler absorbs, feeding the device a different
 	// number of interleaved channels would garble both the audio and the
 	// byte-derived playback clock. Report what the device actually plays so
 	// the caller can ask its decoder for exactly that many channels.
-	if otoChannels > 0 {
-		channels = otoChannels
+	if deviceChannels > 0 {
+		channels = deviceChannels
+	}
+	rate := streamRate
+	if deviceRate > 0 {
+		rate = deviceRate
 	}
 
 	o := &Output{
 		ctx:        ctx,
-		buffer:     buf,
-		sampleRate: sampleRate,
+		buffer:     NewRingBuffer(audioBytes(rate, channels, ringDuration)),
+		sampleRate: rate,
 		channels:   channels,
 		volume:     1.0,
 	}
-
-	// Auto-configure resampling if oto was initialized at a different rate.
-	if otoSampleRate != sampleRate && otoSampleRate > 0 {
-		o.resampler = NewResampler(sampleRate, otoSampleRate, channels)
-	}
-
+	o.SetSourceSampleRate(streamRate)
 	return o
 }
 
-// SetSourceSampleRate configures resampling if the source rate differs from output.
+// SetSourceSampleRate configures resampling from srcRate to the rate the
+// Output plays at, or none when they agree.
 func (o *Output) SetSourceSampleRate(srcRate int) {
+	o.resampler = nil
 	if srcRate != o.sampleRate && srcRate > 0 {
 		o.resampler = NewResampler(srcRate, o.sampleRate, o.channels)
 	}
@@ -123,12 +135,43 @@ func (o *Output) Start() {
 		return
 	}
 	o.player = o.ctx.NewPlayer(o.buffer)
-	o.player.SetBufferSize(defaultBufferSize / 4)
+	o.player.SetBufferSize(playerBufferBytes(o.sampleRate, o.channels))
 	o.player.Play()
 	o.started = true
 }
 
 // Pause pauses audio playback.
+// ringDuration is how much decoded audio the ring buffer holds, and the
+// decoder stops at half of it (Pipeline.audioAheadFull). It is sized in time:
+// a fixed 128 KB was 0.68 s of 48 kHz stereo, so audio could run at most 0.34 s
+// ahead of playback, but FFmpeg's threaded video decoder hands frames out
+// several frames after their packets, by more than that. The decoder sat on the
+// audio limit with the newest video frame already late, every frame was shown
+// late, and A/V sync averaged 25 ms with peaks of 100 ms (#504). With a second
+// of audio allowed ahead, video is decoded before it is due.
+const ringDuration = 2 * time.Second
+
+// playerChunk is how much audio the device player pulls from the ring buffer
+// at a time. It is a duration, not a byte count, because what has to cover it
+// is the decoder's lead, and at 1080p60 the video queue stops the decoder about
+// 270 ms ahead (#504). A fixed 32 KB was 170 ms of 48 kHz stereo but 370 ms of
+// 44.1 kHz mono, longer than that lead, so every pull came up short and was
+// padded with silence that the playback position does not count: the clock,
+// and the video paced on it, ran at half speed. 60 ms was too small for the
+// device and slowed the clock too; 100 to 200 ms all played at full speed.
+const playerChunk = 150 * time.Millisecond
+
+// audioBytes is d of 16-bit audio at rate and channels, in whole sample frames.
+func audioBytes(rate, channels int, d time.Duration) int {
+	frames := int(int64(rate) * int64(d) / int64(time.Second))
+	return frames * channels * 2
+}
+
+// playerBufferBytes is playerChunk of 16-bit audio at rate and channels.
+func playerBufferBytes(rate, channels int) int {
+	return audioBytes(rate, channels, playerChunk)
+}
+
 func (o *Output) Pause() {
 	o.mu.Lock()
 	defer o.mu.Unlock()
@@ -194,7 +237,8 @@ func (o *Output) PlaybackPosition() time.Duration {
 	return posBase + time.Duration(frames)*time.Second/time.Duration(o.sampleRate)
 }
 
-// SampleRate returns the configured sample rate.
+// SampleRate is the rate the Output plays at: the device's, which a stream
+// at another rate is resampled to.
 func (o *Output) SampleRate() int {
 	return o.sampleRate
 }

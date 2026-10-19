@@ -66,6 +66,19 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
   * The progress bar reaches the end when a video finishes, and the time stops
     there instead of running on.
     
+* **Smooth 60 fps video with sound**
+  ([#504](https://github.com/belluikit/bellui/issues/504)). In `x/mmedia`, a
+  1080p 60 fps video with audio played in slow motion at about 0.6× speed and
+  31 fps, and 720p60 dropped about 8 frames a second. Both now play at full
+  speed and 60 fps with no drops. Picture and sound line up better on every
+  video: on average within about 1 ms instead of 25 ms, with peaks of about
+  10 ms instead of 100 ms.
+  
+* **Audio files at different sample rates play at the right speed**
+  ([#506](https://github.com/belluikit/bellui/issues/506)). In `x/mmedia`, a
+  48 kHz file played after a 44.1 kHz one in the same app ran at 0.92× speed,
+  picture included.
+
 * **Typing into a large text field no longer leaks memory**
   ([#508](https://github.com/belluikit/bellui/issues/508)). Each keystroke in
   a multi-line `Entry` kept a full copy of the document in memory: about 30 MB
