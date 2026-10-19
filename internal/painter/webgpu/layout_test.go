@@ -45,7 +45,7 @@ func TestDescriptorsCoverShaders(t *testing.T) {
 // TestTexturedShaders checks that exactly the shaders sampling a texture are
 // flagged as textured (they bind a texture+sampler at bindings 1 & 2).
 func TestTexturedShaders(t *testing.T) {
-	want := map[string]bool{"simple": true, "blur": true}
+	want := map[string]bool{"simple": true, "blur": true, "quad": true}
 	for _, name := range Names() {
 		d, _ := DescriptorFor(name)
 		if d.Textured != want[name] {
