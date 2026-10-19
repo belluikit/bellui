@@ -1,13 +1,13 @@
 <canvas padded size="50x40">
 	<content>
 		<widget pos="4,4" size="42x32" type="*widget.Entry">
-			<rectangle fillColor="inputBackground" pos="2,2" radius="4" size="38x28"/>
+			<rectangle fillColor="inputBackground" pos="2,2" size="38x28" topLeftRadius="4" topRightRadius="4"/>
 			<widget pos="2,2" size="38x28" type="*widget.entryContent">
 				<widget size="38x28" type="*widget.RichText">
 					<text pos="8,6" size="26x16">Text</text>
 				</widget>
 			</widget>
-			<rectangle pos="1,1" radius="4" size="40x29" strokeColor="inputBorder" strokeWidth="2"/>
+			<rectangle fillColor="inputBorder" pos="2,28" size="38x2" strokeColor="inputBorder"/>
 		</widget>
 	</content>
 </canvas>

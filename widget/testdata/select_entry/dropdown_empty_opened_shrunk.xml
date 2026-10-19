@@ -1,7 +1,7 @@
 <canvas padded size="150x200">
 	<content>
 		<widget pos="10,10" size="110x32" type="*widget.SelectEntry">
-			<rectangle fillColor="inputBackground" pos="2,2" radius="4" size="106x28"/>
+			<rectangle fillColor="inputBackground" pos="2,2" size="106x28" topLeftRadius="4" topRightRadius="4"/>
 			<widget pos="2,2" size="70x28" type="*widget.Scroll">
 				<widget size="70x28" type="*widget.entryContent">
 					<widget size="70x28" type="*widget.RichText">
@@ -12,7 +12,7 @@
 					</widget>
 				</widget>
 			</widget>
-			<rectangle pos="1,1" radius="4" size="107x29" strokeColor="inputBorder" strokeWidth="2"/>
+			<rectangle fillColor="inputBorder" pos="2,28" size="106x2" strokeColor="inputBorder"/>
 			<widget pos="72,2" size="36x28" type="*widget.Button">
 				<rectangle fillColor="rgba(64,53,80,255)" radius="20" size="36x28"/>
 				<image fillMode="contain" pos="8,4" rsc="menuDropDownIcon" size="iconInlineSize" themed="foreground"/>

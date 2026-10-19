@@ -65,7 +65,8 @@ func (c *Card) CreateRenderer() core.WidgetRenderer {
 	v := bellui.CurrentApp().Settings().ThemeVariant()
 
 	header := canvas.NewText(c.Title, th.Color(theme.ColorNameForeground, v))
-	header.TextStyle.Bold = true
+	// MD3 Title Medium: a card's title should not compete with the page's (#494).
+	header.TextStyle = theme.TypographyTitleMedium
 	subHeader := canvas.NewText(c.Subtitle, header.Color)
 
 	// Always create the background rect; show/hide based on render style.
@@ -193,8 +194,10 @@ func (c *cardRenderer) Layout(size geo.Size) {
 		pos.Y += titlePad
 	}
 
-	size.Width -= padding * 2
-	pos.X += padding
+	// The content lines up with the title, as MD3's card padding has it (#494).
+	contentPad := padding * 2
+	size.Width -= contentPad * 2
+	pos.X += contentPad
 	if c.card.Content != nil {
 		height := size.Height - padding*2 - (pos.Y - padding/2) // adjust for content and initial offset
 		if c.card.Title != "" || c.card.Subtitle != "" {
@@ -247,7 +250,7 @@ func (c *cardRenderer) MinSize() geo.Size {
 
 	if hasContent {
 		contentMin := c.card.Content.MinSize()
-		min = geo.NewSize(geo.Max(min.Width, contentMin.Width+padding*3),
+		min = geo.NewSize(geo.Max(min.Width, contentMin.Width+padding*5),
 			min.Height+contentMin.Height+padding*2)
 	}
 
@@ -311,7 +314,7 @@ func (c *cardRenderer) applyTheme() {
 		}
 	}
 	if c.header != nil {
-		c.header.TextSize = th.Size(theme.SizeNameHeadingText)
+		c.header.TextSize = th.Size(theme.SizeNameTitleMedium)
 		c.header.Color = th.Color(theme.ColorNameForeground, v)
 	}
 	if c.subHeader != nil {

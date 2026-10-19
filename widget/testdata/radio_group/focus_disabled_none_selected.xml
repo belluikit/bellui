@@ -4,19 +4,16 @@
 			<widget pos="24,47" size="93x97" type="*widget.RadioGroup">
 				<widget size="93x32" type="*widget.radioItem">
 					<circle pos="2,2" size="28x28"/>
-					<image pos="6,6" rsc="radioButtonFillIcon" size="iconInlineSize" themed="surface"/>
 					<image pos="6,6" rsc="radioButtonIcon" size="iconInlineSize" themed="disabled"/>
 					<text color="disabled" pos="32,0" size="93x32">Option A</text>
 				</widget>
 				<widget pos="0,32" size="93x32" type="*widget.radioItem">
 					<circle pos="2,2" size="28x28"/>
-					<image pos="6,6" rsc="radioButtonFillIcon" size="iconInlineSize" themed="surface"/>
 					<image pos="6,6" rsc="radioButtonIcon" size="iconInlineSize" themed="disabled"/>
 					<text color="disabled" pos="32,0" size="93x32">Option B</text>
 				</widget>
 				<widget pos="0,64" size="93x32" type="*widget.radioItem">
 					<circle pos="2,2" size="28x28"/>
-					<image pos="6,6" rsc="radioButtonFillIcon" size="iconInlineSize" themed="surface"/>
 					<image pos="6,6" rsc="radioButtonIcon" size="iconInlineSize" themed="disabled"/>
 					<text color="disabled" pos="32,0" size="93x32">Option C</text>
 				</widget>

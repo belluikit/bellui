@@ -4,9 +4,9 @@
 			<widget pos="2,2" size="76x62" type="*widget.Shadow">
 				<boxShadow blurRadius="1.5" color="shadow" cornerRadius="4" offsetY="0.5" size="76x62"/>
 			</widget>
-			<text bold pos="10,10" size="60x28" textSize="23">Hello</text>
+			<text pos="10,10" size="60x28" textSize="16">Hello</text>
 			<text size="0x0"></text>
-			<rectangle fillColor="inputBackground" pos="6,50" size="68x10" strokeColor="rgba(0,0,0,255)" strokeWidth="2"/>
+			<rectangle fillColor="inputBackground" pos="10,50" size="60x10" strokeColor="rgba(0,0,0,255)" strokeWidth="2"/>
 		</widget>
 	</content>
 </canvas>

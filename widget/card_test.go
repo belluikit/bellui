@@ -120,7 +120,8 @@ func TestCard_MinSize(t *testing.T) {
 	content := widget.NewLabel("simple")
 	card := &widget.Card{Content: content}
 
-	inner := card.MinSize().Subtract(geo.NewSize(theme.InnerPadding()+theme.Padding(), theme.InnerPadding()+theme.Padding())) // shadow + content pad
+	// shadow + content pad; across, the content is inset to the title's edge (#494)
+	inner := card.MinSize().Subtract(geo.NewSize(theme.InnerPadding()*2+theme.Padding(), theme.InnerPadding()+theme.Padding()))
 	assert.Equal(t, content.MinSize(), inner)
 }
 

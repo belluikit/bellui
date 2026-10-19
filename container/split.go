@@ -266,7 +266,9 @@ func (d *divider) CreateRenderer() core.WidgetRenderer {
 	th := d.Theme()
 	v := bellui.CurrentApp().Settings().ThemeVariant()
 
-	background := canvas.NewRectangle(th.Color(theme.ColorNameShadow, v))
+	// The separator colour (MD3 OutlineVariant), not the shadow colour, which
+	// is opaque black in a dark theme (#494).
+	background := canvas.NewRectangle(th.Color(theme.ColorNameSeparator, v))
 	foreground := canvas.NewRectangle(th.Color(theme.ColorNameForeground, v))
 	return &dividerRenderer{
 		divider:    d,
@@ -379,7 +381,7 @@ func (r *dividerRenderer) Refresh() {
 	if r.divider.hovered {
 		r.background.FillColor = th.Color(theme.ColorNameHover, v)
 	} else {
-		r.background.FillColor = th.Color(theme.ColorNameShadow, v)
+		r.background.FillColor = th.Color(theme.ColorNameSeparator, v)
 	}
 	r.background.Refresh()
 	r.foreground.FillColor = th.Color(theme.ColorNameForeground, v)

@@ -23,9 +23,10 @@ func richEntryChrome(t *testing.T, e *RichEntry) *richEntryRenderer {
 	return r
 }
 
-// TestRichEntry_ChromeFilledDefault verifies the default (filled) RichEntry now
-// draws MD3 chrome: a filled rounded background box behind the content and a
-// bordered outline drawn on top (pre-rebrand tracker #749) — no longer a bare underline.
+// TestRichEntry_ChromeFilledDefault verifies the default (filled) RichEntry
+// draws MD3 chrome, as Entry does (pre-rebrand tracker #749): a filled box
+// behind the content, rounded at the top, and the active indicator drawn on
+// top along its bottom edge (#494).
 func TestRichEntry_ChromeFilledDefault(t *testing.T) {
 	test.NewTempApp(t)
 	e := NewRichEntry()
@@ -34,8 +35,10 @@ func TestRichEntry_ChromeFilledDefault(t *testing.T) {
 	th := e.Theme()
 	v := bellui.CurrentApp().Settings().ThemeVariant()
 	assert.Equal(t, th.Color(theme.ColorNameInputBackground, v), r.box.FillColor, "filled style fills the box")
-	assert.Positive(t, r.box.CornerRadius, "rounded corners")
-	assert.Equal(t, th.Color(theme.ColorNameInputBorder, v), r.border.StrokeColor, "unfocused border color")
+	assert.Positive(t, r.box.TopLeftCornerRadius, "rounded top corners")
+	assert.Zero(t, r.box.CornerRadius, "square bottom corners")
+	assert.Equal(t, th.Color(theme.ColorNameInputBorder, v), r.border.FillColor, "unfocused indicator color")
+	assert.Zero(t, r.border.StrokeWidth, "an indicator line, not an outline")
 
 	objs := r.Objects()
 	assert.Same(t, r.box, objs[0], "box is drawn first (behind content)")

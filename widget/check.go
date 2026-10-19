@@ -412,19 +412,20 @@ func (c *checkRenderer) updateLabel() {
 
 // must be called while holding c.check.propertyLock for reading
 func (c *checkRenderer) updateResource(th bellui.Theme) {
+	// MD3: an unchecked box is an empty outline; a checked or partial one is
+	// filled, its mark cut out to show the fill below in ForegroundOnPrimary (#494).
 	res := theme.NewThemedResource(th.Icon(theme.IconNameCheckButton))
-	res.ColorName = theme.ColorNameOutline
+	res.ColorName = theme.ColorNameOnSurfaceVariant
 	bgRes := theme.NewThemedResource(th.Icon(theme.IconNameCheckButtonFill))
-	bgRes.ColorName = theme.ColorNameSurfaceContainerHighest
+	bgRes.ColorName = theme.ColorNameForegroundOnPrimary
+	marked := c.check.Partial || c.check.Checked
 
 	if c.check.Partial {
 		res = theme.NewThemedResource(th.Icon(theme.IconNameCheckButtonPartial))
 		res.ColorName = theme.ColorNamePrimary
-		bgRes.ColorName = theme.ColorNameSurface
 	} else if c.check.Checked {
 		res = theme.NewThemedResource(th.Icon(theme.IconNameCheckButtonChecked))
 		res.ColorName = theme.ColorNamePrimary
-		bgRes.ColorName = theme.ColorNameSurface
 	}
 	if c.check.Disabled() {
 		if c.check.Checked {
@@ -436,6 +437,11 @@ func (c *checkRenderer) updateResource(th bellui.Theme) {
 	c.icon.Resource = res
 	c.icon.Refresh()
 	c.bg.Resource = bgRes
+	if marked {
+		c.bg.Show()
+	} else {
+		c.bg.Hide()
+	}
 	c.bg.Refresh()
 }
 
