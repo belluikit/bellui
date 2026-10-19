@@ -659,6 +659,16 @@ func (p *Pipeline) reportEnd() {
 		}
 		return
 	}
+	// Rest the clock at the end and report it. Time updates come every 100 ms,
+	// so the last one fell short of the end and a progress bar stopped there;
+	// and with nothing to stop it the clock ran on past the duration.
+	p.clock.Pause()
+	if p.duration > 0 {
+		p.clock.Seek(p.duration)
+	}
+	if p.onTime != nil {
+		p.onTime(p.clock.Time(), p.duration)
+	}
 	if p.onEnd != nil {
 		p.onEnd()
 	}
