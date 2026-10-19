@@ -354,7 +354,7 @@ func ReverseWalkVisibleObjectTree(
 	afterChildren func(core.CanvasObject, geo.Position, core.CanvasObject),
 ) bool {
 	clipSize := geo.NewSize(math.MaxInt32, math.MaxInt32)
-	return walkObjectTree(obj, true, nil, geo.NewPos(0, 0), geo.NewPos(0, 0), clipSize, beforeChildren, afterChildren, true)
+	return walkObjectTree(obj, true, nil, geo.NewPos(0, 0), geo.NewPos(0, 0), clipSize, nil, beforeChildren, afterChildren, true)
 }
 
 // WalkCompleteObjectTree will walk an object tree for all objects (ignoring visible state) executing the passed
@@ -372,7 +372,7 @@ func WalkCompleteObjectTree(
 	afterChildren func(core.CanvasObject, geo.Position, core.CanvasObject),
 ) bool {
 	clipSize := geo.NewSize(math.MaxInt32, math.MaxInt32)
-	return walkObjectTree(obj, false, nil, geo.NewPos(0, 0), geo.NewPos(0, 0), clipSize, beforeChildren, afterChildren, false)
+	return walkObjectTree(obj, false, nil, geo.NewPos(0, 0), geo.NewPos(0, 0), clipSize, nil, beforeChildren, afterChildren, false)
 }
 
 // WalkVisibleObjectTree will walk an object tree for all visible objects executing the passed functions following
@@ -390,8 +390,28 @@ func WalkVisibleObjectTree(
 	afterChildren func(core.CanvasObject, geo.Position, core.CanvasObject),
 ) bool {
 	clipSize := geo.NewSize(math.MaxInt32, math.MaxInt32)
-	return walkObjectTree(obj, false, nil, geo.NewPos(0, 0), geo.NewPos(0, 0), clipSize, beforeChildren, afterChildren, true)
+	return walkObjectTree(obj, false, nil, geo.NewPos(0, 0), geo.NewPos(0, 0), clipSize, nil, beforeChildren, afterChildren, true)
 }
+
+// WalkVisibleObjectTreeCulled walks as WalkVisibleObjectTree does, except that
+// an object cull reports as drawing nothing visible is visited without its
+// children: beforeChildren and afterChildren run for it, so a caller that
+// mirrors the tree stays in step, but its children are neither built nor
+// walked (#464). Culling stops below an object with a transform, whose
+// children's positions no longer match the clip's.
+func WalkVisibleObjectTreeCulled(
+	obj core.CanvasObject,
+	cull CullFunc,
+	beforeChildren func(core.CanvasObject, geo.Position, geo.Position, geo.Size) bool,
+	afterChildren func(core.CanvasObject, geo.Position, core.CanvasObject),
+) bool {
+	clipSize := geo.NewSize(math.MaxInt32, math.MaxInt32)
+	return walkObjectTree(obj, false, nil, geo.NewPos(0, 0), geo.NewPos(0, 0), clipSize, cull, beforeChildren, afterChildren, true)
+}
+
+// CullFunc reports whether obj, at the absolute position pos, draws nothing
+// inside the clip (clipPos, clipSize) its parent applies.
+type CullFunc func(obj core.CanvasObject, pos, clipPos geo.Position, clipSize geo.Size) bool
 
 func walkObjectTree(
 	obj core.CanvasObject,
@@ -399,6 +419,7 @@ func walkObjectTree(
 	parent core.CanvasObject,
 	offset, clipPos geo.Position,
 	clipSize geo.Size,
+	cull CullFunc,
 	beforeChildren func(core.CanvasObject, geo.Position, geo.Position, geo.Size) bool,
 	afterChildren func(core.CanvasObject, geo.Position, core.CanvasObject),
 	requireVisible bool,
@@ -411,14 +432,22 @@ func walkObjectTree(
 	}
 	pos := obj.Position().Add(offset)
 
+	culled := cull != nil && cull(obj, pos, clipPos, clipSize)
+	if t, ok := obj.(core.Transformable); ok && !t.Transform().IsIdentity() {
+		cull = nil // positions below no longer match the clip
+	}
+
 	var children []core.CanvasObject
 	switch co := obj.(type) {
 	case *bellui.Container:
 		children = co.Objects
 	case core.Widget:
-		if cache.IsRendered(co) || requireVisible {
+		if !culled && (cache.IsRendered(co) || requireVisible) {
 			children = cache.Renderer(co).Objects()
 		}
+	}
+	if culled {
+		children = nil
 	}
 
 	if IsClip(obj) {
@@ -434,7 +463,7 @@ func walkObjectTree(
 
 	cancelled := false
 	followChild := func(child core.CanvasObject) bool {
-		if walkObjectTree(child, reverse, obj, pos, clipPos, clipSize, beforeChildren, afterChildren, requireVisible) {
+		if walkObjectTree(child, reverse, obj, pos, clipPos, clipSize, cull, beforeChildren, afterChildren, requireVisible) {
 			cancelled = true
 			return true
 		}

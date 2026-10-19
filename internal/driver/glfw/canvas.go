@@ -451,7 +451,9 @@ func (c *glCanvas) paint(size geo.Size) {
 	if dirtyClip {
 		clips.Push(drPos, drSize)
 	}
-	c.WalkContentTrees(walk.draw, walk.afterDraw)
+	// Clip-owners scrolled out of view are visited without their subtrees
+	// (#464); every walk that must reach all objects still does.
+	c.WalkContentTreesCulled(common.CullOffClip, walk.draw, walk.afterDraw)
 	if dirtyClip {
 		c.Painter().StopClipping()
 		clips.Pop()

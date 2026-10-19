@@ -3,6 +3,7 @@ package webview
 import (
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/layoutgen"
 	"github.com/belluikit/bellui/widget"
 )
 
@@ -79,6 +80,7 @@ func (h *Host) WebView() *WebView {
 // gives it.
 func (h *Host) SetMinSize(min geo.Size) {
 	h.impl.setMinSize(min)
+	layoutgen.Changed()
 }
 
 // FocusNativeView hands the keyboard to the web content — the OS focus on a

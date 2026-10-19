@@ -18,6 +18,7 @@ import (
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/layoutgen"
 	"github.com/belluikit/bellui/storage"
 	"github.com/belluikit/bellui/theme"
 )
@@ -134,6 +135,9 @@ func (g *AnimatedGif) MinSize() geo.Size {
 // SetMinSize sets the smallest possible size that this AnimatedGif should be drawn at.
 // Be careful not to set this based on pixel sizes as that will vary based on output device.
 func (g *AnimatedGif) SetMinSize(min geo.Size) {
+	if g.min != min {
+		layoutgen.Changed()
+	}
 	g.min = min
 }
 

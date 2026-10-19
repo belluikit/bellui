@@ -3,6 +3,7 @@
 package webgpu
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"image"
@@ -257,6 +258,13 @@ type Device struct {
 	passDepth   *wgpu.TextureView
 	stencilZero map[*wgpu.TextureView]bool
 
+	// The pending batch of instances (AppendInstance, #475).
+	batchKey     PipelineKey
+	batchView    *wgpu.TextureView
+	batchUniform []byte
+	batchData    []float32
+	batchN       int
+
 	// capture is a persistent copy of the last presented frame, kept so
 	// Capture() can read back content after the swapchain texture is gone. The
 	// per-frame copy is only maintained once Capture has been requested (pre-rebrand tracker #219).
@@ -382,6 +390,9 @@ type DrawCall struct {
 	VertexCount int
 	Uniform     []byte
 	TexView     *wgpu.TextureView // nil unless the shader samples a texture
+	// InstanceCount draws VertexCount vertices that many times, with
+	// Vertices holding per-instance data (a PerInstance layout). 0 means 1.
+	InstanceCount int
 }
 
 // NewDevice brings up WebGPU against the given surface (created from a native
@@ -813,9 +824,13 @@ func vertexBufferLayout(l VertexLayout) wgpu.VertexBufferLayout {
 			ShaderLocation: uint32(a.Location),
 		}
 	}
+	step := wgpu.VertexStepModeVertex
+	if l.PerInstance {
+		step = wgpu.VertexStepModeInstance
+	}
 	return wgpu.VertexBufferLayout{
 		ArrayStride: uint64(l.Stride),
-		StepMode:    wgpu.VertexStepModeVertex,
+		StepMode:    step,
 		Attributes:  attrs,
 	}
 }
@@ -1074,6 +1089,11 @@ func (d *Device) nextTexBind(view *wgpu.TextureView) (*wgpu.BindGroup, error) {
 // capacity falls back to transient per-draw buffers (and the arena grows for the
 // next frame). Must be called between BeginFrame and EndFrame.
 func (d *Device) Record(dc DrawCall) error {
+	d.flushBatch()
+	return d.record(dc)
+}
+
+func (d *Device) record(dc DrawCall) error {
 	if d.pass == nil {
 		return fmt.Errorf("Record called outside a frame")
 	}
@@ -1117,11 +1137,45 @@ func (d *Device) Record(dc DrawCall) error {
 		d.pass.SetPipeline(pipe)
 		d.pass.SetBindGroup(0, bind, []uint32{uint32(uniOff)})
 		d.pass.SetVertexBuffer(0, d.vtxArena, uint64(vtxOff), uint64(len(vbytes)))
-		d.pass.Draw(uint32(dc.VertexCount), 1, 0, 0)
+		d.pass.Draw(uint32(dc.VertexCount), uint32(max(dc.InstanceCount, 1)), 0, 0)
 		return nil
 	}
 
 	return d.recordOverflow(dc, pipe, vbytes)
+}
+
+// AppendInstance adds one instance to the pending batch, which is drawn with a
+// single instanced draw when anything else touches the pass: another draw, a
+// scissor or stencil change, a target push or pop, or the end of the frame
+// (#475). An instance wholly outside the pass's clip is dropped, as Record
+// drops a draw. rect is the instance's pixel bounds, for that test.
+func (d *Device) AppendInstance(key PipelineKey, uniform []byte, view *wgpu.TextureView, inst []float32, x, y, w, h int) {
+	if d.pass == nil || d.Culls(x, y, w, h) {
+		return
+	}
+	if d.batchN > 0 && (key != d.batchKey || view != d.batchView || !bytes.Equal(uniform, d.batchUniform)) {
+		d.flushBatch()
+	}
+	if d.batchN == 0 {
+		d.batchKey, d.batchView = key, view
+		d.batchUniform = append(d.batchUniform[:0], uniform...)
+	}
+	d.batchData = append(d.batchData, inst...)
+	d.batchN++
+}
+
+// flushBatch draws the pending instances, if any.
+func (d *Device) flushBatch() {
+	if d.batchN == 0 {
+		return
+	}
+	n := d.batchN
+	d.batchN = 0
+	_ = d.record(DrawCall{
+		Key: d.batchKey, Vertices: d.batchData, VertexCount: 4, InstanceCount: n,
+		Uniform: d.batchUniform, TexView: d.batchView,
+	})
+	d.batchData = d.batchData[:0]
 }
 
 // recordOverflow renders a draw that does not fit the current arena capacity
@@ -1163,7 +1217,7 @@ func (d *Device) recordOverflow(dc DrawCall, pipe *wgpu.RenderPipeline, vbytes [
 	d.pass.SetPipeline(pipe)
 	d.pass.SetBindGroup(0, bind, []uint32{0})
 	d.pass.SetVertexBuffer(0, vbuf, 0, wgpu.WholeSize)
-	d.pass.Draw(uint32(dc.VertexCount), 1, 0, 0)
+	d.pass.Draw(uint32(dc.VertexCount), uint32(max(dc.InstanceCount, 1)), 0, 0)
 	return nil
 }
 
@@ -1241,6 +1295,36 @@ func (d *Device) WriteTexturePixels(t *Texture, pix []byte, w, h int) error {
 		RowsPerImage: uint32(h),
 	}, &extent)
 	return nil
+}
+
+// CreateAtlasTexture creates an empty w×h RGBA texture that WriteTextureRegion
+// fills piece by piece: the glyph atlas of the batched painter (#475).
+func (d *Device) CreateAtlasTexture(w, h int) (*Texture, error) {
+	tex, err := d.device.TryCreateTexture(&wgpu.TextureDescriptor{
+		Label:         "glyph-atlas",
+		Size:          wgpu.Extent3D{Width: uint32(w), Height: uint32(h), DepthOrArrayLayers: 1},
+		MipLevelCount: 1,
+		SampleCount:   1,
+		Dimension:     wgpu.TextureDimension2D,
+		Format:        wgpu.TextureFormatRGBA8Unorm,
+		Usage:         wgpu.TextureUsageTextureBinding | wgpu.TextureUsageCopyDst,
+	})
+	if err != nil {
+		return nil, err
+	}
+	view, err := tex.TryCreateView(nil)
+	if err != nil {
+		destroyTexture(tex)
+		return nil, err
+	}
+	return &Texture{tex: tex, view: view, w: w, h: h}, nil
+}
+
+// WriteTextureRegion uploads w×h RGBA pixels into t at (x, y).
+func (d *Device) WriteTextureRegion(t *Texture, x, y, w, h int, pix []byte) {
+	extent := wgpu.Extent3D{Width: uint32(w), Height: uint32(h), DepthOrArrayLayers: 1}
+	d.queue.WriteTexture(&wgpu.TexelCopyTextureInfo{Texture: t.tex, Origin: wgpu.Origin3D{X: uint32(x), Y: uint32(y)}, Aspect: wgpu.TextureAspectAll},
+		pix, &wgpu.TexelCopyBufferLayout{BytesPerRow: uint32(w * 4), RowsPerImage: uint32(h)}, &extent)
 }
 
 // validateTextureWrite reports whether pix can be uploaded into t as w×h
@@ -1355,7 +1439,7 @@ func (d *Device) CopyActiveTargetRegion(x, y, w, h int) (*Texture, int, int, err
 
 	d.endPass()
 	d.encoder.CopyTextureToTexture(
-		&wgpu.TexelCopyTextureInfo{Texture: t.tex, Origin: wgpu.Origin3D{X: uint32(x), Y: uint32(y)}},
+		&wgpu.TexelCopyTextureInfo{Texture: t.tex, Origin: wgpu.Origin3D{X: uint32(x), Y: uint32(y)}, Aspect: wgpu.TextureAspectAll},
 		&wgpu.TexelCopyTextureInfo{Texture: dst},
 		&extent,
 	)
@@ -1408,6 +1492,7 @@ func (d *Device) PushTargetLoad(t *Texture, w, h int) {
 // device), and dirty-region / clip rects are padded and can spill a few pixels
 // past the canvas edge.
 func (d *Device) SetScissor(x, y, w, h int) {
+	d.flushBatch()
 	tw, th, hasTarget := d.activeTargetSize()
 	rx, ry, rw, rh, ok := resolveScissor(x, y, w, h, tw, th, hasTarget)
 	if !ok {
@@ -1556,6 +1641,7 @@ func clampRect(x, y, w, h, maxW, maxH int) (int, int, int, int) {
 
 // ClearScissor resets the scissor rectangle to the full active render target.
 func (d *Device) ClearScissor() {
+	d.flushBatch()
 	d.scissor.active = false
 	if d.pass == nil {
 		return
@@ -1809,6 +1895,7 @@ func (d *Device) newDepthStencil(w, h int) *depthStencil {
 // SetStencilRef sets the active render pass's stencil reference value (used by
 // the painter's clip / fill stencil ops). No-op outside a frame.
 func (d *Device) SetStencilRef(ref uint32) {
+	d.flushBatch()
 	d.stencilRef = ref
 	if d.pass != nil {
 		d.pass.SetStencilReference(ref)
@@ -1818,6 +1905,7 @@ func (d *Device) SetStencilRef(ref uint32) {
 // endPass ends and releases the active render pass, if any.
 func (d *Device) endPass() {
 	if d.pass != nil {
+		d.flushBatch()
 		d.pass.End()
 		d.pass.Release()
 		d.pass = nil
@@ -1838,6 +1926,7 @@ func (d *Device) HasOpenFrame() bool {
 // or RecreateSurface a fatal WebGPU validation error ("SurfaceOutput must be
 // dropped before a new Surface is made"). Callers invoke this before reconfiguring.
 func (d *Device) DiscardFrame() {
+	d.batchN, d.batchData = 0, d.batchData[:0] // never drawn
 	d.endPass()
 	if d.encoder != nil {
 		d.encoder.Release()

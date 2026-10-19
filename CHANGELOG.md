@@ -60,6 +60,49 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
   Max, a label's SetText went from 1.6 to 1.05 µs and 22 to 15 allocations,
   and a screen re-texting 2,000 labels every frame from 85 to 100 fps.
 
+* **A screen where little changes does almost no layout work**
+  ([#487](https://github.com/belluikit/bellui/issues/487)). Every frame still
+  visited every object to check its minimum size. Now a frame visits only the
+  paths to what was refreshed: on an M3 Max, a static screen of 500 cards with
+  a spinner went from 1.8 ms to 0.01 ms of layout work per frame, and from 3.6
+  to 2.5 ms of CPU. Show, Hide and SetMinSize, which refresh nothing, still
+  re-lay out the window.
+
+* **Static and scrolled screens use about 40% less CPU**
+  ([#464](https://github.com/belluikit/bellui/issues/464)). Every frame walked
+  every object a scroll container holds, including the ones scrolled out of
+  view, and asked every widget for its minimum size again. Cards and other
+  clip-owners out of view are now skipped when painting, and a widget is asked
+  for its minimum size only when it was refreshed or resized. On an M3 Max, a
+  screen of 500 cards and a spinner went from 9.7 to 5.6 ms of CPU per frame
+  (Fyne: 4.0 ms). Pixels are unchanged.
+
+* **Shapes and text draw in batches on WebGPU**
+  ([#475](https://github.com/belluikit/bellui/issues/475),
+  [#467](https://github.com/belluikit/bellui/issues/467)). Every rectangle,
+  circle and text was its own GPU draw, and every text its own texture.
+  Rectangles, rounded rectangles, circles and single-line text are now drawn
+  as instances of one pipeline, many per draw, with text from a shared glyph
+  atlas. On an M3 Max, 20,000 moving shapes went from 32 to 60 fps at about
+  half the CPU, and their 274 MB of allocator cache is gone; 2,000 changing
+  labels use about 30% less CPU, screens of cards 5–12% less. Text on
+  fractional pixel positions is placed at quarter pixels instead of being
+  filtered, so it is slightly sharper there. `BELLUI_BATCH=0` turns batching
+  off.
+
+* **Animations follow the display's refresh rate**
+  ([#480](https://github.com/belluikit/bellui/issues/480)). The desktop event
+  loop drew at most 60 frames a second, whatever the display. It now paces
+  to the fastest monitor a window is on: on a 144 Hz display, a screen of 500
+  cards with a spinner animates at 144 fps instead of 60.
+
+* **Idle apps no longer use CPU**
+  ([#470](https://github.com/belluikit/bellui/issues/470)). The desktop event
+  loop woke 60 times a second even when nothing changed. While no window needs
+  painting and no animation runs, it now wakes once a second for housekeeping;
+  input and work from other goroutines still wake it at once. On an M3 Max, a
+  small idle window went from 170 ms of CPU per 10 s to under 10 ms.
+  
 * **Cards cost less memory and CPU on WebGPU**
   ([#466](https://github.com/belluikit/bellui/issues/466)). Each card clips its
   content to its rounded corners, and every clip cleared the whole window's

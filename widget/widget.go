@@ -260,6 +260,12 @@ func (w *BaseWidget) Refresh() {
 
 	// 3. Renderer refresh.
 	cache.Renderer(impl).Refresh()
+
+	// 4. The renderer may refresh only its parts, so tell the canvas that the
+	// widget's own min size may have changed too (#464).
+	if m, ok := cache.GetCanvasForObject(impl).(interface{ MarkMinSizeDirty(core.CanvasObject) }); ok {
+		m.MarkMinSizeDirty(impl)
+	}
 }
 
 // Theme returns a cached Theme instance for this widget (or its extending widget).
