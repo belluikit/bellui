@@ -54,6 +54,19 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
   
 ### Fixed
 
+* **Shapes and text draw in batches on WebGPU**
+  ([#475](https://github.com/belluikit/bellui/issues/475),
+  [#467](https://github.com/belluikit/bellui/issues/467)). Every rectangle,
+  circle and text was its own GPU draw, and every text its own texture.
+  Rectangles, rounded rectangles, circles and single-line text are now drawn
+  as instances of one pipeline, many per draw, with text from a shared glyph
+  atlas. On an M3 Max, 20,000 moving shapes went from 32 to 60 fps at about
+  half the CPU, and their 274 MB of allocator cache is gone; 2,000 changing
+  labels use about 30% less CPU, screens of cards 5–12% less. Text on
+  fractional pixel positions is placed at quarter pixels instead of being
+  filtered, so it is slightly sharper there. `BELLUI_BATCH=0` turns batching
+  off.
+
 * **Cards cost less memory and CPU on WebGPU**
   ([#466](https://github.com/belluikit/bellui/issues/466)). Each card clips its
   content to its rounded corners, and every clip cleared the whole window's

@@ -81,7 +81,7 @@ type painter struct {
 	// See draw_shadow.go (#434).
 	shadows map[shadowKey]*shadowEntry
 
-	// batch holds the batched drawing prototype's atlas and text layouts
+	// batch holds the batched drawing's glyph atlas and text layouts
 	// (batch.go, #475).
 	batch batchState
 	frame uint64
@@ -218,6 +218,7 @@ func (p *painter) beginFrame() {
 	p.roundClips = p.roundClips[:0] // a frame never inherits an unpaired clip
 	p.evictShadows()
 	p.evictLayouts()
+	p.resetFullAtlas()
 }
 
 // backgroundColor returns the theme background as straight RGBA in 0..1.

@@ -7,6 +7,8 @@
 // kind 0: a rounded rectangle, filled and stroked, by distance to its edges
 // (the round_rectangle shader's maths; radius 0 is a plain rectangle).
 // kind 1: a glyph: the atlas's coverage at uv, in fill_color.
+// kind 2: a plain rectangle, hard-edged as the rectangle shader draws it: the
+// fill inside, the stroke over the last stroke_width (params.x) pixels.
 
 struct Uniforms {
     frame_size: vec2<f32>, // target size in pixels
@@ -67,6 +69,18 @@ fn calc_distance(p: vec2<f32>, b: vec2<f32>, r: vec4<f32>) -> f32 {
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+    if (in.params.z > 1.5) {
+        let p = in.pos.xy;
+        let r = in.rect;
+        if (p.x < r.x || p.x > r.z || p.y < r.y || p.y > r.w) {
+            discard;
+        }
+        let sw = in.params.x;
+        if (p.x >= r.z - sw || p.x <= r.x + sw || p.y <= r.y + sw || p.y >= r.w - sw) {
+            return in.stroke_color;
+        }
+        return in.fill_color;
+    }
     if (in.params.z > 0.5) {
         let coverage = textureSample(atlas, samp, in.tex).a;
         let a = in.fill_color.a * coverage;

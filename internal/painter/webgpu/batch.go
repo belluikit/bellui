@@ -20,13 +20,19 @@ import (
 	"github.com/belluikit/bellui/theme"
 )
 
-// Batched drawing prototype (#475). With BELLUI_BATCH set, rectangles,
-// rounded rectangles and single-line text are drawn as instances of one quad
-// pipeline (shaders/quad.wgsl), which the Device draws in batches, and text
-// comes from a glyph atlas instead of a texture per text object. Everything
-// else, and anything under a scale, rotation or skew, takes the usual path.
+// Batched drawing (#475). Rectangles, rounded rectangles, circles and
+// single-line text are drawn as instances of one quad pipeline
+// (shaders/quad.wgsl), which the Device draws in batches: one draw for each
+// run of instances that share a pipeline key, uniform and texture. Text comes
+// from a glyph atlas instead of a texture per text object, and its shaped
+// layout is kept by content, as text textures were. Everything else, and
+// anything under a scale, rotation or skew, takes the per-object path, as do
+// colour glyphs, underlined or struck-through text, and text that does not fit
+// a full atlas.
+//
+// BELLUI_BATCH=0 turns it off, to compare against or to rule it out.
 
-var batchEnabled = os.Getenv("BELLUI_BATCH") != ""
+var batchEnabled = os.Getenv("BELLUI_BATCH") != "0"
 
 const atlasSize = 2048
 
@@ -126,16 +132,18 @@ func (p *painter) batchOblong(obj interface{ Size() geo.Size }, fill, stroke col
 	x1, x2, y1, y2 := p.scaleRectCoords(bounds[0], bounds[2], bounds[1], bounds[3])
 	strokeWidthScaled := roundToPixel(strokeWidth*p.pixScale, 1.0)
 	size := geo.NewSize(bounds[2]-bounds[0], bounds[3]-bounds[1])
-	var radius [4]float32
-	if trR != 0 || tlR != 0 || brR != 0 || blR != 0 {
-		radius = [4]float32{
-			roundToPixel(paint.GetMaximumCornerRadius(trR, tlR, brR, size)*p.pixScale, 1.0),
-			roundToPixel(paint.GetMaximumCornerRadius(brR, blR, trR, size)*p.pixScale, 1.0),
-			roundToPixel(paint.GetMaximumCornerRadius(tlR, trR, blR, size)*p.pixScale, 1.0),
-			roundToPixel(paint.GetMaximumCornerRadius(blR, brR, tlR, size)*p.pixScale, 1.0),
-		}
+	if trR == 0 && tlR == 0 && brR == 0 && blR == 0 {
+		// Hard-edged, as the rectangle shader draws it, the stroke inside.
+		p.appendInstance(frame, x1, y1, x2, y2, [4]float32{}, strokeWidthScaled, kindRect, p.fragColor(fill), p.fragColor(orTransparent(stroke)))
+		return true
 	}
-	p.appendShape(frame, x1, y1, x2, y2, radius, strokeWidthScaled*0.5, p.fragColor(fill), p.fragColor(orTransparent(stroke)))
+	radius := [4]float32{
+		roundToPixel(paint.GetMaximumCornerRadius(trR, tlR, brR, size)*p.pixScale, 1.0),
+		roundToPixel(paint.GetMaximumCornerRadius(brR, blR, trR, size)*p.pixScale, 1.0),
+		roundToPixel(paint.GetMaximumCornerRadius(tlR, trR, blR, size)*p.pixScale, 1.0),
+		roundToPixel(paint.GetMaximumCornerRadius(blR, brR, tlR, size)*p.pixScale, 1.0),
+	}
+	p.appendInstance(frame, x1, y1, x2, y2, radius, strokeWidthScaled*0.5, kindRounded, p.fragColor(fill), p.fragColor(orTransparent(stroke)))
 	return true
 }
 
@@ -148,20 +156,27 @@ func (p *painter) batchCircle(circle *canvas.Circle, pos geo.Position, frame geo
 	bounds, _ := p.vecSquareCoords(pos, circle, frame)
 	x1, x2, y1, y2 := p.scaleRectCoords(bounds[0], bounds[2], bounds[1], bounds[3])
 	r := roundToPixel(paint.GetMaximumRadius(circle.Size())*p.pixScale, 1.0)
-	p.appendShape(frame, x1, y1, x2, y2, [4]float32{r, r, r, r}, roundToPixel(circle.StrokeWidth*p.pixScale, 1.0)*0.5,
-		p.fragColor(circle.FillColor), p.fragColor(orTransparent(circle.StrokeColor)))
+	p.appendInstance(frame, x1, y1, x2, y2, [4]float32{r, r, r, r}, roundToPixel(circle.StrokeWidth*p.pixScale, 1.0)*0.5,
+		kindRounded, p.fragColor(circle.FillColor), p.fragColor(orTransparent(circle.StrokeColor)))
 	return true
 }
 
-// appendShape adds one rounded-rectangle instance (pixels, top-left origin).
-func (p *painter) appendShape(frame geo.Size, x1, y1, x2, y2 float32, radius [4]float32, strokeHalf float32, fill, stroke [4]float32) {
+// Instance kinds, the quad shader's params.z.
+const (
+	kindRounded = 0 // distance-field rounded rectangle; stroke is the half width
+	kindGlyph   = 1
+	kindRect    = 2 // hard-edged rectangle; stroke is the full width
+)
+
+// appendInstance adds one shape instance (pixels, top-left origin).
+func (p *painter) appendInstance(frame geo.Size, x1, y1, x2, y2 float32, radius [4]float32, stroke float32, kind float32, fill, strokeC [4]float32) {
 	softness := roundToPixel(edgeSoftness*p.pixScale, 1.0)
 	inst := [QuadInstanceFloats]float32{
 		x1, y1, x2, y2,
 		radius[0], radius[1], radius[2], radius[3],
 		fill[0], fill[1], fill[2], fill[3],
-		stroke[0], stroke[1], stroke[2], stroke[3],
-		strokeHalf, softness, 0, 0,
+		strokeC[0], strokeC[1], strokeC[2], strokeC[3],
+		stroke, softness, kind, 0,
 	}
 	grow := softness + 1
 	p.dev.AppendInstance(p.quadKey(), p.batchUniform(frame), p.batch.atlas.tex.View(), inst[:],
@@ -218,7 +233,7 @@ func (p *painter) batchText(text *canvas.Text, pos geo.Position, frame geo.Size)
 			0, 0, 0, 0,
 			fillC[0], fillC[1], fillC[2], fillC[3],
 			0, 0, 0, 0,
-			0, 0, 1, 0,
+			0, 0, kindGlyph, 0,
 			float32(e.x) / atlasSize, float32(e.y) / atlasSize,
 			float32(e.x+e.w) / atlasSize, float32(e.y+e.h) / atlasSize,
 		}
@@ -313,6 +328,18 @@ func (p *painter) glyphEntry(k atlasKey) *atlasEntry {
 	a.shelfH = max(a.shelfH, h+1)
 	a.entries[k] = e
 	return e
+}
+
+// resetFullAtlas starts the atlas over at a frame's start once it has filled:
+// glyphs still in use are rendered into it again as they are drawn. Doing it
+// between frames keeps every batch of a frame pointing at the atlas it drew.
+func (p *painter) resetFullAtlas() {
+	a := &p.batch.atlas
+	if !a.full {
+		return
+	}
+	clear(a.entries)
+	a.shelfX, a.shelfY, a.shelfH, a.full = 0, 0, 0, false
 }
 
 // evictLayouts forgets the layouts of texts not drawn for a while.
