@@ -84,6 +84,14 @@ func (r *Runner) Stop(a *bellui.Animation) {
 	r.pendingAnimations = newList
 }
 
+// Active reports whether any animation is running or waiting to start, so the
+// driver keeps ticking frames for it.
+func (r *Runner) Active() bool {
+	r.animationMutex.RLock()
+	defer r.animationMutex.RUnlock()
+	return r.runnerStarted
+}
+
 // TickAnimations progresses all running animations by one tick.
 // This will be called from the driver to update objects immediately before next paint.
 func (r *Runner) TickAnimations() {

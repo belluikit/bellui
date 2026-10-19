@@ -67,6 +67,19 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
   filtered, so it is slightly sharper there. `BELLUI_BATCH=0` turns batching
   off.
 
+* **Animations follow the display's refresh rate**
+  ([#480](https://github.com/belluikit/bellui/issues/480)). The desktop event
+  loop drew at most 60 frames a second, whatever the display. It now paces
+  to the fastest monitor a window is on: on a 144 Hz display, a screen of 500
+  cards with a spinner animates at 144 fps instead of 60.
+
+* **Idle apps no longer use CPU**
+  ([#470](https://github.com/belluikit/bellui/issues/470)). The desktop event
+  loop woke 60 times a second even when nothing changed. While no window needs
+  painting and no animation runs, it now wakes once a second for housekeeping;
+  input and work from other goroutines still wake it at once. On an M3 Max, a
+  small idle window went from 170 ms of CPU per 10 s to under 10 ms.
+  
 * **Cards cost less memory and CPU on WebGPU**
   ([#466](https://github.com/belluikit/bellui/issues/466)). Each card clips its
   content to its rounded corners, and every clip cleared the whole window's
