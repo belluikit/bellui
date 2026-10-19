@@ -54,6 +54,12 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
   
 ### Fixed
 
+* **Updating a label or an entry costs about a third less**
+  ([#488](https://github.com/belluikit/bellui/issues/488)). Each SetText laid
+  out and refreshed the widget's text twice. It now does it once: on an M3
+  Max, a label's SetText went from 1.6 to 1.05 µs and 22 to 15 allocations,
+  and a screen re-texting 2,000 labels every frame from 85 to 100 fps.
+
 * **A screen where little changes does almost no layout work**
   ([#487](https://github.com/belluikit/bellui/issues/487)). Every frame still
   visited every object to check its minimum size. Now a frame visits only the

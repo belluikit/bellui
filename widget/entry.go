@@ -277,6 +277,10 @@ type Entry struct {
 	dirty   bool
 	focused bool
 	text    RichText
+	// textSynced records that SyncState just synced the segments and refreshed
+	// the text, so the renderer's Refresh that BaseWidget.Refresh runs next
+	// need not do it again (#488).
+	textSynced bool
 	// Per-line highlight cache. Kept index-aligned with the provider's logical
 	// lines (noteLazyLinesEdited) and filled on demand in the lazy model
 	// (ensureHighlightedThrough); eager for the dense model (pre-rebrand tracker #401).
@@ -1323,6 +1327,7 @@ func (e *Entry) SyncState() {
 	if len(e.text.Segments) > 0 {
 		e.syncSegments()
 		e.text.Refresh()
+		e.textSynced = true
 	}
 
 	if e.sel != nil {
@@ -4151,10 +4156,17 @@ func (r *entryRenderer) Refresh() {
 	scroll := r.entry.Scroll
 	wrapping := r.entry.Wrapping
 
-	r.entry.syncSegments()
-	r.entry.text.updateRowBounds()
+	// BaseWidget.Refresh runs SyncState first, which has just synced and
+	// refreshed the text (its Refresh updates the row bounds too). A renderer
+	// refreshed directly has not.
+	if r.entry.textSynced {
+		r.entry.textSynced = false
+	} else {
+		r.entry.syncSegments()
+		r.entry.text.updateRowBounds()
+		r.entry.text.Refresh()
+	}
 	r.entry.placeholder.updateRowBounds()
-	r.entry.text.Refresh()
 	// Syntax highlighting is applied in textRenderer.Refresh() via
 	// applySyntaxColors() using the RowHighlighter callback.
 	r.entry.placeholder.Refresh()
