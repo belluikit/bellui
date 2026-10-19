@@ -7,6 +7,7 @@ import (
 	"image"
 	"os"
 	"runtime"
+	"time"
 
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/driver/desktop"
@@ -55,6 +56,11 @@ type gLDriver struct {
 	trayStart, trayStop func()        // shut down the system tray, if used
 	systrayMenu         *bellui.Menu  // cache the menu set so we know when to refresh
 	systrayClickDone    chan struct{} // closed before each rebuild to stop the prior menu's click listeners
+
+	// frameDur is the frame duration the desktop loop paces to, last
+	// computed at frameChecked (loop_desktop.go, #480).
+	frameDur     time.Duration
+	frameChecked time.Time
 }
 
 type keyModifierListener struct {

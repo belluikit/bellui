@@ -96,9 +96,14 @@ func wakeMainLoop() {
 // responding") and silently skip widgets. Input events also wake the loop,
 // so this cuts event latency generally; queued funcQueue work wakes it via
 // glfw.PostEmptyEvent (wakeMainLoop).
+//
+// While nothing needs a frame (see idle), ticks are idleTick apart instead of
+// a frame apart, so an idle app does not wake 60 times a second (#470). Input
+// events and wakeMainLoop end the wait early as before, and as soon as
+// something needs a frame the next tick is the frame grid's (#427).
 func (d *gLDriver) runEventLoop() {
-	const frame = time.Second / 60
-	nextFrame := time.Now()
+	now := time.Now()
+	nextFrame, lastTick := now, now
 	for {
 		// Drain control channels without blocking.
 		for {
@@ -118,21 +123,103 @@ func (d *gLDriver) runEventLoop() {
 	drained:
 
 		now := time.Now()
-		if !now.Before(nextFrame) {
+		frame := d.frameInterval(now)
+		nextTick := nextTickDue(nextFrame, lastTick, d.idle())
+		if !now.Before(nextTick) {
 			d.pollEvents()
 			d.processEventTick()
 			nextFrame = nextFrameAfter(nextFrame, now, frame)
+			lastTick = now
 			continue
 		}
 
-		// Sleep inside the native wait until the next frame is due, an
+		// Sleep inside the native wait until the next tick is due, an
 		// input event arrives, or wakeMainLoop posts. The wait is recomputed
-		// here and clamped: time advances between the frame-due check above
+		// here and clamped: time advances between the tick-due check above
 		// and this call, and GLFW asserts on a negative timeout.
-		if wait := time.Until(nextFrame); wait > 0 {
+		if wait := time.Until(nextTick); wait > 0 {
 			glfw.WaitEventsTimeout(wait.Seconds())
 		}
 	}
+}
+
+// frameRecheck is how often the loop looks again at which monitors the windows
+// are on: finding a window's monitor costs GLFW calls, and a window dragged to
+// another display can wait half a second for its new pace.
+const frameRecheck = 500 * time.Millisecond
+
+// frameInterval is how far apart frames are: one refresh of the fastest
+// monitor a visible window is on, so a 120 or 144 Hz display gets every
+// frame it can show (#480). It is recomputed every frameRecheck.
+func (d *gLDriver) frameInterval(now time.Time) time.Duration {
+	if d.frameDur != 0 && now.Sub(d.frameChecked) < frameRecheck {
+		return d.frameDur
+	}
+	d.frameChecked = now
+	var rates []int
+	for _, win := range d.windowList() {
+		w := win.(*window)
+		if w.viewport == nil || !w.visible {
+			continue
+		}
+		if m := w.getMonitorForWindow(); m != nil {
+			if mode := m.GetVideoMode(); mode != nil {
+				rates = append(rates, mode.RefreshRate)
+			}
+		}
+	}
+	d.frameDur = frameForRates(rates)
+	return d.frameDur
+}
+
+// frameForRates returns the frame duration for the fastest of the monitors'
+// refresh rates in Hz: 60 Hz when none is known, and kept to 30–240 Hz, since
+// a monitor can report 0 or nonsense.
+func frameForRates(rates []int) time.Duration {
+	best := 0
+	for _, r := range rates {
+		best = max(best, r)
+	}
+	if best <= 0 {
+		best = 60
+	}
+	best = min(max(best, 30), 240)
+	return time.Second / time.Duration(best)
+}
+
+// idleTick is how far apart ticks are while the app is idle. Ticks then only
+// do housekeeping (cache expiry, keeping cached renderers alive), whose
+// deadlines are tens of seconds away.
+const idleTick = time.Second
+
+// nextTickDue returns when the next tick is due: the frame grid's nextFrame,
+// or idleTick after the last tick while the app is idle. Leaving idle, a grid
+// slot already past is due at once.
+func nextTickDue(nextFrame, lastTick time.Time, idle bool) time.Time {
+	if idle {
+		return lastTick.Add(idleTick)
+	}
+	return nextFrame
+}
+
+// idle reports whether the next tick has nothing to do but housekeeping: no
+// animation runs, and no visible window needs painting, resizing to fit its
+// content, or closing. It is checked before every wait, so main-thread work
+// that dirties a canvas gets its frame on time.
+func (d *gLDriver) idle() bool {
+	if d.animation.Active() {
+		return false
+	}
+	for _, win := range d.windowList() {
+		w := win.(*window)
+		if w.viewport == nil {
+			continue
+		}
+		if w.shouldExpand || w.viewport.ShouldClose() || (w.visible && w.canvas.IsDirty()) {
+			return false
+		}
+	}
+	return true
 }
 
 func (d *gLDriver) Terminate() {
