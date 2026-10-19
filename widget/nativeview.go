@@ -202,8 +202,10 @@ func (h *NativeViewHost) MinSize() geo.Size {
 // SetMinSize sets the smallest size this host should be laid out at. Use
 // device-independent points, not pixels, as with any other widget size.
 func (h *NativeViewHost) SetMinSize(min geo.Size) {
+	if h.min != min {
+		layoutgen.Changed()
+	}
 	h.min = min
-	layoutgen.Changed()
 }
 
 // Hide hides the host and its native view.

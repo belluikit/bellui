@@ -135,8 +135,10 @@ func (g *AnimatedGif) MinSize() geo.Size {
 // SetMinSize sets the smallest possible size that this AnimatedGif should be drawn at.
 // Be careful not to set this based on pixel sizes as that will vary based on output device.
 func (g *AnimatedGif) SetMinSize(min geo.Size) {
+	if g.min != min {
+		layoutgen.Changed()
+	}
 	g.min = min
-	layoutgen.Changed()
 }
 
 // Start begins the animation. The speed of the transition is controlled by the loaded gif file.

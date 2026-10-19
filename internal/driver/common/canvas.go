@@ -562,8 +562,12 @@ func (c *Canvas) Refresh(obj core.CanvasObject) {
 func (c *Canvas) MarkMinSizeDirty(obj core.CanvasObject) {
 	node, ok := c.nodeMap.Load(obj)
 	if !ok {
-		// Nothing places it in the tree yet: only a full walk finds it.
-		c.minSizeFull.Store(true)
+		// Nothing places it in the tree yet: only a full walk finds it. A
+		// hidden object has no node and takes no room until it is shown, which
+		// counts as a layout change (layoutgen), so its refresh needs none.
+		if obj.Visible() {
+			c.minSizeFull.Store(true)
+		}
 		return
 	}
 	node.minSizeDirty.Store(true)

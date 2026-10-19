@@ -71,14 +71,18 @@ func (s *Spacer) Visible() bool {
 
 // Show sets the Spacer to be part of the layout calculations
 func (s *Spacer) Show() {
+	if s.hidden {
+		layoutgen.Changed() // a spacer refreshes nothing (#487)
+	}
 	s.hidden = false
-	layoutgen.Changed() // a spacer refreshes nothing (#487)
 }
 
 // Hide removes this Spacer from layout calculations
 func (s *Spacer) Hide() {
+	if !s.hidden {
+		layoutgen.Changed()
+	}
 	s.hidden = true
-	layoutgen.Changed()
 }
 
 // Refresh does nothing for a spacer but is part of the CanvasObject definition
