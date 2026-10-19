@@ -1,7 +1,7 @@
 <canvas size="120x90">
 	<content>
 		<widget size="120x90" type="*widget.RichEntry">
-			<rectangle fillColor="inputBackground" pos="2,2" radius="4" size="116x86"/>
+			<rectangle fillColor="inputBackground" pos="2,2" size="116x86" topLeftRadius="4" topRightRadius="4"/>
 			<widget size="120x90" type="*widget.selectable">
 			</widget>
 			<widget size="120x90" type="*widget.RichText">
@@ -14,7 +14,7 @@
 				</widget>
 				<text pos="8,48" size="23x16">end</text>
 			</widget>
-			<rectangle pos="1,1" radius="4" size="117x87" strokeColor="inputBorder" strokeWidth="2"/>
+			<rectangle fillColor="inputBorder" pos="2,86" size="116x2" strokeColor="inputBorder"/>
 		</widget>
 	</content>
 </canvas>

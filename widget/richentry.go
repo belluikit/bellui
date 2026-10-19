@@ -1011,6 +1011,8 @@ func (e *RichEntry) CreateRenderer() core.WidgetRenderer {
 	e.cursorAnim = newEntryCursorAnimation(cursor)
 
 	r := &richEntryRenderer{entry: e, box: box, border: border, cursor: cursor}
+	r.indicator = shapeEntryChrome(box, border, e.Style != EntryStyleOutlined, false,
+		th.Size(theme.SizeNameInputRadius), th.Size(theme.SizeNameInputBorder))
 	// box behind the content; border stroked last so it always composites crisply
 	// on top of the text/selection at the rounded edges (mirrors Entry).
 	r.objects = []core.CanvasObject{box, e.sel, &e.provider, cursor, border}
@@ -1022,6 +1024,7 @@ var _ core.WidgetRenderer = (*richEntryRenderer)(nil)
 type richEntryRenderer struct {
 	entry       *RichEntry
 	box, border *canvas.Rectangle
+	indicator   float32 // the filled style's indicator thickness, from shapeEntryChrome
 	cursor      *canvas.Rectangle
 	objects     []core.CanvasObject
 }
@@ -1036,12 +1039,7 @@ func (r *richEntryRenderer) Layout(size geo.Size) {
 	th := r.entry.Theme()
 	borderSize := th.Size(theme.SizeNameInputBorder)
 
-	// 0.5 is removed so on low DPI it rounds down on the trailing edge (as Entry).
-	r.border.Resize(geo.NewSize(size.Width-borderSize-.5, size.Height-borderSize-.5))
-	r.border.StrokeWidth = borderSize
-	r.border.Move(geo.NewSquareOffsetPos(borderSize / 2))
-	r.box.Resize(size.Subtract(geo.NewSquareSize(borderSize * 2)))
-	r.box.Move(geo.NewSquareOffsetPos(borderSize))
+	layoutEntryChrome(r.box, r.border, size, borderSize, r.indicator)
 
 	// The content keeps the full-size coordinate space (the caret geometry is
 	// computed against it); the provider's own inner padding (> the border) keeps
@@ -1080,8 +1078,6 @@ func (r *richEntryRenderer) refreshChrome() {
 	} else {
 		r.box.FillColor = th.Color(theme.ColorNameInputBackground, v)
 	}
-	r.box.CornerRadius = th.Size(theme.SizeNameInputRadius)
-	r.border.CornerRadius = r.box.CornerRadius
 	r.border.StrokeWidth = borderSize
 
 	if e.focused {
@@ -1094,6 +1090,9 @@ func (r *richEntryRenderer) refreshChrome() {
 	} else {
 		r.border.StrokeColor = th.Color(theme.ColorNameInputBorder, v)
 	}
+	r.indicator = shapeEntryChrome(r.box, r.border, !isOutlined, e.focused,
+		th.Size(theme.SizeNameInputRadius), borderSize)
+	layoutEntryChrome(r.box, r.border, e.Size(), borderSize, r.indicator)
 	r.box.Refresh()
 	r.border.Refresh()
 }

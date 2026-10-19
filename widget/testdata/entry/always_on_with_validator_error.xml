@@ -1,7 +1,7 @@
 <canvas padded size="68x40">
 	<content>
 		<widget pos="4,4" size="60x32" type="*widget.Entry">
-			<rectangle fillColor="inputBackground" pos="2,2" radius="4" size="56x28"/>
+			<rectangle fillColor="inputBackground" pos="2,2" size="56x28" topLeftRadius="4" topRightRadius="4"/>
 			<widget pos="2,2" size="24x28" type="*widget.Scroll">
 				<widget size="24x28" type="*widget.entryContent">
 					<widget size="24x28" type="*widget.RichText">
@@ -12,7 +12,7 @@
 					</widget>
 				</widget>
 			</widget>
-			<rectangle pos="1,1" radius="4" size="57x29" strokeColor="error" strokeWidth="2"/>
+			<rectangle fillColor="error" pos="2,26" size="56x4" strokeColor="error"/>
 			<widget pos="32,8" size="20x20" type="*widget.validationStatus">
 				<image rsc="errorIcon" size="iconInlineSize" themed="error"/>
 			</widget>

@@ -807,7 +807,10 @@ func (e *Entry) CreateRenderer() core.WidgetRenderer {
 	}
 
 	e.syncSegments()
-	return &entryRenderer{box, border, e.scroll, icon, objects, e}
+	r := &entryRenderer{box: box, border: border, scroll: e.scroll, icon: icon, objects: objects, entry: e}
+	r.indicator = shapeEntryChrome(box, border, e.Style != EntryStyleOutlined, false,
+		th.Size(theme.SizeNameInputRadius), th.Size(theme.SizeNameInputBorder))
+	return r
 }
 
 // CursorPosition returns the relative position of this Entry widget's cursor.
@@ -3938,6 +3941,7 @@ var _ core.WidgetRenderer = (*entryRenderer)(nil)
 
 type entryRenderer struct {
 	box, border *canvas.Rectangle
+	indicator   float32 // the filled style's indicator thickness, from shapeEntryChrome
 	scroll      *widget.Scroll
 	icon        *canvas.Image
 
@@ -3969,10 +3973,14 @@ func (r *entryRenderer) Destroy() {
 // gives exactly the widget rect with radius+border (same arc centers), so
 // this radius makes the clip's arc concentric with the box's; the remaining
 // one-border band between the two arcs is covered by the border stroke,
-// which draws on top (pre-rebrand tracker #353). The radius tracks the box, which Refresh
-// re-themes.
+// which draws on top (pre-rebrand tracker #353). The radius is the theme's,
+// which the box's top corners take in either style.
+//
+// The clip has one radius for all four corners, so it also rounds the filled
+// style's square bottom corners, which MD3 leaves square (#494).
 func (r *entryRenderer) RoundedClipCornerRadius() float32 {
-	return r.box.CornerRadius + r.entry.Theme().Size(theme.SizeNameInputBorder)
+	th := r.entry.Theme()
+	return th.Size(theme.SizeNameInputRadius) + th.Size(theme.SizeNameInputBorder)
 }
 
 func (r *entryRenderer) trailingInset() float32 {
@@ -4013,12 +4021,7 @@ func (r *entryRenderer) Layout(size geo.Size) {
 	innerPad := th.Size(theme.SizeNameInnerPadding)
 	inputBorder := th.Size(theme.SizeNameInputBorder)
 
-	// 0.5 is removed so on low DPI it rounds down on the trailing edge
-	r.border.Resize(geo.NewSize(size.Width-borderSize-.5, size.Height-borderSize-.5))
-	r.border.StrokeWidth = borderSize
-	r.border.Move(geo.NewSquareOffsetPos(borderSize / 2))
-	r.box.Resize(size.Subtract(geo.NewSquareSize(borderSize * 2)))
-	r.box.Move(geo.NewSquareOffsetPos(borderSize))
+	layoutEntryChrome(r.box, r.border, size, borderSize, r.indicator)
 
 	pad := theme.InputBorderSize()
 	actionIconSize := geo.NewSize(0, size.Height-pad*2)
@@ -4185,6 +4188,10 @@ func (r *entryRenderer) Refresh() {
 	}
 
 	r.refreshValidationStyle(th, v)
+	r.indicator = shapeEntryChrome(r.box, r.border, r.entry.Style != EntryStyleOutlined,
+		focusedAppearance || r.entry.showsValidationError(),
+		th.Size(theme.SizeNameInputRadius), inputBorder)
+	layoutEntryChrome(r.box, r.border, r.entry.Size(), inputBorder, r.indicator)
 
 	if r.entry.Icon != nil {
 		r.icon.Resource = r.entry.Icon
@@ -4246,8 +4253,7 @@ func (r *entryRenderer) refreshBoxAndBorder(th bellui.Theme, v bellui.ThemeVaria
 	} else {
 		r.box.FillColor = th.Color(theme.ColorNameInputBackground, v)
 	}
-	r.box.CornerRadius = th.Size(theme.SizeNameInputRadius)
-	r.border.CornerRadius = r.box.CornerRadius
+	// shapeEntryChrome sets the corner radii, once the border is styled.
 
 	if focusedAppearance {
 		r.border.StrokeColor = th.Color(theme.ColorNamePrimary, v)
@@ -4257,17 +4263,23 @@ func (r *entryRenderer) refreshBoxAndBorder(th bellui.Theme, v bellui.ThemeVaria
 		return
 	}
 
-	if isOutlined {
-		r.border.StrokeColor = th.Color(theme.ColorNameOutline, v)
-		r.border.StrokeWidth = th.Size(theme.SizeNameInputBorder)
-	} else if style == internaltheme.RenderStyleModern {
+	if isOutlined || style == internaltheme.RenderStyleModern {
 		r.border.StrokeWidth = th.Size(theme.SizeNameInputBorder)
 	}
-	if r.entry.Disabled() {
+	switch {
+	case r.entry.Disabled():
 		r.border.StrokeColor = th.Color(theme.ColorNameDisabled, v)
-	} else {
+	case isOutlined:
+		r.border.StrokeColor = th.Color(theme.ColorNameOutline, v)
+	default:
 		r.border.StrokeColor = th.Color(theme.ColorNameInputBorder, v)
 	}
+}
+
+// showsValidationError reports whether the entry shows its validation error.
+func (e *Entry) showsValidationError() bool {
+	return (e.hasValidator() || e.AlwaysShowValidationError) && !e.Disabled() &&
+		(e.dirty || e.AlwaysShowValidationError) && e.validationError != nil
 }
 
 // refreshValidationStyle applies validation-driven border or status styling.
@@ -4279,7 +4291,7 @@ func (r *entryRenderer) refreshValidationStyle(th bellui.Theme, v bellui.ThemeVa
 		return
 	}
 
-	hasError := !r.entry.Disabled() && (r.entry.dirty || r.entry.AlwaysShowValidationError) && r.entry.validationError != nil
+	hasError := r.entry.showsValidationError()
 	if r.entry.ValidateWithBorder {
 		// Show validation via border styling: thicker + red on error
 		if hasError {
