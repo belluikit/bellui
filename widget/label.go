@@ -65,7 +65,11 @@ type Label struct {
 	// Since: 1.0
 	ShowTooltipWhenTruncated bool
 
-	provider  *RichText
+	provider *RichText
+	// synced records that SyncState just synced the segments and refreshed
+	// the provider, so the renderer's Refresh that BaseWidget.Refresh runs
+	// next need not do it again (#488).
+	synced    bool
 	binder    basicBinder
 	selection *focusSelectable
 
@@ -211,6 +215,7 @@ func (l *Label) SyncState() {
 	}
 	l.syncSegments()
 	l.provider.Refresh()
+	l.synced = true
 }
 
 // SelectedText returns the text currently selected in this Label.
@@ -489,8 +494,14 @@ func (r *labelRenderer) Objects() []core.CanvasObject {
 }
 
 func (r *labelRenderer) Refresh() {
-	r.l.syncSegments()
-	r.l.provider.Refresh()
+	// BaseWidget.Refresh runs SyncState first, which has just done this. A
+	// renderer refreshed directly has not: sync and refresh the provider then.
+	if r.l.synced {
+		r.l.synced = false
+	} else {
+		r.l.syncSegments()
+		r.l.provider.Refresh()
+	}
 
 	sel := r.l.selection
 	if !r.l.isSelectable() || sel == nil {
