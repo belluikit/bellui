@@ -4,7 +4,7 @@
 			<widget pos="2,2" size="50x40" type="*widget.Shadow">
 				<boxShadow blurRadius="1.5" color="shadow" cornerRadius="4" offsetY="0.5" size="50x40"/>
 			</widget>
-			<text bold size="0x0" textSize="23"></text>
+			<text size="0x0" textSize="16"></text>
 			<text size="0x0"></text>
 			<widget pos="6,6" size="42x32" type="*widget.Label">
 				<widget size="42x32" type="*widget.RichText">

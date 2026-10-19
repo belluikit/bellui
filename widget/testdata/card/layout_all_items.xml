@@ -1,13 +1,13 @@
-<canvas padded size="151x222">
+<canvas padded size="146x222">
 	<content>
-		<widget pos="4,4" size="143x214" type="*widget.Card">
-			<widget pos="2,2" size="139x210" type="*widget.Shadow">
-				<boxShadow blurRadius="1.5" color="shadow" cornerRadius="4" offsetY="0.5" size="139x210"/>
+		<widget pos="4,4" size="138x214" type="*widget.Card">
+			<widget pos="2,2" size="134x210" type="*widget.Shadow">
+				<boxShadow blurRadius="1.5" color="shadow" cornerRadius="4" offsetY="0.5" size="134x210"/>
 			</widget>
-			<text bold pos="10,138" size="123x28" textSize="23">Longer title</text>
-			<text pos="10,170" size="123x16">subtitle with length</text>
-			<image pos="2,2" rsc="computerIcon" size="139x128" themed="foreground"/>
-			<rectangle fillColor="inputBackground" pos="6,198" size="131x10" strokeColor="rgba(0,0,0,255)" strokeWidth="2"/>
+			<text pos="10,138" size="118x28" textSize="16">Longer title</text>
+			<text pos="10,170" size="118x16">subtitle with length</text>
+			<image pos="2,2" rsc="computerIcon" size="134x128" themed="foreground"/>
+			<rectangle fillColor="inputBackground" pos="6,198" size="126x10" strokeColor="rgba(0,0,0,255)" strokeWidth="2"/>
 		</widget>
 	</content>
 </canvas>

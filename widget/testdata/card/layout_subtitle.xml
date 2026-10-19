@@ -4,7 +4,7 @@
 			<widget pos="2,2" size="76x32" type="*widget.Shadow">
 				<boxShadow blurRadius="1.5" color="shadow" cornerRadius="4" offsetY="0.5" size="76x32"/>
 			</widget>
-			<text bold size="0x0" textSize="23"></text>
+			<text size="0x0" textSize="16"></text>
 			<text pos="10,10" size="60x16">Subtitle</text>
 		</widget>
 	</content>
