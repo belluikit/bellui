@@ -277,12 +277,15 @@ func (w *BaseWidget) Theme() bellui.Theme {
 		return *cached
 	}
 
-	cached := cache.WidgetTheme(w.super())
+	th := cache.WidgetTheme(w.super())
 	// don't cache the default as it may change
-	if cached == nil {
+	if th == nil {
 		return theme.Current()
 	}
 
+	// Only this branch takes an address, so only it allocates: storing &th
+	// made th escape on every call, the default theme's included (#492).
+	cached := th
 	w.themeCache.Store(&cached)
 	return cached
 }
