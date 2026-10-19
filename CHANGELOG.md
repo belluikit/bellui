@@ -60,7 +60,9 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
   came out heavy grey; they now use Material's tones. Unchecked checkboxes and
   radios are empty outlines instead of grey blocks. A filled text field has a
   bottom line in place of a full frame. A split's divider no longer draws a
-  black strip in dark mode.
+  black strip in dark mode. Card titles are 16 px medium weight (Material's
+  Title Medium) instead of 24 px bold, and card content lines up with the
+  title, which makes it 2×padding narrower.
 
 * **Updating a label or an entry costs about a third less**
   ([#488](https://github.com/belluikit/bellui/issues/488)). Each SetText laid
