@@ -283,6 +283,22 @@ func DrawString(dst draw.Image, s string, clr color.Color, f shaping.Fontmap, fo
 	}
 }
 
+// ShapeString shapes s on one line as DrawString draws it, calling cb with each
+// shaped run and its pen x in pixels. It returns the baseline's y in pixels
+// from the top of the text, as DrawString places it. The batched WebGPU
+// painter places atlas glyphs with it (#475).
+func ShapeString(f shaping.Fontmap, s string, fontSize, scale float32, style bellui.TextStyle, cb func(run shaping.Output, x float32)) (baseline int) {
+	baseline = math.MinInt
+	advance := float32(0)
+	walkString(f, s, float32ToFixed266(fontSize), style, &advance, scale, func(run shaping.Output, x float32) {
+		if baseline == math.MinInt {
+			baseline = int(math.Ceil(float64(fixed266ToFloat32(run.LineBounds.Ascent) * scale)))
+		}
+		cb(run, x)
+	})
+	return baseline
+}
+
 // drawUnderline draws a horizontal line below the text baseline, spanning the
 // glyph advance from x0 to x1.
 func drawUnderline(dst draw.Image, clr color.Color, baseline int, bounds shaping.Bounds, x0, x1 int, scale float32) {
