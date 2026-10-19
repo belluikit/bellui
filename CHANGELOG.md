@@ -65,6 +65,13 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
   * Clips shorter than a second play instead of showing nothing.
   * The progress bar reaches the end when a video finishes, and the time stops
     there instead of running on.
+* **Smooth 60 fps video with sound**
+  ([#504](https://github.com/belluikit/bellui/issues/504)). In `x/mmedia`, a
+  1080p 60 fps video with audio played in slow motion at about 0.6× speed and
+  31 fps, and 720p60 dropped about 8 frames a second. Both now play at full
+  speed and 60 fps with no drops. Picture and sound line up better on every
+  video: on average within about 1 ms instead of 25 ms, with peaks of about
+  10 ms instead of 100 ms.
 
 * **Infinite progress bars animate again**
   ([#497](https://github.com/belluikit/bellui/issues/497)). A
