@@ -397,6 +397,7 @@ func TestTextGridRender_TextColor(t *testing.T) {
 }
 
 func BenchmarkTextGrid_Refresh(b *testing.B) {
+	defer releaseNewRenderers()() // the million-cell grid's renderer, #508
 	builder := strings.Builder{}
 	for i := 0; i < 1000; i++ {
 		for j := 0; j < 1000; j++ {

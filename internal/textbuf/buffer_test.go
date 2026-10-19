@@ -283,3 +283,17 @@ func TestInvariants_AfterScriptedOps(t *testing.T) {
 		checkInvariants(t, b)
 	}
 }
+
+// TestSubstringOwnsItsMemory pins #508: a substring taken while the memo is
+// clean must not point into the memo, or keeping it keeps the whole document.
+func TestSubstringOwnsItsMemory(t *testing.T) {
+	doc := strings.Repeat("0123456789\n", 10_000)
+	b := FromString(doc)
+	memo := b.String()
+	sub := b.Substring(100, 120)
+	require.Equal(t, memo[100:120], sub)
+
+	start := uintptr(unsafe.Pointer(unsafe.StringData(memo)))
+	p := uintptr(unsafe.Pointer(unsafe.StringData(sub)))
+	assert.False(t, p >= start && p < start+uintptr(len(memo)), "the substring shares the memo's memory")
+}

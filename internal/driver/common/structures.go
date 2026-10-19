@@ -1,6 +1,7 @@
 package common
 
 import (
+	"sync"
 	"sync/atomic"
 
 	"github.com/belluikit/bellui/core"
@@ -11,18 +12,29 @@ import (
 
 type deduplicatedObjectQueue struct {
 	queue *async.CanvasObjectQueue
-	dedup async.Map[core.CanvasObject, struct{}]
+
+	// dedup holds the objects in the queue. A plain map, not a sync.Map: every
+	// refresh adds and removes one, and a sync.Map allocates a node per store,
+	// which was over a quarter of a labels frame's garbage. A map reuses its
+	// slots once grown.
+	mu    sync.Mutex
+	dedup map[core.CanvasObject]struct{}
 }
 
 // In adds an object to the queue if it is not already present.
 func (q *deduplicatedObjectQueue) In(obj core.CanvasObject) {
-	_, exists := q.dedup.Load(obj)
-	if exists {
+	q.mu.Lock()
+	if _, exists := q.dedup[obj]; exists {
+		q.mu.Unlock()
 		return
 	}
+	if q.dedup == nil {
+		q.dedup = make(map[core.CanvasObject]struct{})
+	}
+	q.dedup[obj] = struct{}{}
+	q.mu.Unlock()
 
 	q.queue.In(obj)
-	q.dedup.Store(obj, struct{}{})
 }
 
 // Out removes and returns the next object from the queue.
@@ -31,7 +43,9 @@ func (q *deduplicatedObjectQueue) Out() core.CanvasObject {
 	if out == nil {
 		return nil
 	}
-	q.dedup.Delete(out)
+	q.mu.Lock()
+	delete(q.dedup, out)
+	q.mu.Unlock()
 	return out
 }
 

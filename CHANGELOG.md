@@ -65,6 +65,7 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
   * Clips shorter than a second play instead of showing nothing.
   * The progress bar reaches the end when a video finishes, and the time stops
     there instead of running on.
+    
 * **Smooth 60 fps video with sound**
   ([#504](https://github.com/belluikit/bellui/issues/504)). In `x/mmedia`, a
   1080p 60 fps video with audio played in slow motion at about 0.6× speed and
@@ -72,11 +73,25 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
   speed and 60 fps with no drops. Picture and sound line up better on every
   video: on average within about 1 ms instead of 25 ms, with peaks of about
   10 ms instead of 100 ms.
+  
 * **Audio files at different sample rates play at the right speed**
   ([#506](https://github.com/belluikit/bellui/issues/506)). In `x/mmedia`, a
   48 kHz file played after a 44.1 kHz one in the same app ran at 0.92× speed,
   picture included.
 
+* **Typing into a large text field no longer leaks memory**
+  ([#508](https://github.com/belluikit/bellui/issues/508)). Each keystroke in
+  a multi-line `Entry` kept a full copy of the document in memory: about 30 MB
+  per key on a 500,000-line document. Old copies are now freed.
+
+* **Busy screens use 12–15% less CPU and about half the memory churn**
+  ([#492](https://github.com/belluikit/bellui/issues/492)). Four sources of
+  per-frame overhead are gone: a refresh-queue set that allocated on every
+  refresh, a text measurement that allocated on every change, a theme lookup
+  that allocated on every call, and repeated renderer lookups during painting.
+  On an M3 Max, re-texting 2,000 labels every frame went from 101 to 111 fps
+  and from 1.5 MB to 0.68 MB of garbage per frame.
+  
 * **Infinite progress bars animate again**
   ([#497](https://github.com/belluikit/bellui/issues/497)). A
   `ProgressBarInfinite` drew a still bar: nothing started its animation once

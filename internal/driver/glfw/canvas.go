@@ -599,15 +599,16 @@ func (w *glPaintWalk) draw(node *common.RenderCacheNode, pos geo.Position) {
 	// unclipped, leaking content past the viewport (pre-rebrand tracker #333). The clip is intersected
 	// with the seeded dirty-region clip, so a clip-owner outside the region yields an
 	// empty clip and its children draw nothing.
-	if driver.IsClip(obj) {
+	clips := driver.ClipsOf(obj)
+	if clips.Rect {
 		inner := w.clips.Push(paintPos, obj.Size())
 		w.c.Painter().StartClipping(inner.Rect())
 	}
-	if isRounded, radius := driver.IsRoundedClip(obj); isRounded {
-		w.c.Painter().StartRoundedClipping(paintPos, obj.Size(), radius)
+	if clips.Rounded {
+		w.c.Painter().StartRoundedClipping(paintPos, obj.Size(), clips.Radius)
 	}
-	if clipPathObj, ok := driver.IsPathClip(obj); ok {
-		if clipPath, is := clipPathObj.(*canvas.Path); is {
+	if clips.Path != nil {
+		if clipPath, is := clips.Path.(*canvas.Path); is {
 			w.c.Painter().StartPathClipping(clipPath, paintPos, obj.Size())
 		}
 	}
@@ -685,13 +686,14 @@ func (w *glPaintWalk) afterDraw(node *common.RenderCacheNode, pos geo.Position) 
 	// Tear down clips even when the object was culled: draw establishes them
 	// unconditionally for clip-owners so descendants stay clipped (pre-rebrand tracker #333), so the
 	// push/pop must stay paired regardless of culling.
-	if isRounded, _ := driver.IsRoundedClip(obj); isRounded {
+	clips := driver.ClipsOf(obj)
+	if clips.Rounded {
 		w.c.Painter().StopRoundedClipping()
 	}
-	if _, ok := driver.IsPathClip(obj); ok {
+	if clips.Path != nil {
 		w.c.Painter().StopPathClipping()
 	}
-	if driver.IsClip(obj) {
+	if clips.Rect {
 		w.clips.Pop()
 		if top := w.clips.Top(); top != nil {
 			w.c.Painter().StartClipping(top.Rect())

@@ -4,13 +4,16 @@ import (
 	"image/color"
 	"testing"
 
+	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/cache"
 	"github.com/belluikit/bellui/internal/driver"
 	internal_widget "github.com/belluikit/bellui/internal/widget"
+	"github.com/belluikit/bellui/test"
 	_ "github.com/belluikit/bellui/test"
 	"github.com/belluikit/bellui/widget"
 
@@ -616,3 +619,62 @@ var (
 
 func (s *scrollableTree) Scrolled(_ *event.ScrollEvent) {
 }
+
+// TestClipsOfMatchesSeparateChecks pins that ClipsOf, which answers from one
+// renderer lookup (#492), agrees with IsClip, IsRoundedClip and IsPathClip.
+func TestClipsOfMatchesSeparateChecks(t *testing.T) {
+	test.NewTempApp(t)
+	path := canvas.NewPath(func(p *canvas.Path) {
+		p.MoveTo(0, 0)
+		p.LineTo(10, 0)
+		p.LineTo(0, 10)
+		p.Close()
+	})
+	card := widget.NewCard("t", "", widget.NewLabel("x"))
+	rounded := &roundedClipWidget{}
+	rounded.ExtendBaseWidget(rounded)
+	pathClip := container.NewPathClip(path, widget.NewLabel("x"))
+
+	for name, obj := range map[string]core.CanvasObject{
+		"scroll":          container.NewVScroll(widget.NewLabel("x")),
+		"clip container":  &bellui.Container{ClipToBounds: true},
+		"plain container": &bellui.Container{},
+		"card":            card,
+		"path clip":       pathClip,
+		"rounded":         rounded,
+		"clip":            container.NewClip(widget.NewLabel("x")),
+		"label":           widget.NewLabel("x"),
+		"rectangle":       canvas.NewRectangle(color.Black),
+	} {
+		if w, ok := obj.(core.Widget); ok {
+			cache.Renderer(w) // the checks read only cached renderers
+		}
+		c := driver.ClipsOf(obj)
+		rounded, radius := driver.IsRoundedClip(obj)
+		p, isPath := driver.IsPathClip(obj)
+		assert.Equal(t, driver.IsClip(obj), c.Rect, name)
+		assert.Equal(t, rounded, c.Rounded, name)
+		assert.Equal(t, radius, c.Radius, name)
+		assert.Equal(t, isPath, c.Path != nil, name)
+		assert.Equal(t, p, c.Path, name)
+	}
+	// The cases that matter are covered, not only the negative ones.
+	assert.NotNil(t, driver.ClipsOf(pathClip).Path)
+	assert.Equal(t, driver.Clips{Rounded: true, Radius: 8}, driver.ClipsOf(rounded))
+}
+
+// roundedClipWidget's renderer clips its children to 8-unit rounded corners.
+type roundedClipWidget struct{ widget.BaseWidget }
+
+func (w *roundedClipWidget) CreateRenderer() core.WidgetRenderer {
+	return &roundedClipRenderer{}
+}
+
+type roundedClipRenderer struct{}
+
+func (r *roundedClipRenderer) Destroy()                         {}
+func (r *roundedClipRenderer) Layout(geo.Size)                  {}
+func (r *roundedClipRenderer) MinSize() geo.Size                { return geo.Size{} }
+func (r *roundedClipRenderer) Objects() []core.CanvasObject     { return nil }
+func (r *roundedClipRenderer) Refresh()                         {}
+func (r *roundedClipRenderer) RoundedClipCornerRadius() float32 { return 8 }
