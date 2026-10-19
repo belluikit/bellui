@@ -623,12 +623,26 @@ func (c *Canvas) WalkContentTrees(
 	beforeChildren func(*RenderCacheNode, geo.Position),
 	afterChildren func(*RenderCacheNode, geo.Position),
 ) {
-	c.walkTree(c.contentTree, beforeChildren, afterChildren)
+	c.WalkContentTreesCulled(nil, beforeChildren, afterChildren)
+}
+
+// WalkContentTreesCulled walks the content trees as WalkContentTrees does,
+// visiting an object cull reports as drawing nothing visible without its
+// children (driver.WalkVisibleObjectTreeCulled). The paint walk passes
+// CullOffClip, so content scrolled out of view costs one visit per clip-owner
+// instead of its whole subtree (#464). Walks that must reach every object
+// (layout, hit testing, accessibility) pass nil.
+func (c *Canvas) WalkContentTreesCulled(
+	cull driver.CullFunc,
+	beforeChildren func(*RenderCacheNode, geo.Position),
+	afterChildren func(*RenderCacheNode, geo.Position),
+) {
+	c.walkTree(c.contentTree, cull, beforeChildren, afterChildren)
 	if c.mWindowHeadTree != nil && c.mWindowHeadTree.root.obj != nil {
-		c.walkTree(c.mWindowHeadTree, beforeChildren, afterChildren)
+		c.walkTree(c.mWindowHeadTree, cull, beforeChildren, afterChildren)
 	}
 	if c.menuTree != nil && c.menuTree.root.obj != nil {
-		c.walkTree(c.menuTree, beforeChildren, afterChildren)
+		c.walkTree(c.menuTree, cull, beforeChildren, afterChildren)
 	}
 }
 
@@ -639,7 +653,7 @@ func (c *Canvas) WalkOverlayTrees(
 ) {
 	for _, tree := range c.overlays.renderCaches {
 		if tree != nil {
-			c.walkTree(tree, beforeChildren, afterChildren)
+			c.walkTree(tree, nil, beforeChildren, afterChildren)
 		}
 	}
 }
@@ -750,6 +764,7 @@ func (c *Canvas) isMenuActive() bool {
 
 func (c *Canvas) walkTree(
 	tree *renderCacheTree,
+	cull driver.CullFunc,
 	beforeChildren func(*RenderCacheNode, geo.Position),
 	afterChildren func(*RenderCacheNode, geo.Position),
 ) {
@@ -831,7 +846,7 @@ func (c *Canvas) walkTree(
 		prev = node
 		node = node.nextSibling
 	}
-	driver.WalkVisibleObjectTree(tree.root.obj, bc, ac)
+	driver.WalkVisibleObjectTreeCulled(tree.root.obj, cull, bc, ac)
 }
 
 type activatableMenu interface {
