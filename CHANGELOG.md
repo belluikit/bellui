@@ -54,6 +54,14 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
   
 ### Fixed
 
+* **Busy screens use 12–15% less CPU and about half the memory churn**
+  ([#492](https://github.com/belluikit/bellui/issues/492)). Four sources of
+  per-frame overhead are gone: a refresh-queue set that allocated on every
+  refresh, a text measurement that allocated on every change, a theme lookup
+  that allocated on every call, and repeated renderer lookups during painting.
+  On an M3 Max, re-texting 2,000 labels every frame went from 101 to 111 fps
+  and from 1.5 MB to 0.68 MB of garbage per frame.
+
 * **Default widgets follow the Material 3 spec more closely**
   ([#494](https://github.com/belluikit/bellui/issues/494)). The light theme's
   surfaces were 2 to 10 tones darker than Material's, so fields and containers
