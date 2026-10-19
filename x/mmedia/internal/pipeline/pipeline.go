@@ -429,7 +429,9 @@ func (p *Pipeline) Play() {
 	if p.hasVideo && p.frameQueue != nil && !p.live {
 		target := p.prerollTarget() // ~1 second, or a full queue at high resolution
 		for i := 0; i < 200; i++ {  // up to ~2s max wait
-			if len(p.frameQueue) >= target || p.audioAheadFull() {
+			// A clip shorter than the target ends first: stop waiting then,
+			// or every start and every loop of it stalls the full two seconds.
+			if len(p.frameQueue) >= target || p.audioAheadFull() || p.sourceEnded() {
 				break
 			}
 			time.Sleep(10 * time.Millisecond)
@@ -442,6 +444,13 @@ func (p *Pipeline) Play() {
 		defer p.wg.Done()
 		p.displayLoop(stopCh)
 	}()
+}
+
+// sourceEnded reports whether the decoder has reached the end of the source.
+func (p *Pipeline) sourceEnded() bool {
+	p.decodeMu.Lock()
+	defer p.decodeMu.Unlock()
+	return p.src.HasEnded()
 }
 
 // audioAheadFull reports whether the audio output buffer is at least half
