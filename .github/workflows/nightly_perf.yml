@@ -66,7 +66,10 @@ jobs:
 
       # -run '^$' runs no tests, only benchmarks. -tags ci: the headless test
       # driver, as every other test leg on this runner uses.
+      # Measured 2026-10-19 on an M3 Max: one pass of every root benchmark takes
+      # about 5 minutes, so six take about 30; the hosted runner is slower.
       - name: Benchmarks
+        timeout-minutes: 150
         run: |
           set -o pipefail
           mkdir -p perf
@@ -89,6 +92,7 @@ jobs:
       # Whole-app scenes in a real window (#427). Each scene runs three times;
       # the RESULT lines go to the summary and the artifact.
       - name: Scenes
+        timeout-minutes: 15
         run: |
           set -e
           go build -o perfscenes ./hack/perfscenes

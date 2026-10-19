@@ -67,6 +67,14 @@ var painted = make(chan time.Time, 1)
 
 func main() {
 	flag.Parse()
+	// A window that never paints (no display session, an occluded window)
+	// can leave the app waiting forever, which ran a CI job out of time
+	// (#439). Give up well after the run should have ended.
+	limit := time.Duration((*warm+*secs)*float64(time.Second)) + 30*time.Second
+	time.AfterFunc(limit, func() {
+		fmt.Fprintf(os.Stderr, "perfscenes: no result after %v, giving up\n", limit)
+		os.Exit(3)
+	})
 	a := app.NewWithID("com.bellui.perfscenes")
 	w := a.NewWindow("perfscenes")
 	mark := canvas.NewRaster(func(int, int) image.Image {
