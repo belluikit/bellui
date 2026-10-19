@@ -54,6 +54,14 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
   
 ### Fixed
 
+* **A screen where little changes does almost no layout work**
+  ([#487](https://github.com/belluikit/bellui/issues/487)). Every frame still
+  visited every object to check its minimum size. Now a frame visits only the
+  paths to what was refreshed: on an M3 Max, a static screen of 500 cards with
+  a spinner went from 1.8 ms to 0.01 ms of layout work per frame, and from 3.6
+  to 2.5 ms of CPU. Show, Hide and SetMinSize, which refresh nothing, still
+  re-lay out the window.
+
 * **Static and scrolled screens use about 40% less CPU**
   ([#464](https://github.com/belluikit/bellui/issues/464)). Every frame walked
   every object a scroll container holds, including the ones scrolled out of

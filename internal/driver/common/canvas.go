@@ -3,6 +3,9 @@ package common
 import (
 	"image/color"
 	"reflect"
+	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/canvas"
@@ -17,6 +20,7 @@ import (
 	"github.com/belluikit/bellui/internal/cache"
 	"github.com/belluikit/bellui/internal/driver"
 	"github.com/belluikit/bellui/internal/gpu"
+	"github.com/belluikit/bellui/internal/layoutgen"
 	"github.com/belluikit/bellui/internal/theme"
 	"github.com/belluikit/bellui/internal/uidir"
 )
@@ -107,6 +111,21 @@ type Canvas struct {
 	measuredGen   uint64
 	measuredScale float32
 	measuredEpoch uint64
+
+	// dirtyNodes are the nodes refreshed since the last min-size pass, queued
+	// from any goroutine (MarkMinSizeDirty); the pass marks them and their
+	// ancestors on the main thread (#487). dirtyTaken is the drained buffer,
+	// reused.
+	dirtyMu    sync.Mutex
+	dirtyNodes []*RenderCacheNode
+	dirtyTaken []*RenderCacheNode
+	// minSizeFull asks the next min-size pass to walk every object: the
+	// content changed.
+	minSizeFull      atomic.Bool
+	lastFullMinSize  time.Time
+	measuredOverlays int
+	// minSizeVisits counts the nodes the last min-size pass visited.
+	minSizeVisits int
 }
 
 // AddShortcut adds a shortcut to the canvas.
@@ -149,11 +168,14 @@ func (c *Canvas) EnsureMinSize() bool {
 	// A theme or scale change can change any min size: ask every object.
 	// Otherwise only objects that were refreshed, resized, or whose children's
 	// min sizes changed are asked again; the rest report what they did (#464).
-	gen, scale, epoch := cache.ThemeCacheGeneration(), c.impl.Scale(), cache.MinSizeEpoch()
+	gen, scale, epoch := cache.ThemeCacheGeneration(), c.impl.Scale(), layoutgen.Epoch()
 	measureAll := gen != c.measuredGen || scale != c.measuredScale || epoch != c.measuredEpoch
 	c.measuredGen, c.measuredScale, c.measuredEpoch = gen, scale, epoch
 
+	c.minSizeVisits = 0
 	setup := func(node *RenderCacheNode, pos geo.Position) {
+		c.minSizeVisits++
+		node.descDirty = false
 		if !node.obj.Visible() {
 			return
 		}
@@ -183,13 +205,7 @@ func (c *Canvas) EnsureMinSize() bool {
 		}
 		minSize := node.minSize
 		size := obj.Size()
-		// Primitives are always asked: their min size can change without a
-		// refresh (SetMinSize), and asking costs a field read or a cached text
-		// measurement. A change then reaches the parent as childChanged.
-		_, isWidget := obj.(core.Widget)
-		_, isContainer := obj.(*bellui.Container)
-		primitive := !isWidget && !isContainer
-		if dirty := node.minSizeDirty.Swap(false); measureAll || primitive || dirty || childChanged || !node.measured || size != node.measuredSize {
+		if needsMeasure(node, obj, size, measureAll, childChanged) {
 			minSize = obj.MinSize()
 			node.measured, node.measuredSize = true, size
 		}
@@ -225,7 +241,7 @@ func (c *Canvas) EnsureMinSize() bool {
 	// past the per-node DirectionScope Pops in the visitor below.
 	defer uidir.Restore(uidir.Mark())
 	uidir.Push(c.layoutDir)
-	c.WalkTrees(setup, ensureMinSize)
+	c.walkForMinSize(measureAll, setup, ensureMinSize)
 	uidir.Pop(c.layoutDir)
 
 	shouldResize := !c.FixedSize && windowNeedsMinSizeUpdate && (csize.Width < min.Width || csize.Height < min.Height)
@@ -526,8 +542,100 @@ func (c *Canvas) Refresh(obj core.CanvasObject) {
 // calls it for the widget itself, whose renderer may refresh only its parts.
 // Safe from any goroutine.
 func (c *Canvas) MarkMinSizeDirty(obj core.CanvasObject) {
-	if node, ok := c.nodeMap.Load(obj); ok {
-		node.minSizeDirty.Store(true)
+	node, ok := c.nodeMap.Load(obj)
+	if !ok {
+		// An object no walk has placed in the tree takes no part in layout
+		// yet. It joins the tree through a container or widget that was
+		// refreshed (marking that path), resized, or shown (counted by
+		// layoutgen), or with new content or overlays, which walk everything;
+		// so its own refresh needs no walk. A tiles screen refreshes ~200
+		// such objects a second (#490), which would otherwise make every pass
+		// a full walk.
+		return
+	}
+	node.minSizeDirty.Store(true)
+	if !node.queued.Swap(true) {
+		c.dirtyMu.Lock()
+		c.dirtyNodes = append(c.dirtyNodes, node)
+		c.dirtyMu.Unlock()
+	}
+}
+
+// MinSizeVisits reports how many nodes the last EnsureMinSize visited.
+func (c *Canvas) MinSizeVisits() int { return c.minSizeVisits }
+
+// fullMinSizeEvery is how often the min-size pass walks every object although
+// nothing asks it to: that keeps the caches of untouched subtrees alive and
+// sweeps the node map of objects that left the tree (#487).
+const fullMinSizeEvery = 10 * time.Second
+
+// markDirtyPaths marks every node refreshed since the last min-size pass, and
+// its ancestors, as having a refreshed descendant.
+func (c *Canvas) markDirtyPaths() {
+	c.dirtyMu.Lock()
+	taken := c.dirtyNodes
+	c.dirtyNodes = c.dirtyTaken[:0]
+	c.dirtyTaken = taken
+	c.dirtyMu.Unlock()
+	for i, n := range taken {
+		n.queued.Store(false)
+		for p := n; p != nil && !p.descDirty; p = p.parent {
+			p.descDirty = true
+		}
+		taken[i] = nil
+	}
+}
+
+// needsMeasure reports whether EnsureMinSize must ask obj for its min size
+// again (#464): when everything is re-measured, when the node is new, was
+// refreshed, changed size or had a child's min size change, and always for a
+// primitive, whose min size can change without a refresh (SetMinSize) and
+// costs a field read or a cached text measurement to ask; a change then
+// reaches the parent as childChanged.
+func needsMeasure(node *RenderCacheNode, obj core.CanvasObject, size geo.Size, measureAll, childChanged bool) bool {
+	dirty := node.minSizeDirty.Swap(false)
+	if measureAll || dirty || childChanged || !node.measured || size != node.measuredSize {
+		return true
+	}
+	_, isWidget := obj.(core.Widget)
+	_, isContainer := obj.(*bellui.Container)
+	return !isWidget && !isContainer
+}
+
+// walkForMinSize walks every object when the shortcut cannot be trusted, and
+// otherwise only the paths to what was refreshed (#487).
+func (c *Canvas) walkForMinSize(measureAll bool, setup, ensureMinSize func(*RenderCacheNode, geo.Position)) {
+	now := time.Now()
+	full := measureAll || c.minSizeFull.Swap(false) ||
+		len(c.overlays.renderCaches) != c.measuredOverlays || now.Sub(c.lastFullMinSize) >= fullMinSizeEvery
+	c.measuredOverlays = len(c.overlays.renderCaches)
+	c.markDirtyPaths()
+	if full {
+		c.WalkTrees(setup, ensureMinSize)
+		c.lastFullMinSize = now
+		return
+	}
+	c.walkChangedTrees(setup, ensureMinSize)
+}
+
+// walkChangedTrees walks the content and overlay trees as WalkTrees does,
+// except that a measured node with no refreshed descendant and an unchanged
+// size is visited without its subtree: nothing below it can report a new min
+// size (#487). It neither sweeps the node map nor rebuilds the spatial index;
+// full walks and the paint walk do those.
+func (c *Canvas) walkChangedTrees(
+	beforeChildren func(*RenderCacheNode, geo.Position),
+	afterChildren func(*RenderCacheNode, geo.Position),
+) {
+	cull := func(obj core.CanvasObject, _, _ geo.Position, _ geo.Size) bool {
+		node, ok := c.nodeMap.Load(obj)
+		return ok && node.measured && !node.descDirty && obj.Size() == node.measuredSize
+	}
+	c.WalkContentTreesCulled(cull, beforeChildren, afterChildren)
+	for _, tree := range c.overlays.renderCaches {
+		if tree != nil {
+			c.walkTree(tree, cull, beforeChildren, afterChildren)
+		}
 	}
 }
 
@@ -566,6 +674,7 @@ func (c *Canvas) SetDirection(d bellui.Direction) {
 // This function does not use the canvas lock.
 func (c *Canvas) SetContentTreeAndFocusMgr(content core.CanvasObject) {
 	c.contentTree = &renderCacheTree{root: &RenderCacheNode{obj: content}}
+	c.minSizeFull.Store(true)
 
 	newFocusMgr := app.NewFocusManager(content)
 	if c.contentFocusMgr != nil {
@@ -810,6 +919,8 @@ func (c *Canvas) walkTree(
 
 	bc := func(obj core.CanvasObject, pos geo.Position, clipPos geo.Position, clipSize geo.Size) bool {
 		if node != nil && node.obj != obj {
+			// The old node and its later siblings leave the tree.
+			c.forgetNodes(node)
 			if parent.firstChild == node {
 				parent.firstChild = nil
 			}
@@ -873,6 +984,9 @@ func (c *Canvas) walkTree(
 		node = parent
 		parent = node.parent
 		if prev != nil && prev.parent != parent {
+			if prev.nextSibling != nil {
+				c.forgetNodes(prev.nextSibling) // old siblings past the last child
+			}
 			prev.nextSibling = nil
 		}
 
@@ -884,6 +998,20 @@ func (c *Canvas) walkTree(
 		node = node.nextSibling
 	}
 	driver.WalkVisibleObjectTreeCulled(tree.root.obj, cull, bc, ac)
+}
+
+// forgetNodes removes the objects of n, its later siblings and all their
+// descendants from the node map, as their nodes leave the render tree. A walk
+// that visits only changed paths does not sweep the map, so without this an
+// object removed from a container would stay reachable until the next full
+// walk (#380, #487). An object that already has a new node keeps it.
+func (c *Canvas) forgetNodes(n *RenderCacheNode) {
+	for ; n != nil; n = n.nextSibling {
+		if cur, ok := c.nodeMap.Load(n.obj); ok && cur == n {
+			c.nodeMap.Delete(n.obj)
+		}
+		c.forgetNodes(n.firstChild)
+	}
 }
 
 type activatableMenu interface {

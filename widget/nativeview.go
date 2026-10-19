@@ -8,7 +8,7 @@ import (
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/driver"
 	"github.com/belluikit/bellui/geo"
-	"github.com/belluikit/bellui/internal/cache"
+	"github.com/belluikit/bellui/internal/layoutgen"
 )
 
 // NativeViewHost embeds an OS-owned view — a web view, a native video surface,
@@ -202,8 +202,10 @@ func (h *NativeViewHost) MinSize() geo.Size {
 // SetMinSize sets the smallest size this host should be laid out at. Use
 // device-independent points, not pixels, as with any other widget size.
 func (h *NativeViewHost) SetMinSize(min geo.Size) {
+	if h.min != min {
+		layoutgen.Changed()
+	}
 	h.min = min
-	cache.MinSizeSet()
 }
 
 // Hide hides the host and its native view.

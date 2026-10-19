@@ -8,6 +8,7 @@ import (
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/cache"
+	"github.com/belluikit/bellui/internal/layoutgen"
 	"github.com/belluikit/bellui/lang"
 	"github.com/belluikit/bellui/theme"
 )
@@ -663,8 +664,10 @@ func (s *Scroll) MinSize() geo.Size {
 // If the specified size is larger than the content size then scrolling will not be enabled
 // This can be helpful to appear larger than default if the layout is collapsing this widget.
 func (s *Scroll) SetMinSize(size geo.Size) {
+	if s.minSize != size {
+		layoutgen.Changed()
+	}
 	s.minSize = size
-	cache.MinSizeSet()
 }
 
 // Refresh causes this widget to be redrawn in it's current state

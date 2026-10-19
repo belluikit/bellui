@@ -125,18 +125,6 @@ func CleanCanvas(canvas core.Canvas) {
 }
 
 // ResetThemeCaches clears all the svg and text size cache maps
-// minSizeEpoch counts direct min-size settings (SetMinSize), which refresh
-// nothing, so no canvas hears of them otherwise.
-var minSizeEpoch atomic.Uint64
-
-// MinSizeSet records that an object's min size was set directly. The next
-// min-size pass of every canvas asks every object again (#464): a pass that
-// asks only refreshed objects would miss it.
-func MinSizeSet() { minSizeEpoch.Add(1) }
-
-// MinSizeEpoch returns the count MinSizeSet raises.
-func MinSizeEpoch() uint64 { return minSizeEpoch.Load() }
-
 func ResetThemeCaches() {
 	svgs.Clear()
 	fontSizeCache.Clear()
