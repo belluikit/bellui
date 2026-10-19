@@ -437,20 +437,28 @@ func walkObjectTree(
 		cull = nil // positions below no longer match the clip
 	}
 
+	// One renderer lookup serves both the children and the clip check (#492).
 	var children []core.CanvasObject
+	var r core.WidgetRenderer
 	switch co := obj.(type) {
 	case *bellui.Container:
 		children = co.Objects
 	case core.Widget:
-		if !culled && (cache.IsRendered(co) || requireVisible) {
-			children = cache.Renderer(co).Objects()
+		r, _ = cache.CachedRenderer(co)
+		if !culled {
+			if r == nil && requireVisible {
+				r = cache.Renderer(co)
+			}
+			if r != nil {
+				children = r.Objects()
+			}
 		}
 	}
 	if culled {
 		children = nil
 	}
 
-	if IsClip(obj) {
+	if isClip(obj, r) {
 		clipPos = pos
 		clipSize = obj.Size()
 	}
@@ -490,25 +498,57 @@ func walkObjectTree(
 }
 
 func IsClip(o core.CanvasObject) bool {
-	_, scroll := o.(event.Scrollable)
-	if scroll {
+	return isClip(o, cachedRenderer(o))
+}
+
+// isClip is IsClip given the object's renderer, nil when it has none.
+func isClip(o core.CanvasObject, r core.WidgetRenderer) bool {
+	if _, scroll := o.(event.Scrollable); scroll {
 		return true
 	}
-
 	if cont, ok := o.(*bellui.Container); ok && cont.ClipToBounds {
 		return true
 	}
-
-	if _, isWid := o.(core.Widget); !isWid {
-		return false
-	}
-	r, rendered := cache.CachedRenderer(o.(core.Widget))
-	if !rendered {
-		return false
-	}
-
 	_, clip := r.(interface{ IsClip() })
 	return clip
+}
+
+// cachedRenderer returns a widget's cached renderer, or nil.
+func cachedRenderer(o core.CanvasObject) core.WidgetRenderer {
+	w, isWid := o.(core.Widget)
+	if !isWid {
+		return nil
+	}
+	r, _ := cache.CachedRenderer(w)
+	return r
+}
+
+// Clips is what an object establishes to clip its children. IsClip,
+// IsRoundedClip and IsPathClip each look the renderer up; a paint walk asks
+// all three for every object, twice, so ClipsOf answers them from one lookup
+// (#492).
+type Clips struct {
+	Rect    bool    // clips to its bounds, as IsClip
+	Rounded bool    // stencil-clips to rounded corners of Radius, as IsRoundedClip
+	Radius  float32 // the rounded clip's corner radius
+	Path    any     // the clip path, as IsPathClip, when non-nil
+}
+
+// ClipsOf reports the clips an object establishes for its children.
+func ClipsOf(o core.CanvasObject) Clips {
+	r := cachedRenderer(o)
+	c := Clips{Rect: isClip(o, r)}
+	if r == nil {
+		return c
+	}
+	if rc, ok := r.(interface{ RoundedClipCornerRadius() float32 }); ok {
+		c.Radius = rc.RoundedClipCornerRadius()
+		c.Rounded = c.Radius > 0
+	}
+	if pc, ok := r.(interface{ ClipPath() any }); ok {
+		c.Path = pc.ClipPath()
+	}
+	return c
 }
 
 // IsRepaintBoundary checks if a canvas object's renderer implements the

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/belluikit/bellui"
+	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/internal/async"
 	"github.com/belluikit/bellui/layout"
 	"github.com/stretchr/testify/assert"
@@ -33,6 +34,30 @@ func TestDeduplicatedObjectQueue(t *testing.T) {
 	assert.Equal(t, uint64(1), queue.Len())
 	queue.In(obj1)
 	assert.Equal(t, uint64(1), queue.Len())
+}
+
+// TestDeduplicatedObjectQueueAllocations pins that a warmed-up queue refreshes
+// without allocating: a labels frame queues thousands of refreshes, and the
+// sync.Map this replaced allocated a node for each.
+func TestDeduplicatedObjectQueueAllocations(t *testing.T) {
+	if raceEnabled {
+		t.Skip("the queue's items come from a sync.Pool, which -race empties at random")
+	}
+	queue := deduplicatedObjectQueue{queue: async.NewCanvasObjectQueue()}
+	objs := make([]core.CanvasObject, 64)
+	for i := range objs {
+		objs[i] = &bellui.Container{}
+	}
+	cycle := func() {
+		for _, o := range objs {
+			queue.In(o)
+			queue.In(o)
+		}
+		for queue.Out() != nil {
+		}
+	}
+	cycle() // grow the map and fill the item pool
+	assert.Zero(t, testing.AllocsPerRun(20, cycle))
 }
 
 func TestOverlayStack(t *testing.T) {

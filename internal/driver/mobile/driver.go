@@ -893,15 +893,16 @@ func (w *mobileTreeWalker) draw(node *common.RenderCacheNode, pos geo.Position) 
 	// clip-owner (scroll/ClipToBounds) still constrains its descendants; otherwise
 	// its children that extend into the dirty region draw unclipped, leaking content
 	// past the viewport (pre-rebrand tracker #333). afterDraw tears these down regardless of culling.
-	if intdriver.IsClip(obj) {
+	clips := intdriver.ClipsOf(obj)
+	if clips.Rect {
 		inner := w.clips.Push(paintPos, obj.Size())
 		w.c.Painter().StartClipping(inner.Rect())
 	}
-	if isRounded, radius := intdriver.IsRoundedClip(obj); isRounded {
-		w.c.Painter().StartRoundedClipping(paintPos, obj.Size(), radius)
+	if clips.Rounded {
+		w.c.Painter().StartRoundedClipping(paintPos, obj.Size(), clips.Radius)
 	}
-	if clipPathObj, ok := intdriver.IsPathClip(obj); ok {
-		if clipPath, is := clipPathObj.(*belluicanvas.Path); is {
+	if clips.Path != nil {
+		if clipPath, is := clips.Path.(*belluicanvas.Path); is {
 			w.c.Painter().StartPathClipping(clipPath, paintPos, obj.Size())
 		}
 	}
@@ -945,13 +946,14 @@ func (w *mobileTreeWalker) afterDraw(node *common.RenderCacheNode, pos geo.Posit
 
 	// Tear down clips even when culled: draw establishes them unconditionally for
 	// clip-owners so descendants stay clipped (pre-rebrand tracker #333), so push/pop must stay paired.
-	if isRounded, _ := intdriver.IsRoundedClip(obj); isRounded {
+	clips := intdriver.ClipsOf(obj)
+	if clips.Rounded {
 		w.c.Painter().StopRoundedClipping()
 	}
-	if _, ok := intdriver.IsPathClip(obj); ok {
+	if clips.Path != nil {
 		w.c.Painter().StopPathClipping()
 	}
-	if intdriver.IsClip(obj) {
+	if clips.Rect {
 		w.c.Painter().StopClipping()
 		w.clips.Pop()
 		if top := w.clips.Top(); top != nil {
