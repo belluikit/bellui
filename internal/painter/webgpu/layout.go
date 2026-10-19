@@ -46,6 +46,9 @@ type VertexAttr struct {
 type VertexLayout struct {
 	Stride int // bytes per vertex
 	Attrs  []VertexAttr
+	// PerInstance steps the buffer once per instance instead of per vertex:
+	// the shader builds each instance's quad from the vertex index (#475).
+	PerInstance bool
 }
 
 // Topology is the primitive topology for a shader's geometry, mirroring the GL
@@ -103,7 +106,27 @@ var texturedVertex = VertexLayout{
 	},
 }
 
+// quadInstance is the per-instance layout of the quad shader (#475): rect,
+// radius, fill, stroke, params (stroke half width, edge softness, kind) and
+// glyph uv, each a vec4.
+var quadInstance = VertexLayout{
+	Stride:      QuadInstanceFloats * 4,
+	PerInstance: true,
+	Attrs: []VertexAttr{
+		{Location: 0, Format: Float32x4, Offset: 0},
+		{Location: 1, Format: Float32x4, Offset: 16},
+		{Location: 2, Format: Float32x4, Offset: 32},
+		{Location: 3, Format: Float32x4, Offset: 48},
+		{Location: 4, Format: Float32x4, Offset: 64},
+		{Location: 5, Format: Float32x4, Offset: 80},
+	},
+}
+
+// QuadInstanceFloats is the number of float32s in one quad instance.
+const QuadInstanceFloats = 24
+
 var descriptors = map[string]Descriptor{
+	"quad": {Name: "quad", Vertex: quadInstance, Textured: true, DefaultBlend: BlendOver, Topology: TriangleStrip},
 	// simple multiplies rgb by alpha in-shader, so it composites premultiplied
 	// (matching the GL painter's BlendFunc(one, oneMinusSrcAlpha) for textures).
 	"simple":          {Name: "simple", Vertex: texturedVertex, Textured: true, DefaultBlend: BlendPremul, Topology: TriangleStrip},

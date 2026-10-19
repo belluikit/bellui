@@ -35,6 +35,7 @@ var shaderNames = []string{
 	"ripple",
 	"blur",
 	"scene3d",
+	"quad",
 }
 
 // Names returns the names of the available WGSL shader modules.

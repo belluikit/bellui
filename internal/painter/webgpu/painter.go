@@ -80,7 +80,11 @@ type painter struct {
 	// equal shadows share one texture. frame counts begun frames, for eviction.
 	// See draw_shadow.go (#434).
 	shadows map[shadowKey]*shadowEntry
-	frame   uint64
+
+	// batch holds the batched drawing's glyph atlas and text layouts
+	// (batch.go, #475).
+	batch batchState
+	frame uint64
 
 	// canvasFBO is the persistent full-canvas render target for dirty-region
 	// culling (gpu.DirtyRegionPainter); nil when not allocated. See canvas_fbo.go.
@@ -213,6 +217,8 @@ func (p *painter) beginFrame() {
 	p.frame++
 	p.roundClips = p.roundClips[:0] // a frame never inherits an unpaired clip
 	p.evictShadows()
+	p.evictLayouts()
+	p.resetFullAtlas()
 }
 
 // backgroundColor returns the theme background as straight RGBA in 0..1.
