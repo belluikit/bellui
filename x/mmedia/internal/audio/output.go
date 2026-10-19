@@ -63,40 +63,49 @@ func NewOutput(sampleRate, channels int) *Output {
 	}
 
 	ctx := initOto(sampleRate, channels)
+	return newOutput(ctx, sampleRate, channels, otoSampleRate, otoChannels)
+}
 
+// newOutput builds an Output for a stream of streamRate and channels played on
+// a device fixed at deviceRate and deviceChannels (0: not known, take the
+// stream's).
+//
+// sampleRate is the rate of the bytes the Output holds and plays, which is the
+// device's: a stream at another rate is resampled to it before it reaches the
+// ring. Everything that turns bytes into time (the playback position, the ring
+// and pull sizes) uses it. The position used to divide device-rate bytes by
+// the stream's rate, so a 48 kHz stream on a device the process had opened at
+// 44.1 kHz played at 0.918x (#506).
+func newOutput(ctx *oto.Context, streamRate, channels, deviceRate, deviceChannels int) *Output {
 	// oto's context is created once per process, so the first stream fixes the
 	// device's channel count for every stream after it. Unlike a sample-rate
 	// mismatch, which the resampler absorbs, feeding the device a different
 	// number of interleaved channels would garble both the audio and the
 	// byte-derived playback clock. Report what the device actually plays so
 	// the caller can ask its decoder for exactly that many channels.
-	if otoChannels > 0 {
-		channels = otoChannels
+	if deviceChannels > 0 {
+		channels = deviceChannels
 	}
-	ringRate := sampleRate // what the ring holds: resampled to the device rate if they differ
-	if otoSampleRate > 0 {
-		ringRate = otoSampleRate
+	rate := streamRate
+	if deviceRate > 0 {
+		rate = deviceRate
 	}
-	buf := NewRingBuffer(audioBytes(ringRate, channels, ringDuration))
 
 	o := &Output{
 		ctx:        ctx,
-		buffer:     buf,
-		sampleRate: sampleRate,
+		buffer:     NewRingBuffer(audioBytes(rate, channels, ringDuration)),
+		sampleRate: rate,
 		channels:   channels,
 		volume:     1.0,
 	}
-
-	// Auto-configure resampling if oto was initialized at a different rate.
-	if otoSampleRate != sampleRate && otoSampleRate > 0 {
-		o.resampler = NewResampler(sampleRate, otoSampleRate, channels)
-	}
-
+	o.SetSourceSampleRate(streamRate)
 	return o
 }
 
-// SetSourceSampleRate configures resampling if the source rate differs from output.
+// SetSourceSampleRate configures resampling from srcRate to the rate the
+// Output plays at, or none when they agree.
 func (o *Output) SetSourceSampleRate(srcRate int) {
+	o.resampler = nil
 	if srcRate != o.sampleRate && srcRate > 0 {
 		o.resampler = NewResampler(srcRate, o.sampleRate, o.channels)
 	}
@@ -228,7 +237,8 @@ func (o *Output) PlaybackPosition() time.Duration {
 	return posBase + time.Duration(frames)*time.Second/time.Duration(o.sampleRate)
 }
 
-// SampleRate returns the configured sample rate.
+// SampleRate is the rate the Output plays at: the device's, which a stream
+// at another rate is resampled to.
 func (o *Output) SampleRate() int {
 	return o.sampleRate
 }
