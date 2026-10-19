@@ -205,13 +205,7 @@ func (c *Canvas) EnsureMinSize() bool {
 		}
 		minSize := node.minSize
 		size := obj.Size()
-		// Primitives are always asked: their min size can change without a
-		// refresh (SetMinSize), and asking costs a field read or a cached text
-		// measurement. A change then reaches the parent as childChanged.
-		_, isWidget := obj.(core.Widget)
-		_, isContainer := obj.(*bellui.Container)
-		primitive := !isWidget && !isContainer
-		if dirty := node.minSizeDirty.Swap(false); measureAll || primitive || dirty || childChanged || !node.measured || size != node.measuredSize {
+		if needsMeasure(node, obj, size, measureAll, childChanged) {
 			minSize = obj.MinSize()
 			node.measured, node.measuredSize = true, size
 		}
@@ -247,19 +241,7 @@ func (c *Canvas) EnsureMinSize() bool {
 	// past the per-node DirectionScope Pops in the visitor below.
 	defer uidir.Restore(uidir.Mark())
 	uidir.Push(c.layoutDir)
-	// Walk every object when the shortcut cannot be trusted, and otherwise only
-	// the paths to what was refreshed (#487).
-	now := time.Now()
-	full := measureAll || c.minSizeFull.Swap(false) ||
-		len(c.overlays.renderCaches) != c.measuredOverlays || now.Sub(c.lastFullMinSize) >= fullMinSizeEvery
-	c.measuredOverlays = len(c.overlays.renderCaches)
-	c.markDirtyPaths()
-	if full {
-		c.WalkTrees(setup, ensureMinSize)
-		c.lastFullMinSize = now
-	} else {
-		c.walkChangedTrees(setup, ensureMinSize)
-	}
+	c.walkForMinSize(measureAll, setup, ensureMinSize)
 	uidir.Pop(c.layoutDir)
 
 	shouldResize := !c.FixedSize && windowNeedsMinSizeUpdate && (csize.Width < min.Width || csize.Height < min.Height)
@@ -602,6 +584,38 @@ func (c *Canvas) markDirtyPaths() {
 		}
 		taken[i] = nil
 	}
+}
+
+// needsMeasure reports whether EnsureMinSize must ask obj for its min size
+// again (#464): when everything is re-measured, when the node is new, was
+// refreshed, changed size or had a child's min size change, and always for a
+// primitive, whose min size can change without a refresh (SetMinSize) and
+// costs a field read or a cached text measurement to ask; a change then
+// reaches the parent as childChanged.
+func needsMeasure(node *RenderCacheNode, obj core.CanvasObject, size geo.Size, measureAll, childChanged bool) bool {
+	dirty := node.minSizeDirty.Swap(false)
+	if measureAll || dirty || childChanged || !node.measured || size != node.measuredSize {
+		return true
+	}
+	_, isWidget := obj.(core.Widget)
+	_, isContainer := obj.(*bellui.Container)
+	return !isWidget && !isContainer
+}
+
+// walkForMinSize walks every object when the shortcut cannot be trusted, and
+// otherwise only the paths to what was refreshed (#487).
+func (c *Canvas) walkForMinSize(measureAll bool, setup, ensureMinSize func(*RenderCacheNode, geo.Position)) {
+	now := time.Now()
+	full := measureAll || c.minSizeFull.Swap(false) ||
+		len(c.overlays.renderCaches) != c.measuredOverlays || now.Sub(c.lastFullMinSize) >= fullMinSizeEvery
+	c.measuredOverlays = len(c.overlays.renderCaches)
+	c.markDirtyPaths()
+	if full {
+		c.WalkTrees(setup, ensureMinSize)
+		c.lastFullMinSize = now
+		return
+	}
+	c.walkChangedTrees(setup, ensureMinSize)
 }
 
 // walkChangedTrees walks the content and overlay trees as WalkTrees does,
