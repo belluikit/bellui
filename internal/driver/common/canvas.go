@@ -101,10 +101,12 @@ type Canvas struct {
 	// direction stack around this canvas' layout and paint.
 	layoutDir bellui.Direction
 
-	// measuredGen and measuredScale are the theme cache generation and scale
-	// EnsureMinSize last measured under; a change re-measures everything.
+	// measuredGen, measuredScale and measuredEpoch are the theme cache
+	// generation, scale and cache.MinSizeEpoch EnsureMinSize last measured
+	// under; a change re-measures everything.
 	measuredGen   uint64
 	measuredScale float32
+	measuredEpoch uint64
 }
 
 // AddShortcut adds a shortcut to the canvas.
@@ -147,9 +149,9 @@ func (c *Canvas) EnsureMinSize() bool {
 	// A theme or scale change can change any min size: ask every object.
 	// Otherwise only objects that were refreshed, resized, or whose children's
 	// min sizes changed are asked again; the rest report what they did (#464).
-	gen, scale := cache.ThemeCacheGeneration(), c.impl.Scale()
-	measureAll := gen != c.measuredGen || scale != c.measuredScale
-	c.measuredGen, c.measuredScale = gen, scale
+	gen, scale, epoch := cache.ThemeCacheGeneration(), c.impl.Scale(), cache.MinSizeEpoch()
+	measureAll := gen != c.measuredGen || scale != c.measuredScale || epoch != c.measuredEpoch
+	c.measuredGen, c.measuredScale, c.measuredEpoch = gen, scale, epoch
 
 	setup := func(node *RenderCacheNode, pos geo.Position) {
 		if !node.obj.Visible() {

@@ -664,6 +664,7 @@ func (s *Scroll) MinSize() geo.Size {
 // This can be helpful to appear larger than default if the layout is collapsing this widget.
 func (s *Scroll) SetMinSize(size geo.Size) {
 	s.minSize = size
+	cache.MinSizeSet()
 }
 
 // Refresh causes this widget to be redrawn in it's current state

@@ -1,11 +1,13 @@
 package mobile
 
 import (
+	"image/color"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/belluikit/bellui"
+	belluicanvas "github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
@@ -70,4 +72,41 @@ func TestEnsureMinSizeAfterWidgetRefresh(t *testing.T) {
 	w.Refresh()
 	c.EnsureMinSize()
 	assert.Equal(t, float32(150), w.Size().Width, "the refreshed widget's new min size was not laid out")
+}
+
+// TestEnsureMinSizeAfterWidgetSetMinSize checks that a widget's SetMinSize,
+// which refreshes nothing, is still laid out: SetMinSize makes the next pass
+// ask everything again (cache.MinSizeSet).
+func TestEnsureMinSizeAfterWidgetSetMinSize(t *testing.T) {
+	c := newCanvas(bellui.CurrentDevice()).(*canvas)
+	scroll := container.NewVScroll(widget.NewLabel("side"))
+	scroll.SetMinSize(geo.NewSize(100, 0))
+	c.SetContent(container.NewStack(container.NewHBox(scroll)))
+	c.Resize(geo.NewSize(400, 300))
+	c.EnsureMinSize()
+	c.EnsureMinSize()
+	assert.Equal(t, float32(100), scroll.Size().Width)
+
+	scroll.SetMinSize(geo.NewSize(240, 0))
+	c.EnsureMinSize()
+	assert.Equal(t, float32(240), scroll.Size().Width, "a widget's SetMinSize without a refresh was not laid out")
+}
+
+// TestEnsureMinSizeAfterHide checks that hiding a primitive, which refreshes
+// nothing, still re-lays out its container.
+func TestEnsureMinSizeAfterHide(t *testing.T) {
+	c := newCanvas(bellui.CurrentDevice()).(*canvas)
+	a := belluicanvas.NewRectangle(color.Black)
+	a.SetMinSize(geo.NewSize(50, 50))
+	b := belluicanvas.NewRectangle(color.White)
+	b.SetMinSize(geo.NewSize(50, 50))
+	c.SetContent(container.NewStack(container.NewHBox(a, b)))
+	c.Resize(geo.NewSize(400, 300))
+	c.EnsureMinSize()
+	c.EnsureMinSize()
+	assert.NotZero(t, b.Position().X)
+
+	a.Hide()
+	c.EnsureMinSize()
+	assert.Zero(t, b.Position().X, "b should move into the hidden a's place")
 }
