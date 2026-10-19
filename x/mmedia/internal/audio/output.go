@@ -11,7 +11,6 @@ import (
 const (
 	defaultSampleRate = 44100
 	defaultChannels   = 2
-	defaultBufferSize = 8192 * 16 // 128 KB: ~740 ms at 44.1 kHz stereo, ~1.5 s mono
 )
 
 // Output manages audio playback via ebitengine/oto.
@@ -64,7 +63,6 @@ func NewOutput(sampleRate, channels int) *Output {
 	}
 
 	ctx := initOto(sampleRate, channels)
-	buf := NewRingBuffer(defaultBufferSize)
 
 	// oto's context is created once per process, so the first stream fixes the
 	// device's channel count for every stream after it. Unlike a sample-rate
@@ -75,6 +73,11 @@ func NewOutput(sampleRate, channels int) *Output {
 	if otoChannels > 0 {
 		channels = otoChannels
 	}
+	ringRate := sampleRate // what the ring holds: resampled to the device rate if they differ
+	if otoSampleRate > 0 {
+		ringRate = otoSampleRate
+	}
+	buf := NewRingBuffer(audioBytes(ringRate, channels, ringDuration))
 
 	o := &Output{
 		ctx:        ctx,
@@ -129,21 +132,35 @@ func (o *Output) Start() {
 }
 
 // Pause pauses audio playback.
+// ringDuration is how much decoded audio the ring buffer holds, and the
+// decoder stops at half of it (Pipeline.audioAheadFull). It is sized in time:
+// a fixed 128 KB was 0.68 s of 48 kHz stereo, so audio could run at most 0.34 s
+// ahead of playback, but FFmpeg's threaded video decoder hands frames out
+// several frames after their packets, by more than that. The decoder sat on the
+// audio limit with the newest video frame already late, every frame was shown
+// late, and A/V sync averaged 25 ms with peaks of 100 ms (#504). With a second
+// of audio allowed ahead, video is decoded before it is due.
+const ringDuration = 2 * time.Second
+
 // playerChunk is how much audio the device player pulls from the ring buffer
 // at a time. It is a duration, not a byte count, because what has to cover it
-// is the decoder's lead, and that is bounded in time: at 1080p60 the video queue
-// stops the decoder about 270 ms ahead (#504). A fixed 32 KB was 170 ms of
-// 48 kHz stereo but 370 ms of 44.1 kHz mono, longer than that lead, so every
-// pull came up short and was padded with silence that the playback position
-// does not count: the clock, and the video paced on it, ran at half speed.
-// 60 ms was too small for the device and slowed the clock too; 100 to 200 ms
-// all played at full speed.
+// is the decoder's lead, and at 1080p60 the video queue stops the decoder about
+// 270 ms ahead (#504). A fixed 32 KB was 170 ms of 48 kHz stereo but 370 ms of
+// 44.1 kHz mono, longer than that lead, so every pull came up short and was
+// padded with silence that the playback position does not count: the clock,
+// and the video paced on it, ran at half speed. 60 ms was too small for the
+// device and slowed the clock too; 100 to 200 ms all played at full speed.
 const playerChunk = 150 * time.Millisecond
+
+// audioBytes is d of 16-bit audio at rate and channels, in whole sample frames.
+func audioBytes(rate, channels int, d time.Duration) int {
+	frames := int(int64(rate) * int64(d) / int64(time.Second))
+	return frames * channels * 2
+}
 
 // playerBufferBytes is playerChunk of 16-bit audio at rate and channels.
 func playerBufferBytes(rate, channels int) int {
-	frames := int(int64(rate) * int64(playerChunk) / int64(time.Second))
-	return frames * channels * 2
+	return audioBytes(rate, channels, playerChunk)
 }
 
 func (o *Output) Pause() {

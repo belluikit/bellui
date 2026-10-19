@@ -21,3 +21,17 @@ func TestPlayerBufferIsADuration(t *testing.T) {
 		}
 	}
 }
+
+// TestAudioCanLeadTheThreadedVideoDecoder pins #504's second half: the
+// decoder stops once half the ring is full, and FFmpeg's threaded video decoder
+// releases frames several frames after their packets. With 0.34 s of lead
+// (128 KB of 48 kHz stereo) video was always decoded late; it needs about half
+// a second or more.
+func TestAudioCanLeadTheThreadedVideoDecoder(t *testing.T) {
+	if lead := ringDuration / 2; lead < 500*time.Millisecond {
+		t.Errorf("audio may run %v ahead of playback; want at least 500 ms", lead)
+	}
+	if got, want := audioBytes(48000, 2, ringDuration), 48000*2*2*int(ringDuration/time.Second); got != want {
+		t.Errorf("ring of 48 kHz stereo is %d bytes; want %d", got, want)
+	}
+}
