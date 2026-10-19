@@ -8,9 +8,9 @@
   separate Go modules — cd into them). Run staticcheck as
   `go run honnef.co/go/tools/cmd/staticcheck@2025.1.1 ./...` — the locally
   installed binary is too old for this Go toolchain.
-- Follow-up issues you file are auto-added to the backlog project by the
-  add-to-project workflow: put suggested Workstream/Priority/Tranche in the
-  issue body so triage can set the fields.
+- Follow-up issues you file are added to the backlog project by hand at
+  triage; nothing adds them automatically. Put suggested
+  Workstream/Priority/Tranche in the issue body so triage can set the fields.
 - A platform-bridge change is not verified by unit tests alone (the repository
   guide: live-verify harnesses in `hack/*probe`). If your change touches a platform
   bridge and you cannot run the matching probe on the required
