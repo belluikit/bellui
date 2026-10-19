@@ -4,6 +4,8 @@ import (
 	"image/color"
 	"testing"
 
+	"github.com/belluikit/bellui/test"
+
 	"github.com/belluikit/bellui/x/charts/coord"
 	"github.com/belluikit/bellui/x/charts/internal/pool"
 )
@@ -43,6 +45,7 @@ func BenchmarkLineRender_100(b *testing.B)   { benchmarkLineRender(b, 100) }
 func BenchmarkLineRender_10000(b *testing.B) { benchmarkLineRender(b, 10000) }
 
 func BenchmarkBarRender_1000(b *testing.B) {
+	test.NewTempApp(b) // a drawn object asks the current app to repaint (#515)
 	cs := makeTestCoordForSeries()
 	data := make([]float64, 1000)
 	for i := range data {
@@ -73,6 +76,7 @@ func BenchmarkBarRender_1000(b *testing.B) {
 }
 
 func BenchmarkBarRender_1000_NoPool(b *testing.B) {
+	test.NewTempApp(b) // a drawn object asks the current app to repaint (#515)
 	cs := makeTestCoordForSeries()
 	data := make([]float64, 1000)
 	for i := range data {
