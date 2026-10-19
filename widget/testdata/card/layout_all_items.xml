@@ -7,7 +7,7 @@
 			<text pos="10,138" size="118x28" textSize="16">Longer title</text>
 			<text pos="10,170" size="118x16">subtitle with length</text>
 			<image pos="2,2" rsc="computerIcon" size="134x128" themed="foreground"/>
-			<rectangle fillColor="inputBackground" pos="6,198" size="126x10" strokeColor="rgba(0,0,0,255)" strokeWidth="2"/>
+			<rectangle fillColor="inputBackground" pos="10,198" size="118x10" strokeColor="rgba(0,0,0,255)" strokeWidth="2"/>
 		</widget>
 	</content>
 </canvas>

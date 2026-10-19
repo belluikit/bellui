@@ -194,8 +194,10 @@ func (c *cardRenderer) Layout(size geo.Size) {
 		pos.Y += titlePad
 	}
 
-	size.Width -= padding * 2
-	pos.X += padding
+	// The content lines up with the title, as MD3's card padding has it (#494).
+	contentPad := padding * 2
+	size.Width -= contentPad * 2
+	pos.X += contentPad
 	if c.card.Content != nil {
 		height := size.Height - padding*2 - (pos.Y - padding/2) // adjust for content and initial offset
 		if c.card.Title != "" || c.card.Subtitle != "" {
@@ -248,7 +250,7 @@ func (c *cardRenderer) MinSize() geo.Size {
 
 	if hasContent {
 		contentMin := c.card.Content.MinSize()
-		min = geo.NewSize(geo.Max(min.Width, contentMin.Width+padding*3),
+		min = geo.NewSize(geo.Max(min.Width, contentMin.Width+padding*5),
 			min.Height+contentMin.Height+padding*2)
 	}
 

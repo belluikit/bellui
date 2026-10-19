@@ -6,7 +6,7 @@
 			</widget>
 			<text pos="10,10" size="60x28" textSize="16">Hello</text>
 			<text size="0x0"></text>
-			<rectangle fillColor="inputBackground" pos="6,50" size="68x10" strokeColor="rgba(0,0,0,255)" strokeWidth="2"/>
+			<rectangle fillColor="inputBackground" pos="10,50" size="60x10" strokeColor="rgba(0,0,0,255)" strokeWidth="2"/>
 		</widget>
 	</content>
 </canvas>

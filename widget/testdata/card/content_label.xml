@@ -1,12 +1,12 @@
-<canvas padded size="62x52">
+<canvas padded size="70x52">
 	<content>
-		<widget pos="4,4" size="54x44" type="*widget.Card">
-			<widget pos="2,2" size="50x40" type="*widget.Shadow">
-				<boxShadow blurRadius="1.5" color="shadow" cornerRadius="4" offsetY="0.5" size="50x40"/>
+		<widget pos="4,4" size="62x44" type="*widget.Card">
+			<widget pos="2,2" size="58x40" type="*widget.Shadow">
+				<boxShadow blurRadius="1.5" color="shadow" cornerRadius="4" offsetY="0.5" size="58x40"/>
 			</widget>
 			<text size="0x0" textSize="16"></text>
 			<text size="0x0"></text>
-			<widget pos="6,6" size="42x32" type="*widget.Label">
+			<widget pos="10,6" size="42x32" type="*widget.Label">
 				<widget size="42x32" type="*widget.RichText">
 					<text pos="8,8" size="26x16">Test</text>
 				</widget>
