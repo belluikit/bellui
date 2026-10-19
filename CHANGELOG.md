@@ -72,6 +72,10 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
   speed and 60 fps with no drops. Picture and sound line up better on every
   video: on average within about 1 ms instead of 25 ms, with peaks of about
   10 ms instead of 100 ms.
+* **Audio files at different sample rates play at the right speed**
+  ([#506](https://github.com/belluikit/bellui/issues/506)). In `x/mmedia`, a
+  48 kHz file played after a 44.1 kHz one in the same app ran at 0.92× speed,
+  picture included.
 
 * **Infinite progress bars animate again**
   ([#497](https://github.com/belluikit/bellui/issues/497)). A
