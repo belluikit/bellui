@@ -264,6 +264,9 @@ func (p *painter) drawOblong(obj core.CanvasObject, fill, stroke color.Color, st
 	}
 	rounded := trR != 0 || tlR != 0 || brR != 0 || blR != 0
 	bounds, points := p.shapeQuad(obj, pos, frame, aspect)
+	if p.batchOblong(obj, fill, stroke, strokeWidth, trR, tlR, brR, blR, aspect, pos, frame, bounds) {
+		return
+	}
 
 	fw, fh := p.scaleFrameSize(frame)
 	x1, x2, y1, y2 := p.scaleRectCoords(bounds[0], bounds[2], bounds[1], bounds[3])
@@ -305,6 +308,9 @@ func (p *painter) drawOblong(obj core.CanvasObject, fill, stroke color.Color, st
 }
 
 func (p *painter) drawCircle(circle *canvas.Circle, pos geo.Position, frame geo.Size) {
+	if p.batchCircle(circle, pos, frame) {
+		return
+	}
 	radius := paint.GetMaximumRadius(circle.Size())
 	var bounds [4]float32
 	var points []float32
@@ -621,6 +627,9 @@ func (p *painter) drawText(text *canvas.Text, pos geo.Position, frame geo.Size) 
 	}
 	size := text.MinSize()
 	pos = p.alignedTextPos(pos, text.Alignment, size, text.Size())
+	if p.batchText(text, pos, frame) {
+		return
+	}
 	if text.SubPixel {
 		size.Width += paint.VectorPad(text)
 	} else {
