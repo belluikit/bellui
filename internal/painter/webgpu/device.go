@@ -249,6 +249,14 @@ type Device struct {
 	// has round-tripped (e.g. a Card's elevation shadow blanked its own content).
 	stencilRef uint32
 
+	// passDepth is the depth-stencil view attached to the open pass, and
+	// stencilZero holds the views whose stencil is known to be zero everywhere:
+	// cleared by a pass's load op, or left so by the painter's clips. A view
+	// missing from it may hold anything. Rounded clips use it to clear only
+	// their own rect instead of the whole target (#466).
+	passDepth   *wgpu.TextureView
+	stencilZero map[*wgpu.TextureView]bool
+
 	// capture is a persistent copy of the last presented frame, kept so
 	// Capture() can read back content after the swapchain texture is gone. The
 	// per-frame copy is only maintained once Capture has been requested (pre-rebrand tracker #219).
@@ -645,6 +653,7 @@ func (d *Device) ReleaseSurface() {
 // releaseDepthStencils frees and clears the depth-stencil attachment cache.
 func (d *Device) releaseDepthStencils() {
 	for k, ds := range d.depthStencils {
+		delete(d.stencilZero, ds.view)
 		ds.view.Release()
 		destroyTexture(ds.tex)
 		delete(d.depthStencils, k)
@@ -1658,6 +1667,32 @@ func (d *Device) beginTopPass() {
 	}
 	d.pass = d.encoder.BeginRenderPass(desc)
 	d.passClip = scissorRect{w: t.w, h: t.h, active: true}
+	d.passDepth = dv
+	if load == wgpu.LoadOpClear {
+		d.SetStencilZero(true)
+	}
+}
+
+// StencilZero reports whether the open pass's stencil is known to be zero
+// everywhere.
+func (d *Device) StencilZero() bool {
+	return d.pass != nil && d.passDepth != nil && d.stencilZero[d.passDepth]
+}
+
+// SetStencilZero records whether the open pass's stencil is zero everywhere.
+// Anything that writes the stencil without restoring it to zero sets false.
+func (d *Device) SetStencilZero(zero bool) {
+	if d.passDepth == nil {
+		return
+	}
+	if !zero {
+		delete(d.stencilZero, d.passDepth)
+		return
+	}
+	if d.stencilZero == nil {
+		d.stencilZero = make(map[*wgpu.TextureView]bool)
+	}
+	d.stencilZero[d.passDepth] = true
 }
 
 // ensureDepthStencil returns a depth+stencil attachment view sized w×h, creating
@@ -1850,6 +1885,7 @@ func (d *Device) EndFrame() error {
 	}
 	d.frameBinds = d.frameBinds[:0]
 	for _, ds := range d.frameDepths {
+		delete(d.stencilZero, ds.view)
 		ds.Release()
 	}
 	d.frameDepths = d.frameDepths[:0]

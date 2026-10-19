@@ -56,6 +56,14 @@ type painter struct {
 	// Start*Clipping / drawPathFillStencil ops; see device.go depthStencilState.
 	stencilMode StencilMode
 
+	// roundClips holds the active rounded clips, innermost last, so
+	// StopRoundedClipping can erase what its Start stamped (#466).
+	roundClips []roundClip
+	// stencilDirties counts path ops that left winding counts in the stencil.
+	// A rounded clip records it at Start; if it is unchanged at Stop, nothing
+	// but the clip itself wrote the stencil, so the erase leaves it zero.
+	stencilDirties uint64
+
 	// textures maps cache handles (stored in internal/cache) to GPU textures.
 	textures  map[uint32]*Texture
 	nextTexID uint32
@@ -203,6 +211,7 @@ func (p *painter) beginFrame() {
 	}
 	p.framing = true
 	p.frame++
+	p.roundClips = p.roundClips[:0] // a frame never inherits an unpaired clip
 	p.evictShadows()
 }
 
@@ -319,15 +328,50 @@ func (p *painter) StopClipping() {
 	}
 }
 
+// roundClip is an active rounded clip: the rect its stamp lies in and the
+// transform it was stamped with, so StopRoundedClipping can erase it.
+type roundClip struct {
+	pos       geo.Position
+	size      geo.Size
+	transform geo.Matrix
+	skipped   bool   // nothing was stamped: the rect lies outside the pass's clip
+	dirties   uint64 // stencilDirties when the clip was stamped
+}
+
 // StartRoundedClipping stencils a rounded-rect mask (ref=1) and restricts
-// subsequent draws to it. Mirrors the GL painter's stencil rounded clip; since
-// WebGPU cannot clear the stencil mid-pass, the buffer is first zeroed with a
-// full-target quad (clearStencil) to emulate GL's glClear(STENCIL).
+// subsequent draws to it. Mirrors the GL painter's stencil rounded clip.
+//
+// WebGPU cannot clear the stencil mid-pass, and clearing the whole target with
+// a full-target quad for every clip cost a grid of cards one full-screen fill
+// per card per frame, and on Apple GPUs tens of MB (#466). So the stencil is
+// kept zero outside active clips: StopRoundedClipping erases the clip's rect
+// again, and a clip that finds the stencil known to be zero just stamps. When
+// it is not known to be zero (a path fill or path clip left winding counts, or
+// the clip is nested in another), the whole target is cleared first, as before.
 func (p *painter) StartRoundedClipping(pos geo.Position, size geo.Size, cornerRadius float32) {
 	if p.dev == nil {
 		return
 	}
-	p.clearStencil()
+	clip := roundClip{pos: pos, size: size, transform: p.transform}
+	zero := p.stencilMode == StencilNone && p.dev.StencilZero()
+	if zero && !p.hasTransform() && p.dev.Culls(
+		int(p.textureScale(pos.X)), int(p.textureScale(pos.Y)),
+		int(p.textureScale(size.Width)), int(p.textureScale(size.Height)),
+	) {
+		// The clip lies outside everything the pass can draw, and the stencil is
+		// zero: testing for 1 rejects every draw in the subtree without stamping.
+		clip.skipped = true
+		p.roundClips = append(p.roundClips, clip)
+		p.dev.SetStencilRef(1)
+		p.stencilMode = StencilTestEqual
+		return
+	}
+	if !zero {
+		p.clearStencil()
+	}
+	clip.dirties = p.stencilDirties
+	p.roundClips = append(p.roundClips, clip)
+	p.dev.SetStencilZero(false)
 	// Stamp the rounded-rect shape into the stencil as 1 (the round_rectangle
 	// shader discards outside the shape, so only the interior is marked), color
 	// writes masked off via the StencilWriteReplace pipeline.
@@ -351,11 +395,45 @@ func (p *painter) StartRoundedClipping(pos geo.Position, size geo.Size, cornerRa
 	p.stencilMode = StencilTestEqual
 }
 
-// StopRoundedClipping disables stencil clipping (GL: Disable(stencilTest)).
+// StopRoundedClipping disables stencil clipping (GL: Disable(stencilTest)),
+// and erases the clip's stamp so the stencil is zero again outside clips.
 func (p *painter) StopRoundedClipping() {
-	if p.dev != nil {
-		p.stencilMode = StencilNone
+	if p.dev == nil {
+		return
 	}
+	p.stencilMode = StencilNone
+	n := len(p.roundClips)
+	if n == 0 {
+		return
+	}
+	clip := p.roundClips[n-1]
+	p.roundClips = p.roundClips[:n-1]
+	if clip.skipped {
+		return
+	}
+	prev := p.transform
+	p.transform = clip.transform
+	p.fillStencilRect(clip.pos, clip.size, 0)
+	p.transform = prev
+	// Start left the stencil zero outside the stamp (it was zero, or cleared),
+	// and the erase covers the stamp, so the stencil is zero again unless a path
+	// op wrote it in between.
+	if p.stencilDirties == clip.dirties {
+		p.dev.SetStencilZero(true)
+	}
+}
+
+// fillStencilRect writes ref into the stencil over the rect (pos, size), color
+// writes masked off. It uses the current transform, as the stamp does.
+func (p *painter) fillStencilRect(pos geo.Position, size geo.Size, ref uint32) {
+	prev := p.stencilMode
+	p.dev.SetStencilRef(ref)
+	p.stencilMode = StencilWriteReplace
+	r := canvas.NewRectangle(color.White)
+	r.Resize(size)
+	r.Move(pos)
+	p.drawRectangle(r, pos, p.canvas.Size())
+	p.stencilMode = prev
 }
 
 // StartPathClipping stencils an arbitrary path's fill (non-zero winding) and
@@ -377,6 +455,7 @@ func (p *painter) StartPathClipping(path *canvas.Path, pos geo.Position, size ge
 		return
 	}
 	p.clearStencil()
+	p.markStencilDirty()
 	// Winding pass: increment front / decrement back faces into the stencil,
 	// color masked off.
 	p.dev.SetStencilRef(0)
@@ -399,6 +478,13 @@ func (p *painter) StopPathClipping() {
 // StencilWriteReplace mode with reference 0 (color masked off). WebGPU can only
 // clear the stencil at a pass's load op, so each clip/fill op that needs a clean
 // slate calls this first — the equivalent of the GL painter's glClear(STENCIL).
+// markStencilDirty records that a path op leaves winding counts in the
+// stencil, so it is not zero and a following rounded clip clears it all.
+func (p *painter) markStencilDirty() {
+	p.dev.SetStencilZero(false)
+	p.stencilDirties++
+}
+
 func (p *painter) clearStencil() {
 	prev := p.stencilMode
 	p.dev.SetStencilRef(0)
