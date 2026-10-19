@@ -90,6 +90,11 @@ func TestBackwardSeekShowsTheTargetPromptly(t *testing.T) {
 	if wait := after[0].at.Sub(seekAt); wait > 500*time.Millisecond {
 		t.Errorf("first frame after the seek came %v later; want within 500 ms", wait)
 	}
+	// The target itself comes first. A seek that discarded frames decoded at
+	// the target showed a later one, held until it was due (#513).
+	if after[0].index != 3 {
+		t.Errorf("first frame after the seek is frame %d; want the target, frame 3", after[0].index)
+	}
 	for _, s := range after {
 		if s.index > 3+40 { // the target plus a second at 30 fps, with room
 			t.Errorf("frame %d, from before the seek, was shown after it", s.index)
