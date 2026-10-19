@@ -119,8 +119,8 @@ type Canvas struct {
 	dirtyMu    sync.Mutex
 	dirtyNodes []*RenderCacheNode
 	dirtyTaken []*RenderCacheNode
-	// minSizeFull asks the next min-size pass to walk every object: an object
-	// without a render node was refreshed, or the content changed.
+	// minSizeFull asks the next min-size pass to walk every object: the
+	// content changed.
 	minSizeFull      atomic.Bool
 	lastFullMinSize  time.Time
 	measuredOverlays int
@@ -562,12 +562,13 @@ func (c *Canvas) Refresh(obj core.CanvasObject) {
 func (c *Canvas) MarkMinSizeDirty(obj core.CanvasObject) {
 	node, ok := c.nodeMap.Load(obj)
 	if !ok {
-		// Nothing places it in the tree yet: only a full walk finds it. A
-		// hidden object has no node and takes no room until it is shown, which
-		// counts as a layout change (layoutgen), so its refresh needs none.
-		if obj.Visible() {
-			c.minSizeFull.Store(true)
-		}
+		// An object no walk has placed in the tree takes no part in layout
+		// yet. It joins the tree through a container or widget that was
+		// refreshed (marking that path), resized, or shown (counted by
+		// layoutgen), or with new content or overlays, which walk everything;
+		// so its own refresh needs no walk. A tiles screen refreshes ~200
+		// such objects a second (#490), which would otherwise make every pass
+		// a full walk.
 		return
 	}
 	node.minSizeDirty.Store(true)
