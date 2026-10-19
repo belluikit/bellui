@@ -120,11 +120,11 @@ func lookupFaces(theme, fallback, emoji bellui.Resource, family string, style be
 	// every platform instead of resolving through a host system font (pre-rebrand tracker #686).
 	addSymbolsFallbackFaces(faces)
 
-	local := lookupLangFont(family, aspect)
-	if local != nil {
-		faces.systemStart = len(faces.faces)
-		faces.addFace(local)
-	}
+	// The host locale face comes next in the chain, but resolving it scans the
+	// system fonts (tens of MB at startup), so it is looked up on the first rune
+	// the faces above do not cover. Text they fully cover never scans (#469).
+	faces.localeAspect = aspect
+	faces.localePending = true
 
 	return faces
 }
@@ -1604,6 +1604,11 @@ type dynamicFontMap struct {
 	faces       []*font.Face
 	family      string
 	systemStart int // index of the first host-system face in faces; 0 = none
+
+	// localePending marks a host locale face still to be looked up, with
+	// localeAspect, on the first rune faces does not cover (#469).
+	localePending bool
+	localeAspect  font.Aspect
 }
 
 // debugFontEscape, when BELLUI_DEBUG_FONTESCAPE is set, logs every rune whose
@@ -1620,6 +1625,23 @@ func (d *dynamicFontMap) ResolveFace(r rune) *font.Face {
 				fmt.Fprintf(os.Stderr, "FONTESCAPE locale-face rune=%U %q family=%s faceIdx=%d\n", r, string(r), d.family, i)
 			}
 			return f
+		}
+	}
+
+	// The host locale face, deferred from lookupFaces. Nothing is appended to
+	// faces before this point, so it takes the same place in the chain as when
+	// it was looked up eagerly.
+	if d.localePending {
+		d.localePending = false
+		if local := lookupLangFont(d.family, d.localeAspect); local != nil {
+			d.systemStart = len(d.faces)
+			d.addFace(local)
+			if _, ok := local.NominalGlyph(r); ok {
+				if debugFontEscape {
+					fmt.Fprintf(os.Stderr, "FONTESCAPE locale-face rune=%U %q family=%s faceIdx=%d\n", r, string(r), d.family, d.systemStart)
+				}
+				return local
+			}
 		}
 	}
 
