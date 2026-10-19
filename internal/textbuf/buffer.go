@@ -236,9 +236,13 @@ func (b *Buffer) Slice(begin, end int) []rune {
 	return b.AppendRunes(make([]rune, 0, end-begin), begin, end)
 }
 
-// Substring returns the text of the rune range [begin, end) as a string. When
-// the memo is clean this is a zero-copy slice of it; otherwise the bytes are
-// gathered from the chunks.
+// Substring returns the text of the rune range [begin, end) as a string: from
+// the memo when it is clean, otherwise gathered from the chunks. The whole
+// range is the memo itself (the string-identity contract), but any part of it
+// is a copy with memory of its own. A zero-copy slice shares the memo's
+// memory, and callers keep short ones (row text, line caches) long after the
+// next edit replaces the memo: each kept a whole document alive, a full copy
+// per keystroke (#508).
 func (b *Buffer) Substring(begin, end int) string {
 	if begin < 0 {
 		begin = 0
@@ -258,7 +262,10 @@ func (b *Buffer) Substring(begin, end int) string {
 		byteEnd = b.cum[cj].bytes + bhi
 	}
 	if b.memoOK {
-		return b.memo[byteBegin:byteEnd]
+		if byteBegin == 0 && byteEnd == len(b.memo) {
+			return b.memo
+		}
+		return strings.Clone(b.memo[byteBegin:byteEnd])
 	}
 	var sb strings.Builder
 	sb.Grow(byteEnd - byteBegin)

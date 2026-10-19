@@ -65,6 +65,11 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
   * Clips shorter than a second play instead of showing nothing.
   * The progress bar reaches the end when a video finishes, and the time stops
     there instead of running on.
+    
+* **Typing into a large text field no longer leaks memory**
+  ([#508](https://github.com/belluikit/bellui/issues/508)). Each keystroke in
+  a multi-line `Entry` kept a full copy of the document in memory: about 30 MB
+  per key on a 500,000-line document. Old copies are now freed.
 
 * **Busy screens use 12–15% less CPU and about half the memory churn**
   ([#492](https://github.com/belluikit/bellui/issues/492)). Four sources of

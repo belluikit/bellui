@@ -79,3 +79,17 @@ type rendererInfo struct {
 	expiringCache
 	renderer core.WidgetRenderer
 }
+
+// RenderedWidgets returns the widgets that currently have a cached renderer.
+// Tests and benchmarks use it to release, at the end, the renderers they
+// created: a test canvas never registers its objects, so closing a test window
+// leaves them cached for ValidDuration, and a benchmark that builds a large
+// widget per run piled them up by the gigabyte (#508).
+func RenderedWidgets() map[core.Widget]struct{} {
+	ws := make(map[core.Widget]struct{})
+	renderers.Range(func(w core.Widget, _ *rendererInfo) bool {
+		ws[w] = struct{}{}
+		return true
+	})
+	return ws
+}
