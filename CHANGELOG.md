@@ -54,6 +54,12 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
   
 ### Fixed
 
+* **Animations follow the display's refresh rate**
+  ([#480](https://github.com/belluikit/bellui/issues/480)). The desktop event
+  loop drew at most 60 frames a second, whatever the display. It now paces
+  to the fastest monitor a window is on: on a 144 Hz display, a screen of 500
+  cards with a spinner animates at 144 fps instead of 60.
+
 * **Idle apps no longer use CPU**
   ([#470](https://github.com/belluikit/bellui/issues/470)). The desktop event
   loop woke 60 times a second even when nothing changed. While no window needs
