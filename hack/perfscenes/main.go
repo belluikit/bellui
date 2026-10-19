@@ -37,6 +37,7 @@ import (
 	"image/color"
 	"math"
 	"os"
+	"os/exec"
 	"runtime"
 	"runtime/pprof"
 	"sort"
@@ -49,6 +50,7 @@ import (
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/core"
+	"github.com/belluikit/bellui/driver/desktop"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/widget"
 )
@@ -60,6 +62,7 @@ var (
 	warm       = flag.Float64("warm", 2, "seconds of warm-up before measuring")
 	memProfile = flag.String("memprofile", "", "write an allocation profile of the measured window to this file")
 	cpuProfile = flag.String("cpuprofile", "", "write a CPU profile of the measured window to this file")
+	maxGap     = flag.Duration("maxgap", 250*time.Millisecond, "refuse the result if any frame took longer than this")
 )
 
 // painted receives the time of each frame that drew the marker raster.
@@ -92,6 +95,14 @@ func main() {
 	}
 	w.SetContent(content)
 	w.Resize(geo.NewSize(1920, 1080))
+	// A window the OS considers hidden (covered, minimised, on another Space,
+	// the display asleep) gets few or no frames, which measures the OS, not
+	// the toolkit. Stay on top, keep the display awake, and refuse a run in
+	// which frames stopped (maxgap).
+	if dw, ok := w.(desktop.Window); ok {
+		dw.RequestAlwaysOnTop()
+	}
+	keepDisplayAwake()
 	go func() {
 		if err := measure(mark, mutate); err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -244,6 +255,9 @@ func measure(mark *canvas.Raster, mutate func(int)) error {
 		gaps[i] = float64(frames[i+1].Sub(frames[i]).Microseconds()) / 1000
 	}
 	sort.Float64s(gaps)
+	if worst := time.Duration(gaps[n-1] * float64(time.Millisecond)); worst > *maxGap {
+		return fmt.Errorf("a frame took %v (over -maxgap %v): the window was probably hidden or the display asleep; no result", worst.Round(time.Millisecond), *maxGap)
+	}
 	p99 := gaps[int(math.Ceil(float64(n)*0.99))-1]
 	nf := float64(n)
 	fmt.Printf("RESULT scene=%s n=%d frames=%d fps=%.1f mean_ms=%.2f p99_ms=%.2f cpu_ms_per_frame=%.2f alloc_kb_per_frame=%.1f allocs_per_frame=%.0f heap_mb=%.1f maxrss_mb=%.0f gc=%d\n",
@@ -279,6 +293,15 @@ func writeProfile(name, path string) error {
 		return err
 	}
 	return f.Close()
+}
+
+// keepDisplayAwake keeps the display and the system awake while this process
+// runs, on macOS (caffeinate exits when the process it watches does).
+func keepDisplayAwake() {
+	if runtime.GOOS != "darwin" {
+		return
+	}
+	_ = exec.Command("caffeinate", "-d", "-i", "-w", strconv.Itoa(os.Getpid())).Start()
 }
 
 // cpuTime is the process's user plus system time, across all threads.
