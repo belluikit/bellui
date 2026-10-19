@@ -6,6 +6,8 @@ import (
 	"os"
 	"testing"
 
+	"github.com/belluikit/bellui/test"
+
 	"github.com/belluikit/bellui/canvas"
 
 	"github.com/belluikit/bellui/x/charts/coord"
@@ -31,6 +33,7 @@ func benchBigSeries(features, points int) *ChoroplethSeries {
 // view with the parse already done -- the ~205 ms hitch cmd/geoprobe reports,
 // which happens once when the GeoJSON lands and again on every pan or zoom step.
 func BenchmarkChoroplethFirstRasterizeBig(b *testing.B) {
+	test.NewTempApp(b) // a drawn object asks the current app to repaint (#515)
 	gc := coord.NewGeoCoord(0, 0, 2)
 	vp := coord.Rect{X: 0, Y: 0, W: 900, H: 600}
 	gc.SetBounds(vp)
@@ -58,6 +61,7 @@ func BenchmarkChoroplethFirstRasterizeBig(b *testing.B) {
 // https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson
 // to run it; it is skipped otherwise so the suite needs no network or fixture.
 func BenchmarkChoroplethFirstRasterizeRealData(b *testing.B) {
+	test.NewTempApp(b) // a drawn object asks the current app to repaint (#515)
 	path := os.Getenv("BELLUI_GEOJSON")
 	if path == "" {
 		b.Skip("set BELLUI_GEOJSON to a countries.geojson to run this benchmark")

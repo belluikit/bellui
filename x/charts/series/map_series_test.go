@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/belluikit/bellui/test"
+
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
 
@@ -283,6 +285,7 @@ func benchMapSeries(b *testing.B) (*MapSeries, *coord.GeoCoord, coord.Rect) {
 
 // BenchmarkMapRepaint is the steady-state cost of painting an unchanged map.
 func BenchmarkMapRepaint(b *testing.B) {
+	test.NewTempApp(b) // a drawn object asks the current app to repaint (#515)
 	ms, gc, vp := benchMapSeries(b)
 	render := func() *canvas.Raster {
 		objs := NewRenderer(TypeMap).Render(RenderContext{Series: ms, Coord: gc, Viewport: vp, Color: color.White})
@@ -298,6 +301,7 @@ func BenchmarkMapRepaint(b *testing.B) {
 
 // BenchmarkMapComposite is the cost the memo elides: a full recomposite.
 func BenchmarkMapComposite(b *testing.B) {
+	test.NewTempApp(b) // a drawn object asks the current app to repaint (#515)
 	ms, gc, vp := benchMapSeries(b)
 
 	b.ResetTimer()

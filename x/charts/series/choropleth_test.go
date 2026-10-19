@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/belluikit/bellui/test"
+
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/x/charts/coord"
@@ -354,6 +356,7 @@ func benchSeries() *ChoroplethSeries {
 // BenchmarkChoroplethRepaint is the steady-state cost the issue measured at
 // 226 ms: the same view painted again and again.
 func BenchmarkChoroplethRepaint(b *testing.B) {
+	test.NewTempApp(b) // a drawn object asks the current app to repaint (#515)
 	cs := benchSeries()
 	gc := coord.NewGeoCoord(0, 0, cs.MapZoom)
 	vp := coord.Rect{X: 0, Y: 0, W: 900, H: 600}
@@ -374,6 +377,7 @@ func BenchmarkChoroplethRepaint(b *testing.B) {
 // BenchmarkChoroplethFirstRasterize is the unavoidable cost of the first paint
 // (and of any genuine view or data change) — the work the cache elides.
 func BenchmarkChoroplethFirstRasterize(b *testing.B) {
+	test.NewTempApp(b) // a drawn object asks the current app to repaint (#515)
 	gc := coord.NewGeoCoord(0, 0, 2)
 	vp := coord.Rect{X: 0, Y: 0, W: 900, H: 600}
 	gc.SetBounds(vp)
