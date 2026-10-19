@@ -209,23 +209,25 @@ func (r *radioItemRenderer) update() {
 		r.label.Color = th.Color(theme.ColorNameOnSurface, v)
 	}
 
+	// MD3: an unselected radio is an empty ring; a selected one is a Primary
+	// ring around a Primary dot (#494).
 	out := theme.NewThemedResource(th.Icon(theme.IconNameRadioButton))
-	out.ColorName = theme.ColorNameOutline
+	out.ColorName = theme.ColorNameOnSurfaceVariant
 	in := theme.NewThemedResource(th.Icon(theme.IconNameRadioButtonFill))
-	in.ColorName = theme.ColorNameSurfaceContainerHighest
+	in.ColorName = theme.ColorNamePrimary
 	if r.item.Selected {
-		in.ColorName = theme.ColorNamePrimary
-		out.ColorName = theme.ColorNameOnSurface
+		out.ColorName = theme.ColorNamePrimary
 	}
 	if r.item.Disabled() {
-		if r.item.Selected {
-			in.ColorName = theme.ColorNameDisabled
-		} else {
-			in.ColorName = theme.ColorNameSurface
-		}
+		in.ColorName = theme.ColorNameDisabled
 		out.ColorName = theme.ColorNameDisabled
 	}
 	r.icon.Resource = in
+	if r.item.Selected {
+		r.icon.Show()
+	} else {
+		r.icon.Hide()
+	}
 	r.icon.Refresh()
 	r.over.Resource = out
 	r.over.Refresh()

@@ -57,7 +57,7 @@ func TestCheck_DisabledWhenChecked(t *testing.T) {
 func TestCheck_DisabledWhenUnchecked(t *testing.T) {
 	check := NewCheck("Hi", nil)
 	render := test.TempWidgetRenderer(t, check).(*checkRenderer)
-	assert.True(t, strings.HasPrefix(render.icon.Resource.Name(), "outline_"))
+	assert.True(t, strings.HasPrefix(render.icon.Resource.Name(), "onSurfaceVariant_"))
 
 	check.Disable()
 	assert.True(t, strings.HasPrefix(render.icon.Resource.Name(), "disabled_"))

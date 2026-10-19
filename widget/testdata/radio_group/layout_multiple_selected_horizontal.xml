@@ -5,13 +5,12 @@
 				<widget size="63x32" type="*widget.radioItem">
 					<circle pos="2,2" size="28x28"/>
 					<image pos="6,6" rsc="radioButtonFillIcon" size="iconInlineSize" themed="primary"/>
-					<image pos="6,6" rsc="radioButtonIcon" size="iconInlineSize" themed="onSurface"/>
+					<image pos="6,6" rsc="radioButtonIcon" size="iconInlineSize" themed="primary"/>
 					<text pos="32,0" size="63x32">Foo</text>
 				</widget>
 				<widget pos="63,0" size="63x32" type="*widget.radioItem">
 					<circle pos="2,2" size="28x28"/>
-					<image pos="6,6" rsc="radioButtonFillIcon" size="iconInlineSize" themed="surfaceContainerHighest"/>
-					<image pos="6,6" rsc="radioButtonIcon" size="iconInlineSize" themed="outline"/>
+					<image pos="6,6" rsc="radioButtonIcon" size="iconInlineSize" themed="onSurfaceVariant"/>
 					<text pos="32,0" size="63x32">Bar</text>
 				</widget>
 			</widget>
