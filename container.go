@@ -3,6 +3,7 @@ package bellui
 import (
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/layoutgen"
 )
 
 // Declare conformity to [core.CanvasObject]
@@ -41,6 +42,7 @@ func (c *Container) Hide() {
 	}
 
 	c.Hidden = true
+	layoutgen.Changed()
 	repaint(c)
 }
 
@@ -131,6 +133,10 @@ func (c *Container) Show() {
 	}
 
 	c.Hidden = false
+	// A container hidden from the start was never walked, so no canvas knows
+	// it: the next min-size pass must walk everything to lay it out (#487).
+	layoutgen.Changed()
+	repaint(c)
 }
 
 // Size returns the current size c.
@@ -161,6 +167,11 @@ func repaint(obj *Container) {
 
 	c := app.Driver().CanvasForObject(obj)
 	if c != nil {
+		// Showing or hiding changes the layout around obj: let the min-size
+		// pass know, as a refresh would (#487).
+		if m, ok := c.(interface{ MarkMinSizeDirty(core.CanvasObject) }); ok {
+			m.MarkMinSizeDirty(obj)
+		}
 		if paint, ok := c.(interface{ SetDirty() }); ok {
 			paint.SetDirty()
 		}

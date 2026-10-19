@@ -11,7 +11,7 @@ import (
 	"sync"
 
 	"github.com/belluikit/bellui/geo"
-	"github.com/belluikit/bellui/internal/cache"
+	"github.com/belluikit/bellui/internal/layoutgen"
 )
 
 type baseObject struct {
@@ -26,6 +26,7 @@ type baseObject struct {
 
 // Hide will set this object to not be visible.
 func (o *baseObject) Hide() {
+	defer layoutgen.Changed()
 	o.propMu.Lock()
 	o.Hidden = true
 	o.propMu.Unlock()
@@ -66,7 +67,7 @@ func (o *baseObject) Resize(size geo.Size) {
 
 // SetMinSize specifies the smallest size this object should be.
 func (o *baseObject) SetMinSize(size geo.Size) {
-	defer cache.MinSizeSet()
+	defer layoutgen.Changed()
 	o.propMu.Lock()
 	o.min = size
 	o.propMu.Unlock()
@@ -74,6 +75,7 @@ func (o *baseObject) SetMinSize(size geo.Size) {
 
 // Show will set this object to be visible.
 func (o *baseObject) Show() {
+	defer layoutgen.Changed()
 	o.propMu.Lock()
 	o.Hidden = false
 	o.propMu.Unlock()

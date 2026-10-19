@@ -18,7 +18,7 @@ import (
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
-	"github.com/belluikit/bellui/internal/cache"
+	"github.com/belluikit/bellui/internal/layoutgen"
 	"github.com/belluikit/bellui/storage"
 	"github.com/belluikit/bellui/theme"
 )
@@ -136,7 +136,7 @@ func (g *AnimatedGif) MinSize() geo.Size {
 // Be careful not to set this based on pixel sizes as that will vary based on output device.
 func (g *AnimatedGif) SetMinSize(min geo.Size) {
 	g.min = min
-	cache.MinSizeSet()
+	layoutgen.Changed()
 }
 
 // Start begins the animation. The speed of the transition is controlled by the loaded gif file.

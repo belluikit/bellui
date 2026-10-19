@@ -3,6 +3,7 @@ package layout
 import (
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/layoutgen"
 )
 
 // SpacerObject is any object that can be used to space out child objects
@@ -71,11 +72,13 @@ func (s *Spacer) Visible() bool {
 // Show sets the Spacer to be part of the layout calculations
 func (s *Spacer) Show() {
 	s.hidden = false
+	layoutgen.Changed() // a spacer refreshes nothing (#487)
 }
 
 // Hide removes this Spacer from layout calculations
 func (s *Spacer) Hide() {
 	s.hidden = true
+	layoutgen.Changed()
 }
 
 // Refresh does nothing for a spacer but is part of the CanvasObject definition
