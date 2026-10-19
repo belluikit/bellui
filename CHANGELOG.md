@@ -54,6 +54,15 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
   
 ### Fixed
 
+* **Static and scrolled screens use about 40% less CPU**
+  ([#464](https://github.com/belluikit/bellui/issues/464)). Every frame walked
+  every object a scroll container holds, including the ones scrolled out of
+  view, and asked every widget for its minimum size again. Cards and other
+  clip-owners out of view are now skipped when painting, and a widget is asked
+  for its minimum size only when it was refreshed or resized. On an M3 Max, a
+  screen of 500 cards and a spinner went from 9.7 to 5.6 ms of CPU per frame
+  (Fyne: 4.0 ms). Pixels are unchanged.
+
 * **Shapes and text draw in batches on WebGPU**
   ([#475](https://github.com/belluikit/bellui/issues/475),
   [#467](https://github.com/belluikit/bellui/issues/467)). Every rectangle,

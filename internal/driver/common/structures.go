@@ -1,6 +1,8 @@
 package common
 
 import (
+	"sync/atomic"
+
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal"
@@ -57,6 +59,13 @@ type RenderCacheNode struct {
 	// pending pointer: several subtrees can report changes in one walk, and a
 	// later change must not cancel an earlier sibling's pending update (pre-rebrand tracker #1039).
 	minSizeChanged bool
+	// measured, measuredSize and minSizeDirty decide whether EnsureMinSize must
+	// ask the object for its min size again (#464): a node is measured once,
+	// and again when its object was refreshed (minSizeDirty, set from any
+	// goroutine), its size changed, or a child's min size changed.
+	measured       bool
+	measuredSize   geo.Size
+	minSizeDirty   atomic.Bool
 	worldTransform geo.Matrix   // accumulated affine transform from root to this node
 	clipPos        geo.Position // effective clip region origin (from nearest Scrollable/ClipToBounds ancestor)
 	clipSize       geo.Size     // effective clip region size

@@ -100,6 +100,13 @@ type Canvas struct {
 	// LTR while the rest of an RTL app does not. It is pushed onto the ambient
 	// direction stack around this canvas' layout and paint.
 	layoutDir bellui.Direction
+
+	// measuredGen, measuredScale and measuredEpoch are the theme cache
+	// generation, scale and cache.MinSizeEpoch EnsureMinSize last measured
+	// under; a change re-measures everything.
+	measuredGen   uint64
+	measuredScale float32
+	measuredEpoch uint64
 }
 
 // AddShortcut adds a shortcut to the canvas.
@@ -139,6 +146,13 @@ func (c *Canvas) EnsureMinSize() bool {
 	csize := c.impl.Size()
 	min := c.impl.MinSize()
 
+	// A theme or scale change can change any min size: ask every object.
+	// Otherwise only objects that were refreshed, resized, or whose children's
+	// min sizes changed are asked again; the rest report what they did (#464).
+	gen, scale, epoch := cache.ThemeCacheGeneration(), c.impl.Scale(), cache.MinSizeEpoch()
+	measureAll := gen != c.measuredGen || scale != c.measuredScale || epoch != c.measuredEpoch
+	c.measuredGen, c.measuredScale, c.measuredEpoch = gen, scale, epoch
+
 	setup := func(node *RenderCacheNode, pos geo.Position) {
 		if !node.obj.Visible() {
 			return
@@ -158,6 +172,7 @@ func (c *Canvas) EnsureMinSize() bool {
 			}
 		})
 
+		childChanged := node.minSizeChanged
 		if node.minSizeChanged {
 			c.updateLayout(obj)
 			node.minSizeChanged = false
@@ -166,7 +181,18 @@ func (c *Canvas) EnsureMinSize() bool {
 		if !obj.Visible() {
 			return
 		}
-		minSize := obj.MinSize()
+		minSize := node.minSize
+		size := obj.Size()
+		// Primitives are always asked: their min size can change without a
+		// refresh (SetMinSize), and asking costs a field read or a cached text
+		// measurement. A change then reaches the parent as childChanged.
+		_, isWidget := obj.(core.Widget)
+		_, isContainer := obj.(*bellui.Container)
+		primitive := !isWidget && !isContainer
+		if dirty := node.minSizeDirty.Swap(false); measureAll || primitive || dirty || childChanged || !node.measured || size != node.measuredSize {
+			minSize = obj.MinSize()
+			node.measured, node.measuredSize = true, size
+		}
 
 		minSizeChanged := node.minSize != minSize
 		if minSizeChanged {
@@ -490,8 +516,19 @@ func (c *Canvas) Painter() gpu.Painter {
 
 // Refresh refreshes a canvas object.
 func (c *Canvas) Refresh(obj core.CanvasObject) {
+	c.MarkMinSizeDirty(obj)
 	c.refreshQueue.In(obj)
 	async.EnsureMain(c.SetDirty)
+}
+
+// MarkMinSizeDirty records that obj may report a different min size, so the
+// next EnsureMinSize asks it again (#464). Refresh calls it; BaseWidget.Refresh
+// calls it for the widget itself, whose renderer may refresh only its parts.
+// Safe from any goroutine.
+func (c *Canvas) MarkMinSizeDirty(obj core.CanvasObject) {
+	if node, ok := c.nodeMap.Load(obj); ok {
+		node.minSizeDirty.Store(true)
+	}
 }
 
 // RemoveShortcut removes a shortcut from the canvas.
@@ -623,12 +660,26 @@ func (c *Canvas) WalkContentTrees(
 	beforeChildren func(*RenderCacheNode, geo.Position),
 	afterChildren func(*RenderCacheNode, geo.Position),
 ) {
-	c.walkTree(c.contentTree, beforeChildren, afterChildren)
+	c.WalkContentTreesCulled(nil, beforeChildren, afterChildren)
+}
+
+// WalkContentTreesCulled walks the content trees as WalkContentTrees does,
+// visiting an object cull reports as drawing nothing visible without its
+// children (driver.WalkVisibleObjectTreeCulled). The paint walk passes
+// CullOffClip, so content scrolled out of view costs one visit per clip-owner
+// instead of its whole subtree (#464). Walks that must reach every object
+// (layout, hit testing, accessibility) pass nil.
+func (c *Canvas) WalkContentTreesCulled(
+	cull driver.CullFunc,
+	beforeChildren func(*RenderCacheNode, geo.Position),
+	afterChildren func(*RenderCacheNode, geo.Position),
+) {
+	c.walkTree(c.contentTree, cull, beforeChildren, afterChildren)
 	if c.mWindowHeadTree != nil && c.mWindowHeadTree.root.obj != nil {
-		c.walkTree(c.mWindowHeadTree, beforeChildren, afterChildren)
+		c.walkTree(c.mWindowHeadTree, cull, beforeChildren, afterChildren)
 	}
 	if c.menuTree != nil && c.menuTree.root.obj != nil {
-		c.walkTree(c.menuTree, beforeChildren, afterChildren)
+		c.walkTree(c.menuTree, cull, beforeChildren, afterChildren)
 	}
 }
 
@@ -639,7 +690,7 @@ func (c *Canvas) WalkOverlayTrees(
 ) {
 	for _, tree := range c.overlays.renderCaches {
 		if tree != nil {
-			c.walkTree(tree, beforeChildren, afterChildren)
+			c.walkTree(tree, nil, beforeChildren, afterChildren)
 		}
 	}
 }
@@ -750,6 +801,7 @@ func (c *Canvas) isMenuActive() bool {
 
 func (c *Canvas) walkTree(
 	tree *renderCacheTree,
+	cull driver.CullFunc,
 	beforeChildren func(*RenderCacheNode, geo.Position),
 	afterChildren func(*RenderCacheNode, geo.Position),
 ) {
@@ -831,7 +883,7 @@ func (c *Canvas) walkTree(
 		prev = node
 		node = node.nextSibling
 	}
-	driver.WalkVisibleObjectTree(tree.root.obj, bc, ac)
+	driver.WalkVisibleObjectTreeCulled(tree.root.obj, cull, bc, ac)
 }
 
 type activatableMenu interface {

@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/cache"
 )
 
 type baseObject struct {
@@ -65,6 +66,7 @@ func (o *baseObject) Resize(size geo.Size) {
 
 // SetMinSize specifies the smallest size this object should be.
 func (o *baseObject) SetMinSize(size geo.Size) {
+	defer cache.MinSizeSet()
 	o.propMu.Lock()
 	o.min = size
 	o.propMu.Unlock()
