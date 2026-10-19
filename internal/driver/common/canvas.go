@@ -100,6 +100,11 @@ type Canvas struct {
 	// LTR while the rest of an RTL app does not. It is pushed onto the ambient
 	// direction stack around this canvas' layout and paint.
 	layoutDir bellui.Direction
+
+	// measuredGen and measuredScale are the theme cache generation and scale
+	// EnsureMinSize last measured under; a change re-measures everything.
+	measuredGen   uint64
+	measuredScale float32
 }
 
 // AddShortcut adds a shortcut to the canvas.
@@ -139,6 +144,13 @@ func (c *Canvas) EnsureMinSize() bool {
 	csize := c.impl.Size()
 	min := c.impl.MinSize()
 
+	// A theme or scale change can change any min size: ask every object.
+	// Otherwise only objects that were refreshed, resized, or whose children's
+	// min sizes changed are asked again; the rest report what they did (#464).
+	gen, scale := cache.ThemeCacheGeneration(), c.impl.Scale()
+	measureAll := gen != c.measuredGen || scale != c.measuredScale
+	c.measuredGen, c.measuredScale = gen, scale
+
 	setup := func(node *RenderCacheNode, pos geo.Position) {
 		if !node.obj.Visible() {
 			return
@@ -158,6 +170,7 @@ func (c *Canvas) EnsureMinSize() bool {
 			}
 		})
 
+		childChanged := node.minSizeChanged
 		if node.minSizeChanged {
 			c.updateLayout(obj)
 			node.minSizeChanged = false
@@ -166,7 +179,18 @@ func (c *Canvas) EnsureMinSize() bool {
 		if !obj.Visible() {
 			return
 		}
-		minSize := obj.MinSize()
+		minSize := node.minSize
+		size := obj.Size()
+		// Primitives are always asked: their min size can change without a
+		// refresh (SetMinSize), and asking costs a field read or a cached text
+		// measurement. A change then reaches the parent as childChanged.
+		_, isWidget := obj.(core.Widget)
+		_, isContainer := obj.(*bellui.Container)
+		primitive := !isWidget && !isContainer
+		if dirty := node.minSizeDirty.Swap(false); measureAll || primitive || dirty || childChanged || !node.measured || size != node.measuredSize {
+			minSize = obj.MinSize()
+			node.measured, node.measuredSize = true, size
+		}
 
 		minSizeChanged := node.minSize != minSize
 		if minSizeChanged {
@@ -490,8 +514,19 @@ func (c *Canvas) Painter() gpu.Painter {
 
 // Refresh refreshes a canvas object.
 func (c *Canvas) Refresh(obj core.CanvasObject) {
+	c.MarkMinSizeDirty(obj)
 	c.refreshQueue.In(obj)
 	async.EnsureMain(c.SetDirty)
+}
+
+// MarkMinSizeDirty records that obj may report a different min size, so the
+// next EnsureMinSize asks it again (#464). Refresh calls it; BaseWidget.Refresh
+// calls it for the widget itself, whose renderer may refresh only its parts.
+// Safe from any goroutine.
+func (c *Canvas) MarkMinSizeDirty(obj core.CanvasObject) {
+	if node, ok := c.nodeMap.Load(obj); ok {
+		node.minSizeDirty.Store(true)
+	}
 }
 
 // RemoveShortcut removes a shortcut from the canvas.
