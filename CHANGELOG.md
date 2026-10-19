@@ -54,6 +54,14 @@ became Bellui; v1.0.0-rc.1 onward describe Bellui itself.
   
 ### Fixed
 
+* **Cards cost less memory and CPU on WebGPU**
+  ([#466](https://github.com/belluikit/bellui/issues/466)). Each card clips its
+  content to its rounded corners, and every clip cleared the whole window's
+  stencil buffer first, once per card per frame, including cards scrolled out
+  of view. Clips now erase only what they drew, and skip cards outside the
+  visible area. On an M3 Max, a grid of 500 cards uses about 33 MB less memory
+  and 5–10% less CPU per frame.
+  
 * **Apps use about 25 MB less memory, and allocate 60 MB less at startup**
   ([#469](https://github.com/belluikit/bellui/issues/469)). Measuring the
   first text scanned every font installed on the system, to find one for the
