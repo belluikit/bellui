@@ -11,7 +11,7 @@ import (
 const (
 	defaultSampleRate = 44100
 	defaultChannels   = 2
-	defaultBufferSize = 8192 * 16 // ~190ms at 44100Hz stereo 16-bit
+	defaultBufferSize = 8192 * 16 // 128 KB: ~740 ms at 44.1 kHz stereo, ~1.5 s mono
 )
 
 // Output manages audio playback via ebitengine/oto.
@@ -123,12 +123,29 @@ func (o *Output) Start() {
 		return
 	}
 	o.player = o.ctx.NewPlayer(o.buffer)
-	o.player.SetBufferSize(defaultBufferSize / 4)
+	o.player.SetBufferSize(playerBufferBytes(o.sampleRate, o.channels))
 	o.player.Play()
 	o.started = true
 }
 
 // Pause pauses audio playback.
+// playerChunk is how much audio the device player pulls from the ring buffer
+// at a time. It is a duration, not a byte count, because what has to cover it
+// is the decoder's lead, and that is bounded in time: at 1080p60 the video queue
+// stops the decoder about 270 ms ahead (#504). A fixed 32 KB was 170 ms of
+// 48 kHz stereo but 370 ms of 44.1 kHz mono, longer than that lead, so every
+// pull came up short and was padded with silence that the playback position
+// does not count: the clock, and the video paced on it, ran at half speed.
+// 60 ms was too small for the device and slowed the clock too; 100 to 200 ms
+// all played at full speed.
+const playerChunk = 150 * time.Millisecond
+
+// playerBufferBytes is playerChunk of 16-bit audio at rate and channels.
+func playerBufferBytes(rate, channels int) int {
+	frames := int(int64(rate) * int64(playerChunk) / int64(time.Second))
+	return frames * channels * 2
+}
+
 func (o *Output) Pause() {
 	o.mu.Lock()
 	defer o.mu.Unlock()
