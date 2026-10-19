@@ -138,3 +138,13 @@ func (t *testWidget) CreateRenderer() core.WidgetRenderer {
 func waitForBinding() {
 	time.Sleep(time.Millisecond * 100) // data resolves on background thread
 }
+
+// TestBaseWidgetThemeDoesNotAllocate pins #492: asking a widget with no theme
+// override for its theme allocates nothing.
+func TestBaseWidgetThemeDoesNotAllocate(t *testing.T) {
+	test.NewTempApp(t)
+	w := &myWidget{}
+	w.ExtendBaseWidget(w)
+	w.Theme()
+	assert.Zero(t, testing.AllocsPerRun(100, func() { w.Theme() }))
+}

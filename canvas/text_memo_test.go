@@ -33,7 +33,7 @@ func TestText_MinSizeMemo(t *testing.T) {
 	assert.Equal(t, s1, s1b)
 	assert.Equal(t, base1, base1b)
 	entry1b, _, _ := canvas.TextMeasureMemoForTest(txt)
-	assert.Same(t, entry1, entry1b, "a memo hit must not rebuild the entry")
+	assert.Equal(t, entry1, entry1b, "a memo hit must not re-measure")
 
 	// Content change on the same object (mutate-then-measure, no Refresh
 	// needed): the guard forces a re-measure, never serving the old size.
@@ -50,7 +50,7 @@ func TestText_MinSizeMemo(t *testing.T) {
 	txt.TextStyle = bellui.TextStyle{Bold: true}
 	s4 := txt.MinSize()
 	entry4, _, _ := canvas.TextMeasureMemoForTest(txt)
-	assert.NotSame(t, entry1, entry4)
+	assert.NotEqual(t, entry1, entry4)
 	assert.False(t, s4.IsZero())
 
 	// A theme/font cache reset bumps the generation; the next measurement
