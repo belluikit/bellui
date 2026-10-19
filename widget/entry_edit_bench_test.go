@@ -9,6 +9,7 @@ import (
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/cache"
 	"github.com/belluikit/bellui/test"
 )
 
@@ -39,12 +40,42 @@ func benchEntryDoc(lines int) string {
 // row model built, ready for per-operation measurement.
 func newBenchEntry(b *testing.B, lines int) (*Entry, bellui.Window) {
 	b.Helper()
+	release := releaseNewRenderers()
 	e := NewMultiLineEntry()
 	e.SetText(benchEntryDoc(lines))
-	w := test.NewWindow(e)
+	w := &benchWindow{Window: test.NewWindow(e), release: release}
 	w.Resize(geo.NewSize(800, 600))
 	e.textProvider().updateRowBounds() // force the initial row-bounds build
 	return e, w
+}
+
+// releaseNewRenderers returns a func that destroys every renderer made since
+// it was called. A test canvas never registers its objects, so the cache keeps
+// their renderers, and whatever they hold, for its minute after a test window
+// closes, and a benchmark that builds a large widget on every run (a 30 MB
+// document, a million-cell grid) piled them up: over a package run that held
+// gigabytes, more than a CI runner has (#508).
+func releaseNewRenderers() func() {
+	before := cache.RenderedWidgets()
+	return func() {
+		for wid := range cache.RenderedWidgets() {
+			if _, ok := before[wid]; !ok {
+				cache.DestroyRenderer(wid)
+			}
+		}
+	}
+}
+
+// benchWindow is a test window whose Close also releases the renderers made
+// since it was opened (see releaseNewRenderers).
+type benchWindow struct {
+	bellui.Window
+	release func()
+}
+
+func (w *benchWindow) Close() {
+	w.Window.Close()
+	w.release()
 }
 
 // BenchmarkEntryTypeBigDoc measures single-keystroke latency on a large
@@ -110,11 +141,12 @@ func BenchmarkEntrySetTextBigDoc(b *testing.B) {
 	for _, size := range benchDocSizes {
 		b.Run(size.name, func(b *testing.B) {
 			doc := benchEntryDoc(size.lines)
+			release := releaseNewRenderers()
 			e := NewMultiLineEntry()
 			e.LineHighlighter = func(line string, state int) ([]StyleRun, int) {
 				return []StyleRun{{Text: line}}, state
 			}
-			w := test.NewWindow(e)
+			w := &benchWindow{Window: test.NewWindow(e), release: release}
 			defer w.Close()
 			w.Resize(geo.NewSize(800, 600))
 
