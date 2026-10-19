@@ -12,61 +12,10 @@ More detailed release notes can be found on the [releases page](https://github.c
 
 ## Unreleased
 
-### Changed
-
-* **iOS apps now need iOS 15 or later**
-  ([#410](https://github.com/belluikit/bellui/issues/410)). Xcode 27 builds
-  for nothing older, and every `bellui package -os ios` or `-os iossimulator`
-  failed with "The iOS deployment target … is set to 14.0, but the range of
-  supported deployment target versions is 15.0 to 27.1.x". The generated
-  Xcode project, the compiler flags and the app icon's asset catalog now all
-  target 15.0; they said 14.0, 14.0 and 9.0.
-
-### Fixed
-
-* A web app in a browser without WebGPU now says so instead of showing a
-  blank page ([#384](https://github.com/belluikit/bellui/issues/384)). The
-  page `bellui package -os web` and `bellui serve` write checked only for
-  WebGL, so where WebGPU was missing (older iOS, Firefox, Lockdown Mode, some
-  Android GPUs) the app loaded, failed to start and left the page blank. A
-  WebGPU build's page now asks the browser for a WebGPU adapter first and
-  shows "This browser does not support WebGPU, which this application needs"
-  when there is none. A `-tags gl` build keeps its WebGL check.
-  
-* `bellui package -os iossimulator` links again
-  ([#10](https://github.com/belluikit/bellui/issues/10)). Go builds the device
-  and the Simulator alike, so the WebGPU libraries pick their archive by the
-  `iossimulator` build tag, which the CLI never set: Simulator builds linked
-  the device archive and failed with "building for 'iOS-simulator', but
-  linking in object file … built for 'iOS'". The tag is now added for every
-  build against the Simulator SDK.
-  
-* Packages now credit the gopher artwork they ship
-  ([#362](https://github.com/belluikit/bellui/issues/362)). The default icon
-  (used when an app has no `Icon.png`) and the web splash spinner are based on
-  the Go gopher, which is CC BY 4.0 and must be credited wherever it is
-  shared, but no package said so. The web splash screen now shows "Gopher
-  artwork based on the Go gopher by Renée French, CC BY 4.0" under the spinner. A package that uses the default
-  icon carries the credit in its macOS or iOS Info.plist (shown in About), its
-  Windows version resource (shown in Properties), its Android manifest, or a
-  `share/doc/<app>/CREDITS` file in Linux and BSD archives. `bellui package`
-  also says so when it falls back to the default icon, and warns when an
-  Android app's own `AndroidManifest.xml` leaves the credit out.
-  
-* A `manifest.pxf` that does not parse now stops `bellui build` and
-  `bellui package` with an error naming the file
-  ([#360](https://github.com/belluikit/bellui/issues/360)). It used to be
-  treated as no manifest: `build` succeeded and silently left out the app's
-  ID, name, version and migrations, and `package` wrote a bundle with a
-  placeholder identity (`com.example.…`, build 1) before failing with an
-  error such as `7:1: expected '}', got EOF` that did not say which file was
-  wrong. A missing `manifest.pxf` is still optional.
-
-* The web page `bellui package -os web` and `bellui serve` write now has a
-  viewport meta tag. Without it, phone browsers laid the app out 980 CSS px
-  wide, so it showed as a shrunken desktop page with a canvas of about six
-  times the pixels it needed (2940×6393 instead of 1206×2622 on a 402×874
-  @3x iPhone).
+Entries for the next release are files in [`changelog.d/`](changelog.d/README.md),
+one per change, so that open pull requests do not conflict here. Run
+`go run ./hack/changelog preview -C cmd/bellui` to see them assembled; the release folds them
+into a section below.
 
 ## v1.0.1 — 2026-10-16
 
