@@ -702,14 +702,20 @@ func (p *Pipeline) Seek(pos time.Duration) {
 		pos = p.duration
 	}
 
+	// Everything up to the clock seek stays under decodeMu, so the decoder
+	// cannot decode the new position until the old one is discarded. Draining
+	// after releasing it also took the first frames decoded at the target, and
+	// the picture froze until the first frame left was due (#513).
 	p.decodeMu.Lock()
+	defer p.decodeMu.Unlock()
 	p.src.Seek(pos)
 	p.seekGen.Add(1) // under decodeMu: no frame decoded before the seek gets the new generation
-	p.decodeMu.Unlock()
 
 	// Discard everything decoded before the seek: queued video frames and
 	// buffered (unplayed) audio. The audio position is rebased so the
-	// consumed-bytes clock continues from the seek target.
+	// consumed-bytes clock continues from the seek target. A frame the decoder
+	// was blocked sending can still arrive after the drain; it carries the old
+	// generation, and the display discards it.
 	if p.frameQueue != nil {
 	drainLoop:
 		for {
