@@ -40,6 +40,7 @@ func TestWindow_ModalBlocksParentKey(t *testing.T) {
 		child.releaseModal()
 		assert.False(t, parent.modalBlocked(), "teardown restores the parent")
 	})
+	closeWhenDone(t, child, parent)
 }
 
 // TestWindow_ModalStackedBlocksParentKey verifies the pre-rebrand tracker #682 ref-count: two modal
@@ -75,4 +76,5 @@ func TestWindow_ModalStackedBlocksParentKey(t *testing.T) {
 		child2.releaseModal()
 		assert.False(t, parent.modalBlocked(), "parent unblocks only when the last modal child clears")
 	})
+	closeWhenDone(t, child2, child1, parent)
 }

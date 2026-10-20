@@ -40,6 +40,22 @@ func repaintWindow(w *safeWindow) {
 	time.Sleep(time.Millisecond * 150) // wait for the frames to be rendered... o
 }
 
+// closeWhenDone closes windows a test created directly (create, viewport.Show)
+// when it ends, failed or not, children before parents. Left open, they stay
+// on screen until the test binary exits (#589).
+func closeWhenDone(t *testing.T, windows ...*window) {
+	t.Helper()
+	t.Cleanup(func() {
+		runOnMain(func() {
+			for _, w := range windows {
+				if w != nil && w.viewport != nil {
+					w.Close()
+				}
+			}
+		})
+	})
+}
+
 func waitForCanvasSize(t *testing.T, w *safeWindow, size geo.Size, resizeIfNecessary bool) {
 	attempts := 0
 	for {
