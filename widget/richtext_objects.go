@@ -961,14 +961,21 @@ func (t *TextSegment) Visual() core.CanvasObject {
 
 // Update applies the current state of this text segment to an existing visual.
 func (t *TextSegment) Update(o core.CanvasObject) {
-	obj := o.(*canvas.Text)
+	t.apply(o.(*canvas.Text))
+	o.Refresh()
+}
+
+// apply copies the segment's text and style onto obj without refreshing it.
+// A RichText refreshing all its rows refreshes itself once afterwards, which
+// frees the textures of every object below it and re-measures them, so a
+// refresh per text object only repeated that work (#492).
+func (t *TextSegment) apply(obj *canvas.Text) {
 	obj.Text = t.Text
 	obj.Color = t.color()
 	obj.Alignment = t.Style.Alignment
 	obj.TextStyle = t.Style.TextStyle
 	obj.FontSource = t.Style.FontSource
 	obj.TextSize = t.size()
-	obj.Refresh()
 }
 
 // Select tells the segment that the user is selecting the content between the two positions.

@@ -2827,9 +2827,9 @@ func (r *textRenderer) Refresh() {
 				reuse = bound.firstSegmentReuse
 			}
 			obj := r.obj.cachedSegmentVisual(seg, reuse)
-			seg.Update(obj)
 			txt := obj.(*canvas.Text)
 			textSeg := seg.(*TextSegment)
+			textSeg.apply(txt) // refreshed with the whole RichText below
 
 			if r.lazyWindowRowText(txt, bound, textSeg) {
 				objs = append(objs, txt)
