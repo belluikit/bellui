@@ -1,6 +1,7 @@
 package widget
 
 import (
+	"slices"
 	"sync"
 	"time"
 
@@ -180,7 +181,7 @@ func (l *Label) CreateRenderer() core.WidgetRenderer {
 		l.tooltipOverlay = newLabelHoverOverlay(l)
 	}
 
-	return &labelRenderer{l}
+	return &labelRenderer{l: l}
 }
 
 // MinSize returns the size that this label should not shrink below.
@@ -456,7 +457,8 @@ func (o *labelHoverOverlay) HoverMoved(_ *event.HoverEvent) {}
 func (o *labelHoverOverlay) HoverOut()                      { o.label.hoverOut() }
 
 type labelRenderer struct {
-	l *Label
+	l    *Label
+	objs []core.CanvasObject // what Objects last returned
 }
 
 func (r *labelRenderer) Destroy() {
@@ -484,16 +486,26 @@ func (r *labelRenderer) MinSize() geo.Size {
 	return r.l.provider.MinSize()
 }
 
+// Objects returns the slice it returned last time while the objects are the
+// same, so the tree walks that call it every frame do not allocate (#554). A
+// change builds a new slice: a caller holding the old one never sees it change.
 func (r *labelRenderer) Objects() []core.CanvasObject {
-	var objs []core.CanvasObject
+	var want [3]core.CanvasObject
+	n := 0
 	if r.l.isSelectable() {
-		objs = append(objs, r.l.selection)
+		want[n] = r.l.selection
+		n++
 	}
-	objs = append(objs, r.l.provider)
+	want[n] = r.l.provider
+	n++
 	if r.l.tooltipOverlay != nil {
-		objs = append(objs, r.l.tooltipOverlay)
+		want[n] = r.l.tooltipOverlay
+		n++
 	}
-	return objs
+	if !slices.Equal(r.objs, want[:n]) {
+		r.objs = slices.Clone(want[:n])
+	}
+	return r.objs
 }
 
 func (r *labelRenderer) Refresh() {
