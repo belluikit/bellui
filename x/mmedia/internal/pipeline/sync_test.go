@@ -89,6 +89,9 @@ func TestEndOfStreamSentinel(t *testing.T) {
 // Smooth means it drifts from wall time by no more than its slew allows over
 // the time between two samples. A fixed bound failed whenever the test woke
 // late: a 2 ms sleep that takes 30 ms lets a correct clock drift 7.5 ms (#575).
+// Each clock read is bracketed by two wall-time reads, and the bracket's width
+// is allowed too: a goroutine preempted between reading the clock and reading
+// the time sees a gap the clock did not.
 func TestClockSmoothsSteppedAudioPosition(t *testing.T) {
 	const step = 90 * time.Millisecond
 	c := NewClock()
@@ -99,9 +102,15 @@ func TestClockSmoothsSteppedAudioPosition(t *testing.T) {
 	// Measure from the first step on: until the audio moves, the clock holds
 	// at the start and then jumps to it once, as intended (see
 	// TestClockWaitsForTheAudioToStart).
-	const margin = time.Millisecond // the clock and wall time are read apart
-	worst, worstGap := time.Duration(0), time.Duration(0)
-	prevClock, prevWall := c.Time(), time.Now()
+	const margin = time.Millisecond
+	read := func() (clock, wall, bracket time.Duration) {
+		before := time.Now()
+		clock = c.Time()
+		after := time.Now()
+		return clock, after.Sub(start), after.Sub(before)
+	}
+	worst, worstGap, worstBracket := time.Duration(0), time.Duration(0), time.Duration(0)
+	prevClock, prevWall, prevBracket := read()
 	nextUpdate := start
 	for i := 0; time.Since(start) < 1500*time.Millisecond; i++ {
 		time.Sleep(2 * time.Millisecond)
@@ -112,23 +121,25 @@ func TestClockSmoothsSteppedAudioPosition(t *testing.T) {
 			c.SetAudioTime(pos)
 			nextUpdate = now.Add(time.Duration(15+i%3*10) * time.Millisecond) // irregular, 15-35 ms
 		}
-		clock, wall := c.Time(), time.Now()
-		if wall.Sub(start) < 2*step { // not under way yet
-			prevClock, prevWall = clock, wall
+		clock, wall, bracket := read()
+		if wall < 2*step { // not under way yet
+			prevClock, prevWall, prevBracket = clock, wall, bracket
 			continue
 		}
-		gap := wall.Sub(prevWall)
+		gap := wall - prevWall
 		dev := (clock - prevClock) - gap
 		if dev < 0 {
 			dev = -dev
 		}
-		if excess := dev - time.Duration(audioMaxSlew*float64(gap)); excess > worst {
-			worst, worstGap = excess, gap
+		allowed := time.Duration(audioMaxSlew*float64(gap)) + prevBracket + bracket
+		if excess := dev - allowed; excess > worst {
+			worst, worstGap, worstBracket = excess, gap, prevBracket+bracket
 		}
-		prevClock, prevWall = clock, wall
+		prevClock, prevWall, prevBracket = clock, wall, bracket
 	}
 	if worst > margin {
-		t.Errorf("clock lurched by %v more than its slew allows over %v between samples; want it smooth", worst, worstGap)
+		t.Errorf("clock lurched by %v more than its slew allows over %v between samples (reads took %v); want it smooth",
+			worst, worstGap, worstBracket)
 	}
 	if lag := time.Since(start) - c.Time(); lag > 2*step || lag < -step {
 		t.Errorf("clock is %v behind real time; want it to track the audio within a step or two", lag)
