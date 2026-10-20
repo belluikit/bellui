@@ -797,7 +797,7 @@ type mobileBoundaryEntry struct {
 }
 
 // mobileTreeWalker bundles the mutable state shared by the draw/afterDraw
-// callbacks passed to canvas.WalkTrees. It mirrors the desktop driver's
+// callbacks of the paint walk. It mirrors the desktop driver's
 // boundary FBO + dirty-region handling.
 type mobileTreeWalker struct {
 	c     *canvas
@@ -813,6 +813,17 @@ type mobileTreeWalker struct {
 	partialRepaint bool
 	drPos          geo.Position
 	drSize         geo.Size
+}
+
+// paint walks the content and overlay trees with draw/afterDraw, then rebuilds
+// the hit-test index. Clip-owners scrolled out of view are visited without
+// their subtrees (#464, #481), as in the desktop driver. A culled walk must not
+// sweep the node map, which WalkTrees does: the objects it skips would lose
+// their nodes every frame. The min-size pass's full walks sweep it instead.
+func (w *mobileTreeWalker) paint() {
+	w.c.WalkContentTreesCulled(common.CullOffClip, w.draw, w.afterDraw)
+	w.c.WalkOverlayTrees(w.draw, w.afterDraw)
+	w.c.RebuildSpatialIndex()
 }
 
 func (w *mobileTreeWalker) insideCleanBoundary() bool {
@@ -904,7 +915,9 @@ func (w *mobileTreeWalker) draw(node *common.RenderCacheNode, pos geo.Position) 
 	// clip-owner (scroll/ClipToBounds) still constrains its descendants; otherwise
 	// its children that extend into the dirty region draw unclipped, leaking content
 	// past the viewport (pre-rebrand tracker #333). afterDraw tears these down regardless of culling.
-	clips := intdriver.ClipsOf(obj)
+	// A clip-owner the paint walk culled has no children to constrain, and
+	// gets no clip (#481).
+	clips := common.PaintClips(node)
 	if clips.Rect {
 		inner := w.clips.Push(paintPos, obj.Size())
 		w.c.Painter().StartClipping(inner.Rect())
@@ -969,7 +982,7 @@ func (w *mobileTreeWalker) afterDraw(node *common.RenderCacheNode, pos geo.Posit
 
 	// Tear down clips even when culled: draw establishes them unconditionally for
 	// clip-owners so descendants stay clipped (pre-rebrand tracker #333), so push/pop must stay paired.
-	clips := intdriver.ClipsOf(obj)
+	clips := common.PaintClips(node)
 	if clips.Rounded {
 		w.c.Painter().StopRoundedClipping()
 	}
@@ -1046,7 +1059,7 @@ func (d *driver) paintWindow(win bellui.Window, size geo.Size) {
 	uidir.Push(c.Direction())
 	defer uidir.Pop(c.Direction())
 
-	c.WalkTrees(walk.draw, walk.afterDraw)
+	walk.paint()
 
 	// In-scene screen-reader focus ring (pre-rebrand tracker #759): the OS-drawn highlight cannot
 	// reach the flat GPU surface, so paint our own over the accessibility-focused

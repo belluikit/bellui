@@ -970,6 +970,12 @@ func (c *Canvas) RebuildSpatialIndex() {
 
 // walkCacheNodeDFS visits a render cache subtree in depth-first order,
 // adding each visible, non-zero-sized object to the spatial index builder.
+//
+// It skips the children the paint walk culled when their clip-owner lies
+// wholly off the grid, where no lookup can find them (#481). Visiting them
+// costs more than the culled paint walk saved on a phone: the walk left them
+// out of the CPU cache. A clip-owner's descendants lie inside its bounds, the
+// assumption the cull itself makes.
 func (c *Canvas) walkCacheNodeDFS(node *RenderCacheNode, b *SpatialIndex) {
 	if node == nil {
 		return
@@ -980,6 +986,9 @@ func (c *Canvas) walkCacheNodeDFS(node *RenderCacheNode, b *SpatialIndex) {
 		s := obj.Size()
 		if s.Width > 0 && s.Height > 0 {
 			b.add(obj, node.worldTransform, s.Width, s.Height, node.clipPos, node.clipSize)
+			if node.paintCulled && b.offGrid(node.worldTransform.AABB(s.Width, s.Height)) {
+				return
+			}
 		}
 	}
 
@@ -1045,6 +1054,19 @@ func (c *Canvas) walkTree(
 ) {
 	var node, parent, prev *RenderCacheNode
 	node = tree.root
+	// culled is the object cull last skipped the children of. Cull runs just
+	// before the object's visit, which records it on the node.
+	var culled core.CanvasObject
+	if cull != nil {
+		skip := cull
+		cull = func(obj core.CanvasObject, pos, clipPos geo.Position, clipSize geo.Size) bool {
+			if skip(obj, pos, clipPos, clipSize) {
+				culled = obj
+				return true
+			}
+			return false
+		}
+	}
 	if nodeCull != nil {
 		cull = func(obj core.CanvasObject, _, _ geo.Position, _ geo.Size) bool {
 			n := node // the node the walk is about to visit for obj
@@ -1102,6 +1124,8 @@ func (c *Canvas) walkTree(
 		// Cache clip bounds for spatial index construction.
 		node.clipPos = clipPos
 		node.clipSize = clipSize
+		node.paintCulled = culled == obj
+		culled = nil
 
 		// Populate the object→node lookup map and cache boundary status. Store
 		// only a changed mapping: storing over an existing key allocates a new

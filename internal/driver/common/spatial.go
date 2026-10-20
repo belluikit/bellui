@@ -81,6 +81,13 @@ func (idx *SpatialIndex) reset(canvasW, canvasH float32) {
 	idx.cellStart = idx.cellStart[:0]
 }
 
+// offGrid reports whether the screen-space box misses the grid, so no
+// lookup can return anything inside it.
+func (idx *SpatialIndex) offGrid(minX, minY, maxX, maxY float32) bool {
+	return maxX <= 0 || maxY <= 0 ||
+		minX >= float32(idx.cols)*idx.cellW || minY >= float32(idx.rows)*idx.cellH
+}
+
 // add inserts an object into the grid. The world transform, local size, and
 // effective clip bounds are used to compute the screen-space AABB and
 // determine which cells the object overlaps.
