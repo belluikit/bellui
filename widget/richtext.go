@@ -2029,6 +2029,22 @@ func (t *RichText) updateRowBoundsInner() bool {
 		t.applyHiddenRanges()
 		return true
 	}
+	// A single line of plain text, neither wrapped nor truncated (every Label
+	// holding one line) has exactly one row: the dense build below would split
+	// it at newlines, find none, and return that row unmeasured. Building the
+	// row directly skips the build's machinery, which was about a fifth of a
+	// Label.SetText (#492).
+	if seg, ok := t.singleSegment(); ok && t.Wrapping == bellui.TextWrapOff &&
+		t.Truncation == bellui.TextTruncateOff && strings.IndexByte(seg.Text, '\n') < 0 {
+		t.lazy = false
+		t.lineRowCount = nil
+		t.updateRowBoundsBlockLazyReset()
+		t.rowBounds = []rowBoundary{{segments: []RichTextSegment{seg}, end: utf8.RuneCountInString(seg.Text)}}
+		t.denseIncr = nil
+		t.rowHeightCacheVer = -1
+		t.rowBoundsCacheStamp(width)
+		return true
+	}
 	// Edit-incremental dense rebuild (pre-rebrand tracker #921): when only a contiguous segment
 	// range changed since the last dense build, re-shape just that range and
 	// splice, leaving the untouched rows (and their caches) in place.
@@ -2219,9 +2235,15 @@ func (r *textRenderer) Layout(size geo.Size) {
 	yPos := innerPadding - r.obj.inset.Height
 	lineWidth := size.Width - left*2
 
-	// Pre-allocate row geometry caches for selection hit-testing.
-	r.obj.rowYPos = make([]float32, len(bounds))
-	r.obj.rowHeight = make([]float32, len(bounds))
+	// Row geometry caches for selection hit-testing, reused when the row count
+	// is unchanged: every entry is written below, and a Label lays out again on
+	// every text change (#492).
+	if len(r.obj.rowYPos) != len(bounds) {
+		r.obj.rowYPos = make([]float32, len(bounds))
+	}
+	if len(r.obj.rowHeight) != len(bounds) {
+		r.obj.rowHeight = make([]float32, len(bounds))
+	}
 
 	i := 0
 	for row, bound := range bounds {
@@ -2840,6 +2862,12 @@ func (r *textRenderer) Refresh() {
 				continue
 			}
 
+			if showsWholeSegment(bound, textSeg) {
+				txt.Text = textSeg.Text
+				objs = append(objs, txt)
+				continue
+			}
+
 			var runes []rune
 			if textSeg == lastSeg {
 				runes = lastRunes
@@ -2906,9 +2934,7 @@ func (r *textRenderer) Refresh() {
 		}
 	}
 
-	// Save original 1-per-row objects for Layout (which expects this count).
-	r.origObjs = make([]core.CanvasObject, len(objs))
-	copy(r.origObjs, objs)
+	r.saveOrigObjs(objs)
 
 	r.Layout(r.obj.Size())
 
@@ -2920,6 +2946,25 @@ func (r *textRenderer) Refresh() {
 	canvas.Refresh(r.obj.super())
 
 	r.obj.cleanVisualCache()
+}
+
+// saveOrigObjs keeps the original 1-per-row objects for Layout (which expects
+// this count), in an array of their own as the incremental refresh expects,
+// reused when the count is unchanged (#492).
+func (r *textRenderer) saveOrigObjs(objs []core.CanvasObject) {
+	if len(r.origObjs) != len(objs) {
+		r.origObjs = make([]core.CanvasObject, len(objs))
+	}
+	copy(r.origObjs, objs)
+}
+
+// showsWholeSegment reports whether a row holds the whole of a single text
+// segment, shown as it is: no ellipsis, not concealed. Its text is then the
+// segment's text, and going through runes would give the same string when the
+// text is valid UTF-8, at two allocations per refresh (#492).
+func showsWholeSegment(bound rowBoundary, seg *TextSegment) bool {
+	return len(bound.segments) == 1 && bound.begin == 0 && !bound.ellipsis && !concealed(seg) &&
+		bound.end >= utf8.RuneCountInString(seg.Text) && utf8.ValidString(seg.Text)
 }
 
 // splitIntoFragments replaces each row's canvas.Text with colored fragments.

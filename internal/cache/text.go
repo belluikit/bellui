@@ -2,15 +2,65 @@ package cache
 
 import (
 	"image/color"
+	"sync"
 	"time"
 
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
-	"github.com/belluikit/bellui/internal/async"
 )
 
-var fontSizeCache async.Map[fontSizeEntry, *fontMetric]
+var fontSizeCache fontMetricMap
+
+// fontMetricMap is a map guarded by a read-write lock rather than an
+// async.Map. A sync.Map hashes its key through an interface, which for this
+// struct of strings and floats walks every field generically, and was most of
+// the lookup a label pays on every text change; a typed map uses the hash
+// function the compiler generates for the key type. A lookup took 121 ns
+// before and 67 ns after (#492).
+type fontMetricMap struct {
+	mu sync.RWMutex
+	m  map[fontSizeEntry]*fontMetric
+}
+
+func (f *fontMetricMap) Load(k fontSizeEntry) (*fontMetric, bool) {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+	v, ok := f.m[k]
+	return v, ok
+}
+
+func (f *fontMetricMap) Store(k fontSizeEntry, v *fontMetric) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.m == nil {
+		f.m = make(map[fontSizeEntry]*fontMetric)
+	}
+	f.m[k] = v
+}
+
+func (f *fontMetricMap) Len() int {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+	return len(f.m)
+}
+
+func (f *fontMetricMap) Clear() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	clear(f.m)
+}
+
+// deleteExpired removes the entries that expired before now.
+func (f *fontMetricMap) deleteExpired(now time.Time) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for k, v := range f.m {
+		if v.isExpired(now) {
+			delete(f.m, k)
+		}
+	}
+}
 
 type fontMetric struct {
 	expiringCache
@@ -99,10 +149,5 @@ func SetFontMetrics(text string, fontSize float32, style bellui.TextStyle, sourc
 
 // destroyExpiredFontMetrics destroys expired fontSizeCache entries
 func destroyExpiredFontMetrics(now time.Time) {
-	fontSizeCache.Range(func(k fontSizeEntry, v *fontMetric) bool {
-		if v.isExpired(now) {
-			fontSizeCache.Delete(k)
-		}
-		return true
-	})
+	fontSizeCache.deleteExpired(now)
 }
