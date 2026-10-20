@@ -44,7 +44,7 @@ func (p *painter) drawCircle(circle *canvas.Circle, pos geo.Position, frame geo.
 	p.UpdateVertexArray(program, "vert", 2, 4, 0)
 	p.UpdateVertexArray(program, "normal", 2, 4, 2)
 
-	p.ctx.BlendFunc(srcAlpha, oneMinusSrcAlpha)
+	p.blendFunc(srcAlpha, oneMinusSrcAlpha)
 	p.logError()
 	// Vertex: END
 
@@ -104,7 +104,7 @@ func (p *painter) drawLine(line *canvas.Line, pos geo.Position, frame geo.Size) 
 	p.UpdateVertexArray(p.lineProgram, "vert", 2, 4, 0)
 	p.UpdateVertexArray(p.lineProgram, "normal", 2, 4, 2)
 
-	p.ctx.BlendFunc(srcAlpha, oneMinusSrcAlpha)
+	p.blendFunc(srcAlpha, oneMinusSrcAlpha)
 	p.logError()
 
 	r, g, b, a := getFragmentColor(line.StrokeColor)
@@ -185,7 +185,7 @@ func (p *painter) drawGLView(view *canvas.GLView, pos geo.Position, frame geo.Si
 	fullH := int(p.textureScale(frame.Height))
 	p.ctx.Viewport(0, 0, fullW, fullH)
 	p.ctx.UseProgram(p.program.ref)
-	p.ctx.BlendFunc(one, oneMinusSrcAlpha)
+	p.blendFunc(one, oneMinusSrcAlpha)
 	p.logError()
 }
 
@@ -257,7 +257,7 @@ func (p *painter) drawBackdropBlur(blur *canvas.BackdropBlur, pos geo.Position, 
 	p.SetUniform4f(p.program, "inset", 0, 0, 1, 1)
 	p.ctx.ActiveTexture(texture0)
 	p.ctx.BindTexture(texture2D, blurredTex)
-	p.ctx.BlendFunc(one, oneMinusSrcAlpha)
+	p.blendFunc(one, oneMinusSrcAlpha)
 	p.ctx.DrawArrays(triangleStrip, 0, 4)
 	p.logError()
 }
@@ -282,7 +282,7 @@ func (p *painter) drawRipple(ripple *canvas.Ripple, pos geo.Position, frame geo.
 	p.UpdateVertexArray(program, "vert", 2, 4, 0)
 	p.UpdateVertexArray(program, "normal", 2, 4, 2)
 
-	p.ctx.BlendFunc(srcAlpha, oneMinusSrcAlpha)
+	p.blendFunc(srcAlpha, oneMinusSrcAlpha)
 	p.logError()
 
 	p.uploadInvTransform(program, pos, frame)
@@ -355,7 +355,7 @@ func (p *painter) drawOblong(obj core.CanvasObject, fill, stroke color.Color, st
 	p.UpdateVertexArray(program, "vert", 2, 4, 0)
 	p.UpdateVertexArray(program, "normal", 2, 4, 2)
 
-	p.ctx.BlendFunc(srcAlpha, oneMinusSrcAlpha)
+	p.blendFunc(srcAlpha, oneMinusSrcAlpha)
 	p.logError()
 	// Vertex: END
 
@@ -439,7 +439,7 @@ func (p *painter) drawPolygon(polygon *canvas.Polygon, pos geo.Position, frame g
 	p.UpdateVertexArray(program, "vert", 2, 4, 0)
 	p.UpdateVertexArray(program, "normal", 2, 4, 2)
 
-	p.ctx.BlendFunc(srcAlpha, oneMinusSrcAlpha)
+	p.blendFunc(srcAlpha, oneMinusSrcAlpha)
 	p.logError()
 	// Vertex: END
 
@@ -506,7 +506,7 @@ func (p *painter) drawArc(arc *canvas.Arc, pos geo.Position, frame geo.Size) {
 	p.UpdateVertexArray(program, "vert", 2, 4, 0)
 	p.UpdateVertexArray(program, "normal", 2, 4, 2)
 
-	p.ctx.BlendFunc(srcAlpha, oneMinusSrcAlpha)
+	p.blendFunc(srcAlpha, oneMinusSrcAlpha)
 	p.logError()
 	// Vertex: END
 
@@ -673,7 +673,7 @@ func (p *painter) drawTextureWithDetails(o core.CanvasObject, creator func(canva
 
 	p.SetUniform1f(p.program, "alpha", p.effectiveAlpha(alpha))
 
-	p.ctx.BlendFunc(one, oneMinusSrcAlpha)
+	p.blendFunc(one, oneMinusSrcAlpha)
 	p.logError()
 
 	p.ctx.ActiveTexture(texture0)
@@ -889,7 +889,7 @@ func (p *painter) drawPath(path *canvas.Path, pos geo.Position, frame geo.Size) 
 
 	program := p.pathProgram
 	p.ctx.UseProgram(program.ref)
-	p.ctx.BlendFunc(srcAlpha, oneMinusSrcAlpha)
+	p.blendFunc(srcAlpha, oneMinusSrcAlpha)
 	p.logError()
 
 	fringeWidth := float32(1.0) / p.pixScale

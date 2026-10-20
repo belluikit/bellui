@@ -101,6 +101,9 @@ const (
 	// Scene3D uniforms.
 	glfnUniform3f
 	glfnUniformMatrix4fv
+
+	// RepaintBoundary targets blend their alpha apart from their color (#570).
+	glfnBlendFuncSeparate
 )
 
 func goString(buf []byte) string {

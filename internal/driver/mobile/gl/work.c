@@ -46,6 +46,9 @@ uintptr_t processFn(struct fnargs* args, char* parg) {
 	case glfnBlendFunc:
 		glBlendFunc((GLenum)args->a0, (GLenum)args->a1);
 		break;
+	case glfnBlendFuncSeparate:
+		glBlendFuncSeparate((GLenum)args->a0, (GLenum)args->a1, (GLenum)args->a2, (GLenum)args->a3);
+		break;
 	case glfnBufferData:
 		glBufferData((GLenum)args->a0, (GLsizeiptr)args->a1, (GLvoid*)parg, (GLenum)args->a2);
 		break;

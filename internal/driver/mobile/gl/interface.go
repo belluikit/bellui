@@ -51,6 +51,12 @@ type Context interface {
 	// http://www.khronos.org/opengles/sdk/docs/man3/html/glBlendFunc.xhtml
 	BlendFunc(sfactor, dfactor Enum)
 
+	// BlendFuncSeparate sets the pixel blending factors for color and alpha
+	// apart.
+	//
+	// http://www.khronos.org/opengles/sdk/docs/man3/html/glBlendFuncSeparate.xhtml
+	BlendFuncSeparate(sfactorRGB, dfactorRGB, sfactorAlpha, dfactorAlpha Enum)
+
 	// BufferData creates a new data store for the bound buffer object.
 	//
 	// http://www.khronos.org/opengles/sdk/docs/man3/html/glBufferData.xhtml

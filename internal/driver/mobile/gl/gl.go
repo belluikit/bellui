@@ -86,6 +86,18 @@ func (ctx *context) BlendFunc(sfactor, dfactor Enum) {
 	})
 }
 
+func (ctx *context) BlendFuncSeparate(sfactorRGB, dfactorRGB, sfactorAlpha, dfactorAlpha Enum) {
+	ctx.enqueue(call{
+		args: fnargs{
+			fn: glfnBlendFuncSeparate,
+			a0: sfactorRGB.c(),
+			a1: dfactorRGB.c(),
+			a2: sfactorAlpha.c(),
+			a3: dfactorAlpha.c(),
+		},
+	})
+}
+
 func (ctx *context) BufferData(target Enum, src []byte, usage Enum) {
 	parg := unsafe.Pointer(nil)
 	if len(src) > 0 {

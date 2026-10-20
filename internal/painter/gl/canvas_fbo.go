@@ -108,9 +108,9 @@ func (p *painter) UnbindAndBlitCanvasFBO(pixW, pixH int) {
 	// alpha < 1 along anti-aliased edges; blending here would let the stale
 	// back-buffer frame bleed through at exactly those border pixels
 	// (visible as bright dashes on borders while scrolling).
-	p.ctx.BlendFunc(one, 0)
+	p.blendFunc(one, 0)
 	p.ctx.DrawArrays(triangleStrip, 0, 4)
-	p.ctx.BlendFunc(srcAlpha, oneMinusSrcAlpha)
+	p.blendFunc(srcAlpha, oneMinusSrcAlpha)
 	p.logError()
 }
 
