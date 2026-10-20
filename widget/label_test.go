@@ -385,6 +385,28 @@ func TestLabel_SelectableMode_All(t *testing.T) {
 	assert.Equal(t, 2, len(test.WidgetRenderer(l).Objects()))
 }
 
+// TestLabel_ObjectsReusedUntilChanged pins that a label's renderer hands the
+// tree walks the same slice every frame, and a new one when its objects change,
+// leaving the old one as it was (#554).
+func TestLabel_ObjectsReusedUntilChanged(t *testing.T) {
+	l := NewLabel("Hello")
+	w := test.NewWindow(l)
+	defer w.Close()
+	r := test.WidgetRenderer(l)
+
+	before := r.Objects()
+	assert.Len(t, before, 1)
+	assert.Zero(t, testing.AllocsPerRun(100, func() { r.Objects() }))
+
+	l.Selectable = true
+	l.Refresh()
+	after := r.Objects()
+	assert.Len(t, after, 2)
+	assert.Len(t, before, 1, "the slice returned before the change")
+	assert.Same(t, l.provider, before[0])
+	assert.Zero(t, testing.AllocsPerRun(100, func() { r.Objects() }))
+}
+
 func TestLabel_SelectableMode_None(t *testing.T) {
 	l := NewLabel("Hello")
 	l.Selectable = true
