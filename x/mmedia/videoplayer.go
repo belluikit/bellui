@@ -24,6 +24,8 @@ type VideoPlayer struct {
 	minSize geo.Size
 	opts    *options
 	loop    bool
+
+	transport transport // orders Play/Pause/Stop/Close against a loop restart (#527)
 }
 
 // NewVideoPlayer creates a new video player widget from an io.Reader.
@@ -92,10 +94,7 @@ func newVideoPlayerFromPipeline(pipe *pipeline.Pipeline, o *options) (*VideoPlay
 		if vp.loop {
 			// Off the pipeline's goroutine, which Stop waits for (#502; see
 			// MediaPlayer).
-			go func() {
-				vp.pipe.Stop()
-				vp.pipe.Play()
-			}()
+			go vp.transport.restart(vp.pipe)
 			return
 		}
 		if o.onEnd != nil {
@@ -122,17 +121,17 @@ func newVideoPlayerFromPipeline(pipe *pipeline.Pipeline, o *options) (*VideoPlay
 
 // Play starts video playback.
 func (vp *VideoPlayer) Play() {
-	vp.pipe.Play()
+	vp.transport.play(vp.pipe)
 }
 
 // Pause pauses video playback.
 func (vp *VideoPlayer) Pause() {
-	vp.pipe.Pause()
+	vp.transport.pause(vp.pipe)
 }
 
 // Stop stops playback and resets to the beginning.
 func (vp *VideoPlayer) Stop() {
-	vp.pipe.Stop()
+	vp.transport.stop(vp.pipe)
 }
 
 // Seek seeks to the given position.
@@ -172,7 +171,7 @@ func (vp *VideoPlayer) SetLoop(loop bool) {
 
 // Close releases all resources.
 func (vp *VideoPlayer) Close() {
-	vp.pipe.Close()
+	vp.transport.close(vp.pipe)
 }
 
 // CreateRenderer returns the Bellui widget renderer.
