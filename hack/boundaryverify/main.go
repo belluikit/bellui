@@ -31,6 +31,7 @@ import (
 	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/theme"
 	"github.com/belluikit/bellui/widget"
 )
 
@@ -48,11 +49,16 @@ func main() {
 	secs := flag.Float64("secs", 20, "seconds to run")
 	shot := flag.String("shot", "", "save a capture here at -shotframe")
 	shotFrame := flag.Int("shotframe", 80, "frame to capture at")
-	variant := flag.String("variant", "card", "column 2: card | plain | noboundary")
+	variant := flag.String("variant", "card", "column 2: card | plain | noboundary | shadow | shadownoboundary")
 	dump := flag.Bool("dump", false, "print the middle column's geometry at -shotframe")
-	settle := flag.Duration("settle", 0, "wait this long after the change before capturing, so the frame loop paints it first")
+	noBar := flag.Bool("nobar", false, "leave out the infinite progress bar, which moves with wall time")
+	light := flag.Bool("light", false, "use the light theme variant, where shadows show")
+	frac := flag.Bool("frac", false, "scroll by fractional amounts, as a touchpad does")
 	flag.Parse()
 	a := app.New()
+	if *light {
+		a.Settings().SetThemeVariant(theme.VariantLight)
+	}
 	w := a.NewWindow("boundaryverify")
 
 	status := widget.NewLabel("frame 0")
@@ -69,13 +75,30 @@ func main() {
 		l := widget.NewLabel("card " + strconv.Itoa(i))
 		cardLabels = append(cardLabels, l)
 		body := container.NewVBox(l)
-		if i == 1 {
+		if i == 1 && !*noBar {
 			body.Add(widget.NewProgressBarInfinite())
 		}
 		switch *variant {
-		case "plain":
+		case "plain", "plainnoboundary":
 			bg := canvas.NewRectangle(color.NRGBA{R: 40, G: 40, B: 60, A: 255})
-			cards[i] = container.NewRepaintBoundary(container.NewStack(bg, container.NewVBox(widget.NewLabel("Plain "+strconv.Itoa(i)), body)))
+			bg.CornerRadius = 12
+			bg.StrokeColor = color.NRGBA{R: 200, G: 200, B: 220, A: 255}
+			bg.StrokeWidth = 1
+			var o core.CanvasObject = container.NewStack(bg, container.NewVBox(widget.NewLabel("Plain "+strconv.Itoa(i)), body))
+			if *variant == "plain" {
+				o = container.NewRepaintBoundary(o)
+			}
+			cards[i] = o
+		case "shadow", "shadownoboundary":
+			// A shadow blurred past its owner's bounds: 2×BlurRadius = 16 pt.
+			sh := canvas.NewBoxShadow(color.NRGBA{A: 160}, 8)
+			sh.OffsetY = 4
+			box := canvas.NewRectangle(color.NRGBA{R: 230, G: 230, B: 240, A: 255})
+			var o core.CanvasObject = container.NewPadded(container.NewStack(sh, box, container.NewVBox(widget.NewLabel("Shadow "+strconv.Itoa(i)), body)))
+			if *variant == "shadow" {
+				o = container.NewRepaintBoundary(o)
+			}
+			cards[i] = o
 		case "noboundary":
 			cards[i] = widget.NewCard("Card "+strconv.Itoa(i), "", body)
 		default:
@@ -104,6 +127,9 @@ func main() {
 			bellui.DoAndWait(func() {
 				status.SetText(fmt.Sprintf("frame %d", f))
 				step := float32((f%40)-20) * 6
+				if *frac {
+					step *= 1.0371
+				}
 				if step < 0 {
 					step = -step
 				}
@@ -129,7 +155,6 @@ func main() {
 			}
 			if *shot != "" && !saved && f == *shotFrame {
 				saved = true
-				time.Sleep(*settle)
 				bellui.DoAndWait(func() {
 					img := w.Canvas().Capture()
 					f, _ := os.Create(*shot)
