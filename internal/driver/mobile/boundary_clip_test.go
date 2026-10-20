@@ -161,3 +161,34 @@ func Test_mobileTreeWalker_BoundaryRerendersOnSubPixelMove(t *testing.T) {
 		"a sub-pixel move renders it again")
 }
 
+// The mobile walk's half of the glfw TestPaint_BoundaryRendersContentOffClip
+// (#564): since it culls (#481), a boundary's render must not be culled by a
+// clip outside the boundary, or content off screen then stays missing from
+// its texture. A clip inside the boundary still culls.
+func Test_mobileTreeWalker_BoundaryRendersContentOffClip(t *testing.T) {
+	marker := belluicanvas.NewRectangle(color.White)
+	marker.SetMinSize(geo.NewSize(50, 50))
+	clipped := container.NewStack(marker)
+	clipped.ClipToBounds = true
+	boundary := container.NewRepaintBoundary(clipped)
+
+	hidden := belluicanvas.NewRectangle(color.Black)
+	hiddenOwner := container.NewStack(hidden)
+	hiddenOwner.ClipToBounds = true
+	hiddenOwner.Move(geo.NewPos(0, 400))
+	hiddenOwner.Resize(geo.NewSize(50, 50))
+	innerClip := container.NewWithoutLayout(hiddenOwner)
+	innerClip.ClipToBounds = true
+	innerClip.Resize(geo.NewSize(50, 50))
+	inner := container.NewRepaintBoundary(innerClip)
+
+	spacer := belluicanvas.NewRectangle(color.Black)
+	spacer.SetMinSize(geo.NewSize(50, 400))
+	outer := container.NewVScroll(container.NewVBox(spacer, boundary, inner))
+	outer.Resize(geo.NewSize(200, 100))
+	_, p, walk := newRecordingWalk(t, container.NewWithoutLayout(outer))
+
+	walk.paint()
+	assert.True(t, p.painted[marker], "content off the outer clip must render into its boundary")
+	assert.False(t, p.painted[hidden], "a clip inside the boundary still culls")
+}

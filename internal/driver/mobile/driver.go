@@ -822,9 +822,21 @@ type mobileTreeWalker struct {
 // sweep the node map, which WalkTrees does: the objects it skips would lose
 // their nodes every frame. The min-size pass's full walks sweep it instead.
 func (w *mobileTreeWalker) paint() {
-	w.c.WalkContentTreesCulled(common.CullOffClip, w.draw, w.afterDraw)
+	w.c.WalkContentTreesCulled(w.cull, w.draw, w.afterDraw)
 	w.c.WalkOverlayTrees(w.draw, w.afterDraw)
 	w.c.RebuildSpatialIndex()
+}
+
+// cull is the paint walk's driver.CullFunc: common.CullOffClip, except while
+// a boundary renders into its texture with no clip of its own open, as in the
+// desktop driver (#564). The clip then comes from outside the boundary, whose
+// cache must hold its whole subtree: content off screen when it rendered would
+// stay missing once scrolled into view.
+func (w *mobileTreeWalker) cull(obj core.CanvasObject, pos, clipPos geo.Position, clipSize geo.Size) bool {
+	if ab := w.activeBoundary(); ab != nil && ab.wasDirty && w.clips.Top() == nil {
+		return false
+	}
+	return common.CullOffClip(obj, pos, clipPos, clipSize)
 }
 
 func (w *mobileTreeWalker) insideCleanBoundary() bool {
