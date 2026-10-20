@@ -69,13 +69,13 @@ func downloadDLLs() (path string, err error) {
 	}
 
 	writeDLLs := func(path string) error {
-		if err := os.WriteFile(filepath.Join(path, "libglesv2.dll"), bytesGLESv2, 0o755); err != nil {
+		if err := installDLL(path, "libglesv2.dll", bytesGLESv2); err != nil {
 			return fmt.Errorf("gl: cannot install ANGLE: %v", err)
 		}
-		if err := os.WriteFile(filepath.Join(path, "libegl.dll"), bytesEGL, 0o755); err != nil {
+		if err := installDLL(path, "libegl.dll", bytesEGL); err != nil {
 			return fmt.Errorf("gl: cannot install ANGLE: %v", err)
 		}
-		if err := os.WriteFile(filepath.Join(path, "d3dcompiler_47.dll"), bytesD3DCompiler, 0o755); err != nil {
+		if err := installDLL(path, "d3dcompiler_47.dll", bytesD3DCompiler); err != nil {
 			return fmt.Errorf("gl: cannot install ANGLE: %v", err)
 		}
 		return nil
@@ -109,30 +109,63 @@ func downloadDLLs() (path string, err error) {
 	return tmp, nil
 }
 
+// installDLL writes data to dir/name so that no process ever reads a partial
+// file. Processes started together on a fresh machine all miss ANGLE and all
+// install it into the same directory (#438): writing in place let one read a
+// file another had only half written, or fail to open one another had already
+// loaded, which Windows locks. The data goes to a temporary file in the same
+// directory and is renamed into place. When the rename fails because another
+// process has already installed the file, and loaded it, a complete copy is
+// there and is kept.
+func installDLL(dir, name string, data []byte) error {
+	f, err := os.CreateTemp(dir, name+".*.tmp")
+	if err != nil {
+		return err
+	}
+	tmp := f.Name()
+	_, werr := f.Write(data)
+	if cerr := f.Close(); werr == nil {
+		werr = cerr
+	}
+	if werr != nil {
+		os.Remove(tmp)
+		return werr
+	}
+	if err := os.Rename(tmp, filepath.Join(dir, name)); err != nil {
+		os.Remove(tmp)
+		if compatibleDLL(dir, name) {
+			return nil // installed by another process
+		}
+		return err
+	}
+	return nil
+}
+
 func appdataPath() string {
 	return filepath.Join(os.Getenv("LOCALAPPDATA"), "GoGL", runtime.GOARCH)
 }
 
 func containsDLLs(dir string) bool {
-	compatible := func(name string) bool {
-		file, err := pe.Open(filepath.Join(dir, name))
-		if err != nil {
-			return false
-		}
-		defer file.Close()
+	return compatibleDLL(dir, "libglesv2.dll") && compatibleDLL(dir, "libegl.dll") && compatibleDLL(dir, "d3dcompiler_47.dll")
+}
 
-		switch file.Machine {
-		case pe.IMAGE_FILE_MACHINE_AMD64:
-			return "amd64" == runtime.GOARCH
-		case pe.IMAGE_FILE_MACHINE_ARM:
-			return "arm" == runtime.GOARCH
-		case pe.IMAGE_FILE_MACHINE_I386:
-			return "386" == runtime.GOARCH
-		}
+// compatibleDLL reports whether dir/name is a complete DLL for this machine.
+func compatibleDLL(dir, name string) bool {
+	file, err := pe.Open(filepath.Join(dir, name))
+	if err != nil {
 		return false
 	}
+	defer file.Close()
 
-	return compatible("libglesv2.dll") && compatible("libegl.dll") && compatible("d3dcompiler_47.dll")
+	switch file.Machine {
+	case pe.IMAGE_FILE_MACHINE_AMD64:
+		return "amd64" == runtime.GOARCH
+	case pe.IMAGE_FILE_MACHINE_ARM:
+		return "arm" == runtime.GOARCH
+	case pe.IMAGE_FILE_MACHINE_I386:
+		return "386" == runtime.GOARCH
+	}
+	return false
 }
 
 func chromePath() string {
@@ -235,7 +268,13 @@ func findDLLs() (err error) {
 		return err
 	}
 	debug.Printf("DLLs written to %s", path)
-	if ok, err := load(path); !ok || err != nil {
+	ok, err := load(path)
+	if !ok && err == nil {
+		// Retry once: a failed load right after installing is the race #438
+		// was, and installDLL should have closed it.
+		ok, err = load(path)
+	}
+	if !ok || err != nil {
 		return fmt.Errorf("gl: unable to load ANGLE after installation: %v", err)
 	}
 	return nil
