@@ -246,13 +246,28 @@ func (w *window) Close() {
 		w.cancelPendingTap()
 		w.viewport.SetShouldClose(true)
 
-		cache.RangeTexturesFor(w.canvas, w.canvas.Painter().Free)
+		w.releaseGPUResources()
 		w.canvas.WalkTrees(nil, func(node *common.RenderCacheNode, _ geo.Position) {
 			if wid, ok := node.Obj().(core.Widget); ok {
 				cache.DestroyRenderer(wid)
 			}
 		})
 	})
+}
+
+// releaseGPUResources deletes the canvas's textures and the painter's own
+// caches with this window's GL context current. Close runs between frames,
+// when the paint loop has detached every context, and the textures belong to
+// this window's context alone (#444).
+func (w *window) releaseGPUResources() {
+	if needsGLContext && w.viewport != nil {
+		w.viewport.MakeContextCurrent()
+		defer w.DetachCurrentContext()
+	}
+	cache.RangeTexturesFor(w.canvas, w.canvas.Painter().Free)
+	if r, ok := w.canvas.Painter().(interface{ ReleaseCaches() }); ok {
+		r.ReleaseCaches()
+	}
 }
 
 func (w *window) ShowAndRun() {

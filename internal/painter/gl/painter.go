@@ -51,6 +51,7 @@ type painter struct {
 	pixScale              float32      // pre-calculate scale*texScale for each draw
 	currentTransform      geo.Matrix   // current world transform set via SetTransform
 	scissorActive         bool         // a StartClipping scissor is currently enabled
+	scissor               [4]int32     // the StartClipping scissor rect: x, y, w, h in y-up pixels
 	shaderInitFailed      bool         // a shader/program failed to build; logged once, rendering degrades
 	baseProgramFailed     bool         // the base textured-quad ("simple") program failed; no GL diagnostic possible
 	initFailureText       *canvas.Text // lazily-built "graphics unavailable" diagnostic message
@@ -60,6 +61,12 @@ type painter struct {
 
 	// canvasFBO is the persistent full-canvas framebuffer for dirty-region culling.
 	canvasFBO *canvasFBOState
+
+	// shadows caches blurred box-shadow textures by what decides their
+	// pixels (#444); frame counts Clear calls, which start a frame, to evict
+	// the entries a frame did not draw.
+	shadows map[shadowKey]*shadowEntry
+	frame   uint64
 
 	// targetStack tracks the active render targets (canvas FBO, nested
 	// boundary FBOs). Temporary offscreen work (shadow blur, Scene3D) must
@@ -163,6 +170,8 @@ func (p *painter) UpdateVertexArray(pState ProgramState, name string, size, stri
 }
 
 func (p *painter) Clear() {
+	p.frame++
+	p.evictShadows()
 	if p.shaderInitFailed {
 		p.drawInitFailure()
 		return
@@ -244,7 +253,8 @@ func (p *painter) StartClipping(pos geo.Position, size geo.Size) {
 	y := p.textureScale(p.canvas.Size().Height - pos.Y - size.Height)
 	w := p.textureScale(size.Width)
 	h := p.textureScale(size.Height)
-	p.ctx.Scissor(int32(x), int32(y), int32(w), int32(h))
+	p.scissor = [4]int32{int32(x), int32(y), int32(w), int32(h)}
+	p.ctx.Scissor(p.scissor[0], p.scissor[1], p.scissor[2], p.scissor[3])
 	p.ctx.Enable(scissorTest)
 	p.scissorActive = true
 	p.logError()
