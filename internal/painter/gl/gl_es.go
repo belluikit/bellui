@@ -296,6 +296,10 @@ func (c *esContext) BlendFunc(srcFactor, destFactor uint32) {
 	gl.BlendFunc(srcFactor, destFactor)
 }
 
+func (c *esContext) BlendFuncSeparate(srcRGB, destRGB, srcAlpha, destAlpha uint32) {
+	gl.BlendFuncSeparate(srcRGB, destRGB, srcAlpha, destAlpha)
+}
+
 func (c *esContext) BufferData(target uint32, points []float32, usage uint32) {
 	gl.BufferData(target, 4*len(points), gl.Ptr(points), usage)
 }

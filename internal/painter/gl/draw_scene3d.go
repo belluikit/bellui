@@ -118,7 +118,7 @@ func (p *painter) drawScene3D(scene *canvas.Scene3D, pos geo.Position, frame geo
 		p.SetUniform1f(program, "ambient", light.Ambient)
 
 		// Disable blending for opaque 3D rendering (depth test handles occlusion).
-		p.ctx.BlendFunc(one, 0)
+		p.blendFunc(one, 0)
 
 		// Draw all triangles.
 		vertCount := len(verts) / 10
@@ -128,7 +128,7 @@ func (p *painter) drawScene3D(scene *canvas.Scene3D, pos geo.Position, frame geo
 		// Restore state and the active render target (canvas/boundary FBO or
 		// screen); the deferred viewport restore below handles an empty stack.
 		p.ctx.Disable(depthTest)
-		p.ctx.BlendFunc(one, oneMinusSrcAlpha)
+		p.blendFunc(one, oneMinusSrcAlpha)
 		p.rebindRenderTarget(0, 0)
 
 		// Cleanup FBO and depth buffer (keep color texture for cache).

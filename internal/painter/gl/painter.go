@@ -83,6 +83,17 @@ type renderTarget struct {
 	logical float32 // logical height, for the scissor's y flip; 0 means the canvas's
 }
 
+// blendFunc sets the color blend factors for a draw. The alpha channel always
+// blends as coverage, (1, 1-a): an opaque target stays opaque, and a
+// transparent one, a RepaintBoundary's texture, ends up premultiplied. Blended
+// like the color, (a, 1-a), a straight-alpha edge left a² for its coverage:
+// the window's alpha fell to 200 of 255 along anti-aliased edges, which
+// captures read as a dark fringe, and a boundary's texture stored the wrong
+// coverage, so its edges came out up to 58 levels off drawing in place (#580).
+func (p *painter) blendFunc(src, dst uint32) {
+	p.ctx.BlendFuncSeparate(src, dst, one, oneMinusSrcAlpha)
+}
+
 type ProgramState struct {
 	ref            Program
 	buff           Buffer
@@ -347,7 +358,7 @@ func (p *painter) blurTexture(srcTex Texture, width, height int, radius float32)
 	p.SetUniform1f(p.blurHProgram, "blur_radius", radius)
 	p.ctx.ActiveTexture(texture0)
 	p.ctx.BindTexture(texture2D, srcTex)
-	p.ctx.BlendFunc(one, oneMinusSrcAlpha)
+	p.blendFunc(one, oneMinusSrcAlpha)
 	p.ctx.DrawArrays(triangleStrip, 0, 4)
 	p.logError()
 
@@ -364,7 +375,7 @@ func (p *painter) blurTexture(srcTex Texture, width, height int, radius float32)
 	p.SetUniform1f(p.blurVProgram, "blur_radius", radius)
 	p.ctx.ActiveTexture(texture0)
 	p.ctx.BindTexture(texture2D, texA)
-	p.ctx.BlendFunc(one, oneMinusSrcAlpha)
+	p.blendFunc(one, oneMinusSrcAlpha)
 	p.ctx.DrawArrays(triangleStrip, 0, 4)
 	p.logError()
 

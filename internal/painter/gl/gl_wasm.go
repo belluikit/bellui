@@ -302,6 +302,10 @@ func (c *xjsContext) BlendFunc(srcFactor, destFactor uint32) {
 	gl.BlendFunc(gl.Enum(srcFactor), gl.Enum(destFactor))
 }
 
+func (c *xjsContext) BlendFuncSeparate(srcRGB, destRGB, srcAlpha, destAlpha uint32) {
+	gl.BlendFuncSeparate(gl.Enum(srcRGB), gl.Enum(destRGB), gl.Enum(srcAlpha), gl.Enum(destAlpha))
+}
+
 func (c *xjsContext) BufferData(target uint32, points []float32, usage uint32) {
 	gl.BufferData(gl.Enum(target), toLEByteOrder(points...), gl.Enum(usage))
 }

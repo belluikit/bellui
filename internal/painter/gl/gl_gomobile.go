@@ -342,6 +342,10 @@ func (c *mobileContext) BlendFunc(srcFactor, destFactor uint32) {
 	c.glContext.BlendFunc(gl.Enum(srcFactor), gl.Enum(destFactor))
 }
 
+func (c *mobileContext) BlendFuncSeparate(srcRGB, destRGB, srcAlpha, destAlpha uint32) {
+	c.glContext.BlendFuncSeparate(gl.Enum(srcRGB), gl.Enum(destRGB), gl.Enum(srcAlpha), gl.Enum(destAlpha))
+}
+
 func (c *mobileContext) BufferData(target uint32, points []float32, usage uint32) {
 	data := toLEByteOrder(points...)
 	c.glContext.BufferData(gl.Enum(target), data, gl.Enum(usage))

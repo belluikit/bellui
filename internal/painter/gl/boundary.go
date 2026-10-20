@@ -118,7 +118,7 @@ func (p *painter) BlitBoundaryTexture(s gpu.BoundaryFBO, pos geo.Position, frame
 
 	p.ctx.ActiveTexture(texture0)
 	p.ctx.BindTexture(texture2D, state.texture)
-	p.ctx.BlendFunc(srcAlpha, oneMinusSrcAlpha)
+	p.blendFunc(one, oneMinusSrcAlpha) // the texture holds premultiplied color
 	p.ctx.DrawArrays(triangleStrip, 0, 4)
 	p.logError()
 }

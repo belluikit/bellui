@@ -81,7 +81,7 @@ func (p *painter) drawBoxShadow(shadow *canvas.BoxShadow, pos geo.Position, fram
 	p.SetUniform4f(p.program, "inset", 0, 0, 1, 1)
 	p.ctx.ActiveTexture(texture0)
 	p.ctx.BindTexture(texture2D, blurredTex)
-	p.ctx.BlendFunc(srcAlpha, oneMinusSrcAlpha)
+	p.blendFunc(srcAlpha, oneMinusSrcAlpha)
 	p.ctx.DrawArrays(triangleStrip, 0, 4)
 	p.logError()
 }
