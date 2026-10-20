@@ -86,7 +86,10 @@ func (c *glCanvas) capture() image.Image {
 
 	// GL: paint into the back buffer and read it before any swap — reading
 	// the front buffer races the presentation pipeline and can return a
-	// stale frame.
+	// stale frame. Prepare it as repaintWindow does: without that, a capture
+	// taken right after a change drew each RepaintBoundary from its old image,
+	// as the refreshes that dirty it were still queued (#565).
+	prepareFrame(w)
 	w.RunWithContext(func() {
 		if bc, ok := c.Painter().(interface {
 			CaptureBack(core.Canvas) image.Image

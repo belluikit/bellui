@@ -229,11 +229,7 @@ func (d *gLDriver) destroyWindow(w *window, index int) {
 
 func (d *gLDriver) repaintWindow(w *window) bool {
 	canvas := w.canvas
-	freed := false
-	if canvas.EnsureMinSize() {
-		w.shouldExpand = true
-	}
-	freed = canvas.FreeDirtyTextures() > 0
+	freed := prepareFrame(w)
 
 	updateGLContext(w)
 
@@ -268,6 +264,17 @@ func (d *gLDriver) repaintWindow(w *window) bool {
 	w.lastWalkedTime = time.Now()
 	verifier.afterFrame(w)
 	return freed
+}
+
+// prepareFrame does what a paint needs done first: the min-size pass, and
+// taking the refreshed objects off the queue, which frees their textures and
+// marks their RepaintBoundaries and partial-repaint nodes dirty. It reports
+// whether any texture was freed.
+func prepareFrame(w *window) bool {
+	if w.canvas.EnsureMinSize() {
+		w.shouldExpand = true
+	}
+	return w.canvas.FreeDirtyTextures() > 0
 }
 
 // refreshWindow requests that the specified window be redrawn
