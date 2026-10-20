@@ -30,6 +30,7 @@ func (p *partialClipPainter) SetTransform(geo.Matrix) {}
 func (p *partialClipPainter) Paint(obj core.CanvasObject, _ geo.Position, _ geo.Size) {
 	p.painted[obj] = p.clip
 }
+
 func (p *partialClipPainter) StartClipping(pos geo.Position, size geo.Size) {
 	p.clip = fmt.Sprintf("%v,%v %vx%v", pos.X, pos.Y, size.Width, size.Height)
 }
