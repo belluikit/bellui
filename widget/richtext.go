@@ -2065,6 +2065,22 @@ func (t *RichText) updateRowBoundsInner() bool {
 		t.applyHiddenRanges()
 		return true
 	}
+	// A single line of plain text, neither wrapped nor truncated (every Label
+	// holding one line) has exactly one row: the dense build below would split
+	// it at newlines, find none, and return that row unmeasured. Building the
+	// row directly skips the build's machinery, which was about a fifth of a
+	// Label.SetText (#492).
+	if seg, ok := t.singleSegment(); ok && t.Wrapping == bellui.TextWrapOff &&
+		t.Truncation == bellui.TextTruncateOff && strings.IndexByte(seg.Text, '\n') < 0 {
+		t.lazy = false
+		t.lineRowCount = nil
+		t.updateRowBoundsBlockLazyReset()
+		t.rowBounds = []rowBoundary{{segments: []RichTextSegment{seg}, end: utf8.RuneCountInString(seg.Text)}}
+		t.denseIncr = nil
+		t.rowHeightCacheVer = -1
+		t.rowBoundsCacheStamp(width)
+		return true
+	}
 	// Edit-incremental dense rebuild (pre-rebrand tracker #921): when only a contiguous segment
 	// range changed since the last dense build, re-shape just that range and
 	// splice, leaving the untouched rows (and their caches) in place.
