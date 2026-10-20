@@ -764,8 +764,9 @@ func (d *driver) onStop() {
 }
 
 // clearCanvasFBO prepares the bound canvas FBO for this frame and returns the
-// dirty region to redraw. Tag off (or first frame): full clear, no region. Tag
-// on: clear just the changed region, or full-clear when it covers most of the
+// dirty region to redraw. Partial repaint off (build.PartialRepaint), or the
+// first frame: full clear, no region. On: clear just the changed region, or
+// full-clear when it covers most of the
 // canvas; an empty region (nothing changed) draws nothing and re-presents the
 // retained FBO.
 func clearCanvasFBO(c *canvas, drp gpu.DirtyRegionPainter, size geo.Size) (partial bool, drPos geo.Position, drSize geo.Size) {
@@ -1046,10 +1047,9 @@ func (d *driver) paintWindow(win bellui.Window, size geo.Size) {
 	if hasDRP {
 		drp.EnsureCanvasFBO(canvasPixW, canvasPixH)
 		drp.BindCanvasFBO()
-		// Default (partialrepaint tag off): full clear + redraw every frame,
-		// which is always safe and matches the desktop GLFW driver. The
-		// dirty-region partial path is opt-in because it cannot be exercised by
-		// the software-painter golden suite and must be validated on-device.
+		// Partial repaint is off by default on mobile (build.PartialRepaint),
+		// until it is validated on devices as on desktop (#496): every frame
+		// is a full clear and redraw. The partialrepaint tag turns it on.
 		partialRepaint, drPos, drSize = clearCanvasFBO(c, drp, size)
 	} else {
 		r, g, b, a := theme.Color(theme.ColorNameBackground).RGBA()

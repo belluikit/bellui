@@ -38,15 +38,15 @@ jobs:
       - name: Tests (GLES fallback)
         run: ./.github/scripts/xvfb-run-safe go test -race -tags gl,mobile,ci,migrated_belluido ./...
 
-      - name: Partial-repaint (opt-in) build + region logic
+      - name: Partial-repaint build + region logic
         run: |
-          # The dirty-region partial-repaint optimisation is gated behind the
-          # partialrepaint build tag (default off). Verify it still compiles for
-          # both desktop and mobile and that the region computation is correct.
-          # The GL paint path itself cannot run headless, so on-device testing
-          # via the gallery app is still required before relying on it. Pinned to
-          # the GL backend because the driver-level feature is backend-agnostic;
-          # the webgpu default is covered by the WebGPU mobile build step below.
+          # Dirty-region partial repaint is on by default on desktop and off on
+          # mobile (#496); the partialrepaint tag forces it on for the mobile
+          # build. Verify it compiles for both and that the region computation
+          # is correct. On-device validation is still owed before mobile turns
+          # it on by default. Pinned to the GL backend because the driver-level
+          # feature is backend-agnostic; the webgpu default is covered by the
+          # WebGPU mobile build step below.
           go build -tags gl,partialrepaint ./...
           go vet -tags gl,mobile,partialrepaint ./internal/driver/mobile/ ./internal/driver/common/
           ./.github/scripts/xvfb-run-safe go test -tags gl,partialrepaint,ci,migrated_belluido ./internal/driver/common/

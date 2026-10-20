@@ -356,8 +356,9 @@ type boundaryEntry struct {
 }
 
 // clearCanvasFBO prepares the bound canvas FBO for this frame and returns the
-// dirty region to redraw. Tag off (or first frame): full clear, no region. Tag
-// on: clear just the changed region, or full-clear when it covers most of the
+// dirty region to redraw. Partial repaint off (build.PartialRepaint), or the
+// first frame: full clear, no region. On: clear just the changed region, or
+// full-clear when it covers most of the
 // canvas; an empty region (nothing changed) draws nothing and re-presents the
 // retained FBO.
 // clampRegionToCanvas intersects a dirty region with the canvas [0,0]-(size)
@@ -432,9 +433,9 @@ func (c *glCanvas) paint(size geo.Size) {
 	if hasDRP {
 		drp.EnsureCanvasFBO(canvasPixW, canvasPixH)
 		drp.BindCanvasFBO()
-		// Default (partialrepaint tag off): full clear + redraw every frame. The
-		// dirty-region partial path is opt-in because it cannot be exercised by
-		// the software-painter golden suite and must be validated on-device.
+		// Partial repaint is on by default on desktop (build.PartialRepaint,
+		// #496): only the dirty region is cleared and redrawn. Off, every frame
+		// is a full clear and redraw.
 		partialRepaint, drPos, drSize = c.clearCanvasFBO(drp, size)
 	} else {
 		c.Painter().SetOutputSize(canvasPixW, canvasPixH)
