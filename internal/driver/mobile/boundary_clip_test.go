@@ -77,10 +77,12 @@ func Test_mobileTreeWalker_BoundaryGetsItsOwnClips(t *testing.T) {
 	}
 	c.WalkTrees(walk.draw, walk.afterDraw)
 
+	m := 2 / c.Scale() // the margin, which depends on the device's scale
+	inner := fmt.Sprintf("clip %v,%v 200x80", m, m)
 	assert.Equal(t, []string{
 		"clip 10,20 200x100", // the outer scroll
 		"noclip", "bind",     // the boundary starts unclipped
-		"clip 1,1 200x80", // the inner scroll, boundary-local, past the texture's 2 px (1 pt at scale 2) margin (#570)
+		inner, // the inner scroll, boundary-local, past the texture's 2 px margin (#570)
 		"noclip",
 		"unbind", "clip 10,20 200x100", "blit", // the outer clip applies to the blit
 		"noclip",
