@@ -356,8 +356,10 @@ func (c *Canvas) FreeDirtyTextures() uint64 {
 	for object := c.refreshQueue.Out(); object != nil; object = c.refreshQueue.Out() {
 		c.freeObject(object)
 
-		// Track dirty region for scissor culling.
-		if node, ok := c.nodeMap.Load(object); ok {
+		// Track dirty region for scissor culling. The node is looked up once,
+		// for this and for the boundary below (#543).
+		node, mapped := c.nodeMap.Load(object)
+		if mapped {
 			wt := node.worldTransform
 			c.dirtyRegion.Union(geo.NewPos(wt.TX, wt.TY), object.Size())
 		}
@@ -366,8 +368,8 @@ func (c *Canvas) FreeDirtyTextures() uint64 {
 		}
 
 		// Propagate dirty state to the nearest ancestor RepaintBoundary.
-		if hasBP {
-			c.markBoundaryDirtyFor(bp, object)
+		if hasBP && mapped {
+			markBoundaryDirtyFrom(bp, node)
 		}
 	}
 
@@ -375,13 +377,9 @@ func (c *Canvas) FreeDirtyTextures() uint64 {
 	return objectsToFree
 }
 
-// markBoundaryDirtyFor walks up the render cache tree from obj to find the
+// markBoundaryDirtyFrom walks up the render cache tree from node to find the
 // nearest RepaintBoundary ancestor and marks its FBO as needing re-render.
-func (c *Canvas) markBoundaryDirtyFor(bp gpu.BoundaryPainter, obj core.CanvasObject) {
-	node, ok := c.nodeMap.Load(obj)
-	if !ok {
-		return
-	}
+func markBoundaryDirtyFrom(bp gpu.BoundaryPainter, node *RenderCacheNode) {
 	for n := node; n != nil; n = n.Parent() {
 		if n.IsBoundary() {
 			bp.MarkBoundaryDirty(n.Obj())
