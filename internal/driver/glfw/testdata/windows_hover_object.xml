@@ -5,7 +5,7 @@
 				<container size="188x288">
 					<widget size="188x36" type="*widget.listItem">
 						<widget size="188x36" type="*widget.Entry">
-							<rectangle fillColor="inputBackground" pos="1,1" radius="8" size="186x34"/>
+							<rectangle fillColor="inputBackground" pos="1,1" size="186x34" topLeftRadius="8" topRightRadius="8"/>
 							<widget pos="1,1" size="186x34" type="*widget.Scroll">
 								<widget size="186x34" type="*widget.entryContent">
 									<widget size="186x34" type="*widget.RichText">
@@ -16,12 +16,12 @@
 									</widget>
 								</widget>
 							</widget>
-							<rectangle radius="8" size="186x34" strokeColor="inputBorder" strokeWidth="1"/>
+							<rectangle fillColor="inputBorder" pos="1,34" size="186x1" strokeColor="inputBorder"/>
 						</widget>
 					</widget>
 					<widget pos="0,42" size="188x36" type="*widget.listItem">
 						<widget size="188x36" type="*widget.Entry">
-							<rectangle fillColor="inputBackground" pos="1,1" radius="8" size="186x34"/>
+							<rectangle fillColor="inputBackground" pos="1,1" size="186x34" topLeftRadius="8" topRightRadius="8"/>
 							<widget pos="1,1" size="186x34" type="*widget.Scroll">
 								<widget size="186x34" type="*widget.entryContent">
 									<widget size="186x34" type="*widget.RichText">
@@ -32,7 +32,7 @@
 									</widget>
 								</widget>
 							</widget>
-							<rectangle radius="8" size="186x34" strokeColor="inputBorder" strokeWidth="1"/>
+							<rectangle fillColor="inputBorder" pos="1,34" size="186x1" strokeColor="inputBorder"/>
 						</widget>
 					</widget>
 					<widget size="0x0" type="*widget.Separator">
