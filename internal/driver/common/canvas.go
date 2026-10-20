@@ -188,11 +188,13 @@ func (c *Canvas) EnsureMinSize() bool {
 	}
 	ensureMinSize := func(node *RenderCacheNode, pos geo.Position) {
 		obj := node.obj
-		cache.SetCanvasForObject(obj, c.impl, func() {
-			if img, ok := obj.(*canvas.Image); ok {
-				img.Refresh() // this may now have a different texScale
-			}
-		})
+		if !node.canvasReg.Current(c.impl) {
+			node.canvasReg = cache.RegisterCanvasForObject(obj, c.impl, func() {
+				if img, ok := obj.(*canvas.Image); ok {
+					img.Refresh() // this may now have a different texScale
+				}
+			})
+		}
 
 		childChanged := node.minSizeChanged
 		if node.minSizeChanged {
@@ -627,14 +629,13 @@ func (c *Canvas) walkChangedTrees(
 	beforeChildren func(*RenderCacheNode, geo.Position),
 	afterChildren func(*RenderCacheNode, geo.Position),
 ) {
-	cull := func(obj core.CanvasObject, _, _ geo.Position, _ geo.Size) bool {
-		node, ok := c.nodeMap.Load(obj)
-		return ok && node.measured && !node.descDirty && obj.Size() == node.measuredSize
+	cull := func(node *RenderCacheNode, obj core.CanvasObject) bool {
+		return node.measured && !node.descDirty && obj.Size() == node.measuredSize
 	}
-	c.WalkContentTreesCulled(cull, beforeChildren, afterChildren)
+	c.walkContentTrees(nil, cull, beforeChildren, afterChildren)
 	for _, tree := range c.overlays.renderCaches {
 		if tree != nil {
-			c.walkTree(tree, cull, beforeChildren, afterChildren)
+			c.walkTree(tree, nil, cull, beforeChildren, afterChildren)
 		}
 	}
 }
@@ -783,12 +784,22 @@ func (c *Canvas) WalkContentTreesCulled(
 	beforeChildren func(*RenderCacheNode, geo.Position),
 	afterChildren func(*RenderCacheNode, geo.Position),
 ) {
-	c.walkTree(c.contentTree, cull, beforeChildren, afterChildren)
+	c.walkContentTrees(cull, nil, beforeChildren, afterChildren)
+}
+
+// walkContentTrees is WalkContentTreesCulled with walkTree's node-level cull.
+func (c *Canvas) walkContentTrees(
+	cull driver.CullFunc,
+	nodeCull func(*RenderCacheNode, core.CanvasObject) bool,
+	beforeChildren func(*RenderCacheNode, geo.Position),
+	afterChildren func(*RenderCacheNode, geo.Position),
+) {
+	c.walkTree(c.contentTree, cull, nodeCull, beforeChildren, afterChildren)
 	if c.mWindowHeadTree != nil && c.mWindowHeadTree.root.obj != nil {
-		c.walkTree(c.mWindowHeadTree, cull, beforeChildren, afterChildren)
+		c.walkTree(c.mWindowHeadTree, cull, nodeCull, beforeChildren, afterChildren)
 	}
 	if c.menuTree != nil && c.menuTree.root.obj != nil {
-		c.walkTree(c.menuTree, cull, beforeChildren, afterChildren)
+		c.walkTree(c.menuTree, cull, nodeCull, beforeChildren, afterChildren)
 	}
 }
 
@@ -799,7 +810,7 @@ func (c *Canvas) WalkOverlayTrees(
 ) {
 	for _, tree := range c.overlays.renderCaches {
 		if tree != nil {
-			c.walkTree(tree, nil, beforeChildren, afterChildren)
+			c.walkTree(tree, nil, nil, beforeChildren, afterChildren)
 		}
 	}
 }
@@ -908,14 +919,32 @@ func (c *Canvas) isMenuActive() bool {
 	return true
 }
 
+// walkTree walks one render tree, keeping its nodes in step with the objects.
+// cull, if set, decides from the object whether to skip its children; nodeCull
+// decides from the object's node. The walk passes nodeCull the node it is about
+// to visit for the object, so it costs no node-map lookup unless the tree
+// changed there (#487).
 func (c *Canvas) walkTree(
 	tree *renderCacheTree,
 	cull driver.CullFunc,
+	nodeCull func(*RenderCacheNode, core.CanvasObject) bool,
 	beforeChildren func(*RenderCacheNode, geo.Position),
 	afterChildren func(*RenderCacheNode, geo.Position),
 ) {
 	var node, parent, prev *RenderCacheNode
 	node = tree.root
+	if nodeCull != nil {
+		cull = func(obj core.CanvasObject, _, _ geo.Position, _ geo.Size) bool {
+			n := node // the node the walk is about to visit for obj
+			if n == nil || n.obj != obj {
+				var ok bool
+				if n, ok = c.nodeMap.Load(obj); !ok {
+					return false
+				}
+			}
+			return nodeCull(n, obj)
+		}
+	}
 
 	bc := func(obj core.CanvasObject, pos geo.Position, clipPos geo.Position, clipSize geo.Size) bool {
 		if node != nil && node.obj != obj {
@@ -966,11 +995,27 @@ func (c *Canvas) walkTree(
 		// only a changed mapping: storing over an existing key allocates a new
 		// entry, which for every node every paint was 23% of a static frame's
 		// allocation once the spatial index stopped allocating (#435).
-		if cur, ok := c.nodeMap.Load(obj); !ok || cur != node {
-			c.nodeMap.Store(obj, node)
+		//
+		// A node confirmed in the map during the current full-walk generation
+		// is still there: the only sweep, at the end of a full walk, deletes
+		// nodes that walk did not reach, before anything later in the
+		// generation is confirmed; and forgetNodes removes only nodes leaving
+		// the tree, which are never reused. So the lookup is needed once per
+		// generation, not on every walk (#487).
+		if node.mappedGen != c.walkGen+1 {
+			if cur, ok := c.nodeMap.Load(obj); !ok || cur != node {
+				c.nodeMap.Store(obj, node)
+			}
+			node.mappedGen = c.walkGen + 1 // +1: a new node's zero never matches
+			node.boundarySettled = false   // and ask again once per generation
 		}
 		node.walkGen = c.walkGen
-		node.isBoundary = driver.IsRepaintBoundary(obj)
+		// Whether a widget is a repaint boundary depends on its renderer's type,
+		// so a settled answer is kept rather than looking the renderer up again
+		// on every visit (#487).
+		if !node.boundarySettled {
+			node.isBoundary, node.boundarySettled = driver.RepaintBoundaryStatus(obj)
+		}
 
 		if beforeChildren != nil {
 			beforeChildren(node, pos)

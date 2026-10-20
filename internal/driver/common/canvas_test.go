@@ -83,7 +83,7 @@ func TestCanvas_walkTree(t *testing.T) {
 	afterCalls := []afterCall{}
 
 	var i int
-	c.walkTree(tree, nil, func(node *RenderCacheNode, pos geo.Position) {
+	c.walkTree(tree, nil, nil, func(node *RenderCacheNode, pos geo.Position) {
 		var parent core.CanvasObject
 		if node.parent != nil {
 			parent = node.parent.obj
@@ -128,7 +128,7 @@ func TestCanvas_walkTree(t *testing.T) {
 	secondRunAfterPainterData := []nodeInfo{}
 	nodes := []*RenderCacheNode{}
 
-	c.walkTree(tree, nil, func(node *RenderCacheNode, pos geo.Position) {
+	c.walkTree(tree, nil, nil, func(node *RenderCacheNode, pos geo.Position) {
 		secondRunBeforePainterData = append(secondRunBeforePainterData, painterData[node])
 		nodes = append(nodes, node)
 	}, func(node *RenderCacheNode, _ geo.Position) {
@@ -176,7 +176,7 @@ func TestCanvas_walkTree(t *testing.T) {
 	thirdRunAfterPainterData := []nodeInfo{}
 
 	i = 0
-	c.walkTree(tree, nil, func(node *RenderCacheNode, pos geo.Position) {
+	c.walkTree(tree, nil, nil, func(node *RenderCacheNode, pos geo.Position) {
 		i++
 		updateInfoBefore(node, i)
 		thirdRunBeforePainterData = append(thirdRunBeforePainterData, painterData[node])
@@ -221,7 +221,7 @@ func TestCanvas_walkTree(t *testing.T) {
 	nodes = []*RenderCacheNode{}
 
 	i = 0
-	c.walkTree(tree, nil, func(node *RenderCacheNode, pos geo.Position) {
+	c.walkTree(tree, nil, nil, func(node *RenderCacheNode, pos geo.Position) {
 		i++
 		updateInfoBefore(node, i)
 		fourthRunBeforePainterData = append(fourthRunBeforePainterData, painterData[node])
@@ -303,7 +303,7 @@ func TestCanvas_walkTree(t *testing.T) {
 	nodes = []*RenderCacheNode{}
 
 	i = 0
-	c.walkTree(tree, nil, func(node *RenderCacheNode, pos geo.Position) {
+	c.walkTree(tree, nil, nil, func(node *RenderCacheNode, pos geo.Position) {
 		i++
 		updateInfoBefore(node, i)
 		fifthRunBeforePainterData = append(fifthRunBeforePainterData, painterData[node])
@@ -483,7 +483,7 @@ func TestCanvas_walkTree_WorldTransform_PureTranslation(t *testing.T) {
 	c.Initialize(nil, func() {})
 
 	var childWT geo.Matrix
-	c.walkTree(tree, nil, func(node *RenderCacheNode, pos geo.Position) {
+	c.walkTree(tree, nil, nil, func(node *RenderCacheNode, pos geo.Position) {
 		if node.Obj() == core.CanvasObject(child) {
 			childWT = node.WorldTransform()
 		}
@@ -514,7 +514,7 @@ func TestCanvas_walkTree_WorldTransform_WithChildRotation(t *testing.T) {
 	c.Initialize(nil, func() {})
 
 	var childWT geo.Matrix
-	c.walkTree(tree, nil, func(node *RenderCacheNode, pos geo.Position) {
+	c.walkTree(tree, nil, nil, func(node *RenderCacheNode, pos geo.Position) {
 		if node.Obj() == core.CanvasObject(child) {
 			childWT = node.WorldTransform()
 		}
@@ -547,7 +547,7 @@ func TestCanvas_walkTree_WorldTransform_NoTransformIsTranslationOnly(t *testing.
 	c.Initialize(nil, func() {})
 
 	var childWT geo.Matrix
-	c.walkTree(tree, nil, func(node *RenderCacheNode, pos geo.Position) {
+	c.walkTree(tree, nil, nil, func(node *RenderCacheNode, pos geo.Position) {
 		if node.Obj() == core.CanvasObject(child) {
 			childWT = node.WorldTransform()
 		}

@@ -8,6 +8,7 @@ import (
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal"
 	"github.com/belluikit/bellui/internal/async"
+	"github.com/belluikit/bellui/internal/cache"
 )
 
 type deduplicatedObjectQueue struct {
@@ -91,7 +92,15 @@ type RenderCacheNode struct {
 	clipPos        geo.Position // effective clip region origin (from nearest Scrollable/ClipToBounds ancestor)
 	clipSize       geo.Size     // effective clip region size
 	isBoundary     bool         // true if this node is a RepaintBoundary
-	walkGen        uint64       // Canvas.walkGen of the last full walk that reached this node
+	// boundarySettled says isBoundary is known: the object is not a widget, or
+	// its renderer existed when it was checked. Reset once per full walk.
+	boundarySettled bool
+	walkGen         uint64 // Canvas.walkGen of the last full walk that reached this node
+	mappedGen       uint64 // 1 + the Canvas.walkGen in which the node map was last confirmed to hold this node
+
+	// canvasReg is the object's entry in the canvas map, kept so the min-size
+	// walk can skip looking it up while it is current (#487).
+	canvasReg cache.CanvasRegistration
 
 	// partial-repaint bookkeeping: the world-space bounds this node occupied at
 	// the previous paint, so a move/resize can clear where it left as well as
