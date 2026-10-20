@@ -62,7 +62,15 @@ func forcePlatform() string {
 	}
 
 	if os.Getenv("WAYLAND_DISPLAY") == "" {
-		return platformAuto // not a Wayland session, leave the choice to GLFW
+		if os.Getenv("DISPLAY") != "" {
+			// An X display was given and no Wayland one. Left to itself, GLFW
+			// tries Wayland first and libwayland falls back to
+			// $XDG_RUNTIME_DIR/wayland-0, so with a Wayland desktop logged in
+			// (ssh -X, or an Xvfb on such a machine) the window would open
+			// there instead of on DISPLAY (#534).
+			return platformX11
+		}
+		return platformAuto // no display named at all, leave the choice to GLFW
 	}
 	if os.Getenv("DISPLAY") == "" {
 		return platformAuto // no XWayland available to fall back to, stay on Wayland
