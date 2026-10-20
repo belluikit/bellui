@@ -1,4 +1,4 @@
-//go:build !windows || !ci
+//go:build (!windows || !ci) && !wasm
 
 package mobile
 

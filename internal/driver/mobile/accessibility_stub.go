@@ -1,4 +1,4 @@
-//go:build !accessibility || (!android && !ios)
+//go:build (!accessibility || (!android && !ios)) && !wasm
 
 package mobile
 

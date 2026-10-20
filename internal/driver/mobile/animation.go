@@ -1,3 +1,5 @@
+//go:build !wasm
+
 package mobile
 
 import "github.com/belluikit/bellui"

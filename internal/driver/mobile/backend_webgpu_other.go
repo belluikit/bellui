@@ -1,4 +1,4 @@
-//go:build !gl && !android && !ios
+//go:build !gl && !android && !ios && !wasm
 
 package mobile
 
