@@ -238,3 +238,26 @@ func TestPartialDirtyRegion_CulledClipOwner(t *testing.T) {
 	assert.True(t, childNode.lastPaintSet)
 }
 
+// TestPartialDirtyRegion_BoxShadowReach pins that a box shadow's region is
+// the blurred area the painters draw, not its bounds: moving it must clear
+// the blur it drew outside them.
+func TestPartialDirtyRegion_BoxShadowReach(t *testing.T) {
+	test.NewTempApp(t)
+
+	shadow := canvas.NewBoxShadow(color.Black, 5) // drawn 10 past each side
+	shadow.OffsetY = 4
+	shadow.Resize(geo.NewSize(20, 20))
+	shadow.Move(geo.NewPos(50, 50))
+	content := container.NewWithoutLayout(shadow)
+	content.Resize(geo.NewSize(400, 400))
+	c := newPartialCanvas(content, geo.NewSize(400, 400))
+	c.PartialDirtyRegion()
+
+	shadow.Move(geo.NewPos(200, 200))
+	pos, sz, set := c.PartialDirtyRegion()
+	require.True(t, set)
+	assert.LessOrEqual(t, pos.X, float32(40), "region should include the old blur")
+	assert.LessOrEqual(t, pos.Y, float32(44), "region should include the old blur, offset")
+	assert.GreaterOrEqual(t, pos.X+sz.Width, float32(230), "region should include the new blur")
+	assert.GreaterOrEqual(t, pos.Y+sz.Height, float32(234), "region should include the new blur, offset")
+}

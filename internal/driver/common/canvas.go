@@ -526,10 +526,7 @@ func (c *Canvas) PartialDirtyRegion() (pos geo.Position, size geo.Size, set bool
 			node.childrenCulled = false
 		}
 
-		s := node.obj.Size()
-		minX, minY, maxX, maxY := node.worldTransform.AABB(s.Width, s.Height)
-		newPos := geo.NewPos(minX, minY)
-		newSize := geo.NewSize(maxX-minX, maxY-minY)
+		newPos, newSize := paintBounds(node)
 
 		isRefreshed := node.paintRefreshed
 		node.paintRefreshed = false
@@ -611,11 +608,23 @@ func clampRect(r dirtyRect, canvas geo.Size) geo.Size {
 // overflow drawn by its children.
 func (c *Canvas) unionSubtreeBounds(node *RenderCacheNode, region *dirtyRect) {
 	for child := node.firstChild; child != nil; child = child.nextSibling {
-		s := child.obj.Size()
-		minX, minY, maxX, maxY := child.worldTransform.AABB(s.Width, s.Height)
-		region.Union(padRect(geo.NewPos(minX, minY), geo.NewSize(maxX-minX, maxY-minY)))
+		region.Union(padRect(paintBounds(child)))
 		c.unionSubtreeBounds(child, region)
 	}
+}
+
+// paintBounds returns the world-space box node's object paints in: its bounds,
+// or for a box shadow the blurred area the painters draw around them, offset.
+func paintBounds(node *RenderCacheNode) (geo.Position, geo.Size) {
+	s := node.obj.Size()
+	m := node.worldTransform
+	if sh, ok := node.obj.(*canvas.BoxShadow); ok && sh.BlurRadius > 0 {
+		spread := sh.BlurRadius * 2 // as drawBoxShadow pads it
+		m = m.Multiply(geo.NewTranslation(sh.OffsetX-spread, sh.OffsetY-spread))
+		s = geo.NewSize(s.Width+2*spread, s.Height+2*spread)
+	}
+	minX, minY, maxX, maxY := m.AABB(s.Width, s.Height)
+	return geo.NewPos(minX, minY), geo.NewSize(maxX-minX, maxY-minY)
 }
 
 // NodeFor returns the RenderCacheNode for the given object, if it exists.
