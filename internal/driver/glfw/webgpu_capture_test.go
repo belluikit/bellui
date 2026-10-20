@@ -211,6 +211,12 @@ func TestWindowedSurfaceCaptureOverlays(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Errorf("popup overlay marker not present in Capture() output (#473)")
+		// Say what the capture held instead, so a rare failure (#528) shows
+		// whether it was blank, stale or sized for another frame.
+		scale := float32(b.Dx()) / 220
+		r, g, bl, a := img.At(b.Min.X+int(80*scale), b.Min.Y+int(65*scale)).RGBA()
+		t.Errorf("popup overlay marker not present in Capture() output (#473): "+
+			"capture %v for canvas %v, marker centre holds %d,%d,%d,%d",
+			b, w.Canvas().Size(), r>>8, g>>8, bl>>8, a>>8)
 	}
 }
