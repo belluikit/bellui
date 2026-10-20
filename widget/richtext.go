@@ -2271,9 +2271,15 @@ func (r *textRenderer) Layout(size geo.Size) {
 	yPos := innerPadding - r.obj.inset.Height
 	lineWidth := size.Width - left*2
 
-	// Pre-allocate row geometry caches for selection hit-testing.
-	r.obj.rowYPos = make([]float32, len(bounds))
-	r.obj.rowHeight = make([]float32, len(bounds))
+	// Row geometry caches for selection hit-testing, reused when the row count
+	// is unchanged: every entry is written below, and a Label lays out again on
+	// every text change (#492).
+	if len(r.obj.rowYPos) != len(bounds) {
+		r.obj.rowYPos = make([]float32, len(bounds))
+	}
+	if len(r.obj.rowHeight) != len(bounds) {
+		r.obj.rowHeight = make([]float32, len(bounds))
+	}
 
 	i := 0
 	for row, bound := range bounds {
