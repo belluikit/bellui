@@ -173,6 +173,7 @@ func (p *painter) UpdateVertexArray(pState ProgramState, name string, size, stri
 func (p *painter) Clear() {
 	p.frame++
 	p.evictShadows()
+	p.evictBoundaries()
 	if p.shaderInitFailed {
 		p.drawInitFailure()
 		return

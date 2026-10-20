@@ -231,6 +231,7 @@ func (p *painter) beginFrame() {
 	p.roundClips = p.roundClips[:0] // a frame never inherits an unpaired clip
 	p.evictShadows()
 	p.evictLayouts()
+	p.evictBoundaries()
 	p.resetFullAtlas()
 }
 
