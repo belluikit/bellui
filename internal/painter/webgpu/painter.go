@@ -280,9 +280,12 @@ func (p *painter) Free(obj core.CanvasObject) {
 		p.releaseTexture(uint32(id))
 		cache.DeleteTexture(obj)
 	}
-	// Drop any Scene3D cache entry (no-op for non-scene objects); the texture
-	// itself was released above via the shared cache handle.
-	delete(p.scenes, obj)
+	// Drop the Scene3D cache entry; the texture itself was released above via
+	// the shared cache handle. Only a Scene3D has one, so other objects, about
+	// 4,000 a frame when 2,000 labels change, skip hashing into the map (#543).
+	if _, ok := obj.(*canvas.Scene3D); ok {
+		delete(p.scenes, obj)
+	}
 }
 
 // EnableCapture arms the device's per-frame capture copy without reading a
