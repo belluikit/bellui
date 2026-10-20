@@ -27,10 +27,22 @@ type boundaryState struct {
 	height  int
 	logical geo.Size
 	dirty   bool
+	// bound says the boundary is the render target this frame, so what the
+	// walk draws lands in its texture. A boundary is only clean once that
+	// happened: a walk with no frame open (the surface occluded, #564) draws
+	// nothing, and must not leave a blank texture cached as clean.
+	bound bool
 }
 
-// SetDirty implements gpu.BoundaryFBO.
-func (s *boundaryState) SetDirty(dirty bool) { s.dirty = dirty }
+// SetDirty implements gpu.BoundaryFBO. Clearing it after a render that did
+// not reach the texture keeps the boundary dirty.
+func (s *boundaryState) SetDirty(dirty bool) {
+	if !dirty && !s.bound {
+		return
+	}
+	s.dirty = dirty
+	s.bound = false
+}
 
 func (p *painter) EnsureBoundaryFBO(obj core.CanvasObject, pixW, pixH int, logicalSize geo.Size) gpu.BoundaryFBO {
 	// The device is brought up lazily (mobile builds its surface from the native
@@ -67,22 +79,29 @@ func (p *painter) EnsureBoundaryFBO(obj core.CanvasObject, pixW, pixH int, logic
 
 func (p *painter) BindBoundaryFBO(state gpu.BoundaryFBO) {
 	s := state.(*boundaryState)
-	if p.dev == nil || s.tex == nil {
+	// No open frame means no encoder to begin the boundary's pass on (#564).
+	if p.dev == nil || s.tex == nil || !p.framing {
 		return
 	}
 	p.dev.PushTarget(s.tex, s.width, s.height)
+	s.bound = true
+	p.boundaryFrames = append(p.boundaryFrames, s.logical)
 }
 
 func (p *painter) UnbindBoundaryFBO(canvasPixW, canvasPixH int) {
-	if p.dev == nil {
+	// Pops only what BindBoundaryFBO pushed: the frame cannot open between
+	// the two, so no frame here means no push.
+	n := len(p.boundaryFrames)
+	if p.dev == nil || n == 0 {
 		return
 	}
+	p.boundaryFrames = p.boundaryFrames[:n-1]
 	p.dev.PopTarget()
 }
 
 func (p *painter) BlitBoundaryTexture(state gpu.BoundaryFBO, pos geo.Position, frame geo.Size) {
 	s := state.(*boundaryState)
-	if s.tex == nil {
+	if s.tex == nil || !p.framing {
 		return
 	}
 	// The boundary quad is drawn in canvas space; reset the world transform.
