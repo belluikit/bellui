@@ -1,4 +1,4 @@
-//go:build accessibility && ios
+//go:build accessibility && ios && !wasm
 
 package mobile
 

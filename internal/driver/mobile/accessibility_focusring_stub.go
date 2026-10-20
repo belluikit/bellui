@@ -1,4 +1,4 @@
-//go:build !accessibility
+//go:build !accessibility && !wasm
 
 package mobile
 

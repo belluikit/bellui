@@ -1,3 +1,5 @@
+//go:build (linux || freebsd || openbsd || netbsd) && !android
+
 // Command atspiprobe is a research spike for pre-rebrand tracker #489: a *pure-Go* AT-SPI2
 // accessibility provider, speaking the org.a11y.atspi.* D-Bus protocol directly
 // through github.com/godbus/dbus/v5 (already a fork dependency) with no cgo and
