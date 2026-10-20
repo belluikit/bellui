@@ -14,7 +14,9 @@
 //   - tiles: n cards with a label, progress bar and button (default 500), all updated every frame
 //   - spinner: the same n cards left static, plus one infinite progress bar
 //
-// The window is 1920×1080. One mutation is applied per painted frame: a 1×1
+// The window is 1920×1080. -screen opens it on the display whose name
+// contains the given text, shrunk to fit, to measure that display's frame
+// rate (#486). One mutation is applied per painted frame: a 1×1
 // raster refreshed with each mutation marks when a frame was painted. After a
 // warm-up, one line is printed:
 //
@@ -49,6 +51,7 @@ import (
 	"runtime/pprof"
 	"sort"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -70,6 +73,7 @@ var (
 	memProfile = flag.String("memprofile", "", "write allocation profiles at the end (this file) and start (file.base) of the measured window")
 	cpuProfile = flag.String("cpuprofile", "", "write a CPU profile of the measured window to this file")
 	maxGap     = flag.Duration("maxgap", 250*time.Millisecond, "refuse the result if any frame took longer than this")
+	screen     = flag.String("screen", "", "open the window on the display whose name contains this (default: the system's choice)")
 )
 
 // painted receives the time of each frame that drew the marker raster.
@@ -102,6 +106,12 @@ func main() {
 	}
 	w.SetContent(content)
 	w.Resize(geo.NewSize(1920, 1080))
+	if *screen != "" {
+		if err := placeOnScreen(w, *screen); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(2)
+		}
+	}
 	// A window the OS considers hidden (covered, minimised, on another Space,
 	// the display asleep) gets few or no frames, which measures the OS, not
 	// the toolkit. Stay on top, keep the display awake, and refuse a run in
@@ -119,6 +129,29 @@ func main() {
 	}()
 	w.Show()
 	a.Run()
+}
+
+// placeOnScreen moves w to the top-left of the named display's work area,
+// shrunk to fit it, so a run can measure one display's refresh rate (#486).
+func placeOnScreen(w bellui.Window, name string) error {
+	sd, ok := bellui.CurrentApp().Driver().(desktop.ScreensDriver)
+	dw, isDesktop := w.(desktop.Window)
+	if !ok || !isDesktop {
+		return fmt.Errorf("-screen: this driver cannot place windows")
+	}
+	var names []string
+	for _, s := range sd.Screens() {
+		names = append(names, s.Name)
+		if !strings.Contains(s.Name, name) {
+			continue
+		}
+		a := s.WorkArea
+		w.Resize(geo.NewSize(min(1920, float32(a.Width)), min(1080, float32(a.Height))))
+		dw.RequestPosition(a.X, a.Y)
+		fmt.Printf("SCREEN name=%q work_area=%dx%d+%d+%d\n", s.Name, a.Width, a.Height, a.X, a.Y)
+		return nil
+	}
+	return fmt.Errorf("-screen: no display named like %q; displays: %q", name, names)
 }
 
 func objectCount(def int) int {
