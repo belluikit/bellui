@@ -236,9 +236,7 @@ type RichText struct {
 	// The last charMinSize result and what it was measured for (#492). Every
 	// min-size pass asks each label for it, and looking it up in the global
 	// font metrics cache cost about a third of the pass in the labels scene.
-	charMemoKey charSizeKey
-	charMemo    geo.Size
-	charMemoOk  bool
+	charMemo measureMemo
 
 	// Selectable enables text selection on this RichText when the window's
 	// SelectableMode is SelectableAll. Default false — internal RichText
@@ -740,47 +738,13 @@ func (t *RichText) String() string {
 	return t.strMemo
 }
 
-// charSizeKey is everything charMinSize's measurement depends on: the style
-// as the font metrics cache keys it (pointer fields resolved to values), and
-// the cache generation, which changes whenever fonts or the theme do.
-type charSizeKey struct {
-	concealed                       bool
-	size                            float32
-	bold, italic, monospace, symbol bool
-	underline, strikethrough        bool
-	tabWidth                        int
-	weight                          bellui.TextWeight
-	lineHeightScale, letterSpacing  float32
-	direction                       bellui.TextDirection
-	language                        string
-	generation                      uint64
-}
-
 // charMinSize returns the average char size to use for internal computation
 func (t *RichText) charMinSize(concealed bool, style bellui.TextStyle, textSize float32) geo.Size {
-	key := charSizeKey{
-		concealed: concealed, size: textSize,
-		bold: style.Bold, italic: style.Italic, monospace: style.Monospace, symbol: style.Symbol,
-		underline: style.Underline, strikethrough: style.Strikethrough,
-		tabWidth:        style.TabWidth,
-		weight:          style.ResolvedWeight(),
-		lineHeightScale: style.ResolvedLineHeightScale(),
-		letterSpacing:   style.ResolvedLetterSpacing(),
-		direction:       style.Direction,
-		language:        style.Language,
-		generation:      cache.ThemeCacheGeneration(),
-	}
-	if t.charMemoOk && t.charMemoKey == key {
-		return t.charMemo
-	}
-
 	defaultChar := "M"
 	if concealed {
 		defaultChar = passwordChar
 	}
-	t.charMemo = bellui.MeasureText(defaultChar, textSize, style)
-	t.charMemoKey, t.charMemoOk = key, true
-	return t.charMemo
+	return t.charMemo.measure(defaultChar, textSize, style)
 }
 
 // singleSegment returns the sole *TextSegment of this RichText, if the content

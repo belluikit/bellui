@@ -20,6 +20,7 @@ type progressRenderer struct {
 	label           canvas.Text
 	ratio           float32
 	progress        *ProgressBar
+	textMemo        measureMemo // MinSize's text measurement (#487)
 }
 
 // MinSize calculates the minimum size of a progress bar.
@@ -32,7 +33,7 @@ func (p *progressRenderer) MinSize() geo.Size {
 
 	th := p.progress.Theme()
 	padding := th.Size(theme.SizeNameInnerPadding) * 2
-	size := bellui.MeasureText(text, p.label.TextSize, p.label.TextStyle)
+	size := p.textMemo.measure(text, p.label.TextSize, p.label.TextStyle)
 	return size.AddWidthHeight(padding, padding)
 }
 
