@@ -50,6 +50,10 @@ type painter struct {
 	transform    geo.Matrix
 	outW, outH   int
 	framing      bool // true between Clear (frame begin) and Present
+	// boundaryFrames holds the logical size of each RepaintBoundary target
+	// pushed and not yet popped, innermost last. An unbind pops only what a
+	// bind pushed, and the clip stamps are drawn in the innermost frame (#564).
+	boundaryFrames []geo.Size
 
 	// stencilMode is the depth-stencil mode injected into every draw's pipeline
 	// key while a stencil clip is active (StencilNone otherwise). Set by the
@@ -406,9 +410,20 @@ func (p *painter) StartRoundedClipping(pos geo.Position, size geo.Size, cornerRa
 	inset := float32(edgeSoftness) * 1.5
 	p.stamp = stencilBox{pos: pos.Add(geo.NewSquareOffsetPos(inset)), size: size.Subtract(geo.NewSquareSize(inset * 2))}
 	r := geo.Max(0, cornerRadius-inset)
-	p.drawOblong(&p.stamp, stampFill, nil, 0, r, r, r, r, 0, p.stamp.pos, p.canvas.Size())
+	p.drawOblong(&p.stamp, stampFill, nil, 0, r, r, r, r, 0, p.stamp.pos, p.targetFrame())
 	// Restrict subsequent draws to where the stencil == 1.
 	p.stencilMode = StencilTestEqual
+}
+
+// targetFrame returns the logical size of the render target draws land in: a
+// bound RepaintBoundary's, or the canvas's. Clip stamps take no frame from
+// the walk, and stamped against the canvas inside a boundary they came out
+// scaled by the boundary's share of it (#564).
+func (p *painter) targetFrame() geo.Size {
+	if n := len(p.boundaryFrames); n > 0 {
+		return p.boundaryFrames[n-1]
+	}
+	return p.canvas.Size()
 }
 
 // StopRoundedClipping disables stencil clipping (GL: Disable(stencilTest)),
@@ -446,7 +461,7 @@ func (p *painter) fillStencilRect(pos geo.Position, size geo.Size, ref uint32) {
 	p.dev.SetStencilRef(ref)
 	p.stencilMode = StencilWriteReplace
 	p.stamp = stencilBox{pos: pos, size: size}
-	p.drawOblong(&p.stamp, stampFill, nil, 0, 0, 0, 0, 0, 0, pos, p.canvas.Size())
+	p.drawOblong(&p.stamp, stampFill, nil, 0, 0, 0, 0, 0, 0, pos, p.targetFrame())
 	p.stencilMode = prev
 }
 
@@ -488,7 +503,7 @@ func (p *painter) StartPathClipping(path *canvas.Path, pos geo.Position, size ge
 	// color masked off.
 	p.dev.SetStencilRef(0)
 	p.stencilMode = StencilWriteIncrDecr
-	verts := p.pathFanToNDC(fanTris, pos, p.canvas.Size())
+	verts := p.pathFanToNDC(fanTris, pos, p.targetFrame())
 	u := PathUniforms{}
 	p.record("path", verts, len(verts)/3, uniformBytes(&u), nil)
 	// Restrict subsequent draws to where the winding count is non-zero.

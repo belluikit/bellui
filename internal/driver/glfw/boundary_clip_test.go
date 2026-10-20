@@ -84,3 +84,56 @@ func TestPaint_BoundaryGetsItsOwnClips(t *testing.T) {
 		"noclip",
 	}, p.calls)
 }
+
+// boundaryPaintRecorder records which objects the walk paints.
+type boundaryPaintRecorder struct {
+	boundaryClipPainter
+	painted map[core.CanvasObject]bool
+}
+
+func (p *boundaryPaintRecorder) Paint(obj core.CanvasObject, _ geo.Position, _ geo.Size) {
+	p.painted[obj] = true
+}
+
+// A boundary renders its whole subtree into its texture, which is then kept
+// while it is clean. Culling that render by a clip outside the boundary left
+// out what was off screen at the time, and it stayed out once scrolled into
+// view: boundary-wrapped cards below a scroll's viewport never appeared
+// (#564). A clip inside the boundary still culls.
+func TestPaint_BoundaryRendersContentOffClip(t *testing.T) {
+	marker := canvas.NewRectangle(color.White)
+	marker.SetMinSize(geo.NewSize(50, 50))
+	clipped := container.NewStack(marker)
+	clipped.ClipToBounds = true // a clip-owner, which the walk culls off its clip
+	boundary := container.NewRepaintBoundary(clipped)
+
+	hidden := canvas.NewRectangle(color.White) // below the inner scroll's view
+	hidden.Move(geo.NewPos(0, 400))
+	hidden.Resize(geo.NewSize(50, 50))
+	innerClip := container.NewWithoutLayout(hidden)
+	innerClip.ClipToBounds = true
+	innerClip.Resize(geo.NewSize(50, 50))
+	hiddenOwner := container.NewStack(canvas.NewRectangle(color.Black))
+	hiddenOwner.ClipToBounds = true
+	hiddenOwner.Move(geo.NewPos(0, 400))
+	hiddenOwner.Resize(geo.NewSize(50, 50))
+	innerClip.Add(hiddenOwner)
+	inner := container.NewRepaintBoundary(innerClip)
+
+	spacer := canvas.NewRectangle(color.Black)
+	spacer.SetMinSize(geo.NewSize(50, 400)) // pushes the boundary below the view
+	outer := container.NewVScroll(container.NewVBox(spacer, boundary, inner))
+	outer.Resize(geo.NewSize(200, 100))
+
+	c := newCanvas()
+	c.SetPadded(false)
+	c.SetContent(container.NewWithoutLayout(outer))
+	c.Resize(geo.NewSize(300, 300))
+	p := &boundaryPaintRecorder{painted: map[core.CanvasObject]bool{}}
+	c.SetPainter(p)
+
+	c.paint(c.Size())
+
+	assert.True(t, p.painted[marker], "content off the outer clip must render into its boundary")
+	assert.False(t, p.painted[hiddenOwner.Objects[0]], "a clip inside the boundary still culls")
+}
