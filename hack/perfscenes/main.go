@@ -21,6 +21,13 @@
 //	RESULT scene=... frames=... fps=... mean_ms=... p99_ms=... cpu_ms_per_frame=...
 //	       alloc_kb_per_frame=... allocs_per_frame=... heap_mb=... maxrss_mb=... gc=...
 //
+// -memprofile writes two allocation profiles: the given file at the end of the
+// measured window and file.base at its start. An allocation profile counts
+// from the start of the process, so read the window's allocations as the
+// difference; the file alone also counts startup (#446):
+//
+//	go tool pprof -diff_base mem.prof.base mem.prof
+//
 // cpu_ms_per_frame counts every thread of the process, so it can exceed
 // mean_ms. On a vsync'd display fps is capped at the refresh rate, which makes
 // cpu_ms_per_frame the better cost figure for cheap scenes.
@@ -60,7 +67,7 @@ var (
 	count      = flag.Int("n", 0, "object count (0: the scene's default)")
 	secs       = flag.Float64("secs", 8, "seconds measured")
 	warm       = flag.Float64("warm", 2, "seconds of warm-up before measuring")
-	memProfile = flag.String("memprofile", "", "write an allocation profile of the measured window to this file")
+	memProfile = flag.String("memprofile", "", "write allocation profiles at the end (this file) and start (file.base) of the measured window")
 	cpuProfile = flag.String("cpuprofile", "", "write a CPU profile of the measured window to this file")
 	maxGap     = flag.Duration("maxgap", 250*time.Millisecond, "refuse the result if any frame took longer than this")
 )
@@ -218,6 +225,11 @@ func measure(mark *canvas.Raster, mutate func(int)) error {
 			measuring = true
 			if *memProfile != "" {
 				runtime.MemProfileRate = 4096
+				// A profile reflects the allocations up to the last GC.
+				runtime.GC()
+				if err := writeProfile("allocs", *memProfile+".base"); err != nil {
+					return err
+				}
 			}
 			if *cpuProfile != "" {
 				stop, err := startCPUProfile(*cpuProfile)
@@ -240,6 +252,7 @@ func measure(mark *canvas.Raster, mutate func(int)) error {
 	cpu := cpuTime() - cpuStart
 	stopCPUProfile()
 	if *memProfile != "" {
+		runtime.GC()
 		if err := writeProfile("allocs", *memProfile); err != nil {
 			return err
 		}

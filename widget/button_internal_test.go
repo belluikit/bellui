@@ -11,11 +11,33 @@ import (
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/cache"
+	"github.com/belluikit/bellui/internal/painter"
 	"github.com/belluikit/bellui/test"
 	"github.com/belluikit/bellui/theme"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+// TestButton_RefreshKeepsTextRenderer pins #446: refreshing a button whose
+// text has not changed keeps its label's renderer and parses no font.
+func TestButton_RefreshKeepsTextRenderer(t *testing.T) {
+	painter.ClearFontCache()
+	cache.ResetThemeCaches()
+	parses := painter.FontParses()
+	button := NewButton("Test", nil)
+	render := test.TempWidgetRenderer(t, button).(*buttonRenderer)
+	require.Greater(t, painter.FontParses(), parses, "the label was not measured with the painter's fonts")
+	button.Refresh() // warm up
+
+	label := cache.Renderer(render.label)
+	parses = painter.FontParses()
+	for range 10 {
+		button.Refresh()
+	}
+	assert.Same(t, label, cache.Renderer(render.label), "the label's renderer was re-created")
+	assert.Equal(t, parses, painter.FontParses(), "a font was parsed again")
+}
 
 func TestButton_Style(t *testing.T) {
 	button := NewButton("Test", nil)
