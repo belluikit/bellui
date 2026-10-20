@@ -12,8 +12,8 @@ github.com/belluikit/glfw-js v1.0.4 h1:E+339oJ3SjI0noviExqKj5GOfTQ5/fKGOi6VeNkSr
 github.com/belluikit/glfw-js v1.0.4/go.mod h1:JYXSw+veF7drhhMre99XhEIGdUHLiyF9JWXEwzd8cZ4=
 github.com/belluikit/gocef v0.5.0 h1:ZfmzCS4CC4EFdvlkPhjSUmEluS+prSbm1iqRUxeGeHI=
 github.com/belluikit/gocef v0.5.0/go.mod h1:TNOi0I+bD7NYO4FdPj7XrgjxMBRNbIf+NnWuY3y1Boc=
-github.com/belluikit/systray v1.12.1 h1:lTFuyhv1azUPgXnrqfQ1NORDwbYCMkUgN3BBtfXrIpc=
-github.com/belluikit/systray v1.12.1/go.mod h1:peb+/O80A/aXu5fUel0gSgeAsAVYz5x01SZF5mnyErU=
+github.com/belluikit/systray v1.12.2 h1:bWDRI+uX3DntAvul2DxdMC1wPD/sa31vtBnxEvYo0sw=
+github.com/belluikit/systray v1.12.2/go.mod h1:peb+/O80A/aXu5fUel0gSgeAsAVYz5x01SZF5mnyErU=
 github.com/belluikit/typesetting v0.3.6 h1:M27Rx+fhz1IV2n6Tei3fNhs/Oe9gGAnq3QMrBpAqisY=
 github.com/belluikit/typesetting v0.3.6/go.mod h1:vOvJAyUaoKpOpxqHeDglX6xNuG1zv2C3IOG3yEnHuLQ=
 github.com/belluikit/webgpu v1.2.2 h1:8dOgdNHrvvYz+rhdMUDg5yKxCmwBrbT+xMrxv3aZQDM=

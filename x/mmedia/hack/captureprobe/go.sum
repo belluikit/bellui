@@ -36,8 +36,8 @@ github.com/belluikit/goffmpeg-libs/windows_amd64 v0.3.1 h1:iVUfh4o5h8YP5fYdnUKPv
 github.com/belluikit/goffmpeg-libs/windows_amd64 v0.3.1/go.mod h1:x+DbU4kyhbEvk4fr7080dbV7lzSiXMh9x5rmDEuuz1w=
 github.com/belluikit/goffmpeg-libs/windows_arm64 v0.3.1 h1:WNUAAuJX6iEo5lNv2FfZlro2TyKy+Tpt1mTsV6poA/g=
 github.com/belluikit/goffmpeg-libs/windows_arm64 v0.3.1/go.mod h1:R8fUvbRy4Z80X1S4gntJqzuKdldkrMSB78cEOXVRaTI=
-github.com/belluikit/systray v1.12.1 h1:lTFuyhv1azUPgXnrqfQ1NORDwbYCMkUgN3BBtfXrIpc=
-github.com/belluikit/systray v1.12.1/go.mod h1:peb+/O80A/aXu5fUel0gSgeAsAVYz5x01SZF5mnyErU=
+github.com/belluikit/systray v1.12.2 h1:bWDRI+uX3DntAvul2DxdMC1wPD/sa31vtBnxEvYo0sw=
+github.com/belluikit/systray v1.12.2/go.mod h1:peb+/O80A/aXu5fUel0gSgeAsAVYz5x01SZF5mnyErU=
 github.com/belluikit/typesetting v0.3.6 h1:M27Rx+fhz1IV2n6Tei3fNhs/Oe9gGAnq3QMrBpAqisY=
 github.com/belluikit/typesetting v0.3.6/go.mod h1:vOvJAyUaoKpOpxqHeDglX6xNuG1zv2C3IOG3yEnHuLQ=
 github.com/belluikit/webgpu v1.2.2 h1:8dOgdNHrvvYz+rhdMUDg5yKxCmwBrbT+xMrxv3aZQDM=

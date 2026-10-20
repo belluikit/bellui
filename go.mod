@@ -7,7 +7,7 @@ require (
 	github.com/belluikit/fsnotify v1.10.2
 	github.com/belluikit/gl-js v0.2.1
 	github.com/belluikit/glfw v1.10.0
-	github.com/belluikit/systray v1.12.1
+	github.com/belluikit/systray v1.12.2
 	github.com/belluikit/typesetting v0.3.6
 	// WebGPU rendering backend (#198), now the default painter: the impl in
 	// internal/painter/webgpu builds under `//go:build !gl`, so plain `go mod tidy`
