@@ -81,6 +81,7 @@ func TestWindow_RequestAlwaysOnTop(t *testing.T) {
 
 		assert.Equal(t, glfw.True, w.viewport.GetAttrib(glfw.Floating))
 	})
+	closeWhenDone(t, w)
 }
 
 func TestWindow_SetParent(t *testing.T) {
@@ -103,6 +104,7 @@ func TestWindow_SetParent(t *testing.T) {
 		child.SetParent(nil) // clearing the relationship is also safe
 		child.applyParent()
 	})
+	closeWhenDone(t, child, parent)
 }
 
 func TestWindow_SetModal(t *testing.T) {
@@ -132,6 +134,7 @@ func TestWindow_SetModal(t *testing.T) {
 		child.SetModal(false)
 		child.applyModal()
 	})
+	closeWhenDone(t, child, parent)
 }
 
 func TestWindow_ModalRefCount(t *testing.T) {
