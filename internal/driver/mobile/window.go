@@ -205,6 +205,9 @@ func (w *window) Close() {
 	w.cleanupAccessibilityForWindow()
 
 	cache.RangeTexturesFor(w.canvas, w.canvas.Painter().Free)
+	if r, ok := w.canvas.Painter().(interface{ ReleaseCaches() }); ok {
+		r.ReleaseCaches()
+	}
 
 	w.canvas.WalkTrees(nil, func(node *common.RenderCacheNode, _ geo.Position) {
 		if wid, ok := node.Obj().(core.Widget); ok {
