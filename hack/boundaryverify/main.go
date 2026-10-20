@@ -50,6 +50,7 @@ func main() {
 	shotFrame := flag.Int("shotframe", 80, "frame to capture at")
 	variant := flag.String("variant", "card", "column 2: card | plain | noboundary")
 	dump := flag.Bool("dump", false, "print the middle column's geometry at -shotframe")
+	settle := flag.Duration("settle", 0, "wait this long after the change before capturing, so the frame loop paints it first")
 	flag.Parse()
 	a := app.New()
 	w := a.NewWindow("boundaryverify")
@@ -128,6 +129,7 @@ func main() {
 			}
 			if *shot != "" && !saved && f == *shotFrame {
 				saved = true
+				time.Sleep(*settle)
 				bellui.DoAndWait(func() {
 					img := w.Canvas().Capture()
 					f, _ := os.Create(*shot)
