@@ -15,6 +15,8 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+
+	"golang.org/x/sys/windows"
 )
 
 var debug = log.New(io.Discard, "gl: ", log.LstdFlags)
@@ -114,9 +116,10 @@ func downloadDLLs() (path string, err error) {
 // install it into the same directory (#438): writing in place let one read a
 // file another had only half written, or fail to open one another had already
 // loaded, which Windows locks. The data goes to a temporary file in the same
-// directory and is renamed into place. When the rename fails because another
-// process has already installed the file, and loaded it, a complete copy is
-// there and is kept.
+// directory and moved into place. The move never replaces a complete copy
+// another process installed first: replacing holds the file exclusively, and a
+// process checking it at that moment cannot open it (#577). Only a file that is
+// not a complete DLL for this machine, left from before, is replaced.
 func installDLL(dir, name string, data []byte) error {
 	f, err := os.CreateTemp(dir, name+".*.tmp")
 	if err != nil {
@@ -131,7 +134,15 @@ func installDLL(dir, name string, data []byte) error {
 		os.Remove(tmp)
 		return werr
 	}
-	if err := os.Rename(tmp, filepath.Join(dir, name)); err != nil {
+	target := filepath.Join(dir, name)
+	if err := moveNoReplace(tmp, target); err == nil {
+		return nil
+	}
+	if compatibleDLL(dir, name) {
+		os.Remove(tmp)
+		return nil // installed by another process
+	}
+	if err := os.Rename(tmp, target); err != nil {
 		os.Remove(tmp)
 		if compatibleDLL(dir, name) {
 			return nil // installed by another process
@@ -141,31 +152,67 @@ func installDLL(dir, name string, data []byte) error {
 	return nil
 }
 
+// moveNoReplace moves from to to, failing if to exists.
+func moveNoReplace(from, to string) error {
+	f, err := windows.UTF16PtrFromString(from)
+	if err != nil {
+		return err
+	}
+	t, err := windows.UTF16PtrFromString(to)
+	if err != nil {
+		return err
+	}
+	return windows.MoveFileEx(f, t, 0)
+}
+
 func appdataPath() string {
 	return filepath.Join(os.Getenv("LOCALAPPDATA"), "GoGL", runtime.GOARCH)
 }
 
 func containsDLLs(dir string) bool {
-	return compatibleDLL(dir, "libglesv2.dll") && compatibleDLL(dir, "libegl.dll") && compatibleDLL(dir, "d3dcompiler_47.dll")
+	return checkDLLs(dir) == nil
+}
+
+// checkDLLs returns why dir does not hold all three DLLs for this machine, or
+// nil when it does.
+func checkDLLs(dir string) error {
+	for _, name := range []string{"libglesv2.dll", "libegl.dll", "d3dcompiler_47.dll"} {
+		if err := checkDLL(dir, name); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // compatibleDLL reports whether dir/name is a complete DLL for this machine.
 func compatibleDLL(dir, name string) bool {
+	return checkDLL(dir, name) == nil
+}
+
+// checkDLL returns why dir/name is not a complete DLL for this machine, or nil
+// when it is.
+func checkDLL(dir, name string) error {
 	file, err := pe.Open(filepath.Join(dir, name))
 	if err != nil {
-		return false
+		return err
 	}
 	defer file.Close()
 
+	arch := ""
 	switch file.Machine {
 	case pe.IMAGE_FILE_MACHINE_AMD64:
-		return "amd64" == runtime.GOARCH
+		arch = "amd64"
 	case pe.IMAGE_FILE_MACHINE_ARM:
-		return "arm" == runtime.GOARCH
+		arch = "arm"
+	case pe.IMAGE_FILE_MACHINE_ARM64:
+		arch = "arm64"
 	case pe.IMAGE_FILE_MACHINE_I386:
-		return "386" == runtime.GOARCH
+		arch = "386"
 	}
-	return false
+	if arch != runtime.GOARCH {
+		return fmt.Errorf("%s is for machine %#x, not %s", filepath.Join(dir, name), file.Machine, runtime.GOARCH)
+	}
+	return nil
 }
 
 func chromePath() string {
@@ -205,10 +252,13 @@ func chromePath() string {
 }
 
 func findDLLs() (err error) {
+	// missed holds why the last load found nothing, for the error after an
+	// install.
+	var missed error
 	load := func(path string) (bool, error) {
 		if path != "" {
 			// don't try to start when one of the files is missing
-			if !containsDLLs(path) {
+			if missed = checkDLLs(path); missed != nil {
 				return false, nil
 			}
 
@@ -217,7 +267,8 @@ func findDLLs() (err error) {
 			LibEGL.Name = filepath.Join(path, filepath.Base(LibEGL.Name))
 		}
 
-		if err := LibGLESv2.Load(); err == nil {
+		missed = LibGLESv2.Load()
+		if missed == nil {
 			if err := LibEGL.Load(); err != nil {
 				return false, fmt.Errorf("gl: loaded libglesv2 but not libegl: %v", err)
 			}
@@ -273,6 +324,9 @@ func findDLLs() (err error) {
 		// Retry once: a failed load right after installing is the race #438
 		// was, and installDLL should have closed it.
 		ok, err = load(path)
+	}
+	if !ok && err == nil {
+		err = missed
 	}
 	if !ok || err != nil {
 		return fmt.Errorf("gl: unable to load ANGLE after installation: %v", err)
