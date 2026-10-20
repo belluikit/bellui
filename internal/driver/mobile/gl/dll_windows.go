@@ -204,6 +204,8 @@ func checkDLL(dir, name string) error {
 		arch = "amd64"
 	case pe.IMAGE_FILE_MACHINE_ARM:
 		arch = "arm"
+	case pe.IMAGE_FILE_MACHINE_ARM64:
+		arch = "arm64"
 	case pe.IMAGE_FILE_MACHINE_I386:
 		arch = "386"
 	}
