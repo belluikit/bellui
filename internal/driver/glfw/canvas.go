@@ -14,6 +14,7 @@ import (
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal"
 	"github.com/belluikit/bellui/internal/app"
+	"github.com/belluikit/bellui/internal/async"
 	"github.com/belluikit/bellui/internal/build"
 	"github.com/belluikit/bellui/internal/driver"
 	"github.com/belluikit/bellui/internal/driver/common"
@@ -48,7 +49,20 @@ type glCanvas struct {
 	webExtraWindows *container.MultipleWindows
 }
 
+// Capture paints a fresh frame and returns it. Any goroutine may call it. The
+// paint and read-back run on the main thread, which owns the window's GL
+// context and paints the window every frame. Run on the caller's thread, the
+// GL calls could find no context current, or race the render loop (#562).
 func (c *glCanvas) Capture() image.Image {
+	if async.IsMainGoroutine() {
+		return c.capture()
+	}
+	var img image.Image
+	runOnMain(func() { img = c.capture() })
+	return img
+}
+
+func (c *glCanvas) capture() image.Image {
 	var img image.Image
 	w := c.context.(*window)
 
