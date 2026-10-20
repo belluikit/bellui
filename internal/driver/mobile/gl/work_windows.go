@@ -120,6 +120,10 @@ var glfnFuncs = [...]func(c call) (ret uintptr){
 		syscall.SyscallN(glBlendFunc.Addr(), c.args.a0, c.args.a1)
 		return ret
 	},
+	glfnBlendFuncSeparate: func(c call) (ret uintptr) {
+		syscall.SyscallN(glBlendFuncSeparate.Addr(), c.args.a0, c.args.a1, c.args.a2, c.args.a3)
+		return ret
+	},
 	glfnBufferData: func(c call) (ret uintptr) {
 		syscall.SyscallN(glBufferData.Addr(), c.args.a0, c.args.a1, uintptr(c.parg), c.args.a2)
 		return ret
@@ -322,6 +326,7 @@ var (
 	glBindVertexArray         = libGLESv2.NewProc("glBindVertexArray")
 	glBlendColor              = libGLESv2.NewProc("glBlendColor")
 	glBlendFunc               = libGLESv2.NewProc("glBlendFunc")
+	glBlendFuncSeparate       = libGLESv2.NewProc("glBlendFuncSeparate")
 	glBufferData              = libGLESv2.NewProc("glBufferData")
 	glBufferSubData           = libGLESv2.NewProc("glBufferSubData")
 	glClear                   = libGLESv2.NewProc("glClear")

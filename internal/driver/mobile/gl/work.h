@@ -105,6 +105,9 @@ typedef enum {
 	// Scene3D uniforms.
 	glfnUniform3f,
 	glfnUniformMatrix4fv,
+
+	// RepaintBoundary targets blend their alpha apart from their color (#570).
+	glfnBlendFuncSeparate,
 } glfn;
 
 // TODO: generate this type from fn.go.
