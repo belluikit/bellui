@@ -120,6 +120,11 @@ type RenderCacheNode struct {
 	// walks then set up no clip for it, and the spatial index skips the
 	// children too where nothing on the canvas can reach them (#481).
 	paintCulled bool
+
+	// boundaryPhase is the sub-pixel phase a RepaintBoundary's texture was last
+	// rendered at, when boundaryPhaseSet (BoundaryGeometry, #570).
+	boundaryPhase    BoundaryPhase
+	boundaryPhaseSet bool
 }
 
 // IsBoundary returns true if this node is a RepaintBoundary.
