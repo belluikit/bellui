@@ -115,6 +115,11 @@ type RenderCacheNode struct {
 	// clip-owner without its children, as the paint walk did: they drew
 	// nothing, and their bounds are forgotten.
 	childrenCulled bool
+	// paintCulled says the last walk to visit this node skipped its children:
+	// the paint walk's cull found a clip-owner off its clip (#464). The
+	// spatial index then skips them too where nothing on the canvas can
+	// reach them (#481).
+	paintCulled bool
 }
 
 // IsBoundary returns true if this node is a RepaintBoundary.
