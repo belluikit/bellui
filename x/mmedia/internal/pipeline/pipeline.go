@@ -904,6 +904,23 @@ func (p *Pipeline) displayLoop(stop <-chan struct{}) {
 	defer timeTicker.Stop()
 
 	for {
+		// While paused, leave the queue alone. A frame taken now could only be
+		// thrown away, so resuming lost up to a queue's worth of picture, and
+		// taking the end-of-stream marker ended a paused clip, moving its time
+		// to the end (#527).
+		if p.state.IsPaused() {
+			select {
+			case <-stop:
+				return
+			case <-timeTicker.C:
+				if p.onTime != nil {
+					p.onTime(p.clock.Time(), p.duration)
+				}
+			case <-time.After(10 * time.Millisecond):
+			}
+			continue
+		}
+
 		// Wait for the next frame (blocking). This naturally adapts to
 		// the decode rate — no pauses when the decoder is slow, it just
 		// runs at whatever fps the decoder can sustain.
