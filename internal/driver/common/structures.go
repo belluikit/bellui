@@ -108,6 +108,13 @@ type RenderCacheNode struct {
 	lastPaintPos  geo.Position
 	lastPaintSize geo.Size
 	lastPaintSet  bool
+	// paintRefreshed marks the object as refreshed since the last
+	// PartialDirtyRegion walk, which clears it. Main thread only.
+	paintRefreshed bool
+	// childrenCulled says the last PartialDirtyRegion walk visited this
+	// clip-owner without its children, as the paint walk did: they drew
+	// nothing, and their bounds are forgotten.
+	childrenCulled bool
 }
 
 // IsBoundary returns true if this node is a RepaintBoundary.

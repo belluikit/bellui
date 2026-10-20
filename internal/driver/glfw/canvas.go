@@ -385,6 +385,7 @@ func (c *glCanvas) clearCanvasFBO(drp gpu.DirtyRegionPainter, size geo.Size) (pa
 	}
 	c.Painter().Clear()
 	drp.MarkCanvasFBOCleared()
+	c.MarkFullRepaint()
 	return false, geo.Position{}, geo.Size{}
 }
 
@@ -467,6 +468,9 @@ func (c *glCanvas) paint(size geo.Size) {
 	if hasDRP {
 		drp.UnbindAndBlitCanvasFBO(canvasPixW, canvasPixH)
 	}
+	// The surface keeps nothing from the last frame, so overlays are drawn
+	// whole every frame, whatever the dirty region.
+	walk.partialRepaint = false
 	c.WalkOverlayTrees(walk.draw, walk.afterDraw)
 
 	c.RebuildSpatialIndex()

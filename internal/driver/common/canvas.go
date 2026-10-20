@@ -81,11 +81,20 @@ type Canvas struct {
 	// GL operations to this region.
 	dirtyRegion dirtyRect
 
-	// refreshedObjs is the set of objects pulled from the refresh queue in the
-	// most recent FreeDirtyTextures pass, used by PartialDirtyRegion to union
-	// the bounds of content-changed (but not necessarily moved) objects. Only
-	// populated when the partialrepaint build tag is set.
-	refreshedObjs map[core.CanvasObject]struct{}
+	// refreshedWas is the union of the bounds the objects refreshed since the
+	// last paint had at that paint, gathered by FreeDirtyTextures. It is a part
+	// of the region PartialDirtyRegion would find, so once it covers the canvas
+	// the frame is a full repaint and the walk can be skipped (#496). Only kept
+	// under the partialrepaint build tag.
+	refreshedWas dirtyRect
+	// paintBoundsStale says the nodes' lastPaint bounds are not those of the
+	// last painted frame: it was a full repaint that did not walk to record
+	// them. The next PartialDirtyRegion must then repaint fully, and walk to
+	// record them again.
+	paintBoundsStale bool
+	// leftRegion is where the nodes that left the render tree since the last
+	// PartialDirtyRegion were painted (forgetNodes).
+	leftRegion dirtyRect
 
 	// spatialIdx provides O(1) broadphase hit testing. Built during
 	// WalkTrees and read during mouse/touch event processing.
@@ -349,9 +358,6 @@ func (c *Canvas) FreeDirtyTextures() uint64 {
 	bp, hasBP := c.painter.(gpu.BoundaryPainter)
 
 	c.dirtyRegion.Reset()
-	if build.PartialRepaint {
-		c.refreshedObjs = make(map[core.CanvasObject]struct{}, c.refreshQueue.Len())
-	}
 	objectsToFree := c.refreshQueue.Len()
 	for object := c.refreshQueue.Out(); object != nil; object = c.refreshQueue.Out() {
 		c.freeObject(object)
@@ -362,9 +368,11 @@ func (c *Canvas) FreeDirtyTextures() uint64 {
 		if mapped {
 			wt := node.worldTransform
 			c.dirtyRegion.Union(geo.NewPos(wt.TX, wt.TY), object.Size())
-		}
-		if build.PartialRepaint {
-			c.refreshedObjs[object] = struct{}{}
+			if build.PartialRepaint {
+				// An object with no node yet is new to the tree, and the walk
+				// counts it as moved.
+				c.notePaintRefresh(node)
+			}
 		}
 
 		// Propagate dirty state to the nearest ancestor RepaintBoundary.
@@ -472,28 +480,67 @@ func padRect(pos geo.Position, size geo.Size) (geo.Position, geo.Size) {
 // recorded bounds are advanced to the current frame. set is false when nothing
 // changed, in which case the caller can skip the redraw entirely.
 //
+// When the refreshed objects' previous bounds alone cover most of the canvas,
+// the region would too, so it returns the whole canvas without walking; the
+// first later call that cannot skip walks to record the bounds again, and also
+// returns the whole canvas (#496). So does the call after a full repaint the
+// caller did without asking for a region (MarkFullRepaint).
+//
 // Only meaningful under the partialrepaint build tag; the per-node bookkeeping
 // it relies on is otherwise never populated.
 func (c *Canvas) PartialDirtyRegion() (pos geo.Position, size geo.Size, set bool) {
+	canvasSize := c.impl.Size()
+	was := c.refreshedWas
+	c.refreshedWas.Reset()
+	// Stale bounds make the frame full anyway, and when they are stale, was
+	// may be too, so it only decides whether the frame walks.
+	if was.set && RegionCoversCanvas(clampRect(was, canvasSize), canvasSize) {
+		c.paintBoundsStale = true
+		c.leftRegion.Reset()
+		return geo.Position{}, canvasSize, true
+	}
+	stale := c.paintBoundsStale
+	c.paintBoundsStale = false
+
 	var region dirtyRect
-	refreshed := c.refreshedObjs
+	// The walk culls what the paint walk culls, so a clip-owner off its clip
+	// is visited without the children it would not draw (#464); culledObj is
+	// the object cull last skipped the children of. Cull runs just before the
+	// object's visit.
+	var culledObj core.CanvasObject
+	cull := func(obj core.CanvasObject, pos, clipPos geo.Position, clipSize geo.Size) bool {
+		if CullOffClip(obj, pos, clipPos, clipSize) {
+			culledObj = obj
+			return true
+		}
+		return false
+	}
+	record := func(node *RenderCacheNode, _ geo.Position) {
+		if culledObj == node.obj {
+			culledObj = nil
+			if !node.childrenCulled {
+				// What the children drew until now is no longer drawn: clear
+				// it, and forget it, so they count as new when drawn again.
+				node.childrenCulled = true
+				forgetPaintBounds(node, &region, !stale)
+			}
+		} else {
+			node.childrenCulled = false
+		}
 
-	c.WalkTrees(func(node *RenderCacheNode, _ geo.Position) {
-		s := node.obj.Size()
-		minX, minY, maxX, maxY := node.worldTransform.AABB(s.Width, s.Height)
-		newPos := geo.NewPos(minX, minY)
-		newSize := geo.NewSize(maxX-minX, maxY-minY)
+		newPos, newSize := paintBounds(node)
 
-		_, isRefreshed := refreshed[node.obj]
+		isRefreshed := node.paintRefreshed
+		node.paintRefreshed = false
 		moved := !node.lastPaintSet || node.lastPaintPos != newPos || node.lastPaintSize != newSize
 
-		if isRefreshed || moved {
+		if !stale && (isRefreshed || moved) {
 			region.Union(padRect(newPos, newSize)) // where it is now
 			if node.lastPaintSet {
 				region.Union(padRect(node.lastPaintPos, node.lastPaintSize)) // where it was
 			}
 		}
-		if isRefreshed {
+		if !stale && isRefreshed && !node.childrenCulled {
 			// A content refresh can repaint descendants that overflow this node's
 			// own bounds (shadows, focus rings, selection); cover the subtree.
 			c.unionSubtreeBounds(node, &region)
@@ -502,10 +549,65 @@ func (c *Canvas) PartialDirtyRegion() (pos geo.Position, size geo.Size, set bool
 		node.lastPaintPos = newPos
 		node.lastPaintSize = newSize
 		node.lastPaintSet = true
-	}, nil)
+	}
+	// Not WalkTrees: a full walk starts a node-map generation, which makes
+	// every node look itself up again (#487), and sweeps the map and rebuilds
+	// the spatial index, which the full walks and the paint walk already do.
+	c.walkContentTrees(cull, nil, record, nil)
+	for _, tree := range c.overlays.renderCaches {
+		if tree != nil {
+			c.walkTree(tree, nil, nil, record, nil)
+		}
+	}
 
-	c.refreshedObjs = nil
+	if stale {
+		c.leftRegion.Reset()
+		return geo.Position{}, canvasSize, true
+	}
+	if c.leftRegion.set {
+		region.Union(c.leftRegion.pos, c.leftRegion.size)
+		c.leftRegion.Reset()
+	}
 	return region.pos, region.size, region.set
+}
+
+// notePaintRefresh records for PartialDirtyRegion that node's object was
+// refreshed.
+func (c *Canvas) notePaintRefresh(node *RenderCacheNode) {
+	node.paintRefreshed = true
+	if node.lastPaintSet {
+		c.refreshedWas.Union(node.lastPaintPos, node.lastPaintSize)
+	}
+}
+
+// forgetPaintBounds forgets the bounds every descendant of node was painted
+// at, first adding them to region if union is set.
+func forgetPaintBounds(node *RenderCacheNode, region *dirtyRect, union bool) {
+	for child := node.firstChild; child != nil; child = child.nextSibling {
+		if child.lastPaintSet && union {
+			region.Union(padRect(child.lastPaintPos, child.lastPaintSize))
+		}
+		child.lastPaintSet = false
+		forgetPaintBounds(child, region, union)
+	}
+}
+
+// MarkFullRepaint tells PartialDirtyRegion that the frame being painted is a
+// full repaint that did not ask it for a region, so the bounds it recorded are
+// no longer those on screen.
+func (c *Canvas) MarkFullRepaint() {
+	c.paintBoundsStale = true
+}
+
+// clampRect returns the size of the part of r inside a canvas of size canvas.
+func clampRect(r dirtyRect, canvas geo.Size) geo.Size {
+	minX, minY := geo.Max(r.pos.X, 0), geo.Max(r.pos.Y, 0)
+	maxX := geo.Min(r.pos.X+r.size.Width, canvas.Width)
+	maxY := geo.Min(r.pos.Y+r.size.Height, canvas.Height)
+	if maxX <= minX || maxY <= minY {
+		return geo.Size{}
+	}
+	return geo.NewSize(maxX-minX, maxY-minY)
 }
 
 // unionSubtreeBounds expands region to include the current world-space bounds of
@@ -513,11 +615,23 @@ func (c *Canvas) PartialDirtyRegion() (pos geo.Position, size geo.Size, set bool
 // overflow drawn by its children.
 func (c *Canvas) unionSubtreeBounds(node *RenderCacheNode, region *dirtyRect) {
 	for child := node.firstChild; child != nil; child = child.nextSibling {
-		s := child.obj.Size()
-		minX, minY, maxX, maxY := child.worldTransform.AABB(s.Width, s.Height)
-		region.Union(padRect(geo.NewPos(minX, minY), geo.NewSize(maxX-minX, maxY-minY)))
+		region.Union(padRect(paintBounds(child)))
 		c.unionSubtreeBounds(child, region)
 	}
+}
+
+// paintBounds returns the world-space box node's object paints in: its bounds,
+// or for a box shadow the blurred area the painters draw around them, offset.
+func paintBounds(node *RenderCacheNode) (geo.Position, geo.Size) {
+	s := node.obj.Size()
+	m := node.worldTransform
+	if sh, ok := node.obj.(*canvas.BoxShadow); ok && sh.BlurRadius > 0 {
+		spread := sh.BlurRadius * 2 // as drawBoxShadow pads it
+		m = m.Multiply(geo.NewTranslation(sh.OffsetX-spread, sh.OffsetY-spread))
+		s = geo.NewSize(s.Width+2*spread, s.Height+2*spread)
+	}
+	minX, minY, maxX, maxY := m.AABB(s.Width, s.Height)
+	return geo.NewPos(minX, minY), geo.NewSize(maxX-minX, maxY-minY)
 }
 
 // NodeFor returns the RenderCacheNode for the given object, if it exists.
@@ -1048,10 +1162,16 @@ func (c *Canvas) walkTree(
 // that visits only changed paths does not sweep the map, so without this an
 // object removed from a container would stay reachable until the next full
 // walk (#380, #487). An object that already has a new node keeps it.
+//
+// Under partial repaint, what the nodes were painted as joins the next dirty
+// region (leftRegion): a hidden or removed object's pixels must be cleared.
 func (c *Canvas) forgetNodes(n *RenderCacheNode) {
 	for ; n != nil; n = n.nextSibling {
 		if cur, ok := c.nodeMap.Load(n.obj); ok && cur == n {
 			c.nodeMap.Delete(n.obj)
+		}
+		if build.PartialRepaint && n.lastPaintSet {
+			c.leftRegion.Union(padRect(n.lastPaintPos, n.lastPaintSize))
 		}
 		c.forgetNodes(n.firstChild)
 	}
