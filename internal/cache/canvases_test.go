@@ -36,3 +36,32 @@ func TestSetCanvasForObjectRegisteredDoesNotAllocate(t *testing.T) {
 
 	assert.Zero(t, testing.AllocsPerRun(100, func() { SetCanvasForObject(obj, c, nil) }))
 }
+
+// TestCanvasRegistrationCurrent pins the rule the min-size walk relies on to
+// skip looking an object up (#487): a registration is current only while the
+// map still holds that entry for that canvas, so once Clean deletes an expired
+// entry the walk registers the object again and GetCanvasForObject finds it.
+func TestCanvasRegistrationCurrent(t *testing.T) {
+	testClearAll()
+	t.Cleanup(testClearAll)
+	tm := &timeMock{}
+	tm.setTime(10, 0)
+
+	c := &dummyCanvas{}
+	obj := &dummyWidget{}
+	reg := RegisterCanvasForObject(obj, c, nil)
+	assert.True(t, reg.Current(c))
+	assert.False(t, reg.Current(&dummyCanvas{}), "current for another canvas")
+	assert.False(t, CanvasRegistration{}.Current(c), "a zero registration is current")
+
+	// Past its expiry, and after Clean has deleted it, it is not current.
+	tm.setTime(11, 1)
+	assert.False(t, reg.Current(c), "an expired registration is current")
+	Clean(true)
+	assert.Nil(t, GetCanvasForObject(obj), "Clean kept the expired entry")
+
+	// Registering again restores the mapping and a current registration.
+	reg = RegisterCanvasForObject(obj, c, nil)
+	assert.True(t, reg.Current(c))
+	assert.Equal(t, c, GetCanvasForObject(obj))
+}

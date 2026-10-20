@@ -555,16 +555,25 @@ func ClipsOf(o core.CanvasObject) Clips {
 // RepaintBoundary marker interface, indicating its subtree should be
 // rendered into a cached FBO for dirty-region isolation.
 func IsRepaintBoundary(o core.CanvasObject) bool {
+	boundary, _ := RepaintBoundaryStatus(o)
+	return boundary
+}
+
+// RepaintBoundaryStatus is IsRepaintBoundary, and also reports whether the
+// answer is settled: false for a widget whose renderer does not exist yet,
+// which may turn out to be a boundary once it does. A walk can keep a settled
+// answer rather than look the renderer up again on every visit (#487).
+func RepaintBoundaryStatus(o core.CanvasObject) (boundary, settled bool) {
 	w, isWid := o.(core.Widget)
 	if !isWid {
-		return false
+		return false, true
 	}
 	r, rendered := cache.CachedRenderer(w)
 	if !rendered {
-		return false
+		return false, false
 	}
 	_, isBoundary := r.(interface{ IsRepaintBoundary() })
-	return isBoundary
+	return isBoundary, true
 }
 
 // IsRoundedClip checks if a canvas object's renderer implements rounded-corner

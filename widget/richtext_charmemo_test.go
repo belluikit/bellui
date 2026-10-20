@@ -23,8 +23,8 @@ func TestRichText_CharMinSizeMemoFollowsItsInputs(t *testing.T) {
 	assert.Equal(t, bellui.MeasureText("M", 14, bellui.TextStyle{Monospace: true}), r.charMinSize(false, bellui.TextStyle{Monospace: true}, 14))
 	assert.Equal(t, bellui.MeasureText(passwordChar, 14, bellui.TextStyle{}), r.charMinSize(true, bellui.TextStyle{}, 14))
 
-	before := r.charMemoKey.generation
+	before := r.charMemo.key.generation
 	cache.ResetThemeCaches()
 	assert.Equal(t, small, r.charMinSize(false, bellui.TextStyle{}, 14))
-	assert.NotEqual(t, before, r.charMemoKey.generation, "a font cache reset must drop the memo")
+	assert.NotEqual(t, before, r.charMemo.key.generation, "a font cache reset must drop the memo")
 }
