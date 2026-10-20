@@ -156,6 +156,7 @@ func (d *gLDriver) runGL() {
 // fire the stopped callback and drain the pending funcQueue.
 func (d *gLDriver) shutdownLoop() {
 	profiler.Flush()
+	verifier.Flush()
 	d.Terminate()
 	l := bellui.CurrentApp().Lifecycle().(*app.Lifecycle)
 	if f := l.OnStopped(); f != nil {
@@ -265,6 +266,7 @@ func (d *gLDriver) repaintWindow(w *window) bool {
 	// mark that we have walked the window and don't
 	// need to walk it again to mark caches alive
 	w.lastWalkedTime = time.Now()
+	verifier.afterFrame(w)
 	return freed
 }
 
