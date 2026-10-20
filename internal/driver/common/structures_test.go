@@ -36,6 +36,41 @@ func TestDeduplicatedObjectQueue(t *testing.T) {
 	assert.Equal(t, uint64(1), queue.Len())
 }
 
+// TestDeduplicatedObjectQueueConcurrentInOut pins that a refresh queued from
+// one goroutine while the main thread drains the queue is never lost (#445).
+// In once queued the object before recording it, so an Out in between deleted
+// a record not yet stored; the late store then marked the object queued for
+// good and every later In for it returned early, so it never repainted.
+func TestDeduplicatedObjectQueueConcurrentInOut(t *testing.T) {
+	queue := deduplicatedObjectQueue{queue: async.NewCanvasObjectQueue()}
+	obj := &bellui.Container{}
+	for round := 0; round < 5000; round++ {
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			for i := 0; i < 500; i++ {
+				queue.In(obj)
+			}
+		}()
+	drain:
+		for {
+			select {
+			case <-done:
+				break drain
+			default:
+				queue.Out()
+			}
+		}
+		for queue.Out() != nil {
+		}
+
+		queue.In(obj)
+		if !assert.Same(t, obj, queue.Out(), "round %d: a refresh queued after the drain was dropped", round) {
+			return
+		}
+	}
+}
+
 // TestDeduplicatedObjectQueueAllocations pins that a warmed-up queue refreshes
 // without allocating: a labels frame queues thousands of refreshes, and the
 // sync.Map this replaced allocated a node for each.
