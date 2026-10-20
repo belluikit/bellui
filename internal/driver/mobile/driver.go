@@ -790,7 +790,8 @@ type mobileBoundaryEntry struct {
 	state                  gpu.BoundaryFBO
 	wasDirty               bool
 	invWT                  geo.Matrix
-	origin                 geo.Position
+	origin                 geo.Position         // the texture's origin: the boundary's position snapped to a device pixel
+	phase                  common.BoundaryPhase // the sub-pixel phase the texture is rendered at
 	size                   geo.Size
 	canvasPixW, canvasPixH int
 	outerClips             *internal.ClipStack // the clips outside a dirty boundary (#559)
@@ -849,16 +850,16 @@ func (w *mobileTreeWalker) pushBoundary(node *common.RenderCacheNode, pos geo.Po
 	}
 
 	obj := node.Obj()
-	objSize := obj.Size()
-	pixW := scale.ToScreenCoordinate(w.c, objSize.Width)
-	pixH := scale.ToScreenCoordinate(w.c, objSize.Height)
+	// Snapped to a device pixel so the blit is a copy, pixel for pixel (#570).
+	g := common.BoundaryGeometryFor(pos, obj.Size(), w.c.Scale())
+	pixW, pixH, objSize := g.PixW, g.PixH, g.Size
 
 	if pixW > 0 && pixH > 0 {
-		if w.bp.IsBoundaryClean(obj) {
+		if w.bp.IsBoundaryClean(obj) && node.BoundaryRenderedAt(g.Phase) {
 			cleanState := w.bp.EnsureBoundaryFBO(obj, pixW, pixH, objSize)
 			w.bStack = append(w.bStack, mobileBoundaryEntry{
 				obj: obj, state: cleanState, wasDirty: false,
-				origin: pos, size: objSize,
+				origin: g.Origin, size: objSize,
 			})
 			return true
 		}
@@ -875,9 +876,10 @@ func (w *mobileTreeWalker) pushBoundary(node *common.RenderCacheNode, pos geo.Po
 		if !ok {
 			invWT = geo.Identity()
 		}
+		invWT = geo.NewTranslation(pos.X-g.Origin.X, pos.Y-g.Origin.Y).Multiply(invWT)
 		w.bStack = append(w.bStack, mobileBoundaryEntry{
 			obj: obj, state: state, wasDirty: true,
-			invWT: invWT, origin: pos, size: objSize,
+			invWT: invWT, origin: g.Origin, phase: g.Phase, size: objSize,
 			canvasPixW: w.canvasPixW, canvasPixH: w.canvasPixH,
 			outerClips: outerClips,
 		})
@@ -965,11 +967,12 @@ func (w *mobileTreeWalker) afterDraw(node *common.RenderCacheNode, pos geo.Posit
 		if entry.wasDirty && entry.state != nil {
 			w.bp.UnbindBoundaryFBO(entry.canvasPixW, entry.canvasPixH)
 			entry.state.SetDirty(false)
+			node.SetBoundaryRenderedAt(entry.phase)
 			w.clips = entry.outerClips
 			w.applyClip()
 		}
-		if !w.shouldSkipForDirtyRegion(pos, entry.size) {
-			w.bp.BlitBoundaryTexture(entry.state, pos, w.size)
+		if !w.shouldSkipForDirtyRegion(entry.origin, entry.size) {
+			w.bp.BlitBoundaryTexture(entry.state, entry.origin, w.size)
 		}
 		return
 	}
