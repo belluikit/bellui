@@ -2898,11 +2898,7 @@ func (r *textRenderer) Refresh() {
 				continue
 			}
 
-			// A row holding the whole of a single segment shows the segment's
-			// text as it is. Going through runes gives the same string when the
-			// text is valid UTF-8, at two allocations per refresh (#492).
-			if len(bound.segments) == 1 && bound.begin == 0 && !bound.ellipsis && !concealed(seg) &&
-				bound.end >= utf8.RuneCountInString(textSeg.Text) && utf8.ValidString(textSeg.Text) {
+			if showsWholeSegment(bound, textSeg) {
 				txt.Text = textSeg.Text
 				objs = append(objs, txt)
 				continue
@@ -2974,12 +2970,7 @@ func (r *textRenderer) Refresh() {
 		}
 	}
 
-	// Save original 1-per-row objects for Layout (which expects this count),
-	// in an array of their own, reused when the count is unchanged (#492).
-	if len(r.origObjs) != len(objs) {
-		r.origObjs = make([]core.CanvasObject, len(objs))
-	}
-	copy(r.origObjs, objs)
+	r.saveOrigObjs(objs)
 
 	r.Layout(r.obj.Size())
 
@@ -2991,6 +2982,25 @@ func (r *textRenderer) Refresh() {
 	canvas.Refresh(r.obj.super())
 
 	r.obj.cleanVisualCache()
+}
+
+// saveOrigObjs keeps the original 1-per-row objects for Layout (which expects
+// this count), in an array of their own as the incremental refresh expects,
+// reused when the count is unchanged (#492).
+func (r *textRenderer) saveOrigObjs(objs []core.CanvasObject) {
+	if len(r.origObjs) != len(objs) {
+		r.origObjs = make([]core.CanvasObject, len(objs))
+	}
+	copy(r.origObjs, objs)
+}
+
+// showsWholeSegment reports whether a row holds the whole of a single text
+// segment, shown as it is: no ellipsis, not concealed. Its text is then the
+// segment's text, and going through runes would give the same string when the
+// text is valid UTF-8, at two allocations per refresh (#492).
+func showsWholeSegment(bound rowBoundary, seg *TextSegment) bool {
+	return len(bound.segments) == 1 && bound.begin == 0 && !bound.ellipsis && !concealed(seg) &&
+		bound.end >= utf8.RuneCountInString(seg.Text) && utf8.ValidString(seg.Text)
 }
 
 // splitIntoFragments replaces each row's canvas.Text with colored fragments.
