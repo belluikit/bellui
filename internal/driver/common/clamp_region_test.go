@@ -1,6 +1,4 @@
-//go:build !no_glfw && !ci && !mobile
-
-package glfw
+package common
 
 import (
 	"testing"
@@ -10,7 +8,8 @@ import (
 
 // TestClampRegionToCanvas covers the dirty-region clamp that keeps a partial
 // repaint's clip in bounds when a refreshed object sits (partly) off-canvas —
-// e.g. content scrolled out of a container (pre-rebrand tracker #238).
+// e.g. content scrolled out of a container (pre-rebrand tracker #238). Both
+// drivers use it (#591).
 func TestClampRegionToCanvas(t *testing.T) {
 	canvas := geo.NewSize(100, 100)
 	for _, tt := range []struct {
@@ -28,7 +27,7 @@ func TestClampRegionToCanvas(t *testing.T) {
 		{"fully right", geo.NewPos(160, 20), geo.NewSize(40, 40), geo.NewPos(100, 20), geo.Size{}, true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			pos, sz := clampRegionToCanvas(tt.pos, tt.sz, canvas)
+			pos, sz := ClampRegionToCanvas(tt.pos, tt.sz, canvas)
 			empty := sz.Width <= 0 || sz.Height <= 0
 			if empty != tt.wantEmptySet {
 				t.Fatalf("empty = %v (sz=%v), want empty=%v", empty, sz, tt.wantEmptySet)

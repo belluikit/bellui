@@ -1227,3 +1227,25 @@ func (c *Canvas) updateLayout(objToLayout core.CanvasObject) {
 		renderer.Layout(cont.Size())
 	}
 }
+
+// ClampRegionToCanvas intersects a dirty region with the canvas [0,0]-(size)
+// box, returning a zero-size region when it falls entirely outside.
+func ClampRegionToCanvas(pos geo.Position, sz geo.Size, size geo.Size) (geo.Position, geo.Size) {
+	maxX, maxY := pos.X+sz.Width, pos.Y+sz.Height
+	if pos.X < 0 {
+		pos.X = 0
+	}
+	if pos.Y < 0 {
+		pos.Y = 0
+	}
+	if maxX > size.Width {
+		maxX = size.Width
+	}
+	if maxY > size.Height {
+		maxY = size.Height
+	}
+	if maxX <= pos.X || maxY <= pos.Y {
+		return pos, geo.Size{}
+	}
+	return pos, geo.NewSize(maxX-pos.X, maxY-pos.Y)
+}

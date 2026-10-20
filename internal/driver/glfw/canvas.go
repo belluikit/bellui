@@ -360,35 +360,13 @@ type boundaryEntry struct {
 // on: clear just the changed region, or full-clear when it covers most of the
 // canvas; an empty region (nothing changed) draws nothing and re-presents the
 // retained FBO.
-// clampRegionToCanvas intersects a dirty region with the canvas [0,0]-(size)
-// box, returning a zero-size region when it falls entirely outside.
-func clampRegionToCanvas(pos geo.Position, sz geo.Size, size geo.Size) (geo.Position, geo.Size) {
-	maxX, maxY := pos.X+sz.Width, pos.Y+sz.Height
-	if pos.X < 0 {
-		pos.X = 0
-	}
-	if pos.Y < 0 {
-		pos.Y = 0
-	}
-	if maxX > size.Width {
-		maxX = size.Width
-	}
-	if maxY > size.Height {
-		maxY = size.Height
-	}
-	if maxX <= pos.X || maxY <= pos.Y {
-		return pos, geo.Size{}
-	}
-	return pos, geo.NewSize(maxX-pos.X, maxY-pos.Y)
-}
-
 func (c *glCanvas) clearCanvasFBO(drp gpu.DirtyRegionPainter, size geo.Size) (partial bool, drPos geo.Position, drSize geo.Size) {
 	if build.PartialRepaint && !drp.CanvasFBONeedsFullClear() {
 		pos, sz, set := c.PartialDirtyRegion()
 		// A refreshed object can sit (partly) outside the canvas — e.g. content
 		// scrolled out of a container. Clamp the dirty region to the canvas so the
 		// region clip stays in bounds; if nothing on-canvas changed, retain.
-		pos, sz = clampRegionToCanvas(pos, sz, size)
+		pos, sz = common.ClampRegionToCanvas(pos, sz, size)
 		set = set && sz.Width > 0 && sz.Height > 0
 		switch {
 		case !set:

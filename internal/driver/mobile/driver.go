@@ -771,6 +771,11 @@ func (d *driver) onStop() {
 func clearCanvasFBO(c *canvas, drp gpu.DirtyRegionPainter, size geo.Size) (partial bool, drPos geo.Position, drSize geo.Size) {
 	if build.PartialRepaint && !drp.CanvasFBONeedsFullClear() {
 		pos, sz, set := c.PartialDirtyRegion()
+		// Clamped as the desktop driver does: a region running off the canvas
+		// would make a scissor the painter cannot set, so the clear would not be
+		// confined to it.
+		pos, sz = common.ClampRegionToCanvas(pos, sz, size)
+		set = set && sz.Width > 0 && sz.Height > 0
 		switch {
 		case !set:
 			return true, geo.Position{}, geo.Size{}
@@ -830,6 +835,25 @@ func (w *mobileTreeWalker) paint() {
 	w.c.WalkContentTreesCulled(w.cull, w.draw, w.afterDraw)
 	w.c.WalkOverlayTrees(w.draw, w.afterDraw)
 	w.c.RebuildSpatialIndex()
+}
+
+// paintClipped is paint with, under a partial repaint, the dirty region's clip
+// on through the walk. Culling skips the objects outside the region, but one
+// that overlaps it is drawn whole: a full-canvas background painted over the
+// retained pixels of everything culled, so only what the region held stayed
+// on screen (#591; the desktop driver's paint does the same). The region
+// seeds the clip stack, so nested clips intersect with it and restore to it.
+func (w *mobileTreeWalker) paintClipped() {
+	dirtyClip := w.partialRepaint && w.drSize.Width > 0 && w.drSize.Height > 0
+	if dirtyClip {
+		w.clips.Push(w.drPos, w.drSize)
+		w.applyClip()
+	}
+	w.paint()
+	if dirtyClip {
+		w.clips.Pop()
+		w.applyClip()
+	}
 }
 
 // cull is the paint walk's driver.CullFunc: common.CullOffClip, except while
@@ -1084,7 +1108,7 @@ func (d *driver) paintWindow(win bellui.Window, size geo.Size) {
 	uidir.Push(c.Direction())
 	defer uidir.Pop(c.Direction())
 
-	walk.paint()
+	walk.paintClipped()
 
 	// In-scene screen-reader focus ring (pre-rebrand tracker #759): the OS-drawn highlight cannot
 	// reach the flat GPU surface, so paint our own over the accessibility-focused
