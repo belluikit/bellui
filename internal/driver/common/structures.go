@@ -116,9 +116,9 @@ type RenderCacheNode struct {
 	// nothing, and their bounds are forgotten.
 	childrenCulled bool
 	// paintCulled says the last walk to visit this node skipped its children:
-	// the paint walk's cull found a clip-owner off its clip (#464). The
-	// spatial index then skips them too where nothing on the canvas can
-	// reach them (#481).
+	// the paint walk's cull found a clip-owner off its clip (#464). The paint
+	// walks then set up no clip for it, and the spatial index skips the
+	// children too where nothing on the canvas can reach them (#481).
 	paintCulled bool
 }
 

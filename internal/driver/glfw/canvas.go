@@ -605,8 +605,9 @@ func (w *glPaintWalk) draw(node *common.RenderCacheNode, pos geo.Position) {
 	// push while its children — which may extend into the dirty region — get drawn
 	// unclipped, leaking content past the viewport (pre-rebrand tracker #333). The clip is intersected
 	// with the seeded dirty-region clip, so a clip-owner outside the region yields an
-	// empty clip and its children draw nothing.
-	clips := driver.ClipsOf(obj)
+	// empty clip and its children draw nothing. A clip-owner the paint walk
+	// culled has no children to constrain, and gets no clip (#481).
+	clips := common.PaintClips(node)
 	if clips.Rect {
 		inner := w.clips.Push(paintPos, obj.Size())
 		w.c.Painter().StartClipping(inner.Rect())
@@ -693,7 +694,7 @@ func (w *glPaintWalk) afterDraw(node *common.RenderCacheNode, pos geo.Position) 
 	// Tear down clips even when the object was culled: draw establishes them
 	// unconditionally for clip-owners so descendants stay clipped (pre-rebrand tracker #333), so the
 	// push/pop must stay paired regardless of culling.
-	clips := driver.ClipsOf(obj)
+	clips := common.PaintClips(node)
 	if clips.Rounded {
 		w.c.Painter().StopRoundedClipping()
 	}

@@ -27,8 +27,9 @@ func (p *objectRecordingPainter) Paint(obj core.CanvasObject, _ geo.Position, _ 
 
 // TestPaintCullsOffClipKeepsNodes pins #481: the mobile paint walk skips the
 // subtree of a clip-owner scrolled out of view, as the desktop one does
-// (#464), and does not sweep the node map, so the skipped objects keep their
-// nodes for the next walk that reaches them.
+// (#464), sets up no clip for that clip-owner, and does not sweep the node
+// map, so the skipped objects keep their nodes for the next walk that reaches
+// them.
 func TestPaintCullsOffClipKeepsNodes(t *testing.T) {
 	items := make([]*roundedClipTestWidget, 100)
 	objs := make([]core.CanvasObject, len(items))
@@ -52,4 +53,21 @@ func TestPaintCullsOffClipKeepsNodes(t *testing.T) {
 	assert.False(t, painter.painted[last], "an item scrolled out of view is not")
 	_, ok := c.NodeFor(last)
 	assert.True(t, ok, "the culled item's content keeps its node")
+
+	drawn, starts, stops := 0, 0, 0
+	for _, it := range items {
+		if painter.painted[it.content] {
+			drawn++
+		}
+	}
+	for _, call := range painter.calls {
+		switch call {
+		case "startRounded 8":
+			starts++
+		case "stopRounded":
+			stops++
+		}
+	}
+	assert.Equal(t, drawn, starts, "only the items drawn set up their rounded clip")
+	assert.Equal(t, starts, stops, "every clip set up is torn down")
 }

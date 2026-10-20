@@ -907,7 +907,9 @@ func (w *mobileTreeWalker) draw(node *common.RenderCacheNode, pos geo.Position) 
 	// clip-owner (scroll/ClipToBounds) still constrains its descendants; otherwise
 	// its children that extend into the dirty region draw unclipped, leaking content
 	// past the viewport (pre-rebrand tracker #333). afterDraw tears these down regardless of culling.
-	clips := intdriver.ClipsOf(obj)
+	// A clip-owner the paint walk culled has no children to constrain, and
+	// gets no clip (#481).
+	clips := common.PaintClips(node)
 	if clips.Rect {
 		inner := w.clips.Push(paintPos, obj.Size())
 		w.c.Painter().StartClipping(inner.Rect())
@@ -960,7 +962,7 @@ func (w *mobileTreeWalker) afterDraw(node *common.RenderCacheNode, pos geo.Posit
 
 	// Tear down clips even when culled: draw establishes them unconditionally for
 	// clip-owners so descendants stay clipped (pre-rebrand tracker #333), so push/pop must stay paired.
-	clips := intdriver.ClipsOf(obj)
+	clips := common.PaintClips(node)
 	if clips.Rounded {
 		w.c.Painter().StopRoundedClipping()
 	}

@@ -33,6 +33,16 @@ func CullOffClip(obj core.CanvasObject, pos, clipPos geo.Position, clipSize geo.
 	return outside(pos, size, cullMargin+shadowReach(obj), clipPos, clipSize)
 }
 
+// PaintClips is the clips a paint walk sets up for node's object: none for a
+// clip-owner whose children the walk culled, as they would constrain nothing
+// (#481). Each one costs the painter a stencil or scissor change.
+func PaintClips(node *RenderCacheNode) driver.Clips {
+	if node.paintCulled {
+		return driver.Clips{}
+	}
+	return driver.ClipsOf(node.obj)
+}
+
 // outside reports whether the rect (pos, size) widened by m misses the clip.
 func outside(pos geo.Position, size geo.Size, m float32, clipPos geo.Position, clipSize geo.Size) bool {
 	return pos.X+size.Width+m <= clipPos.X || pos.X-m >= clipPos.X+clipSize.Width ||
