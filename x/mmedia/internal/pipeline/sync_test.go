@@ -85,6 +85,10 @@ func TestEndOfStreamSentinel(t *testing.T) {
 // and is sampled at irregular times. The clock used to snap to each sample and
 // lurched by up to 50 ms, so video paced on it dropped frames as late. It must
 // run smoothly and still track the audio.
+//
+// Smooth means it drifts from wall time by no more than its slew allows over
+// the time between two samples. A fixed bound failed whenever the test woke
+// late: a 2 ms sleep that takes 30 ms lets a correct clock drift 7.5 ms (#575).
 func TestClockSmoothsSteppedAudioPosition(t *testing.T) {
 	const step = 90 * time.Millisecond
 	c := NewClock()
@@ -95,7 +99,8 @@ func TestClockSmoothsSteppedAudioPosition(t *testing.T) {
 	// Measure from the first step on: until the audio moves, the clock holds
 	// at the start and then jumps to it once, as intended (see
 	// TestClockWaitsForTheAudioToStart).
-	worst := time.Duration(0)
+	const margin = time.Millisecond // the clock and wall time are read apart
+	worst, worstGap := time.Duration(0), time.Duration(0)
 	prevClock, prevWall := c.Time(), time.Now()
 	nextUpdate := start
 	for i := 0; time.Since(start) < 1500*time.Millisecond; i++ {
@@ -112,15 +117,18 @@ func TestClockSmoothsSteppedAudioPosition(t *testing.T) {
 			prevClock, prevWall = clock, wall
 			continue
 		}
-		if dev := (clock - prevClock) - wall.Sub(prevWall); dev > worst {
-			worst = dev
-		} else if -dev > worst {
-			worst = -dev
+		gap := wall.Sub(prevWall)
+		dev := (clock - prevClock) - gap
+		if dev < 0 {
+			dev = -dev
+		}
+		if excess := dev - time.Duration(audioMaxSlew*float64(gap)); excess > worst {
+			worst, worstGap = excess, gap
 		}
 		prevClock, prevWall = clock, wall
 	}
-	if worst > 5*time.Millisecond {
-		t.Errorf("clock lurched by %v against wall time between 2 ms samples; want it smooth", worst)
+	if worst > margin {
+		t.Errorf("clock lurched by %v more than its slew allows over %v between samples; want it smooth", worst, worstGap)
 	}
 	if lag := time.Since(start) - c.Time(); lag > 2*step || lag < -step {
 		t.Errorf("clock is %v behind real time; want it to track the audio within a step or two", lag)
