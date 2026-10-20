@@ -2898,6 +2898,16 @@ func (r *textRenderer) Refresh() {
 				continue
 			}
 
+			// A row holding the whole of a single segment shows the segment's
+			// text as it is. Going through runes gives the same string when the
+			// text is valid UTF-8, at two allocations per refresh (#492).
+			if len(bound.segments) == 1 && bound.begin == 0 && !bound.ellipsis && !concealed(seg) &&
+				bound.end >= utf8.RuneCountInString(textSeg.Text) && utf8.ValidString(textSeg.Text) {
+				txt.Text = textSeg.Text
+				objs = append(objs, txt)
+				continue
+			}
+
 			var runes []rune
 			if textSeg == lastSeg {
 				runes = lastRunes
@@ -2964,8 +2974,11 @@ func (r *textRenderer) Refresh() {
 		}
 	}
 
-	// Save original 1-per-row objects for Layout (which expects this count).
-	r.origObjs = make([]core.CanvasObject, len(objs))
+	// Save original 1-per-row objects for Layout (which expects this count),
+	// in an array of their own, reused when the count is unchanged (#492).
+	if len(r.origObjs) != len(objs) {
+		r.origObjs = make([]core.CanvasObject, len(objs))
+	}
 	copy(r.origObjs, objs)
 
 	r.Layout(r.obj.Size())
