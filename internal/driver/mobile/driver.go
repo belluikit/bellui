@@ -135,6 +135,10 @@ type driver struct {
 	// ring that moved or went away does not leave itself behind (#551).
 	a11yRingPainted    geo.Rectangle
 	a11yRingWasPainted bool
+
+	// surfaceWasHidden records that the window's surface has gone away once
+	// (the app went to the background), for surfaceShown.
+	surfaceWasHidden bool
 }
 
 // Declare conformity with Driver
@@ -617,6 +621,24 @@ func (*driver) SetDisableScreenBlanking(disable bool) {
 	setDisableScreenBlank(disable)
 }
 
+// surfaceShown is the canvas FBO's half of the surface coming up. The
+// persistent partial-repaint canvas FBO stops retaining its contents across
+// frames after a mobile background→resume (the off-screen texture is no longer
+// load-stable on tiled GPUs, even when reallocated), so dirty-region frames
+// would lose everything they don't redraw. After a resume, fall back to full
+// repaint for the rest of the session — correct, at the cost of the
+// optimization (pre-rebrand tracker #342). The first time the surface comes up
+// is no resume: marking then turned partial repaint off for every session
+// within a frame of launch (#591). No-op when not using the FBO path.
+func (d *driver) surfaceShown(c *canvas) {
+	if !d.surfaceWasHidden {
+		return
+	}
+	if m, ok := c.Painter().(interface{ MarkCanvasFBORetentionUnreliable() }); ok {
+		m.MarkCanvasFBORetentionUnreliable()
+	}
+}
+
 func (d *driver) handleLifecycle(e lifecycle.Event, w *window) {
 	c := w.Canvas().(*canvas)
 	switch e.Crosses(lifecycle.StageAlive) {
@@ -628,21 +650,14 @@ func (d *driver) handleLifecycle(e lifecycle.Event, w *window) {
 	switch e.Crosses(lifecycle.StageVisible) {
 	case lifecycle.CrossOn:
 		d.glctx, _ = e.DrawContext.(gl.Context)
-		// The persistent partial-repaint canvas FBO stops retaining its contents
-		// across frames after a mobile background→resume (the off-screen texture is
-		// no longer load-stable on tiled GPUs, even when reallocated), so
-		// dirty-region frames lose everything they don't redraw and static UI
-		// vanishes. Fall back to full repaint for the rest of the session — correct,
-		// at the cost of the optimization (pre-rebrand tracker #342). No-op when not using the FBO path.
-		if m, ok := c.Painter().(interface{ MarkCanvasFBORetentionUnreliable() }); ok {
-			m.MarkCanvasFBORetentionUnreliable()
-		}
+		d.surfaceShown(c)
 		// this is a fix for some android phone to prevent the app from being drawn as a blank screen after being pushed in the background
 		c.Content().Refresh()
 
 		d.sendPaintEvent()
 	case lifecycle.CrossOff:
 		d.glctx = nil
+		d.surfaceWasHidden = true
 	}
 	switch e.Crosses(lifecycle.StageFocused) {
 	case lifecycle.CrossOn: // foregrounding

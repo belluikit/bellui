@@ -90,3 +90,29 @@ func Test_mobileTreeWalker_FullRepaintIsUnclipped(t *testing.T) {
 
 	assert.Equal(t, "none", p.painted[bg])
 }
+
+// retentionPainter counts MarkCanvasFBORetentionUnreliable calls.
+type retentionPainter struct {
+	gpu.Painter
+	marked int
+}
+
+func (p *retentionPainter) MarkCanvasFBORetentionUnreliable() { p.marked++ }
+
+// Test_driver_RetentionMarkedOnlyAfterResume pins #591's second half: the
+// surface coming up at launch leaves partial repaint on. Only a surface shown
+// again after it went away (a background→resume, #342) marks the canvas FBO's
+// retention unreliable.
+func Test_driver_RetentionMarkedOnlyAfterResume(t *testing.T) {
+	c := newCanvas(bellui.CurrentDevice()).(*canvas)
+	p := &retentionPainter{}
+	c.SetPainter(p)
+	d := &driver{}
+
+	d.surfaceShown(c)
+	assert.Zero(t, p.marked, "the first surface is no resume")
+
+	d.surfaceWasHidden = true // the visible CrossOff
+	d.surfaceShown(c)
+	assert.Equal(t, 1, p.marked, "a resume marks retention unreliable")
+}
