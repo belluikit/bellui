@@ -66,10 +66,12 @@ func renderFrame(n int, tint color.RGBA) []byte {
 }
 
 // objectRect maps an object's canvas position/size to pixel bounds in a capture.
-func objectRect(c core.Canvas, obj core.CanvasObject) image.Rectangle {
+func objectRect(c core.Canvas, obj core.CanvasObject, img image.Image) image.Rectangle {
 	pos := bellui.CurrentApp().Driver().AbsolutePositionForObject(obj)
 	size := obj.Size()
-	s := c.Scale()
+	// The capture is in framebuffer pixels, which Scale alone does not give
+	// on a high-density output (#556).
+	s := float32(img.Bounds().Dx()) / c.Size().Width
 	return image.Rect(
 		int(pos.X*s), int(pos.Y*s),
 		int((pos.X+size.Width)*s), int((pos.Y+size.Height)*s),
@@ -116,7 +118,7 @@ func runAuto(a bellui.App, w bellui.Window, rasters map[string]core.CanvasObject
 	failed := false
 	for name, obj := range rasters {
 		var r image.Rectangle
-		bellui.DoAndWait(func() { r = objectRect(w.Canvas(), obj) })
+		bellui.DoAndWait(func() { r = objectRect(w.Canvas(), obj, first) })
 		n := changedPixels(first, second, r)
 		verdict := "PASS"
 		if n == 0 {
@@ -129,8 +131,8 @@ func runAuto(a bellui.App, w bellui.Window, rasters map[string]core.CanvasObject
 	// canvas as the same colour.
 	var opaqueRect, fadedRect image.Rectangle
 	bellui.DoAndWait(func() {
-		opaqueRect = objectRect(w.Canvas(), opaque)
-		fadedRect = objectRect(w.Canvas(), faded)
+		opaqueRect = objectRect(w.Canvas(), opaque, second)
+		fadedRect = objectRect(w.Canvas(), faded, second)
 	})
 	oc := second.At(centreOf(opaqueRect))
 	fc := second.At(centreOf(fadedRect))
