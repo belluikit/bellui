@@ -3,9 +3,12 @@
 package gl
 
 import (
+	"time"
+
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/cache"
 	"github.com/belluikit/bellui/internal/gpu"
 )
 
@@ -20,6 +23,10 @@ type BoundaryFBOState struct {
 	height      int      // pixel dimensions
 	LogicalSize geo.Size // logical size for coordinate adjustment
 	Dirty       bool     // true if the subtree needs re-rendering into the FBO
+	// used and usedFrame are when, and in which frame, a paint walk last
+	// reached the boundary (see evictBoundaries).
+	used      time.Time
+	usedFrame uint64
 }
 
 // SetDirty implements gpu.BoundaryFBO.
@@ -34,6 +41,12 @@ var (
 	_ gpu.BoundaryFBO     = (*BoundaryFBOState)(nil)
 )
 
+// boundaryKeepFrames is how many frames a boundary no paint walk reached is
+// kept for, at least (see evictBoundaries). One would do: the first frame
+// after an idle spell is the one that must not evict, and its walk re-stamps
+// every boundary on screen.
+const boundaryKeepFrames = 3
+
 // EnsureBoundaryFBO creates or resizes the FBO for a RepaintBoundary object.
 func (p *painter) EnsureBoundaryFBO(obj core.CanvasObject, pixW, pixH int, logicalSize geo.Size) gpu.BoundaryFBO {
 	if p.boundaries == nil {
@@ -42,6 +55,7 @@ func (p *painter) EnsureBoundaryFBO(obj core.CanvasObject, pixW, pixH int, logic
 
 	state, exists := p.boundaries[obj]
 	if exists && state.width == pixW && state.height == pixH {
+		state.used, state.usedFrame = time.Now(), p.frame
 		return state
 	}
 
@@ -73,6 +87,8 @@ func (p *painter) EnsureBoundaryFBO(obj core.CanvasObject, pixW, pixH int, logic
 		height:      pixH,
 		LogicalSize: logicalSize,
 		Dirty:       true, // newly created, must render
+		used:        time.Now(),
+		usedFrame:   p.frame,
 	}
 	p.boundaries[obj] = state
 	return state
@@ -135,6 +151,31 @@ func (p *painter) FreeBoundaryFBO(obj core.CanvasObject) {
 	p.ctx.DeleteFramebuffer(state.fbo)
 	p.ctx.DeleteTexture(state.texture)
 	delete(p.boundaries, obj)
+}
+
+// evictBoundaries frees the FBOs of the boundaries no paint walk has reached
+// for cache.ValidDuration and boundaryKeepFrames frames, at the start of a
+// frame. Nothing else frees a boundary that left the window: painter.Free is
+// called for the objects of a refreshed subtree, which no longer holds it
+// (#569). Counting frames too keeps an app that sat idle from dropping every
+// boundary on screen with its first frame back.
+func (p *painter) evictBoundaries() {
+	if len(p.boundaries) == 0 {
+		return
+	}
+	now := time.Now()
+	for obj, state := range p.boundaries {
+		if p.frame-state.usedFrame > boundaryKeepFrames && now.Sub(state.used) > cache.ValidDuration {
+			p.ctx.DeleteFramebuffer(state.fbo)
+			p.ctx.DeleteTexture(state.texture)
+			delete(p.boundaries, obj)
+		}
+	}
+}
+
+// CachedBoundaries returns how many boundary FBOs the painter holds.
+func (p *painter) CachedBoundaries() int {
+	return len(p.boundaries)
 }
 
 // MarkBoundaryDirty marks a RepaintBoundary's FBO as needing re-render.

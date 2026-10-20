@@ -3,11 +3,14 @@
 package webgpu
 
 import (
+	"time"
+
 	"github.com/belluikit/webgpu/wgpu"
 
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/cache"
 	"github.com/belluikit/bellui/internal/gpu"
 )
 
@@ -32,6 +35,10 @@ type boundaryState struct {
 	// happened: a walk with no frame open (the surface occluded, #564) draws
 	// nothing, and must not leave a blank texture cached as clean.
 	bound bool
+	// used and usedFrame are when, and in which frame, a paint walk last
+	// reached the boundary (see evictBoundaries).
+	used      time.Time
+	usedFrame uint64
 }
 
 // SetDirty implements gpu.BoundaryFBO. Clearing it after a render that did
@@ -43,6 +50,12 @@ func (s *boundaryState) SetDirty(dirty bool) {
 	s.dirty = dirty
 	s.bound = false
 }
+
+// boundaryKeepFrames is how many frames a boundary no paint walk reached is
+// kept for, at least (see evictBoundaries). One would do: the first frame
+// after an idle spell is the one that must not evict, and its walk re-stamps
+// every boundary on screen.
+const boundaryKeepFrames = 3
 
 func (p *painter) EnsureBoundaryFBO(obj core.CanvasObject, pixW, pixH int, logicalSize geo.Size) gpu.BoundaryFBO {
 	// The device is brought up lazily (mobile builds its surface from the native
@@ -60,6 +73,7 @@ func (p *painter) EnsureBoundaryFBO(obj core.CanvasObject, pixW, pixH int, logic
 	}
 	if s, ok := p.boundaries[obj]; ok && s.width == pixW && s.height == pixH {
 		s.logical = logicalSize
+		s.used, s.usedFrame = time.Now(), p.frame
 		return s
 	} else if ok {
 		// Resizing: the old target may already be sampled by this frame's
@@ -72,7 +86,7 @@ func (p *painter) EnsureBoundaryFBO(obj core.CanvasObject, pixW, pixH int, logic
 	if err != nil {
 		return &boundaryState{logical: logicalSize} // nil tex; Bind/Blit no-op safely
 	}
-	s := &boundaryState{tex: tex, width: pixW, height: pixH, logical: logicalSize, dirty: true}
+	s := &boundaryState{tex: tex, width: pixW, height: pixH, logical: logicalSize, dirty: true, used: time.Now(), usedFrame: p.frame}
 	p.boundaries[obj] = s
 	return s
 }
@@ -117,16 +131,51 @@ func (p *painter) blitTexture(view *wgpu.TextureView, logical geo.Size, pos geo.
 	p.record("simple", points, 4, uniformBytes(&u), view)
 }
 
+// FreeBoundaryFBO frees the boundary's target once the frame is submitted:
+// this frame's commands may already sample it.
 func (p *painter) FreeBoundaryFBO(obj core.CanvasObject) {
 	if p.boundaries == nil {
 		return
 	}
 	if s, ok := p.boundaries[obj]; ok {
-		if s.tex != nil {
-			s.tex.Release()
-		}
+		p.releaseBoundary(s)
 		delete(p.boundaries, obj)
 	}
+}
+
+func (p *painter) releaseBoundary(s *boundaryState) {
+	if s.tex == nil {
+		return
+	}
+	if p.dev != nil {
+		p.dev.ReleaseTextureAfterFrame(s.tex)
+	} else {
+		s.tex.Release()
+	}
+}
+
+// evictBoundaries frees the targets of the boundaries no paint walk has
+// reached for cache.ValidDuration and boundaryKeepFrames frames, at the start
+// of a frame. Nothing else frees a boundary that left the window:
+// painter.Free is called for the objects of a refreshed subtree, which no
+// longer holds it (#569). Counting frames too keeps an app that sat idle from
+// dropping every boundary on screen with its first frame back.
+func (p *painter) evictBoundaries() {
+	if len(p.boundaries) == 0 {
+		return
+	}
+	now := time.Now()
+	for obj, s := range p.boundaries {
+		if p.frame-s.usedFrame > boundaryKeepFrames && now.Sub(s.used) > cache.ValidDuration {
+			p.releaseBoundary(s)
+			delete(p.boundaries, obj)
+		}
+	}
+}
+
+// CachedBoundaries returns how many boundary targets the painter holds.
+func (p *painter) CachedBoundaries() int {
+	return len(p.boundaries)
 }
 
 func (p *painter) MarkBoundaryDirty(obj core.CanvasObject) {

@@ -6,13 +6,17 @@ package webgpu
 
 import (
 	"image/color"
+	"slices"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/belluikit/bellui/canvas"
+	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/cache"
 )
 
 // TestBoundaryRoundedClipUsesBoundaryFrame pins #564: inside a
@@ -77,4 +81,54 @@ func TestBoundaryWithoutFrame(t *testing.T) {
 		state.SetDirty(false)
 	})
 	assert.True(t, o.IsBoundaryClean(obj))
+}
+
+// TestBoundaryFreedInAnOpenFrame pins #569's second half: a boundary freed
+// after it was blitted in the open frame keeps its texture until the frame is
+// submitted, and the frame still draws it.
+func TestBoundaryFreedInAnOpenFrame(t *testing.T) {
+	o := newOffscreenPainter(t)
+	obj := canvas.NewRectangle(nil)
+	logical := geo.NewSquareSize(clipDim)
+	state := o.EnsureBoundaryFBO(obj, clipDim, clipDim, logical)
+	tex := state.(*boundaryState).tex
+	require.NotNil(t, tex)
+
+	img := o.frame(t, func() {
+		o.framing = true
+		defer func() { o.framing = false }()
+		o.BindBoundaryFBO(state)
+		o.fill()
+		o.UnbindBoundaryFBO(clipDim, clipDim)
+		o.BlitBoundaryTexture(state, geo.Position{}, logical)
+		o.FreeBoundaryFBO(obj)
+	})
+
+	assert.Equal(t, clipRed, pixel(img, clipDim/2, clipDim/2), "the frame drew the freed boundary")
+	assert.Zero(t, o.CachedBoundaries())
+	assert.True(t, slices.Contains(o.dev.frameTextures, tex), "the texture waits for the frame's submit")
+}
+
+// TestBoundaryEvictedWhenUnused pins #569: a boundary no paint walk reached
+// for cache.ValidDuration and boundaryKeepFrames frames is freed at the start
+// of a frame, after the frame's submit, and one still drawn is kept. A
+// boundary removed from the window is freed no other way.
+func TestBoundaryEvictedWhenUnused(t *testing.T) {
+	o := newOffscreenPainter(t)
+	gone, kept := canvas.NewRectangle(nil), canvas.NewRectangle(nil)
+	logical := geo.NewSquareSize(16)
+	goneTex := o.EnsureBoundaryFBO(gone, 16, 16, logical).(*boundaryState).tex
+	o.EnsureBoundaryFBO(kept, 16, 16, logical)
+	o.boundaries[gone].used = time.Now().Add(-cache.ValidDuration - time.Second)
+
+	o.evictBoundaries()
+	assert.Equal(t, 2, o.CachedBoundaries(), "unused for a while but no frames painted: an idle app keeps its boundaries")
+
+	o.painter.frame += boundaryKeepFrames + 1
+	o.boundaries[kept].usedFrame = o.painter.frame // drawn in the latest frame
+	o.evictBoundaries()
+
+	assert.Equal(t, 1, o.CachedBoundaries())
+	assert.Contains(t, o.boundaries, core.CanvasObject(kept))
+	assert.True(t, slices.Contains(o.dev.frameTextures, goneTex), "the texture waits for the frame's submit")
 }
