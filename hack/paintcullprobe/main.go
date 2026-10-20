@@ -1,3 +1,5 @@
+//go:build darwin || linux
+
 // Command paintcullprobe is the on-device check for the mobile paint walk's
 // off-clip culling (#481, the desktop half was #464). It runs perfscenes'
 // spinner scene, n cards in a scroll container plus one infinite progress bar,
