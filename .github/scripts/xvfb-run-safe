@@ -38,4 +38,10 @@ if ! read -t 60 -r display <"$tmp/displayfd"; then
 	exit 1
 fi
 
-DISPLAY=":$display" "$@"
+# Pin GLFW to X11 so the tests land on this Xvfb (#531). Left to itself, GLFW
+# tries Wayland first, and libwayland connects to $XDG_RUNTIME_DIR/wayland-0
+# even with WAYLAND_DISPLAY unset. On a machine with a logged-in Wayland
+# desktop, such as the linux_parallels runner VM over SSH, the tests then open
+# their windows on that desktop instead: canvases never get sized, splash
+# windows don't centre and the clipboard reads back empty.
+BELLUI_PLATFORM="${BELLUI_PLATFORM:-x11}" DISPLAY=":$display" "$@"
