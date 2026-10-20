@@ -130,6 +130,11 @@ type driver struct {
 	// goroutine at paint time.
 	a11yRing     *belluicanvas.Rectangle
 	a11yRingCore *belluicanvas.Rectangle
+	// a11yRingPainted is where the ring was last painted, and whether it was.
+	// Under partial repaint it marks that area dirty on the next paint, so a
+	// ring that moved or went away does not leave itself behind (#551).
+	a11yRingPainted    geo.Rectangle
+	a11yRingWasPainted bool
 }
 
 // Declare conformity with Driver
@@ -1033,6 +1038,11 @@ func (d *driver) paintWindow(win bellui.Window, size geo.Size) {
 	var drPos geo.Position
 	var drSize geo.Size
 
+	ring, hasRing := win.(*window).a11yFocusRing()
+	if build.PartialRepaint {
+		d.markA11yRingDirty(c, ring, hasRing)
+	}
+
 	if hasDRP {
 		drp.EnsureCanvasFBO(canvasPixW, canvasPixH)
 		drp.BindCanvasFBO()
@@ -1080,9 +1090,10 @@ func (d *driver) paintWindow(win bellui.Window, size geo.Size) {
 	// reach the flat GPU surface, so paint our own over the accessibility-focused
 	// element, on top of the content. No-op (ok=false) without the accessibility
 	// bridge or when nothing is focused.
-	if ring, ok := win.(*window).a11yFocusRing(); ok {
+	if hasRing {
 		d.paintA11yFocusRing(c, ring, size)
 	}
+	d.a11yRingPainted, d.a11yRingWasPainted = ring, hasRing
 
 	// --- Blit canvas FBO to the default framebuffer ---
 	if hasDRP {
@@ -1113,6 +1124,25 @@ var (
 // any colour — one of the two edges always contrasts (the approach VoiceOver
 // uses), and unlike a theme-coloured stroke it never vanishes into a
 // same-coloured widget.
+// markA11yRingDirty marks where the focus ring was last painted, and where it
+// is painted now, dirty for the partial repaint about to be computed. The ring
+// is no canvas object, so nothing else puts it in the region: where it left,
+// its pixels stayed in the retained canvas texture, and where it stays, it was
+// painted over itself every frame, its anti-aliased edges thickening (#551).
+// Its halo is stroked across the rect's edge, so the rect is widened by it.
+func (d *driver) markA11yRingDirty(c *canvas, ring geo.Rectangle, hasRing bool) {
+	mark := func(r geo.Rectangle) {
+		w := float32(a11yFocusRingHalo)
+		c.MarkDirtyRect(r.Pos.SubtractXY(w, w), r.Size.AddWidthHeight(2*w, 2*w))
+	}
+	if d.a11yRingWasPainted {
+		mark(d.a11yRingPainted)
+	}
+	if hasRing {
+		mark(ring)
+	}
+}
+
 func (d *driver) paintA11yFocusRing(c *canvas, ring geo.Rectangle, size geo.Size) {
 	if size.Width <= 0 || size.Height <= 0 || ring.Size.Width <= 0 || ring.Size.Height <= 0 {
 		return

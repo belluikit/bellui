@@ -93,7 +93,8 @@ type Canvas struct {
 	// record them again.
 	paintBoundsStale bool
 	// leftRegion is where the nodes that left the render tree since the last
-	// PartialDirtyRegion were painted (forgetNodes).
+	// PartialDirtyRegion were painted (forgetNodes), and the rects drivers
+	// marked dirty (MarkDirtyRect).
 	leftRegion dirtyRect
 
 	// spatialIdx provides O(1) broadphase hit testing. Built during
@@ -590,6 +591,14 @@ func forgetPaintBounds(node *RenderCacheNode, region *dirtyRect, union bool) {
 		child.lastPaintSet = false
 		forgetPaintBounds(child, region, union)
 	}
+}
+
+// MarkDirtyRect adds a rect to the next PartialDirtyRegion. A driver that
+// paints something no canvas object stands for, such as the mobile
+// screen-reader focus ring, marks where it was and where it will be, so the
+// region clears the one and redraws the content under the other (#551).
+func (c *Canvas) MarkDirtyRect(pos geo.Position, size geo.Size) {
+	c.leftRegion.Union(padRect(pos, size))
 }
 
 // MarkFullRepaint tells PartialDirtyRegion that the frame being painted is a
