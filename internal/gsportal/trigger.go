@@ -1,9 +1,12 @@
+//go:build (linux || freebsd || openbsd || netbsd) && !android
+
 // Package gsportal is a pure-Go client for the freedesktop
 // org.freedesktop.portal.GlobalShortcuts D-Bus portal — the only way to register
 // system-wide hotkeys under Wayland, where there is no client key-grab API by
 // design. It is consumed by the Linux glfw driver's desktop.GlobalShortcutApp
 // implementation. Kept free of cgo (and of the driver package) so the portal
-// protocol logic compiles and unit-tests on any platform.
+// protocol logic compiles and unit-tests without a C toolchain, on every
+// platform with D-Bus: Linux and the BSDs.
 package gsportal
 
 import (
