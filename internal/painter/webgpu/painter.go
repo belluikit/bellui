@@ -63,6 +63,15 @@ type painter struct {
 	// A rounded clip records it at Start; if it is unchanged at Stop, nothing
 	// but the clip itself wrote the stencil, so the erase leaves it zero.
 	stencilDirties uint64
+	// stamp is the box a rounded clip stamps into the stencil and erases.
+	stamp stencilBox
+
+	// verts and uni are scratch for one draw's vertices and uniform block.
+	// Record copies both into the frame's arena before it returns, so draws
+	// reuse them instead of allocating (#447). A vertex builder's result is
+	// valid only until the next builder runs.
+	verts []float32
+	uni   [uniformBlockStride]byte
 
 	// textures maps cache handles (stored in internal/cache) to GPU textures.
 	textures  map[uint32]*Texture
@@ -394,12 +403,10 @@ func (p *painter) StartRoundedClipping(pos geo.Position, size geo.Size, cornerRa
 	// edge's own anti-aliasing, which is where the eye reads the outline.
 	p.dev.SetStencilRef(1)
 	p.stencilMode = StencilWriteReplace
-	r := canvas.NewRectangle(color.White)
 	inset := float32(edgeSoftness) * 1.5
-	r.Resize(size.Subtract(geo.NewSquareSize(inset * 2)))
-	r.Move(pos.Add(geo.NewSquareOffsetPos(inset)))
-	r.CornerRadius = geo.Max(0, cornerRadius-inset)
-	p.drawRectangle(r, r.Position(), p.canvas.Size())
+	p.stamp = stencilBox{pos: pos.Add(geo.NewSquareOffsetPos(inset)), size: size.Subtract(geo.NewSquareSize(inset * 2))}
+	r := geo.Max(0, cornerRadius-inset)
+	p.drawOblong(&p.stamp, stampFill, nil, 0, r, r, r, r, 0, p.stamp.pos, p.canvas.Size())
 	// Restrict subsequent draws to where the stencil == 1.
 	p.stencilMode = StencilTestEqual
 }
@@ -438,12 +445,24 @@ func (p *painter) fillStencilRect(pos geo.Position, size geo.Size, ref uint32) {
 	prev := p.stencilMode
 	p.dev.SetStencilRef(ref)
 	p.stencilMode = StencilWriteReplace
-	r := canvas.NewRectangle(color.White)
-	r.Resize(size)
-	r.Move(pos)
-	p.drawRectangle(r, pos, p.canvas.Size())
+	p.stamp = stencilBox{pos: pos, size: size}
+	p.drawOblong(&p.stamp, stampFill, nil, 0, 0, 0, 0, 0, 0, pos, p.canvas.Size())
 	p.stencilMode = prev
 }
+
+// stencilBox is a rectangle drawn only into the stencil. It is not a
+// canvas.Rectangle, whose Move and Resize would look up a canvas for it on
+// every clip (#447).
+type stencilBox struct {
+	pos  geo.Position
+	size geo.Size
+}
+
+func (b *stencilBox) Position() geo.Position { return b.pos }
+func (b *stencilBox) Size() geo.Size         { return b.size }
+
+// stampFill is the stencil stamps' colour, converted to an interface once.
+var stampFill color.Color = color.White
 
 // StartPathClipping stencils an arbitrary path's fill (non-zero winding) and
 // restricts subsequent draws to it, mirroring the GL painter.
@@ -498,12 +517,13 @@ func (p *painter) clearStencil() {
 	prev := p.stencilMode
 	p.dev.SetStencilRef(0)
 	p.stencilMode = StencilWriteReplace
-	// Full-target triangle in NDC (covers the whole clip space); vert.xy + alpha.
-	verts := []float32{-1, -1, 1, 3, -1, 1, -1, 3, 1}
 	u := PathUniforms{}
-	p.record("path", verts, 3, uniformBytes(&u), nil)
+	p.record("path", fullTargetTriangle, 3, uniformBytes(&u), nil)
 	p.stencilMode = prev
 }
+
+// fullTargetTriangle covers the whole clip space in NDC; vert.xy + alpha.
+var fullTargetTriangle = []float32{-1, -1, 1, 3, -1, 1, -1, 3, 1}
 
 func (p *painter) SetGroupOpacity(opacity float32) { p.groupOpacity = opacity }
 func (p *painter) ClearGroupOpacity()              { p.groupOpacity = 1 }

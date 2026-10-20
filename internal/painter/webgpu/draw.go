@@ -6,6 +6,7 @@ import (
 	"image"
 	"image/color"
 	"math"
+	"slices"
 	"sync"
 
 	"github.com/belluikit/webgpu/wgpu"
@@ -163,9 +164,16 @@ func (p *painter) invTransformStd140(pos geo.Position, frame geo.Size) [12]float
 	return Mat3ToStd140(inv.ToGL())
 }
 
+// box is what the shape quad builders read of an object: where it is and how
+// big. A stencil stamp is one without being a canvas object.
+type box interface {
+	Position() geo.Position
+	Size() geo.Size
+}
+
 // vecRectCoords returns the SDF rect bounds (x1,y1,x2,y2) and the 4-vertex strip
-// quad (vert+normal interleaved) for a shape object.
-func (p *painter) vecRectCoords(pos geo.Position, rect core.CanvasObject, frame geo.Size, aspect float32) ([4]float32, []float32) {
+// quad (vert+normal interleaved) for a shape object. The quad is p.verts.
+func (p *painter) vecRectCoords(pos geo.Position, rect box, frame geo.Size, aspect float32) ([4]float32, []float32) {
 	xPad, yPad := float32(0), float32(0)
 	if aspect != 0 {
 		inner := rect.Size()
@@ -179,7 +187,7 @@ func (p *painter) vecRectCoords(pos geo.Position, rect core.CanvasObject, frame 
 	return p.vecRectCoordsWithPad(pos, rect, frame, xPad, yPad)
 }
 
-func (p *painter) vecRectCoordsWithPad(pos geo.Position, rect core.CanvasObject, frame geo.Size, xPad, yPad float32) ([4]float32, []float32) {
+func (p *painter) vecRectCoordsWithPad(pos geo.Position, rect box, frame geo.Size, xPad, yPad float32) ([4]float32, []float32) {
 	size := rect.Size()
 	pos1 := rect.Position()
 	xPosDiff := pos.X - pos1.X + xPad
@@ -199,16 +207,17 @@ func (p *painter) vecRectCoordsWithPad(pos geo.Position, rect core.CanvasObject,
 	y2Pos := pos1.Y + size.Height
 	y2Norm := 1 - (y2Pos+edgeSoftnessScaled)*2/frame.Height
 
-	coords := []float32{
+	p.verts = append(
+		p.verts[:0],
 		0, 0, x1Norm, y1Norm,
 		0, 0, x2Norm, y1Norm,
 		0, 0, x1Norm, y2Norm,
 		0, 0, x2Norm, y2Norm,
-	}
-	return [4]float32{x1Pos, y1Pos, x2Pos, y2Pos}, coords
+	)
+	return [4]float32{x1Pos, y1Pos, x2Pos, y2Pos}, p.verts
 }
 
-func (p *painter) vecSquareCoords(pos geo.Position, rect core.CanvasObject, frame geo.Size) ([4]float32, []float32) {
+func (p *painter) vecSquareCoords(pos geo.Position, rect box, frame geo.Size) ([4]float32, []float32) {
 	return p.vecRectCoordsWithPad(pos, rect, frame, 0, 0)
 }
 
@@ -228,18 +237,19 @@ func (p *painter) transformedAABBQuad(pos geo.Position, size geo.Size, frame geo
 	ndcX2 := -1 + (maxX/frame.Width)*2
 	ndcY1 := 1 - (minY/frame.Height)*2
 	ndcY2 := 1 - (maxY/frame.Height)*2
-	coords := []float32{
+	p.verts = append(
+		p.verts[:0],
 		0, 0, ndcX1, ndcY1,
 		0, 0, ndcX2, ndcY1,
 		0, 0, ndcX1, ndcY2,
 		0, 0, ndcX2, ndcY2,
-	}
-	return [4]float32{minX, minY, maxX, maxY}, coords
+	)
+	return [4]float32{minX, minY, maxX, maxY}, p.verts
 }
 
 // shapeQuad returns the SDF bounds and vertex strip for a shape, choosing the
 // transformed AABB quad when a non-trivial transform is active.
-func (p *painter) shapeQuad(o core.CanvasObject, pos geo.Position, frame geo.Size, aspect float32) ([4]float32, []float32) {
+func (p *painter) shapeQuad(o box, pos geo.Position, frame geo.Size, aspect float32) ([4]float32, []float32) {
 	if p.hasTransform() {
 		bounds, _ := p.vecRectCoords(pos, o, frame, aspect)
 		_, pts := p.transformedAABBQuad(pos, o.Size(), frame)
@@ -258,7 +268,7 @@ func (p *painter) drawRectangle(rect *canvas.Rectangle, pos geo.Position, frame 
 	p.drawOblong(rect, rect.FillColor, rect.StrokeColor, rect.StrokeWidth, trR, tlR, brR, blR, rect.Aspect, pos, frame)
 }
 
-func (p *painter) drawOblong(obj core.CanvasObject, fill, stroke color.Color, strokeWidth, trR, tlR, brR, blR, aspect float32, pos geo.Position, frame geo.Size) {
+func (p *painter) drawOblong(obj box, fill, stroke color.Color, strokeWidth, trR, tlR, brR, blR, aspect float32, pos geo.Position, frame geo.Size) {
 	if (fill == color.Transparent || fill == nil) && (stroke == color.Transparent || stroke == nil || strokeWidth == 0) {
 		return
 	}
@@ -469,14 +479,16 @@ func (p *painter) lineCoords(pos, pos1, pos2 geo.Position, lineWidth, feather fl
 	widthMultiplier := float32(math.Sqrt(float64(normalObjX*normalObjX + normalObjY*normalObjY)))
 	halfWidth := (roundToPixel(lineWidth+feather, p.pixScale) * 0.5) / widthMultiplier
 	featherWidth := feather / widthMultiplier
-	return []float32{
+	p.verts = append(
+		p.verts[:0],
 		x1, y1, normalX, normalY,
 		x2, y2, normalX, normalY,
 		x2, y2, -normalX, -normalY,
 		x2, y2, -normalX, -normalY,
 		x1, y1, normalX, normalY,
 		x1, y1, -normalX, -normalY,
-	}, halfWidth, featherWidth
+	)
+	return p.verts, halfWidth, featherWidth
 }
 
 // drawPath renders a canvas.Path: a stencil-based fill (winding / even-odd) and
@@ -540,10 +552,11 @@ func (p *painter) drawPathFillStencil(path *canvas.Path, fanTris []float32, subp
 	c := p.fragColor(path.FillColor)
 	fu := PathUniforms{FillColor: c}
 	minX, minY, maxX, maxY := path.Bounds()
-	bb := p.pathVertsToNDCWithAlpha([]float32{
+	quad := [...]float32{
 		minX, minY, 1, maxX, minY, 1, maxX, maxY, 1,
 		minX, minY, 1, maxX, maxY, 1, minX, maxY, 1,
-	}, pos, frame)
+	}
+	bb := p.pathVertsToNDCWithAlpha(quad[:], pos, frame)
 	p.record("path", bb, len(bb)/3, uniformBytes(&fu), nil)
 
 	// Pass 3: anti-aliased fringe along the fill boundary, no stencil.
@@ -558,9 +571,9 @@ func (p *painter) drawPathFillStencil(path *canvas.Path, fanTris []float32, subp
 // pathFanToNDC maps flat path-local (x, y) pairs (e.g. fan-triangulated fill
 // geometry) to the path shader's NDC (x, y, alpha) triples, with alpha fixed at
 // 1 (the stencil winding pass ignores color, and the bounding-box fill is fully
-// opaque before its own color's alpha).
+// opaque before its own color's alpha). The result is p.verts.
 func (p *painter) pathFanToNDC(fan []float32, pos geo.Position, frame geo.Size) []float32 {
-	out := make([]float32, 0, len(fan)/2*3)
+	out := p.verts[:0]
 	wt := p.anchor(pos)
 	for i := 0; i+1 < len(fan); i += 2 {
 		cx := fan[i] + pos.X
@@ -570,13 +583,16 @@ func (p *painter) pathFanToNDC(fan []float32, pos geo.Position, frame geo.Size) 
 		}
 		out = append(out, -1+cx*2/frame.Width, 1-cy*2/frame.Height, 1)
 	}
+	p.verts = out
 	return out
 }
 
 // pathVertsToNDCWithAlpha maps path-local (x, y, alpha) triples to NDC, keeping
-// alpha as the third component (path vertex layout: vert.xy + alpha).
+// alpha as the third component (path vertex layout: vert.xy + alpha). The
+// result is p.verts, so verts must not be.
 func (p *painter) pathVertsToNDCWithAlpha(verts []float32, pos geo.Position, frame geo.Size) []float32 {
-	out := make([]float32, len(verts))
+	out := slices.Grow(p.verts[:0], len(verts))[:len(verts)]
+	p.verts = out
 	wt := p.anchor(pos)
 	for i := 0; i < len(verts); i += 3 {
 		cx := verts[i] + pos.X
@@ -730,7 +746,7 @@ func (p *painter) drawTexture(o core.CanvasObject, raster func(core.CanvasObject
 // non-trivial world transform it delegates to transformedRectCoords so textured
 // ops (image/text/gradient/raster/StyledText + the Scene3D blit) honor the
 // transform like the GL backend (pre-rebrand tracker #233); the `simple` shader needs no per-fragment
-// inverse — the quad corners carry the transform.
+// inverse — the quad corners carry the transform. The quad is p.verts.
 func (p *painter) rectCoords(size geo.Size, pos geo.Position, frame geo.Size, fill canvas.ImageFill, aspect, pad float32) ([]float32, [4]float32) {
 	if p.hasTransform() {
 		return p.transformedRectCoords(size, pos, frame, fill, aspect, pad)
@@ -744,12 +760,14 @@ func (p *painter) rectCoords(size geo.Size, pos geo.Position, frame geo.Size, fi
 	y2 := 1 - (pos.Y+size.Height+pad)/frame.Height*2
 
 	insets := coverInsets(size, fill, aspect)
-	return []float32{
+	p.verts = append(
+		p.verts[:0],
 		x1, y2, 0, insets[0], insets[3],
 		x1, y1, 0, insets[0], insets[1],
 		x2, y2, 0, insets[2], insets[3],
 		x2, y1, 0, insets[2], insets[1],
-	}, insets
+	)
+	return p.verts, insets
 }
 
 // transformedRectCoords builds the textured quad with the four corners run
@@ -777,12 +795,14 @@ func (p *painter) transformedRectCoords(size geo.Size, pos geo.Position, frame g
 	brNX, brNY := ndc(brX, brY)
 
 	insets := coverInsets(size, fill, aspect)
-	return []float32{
+	p.verts = append(
+		p.verts[:0],
 		tlNX, tlNY, 0, insets[0], insets[3],
 		blNX, blNY, 0, insets[0], insets[1],
 		trNX, trNY, 0, insets[2], insets[3],
 		brNX, brNY, 0, insets[2], insets[1],
-	}, insets
+	)
+	return p.verts, insets
 }
 
 // coverInsets computes the texture-coordinate insets for ImageFillCover (zero
@@ -932,6 +952,10 @@ func (p *painter) recordWithBlend(shader string, verts []float32, vertexCount in
 	if _, ok := DescriptorFor(shader); !ok {
 		return
 	}
+	staged, ok := p.stage(uniform)
+	if !ok {
+		return
+	}
 	_ = p.dev.Record(DrawCall{
 		Key: PipelineKey{
 			Shader:   shader,
@@ -942,9 +966,19 @@ func (p *painter) recordWithBlend(shader string, verts []float32, vertexCount in
 		},
 		Vertices:    verts,
 		VertexCount: vertexCount,
-		Uniform:     uniform,
+		Uniform:     staged,
 		TexView:     texView,
 	})
+}
+
+// stage copies a draw's uniform block into p.uni, so the caller's uniform
+// struct does not escape through Record (#447). It reports false for a block
+// larger than an arena slot, which Record would refuse.
+func (p *painter) stage(uniform []byte) ([]byte, bool) {
+	if len(uniform) > len(p.uni) {
+		return nil, false
+	}
+	return p.uni[:copy(p.uni[:], uniform)], true
 }
 
 func orTransparent(c color.Color) color.Color {
