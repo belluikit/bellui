@@ -356,6 +356,7 @@ func (c *Canvas) SetSelectableMode(mode bellui.SelectableMode) {
 	c.propertyLock.Lock()
 	defer c.propertyLock.Unlock()
 
+	cache.NoteSelectableMode(mode)
 	c.selectableMode = mode
 }
 

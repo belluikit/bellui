@@ -3,6 +3,8 @@ package mobile
 import (
 	"image"
 
+	"github.com/belluikit/bellui/internal/cache"
+
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/core"
@@ -128,6 +130,7 @@ func (c *canvas) SelectableMode() bellui.SelectableMode {
 }
 
 func (c *canvas) SetSelectableMode(mode bellui.SelectableMode) {
+	cache.NoteSelectableMode(mode)
 	c.selectableMode = mode
 }
 

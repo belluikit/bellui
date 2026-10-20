@@ -4,6 +4,8 @@ import (
 	"image"
 	"math"
 
+	"github.com/belluikit/bellui/internal/cache"
+
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/container"
@@ -155,6 +157,7 @@ func (c *glCanvas) SelectableMode() bellui.SelectableMode {
 }
 
 func (c *glCanvas) SetSelectableMode(mode bellui.SelectableMode) {
+	cache.NoteSelectableMode(mode)
 	c.selectableMode = mode
 }
 

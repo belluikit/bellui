@@ -476,6 +476,9 @@ func normalizeFontName(name string) string {
 // isSelectable returns whether this RichText should support text selection,
 // considering both the Selectable property and the window-level SelectableMode.
 func (t *RichText) isSelectable() bool {
+	if !t.Selectable {
+		return false // no window mode makes a non-selectable RichText selectable
+	}
 	c := bellui.CurrentApp().Driver().CanvasForObject(t)
 	if sc, ok := c.(selectableCanvas); ok {
 		switch sc.SelectableMode() {
