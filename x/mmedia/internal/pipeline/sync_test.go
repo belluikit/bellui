@@ -131,9 +131,13 @@ func TestClockSmoothsSteppedAudioPosition(t *testing.T) {
 		if dev < 0 {
 			dev = -dev
 		}
-		allowed := time.Duration(audioMaxSlew*float64(gap)) + prevBracket + bracket
+		// The two clock reads are each somewhere in their bracket, so the time
+		// between them is the gap give or take the brackets, and the clock
+		// slews over all of it.
+		reads := prevBracket + bracket
+		allowed := time.Duration(audioMaxSlew*float64(gap+reads)) + reads
 		if excess := dev - allowed; excess > worst {
-			worst, worstGap, worstBracket = excess, gap, prevBracket+bracket
+			worst, worstGap, worstBracket = excess, gap, reads
 		}
 		prevClock, prevWall, prevBracket = clock, wall, bracket
 	}
