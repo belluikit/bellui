@@ -30,6 +30,8 @@ type MediaPlayer struct {
 	opts     *options
 	loop     bool
 
+	transport transport // orders Play/Pause/Stop/Close against a loop restart (#527)
+
 	// preview is the scrub thumbnail, and its second decoder. nil unless
 	// WithScrubPreview was given and this source can have one.
 	preview *scrubPreview
@@ -177,11 +179,11 @@ func newMediaPlayerFromPipeline(pipe *pipeline.Pipeline, o *options, previewURL 
 			// Not on this goroutine: OnEnd runs on the pipeline's display
 			// goroutine, and Stop waits for it to finish (#502).
 			go func() {
-				mp.pipe.Stop()
-				mp.pipe.Play()
-				bellui.Do(func() {
-					mp.controls.SetPlaying(true)
-				})
+				if mp.transport.restart(mp.pipe) {
+					bellui.Do(func() {
+						mp.controls.SetPlaying(true)
+					})
+				}
 			}()
 			return
 		}
@@ -216,23 +218,25 @@ func newMediaPlayerFromPipeline(pipe *pipeline.Pipeline, o *options, previewURL 
 
 // Play starts media playback.
 func (mp *MediaPlayer) Play() {
-	mp.pipe.Play()
-	mp.controls.SetPlaying(true)
+	mp.transport.play(mp.pipe)
+	bellui.Do(func() { mp.controls.SetPlaying(true) })
 }
 
 // Pause pauses media playback.
 func (mp *MediaPlayer) Pause() {
-	mp.pipe.Pause()
-	mp.controls.SetPlaying(false)
+	mp.transport.pause(mp.pipe)
+	bellui.Do(func() { mp.controls.SetPlaying(false) })
 }
 
 // Stop stops playback and resets to the beginning.
 func (mp *MediaPlayer) Stop() {
-	mp.pipe.Stop()
-	mp.controls.SetPlaying(false)
+	mp.transport.stop(mp.pipe)
 	// Stopping also rewinds the source, so the transport must follow it back
 	// to zero — the pipeline's time updates have stopped by now.
-	mp.controls.Reset()
+	bellui.Do(func() {
+		mp.controls.SetPlaying(false)
+		mp.controls.Reset()
+	})
 }
 
 // Seek seeks to the given position.
@@ -424,7 +428,7 @@ func (mp *MediaPlayer) Close() {
 	if mp.preview != nil {
 		mp.preview.close()
 	}
-	mp.pipe.Close()
+	mp.transport.close(mp.pipe)
 }
 
 // CreateRenderer returns the Bellui widget renderer.

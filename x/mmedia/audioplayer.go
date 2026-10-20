@@ -22,6 +22,8 @@ type AudioPlayer struct {
 	controls *TransportControls
 	opts     *options
 	loop     bool
+
+	transport transport // orders Play/Pause/Stop/Close against a loop restart (#527)
 }
 
 // NewAudioPlayer creates a new audio player widget from an io.Reader.
@@ -83,11 +85,15 @@ func newAudioPlayerFromPipeline(pipe *pipeline.Pipeline, o *options) (*AudioPlay
 			ap.controls.SetPlaying(false)
 		})
 		if ap.loop {
-			ap.pipe.Stop()
-			ap.pipe.Play()
-			bellui.Do(func() {
-				ap.controls.SetPlaying(true)
-			})
+			// Not on this goroutine: OnEnd runs on the pipeline's decode
+			// goroutine, and Stop waits for it to finish (#502, #527).
+			go func() {
+				if ap.transport.restart(ap.pipe) {
+					bellui.Do(func() {
+						ap.controls.SetPlaying(true)
+					})
+				}
+			}()
 			return
 		}
 		if o.onEnd != nil {
@@ -114,23 +120,25 @@ func newAudioPlayerFromPipeline(pipe *pipeline.Pipeline, o *options) (*AudioPlay
 
 // Play starts audio playback.
 func (ap *AudioPlayer) Play() {
-	ap.pipe.Play()
-	ap.controls.SetPlaying(true)
+	ap.transport.play(ap.pipe)
+	bellui.Do(func() { ap.controls.SetPlaying(true) })
 }
 
 // Pause pauses audio playback.
 func (ap *AudioPlayer) Pause() {
-	ap.pipe.Pause()
-	ap.controls.SetPlaying(false)
+	ap.transport.pause(ap.pipe)
+	bellui.Do(func() { ap.controls.SetPlaying(false) })
 }
 
 // Stop stops playback and resets to the beginning.
 func (ap *AudioPlayer) Stop() {
-	ap.pipe.Stop()
-	ap.controls.SetPlaying(false)
+	ap.transport.stop(ap.pipe)
 	// Stopping also rewinds the source, so the transport must follow it back
 	// to zero — the pipeline's time updates have stopped by now.
-	ap.controls.Reset()
+	bellui.Do(func() {
+		ap.controls.SetPlaying(false)
+		ap.controls.Reset()
+	})
 }
 
 // Seek seeks to the given position.
@@ -171,7 +179,7 @@ func (ap *AudioPlayer) SetLoop(loop bool) {
 
 // Close releases all resources.
 func (ap *AudioPlayer) Close() {
-	ap.pipe.Close()
+	ap.transport.close(ap.pipe)
 }
 
 // CreateRenderer returns the Bellui widget renderer.
