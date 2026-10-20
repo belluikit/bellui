@@ -252,7 +252,9 @@ func measure(mark *canvas.Raster, mutate func(int)) error {
 		select {
 		case at = <-painted:
 		case <-time.After(2 * time.Second):
-			return fmt.Errorf("no frame painted within 2s (frame %d)", f)
+			// macOS gives a hidden window no frames at all, so this is
+			// what hiding, covering or minimising it looks like (#445).
+			return fmt.Errorf("no frame painted within 2s (frame %d): the window was probably hidden or the display asleep", f)
 		}
 		if !measuring && at.After(warmEnd) {
 			measuring = true
