@@ -330,6 +330,11 @@ type boundaryEntry struct {
 	origin                 geo.Position // boundary's canvas position
 	size                   geo.Size     // boundary's logical size
 	canvasPixW, canvasPixH int          // for restoring viewport
+
+	// outerClips is the clip stack in force outside a dirty boundary. Its
+	// rects are in the enclosing target's space, so the subtree is rendered
+	// with a stack of its own and these apply to the blit instead (#559).
+	outerClips *internal.ClipStack
 }
 
 // clearCanvasFBO prepares the bound canvas FBO for this frame and returns the
@@ -546,7 +551,13 @@ func (w *glPaintWalk) enterBoundary(node *common.RenderCacheNode, pos geo.Positi
 		}
 
 		// Dirty boundary: create/get FBO, bind it, render subtree into it.
+		// Outer clips are in the enclosing target's space: render the subtree
+		// with a clip stack of its own, and stop the scissor before the bind,
+		// whose clear GL would scissor too (#559).
 		state := w.bp.EnsureBoundaryFBO(obj, pixW, pixH, objSize)
+		outerClips := w.clips
+		w.clips = &internal.ClipStack{}
+		w.c.Painter().StopClipping()
 		w.bp.BindBoundaryFBO(state)
 
 		invWT, ok := node.WorldTransform().Inverse()
@@ -563,6 +574,7 @@ func (w *glPaintWalk) enterBoundary(node *common.RenderCacheNode, pos geo.Positi
 			size:       objSize,
 			canvasPixW: w.canvasPixW,
 			canvasPixH: w.canvasPixH,
+			outerClips: outerClips,
 		})
 	}
 	// Don't paint the boundary widget itself — it's just a container.
@@ -654,6 +666,8 @@ func (w *glPaintWalk) exitBoundary(node *common.RenderCacheNode, pos geo.Positio
 		// Finished rendering subtree into FBO. Unbind and mark clean.
 		w.bp.UnbindBoundaryFBO(entry.canvasPixW, entry.canvasPixH)
 		entry.state.SetDirty(false)
+		w.clips = entry.outerClips
+		w.applyClip()
 	}
 
 	// Blit the boundary's cached FBO texture at its canvas position,
@@ -662,6 +676,16 @@ func (w *glPaintWalk) exitBoundary(node *common.RenderCacheNode, pos geo.Positio
 		w.bp.BlitBoundaryTexture(entry.state, pos, w.size)
 	}
 	return true
+}
+
+// applyClip sets the painter's scissor to the top of the clip stack, or
+// clears it when the stack is empty.
+func (w *glPaintWalk) applyClip() {
+	if top := w.clips.Top(); top != nil {
+		w.c.Painter().StartClipping(top.Rect())
+	} else {
+		w.c.Painter().StopClipping()
+	}
 }
 
 func (w *glPaintWalk) afterDraw(node *common.RenderCacheNode, pos geo.Position) {
@@ -702,11 +726,7 @@ func (w *glPaintWalk) afterDraw(node *common.RenderCacheNode, pos geo.Position) 
 	}
 	if clips.Rect {
 		w.clips.Pop()
-		if top := w.clips.Top(); top != nil {
-			w.c.Painter().StartClipping(top.Rect())
-		} else {
-			w.c.Painter().StopClipping()
-		}
+		w.applyClip()
 	}
 
 	if !culled && build.Mode == bellui.BuildDebug {

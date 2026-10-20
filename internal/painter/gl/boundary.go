@@ -81,7 +81,7 @@ func (p *painter) EnsureBoundaryFBO(obj core.CanvasObject, pixW, pixH int, logic
 // BindBoundaryFBO redirects rendering to the boundary's FBO.
 func (p *painter) BindBoundaryFBO(s gpu.BoundaryFBO) {
 	state := s.(*BoundaryFBOState)
-	p.pushRenderTarget(state.fbo, state.width, state.height)
+	p.pushRenderTarget(state.fbo, state.width, state.height, state.LogicalSize.Height)
 	p.ctx.ClearColor(0, 0, 0, 0)
 	p.ctx.Clear(bitColorBuffer | bitDepthBuffer)
 	p.logError()

@@ -4,8 +4,9 @@ package gl
 
 // pushRenderTarget binds an FBO as the current render target and records it
 // on the target stack so temporary offscreen work can restore it.
-func (p *painter) pushRenderTarget(fbo Framebuffer, w, h int) {
-	p.targetStack = append(p.targetStack, renderTarget{fbo: fbo, w: w, h: h})
+// logicalH is the target's height in canvas units, 0 for the full canvas.
+func (p *painter) pushRenderTarget(fbo Framebuffer, w, h int, logicalH float32) {
+	p.targetStack = append(p.targetStack, renderTarget{fbo: fbo, w: w, h: h, logical: logicalH})
 	p.ctx.BindFramebuffer(glFramebuffer, fbo)
 	p.ctx.Viewport(0, 0, w, h)
 }

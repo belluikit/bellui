@@ -36,12 +36,12 @@ func TestRenderTargetStack(t *testing.T) {
 
 	canvasFBO, boundaryFBO := Framebuffer(7), Framebuffer(9)
 
-	p.pushRenderTarget(canvasFBO, 100, 200)
+	p.pushRenderTarget(canvasFBO, 100, 200, 0)
 	assert.Equal(t, []Framebuffer{canvasFBO}, ctx.binds)
 	assert.Equal(t, [][2]int{{100, 200}}, ctx.viewports)
 
 	// Nested boundary FBO.
-	p.pushRenderTarget(boundaryFBO, 30, 40)
+	p.pushRenderTarget(boundaryFBO, 30, 40, 40)
 	assert.Equal(t, boundaryFBO, ctx.binds[len(ctx.binds)-1])
 
 	// Offscreen work (shadow blur) restores the boundary, not framebuffer 0.
