@@ -15,6 +15,7 @@ import (
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/cache"
 	paint "github.com/belluikit/bellui/internal/painter"
 	"github.com/belluikit/bellui/internal/render"
 	"github.com/belluikit/bellui/theme"
@@ -70,12 +71,18 @@ type placedGlyph struct {
 
 // layoutKey is everything that decides a text's shaped glyphs. Layouts are
 // shared by content, as text textures are: equal texts shape once.
+//
+// The fonts are named by what paint.CachedFontFace chooses them from (the
+// style, the font source and the theme scope) plus the font cache generation,
+// so a cache hit needs no font lookup (#483).
 type layoutKey struct {
-	text  string
-	size  float32
-	scale float32
-	fonts shaping.Fontmap
-	style bellui.TextStyle
+	text   string
+	size   float32
+	scale  float32
+	style  bellui.TextStyle
+	source bellui.Resource
+	scope  string
+	gen    uint64
 }
 
 // textLayout is a text's shaped glyphs.
@@ -248,12 +255,15 @@ func (p *painter) layoutText(text *canvas.Text) *textLayout {
 	if p.batch.layouts == nil {
 		p.batch.layouts = map[layoutKey]*textLayout{}
 	}
-	face := paint.CachedFontFace(text.TextStyle, text.FontSource, text)
-	k := layoutKey{text: text.Text, size: text.TextSize, scale: p.pixScale, fonts: face.Fonts, style: text.TextStyle}
+	k := layoutKey{
+		text: text.Text, size: text.TextSize, scale: p.pixScale, style: text.TextStyle,
+		source: text.FontSource, scope: cache.WidgetScopeID(text), gen: paint.FontCacheGeneration(),
+	}
 	if l := p.batch.layouts[k]; l != nil {
 		l.used = p.frame
 		return l
 	}
+	face := paint.CachedFontFace(text.TextStyle, text.FontSource, text)
 	l := &textLayout{used: p.frame}
 	pixSize := text.TextSize * p.pixScale
 	baseline := paint.ShapeString(face.Fonts, text.Text, text.TextSize, p.pixScale, text.TextStyle, func(run shaping.Output, x float32) {

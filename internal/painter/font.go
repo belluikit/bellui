@@ -229,6 +229,15 @@ func CachedFontFace(style bellui.TextStyle, source bellui.Resource, o core.Canva
 func ClearFontCache() {
 	fontCache.Clear()
 	fontCustomCache.Clear()
+	fontCacheGen.Add(1)
+}
+
+// FontCacheGeneration returns a counter bumped by each ClearFontCache. Between
+// two equal readings, CachedFontFace returns the same fonts for the same text
+// style, font source and theme scope, so a cache of work derived from those
+// fonts can key on the generation instead of looking the fonts up (#483).
+func FontCacheGeneration() uint64 {
+	return fontCacheGen.Load()
 }
 
 // SweepFontCache removes font cache entries that have not been accessed for the given duration.
@@ -1610,6 +1619,7 @@ type cacheID struct {
 var (
 	fontCache       async.Map[cacheID, *FontCacheItem]
 	fontCustomCache async.Map[bellui.Resource, *FontCacheItem] // for custom resources
+	fontCacheGen    atomic.Uint64
 )
 
 type noopLogger struct{}
