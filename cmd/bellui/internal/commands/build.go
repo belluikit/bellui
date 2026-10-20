@@ -24,6 +24,12 @@ const (
 	hardeningCFLAGS        = "-D_FORTIFY_SOURCE=3 -fstack-protector-strong"
 	hardeningLDFLAGSLinux  = "-Wl,-z,relro,-z,now -Wl,--as-needed"
 	hardeningLDFLAGSDarwin = "-Wl,-dead_strip_dylibs"
+
+	// Go's link does not pass -dead_strip to Apple's linker, which then keeps
+	// every function of each native object file it pulls in, used or not.
+	// Stripping them takes ~3 MB, nearly all of it wgpu-native, out of every
+	// macOS and iOS app (#521).
+	deadStripLDFLAGSDarwin = "-Wl,-dead_strip"
 )
 
 // Builder generate the executables.
@@ -316,7 +322,7 @@ func (b *Builder) applyCAndLDFlags(env *[]string, goos string) {
 	case "linux":
 		ldflags = append(ldflags, hardeningLDFLAGSLinux)
 	case "darwin":
-		ldflags = append(ldflags, hardeningLDFLAGSDarwin)
+		ldflags = append(ldflags, hardeningLDFLAGSDarwin, deadStripLDFLAGSDarwin)
 
 		cflags = append(cflags, "-mmacosx-version-min=10.13")
 		ldflags = append(ldflags, "-mmacosx-version-min=10.13")

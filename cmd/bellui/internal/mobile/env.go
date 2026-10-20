@@ -217,6 +217,11 @@ func envInit() (err error) {
 		// through UIKit, so CoreGraphics must be linked directly.
 		ldExtra := " -framework CoreGraphics"
 
+		// Go's link does not pass -dead_strip to Apple's linker, which then
+		// keeps every function of each native object file it pulls in, used
+		// or not: ~3 MB per app, nearly all of it wgpu-native (#521).
+		ldExtra += " -Wl,-dead_strip"
+
 		// The Go darwin runtime / GoVM jit emits a reference to the macOS-only
 		// pthread_jit_write_protect_np (__API_UNAVAILABLE(ios)); the iOS SDK does
 		// not export it, so a device link either fails or — if left undefined —
