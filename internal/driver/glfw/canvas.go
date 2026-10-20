@@ -385,6 +385,7 @@ func (c *glCanvas) clearCanvasFBO(drp gpu.DirtyRegionPainter, size geo.Size) (pa
 	}
 	c.Painter().Clear()
 	drp.MarkCanvasFBOCleared()
+	c.MarkFullRepaint()
 	return false, geo.Position{}, geo.Size{}
 }
 

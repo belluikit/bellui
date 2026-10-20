@@ -55,7 +55,7 @@ func TestPartialDirtyRegion(t *testing.T) {
 	assert.False(t, set, "an unchanged frame should produce no dirty region")
 
 	// Frame 3: refresh only objA -> region covers objA and excludes objB.
-	c.refreshedObjs = map[core.CanvasObject]struct{}{objA: {}}
+	refresh(t, c, objA)
 	pos, sz, set := c.PartialDirtyRegion()
 	require.True(t, set)
 	assert.LessOrEqual(t, pos.X, float32(0))
@@ -74,4 +74,114 @@ func TestPartialDirtyRegion(t *testing.T) {
 	assert.LessOrEqual(t, pos.Y, float32(100), "region should include objB old position")
 	assert.GreaterOrEqual(t, pos.X+sz.Width, float32(140), "region should include objB new position")
 	assert.GreaterOrEqual(t, pos.Y+sz.Height, float32(140), "region should include objB new position")
+}
+
+// refresh does for PartialDirtyRegion what FreeDirtyTextures does for an
+// object taken from the refresh queue.
+func refresh(t *testing.T, c *Canvas, objs ...core.CanvasObject) {
+	t.Helper()
+	for _, o := range objs {
+		node, ok := c.NodeFor(o)
+		require.True(t, ok, "object has no node")
+		c.notePaintRefresh(node)
+	}
+}
+
+func newPartialCanvas(content core.CanvasObject, size geo.Size) *Canvas {
+	c := &Canvas{}
+	c.Initialize(&fakeSizeable{size: size}, func() {})
+	c.SetContentTreeAndFocusMgr(content)
+	return c
+}
+
+// TestPartialDirtyRegion_SkipsWalkWhenRefreshCoversCanvas pins the shortcut
+// that keeps a frame where everything changes as cheap as a full repaint
+// (#496): refreshed objects whose previous bounds cover the canvas make the
+// whole canvas dirty without a walk, and the next frame walks to record the
+// bounds again and repaints fully too, before regions are partial again.
+func TestPartialDirtyRegion_SkipsWalkWhenRefreshCoversCanvas(t *testing.T) {
+	test.NewTempApp(t)
+
+	bg := canvas.NewRectangle(color.White)
+	bg.Resize(geo.NewSize(200, 200))
+	spot := canvas.NewRectangle(color.White)
+	spot.Resize(geo.NewSize(10, 10))
+	spot.Move(geo.NewPos(50, 50))
+	content := container.NewWithoutLayout(bg, spot)
+	content.Resize(geo.NewSize(200, 200))
+	canvasSize := geo.NewSize(200, 200)
+	c := newPartialCanvas(content, canvasSize)
+	c.PartialDirtyRegion() // first frame records the bounds
+
+	// bg covers the canvas: the frame is full, and no walk sees spot move.
+	refresh(t, c, bg)
+	spot.Move(geo.NewPos(60, 60))
+	pos, sz, set := c.PartialDirtyRegion()
+	require.True(t, set)
+	assert.Equal(t, geo.Position{}, pos)
+	assert.Equal(t, canvasSize, sz)
+	node, _ := c.NodeFor(spot)
+	assert.Equal(t, geo.NewPos(50, 50), node.lastPaintPos, "the skipped frame must not walk")
+
+	// spot moving back must not hide behind the stale bounds (50,50): this
+	// frame repaints fully, and records the bounds.
+	spot.Move(geo.NewPos(50, 50))
+	pos, sz, set = c.PartialDirtyRegion()
+	require.True(t, set)
+	assert.Equal(t, geo.Position{}, pos)
+	assert.Equal(t, canvasSize, sz)
+
+	_, _, set = c.PartialDirtyRegion()
+	assert.False(t, set, "with the bounds recorded, an unchanged frame is clean")
+
+	refresh(t, c, spot)
+	_, sz, set = c.PartialDirtyRegion()
+	require.True(t, set)
+	assert.Less(t, sz.Width, float32(50), "a small refresh is partial again")
+}
+
+// TestPartialDirtyRegion_AfterFullRepaint pins that a full repaint the driver
+// did without asking for a region (a cleared canvas texture, a resize) makes
+// the next region the whole canvas: an object that moved during it and back
+// would otherwise match its recorded bounds and keep the pixels it left.
+func TestPartialDirtyRegion_AfterFullRepaint(t *testing.T) {
+	test.NewTempApp(t)
+
+	obj := canvas.NewRectangle(color.White)
+	obj.Resize(geo.NewSize(20, 20))
+	content := container.NewWithoutLayout(obj)
+	content.Resize(geo.NewSize(200, 200))
+	canvasSize := geo.NewSize(200, 200)
+	c := newPartialCanvas(content, canvasSize)
+	c.PartialDirtyRegion()
+
+	obj.Move(geo.NewPos(100, 100))
+	c.MarkFullRepaint() // painted at (100,100) without a region
+	obj.Move(geo.NewPos(0, 0))
+
+	pos, sz, set := c.PartialDirtyRegion()
+	require.True(t, set)
+	assert.Equal(t, geo.Position{}, pos)
+	assert.Equal(t, canvasSize, sz)
+}
+
+// TestPartialDirtyRegion_KeepsWalkGeneration pins that the region walk is not
+// a full walk: one would start a node-map generation every frame, making every
+// node look itself up again (#487), which was most of partial repaint's extra
+// CPU (#496).
+func TestPartialDirtyRegion_KeepsWalkGeneration(t *testing.T) {
+	test.NewTempApp(t)
+
+	obj := canvas.NewRectangle(color.White)
+	obj.Resize(geo.NewSize(20, 20))
+	content := container.NewWithoutLayout(obj)
+	content.Resize(geo.NewSize(200, 200))
+	c := newPartialCanvas(content, geo.NewSize(200, 200))
+
+	gen := c.walkGen
+	c.PartialDirtyRegion()
+	obj.Move(geo.NewPos(10, 10))
+	_, _, set := c.PartialDirtyRegion()
+	assert.True(t, set, "the walk still sees the move")
+	assert.Equal(t, gen, c.walkGen)
 }
