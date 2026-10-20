@@ -8,6 +8,7 @@ import (
 	"image/draw"
 	"math"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -148,7 +149,7 @@ func CachedFontFace(style bellui.TextStyle, source bellui.Resource, o core.Canva
 			}
 			addSymbolsFallbackFaces(faces)
 
-			val = &FontCacheItem{Fonts: faces}
+			val = newFontCacheItem(faces)
 			val.lastAccess.Store(now)
 			fontCustomCache.Store(source, val)
 		} else {
@@ -215,7 +216,7 @@ func CachedFontFace(style bellui.TextStyle, source bellui.Resource, o core.Canva
 			faces = lookupFaces(font1, theme.DefaultTextFont(), emoji, fontscan.SansSerif, style)
 		}
 
-		val = &FontCacheItem{Fonts: faces}
+		val = newFontCacheItem(faces)
 		val.lastAccess.Store(now)
 		fontCache.Store(key, val)
 	} else {
@@ -229,6 +230,7 @@ func CachedFontFace(style bellui.TextStyle, source bellui.Resource, o core.Canva
 func ClearFontCache() {
 	fontCache.Clear()
 	fontCustomCache.Clear()
+	parsedFonts.Clear()
 	fontCacheGen.Add(1)
 }
 
@@ -253,6 +255,28 @@ func SweepFontCache(expiry time.Duration) {
 	fontCustomCache.Range(func(key bellui.Resource, val *FontCacheItem) bool {
 		if val.lastAccess.Load() < cutoff {
 			fontCustomCache.Delete(key)
+		}
+		return true
+	})
+
+	// Keep the parsed fonts the remaining chains were built from, and no others.
+	inUse := make(map[*font.Face]bool)
+	markBuiltFrom := func(val *FontCacheItem) {
+		for _, f := range val.builtFrom {
+			inUse[f] = true
+		}
+	}
+	fontCache.Range(func(_ cacheID, val *FontCacheItem) bool {
+		markBuiltFrom(val)
+		return true
+	})
+	fontCustomCache.Range(func(_ bellui.Resource, val *FontCacheItem) bool {
+		markBuiltFrom(val)
+		return true
+	})
+	parsedFonts.Range(func(key parsedFontKey, f *font.Face) bool {
+		if !inUse[f] {
+			parsedFonts.Delete(key)
 		}
 		return true
 	})
@@ -340,11 +364,37 @@ func drawDecorationLine(dst draw.Image, clr color.Color, y, x0, x1 int, scale fl
 	}
 }
 
+// loadMeasureFont returns the face parsed from a font resource. A font file is
+// parsed once while a cached chain uses it: every text style's chain includes
+// the bundled text and emoji fonts, and the emoji font alone is 4.2 MB (#446).
 func loadMeasureFont(data bellui.Resource) *font.Face {
+	content := data.Content()
+	if len(content) == 0 {
+		return parseMeasureFont(content)
+	}
+	key := parsedFontKey{data: &content[0], size: len(content)}
+	if f, ok := parsedFonts.Load(key); ok {
+		return f
+	}
+	f := parseMeasureFont(content)
+	if f == nil {
+		return nil
+	}
+	f, _ = parsedFonts.LoadOrStore(key, f)
+	return f
+}
+
+// FontParses reports how many font files have been parsed.
+func FontParses() uint64 {
+	return fontParses.Load()
+}
+
+func parseMeasureFont(content []byte) *font.Face {
+	fontParses.Add(1)
 	// Try single font first, then collection (TTC).
-	loaded, err := font.ParseTTF(bytes.NewReader(data.Content()))
+	loaded, err := font.ParseTTF(bytes.NewReader(content))
 	if err != nil {
-		faces, err2 := font.ParseTTC(bytes.NewReader(data.Content()))
+		faces, err2 := font.ParseTTC(bytes.NewReader(content))
 		if err2 != nil || len(faces) == 0 {
 			bellui.LogError("font load error", err)
 			return nil
@@ -1603,6 +1653,21 @@ func assignCluster(carets, caretsBwd []float32, extents [][2]float32, cluster, r
 type FontCacheItem struct {
 	Fonts      shaping.Fontmap
 	lastAccess atomic.Int64 // unix timestamp (seconds) of last access
+
+	// builtFrom holds the faces Fonts started with, which keep their parsed
+	// fonts from being swept. Fonts itself grows as runes resolve.
+	builtFrom []*font.Face
+}
+
+func newFontCacheItem(faces *dynamicFontMap) *FontCacheItem {
+	return &FontCacheItem{Fonts: faces, builtFrom: slices.Clone(faces.faces)}
+}
+
+// parsedFontKey identifies a font file by its content, which resources of the
+// same font share.
+type parsedFontKey struct {
+	data *byte
+	size int
 }
 
 // cacheID is a comparable cache key for font face lookups.
@@ -1620,6 +1685,8 @@ var (
 	fontCache       async.Map[cacheID, *FontCacheItem]
 	fontCustomCache async.Map[bellui.Resource, *FontCacheItem] // for custom resources
 	fontCacheGen    atomic.Uint64
+	parsedFonts     async.Map[parsedFontKey, *font.Face]
+	fontParses      atomic.Uint64
 )
 
 type noopLogger struct{}
