@@ -34,6 +34,10 @@ type SizeableCanvas interface {
 
 // Canvas defines common canvas implementation.
 type Canvas struct {
+	// visiting is the node a walk's cull is asked about, for CullOffClip;
+	// nil outside a cull call. Walks run on the main goroutine.
+	visiting *RenderCacheNode
+
 	OnFocus   func(obj event.Focusable)
 	OnUnfocus func()
 
@@ -510,7 +514,7 @@ func (c *Canvas) PartialDirtyRegion() (pos geo.Position, size geo.Size, set bool
 	// object's visit.
 	var culledObj core.CanvasObject
 	cull := func(obj core.CanvasObject, pos, clipPos geo.Position, clipSize geo.Size) bool {
-		if CullOffClip(obj, pos, clipPos, clipSize) {
+		if c.CullOffClip(obj, pos, clipPos, clipSize) {
 			culledObj = obj
 			return true
 		}
@@ -677,6 +681,7 @@ func (c *Canvas) MarkMinSizeDirty(obj core.CanvasObject) {
 		return
 	}
 	node.minSizeDirty.Store(true)
+	node.cullGen.Store(0)
 	if !node.queued.Swap(true) {
 		c.dirtyMu.Lock()
 		c.dirtyNodes = append(c.dirtyNodes, node)
@@ -1069,7 +1074,14 @@ func (c *Canvas) walkTree(
 	if cull != nil {
 		skip := cull
 		cull = func(obj core.CanvasObject, pos, clipPos geo.Position, clipSize geo.Size) bool {
-			if skip(obj, pos, clipPos, clipSize) {
+			// The node the walk is about to visit, for Canvas.CullOffClip.
+			c.visiting = nil
+			if node != nil && node.obj == obj {
+				c.visiting = node
+			}
+			cut := skip(obj, pos, clipPos, clipSize)
+			c.visiting = nil
+			if cut {
 				culled = obj
 				return true
 			}
@@ -1248,4 +1260,15 @@ func ClampRegionToCanvas(pos geo.Position, sz geo.Size, size geo.Size) (geo.Posi
 		return pos, geo.Size{}
 	}
 	return pos, geo.NewSize(maxX-pos.X, maxY-pos.Y)
+}
+
+// CullOffClip is the package's CullOffClip for a walk's CullFunc. For the
+// object the walk is about to visit it answers from that object's node, which
+// remembers its clip and shadow reach (#599); for any other object it asks the
+// renderer, as CullOffClip does.
+func (c *Canvas) CullOffClip(obj core.CanvasObject, pos, clipPos geo.Position, clipSize geo.Size) bool {
+	if n := c.visiting; n != nil && n.obj == obj {
+		return n.cullOffClip(pos, clipPos, clipSize)
+	}
+	return CullOffClip(obj, pos, clipPos, clipSize)
 }

@@ -881,7 +881,7 @@ func (w *mobileTreeWalker) cull(obj core.CanvasObject, pos, clipPos geo.Position
 	if ab := w.activeBoundary(); ab != nil && ab.wasDirty && w.clips.Top() == nil {
 		return false
 	}
-	return common.CullOffClip(obj, pos, clipPos, clipSize)
+	return w.c.CullOffClip(obj, pos, clipPos, clipSize)
 }
 
 func (w *mobileTreeWalker) insideCleanBoundary() bool {

@@ -102,6 +102,15 @@ type RenderCacheNode struct {
 	// walk can skip looking it up while it is current (#487).
 	canvasReg cache.CanvasRegistration
 
+	// cullGen is the theme-cache generation, plus one, that cullClip and
+	// cullReach were measured at: whether the object owns a clip, and how far
+	// its own shadow reaches. Zero when not measured; a refresh of the object
+	// clears it (MarkMinSizeDirty). They spare CullOffClip three renderer
+	// lookups for every off-screen clip-owner every frame (#599).
+	cullGen   atomic.Uint64
+	cullClip  bool
+	cullReach float32
+
 	// partial-repaint bookkeeping: the world-space bounds this node occupied at
 	// the previous paint, so a move/resize can clear where it left as well as
 	// where it lands. Only maintained when the partialrepaint build tag is set.
