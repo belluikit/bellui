@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSetCanvasForObject(t *testing.T) {
@@ -24,6 +25,34 @@ func TestSetCanvasForObject(t *testing.T) {
 	c = &dummyCanvas{}
 	SetCanvasForObject(obj, c, setup)
 	assert.Equal(t, 2, called)
+}
+
+// TestSetCanvasForObjectMoved pins #448: an object registered to one canvas
+// and walked on another, with the first still open, moves to the second. It
+// used to keep the first, so refreshes went to the window it had left and
+// every walk set it up again.
+func TestSetCanvasForObjectMoved(t *testing.T) {
+	a, b := &dummyCanvas{}, &dummyCanvas{}
+	obj := &dummyWidget{}
+	called := 0
+	setup := func() { called++ }
+
+	regA := RegisterCanvasForObject(obj, a, setup)
+	require.Equal(t, a, GetCanvasForObject(obj))
+
+	regB := RegisterCanvasForObject(obj, b, setup)
+	assert.Equal(t, b, GetCanvasForObject(obj), "maps to the canvas it moved to")
+	assert.Equal(t, 2, called, "set up once for the move")
+	assert.True(t, regB.Current(b))
+	assert.False(t, regA.Current(a), "the replaced registration is not current: a walk holding it registers again")
+
+	RegisterCanvasForObject(obj, b, setup)
+	RegisterCanvasForObject(obj, b, setup)
+	assert.Equal(t, 2, called, "no setup again once registered here")
+
+	RegisterCanvasForObject(obj, a, setup)
+	assert.Equal(t, a, GetCanvasForObject(obj), "moving back moves it back")
+	assert.Equal(t, 3, called)
 }
 
 // TestSetCanvasForObjectRegisteredDoesNotAllocate: the paint walk calls this
