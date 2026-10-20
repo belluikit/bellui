@@ -93,3 +93,8 @@ The renderer also has an OpenGL build; if you touch rendering code, run
   requests do not conflict there.
 - Breaking changes need a deprecation path, or an issue where they were agreed
   first.
+- Data formats Bellui defines are PXF: files it reads or writes, data it
+  stores, messages between its own processes. JSON is only for the edge, where
+  another system defines the format: OAuth and OpenID Connect, web APIs,
+  messages to and from JavaScript. Moving an existing JSON format keeps
+  reading the old one for a while, as preferences did (`app/preferences.go`).
