@@ -15,42 +15,7 @@ import (
 	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
-	"github.com/belluikit/bellui/internal/gpu"
 )
-
-// boundaryStateRecorder keeps one dirty flag per boundary, as the painters
-// do, and records the boundary calls and the capture.
-type boundaryStateRecorder struct {
-	boundaryClipPainter
-	states map[core.CanvasObject]*recordedBoundary
-}
-
-type recordedBoundary struct{ dirty bool }
-
-func (b *recordedBoundary) SetDirty(dirty bool) { b.dirty = dirty }
-
-func (p *boundaryStateRecorder) EnsureBoundaryFBO(obj core.CanvasObject, _, _ int, _ geo.Size) gpu.BoundaryFBO {
-	if s, ok := p.states[obj]; ok {
-		return s
-	}
-	s := &recordedBoundary{dirty: true}
-	p.states[obj] = s
-	return s
-}
-
-func (p *boundaryStateRecorder) MarkBoundaryDirty(obj core.CanvasObject) {
-	if s, ok := p.states[obj]; ok {
-		s.dirty = true
-	}
-}
-
-func (p *boundaryStateRecorder) IsBoundaryClean(obj core.CanvasObject) bool {
-	s, ok := p.states[obj]
-	return ok && !s.dirty
-}
-
-func (p *boundaryStateRecorder) SetFrameBufferScale(float32) {}
-func (p *boundaryStateRecorder) Free(core.CanvasObject)      {}
 
 func (p *boundaryStateRecorder) CaptureBack(core.Canvas) image.Image {
 	p.calls = append(p.calls, "capture")

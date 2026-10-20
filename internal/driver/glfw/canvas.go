@@ -343,10 +343,11 @@ type boundaryEntry struct {
 	obj                    core.CanvasObject
 	state                  gpu.BoundaryFBO
 	wasDirty               bool
-	invWT                  geo.Matrix   // inverse of boundary's worldTransform
-	origin                 geo.Position // boundary's canvas position
-	size                   geo.Size     // boundary's logical size
-	canvasPixW, canvasPixH int          // for restoring viewport
+	invWT                  geo.Matrix           // inverse of boundary's worldTransform
+	origin                 geo.Position         // boundary's texture origin: its canvas position snapped to a device pixel
+	phase                  common.BoundaryPhase // sub-pixel phase the texture is rendered at
+	size                   geo.Size             // boundary's logical size
+	canvasPixW, canvasPixH int                  // for restoring viewport
 
 	// outerClips is the clip stack in force outside a dirty boundary. Its
 	// rects are in the enclosing target's space, so the subtree is rendered
@@ -559,12 +560,11 @@ func (w *glPaintWalk) enterBoundary(node *common.RenderCacheNode, pos geo.Positi
 		return false
 	}
 
-	objSize := obj.Size()
-	pixW := int(float32(scale.ToScreenCoordinate(w.c, objSize.Width)) * w.c.texScale)
-	pixH := int(float32(scale.ToScreenCoordinate(w.c, objSize.Height)) * w.c.texScale)
+	g := common.BoundaryGeometryFor(pos, obj.Size(), w.c.Scale()*w.c.texScale)
+	pixW, pixH, objSize := g.PixW, g.PixH, g.Size
 
 	if pixW > 0 && pixH > 0 {
-		if w.bp.IsBoundaryClean(obj) {
+		if w.bp.IsBoundaryClean(obj) && node.BoundaryRenderedAt(g.Phase) {
 			// Clean boundary: push skip entry, children will be skipped.
 			cleanState := w.bp.EnsureBoundaryFBO(obj, pixW, pixH, objSize)
 
@@ -574,7 +574,7 @@ func (w *glPaintWalk) enterBoundary(node *common.RenderCacheNode, pos geo.Positi
 				obj:      obj,
 				state:    cleanState,
 				wasDirty: false,
-				origin:   pos,
+				origin:   g.Origin,
 				size:     objSize,
 			})
 			return true
@@ -594,13 +594,17 @@ func (w *glPaintWalk) enterBoundary(node *common.RenderCacheNode, pos geo.Positi
 		if !ok {
 			invWT = geo.Identity()
 		}
+		// Content is drawn relative to the snapped origin, which keeps its
+		// sub-pixel offset from the pixel grid.
+		invWT = geo.NewTranslation(pos.X-g.Origin.X, pos.Y-g.Origin.Y).Multiply(invWT)
 
 		w.bStack = append(w.bStack, boundaryEntry{
 			obj:        obj,
 			state:      state,
 			wasDirty:   true,
 			invWT:      invWT,
-			origin:     pos,
+			origin:     g.Origin,
+			phase:      g.Phase,
 			size:       objSize,
 			canvasPixW: w.canvasPixW,
 			canvasPixH: w.canvasPixH,
@@ -697,14 +701,16 @@ func (w *glPaintWalk) exitBoundary(node *common.RenderCacheNode, pos geo.Positio
 		// Finished rendering subtree into FBO. Unbind and mark clean.
 		w.bp.UnbindBoundaryFBO(entry.canvasPixW, entry.canvasPixH)
 		entry.state.SetDirty(false)
+		node.SetBoundaryRenderedAt(entry.phase)
 		w.clips = entry.outerClips
 		w.applyClip()
 	}
 
-	// Blit the boundary's cached FBO texture at its canvas position,
-	// unless doing partial repaint and boundary is outside dirty region.
-	if !w.shouldSkipForDirtyRegion(pos, entry.size) {
-		w.bp.BlitBoundaryTexture(entry.state, pos, w.size)
+	// Blit the boundary's cached FBO texture at its snapped origin, where it
+	// lands pixel for pixel, unless doing partial repaint and the boundary is
+	// outside the dirty region.
+	if !w.shouldSkipForDirtyRegion(entry.origin, entry.size) {
+		w.bp.BlitBoundaryTexture(entry.state, entry.origin, w.size)
 	}
 	return true
 }

@@ -78,7 +78,7 @@ func TestPaint_BoundaryGetsItsOwnClips(t *testing.T) {
 	assert.Equal(t, []string{
 		"clip 10,20 200x100", // the outer scroll
 		"noclip", "bind",     // the boundary starts unclipped
-		"clip 0,0 200x80", // the inner scroll, boundary-local
+		"clip 2,2 200x80", // the inner scroll, boundary-local, past the texture's 2 px margin (#570)
 		"noclip",
 		"unbind", "clip 10,20 200x100", "blit", // the outer clip applies to the blit
 		"noclip",
@@ -136,4 +136,74 @@ func TestPaint_BoundaryRendersContentOffClip(t *testing.T) {
 
 	assert.True(t, p.painted[marker], "content off the outer clip must render into its boundary")
 	assert.False(t, p.painted[hiddenOwner.Objects[0]], "a clip inside the boundary still culls")
+}
+
+// boundaryStateRecorder keeps one dirty flag per boundary, as the painters
+// do, and records the boundary calls and the capture.
+type boundaryStateRecorder struct {
+	boundaryClipPainter
+	states map[core.CanvasObject]*recordedBoundary
+}
+
+type recordedBoundary struct{ dirty bool }
+
+func (b *recordedBoundary) SetDirty(dirty bool) { b.dirty = dirty }
+
+func (p *boundaryStateRecorder) EnsureBoundaryFBO(obj core.CanvasObject, _, _ int, _ geo.Size) gpu.BoundaryFBO {
+	if s, ok := p.states[obj]; ok {
+		return s
+	}
+	s := &recordedBoundary{dirty: true}
+	p.states[obj] = s
+	return s
+}
+
+func (p *boundaryStateRecorder) BlitBoundaryTexture(_ gpu.BoundaryFBO, pos geo.Position, _ geo.Size) {
+	p.calls = append(p.calls, fmt.Sprintf("blit %v,%v", pos.X, pos.Y))
+}
+
+func (p *boundaryStateRecorder) MarkBoundaryDirty(obj core.CanvasObject) {
+	if s, ok := p.states[obj]; ok {
+		s.dirty = true
+	}
+}
+
+func (p *boundaryStateRecorder) IsBoundaryClean(obj core.CanvasObject) bool {
+	s, ok := p.states[obj]
+	return ok && !s.dirty
+}
+
+func (p *boundaryStateRecorder) SetFrameBufferScale(float32) {}
+func (p *boundaryStateRecorder) Free(core.CanvasObject)      {}
+
+// A boundary's texture is rendered at the sub-pixel offset the boundary had,
+// and blitted at its position snapped to a device pixel, so the copy lands
+// pixel for pixel. Moved by whole pixels, it is still right and is only
+// blitted; moved by a fraction, its content sits on another sub-pixel grid
+// and is rendered again, though nothing in it changed (#570).
+func TestPaint_BoundaryRerendersOnSubPixelMove(t *testing.T) {
+	content := canvas.NewRectangle(color.White)
+	content.SetMinSize(geo.NewSize(50, 50))
+	boundary := container.NewRepaintBoundary(content)
+	boundary.Resize(geo.NewSize(50, 50))
+	boundary.Move(geo.NewPos(10, 10))
+
+	c := newCanvas() // 1 device pixel per unit
+	c.SetPadded(false)
+	c.SetContent(container.NewWithoutLayout(boundary))
+	c.Resize(geo.NewSize(200, 200))
+	p := &boundaryStateRecorder{states: map[core.CanvasObject]*recordedBoundary{}}
+	c.SetPainter(p)
+	c.paint(c.Size())
+	assert.Equal(t, []string{"noclip", "bind", "unbind", "noclip", "blit 8,8"}, p.calls, "first render, blitted at the origin less the 2 px margin")
+
+	p.calls = nil
+	boundary.Move(geo.NewPos(13, 10))
+	c.paint(c.Size())
+	assert.Equal(t, []string{"blit 11,8"}, p.calls, "a whole-pixel move reuses the texture")
+
+	p.calls = nil
+	boundary.Move(geo.NewPos(13.5, 10))
+	c.paint(c.Size())
+	assert.Equal(t, []string{"noclip", "bind", "unbind", "noclip", "blit 11,8"}, p.calls, "a sub-pixel move renders it again")
 }
