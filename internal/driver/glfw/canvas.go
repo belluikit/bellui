@@ -462,7 +462,7 @@ func (c *glCanvas) paint(size geo.Size) {
 	}
 	// Clip-owners scrolled out of view are visited without their subtrees
 	// (#464); every walk that must reach all objects still does.
-	c.WalkContentTreesCulled(common.CullOffClip, walk.draw, walk.afterDraw)
+	c.WalkContentTreesCulled(walk.cull, walk.draw, walk.afterDraw)
 	if dirtyClip {
 		c.Painter().StopClipping()
 		clips.Pop()
@@ -504,6 +504,19 @@ type glPaintWalk struct {
 // insideCleanBoundary reports whether we are inside a clean (non-dirty) boundary.
 func (w *glPaintWalk) insideCleanBoundary() bool {
 	return len(w.bStack) > 0 && !w.bStack[len(w.bStack)-1].wasDirty
+}
+
+// cull is the paint walk's driver.CullFunc: common.CullOffClip, except while
+// a boundary renders into its texture with no clip of its own open. The clip
+// then comes from outside the boundary, and its cache must hold the whole
+// subtree: content culled because it was off screen when the boundary
+// rendered stayed missing once scrolled into view (#564). A clip opened
+// inside the boundary still culls, so a scroll in it skips its hidden rows.
+func (w *glPaintWalk) cull(obj core.CanvasObject, pos, clipPos geo.Position, clipSize geo.Size) bool {
+	if ab := w.activeBoundary(); ab != nil && ab.wasDirty && w.clips.Top() == nil {
+		return false
+	}
+	return common.CullOffClip(obj, pos, clipPos, clipSize)
 }
 
 // activeBoundary returns the active boundary entry (topmost dirty boundary), or nil.
