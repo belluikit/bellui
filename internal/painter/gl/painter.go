@@ -63,10 +63,12 @@ type painter struct {
 	canvasFBO *canvasFBOState
 
 	// shadows caches blurred box-shadow textures by what decides their
-	// pixels (#444); frame counts Clear calls, which start a frame, to evict
-	// the entries a frame did not draw.
-	shadows map[shadowKey]*shadowEntry
-	frame   uint64
+	// pixels (#444); frame counts frames (beginFrame), to evict the entries a
+	// frame did not draw. frameOpen says the canvas FBO's bind began the
+	// current frame, so its Clears do not count it again.
+	shadows   map[shadowKey]*shadowEntry
+	frame     uint64
+	frameOpen bool
 
 	// targetStack tracks the active render targets (canvas FBO, nested
 	// boundary FBOs). Temporary offscreen work (shadow blur, Scene3D) must
@@ -81,6 +83,16 @@ type renderTarget struct {
 	fbo     Framebuffer
 	w, h    int     // viewport pixel dimensions
 	logical float32 // logical height, for the scissor's y flip; 0 means the canvas's
+}
+
+// beginFrame counts a frame and frees the cached shadows and boundaries no
+// paint has reached for a while. It runs once per frame, at the canvas FBO's
+// bind: Clear, where it ran before, is skipped by a partial repaint that has
+// nothing to redraw, which then never counted, so eviction stalled (#496).
+func (p *painter) beginFrame() {
+	p.frame++
+	p.evictShadows()
+	p.evictBoundaries()
 }
 
 // blendFunc sets the color blend factors for a draw. The alpha channel always
@@ -182,9 +194,9 @@ func (p *painter) UpdateVertexArray(pState ProgramState, name string, size, stri
 }
 
 func (p *painter) Clear() {
-	p.frame++
-	p.evictShadows()
-	p.evictBoundaries()
+	if !p.frameOpen {
+		p.beginFrame() // no canvas FBO: Clear is the frame's start
+	}
 	if p.shaderInitFailed {
 		p.drawInitFailure()
 		return

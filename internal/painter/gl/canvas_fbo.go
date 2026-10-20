@@ -67,6 +67,8 @@ func (p *painter) BindCanvasFBO() {
 		return
 	}
 	p.targetStack = p.targetStack[:0]
+	p.beginFrame()
+	p.frameOpen = true
 	p.pushRenderTarget(p.canvasFBO.fbo, p.canvasFBO.width, p.canvasFBO.height, 0)
 	p.logError()
 }
@@ -103,15 +105,15 @@ func (p *painter) UnbindAndBlitCanvasFBO(pixW, pixH int) {
 	p.ctx.ActiveTexture(texture0)
 	p.ctx.BindTexture(texture2D, p.canvasFBO.texture)
 	// Opaque copy — no blending. The FBO holds the complete frame, and the
-	// back buffer still contains the frame from two swaps ago. Content is
-	// drawn into the FBO with non-premultiplied blending, which leaves
-	// alpha < 1 along anti-aliased edges; blending here would let the stale
-	// back-buffer frame bleed through at exactly those border pixels
-	// (visible as bright dashes on borders while scrolling).
+	// back buffer still contains the frame from two swaps ago. Blending here
+	// would let that stale frame bleed through wherever the FBO's alpha fell
+	// below 1, which it did along anti-aliased edges until alpha blended as
+	// coverage (#580): bright dashes on borders while scrolling.
 	p.blendFunc(one, 0)
 	p.ctx.DrawArrays(triangleStrip, 0, 4)
 	p.blendFunc(srcAlpha, oneMinusSrcAlpha)
 	p.logError()
+	p.frameOpen = false
 }
 
 // HasCanvasFBO returns true if the canvas FBO is allocated.
