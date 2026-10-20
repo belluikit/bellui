@@ -69,6 +69,15 @@ Requirements:
 - A working GPU / driver at **run time** (Metal, a Vulkan ICD such as a real GPU
   or lavapipe, or D3D12). Building does not require a GPU.
 
+On macOS, Go's link does not ask Apple's linker to drop native code nothing
+calls, so a plain `go build` keeps about 3 MB of unused wgpu-native code.
+`bellui build` and `bellui package` pass `-dead_strip` for you; with plain
+`go build`, add it yourself:
+
+```sh
+go build -ldflags=-extldflags=-Wl,-dead_strip ./...
+```
+
 To build the pure-Go-link GL fallback instead (no wgpu-native), add `-tags gl`:
 
 ```sh

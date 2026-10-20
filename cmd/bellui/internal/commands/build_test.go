@@ -93,6 +93,14 @@ func Test_BuildWasmReleaseVersion(t *testing.T) {
 	wasmBuildTest.verifyExpectation()
 }
 
+// macOS builds pass -dead_strip to Apple's linker, which Go's link leaves out
+// (#521).
+func Test_ApplyCAndLDFlagsDarwinDeadStrips(t *testing.T) {
+	env := []string{}
+	(&Builder{}).applyCAndLDFlags(&env, "darwin")
+	assert.Contains(t, env, "CGO_LDFLAGS="+hardeningLDFLAGSDarwin+" "+deadStripLDFLAGSDarwin+" -mmacosx-version-min=10.13")
+}
+
 func Test_BuildLinuxReleaseVersion(t *testing.T) {
 	relativePath := "." + string(os.PathSeparator) + filepath.Join("cmd", "terminal")
 
