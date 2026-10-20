@@ -3,16 +3,17 @@
 // exercised by the software-painter golden suite, so the optimization can only
 // be measured on a real GPU. This harness builds a deliberately heavy, mostly
 // static scene and then drives one deterministic update workload at a fixed
-// cadence, so the same binary built with and without the partialrepaint tag can
-// be compared apples-to-apples.
+// cadence, so the same binary built with and without the nopartialrepaint tag
+// (partial repaint is on by default on desktop, #496) can be compared
+// apples-to-apples.
 //
 // Measurement is done by the driver's BELLUI_FRAME_DEBUG profiler (internal/driver
 // /glfw/frametime.go), which this harness enables. Run one workload per process
 // so the profiler's shutdown flush reports the whole run as a single sample set:
 //
 //	# build both variants
-//	go build -o /tmp/framebench.full ./cmd/framebench
-//	go build -tags partialrepaint -o /tmp/framebench.partial ./cmd/framebench
+//	go build -tags nopartialrepaint -o /tmp/framebench.full ./cmd/framebench
+//	go build -o /tmp/framebench.partial ./cmd/framebench
 //
 //	# compare the localized-update case (the one partial repaint should win)
 //	/tmp/framebench.full    -workload spot

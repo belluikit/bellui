@@ -174,11 +174,11 @@ jobs:
       - name: WebGPU windowed present + Capture (#329)
         run: ${{ matrix.runner }} go test -run TestWindowedSurfaceCapture -count=1 -timeout 120s ./internal/driver/glfw/
 
-      # The same under partial repaint (#496), whose paint path differs: the
-      # overlay pass once culled to the dirty region, so a shown popup vanished
-      # from every frame that did not change it.
-      - name: WebGPU windowed present + Capture, partialrepaint (#496)
-        run: ${{ matrix.runner }} go test -tags partialrepaint -run TestWindowedSurfaceCapture -count=1 -timeout 120s ./internal/driver/glfw/
+      # The same with partial repaint off (#496). It is on by default on
+      # desktop, so this keeps the full-repaint paint path, which mobile and the
+      # web use, covered too.
+      - name: WebGPU windowed present + Capture, nopartialrepaint (#496)
+        run: ${{ matrix.runner }} go test -tags nopartialrepaint -run TestWindowedSurfaceCapture -count=1 -timeout 120s ./internal/driver/glfw/
 
 
   windows_tests:

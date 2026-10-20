@@ -16,8 +16,8 @@ import (
 
 // partialVerifier checks partial repaint against a full repaint on the real GPU
 // path, which the software-painter golden suite cannot reach (#496). It is
-// enabled by BELLUI_PARTIAL_VERIFY=N in a build with the partialrepaint tag, and
-// is otherwise inert.
+// enabled by BELLUI_PARTIAL_VERIFY=N where partial repaint is on
+// (build.PartialRepaint), and is otherwise inert.
 //
 // Every N painted frames it captures the window as partial repaint left it,
 // makes the next frame a full repaint (Canvas.MarkFullRepaint), captures that,
@@ -57,7 +57,7 @@ func newPartialVerifier() *partialVerifier {
 		return &partialVerifier{}
 	}
 	if !build.PartialRepaint {
-		bellui.LogError("BELLUI_PARTIAL_VERIFY: ignored, this build has no partialrepaint tag", nil)
+		bellui.LogError("BELLUI_PARTIAL_VERIFY: ignored, partial repaint is off (nopartialrepaint, or BELLUI_PARTIAL_REPAINT=0)", nil)
 		return &partialVerifier{}
 	}
 	every, err := strconv.Atoi(v)
