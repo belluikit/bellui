@@ -78,8 +78,9 @@ type painter struct {
 
 // renderTarget is one entry of the painter's render-target stack.
 type renderTarget struct {
-	fbo  Framebuffer
-	w, h int // viewport pixel dimensions
+	fbo     Framebuffer
+	w, h    int     // viewport pixel dimensions
+	logical float32 // logical height, for the scissor's y flip; 0 means the canvas's
 }
 
 type ProgramState struct {
@@ -250,7 +251,7 @@ func (p *painter) SetOutputSize(width, height int) {
 
 func (p *painter) StartClipping(pos geo.Position, size geo.Size) {
 	x := p.textureScale(pos.X)
-	y := p.textureScale(p.canvas.Size().Height - pos.Y - size.Height)
+	y := p.textureScale(p.targetHeight() - pos.Y - size.Height)
 	w := p.textureScale(size.Width)
 	h := p.textureScale(size.Height)
 	p.scissor = [4]int32{int32(x), int32(y), int32(w), int32(h)}
@@ -258,6 +259,17 @@ func (p *painter) StartClipping(pos geo.Position, size geo.Size) {
 	p.ctx.Enable(scissorTest)
 	p.scissorActive = true
 	p.logError()
+}
+
+// targetHeight returns the logical height of the bound render target, which
+// GL's y-up scissor is flipped against. Inside a boundary FBO that is the
+// boundary's height, not the canvas's: the paint walk hands StartClipping
+// boundary-local rects there (#559).
+func (p *painter) targetHeight() float32 {
+	if n := len(p.targetStack); n > 0 && p.targetStack[n-1].logical > 0 {
+		return p.targetStack[n-1].logical
+	}
+	return p.canvas.Size().Height
 }
 
 func (p *painter) StopClipping() {

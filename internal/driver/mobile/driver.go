@@ -793,6 +793,7 @@ type mobileBoundaryEntry struct {
 	origin                 geo.Position
 	size                   geo.Size
 	canvasPixW, canvasPixH int
+	outerClips             *internal.ClipStack // the clips outside a dirty boundary (#559)
 }
 
 // mobileTreeWalker bundles the mutable state shared by the draw/afterDraw
@@ -851,7 +852,13 @@ func (w *mobileTreeWalker) pushBoundary(node *common.RenderCacheNode, pos geo.Po
 			return true
 		}
 
+		// The subtree is rendered in boundary-local space with a clip stack
+		// of its own; the outer clips apply to the blit. The scissor stops
+		// before the bind, whose clear GL would scissor too (#559).
 		state := w.bp.EnsureBoundaryFBO(obj, pixW, pixH, objSize)
+		outerClips := w.clips
+		w.clips = &internal.ClipStack{}
+		w.c.Painter().StopClipping()
 		w.bp.BindBoundaryFBO(state)
 		invWT, ok := node.WorldTransform().Inverse()
 		if !ok {
@@ -861,6 +868,7 @@ func (w *mobileTreeWalker) pushBoundary(node *common.RenderCacheNode, pos geo.Po
 			obj: obj, state: state, wasDirty: true,
 			invWT: invWT, origin: pos, size: objSize,
 			canvasPixW: w.canvasPixW, canvasPixH: w.canvasPixH,
+			outerClips: outerClips,
 		})
 	}
 	return true
@@ -921,6 +929,16 @@ func (w *mobileTreeWalker) draw(node *common.RenderCacheNode, pos geo.Position) 
 	w.c.Painter().Paint(obj, paintPos, paintFrame)
 }
 
+// applyClip sets the painter's scissor to the top of the clip stack, or
+// clears it when the stack is empty.
+func (w *mobileTreeWalker) applyClip() {
+	if top := w.clips.Top(); top != nil {
+		w.c.Painter().StartClipping(top.Rect())
+	} else {
+		w.c.Painter().StopClipping()
+	}
+}
+
 func (w *mobileTreeWalker) afterDraw(node *common.RenderCacheNode, pos geo.Position) {
 	obj := node.Obj()
 
@@ -934,6 +952,8 @@ func (w *mobileTreeWalker) afterDraw(node *common.RenderCacheNode, pos geo.Posit
 		if entry.wasDirty && entry.state != nil {
 			w.bp.UnbindBoundaryFBO(entry.canvasPixW, entry.canvasPixH)
 			entry.state.SetDirty(false)
+			w.clips = entry.outerClips
+			w.applyClip()
 		}
 		if !w.shouldSkipForDirtyRegion(pos, entry.size) {
 			w.bp.BlitBoundaryTexture(entry.state, pos, w.size)
@@ -957,11 +977,8 @@ func (w *mobileTreeWalker) afterDraw(node *common.RenderCacheNode, pos geo.Posit
 		w.c.Painter().StopPathClipping()
 	}
 	if clips.Rect {
-		w.c.Painter().StopClipping()
 		w.clips.Pop()
-		if top := w.clips.Top(); top != nil {
-			w.c.Painter().StartClipping(top.Rect())
-		}
+		w.applyClip()
 	}
 
 	if !culled && build.Mode == bellui.BuildDebug {

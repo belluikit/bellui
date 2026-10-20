@@ -67,7 +67,7 @@ func (p *painter) BindCanvasFBO() {
 		return
 	}
 	p.targetStack = p.targetStack[:0]
-	p.pushRenderTarget(p.canvasFBO.fbo, p.canvasFBO.width, p.canvasFBO.height)
+	p.pushRenderTarget(p.canvasFBO.fbo, p.canvasFBO.width, p.canvasFBO.height, 0)
 	p.logError()
 }
 
