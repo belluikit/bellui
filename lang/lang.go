@@ -40,8 +40,12 @@ var (
 	bundle     *i18n.Bundle
 	localizer  *i18n.Localizer
 	currentTag language.Tag // resolved language tag for formatting functions
-	tagMu      sync.RWMutex
-	setupOnce  sync.Once
+	// currentTagRTL is isRTLTag(currentTag), kept in step by setCurrentTag:
+	// working it out reads the tag's script, which was most of the
+	// right-to-left check every label row makes when it lays out (#492).
+	currentTagRTL bool
+	tagMu         sync.RWMutex
+	setupOnce     sync.Once
 
 	// localeOverride records that an explicit locale override is active —
 	// [SetLocale] with a non-empty locale, or [SetLocaleForTests]. While set,
@@ -328,6 +332,7 @@ func setCurrentTag(tag language.Tag) {
 	tagMu.Lock()
 	defer tagMu.Unlock()
 	currentTag = tag
+	currentTagRTL = isRTLTag(tag)
 }
 
 // localize runs a translation under the read lock. tagMu guards both the
