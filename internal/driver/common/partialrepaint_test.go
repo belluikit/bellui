@@ -298,3 +298,26 @@ func TestPartialDirtyRegion_LeftTree(t *testing.T) {
 		})
 	}
 }
+
+// TestPartialDirtyRegion_MarkDirtyRect pins that a rect a driver marks dirty,
+// for something it paints that no canvas object stands for, joins the next
+// region and only that one (#551).
+func TestPartialDirtyRegion_MarkDirtyRect(t *testing.T) {
+	test.NewTempApp(t)
+
+	content := container.NewWithoutLayout(canvas.NewRectangle(color.White))
+	content.Resize(geo.NewSize(400, 400))
+	c := newPartialCanvas(content, geo.NewSize(400, 400))
+	c.PartialDirtyRegion()
+
+	c.MarkDirtyRect(geo.NewPos(100, 120), geo.NewSize(30, 20))
+	pos, sz, set := c.PartialDirtyRegion()
+	require.True(t, set)
+	assert.LessOrEqual(t, pos.X, float32(100))
+	assert.LessOrEqual(t, pos.Y, float32(120))
+	assert.GreaterOrEqual(t, pos.X+sz.Width, float32(130))
+	assert.GreaterOrEqual(t, pos.Y+sz.Height, float32(140))
+
+	_, _, set = c.PartialDirtyRegion()
+	assert.False(t, set, "and only once")
+}
