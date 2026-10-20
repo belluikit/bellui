@@ -123,6 +123,14 @@ func TestPartialDirtyRegion_SkipsWalkWhenRefreshCoversCanvas(t *testing.T) {
 	node, _ := c.NodeFor(spot)
 	assert.Equal(t, geo.NewPos(50, 50), node.lastPaintPos, "the skipped frame must not walk")
 
+	// Everything changing frame after frame keeps skipping.
+	refresh(t, c, bg)
+	spot.Move(geo.NewPos(70, 70))
+	_, sz, set = c.PartialDirtyRegion()
+	require.True(t, set)
+	assert.Equal(t, canvasSize, sz)
+	assert.Equal(t, geo.NewPos(50, 50), node.lastPaintPos, "a second skipped frame must not walk")
+
 	// spot moving back must not hide behind the stale bounds (50,50): this
 	// frame repaints fully, and records the bounds.
 	spot.Move(geo.NewPos(50, 50))
@@ -229,3 +237,4 @@ func TestPartialDirtyRegion_CulledClipOwner(t *testing.T) {
 	assert.GreaterOrEqual(t, pos.X+sz.Width, float32(80), "region should include the child's new bounds")
 	assert.True(t, childNode.lastPaintSet)
 }
+

@@ -481,9 +481,9 @@ func padRect(pos geo.Position, size geo.Size) (geo.Position, geo.Size) {
 //
 // When the refreshed objects' previous bounds alone cover most of the canvas,
 // the region would too, so it returns the whole canvas without walking; the
-// next call then walks to record the bounds again, and also returns the whole
-// canvas (#496). So does the call after a full repaint the caller did without
-// asking for a region (MarkFullRepaint).
+// first later call that cannot skip walks to record the bounds again, and also
+// returns the whole canvas (#496). So does the call after a full repaint the
+// caller did without asking for a region (MarkFullRepaint).
 //
 // Only meaningful under the partialrepaint build tag; the per-node bookkeeping
 // it relies on is otherwise never populated.
@@ -491,7 +491,9 @@ func (c *Canvas) PartialDirtyRegion() (pos geo.Position, size geo.Size, set bool
 	canvasSize := c.impl.Size()
 	was := c.refreshedWas
 	c.refreshedWas.Reset()
-	if !c.paintBoundsStale && was.set && RegionCoversCanvas(clampRect(was, canvasSize), canvasSize) {
+	// Stale bounds make the frame full anyway, and when they are stale, was
+	// may be too, so it only decides whether the frame walks.
+	if was.set && RegionCoversCanvas(clampRect(was, canvasSize), canvasSize) {
 		c.paintBoundsStale = true
 		return geo.Position{}, canvasSize, true
 	}
