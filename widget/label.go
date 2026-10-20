@@ -235,6 +235,9 @@ func (l *Label) SelectedText() string {
 // isSelectable returns whether this label should currently be selectable,
 // considering both the widget's own Selectable property and the window-level SelectableMode.
 func (l *Label) isSelectable() bool {
+	if !cache.SelectableModeSet() {
+		return l.Selectable // every canvas is in the default, per-widget mode
+	}
 	c := bellui.CurrentApp().Driver().CanvasForObject(l)
 	if sc, ok := c.(selectableCanvas); ok {
 		switch sc.SelectableMode() {

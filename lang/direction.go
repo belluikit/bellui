@@ -38,11 +38,13 @@ func IsRTL() bool {
 	// back to the system locale on that cold-start branch, mirroring
 	// [CurrentLocale]; the common (initialised) path stays a single tag read so
 	// the layout, alignment and shaping hot paths are unaffected.
-	tag := getCurrentTag()
+	tagMu.RLock()
+	tag, rtl := currentTag, currentTagRTL
+	tagMu.RUnlock()
 	if tag == (language.Tag{}) {
 		return IsRTLLocale(SystemLocale())
 	}
-	return isRTLTag(tag)
+	return rtl
 }
 
 // IsRTLLocale reports whether the given locale uses a right-to-left script.

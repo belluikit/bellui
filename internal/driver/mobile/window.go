@@ -81,7 +81,7 @@ func (w *window) SelectableMode() bellui.SelectableMode {
 }
 
 func (w *window) SetSelectableMode(mode bellui.SelectableMode) {
-	w.canvas.selectableMode = mode
+	w.canvas.SetSelectableMode(mode)
 }
 
 func (w *window) Icon() bellui.Resource {
