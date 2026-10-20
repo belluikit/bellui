@@ -230,11 +230,9 @@ func (p *painter) blurTexture(src *wgpu.TextureView, w, h int, radius float32) *
 // stencil (it must ignore any enclosing clip). The quad maps NDC top to texcoord
 // v=0 so the top-down render-to-texture stays consistent across the ping-pong.
 func (p *painter) recordBlur(view *wgpu.TextureView, uniform []byte, fragment string) {
-	points := []float32{
-		-1, -1, 0, 0, 1,
-		-1, 1, 0, 0, 0,
-		1, -1, 0, 1, 1,
-		1, 1, 0, 1, 0,
+	staged, ok := p.stage(uniform)
+	if !ok {
+		return
 	}
 	_ = p.dev.Record(DrawCall{
 		Key: PipelineKey{
@@ -244,9 +242,9 @@ func (p *painter) recordBlur(view *wgpu.TextureView, uniform []byte, fragment st
 			Stencil:  StencilNone,
 			Format:   p.dev.Format(),
 		},
-		Vertices:    points,
+		Vertices:    fullScreenTexQuad,
 		VertexCount: 4,
-		Uniform:     uniform,
+		Uniform:     staged,
 		TexView:     view,
 	})
 }

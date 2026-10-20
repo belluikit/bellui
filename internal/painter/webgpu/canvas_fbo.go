@@ -85,17 +85,19 @@ func (p *painter) BindCanvasFBO() {
 // region so the rest of the retained FBO is preserved.
 func (p *painter) clearActiveToBackground() {
 	bg := backgroundColor()
-	// Full-screen quad in NDC (path layout: vert.xy + coverage alpha = 1).
-	verts := []float32{
-		-1, -1, 1,
-		1, -1, 1,
-		-1, 1, 1,
-		1, -1, 1,
-		1, 1, 1,
-		-1, 1, 1,
-	}
 	u := PathUniforms{FillColor: bg}
-	p.recordWithBlend("path", verts, 6, uniformBytes(&u), nil, BlendReplace)
+	p.recordWithBlend("path", fullScreenPathQuad, 6, uniformBytes(&u), nil, BlendReplace)
+}
+
+// fullScreenPathQuad is a full-screen quad in NDC (path layout: vert.xy +
+// coverage alpha = 1).
+var fullScreenPathQuad = []float32{
+	-1, -1, 1,
+	1, -1, 1,
+	-1, 1, 1,
+	1, -1, 1,
+	1, 1, 1,
+	-1, 1, 1,
 }
 
 // UnbindAndBlitCanvasFBO pops back to the surface and blits the canvas FBO over
@@ -115,15 +117,18 @@ func (p *painter) UnbindAndBlitCanvasFBO(pixW, pixH int) {
 // simple shader (full opacity, no corner radius). No V-flip: render-to-texture is
 // top-down, matching the surface origin.
 func (p *painter) blitFullScreen(view *wgpu.TextureView, blend BlendMode) {
-	points := []float32{
-		// x,  y, z, u, v   (NDC top = v 0, since the texture is top-down)
-		-1, -1, 0, 0, 1,
-		-1, 1, 0, 0, 0,
-		1, -1, 0, 1, 1,
-		1, 1, 0, 1, 0,
-	}
 	u := SimpleUniforms{Alpha: 1, Inset: [4]float32{0, 0, 1, 1}}
-	p.recordWithBlend("simple", points, 4, uniformBytes(&u), view, blend)
+	p.recordWithBlend("simple", fullScreenTexQuad, 4, uniformBytes(&u), view, blend)
+}
+
+// fullScreenTexQuad is a full-screen textured quad. NDC top maps to v 0, since
+// render-to-texture is top-down.
+var fullScreenTexQuad = []float32{
+	// x,  y, z, u, v
+	-1, -1, 0, 0, 1,
+	-1, 1, 0, 0, 0,
+	1, -1, 0, 1, 1,
+	1, 1, 0, 1, 0,
 }
 
 // HasCanvasFBO reports whether the persistent canvas FBO is allocated.

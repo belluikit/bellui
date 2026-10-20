@@ -1,5 +1,7 @@
 package webgpu
 
+import "slices"
+
 // Per-frame vertex/uniform arena bookkeeping (pre-rebrand tracker #255).
 //
 // The slot pool (pre-rebrand tracker #245) reuses a vertex buffer, a uniform buffer and a bind group
@@ -49,10 +51,10 @@ func (a *arena) addVertices(v []byte) int {
 // offset (a multiple of the stride). u must be no larger than uniformBlockStride.
 func (a *arena) addUniform(u []byte) int {
 	off := len(a.uni)
-	a.uni = append(a.uni, u...)
-	if pad := uniformBlockStride - len(u); pad > 0 {
-		a.uni = append(a.uni, make([]byte, pad)...)
-	}
+	// Grown and cleared rather than appended from make([]byte, pad), which
+	// allocates the padding on every call in a -race build (#447).
+	a.uni = slices.Grow(a.uni, uniformBlockStride)[:off+uniformBlockStride]
+	clear(a.uni[off+copy(a.uni[off:], u):])
 	return off
 }
 
