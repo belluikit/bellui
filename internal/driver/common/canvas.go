@@ -499,7 +499,31 @@ func (c *Canvas) PartialDirtyRegion() (pos geo.Position, size geo.Size, set bool
 	c.paintBoundsStale = false
 
 	var region dirtyRect
+	// The walk culls what the paint walk culls, so a clip-owner off its clip
+	// is visited without the children it would not draw (#464); culledObj is
+	// the object cull last skipped the children of. Cull runs just before the
+	// object's visit.
+	var culledObj core.CanvasObject
+	cull := func(obj core.CanvasObject, pos, clipPos geo.Position, clipSize geo.Size) bool {
+		if CullOffClip(obj, pos, clipPos, clipSize) {
+			culledObj = obj
+			return true
+		}
+		return false
+	}
 	record := func(node *RenderCacheNode, _ geo.Position) {
+		if culledObj == node.obj {
+			culledObj = nil
+			if !node.childrenCulled {
+				// What the children drew until now is no longer drawn: clear
+				// it, and forget it, so they count as new when drawn again.
+				node.childrenCulled = true
+				forgetPaintBounds(node, &region, !stale)
+			}
+		} else {
+			node.childrenCulled = false
+		}
+
 		s := node.obj.Size()
 		minX, minY, maxX, maxY := node.worldTransform.AABB(s.Width, s.Height)
 		newPos := geo.NewPos(minX, minY)
@@ -515,7 +539,7 @@ func (c *Canvas) PartialDirtyRegion() (pos geo.Position, size geo.Size, set bool
 				region.Union(padRect(node.lastPaintPos, node.lastPaintSize)) // where it was
 			}
 		}
-		if !stale && isRefreshed {
+		if !stale && isRefreshed && !node.childrenCulled {
 			// A content refresh can repaint descendants that overflow this node's
 			// own bounds (shadows, focus rings, selection); cover the subtree.
 			c.unionSubtreeBounds(node, &region)
@@ -528,7 +552,7 @@ func (c *Canvas) PartialDirtyRegion() (pos geo.Position, size geo.Size, set bool
 	// Not WalkTrees: a full walk starts a node-map generation, which makes
 	// every node look itself up again (#487), and sweeps the map and rebuilds
 	// the spatial index, which the full walks and the paint walk already do.
-	c.walkContentTrees(nil, nil, record, nil)
+	c.walkContentTrees(cull, nil, record, nil)
 	for _, tree := range c.overlays.renderCaches {
 		if tree != nil {
 			c.walkTree(tree, nil, nil, record, nil)
@@ -547,6 +571,18 @@ func (c *Canvas) notePaintRefresh(node *RenderCacheNode) {
 	node.paintRefreshed = true
 	if node.lastPaintSet {
 		c.refreshedWas.Union(node.lastPaintPos, node.lastPaintSize)
+	}
+}
+
+// forgetPaintBounds forgets the bounds every descendant of node was painted
+// at, first adding them to region if union is set.
+func forgetPaintBounds(node *RenderCacheNode, region *dirtyRect, union bool) {
+	for child := node.firstChild; child != nil; child = child.nextSibling {
+		if child.lastPaintSet && union {
+			region.Union(padRect(child.lastPaintPos, child.lastPaintSize))
+		}
+		child.lastPaintSet = false
+		forgetPaintBounds(child, region, union)
 	}
 }
 

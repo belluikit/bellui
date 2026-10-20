@@ -185,3 +185,47 @@ func TestPartialDirtyRegion_KeepsWalkGeneration(t *testing.T) {
 	assert.True(t, set, "the walk still sees the move")
 	assert.Equal(t, gen, c.walkGen)
 }
+
+// TestPartialDirtyRegion_CulledClipOwner pins that the walk culls what the
+// paint walk culls (#496) and still clears what a culled subtree drew: the
+// children of a clip-owner that leaves its clip may draw outside it (shadows
+// with the stencil off), so their last bounds join the region and are
+// forgotten, and when the clip-owner comes back they count as new.
+func TestPartialDirtyRegion_CulledClipOwner(t *testing.T) {
+	test.NewTempApp(t)
+
+	// Overflows the clip-owner by 10 on each side, as a shadow would.
+	child := canvas.NewRectangle(color.White)
+	child.Resize(geo.NewSize(50, 50))
+	child.Move(geo.NewPos(-10, -10))
+	owner := container.NewWithoutLayout(child)
+	owner.ClipToBounds = true
+	owner.Resize(geo.NewSize(30, 30))
+	owner.Move(geo.NewPos(40, 40))
+	clip := container.NewWithoutLayout(owner)
+	clip.ClipToBounds = true
+	clip.Resize(geo.NewSize(200, 200))
+	content := container.NewWithoutLayout(clip)
+	content.Resize(geo.NewSize(400, 400))
+	c := newPartialCanvas(content, geo.NewSize(400, 400))
+	c.PartialDirtyRegion()
+
+	owner.Move(geo.NewPos(300, 300)) // off clip, beyond cullMargin
+	pos, sz, set := c.PartialDirtyRegion()
+	require.True(t, set)
+	assert.LessOrEqual(t, pos.X, float32(30), "region should include the child's last bounds")
+	assert.LessOrEqual(t, pos.Y, float32(30), "region should include the child's last bounds")
+	childNode, ok := c.NodeFor(child)
+	require.True(t, ok)
+	assert.False(t, childNode.lastPaintSet, "a culled child is not walked, and its bounds are forgotten")
+
+	_, _, set = c.PartialDirtyRegion()
+	assert.False(t, set, "a subtree that stays culled is clean")
+
+	owner.Move(geo.NewPos(40, 40))
+	pos, sz, set = c.PartialDirtyRegion()
+	require.True(t, set)
+	assert.LessOrEqual(t, pos.X, float32(30), "region should include the child's new bounds")
+	assert.GreaterOrEqual(t, pos.X+sz.Width, float32(80), "region should include the child's new bounds")
+	assert.True(t, childNode.lastPaintSet)
+}
