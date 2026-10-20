@@ -92,6 +92,9 @@ type Canvas struct {
 	// them. The next PartialDirtyRegion must then repaint fully, and walk to
 	// record them again.
 	paintBoundsStale bool
+	// leftRegion is where the nodes that left the render tree since the last
+	// PartialDirtyRegion were painted (forgetNodes).
+	leftRegion dirtyRect
 
 	// spatialIdx provides O(1) broadphase hit testing. Built during
 	// WalkTrees and read during mouse/touch event processing.
@@ -495,6 +498,7 @@ func (c *Canvas) PartialDirtyRegion() (pos geo.Position, size geo.Size, set bool
 	// may be too, so it only decides whether the frame walks.
 	if was.set && RegionCoversCanvas(clampRect(was, canvasSize), canvasSize) {
 		c.paintBoundsStale = true
+		c.leftRegion.Reset()
 		return geo.Position{}, canvasSize, true
 	}
 	stale := c.paintBoundsStale
@@ -559,7 +563,12 @@ func (c *Canvas) PartialDirtyRegion() (pos geo.Position, size geo.Size, set bool
 	}
 
 	if stale {
+		c.leftRegion.Reset()
 		return geo.Position{}, canvasSize, true
+	}
+	if c.leftRegion.set {
+		region.Union(c.leftRegion.pos, c.leftRegion.size)
+		c.leftRegion.Reset()
 	}
 	return region.pos, region.size, region.set
 }
@@ -1155,10 +1164,16 @@ func (c *Canvas) walkTree(
 // that visits only changed paths does not sweep the map, so without this an
 // object removed from a container would stay reachable until the next full
 // walk (#380, #487). An object that already has a new node keeps it.
+//
+// Under partial repaint, what the nodes were painted as joins the next dirty
+// region (leftRegion): a hidden or removed object's pixels must be cleared.
 func (c *Canvas) forgetNodes(n *RenderCacheNode) {
 	for ; n != nil; n = n.nextSibling {
 		if cur, ok := c.nodeMap.Load(n.obj); ok && cur == n {
 			c.nodeMap.Delete(n.obj)
+		}
+		if build.PartialRepaint && n.lastPaintSet {
+			c.leftRegion.Union(padRect(n.lastPaintPos, n.lastPaintSize))
 		}
 		c.forgetNodes(n.firstChild)
 	}

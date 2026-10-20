@@ -9,11 +9,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/test"
+	"github.com/belluikit/bellui/widget"
 )
 
 // fakeSizeable is a minimal SizeableCanvas: PartialDirtyRegion only needs
@@ -260,4 +262,39 @@ func TestPartialDirtyRegion_BoxShadowReach(t *testing.T) {
 	assert.LessOrEqual(t, pos.Y, float32(44), "region should include the old blur, offset")
 	assert.GreaterOrEqual(t, pos.X+sz.Width, float32(230), "region should include the new blur")
 	assert.GreaterOrEqual(t, pos.Y+sz.Height, float32(234), "region should include the new blur, offset")
+}
+
+// TestPartialDirtyRegion_LeftTree pins that an object leaving the render tree,
+// hidden or removed, leaves its pixels in the region: no walk visits it any
+// more, so nothing else would clear them.
+func TestPartialDirtyRegion_LeftTree(t *testing.T) {
+	test.NewTempApp(t)
+
+	for name, leave := range map[string]func(c *bellui.Container, o core.CanvasObject){
+		"hidden":  func(_ *bellui.Container, o core.CanvasObject) { o.Hide() },
+		"removed": func(c *bellui.Container, o core.CanvasObject) { c.Remove(o) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			first := canvas.NewRectangle(color.White)
+			first.Resize(geo.NewSize(20, 20))
+			label := widget.NewLabel("gone")
+			label.Resize(geo.NewSize(80, 30))
+			label.Move(geo.NewPos(200, 200))
+			content := container.NewWithoutLayout(first, label)
+			content.Resize(geo.NewSize(400, 400))
+			c := newPartialCanvas(content, geo.NewSize(400, 400))
+			c.PartialDirtyRegion()
+
+			leave(content, label)
+			pos, sz, set := c.PartialDirtyRegion()
+			require.True(t, set, "the object's pixels must be cleared")
+			assert.LessOrEqual(t, pos.X, float32(200))
+			assert.LessOrEqual(t, pos.Y, float32(200))
+			assert.GreaterOrEqual(t, pos.X+sz.Width, float32(280))
+			assert.GreaterOrEqual(t, pos.Y+sz.Height, float32(230))
+
+			_, _, set = c.PartialDirtyRegion()
+			assert.False(t, set, "and only once")
+		})
+	}
 }
