@@ -1,6 +1,7 @@
 package common
 
 import (
+	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
@@ -10,7 +11,7 @@ import (
 // PaintExtent returns the box obj's painters draw in, relative to its
 // position: its bounds, grown to what the painters draw past them. A text is
 // drawn at its MinSize whatever its own size, so one positioned but never
-// resized still draws its glyphs (#602); a stroke, an italic lean or a path
+// resized still draws its glyphs (#602), on the side its alignment puts them; a stroke, an italic lean or a path
 // reaching outside its size overflows by the painters' VectorPad; a box
 // shadow's blur spreads around its offset box.
 //
@@ -28,9 +29,9 @@ func PaintExtent(obj core.CanvasObject) (geo.Position, geo.Size) {
 		}
 		return off, s
 	case *canvas.Text:
-		s = grownTo(s, o.MinSize())
+		off, s = textExtent(s, o.MinSize(), o.Alignment)
 	case *canvas.StyledText:
-		s = grownTo(s, o.MinSize())
+		off, s = textExtent(s, o.MinSize(), o.Alignment)
 	case *canvas.TextOnPath:
 		if s.IsZero() {
 			s = o.MinSize()
@@ -45,6 +46,20 @@ func PaintExtent(obj core.CanvasObject) (geo.Position, geo.Size) {
 	return off, s
 }
 
-func grownTo(s, to geo.Size) geo.Size {
-	return geo.NewSize(max(s.Width, to.Width), max(s.Height, to.Height))
+// textExtent returns where the painters draw a text of the given MinSize in
+// a box of size s. A text wider than its box is placed by its alignment, so a
+// centred one overflows both sides and a trailing one the leading side. A
+// leading or trailing alignment flips under a right-to-left DirectionScope,
+// which the dirty-region walk does not track, so for those the extent covers
+// the overflow on both sides.
+func textExtent(s, min geo.Size, align bellui.TextAlign) (geo.Position, geo.Size) {
+	h := max(s.Height, min.Height)
+	over := min.Width - s.Width
+	if over <= 0 {
+		return geo.Position{}, geo.NewSize(s.Width, h)
+	}
+	if align == bellui.TextAlignCenter {
+		return geo.NewPos(-over/2, 0), geo.NewSize(min.Width, h)
+	}
+	return geo.NewPos(-over, 0), geo.NewSize(s.Width+2*over, h)
 }
