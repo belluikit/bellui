@@ -250,3 +250,33 @@ func (o *overlayStack) Remove(overlay core.CanvasObject) {
 
 	o.renderCaches = o.renderCaches[:overlayCount]
 }
+
+// nodeQueue holds nodes queued from any goroutine for the main thread to
+// drain, each node once until drained: the flag add is given says it is
+// queued, and whoever takes the node clears it.
+type nodeQueue struct {
+	mu    sync.Mutex
+	nodes []*RenderCacheNode
+	taken []*RenderCacheNode // the buffer take returned last, reused
+}
+
+// add queues node unless queued says it already is.
+func (q *nodeQueue) add(node *RenderCacheNode, queued *atomic.Bool) {
+	if queued.Swap(true) {
+		return
+	}
+	q.mu.Lock()
+	q.nodes = append(q.nodes, node)
+	q.mu.Unlock()
+}
+
+// take returns the nodes queued since it was last called. The next take hands
+// the slice back to add, so the caller is done with it by then.
+func (q *nodeQueue) take() []*RenderCacheNode {
+	q.mu.Lock()
+	taken := q.nodes
+	q.nodes = q.taken[:0]
+	q.taken = taken
+	q.mu.Unlock()
+	return taken
+}

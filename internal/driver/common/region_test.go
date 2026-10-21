@@ -4,11 +4,15 @@ package common
 
 import (
 	"fmt"
+	"go/ast"
+	"go/parser"
+	"go/token"
 	"image/color"
 	"math/rand"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/canvas"
@@ -36,11 +40,15 @@ func (f *twinSizeable) MarkMinSizeDirty(core.CanvasObject) {}
 
 func (f *twinSizeable) SetDirty() {}
 
+func (f *twinSizeable) PixelCoordinateForPosition(p geo.Position) (int, int) {
+	return int(p.X), int(p.Y) // a scale of 1, for icons rendered at their size
+}
+
+func (f *twinSizeable) Scale() float32 { return 1 }
+
 func (f *twinSizeable) Refresh(o core.CanvasObject) {
 	for _, c := range []*Canvas{f.c, f.ref} {
-		if node, ok := c.NodeFor(o); ok {
-			c.notePaintRefresh(node)
-		}
+		c.noteRefreshed(o) // as FreeDirtyTextures does
 	}
 }
 
@@ -218,6 +226,18 @@ func TestPartialDirtyRegion_FromReported(t *testing.T) {
 			l.Resize(geo.NewSize(200, 30))
 			return container.NewWithoutLayout(l), func() { l.SetText("a much longer text than before") }
 		}, 1},
+		{"tree branch opened", func() (core.CanvasObject, func()) {
+			// Its content grows, through a Resize that is not BaseWidget's.
+			tree := widget.NewTreeWithStrings(map[string][]string{"": {"a", "b"}, "a": {"c", "d", "e"}})
+			tree.Resize(geo.NewSize(200, 60))
+			return container.NewWithoutLayout(tree), func() { tree.ToggleBranch("a") }
+		}, 2},
+		{"tree view branch opened", func() (core.CanvasObject, func()) {
+			tree := widget.NewTreeViewWithNodes([]widget.TreeViewNode{{ID: "a", Text: "a"}, {ID: "b", Text: "b"}})
+			tree.SetChildren("a", []widget.TreeViewNode{{ID: "c", Text: "c"}, {ID: "d", Text: "d"}})
+			tree.Resize(geo.NewSize(200, 60))
+			return container.NewWithoutLayout(tree), func() { tree.ToggleBranch("a") }
+		}, 2},
 		{"own object moved", func() (core.CanvasObject, func()) {
 			o := &ownObject{pos: geo.NewPos(10, 10), size: geo.NewSize(20, 20)}
 			return container.NewWithoutLayout(o, rect(100, 100, 5, 5)), func() { o.Move(geo.NewPos(150, 150)) }
@@ -453,4 +473,144 @@ func TestPartialDirtyRegion_WalksOnlyWhatChanged(t *testing.T) {
 	_, _, set = c.PartialDirtyRegion()
 	assert.True(t, set)
 	assert.Equal(t, 1, c.RegionVisits(), "a refreshed object is visited alone (of %d)", full)
+
+	grid := scroll.Content.(*bellui.Container)
+	grid.Layout.Layout(grid.Objects, grid.Size()) // as a relayout does: every card moved to where it is
+	_, _, set = c.PartialDirtyRegion()
+	assert.False(t, set)
+	assert.Zero(t, c.RegionVisits(), "a relayout that moves nothing visits nothing (of %d)", full)
+}
+
+// TestPartialDirtyRegion_OverlayIsNotARoot pins that a reported overlay node
+// is left to the walk of the overlays, which covers it: walked as a root, it
+// was taken for content, and an overlay that does not report made every
+// region after it walk everything.
+func TestPartialDirtyRegion_OverlayIsNotARoot(t *testing.T) {
+	test.NewTempApp(t)
+
+	objs := make([]core.CanvasObject, 100)
+	for i := range objs {
+		r := canvas.NewRectangle(color.White)
+		r.Move(geo.NewPos(float32(i), 0))
+		r.Resize(geo.NewSize(5, 5))
+		objs[i] = r
+	}
+	mark := objs[0].(*canvas.Rectangle)
+	content := container.NewWithoutLayout(objs...)
+	content.Resize(geo.NewSize(400, 400))
+	c := newPartialCanvas(content, geo.NewSize(400, 400))
+	ov := &ownObject{pos: geo.NewPos(200, 200), size: geo.NewSize(30, 30)}
+	c.Overlays().Add(ov)
+	c.WalkTrees(nil, nil) // the overlay's node, as the min-size pass makes it
+	c.PartialDirtyRegion()
+	full := c.RegionVisits()
+
+	refresh(t, c, ov)
+	pos, size, set := c.PartialDirtyRegion()
+	assert.True(t, set)
+	assert.Equal(t, 1, c.RegionVisits(), "the overlay is walked alone (of %d)", full)
+	assert.True(t, pos.X <= 200 && pos.Y <= 200 && pos.X+size.Width >= 230 && pos.Y+size.Height >= 230,
+		"the region %v %v does not cover the refreshed overlay", pos, size)
+
+	mark.Move(geo.NewPos(3, 3))
+	c.PartialDirtyRegion()
+	assert.Equal(t, 2, c.RegionVisits(), "a move after it visits the object and the overlay (of %d)", full)
+}
+
+// TestReportsPlacement_ListedTypesReport pins that every type reportsPlacement
+// names tells its canvas when it is moved, resized or hidden: one that did not
+// would have its changes missed by the region, which walks only from what
+// reports. The list is read from reportsPlacement's source, so a type added
+// there is checked here too.
+func TestReportsPlacement_ListedTypesReport(t *testing.T) {
+	test.NewTempApp(t)
+
+	examples := map[string]core.CanvasObject{
+		"bellui.Container":      container.NewWithoutLayout(),
+		"canvas.Arc":            &canvas.Arc{},
+		"canvas.BackdropBlur":   &canvas.BackdropBlur{},
+		"canvas.BoxShadow":      &canvas.BoxShadow{},
+		"canvas.Circle":         &canvas.Circle{},
+		"canvas.GLView":         &canvas.GLView{},
+		"canvas.Image":          &canvas.Image{},
+		"canvas.Line":           &canvas.Line{},
+		"canvas.LinearGradient": &canvas.LinearGradient{},
+		"canvas.Path":           &canvas.Path{},
+		"canvas.Polygon":        &canvas.Polygon{},
+		"canvas.RadialGradient": &canvas.RadialGradient{},
+		"canvas.Raster":         &canvas.Raster{},
+		"canvas.Rectangle":      &canvas.Rectangle{},
+		"canvas.Ripple":         &canvas.Ripple{},
+		"canvas.Scene3D":        &canvas.Scene3D{},
+		"canvas.StyledText":     &canvas.StyledText{},
+		"canvas.Text":           &canvas.Text{},
+		"canvas.TextOnPath":     &canvas.TextOnPath{},
+	}
+	// Spacer is listed, and reports nothing: it draws nothing, so where it is
+	// changes no pixel.
+	silent := map[string]bool{"layout.Spacer": true}
+
+	listed := reportsPlacementCases(t)
+	require.NotEmpty(t, listed)
+	for _, name := range listed {
+		if silent[name] {
+			continue
+		}
+		obj, ok := examples[name]
+		if !assert.True(t, ok, "%s is listed by reportsPlacement, and not checked here", name) {
+			continue
+		}
+		t.Run(name, func(t *testing.T) {
+			require.True(t, reportsPlacement(obj))
+			obj.Move(geo.NewPos(1, 1))
+			obj.Resize(geo.NewSize(10, 10))
+			content := container.NewWithoutLayout(obj)
+			content.Resize(geo.NewSize(100, 100))
+			c := newPartialCanvas(content, geo.NewSize(100, 100))
+			c.PartialDirtyRegion()
+			node, ok := c.NodeFor(obj)
+			require.True(t, ok)
+			for _, change := range []struct {
+				name string
+				do   func()
+			}{
+				{"move", func() { obj.Move(geo.NewPos(5, 5)) }},
+				{"resize", func() { obj.Resize(geo.NewSize(20, 20)) }},
+				{"hide", obj.Hide},
+			} {
+				c.takePlaced()
+				change.do()
+				assert.Contains(t, c.takePlaced(), node, "%s does not report a %s", name, change.name)
+			}
+		})
+	}
+}
+
+// reportsPlacementCases returns the types reportsPlacement's type switch
+// names, as package.Type.
+func reportsPlacementCases(t *testing.T) []string {
+	t.Helper()
+	f, err := parser.ParseFile(token.NewFileSet(), "region.go", nil, 0)
+	require.NoError(t, err)
+	var names []string
+	ast.Inspect(f, func(n ast.Node) bool {
+		fn, ok := n.(*ast.FuncDecl)
+		if !ok || fn.Name.Name != "reportsPlacement" {
+			return true
+		}
+		ast.Inspect(fn.Body, func(n ast.Node) bool {
+			if cc, ok := n.(*ast.CaseClause); ok {
+				for _, e := range cc.List {
+					if star, ok := e.(*ast.StarExpr); ok {
+						if sel, ok := star.X.(*ast.SelectorExpr); ok {
+							names = append(names, sel.X.(*ast.Ident).Name+"."+sel.Sel.Name)
+						}
+					}
+				}
+			}
+			return true
+		})
+		return false
+	})
+	return names
 }

@@ -117,7 +117,7 @@ func (l *Line) Transform() geo.Matrix {
 // Use [geo.Identity] to clear the transform.
 func (l *Line) SetTransform(m geo.Matrix) {
 	l.propMu.Lock()
-	changed := l.transform != m
+	changed := !sameTransform(l.transform, m)
 	l.transform = m
 	l.propMu.Unlock()
 	if changed {

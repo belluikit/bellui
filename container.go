@@ -65,6 +65,9 @@ func (c *Container) MinSize() geo.Size {
 
 // Move the container (and all its children) to a new position, relative to its parent.
 func (c *Container) Move(pos geo.Position) {
+	if c.position == pos {
+		return // a relayout moves every child to where it was (#599)
+	}
 	c.position = pos
 	repaint(c)
 }

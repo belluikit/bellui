@@ -3,7 +3,6 @@ package common
 import (
 	"image/color"
 	"reflect"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -129,11 +128,8 @@ type Canvas struct {
 
 	// dirtyNodes are the nodes refreshed since the last min-size pass, queued
 	// from any goroutine (MarkMinSizeDirty); the pass marks them and their
-	// ancestors on the main thread (#487). dirtyTaken is the drained buffer,
-	// reused.
-	dirtyMu    sync.Mutex
-	dirtyNodes []*RenderCacheNode
-	dirtyTaken []*RenderCacheNode
+	// ancestors on the main thread (#487).
+	dirtyNodes nodeQueue
 	// minSizeFull asks the next min-size pass to walk every object: the
 	// content changed.
 	minSizeFull      atomic.Bool
@@ -145,10 +141,8 @@ type Canvas struct {
 	// placed are the nodes whose objects were moved, resized, hidden or
 	// refreshed since the last PartialDirtyRegion, queued from any goroutine
 	// (MarkPlacementDirty); the region walks from them instead of from the
-	// roots (#599). placedTaken is the drained buffer, reused.
-	placeMu     sync.Mutex
-	placed      []*RenderCacheNode
-	placedTaken []*RenderCacheNode
+	// roots (#599).
+	placed nodeQueue
 	// placeAll asks the next PartialDirtyRegion to walk every tree: one was
 	// replaced. paintEpoch is the paintgen epoch the last one walked at.
 	placeAll   atomic.Bool
@@ -395,16 +389,11 @@ func (c *Canvas) FreeDirtyTextures() uint64 {
 		c.freeObject(object)
 
 		// Track dirty region for scissor culling. The node is looked up once,
-		// for this and for the boundary below (#543).
-		node, mapped := c.nodeMap.Load(object)
+		// for this, the partial-repaint region and the boundary below (#543).
+		node, mapped := c.noteRefreshed(object)
 		if mapped {
 			wt := node.worldTransform
 			c.dirtyRegion.Union(geo.NewPos(wt.TX, wt.TY), object.Size())
-			if build.PartialRepaint {
-				// An object with no node yet is new to the tree, and the walk
-				// that adds its node reports it (walkTreeFrom).
-				c.notePaintRefresh(node)
-			}
 		}
 
 		// Propagate dirty state to the nearest ancestor RepaintBoundary.
@@ -746,11 +735,7 @@ func (c *Canvas) MarkMinSizeDirty(obj core.CanvasObject) {
 	}
 	node.minSizeDirty.Store(true)
 	node.cullGen.Store(0)
-	if !node.queued.Swap(true) {
-		c.dirtyMu.Lock()
-		c.dirtyNodes = append(c.dirtyNodes, node)
-		c.dirtyMu.Unlock()
-	}
+	c.dirtyNodes.add(node, &node.queued)
 }
 
 // MinSizeVisits reports how many nodes the last EnsureMinSize visited.
@@ -764,11 +749,7 @@ const fullMinSizeEvery = 10 * time.Second
 // markDirtyPaths marks every node refreshed since the last min-size pass, and
 // its ancestors, as having a refreshed descendant.
 func (c *Canvas) markDirtyPaths() {
-	c.dirtyMu.Lock()
-	taken := c.dirtyNodes
-	c.dirtyNodes = c.dirtyTaken[:0]
-	c.dirtyTaken = taken
-	c.dirtyMu.Unlock()
+	taken := c.dirtyNodes.take()
 	for i, n := range taken {
 		n.queued.Store(false)
 		for p := n; p != nil && !p.descDirty; p = p.parent {

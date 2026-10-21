@@ -9,6 +9,7 @@ import (
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/cache"
+	"github.com/belluikit/bellui/internal/paintgen"
 	"github.com/belluikit/bellui/theme"
 )
 
@@ -179,8 +180,13 @@ func (t *Text) Transform() geo.Matrix {
 // SetTransform sets an arbitrary affine transform and clears any rotation
 // previously set via [SetRotation].
 func (t *Text) SetTransform(m geo.Matrix) {
+	rotated := t.rotation != 0
 	t.rotation = 0
 	t.baseObject.SetTransform(m)
+	if rotated {
+		// The matrix kept may be the same, but the text drew rotated.
+		paintgen.Changed()
+	}
 }
 
 // NewText returns a new Text implementation

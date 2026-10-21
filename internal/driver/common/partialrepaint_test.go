@@ -37,11 +37,7 @@ func (f *fakeSizeable) MarkMinSizeDirty(o core.CanvasObject) { f.c.MarkMinSizeDi
 
 func (f *fakeSizeable) SetDirty() {}
 
-func (f *fakeSizeable) Refresh(o core.CanvasObject) {
-	if node, ok := f.c.NodeFor(o); ok {
-		f.c.notePaintRefresh(node)
-	}
-}
+func (f *fakeSizeable) Refresh(o core.CanvasObject) { f.c.noteRefreshed(o) }
 
 // regionDriver is the test driver, except that every object's canvas is c.
 type regionDriver struct {

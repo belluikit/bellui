@@ -46,7 +46,10 @@ const (
 // walked as if it did not, which costs time, never pixels.
 func reportsPlacement(obj core.CanvasObject) bool {
 	switch obj.(type) {
-	case *bellui.Container, *layout.Spacer,
+	case *layout.Spacer:
+		// Reports nothing, and draws nothing: where it is changes no pixel.
+		return true
+	case *bellui.Container,
 		*canvas.Arc, *canvas.BackdropBlur, *canvas.BoxShadow, *canvas.Circle,
 		*canvas.GLView, *canvas.Image, *canvas.Line, *canvas.LinearGradient,
 		*canvas.Path, *canvas.Polygon, *canvas.RadialGradient, *canvas.Raster,
@@ -76,21 +79,13 @@ func (c *Canvas) MarkPlacementDirty(obj core.CanvasObject) {
 
 // queuePlaced queues node for the next region walk, once.
 func (c *Canvas) queuePlaced(node *RenderCacheNode) {
-	if !node.placeQueued.Swap(true) {
-		c.placeMu.Lock()
-		c.placed = append(c.placed, node)
-		c.placeMu.Unlock()
-	}
+	c.placed.add(node, &node.placeQueued)
 }
 
 // takePlaced returns the nodes queued since it was last called, and clears
 // their queued marks.
 func (c *Canvas) takePlaced() []*RenderCacheNode {
-	c.placeMu.Lock()
-	taken := c.placed
-	c.placed = c.placedTaken[:0]
-	c.placedTaken = taken
-	c.placeMu.Unlock()
+	taken := c.placed.take()
 	for _, n := range taken {
 		n.placeQueued.Store(false)
 	}
@@ -111,9 +106,12 @@ func (c *Canvas) regionRootsFor(placed []*RenderCacheNode) (roots []*RenderCache
 		}
 		// A hidden object's parent walks without it, clearing where it was.
 		for !n.obj.Visible() {
-			if n = n.parent; n == nil {
-				return false
+			if n.parent == nil {
+				// An overlay is walked whole; a hidden content root, never
+				// expected, falls back to walking everything.
+				return !c.isContentRoot(n)
 			}
+			n = n.parent
 		}
 		if n.regionPass != pass {
 			n.regionPass = pass
@@ -128,7 +126,7 @@ func (c *Canvas) regionRootsFor(placed []*RenderCacheNode) (roots []*RenderCache
 		placed[i] = nil
 	}
 	for n := range c.foreignParents {
-		if cur, ok := c.nodeMap.Load(n.obj); !ok || cur != n {
+		if cur, ok := c.nodeMap.Load(n.obj); !ok || cur != n || !c.isContentRoot(rootOf(n)) {
 			delete(c.foreignParents, n)
 			n.inForeign = false
 			continue
@@ -141,7 +139,7 @@ func (c *Canvas) regionRootsFor(placed []*RenderCacheNode) (roots []*RenderCache
 	// Keep the roots no other root is above, and that are drawn.
 	kept := roots[:0]
 	for _, n := range roots {
-		if drawnAlone(n, pass) {
+		if c.drawnAlone(n, pass) {
 			kept = append(kept, n)
 		}
 	}
@@ -151,14 +149,45 @@ func (c *Canvas) regionRootsFor(placed []*RenderCacheNode) (roots []*RenderCache
 
 // drawnAlone reports whether n is drawn, under no culled or hidden ancestor,
 // and no ancestor of it was chosen as a root in pass: a walk from that
-// ancestor covers n.
-func drawnAlone(n *RenderCacheNode, pass uint64) bool {
+// ancestor covers n. A node of an overlay, which the region walks whole, or
+// of a tree the canvas no longer shows, is not: a walk from it would take it
+// for content.
+func (c *Canvas) drawnAlone(n *RenderCacheNode, pass uint64) bool {
+	top := n
 	for p := n.parent; p != nil; p = p.parent {
 		if p.regionPass == pass || p.childrenCulled || !p.obj.Visible() {
 			return false
 		}
+		top = p
 	}
-	return true
+	return c.isContentRoot(top)
+}
+
+// isContentRoot reports whether n is the root of the content, window head or
+// menu tree the canvas shows: the trees a region walks from reported nodes.
+func (c *Canvas) isContentRoot(n *RenderCacheNode) bool {
+	return n == c.contentTree.root ||
+		(c.mWindowHeadTree != nil && n == c.mWindowHeadTree.root) ||
+		(c.menuTree != nil && n == c.menuTree.root)
+}
+
+// rootOf returns the root of n's tree.
+func rootOf(n *RenderCacheNode) *RenderCacheNode {
+	for n.parent != nil {
+		n = n.parent
+	}
+	return n
+}
+
+// noteRefreshed records for the next region that obj was refreshed, and
+// returns its node. An object with no node is not drawn, or is new to the
+// tree, and the walk that adds its node reports it (addChild).
+func (c *Canvas) noteRefreshed(obj core.CanvasObject) (*RenderCacheNode, bool) {
+	node, ok := c.nodeMap.Load(obj)
+	if ok && build.PartialRepaint {
+		c.notePaintRefresh(node)
+	}
+	return node, ok
 }
 
 // notePlacement records for a region walk what node's object reports, and

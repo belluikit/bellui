@@ -135,7 +135,7 @@ func (c *Circle) Transform() geo.Matrix {
 // Use [geo.Identity] to clear the transform.
 func (c *Circle) SetTransform(m geo.Matrix) {
 	c.propMu.Lock()
-	changed := c.transform != m
+	changed := !sameTransform(c.transform, m)
 	c.transform = m
 	c.propMu.Unlock()
 	if changed {
