@@ -31,3 +31,18 @@ func Test_glPaintWalk_SkipsByPaintExtent(t *testing.T) {
 	w.partialRepaint = false
 	assert.False(t, w.skipObjectForDirtyRegion(text, pos), "a full repaint skips nothing")
 }
+
+// Test_glPaintWalk_EmptyRegionSkipsEverything pins #605 on desktop: a frame
+// with nothing dirty has an empty region at (0, 0), and an object reaching
+// across the origin, a shadow's blur or content scrolled past it, is not
+// painted unclipped over the retained canvas.
+func Test_glPaintWalk_EmptyRegionSkipsEverything(t *testing.T) {
+	test.NewTempApp(t)
+
+	shadow := canvas.NewBoxShadow(color.NRGBA{A: 0x40}, 8)
+	shadow.Resize(geo.NewSize(200, 300))
+
+	w := &glPaintWalk{partialRepaint: true}
+	assert.True(t, w.skipObjectForDirtyRegion(shadow, geo.NewPos(0, 0)), "a shadow's blur across the origin")
+	assert.True(t, w.shouldSkipForDirtyRegion(geo.NewPos(-40, -40), geo.NewSize(120, 120)), "content scrolled across the origin")
+}

@@ -510,6 +510,10 @@ func (r *modalPopUpRenderer) Refresh() {
 	}
 	r.popUp.Content.Refresh()
 	r.background.Refresh()
+	// The scrim's colour fades with the entrance and exit animations, and it
+	// covers the canvas, far past the content: unrefreshed, partial repaint
+	// redrew it only where the content changed (#605).
+	r.underlay.Refresh()
 }
 
 func withRelativePosition(rel geo.Position, to core.CanvasObject, f func(position geo.Position)) {

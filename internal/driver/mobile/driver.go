@@ -902,7 +902,7 @@ func (w *mobileTreeWalker) activeBoundary() *mobileBoundaryEntry {
 }
 
 func (w *mobileTreeWalker) shouldSkipForDirtyRegion(pos geo.Position, objSize geo.Size) bool {
-	return w.partialRepaint && !common.RectsOverlap(pos, objSize, w.drPos, w.drSize)
+	return w.partialRepaint && !common.InDirtyRegion(pos, objSize, w.drPos, w.drSize)
 }
 
 // skipObjectForDirtyRegion is shouldSkipForDirtyRegion for obj at pos, by

@@ -146,3 +146,30 @@ func Test_driver_RetentionMarkedOnlyAfterResume(t *testing.T) {
 	d.surfaceShown(c)
 	assert.Equal(t, 1, p.marked, "a resume marks retention unreliable")
 }
+
+// Test_mobileTreeWalker_EmptyRegionPaintsNothing pins #605: a frame with
+// nothing dirty has an empty region at (0, 0) and sets no clip, so whatever
+// it painted went unclipped over retained pixels. A modal drawer's shadow,
+// whose blur starts left of and above the origin, was painted on every such
+// frame until the drawer turned black; content scrolled across the origin
+// covered the scrim.
+func Test_mobileTreeWalker_EmptyRegionPaintsNothing(t *testing.T) {
+	shadow := belluicanvas.NewBoxShadow(color.NRGBA{A: 0x40}, 8)
+	shadow.Resize(geo.NewSize(200, 300))
+	scrolled := belluicanvas.NewRectangle(color.White)
+	scrolled.Move(geo.NewPos(-40, -40))
+	scrolled.Resize(geo.NewSize(120, 120))
+
+	c := newCanvas(bellui.CurrentDevice()).(*canvas)
+	c.padded = false
+	c.SetContent(container.NewWithoutLayout(shadow, scrolled))
+	c.Resize(geo.NewSize(300, 300))
+	p := &partialClipPainter{clip: "none", painted: map[core.CanvasObject]string{}}
+	c.SetPainter(p)
+
+	walk := &mobileTreeWalker{c: c, clips: &internal.ClipStack{}, size: c.Size(), partialRepaint: true}
+	walk.paintClipped()
+
+	assert.NotContains(t, p.painted, shadow, "a shadow reaching across the origin is not painted")
+	assert.NotContains(t, p.painted, scrolled, "nor is content scrolled across it")
+}
