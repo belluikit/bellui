@@ -33,6 +33,41 @@ func CullOffClip(obj core.CanvasObject, pos, clipPos geo.Position, clipSize geo.
 	return outside(pos, size, cullMargin+shadowReach(obj), clipPos, clipSize)
 }
 
+// cullOffClip is CullOffClip for node's object, answering its renderer
+// questions from the node while neither a refresh nor a theme change has made
+// them stale.
+func (r *RenderCacheNode) cullOffClip(pos, clipPos geo.Position, clipSize geo.Size) bool {
+	size := r.obj.Size()
+	if !outside(pos, size, cullMargin, clipPos, clipSize) {
+		return false
+	}
+	clip, reach := r.clipInfo()
+	return clip && outside(pos, size, cullMargin+reach, clipPos, clipSize)
+}
+
+// clipInfo is whether node's object owns a clip and, if so, its shadow reach,
+// measured once per theme generation and per refresh.
+func (r *RenderCacheNode) clipInfo() (bool, float32) {
+	gen := cache.ThemeCacheGeneration() + 1
+	was := r.cullGen.Load()
+	if was == gen {
+		return r.cullClip, r.cullReach
+	}
+	clip := driver.IsClip(r.obj)
+	if !clip {
+		clip, _ = driver.IsRoundedClip(r.obj)
+	}
+	reach := float32(0)
+	if clip {
+		reach = shadowReach(r.obj)
+	}
+	r.cullClip, r.cullReach = clip, reach
+	// A refresh clearing the generation meanwhile leaves it clear, so the next
+	// visit measures again.
+	r.cullGen.CompareAndSwap(was, gen)
+	return clip, reach
+}
+
 // PaintClips is the clips a paint walk sets up for node's object: none for a
 // clip-owner whose children the walk culled, as they would constrain nothing
 // (#481). Each one costs the painter a stencil or scissor change.

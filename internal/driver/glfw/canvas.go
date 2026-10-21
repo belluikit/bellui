@@ -513,7 +513,7 @@ func (w *glPaintWalk) cull(obj core.CanvasObject, pos, clipPos geo.Position, cli
 	if ab := w.activeBoundary(); ab != nil && ab.wasDirty && w.clips.Top() == nil {
 		return false
 	}
-	return common.CullOffClip(obj, pos, clipPos, clipSize)
+	return w.c.CullOffClip(obj, pos, clipPos, clipSize)
 }
 
 // activeBoundary returns the active boundary entry (topmost dirty boundary), or nil.
