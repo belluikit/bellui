@@ -15,9 +15,13 @@
 // package directory, so a second main() beside main.go fails the link.
 //
 // Build (see setup.sh):
-//   cc -o cefprobe_helper helper/helper.c -ldl
+//   cc -DCEF_API_VERSION=15101 -o cefprobe_helper helper/helper.c -ldl
 
-#define CEF_API_VERSION 15101
+// Supplied by the build, so one source serves both this probe (15101, as in
+// cef.c) and the webview's cef_helper (gocef's APIVersion, 13300).
+#ifndef CEF_API_VERSION
+#error CEF_API_VERSION must be defined by the build
+#endif
 
 #include <dlfcn.h>
 #include <libgen.h>
@@ -27,7 +31,12 @@
 
 #include "include/capi/cef_app_capi.h"
 
-int main(int argc, char **argv) {
+// No stack protector on main. Chromium's zygote forks this process's children
+// and, from CEF 154 on, those children evidently get a fresh stack canary:
+// main's frame still holds the zygote's, so a child that exits by returning
+// through here failed the check ("*** stack smashing detected ***") on every
+// normal exit (#510). Nothing past this frame is ours.
+__attribute__((no_stack_protector)) int main(int argc, char **argv) {
   char exe[1024];
   ssize_t n = readlink("/proc/self/exe", exe, sizeof(exe) - 1);
   if (n < 0) {

@@ -14,9 +14,9 @@
 
 set -euo pipefail
 
-CEF_VERSION="151.3.12+gd9cea67+chromium-151.0.7922.47"
+CEF_VERSION="154.0.34+g14c5a08+chromium-154.0.8037.98"
 CEF_PLATFORM="${CEF_PLATFORM:-linux64}"
-CEF_SHA1_linux64="233c2d4e5fcf2654c16aa98ff7c0665a2d1fa7c3"
+CEF_SHA1_linux64="15c91ad767097217b2e82ba8b933fe30b134be69"
 
 cd "$(dirname "$0")"
 ROOT="$PWD/cefroot"
@@ -101,7 +101,15 @@ fi
 # belluikit/gocef-libs publishes a prebuilt one (belluikit/bellui#104).
 if [ ! -f "$ROOT/cefprobe_helper" ]; then
   echo "building the subprocess helper"
-  cc -O2 -I"$ROOT" -o "$ROOT/cefprobe_helper" helper/helper.c -ldl
+  cc -O2 -I"$ROOT" -DCEF_API_VERSION=15101 -o "$ROOT/cefprobe_helper" helper/helper.c -ldl
+fi
+
+# The webview backend (and so hack/cefhostprobe) launches cef_helper, as laid
+# out in a gocef-libs payload, at the binding's API version rather than this
+# probe's.
+if [ ! -f "$ROOT/cef_helper" ]; then
+  echo "building cef_helper for the webview backend"
+  cc -O2 -I"$ROOT" -DCEF_API_VERSION=13300 -o "$ROOT/cef_helper" helper/helper.c -ldl
 fi
 
 echo
