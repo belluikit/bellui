@@ -82,7 +82,8 @@ func (p *painter) drawBoxShadow(shadow *canvas.BoxShadow, pos geo.Position, fram
 	p.SetUniform4f(p.program, "inset", 0, 0, 1, 1)
 	p.ctx.ActiveTexture(texture0)
 	p.ctx.BindTexture(texture2D, blurredTex)
-	p.blendFunc(srcAlpha, oneMinusSrcAlpha)
+	// The blurred texture is premultiplied, like the WebGPU painter's.
+	p.blendFunc(one, oneMinusSrcAlpha)
 	p.drawSoftTail()
 }
 

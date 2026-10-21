@@ -65,3 +65,34 @@ func TestCapture_BoxShadowEdgeProfile(t *testing.T) {
 	}
 	assert.Less(t, worst, 0.04, "the edge falls off as a Gaussian of sigma radius/2")
 }
+
+// A coloured box shadow is drawn in its colour by either painter: GL blended
+// the premultiplied shadow as if it were not, multiplying its colour by its
+// alpha twice, so half-transparent red over white came out (191, 127, 127)
+// where WebGPU drew (255, 127, 127) (#442).
+func TestCapture_BoxShadowColor(t *testing.T) {
+	bg := canvas.NewRectangle(color.White)
+	bg.Resize(geo.NewSize(300, 200))
+	shadow := canvas.NewBoxShadow(color.NRGBA{R: 255, A: 128}, 12)
+	shadow.Resize(geo.NewSize(120, 80))
+	shadow.Move(geo.NewPos(60, 60))
+
+	w := createWindow("shadow colour")
+	defer w.Close()
+	w.SetPadded(false)
+	w.SetContent(container.NewWithoutLayout(bg, shadow))
+	runOnMain(func() { w.window.Show() })
+	w.Resize(geo.NewSize(300, 200))
+	ensureCanvasSizeOrSkip(t, w, geo.NewSize(300, 200))
+	repaintWindow(w)
+	repaintWindow(w)
+
+	img := w.Canvas().Capture()
+	if img == nil || img.Bounds().Empty() {
+		t.Skip("no capture available")
+	}
+	scale := float64(img.Bounds().Dx()) / float64(w.Canvas().Size().Width)
+	middle := color.NRGBAModel.Convert(img.At(int(120*scale), int(100*scale))).(color.NRGBA)
+	assert.InDelta(t, 255, int(middle.R), 1, "red stays red")
+	assert.InDelta(t, 127, int(middle.G), 2, "half covers the white")
+}
