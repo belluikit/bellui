@@ -73,6 +73,10 @@ func (p *painter) BindCanvasFBO() {
 		p.beginFrame()
 	}
 	if !p.framing { // BeginFrame failed (e.g. lost surface) — fall back to surface draws.
+		// Nothing this frame reaches the FBO, but the driver's partial-repaint
+		// bookkeeping moves on as if it had: the next frame must clear and
+		// redraw it all, or what this one missed stays missing (#595).
+		p.canvasFBO.initialClear = false
 		return
 	}
 	p.dev.PushTargetLoad(p.canvasFBO.tex, p.canvasFBO.width, p.canvasFBO.height)
@@ -145,8 +149,9 @@ func (p *painter) CanvasFBONeedsFullClear() bool {
 }
 
 // MarkCanvasFBOCleared records that the FBO has been fully cleared at least once.
+// A frame that could not be opened cleared nothing, so the mark is ignored then.
 func (p *painter) MarkCanvasFBOCleared() {
-	if p.canvasFBO != nil {
+	if p.canvasFBO != nil && p.canvasFBO.active {
 		p.canvasFBO.initialClear = true
 	}
 }

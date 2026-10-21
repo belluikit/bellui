@@ -1662,6 +1662,10 @@ const (
 	acquireFatal                         // unrecoverable this frame — log then skip (Lost/DeviceLost/OutOfMemory)
 )
 
+// errNoSurface is BeginFrame's error on a device with no surface to draw to,
+// such as an offscreen one.
+var errNoSurface = errors.New("webgpu: no surface")
+
 // SurfaceStatusError carries a non-success surface-acquire status as an error.
 // The bindings report the status in the returned SurfaceTexture rather than as an
 // error, so acquireSurfaceTexture converts it here — keeping the classification
@@ -1677,6 +1681,9 @@ func (e *SurfaceStatusError) Error() string {
 // acquireSurfaceTexture wraps TryGetCurrentTexture so a non-success status (and a
 // success status with no texture) surfaces as a *SurfaceStatusError.
 func (d *Device) acquireSurfaceTexture() (*wgpu.Texture, error) {
+	if d.surface == nil {
+		return nil, errNoSurface
+	}
 	st, err := d.surface.TryGetCurrentTexture()
 	if err != nil {
 		return nil, err
