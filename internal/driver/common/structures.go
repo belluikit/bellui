@@ -134,6 +134,24 @@ type RenderCacheNode struct {
 	// a walk reaches them again.
 	childrenSkipped bool
 
+	// placeQueued marks the node as waiting in Canvas.placed. regionPass is
+	// the Canvas.regionPass that chose to walk from it.
+	placeQueued atomic.Bool
+	regionPass  uint64
+	// walkPos is where the last walk to visit the node found its object on the
+	// canvas, before transforms, and noCullBelow says that walk culled nothing
+	// below it, as it or an ancestor has a transform. A walk from a child
+	// starts from them (walkTreeFrom).
+	walkPos     geo.Position
+	noCullBelow bool
+	// placement says whether the object reports its moves (reportsPlacement):
+	// placementUnknown until a region walk asks. foreignChild says the last
+	// region walk through the node found a child that does not, and
+	// inForeign that the node is in Canvas.foreignParents.
+	placement    placement
+	foreignChild bool
+	inForeign    bool
+
 	// boundaryPhase is the sub-pixel phase a RepaintBoundary's texture was last
 	// rendered at, when boundaryPhaseSet (BoundaryGeometry, #570).
 	boundaryPhase    BoundaryPhase

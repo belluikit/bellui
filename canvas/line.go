@@ -7,6 +7,7 @@ import (
 
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/paintgen"
 )
 
 // Declare conformity with CanvasObject interface
@@ -116,8 +117,12 @@ func (l *Line) Transform() geo.Matrix {
 // Use [geo.Identity] to clear the transform.
 func (l *Line) SetTransform(m geo.Matrix) {
 	l.propMu.Lock()
+	changed := l.transform != m
 	l.transform = m
 	l.propMu.Unlock()
+	if changed {
+		paintgen.Changed()
+	}
 }
 
 // Visible returns true if this line is visible, false otherwise
@@ -131,8 +136,12 @@ func (l *Line) Visible() bool {
 // Show will set this line to be visible
 func (l *Line) Show() {
 	l.propMu.Lock()
+	changed := l.Hidden
 	l.Hidden = false
 	l.propMu.Unlock()
+	if changed {
+		paintgen.Changed()
+	}
 
 	l.Refresh()
 }

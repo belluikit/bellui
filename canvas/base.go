@@ -12,6 +12,7 @@ import (
 
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/layoutgen"
+	"github.com/belluikit/bellui/internal/paintgen"
 )
 
 type baseObject struct {
@@ -88,6 +89,7 @@ func (o *baseObject) Show() {
 	o.propMu.Unlock()
 	if changed {
 		layoutgen.Changed()
+		paintgen.Changed()
 	}
 }
 
@@ -125,6 +127,10 @@ func (o *baseObject) Transform() geo.Matrix {
 // SetTransform is safe for concurrent use.
 func (o *baseObject) SetTransform(m geo.Matrix) {
 	o.transformMu.Lock()
+	changed := o.transform != m
 	o.transform = m
 	o.transformMu.Unlock()
+	if changed {
+		paintgen.Changed()
+	}
 }

@@ -43,6 +43,8 @@ func RecolorSVG(svgContent []byte, color color.Color) ([]byte, error) {
 }
 
 // repaint instructs the containing canvas to redraw, even if nothing changed.
+// Callers have moved, resized or hidden obj, and the canvas's partial repaint
+// learns where from this alone: it does not walk what was not reported (#599).
 func repaint(obj core.CanvasObject) {
 	app := bellui.CurrentApp()
 	if app == nil || app.Driver() == nil {
@@ -51,6 +53,9 @@ func repaint(obj core.CanvasObject) {
 
 	c := app.Driver().CanvasForObject(obj)
 	if c != nil {
+		if m, ok := c.(interface{ MarkPlacementDirty(core.CanvasObject) }); ok {
+			m.MarkPlacementDirty(obj)
+		}
 		if paint, ok := c.(interface{ SetDirty() }); ok {
 			paint.SetDirty()
 		}

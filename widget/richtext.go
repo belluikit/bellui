@@ -684,6 +684,8 @@ func (t *RichText) Resize(size geo.Size) {
 	}
 
 	t.size = size
+	// Not BaseWidget.Resize, which would tell the canvas: tell it here (#599).
+	defer widget.Repaint(t)
 
 	min := t.MinSize()
 	skipResize := !min.IsZero() && size.Width >= min.Width && size.Height >= min.Height && t.Wrapping == bellui.TextWrapOff && t.Truncation == bellui.TextTruncateOff

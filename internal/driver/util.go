@@ -356,7 +356,7 @@ func ReverseWalkVisibleObjectTree(
 	afterChildren func(core.CanvasObject, geo.Position, core.CanvasObject),
 ) bool {
 	clipSize := geo.NewSize(math.MaxInt32, math.MaxInt32)
-	return walkObjectTree(obj, true, nil, geo.NewPos(0, 0), geo.NewPos(0, 0), clipSize, nil, beforeChildren, afterChildren, true)
+	return walkObjectTree(obj, true, nil, geo.NewPos(0, 0), geo.NewPos(0, 0), clipSize, nil, nil, beforeChildren, afterChildren, true)
 }
 
 // WalkCompleteObjectTree will walk an object tree for all objects (ignoring visible state) executing the passed
@@ -374,7 +374,7 @@ func WalkCompleteObjectTree(
 	afterChildren func(core.CanvasObject, geo.Position, core.CanvasObject),
 ) bool {
 	clipSize := geo.NewSize(math.MaxInt32, math.MaxInt32)
-	return walkObjectTree(obj, false, nil, geo.NewPos(0, 0), geo.NewPos(0, 0), clipSize, nil, beforeChildren, afterChildren, false)
+	return walkObjectTree(obj, false, nil, geo.NewPos(0, 0), geo.NewPos(0, 0), clipSize, nil, nil, beforeChildren, afterChildren, false)
 }
 
 // WalkVisibleObjectTree will walk an object tree for all visible objects executing the passed functions following
@@ -392,7 +392,7 @@ func WalkVisibleObjectTree(
 	afterChildren func(core.CanvasObject, geo.Position, core.CanvasObject),
 ) bool {
 	clipSize := geo.NewSize(math.MaxInt32, math.MaxInt32)
-	return walkObjectTree(obj, false, nil, geo.NewPos(0, 0), geo.NewPos(0, 0), clipSize, nil, beforeChildren, afterChildren, true)
+	return walkObjectTree(obj, false, nil, geo.NewPos(0, 0), geo.NewPos(0, 0), clipSize, nil, nil, beforeChildren, afterChildren, true)
 }
 
 // WalkVisibleObjectTreeCulled walks as WalkVisibleObjectTree does, except that
@@ -408,7 +408,26 @@ func WalkVisibleObjectTreeCulled(
 	afterChildren func(core.CanvasObject, geo.Position, core.CanvasObject),
 ) bool {
 	clipSize := geo.NewSize(math.MaxInt32, math.MaxInt32)
-	return walkObjectTree(obj, false, nil, geo.NewPos(0, 0), geo.NewPos(0, 0), clipSize, cull, beforeChildren, afterChildren, true)
+	return walkObjectTree(obj, false, nil, geo.NewPos(0, 0), geo.NewPos(0, 0), clipSize, cull, nil, beforeChildren, afterChildren, true)
+}
+
+// WalkVisibleSubtreeCulled walks as WalkVisibleObjectTreeCulled does, from
+// obj inside a tree rather than from the tree's root: parent is obj's parent,
+// offset its position on the canvas and (clipPos, clipSize) the clip obj sits
+// in, as a walk from the root would have passed them. cull is nil below an
+// object with a transform, as the walk from the root would have it; the
+// caller passes nil when an ancestor of obj has one. hidden, if set, is called
+// for each hidden object the walk skips, with the object it belongs to.
+func WalkVisibleSubtreeCulled(
+	obj, parent core.CanvasObject,
+	offset, clipPos geo.Position,
+	clipSize geo.Size,
+	cull CullFunc,
+	hidden func(obj, parent core.CanvasObject),
+	beforeChildren func(core.CanvasObject, geo.Position, geo.Position, geo.Size) bool,
+	afterChildren func(core.CanvasObject, geo.Position, core.CanvasObject),
+) bool {
+	return walkObjectTree(obj, false, parent, offset, clipPos, clipSize, cull, hidden, beforeChildren, afterChildren, true)
 }
 
 // CullFunc reports whether obj, at the absolute position pos, draws nothing
@@ -422,6 +441,7 @@ func walkObjectTree(
 	offset, clipPos geo.Position,
 	clipSize geo.Size,
 	cull CullFunc,
+	hidden func(obj, parent core.CanvasObject),
 	beforeChildren func(core.CanvasObject, geo.Position, geo.Position, geo.Size) bool,
 	afterChildren func(core.CanvasObject, geo.Position, core.CanvasObject),
 	requireVisible bool,
@@ -430,6 +450,9 @@ func walkObjectTree(
 		return false
 	}
 	if requireVisible && !obj.Visible() {
+		if hidden != nil {
+			hidden(obj, parent)
+		}
 		return false
 	}
 	pos := obj.Position().Add(offset)
@@ -472,7 +495,7 @@ func walkObjectTree(
 
 	cancelled := false
 	followChild := func(child core.CanvasObject) bool {
-		if walkObjectTree(child, reverse, obj, pos, clipPos, clipSize, cull, beforeChildren, afterChildren, requireVisible) {
+		if walkObjectTree(child, reverse, obj, pos, clipPos, clipSize, cull, hidden, beforeChildren, afterChildren, requireVisible) {
 			cancelled = true
 			return true
 		}

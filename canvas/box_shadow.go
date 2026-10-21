@@ -2,6 +2,8 @@ package canvas
 
 import (
 	"image/color"
+
+	"github.com/belluikit/bellui/geo"
 )
 
 // BoxShadow is a canvas object that renders a blurred shadow behind a widget.
@@ -35,4 +37,33 @@ func NewBoxShadow(c color.Color, blurRadius float32) *BoxShadow {
 // Refresh causes this shadow to be redrawn.
 func (s *BoxShadow) Refresh() {
 	Refresh(s)
+}
+
+// Hide will set this shadow to not be visible.
+func (s *BoxShadow) Hide() {
+	s.baseObject.Hide()
+
+	repaint(s)
+}
+
+// Move the shadow to a new position, relative to its parent.
+func (s *BoxShadow) Move(pos geo.Position) {
+	if s.Position() == pos {
+		return
+	}
+
+	s.baseObject.Move(pos)
+
+	repaint(s)
+}
+
+// Resize sets a new size for the shadow.
+func (s *BoxShadow) Resize(size geo.Size) {
+	if size == s.Size() {
+		return
+	}
+
+	s.baseObject.Resize(size)
+
+	repaint(s)
 }

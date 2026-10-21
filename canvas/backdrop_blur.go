@@ -28,6 +28,35 @@ func (b *BackdropBlur) Refresh() {
 	Refresh(b)
 }
 
+// Hide will set this backdrop blur to not be visible.
+func (b *BackdropBlur) Hide() {
+	b.baseObject.Hide()
+
+	repaint(b)
+}
+
+// Move the backdrop blur to a new position, relative to its parent.
+func (b *BackdropBlur) Move(pos geo.Position) {
+	if b.Position() == pos {
+		return
+	}
+
+	b.baseObject.Move(pos)
+
+	repaint(b)
+}
+
+// Resize sets a new size for the backdrop blur.
+func (b *BackdropBlur) Resize(s geo.Size) {
+	if s == b.Size() {
+		return
+	}
+
+	b.baseObject.Resize(s)
+
+	repaint(b)
+}
+
 // MinSize returns the minimum size — backdrop blur has no inherent size.
 func (b *BackdropBlur) MinSize() geo.Size {
 	return geo.NewSize(0, 0)

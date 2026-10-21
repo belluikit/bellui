@@ -6,6 +6,7 @@ import (
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/cache"
+	"github.com/belluikit/bellui/internal/paintgen"
 )
 
 // Base provides a helper that handles basic widget behaviours.
@@ -45,6 +46,7 @@ func (w *Base) Resize(size geo.Size) {
 		return
 	}
 	cache.Renderer(impl).Layout(size)
+	Repaint(impl)
 }
 
 // Position gets the current position of this widget, relative to its parent.
@@ -89,6 +91,7 @@ func (w *Base) Show() {
 	}
 
 	w.hidden = false
+	paintgen.Changed() // a hidden widget has no node to refresh (#599)
 
 	impl := w.super()
 	if impl == nil {
@@ -129,6 +132,8 @@ func (w *Base) super() core.Widget {
 }
 
 // Repaint instructs the containing canvas to redraw, even if nothing changed.
+// Callers have moved or resized obj, and the canvas's partial repaint learns
+// where from this alone (#599).
 // This method is a duplicate of what is in `canvas/canvas.go` to avoid a dependency loop or public API.
 func Repaint(obj core.CanvasObject) {
 	app := bellui.CurrentApp()
@@ -138,6 +143,9 @@ func Repaint(obj core.CanvasObject) {
 
 	c := app.Driver().CanvasForObject(obj)
 	if c != nil {
+		if m, ok := c.(interface{ MarkPlacementDirty(core.CanvasObject) }); ok {
+			m.MarkPlacementDirty(obj)
+		}
 		if paint, ok := c.(interface{ SetDirty() }); ok {
 			paint.SetDirty()
 		}
