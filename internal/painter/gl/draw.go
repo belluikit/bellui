@@ -237,8 +237,7 @@ func (p *painter) drawBackdropBlur(blur *canvas.BackdropBlur, pos geo.Position, 
 	p.ctx.CopyTexSubImage2D(texture2D, 0, 0, 0, x, y, w, h)
 	p.logError()
 
-	// Blur the captured texture. The shader expects radius in framebuffer pixels.
-	blurredTex := p.blurTexture(captureTex, w, h, blur.BlurRadius*p.pixScale)
+	blurredTex := p.blurTexture(captureTex, w, h, paint.BlurSigma(blur.BlurRadius)*p.pixScale)
 	defer p.ctx.DeleteTexture(blurredTex)
 
 	// Restore viewport after blur.

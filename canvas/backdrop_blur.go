@@ -13,7 +13,8 @@ import "github.com/belluikit/bellui/geo"
 type BackdropBlur struct {
 	baseObject
 
-	// BlurRadius controls the Gaussian blur strength in logical pixels.
+	// BlurRadius is the blur radius in logical pixels, as for BoxShadow: the
+	// content behind is blurred by a Gaussian of sigma BlurRadius/2.
 	BlurRadius float32
 }
 

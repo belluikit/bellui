@@ -4,7 +4,7 @@
 
 struct Uniforms {
     resolution: vec2<f32>,  // offset 0
-    blur_radius: f32,       // offset 8
+    blur_radius: f32,       // offset 8: the distance between taps, in texels
 };
 
 @group(0) @binding(0) var<uniform> u: Uniforms;
@@ -29,7 +29,9 @@ fn vs_main(in: VertexInput) -> VertexOutput {
     return out;
 }
 
-// 9-tap Gaussian kernel (sigma ~= blur_radius/3), shared by both passes.
+// 9-tap Gaussian kernel, shared by both passes. Its weights have a standard
+// deviation of 1.689 taps, so sigma = 1.689 * blur_radius texels; the painters
+// choose blur_radius with paint.PlanBlur.
 fn blur_along(uv: vec2<f32>, axis: vec2<f32>) -> vec4<f32> {
     let step = axis * u.blur_radius;
     var sum = vec4<f32>(0.0);

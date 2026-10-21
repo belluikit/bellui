@@ -5,6 +5,7 @@ package gl
 import (
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/geo"
+	paint "github.com/belluikit/bellui/internal/painter"
 )
 
 // shadowKey is everything that decides a blurred shadow texture's pixels. Where
@@ -135,8 +136,9 @@ func (p *painter) shadowTexture(shadow *canvas.BoxShadow, spread, shadowW, shado
 	frameWidthScaled, frameHeightScaled := p.scaleFrameSize(frame)
 	p.rebindRenderTarget(int(frameWidthScaled), int(frameHeightScaled))
 
-	blurRadius := shadow.BlurRadius * p.pixScale / float32(texW) * 2 // normalize to texture space
-	blurredTex := p.blurTexture(shapeTex, texW, texH, blurRadius)
+	// The texture may come back smaller than the shape's; it is drawn
+	// stretched to the shadow's size.
+	blurredTex := p.blurTexture(shapeTex, texW, texH, paint.BlurSigma(shadow.BlurRadius)*p.pixScale)
 
 	// Restore the render target again — blurTexture leaves the blur-pass
 	// viewport behind when no FBO target is on the stack (overlay pass).

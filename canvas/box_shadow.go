@@ -14,8 +14,10 @@ type BoxShadow struct {
 	// Color is the shadow base color (typically black with some alpha).
 	Color color.Color
 
-	// BlurRadius controls the Gaussian blur sigma in logical pixels.
-	// Larger values produce softer, more spread-out shadows.
+	// BlurRadius is the blur radius in logical pixels, as in CSS box-shadow:
+	// the shadow is blurred by a Gaussian of sigma BlurRadius/2, so its edge
+	// fades over about BlurRadius either side. Larger values produce softer,
+	// more spread-out shadows.
 	BlurRadius float32
 
 	// OffsetX and OffsetY shift the shadow relative to the widget.

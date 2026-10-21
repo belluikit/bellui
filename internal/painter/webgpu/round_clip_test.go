@@ -39,9 +39,16 @@ func (sizeCanvas) Scale() float32   { return 1 }
 type offscreenPainter struct {
 	*painter
 	target *Texture
+	w, h   int
 }
 
 func newOffscreenPainter(t *testing.T) *offscreenPainter {
+	t.Helper()
+	return newOffscreenPainterSized(t, clipDim, clipDim)
+}
+
+// newOffscreenPainterSized is newOffscreenPainter drawing into a w×h texture.
+func newOffscreenPainterSized(t *testing.T, w, h int) *offscreenPainter {
 	t.Helper()
 	instance := wgpu.CreateInstance(chooseInstanceBackends())
 	t.Cleanup(instance.Release)
@@ -63,26 +70,28 @@ func newOffscreenPainter(t *testing.T) *offscreenPainter {
 		depthStencils: map[[2]int]*depthStencil{},
 		arenaMaxVtx:   64 * 1024,
 		arenaMaxUni:   256 * uniformBlockStride,
-		config:        &wgpu.SurfaceConfiguration{Format: wgpu.TextureFormatRGBA8Unorm, Width: clipDim, Height: clipDim},
+		config:        &wgpu.SurfaceConfiguration{Format: wgpu.TextureFormatRGBA8Unorm, Width: uint32(w), Height: uint32(h)},
 	}
 	t.Cleanup(d.Destroy)
+	// Linear, like the device's own sampler: the blur depends on it.
 	d.sampler, err = device.TryCreateSampler(&wgpu.SamplerDescriptor{
 		AddressModeU: wgpu.AddressModeClampToEdge, AddressModeV: wgpu.AddressModeClampToEdge,
-		AddressModeW: wgpu.AddressModeClampToEdge, LodMaxClamp: 1, MaxAnisotropy: 1,
+		AddressModeW: wgpu.AddressModeClampToEdge, MagFilter: wgpu.FilterModeLinear,
+		MinFilter: wgpu.FilterModeLinear, LodMaxClamp: 1, MaxAnisotropy: 1,
 	})
 	require.NoError(t, err)
 	require.NoError(t, d.buildLayouts())
 	d.pipelines = NewPipelineCache(d.buildPipeline)
 
-	target, err := d.CreateRenderTexture(clipDim, clipDim)
+	target, err := d.CreateRenderTexture(w, h)
 	require.NoError(t, err)
 	t.Cleanup(target.Release)
 
 	p := &painter{
-		dev: d, canvas: sizeCanvas{size: geo.NewSquareSize(clipDim)},
+		dev: d, canvas: sizeCanvas{size: geo.NewSize(float32(w), float32(h))},
 		pixScale: 1, texScale: 1, groupOpacity: 1, transform: geo.Identity(),
 	}
-	return &offscreenPainter{painter: p, target: target}
+	return &offscreenPainter{painter: p, target: target, w: w, h: h}
 }
 
 // frame clears the target to blue, runs draw, submits, and returns the pixels.
@@ -96,7 +105,7 @@ func (o *offscreenPainter) frame(t *testing.T, draw func()) *image.RGBA {
 	d.encoder, err = d.device.TryCreateCommandEncoder(nil)
 	require.NoError(t, err)
 	d.targets = append(d.targets[:0], renderTarget{
-		view: o.target.View(), tex: o.target.tex, w: clipDim, h: clipDim,
+		view: o.target.View(), tex: o.target.tex, w: o.w, h: o.h,
 		clear: wgpu.Color{B: 1, A: 1},
 	})
 	d.stencilRef = 0
@@ -119,7 +128,7 @@ func (o *offscreenPainter) frame(t *testing.T, draw func()) *image.RGBA {
 	d.encoder.Release()
 	d.encoder = nil
 
-	img := d.CaptureTexture(o.target.tex, clipDim, clipDim)
+	img := d.CaptureTexture(o.target.tex, o.w, o.h)
 	require.NotNil(t, img, "capture failed")
 	return img
 }
