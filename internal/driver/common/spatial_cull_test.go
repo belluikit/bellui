@@ -14,6 +14,7 @@ import (
 	"github.com/belluikit/bellui/geo"
 	intdriver "github.com/belluikit/bellui/internal/driver"
 	"github.com/belluikit/bellui/test"
+	"github.com/belluikit/bellui/widget"
 )
 
 // visibleCounter is a rectangle that counts the walks that ask whether it is
@@ -82,4 +83,43 @@ func TestSpatialIndexSkipsCulledOffGrid(t *testing.T) {
 	want, _, _ := intdriver.FindObjectAtPositionMatching(at, matchAll, nil, content)
 	got, _, _ := idx.FindObjectAtPositionMatching(at, matchAll)
 	assert.Same(t, want, got, "the index answers what the tree walk answers")
+}
+
+// TestSpatialIndexNestedClip pins #566 for the hit-test index: a button in a
+// horizontal scroll that the outer vertical scroll has moved up under a header
+// is out of reach on the header, in the index as in the tree walk.
+func TestSpatialIndexNestedClip(t *testing.T) {
+	test.NewTempApp(t)
+
+	button := widget.NewButton("hidden", func() {})
+	spacer := canvas.NewRectangle(color.Transparent)
+	spacer.SetMinSize(geo.NewSize(10, 1000))
+	outer := container.NewVScroll(container.NewVBox(container.NewHScroll(button), spacer))
+	header := canvas.NewRectangle(color.Black)
+	header.SetMinSize(geo.NewSize(10, 40))
+	content := container.NewBorder(header, nil, nil, nil, outer)
+	content.Resize(geo.NewSize(300, 300))
+	outer.ScrollToOffset(geo.NewPos(0, 30))
+
+	c := &Canvas{}
+	c.Initialize(&windowSizedCanvas{size: geo.NewSize(300, 300)}, func() {})
+	c.SetContentTreeAndFocusMgr(content)
+	c.WalkTrees(noWalk, noWalk)
+	c.RebuildSpatialIndex()
+	idx := c.SpatialIndex()
+	require.NotNil(t, idx)
+
+	isButton := func(o core.CanvasObject) bool {
+		_, ok := o.(*widget.Button)
+		return ok
+	}
+	onHeader := geo.NewPos(5, 20)
+	got, _, _ := idx.FindObjectAtPositionMatching(onHeader, isButton)
+	assert.Nil(t, got, "the index does not reach the button under the header")
+	want, _, _ := intdriver.FindObjectAtPositionMatching(onHeader, isButton, nil, content)
+	assert.Nil(t, want, "nor does the tree walk")
+
+	below := geo.NewPos(5, 50) // inside the outer scroll, on the button
+	got, _, _ = idx.FindObjectAtPositionMatching(below, isButton)
+	assert.Same(t, button, got)
 }

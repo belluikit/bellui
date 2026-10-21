@@ -12,9 +12,10 @@ import (
 //
 // ok is false when obj is not found — it is absent from the canvas, hidden, or
 // has a hidden ancestor — and the other results are then meaningless. pos is
-// obj's absolute position in canvas-tree coordinates. clip is the bounds of
-// obj's nearest clipping ancestor, in the same coordinates, with clipped true
-// only when there is one; an unclipped obj is drawn against the whole canvas.
+// obj's absolute position in canvas-tree coordinates. clip is the region
+// obj's clipping ancestors leave visible, as [ClipBoundsForObject] reports it,
+// in the same coordinates, with clipped true only when there is one; an
+// unclipped obj is drawn against the whole canvas.
 //
 // It is the combined form of [AncestorsOfObject] (used for its ok alone),
 // [ClipBoundsForObject] and an absolute-position lookup, which each re-derive

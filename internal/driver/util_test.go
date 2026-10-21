@@ -18,6 +18,7 @@ import (
 	"github.com/belluikit/bellui/widget"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAbsolutePositionForObject(t *testing.T) {
@@ -678,3 +679,85 @@ func (r *roundedClipRenderer) MinSize() geo.Size                { return geo.Siz
 func (r *roundedClipRenderer) Objects() []core.CanvasObject     { return nil }
 func (r *roundedClipRenderer) Refresh()                         {}
 func (r *roundedClipRenderer) RoundedClipCornerRadius() float32 { return 8 }
+
+// nestedScrollUnderHeader is #566's layout: a button in a horizontal scroll,
+// inside a vertical scroll that has moved it up under a header. It returns the
+// root, the hidden button and the nested scroll.
+func nestedScrollUnderHeader(t *testing.T) (root, hidden, nested core.CanvasObject) {
+	button := widget.NewButton("hidden", func() {})
+	inner := container.NewHScroll(button)
+	spacer := canvas.NewRectangle(color.Transparent)
+	spacer.SetMinSize(geo.NewSize(10, 1000))
+	outer := container.NewVScroll(container.NewVBox(inner, spacer))
+	header := canvas.NewRectangle(color.Black)
+	header.SetMinSize(geo.NewSize(10, 40))
+	root = container.NewBorder(header, nil, nil, nil, outer)
+	w := test.NewWindow(root)
+	t.Cleanup(w.Close)
+	w.Resize(geo.NewSize(300, 300))
+	outer.ScrollToOffset(geo.NewPos(0, 30))
+	return root, button, inner
+}
+
+// TestFindObjectAtPositionMatching_NestedClip pins #566: a clip-owner's clip
+// is its bounds intersected with the clip it sits in, as the painters' clip
+// stack has it, so a tap on the header does not reach the button the outer
+// scroll has moved under it.
+func TestFindObjectAtPositionMatching_NestedClip(t *testing.T) {
+	root, hidden, _ := nestedScrollUnderHeader(t)
+	isButton := func(o core.CanvasObject) bool {
+		_, ok := o.(*widget.Button)
+		return ok
+	}
+
+	at := geo.NewPos(5, 20) // on the header; the button is drawn below y 43
+	got, _, _ := driver.FindObjectAtPositionMatching(at, isButton, nil, root)
+	assert.Nil(t, got, "the button is clipped away under the header")
+	all := driver.FindAllObjectsAtPositionMatching(at, isButton, nil, root)
+	assert.Empty(t, all)
+
+	// Where the outer scroll shows it, the button still takes the tap.
+	var buttonPos geo.Position
+	driver.WalkVisibleObjectTree(root, func(o core.CanvasObject, pos, _ geo.Position, _ geo.Size) bool {
+		if o == hidden {
+			buttonPos = pos
+			return true
+		}
+		return false
+	}, nil)
+	below := geo.NewPos(5, buttonPos.Y+hidden.Size().Height-2)
+	require.Greater(t, below.Y, float32(43), "the button reaches below the outer scroll's top")
+	got, _, _ = driver.FindObjectAtPositionMatching(below, isButton, nil, root)
+	assert.Same(t, hidden, got)
+}
+
+// TestWalkVisibleObjectTree_NestedClip pins the clip the walk reports below
+// nested clip-owners (#566): the overlap of their bounds, and an empty clip
+// for an owner wholly outside the clip it sits in.
+func TestWalkVisibleObjectTree_NestedClip(t *testing.T) {
+	inside := canvas.NewRectangle(color.White)
+	inner := container.NewWithoutLayout(inside)
+	inner.ClipToBounds = true
+	inner.Resize(geo.NewSize(100, 100))
+	inner.Move(geo.NewPos(50, -40))
+	away := canvas.NewRectangle(color.White)
+	gone := container.NewWithoutLayout(away)
+	gone.ClipToBounds = true
+	gone.Resize(geo.NewSize(20, 20))
+	gone.Move(geo.NewPos(300, 0))
+	outer := container.NewWithoutLayout(inner, gone)
+	outer.ClipToBounds = true
+	outer.Resize(geo.NewSize(120, 80))
+	outer.Move(geo.NewPos(10, 10))
+
+	clips := map[core.CanvasObject]geo.Rectangle{}
+	driver.WalkVisibleObjectTree(container.NewWithoutLayout(outer), func(o core.CanvasObject, _, clipPos geo.Position, clipSize geo.Size) bool {
+		clips[o] = geo.Rectangle{Pos: clipPos, Size: clipSize}
+		return false
+	}, nil)
+
+	assert.Equal(t, geo.Rectangle{Pos: geo.NewPos(10, 10), Size: geo.NewSize(120, 80)}, clips[outer])
+	// inner spans x 60..160, y -30..70; outer x 10..130, y 10..90.
+	assert.Equal(t, geo.Rectangle{Pos: geo.NewPos(60, 10), Size: geo.NewSize(70, 60)}, clips[inside])
+	assert.Zero(t, clips[away].Size.Width*clips[away].Size.Height, "an owner outside its clip leaves nothing visible")
+}

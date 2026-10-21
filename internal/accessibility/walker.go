@@ -23,8 +23,9 @@ type Node struct {
 	// Size is the object's current size in device-independent units.
 	Size geo.Size
 
-	// Clip is the bounds of the nearest clipping ancestor (a scrollable, a
-	// clipping container or a clipping renderer) in absolute canvas
+	// Clip is the region the clipping ancestors (scrollables, clipping
+	// containers and clipping renderers) leave visible: the nearest one's
+	// bounds intersected with those above it, in absolute canvas
 	// coordinates, valid only when HasClip is true. Backends can use it to
 	// cull or trim elements scrolled out of view.
 	Clip    geo.Rectangle
