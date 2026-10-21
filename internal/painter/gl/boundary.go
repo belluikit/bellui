@@ -178,6 +178,17 @@ func (p *painter) CachedBoundaries() int {
 	return len(p.boundaries)
 }
 
+// BoundaryFramesSinceUse reports how many frames the painter has begun since a
+// paint walk last reached obj's boundary, and whether it holds one: what
+// eviction waits on, for a test to say why a boundary was kept (#615).
+func (p *painter) BoundaryFramesSinceUse(obj core.CanvasObject) (uint64, bool) {
+	s, ok := p.boundaries[obj]
+	if !ok {
+		return 0, false
+	}
+	return p.frame - s.usedFrame, true
+}
+
 // MarkBoundaryDirty marks a RepaintBoundary's FBO as needing re-render.
 func (p *painter) MarkBoundaryDirty(obj core.CanvasObject) {
 	if p.boundaries == nil {
