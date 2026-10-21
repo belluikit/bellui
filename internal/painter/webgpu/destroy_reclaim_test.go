@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -116,19 +117,29 @@ func TestSubmitFrameReclaimsDestroyedTextures(t *testing.T) {
 
 	// Resident size first climbs to a plateau while Metal and the allocator
 	// keep freed memory for reuse, so measure past it. From there it grows
-	// under 1 MB per 500 frames with the poll, and about 40 MB without it.
-	for range 500 {
+	// under 1 MB per 500 frames with the poll, and about 34 MB without it.
+	//
+	// A leak grows every window by the same amount; what Metal and the
+	// allocator keep after heavy GPU use, such as a perfscenes loop just
+	// before, moves the resident size by up to 12 MB in one window and not
+	// the next (#478). So the test judges the median of several windows.
+	for range 300 {
 		frame()
 		time.Sleep(pace)
 	}
-	before := residentBytes(t)
-	for range 500 {
-		frame()
-		time.Sleep(pace)
+	const windows, framesPerWindow = 5, 200
+	growth := make([]float64, windows)
+	for w := range growth {
+		before := residentBytes(t)
+		for range framesPerWindow {
+			frame()
+			time.Sleep(pace)
+		}
+		growth[w] = (float64(residentBytes(t)) - float64(before)) / (1 << 20)
 	}
-	grown := float64(residentBytes(t)) - float64(before)
-	t.Logf("resident size grew %.1f MB over 500 frames, paced at %v", grown/(1<<20), pace)
-	require.Less(t, grown, float64(8<<20), "destroyed targets are not being freed")
+	t.Logf("resident size grew %.1f MB per %d frames, paced at %v", growth, framesPerWindow, pace)
+	slices.Sort(growth)
+	require.Less(t, growth[windows/2], 4.0, "destroyed targets are not being freed: median MB per window")
 }
 
 // residentBytes is the process's resident set size.
