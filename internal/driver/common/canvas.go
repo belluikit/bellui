@@ -60,7 +60,10 @@ type Canvas struct {
 	// the refreshQueue is an unbounded queue which is able to cache
 	// arbitrary number of core.CanvasObject for the rendering.
 	refreshQueue deduplicatedObjectQueue
-	dirty        bool
+	// dirty is read and written on the main goroutine only, so it has no
+	// lock (#586). Refresh sets it through async.EnsureMain, which moves a
+	// call from another goroutine to main in apps not migrated to bellui.Do.
+	dirty bool
 
 	mWindowHeadTree, contentTree, menuTree *renderCacheTree
 
@@ -820,22 +823,24 @@ func (c *Canvas) SetContentTreeAndFocusMgr(content core.CanvasObject) {
 	c.contentFocusMgr = newFocusMgr
 }
 
-// CheckDirtyAndClear returns true if the canvas is dirty and
-// clears the dirty state atomically.
+// CheckDirtyAndClear returns true if the canvas is dirty and clears the dirty
+// state. Call it on the main goroutine only: the flag has no lock.
 func (c *Canvas) CheckDirtyAndClear() bool {
 	wasDirty := c.dirty
 	c.dirty = false
 	return wasDirty
 }
 
-// SetDirty sets canvas dirty flag atomically.
+// SetDirty marks the canvas as needing a paint. Call it on the main goroutine
+// only: the flag has no lock.
 func (c *Canvas) SetDirty() {
 	c.dirty = true
 }
 
 // IsDirty reports whether the canvas has changes that have not been painted
-// yet, without clearing the flag. While it is true the spatial index has not
-// been rebuilt since the last change, so hit testing must not rely on it.
+// yet, without clearing the flag. Call it on the main goroutine only. While it
+// is true the spatial index has not been rebuilt since the last change, so hit
+// testing must not rely on it.
 func (c *Canvas) IsDirty() bool {
 	return c.dirty
 }
