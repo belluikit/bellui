@@ -3,7 +3,7 @@ module github.com/belluikit/bellui/cmd/bellui
 go 1.25.0
 
 require (
-	github.com/belluikit/gocef-libs v0.1.0
+	github.com/belluikit/gocef-libs v0.2.0
 	github.com/fogleman/gg v1.3.0
 	github.com/go-ole/go-ole v1.3.0
 	github.com/jackmordaunt/icns/v2 v2.2.6
