@@ -170,7 +170,13 @@ func Test_mobileTreeWalker_BoundaryRerendersOnSubPixelMove(t *testing.T) {
 func Test_mobileTreeWalker_BoundaryRendersContentOffClip(t *testing.T) {
 	marker := belluicanvas.NewRectangle(color.White)
 	marker.SetMinSize(geo.NewSize(50, 50))
-	clipped := container.NewStack(marker)
+	nestedMarker := belluicanvas.NewRectangle(color.White)
+	nestedMarker.SetMinSize(geo.NewSize(50, 50))
+	nested := container.NewStack(nestedMarker) // a clip-owner in a clip-owner (#566)
+	nested.ClipToBounds = true
+	tall := belluicanvas.NewRectangle(color.Black)
+	tall.SetMinSize(geo.NewSize(50, 100)) // past the cull margin of the boundary's top
+	clipped := container.NewVBox(marker, tall, nested)
 	clipped.ClipToBounds = true
 	boundary := container.NewRepaintBoundary(clipped)
 
@@ -192,5 +198,6 @@ func Test_mobileTreeWalker_BoundaryRendersContentOffClip(t *testing.T) {
 
 	walk.paint()
 	assert.True(t, p.painted[marker], "content off the outer clip must render into its boundary")
+	assert.True(t, p.painted[nestedMarker], "so must content in a clip-owner nested inside the boundary")
 	assert.False(t, p.painted[hidden], "a clip inside the boundary still culls")
 }

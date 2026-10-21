@@ -6,9 +6,12 @@ import (
 	idriver "github.com/belluikit/bellui/internal/driver"
 )
 
-// ClipBoundsForObject returns the bounds of the nearest clipping ancestor of obj
+// ClipBoundsForObject returns the region obj's clipping ancestors leave visible
 // within canvas c, in absolute canvas coordinates, with ok=true when obj is
-// clipped. When obj is drawn against the full canvas (no clipping ancestor) ok
+// clipped: the bounds of the nearest clipping ancestor, intersected with those
+// of the clipping ancestors above it, so a scroll nested in a scroll reports
+// only what the outer one shows. The region is empty when they do not
+// overlap. When obj is drawn against the full canvas (no clipping ancestor) ok
 // is false.
 //
 // A clipping ancestor is one a scroll container (or any [event.Scrollable]), a

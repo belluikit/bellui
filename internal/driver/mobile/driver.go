@@ -873,13 +873,19 @@ func (w *mobileTreeWalker) paintClipped() {
 }
 
 // cull is the paint walk's driver.CullFunc: common.CullOffClip, except while
-// a boundary renders into its texture with no clip of its own open, as in the
-// desktop driver (#564). The clip then comes from outside the boundary, whose
-// cache must hold its whole subtree: content off screen when it rendered would
-// stay missing once scrolled into view.
+// a boundary renders into its texture, as in the desktop driver (#564). The
+// boundary's cache must hold its whole subtree, or content off screen when it
+// rendered would stay missing once scrolled into view, so only the clips
+// opened inside it cull: its own clip stack, in the texture's space, not the
+// walk's clip, which includes the clips outside it (#566).
 func (w *mobileTreeWalker) cull(obj core.CanvasObject, pos, clipPos geo.Position, clipSize geo.Size) bool {
-	if ab := w.activeBoundary(); ab != nil && ab.wasDirty && w.clips.Top() == nil {
-		return false
+	if ab := w.activeBoundary(); ab != nil && ab.wasDirty {
+		top := w.clips.Top()
+		if top == nil {
+			return false
+		}
+		clipPos, clipSize = top.Rect()
+		clipPos = clipPos.Add(ab.origin)
 	}
 	return w.c.CullOffClip(obj, pos, clipPos, clipSize)
 }

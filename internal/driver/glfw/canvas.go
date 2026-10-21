@@ -504,14 +504,20 @@ func (w *glPaintWalk) insideCleanBoundary() bool {
 }
 
 // cull is the paint walk's driver.CullFunc: common.CullOffClip, except while
-// a boundary renders into its texture with no clip of its own open. The clip
-// then comes from outside the boundary, and its cache must hold the whole
-// subtree: content culled because it was off screen when the boundary
-// rendered stayed missing once scrolled into view (#564). A clip opened
-// inside the boundary still culls, so a scroll in it skips its hidden rows.
+// a boundary renders into its texture. Its cache must hold the whole subtree,
+// so only the clips opened inside the boundary cull: content culled because it
+// was off screen when the boundary rendered stayed missing once scrolled into
+// view (#564). The walk's clip includes the clips outside the boundary (#566),
+// so the cull goes by the boundary's own clip stack instead, which is in the
+// texture's space. A scroll in the boundary still skips its hidden rows.
 func (w *glPaintWalk) cull(obj core.CanvasObject, pos, clipPos geo.Position, clipSize geo.Size) bool {
-	if ab := w.activeBoundary(); ab != nil && ab.wasDirty && w.clips.Top() == nil {
-		return false
+	if ab := w.activeBoundary(); ab != nil && ab.wasDirty {
+		top := w.clips.Top()
+		if top == nil {
+			return false
+		}
+		clipPos, clipSize = top.Rect()
+		clipPos = clipPos.Add(ab.origin)
 	}
 	return w.c.CullOffClip(obj, pos, clipPos, clipSize)
 }

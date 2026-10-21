@@ -61,14 +61,16 @@ func AbsolutePositionForObject(object core.CanvasObject, trees []core.CanvasObje
 // reached with this clip size has crossed no clipping ancestor.
 var NoClipBounds = geo.NewSize(math.MaxInt32, math.MaxInt32)
 
-// ClipBoundsForObject returns the bounds of the nearest clipping ancestor of
-// object within the given trees, in absolute canvas coordinates. ok is false
-// when object is not found, or when no ancestor clips it (it is drawn against
-// the full canvas). A clipping ancestor is one [IsClip] reports — a
-// [event.Scrollable], a [bellui.Container] with ClipToBounds, or a widget whose
-// renderer clips. It reuses the same clip tracking the hit-test walk uses, so a
-// caller can size content (e.g. a popover) to the region that will actually be
-// visible rather than overflowing into a clipped area.
+// ClipBoundsForObject returns the region object's clipping ancestors leave
+// visible, within the given trees, in absolute canvas coordinates: the bounds
+// of the nearest one, intersected with those of the ones above it (#566), and
+// empty when they do not overlap. ok is false when object is not found, or
+// when no ancestor clips it (it is drawn against the full canvas). A clipping
+// ancestor is one [IsClip] reports — a [event.Scrollable], a
+// [bellui.Container] with ClipToBounds, or a widget whose renderer clips. It
+// reuses the same clip tracking the hit-test walk uses, so a caller can size
+// content (e.g. a popover) to the region that will actually be visible rather
+// than overflowing into a clipped area.
 func ClipBoundsForObject(object core.CanvasObject, trees []core.CanvasObject) (geo.Rectangle, bool) {
 	var bounds geo.Rectangle
 	var clipped bool
@@ -459,8 +461,7 @@ func walkObjectTree(
 	}
 
 	if isClip(obj, r) {
-		clipPos = pos
-		clipSize = obj.Size()
+		clipPos, clipSize = intersectClip(clipPos, clipSize, pos, obj.Size())
 	}
 
 	if beforeChildren != nil {
@@ -495,6 +496,21 @@ func walkObjectTree(
 		afterChildren(obj, pos, parent)
 	}
 	return cancelled
+}
+
+// intersectClip is the clip a clip-owner at (pos, size) gives its children
+// inside the clip (clipPos, clipSize) it sits in: the overlap of the two, as
+// the painters' clip stack computes it, so that what can be hit is what is
+// drawn (#566). Under no clip yet, the owner's bounds stand alone; NoClipBounds
+// starts at the origin and would cut off an owner above or left of it.
+func intersectClip(clipPos geo.Position, clipSize geo.Size, pos geo.Position, size geo.Size) (geo.Position, geo.Size) {
+	if clipSize == NoClipBounds {
+		return pos, size
+	}
+	minX, minY := max(clipPos.X, pos.X), max(clipPos.Y, pos.Y)
+	maxX := max(minX, min(clipPos.X+clipSize.Width, pos.X+size.Width))
+	maxY := max(minY, min(clipPos.Y+clipSize.Height, pos.Y+size.Height))
+	return geo.NewPos(minX, minY), geo.NewSize(maxX-minX, maxY-minY)
 }
 
 func IsClip(o core.CanvasObject) bool {

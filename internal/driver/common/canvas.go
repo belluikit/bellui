@@ -983,11 +983,11 @@ func (c *Canvas) RebuildSpatialIndex() {
 // walkCacheNodeDFS visits a render cache subtree in depth-first order,
 // adding each visible, non-zero-sized object to the spatial index builder.
 //
-// It skips the children the paint walk culled when their clip-owner lies
-// wholly off the grid, where no lookup can find them (#481). Visiting them
-// costs more than the culled paint walk saved on a phone: the walk left them
-// out of the CPU cache. A clip-owner's descendants lie inside its bounds, the
-// assumption the cull itself makes.
+// It skips the children the paint walk culled (#481). Their clip-owner misses
+// the clip it sits in, so their own clip, the overlap of the two, is empty and
+// nothing in them can be hit (#566); and the walk did not visit them, so their
+// nodes still say where they were. Visiting them also costs more than the
+// culled paint walk saved on a phone: the walk left them out of the CPU cache.
 func (c *Canvas) walkCacheNodeDFS(node *RenderCacheNode, b *SpatialIndex) {
 	if node == nil {
 		return
@@ -998,7 +998,7 @@ func (c *Canvas) walkCacheNodeDFS(node *RenderCacheNode, b *SpatialIndex) {
 		s := obj.Size()
 		if s.Width > 0 && s.Height > 0 {
 			b.add(obj, node.worldTransform, s.Width, s.Height, node.clipPos, node.clipSize)
-			if node.paintCulled && b.offGrid(node.worldTransform.AABB(s.Width, s.Height)) {
+			if node.paintCulled {
 				return
 			}
 		}

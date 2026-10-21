@@ -89,7 +89,7 @@ type RenderCacheNode struct {
 	// many times is queued once.
 	queued         atomic.Bool
 	worldTransform geo.Matrix   // accumulated affine transform from root to this node
-	clipPos        geo.Position // effective clip region origin (from nearest Scrollable/ClipToBounds ancestor)
+	clipPos        geo.Position // effective clip region origin (the clipping ancestors' bounds intersected)
 	clipSize       geo.Size     // effective clip region size
 	isBoundary     bool         // true if this node is a RepaintBoundary
 	// boundarySettled says isBoundary is known: the object is not a widget, or

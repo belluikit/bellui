@@ -103,7 +103,13 @@ func (p *boundaryPaintRecorder) Paint(obj core.CanvasObject, _ geo.Position, _ g
 func TestPaint_BoundaryRendersContentOffClip(t *testing.T) {
 	marker := canvas.NewRectangle(color.White)
 	marker.SetMinSize(geo.NewSize(50, 50))
-	clipped := container.NewStack(marker)
+	nestedMarker := canvas.NewRectangle(color.White)
+	nestedMarker.SetMinSize(geo.NewSize(50, 50))
+	nested := container.NewStack(nestedMarker) // a clip-owner in a clip-owner (#566)
+	nested.ClipToBounds = true
+	tall := canvas.NewRectangle(color.Black)
+	tall.SetMinSize(geo.NewSize(50, 100)) // past the cull margin of the boundary's top
+	clipped := container.NewVBox(marker, tall, nested)
 	clipped.ClipToBounds = true // a clip-owner, which the walk culls off its clip
 	boundary := container.NewRepaintBoundary(clipped)
 
@@ -135,6 +141,7 @@ func TestPaint_BoundaryRendersContentOffClip(t *testing.T) {
 	c.paint(c.Size())
 
 	assert.True(t, p.painted[marker], "content off the outer clip must render into its boundary")
+	assert.True(t, p.painted[nestedMarker], "so must content in a clip-owner nested inside the boundary")
 	assert.False(t, p.painted[hiddenOwner.Objects[0]], "a clip inside the boundary still culls")
 }
 
