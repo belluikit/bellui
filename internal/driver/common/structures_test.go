@@ -1,6 +1,7 @@
 package common
 
 import (
+	"runtime"
 	"testing"
 
 	"github.com/belluikit/bellui"
@@ -42,6 +43,9 @@ func TestDeduplicatedObjectQueue(t *testing.T) {
 // a record not yet stored; the late store then marked the object queued for
 // good and every later In for it returned early, so it never repainted.
 func TestDeduplicatedObjectQueueConcurrentInOut(t *testing.T) {
+	if runtime.GOOS == "js" {
+		t.Skip("wasm runs one thread: the drain loop never yields to the producer, and In and Out cannot overlap")
+	}
 	queue := deduplicatedObjectQueue{queue: async.NewCanvasObjectQueue()}
 	obj := &bellui.Container{}
 	for round := 0; round < 5000; round++ {
