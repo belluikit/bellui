@@ -34,6 +34,12 @@ const (
 	DialogLevel           ElevationLevel = 24
 )
 
+// ShadowGeometry is the blur radius and downward offset of the box shadow an
+// object at level casts.
+func ShadowGeometry(level ElevationLevel) (blurRadius, offsetY float32) {
+	return float32(level) * 1.5, float32(level) * 0.5
+}
+
 // ShadowType specifies the type of the shadow.
 type ShadowType int
 
@@ -138,10 +144,10 @@ func (r *shadowRenderer) createShadows() {
 	switch r.s.typ {
 	case ShadowAround:
 		// Use BoxShadow for ShadowAround — produces GPU-blurred soft shadows.
-		blurRadius := float32(r.s.level) * 1.5
+		blurRadius, offsetY := ShadowGeometry(r.s.level)
 		bs := canvas.NewBoxShadow(fg, blurRadius)
 		bs.CornerRadius = th.Size(theme.SizeNameInputRadius)
-		bs.OffsetY = float32(r.s.level) * 0.5
+		bs.OffsetY = offsetY
 		r.boxShadow = bs
 		r.SetObjects([]core.CanvasObject{bs})
 	case ShadowLeft:
@@ -166,9 +172,8 @@ func (r *shadowRenderer) refreshShadows() {
 
 	if r.boxShadow != nil {
 		r.boxShadow.Color = fg
-		r.boxShadow.BlurRadius = float32(r.s.level) * 1.5
+		r.boxShadow.BlurRadius, r.boxShadow.OffsetY = ShadowGeometry(r.s.level)
 		r.boxShadow.CornerRadius = th.Size(theme.SizeNameInputRadius)
-		r.boxShadow.OffsetY = float32(r.s.level) * 0.5
 		r.boxShadow.Refresh()
 		return
 	}

@@ -252,3 +252,39 @@ func TestButtonRenderer_TapAnimation(t *testing.T) {
 	test.Tap(button)
 	assert.NotNil(t, button.tapAnim)
 }
+
+// An Elevated button casts a shadow, MD3 level 1 at rest and 2 under the
+// pointer, and none when disabled; the other styles sit flat (#609).
+func TestButton_ElevatedShadow(t *testing.T) {
+	test.NewTempApp(t)
+
+	shadowOf := func(b *Button) *canvas.BoxShadow {
+		b.Resize(b.MinSize())
+		return cache.Renderer(b).(*buttonRenderer).shadow
+	}
+	for _, style := range []ButtonStyle{ButtonStyleDefault, ButtonStyleFilled, ButtonStyleFilledTonal, ButtonStyleOutlined, ButtonStyleText} {
+		b := NewButton("flat", nil)
+		b.Style = style
+		assert.False(t, shadowOf(b).Visible(), "style %d sits flat", style)
+	}
+
+	b := NewButton("raised", nil)
+	b.Style = ButtonStyleElevated
+	s := shadowOf(b)
+	require.True(t, s.Visible())
+	assert.Equal(t, float32(1.5), s.BlurRadius, "level 1 at rest")
+	assert.Equal(t, float32(0.5), s.OffsetY)
+	assert.Equal(t, s.Size(), b.Size())
+	assert.Equal(t, cache.Renderer(b).(*buttonRenderer).background.CornerRadius, s.CornerRadius, "the shadow follows the pill")
+
+	b.HoverIn(&event.HoverEvent{})
+	assert.Equal(t, float32(3), s.BlurRadius, "level 2 under the pointer")
+	assert.Equal(t, float32(1), s.OffsetY)
+	b.HoverOut()
+	assert.Equal(t, float32(1.5), s.BlurRadius)
+
+	b.Disable()
+	assert.False(t, s.Visible(), "a disabled button sits flat")
+	b.Enable()
+	assert.True(t, s.Visible())
+}

@@ -130,8 +130,13 @@ func (b *Button) CreateRenderer() core.WidgetRenderer {
 	grad := canvas.NewLinearGradient(color.Transparent, color.Transparent, 90)
 	grad.Hide()
 
+	// Only an Elevated button shows its shadow (#609).
+	shadow := canvas.NewBoxShadow(color.Transparent, 0)
+	shadow.Hide()
+
 	r := &buttonRenderer{
-		BaseRenderer: widget.NewBaseRenderer([]core.CanvasObject{background, grad, ripple, text}),
+		BaseRenderer: widget.NewBaseRenderer([]core.CanvasObject{shadow, background, grad, ripple, text}),
+		shadow:       shadow,
 		background:   background,
 		gradientBG:   grad,
 		ripple:       ripple,
@@ -310,6 +315,7 @@ type buttonRenderer struct {
 
 	icon       *canvas.Image
 	label      *RichText
+	shadow     *canvas.BoxShadow // shown for ButtonStyleElevated
 	background *canvas.Rectangle
 	gradientBG *canvas.LinearGradient // non-nil for modern render style
 	ripple     *canvas.Ripple
@@ -319,6 +325,7 @@ type buttonRenderer struct {
 
 // Layout the components of the button widget
 func (r *buttonRenderer) Layout(size geo.Size) {
+	r.shadow.Resize(size)
 	r.background.Resize(size)
 	if r.gradientBG != nil {
 		r.gradientBG.Resize(size)
@@ -458,6 +465,7 @@ func (r *buttonRenderer) applyTheme() {
 			bg.StrokeColor = color.Transparent
 		}
 		bg.Refresh()
+		r.applyElevation(th, v, bg.CornerRadius)
 	}
 
 	// Hide gradient overlay — all styles now use MD3 flat fill.
@@ -479,6 +487,26 @@ func (r *buttonRenderer) applyTheme() {
 		r.icon.Resource = icon
 		r.icon.Refresh()
 	}
+}
+
+// applyElevation shows the shadow of an Elevated button: MD3 level 1 at rest
+// and 2 under the pointer, and none when disabled (#609). Other styles sit
+// flat.
+func (r *buttonRenderer) applyElevation(th bellui.Theme, v bellui.ThemeVariant, cornerRadius float32) {
+	b := r.button
+	if b.Style != ButtonStyleElevated || b.Disabled() {
+		r.shadow.Hide()
+		return
+	}
+	level := widget.CardLevel
+	if b.hovered {
+		level = widget.ButtonLevel
+	}
+	r.shadow.BlurRadius, r.shadow.OffsetY = widget.ShadowGeometry(level)
+	r.shadow.Color = th.Color(theme.ColorNameShadow, v)
+	r.shadow.CornerRadius = cornerRadius
+	r.shadow.Show()
+	r.shadow.Refresh()
 }
 
 func (r *buttonRenderer) buttonColorNames() (foreground, background, backgroundBlend bellui.ThemeColorName) {
