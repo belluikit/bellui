@@ -11,9 +11,9 @@ import (
 // PaintExtent returns the box obj's painters draw in, relative to its
 // position: its bounds, grown to what the painters draw past them. A text is
 // drawn at its MinSize whatever its own size, so one positioned but never
-// resized still draws its glyphs (#602), on the side its alignment puts them; a stroke, an italic lean or a path
-// reaching outside its size overflows by the painters' VectorPad; a box
-// shadow's blur spreads around its offset box.
+// resized still draws its glyphs (#602), on the side its alignment puts them;
+// a stroke, an italic lean or a path reaching outside its size overflows by
+// the painters' VectorPad; a box shadow's blur spreads around its offset box.
 //
 // Partial repaint decides from this box whether an object needs repainting,
 // and records it as where the object was painted, so pixels an object draws
