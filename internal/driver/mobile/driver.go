@@ -135,6 +135,10 @@ type driver struct {
 	// ring that moved or went away does not leave itself behind (#551).
 	a11yRingPainted    geo.Rectangle
 	a11yRingWasPainted bool
+
+	// surfaceWasHidden records that the window's surface has gone away once
+	// (the app went to the background), for surfaceShown.
+	surfaceWasHidden bool
 }
 
 // Declare conformity with Driver
@@ -617,6 +621,24 @@ func (*driver) SetDisableScreenBlanking(disable bool) {
 	setDisableScreenBlank(disable)
 }
 
+// surfaceShown is the canvas FBO's half of the surface coming up. The
+// persistent partial-repaint canvas FBO stops retaining its contents across
+// frames after a mobile background→resume (the off-screen texture is no longer
+// load-stable on tiled GPUs, even when reallocated), so dirty-region frames
+// would lose everything they don't redraw. After a resume, fall back to full
+// repaint for the rest of the session — correct, at the cost of the
+// optimization (pre-rebrand tracker #342). The first time the surface comes up
+// is no resume: marking then turned partial repaint off for every session
+// within a frame of launch (#591). No-op when not using the FBO path.
+func (d *driver) surfaceShown(c *canvas) {
+	if !d.surfaceWasHidden {
+		return
+	}
+	if m, ok := c.Painter().(interface{ MarkCanvasFBORetentionUnreliable() }); ok {
+		m.MarkCanvasFBORetentionUnreliable()
+	}
+}
+
 func (d *driver) handleLifecycle(e lifecycle.Event, w *window) {
 	c := w.Canvas().(*canvas)
 	switch e.Crosses(lifecycle.StageAlive) {
@@ -628,21 +650,14 @@ func (d *driver) handleLifecycle(e lifecycle.Event, w *window) {
 	switch e.Crosses(lifecycle.StageVisible) {
 	case lifecycle.CrossOn:
 		d.glctx, _ = e.DrawContext.(gl.Context)
-		// The persistent partial-repaint canvas FBO stops retaining its contents
-		// across frames after a mobile background→resume (the off-screen texture is
-		// no longer load-stable on tiled GPUs, even when reallocated), so
-		// dirty-region frames lose everything they don't redraw and static UI
-		// vanishes. Fall back to full repaint for the rest of the session — correct,
-		// at the cost of the optimization (pre-rebrand tracker #342). No-op when not using the FBO path.
-		if m, ok := c.Painter().(interface{ MarkCanvasFBORetentionUnreliable() }); ok {
-			m.MarkCanvasFBORetentionUnreliable()
-		}
+		d.surfaceShown(c)
 		// this is a fix for some android phone to prevent the app from being drawn as a blank screen after being pushed in the background
 		c.Content().Refresh()
 
 		d.sendPaintEvent()
 	case lifecycle.CrossOff:
 		d.glctx = nil
+		d.surfaceWasHidden = true
 	}
 	switch e.Crosses(lifecycle.StageFocused) {
 	case lifecycle.CrossOn: // foregrounding
@@ -772,6 +787,11 @@ func (d *driver) onStop() {
 func clearCanvasFBO(c *canvas, drp gpu.DirtyRegionPainter, size geo.Size) (partial bool, drPos geo.Position, drSize geo.Size) {
 	if build.PartialRepaint && !drp.CanvasFBONeedsFullClear() {
 		pos, sz, set := c.PartialDirtyRegion()
+		// Clamped as the desktop driver does: a region running off the canvas
+		// would make a scissor the painter cannot set, so the clear would not be
+		// confined to it.
+		pos, sz = common.ClampRegionToCanvas(pos, sz, size)
+		set = set && sz.Width > 0 && sz.Height > 0
 		switch {
 		case !set:
 			return true, geo.Position{}, geo.Size{}
@@ -831,6 +851,25 @@ func (w *mobileTreeWalker) paint() {
 	w.c.WalkContentTreesCulled(w.cull, w.draw, w.afterDraw)
 	w.c.WalkOverlayTrees(w.draw, w.afterDraw)
 	w.c.RebuildSpatialIndex()
+}
+
+// paintClipped is paint with, under a partial repaint, the dirty region's clip
+// on through the walk. Culling skips the objects outside the region, but one
+// that overlaps it is drawn whole: a full-canvas background painted over the
+// retained pixels of everything culled, so only what the region held stayed
+// on screen (#591; the desktop driver's paint does the same). The region
+// seeds the clip stack, so nested clips intersect with it and restore to it.
+func (w *mobileTreeWalker) paintClipped() {
+	dirtyClip := w.partialRepaint && w.drSize.Width > 0 && w.drSize.Height > 0
+	if dirtyClip {
+		w.clips.Push(w.drPos, w.drSize)
+		w.applyClip()
+	}
+	w.paint()
+	if dirtyClip {
+		w.clips.Pop()
+		w.applyClip()
+	}
 }
 
 // cull is the paint walk's driver.CullFunc: common.CullOffClip, except while
@@ -1084,7 +1123,7 @@ func (d *driver) paintWindow(win bellui.Window, size geo.Size) {
 	uidir.Push(c.Direction())
 	defer uidir.Pop(c.Direction())
 
-	walk.paint()
+	walk.paintClipped()
 
 	// In-scene screen-reader focus ring (pre-rebrand tracker #759): the OS-drawn highlight cannot
 	// reach the flat GPU surface, so paint our own over the accessibility-focused
