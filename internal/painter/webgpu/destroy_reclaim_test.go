@@ -104,12 +104,15 @@ func TestSubmitFrameReclaimsDestroyedTextures(t *testing.T) {
 	// virtual machines (#461). So time the GPU first and pace each frame to
 	// twice that. The pacing sleeps rather than polls: a poll here would free
 	// what a missing poll in submitFrame leaks, and hide the bug.
-	start := time.Now()
-	for range 20 {
-		frame()
-		d.device.Poll(true, nil)
+	timeGPU := func() time.Duration {
+		start := time.Now()
+		for range 20 {
+			frame()
+			d.device.Poll(true, nil)
+		}
+		return time.Since(start) / 20
 	}
-	gpuFrame := time.Since(start) / 20
+	gpuFrame := timeGPU()
 	if gpuFrame > 25*time.Millisecond {
 		t.Skipf("the GPU takes %v per frame here; paced, the test would run for minutes", gpuFrame)
 	}
@@ -139,7 +142,21 @@ func TestSubmitFrameReclaimsDestroyedTextures(t *testing.T) {
 	}
 	t.Logf("resident size grew %.1f MB per %d frames, paced at %v", growth, framesPerWindow, pace)
 	slices.Sort(growth)
-	require.Less(t, growth[windows/2], 4.0, "destroyed targets are not being freed: median MB per window")
+	if growth[windows/2] < 4.0 {
+		return
+	}
+	// A GPU that slowed during the test past the pacing was outrun, and its
+	// backlog of destroyed targets reads as a leak: a CI runner's shared GPU
+	// held 231 MB after 500 frames (#478). Timing it again is safe now, after
+	// the readings, and tells the two apart. Waiting for the GPU before
+	// reading cannot: a poll frees what a missing poll in submitFrame leaks.
+	now := timeGPU()
+	if now > pace {
+		t.Skipf("the GPU slowed from %v to %v per frame during the test, past the pacing of %v: "+
+			"the growth (median %.1f MB) is its backlog, not necessarily a leak", gpuFrame, now, pace, growth[windows/2])
+	}
+	t.Fatalf("destroyed targets are not being freed: median %.1f MB per window (limit 4), "+
+		"the GPU taking %v per frame before and %v after", growth[windows/2], gpuFrame, now)
 }
 
 // residentBytes is the process's resident set size.
