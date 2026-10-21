@@ -35,6 +35,27 @@ func drawerRows(t *testing.T, d *NavigationDrawer) []*drawerItemWidget {
 	return rows
 }
 
+// The captions are sized as well as placed: an unsized text has no box for
+// partial repaint to find its glyphs in, which cut "File Transfer" in half in
+// the gallery (#602), and screen readers get no bounds for it.
+func TestNavigationDrawer_CaptionsAreSized(t *testing.T) {
+	test.NewTempApp(t)
+	items := []*NavigationDrawerItem{
+		{Label: "Home", Icon: theme.HomeIcon()},
+		{Label: "File Transfer", Icon: theme.UploadIcon()},
+	}
+	d := NewNavigationDrawer(items, nil)
+	w := test.NewTempWindow(t, NewLabel("content"))
+	w.Resize(geo.NewSize(400, 600))
+	d.Show(w.Canvas())
+
+	rows := drawerRows(t, d)
+	require.Len(t, rows, 2)
+	for _, row := range rows {
+		assert.Equal(t, row.label.MinSize(), row.label.Size(), row.label.Text)
+	}
+}
+
 func TestNavigationDrawer_ItemTap(t *testing.T) {
 	test.NewTempApp(t)
 	var got, calls int

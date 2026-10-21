@@ -633,15 +633,13 @@ func (c *Canvas) unionSubtreeBounds(node *RenderCacheNode, region *dirtyRect) {
 	}
 }
 
-// paintBounds returns the world-space box node's object paints in: its bounds,
-// or for a box shadow the blurred area the painters draw around them, offset.
+// paintBounds returns the world-space box node's object paints in: its
+// PaintExtent, through its world transform.
 func paintBounds(node *RenderCacheNode) (geo.Position, geo.Size) {
-	s := node.obj.Size()
+	off, s := PaintExtent(node.obj)
 	m := node.worldTransform
-	if sh, ok := node.obj.(*canvas.BoxShadow); ok && sh.BlurRadius > 0 {
-		spread := sh.BlurRadius * 2 // as drawBoxShadow pads it
-		m = m.Multiply(geo.NewTranslation(sh.OffsetX-spread, sh.OffsetY-spread))
-		s = geo.NewSize(s.Width+2*spread, s.Height+2*spread)
+	if !off.IsZero() {
+		m = m.Multiply(geo.NewTranslation(off.X, off.Y))
 	}
 	minX, minY, maxX, maxY := m.AABB(s.Width, s.Height)
 	return geo.NewPos(minX, minY), geo.NewSize(maxX-minX, maxY-minY)

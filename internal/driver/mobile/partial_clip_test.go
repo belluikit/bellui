@@ -75,6 +75,35 @@ func Test_mobileTreeWalker_PartialRepaintKeepsRegionClip(t *testing.T) {
 	assert.Equal(t, "none", p.clip, "the clip is released after the walk")
 }
 
+// Test_mobileTreeWalker_PartialRepaintDrawsTextOutsideItsBox pins #602: a
+// text positioned but never resized draws its glyphs anyway, so when the dirty
+// region covers only their lower half, the text is painted again, or that half
+// is cleared and stays blank.
+func Test_mobileTreeWalker_PartialRepaintDrawsTextOutsideItsBox(t *testing.T) {
+	text := belluicanvas.NewText("File Transfer", color.White)
+	text.Move(geo.NewPos(20, 20))
+	min := text.MinSize()
+
+	c := newCanvas(bellui.CurrentDevice()).(*canvas)
+	c.padded = false
+	c.SetContent(container.NewWithoutLayout(text))
+	c.Resize(geo.NewSize(300, 300))
+	p := &partialClipPainter{clip: "none", painted: map[core.CanvasObject]string{}}
+	c.SetPainter(p)
+
+	walk := &mobileTreeWalker{
+		c:              c,
+		clips:          &internal.ClipStack{},
+		size:           c.Size(),
+		partialRepaint: true,
+		drPos:          geo.NewPos(0, 20+min.Height/2),
+		drSize:         geo.NewSize(300, 4),
+	}
+	walk.paintClipped()
+
+	assert.Contains(t, p.painted, text, "the text whose glyphs cross the region is painted")
+}
+
 // Without a partial repaint nothing is clipped.
 func Test_mobileTreeWalker_FullRepaintIsUnclipped(t *testing.T) {
 	bg := belluicanvas.NewRectangle(color.NRGBA{B: 0x80, A: 0xff})

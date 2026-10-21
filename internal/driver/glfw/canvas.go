@@ -530,6 +530,16 @@ func (w *glPaintWalk) shouldSkipForDirtyRegion(pos geo.Position, objSize geo.Siz
 	return w.partialRepaint && !common.RectsOverlap(pos, objSize, w.drPos, w.drSize)
 }
 
+// skipObjectForDirtyRegion is shouldSkipForDirtyRegion for obj at pos, by
+// where it draws rather than its bounds (#602).
+func (w *glPaintWalk) skipObjectForDirtyRegion(obj core.CanvasObject, pos geo.Position) bool {
+	if !w.partialRepaint {
+		return false
+	}
+	off, size := common.PaintExtent(obj)
+	return w.shouldSkipForDirtyRegion(pos.Add(off), size)
+}
+
 // enterBoundary handles a RepaintBoundary node on the way down. It reports
 // whether the node was a boundary (in which case the boundary widget itself is
 // not painted).
@@ -650,7 +660,7 @@ func (w *glPaintWalk) draw(node *common.RenderCacheNode, pos geo.Position) {
 	// outside the dirty region. Only applies when not inside a boundary FBO
 	// (boundary FBOs manage their own dirty state). Clips were already established
 	// above so descendants stay correctly clipped; afterDraw tears them down.
-	if w.activeBoundary() == nil && w.shouldSkipForDirtyRegion(pos, obj.Size()) {
+	if w.activeBoundary() == nil && w.skipObjectForDirtyRegion(obj, pos) {
 		return
 	}
 
@@ -720,7 +730,7 @@ func (w *glPaintWalk) afterDraw(node *common.RenderCacheNode, pos geo.Position) 
 		return
 	}
 
-	culled := w.activeBoundary() == nil && w.shouldSkipForDirtyRegion(pos, node.Obj().Size())
+	culled := w.activeBoundary() == nil && w.skipObjectForDirtyRegion(node.Obj(), pos)
 
 	// Group opacity is only set for objects that actually drew (not culled), so
 	// only clear it then.

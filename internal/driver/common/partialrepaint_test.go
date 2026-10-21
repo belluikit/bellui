@@ -321,3 +321,27 @@ func TestPartialDirtyRegion_MarkDirtyRect(t *testing.T) {
 	_, _, set = c.PartialDirtyRegion()
 	assert.False(t, set, "and only once")
 }
+
+// TestPartialDirtyRegion_TextOutsideItsBox pins #602: a text positioned but
+// never resized, as the navigation drawer's captions were, still draws its
+// glyphs, so refreshing it must clear and redraw where they are.
+func TestPartialDirtyRegion_TextOutsideItsBox(t *testing.T) {
+	test.NewTempApp(t)
+
+	text := canvas.NewText("File Transfer", color.White)
+	text.Move(geo.NewPos(200, 200))
+	content := container.NewWithoutLayout(text)
+	content.Resize(geo.NewSize(400, 400))
+	c := newPartialCanvas(content, geo.NewSize(400, 400))
+	c.PartialDirtyRegion()
+
+	text.Text = "Files"
+	text.Refresh()
+	min := canvas.NewText("File Transfer", color.White).MinSize()
+	pos, sz, set := c.PartialDirtyRegion()
+	require.True(t, set)
+	assert.LessOrEqual(t, pos.X, float32(200))
+	assert.LessOrEqual(t, pos.Y, float32(200))
+	assert.GreaterOrEqual(t, pos.X+sz.Width, 200+min.Width, "the old glyphs' width is cleared")
+	assert.GreaterOrEqual(t, pos.Y+sz.Height, 200+min.Height, "and their height")
+}

@@ -899,6 +899,16 @@ func (w *mobileTreeWalker) shouldSkipForDirtyRegion(pos geo.Position, objSize ge
 	return w.partialRepaint && !common.RectsOverlap(pos, objSize, w.drPos, w.drSize)
 }
 
+// skipObjectForDirtyRegion is shouldSkipForDirtyRegion for obj at pos, by
+// where it draws rather than its bounds (#602).
+func (w *mobileTreeWalker) skipObjectForDirtyRegion(obj core.CanvasObject, pos geo.Position) bool {
+	if !w.partialRepaint {
+		return false
+	}
+	off, size := common.PaintExtent(obj)
+	return w.shouldSkipForDirtyRegion(pos.Add(off), size)
+}
+
 // pushBoundary handles a RepaintBoundary node in the draw pass. It returns true
 // when the node was a boundary (and thus fully handled here).
 func (w *mobileTreeWalker) pushBoundary(node *common.RenderCacheNode, pos geo.Position) bool {
@@ -990,7 +1000,7 @@ func (w *mobileTreeWalker) draw(node *common.RenderCacheNode, pos geo.Position) 
 		}
 	}
 
-	if w.activeBoundary() == nil && w.shouldSkipForDirtyRegion(pos, obj.Size()) {
+	if w.activeBoundary() == nil && w.skipObjectForDirtyRegion(obj, pos) {
 		return
 	}
 
@@ -1038,7 +1048,7 @@ func (w *mobileTreeWalker) afterDraw(node *common.RenderCacheNode, pos geo.Posit
 		return
 	}
 
-	culled := w.activeBoundary() == nil && w.shouldSkipForDirtyRegion(pos, node.Obj().Size())
+	culled := w.activeBoundary() == nil && w.skipObjectForDirtyRegion(node.Obj(), pos)
 
 	// Tear down clips even when culled: draw establishes them unconditionally for
 	// clip-owners so descendants stay clipped (pre-rebrand tracker #333), so push/pop must stay paired.
