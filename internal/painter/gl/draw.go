@@ -257,8 +257,7 @@ func (p *painter) drawBackdropBlur(blur *canvas.BackdropBlur, pos geo.Position, 
 	p.ctx.ActiveTexture(texture0)
 	p.ctx.BindTexture(texture2D, blurredTex)
 	p.blendFunc(one, oneMinusSrcAlpha)
-	p.ctx.DrawArrays(triangleStrip, 0, 4)
-	p.logError()
+	p.drawSoftTail()
 }
 
 func (p *painter) drawRipple(ripple *canvas.Ripple, pos geo.Position, frame geo.Size) {

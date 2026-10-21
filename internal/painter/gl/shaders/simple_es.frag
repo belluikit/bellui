@@ -14,6 +14,7 @@ uniform sampler2D tex;
 uniform float cornerRadius;  // in pixels
 uniform vec2 size;           // in pixels: size of the rendered image quad
 uniform vec4 inset;          // texture coordinate insets (minX, minY, maxX, maxY)
+uniform float keepSoftTail;  // 1 to draw the faintest texels too: a blurred shadow's tail (#442)
 
 varying vec2 fragTexCoord;
 varying float fragAlpha;
@@ -35,7 +36,7 @@ void main() {
     texColor.a *= fragAlpha * alpha;
     texColor.rgb *= fragAlpha * alpha;
 
-    if(texColor.a < 0.01)
+    if(keepSoftTail < 0.5 && texColor.a < 0.01)
         discard;
     gl_FragColor = texColor;
 }

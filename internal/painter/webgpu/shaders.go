@@ -21,6 +21,9 @@ const (
 	BlurFragmentEntryH = "fs_main_h"
 	// BlurFragmentEntryV is the vertical-pass fragment entry of the blur shader.
 	BlurFragmentEntryV = "fs_main_v"
+	// SimpleSoftFragmentEntry is the simple shader's second fragment entry,
+	// which draws the faintest texels too (#442).
+	SimpleSoftFragmentEntry = "fs_main_soft"
 )
 
 // shaderNames is the set of shader modules available, in a stable order.

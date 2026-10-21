@@ -284,9 +284,31 @@ func (p *painter) recordBlur(view *wgpu.TextureView, uniform []byte, fragment st
 
 // blitTextureAlpha draws a texture view as a stretched quad at pos via the simple
 // shader at the given alpha (no corner radius). Like blitTexture but with an
-// explicit alpha so shadows/backdrop honour the active group opacity.
+// explicit alpha so shadows/backdrop honour the active group opacity, and
+// through SimpleSoftFragmentEntry: the simple shader's own entry drops texels
+// under 1% alpha, which stopped a shadow's tail on a faint line (#442).
 func (p *painter) blitTextureAlpha(view *wgpu.TextureView, logical geo.Size, pos geo.Position, frame geo.Size, alpha float32) {
 	points, insets := p.rectCoords(logical, pos, frame, canvas.ImageFillStretch, 0, 0)
 	u := SimpleUniforms{Alpha: alpha, Inset: insets}
-	p.record("simple", points, 4, uniformBytes(&u), view)
+	desc, ok := DescriptorFor("simple")
+	if !ok {
+		return
+	}
+	staged, ok := p.stage(uniformBytes(&u))
+	if !ok {
+		return
+	}
+	_ = p.dev.Record(DrawCall{
+		Key: PipelineKey{
+			Shader:   "simple",
+			Fragment: SimpleSoftFragmentEntry,
+			Blend:    desc.DefaultBlend,
+			Stencil:  p.stencilMode,
+			Format:   p.dev.Format(),
+		},
+		Vertices:    points,
+		VertexCount: 4,
+		Uniform:     staged,
+		TexView:     view,
+	})
 }

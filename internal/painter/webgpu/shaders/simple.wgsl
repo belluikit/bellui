@@ -29,8 +29,7 @@ fn vs_main(in: VertexInput) -> VertexOutput {
     return out;
 }
 
-@fragment
-fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+fn shade(in: VertexOutput) -> vec4<f32> {
     var alpha: f32 = 1.0;
     if (u.corner_radius > 0.5) {
         // normalize texture coords from [insetMin, insetMax] to [0, 1] so the
@@ -46,10 +45,21 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     var tex_color = textureSample(tex, samp, in.frag_tex_coord);
     tex_color.a = tex_color.a * u.alpha * alpha;
     let rgb = tex_color.rgb * u.alpha * alpha;
-    tex_color = vec4<f32>(rgb, tex_color.a);
+    return vec4<f32>(rgb, tex_color.a);
+}
 
+@fragment
+fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+    let tex_color = shade(in);
     if (tex_color.a < 0.01) {
         discard;
     }
     return tex_color;
+}
+
+// fs_main_soft draws the faintest texels too, which fs_main drops: a blurred
+// shadow's tail would otherwise stop on a faint line (#442).
+@fragment
+fn fs_main_soft(in: VertexOutput) -> @location(0) vec4<f32> {
+    return shade(in);
 }

@@ -94,6 +94,15 @@ func TestBoxShadowEdgeProfile(t *testing.T) {
 		for x := int(edge + sigma); x < int(edge+4.2*sigma) && testing.Verbose(); x++ {
 			t.Logf("TAIL r=%v d=%.2fσ got %.4f want %.4f", radius, (float64(x)+0.5-edge)/sigma, coverage(x), blurred(x, sigma))
 		}
+		// The tail fades out: a kernel that ends on a heavy tap stops it on a
+		// step, a faint line around the shadow.
+		for x := int(edge + sigma); x < int(edge+4*sigma); x++ {
+			step := math.Abs(coverage(x+1) - coverage(x))
+			slope := math.Abs(blurred(x+1, sigma) - blurred(x, sigma))
+			if !assert.Less(t, step, 2*slope+1.5/255, "radius %v: the tail %.1fσ from the edge", radius, (float64(x)-edge)/sigma) {
+				break
+			}
+		}
 	}
 }
 

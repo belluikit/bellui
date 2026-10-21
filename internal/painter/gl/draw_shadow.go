@@ -83,7 +83,16 @@ func (p *painter) drawBoxShadow(shadow *canvas.BoxShadow, pos geo.Position, fram
 	p.ctx.ActiveTexture(texture0)
 	p.ctx.BindTexture(texture2D, blurredTex)
 	p.blendFunc(srcAlpha, oneMinusSrcAlpha)
+	p.drawSoftTail()
+}
+
+// drawSoftTail draws the bound quad through the simple program, keeping the
+// texels it otherwise drops for under 1% alpha: a blurred shadow's tail would
+// stop on a faint line (#442).
+func (p *painter) drawSoftTail() {
+	p.SetUniform1f(p.program, "keepSoftTail", 1)
 	p.ctx.DrawArrays(triangleStrip, 0, 4)
+	p.SetUniform1f(p.program, "keepSoftTail", 0)
 	p.logError()
 }
 
