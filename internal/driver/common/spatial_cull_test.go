@@ -47,9 +47,9 @@ func clipOwner(pos geo.Position, child core.CanvasObject) *bellui.Container {
 
 // TestSpatialIndexSkipsCulledOffGrid pins #481: rebuilding the hit-test index
 // after a culled paint walk does not visit the children of a clip-owner the
-// walk culled that lies off the grid, where no lookup can reach them. A culled
-// clip-owner still on the grid keeps its children in the index, so a lookup
-// there answers what the tree-walk hit test answers.
+// walk culled. Off the grid no lookup could reach them; on it, they lie outside
+// their clip (#566), so a lookup there answers what the tree-walk hit test
+// answers without them.
 func TestSpatialIndexSkipsCulledOffGrid(t *testing.T) {
 	test.NewTempApp(t)
 
@@ -75,7 +75,7 @@ func TestSpatialIndexSkipsCulledOffGrid(t *testing.T) {
 	c.WalkContentTreesCulled(CullOffClip, noWalk, noWalk)
 	c.RebuildSpatialIndex()
 	assert.Zero(t, offChild.asked, "the paint walk and the index skip a culled clip-owner off the grid")
-	assert.NotZero(t, onChild.asked, "the index still visits a culled clip-owner on the grid")
+	assert.Zero(t, onChild.asked, "and one on the grid")
 
 	idx := c.SpatialIndex()
 	require.NotNil(t, idx)
@@ -122,4 +122,41 @@ func TestSpatialIndexNestedClip(t *testing.T) {
 	below := geo.NewPos(5, 50) // inside the outer scroll, on the button
 	got, _, _ = idx.FindObjectAtPositionMatching(below, isButton)
 	assert.Same(t, button, got)
+}
+
+// TestSpatialIndexSkipsCulledOnGrid pins that the index leaves out the
+// children of every clip-owner the paint walk culled, on the grid too: the
+// culled walk did not visit them, so their nodes keep where they were, and the
+// owner misses its clip, so none of them can be hit (#566). The index then
+// answers where a child used to be what the tree walk answers.
+func TestSpatialIndexSkipsCulledOnGrid(t *testing.T) {
+	test.NewTempApp(t)
+
+	child := newVisibleCounter(geo.NewPos(5, 5))
+	owner := clipOwner(geo.NewPos(0, 10), child)
+	region := container.NewWithoutLayout(owner)
+	region.ClipToBounds = true
+	region.Resize(geo.NewSize(400, 100))
+	region.Move(geo.NewPos(0, 200))
+	content := container.NewWithoutLayout(region)
+	content.Resize(geo.NewSize(400, 400))
+
+	c := &Canvas{}
+	c.Initialize(&windowSizedCanvas{size: geo.NewSize(400, 400)}, func() {})
+	c.SetContentTreeAndFocusMgr(content)
+	c.WalkContentTreesCulled(CullOffClip, noWalk, noWalk)
+	c.RebuildSpatialIndex()
+	at := geo.NewPos(10, 220) // on the child, at y 215
+	got, _, _ := c.SpatialIndex().FindObjectAtPositionMatching(at, matchAll)
+	require.Same(t, child, got)
+
+	// Move the owner above the region, still on the canvas: the paint walk
+	// culls it and leaves the child's node where it was.
+	owner.Move(geo.NewPos(0, -150))
+	c.WalkContentTreesCulled(CullOffClip, noWalk, noWalk)
+	c.RebuildSpatialIndex()
+	want, _, _ := intdriver.FindObjectAtPositionMatching(at, matchAll, nil, content)
+	require.Same(t, region, want)
+	got, _, _ = c.SpatialIndex().FindObjectAtPositionMatching(at, matchAll)
+	assert.Same(t, want, got, "the index answers what the tree walk answers")
 }
