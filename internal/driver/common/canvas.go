@@ -1148,15 +1148,9 @@ func (c *Canvas) walkTreeFrom(
 ) {
 	var node, parent, prev *RenderCacheNode
 	node, parent = start, start.parent
-	var parentObj core.CanvasObject
-	var offset, clipPos geo.Position
-	clipSize := driver.NoClipBounds
-	if parent != nil {
-		parentObj, offset = parent.obj, parent.walkPos
-		clipPos, clipSize = parent.clipPos, parent.clipSize
-		if parent.noCullBelow {
-			cull, nodeCull = nil, nil // the walk from the root would not cull here
-		}
+	parentObj, offset, clipPos, clipSize := start.walkStart()
+	if parent != nil && parent.noCullBelow {
+		cull, nodeCull = nil, nil // the walk from the root would not cull here
 	}
 	// culled is the object cull last skipped the children of, and skipped the
 	// object cull or nodeCull did. Cull runs just before the object's visit,
@@ -1200,11 +1194,7 @@ func (c *Canvas) walkTreeFrom(
 	if region {
 		// A hidden child that does not report placement would not report
 		// being shown either: its parent is walked every region (#599).
-		hidden = func(obj, _ core.CanvasObject) {
-			if parent != nil && !reportsPlacement(obj) {
-				parent.foreignChild = true
-			}
-		}
+		hidden = func(obj, _ core.CanvasObject) { noteHiddenChild(parent, obj) }
 	}
 
 	bc := func(obj core.CanvasObject, pos geo.Position, clipPos geo.Position, clipSize geo.Size) bool {
@@ -1217,46 +1207,14 @@ func (c *Canvas) walkTreeFrom(
 			node = nil
 		}
 		if node == nil {
-			node = &RenderCacheNode{parent: parent, obj: obj}
-			if parent.firstChild == nil {
-				parent.firstChild = node
-			} else {
-				prev.nextSibling = node
-			}
-			if build.PartialRepaint && c.regionWalk == regionNone {
-				// The partial-repaint region walks only from reported nodes,
-				// so it must hear of one added outside it (#599).
-				c.queuePlaced(node)
-			}
+			node = c.addChild(parent, prev, obj)
 		}
 		if prev != nil && prev.parent != parent {
 			prev = nil
 		}
 
-		// Compute the accumulated world transform for this node.
-		// worldTransform = parent.worldTransform * Translate(obj.Position()) * obj.Transform()
-		parentWT := geo.Identity()
-		noCull := false
-		if parent != nil {
-			parentWT = parent.worldTransform
-			noCull = parent.noCullBelow
-		}
-		objPos := obj.Position()
-		localT := geo.NewTranslation(objPos.X, objPos.Y)
-		if t, ok := obj.(core.Transformable); ok {
-			lt := t.Transform()
-			if !lt.IsIdentity() {
-				localT = localT.Multiply(lt)
-				noCull = true
-			}
-		}
-		if parentWT.IsIdentity() {
-			node.worldTransform = localT
-		} else {
-			node.worldTransform = parentWT.Multiply(localT)
-		}
+		node.setWorldTransform(obj)
 		node.walkPos = pos
-		node.noCullBelow = noCull
 
 		// Cache clip bounds for spatial index construction.
 		node.clipPos = clipPos
@@ -1265,31 +1223,7 @@ func (c *Canvas) walkTreeFrom(
 		node.childrenSkipped = skipped == obj
 		culled, skipped = nil, nil
 
-		// Populate the object→node lookup map and cache boundary status. Store
-		// only a changed mapping: storing over an existing key allocates a new
-		// entry, which for every node every paint was 23% of a static frame's
-		// allocation once the spatial index stopped allocating (#435).
-		//
-		// A node confirmed in the map during the current full-walk generation
-		// is still there: the only sweep, at the end of a full walk, deletes
-		// nodes that walk did not reach, before anything later in the
-		// generation is confirmed; and forgetNodes removes only nodes leaving
-		// the tree, which are never reused. So the lookup is needed once per
-		// generation, not on every walk (#487).
-		if node.mappedGen != c.walkGen+1 {
-			if cur, ok := c.nodeMap.Load(obj); !ok || cur != node {
-				c.nodeMap.Store(obj, node)
-			}
-			node.mappedGen = c.walkGen + 1 // +1: a new node's zero never matches
-			node.boundarySettled = false   // and ask again once per generation
-		}
-		node.walkGen = c.walkGen
-		// Whether a widget is a repaint boundary depends on its renderer's type,
-		// so a settled answer is kept rather than looking the renderer up again
-		// on every visit (#487).
-		if !node.boundarySettled {
-			node.isBoundary, node.boundarySettled = driver.RepaintBoundaryStatus(obj)
-		}
+		c.mapNode(node, obj)
 		if region {
 			c.notePlacement(node)
 		}
@@ -1329,6 +1263,85 @@ func (c *Canvas) walkTreeFrom(
 		node = node.nextSibling
 	}
 	driver.WalkVisibleSubtreeCulled(start.obj, parentObj, offset, clipPos, clipSize, cull, hidden, bc, ac)
+}
+
+// addChild adds a node for obj to parent, after prev or first.
+func (c *Canvas) addChild(parent, prev *RenderCacheNode, obj core.CanvasObject) *RenderCacheNode {
+	node := &RenderCacheNode{parent: parent, obj: obj}
+	if parent.firstChild == nil {
+		parent.firstChild = node
+	} else {
+		prev.nextSibling = node
+	}
+	if build.PartialRepaint && c.regionWalk == regionNone {
+		// The partial-repaint region walks only from reported nodes, so it
+		// must hear of one added outside it (#599).
+		c.queuePlaced(node)
+	}
+	return node
+}
+
+// walkStart is where a walk from r starts: as the walk of r's parent left it.
+func (r *RenderCacheNode) walkStart() (parent core.CanvasObject, offset, clipPos geo.Position, clipSize geo.Size) {
+	p := r.parent
+	if p == nil {
+		return nil, geo.Position{}, geo.Position{}, driver.NoClipBounds
+	}
+	return p.obj, p.walkPos, p.clipPos, p.clipSize
+}
+
+// setWorldTransform computes the node's accumulated world transform,
+// parent.worldTransform * Translate(obj.Position()) * obj.Transform(), and
+// whether walks cull below it.
+func (r *RenderCacheNode) setWorldTransform(obj core.CanvasObject) {
+	parentWT := geo.Identity()
+	noCull := false
+	if r.parent != nil {
+		parentWT = r.parent.worldTransform
+		noCull = r.parent.noCullBelow
+	}
+	objPos := obj.Position()
+	localT := geo.NewTranslation(objPos.X, objPos.Y)
+	if t, ok := obj.(core.Transformable); ok {
+		lt := t.Transform()
+		if !lt.IsIdentity() {
+			localT = localT.Multiply(lt)
+			noCull = true
+		}
+	}
+	if parentWT.IsIdentity() {
+		r.worldTransform = localT
+	} else {
+		r.worldTransform = parentWT.Multiply(localT)
+	}
+	r.noCullBelow = noCull
+}
+
+// mapNode keeps the object→node lookup map and the node's boundary status
+// current. It stores only a changed mapping: storing over an existing key
+// allocates a new entry, which for every node every paint was 23% of a static
+// frame's allocation once the spatial index stopped allocating (#435).
+//
+// A node confirmed in the map during the current full-walk generation is
+// still there: the only sweep, at the end of a full walk, deletes nodes that
+// walk did not reach, before anything later in the generation is confirmed;
+// and forgetNodes removes only nodes leaving the tree, which are never reused.
+// So the lookup is needed once per generation, not on every walk (#487).
+func (c *Canvas) mapNode(node *RenderCacheNode, obj core.CanvasObject) {
+	if node.mappedGen != c.walkGen+1 {
+		if cur, ok := c.nodeMap.Load(obj); !ok || cur != node {
+			c.nodeMap.Store(obj, node)
+		}
+		node.mappedGen = c.walkGen + 1 // +1: a new node's zero never matches
+		node.boundarySettled = false   // and ask again once per generation
+	}
+	node.walkGen = c.walkGen
+	// Whether a widget is a repaint boundary depends on its renderer's type,
+	// so a settled answer is kept rather than looking the renderer up again
+	// on every visit (#487).
+	if !node.boundarySettled {
+		node.isBoundary, node.boundarySettled = driver.RepaintBoundaryStatus(obj)
+	}
 }
 
 // forgetNodes removes the objects of n, its later siblings and all their

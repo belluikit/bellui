@@ -181,6 +181,14 @@ func (c *Canvas) notePlacement(node *RenderCacheNode) {
 	}
 }
 
+// noteHiddenChild marks parent when a region walk skips a hidden child of it
+// that does not report placement, and so would not report being shown.
+func noteHiddenChild(parent *RenderCacheNode, obj core.CanvasObject) {
+	if parent != nil && !reportsPlacement(obj) {
+		parent.foreignChild = true
+	}
+}
+
 // noteForeignChildren keeps node in foreignParents while a region walk finds
 // a child of it that does not report.
 func (c *Canvas) noteForeignChildren(node *RenderCacheNode) {

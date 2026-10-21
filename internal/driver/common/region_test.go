@@ -116,17 +116,16 @@ type ownObject struct {
 	hidden bool
 }
 
-func (o *ownObject) MinSize() geo.Size            { return geo.NewSize(1, 1) }
-func (o *ownObject) Move(p geo.Position)          { o.pos = p }
-func (o *ownObject) Position() geo.Position       { return o.pos }
-func (o *ownObject) Resize(s geo.Size)            { o.size = s }
-func (o *ownObject) Size() geo.Size               { return o.size }
-func (o *ownObject) Hide()                        { o.hidden = true }
-func (o *ownObject) Visible() bool                { return !o.hidden }
-func (o *ownObject) Show()                        { o.hidden = false }
-func (o *ownObject) Refresh()                     {}
-func (o *ownObject) String() string               { return fmt.Sprintf("own%p", o) }
-func (o *ownObject) objects() []core.CanvasObject { return nil }
+func (o *ownObject) MinSize() geo.Size      { return geo.NewSize(1, 1) }
+func (o *ownObject) Move(p geo.Position)    { o.pos = p }
+func (o *ownObject) Position() geo.Position { return o.pos }
+func (o *ownObject) Resize(s geo.Size)      { o.size = s }
+func (o *ownObject) Size() geo.Size         { return o.size }
+func (o *ownObject) Hide()                  { o.hidden = true }
+func (o *ownObject) Visible() bool          { return !o.hidden }
+func (o *ownObject) Show()                  { o.hidden = false }
+func (o *ownObject) Refresh()               {}
+func (o *ownObject) String() string         { return fmt.Sprintf("own%p", o) }
 
 // ownWidget is a widget an app implements without BaseWidget: neither it nor
 // its own layout of its children reports anything.
@@ -303,8 +302,7 @@ func TestPartialDirtyRegion_FromReportedRandom(t *testing.T) {
 			var objects []core.CanvasObject
 			var containers []*bellui.Container
 			parents := map[core.CanvasObject]*bellui.Container{}
-			var leaf func() core.CanvasObject
-			leaf = func() core.CanvasObject {
+			leaf := func() core.CanvasObject {
 				var o core.CanvasObject
 				switch rnd.Intn(5) {
 				case 0, 1:
