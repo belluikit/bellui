@@ -12,6 +12,7 @@ import (
 
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/container"
+	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/cache"
 )
@@ -48,11 +49,23 @@ func TestRepaintBoundaryRemovedIsFreed(t *testing.T) {
 	require.Equal(t, 2, cached(), "both boundaries are cached once painted")
 
 	runOnMain(func() { box.Remove(gone) })
-	paint()
-	time.Sleep(100 * time.Millisecond)
-	for range 5 { // more than the painters' boundaryKeepFrames
+	// Eviction counts the frames a painter began, and a window macOS reports
+	// occluded, as it does for a moment after showing one, begins none: so
+	// paint until the boundary goes, not a fixed number of times (#615).
+	start, paints := time.Now(), 0
+	for deadline := start.Add(5 * time.Second); cached() != 1 && time.Now().Before(deadline); paints++ {
 		paint()
 	}
 
-	assert.Equal(t, 1, cached(), "the removed boundary is freed, the one on screen kept")
+	if !assert.Equal(t, 1, cached(), "the removed boundary is freed, the one on screen kept") {
+		// Few frames since it was reached: a walk still reaches it. Many, or
+		// as many as before: the window began no frames (#615).
+		runOnMain(func() {
+			since, held := w.canvas.Painter().(interface {
+				BoundaryFramesSinceUse(core.CanvasObject) (uint64, bool)
+			}).BoundaryFramesSinceUse(gone)
+			t.Logf("after %d paints in %v: removed boundary held=%v, reached %d frames ago, window visible=%v",
+				paints, time.Since(start).Round(time.Millisecond), held, since, w.visible)
+		})
+	}
 }
