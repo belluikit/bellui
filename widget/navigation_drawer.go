@@ -210,6 +210,7 @@ func (r *drawerItemRenderer) Layout(size geo.Size) {
 	r.item.icon.Resize(geo.NewSize(24, 24))
 	labelSize := r.item.label.MinSize()
 	r.item.label.Move(geo.NewPos(52, (size.Height-labelSize.Height)/2))
+	r.item.label.Resize(labelSize)
 }
 
 func (r *drawerItemRenderer) Refresh() {
