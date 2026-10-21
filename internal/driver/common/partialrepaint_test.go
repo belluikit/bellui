@@ -345,3 +345,33 @@ func TestPartialDirtyRegion_TextOutsideItsBox(t *testing.T) {
 	assert.GreaterOrEqual(t, pos.X+sz.Width, 200+min.Width, "the old glyphs' width is cleared")
 	assert.GreaterOrEqual(t, pos.Y+sz.Height, 200+min.Height, "and their height")
 }
+
+// TestPartialDirtyRegion_HiddenOnlyChild pins that hiding the only visible
+// child of a container clears it, as hiding one of several does: the walk
+// visited no child there, and kept the old one's node, so its pixels stayed
+// and it stayed mapped.
+func TestPartialDirtyRegion_HiddenOnlyChild(t *testing.T) {
+	test.NewTempApp(t)
+
+	child := canvas.NewRectangle(color.White)
+	child.Move(geo.NewPos(10, 10))
+	child.Resize(geo.NewSize(20, 20))
+	inner := container.NewWithoutLayout(child)
+	inner.Resize(geo.NewSize(50, 50))
+	content := container.NewWithoutLayout(inner)
+	content.Resize(geo.NewSize(100, 100))
+	c := newPartialCanvas(content, geo.NewSize(100, 100))
+	c.PartialDirtyRegion()
+
+	child.Hide()
+	pos, sz, set := c.PartialDirtyRegion()
+	require.True(t, set, "the hidden child's pixels must be cleared")
+	assert.LessOrEqual(t, pos.X, float32(10))
+	assert.LessOrEqual(t, pos.Y, float32(10))
+	assert.GreaterOrEqual(t, pos.X+sz.Width, float32(30))
+	assert.GreaterOrEqual(t, pos.Y+sz.Height, float32(30))
+	_, ok := c.NodeFor(child)
+	assert.False(t, ok, "and its node forgotten")
+	node, _ := c.NodeFor(inner)
+	assert.Nil(t, node.firstChild)
+}

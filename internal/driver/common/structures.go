@@ -129,6 +129,10 @@ type RenderCacheNode struct {
 	// walks then set up no clip for it, and the spatial index skips the
 	// children too where nothing on the canvas can reach them (#481).
 	paintCulled bool
+	// childrenSkipped says the last walk to visit this node skipped its
+	// children, by its cull or its nodeCull: their nodes are kept for when
+	// a walk reaches them again.
+	childrenSkipped bool
 
 	// boundaryPhase is the sub-pixel phase a RepaintBoundary's texture was last
 	// rendered at, when boundaryPhaseSet (BoundaryGeometry, #570).

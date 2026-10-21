@@ -1075,9 +1075,10 @@ func (c *Canvas) walkTree(
 ) {
 	var node, parent, prev *RenderCacheNode
 	node = tree.root
-	// culled is the object cull last skipped the children of. Cull runs just
-	// before the object's visit, which records it on the node.
-	var culled core.CanvasObject
+	// culled is the object cull last skipped the children of, and skipped the
+	// object cull or nodeCull did. Cull runs just before the object's visit,
+	// which records them on the node.
+	var culled, skipped core.CanvasObject
 	if cull != nil {
 		skip := cull
 		cull = func(obj core.CanvasObject, pos, clipPos geo.Position, clipSize geo.Size) bool {
@@ -1089,7 +1090,7 @@ func (c *Canvas) walkTree(
 			cut := skip(obj, pos, clipPos, clipSize)
 			c.visiting = nil
 			if cut {
-				culled = obj
+				culled, skipped = obj, obj
 				return true
 			}
 			return false
@@ -1104,7 +1105,11 @@ func (c *Canvas) walkTree(
 					return false
 				}
 			}
-			return nodeCull(n, obj)
+			if nodeCull(n, obj) {
+				skipped = obj
+				return true
+			}
+			return false
 		}
 	}
 
@@ -1153,7 +1158,8 @@ func (c *Canvas) walkTree(
 		node.clipPos = clipPos
 		node.clipSize = clipSize
 		node.paintCulled = culled == obj
-		culled = nil
+		node.childrenSkipped = skipped == obj
+		culled, skipped = nil, nil
 
 		// Populate the object→node lookup map and cache boundary status. Store
 		// only a changed mapping: storing over an existing key allocates a new
@@ -1190,6 +1196,12 @@ func (c *Canvas) walkTree(
 		return false
 	}
 	ac := func(obj core.CanvasObject, pos geo.Position, _ core.CanvasObject) {
+		if node != nil && node == parent.firstChild && !parent.childrenSkipped {
+			// No child was visited, and none skipped: the old ones all left
+			// the tree, hidden or removed.
+			c.forgetNodes(node)
+			parent.firstChild = nil
+		}
 		node = parent
 		parent = node.parent
 		if prev != nil && prev.parent != parent {
