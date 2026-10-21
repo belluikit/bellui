@@ -237,7 +237,6 @@ func (i *Image) Resize(s geo.Size) {
 		return
 	}
 
-	i.baseObject.Resize(s)
 	i.propMu.RLock()
 	isSVG := i.isSVG
 	i.propMu.RUnlock()
