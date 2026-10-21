@@ -315,39 +315,79 @@ func (p *painter) suspendScissor() func() {
 	return func() { p.ctx.Enable(scissorTest) }
 }
 
-// blurTexture performs a two-pass separable Gaussian blur on a texture using FBOs.
-// It creates temporary FBOs, renders the texture through horizontal then vertical
-// blur shaders, and returns the blurred texture. The caller must delete the returned
-// texture and FBOs when done.
-func (p *painter) blurTexture(srcTex Texture, width, height int, radius float32) Texture {
-	// Create two FBOs for ping-pong blur
-	fboA := p.ctx.CreateFramebuffer()
-	texA := p.ctx.CreateTexture()
+// blurTexture performs a separable Gaussian blur of sigma texels on a
+// width×height texture using FBOs, and returns the blurred texture, which the
+// caller must delete. As paint.PlanBlur says, a wide blur first halves the
+// texture, so the result can be smaller than width×height: draw it stretched.
+func (p *painter) blurTexture(srcTex Texture, width, height int, sigma float32) Texture {
+	halvings, step := paint.PlanBlur(sigma)
+	var halvedFBO Framebuffer
+	halvedTex, halved := noTexture, false
+	for range halvings {
+		if width == 1 && height == 1 {
+			break
+		}
+		width, height = paint.HalveTexels(width), paint.HalveTexels(height)
+		fbo, tex := p.newBlurTarget(width, height)
+		// A blur of no width samples each target texel's centre, between
+		// four source texels: linear filtering averages them.
+		p.blurPass(p.blurHProgram, fbo, width, height, srcTex, 0)
+		if halved {
+			p.ctx.DeleteFramebuffer(halvedFBO)
+			p.ctx.DeleteTexture(halvedTex)
+		}
+		halvedFBO, halvedTex, halved, srcTex = fbo, tex, true, tex
+	}
+
+	// Horizontal then vertical, paint.BlurPasses times: src → texA → texB →
+	// texA → texB.
+	fboA, texA := p.newBlurTarget(width, height)
+	fboB, texB := p.newBlurTarget(width, height)
+	for range paint.BlurPasses {
+		p.blurPass(p.blurHProgram, fboA, width, height, srcTex, step)
+		p.blurPass(p.blurVProgram, fboB, width, height, texA, step)
+		srcTex = texB
+	}
+
+	// Restore the active render target (canvas/boundary FBO or screen).
+	// The caller restores its own viewport if the stack is empty.
+	p.rebindRenderTarget(0, 0)
+
+	// Cleanup intermediate resources
+	if halved {
+		p.ctx.DeleteFramebuffer(halvedFBO)
+		p.ctx.DeleteTexture(halvedTex)
+	}
+	p.ctx.DeleteFramebuffer(fboA)
+	p.ctx.DeleteTexture(texA)
+	p.ctx.DeleteFramebuffer(fboB)
+
+	// Return the blurred texture (caller owns texB)
+	return texB
+}
+
+// newBlurTarget creates a width×height texture, linearly filtered and clamped
+// to its edges, and an FBO that renders into it.
+func (p *painter) newBlurTarget(width, height int) (Framebuffer, Texture) {
+	fbo := p.ctx.CreateFramebuffer()
+	tex := p.ctx.CreateTexture()
 	p.ctx.ActiveTexture(texture0)
-	p.ctx.BindTexture(texture2D, texA)
+	p.ctx.BindTexture(texture2D, tex)
 	p.ctx.TexImage2D(texture2D, 0, width, height, colorFormatRGBA, unsignedByte, nil)
 	p.ctx.TexParameteri(texture2D, textureMinFilter, textureFilterToGL[0])
 	p.ctx.TexParameteri(texture2D, textureMagFilter, textureFilterToGL[0])
 	p.ctx.TexParameteri(texture2D, textureWrapS, clampToEdge)
 	p.ctx.TexParameteri(texture2D, textureWrapT, clampToEdge)
-	p.ctx.BindFramebuffer(glFramebuffer, fboA)
-	p.ctx.FramebufferTexture2D(glFramebuffer, colorAttachment0, texA, 0)
+	p.ctx.BindFramebuffer(glFramebuffer, fbo)
+	p.ctx.FramebufferTexture2D(glFramebuffer, colorAttachment0, tex, 0)
 	p.checkFBOComplete()
 	p.logError()
+	return fbo, tex
+}
 
-	fboB := p.ctx.CreateFramebuffer()
-	texB := p.ctx.CreateTexture()
-	p.ctx.BindTexture(texture2D, texB)
-	p.ctx.TexImage2D(texture2D, 0, width, height, colorFormatRGBA, unsignedByte, nil)
-	p.ctx.TexParameteri(texture2D, textureMinFilter, textureFilterToGL[0])
-	p.ctx.TexParameteri(texture2D, textureMagFilter, textureFilterToGL[0])
-	p.ctx.TexParameteri(texture2D, textureWrapS, clampToEdge)
-	p.ctx.TexParameteri(texture2D, textureWrapT, clampToEdge)
-	p.ctx.BindFramebuffer(glFramebuffer, fboB)
-	p.ctx.FramebufferTexture2D(glFramebuffer, colorAttachment0, texB, 0)
-	p.checkFBOComplete()
-	p.logError()
-
+// blurPass draws src through one of the blur programs into fbo, which is
+// width×height, with taps step texels apart.
+func (p *painter) blurPass(program ProgramState, fbo Framebuffer, width, height int, src Texture, step float32) {
 	// Full-screen quad vertices: position (x,y,z) + texcoord (u,v)
 	quad := []float32{
 		-1, -1, 0, 0, 0,
@@ -355,54 +395,22 @@ func (p *painter) blurTexture(srcTex Texture, width, height int, radius float32)
 		1, -1, 0, 1, 0,
 		1, 1, 0, 1, 1,
 	}
-	resW, resH := float32(width), float32(height)
-
-	// Pass 1: Horizontal blur (src → fboA)
-	p.ctx.BindFramebuffer(glFramebuffer, fboA)
+	p.ctx.BindFramebuffer(glFramebuffer, fbo)
 	p.ctx.Viewport(0, 0, width, height)
 	p.ctx.ClearColor(0, 0, 0, 0)
 	p.ctx.Clear(bitColorBuffer)
 
-	p.ctx.UseProgram(p.blurHProgram.ref)
-	p.updateBuffer(p.blurHProgram.buff, quad)
-	p.UpdateVertexArray(p.blurHProgram, "vert", 3, 5, 0)
-	p.UpdateVertexArray(p.blurHProgram, "vertTexCoord", 2, 5, 3)
-	p.SetUniform2f(p.blurHProgram, "resolution", resW, resH)
-	p.SetUniform1f(p.blurHProgram, "blur_radius", radius)
+	p.ctx.UseProgram(program.ref)
+	p.updateBuffer(program.buff, quad)
+	p.UpdateVertexArray(program, "vert", 3, 5, 0)
+	p.UpdateVertexArray(program, "vertTexCoord", 2, 5, 3)
+	p.SetUniform2f(program, "resolution", float32(width), float32(height))
+	p.SetUniform1f(program, "blur_radius", step)
 	p.ctx.ActiveTexture(texture0)
-	p.ctx.BindTexture(texture2D, srcTex)
+	p.ctx.BindTexture(texture2D, src)
 	p.blendFunc(one, oneMinusSrcAlpha)
 	p.ctx.DrawArrays(triangleStrip, 0, 4)
 	p.logError()
-
-	// Pass 2: Vertical blur (fboA/texA → fboB)
-	p.ctx.BindFramebuffer(glFramebuffer, fboB)
-	p.ctx.ClearColor(0, 0, 0, 0)
-	p.ctx.Clear(bitColorBuffer)
-
-	p.ctx.UseProgram(p.blurVProgram.ref)
-	p.updateBuffer(p.blurVProgram.buff, quad)
-	p.UpdateVertexArray(p.blurVProgram, "vert", 3, 5, 0)
-	p.UpdateVertexArray(p.blurVProgram, "vertTexCoord", 2, 5, 3)
-	p.SetUniform2f(p.blurVProgram, "resolution", resW, resH)
-	p.SetUniform1f(p.blurVProgram, "blur_radius", radius)
-	p.ctx.ActiveTexture(texture0)
-	p.ctx.BindTexture(texture2D, texA)
-	p.blendFunc(one, oneMinusSrcAlpha)
-	p.ctx.DrawArrays(triangleStrip, 0, 4)
-	p.logError()
-
-	// Restore the active render target (canvas/boundary FBO or screen).
-	// The caller restores its own viewport if the stack is empty.
-	p.rebindRenderTarget(0, 0)
-
-	// Cleanup intermediate resources
-	p.ctx.DeleteFramebuffer(fboA)
-	p.ctx.DeleteTexture(texA)
-	p.ctx.DeleteFramebuffer(fboB)
-
-	// Return the blurred texture (caller owns texB)
-	return texB
 }
 
 // StartRoundedClipping enables stencil-based rounded-corner clipping.

@@ -7,6 +7,7 @@ import (
 
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/geo"
+	paint "github.com/belluikit/bellui/internal/painter"
 )
 
 // Box shadows and backdrop blur for WebGPU (pre-rebrand tracker #223), porting the GL painter's
@@ -112,9 +113,9 @@ func (p *painter) shadowTexture(shadow *canvas.BoxShadow, spread, shadowW, shado
 	p.drawRectangle(shadowRect, geo.NewPos(spread, spread), fboFrame)
 	p.dev.PopTarget()
 
-	// Separably blur the shape (radius normalised to texture space, as in GL).
-	blurRadius := shadow.BlurRadius * p.pixScale / float32(texW) * 2
-	blurred := p.blurTexture(shapeTex.View(), texW, texH, blurRadius)
+	// Separably blur the shape. The texture may come back smaller than the
+	// shape's; it is drawn stretched to the shadow's size.
+	blurred := p.blurTexture(shapeTex.View(), texW, texH, paint.BlurSigma(shadow.BlurRadius)*p.pixScale)
 	p.dev.ReleaseTextureAfterFrame(shapeTex)
 	if blurred == nil {
 		return nil
@@ -180,8 +181,7 @@ func (p *painter) drawBackdropBlur(blur *canvas.BackdropBlur, pos geo.Position, 
 		return
 	}
 
-	// Blur radius in captured-texture pixels (matches the GL backdrop path).
-	blurred := p.blurTexture(captured.View(), capW, capH, blur.BlurRadius*p.pixScale)
+	blurred := p.blurTexture(captured.View(), capW, capH, paint.BlurSigma(blur.BlurRadius)*p.pixScale)
 	p.dev.ReleaseTextureAfterFrame(captured)
 	if blurred == nil {
 		return
@@ -195,11 +195,41 @@ func (p *painter) drawBackdropBlur(blur *canvas.BackdropBlur, pos geo.Position, 
 	p.transform = prevTransform
 }
 
-// blurTexture runs a two-pass separable Gaussian blur on a texture view via the
-// blur shader and ping-pong off-screen targets, returning the blurred texture
-// (owned by the caller). The radius is passed to the shader unchanged (resolution
-// = w×h), mirroring gl.blurTexture's convention. Returns nil on allocation failure.
-func (p *painter) blurTexture(src *wgpu.TextureView, w, h int, radius float32) *Texture {
+// blurTexture runs a separable Gaussian blur of sigma texels on a w×h texture
+// view via the blur shader and ping-pong off-screen targets, returning the
+// blurred texture (owned by the caller). As paint.PlanBlur says, a wide blur
+// first halves the texture, so the result can be smaller than w×h: draw it
+// stretched. Mirrors gl.blurTexture. Returns nil on allocation failure.
+func (p *painter) blurTexture(src *wgpu.TextureView, w, h int, sigma float32) *Texture {
+	halvings, step := paint.PlanBlur(sigma)
+	var halved *Texture
+	for range halvings {
+		if w == 1 && h == 1 {
+			break
+		}
+		w, h = paint.HalveTexels(w), paint.HalveTexels(h)
+		next, err := p.dev.CreateRenderTexture(w, h)
+		if err != nil {
+			if halved != nil {
+				halved.Release()
+			}
+			return nil
+		}
+		// A blur of no width samples each target texel's centre, between
+		// four source texels: linear filtering averages them.
+		u := BlurUniforms{Resolution: [2]float32{float32(w), float32(h)}}
+		p.dev.PushOffscreenTarget(next, w, h, wgpu.Color{})
+		p.recordBlur(src, uniformBytes(&u), BlurFragmentEntryH)
+		p.dev.PopTarget()
+		if halved != nil {
+			p.dev.ReleaseTextureAfterFrame(halved)
+		}
+		halved, src = next, next.View()
+	}
+	if halved != nil {
+		defer p.dev.ReleaseTextureAfterFrame(halved)
+	}
+
 	texA, err := p.dev.CreateRenderTexture(w, h)
 	if err != nil {
 		return nil
@@ -209,17 +239,20 @@ func (p *painter) blurTexture(src *wgpu.TextureView, w, h int, radius float32) *
 		texA.Release()
 		return nil
 	}
-	u := BlurUniforms{Resolution: [2]float32{float32(w), float32(h)}, BlurRadius: radius}
+	u := BlurUniforms{Resolution: [2]float32{float32(w), float32(h)}, BlurRadius: step}
 
-	// Pass 1: horizontal blur, src → texA.
-	p.dev.PushOffscreenTarget(texA, w, h, wgpu.Color{})
-	p.recordBlur(src, uniformBytes(&u), BlurFragmentEntryH)
-	p.dev.PopTarget()
+	// Horizontal then vertical, paint.BlurPasses times: src → texA → texB →
+	// texA → texB.
+	for range paint.BlurPasses {
+		p.dev.PushOffscreenTarget(texA, w, h, wgpu.Color{})
+		p.recordBlur(src, uniformBytes(&u), BlurFragmentEntryH)
+		p.dev.PopTarget()
 
-	// Pass 2: vertical blur, texA → texB.
-	p.dev.PushOffscreenTarget(texB, w, h, wgpu.Color{})
-	p.recordBlur(texA.View(), uniformBytes(&u), BlurFragmentEntryV)
-	p.dev.PopTarget()
+		p.dev.PushOffscreenTarget(texB, w, h, wgpu.Color{})
+		p.recordBlur(texA.View(), uniformBytes(&u), BlurFragmentEntryV)
+		p.dev.PopTarget()
+		src = texB.View()
+	}
 
 	p.dev.ReleaseTextureAfterFrame(texA) // intermediate; texB is returned
 	return texB
@@ -251,9 +284,31 @@ func (p *painter) recordBlur(view *wgpu.TextureView, uniform []byte, fragment st
 
 // blitTextureAlpha draws a texture view as a stretched quad at pos via the simple
 // shader at the given alpha (no corner radius). Like blitTexture but with an
-// explicit alpha so shadows/backdrop honour the active group opacity.
+// explicit alpha so shadows/backdrop honour the active group opacity, and
+// through SimpleSoftFragmentEntry: the simple shader's own entry drops texels
+// under 1% alpha, which stopped a shadow's tail on a faint line (#442).
 func (p *painter) blitTextureAlpha(view *wgpu.TextureView, logical geo.Size, pos geo.Position, frame geo.Size, alpha float32) {
 	points, insets := p.rectCoords(logical, pos, frame, canvas.ImageFillStretch, 0, 0)
 	u := SimpleUniforms{Alpha: alpha, Inset: insets}
-	p.record("simple", points, 4, uniformBytes(&u), view)
+	desc, ok := DescriptorFor("simple")
+	if !ok {
+		return
+	}
+	staged, ok := p.stage(uniformBytes(&u))
+	if !ok {
+		return
+	}
+	_ = p.dev.Record(DrawCall{
+		Key: PipelineKey{
+			Shader:   "simple",
+			Fragment: SimpleSoftFragmentEntry,
+			Blend:    desc.DefaultBlend,
+			Stencil:  p.stencilMode,
+			Format:   p.dev.Format(),
+		},
+		Vertices:    points,
+		VertexCount: 4,
+		Uniform:     staged,
+		TexView:     view,
+	})
 }

@@ -2,7 +2,7 @@
 
 uniform sampler2D tex;
 uniform vec2 resolution;
-uniform float blur_radius;
+uniform float blur_radius; // the distance between taps, in texels
 
 varying vec2 fragTexCoord;
 

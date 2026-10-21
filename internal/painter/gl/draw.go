@@ -237,8 +237,7 @@ func (p *painter) drawBackdropBlur(blur *canvas.BackdropBlur, pos geo.Position, 
 	p.ctx.CopyTexSubImage2D(texture2D, 0, 0, 0, x, y, w, h)
 	p.logError()
 
-	// Blur the captured texture. The shader expects radius in framebuffer pixels.
-	blurredTex := p.blurTexture(captureTex, w, h, blur.BlurRadius*p.pixScale)
+	blurredTex := p.blurTexture(captureTex, w, h, paint.BlurSigma(blur.BlurRadius)*p.pixScale)
 	defer p.ctx.DeleteTexture(blurredTex)
 
 	// Restore viewport after blur.
@@ -258,8 +257,7 @@ func (p *painter) drawBackdropBlur(blur *canvas.BackdropBlur, pos geo.Position, 
 	p.ctx.ActiveTexture(texture0)
 	p.ctx.BindTexture(texture2D, blurredTex)
 	p.blendFunc(one, oneMinusSrcAlpha)
-	p.ctx.DrawArrays(triangleStrip, 0, 4)
-	p.logError()
+	p.drawSoftTail()
 }
 
 func (p *painter) drawRipple(ripple *canvas.Ripple, pos geo.Position, frame geo.Size) {

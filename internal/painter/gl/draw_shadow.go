@@ -5,6 +5,7 @@ package gl
 import (
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/geo"
+	paint "github.com/belluikit/bellui/internal/painter"
 )
 
 // shadowKey is everything that decides a blurred shadow texture's pixels. Where
@@ -81,8 +82,18 @@ func (p *painter) drawBoxShadow(shadow *canvas.BoxShadow, pos geo.Position, fram
 	p.SetUniform4f(p.program, "inset", 0, 0, 1, 1)
 	p.ctx.ActiveTexture(texture0)
 	p.ctx.BindTexture(texture2D, blurredTex)
-	p.blendFunc(srcAlpha, oneMinusSrcAlpha)
+	// The blurred texture is premultiplied, like the WebGPU painter's.
+	p.blendFunc(one, oneMinusSrcAlpha)
+	p.drawSoftTail()
+}
+
+// drawSoftTail draws the bound quad through the simple program, keeping the
+// texels it otherwise drops for under 1% alpha: a blurred shadow's tail would
+// stop on a faint line (#442).
+func (p *painter) drawSoftTail() {
+	p.SetUniform1f(p.program, "keepSoftTail", 1)
 	p.ctx.DrawArrays(triangleStrip, 0, 4)
+	p.SetUniform1f(p.program, "keepSoftTail", 0)
 	p.logError()
 }
 
@@ -135,8 +146,9 @@ func (p *painter) shadowTexture(shadow *canvas.BoxShadow, spread, shadowW, shado
 	frameWidthScaled, frameHeightScaled := p.scaleFrameSize(frame)
 	p.rebindRenderTarget(int(frameWidthScaled), int(frameHeightScaled))
 
-	blurRadius := shadow.BlurRadius * p.pixScale / float32(texW) * 2 // normalize to texture space
-	blurredTex := p.blurTexture(shapeTex, texW, texH, blurRadius)
+	// The texture may come back smaller than the shape's; it is drawn
+	// stretched to the shadow's size.
+	blurredTex := p.blurTexture(shapeTex, texW, texH, paint.BlurSigma(shadow.BlurRadius)*p.pixScale)
 
 	// Restore the render target again — blurTexture leaves the blur-pass
 	// viewport behind when no FBO target is on the stack (overlay pass).
