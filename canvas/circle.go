@@ -7,6 +7,7 @@ import (
 
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/paintgen"
 )
 
 // Declare conformity with CanvasObject interface
@@ -93,8 +94,12 @@ func (c *Circle) Resize(size geo.Size) {
 // Show will set this circle to be visible
 func (c *Circle) Show() {
 	c.propMu.Lock()
+	changed := c.Hidden
 	c.Hidden = false
 	c.propMu.Unlock()
+	if changed {
+		paintgen.Changed()
+	}
 
 	c.Refresh()
 }
@@ -130,8 +135,12 @@ func (c *Circle) Transform() geo.Matrix {
 // Use [geo.Identity] to clear the transform.
 func (c *Circle) SetTransform(m geo.Matrix) {
 	c.propMu.Lock()
+	changed := !sameTransform(c.transform, m)
 	c.transform = m
 	c.propMu.Unlock()
+	if changed {
+		paintgen.Changed()
+	}
 }
 
 // Visible returns true if this circle is visible, false otherwise

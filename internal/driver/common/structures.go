@@ -129,6 +129,28 @@ type RenderCacheNode struct {
 	// walks then set up no clip for it, and the spatial index skips the
 	// children too where nothing on the canvas can reach them (#481).
 	paintCulled bool
+	// childrenSkipped says the last walk to visit this node skipped its
+	// children, by its cull or its nodeCull: their nodes are kept for when
+	// a walk reaches them again.
+	childrenSkipped bool
+
+	// placeQueued marks the node as waiting in Canvas.placed. regionPass is
+	// the Canvas.regionPass that chose to walk from it.
+	placeQueued atomic.Bool
+	regionPass  uint64
+	// walkPos is where the last walk to visit the node found its object on the
+	// canvas, before transforms, and noCullBelow says that walk culled nothing
+	// below it, as it or an ancestor has a transform. A walk from a child
+	// starts from them (walkTreeFrom).
+	walkPos     geo.Position
+	noCullBelow bool
+	// placement says whether the object reports its moves (reportsPlacement):
+	// placementUnknown until a region walk asks. foreignChild says the last
+	// region walk through the node found a child that does not, and
+	// inForeign that the node is in Canvas.foreignParents.
+	placement    placement
+	foreignChild bool
+	inForeign    bool
 
 	// boundaryPhase is the sub-pixel phase a RepaintBoundary's texture was last
 	// rendered at, when boundaryPhaseSet (BoundaryGeometry, #570).
@@ -227,4 +249,34 @@ func (o *overlayStack) Remove(overlay core.CanvasObject) {
 	}
 
 	o.renderCaches = o.renderCaches[:overlayCount]
+}
+
+// nodeQueue holds nodes queued from any goroutine for the main thread to
+// drain, each node once until drained: the flag add is given says it is
+// queued, and whoever takes the node clears it.
+type nodeQueue struct {
+	mu    sync.Mutex
+	nodes []*RenderCacheNode
+	taken []*RenderCacheNode // the buffer take returned last, reused
+}
+
+// add queues node unless queued says it already is.
+func (q *nodeQueue) add(node *RenderCacheNode, queued *atomic.Bool) {
+	if queued.Swap(true) {
+		return
+	}
+	q.mu.Lock()
+	q.nodes = append(q.nodes, node)
+	q.mu.Unlock()
+}
+
+// take returns the nodes queued since it was last called. The next take hands
+// the slice back to add, so the caller is done with it by then.
+func (q *nodeQueue) take() []*RenderCacheNode {
+	q.mu.Lock()
+	taken := q.nodes
+	q.nodes = q.taken[:0]
+	q.taken = taken
+	q.mu.Unlock()
+	return taken
 }

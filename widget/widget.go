@@ -13,6 +13,7 @@ import (
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/cache"
+	"github.com/belluikit/bellui/internal/paintgen"
 	internalWidget "github.com/belluikit/bellui/internal/widget"
 	"github.com/belluikit/bellui/theme"
 )
@@ -151,6 +152,7 @@ func (w *BaseWidget) Resize(size geo.Size) {
 	}
 
 	cache.Renderer(impl).Layout(size)
+	internalWidget.Repaint(impl)
 }
 
 // Position gets the current position of this widget, relative to its parent.
@@ -201,6 +203,7 @@ func (w *BaseWidget) Show() {
 	}
 
 	w.Hidden = false
+	paintgen.Changed() // a hidden widget has no node to refresh (#599)
 
 	impl := w.super()
 	if impl == nil {

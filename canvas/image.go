@@ -229,12 +229,14 @@ func (i *Image) Resize(s geo.Size) {
 		return
 	}
 	i.baseObject.Resize(s)
+	// Refresh can return without telling the canvas, when there is nothing to
+	// draw or it fails to: tell it here, as Move and Hide do (#599).
+	defer repaint(i)
 	if i.FillMode == ImageFillOriginal && i.Size().Height > 2 { // we can just ask for a GPU redraw to align
 		Refresh(i)
 		return
 	}
 
-	i.baseObject.Resize(s)
 	i.propMu.RLock()
 	isSVG := i.isSVG
 	i.propMu.RUnlock()

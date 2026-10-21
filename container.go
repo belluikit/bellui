@@ -4,6 +4,7 @@ import (
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/layoutgen"
+	"github.com/belluikit/bellui/internal/paintgen"
 )
 
 // Declare conformity to [core.CanvasObject]
@@ -32,6 +33,7 @@ func (c *Container) Add(add core.CanvasObject) {
 		}
 		c.Objects = append(c.Objects, add)
 		c.layout()
+		placed(c)
 	})
 }
 
@@ -63,6 +65,9 @@ func (c *Container) MinSize() geo.Size {
 
 // Move the container (and all its children) to a new position, relative to its parent.
 func (c *Container) Move(pos geo.Position) {
+	if c.position == pos {
+		return // a relayout moves every child to where it was (#599)
+	}
 	c.position = pos
 	repaint(c)
 }
@@ -104,6 +109,7 @@ func (c *Container) Remove(rem core.CanvasObject) {
 		c.Objects[len(c.Objects)-1] = nil
 		c.Objects = c.Objects[:len(c.Objects)-1]
 		c.layout()
+		placed(c)
 		return
 	}
 }
@@ -114,6 +120,7 @@ func (c *Container) Remove(rem core.CanvasObject) {
 func (c *Container) RemoveAll() {
 	c.Objects = nil
 	c.layout()
+	placed(c)
 }
 
 // Resize sets a new size for c.
@@ -124,6 +131,7 @@ func (c *Container) Resize(size geo.Size) {
 
 	c.size = size
 	c.layout()
+	placed(c)
 }
 
 // Show sets this container, and all its children, to be visible.
@@ -134,8 +142,10 @@ func (c *Container) Show() {
 
 	c.Hidden = false
 	// A container hidden from the start was never walked, so no canvas knows
-	// it: the next min-size pass must walk everything to lay it out (#487).
+	// it: the next min-size pass must walk everything to lay it out (#487),
+	// and the next partial repaint everything to find where it shows (#599).
 	layoutgen.Changed()
+	paintgen.Changed()
 	repaint(c)
 }
 
@@ -172,8 +182,25 @@ func repaint(obj *Container) {
 		if m, ok := c.(interface{ MarkMinSizeDirty(core.CanvasObject) }); ok {
 			m.MarkMinSizeDirty(obj)
 		}
+		if m, ok := c.(interface{ MarkPlacementDirty(core.CanvasObject) }); ok {
+			m.MarkPlacementDirty(obj)
+		}
 		if paint, ok := c.(interface{ SetDirty() }); ok {
 			paint.SetDirty()
+		}
+	}
+}
+
+// placed tells the canvas showing c that c was resized or its objects
+// changed, which a partial repaint learns of from this alone (#599).
+func placed(c *Container) {
+	app := CurrentApp()
+	if app == nil || app.Driver() == nil {
+		return
+	}
+	if cv := app.Driver().CanvasForObject(c); cv != nil {
+		if m, ok := cv.(interface{ MarkPlacementDirty(core.CanvasObject) }); ok {
+			m.MarkPlacementDirty(c)
 		}
 	}
 }

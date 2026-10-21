@@ -19,13 +19,40 @@ import (
 )
 
 // fakeSizeable is a minimal SizeableCanvas: PartialDirtyRegion only needs
-// impl.Size() (via RebuildSpatialIndex); the rest of the interface is unused.
+// impl.Size() (via RebuildSpatialIndex). As the canvas the driver finds for
+// every object (regionDriver), it passes on what objects report, as a
+// driver's canvas does: a placement change, and a refresh the way
+// FreeDirtyTextures takes it from the queue.
 type fakeSizeable struct {
 	SizeableCanvas
 	size geo.Size
+	c    *Canvas
 }
 
 func (f *fakeSizeable) Size() geo.Size { return f.size }
+
+func (f *fakeSizeable) MarkPlacementDirty(o core.CanvasObject) { f.c.MarkPlacementDirty(o) }
+
+func (f *fakeSizeable) MarkMinSizeDirty(o core.CanvasObject) { f.c.MarkMinSizeDirty(o) }
+
+func (f *fakeSizeable) SetDirty() {}
+
+func (f *fakeSizeable) Refresh(o core.CanvasObject) { f.c.noteRefreshed(o) }
+
+// regionDriver is the test driver, except that every object's canvas is c.
+type regionDriver struct {
+	bellui.Driver
+	c core.Canvas
+}
+
+func (d *regionDriver) CanvasForObject(core.CanvasObject) core.Canvas { return d.c }
+
+type regionApp struct {
+	bellui.App
+	d *regionDriver
+}
+
+func (a *regionApp) Driver() bellui.Driver { return a.d }
 
 // TestPartialDirtyRegion verifies the heart of the dirty-region repair: a region
 // that covers exactly what changed, includes both the old and new bounds of a
@@ -42,10 +69,7 @@ func TestPartialDirtyRegion(t *testing.T) {
 	objB.Move(geo.NewPos(100, 100))
 	content := container.NewWithoutLayout(objA, objB)
 	content.Resize(geo.NewSize(200, 200))
-
-	c := &Canvas{}
-	c.Initialize(&fakeSizeable{size: geo.NewSize(200, 200)}, func() {})
-	c.SetContentTreeAndFocusMgr(content)
+	c := newPartialCanvas(content, geo.NewSize(200, 200))
 
 	// Frame 1: no recorded bounds yet, so every node is "moved" and the region
 	// spans the content. This pass also records lastPaintBounds for next time.
@@ -89,10 +113,15 @@ func refresh(t *testing.T, c *Canvas, objs ...core.CanvasObject) {
 	}
 }
 
+// newPartialCanvas returns a canvas showing content, which the current app's
+// driver finds for every object until the test ends.
 func newPartialCanvas(content core.CanvasObject, size geo.Size) *Canvas {
 	c := &Canvas{}
-	c.Initialize(&fakeSizeable{size: size}, func() {})
+	impl := &fakeSizeable{size: size, c: c}
+	c.Initialize(impl, func() {})
 	c.SetContentTreeAndFocusMgr(content)
+	a := bellui.CurrentApp()
+	bellui.SetCurrentApp(&regionApp{App: a, d: &regionDriver{Driver: a.Driver(), c: impl}})
 	return c
 }
 
@@ -344,4 +373,34 @@ func TestPartialDirtyRegion_TextOutsideItsBox(t *testing.T) {
 	assert.LessOrEqual(t, pos.Y, float32(200))
 	assert.GreaterOrEqual(t, pos.X+sz.Width, 200+min.Width, "the old glyphs' width is cleared")
 	assert.GreaterOrEqual(t, pos.Y+sz.Height, 200+min.Height, "and their height")
+}
+
+// TestPartialDirtyRegion_HiddenOnlyChild pins that hiding the only visible
+// child of a container clears it, as hiding one of several does: the walk
+// visited no child there, and kept the old one's node, so its pixels stayed
+// and it stayed mapped.
+func TestPartialDirtyRegion_HiddenOnlyChild(t *testing.T) {
+	test.NewTempApp(t)
+
+	child := canvas.NewRectangle(color.White)
+	child.Move(geo.NewPos(10, 10))
+	child.Resize(geo.NewSize(20, 20))
+	inner := container.NewWithoutLayout(child)
+	inner.Resize(geo.NewSize(50, 50))
+	content := container.NewWithoutLayout(inner)
+	content.Resize(geo.NewSize(100, 100))
+	c := newPartialCanvas(content, geo.NewSize(100, 100))
+	c.PartialDirtyRegion()
+
+	child.Hide()
+	pos, sz, set := c.PartialDirtyRegion()
+	require.True(t, set, "the hidden child's pixels must be cleared")
+	assert.LessOrEqual(t, pos.X, float32(10))
+	assert.LessOrEqual(t, pos.Y, float32(10))
+	assert.GreaterOrEqual(t, pos.X+sz.Width, float32(30))
+	assert.GreaterOrEqual(t, pos.Y+sz.Height, float32(30))
+	_, ok := c.NodeFor(child)
+	assert.False(t, ok, "and its node forgotten")
+	node, _ := c.NodeFor(inner)
+	assert.Nil(t, node.firstChild)
 }

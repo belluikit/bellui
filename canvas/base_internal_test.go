@@ -6,6 +6,7 @@ import (
 
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/paintgen"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -128,4 +129,44 @@ func TestBase_Transform_ConcurrentAccess(t *testing.T) {
 
 	wg.Wait()
 	// No race detector failures = pass.
+}
+
+// TestSetTransform_ReportsOnlyAChange pins when SetTransform tells the
+// partial-repaint region that what is drawn may have moved (#599): every
+// change does, and that walks every node, so the identity set on an object
+// that never had a transform, which changes nothing, must not.
+func TestSetTransform_ReportsOnlyAChange(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		obj  core.Transformable
+	}{
+		{"rectangle", NewRectangle(nil)},
+		{"circle", NewCircle(nil)},
+		{"line", NewLine(nil)},
+		{"text", NewText("t", nil)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			reports := func(m geo.Matrix) bool {
+				e := paintgen.Epoch()
+				tc.obj.SetTransform(m)
+				return paintgen.Epoch() != e
+			}
+			assert.False(t, reports(geo.Identity()), "the identity, on an object with no transform")
+			assert.True(t, reports(geo.NewScale(2, 2)))
+			assert.False(t, reports(geo.NewScale(2, 2)), "the same transform again")
+			assert.True(t, reports(geo.Identity()))
+			assert.False(t, reports(geo.Matrix{}), "the zero matrix, which is the identity")
+		})
+	}
+}
+
+// TestText_SetTransformClearingRotationReports pins that a transform set over
+// a rotation reports, even when it is the one kept: the text drew rotated.
+func TestText_SetTransformClearingRotationReports(t *testing.T) {
+	txt := NewText("rotated", nil)
+	txt.SetRotation(45)
+	e := paintgen.Epoch()
+	txt.SetTransform(geo.Identity())
+	assert.NotEqual(t, e, paintgen.Epoch())
+	assert.Equal(t, geo.Identity(), txt.Transform())
 }

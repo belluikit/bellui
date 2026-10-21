@@ -37,3 +37,32 @@ func NewRipple(c color.Color) *Ripple {
 func (r *Ripple) Refresh() {
 	Refresh(r)
 }
+
+// Hide will set this ripple to not be visible.
+func (r *Ripple) Hide() {
+	r.baseObject.Hide()
+
+	repaint(r)
+}
+
+// Move the ripple to a new position, relative to its parent.
+func (r *Ripple) Move(pos geo.Position) {
+	if r.Position() == pos {
+		return
+	}
+
+	r.baseObject.Move(pos)
+
+	repaint(r)
+}
+
+// Resize sets a new size for the ripple.
+func (r *Ripple) Resize(s geo.Size) {
+	if s == r.Size() {
+		return
+	}
+
+	r.baseObject.Resize(s)
+
+	repaint(r)
+}
