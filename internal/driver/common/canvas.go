@@ -450,6 +450,15 @@ func (c *Canvas) DirtyRegion() (pos geo.Position, size geo.Size, set bool) {
 	return c.dirtyRegion.pos, c.dirtyRegion.size, c.dirtyRegion.set
 }
 
+// InDirtyRegion reports whether the rect (pos, size) needs repainting under a
+// partial repaint of the region (rPos, rSize). An empty region, a frame with
+// nothing dirty, holds nothing. By overlap alone, a rect reaching across the
+// empty region at (0, 0) would count as inside it and be painted unclipped,
+// over pixels nothing else repainted (#605).
+func InDirtyRegion(pos geo.Position, size geo.Size, rPos geo.Position, rSize geo.Size) bool {
+	return rSize.Width > 0 && rSize.Height > 0 && RectsOverlap(pos, size, rPos, rSize)
+}
+
 // RectsOverlap reports whether two axis-aligned rectangles intersect. Used by
 // the drivers to cull objects that fall outside the partial-repaint region.
 func RectsOverlap(aPos geo.Position, aSize geo.Size, bPos geo.Position, bSize geo.Size) bool {
