@@ -95,11 +95,21 @@ func (d *NavigationDrawer) Show(c core.Canvas) {
 		objects = append(objects, row)
 	}
 
-	drawerWidth := float32(360)
+	// The drawer surface runs edge to edge, but its destinations keep clear of
+	// the system insets (status bar, home indicator, a landscape notch).
+	insetPos, insetSize := c.InteractiveArea()
+	canvasSize := c.Size()
+	insetBottom := max(canvasSize.Height-insetPos.Y-insetSize.Height, 0)
+
+	drawerWidth := float32(360) + insetPos.X
 	content := &bellui.Container{Layout: layout.NewVBoxLayout(), Objects: objects}
 	padded := &bellui.Container{Layout: layout.NewPaddedLayout(), Objects: []core.CanvasObject{content}}
+	inset := &bellui.Container{
+		Layout:  layout.NewCustomPaddedLayout(insetPos.Y, insetBottom, insetPos.X, 0),
+		Objects: []core.CanvasObject{padded},
+	}
 	// Scroll so destination lists taller than the canvas remain reachable.
-	scroll := internalWidget.NewScroll(padded)
+	scroll := internalWidget.NewScroll(inset)
 
 	if d.Modal {
 		d.popUp = NewModalPopUp(scroll, c)
@@ -108,9 +118,7 @@ func (d *NavigationDrawer) Show(c core.Canvas) {
 		d.popUp = NewPopUp(scroll, c)
 	}
 
-	canvasSize := c.Size()
-	height := canvasSize.Height
-	d.popUp.Resize(geo.NewSize(drawerWidth, height))
+	d.popUp.Resize(geo.NewSize(drawerWidth, canvasSize.Height))
 	d.popUp.Show()
 	d.popUp.Move(geo.NewPos(0, 0))
 	d.open = true
