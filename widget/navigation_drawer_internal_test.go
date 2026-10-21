@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/belluikit/bellui"
+	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
 	internalWidget "github.com/belluikit/bellui/internal/widget"
@@ -21,7 +22,9 @@ func drawerRows(t *testing.T, d *NavigationDrawer) []*drawerItemWidget {
 	t.Helper()
 	scroll, ok := d.popUp.Content.(*internalWidget.Scroll)
 	require.True(t, ok, "drawer popup content should be a scroll")
-	padded, ok := scroll.Content.(*bellui.Container)
+	inset, ok := scroll.Content.(*bellui.Container)
+	require.True(t, ok)
+	padded, ok := inset.Objects[0].(*bellui.Container)
 	require.True(t, ok)
 	content, ok := padded.Objects[0].(*bellui.Container)
 	require.True(t, ok)
@@ -107,4 +110,63 @@ func TestNavigationDrawer_ScrollsLongLists(t *testing.T) {
 	if scroll.Content.MinSize().Height <= w.Canvas().Size().Height {
 		t.Fatal("expected the 30-item list to exceed the canvas height")
 	}
+}
+
+// insetCanvas reports system insets the way a phone canvas does: a status bar
+// at the top, a home indicator at the bottom and a notch on the left.
+type insetCanvas struct {
+	core.Canvas
+	top, bottom, left float32
+}
+
+func (c insetCanvas) InteractiveArea() (geo.Position, geo.Size) {
+	return geo.NewPos(c.left, c.top), c.Size().SubtractWidthHeight(c.left, c.top+c.bottom)
+}
+
+// drawerRowsAbs returns the absolute top and bottom of the drawer's first and
+// last destination, with the drawer scrolled to its end.
+func drawerRowsAbs(t *testing.T, d *NavigationDrawer) (firstTop, firstLeft, lastBottom float32) {
+	t.Helper()
+	rows := drawerRows(t, d)
+	require.NotEmpty(t, rows)
+	drv := bellui.CurrentApp().Driver()
+	first := drv.AbsolutePositionForObject(rows[0])
+
+	scroll := d.popUp.Content.(*internalWidget.Scroll)
+	scroll.ScrollToBottom()
+	last := rows[len(rows)-1]
+	lastPos := drv.AbsolutePositionForObject(last)
+	return first.Y, first.X, lastPos.Y + last.Size().Height
+}
+
+// The drawer's destinations start below the status bar and can scroll clear
+// of the home indicator; the surface itself still covers the whole edge (#608).
+func TestNavigationDrawer_KeepsDestinationsInsideInsets(t *testing.T) {
+	test.NewTempApp(t)
+	items := make([]*NavigationDrawerItem, 30)
+	for i := range items {
+		items[i] = &NavigationDrawerItem{Label: fmt.Sprintf("Item %d", i), Icon: theme.HomeIcon()}
+	}
+	w := test.NewTempWindow(t, NewLabel("content"))
+	w.Resize(geo.NewSize(400, 600))
+
+	// Reference: the same drawer on a canvas without insets. The test canvas
+	// reports a small inset of its own, so the reference zeroes it.
+	plain := NewNavigationDrawer(items, nil)
+	plain.Show(insetCanvas{Canvas: w.Canvas()})
+	plainTop, plainLeft, plainBottom := drawerRowsAbs(t, plain)
+	plainSurfaceY := plain.popUp.Content.Position().Y
+	plain.Hide()
+
+	c := insetCanvas{Canvas: w.Canvas(), top: 48, bottom: 24, left: 30}
+	d := NewNavigationDrawer(items, nil)
+	d.Show(c)
+	defer d.Hide()
+	top, left, bottom := drawerRowsAbs(t, d)
+
+	assert.Equal(t, plainTop+c.top, top, "first destination sits below the status bar")
+	assert.Equal(t, plainLeft+c.left, left, "destinations clear a left notch")
+	assert.Equal(t, plainBottom-c.bottom, bottom, "last destination scrolls clear of the home indicator")
+	assert.Equal(t, plainSurfaceY, d.popUp.Content.Position().Y,
+		"the drawer surface still starts at the top edge")
 }
