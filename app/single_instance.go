@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/trendvidia/protowire-go/encoding/pxf"
 
@@ -79,14 +81,15 @@ func (a *belluiApp) onForwardedArgs(args []string) {
 
 // writeArgs sends a length-prefixed message of arguments to a forwarding peer.
 // The wire format (4-byte big-endian length + PXF instancepb.ForwardedArgs) is
-// shared by every transport. An argument that is not valid UTF-8, such as a
-// file name in another encoding, is sent as JSON sent it, with U+FFFD for each
-// bad byte: PXF would send it as it is, and the running copy would then refuse
-// the whole message.
+// shared by every transport. Each argument is escaped with escapeArg, so a file
+// name that is not valid UTF-8 (a Latin-1 name on Linux, say) reaches the
+// running copy byte for byte: PXF refuses to read invalid UTF-8 back, and the
+// JSON message before #523 replaced each bad byte with U+FFFD, naming a file
+// that does not exist (#661).
 func writeArgs(w io.Writer, args []string) error {
 	msg := &instancepb.ForwardedArgs{Args: make([]string, len(args))}
 	for i, a := range args {
-		msg.Args[i] = pxfmigrate.ValidUTF8(a)
+		msg.Args[i] = escapeArg(a)
 	}
 	payload, err := pxf.Marshal(msg)
 	if err != nil {
@@ -131,5 +134,56 @@ func readArgs(r io.Reader) ([]string, error) {
 	if err := pxf.Unmarshal(payload, &msg); err != nil {
 		return nil, err
 	}
-	return msg.GetArgs(), nil
+	args := msg.GetArgs()
+	for i, a := range args {
+		args[i] = unescapeArg(a)
+	}
+	return args, nil
+}
+
+// argEscapeBase maps the bytes 0x80..0xFF to the private-use code points
+// U+EF80..U+EFFF. Part of the forwarded-arguments wire format: a running copy
+// and the launch forwarding to it must agree on it, so it never changes.
+const argEscapeBase = 0xEF00
+
+func isArgEscape(r rune) bool { return r >= argEscapeBase+0x80 && r <= argEscapeBase+0xFF }
+
+// escapeArg returns s as valid UTF-8 that unescapeArg turns back into s's exact
+// bytes. Valid UTF-8 is kept as it is, except a code point in U+EF80..U+EFFF;
+// each byte of that, and each byte that is not part of valid UTF-8, becomes
+// its escape. It works without knowing the bytes' encoding, which Linux does
+// not record for a file name.
+func escapeArg(s string) string {
+	if utf8.ValidString(s) && !strings.ContainsFunc(s, isArgEscape) {
+		return s
+	}
+	var b strings.Builder
+	for i := 0; i < len(s); {
+		r, n := utf8.DecodeRuneInString(s[i:])
+		if (r == utf8.RuneError && n == 1) || isArgEscape(r) {
+			for j := i; j < i+n; j++ {
+				b.WriteRune(argEscapeBase + rune(s[j]))
+			}
+		} else {
+			b.WriteString(s[i : i+n])
+		}
+		i += n
+	}
+	return b.String()
+}
+
+// unescapeArg reverses escapeArg.
+func unescapeArg(s string) string {
+	if !strings.ContainsFunc(s, isArgEscape) {
+		return s
+	}
+	var b strings.Builder
+	for _, r := range s {
+		if isArgEscape(r) {
+			b.WriteByte(byte(r - argEscapeBase))
+		} else {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }
