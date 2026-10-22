@@ -46,10 +46,9 @@ func TestAndroidManifestNoHandlers(t *testing.T) {
 }
 
 func TestIOSEntitlementsAssociatedDomains(t *testing.T) {
-	buf := &bytes.Buffer{}
-	err := entitlementsTmpl.Execute(buf, []string{"example.com", "links.example.com?mode=developer"})
+	ent, err := iosEntitlements(t.TempDir(), []string{"example.com", "links.example.com?mode=developer"})
 	assert.NoError(t, err)
-	out := buf.String()
+	out := string(encodePlist(ent))
 
 	// Universal Links (pre-rebrand tracker #622) need a com.apple.developer.associated-domains
 	// entitlement with an applinks:<domain> entry per declared domain.
