@@ -242,3 +242,34 @@ next to the app's main package, the way `android/*.java` works on Android:
 - **Swift is not compiled** by the packager; it ships as an xcframework.
 - Verified with `hack/iosframeworkprobe` (bundle inspection; see its doc
   comment for the device run).
+
+### Android library dependencies in `bellui package` (#672)
+
+`<appdir>/android/libs/*.jar|*.aar` are packaged without Gradle; the user-facing
+description is in `cmd/bellui/README.md`, the code in
+`cmd/bellui/internal/mobile/android_libs.go`.
+
+- **File convention, not manifest.pxf fields** (owner decision, 2026-10-22): the
+  same envelope as `android/*.java` and a custom `AndroidManifest.xml`. A static
+  directory cannot vary per Development/Release build.
+- **AARs switch resources to aapt2.** Library res needs a real link and R
+  classes, which binres cannot do. Libraries are `-R` overlays in file-name
+  order and the app's own resources come last, so the app wins a name clash.
+  `--extra-packages` generates an R class for every library package with
+  resources, or with a non-empty `R.txt` (an AAR built with transitive R reads
+  its dependencies' resources through its own R). The R sources are compiled
+  and dexed with the app, which is why linking now runs before dexing.
+- **No AAR, no change.** Without an AAR the binres path is untouched; a test
+  pins the manifest byte-identical with and without a jar.
+- **Simplified manifest merge**: permissions, features, queries and
+  `<application>` children, deduplicated by `android:name` with the app first.
+  No `tools:` directives, no `<application>` attribute merge, no placeholder
+  other than `${applicationId}`. Upgrade path if a library needs more: the
+  app's own `AndroidManifest.xml`.
+- **Missing ABI is an error**: an AAR with `jni/` for some ABIs but not a built
+  one would install and then fail `System.loadLibrary` on exactly those devices.
+- **Build-tools selection**: `util.AndroidBuildToolsPath` used to take the
+  lexically first (oldest) build-tools; d8 2.1.7 from 30.0.3 crashed on the
+  android-35 `android.jar` given as `--lib`. It now takes the newest.
+- **Verify** with `hack/androidlibprobe` (androidx.core 1.3.2 closure; expects
+  `androidlibprobe ok color=#ff9e9e9e overflow=999+ arrayset=2`).
