@@ -174,6 +174,12 @@ func (a *aarLib) resDir() string {
 	return nonEmptyDir(filepath.Join(a.dir, "res"))
 }
 
+// hasRTxt reports whether the AAR lists any resource in R.txt.
+func (a *aarLib) hasRTxt() bool {
+	fi, err := os.Stat(filepath.Join(a.dir, "R.txt"))
+	return err == nil && fi.Size() > 0
+}
+
 func nonEmptyDir(dir string) string {
 	found := false
 	_ = filepath.WalkDir(dir, func(_ string, d os.DirEntry, err error) error {
@@ -611,11 +617,18 @@ func writeAppIconRes(appRes string, manifest []byte, legacyIcon, iconFG, iconBG,
 }
 
 // compileLibraryRes compiles each AAR's res/ into a zip of flat files and
-// returns them in order, with the library packages that need an R class.
+// returns them in order, with the library packages that need an R class: those
+// with resources, and those whose R.txt lists any (transitive R).
 func compileLibraryRes(run func(...string) error, work string, libs *androidLibs, appPkg string) (overlays, extraPkgs []string, err error) {
 	for i, a := range libs.aars {
 		res := a.resDir()
 		if res == "" {
+			// No resources of its own, but an AAR built with transitive R
+			// classes still reads its dependencies' resources through its own
+			// R, which R.txt lists.
+			if a.pkg != "" && a.pkg != appPkg && a.hasRTxt() && !slices.Contains(extraPkgs, a.pkg) {
+				extraPkgs = append(extraPkgs, a.pkg)
+			}
 			continue
 		}
 		if a.pkg == "" {

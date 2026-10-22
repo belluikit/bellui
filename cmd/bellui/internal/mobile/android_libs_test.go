@@ -252,6 +252,26 @@ func TestPackageAndroidLibs(t *testing.T) {
 		"aidl/com/example/Thing.aidl": []byte("ignored"),
 	})
 
+	// An AAR with no res/ whose code reads a dependency's resource through
+	// its own R (transitive R, as R.txt lists).
+	userClasses := javacJar(t, androidJar, nil, map[string]string{
+		"com/example/user/R.java":    `package com.example.user; public final class R { public static final class string { public static int aar_greeting = 0; } }`,
+		"com/example/user/User.java": `package com.example.user; public class User { public static int id() { return R.string.aar_greeting; } }`,
+	}, "com/example/user/R")
+	var userJar bytes.Buffer
+	zw = zip.NewWriter(&userJar)
+	for name, data := range userClasses {
+		w, err := zw.Create(name)
+		require.NoError(t, err)
+		_, _ = w.Write(data)
+	}
+	require.NoError(t, zw.Close())
+	writeZip(t, filepath.Join(libDir, "user.aar"), map[string][]byte{
+		"AndroidManifest.xml": []byte(`<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.example.user"/>`),
+		"classes.jar":         userJar.Bytes(),
+		"R.txt":               []byte("int string aar_greeting 0x7f010000\n"),
+	})
+
 	// App Java that uses both libraries.
 	require.NoError(t, os.WriteFile(filepath.Join(app, "android", "Shim.java"), []byte(
 		`package com.example.app; public class Shim { public static String go() { return com.example.plain.Plain.hi() + com.example.aar.Greeter.id(); } }`,
@@ -315,6 +335,8 @@ func TestPackageAndroidLibs(t *testing.T) {
 		"Lcom/example/plain/Plain;",
 		"Lcom/example/aar/Greeter;",
 		"Lcom/example/aar/R$string;",
+		"Lcom/example/user/User;",
+		"Lcom/example/user/R$string;",
 	} {
 		assert.Contains(t, descriptors.String(), "Class descriptor  : '"+class+"'")
 	}
