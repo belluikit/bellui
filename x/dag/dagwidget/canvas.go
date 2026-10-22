@@ -93,7 +93,6 @@ type DAGCanvas struct {
 
 	// Interaction state
 	dragState        canvasDragState
-	dragStart        geo.Position
 	pendingEdge      *pendingConnection
 	pendingGroupLink *pendingGroupEdge
 	pendingNodeLink  *pendingNodeLink

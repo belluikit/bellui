@@ -144,9 +144,11 @@ func TestAddEdgeStreamCompatibility(t *testing.T) {
 	}
 
 	// Incompatible: image (image/frame) -> filter (json/object)
-	err = g.AddEdge(&Edge{ID: "e2", Source: PortID{"img", "frames"}, Target: PortID{"flt", "in"}})
-	// Target already connected, but even without that, types don't match
-	// Let's test with a fresh filter
+	// The target is already connected, so this fails either way; e3 below
+	// isolates the type check with a fresh filter.
+	if err := g.AddEdge(&Edge{ID: "e2", Source: PortID{"img", "frames"}, Target: PortID{"flt", "in"}}); err == nil {
+		t.Fatal("incompatible edge to a connected input should fail")
+	}
 	g.AddNode(r.Get("filter").NewNode("flt2", [2]float32{200, 200}))
 	err = g.AddEdge(&Edge{ID: "e3", Source: PortID{"img", "frames"}, Target: PortID{"flt2", "in"}})
 	if err == nil {
