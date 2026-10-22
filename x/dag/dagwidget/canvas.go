@@ -1489,10 +1489,23 @@ func (c *DAGCanvas) edgeAtPosition(screenPos geo.Position) *EdgeWidget {
 
 // --- Focusable interface for keyboard input ---
 
+// isMobile reports whether the app runs on a phone or tablet. A variable so
+// tests can take the mobile path without a mobile build.
+var isMobile = func() bool { return bellui.CurrentDevice().IsMobile() }
+
 // requestFocus directs key events (Delete, Enter) to the canvas. Called from
 // taps on the canvas itself and on elements whose selection keyboard actions
 // operate on.
+//
+// On mobile it does nothing, as for the toolkit's List, Table and Tree: the
+// mobile driver opens the on-screen keyboard for whatever has the focus, and
+// the canvas takes no text (#415). The cost is hardware-keyboard shortcuts on
+// mobile, parked as #660; touch users reach every action through the node menu
+// and the app's own buttons.
 func (c *DAGCanvas) requestFocus() {
+	if isMobile() {
+		return
+	}
 	if cnv := bellui.CurrentApp().Driver().CanvasForObject(c); cnv != nil {
 		cnv.Focus(c)
 	}

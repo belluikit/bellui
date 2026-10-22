@@ -84,6 +84,11 @@ Several `Bind` implementations used to install the data write-back by **assignin
 
 `Label.Bind` and `ProgressBar.Bind` install no callback at all and were always clean.
 
+### No Focus on Tap on Mobile for Widgets Without Text (#415)
+The mobile driver opens the on-screen keyboard for whatever has the focus (`handleKeyboard`, `internal/driver/mobile/keyboard.go`); a widget that is not `mobile.Keyboardable` gets the default text keyboard. So **a widget that takes keys but no text must not take the focus on a tap on mobile**, or every tap opens a keyboard whose typing goes nowhere. Built-ins follow this: Check, radio items, Slider, RangeSlider, Select and SegmentedButton through `focusIfNotMobile` (`widget/check.go`), and List, Table, Tree and GridWrap with an `IsMobile()` guard. Since #415 the x/ widgets do too: `DAGCanvas.requestFocus` returns at once on mobile, and `Chart` takes the focus only while its Text tool waits for text (`syncMobileFocus`), giving it up when the label is finished or the tool changes.
+- **The cost:** hardware-keyboard shortcuts on a phone or tablet don't reach these widgets. Measured on a Pixel 9a: Backspace deleted a selected DAG node on v1.2.0, and no longer does. Touch users reach every action through menus and buttons. Bringing the shortcuts back without a keyboard needs an opt-out keyboard type plus native iOS work, parked as #660.
+- **New code:** a widget that focuses itself on tap checks `bellui.CurrentDevice().IsMobile()` first, unless it takes text. One that takes text only in some states (like the chart's Text tool) takes the focus when it enters that state and calls `Unfocus` when it leaves it, so the keyboard closes.
+
 ### NumericEntry Widget
 `widget.NumericEntry` and `widget.NewNumericEntry()` — Entry that only accepts numeric input. Right-aligned by default. Rejects non-numeric keystrokes at input time and filters paste content. `NewIntegerEntry()` for integer-only input.
 - `AllowFloat` (default true) — permits decimal point
