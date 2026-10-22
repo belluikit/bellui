@@ -213,3 +213,32 @@ Two defects in the Windows `ReadDirectoryChangesW` backend, **both still present
 
 **Verify:** `go run ./hack/winwatchprobe -rounds 200` on a Windows box reports the two numbers that track this — bail-out rate (a `Destroy` taking ≥5s means `closeWatcher` gave up and leaked the reader; was 4 per 200 rounds, now 0) and process handle drift (was creeping, now flat). Retire the fork when the fixes land upstream.
 
+
+### iOS Packaging — the `ios/` Directory (#672)
+
+`bellui package -os ios` takes what `manifest.pxf` cannot express from files
+next to the app's main package, the way `android/*.java` works on Android:
+`ios/Info.plist` and `ios/Entitlements.plist` (plist dict fragments) and
+`ios/Frameworks/` (`.xcframework` / `.framework`). The user-facing rules are in
+`cmd/bellui/README.md`; the design points:
+
+- **Files, not manifest fields** (owner decision, 2026-10-22). A plist fragment
+  holds any plist type with no typed-value encoding in PXF or the manifest
+  proto. The cost: a static file cannot vary per build, so dev/release-split
+  entitlements (`aps-environment`) are not expressible.
+- **One source of truth per key.** A fragment key the packager owns or derives
+  from the manifest is an error, never a silent override. Generated defaults
+  (orientations, `UIRequiresFullScreen`, …) are the fragment's to replace.
+  The merge is a real plist tree (`internal/mobile/plist.go`), so key order is
+  deterministic.
+- **Frameworks link through cgo, embed through Xcode.** The Go binary is built
+  outside Xcode and copied in as a resource, so the slice for each GOARCH is
+  added to that architecture's `CGO_CFLAGS`/`CGO_LDFLAGS` (plus
+  `-rpath @executable_path/Frameworks` when one is dynamic). Dynamic
+  frameworks are copied into the Xcode project and an Embed Frameworks phase
+  with `CodeSignOnCopy` signs them with the app's identity; copying into the
+  .app after xcodebuild would break the seal. `bellui release` re-signs each
+  with the release certificate before the app.
+- **Swift is not compiled** by the packager; it ships as an xcframework.
+- Verified with `hack/iosframeworkprobe` (bundle inspection; see its doc
+  comment for the device run).
