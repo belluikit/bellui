@@ -96,6 +96,34 @@ func TestPaletteTapAvoidsGroups(t *testing.T) {
 	}
 }
 
+// A note is not a free spot either: a node placed under one is hidden by it.
+// Seen on a Pixel in the gallery, where the third tapped-in node landed under
+// a note (#629).
+func TestPaletteTapAvoidsNotes(t *testing.T) {
+	c := newTestCanvas(t)
+	item := testPaletteItem(t, c)
+	center := c.screenToGraph(geo.NewPos(400, 300))
+	a := &dag.Annotation{
+		ID: "a", Text: "A note over the centre",
+		Position: [2]float32{center.X - 100, center.Y - 50}, Size: [2]float32{300, 150},
+	}
+	if err := c.AddAnnotation(a); err != nil {
+		t.Fatal(err)
+	}
+	box := c.annotations[a.ID].effectiveSize()
+
+	for range 3 {
+		item.Tapped(&event.PointEvent{})
+	}
+	for id := range c.Graph.Nodes {
+		pos, size := nodeGraphRect(c, id)
+		if pos[0] < a.Position[0]+box.Width && a.Position[0] < pos[0]+size.Width &&
+			pos[1] < a.Position[1]+box.Height && a.Position[1] < pos[1]+size.Height {
+			t.Errorf("node at %v lands under the note at %v (size %v)", pos, a.Position, box)
+		}
+	}
+}
+
 func TestPaletteTapIsUndoable(t *testing.T) {
 	c := newTestCanvas(t)
 	item := testPaletteItem(t, c)

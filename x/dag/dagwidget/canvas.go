@@ -1294,7 +1294,7 @@ func (c *DAGCanvas) AddComponentNode(comp *dag.Component, pos [2]float32) (*dag.
 }
 
 // addComponentNodeNear adds a component node at pos, or at the nearest spot
-// that does not cover an existing node or group, so repeated palette taps fan
+// that does not cover an existing node, group or note, so repeated palette taps fan
 // out instead of stacking every node on the viewport center.
 func (c *DAGCanvas) addComponentNodeNear(comp *dag.Component, pos [2]float32) (*dag.Node, error) {
 	size := NewNodeWidget(comp.NewNode("", pos), c).effectiveSize()
@@ -1303,7 +1303,7 @@ func (c *DAGCanvas) addComponentNodeNear(comp *dag.Component, pos [2]float32) (*
 
 // freeNodePosition returns the candidate closest to pos, on a grid of
 // card-sized steps around it, where a node of the given size (graph units)
-// overlaps no node or group. It returns pos when the searched rings are full.
+// overlaps no node, group or note. It returns pos when the searched rings are full.
 func (c *DAGCanvas) freeNodePosition(pos [2]float32, size geo.Size) [2]float32 {
 	const gap, rings = 20, 6
 	stepX, stepY := size.Width+gap, size.Height+gap
@@ -1328,7 +1328,7 @@ func (c *DAGCanvas) freeNodePosition(pos [2]float32, size geo.Size) [2]float32 {
 }
 
 // graphAreaOccupied reports whether the rectangle at pos with size, grown by
-// margin on every side, intersects any node card or group box.
+// margin on every side, intersects any node card, group box or note.
 func (c *DAGCanvas) graphAreaOccupied(pos [2]float32, size geo.Size, margin float32) bool {
 	x0, y0 := pos[0]-margin, pos[1]-margin
 	x1, y1 := pos[0]+size.Width+margin, pos[1]+size.Height+margin
@@ -1346,6 +1346,16 @@ func (c *DAGCanvas) graphAreaOccupied(pos [2]float32, size geo.Size, margin floa
 	}
 	for _, g := range c.Graph.Groups {
 		if hits(g.Position, g.Size) {
+			return true
+		}
+	}
+	for id, a := range c.Graph.Annotations {
+		box := a.Size
+		if aw := c.annotations[id]; aw != nil {
+			eff := aw.effectiveSize() // grown to fit its text
+			box = [2]float32{eff.Width, eff.Height}
+		}
+		if hits(a.Position, box) {
 			return true
 		}
 	}
