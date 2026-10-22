@@ -103,7 +103,7 @@ func TestUpdateLocalizer_KeepsOverrideOnAddTranslations(t *testing.T) {
 	snapshotLocaleState(t)
 
 	SetLocale("fr")
-	require.NoError(t, AddTranslationsForLocale([]byte(`{
+	require.NoError(t, AddTranslationsForLocale([]byte(`messages = {
 		"resolve-test-key": "clé"
 	}`), "fr"))
 

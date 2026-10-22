@@ -1,0 +1,108 @@
+messages = {
+  AM: "AM"
+  Advanced: "Avanzado"
+  Cancel: "Cancelar"
+  Confirm: "Confirmar"
+  Copy: "Copiar"
+  "Create Folder": "Crear carpeta"
+  Cut: "Cortar"
+  Date: "Fecha"
+  "Enter filename": "Introducir nombre del archivo"
+  Error: "Error"
+  Favourites: "Favoritos"
+  File: "Archivo"
+  Folder: "Carpeta"
+  "New Folder": "Nueva carpeta"
+  No: "No"
+  OK: "OK"
+  Open: "Abrir"
+  PM: "PM"
+  Paste: "Pegar"
+  Quit: "Salir"
+  Redo: "Rehacer"
+  Save: "Guardar"
+  "Select all": "Seleccionar todo"
+  "Select time": "Seleccionar hora"
+  "Show Hidden Files": "Mostrar archivos ocultos"
+  Time: "Hora"
+  Undo: "Deshacer"
+  Yes: "Si"
+  april: "Abril"
+  august: "Agosto"
+  december: "Diciembre"
+  february: "Febrero"
+  "file.name": {
+    other = "Nombre"
+  }
+  "file.parent": {
+    other = "Padre"
+  }
+  friday: "Viernes"
+  "friday.narrow": "V"
+  "friday.short": "Vie"
+  january: "Enero"
+  july: "Julio"
+  june: "Junio"
+  "list.end": "{0} y {1}"
+  "list.middle": "{0}, {1}"
+  "list.start": "{0}, {1}"
+  "list.two": "{0} y {1}"
+  march: "Marzo"
+  may: "Mayo"
+  monday: "Lunes"
+  "monday.narrow": "L"
+  "monday.short": "Lun"
+  november: "Noviembre"
+  october: "Octubre"
+  saturday: "Sábado"
+  "saturday.narrow": "S"
+  "saturday.short": "Sab"
+  september: "Septiembre"
+  sunday: "Domingo"
+  "sunday.narrow": "D"
+  "sunday.short": "Dom"
+  thursday: "Jueves"
+  "thursday.narrow": "J"
+  "thursday.short": "Jue"
+  tuesday: "Martes"
+  "tuesday.narrow": "M"
+  "tuesday.short": "Mar"
+  "unit.foot": {
+    many = "{Value} ft"
+    one = "{Value} ft"
+    other = "{Value} ft"
+  }
+  "unit.gram": {
+    many = "{Value} g"
+    one = "{Value} g"
+    other = "{Value} g"
+  }
+  "unit.kilogram": {
+    many = "{Value} kg"
+    one = "{Value} kg"
+    other = "{Value} kg"
+  }
+  "unit.kilometer": {
+    many = "{Value} km"
+    one = "{Value} km"
+    other = "{Value} km"
+  }
+  "unit.meter": {
+    many = "{Value} m"
+    one = "{Value} m"
+    other = "{Value} m"
+  }
+  "unit.mile": {
+    many = "{Value} mi"
+    one = "{Value} mi"
+    other = "{Value} mi"
+  }
+  "unit.pound": {
+    many = "{Value} lb"
+    one = "{Value} lb"
+    other = "{Value} lb"
+  }
+  wednesday: "Miércoles"
+  "wednesday.narrow": "X"
+  "wednesday.short": "Mie"
+}

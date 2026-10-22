@@ -881,7 +881,7 @@ func (f *fileDialog) applyMultiSelection() {
 		f.fileName.SetText(f.multiSelected[0].Name())
 		f.open.Enable()
 	default:
-		f.fileName.SetText(lang.LocalizePluralKey("file.selectedCount", "{{.Count}} files selected",
+		f.fileName.SetText(lang.LocalizePluralKey("file.selectedCount", "{Count} files selected",
 			len(f.multiSelected), map[string]any{"Count": len(f.multiSelected)}))
 		f.open.Enable()
 	}

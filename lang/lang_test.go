@@ -11,7 +11,7 @@ import (
 )
 
 func TestAddTranslations(t *testing.T) {
-	err := AddTranslations(bellui.NewStaticResource("en.json", []byte(`{
+	err := AddTranslations(bellui.NewStaticResource("en.pxf", []byte(`messages = {
 		"Test": "Match"
 	}`)))
 	if assert.NoError(t, err) {
@@ -19,7 +19,7 @@ func TestAddTranslations(t *testing.T) {
 		assert.Equal(t, "Match", L("Test"))
 	}
 
-	err = AddTranslationsForLocale([]byte(`{
+	err = AddTranslationsForLocale([]byte(`messages = {
 		"Test2": "Match2"
 	}`), "fr")
 	if assert.NoError(t, err) {
@@ -42,18 +42,20 @@ func TestLocalize_Struct(t *testing.T) {
 		Str string
 	}
 
-	assert.Equal(t, "Hello World!", L("Hello {{.Str}}!", data{Str: "World"}))
+	assert.Equal(t, "Hello World!", L("Hello {Str}!", data{Str: "World"}))
+	assert.Equal(t, "Hello World!", L("Hello {{.Str}}!", data{Str: "World"}), "the Go template form still fills")
 }
 
 func TestLocalize_Map(t *testing.T) {
-	assert.Equal(t, "Hello World!", L("Hello {{.Str}}!", map[string]string{"Str": "World"}))
+	assert.Equal(t, "Hello World!", L("Hello {Str}!", map[string]string{"Str": "World"}))
+	assert.Equal(t, "Hello World!", L("Hello {{.Str}}!", map[string]string{"Str": "World"}), "the Go template form still fills")
 }
 
 func TestLocalizePlural_Fallback(t *testing.T) {
-	require.NoError(t, AddTranslations(bellui.NewStaticResource("en.json", []byte(`{
+	require.NoError(t, AddTranslations(bellui.NewStaticResource("en.pxf", []byte(`messages = {
 		"Apple": {
-			"one": "Apple",
-			"other": "Apples"
+			one = "Apple"
+			other = "Apples"
 		}
 	}`))))
 
@@ -64,7 +66,7 @@ func TestLocalizePlural_Fallback(t *testing.T) {
 }
 
 func TestLocalizeKey_Fallback(t *testing.T) {
-	require.NoError(t, AddTranslations(bellui.NewStaticResource("en.json", []byte(`{
+	require.NoError(t, AddTranslations(bellui.NewStaticResource("en.pxf", []byte(`messages = {
 		"appleID": "Apple Matched"
 	}`))))
 
@@ -74,10 +76,10 @@ func TestLocalizeKey_Fallback(t *testing.T) {
 }
 
 func TestLocalizePluralKey_Fallback(t *testing.T) {
-	require.NoError(t, AddTranslations(bellui.NewStaticResource("en.json", []byte(`{
+	require.NoError(t, AddTranslations(bellui.NewStaticResource("en.pxf", []byte(`messages = {
 		"appleID": {
-			"one": "Apple",
-			"other": "Apples"
+			one = "Apple"
+			other = "Apples"
 		}
 	}`))))
 

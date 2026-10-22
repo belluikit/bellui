@@ -107,7 +107,7 @@ func (s *localizedString) update() {
 	data := s.data
 	if len(data) == 0 {
 		// Expose the live count to the template so the common case —
-		// NewLocalizedPlural("Apples", count) with a "{{.Count}} apple(s)"
+		// NewLocalizedPlural("Apples", count) with a "{Count} apple(s)"
 		// message — shows the current number, not a value frozen at
 		// construction. A caller-supplied template data takes precedence.
 		data = []any{map[string]any{"Count": n, "PluralCount": n}}

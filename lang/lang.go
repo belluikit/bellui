@@ -1,16 +1,41 @@
 // Package lang introduces a translation and localisation API for Bellui applications
 //
+// # Placeholders
+//
+// A message names the values it shows in braces, as ICU MessageFormat does:
+//
+//	lang.L("Hello {Name}", map[string]any{"Name": name})
+//
+// Values come from a map with string keys or a struct's exported fields. The
+// Go template form "{{.Name}}" is filled the same way, so source strings
+// written for earlier versions keep working, but translations should use
+// "{Name}". A name the data does not have is left as written.
+//
+// # Translation catalogs
+//
+// A catalog is a PXF file named [prefix.]locale.pxf, for example
+// "translations/base.fr.pxf", holding one messages map keyed by message ID:
+//
+//	messages = {
+//	  "Cancel": "Annuler"
+//	  "file.selectedCount": {
+//	    one = "{Count} fichier sélectionné"
+//	    other = "{Count} fichiers sélectionnés"
+//	  }
+//	}
+//
+// A string is the translation. A block holds the plural forms (zero, one,
+// two, few, many, other) and may add a description and a hash. The bellui
+// translate command creates and updates catalogs from an app's source.
+// JSON catalogs are not read.
+//
 // Since: 1.0
 package lang
 
 import (
 	"embed"
-	"encoding/json"
-	"log"
-	"strings"
 	"sync"
 	"sync/atomic"
-	"text/template"
 
 	"github.com/jeandeaual/go-locale"
 	"github.com/nicksnyder/go-i18n/v2/i18n"
@@ -59,16 +84,16 @@ var (
 )
 
 // Localize asks the translation engine to translate a string, this behaves like the gettext "_" function.
-// The string can be templated and the template data can be passed as a struct with exported fields,
-// or as a map of string keys to any suitable value.
+// The string can hold {Name} placeholders, filled from data: a struct with exported fields,
+// or a map of string keys to any suitable value.
 func Localize(in string, data ...any) string {
 	return LocalizeKey(in, in, data...)
 }
 
 // LocalizeKey asks the translation engine for the translation with specific ID.
 // If it cannot be found then the fallback will be used.
-// The string can be templated and the template data can be passed as a struct with exported fields,
-// or as a map of string keys to any suitable value.
+// The string can hold {Name} placeholders, filled from data: a struct with exported fields,
+// or a map of string keys to any suitable value.
 func LocalizeKey(key, fallback string, data ...any) string {
 	var d0 any
 	if len(data) > 0 {
@@ -91,8 +116,8 @@ func LocalizeKey(key, fallback string, data ...any) string {
 
 // LocalizePlural asks the translation engine to translate a string from one of a number of plural forms.
 // This behaves like the ngettext function, with the `count` parameter determining the plurality looked up.
-// The string can be templated and the template data can be passed as a struct with exported fields,
-// or as a map of string keys to any suitable value.
+// The string can hold {Name} placeholders, filled from data: a struct with exported fields,
+// or a map of string keys to any suitable value.
 func LocalizePlural(in string, count int, data ...any) string {
 	return LocalizePluralKey(in, in, count, data...)
 }
@@ -100,8 +125,8 @@ func LocalizePlural(in string, count int, data ...any) string {
 // LocalizePluralKey asks the translation engine for the translation with specific ID in plural form.
 // This behaves like the npgettext function, with the `count` parameter determining the plurality looked up.
 // If it cannot be found then the fallback will be used.
-// The string can be templated and the template data can be passed as a struct with exported fields,
-// or as a map of string keys to any suitable value.
+// The string can hold {Name} placeholders, filled from data: a struct with exported fields,
+// or a map of string keys to any suitable value.
 func LocalizePluralKey(key, fallback string, count int, data ...any) string {
 	var d0 any
 	if len(data) > 0 {
@@ -124,24 +149,25 @@ func LocalizePluralKey(key, fallback string, count int, data ...any) string {
 }
 
 // AddTranslations allows an app to load a bundle of translations.
-// The language that this relates to will be inferred from the resource name, for example "fr.json".
-// The data should be in json format.
+// The language that this relates to will be inferred from the resource name, for example "fr.pxf".
+// The data is a PXF translation catalog; a JSON catalog (".json") is an error.
 func AddTranslations(r bellui.Resource) error {
 	defer updateLocalizer()
 	return addLanguage(r.Content(), r.Name())
 }
 
 // AddTranslationsForLocale allows an app to load a bundle of translations for a specified locale.
-// The data should be in json format.
+// The data is a PXF translation catalog.
 func AddTranslationsForLocale(data []byte, l bellui.Locale) error {
 	defer updateLocalizer()
-	return addLanguage(data, l.String()+".json")
+	return addLanguage(data, l.String()+".pxf")
 }
 
 // AddTranslationsFS supports adding all translations in one calling using an `embed.FS` setup.
 // The `dir` parameter specifies the name or path of the directory containing translation files
 // inside this embedded filesystem.
-// Each file should be a json file with the name following pattern [prefix.]lang.json.
+// Each file is a PXF translation catalog named [prefix.]lang.pxf; a JSON
+// catalog (".json") is reported as an error and skipped.
 func AddTranslationsFS(fs embed.FS, dir string) (retErr error) {
 	files, err := fs.ReadDir(dir)
 	if err != nil {
@@ -176,6 +202,9 @@ func addLanguage(data []byte, name string) error {
 	// Guard the shared bundle and translated slice against concurrent readers
 	// (localize, newLocalizer, closestSupportedLocale) now that SetLocale is a
 	// public runtime API.
+	if err := checkCatalogName(name); err != nil {
+		return err
+	}
 	tagMu.Lock()
 	defer tagMu.Unlock()
 
@@ -190,7 +219,7 @@ func addLanguage(data []byte, name string) error {
 
 func init() {
 	bundle = i18n.NewBundle(language.English)
-	bundle.RegisterUnmarshalFunc("json", json.Unmarshal)
+	bundle.RegisterUnmarshalFunc("pxf", unmarshalCatalog)
 
 	translated = []language.Tag{language.Make("en")} // the first item in this list will be the fallback if none match
 	err := AddTranslationsFS(translations, "translations")
@@ -199,15 +228,9 @@ func init() {
 	}
 }
 
-func fallbackWithData(key, fallback string, data any) string {
-	t, err := template.New(key).Parse(fallback)
-	if err != nil {
-		log.Println("Could not parse fallback template")
-		return fallback
-	}
-	str := &strings.Builder{}
-	_ = t.Execute(str, data)
-	return str.String()
+func fallbackWithData(_, fallback string, data any) string {
+	str, _ := parsePlaceholders(fallback).Execute(data)
+	return str
 }
 
 // SetLocaleForTests overrides the current locale for testing purposes.
@@ -341,6 +364,7 @@ func setCurrentTag(tag language.Tag) {
 // lock is held for the whole call. It is a read lock: concurrent translations
 // proceed in parallel and only block while a writer holds tagMu, which is rare.
 func localize(cfg *i18n.LocalizeConfig) (string, error) {
+	cfg.TemplateParser = placeholders
 	tagMu.RLock()
 	defer tagMu.RUnlock()
 	return localizer.Localize(cfg)

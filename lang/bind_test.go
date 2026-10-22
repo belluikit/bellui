@@ -34,7 +34,7 @@ func TestBindText_TemplateData(t *testing.T) {
 	t.Cleanup(func() { SetLocale("") })
 
 	var got string
-	remove := BindText("Hello {{.Name}}", func(s string) { got = s }, map[string]any{"Name": "Ada"})
+	remove := BindText("Hello {Name}", func(s string) { got = s }, map[string]any{"Name": "Ada"})
 	t.Cleanup(remove)
 
 	// Unknown key falls back to the key text with template data filled in.
