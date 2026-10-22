@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
+	"math/rand/v2"
 	"os"
 	"path/filepath"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -103,21 +105,56 @@ func TestForwardedArgs_GoldenDecode(t *testing.T) {
 }
 
 // An argument that is not valid UTF-8, such as a Latin-1 file name on Linux,
-// arrives as the JSON message delivered it, and the other arguments with it.
-// PXF writes such a string but refuses to read it back, so the running copy
-// used to lose the whole message.
+// reaches the running copy byte for byte, with the other arguments, so the
+// file it names can be opened (#661). The JSON message before #523, and PXF
+// before this escape, delivered "caf\uFFFD.txt" instead, a file that does not
+// exist.
 func TestForwardedArgs_InvalidUTF8(t *testing.T) {
-	args := []string{"--open", "/home/u/caf\xe9.txt"}
+	args := []string{"--open", "/home/u/caf\xe9.txt", "/home/u/\xff\xfe", "café.txt"}
 
 	var buf bytes.Buffer
 	require.NoError(t, writeArgs(&buf, args))
 	got, err := readArgs(&buf)
 	require.NoError(t, err)
+	assert.Equal(t, args, got)
+	assert.Equal(t, []byte("/home/u/caf\xe9.txt"), []byte(got[1]), "the exact bytes")
+}
 
-	legacy, err := json.Marshal(args)
-	require.NoError(t, err)
-	var want []string
-	require.NoError(t, json.Unmarshal(legacy, &want))
-	assert.Equal(t, want, got)
-	assert.Equal(t, "/home/u/caf�.txt", got[1])
+// The escape is part of the wire format, so a running copy and a launch of
+// another version agree on it: these encodings must never change (#661).
+func TestForwardedArgs_EscapeForm(t *testing.T) {
+	for in, want := range map[string]string{
+		"/tmp/café.txt":     "/tmp/café.txt",               // valid UTF-8 is kept
+		"/tmp/caf\xe9.txt":  "/tmp/caf\uefe9.txt",          // a Latin-1 byte
+		"/tmp/\xc3":         "/tmp/\uefc3",                 // a cut-off sequence
+		"/tmp/\xed\xa0\x80": "/tmp/\uefed\uefa0\uef80",     // an encoded surrogate
+		"/tmp/\uef9a.txt":   "/tmp/\uefee\uefbe\uef9a.txt", // a real escape-range code point
+		"":                  "",
+	} {
+		e := escapeArg(in)
+		assert.Equal(t, want, e, "escapeArg(%q)", in)
+		assert.True(t, utf8.ValidString(e), "escapeArg(%q) is valid UTF-8", in)
+		assert.Equal(t, in, unescapeArg(e), "unescapeArg(escapeArg(%q))", in)
+	}
+}
+
+// Any byte string survives the escape, weighted towards the bytes that start
+// or continue a sequence in the escape range.
+func TestForwardedArgs_EscapeRoundTrip(t *testing.T) {
+	rng := rand.New(rand.NewPCG(661, 523))
+	tricky := []byte{0xEE, 0xBE, 0xBF, 0xC3, 0xED, 0x80}
+	for range 200_000 {
+		b := make([]byte, rng.IntN(24))
+		for j := range b {
+			if rng.IntN(3) == 0 {
+				b[j] = tricky[rng.IntN(len(tricky))]
+			} else {
+				b[j] = byte(rng.IntN(256))
+			}
+		}
+		e := escapeArg(string(b))
+		if !utf8.ValidString(e) || unescapeArg(e) != string(b) {
+			t.Fatalf("%q escapes to %q, which reads back as %q", b, e, unescapeArg(e))
+		}
+	}
 }

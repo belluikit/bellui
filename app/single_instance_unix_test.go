@@ -61,7 +61,8 @@ func TestSingleInstance_ForwardsExactArgs(t *testing.T) {
 	require.True(t, primary)
 	t.Cleanup(closer)
 
-	want := []string{"file:///tmp/doc.txt", "--flag", "value with spaces", "unicode-π"}
+	// The Latin-1 name is not valid UTF-8; it must arrive byte for byte (#661).
+	want := []string{"file:///tmp/doc.txt", "--flag", "value with spaces", "unicode-π", "/tmp/caf\xe9.txt"}
 	require.NoError(t, forwardTo(path, want))
 
 	select {
