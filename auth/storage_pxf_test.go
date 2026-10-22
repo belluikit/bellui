@@ -10,6 +10,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/trendvidia/protowire-go/encoding/pxf"
+
+	"github.com/belluikit/bellui/internal/authstore/tokenpb"
 )
 
 // readPlaintext decrypts the stored record for provider's own token.
@@ -64,4 +67,28 @@ func TestLoadToken_LegacyJSON(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "refresh-old", refresh)
 	assert.Equal(t, "old@example.com", email)
+}
+
+// TestToken_GoldenDecode guards the token record format (#523): it decodes a
+// committed testdata/token.pxf, the plaintext this version encrypts, so a
+// change that stops reading tokens saved on users' machines fails here. Do not
+// regenerate it to make the test pass; only when the format changes on purpose:
+//
+//	BELLUI_REGEN_GOLDEN=1 go test -run TestToken_GoldenDecode ./auth/
+func TestToken_GoldenDecode(t *testing.T) {
+	path := filepath.Join("testdata", "token.pxf")
+	if os.Getenv("BELLUI_REGEN_GOLDEN") != "" {
+		data, err := pxf.Marshal(&tokenpb.StoredToken{Provider: "google", RefreshToken: "refresh-123", Email: "user@example.com"})
+		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(path, data, 0o600))
+	}
+
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	st, legacy, err := unmarshalToken(data)
+	require.NoError(t, err)
+	assert.False(t, legacy)
+	assert.Equal(t, "google", st.GetProvider())
+	assert.Equal(t, "refresh-123", st.GetRefreshToken())
+	assert.Equal(t, "user@example.com", st.GetEmail())
 }

@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -71,4 +73,31 @@ func TestForwardedArgs_Format(t *testing.T) {
 	got, err = readArgs(&buf)
 	require.NoError(t, err)
 	assert.Empty(t, got, "a launch with no arguments")
+}
+
+// TestForwardedArgs_GoldenDecode guards the forwarded-arguments message (#523):
+// a running copy must read what a later version's launch sends, so it decodes
+// a committed testdata/forwarded_args.pxf payload. Do not regenerate it to make
+// the test pass; only when the format changes on purpose:
+//
+//	BELLUI_REGEN_GOLDEN=1 go test -run TestForwardedArgs_GoldenDecode ./app/
+func TestForwardedArgs_GoldenDecode(t *testing.T) {
+	path := filepath.Join("testdata", "forwarded_args.pxf")
+	golden := []string{"--open", "/tmp/a file.txt"}
+	if os.Getenv("BELLUI_REGEN_GOLDEN") != "" {
+		var buf bytes.Buffer
+		require.NoError(t, writeArgs(&buf, golden))
+		require.NoError(t, os.WriteFile(path, buf.Bytes()[4:], 0o600))
+	}
+
+	payload, err := os.ReadFile(path)
+	require.NoError(t, err)
+	var buf bytes.Buffer
+	var hdr [4]byte
+	binary.BigEndian.PutUint32(hdr[:], uint32(len(payload)))
+	buf.Write(hdr[:])
+	buf.Write(payload)
+	got, err := readArgs(&buf)
+	require.NoError(t, err)
+	assert.Equal(t, golden, got)
 }

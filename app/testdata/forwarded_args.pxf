@@ -1,0 +1,4 @@
+args = [
+  "--open",
+  "/tmp/a file.txt"
+]
