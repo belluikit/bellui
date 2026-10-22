@@ -697,10 +697,19 @@ type tapResult struct {
 	drillCfg      *DrilldownConfig
 }
 
+// isMobile reports whether the app runs on a phone or tablet. A variable so
+// tests can take the mobile path without a mobile build.
+var isMobile = func() bool { return bellui.CurrentDevice().IsMobile() }
+
 // Tapped handles tap/click events on the chart for zoom buttons, legend toggles, and data points.
 func (c *Chart) Tapped(e *event.PointEvent) {
-	// Request keyboard focus so TypedKey/TypedRune events are delivered.
-	if cv := bellui.CurrentApp().Driver().CanvasForObject(c); cv != nil {
+	if isMobile() {
+		// The mobile driver opens the on-screen keyboard for whatever has the
+		// focus, so a tap focuses the chart only when it leaves the Text tool
+		// waiting for text (#415).
+		defer c.syncMobileFocus()
+	} else if cv := bellui.CurrentApp().Driver().CanvasForObject(c); cv != nil {
+		// Request keyboard focus so TypedKey/TypedRune events are delivered.
 		cv.Focus(c)
 	}
 
@@ -1206,8 +1215,31 @@ func (c *Chart) TypedRune(r rune) {
 	})
 }
 
+// syncMobileFocus gives the chart the focus, and with it the on-screen
+// keyboard, while its Text tool is waiting for text, and gives it up
+// otherwise. Mobile only: on desktop the chart takes the focus on every tap,
+// for its keyboard shortcuts. Hardware-keyboard shortcuts on mobile are #660.
+func (c *Chart) syncMobileFocus() {
+	c.mu.RLock()
+	wantText := c.drawingGesture.Active && c.drawingGesture.Tool == interact.DrawingToolTextLabel
+	c.mu.RUnlock()
+	cv := bellui.CurrentApp().Driver().CanvasForObject(c)
+	if cv == nil {
+		return
+	}
+	switch focused := cv.Focused() == c; {
+	case wantText && !focused:
+		cv.Focus(c)
+	case !wantText && focused:
+		cv.Unfocus()
+	}
+}
+
 // TypedKey is called when a non-printable key is pressed while focused.
 func (c *Chart) TypedKey(e *event.KeyEvent) {
+	if isMobile() {
+		defer c.syncMobileFocus() // Return or Escape may end the text input
+	}
 	// Delete selected drawing.
 	if e.Name == event.KeyDelete || e.Name == event.KeyBackspace {
 		// In text label mode, backspace removes last character.

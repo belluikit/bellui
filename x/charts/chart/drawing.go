@@ -33,6 +33,9 @@ func (c *Chart) SetDrawingTool(tool interact.DrawingToolMode) {
 	c.drawingGesture.Reset()
 	c.mu.Unlock()
 	c.refreshDirty(dirtyFull)
+	if isMobile() {
+		c.syncMobileFocus() // no text input is pending any more
+	}
 }
 
 // DrawingTool returns the currently active drawing tool.
