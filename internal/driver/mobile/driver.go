@@ -139,6 +139,12 @@ type driver struct {
 	// surfaceWasHidden records that the window's surface has gone away once
 	// (the app went to the background), for surfaceShown.
 	surfaceWasHidden bool
+
+	// surfaceVisible is whether the app is on screen: true from the visible
+	// lifecycle crossing on, false from the crossing off. Backends with no
+	// other signal for it gate painting on it (iOS WebGPU, #673): iOS may
+	// kill an app that submits GPU work while backgrounded.
+	surfaceVisible bool
 }
 
 // Declare conformity with Driver
@@ -650,6 +656,7 @@ func (d *driver) handleLifecycle(e lifecycle.Event, w *window) {
 	switch e.Crosses(lifecycle.StageVisible) {
 	case lifecycle.CrossOn:
 		d.glctx, _ = e.DrawContext.(gl.Context)
+		d.surfaceVisible = true
 		d.surfaceShown(c)
 		// this is a fix for some android phone to prevent the app from being drawn as a blank screen after being pushed in the background
 		c.Content().Refresh()
@@ -657,6 +664,7 @@ func (d *driver) handleLifecycle(e lifecycle.Event, w *window) {
 		d.sendPaintEvent()
 	case lifecycle.CrossOff:
 		d.glctx = nil
+		d.surfaceVisible = false
 		d.surfaceWasHidden = true
 	}
 	switch e.Crosses(lifecycle.StageFocused) {
