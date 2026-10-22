@@ -65,6 +65,10 @@ func fromJSONWithFallback(r io.Reader, fallback bellui.Theme) (bellui.Theme, err
 	if err := json.NewDecoder(r).Decode(&th); err != nil {
 		return fallback, err
 	}
+	if th == nil {
+		// The document was null: no theme data, so all of it falls back.
+		th = &schema{}
+	}
 
 	return &dataTheme{data: th, fallback: fallback}, nil
 }
