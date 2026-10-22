@@ -3,7 +3,8 @@ module github.com/belluikit/bellui/x/dag
 go 1.25.0
 
 require (
-	github.com/belluikit/bellui v1.1.2
+	github.com/belluikit/bellui v1.2.0
+	github.com/stretchr/testify v1.11.1
 	github.com/trendvidia/protowire-go v1.2.2
 	google.golang.org/protobuf v1.36.11
 )
@@ -20,7 +21,6 @@ require (
 	github.com/jeandeaual/go-locale v0.0.0-20250612000132-0ef82f21eade // indirect
 	github.com/nicksnyder/go-i18n/v2 v2.5.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/yuin/goldmark v1.8.5 // indirect
 	golang.org/x/image v0.44.0 // indirect
 	golang.org/x/net v0.57.0 // indirect
