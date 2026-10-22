@@ -2,6 +2,8 @@ package mobile
 
 import (
 	"bytes"
+	"encoding/xml"
+	"io"
 	"strings"
 	"testing"
 
@@ -52,4 +54,36 @@ func TestInfoPlistNoUsageDescriptions(t *testing.T) {
 	// No usage-description keys when none are declared, and the plist is still valid.
 	assert.NotContains(t, out, "UsageDescription")
 	assert.True(t, strings.HasSuffix(strings.TrimSpace(out), "</plist>"))
+}
+
+// Values from the manifest are user text, so the generated Info.plist must
+// escape them: a raw & or < makes the plist unparseable and the build fails
+// in xcodebuild with an unhelpful error.
+func TestInfoPlistEscapesValues(t *testing.T) {
+	buf := &bytes.Buffer{}
+	err := infoplistTmpl.Execute(buf, infoplistTmplData{
+		BundleID: "com.example.testing",
+		Name:     "Tom & Jerry",
+		Version:  "1.0",
+		Build:    1,
+		UsageDescriptions: sortedPlistEntries(map[string]string{
+			"NSCameraUsageDescription": "Scan <documents> & receipts.",
+		}),
+	})
+	assert.NoError(t, err)
+	assert.NoError(t, xmlWellFormed(buf.Bytes()), buf.String())
+	assert.Contains(t, buf.String(), "<string>Scan &lt;documents&gt; &amp; receipts.</string>")
+	assert.Contains(t, buf.String(), "<string>Tom &amp; Jerry</string>")
+}
+
+func xmlWellFormed(b []byte) error {
+	d := xml.NewDecoder(bytes.NewReader(b))
+	for {
+		if _, err := d.Token(); err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return err
+		}
+	}
 }

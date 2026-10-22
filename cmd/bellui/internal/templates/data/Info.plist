@@ -3,15 +3,15 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleName</key>
-	<string>{{.Name}}</string>
+	<string>{{xml .Name}}</string>
 	<key>CFBundleExecutable</key>
-	<string>{{.ExeName}}</string>
+	<string>{{xml .ExeName}}</string>
 	<key>CFBundleIdentifier</key>
-	<string>{{.AppID}}</string>
+	<string>{{xml .AppID}}</string>
 	<key>CFBundleIconFile</key>
 	<string>icon.icns</string>
 	<key>CFBundleShortVersionString</key>
-	<string>{{.Version}}</string>
+	<string>{{xml .Version}}</string>
 	<key>CFBundleSupportedPlatforms</key>
 	<array>
 		<string>MacOSX</string>
@@ -26,7 +26,7 @@
 	<string>6.0</string>
 	{{- if .Credit}}
 	<key>NSHumanReadableCopyright</key>
-	<string>{{.Credit}}</string>
+	<string>{{xml .Credit}}</string>
 	{{- end}}
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
@@ -34,17 +34,17 @@
 	<key>CFBundleLocalizations</key>
 	<array>
 		{{- range .Languages}}
-		<string>{{.}}</string>
+		<string>{{xml .}}</string>
 		{{- end}}
 	</array>
 	{{- end}}
 	<key>LSApplicationCategoryType</key>
-	<string>public.app-category.{{.Category}}</string>
+	<string>public.app-category.{{xml .Category}}</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>10.11</string>
 	{{- range .UsageDescriptions}}
-	<key>{{.Key}}</key>
-	<string>{{.Value}}</string>
+	<key>{{xml .Key}}</key>
+	<string>{{xml .Value}}</string>
 	{{- end}}
 	{{- if .FileAssociations}}
 	<key>CFBundleDocumentTypes</key>
@@ -52,14 +52,14 @@
 		{{- range .FileAssociations}}
 		<dict>
 			<key>CFBundleTypeName</key>
-			<string>{{.Name}}</string>
+			<string>{{xml .Name}}</string>
 			<key>CFBundleTypeRole</key>
-			<string>{{.Role}}</string>
+			<string>{{xml .Role}}</string>
 			{{- if .Extensions}}
 			<key>CFBundleTypeExtensions</key>
 			<array>
 				{{- range .Extensions}}
-				<string>{{.}}</string>
+				<string>{{xml .}}</string>
 				{{- end}}
 			</array>
 			{{- end}}
@@ -67,13 +67,13 @@
 			<key>CFBundleTypeMIMETypes</key>
 			<array>
 				{{- range .MimeTypes}}
-				<string>{{.}}</string>
+				<string>{{xml .}}</string>
 				{{- end}}
 			</array>
 			{{- end}}
 			{{- if .Icon}}
 			<key>CFBundleTypeIconFile</key>
-			<string>{{.Icon}}</string>
+			<string>{{xml .Icon}}</string>
 			{{- end}}
 		</dict>
 		{{- end}}
@@ -84,11 +84,11 @@
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>{{.AppID}}</string>
+			<string>{{xml .AppID}}</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				{{- range .URLSchemes}}
-				<string>{{.}}</string>
+				<string>{{xml .}}</string>
 				{{- end}}
 			</array>
 		</dict>

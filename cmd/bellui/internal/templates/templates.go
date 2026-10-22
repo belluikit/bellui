@@ -1,6 +1,19 @@
 package templates
 
-import "text/template"
+import (
+	"encoding/xml"
+	"strings"
+	"text/template"
+)
+
+// xmlFuncs gives the XML templates an escape for user text: names, usage
+// strings and file-type descriptions come from manifest.pxf, and a raw & or <
+// makes the file unparseable.
+var xmlFuncs = template.FuncMap{"xml": func(s string) string {
+	var b strings.Builder
+	_ = xml.EscapeText(&b, []byte(s))
+	return b.String()
+}}
 
 // GopherCredit is the attribution the gopher artwork needs wherever it is
 // shipped: CC BY 4.0 requires credit for the material and for adaptations of
@@ -42,7 +55,7 @@ var (
 	AppxManifestWindows = template.Must(template.New("ReleaseManifest").Parse(appxManifestXML))
 
 	// InfoPlistDarwin is the manifest file for darwin packaging
-	InfoPlistDarwin = template.Must(template.New("InfoPlist").Parse(infoPlist))
+	InfoPlistDarwin = template.Must(template.New("InfoPlist").Funcs(xmlFuncs).Parse(infoPlist))
 
 	// XCAssetsDarwin is the Contents.json file for darwin xcassets bundle
 	XCAssetsDarwin = template.Must(template.New("XCAssets").Parse(xcassetsJSON))

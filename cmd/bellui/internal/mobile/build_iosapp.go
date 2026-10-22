@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"crypto/x509"
 	"encoding/pem"
+	"encoding/xml"
 	"fmt"
 	"io/fs"
 	"os"
@@ -418,7 +419,18 @@ var entitlementsTmpl = template.Must(template.New("entitlements").Parse(`<?xml v
 </plist>
 `))
 
-var infoplistTmpl = template.Must(template.New("infoplist").Parse(`<?xml version="1.0" encoding="UTF-8"?>
+// plistFuncs escapes manifest text for the XML templates: names, usage
+// strings and versions are user text, and a raw & or < made the generated
+// plist unparseable.
+var plistFuncs = template.FuncMap{"xml": xmlEscape}
+
+func xmlEscape(s string) string {
+	var b strings.Builder
+	_ = xml.EscapeText(&b, []byte(s))
+	return b.String()
+}
+
+var infoplistTmpl = template.Must(template.New("infoplist").Funcs(plistFuncs).Parse(`<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
@@ -427,19 +439,19 @@ var infoplistTmpl = template.Must(template.New("infoplist").Parse(`<?xml version
   <key>CFBundleExecutable</key>
   <string>main</string>
   <key>CFBundleIdentifier</key>
-  <string>{{.BundleID}}</string>
+  <string>{{xml .BundleID}}</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   {{- if .Credit}}
   <key>NSHumanReadableCopyright</key>
-  <string>{{.Credit}}</string>
+  <string>{{xml .Credit}}</string>
   {{- end}}
   <key>CFBundleName</key>
-  <string>{{.Name}}</string>
+  <string>{{xml .Name}}</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-  <string>{{.Version}}</string>
+  <string>{{xml .Version}}</string>
   <key>CFBundleSignature</key>
   <string>????</string>
   <key>CFBundleVersion</key>
@@ -499,19 +511,19 @@ var infoplistTmpl = template.Must(template.New("infoplist").Parse(`<?xml version
     <string>UIInterfaceOrientationLandscapeRight</string>
   </array>
 {{- range .UsageDescriptions}}
-  <key>{{.Key}}</key>
-  <string>{{.Value}}</string>
+  <key>{{xml .Key}}</key>
+  <string>{{xml .Value}}</string>
 {{- end}}
 {{- if .URLSchemes}}
   <key>CFBundleURLTypes</key>
   <array>
     <dict>
       <key>CFBundleURLName</key>
-      <string>{{.BundleID}}</string>
+      <string>{{xml .BundleID}}</string>
       <key>CFBundleURLSchemes</key>
       <array>
 {{- range .URLSchemes}}
-        <string>{{.}}</string>
+        <string>{{xml .}}</string>
 {{- end}}
       </array>
     </dict>
@@ -522,7 +534,7 @@ var infoplistTmpl = template.Must(template.New("infoplist").Parse(`<?xml version
   <array>
     <dict>
       <key>CFBundleTypeName</key>
-      <string>{{.Name}} Document</string>
+      <string>{{xml .Name}} Document</string>
       <key>CFBundleTypeRole</key>
       <string>Editor</string>
       <key>LSHandlerRank</key>
@@ -531,14 +543,14 @@ var infoplistTmpl = template.Must(template.New("infoplist").Parse(`<?xml version
       <key>LSItemContentTypes</key>
       <array>
 {{- range .ContentTypes}}
-        <string>{{.}}</string>
+        <string>{{xml .}}</string>
 {{- end}}
       </array>
 {{- end}}
       <key>CFBundleTypeMIMETypes</key>
       <array>
 {{- range .MimeTypes}}
-        <string>{{.}}</string>
+        <string>{{xml .}}</string>
 {{- end}}
       </array>
     </dict>
