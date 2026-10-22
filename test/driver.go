@@ -74,22 +74,34 @@ func NewDriverWithPainter(painter SoftwarePainter) bellui.Driver {
 // mutually exclusive with a happens-before edge between them, as on real drivers.
 // The wait flag is ignored as execution is always synchronous; nested calls from
 // within a running callback execute inline.
+//
+// The called-from-main check only applies once a main goroutine has been
+// registered. Until then the mobile build reports every goroutine as main, and
+// the check would hand each callback to a bare goroutine outside the mutex: Do
+// callbacks then ran concurrently with each other and DoAndWait did not wait
+// (#639).
 func (d *driver) DoFromGoroutine(f func(), _ bool) {
-	async.EnsureNotMain(func() {
-		gid := thread.GoroutineID()
-		if doOwner.Load() == gid {
-			f() // nested bellui.Do[AndWait] from within a callback we are running
-			return
-		}
+	if !thread.MainGoroutineRegistered() {
+		doSerialized(f)
+		return
+	}
+	async.EnsureNotMain(func() { doSerialized(f) })
+}
 
-		doMutex.Lock()
-		doOwner.Store(gid)
-		defer func() {
-			doOwner.Store(0)
-			doMutex.Unlock()
-		}()
-		f()
-	})
+func doSerialized(f func()) {
+	gid := thread.GoroutineID()
+	if doOwner.Load() == gid {
+		f() // nested bellui.Do[AndWait] from within a callback we are running
+		return
+	}
+
+	doMutex.Lock()
+	doOwner.Store(gid)
+	defer func() {
+		doOwner.Store(0)
+		doMutex.Unlock()
+	}()
+	f()
 }
 
 func (d *driver) AbsolutePositionForObject(co core.CanvasObject) geo.Position {

@@ -18,6 +18,13 @@ func SetMainGoroutine() {
 	mainGoroutineID.Store(GoroutineID())
 }
 
+// MainGoroutineRegistered reports whether SetMainGoroutine has been called.
+// IsMainGoroutine cannot answer this on mobile, where it reports true for every
+// goroutine until one is registered.
+func MainGoroutineRegistered() bool {
+	return mainGoroutineID.Load() != 0
+}
+
 // GoroutineID returns the current goroutine's ID.
 //
 // Where the runtime's goroutine record can be read (gc on amd64 and arm64), the

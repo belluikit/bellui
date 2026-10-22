@@ -1,4 +1,16 @@
 // Package test provides utility drivers for running UI tests without rendering to a screen.
+//
+// The test driver has no main loop: bellui.Do and bellui.DoAndWait run their
+// function at once on the calling goroutine, one at a time under a shared lock.
+// A widget that finishes background work through bellui.Do (FileTree's
+// directory listings, for one) therefore runs that callback on its own
+// goroutine. A test that lays out or reads such a widget must do it inside
+// bellui.DoAndWait too, or the two touch the widget at the same time:
+//
+//	bellui.DoAndWait(func() {
+//		w := test.NewWindow(tree)
+//		w.Resize(geo.NewSize(400, 300))
+//	})
 package test // import "github.com/belluikit/bellui/test"
 
 import (
