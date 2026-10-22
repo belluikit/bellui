@@ -106,8 +106,11 @@ Fonts used only by tests:
   in `cmd/bellui/internal/templates/data/` show a gopher. The Go gopher was
   designed by Renée French and is licensed under
   [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
-  `default-icon.png` is AI-generated: it was made with Google Gemini. Google's
-  [Terms of Service](https://policies.google.com/terms/archive/20260730)
+  `default-icon.png` is the Bellui logo, the same image bellui.com shows.
+  `spinner_dark.gif` and `spinner_light.gif` are one 128×128 GIF of a 3D
+  gopher skipping rope. Both images are AI-generated: they were made with
+  Google Gemini.
+  Google's [Terms of Service](https://policies.google.com/terms/archive/20260730)
   (effective 30 July 2026) say "Google won't claim ownership" of content
   generated with its services.
   `bellui package` credits the gopher in what it ships: under the spinner on

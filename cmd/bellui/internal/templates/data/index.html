@@ -2,8 +2,13 @@
 <html>
 	<head>
 		<style>
+			/* Roboto is the font the app draws with, but it lives inside the
+			   wasm binary, which isn't loaded yet. So name it first, for the
+			   devices that have it (Android, ChromeOS), then fall back to the
+			   system's own UI font. No font file ships with the page. */
 			body {
 				text-align:center;
+				font-family: Roboto, system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
 			}
 			.center {
 				margin-left: auto;
@@ -28,13 +33,13 @@
 				width: auto;
 				height: auto;
 			}
+			/* The GIF is 128 px, so 64 CSS px stays sharp on 2x screens. */
 			.spinner {
-				max-width: 48px;
-				max-height: 48px;
+				max-width: 64px;
+				max-height: 64px;
 			}
 			.credit {
 				margin-top: 2em;
-				font-family: sans-serif;
 			}
 		</style>
 		<link rel="stylesheet" href="dark.css" media="(prefers-color-scheme: dark)" />
