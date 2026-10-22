@@ -33,13 +33,15 @@ func TestHelloWorldTemplateUsesShowAndRunFunction(t *testing.T) {
 }
 
 // The main.go bellui init writes embeds the catalog init creates: a pattern
-// matching no file fails the build ("no matching files found").
+// matching no file fails the build ("no matching files found"). A Windows
+// checkout with core.autocrlf gives the template CRLF line endings, so the
+// line may end in "\r".
 func TestHelloWorldTemplateEmbedsInitCatalog(t *testing.T) {
 	data := &metadata.BelluiApp{}
 	var buf bytes.Buffer
 	require.NoError(t, templates.HelloWorld.Execute(&buf, &data))
 
-	m := regexp.MustCompile(`(?m)^//go:embed (\S+)$`).FindStringSubmatch(buf.String())
+	m := regexp.MustCompile(`(?m)^//go:embed (\S+)\r?$`).FindStringSubmatch(buf.String())
 	require.NotNil(t, m, "main.go embeds the translations:\n%s", buf.String())
 	ok, err := path.Match(m[1], initCatalog)
 	require.NoError(t, err)
