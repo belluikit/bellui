@@ -4,13 +4,18 @@ import (
 	"errors"
 	"io"
 	"sync"
+	"sync/atomic"
 
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/storage"
 )
 
 // spoolFileName is the name used inside the app storage sandbox for the spool.
-const spoolFileName = "bellui-analytics-spool.json"
+const spoolFileName = "bellui-analytics-spool.pxf"
+
+// legacySpoolFileName is the spool's name before it moved to PXF (#523). Load
+// reads it while there is no spool by the new name, and Save removes it.
+const legacySpoolFileName = "bellui-analytics-spool.json"
 
 // Store is the persistence backend for the disk spool. It stores a single
 // opaque blob (the serialized event ring) that survives process death.
@@ -31,11 +36,18 @@ type Store interface {
 type BelluiStore struct {
 	storage bellui.Storage
 	name    string
+
+	legacyName    string
+	legacyRemoved atomic.Bool // Save has removed any spool by legacyName
 }
 
 // NewBelluiStore returns a [Store] backed by the given app's storage sandbox.
 func NewBelluiStore(app bellui.App) *BelluiStore {
-	return &BelluiStore{storage: app.Storage(), name: spoolFileName}
+	return newBelluiStore(app.Storage())
+}
+
+func newBelluiStore(s bellui.Storage) *BelluiStore {
+	return &BelluiStore{storage: s, name: spoolFileName, legacyName: legacySpoolFileName}
 }
 
 // Save implements [Store].
@@ -52,13 +64,21 @@ func (s *BelluiStore) Save(data []byte) error {
 		return err
 	}
 	defer w.Close()
-	_, err = w.Write(data)
-	return err
+	if _, err = w.Write(data); err != nil {
+		return err
+	}
+	if s.legacyName != "" && !s.legacyRemoved.Swap(true) {
+		_ = s.storage.Remove(s.legacyName)
+	}
+	return nil
 }
 
 // Load implements [Store].
 func (s *BelluiStore) Load() ([]byte, error) {
 	r, err := s.storage.Open(s.name)
+	if err != nil && s.legacyName != "" {
+		r, err = s.storage.Open(s.legacyName)
+	}
 	if err != nil {
 		// A missing spool is not an error.
 		return nil, nil //nolint:nilerr
@@ -69,6 +89,9 @@ func (s *BelluiStore) Load() ([]byte, error) {
 
 // Clear implements [Store].
 func (s *BelluiStore) Clear() error {
+	if s.legacyName != "" {
+		_ = s.storage.Remove(s.legacyName)
+	}
 	err := s.storage.Remove(s.name)
 	if err != nil && !errors.Is(err, io.EOF) {
 		// Removing an absent spool is fine.

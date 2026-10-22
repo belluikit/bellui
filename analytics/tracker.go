@@ -1,7 +1,6 @@
 package analytics
 
 import (
-	"encoding/json"
 	"math/rand/v2"
 	"strconv"
 	"sync"
@@ -76,7 +75,7 @@ func New(sink Sink, opts ...Option) Tracker {
 func defaultStore() Store {
 	if app := bellui.CurrentApp(); app != nil {
 		if s := app.Storage(); s != nil {
-			return &BelluiStore{storage: s, name: spoolFileName}
+			return newBelluiStore(s)
 		}
 	}
 	return &memStore{}
@@ -196,8 +195,8 @@ func (t *tracker) loadSpoolLocked() {
 	if err != nil || len(data) == 0 {
 		return
 	}
-	var spooled []Event
-	if err := json.Unmarshal(data, &spooled); err != nil {
+	spooled, err := unmarshalSpool(data)
+	if err != nil {
 		return
 	}
 	// Spooled events are older, so they lead.
@@ -207,7 +206,7 @@ func (t *tracker) loadSpoolLocked() {
 
 // persistLocked checkpoints the queue to the disk spool.
 func (t *tracker) persistLocked() {
-	data, err := json.Marshal(t.queue)
+	data, err := marshalSpool(t.queue)
 	if err != nil {
 		return
 	}

@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package bellui.analytics.v1;
+
+option go_package = "github.com/belluikit/bellui/internal/analytics/spoolpb;spoolpb";
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+// Spool is the wire schema for the analytics events saved between runs, encoded
+// in the textual PXF format (replacing the legacy JSON spool). Event mirrors
+// analytics.Event field for field (#523). See analytics/spool.go.
+message Spool {
+  repeated Event events = 1;
+}
+
+message Event {
+  // kind is "track" or "identify" (analytics.EventKind).
+  string kind = 1;
+  string name = 2;
+  // props and traits hold what JSON could: the spool kept them as JSON before,
+  // so a value that JSON flattened (a number of any type, a struct) is
+  // flattened the same way here.
+  google.protobuf.Struct props = 3;
+  google.protobuf.Struct traits = 4;
+  string user_id = 5;
+  string session_id = 6;
+  google.protobuf.Timestamp timestamp = 7;
+}
