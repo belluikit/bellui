@@ -2,16 +2,22 @@ package glfw
 
 import (
 	"fmt"
+	"hash/fnv"
 	"image"
 	"image/color"
 	"image/draw"
 	"image/png"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 
 	"github.com/belluikit/bellui"
+	"github.com/belluikit/bellui/canvas"
+	"github.com/belluikit/bellui/core"
+	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/build"
+	"github.com/belluikit/bellui/internal/driver"
 )
 
 // partialVerifier checks partial repaint against a full repaint on the real GPU
@@ -21,14 +27,16 @@ import (
 //
 // Every N painted frames it captures the window as partial repaint left it,
 // makes the next frame a full repaint (Canvas.MarkFullRepaint), captures that,
-// and compares the two. Both captures run in one main-thread call, so nothing
-// can change the scene between them: any pixel that differs is one partial
-// repaint got wrong. A check also corrects what it found, so a wrong pixel is
-// reported by the first check after the frame that left it.
+// and compares the two. Both captures run in one main-thread call, so only
+// another goroutine can change the scene between them: any other pixel that
+// differs is one partial repaint got wrong. A check also corrects what it
+// found, so a wrong pixel is reported by the first check after the frame that
+// left it.
 //
-// A check whose two captures differ takes a second full repaint; if that
-// differs from the first, the scene changed during the check (a video drawing
-// from another goroutine) and the check counts as unstable, not as a mismatch.
+// A check whose two captures differ counts as unstable, not as a mismatch,
+// when the scene changed during it: a streaming raster's pixels changed, as a
+// video decoder writes them from its own goroutine (#613), or a second full
+// repaint differs from the first.
 //
 // It logs each mismatch with the differing pixel count and their bounding box,
 // and, when BELLUI_PARTIAL_VERIFY_DIR names a directory, saves the first few as
@@ -41,9 +49,9 @@ type partialVerifier struct {
 	busy                     bool
 	frames, checks, failures int
 	differing                int // pixels, over all checks
-	// unstable counts checks whose two full repaints differed: the scene
-	// changed during the check, so it proves nothing.
-	unstable int
+	// unstable counts checks during which the scene changed, so they prove
+	// nothing: newFrames of them had a streaming raster's pixels change.
+	unstable, newFrames int
 }
 
 // maxSavedMismatches bounds the PNGs a run writes.
@@ -81,6 +89,7 @@ func (v *partialVerifier) afterFrame(w *window) {
 	v.busy = true // the captures repaint, which would call this again
 	defer func() { v.busy = false }()
 
+	streams := streamHashes(w.canvas, nil)
 	partial := w.canvas.Capture()
 	w.canvas.MarkFullRepaint()
 	full := w.canvas.Capture()
@@ -90,6 +99,11 @@ func (v *partialVerifier) afterFrame(w *window) {
 	v.checks++
 	n, box, maxDelta := diffImages(partial, full)
 	if n == 0 {
+		return
+	}
+	if !slices.Equal(streams, streamHashes(w.canvas, streams[:0:0])) {
+		v.unstable++
+		v.newFrames++
 		return
 	}
 	// Something drawing from another goroutine (a video, a streaming raster)
@@ -115,13 +129,34 @@ func (v *partialVerifier) afterFrame(w *window) {
 	bellui.LogError(msg, nil)
 }
 
+// streamHashes appends to buf a hash of the pixels each streaming raster shown
+// on c draws. A video decoder writes them from its own goroutine, often more
+// than once during a check, which takes three full captures: swapping between
+// two buffers can leave the same one in place with a new frame in it (#613).
+func streamHashes(c *glCanvas, buf []uint64) []uint64 {
+	h := fnv.New64a()
+	for _, tree := range c.ObjectTrees() {
+		driver.WalkVisibleObjectTree(tree, func(o core.CanvasObject, _, _ geo.Position, _ geo.Size) bool {
+			if r, ok := o.(*canvas.Raster); ok && r.Streaming {
+				h.Reset()
+				r.StreamMu.Lock()
+				h.Write(r.StreamPix)
+				r.StreamMu.Unlock()
+				buf = append(buf, h.Sum64())
+			}
+			return false
+		}, nil)
+	}
+	return buf
+}
+
 // Flush prints the run's summary. Safe to call when disabled.
 func (v *partialVerifier) Flush() {
 	if v == nil || !v.enabled {
 		return
 	}
-	bellui.LogError(fmt.Sprintf("BELLUI_PARTIAL_VERIFY: summary: frames=%d checks=%d mismatches=%d unstable=%d differing_pixels=%d",
-		v.frames, v.checks, v.failures, v.unstable, v.differing), nil)
+	bellui.LogError(fmt.Sprintf("BELLUI_PARTIAL_VERIFY: summary: frames=%d checks=%d mismatches=%d unstable=%d (stream changed %d) differing_pixels=%d",
+		v.frames, v.checks, v.failures, v.unstable, v.newFrames, v.differing), nil)
 }
 
 // diffImages counts the pixels that differ between a and b, which must have the
