@@ -1,0 +1,6 @@
+colors = { foreground: "#ffffffff" }
+colors_light = {
+  background: "#303030"
+  foreground: "#c0c0c0ff"
+}
+sizes = { iconInline: 10.0 }
