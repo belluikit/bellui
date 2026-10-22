@@ -38,7 +38,7 @@ type BelluiStore struct {
 	name    string
 
 	legacyName    string
-	legacyRemoved atomic.Bool // Save has removed any spool by legacyName
+	legacyRemoved atomic.Bool // there is no spool by legacyName any more
 }
 
 // NewBelluiStore returns a [Store] backed by the given app's storage sandbox.
@@ -63,14 +63,41 @@ func (s *BelluiStore) Save(data []byte) error {
 	if err != nil {
 		return err
 	}
-	defer w.Close()
 	if _, err = w.Write(data); err != nil {
+		_ = w.Close()
 		return err
 	}
-	if s.legacyName != "" && !s.legacyRemoved.Swap(true) {
-		_ = s.storage.Remove(s.legacyName)
+	// A save completes when its writer closes (internal.Docs.Save), so the
+	// spool is not known to be saved before then, and the legacy spool, whose
+	// events it now holds, must outlive it until it is.
+	if err := w.Close(); err != nil {
+		return err
 	}
+	s.removeLegacy()
 	return nil
+}
+
+// removeLegacy removes the spool saved under legacyName, once it is gone: a
+// removal that fails is tried again at the next Save, so the old spool is not
+// left to be read again after the new one has been cleared.
+func (s *BelluiStore) removeLegacy() {
+	if s.legacyName == "" || s.legacyRemoved.Load() {
+		return
+	}
+	if s.storage.Remove(s.legacyName) == nil || !s.exists(s.legacyName) {
+		s.legacyRemoved.Store(true)
+	}
+}
+
+// exists reports whether the document name can be opened. Storage backends do
+// not agree on the error a missing document gives, so this does not ask.
+func (s *BelluiStore) exists(name string) bool {
+	r, err := s.storage.Open(name)
+	if err != nil {
+		return false
+	}
+	_ = r.Close()
+	return true
 }
 
 // Load implements [Store].

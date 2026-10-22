@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -16,11 +15,13 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/trendvidia/protowire-go/encoding/pxf"
 
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/internal/authstore/tokenpb"
+	"github.com/belluikit/bellui/internal/pxfmigrate"
 )
 
 // ErrNoAppID is returned by SaveToken, LoadToken and ClearToken, and by
@@ -29,6 +30,11 @@ import (
 // signs users in must be created with app.NewWithID (or have an ID in its
 // manifest.pxf), as Preferences already require.
 var ErrNoAppID = errors.New("auth: storing a sign-in token needs an app ID; create the app with app.NewWithID")
+
+// tokenMu serialises saving, loading and clearing token files. Loading writes
+// too, when it rewrites a JSON record as PXF, and a load that read a token
+// before a sign-out or a rotation must not write it back after.
+var tokenMu sync.Mutex
 
 // legacyToken is a token record as versions before #523 saved it, in JSON.
 // Records are PXF now (tokenpb.StoredToken).
@@ -57,6 +63,8 @@ func SaveToken(provider, refreshToken, email string) error {
 //
 // Since: 1.2
 func SaveTokenFor(provider, issuer, refreshToken, email string) error {
+	tokenMu.Lock()
+	defer tokenMu.Unlock()
 	removeLegacyToken(provider)
 	issuer = keyIssuer(provider, issuer)
 	path, appID, err := tokenPath(provider, issuer)
@@ -74,9 +82,19 @@ func SaveTokenFor(provider, issuer, refreshToken, email string) error {
 	})
 }
 
-// writeToken encrypts a token record, encoded as PXF, to path.
+// writeToken encrypts a token record, encoded as PXF, to path. Strings that are
+// not valid UTF-8 are written as JSON wrote them, since PXF would write them as
+// they are and then refuse to read the record back.
+//
+// The record is written beside path and renamed over it, so a write that fails
+// or is cut short leaves the token that was there: a partial file would not
+// decrypt, and the next load would remove it.
 func writeToken(path, appID, provider, issuer string, st *tokenpb.StoredToken) error {
-	plaintext, err := pxf.Marshal(st)
+	plaintext, err := pxf.Marshal(&tokenpb.StoredToken{
+		Provider:     pxfmigrate.ValidUTF8(st.GetProvider()),
+		RefreshToken: pxfmigrate.ValidUTF8(st.GetRefreshToken()),
+		Email:        pxfmigrate.ValidUTF8(st.GetEmail()),
+	})
 	if err != nil {
 		return err
 	}
@@ -90,7 +108,33 @@ func writeToken(path, appID, provider, issuer string, st *tokenpb.StoredToken) e
 		return err
 	}
 
-	return os.WriteFile(path, ciphertext, 0o600)
+	return replaceFile(path, ciphertext)
+}
+
+// tempSuffix names the file writeToken writes before renaming it into place.
+const tempSuffix = ".tmp"
+
+// replaceFile writes data to path+tempSuffix and renames it over path.
+func replaceFile(path string, data []byte) error {
+	tmp := path + tempSuffix
+	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	if err != nil {
+		return err
+	}
+	_, err = f.Write(data)
+	if err == nil {
+		err = f.Sync()
+	}
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err == nil {
+		err = os.Rename(tmp, path)
+	}
+	if err != nil {
+		_ = os.Remove(tmp)
+	}
+	return err
 }
 
 // LoadToken reads and decrypts the running app's stored refresh token for a
@@ -105,6 +149,8 @@ func LoadToken(provider string) (refreshToken, email string, err error) {
 //
 // Since: 1.2
 func LoadTokenFor(provider, issuer string) (refreshToken, email string, err error) {
+	tokenMu.Lock()
+	defer tokenMu.Unlock()
 	issuer = keyIssuer(provider, issuer)
 	path, appID, err := tokenPath(provider, issuer)
 	if err != nil {
@@ -149,7 +195,7 @@ func LoadTokenFor(provider, issuer string) (refreshToken, email string, err erro
 // saved it, which it reports as legacy. A JSON record is an object, so it starts
 // with '{'; a PXF one starts with a field name.
 func unmarshalToken(plaintext []byte) (st *tokenpb.StoredToken, legacy bool, err error) {
-	if trimmed := bytes.TrimLeft(plaintext, " \t\r\n"); len(trimmed) > 0 && trimmed[0] == '{' {
+	if pxfmigrate.IsJSON(plaintext, '{') {
 		var old legacyToken
 		if err := json.Unmarshal(plaintext, &old); err != nil {
 			return nil, true, err
@@ -176,11 +222,15 @@ func ClearToken(provider string) error {
 //
 // Since: 1.2
 func ClearTokenFor(provider, issuer string) error {
+	tokenMu.Lock()
+	defer tokenMu.Unlock()
 	removeLegacyToken(provider)
 	path, _, err := tokenPath(provider, keyIssuer(provider, issuer))
 	if err != nil {
 		return err
 	}
+	// A write cut short before its rename leaves the token beside path.
+	_ = os.Remove(path + tempSuffix)
 	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 		return err
 	}

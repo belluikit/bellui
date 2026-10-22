@@ -101,3 +101,23 @@ func TestForwardedArgs_GoldenDecode(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, golden, got)
 }
+
+// An argument that is not valid UTF-8, such as a Latin-1 file name on Linux,
+// arrives as the JSON message delivered it, and the other arguments with it.
+// PXF writes such a string but refuses to read it back, so the running copy
+// used to lose the whole message.
+func TestForwardedArgs_InvalidUTF8(t *testing.T) {
+	args := []string{"--open", "/home/u/caf\xe9.txt"}
+
+	var buf bytes.Buffer
+	require.NoError(t, writeArgs(&buf, args))
+	got, err := readArgs(&buf)
+	require.NoError(t, err)
+
+	legacy, err := json.Marshal(args)
+	require.NoError(t, err)
+	var want []string
+	require.NoError(t, json.Unmarshal(legacy, &want))
+	assert.Equal(t, want, got)
+	assert.Equal(t, "/home/u/caf�.txt", got[1])
+}

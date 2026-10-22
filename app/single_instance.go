@@ -1,7 +1,6 @@
 package app
 
 import (
-	"bytes"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/internal/app/instancepb"
+	"github.com/belluikit/bellui/internal/pxfmigrate"
 )
 
 // siMaxPayload caps a single forwarded-argument message (defensive against a
@@ -79,9 +79,16 @@ func (a *belluiApp) onForwardedArgs(args []string) {
 
 // writeArgs sends a length-prefixed message of arguments to a forwarding peer.
 // The wire format (4-byte big-endian length + PXF instancepb.ForwardedArgs) is
-// shared by every transport.
+// shared by every transport. An argument that is not valid UTF-8, such as a
+// file name in another encoding, is sent as JSON sent it, with U+FFFD for each
+// bad byte: PXF would send it as it is, and the running copy would then refuse
+// the whole message.
 func writeArgs(w io.Writer, args []string) error {
-	payload, err := pxf.Marshal(&instancepb.ForwardedArgs{Args: args})
+	msg := &instancepb.ForwardedArgs{Args: make([]string, len(args))}
+	for i, a := range args {
+		msg.Args[i] = pxfmigrate.ValidUTF8(a)
+	}
+	payload, err := pxf.Marshal(msg)
 	if err != nil {
 		return err
 	}
@@ -113,7 +120,7 @@ func readArgs(r io.Reader) ([]string, error) {
 	if _, err := io.ReadFull(r, payload); err != nil {
 		return nil, err
 	}
-	if trimmed := bytes.TrimLeft(payload, " \t\r\n"); len(trimmed) > 0 && trimmed[0] == '[' {
+	if pxfmigrate.IsJSON(payload, '[') {
 		var args []string
 		if err := json.Unmarshal(payload, &args); err != nil {
 			return nil, err

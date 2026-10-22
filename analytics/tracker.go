@@ -268,8 +268,8 @@ func (t *tracker) doFlush(force bool) error {
 	if !t.enabled {
 		// Consent was withdrawn during the send: SetEnabled(false) already
 		// dropped the queue and cleared the spool. Do not re-queue the in-flight
-		// batch or persist — a persistLocked here would marshal the now-nil queue
-		// to "null" and land *after* SetEnabled's store.Clear(), resurrecting a
+		// batch or persist — a persistLocked here would save the now-nil queue
+		// as an empty spool *after* SetEnabled's store.Clear(), resurrecting a
 		// spool the user opted out of (a rare drain-race, but real).
 		t.queue = nil
 		t.mu.Unlock()

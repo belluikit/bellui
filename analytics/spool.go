@@ -1,7 +1,6 @@
 package analytics
 
 import (
-	"bytes"
 	"encoding/json"
 
 	"github.com/trendvidia/protowire-go/encoding/pxf"
@@ -9,19 +8,22 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/belluikit/bellui/internal/analytics/spoolpb"
+	"github.com/belluikit/bellui/internal/pxfmigrate"
 )
 
-// marshalSpool encodes queued events for the disk spool, as PXF (#523).
+// marshalSpool encodes queued events for the disk spool, as PXF (#523). Strings
+// that are not valid UTF-8 are written as JSON wrote them: PXF would write them
+// as they are and then refuse to read the whole spool back.
 func marshalSpool(events []Event) ([]byte, error) {
 	msg := &spoolpb.Spool{Events: make([]*spoolpb.Event, len(events))}
 	for i, e := range events {
 		msg.Events[i] = &spoolpb.Event{
-			Kind:      string(e.Kind),
-			Name:      e.Name,
+			Kind:      pxfmigrate.ValidUTF8(string(e.Kind)),
+			Name:      pxfmigrate.ValidUTF8(e.Name),
 			Props:     toStruct(e.Props),
 			Traits:    toStruct(e.Traits),
-			UserId:    e.UserID,
-			SessionId: e.SessionID,
+			UserId:    pxfmigrate.ValidUTF8(e.UserID),
+			SessionId: pxfmigrate.ValidUTF8(e.SessionID),
 			Timestamp: timestamppb.New(e.Timestamp),
 		}
 	}
@@ -32,7 +34,7 @@ func marshalSpool(events []Event) ([]byte, error) {
 // #523 wrote. A JSON spool is an array, so it starts with '['; a PXF one starts
 // with a field name.
 func unmarshalSpool(data []byte) ([]Event, error) {
-	if trimmed := bytes.TrimLeft(data, " \t\r\n"); len(trimmed) > 0 && trimmed[0] == '[' {
+	if pxfmigrate.IsJSON(data, '[') {
 		var events []Event
 		err := json.Unmarshal(data, &events)
 		return events, err
@@ -62,7 +64,8 @@ func unmarshalSpool(data []byte) ([]Event, error) {
 // it is (strings, booleans, numbers, nil, []any, map[string]any) is kept; any
 // other goes through JSON first, as the whole spool did before #523, so a
 // time.Time becomes its JSON string and a struct its JSON object. Either way the
-// value reads back as JSON would have given it: numbers as float64.
+// value reads back as JSON would have given it: numbers as float64, and bytes
+// that are not valid UTF-8, in a key or a string, as U+FFFD.
 func toStruct(m map[string]any) *structpb.Struct {
 	if len(m) == 0 {
 		return nil
@@ -74,7 +77,7 @@ func toStruct(m map[string]any) *structpb.Struct {
 			pv = jsonValue(v)
 		}
 		if pv != nil {
-			s.Fields[k] = pv
+			s.Fields[pxfmigrate.ValidUTF8(k)] = pv
 		}
 	}
 	return s
