@@ -51,6 +51,10 @@ messages = {
 		"profile": map[string]any{"female": "{Name} hat ihr Profil aktualisiert"},
 	}, m)
 
+	m, err = readCatalog(t, "messages = {\n  plural {\n    one = \"a\"\n    other = \"b\"\n  }\n}\n")
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"plural": map[string]any{"one": "a", "other": "b"}}, m, "the name { … } block form")
+
 	m, err = readCatalog(t, "")
 	require.NoError(t, err)
 	assert.Empty(t, m)

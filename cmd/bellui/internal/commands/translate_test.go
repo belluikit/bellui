@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"encoding/json"
 	"fmt"
 	"go/ast"
 	"go/parser"
@@ -88,7 +87,7 @@ func TestUpdateTranslationsFile(t *testing.T) {
 	srcpath := filepath.Join(dir, src)
 
 	opts := translateOpts{}
-	dst := filepath.Join(dir, "en.json")
+	dst := filepath.Join(dir, "en.pxf")
 
 	if err := updateTranslationsFile(dst, []string{srcpath}, &opts); err != nil {
 		t.Fatal(err)
@@ -98,17 +97,14 @@ func TestUpdateTranslationsFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	f, err := os.Open(dst)
+	data, err := os.ReadFile(dst)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	translations := make(map[string]any)
-	dec := json.NewDecoder(f)
-	if err := dec.Decode(&translations); err != nil {
+	translations, err := readCatalog(data)
+	if err != nil {
 		t.Fatal(err)
 	}
-	f.Close()
 
 	key := "example"
 	val, found := translations[key]
@@ -272,8 +268,8 @@ func TestTranslateForkSeams(t *testing.T) {
 		key  string
 		want string
 	}{
-		{"Apples", "Apples"},                    // NewLocalizedPlural — key-only
-		{"basket.count", "{{.Count}} apple(s)"}, // NewLocalizedPluralWithKey — explicit fallback
+		{"Apples", "Apples"},                 // NewLocalizedPlural — key-only
+		{"basket.count", "{Count} apple(s)"}, // NewLocalizedPluralWithKey — explicit fallback, written with named placeholders
 	} {
 		val, found := translations[test.key]
 		if !found {

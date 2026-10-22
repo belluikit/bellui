@@ -160,7 +160,7 @@ func initAction(ctx *cli.Context) error {
 	if verbose {
 		args = append(args, "-v")
 	}
-	args = append(args, "translations/en.json")
+	args = append(args, "translations/en.pxf")
 	args = append(args, "main.go")
 	if err := ctx.App.Run(args); err != nil {
 		return fmt.Errorf("failed to run command: %v", err)
