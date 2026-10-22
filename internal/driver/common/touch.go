@@ -73,8 +73,10 @@ type TouchHandler struct {
 	// every move calls this with the gesture origin and the move's delta, and
 	// the driver turns it into a touch-sourced ScrollEvent (which buys nested
 	// propagation from its scroll dispatch). It also carries two-finger pans
-	// (pinch.go, #398). Drivers whose Scroll is itself Draggable (mobile) leave
-	// this nil: they get neither, and two fingers over a Pinchable always pinch.
+	// (pinch.go, #398). Where the Scroll is itself Draggable (the mobile
+	// driver, #402) a one-finger drag latches the Scroll first, so setting this
+	// there only adds the two-finger pan. A driver that leaves it nil gets
+	// neither, and two fingers over a Pinchable always pinch.
 	ScrollCallback func(origin geo.Position, delta geo.Delta)
 	// ScrollEndCallback is called when a scroll gesture's contact lifts, with
 	// the last move's delta as the momentum seed. A system cancel ends the

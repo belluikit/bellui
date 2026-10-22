@@ -414,10 +414,10 @@ func TestTouchHandler_PanEndedWithoutReleaseHasNoMomentum(t *testing.T) {
 	}
 }
 
-// A driver that cannot pan (no ScrollCallback: the native mobile driver,
-// #402) keeps the pinch as it was: two fingers over a Pinchable pinch from
-// their first move, and a move that keeps the distance reports the new focus,
-// so a widget can pan with them. Without a Pinchable, they form no gesture.
+// A driver that cannot pan (no ScrollCallback) keeps the pinch as it was: two
+// fingers over a Pinchable pinch from their first move, and a move that keeps
+// the distance reports the new focus, so a widget can pan with them. Without a
+// Pinchable, they form no gesture.
 func TestTouchHandler_NoScrollCallbackPinchesFromFirstMove(t *testing.T) {
 	target := &pinchRect{Rectangle: canvas.NewRectangle(color.Black)}
 	h := newPinchHandler(target)

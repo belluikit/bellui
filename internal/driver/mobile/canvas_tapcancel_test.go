@@ -100,11 +100,17 @@ func Test_canvas_TapCancelLeavesAnotherContactsDrag(t *testing.T) {
 
 	// The palm lands first, the finger then drags: the rejection of the palm
 	// that follows must not end the drag it never latched.
+	// Two contacts down could be a two-finger pan (#402), so the finger's first
+	// move past the slop is held while the handler waits to see whether the
+	// palm moves too; the next one, with the palm still resting, starts the
+	// drag from where the finger landed.
 	c.TapDown(geo.NewPos(21, 21), 0)
 	c.TapDown(geo.NewPos(20, 20), 1)
-	c.TapMove(geo.NewPos(40, 20), 1, func(wid event.Draggable, ev *event.DragEvent) {
+	drag := func(wid event.Draggable, ev *event.DragEvent) {
 		wid.Dragged(ev)
-	})
+	}
+	c.TapMove(geo.NewPos(40, 20), 1, drag)
+	c.TapMove(geo.NewPos(45, 20), 1, drag)
 	assert.Equal(t, 1, r.dragged, "the move past the slop started a drag")
 
 	c.TapCancel(geo.NewPos(21, 21), 0)
