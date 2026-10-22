@@ -50,3 +50,7 @@ func (d *driver) claimNativeSurface(*canvas, *window) {}
 // setWindowSurfaceHidden is a no-op: only the iOS WebGPU backend stacks a
 // per-window CAMetalLayer whose visibility must toggle on Hide/Show (pre-rebrand tracker #742).
 func (d *driver) setWindowSurfaceHidden(*window, bool) {}
+
+// nativeSurfacePresentable is always true for GL: gomobile owns the EGL surface,
+// and only the WebGPU backend abandons a frame whose window died (#283).
+func (d *driver) nativeSurfacePresentable() bool { return true }

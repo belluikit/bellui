@@ -126,7 +126,10 @@ func TestMobileDriver_FindMenu(t *testing.T) {
 	m1 := bellui.NewMainMenu(bellui.NewMenu("1"))
 	m2 := bellui.NewMainMenu(bellui.NewMenu("2"))
 
-	d := NewGoMobileDriver().(*driver)
+	// A bare driver: NewGoMobileDriver registers the calling goroutine as
+	// main, which from a test goroutine took that over from TestMain's loop
+	// for every test after this one.
+	d := &driver{}
 	w1 := dummyWin(d, "top")
 	w1.SetMainMenu(m1)
 	assert.Equal(t, m1, d.findMenu(w1))

@@ -739,14 +739,7 @@ func (d *driver) handlePaint(e paint.Event, w *window) {
 	d.animation.TickAnimations()
 	canvasNeedRefresh := c.FreeDirtyTextures() > 0 || c.CheckDirtyAndClear()
 	if canvasNeedRefresh {
-		newSize := geo.NewSize(float32(d.currentSize.WidthPx)/c.scale, float32(d.currentSize.HeightPx)/c.scale)
-
-		if c.EnsureMinSize() {
-			c.sizeContent(newSize) // force resize of content
-		} else { // if screen changed
-			w.Resize(newSize)
-		}
-
+		newSize := d.prepareFrame(w)
 		d.paintWindow(w, newSize)
 		d.presentPainter(c)
 		d.app.Publish()
@@ -763,6 +756,19 @@ func (d *driver) handlePaint(e paint.Event, w *window) {
 		d.syncKeyboardState()
 	}
 	cache.Clean(canvasNeedRefresh)
+}
+
+// prepareFrame sizes the window's content to the screen before a paint, and
+// returns the size to paint at.
+func (d *driver) prepareFrame(w *window) geo.Size {
+	c := w.canvas
+	newSize := geo.NewSize(float32(d.currentSize.WidthPx)/c.scale, float32(d.currentSize.HeightPx)/c.scale)
+	if c.EnsureMinSize() {
+		c.sizeContent(newSize) // force resize of content
+	} else { // if screen changed
+		w.Resize(newSize)
+	}
+	return newSize
 }
 
 func (d *driver) onStart() {
