@@ -43,7 +43,7 @@ var (
 	HelloWorld = template.Must(template.New("hello_world.got").Parse(helloWorld))
 
 	// ManifestAndroid is the default manifest for building an Android application
-	ManifestAndroid = template.Must(template.New("AndroidManifest").Parse(androidManifestXML))
+	ManifestAndroid = template.Must(template.New("AndroidManifest").Funcs(xmlFuncs).Parse(androidManifestXML))
 
 	// ManifestWindows is the manifest file for windows packaging
 	ManifestWindows = template.Must(template.New("Manifest").Parse(appManifest))
