@@ -777,6 +777,32 @@ func (c *SetGroupLabelCommand) setLabel(label string) {
 	}
 }
 
+// RenameNodeCommand changes a node's label.
+type RenameNodeCommand struct {
+	Canvas *DAGCanvas
+	NodeID string
+	Old    string
+	New    string
+	OnDone func()
+}
+
+func (c *RenameNodeCommand) Execute() { c.setLabel(c.New) }
+func (c *RenameNodeCommand) Undo()    { c.setLabel(c.Old) }
+
+func (c *RenameNodeCommand) setLabel(label string) {
+	if n := c.Canvas.Graph.Nodes[c.NodeID]; n != nil {
+		n.Label = label
+	}
+	if nw := c.Canvas.nodes[c.NodeID]; nw != nil {
+		nw.Label = label
+		nw.Refresh()
+	}
+	c.Canvas.Refresh()
+	if c.OnDone != nil {
+		c.OnDone()
+	}
+}
+
 // SetGroupColorCommand changes a group's tint color.
 type SetGroupColorCommand struct {
 	Canvas  *DAGCanvas
