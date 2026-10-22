@@ -34,7 +34,7 @@ type PropertiesPanel struct {
 	// CanvasRef is needed for node renaming and group/annotation editing:
 	// commands carry the canvas, and anchor pickers enumerate the graph. Set
 	// by the app screen after construction; without it a node shows no Name
-	// field.
+	// field, and edits to a group, annotation or link store nothing.
 	CanvasRef *DAGCanvas
 
 	node       *dag.Node
@@ -190,7 +190,7 @@ func (p *PropertiesPanel) SetGroup(g *dag.Group) {
 		if p.rebuilding || p.group == nil {
 			return
 		}
-		if p.CanvasRef != nil && !p.CanvasRef.Capabilities.EditProperties {
+		if p.CanvasRef == nil || !p.CanvasRef.Capabilities.EditProperties {
 			return
 		}
 		p.doCommand(&SetGroupLabelCommand{
@@ -214,7 +214,7 @@ func (p *PropertiesPanel) SetGroup(g *dag.Group) {
 		if p.rebuilding || p.group == nil {
 			return
 		}
-		if p.CanvasRef != nil && !p.CanvasRef.Capabilities.EditProperties {
+		if p.CanvasRef == nil || !p.CanvasRef.Capabilities.EditProperties {
 			return
 		}
 		if _, ok := parseHexColor(s); !ok && s != "" {
@@ -282,7 +282,7 @@ func (p *PropertiesPanel) SetAnnotation(a *dag.Annotation) {
 		if p.rebuilding || p.annotation == nil {
 			return
 		}
-		if p.CanvasRef != nil && !p.CanvasRef.Capabilities.Annotations {
+		if p.CanvasRef == nil || !p.CanvasRef.Capabilities.Annotations {
 			return
 		}
 		p.doCommand(&SetAnnotationTextCommand{
@@ -310,7 +310,7 @@ func (p *PropertiesPanel) SetAnnotation(a *dag.Annotation) {
 		if p.annotation == nil {
 			return
 		}
-		if p.CanvasRef != nil && !p.CanvasRef.Capabilities.Annotations {
+		if p.CanvasRef == nil || !p.CanvasRef.Capabilities.Annotations {
 			return
 		}
 		p.doCommand(&SetAnnotationAnchorCommand{
@@ -437,7 +437,7 @@ func (p *PropertiesPanel) SetLinkEdge(le *dag.LinkEdge) {
 		if p.rebuilding || p.linkEdge == nil {
 			return
 		}
-		if p.CanvasRef != nil && !p.CanvasRef.Capabilities.EditProperties {
+		if p.CanvasRef == nil || !p.CanvasRef.Capabilities.EditProperties {
 			return
 		}
 		p.doCommand(&SetLinkEdgeLabelCommand{

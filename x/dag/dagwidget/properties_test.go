@@ -467,3 +467,31 @@ func TestPropertiesPanelFormAndSuppression(t *testing.T) {
 		t.Fatal("syncForm ended an outer rebuild's suppression")
 	}
 }
+
+// Without a CanvasRef, the commands behind group, annotation and link edits
+// have no canvas to write: the edits store nothing rather than panic.
+func TestPropertiesPanelWithoutCanvasRefStoresNothing(t *testing.T) {
+	c := fullCanvas(t)
+	p := NewPropertiesPanel(nil, c.Commands)
+	test.NewTempWindow(t, p).Resize(geo.NewSize(320, 600))
+
+	p.SetGroup(c.Graph.Groups["g1"])
+	for _, e := range renderedEntries(p) {
+		e.SetText("#00ff00")
+	}
+	p.SetLinkEdge(c.Graph.LinkEdges["l1"])
+	renderedEntries(p)[0].SetText("feeds")
+	p.SetAnnotation(c.Graph.Annotations["an1"])
+	renderedEntries(p)[0].SetText("edited")
+	rendered[*widget.Select](p)[0].SetSelected("None")
+
+	if g := c.Graph.Groups["g1"]; g.Label != "g1" || g.Color != "" {
+		t.Errorf("group edited without a canvas: %+v", g)
+	}
+	if l := c.Graph.LinkEdges["l1"]; l.Label != "" {
+		t.Errorf("link edited without a canvas: %q", l.Label)
+	}
+	if a := c.Graph.Annotations["an1"]; a.Text != "note" || a.AnchorKind != dag.AnchorNode {
+		t.Errorf("annotation edited without a canvas: %+v", a)
+	}
+}
