@@ -408,3 +408,32 @@ func readZipEntry(t *testing.T, f *zip.File) string {
 	require.NoError(t, err)
 	return string(b)
 }
+
+// TestFindLastPlatform pins numeric API-level ordering: name order would
+// pick android-9 over android-35, and a codename preview over both.
+func TestFindLastPlatform(t *testing.T) {
+	for _, tc := range []struct {
+		dirs []string
+		want string
+	}{
+		{[]string{"android-35", "android-9"}, "android-35"},
+		{[]string{"android-34", "android-34-ext12", "android-33"}, "android-34-ext12"},
+		{[]string{"android-36", "android-36.1", "android-35"}, "android-36.1"},
+		{[]string{"android-Baklava", "android-35"}, "android-35"},
+		{[]string{"android-Baklava"}, "android-Baklava"},
+	} {
+		home := t.TempDir()
+		for _, d := range tc.dirs {
+			if err := os.MkdirAll(filepath.Join(home, "platforms", d), 0o755); err != nil {
+				t.Fatal(err)
+			}
+		}
+		got, err := findLastPlatform(home)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if filepath.Base(got) != tc.want {
+			t.Errorf("findLastPlatform(%v) = %s, want %s", tc.dirs, filepath.Base(got), tc.want)
+		}
+	}
+}

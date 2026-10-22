@@ -22,6 +22,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -727,14 +728,53 @@ func findLastPlatform(androidHome string) (string, error) {
 	}
 	last := ""
 	for _, e := range entries {
-		if e.IsDir() {
-			last = e.Name() // os.ReadDir returns entries in sorted order
+		if e.IsDir() && (last == "" || newerPlatform(e.Name(), last)) {
+			last = e.Name()
 		}
 	}
 	if last == "" {
 		return "", fmt.Errorf("no android platform found in %s", dir)
 	}
 	return filepath.Join(dir, last), nil
+}
+
+// newerPlatform reports whether SDK platform directory a is newer than b. The
+// API level is compared as a number, so android-35 beats android-9; a
+// directory with no numeric level (a codename preview) ranks below every
+// numbered one. Equal levels fall back to name order (android-34-ext12 after
+// android-34).
+func newerPlatform(a, b string) bool {
+	la, oka := platformLevel(a)
+	lb, okb := platformLevel(b)
+	switch {
+	case oka != okb:
+		return oka
+	case oka && la != lb:
+		return la > lb
+	}
+	return a > b
+}
+
+// platformLevel is the API level in "android-NN", "android-NN.M" or
+// "android-NN-extK", scaled so a minor version orders after its major.
+func platformLevel(name string) (int, bool) {
+	rest, ok := strings.CutPrefix(name, "android-")
+	if !ok {
+		return 0, false
+	}
+	rest, _, _ = strings.Cut(rest, "-")
+	major, minor, _ := strings.Cut(rest, ".")
+	ma, err := strconv.Atoi(major)
+	if err != nil {
+		return 0, false
+	}
+	mi := 0
+	if minor != "" {
+		if mi, err = strconv.Atoi(minor); err != nil {
+			return 0, false
+		}
+	}
+	return ma*1000 + mi, true
 }
 
 func apkwCreate(name string, apkw *Writer) (io.Writer, error) {
