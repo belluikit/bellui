@@ -19,10 +19,7 @@ import (
 //
 // Since: 1.0
 func LSelect(keyPrefix, selector string, data ...any) string {
-	var d0 any
-	if len(data) > 0 {
-		d0 = data[0]
-	}
+	d0 := templateData(data)
 
 	if selector != "" {
 		if s, ok := lookupMessage(keyPrefix+"."+selector, d0); ok {
@@ -45,10 +42,7 @@ func LSelect(keyPrefix, selector string, data ...any) string {
 //
 // Since: 1.0
 func LSelectPlural(keyPrefix, selector string, count int, data ...any) string {
-	var d0 any
-	if len(data) > 0 {
-		d0 = data[0]
-	}
+	d0 := templateData(data)
 
 	if selector != "" {
 		if s, ok := lookupPluralMessage(keyPrefix+"."+selector, count, d0); ok {

@@ -103,3 +103,92 @@ func TestLocalize_PlaceholdersInCatalog(t *testing.T) {
 	assert.Equal(t, "Sie hat 3 Elemente geteilt", XN("items_shared.female", "", 3, map[string]any{"Count": 3}))
 	assert.Equal(t, "Alex hat sein Profil aktualisiert", X("profile_updated.male", "", map[string]any{"Name": "Alex"}))
 }
+
+type valueCount struct{}
+
+func (valueCount) Count() int { return 3 }
+
+type pointerCount struct{}
+
+func (*pointerCount) Count() int { return 3 }
+
+// Methods are not called, in either form, whatever the receiver (#667): a
+// value comes from a map key or a struct field. text/template called them.
+func TestPlaceholders_MethodsAreNotCalled(t *testing.T) {
+	for _, data := range []any{valueCount{}, &valueCount{}, &pointerCount{}} {
+		assert.Equal(t, "{Count} items", fill("{Count} items", data), "%T", data)
+		assert.Equal(t, "{{.Count}} items", fill("{{.Count}} items", data), "%T", data)
+	}
+}
+
+func captureLog(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+	return &buf
+}
+
+type methodOnlyProbe struct{ Other int }
+
+func (methodOnlyProbe) Total() int { return 7 }
+
+// A placeholder left unfilled while a data value has a method of that name is
+// logged once per type and name, with the map to pass instead (#667). A name
+// that no method has is not logged.
+func TestPlaceholders_MethodOnlyLogged(t *testing.T) {
+	buf := captureLog(t)
+	for range 3 {
+		assert.Equal(t, "{Total} / {Missing}", fill("{Total} / {Missing}", methodOnlyProbe{}))
+	}
+	out := buf.String()
+	assert.Equal(t, 1, bytes.Count(buf.Bytes(), []byte("{Total} is left as written")), out)
+	assert.Contains(t, out, `map[string]any{"Total": v.Total()}`)
+	assert.NotContains(t, out, "Missing")
+
+	buf.Reset()
+	fill("{Total}", dataList{map[string]any{}, methodOnlyProbe{}})
+	assert.Empty(t, buf.String(), "already logged for this type and name")
+}
+
+// The Go template form is deprecated: each spelling is logged once, and still
+// filled (#667). The "{Name}" form is not logged.
+func TestPlaceholders_DeprecatedFormLogged(t *testing.T) {
+	buf := captureLog(t)
+	d := map[string]any{"DeprecationProbe": "x"}
+	for range 3 {
+		assert.Equal(t, "x x", fill("{{.DeprecationProbe}} {DeprecationProbe}", d))
+	}
+	out := buf.String()
+	assert.Equal(t, 1, bytes.Count(buf.Bytes(), []byte(`"{{.DeprecationProbe}}" is deprecated; write {DeprecationProbe}`)), out)
+	assert.Equal(t, 1, bytes.Count(buf.Bytes(), []byte("lang: ")), "one line, for the deprecated form only: %s", out)
+}
+
+// Several data values can be mixed; the first that has a name fills it, in
+// every lang call that takes data (#667). One value behaves as before.
+func TestLocalize_SeveralDataValues(t *testing.T) {
+	SetLocaleForTests(t, "en")
+	type user struct{ Name string }
+	ana := user{Name: "Ana"}
+	extra := map[string]any{"Count": 3, "Name": "not used"}
+
+	assert.Equal(t, "Ana sent 3", L("{Name} sent {Count}", ana, extra), "struct, then map")
+	assert.Equal(t, "not used sent 3", L("{Name} sent {Count}", extra, ana), "the first value wins")
+	assert.Equal(t, "Ana sent {Count}", L("{Name} sent {Count}", ana), "one value, as before")
+	assert.Equal(t, "Ana sent 3", L("{Name} sent {Count}", nil, ana, extra), "a nil value is skipped")
+	assert.Equal(t, "Ana sent 3", LocalizeKey("probe.sent", "{Name} sent {Count}", ana, extra))
+	assert.Equal(t, "Ana sent 3 files", LocalizePlural("{Name} sent {Count} files", 3, ana, extra))
+	assert.Equal(t, "Ana sent 3 files", LocalizePluralKey("probe.sentFiles", "{Name} sent {Count} files", 3, ana, extra))
+	assert.Equal(t, "2 things", LocalizePlural("{PluralCount} things", 2), "go-i18n's PluralCount, with no data")
+
+	SetLocaleForTests(t, "de")
+	assert.Equal(t, "Alex hat sein Profil aktualisiert",
+		LSelect("profile_updated", "male", user{Name: "Alex"}, extra))
+	assert.Equal(t, "Sie hat 3 Elemente geteilt",
+		LSelectPlural("items_shared", "female", 3, user{}, map[string]any{"Count": 3}))
+
+	var got string
+	remove := BindText("{Name} sent {Count}", func(s string) { got = s }, ana, extra)
+	t.Cleanup(remove)
+	assert.Equal(t, "Ana sent 3", got)
+}
