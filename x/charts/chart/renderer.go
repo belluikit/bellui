@@ -469,11 +469,18 @@ func (r *chartRenderer) computeLayout(
 		)
 	}
 
+	// The plot starts below the title, or below the zoom and toolbox buttons
+	// when they reach lower (#663): they sit at the top right, over the plot's
+	// first rows otherwise.
+	header := titleHeight + breadcrumbHeight
+	if bottom := controlsBottom(opt); bottom > 0 && bottom+controlsGap > header {
+		header = bottom + controlsGap
+	}
 	plotRect := coord.Rect{
 		X: grid.Left,
-		Y: grid.Top + titleHeight + breadcrumbHeight,
+		Y: grid.Top + header,
 		W: size.Width - grid.Left - grid.Right,
-		H: size.Height - grid.Top - grid.Bottom - titleHeight - breadcrumbHeight - legendHeight,
+		H: size.Height - grid.Top - grid.Bottom - header - legendHeight,
 	}
 
 	return layoutResult{
@@ -484,6 +491,29 @@ func (r *chartRenderer) computeLayout(
 		legendLayout:     legendLayout,
 		breadcrumbLayout: breadcrumbLayout,
 	}
+}
+
+// The zoom buttons and the toolbox sit at the top right, below grid.Top.
+const (
+	controlsTop     float32 = 2  // the first row's offset below grid.Top
+	controlsRowStep float32 = 26 // the toolbox row's offset below the zoom row
+	controlsGap     float32 = 4  // space between the lowest row and the plot
+)
+
+// controlsBottom is how far below grid.Top the zoom and toolbox buttons
+// reach, or 0 when the chart shows neither.
+func controlsBottom(opt Option) float32 {
+	zoom := opt.DataZoom != nil && opt.DataZoom.Enabled
+	toolbox := opt.Toolbox.HasButtons()
+	switch {
+	case zoom && toolbox:
+		return controlsTop + controlsRowStep + component.ToolboxButtonHeight
+	case zoom:
+		return controlsTop + component.ZoomButtonHeight
+	case toolbox:
+		return controlsTop + component.ToolboxButtonHeight
+	}
+	return 0
 }
 
 // renderOverlaysAndControls renders overlays, legend, zoom buttons, and toolbox.
@@ -546,7 +576,7 @@ func (r *chartRenderer) renderOverlaysAndControls(
 	var zoomButtonsLayout *component.ZoomButtonsLayout
 	if opt.DataZoom != nil && opt.DataZoom.Enabled {
 		btnRightX := size.Width - grid.Right
-		btnY := grid.Top + 2
+		btnY := grid.Top + controlsTop
 		btnObjs, btnLayout := component.RenderZoomButtons(btnRightX, btnY, resolver)
 		objects = append(objects, btnObjs...)
 		zoomButtonsLayout = btnLayout
@@ -556,9 +586,9 @@ func (r *chartRenderer) renderOverlaysAndControls(
 	var toolboxLayout *component.ToolboxLayout
 	if opt.Toolbox != nil {
 		tbX := size.Width - grid.Right - 100
-		tbY := grid.Top + 2
+		tbY := grid.Top + controlsTop
 		if zoomButtonsLayout != nil {
-			tbY += 26 // below zoom buttons
+			tbY += controlsRowStep // below zoom buttons
 		}
 		tbObjs, tbLayout := component.RenderToolbox(opt.Toolbox, tbX, tbY, resolver)
 		objects = append(objects, tbObjs...)

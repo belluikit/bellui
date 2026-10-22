@@ -43,11 +43,14 @@ func hitButton(pos geo.Position, btn buttonRect) bool {
 		pos.Y >= btn.Pos.Y && pos.Y <= btn.Pos.Y+btn.Size.Height
 }
 
+// ZoomButtonHeight is the height of the zoom buttons' row.
+const ZoomButtonHeight float32 = 22
+
 // RenderZoomButtons draws +, −, and reset buttons horizontally.
 // rightX is the right edge to align to, y is the top position.
 func RenderZoomButtons(rightX, y float32, resolver *style.Resolver) ([]core.CanvasObject, *ZoomButtonsLayout) {
 	btnW := float32(28)
-	btnH := float32(22)
+	btnH := ZoomButtonHeight
 	btnSize := geo.NewSize(btnW, btnH)
 	gap := float32(3)
 	bgColor := resolver.ZoomButtonBackgroundColor()
