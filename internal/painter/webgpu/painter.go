@@ -552,3 +552,8 @@ func (p *painter) effectiveAlpha(alpha float32) float32 {
 	}
 	return alpha
 }
+
+// FramesBegun counts the frames the painter has begun. A frame for a window
+// the system reports occluded never begins on WebGPU, so Canvas.Capture can
+// tell a frame it painted from one it could not (#631).
+func (p *painter) FramesBegun() uint64 { return p.frame }
