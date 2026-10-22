@@ -183,13 +183,20 @@ func drain(ch chan error) {
 // TestDisableClearsSpool verifies disabling drops the queue and clears disk.
 func TestDisableClearsSpool(t *testing.T) {
 	sink := newFakeSink()
+	// Every send fails, so the flush SetEnabled(true) asks for cannot take the
+	// events off the spool. It ran after the Track calls at times, and the
+	// spool then held no events: the JSON spool still read as "null", so the
+	// check below passed without anything spooled.
+	sink.failNext = 1000
 	tr, _, store, _ := newTestTracker(t, sink, WithBatchSize(1000))
 	tr.SetEnabled(true)
 	tr.Track("a", nil)
 	tr.Track("b", nil)
 
 	data, _ := store.Load()
-	require.NotEmpty(t, data, "events spooled while enabled")
+	spooled, err := unmarshalSpool(data)
+	require.NoError(t, err)
+	require.Len(t, spooled, 2, "events spooled while enabled")
 
 	tr.SetEnabled(false)
 
