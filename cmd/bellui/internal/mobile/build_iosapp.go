@@ -54,16 +54,8 @@ func goIOSBuild(pkg *packages.Package, bundleID string, archs []string,
 		return nil, err
 	}
 
-	infoplist := new(bytes.Buffer)
-	plistData := iosInfoPlistData(bundleID, appName, version, build, len(allArchs["ios"]) > 2, usageDescriptions)
-	if err := infoplistTmpl.Execute(infoplist, plistData); err != nil {
-		return nil, err
-	}
-	fragment, err := readIOSFragment(appDir, iosInfoPlistFragment)
-	if err != nil {
-		return nil, err
-	}
-	infoplistBytes, err := mergeInfoPlist(infoplist.Bytes(), fragment, plistData)
+	infoplistBytes, err := iosInfoPlist(appDir,
+		iosInfoPlistData(bundleID, appName, version, build, len(allArchs["ios"]) > 2, usageDescriptions))
 	if err != nil {
 		return nil, err
 	}
@@ -136,16 +128,8 @@ func goIOSBuild(pkg *packages.Package, bundleID string, archs []string,
 		return nil, err
 	}
 
-	// Dynamic frameworks go next to the project; its Embed Frameworks phase
-	// copies them into the app and signs them with the app's identity.
-	for _, f := range embed {
-		dst := filepath.Join(tmpdir, "main", iosFrameworksDir, filepath.Base(f.Path))
-		if err := mkdir(filepath.Dir(dst)); err != nil {
-			return nil, err
-		}
-		if err := runCmd(exec.Command("cp", "-R", f.Path, dst)); err != nil {
-			return nil, err
-		}
+	if err := copyIOSEmbeds(embed); err != nil {
+		return nil, err
 	}
 
 	// Build and move the release build to the output directory.
@@ -199,6 +183,36 @@ func goIOSBuild(pkg *packages.Package, bundleID string, archs []string,
 	}
 
 	return nmpkgs, nil
+}
+
+// iosInfoPlist renders the generated Info.plist and merges the app's
+// ios/Info.plist fragment into it.
+func iosInfoPlist(appDir string, data infoplistTmplData) ([]byte, error) {
+	buf := new(bytes.Buffer)
+	if err := infoplistTmpl.Execute(buf, data); err != nil {
+		return nil, err
+	}
+	fragment, err := readIOSFragment(appDir, iosInfoPlistFragment)
+	if err != nil {
+		return nil, err
+	}
+	return mergeInfoPlist(buf.Bytes(), fragment, data)
+}
+
+// copyIOSEmbeds puts the dynamic frameworks next to the Xcode project, whose
+// Embed Frameworks phase copies them into the app and signs them with the
+// app's identity.
+func copyIOSEmbeds(embed []iosFramework) error {
+	for _, f := range embed {
+		dst := filepath.Join(tmpdir, "main", iosFrameworksDir, filepath.Base(f.Path))
+		if err := mkdir(filepath.Dir(dst)); err != nil {
+			return err
+		}
+		if err := runCmd(exec.Command("cp", "-R", f.Path, dst)); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // DetectIOSTeamID finds the team ID used by the app certificates.
