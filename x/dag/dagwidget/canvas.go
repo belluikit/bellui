@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"image/color"
 	"math"
+	"sort"
 
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/canvas"
@@ -1279,15 +1280,77 @@ func (c *DAGCanvas) AutoLayout() error {
 }
 
 // AddComponentNode creates a node from a component definition at the given
-// graph position. Errors when the canvas capabilities forbid adding nodes —
-// it is a user-interaction entry point (palette), unlike the raw AddNode.
+// graph position, as one undoable step. Errors when the canvas capabilities
+// forbid adding nodes — it is a user-interaction entry point (palette), unlike
+// the raw AddNode.
 func (c *DAGCanvas) AddComponentNode(comp *dag.Component, pos [2]float32) (*dag.Node, error) {
 	if !c.Capabilities.AddNodes {
 		return nil, fmt.Errorf("canvas capabilities forbid adding nodes")
 	}
 	nodeID := c.generateEdgeID() // reuse ID generator
 	n := comp.NewNode(nodeID, pos)
-	return n, c.AddNode(n)
+	cmd := &AddNodeCommand{Canvas: c, Node: n}
+	c.do(cmd)
+	return n, cmd.err
+}
+
+// addComponentNodeNear adds a component node at pos, or at the nearest spot
+// that does not cover an existing node or group, so repeated palette taps fan
+// out instead of stacking every node on the viewport center.
+func (c *DAGCanvas) addComponentNodeNear(comp *dag.Component, pos [2]float32) (*dag.Node, error) {
+	size := NewNodeWidget(comp.NewNode("", pos), c).effectiveSize()
+	return c.AddComponentNode(comp, c.freeNodePosition(pos, size))
+}
+
+// freeNodePosition returns the candidate closest to pos, on a grid of
+// card-sized steps around it, where a node of the given size (graph units)
+// overlaps no node or group. It returns pos when the searched rings are full.
+func (c *DAGCanvas) freeNodePosition(pos [2]float32, size geo.Size) [2]float32 {
+	const gap, rings = 20, 6
+	stepX, stepY := size.Width+gap, size.Height+gap
+	type cand struct {
+		pos  [2]float32
+		dist float32
+	}
+	var cands []cand
+	for dy := -rings; dy <= rings; dy++ {
+		for dx := -rings; dx <= rings; dx++ {
+			x, y := float32(dx)*stepX, float32(dy)*stepY
+			cands = append(cands, cand{[2]float32{pos[0] + x, pos[1] + y}, x*x + y*y})
+		}
+	}
+	sort.SliceStable(cands, func(i, j int) bool { return cands[i].dist < cands[j].dist })
+	for _, cd := range cands {
+		if !c.graphAreaOccupied(cd.pos, size, gap) {
+			return cd.pos
+		}
+	}
+	return pos
+}
+
+// graphAreaOccupied reports whether the rectangle at pos with size, grown by
+// margin on every side, intersects any node card or group box.
+func (c *DAGCanvas) graphAreaOccupied(pos [2]float32, size geo.Size, margin float32) bool {
+	x0, y0 := pos[0]-margin, pos[1]-margin
+	x1, y1 := pos[0]+size.Width+margin, pos[1]+size.Height+margin
+	hits := func(p, s [2]float32) bool {
+		return p[0] < x1 && p[0]+s[0] > x0 && p[1] < y1 && p[1]+s[1] > y0
+	}
+	for id, n := range c.Graph.Nodes {
+		eff := geo.NewSize(n.Size[0], n.Size[1])
+		if nw := c.nodes[id]; nw != nil {
+			eff = nw.effectiveSize()
+		}
+		if hits(n.Position, [2]float32{eff.Width, eff.Height}) {
+			return true
+		}
+	}
+	for _, g := range c.Graph.Groups {
+		if hits(g.Position, g.Size) {
+			return true
+		}
+	}
+	return false
 }
 
 // deselectAll clears the selection flag on every selectable widget kind.

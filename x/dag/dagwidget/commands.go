@@ -133,9 +133,13 @@ type AddNodeCommand struct {
 	Node   *dag.Node
 
 	rejected bool
+	err      error
 }
 
-func (c *AddNodeCommand) Execute()     { c.rejected = c.Canvas.addNode(c.Node) != nil }
+func (c *AddNodeCommand) Execute() {
+	c.err = c.Canvas.addNode(c.Node)
+	c.rejected = c.err != nil
+}
 func (c *AddNodeCommand) Failed() bool { return c.rejected }
 func (c *AddNodeCommand) Undo() {
 	if c.rejected {
@@ -766,6 +770,32 @@ func (c *SetGroupLabelCommand) Undo()    { c.setLabel(c.Old) }
 func (c *SetGroupLabelCommand) setLabel(label string) {
 	if g := c.Canvas.Graph.Groups[c.GroupID]; g != nil {
 		g.Label = label
+	}
+	c.Canvas.Refresh()
+	if c.OnDone != nil {
+		c.OnDone()
+	}
+}
+
+// RenameNodeCommand changes a node's label.
+type RenameNodeCommand struct {
+	Canvas *DAGCanvas
+	NodeID string
+	Old    string
+	New    string
+	OnDone func()
+}
+
+func (c *RenameNodeCommand) Execute() { c.setLabel(c.New) }
+func (c *RenameNodeCommand) Undo()    { c.setLabel(c.Old) }
+
+func (c *RenameNodeCommand) setLabel(label string) {
+	if n := c.Canvas.Graph.Nodes[c.NodeID]; n != nil {
+		n.Label = label
+	}
+	if nw := c.Canvas.nodes[c.NodeID]; nw != nil {
+		nw.Label = label
+		nw.Refresh()
 	}
 	c.Canvas.Refresh()
 	if c.OnDone != nil {

@@ -120,7 +120,8 @@ func (item *paletteItem) DragImage() core.CanvasObject {
 	return container.NewStack(bg, container.NewPadded(label))
 }
 
-// Tapped adds this component at the viewport center (fallback when not dragged).
+// Tapped adds this component at the viewport center, or the nearest free spot
+// around it (fallback when not dragged).
 func (item *paletteItem) Tapped(_ *event.PointEvent) {
 	dc := item.palette.DAGCanvas
 	if dc == nil || !dc.Capabilities.AddNodes {
@@ -129,7 +130,7 @@ func (item *paletteItem) Tapped(_ *event.PointEvent) {
 	size := dc.Size()
 	centerScreen := geo.NewPos(size.Width/2, size.Height/2)
 	graphPos := dc.screenToGraph(centerScreen)
-	dc.AddComponentNode(item.component, [2]float32{graphPos.X, graphPos.Y})
+	dc.addComponentNodeNear(item.component, [2]float32{graphPos.X, graphPos.Y})
 }
 
 // Dragged tracks the cursor position during a drag from the palette.

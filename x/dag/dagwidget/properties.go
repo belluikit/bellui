@@ -25,9 +25,10 @@ type PropertiesPanel struct {
 
 	Registry *dag.Registry
 	Commands *CommandStack
-	// CanvasRef is needed for group/annotation editing: commands carry the
-	// canvas, and anchor pickers enumerate the graph. Set by the app screen
-	// after construction.
+	// CanvasRef is needed for node renaming and group/annotation editing:
+	// commands carry the canvas, and anchor pickers enumerate the graph. Set
+	// by the app screen after construction; without it a node shows no Name
+	// field.
 	CanvasRef *DAGCanvas
 
 	node       *dag.Node
@@ -87,6 +88,9 @@ func (p *PropertiesPanel) SetNode(n *dag.Node) {
 	p.typeLabel.SetText("Type: " + n.TypeTag)
 	p.streamInfo.SetText(p.buildStreamInfo())
 	p.form.Items = nil
+	if p.CanvasRef != nil {
+		p.form.Items = append(p.form.Items, widget.NewFormItem("Name", p.nameEntry(n)))
+	}
 
 	if p.component != nil {
 		// Load current values from node metadata
@@ -107,6 +111,30 @@ func (p *PropertiesPanel) SetNode(n *dag.Node) {
 		p.form,
 	}
 	p.content.Refresh()
+}
+
+// nameEntry edits the node's label through RenameNodeCommand, one undoable
+// step per change like the group label.
+func (p *PropertiesPanel) nameEntry(n *dag.Node) *widget.Entry {
+	entry := widget.NewEntry()
+	entry.SetText(n.Label)
+	entry.OnChanged = func(s string) {
+		if p.rebuilding || p.node == nil || !p.CanvasRef.Capabilities.EditProperties {
+			return
+		}
+		p.doCommand(&RenameNodeCommand{
+			Canvas: p.CanvasRef,
+			NodeID: p.node.ID,
+			Old:    p.node.Label,
+			New:    s,
+			OnDone: func() {
+				if p.node != nil {
+					p.header.SetText(p.node.Label)
+				}
+			},
+		})
+	}
+	return entry
 }
 
 // SetGroup updates the panel to edit a group's label and color.
