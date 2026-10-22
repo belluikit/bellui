@@ -162,6 +162,10 @@ type Canvas struct {
 	// region walks everything.
 	foreignParents map[*RenderCacheNode]struct{}
 	foreignRoot    bool
+	// hiddenUnder maps each hidden object a walk skipped under a visible one
+	// to the node it was skipped under, so that showing it by its Hidden
+	// field, which reports nothing, has a node to report from (#619).
+	hiddenUnder async.Map[core.CanvasObject, hiddenAt]
 	// regionVisits counts the nodes the last PartialDirtyRegion visited.
 	regionVisits int
 }
@@ -727,6 +731,9 @@ func (c *Canvas) Refresh(obj core.CanvasObject) {
 func (c *Canvas) MarkMinSizeDirty(obj core.CanvasObject) {
 	node, ok := c.nodeMap.Load(obj)
 	if !ok {
+		// A widget refresh asks this of the widget itself, which may have
+		// been shown by its Hidden field (#619).
+		c.noteShown(obj)
 		// An object no walk has placed in the tree takes no part in layout
 		// yet. It joins the tree through a container or widget that was
 		// refreshed (marking that path), resized, or shown (counted by
@@ -939,6 +946,12 @@ func (c *Canvas) WalkTrees(
 	c.nodeMap.Range(func(obj core.CanvasObject, node *RenderCacheNode) bool {
 		if node.walkGen != gen {
 			c.nodeMap.Delete(obj)
+		}
+		return true
+	})
+	c.hiddenUnder.Range(func(obj core.CanvasObject, at hiddenAt) bool {
+		if at.walkGen != gen {
+			c.hiddenUnder.Delete(obj) // shown, or no longer in the tree
 		}
 		return true
 	})
@@ -1181,6 +1194,10 @@ func (c *Canvas) walkTreeFrom(
 		// A hidden child that does not report placement would not report
 		// being shown either: its parent is walked every region (#599).
 		hidden = func(obj, _ core.CanvasObject) { noteHiddenChild(parent, obj) }
+	} else if build.PartialRepaint {
+		// Nor does one shown by its Hidden field: the other walks, the paint
+		// walk among them, record where it is (#619).
+		hidden = func(obj, _ core.CanvasObject) { c.noteHidden(parent, obj) }
 	}
 
 	bc := func(obj core.CanvasObject, pos geo.Position, clipPos geo.Position, clipSize geo.Size) bool {

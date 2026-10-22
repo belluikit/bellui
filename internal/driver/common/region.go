@@ -21,6 +21,13 @@ import (
 // an app's own CanvasObject type, at a tree's root (foreignRoot). Such an
 // object deeper in a tree has its parent walked by every region instead
 // (foreignParents), so an app sees no change in what repaints.
+//
+// Setting an object's Hidden field reports nothing either, only the refresh
+// that follows it (#619). Shown that way, a hidden object has no node to
+// refresh, so the walks record the node each hidden object was skipped under
+// (hiddenUnder) and its refresh walks that one. Hidden that way, the refresh
+// may reach only objects below it, so a region walks from above the highest
+// hidden ancestor of what it walks from.
 
 // regionWalk says which trees a PartialDirtyRegion walk is in.
 type regionWalk uint8
@@ -105,13 +112,22 @@ func (c *Canvas) regionRootsFor(placed []*RenderCacheNode) (roots []*RenderCache
 			return true // left the tree, which cleared where it was drawn
 		}
 		// A hidden object's parent walks without it, clearing where it was.
-		for !n.obj.Visible() {
-			if n.parent == nil {
+		// So does a hidden ancestor's, hidden by its Hidden field, which
+		// reports nothing, and found when something below it is refreshed
+		// (#619).
+		var hidden *RenderCacheNode
+		for a := n; a != nil; a = a.parent {
+			if !a.obj.Visible() {
+				hidden = a
+			}
+		}
+		if hidden != nil {
+			if hidden.parent == nil {
 				// An overlay is walked whole; a hidden content root, never
 				// expected, falls back to walking everything.
-				return !c.isContentRoot(n)
+				return !c.isContentRoot(hidden)
 			}
-			n = n.parent
+			n = hidden.parent
 		}
 		if n.regionPass != pass {
 			n.regionPass = pass
@@ -180,14 +196,57 @@ func rootOf(n *RenderCacheNode) *RenderCacheNode {
 }
 
 // noteRefreshed records for the next region that obj was refreshed, and
-// returns its node. An object with no node is not drawn, or is new to the
-// tree, and the walk that adds its node reports it (addChild).
+// returns its node. An object with no node is not drawn, is new to the tree,
+// and the walk that adds its node reports it (addChild), or was shown by its
+// Hidden field (noteShown).
 func (c *Canvas) noteRefreshed(obj core.CanvasObject) (*RenderCacheNode, bool) {
 	node, ok := c.nodeMap.Load(obj)
-	if ok && build.PartialRepaint {
-		c.notePaintRefresh(node)
+	if build.PartialRepaint {
+		if ok {
+			c.notePaintRefresh(node)
+		} else {
+			c.noteShown(obj)
+		}
 	}
 	return node, ok
+}
+
+// hiddenAt is where a walk last skipped a hidden object: under parent, in the
+// full walk numbered walkGen.
+type hiddenAt struct {
+	parent  *RenderCacheNode
+	walkGen uint64
+}
+
+// noteHidden records that a walk skipped obj, hidden, under parent. A hidden
+// object has no node, so when it is shown by setting its Hidden field and
+// refreshed, rather than by Show (counted by paintgen), only this says where
+// (noteShown). Only the top of a hidden subtree is recorded: a walk skips
+// what is below it. The full walk keeps the entries it records again and
+// drops the rest (WalkTrees).
+func (c *Canvas) noteHidden(parent *RenderCacheNode, obj core.CanvasObject) {
+	if parent == nil {
+		return
+	}
+	if at, ok := c.hiddenUnder.Load(obj); ok && at.parent == parent && at.walkGen == c.walkGen {
+		return // storing over a key allocates (mapNode)
+	}
+	c.hiddenUnder.Store(obj, hiddenAt{parent, c.walkGen})
+}
+
+// noteShown queues for the next region walk the node a hidden object was
+// skipped under, if obj is one and is now visible: it was shown by its Hidden
+// field, and refreshed. Safe from any goroutine.
+func (c *Canvas) noteShown(obj core.CanvasObject) {
+	if !build.PartialRepaint {
+		return
+	}
+	at, ok := c.hiddenUnder.Load(obj)
+	if !ok || !obj.Visible() {
+		return
+	}
+	c.hiddenUnder.Delete(obj)
+	c.queuePlaced(at.parent) // regionRootsFor drops it if it left the tree
 }
 
 // notePlacement records for a region walk what node's object reports, and
