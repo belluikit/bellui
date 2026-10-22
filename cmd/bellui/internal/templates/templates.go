@@ -33,9 +33,6 @@ var (
 	// EntitlementsDarwin is a plist file that lists build entitlements for darwin releases
 	EntitlementsDarwin = template.Must(template.New("Entitlements").Parse(entitlementsDarwinPlist))
 
-	// EntitlementsDarwinMobile is a plist file that lists build entitlements for iOS releases
-	EntitlementsDarwinMobile = template.Must(template.New("EntitlementsMobile").Parse(entitlementsIosPlist))
-
 	// BelluiMetadataInit is the metadata injecting file for bellui metadata
 	BelluiMetadataInit = template.Must(template.New("bellui_metadata_init.got").Parse(belluiMetadataInit))
 
