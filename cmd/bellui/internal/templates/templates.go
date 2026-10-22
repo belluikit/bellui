@@ -57,8 +57,9 @@ var (
 	CSSLight = lightCSS
 
 	// DefaultIcon is the bundled default application icon, used when a
-	// package has no Icon.png of its own (1024x1024 PNG). Its origin and the
-	// gopher design credit are in THIRD_PARTY_NOTICES.md.
+	// package has no Icon.png of its own: the Bellui logo, a 1024x1024 PNG
+	// with a transparent background. Its origin and the gopher design credit
+	// are in THIRD_PARTY_NOTICES.md.
 	DefaultIcon = defaultIconPNG
 
 	// SpinnerDark is the animated gopher shown on the web splash screen under
