@@ -90,13 +90,24 @@ func androidManifestData(dir, bundleID, appName, libName, version string, build 
 	return manifestData, outLibName, nil
 }
 
+// androidPageSizeLDFLAG links native libraries with 16 KB page alignment.
+// Devices with 16 KB pages cannot load a library aligned for 4 KB, and Google
+// Play requires the alignment for apps targeting Android 15 and up. NDKs before
+// r28 link for 4 KB pages by default; the flag is harmless on later ones
+// (#626).
+const androidPageSizeLDFLAG = "-Wl,-z,max-page-size=16384"
+
+// androidLinkEnv returns the CGO_LDFLAGS an Android build runs with: the
+// user's own, then the page alignment. Every build gets it, not only release:
+// an APK installed while testing runs on the same devices.
+func androidLinkEnv(userLDFLAGS string) []string {
+	return []string{"CGO_LDFLAGS=" + strings.TrimSpace(userLDFLAGS+" "+androidPageSizeLDFLAG)}
+}
+
 func goAndroidBuild(pkg *packages.Package, bundleID string, androidArchs []string,
 	iconPath, appName, version string, build, target int, release, distribution bool, iconFG, iconBG, iconMono string,
 ) (map[string]bool, error) {
-	var env []string
-	if release { // Google Play Store requires 16K alignment
-		env = []string{"CGO_LDFLAGS=\"-Wl,-z,max-page-size=16384\""}
-	}
+	env := androidLinkEnv(os.Getenv("CGO_LDFLAGS"))
 
 	ndkRoot, err := ndkRoot()
 	if err != nil {
