@@ -38,6 +38,14 @@ func (tl *ToolboxLayout) HitTest(pos geo.Position) string {
 	return ""
 }
 
+// ToolboxButtonHeight is the height of the toolbox buttons' row.
+const ToolboxButtonHeight float32 = 20
+
+// HasButtons reports whether the toolbox draws any button.
+func (cfg *ToolboxConfig) HasButtons() bool {
+	return cfg != nil && (cfg.SaveAsImage || len(cfg.MagicType) > 0)
+}
+
 // RenderToolbox renders toolbox buttons and returns the layout for click detection.
 // Positioned below zoom buttons (or at top-right if no zoom).
 func RenderToolbox(cfg *ToolboxConfig, x, y float32, resolver *style.Resolver) ([]core.CanvasObject, *ToolboxLayout) {
@@ -49,7 +57,7 @@ func RenderToolbox(cfg *ToolboxConfig, x, y float32, resolver *style.Resolver) (
 	layout := &ToolboxLayout{}
 
 	btnW := float32(24)
-	btnH := float32(20)
+	btnH := ToolboxButtonHeight
 	gap := float32(3)
 	bgColor := resolver.ButtonBackgroundColor()
 	textColor := resolver.ButtonTextColor()
