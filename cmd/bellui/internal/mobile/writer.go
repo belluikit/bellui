@@ -45,8 +45,10 @@ package mobile
 //	openssl smime -verify -in CERT.RSA -inform DER -content CERT.SF cert.pem
 //
 // The APK format imposes two extra restrictions on the ZIP format. First,
-// it is uncompressed. Second, each contained file is 4-byte aligned. This
-// allows the Android OS to mmap contents without unpacking the archive.
+// it is uncompressed. Second, each contained file is 4-byte aligned, and each
+// native library 16 KB aligned (zipalign -P 16), so that a device with 16 KB
+// pages can map it straight from the archive (#626). This allows the Android
+// OS to mmap contents without unpacking the archive.
 
 // Note: to make life a little harder, Android Studio stores the RSA key used
 // for signing in an Oracle Java proprietary keystore format, JKS. For example,
@@ -74,6 +76,7 @@ import (
 	"fmt"
 	"hash"
 	"io"
+	"strings"
 )
 
 // NewWriter returns a new Writer writing an APK file to w.
@@ -115,7 +118,14 @@ func (w *Writer) create(name string) (io.Writer, error) {
 	}
 	const fileHeaderLen = 30 // + filename + extra
 	start := w.offset + fileHeaderLen + len(name)
-	extra := start % 4
+	if len(w.manifest) > 0 {
+		// The previous entry's data descriptor (signature, CRC-32 and the two
+		// 32-bit sizes) is written only when CreateHeader closes that entry,
+		// after this offset was read.
+		const dataDescriptorLen = 16
+		start += dataDescriptorLen
+	}
+	extra := apkAlignPadding(start, apkAlignment(name))
 
 	zipfw, err := w.w.CreateHeader(&zip.FileHeader{
 		Name:  name,
@@ -130,6 +140,21 @@ func (w *Writer) create(name string) (io.Writer, error) {
 		sha1: sha1.New(),
 	}
 	return w.cur, nil
+}
+
+// apkAlignment is the boundary a file's contents start on in the archive:
+// 16 KB for a native library, 4 bytes for everything else.
+func apkAlignment(name string) int {
+	if strings.HasSuffix(name, ".so") {
+		return 16384
+	}
+	return 4
+}
+
+// apkAlignPadding is how many bytes of padding move start up to the next
+// multiple of align.
+func apkAlignPadding(start, align int) int {
+	return (align - start%align) % align
 }
 
 // Close finishes writing the APK. This includes writing the manifest and
