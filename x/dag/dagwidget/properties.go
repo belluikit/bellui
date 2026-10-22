@@ -3,6 +3,7 @@ package dagwidget
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -44,15 +45,17 @@ type PropertiesPanel struct {
 	header     *widget.Label
 	typeLabel  *widget.Label
 	streamInfo *widget.Label
-	form       *widget.Form
+	form       *widget.Form // the form on show; nil while the panel is empty
 	content    *bellui.Container
 	empty      *widget.Label
 	rebuilding bool // true while a Set* rebuild is running, suppresses callbacks
 
 	// syncers write the shown element's current values into the fields the
-	// last Set* call built, in place. An edit or an undo goes through them rather than a
-	// rebuild, which would replace the entry being typed in and drop its focus.
-	syncers []func()
+	// last Set* call built, in place. An edit or an undo goes through them
+	// rather than a rebuild, which would replace the entry being typed in and
+	// drop its focus. Each gets the shown node's properties, loaded once per
+	// sync (empty for the other views).
+	syncers []func(props map[string]any)
 }
 
 // NewPropertiesPanel creates a new properties panel.
@@ -63,7 +66,6 @@ func NewPropertiesPanel(registry *dag.Registry, cmds *CommandStack) *PropertiesP
 		header:     widget.NewLabel("No selection"),
 		typeLabel:  widget.NewLabel(""),
 		streamInfo: widget.NewLabel(""),
-		form:       widget.NewForm(),
 		empty:      widget.NewLabel("Select a node to view properties"),
 	}
 	p.header.TextStyle.Bold = true
@@ -84,6 +86,7 @@ func (p *PropertiesPanel) SetNode(n *dag.Node) {
 	p.rebuilding = true
 	defer func() { p.rebuilding = false }()
 	p.syncers = nil
+	p.form = nil
 
 	p.node = n
 	p.group = nil
@@ -146,9 +149,10 @@ func (p *PropertiesPanel) nameEntry(n *dag.Node) *widget.Entry {
 			OnDone: p.syncForm,
 		})
 	}
-	p.syncers = append(p.syncers, func() {
-		p.header.SetText(n.Label)
-		syncText(entry, n.Label)
+	p.syncers = append(p.syncers, func(map[string]any) {
+		cur := liveOr(p.CanvasRef.Graph.Nodes, n.ID, n)
+		p.header.SetText(cur.Label)
+		syncText(entry, cur.Label)
 	})
 	return entry
 }
@@ -158,6 +162,7 @@ func (p *PropertiesPanel) SetGroup(g *dag.Group) {
 	p.rebuilding = true
 	defer func() { p.rebuilding = false }()
 	p.syncers = nil
+	p.form = nil
 
 	p.node = nil
 	p.component = nil
@@ -172,6 +177,12 @@ func (p *PropertiesPanel) SetGroup(g *dag.Group) {
 
 	p.header.SetText(g.Label)
 	p.typeLabel.SetText(fmt.Sprintf("Group · %d nodes", len(g.Members)))
+	live := func() *dag.Group {
+		if p.CanvasRef == nil {
+			return g
+		}
+		return liveOr(p.CanvasRef.Graph.Groups, g.ID, g)
+	}
 
 	labelEntry := widget.NewEntry()
 	labelEntry.SetText(g.Label)
@@ -190,9 +201,10 @@ func (p *PropertiesPanel) SetGroup(g *dag.Group) {
 			OnDone:  p.syncForm,
 		})
 	}
-	p.syncers = append(p.syncers, func() {
-		p.header.SetText(g.Label)
-		syncText(labelEntry, g.Label)
+	p.syncers = append(p.syncers, func(map[string]any) {
+		cur := live()
+		p.header.SetText(cur.Label)
+		syncText(labelEntry, cur.Label)
 	})
 
 	colorEntry := widget.NewEntry()
@@ -216,10 +228,15 @@ func (p *PropertiesPanel) SetGroup(g *dag.Group) {
 			OnDone:  p.syncForm,
 		})
 	}
-	p.syncers = append(p.syncers, func() {
-		// A half-typed color is not stored yet; leave it to be finished.
-		if _, ok := parseHexColor(colorEntry.Text); ok || colorEntry.Text == "" {
-			syncText(colorEntry, g.Color)
+	lastColor := g.Color
+	p.syncers = append(p.syncers, func(map[string]any) {
+		// A half-typed color is not stored yet; leave it to be finished
+		// unless the stored color itself changed, by an undo or redo.
+		cur := live().Color
+		changed := cur != lastColor
+		lastColor = cur
+		if changed {
+			syncText(colorEntry, cur)
 		}
 	})
 
@@ -227,6 +244,7 @@ func (p *PropertiesPanel) SetGroup(g *dag.Group) {
 		widget.NewFormItem("Label", labelEntry),
 		widget.NewFormItem("Color", colorEntry),
 	)
+	p.form = form
 	p.content.Objects = []core.CanvasObject{
 		p.header,
 		p.typeLabel,
@@ -241,6 +259,7 @@ func (p *PropertiesPanel) SetAnnotation(a *dag.Annotation) {
 	p.rebuilding = true
 	defer func() { p.rebuilding = false }()
 	p.syncers = nil
+	p.form = nil
 
 	p.node = nil
 	p.component = nil
@@ -302,9 +321,13 @@ func (p *PropertiesPanel) SetAnnotation(a *dag.Annotation) {
 			OldAnchorID:  p.annotation.AnchorID,
 			NewAnchorID:  anchorID,
 			OnDone: func() {
-				// The anchor command re-creates the annotation; re-resolve it.
-				if p.CanvasRef != nil {
-					p.annotation = p.CanvasRef.Graph.Annotations[a.ID]
+				// The anchor command re-creates the annotation; re-resolve
+				// it, but only while the panel still shows it: an undo can
+				// run after the panel moved on to another element.
+				if p.CanvasRef != nil && p.annotation != nil && p.annotation.ID == a.ID {
+					if cur := p.CanvasRef.Graph.Annotations[a.ID]; cur != nil {
+						p.annotation = cur
+					}
 				}
 				p.syncForm()
 			},
@@ -317,6 +340,8 @@ func (p *PropertiesPanel) SetAnnotation(a *dag.Annotation) {
 		}
 		kind := kindByName[name]
 		populateTargets(kind)
+		// The old target belongs to the old kind; the user picks a new one.
+		targetSelect.ClearSelected()
 		if kind == dag.AnchorNone {
 			applyAnchor(dag.AnchorNone, "")
 		}
@@ -346,13 +371,22 @@ func (p *PropertiesPanel) SetAnnotation(a *dag.Annotation) {
 	if a.AnchorID != "" {
 		selectTarget(a.AnchorID)
 	}
-	p.syncers = append(p.syncers, func() {
+	lastKind, lastAnchorID := a.AnchorKind, a.AnchorID
+	p.syncers = append(p.syncers, func(map[string]any) {
 		// The anchor command re-creates the annotation, so read it afresh.
-		cur := p.annotation
-		if cur == nil {
-			return
+		cur := a
+		if p.CanvasRef != nil {
+			cur = liveOr(p.CanvasRef.Graph.Annotations, a.ID, a)
 		}
 		syncText(textEntry, cur.Text)
+		changed := cur.AnchorKind != lastKind || cur.AnchorID != lastAnchorID
+		lastKind, lastAnchorID = cur.AnchorKind, cur.AnchorID
+		// A kind picked with no target yet stores nothing. Keep it until the
+		// user picks a target or the stored anchor changes; a picked target
+		// the model rejected does snap back.
+		if !changed && targetSelect.Selected == "" {
+			return
+		}
 		if kindSelect.Selected != kindNames[cur.AnchorKind] {
 			kindSelect.SetSelected(kindNames[cur.AnchorKind])
 			populateTargets(cur.AnchorKind)
@@ -367,6 +401,7 @@ func (p *PropertiesPanel) SetAnnotation(a *dag.Annotation) {
 		widget.NewFormItem("Anchor", kindSelect),
 		widget.NewFormItem("Target", targetSelect),
 	)
+	p.form = form
 	p.content.Objects = []core.CanvasObject{
 		p.header,
 		widget.NewSeparator(),
@@ -380,6 +415,7 @@ func (p *PropertiesPanel) SetLinkEdge(le *dag.LinkEdge) {
 	p.rebuilding = true
 	defer func() { p.rebuilding = false }()
 	p.syncers = nil
+	p.form = nil
 
 	p.node = nil
 	p.component = nil
@@ -412,11 +448,18 @@ func (p *PropertiesPanel) SetLinkEdge(le *dag.LinkEdge) {
 			OnDone: p.syncForm,
 		})
 	}
-	p.syncers = append(p.syncers, func() { syncText(labelEntry, le.Label) })
+	p.syncers = append(p.syncers, func(map[string]any) {
+		cur := le
+		if p.CanvasRef != nil {
+			cur = liveOr(p.CanvasRef.Graph.LinkEdges, le.ID, le)
+		}
+		syncText(labelEntry, cur.Label)
+	})
 
 	form := widget.NewForm(
 		widget.NewFormItem("Label", labelEntry),
 	)
+	p.form = form
 	p.content.Objects = []core.CanvasObject{
 		p.header,
 		p.typeLabel,
@@ -547,11 +590,25 @@ func (p *PropertiesPanel) setProp(key string, newValue any) {
 // already holds the value, so the entry being typed in keeps its text, caret
 // and focus.
 func (p *PropertiesPanel) syncForm() {
+	// Restore rather than clear, so a sync nested in a Set* rebuild or in
+	// another sync does not end the outer one's suppression early.
+	was := p.rebuilding
 	p.rebuilding = true
-	defer func() { p.rebuilding = false }()
+	defer func() { p.rebuilding = was }()
+	props := p.loadProps()
 	for _, sync := range p.syncers {
-		sync()
+		sync(props)
 	}
+}
+
+// liveOr returns the element with the given ID from a graph map, or shown
+// when the map has none. The syncers read each element where its commands
+// write it, by ID: the pointer a Set* call was given may be another copy.
+func liveOr[T any](byID map[string]*T, id string, shown *T) *T {
+	if cur := byID[id]; cur != nil {
+		return cur
+	}
+	return shown
 }
 
 // syncText sets an entry's text only when it differs, so the caret of an
@@ -589,11 +646,17 @@ func sameNumber(text string, v any) bool {
 	return false
 }
 
-// syncNumber keeps a number entry showing the stored value.
-func (p *PropertiesPanel) syncNumber(entry *widget.Entry, pd dag.PropertyDef) {
-	p.syncers = append(p.syncers, func() {
-		v := propValue(pd, p.loadProps())
-		if !sameNumber(entry.Text, v) {
+// syncNumber keeps a number entry showing the stored value. Text that does
+// not denote it ("", "1e", "1.5" in an int field) was never stored: it is the
+// user's unfinished edit, kept until the stored value itself changes, by an
+// undo or redo.
+func (p *PropertiesPanel) syncNumber(entry *widget.Entry, pd dag.PropertyDef, initial any) {
+	last := formatNumber(initial)
+	p.syncers = append(p.syncers, func(props map[string]any) {
+		v := propValue(pd, props)
+		changed := formatNumber(v) != last
+		last = formatNumber(v)
+		if changed && !sameNumber(entry.Text, v) {
 			entry.SetText(formatNumber(v))
 		}
 	})
@@ -610,8 +673,8 @@ func (p *PropertiesPanel) createFormItem(pd dag.PropertyDef, props map[string]an
 		if b, ok := currentVal.(bool); ok {
 			check.Checked = b
 		}
-		p.syncers = append(p.syncers, func() {
-			b, _ := propValue(pd, p.loadProps()).(bool)
+		p.syncers = append(p.syncers, func(props map[string]any) {
+			b, _ := propValue(pd, props).(bool)
 			if check.Checked != b {
 				check.SetChecked(b)
 			}
@@ -625,14 +688,16 @@ func (p *PropertiesPanel) createFormItem(pd dag.PropertyDef, props map[string]an
 		if s, ok := currentVal.(string); ok {
 			sel.SetSelected(s)
 		}
-		p.syncers = append(p.syncers, func() {
-			s, _ := propValue(pd, p.loadProps()).(string)
+		p.syncers = append(p.syncers, func(props map[string]any) {
+			s, _ := propValue(pd, props).(string)
 			switch {
 			case s == sel.Selected:
-			case s == "":
-				sel.ClearSelected()
-			default:
+			case slices.Contains(sel.Options, s):
 				sel.SetSelected(s)
+			default:
+				// Unset, or a value the options lack (SetSelected would
+				// ignore it and keep showing the old choice).
+				sel.ClearSelected()
 			}
 		})
 		return widget.NewFormItem(pd.Label, sel)
@@ -647,7 +712,7 @@ func (p *PropertiesPanel) createFormItem(pd dag.PropertyDef, props map[string]an
 				p.setProp(pd.Key, v)
 			}
 		}
-		p.syncNumber(entry, pd)
+		p.syncNumber(entry, pd, currentVal)
 		return widget.NewFormItem(pd.Label, entry)
 
 	case dag.PropertyFloat:
@@ -660,7 +725,7 @@ func (p *PropertiesPanel) createFormItem(pd dag.PropertyDef, props map[string]an
 				p.setProp(pd.Key, v)
 			}
 		}
-		p.syncNumber(entry, pd)
+		p.syncNumber(entry, pd, currentVal)
 		return widget.NewFormItem(pd.Label, entry)
 
 	default: // PropertyString
@@ -676,8 +741,8 @@ func (p *PropertiesPanel) createFormItem(pd dag.PropertyDef, props map[string]an
 			hint = "required"
 		}
 		entry.SetPlaceHolder(hint)
-		p.syncers = append(p.syncers, func() {
-			s, _ := propValue(pd, p.loadProps()).(string)
+		p.syncers = append(p.syncers, func(props map[string]any) {
+			s, _ := propValue(pd, props).(string)
 			syncText(entry, s)
 		})
 		return widget.NewFormItem(pd.Label, entry)
