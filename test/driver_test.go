@@ -53,6 +53,19 @@ func TestDriver_DoFromGoroutineNested(t *testing.T) {
 	assert.True(t, ran)
 }
 
+// Do on the test driver has run its function by the time it returns, under
+// every tag set. A bare -tags mobile build used to hand it to a new goroutine
+// instead, because the test app registers no main goroutine and the mobile
+// build counts an unregistered caller as main (#625).
+func TestDriver_DoRunsBeforeReturning(t *testing.T) {
+	NewTempApp(t)
+
+	ran := false
+	bellui.Do(func() { ran = true })
+
+	assert.True(t, ran)
+}
+
 // A goroutine leaked from (or still in flight at the end of) a previous test
 // keeps calling bellui.Do against the previous test app's driver while the next
 // test's work runs on a fresh driver instance. The Do mutex is package-level,

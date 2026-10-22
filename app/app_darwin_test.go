@@ -1,4 +1,4 @@
-//go:build !ci && !ios
+//go:build !ci && !ios && !wasm && !mobile && !tinygo
 
 package app
 
