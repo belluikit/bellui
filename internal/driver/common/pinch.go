@@ -45,9 +45,9 @@ import (
 // the other finger, which brings both positions up to date, or from the same
 // one again, which shows the other is resting.
 //
-// A driver without a ScrollCallback (the native mobile driver, #402) cannot
-// pan: two fingers over a Pinchable pinch from their first move, and without
-// one they form no gesture at all.
+// A driver without a ScrollCallback cannot pan: two fingers over a Pinchable
+// pinch from their first move, and without one they form no gesture at all.
+// Every driver sets one now; the native mobile driver did not until #402.
 type pinchState struct {
 	target event.Pinchable // nil when no Pinchable is under the fingers
 	ids    [2]int

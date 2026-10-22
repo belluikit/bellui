@@ -37,6 +37,12 @@ type canvas struct {
 	// tabEscape is the Escape-then-Tab way out of a widget that keeps Tab (#357).
 	tabEscape intdriver.TabEscape
 
+	// touchScrollGen is bumped by every contact that lands, which stops the
+	// momentum of an earlier pan; touchScroll is the current pan's scroll
+	// chain (touch_scroll.go, #402). Main-goroutine state.
+	touchScrollGen int
+	touchScroll    touchScrollLatch
+
 	onTypedKey  func(ev *event.KeyEvent)
 	onTypedRune func(rune)
 }
@@ -53,6 +59,7 @@ func newCanvas(dev bellui.Device) core.Canvas {
 		scale:  dev.SystemScaleForWindow(nil), // we don't need a window parameter on mobile,
 	}
 	ret.InitTouchHandler(&mobileFinder{canvas: ret})
+	ret.initTouchScroll()
 	ret.LongPressCallback = func(wid event.LongPressable, ev *event.PointEvent) {
 		wid.LongPressed(ev)
 	}
