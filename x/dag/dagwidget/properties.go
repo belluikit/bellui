@@ -44,8 +44,8 @@ type PropertiesPanel struct {
 	empty      *widget.Label
 	rebuilding bool // true while a Set* rebuild is running, suppresses callbacks
 
-	// syncers write the shown node's current values into the fields SetNode
-	// built, in place. An edit or an undo goes through them rather than a
+	// syncers write the shown element's current values into the fields the
+	// last Set* call built, in place. An edit or an undo goes through them rather than a
 	// rebuild, which would replace the entry being typed in and drop its focus.
 	syncers []func()
 }
@@ -152,6 +152,7 @@ func (p *PropertiesPanel) nameEntry(n *dag.Node) *widget.Entry {
 func (p *PropertiesPanel) SetGroup(g *dag.Group) {
 	p.rebuilding = true
 	defer func() { p.rebuilding = false }()
+	p.syncers = nil
 
 	p.node = nil
 	p.component = nil
@@ -181,9 +182,13 @@ func (p *PropertiesPanel) SetGroup(g *dag.Group) {
 			GroupID: p.group.ID,
 			Old:     p.group.Label,
 			New:     s,
-			OnDone:  func() { p.header.SetText(p.group.Label) },
+			OnDone:  p.syncForm,
 		})
 	}
+	p.syncers = append(p.syncers, func() {
+		p.header.SetText(g.Label)
+		syncText(labelEntry, g.Label)
+	})
 
 	colorEntry := widget.NewEntry()
 	colorEntry.SetText(g.Color)
@@ -203,8 +208,15 @@ func (p *PropertiesPanel) SetGroup(g *dag.Group) {
 			GroupID: p.group.ID,
 			Old:     p.group.Color,
 			New:     s,
+			OnDone:  p.syncForm,
 		})
 	}
+	p.syncers = append(p.syncers, func() {
+		// A half-typed color is not stored yet; leave it to be finished.
+		if _, ok := parseHexColor(colorEntry.Text); ok || colorEntry.Text == "" {
+			syncText(colorEntry, g.Color)
+		}
+	})
 
 	form := widget.NewForm(
 		widget.NewFormItem("Label", labelEntry),
@@ -223,6 +235,7 @@ func (p *PropertiesPanel) SetGroup(g *dag.Group) {
 func (p *PropertiesPanel) SetAnnotation(a *dag.Annotation) {
 	p.rebuilding = true
 	defer func() { p.rebuilding = false }()
+	p.syncers = nil
 
 	p.node = nil
 	p.component = nil
@@ -253,6 +266,7 @@ func (p *PropertiesPanel) SetAnnotation(a *dag.Annotation) {
 			AnnotationID: p.annotation.ID,
 			OldText:      p.annotation.Text,
 			NewText:      s,
+			OnDone:       p.syncForm,
 		})
 	}
 
@@ -287,6 +301,7 @@ func (p *PropertiesPanel) SetAnnotation(a *dag.Annotation) {
 				if p.CanvasRef != nil {
 					p.annotation = p.CanvasRef.Graph.Annotations[a.ID]
 				}
+				p.syncForm()
 			},
 		})
 	}
@@ -313,15 +328,34 @@ func (p *PropertiesPanel) SetAnnotation(a *dag.Annotation) {
 		}
 		applyAnchor(kind, anchorIDFromOption(sel))
 	}
-	populateTargets(a.AnchorKind)
-	if a.AnchorID != "" {
+	selectTarget := func(anchorID string) {
 		for _, opt := range targetSelect.Options {
-			if anchorIDFromOption(opt) == a.AnchorID {
+			if anchorIDFromOption(opt) == anchorID {
 				targetSelect.SetSelected(opt)
-				break
+				return
 			}
 		}
+		targetSelect.ClearSelected()
 	}
+	populateTargets(a.AnchorKind)
+	if a.AnchorID != "" {
+		selectTarget(a.AnchorID)
+	}
+	p.syncers = append(p.syncers, func() {
+		// The anchor command re-creates the annotation, so read it afresh.
+		cur := p.annotation
+		if cur == nil {
+			return
+		}
+		syncText(textEntry, cur.Text)
+		if kindSelect.Selected != kindNames[cur.AnchorKind] {
+			kindSelect.SetSelected(kindNames[cur.AnchorKind])
+			populateTargets(cur.AnchorKind)
+		}
+		if anchorIDFromOption(targetSelect.Selected) != cur.AnchorID {
+			selectTarget(cur.AnchorID)
+		}
+	})
 
 	form := widget.NewForm(
 		widget.NewFormItem("Text", textEntry),
@@ -340,6 +374,7 @@ func (p *PropertiesPanel) SetAnnotation(a *dag.Annotation) {
 func (p *PropertiesPanel) SetLinkEdge(le *dag.LinkEdge) {
 	p.rebuilding = true
 	defer func() { p.rebuilding = false }()
+	p.syncers = nil
 
 	p.node = nil
 	p.component = nil
@@ -369,8 +404,10 @@ func (p *PropertiesPanel) SetLinkEdge(le *dag.LinkEdge) {
 			EdgeID: p.linkEdge.ID,
 			Old:    p.linkEdge.Label,
 			New:    s,
+			OnDone: p.syncForm,
 		})
 	}
+	p.syncers = append(p.syncers, func() { syncText(labelEntry, le.Label) })
 
 	form := widget.NewForm(
 		widget.NewFormItem("Label", labelEntry),
@@ -500,14 +537,11 @@ func (p *PropertiesPanel) setProp(key string, newValue any) {
 	}
 }
 
-// syncForm writes the node's current label and property values into the
-// fields on show. Called after an edit, undo or redo; it leaves alone a field
-// that already holds the value, so the entry being typed in keeps its text,
-// caret and focus.
+// syncForm writes the shown element's current values into the fields on
+// show. Called after an edit, undo or redo; it leaves alone a field that
+// already holds the value, so the entry being typed in keeps its text, caret
+// and focus.
 func (p *PropertiesPanel) syncForm() {
-	if p.node == nil {
-		return
-	}
 	p.rebuilding = true
 	defer func() { p.rebuilding = false }()
 	for _, sync := range p.syncers {

@@ -227,3 +227,59 @@ func TestPropertiesPanelPortSummaryWraps(t *testing.T) {
 		t.Fatalf("port summary is %.0f px wide in a %.0f px panel", p.streamInfo.Size().Width, p.content.Size().Width)
 	}
 }
+
+// Undo of a group, link or annotation edit shows the restored value in the
+// panel, as it does for a node (#638).
+func TestPropertiesPanelUndoUpdatesOtherElements(t *testing.T) {
+	c := fullCanvas(t)
+	p := NewPropertiesPanel(nil, c.Commands)
+	p.CanvasRef = c
+	test.NewTempWindow(t, p).Resize(geo.NewSize(320, 600))
+
+	p.SetGroup(c.Graph.Groups["g1"])
+	entries := renderedEntries(p)
+	if len(entries) != 2 {
+		t.Fatalf("group view draws %d entries, want Label and Color", len(entries))
+	}
+	label, color := entries[0], entries[1]
+	label.SetText("Stage")
+	color.SetText("#ff0000")
+	c.Commands.Undo()
+	if color.Text != "" {
+		t.Errorf("group color after undo reads %q, want empty", color.Text)
+	}
+	c.Commands.Undo()
+	if label.Text != "g1" || p.header.Text != "g1" {
+		t.Errorf("group label after undo: entry %q, header %q, want g1", label.Text, p.header.Text)
+	}
+
+	p.SetLinkEdge(c.Graph.LinkEdges["l1"])
+	link := renderedEntries(p)[0]
+	link.SetText("feeds")
+	c.Commands.Undo()
+	if link.Text != "" {
+		t.Errorf("link label after undo reads %q, want empty", link.Text)
+	}
+
+	p.SetAnnotation(c.Graph.Annotations["an1"])
+	text := renderedEntries(p)[0]
+	text.SetText("note, edited")
+	c.Commands.Undo()
+	if text.Text != "note" {
+		t.Errorf("annotation text after undo reads %q, want note", text.Text)
+	}
+
+	selects := rendered[*widget.Select](p)
+	if len(selects) != 2 {
+		t.Fatalf("annotation view draws %d selects, want Anchor and Target", len(selects))
+	}
+	kind, target := selects[0], selects[1]
+	kind.SetSelected("None")
+	if a := c.Graph.Annotations["an1"]; a.AnchorKind != dag.AnchorNone {
+		t.Fatalf("anchor not cleared: kind %v", a.AnchorKind)
+	}
+	c.Commands.Undo()
+	if kind.Selected != "Node" || anchorIDFromOption(target.Selected) != "a" {
+		t.Errorf("anchor after undo shows %q / %q, want Node / a", kind.Selected, target.Selected)
+	}
+}
