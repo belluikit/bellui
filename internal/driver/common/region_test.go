@@ -1,4 +1,4 @@
-//go:build !nopartialrepaint && (partialrepaint || (!android && !ios && !js && !wasm && !mobile))
+//go:build !nopartialrepaint && (partialrepaint || (!js && !wasm && !mobile && !(gl && (android || ios))))
 
 package common
 

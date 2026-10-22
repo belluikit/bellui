@@ -7,13 +7,17 @@ import (
 	"testing"
 )
 
-// TestPartialRepaintDefault pins where partial repaint is on without a tag
-// (#496): on desktop, where it is validated pixel for pixel against a full
-// repaint, and off on mobile and the web, where it is not yet.
+// TestPartialRepaintDefault pins where partial repaint is on without a tag.
+// It is on where it was validated pixel for pixel against a full repaint:
+// desktop (#496), and Android and iOS with the WebGPU painter (#593). It is
+// off on the web (#648) and with the GL painter on mobile, which are not
+// validated yet.
 func TestPartialRepaintDefault(t *testing.T) {
 	desktop := map[string]bool{"darwin": true, "linux": true, "windows": true, "freebsd": true, "openbsd": true, "netbsd": true}
-	if want := desktop[runtime.GOOS]; partialRepaintDefault != want {
-		t.Errorf("partial repaint default on %s = %v, want %v", runtime.GOOS, partialRepaintDefault, want)
+	phone := map[string]bool{"android": true, "ios": true}
+	want := desktop[runtime.GOOS] || (phone[runtime.GOOS] && !glPainterBuild)
+	if partialRepaintDefault != want {
+		t.Errorf("partial repaint default on %s (gl tag %v) = %v, want %v", runtime.GOOS, glPainterBuild, partialRepaintDefault, want)
 	}
 }
 
