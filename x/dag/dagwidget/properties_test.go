@@ -283,3 +283,27 @@ func TestPropertiesPanelUndoUpdatesOtherElements(t *testing.T) {
 		t.Errorf("anchor after undo shows %q / %q, want Node / a", kind.Selected, target.Selected)
 	}
 }
+
+// Each keystroke is its own undo step, a decision recorded in #640. If edits
+// ever start merging, this fails and the decision has to be revisited.
+func TestPropertiesPanelUndoesOneKeystrokeAtATime(t *testing.T) {
+	f := newPanelFixture(t)
+	f.p.SetNode(f.other)
+
+	typeKeepingFocus(t, f, "Connection", "abc")
+	name := formEntry(t, f.p, "Name")
+	f.w.Canvas().Focus(name)
+	f.w.Canvas().Focused().TypedRune('!')
+
+	for _, want := range []struct{ name, conn string }{
+		{"Orders", "abc"},
+		{"Orders", "ab"},
+		{"Orders", "a"},
+	} {
+		f.c.Commands.Undo()
+		if f.other.Label != want.name || f.p.loadProps()["conn"] != want.conn {
+			t.Fatalf("after an undo: name %q, connection %v; want %q, %q",
+				f.other.Label, f.p.loadProps()["conn"], want.name, want.conn)
+		}
+	}
+}

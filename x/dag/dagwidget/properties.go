@@ -20,6 +20,11 @@ import (
 // a node's component properties, a group's label and color, an annotation's
 // text and anchor, or a link edge's label. At most one of
 // node/group/annotation/linkEdge is set.
+//
+// Every change is its own undo step, down to each keystroke in a text
+// field: typing "Merge" into an empty Name field takes five Undos to
+// reverse. That is deliberate (#640); edits are not merged per field or per
+// focus.
 type PropertiesPanel struct {
 	widget.BaseWidget
 
