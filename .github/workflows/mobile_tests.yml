@@ -49,13 +49,12 @@ jobs:
 
       - name: Partial-repaint build + region logic
         run: |
-          # Dirty-region partial repaint is on by default on desktop and off on
-          # mobile (#496); the partialrepaint tag forces it on for the mobile
-          # build. Verify it compiles for both and that the region computation
-          # is correct. On-device validation is still owed before mobile turns
-          # it on by default. Pinned to the GL backend because the driver-level
-          # feature is backend-agnostic; the webgpu default is covered by the
-          # WebGPU mobile build step below.
+          # Dirty-region partial repaint is on by default on desktop (#496)
+          # and on Android/iOS with WebGPU (#593), and off with -tags gl on
+          # mobile, which was not validated on a device; the partialrepaint
+          # tag forces it on for that build. Verify it compiles and that the
+          # region computation is correct. The webgpu default is covered by
+          # the WebGPU mobile build step below.
           go build -tags gl,partialrepaint ./...
           go vet -tags gl,mobile,partialrepaint ./internal/driver/mobile/ ./internal/driver/common/
           ./.github/scripts/xvfb-run-safe go test -tags gl,partialrepaint,ci,migrated_belluido ./internal/driver/common/
