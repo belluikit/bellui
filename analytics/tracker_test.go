@@ -183,29 +183,45 @@ func drain(ch chan error) {
 // TestDisableClearsSpool verifies disabling drops the queue and clears disk.
 func TestDisableClearsSpool(t *testing.T) {
 	sink := newFakeSink()
+	// Every send fails, so the flush SetEnabled(true) asks for cannot take the
+	// events off the spool. It ran after the Track calls at times, and the
+	// spool then held no events: the JSON spool still read as "null", so the
+	// check below passed without anything spooled.
+	sink.failNext = 1000
 	tr, _, store, _ := newTestTracker(t, sink, WithBatchSize(1000))
 	tr.SetEnabled(true)
 	tr.Track("a", nil)
 	tr.Track("b", nil)
 
 	data, _ := store.Load()
-	require.NotEmpty(t, data, "events spooled while enabled")
+	spooled, err := unmarshalSpool(data)
+	require.NoError(t, err)
+	require.Len(t, spooled, 2, "events spooled while enabled")
 
 	tr.SetEnabled(false)
 
 	tr.mu.Lock()
 	assert.Empty(t, tr.queue)
 	tr.mu.Unlock()
-	data, _ = store.Load()
-	assert.Empty(t, data, "spool cleared on disable")
+	assert.False(t, store.saved(), "spool cleared on disable")
+}
+
+// saved reports whether the store holds a spool: one was saved since the last
+// Clear, even an empty one.
+func (m *memStore) saved() bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.ok
 }
 
 // TestDisableDuringSend_ClearsSpool is the deterministic regression for the
 // drain-race behind the flaky TestDisableClearsSpool: if consent is withdrawn
 // while a flush's send is in flight, the post-send bookkeeping must not
-// re-persist the (now-dropped) queue — which marshalled the nil queue to "null"
-// and landed after SetEnabled(false)'s store.Clear(), resurrecting a spool the
-// user opted out of. The blocking sink pins the send open across SetEnabled(false).
+// re-persist the (now-dropped) queue, which landed after SetEnabled(false)'s
+// store.Clear() and resurrected a spool the user opted out of. The blocking sink
+// pins the send open across SetEnabled(false). The nil queue marshals to an
+// empty PXF spool, so the check is that nothing was saved, not that what was
+// saved is empty.
 func TestDisableDuringSend_ClearsSpool(t *testing.T) {
 	sink := newFakeSink()
 	sink.block = make(chan struct{})
@@ -230,12 +246,11 @@ func TestDisableDuringSend_ClearsSpool(t *testing.T) {
 	tr.SetEnabled(false)
 
 	// Complete the send; doFlush re-locks and must observe the disabled state
-	// rather than persisting the nil queue as "null".
+	// rather than persisting the nil queue.
 	close(sink.block)
 	waitFlush(t, flushCh)
 
-	data, _ := store.Load()
-	assert.Empty(t, data, "spool must stay cleared when disabled mid-send")
+	assert.False(t, store.saved(), "spool must stay cleared when disabled mid-send")
 
 	tr.mu.Lock()
 	assert.Empty(t, tr.queue, "queue must stay empty when disabled mid-send")

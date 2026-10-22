@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package bellui.app.v1;
+
+option go_package = "github.com/belluikit/bellui/internal/app/instancepb;instancepb";
+
+// ForwardedArgs is the message a second launch of a single-instance app sends
+// the running copy, encoded in the textual PXF format (replacing the legacy JSON
+// array) after a 4-byte big-endian length (#523). See app/single_instance.go.
+message ForwardedArgs {
+  repeated string args = 1;
+}

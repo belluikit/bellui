@@ -2,6 +2,7 @@ package app
 
 import (
 	"github.com/belluikit/bellui/internal/preferences/prefspb"
+	"github.com/belluikit/bellui/internal/pxfmigrate"
 	"github.com/trendvidia/protowire-go/encoding/pxf"
 )
 
@@ -12,17 +13,7 @@ import (
 // drives the read-both migration window and avoids relying on the decoder's error
 // behavior to distinguish the two formats.
 func isLegacyJSONPreferences(data []byte) bool {
-	for _, b := range data {
-		switch b {
-		case ' ', '\t', '\r', '\n':
-			continue
-		case '{':
-			return true
-		default:
-			return false
-		}
-	}
-	return false
+	return pxfmigrate.IsJSON(data, '{')
 }
 
 // marshalPreferencesPXF encodes the in-memory preference value map to PXF bytes.

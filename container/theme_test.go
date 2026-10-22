@@ -54,7 +54,7 @@ func TestThemeOverride_Refresh(t *testing.T) {
 }
 
 func TestThemeOverride_CurrentTheme(t *testing.T) {
-	custom, err := theme.FromJSON("{\"Colors\": {\"foreground\": \"#000000\"}}")
+	custom, err := theme.FromPXF(`colors = { foreground: "#000000" }`)
 	assert.NoError(t, err)
 
 	l := widget.NewLabel("Test")

@@ -56,7 +56,7 @@ func TestFromTOML_Resource(t *testing.T) {
 }
 
 func TestHexColor(t *testing.T) {
-	c := jsonColor{}
+	c := hexColor{}
 	err := c.parseColor("#abc")
 	assert.NoError(t, err)
 	assert.Equal(t, &color.NRGBA{R: 0xaa, G: 0xbb, B: 0xcc, A: 0xff}, c.color)
@@ -156,4 +156,19 @@ func BenchmarkJsonTheme_Color(b *testing.B) {
 		localResult = th.Color("primary", theme.VariantDark)
 	}
 	result = localResult
+}
+
+// A JSON theme document of null sets nothing, so everything falls back, as for
+// an empty PXF theme. It used to give a theme whose every method panicked; a
+// user theme.json holding null took the app down at its first Color call.
+func TestFromJSON_Null(t *testing.T) {
+	for _, data := range []string{"null", "{}"} {
+		th, err := FromJSONWithFallback(data, DefaultTheme())
+		assert.NoError(t, err, data)
+		assert.Equal(t, DefaultTheme().Size(SizeNamePadding), th.Size(SizeNamePadding), data)
+		assert.Equal(t, DefaultTheme().Color(ColorNameForeground, VariantDark), th.Color(ColorNameForeground, VariantDark), data)
+	}
+	th, err := FromPXFWithFallback("", DefaultTheme())
+	assert.NoError(t, err, "an empty PXF theme")
+	assert.Equal(t, DefaultTheme().Size(SizeNamePadding), th.Size(SizeNamePadding))
 }

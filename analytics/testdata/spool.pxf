@@ -1,0 +1,34 @@
+events = [
+  {
+    kind = "track"
+    name = "opened"
+    props {
+      fields = {
+        count: {
+          number_value = 3
+        }
+        dark: {
+          bool_value = true
+        }
+        screen: {
+          string_value = "home"
+        }
+      }
+    }
+    session_id = "s1"
+    timestamp = 2026-10-22T09:30:15Z
+  },
+  {
+    kind = "identify"
+    traits {
+      fields = {
+        plan: {
+          string_value = "pro"
+        }
+      }
+    }
+    user_id = "u1"
+    session_id = "s1"
+    timestamp = 2026-10-22T09:30:15Z
+  }
+]

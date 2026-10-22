@@ -17,6 +17,9 @@ import (
 // If a parse error occurs it will be returned along with a default theme.
 //
 // Since: 1.0
+//
+// Deprecated: Bellui's own data formats are PXF. Use [FromPXF], which
+// reads the same theme data.
 func FromJSON(data string) (bellui.Theme, error) {
 	return FromJSONReader(strings.NewReader(data))
 }
@@ -26,6 +29,9 @@ func FromJSON(data string) (bellui.Theme, error) {
 // If a parse error occurs it will be returned along with a specified fallback theme.
 //
 // Since: 1.0
+//
+// Deprecated: Bellui's own data formats are PXF. Use [FromPXFWithFallback], which
+// reads the same theme data.
 func FromJSONWithFallback(data string, fallback bellui.Theme) (bellui.Theme, error) {
 	return fromJSONWithFallback(strings.NewReader(data), fallback)
 }
@@ -35,6 +41,9 @@ func FromJSONWithFallback(data string, fallback bellui.Theme) (bellui.Theme, err
 // If a parse error occurs it will be returned along with a default theme.
 //
 // Since: 1.0
+//
+// Deprecated: Bellui's own data formats are PXF. Use [FromPXFReader], which
+// reads the same theme data.
 func FromJSONReader(r io.Reader) (bellui.Theme, error) {
 	return fromJSONWithFallback(r, DefaultTheme())
 }
@@ -44,6 +53,9 @@ func FromJSONReader(r io.Reader) (bellui.Theme, error) {
 // If a parse error occurs it will be returned along with a specified fallback theme.
 //
 // Since: 1.0
+//
+// Deprecated: Bellui's own data formats are PXF. Use [FromPXFReaderWithFallback], which
+// reads the same theme data.
 func FromJSONReaderWithFallback(r io.Reader, fallback bellui.Theme) (bellui.Theme, error) {
 	return fromJSONWithFallback(r, fallback)
 }
@@ -53,15 +65,20 @@ func fromJSONWithFallback(r io.Reader, fallback bellui.Theme) (bellui.Theme, err
 	if err := json.NewDecoder(r).Decode(&th); err != nil {
 		return fallback, err
 	}
+	if th == nil {
+		// The document was null: no theme data, so all of it falls back.
+		th = &schema{}
+	}
 
-	return &jsonTheme{data: th, fallback: fallback}, nil
+	return &dataTheme{data: th, fallback: fallback}, nil
 }
 
-type jsonColor struct {
+// hexColor is a theme color given as hex, in JSON or PXF theme data.
+type hexColor struct {
 	color color.Color
 }
 
-func (h *jsonColor) UnmarshalJSON(b []byte) error {
+func (h *hexColor) UnmarshalJSON(b []byte) error {
 	var str string
 	if err := json.Unmarshal(b, &str); err != nil {
 		return err
@@ -69,7 +86,7 @@ func (h *jsonColor) UnmarshalJSON(b []byte) error {
 	return h.parseColor(str)
 }
 
-func (h *jsonColor) parseColor(str string) error {
+func (h *hexColor) parseColor(str string) error {
 	data := str
 	switch len([]rune(str)) {
 	case 8, 6:
@@ -126,22 +143,25 @@ func (u uriString) resource() bellui.Resource {
 	return r
 }
 
+// schema is theme data as read from JSON or PXF.
 type schema struct {
-	Colors      map[string]jsonColor `json:"Colors,omitempty"`
-	DarkColors  map[string]jsonColor `json:"Colors-dark,omitempty"`
-	LightColors map[string]jsonColor `json:"Colors-light,omitempty"`
-	Sizes       map[string]float32   `json:"Sizes,omitempty"`
+	Colors      map[string]hexColor `json:"Colors,omitempty"`
+	DarkColors  map[string]hexColor `json:"Colors-dark,omitempty"`
+	LightColors map[string]hexColor `json:"Colors-light,omitempty"`
+	Sizes       map[string]float32  `json:"Sizes,omitempty"`
 
 	Fonts map[string]uriString `json:"Fonts,omitempty"`
 	Icons map[string]uriString `json:"Icons,omitempty"`
 }
 
-type jsonTheme struct {
+// dataTheme is a theme read from JSON or PXF data, falling back to another
+// theme for anything the data does not set.
+type dataTheme struct {
 	data     *schema
 	fallback bellui.Theme
 }
 
-func (t *jsonTheme) Color(name bellui.ThemeColorName, variant bellui.ThemeVariant) color.Color {
+func (t *dataTheme) Color(name bellui.ThemeColorName, variant bellui.ThemeVariant) color.Color {
 	switch variant {
 	case VariantLight:
 		if val, ok := t.data.LightColors[string(name)]; ok {
@@ -160,7 +180,7 @@ func (t *jsonTheme) Color(name bellui.ThemeColorName, variant bellui.ThemeVarian
 	return t.fallback.Color(name, variant)
 }
 
-func (t *jsonTheme) Font(style bellui.TextStyle) bellui.Resource {
+func (t *dataTheme) Font(style bellui.TextStyle) bellui.Resource {
 	if val, ok := t.data.Fonts[styleString(style)]; ok {
 		r := val.resource()
 		if r != nil {
@@ -170,7 +190,7 @@ func (t *jsonTheme) Font(style bellui.TextStyle) bellui.Resource {
 	return t.fallback.Font(style)
 }
 
-func (t *jsonTheme) Icon(name bellui.ThemeIconName) bellui.Resource {
+func (t *dataTheme) Icon(name bellui.ThemeIconName) bellui.Resource {
 	if val, ok := t.data.Icons[string(name)]; ok {
 		r := val.resource()
 		if r != nil {
@@ -180,7 +200,7 @@ func (t *jsonTheme) Icon(name bellui.ThemeIconName) bellui.Resource {
 	return t.fallback.Icon(name)
 }
 
-func (t *jsonTheme) Size(name bellui.ThemeSizeName) float32 {
+func (t *dataTheme) Size(name bellui.ThemeSizeName) float32 {
 	if val, ok := t.data.Sizes[string(name)]; ok {
 		return val
 	}

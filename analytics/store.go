@@ -4,13 +4,18 @@ import (
 	"errors"
 	"io"
 	"sync"
+	"sync/atomic"
 
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/storage"
 )
 
 // spoolFileName is the name used inside the app storage sandbox for the spool.
-const spoolFileName = "bellui-analytics-spool.json"
+const spoolFileName = "bellui-analytics-spool.pxf"
+
+// legacySpoolFileName is the spool's name before it moved to PXF (#523). Load
+// reads it while there is no spool by the new name, and Save removes it.
+const legacySpoolFileName = "bellui-analytics-spool.json"
 
 // Store is the persistence backend for the disk spool. It stores a single
 // opaque blob (the serialized event ring) that survives process death.
@@ -31,11 +36,18 @@ type Store interface {
 type BelluiStore struct {
 	storage bellui.Storage
 	name    string
+
+	legacyName    string
+	legacyRemoved atomic.Bool // there is no spool by legacyName any more
 }
 
 // NewBelluiStore returns a [Store] backed by the given app's storage sandbox.
 func NewBelluiStore(app bellui.App) *BelluiStore {
-	return &BelluiStore{storage: app.Storage(), name: spoolFileName}
+	return newBelluiStore(app.Storage())
+}
+
+func newBelluiStore(s bellui.Storage) *BelluiStore {
+	return &BelluiStore{storage: s, name: spoolFileName, legacyName: legacySpoolFileName}
 }
 
 // Save implements [Store].
@@ -51,14 +63,49 @@ func (s *BelluiStore) Save(data []byte) error {
 	if err != nil {
 		return err
 	}
-	defer w.Close()
-	_, err = w.Write(data)
-	return err
+	if _, err = w.Write(data); err != nil {
+		_ = w.Close()
+		return err
+	}
+	// A save completes when its writer closes (internal.Docs.Save), so the
+	// spool is not known to be saved before then, and the legacy spool, whose
+	// events it now holds, must outlive it until it is.
+	if err := w.Close(); err != nil {
+		return err
+	}
+	s.removeLegacy()
+	return nil
+}
+
+// removeLegacy removes the spool saved under legacyName, once it is gone: a
+// removal that fails is tried again at the next Save, so the old spool is not
+// left to be read again after the new one has been cleared.
+func (s *BelluiStore) removeLegacy() {
+	if s.legacyName == "" || s.legacyRemoved.Load() {
+		return
+	}
+	if s.storage.Remove(s.legacyName) == nil || !s.exists(s.legacyName) {
+		s.legacyRemoved.Store(true)
+	}
+}
+
+// exists reports whether the document name can be opened. Storage backends do
+// not agree on the error a missing document gives, so this does not ask.
+func (s *BelluiStore) exists(name string) bool {
+	r, err := s.storage.Open(name)
+	if err != nil {
+		return false
+	}
+	_ = r.Close()
+	return true
 }
 
 // Load implements [Store].
 func (s *BelluiStore) Load() ([]byte, error) {
 	r, err := s.storage.Open(s.name)
+	if err != nil && s.legacyName != "" {
+		r, err = s.storage.Open(s.legacyName)
+	}
 	if err != nil {
 		// A missing spool is not an error.
 		return nil, nil //nolint:nilerr
@@ -69,6 +116,9 @@ func (s *BelluiStore) Load() ([]byte, error) {
 
 // Clear implements [Store].
 func (s *BelluiStore) Clear() error {
+	if s.legacyName != "" {
+		_ = s.storage.Remove(s.legacyName)
+	}
 	err := s.storage.Remove(s.name)
 	if err != nil && !errors.Is(err, io.EOF) {
 		// Removing an absent spool is fine.

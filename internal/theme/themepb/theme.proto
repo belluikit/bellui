@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package bellui.theme.v1;
+
+option go_package = "github.com/belluikit/bellui/internal/theme/themepb;themepb";
+
+// Theme is the wire schema for a theme file in the textual PXF format: the
+// user-wide theme.pxf (replacing the legacy theme.json) and the data the public
+// theme.FromPXF* functions read. It mirrors the JSON theme schema key for key
+// (#523). See theme/pxf.go for the conversion.
+message Theme {
+  // Colors by theme color name, as hex: "#rgb", "#rgba", "#rrggbb" or
+  // "#rrggbbaa", the "#" optional. They apply to both variants unless
+  // colors_dark or colors_light names the same color.
+  map<string, string> colors = 1;
+  map<string, string> colors_dark = 2;
+  map<string, string> colors_light = 3;
+  // Sizes by theme size name.
+  map<string, float> sizes = 4;
+  // Fonts by text style ("regular", "bold", "boldItalic", "monospace") and
+  // icons by theme icon name, each a URI to load the resource from.
+  map<string, string> fonts = 5;
+  map<string, string> icons = 6;
+}
