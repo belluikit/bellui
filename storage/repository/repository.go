@@ -4,13 +4,19 @@ package repository
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/belluikit/bellui"
 )
 
 // repositoryTable stores the mapping of schemes to Repository implementations.
-// It should only ever be used by ForURI() and Register().
-var repositoryTable = map[string]Repository{}
+// It should only ever be used by ForURI() and Register(), under
+// repositoryLock: a background goroutine (a directory listing, say) can look a
+// scheme up while a new app registers its repositories.
+var (
+	repositoryTable = map[string]Repository{}
+	repositoryLock  sync.RWMutex
+)
 
 // Repository represents a storage repository, which is a set of methods which
 // implement specific functions on a URI. Repositories are registered to handle
@@ -312,11 +318,14 @@ type MovableRepository interface {
 func Register(scheme string, repository Repository) {
 	scheme = strings.ToLower(scheme)
 
-	if prev, ok := repositoryTable[scheme]; ok {
+	repositoryLock.Lock()
+	prev, ok := repositoryTable[scheme]
+	repositoryTable[scheme] = repository
+	repositoryLock.Unlock()
+
+	if ok {
 		prev.Destroy(scheme)
 	}
-
-	repositoryTable[scheme] = repository
 }
 
 // ForURI returns the Repository instance which is registered to handle URIs of
@@ -341,7 +350,9 @@ func ForURI(u bellui.URI) (Repository, error) {
 //
 // Since: 1.0
 func ForScheme(scheme string) (Repository, error) {
+	repositoryLock.RLock()
 	repo, ok := repositoryTable[scheme]
+	repositoryLock.RUnlock()
 	if !ok {
 		return nil, fmt.Errorf("no repository registered for scheme '%s'", scheme)
 	}
