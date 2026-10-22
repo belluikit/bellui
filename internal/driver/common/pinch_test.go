@@ -26,10 +26,107 @@ func (p *pinchRect) Pinched(e *event.PinchEvent) { p.pinches = append(p.pinches,
 func (p *pinchRect) PinchEnded()                 { p.ended++ }
 func (p *pinchRect) Tapped(*event.PointEvent)    { p.taps++ }
 
+// newPinchHandler places every object at the canvas origin, as touchScrollFinder
+// does, and sizes any that has no size yet to cover the area the tests touch,
+// so both fingers are on it (#393).
 func newPinchHandler(objects ...core.CanvasObject) *TouchHandler {
+	for _, o := range objects {
+		if o.Size().IsZero() {
+			o.Resize(geo.NewSize(1000, 1000))
+		}
+	}
 	h := &TouchHandler{}
 	h.InitTouchHandler(&touchScrollFinder{objects: objects})
 	return h
+}
+
+// placedFinder is an ObjectFinder over objects at their own positions: the
+// topmost object under pos that passes the test wins.
+type placedFinder struct {
+	objects []core.CanvasObject // bottom to top
+}
+
+func (f *placedFinder) FindObjectAtPositionMatching(pos geo.Position,
+	test func(core.CanvasObject) bool,
+) (core.CanvasObject, geo.Position, int) {
+	for i := len(f.objects) - 1; i >= 0; i-- {
+		o := f.objects[i]
+		if within(pos, o.Position(), o.Size()) && test(o) {
+			return o, pos.Subtract(o.Position()), 1
+		}
+	}
+	return nil, pos, 1
+}
+
+func (f *placedFinder) CanvasForTouch() core.Canvas { return nil }
+
+// tapRect records taps.
+type tapRect struct {
+	*canvas.Rectangle
+	taps int
+}
+
+func (r *tapRect) Tapped(*event.PointEvent) { r.taps++ }
+
+// A pinch starts only on a Pinchable both fingers are on (#393). One finger
+// dragging a slider left of a chart and another tapping a button right of it
+// put the midpoint on the chart, but neither finger is on it: the drag goes on
+// and the button taps. Two fingers that are both on the chart still pinch it.
+func TestTouchHandler_PinchNeedsBothFingersOnTheTarget(t *testing.T) {
+	slider := &draggableRect{Rectangle: canvas.NewRectangle(color.Black)}
+	slider.Move(geo.NewPos(0, 0))
+	slider.Resize(geo.NewSize(100, 100))
+	chart := &pinchRect{Rectangle: canvas.NewRectangle(color.Black)}
+	chart.Move(geo.NewPos(100, 0))
+	chart.Resize(geo.NewSize(200, 100))
+	button := &tapRect{Rectangle: canvas.NewRectangle(color.Black)}
+	button.Move(geo.NewPos(300, 0))
+	button.Resize(geo.NewSize(100, 100))
+
+	h := &TouchHandler{}
+	h.InitTouchHandler(&placedFinder{objects: []core.CanvasObject{slider, chart, button}})
+	h.ScrollCallback = func(geo.Position, geo.Delta) {}
+	drag := func(w event.Draggable, e *event.DragEvent) { w.Dragged(e) }
+
+	// Finger 1 starts dragging the slider.
+	h.TapDown(geo.NewPos(50, 50), 1)
+	for x := float32(55); x <= 70; x += 5 {
+		h.TapMove(geo.NewPos(x, 50), 1, drag)
+	}
+	draggedBefore := slider.dragged
+	require.Positive(t, draggedBefore, "the slider drag started")
+
+	// Finger 2 taps the button. Their midpoint, (185, 50), is on the chart.
+	h.TapDown(geo.NewPos(350, 50), 2)
+	assert.Nil(t, h.pinch, "a chart neither finger is on must not take the gesture")
+	pinchTapUp(h, geo.NewPos(350, 50), 2)
+	assert.Equal(t, 1, button.taps, "the button taps")
+
+	// The slider drag carries on and ends normally.
+	h.TapMove(geo.NewPos(80, 50), 1, drag)
+	assert.Greater(t, slider.dragged, draggedBefore, "the slider keeps dragging")
+	pinchTapUp(h, geo.NewPos(80, 50), 1)
+	assert.Equal(t, 1, slider.ended, "the drag ends once, at its own release")
+	assert.Empty(t, chart.pinches)
+
+	// One finger on the chart and one on the button: still no pinch.
+	h.TapDown(geo.NewPos(250, 50), 3)
+	h.TapDown(geo.NewPos(350, 50), 4)
+	h.TapMove(geo.NewPos(390, 50), 4, nil)
+	h.TapMove(geo.NewPos(395, 50), 4, nil)
+	assert.Empty(t, chart.pinches, "a finger off the chart must not pinch it")
+	pinchTapUp(h, geo.NewPos(395, 50), 4)
+	pinchTapUp(h, geo.NewPos(250, 50), 3)
+
+	// Both fingers on the chart pinch it.
+	h.TapDown(geo.NewPos(150, 50), 5)
+	h.TapDown(geo.NewPos(200, 50), 6)
+	h.TapMove(geo.NewPos(250, 50), 6, nil)
+	h.TapMove(geo.NewPos(260, 50), 6, nil)
+	assert.NotEmpty(t, chart.pinches, "two fingers on the chart pinch it")
+	pinchTapUp(h, geo.NewPos(260, 50), 6)
+	pinchTapUp(h, geo.NewPos(150, 50), 5)
+	assert.Equal(t, 1, chart.ended)
 }
 
 func pinchTapUp(h *TouchHandler, pos geo.Position, id int) {
