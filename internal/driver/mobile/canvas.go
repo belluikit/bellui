@@ -13,6 +13,7 @@ import (
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/app"
+	"github.com/belluikit/bellui/internal/async"
 	intdriver "github.com/belluikit/bellui/internal/driver"
 	"github.com/belluikit/bellui/internal/driver/common"
 	"github.com/belluikit/bellui/theme"
@@ -76,8 +77,76 @@ func newCanvas(dev bellui.Device) core.Canvas {
 	return ret
 }
 
+// Capture paints a fresh frame and returns it. Any goroutine may call it. The
+// paint and read-back run on the main goroutine, the app's event loop, which
+// paints the window every frame. Run on the caller's goroutine, they raced
+// that paint, and under -tags gl issued GL calls off the loop that owns the
+// context (#573; desktop had the same shape, #562). It returns nil when no
+// frame can be painted: the window is not the one on screen, its surface is
+// not ready, or the painter began no frame.
 func (c *canvas) Capture() image.Image {
-	return c.Painter().Capture(c)
+	if async.IsMainGoroutine() {
+		return c.capture()
+	}
+	var img image.Image
+	bellui.CurrentApp().Driver().DoFromGoroutine(func() { img = c.capture() }, true)
+	return img
+}
+
+func (c *canvas) capture() image.Image {
+	// The frame count tells whether the paint below began a frame; what the
+	// painter holds otherwise is an earlier frame or nothing (#631).
+	counter, counts := c.Painter().(interface{ FramesBegun() uint64 })
+	var before uint64
+	if counts {
+		before = counter.FramesBegun()
+	}
+	began := func() bool { return !counts || counter.FramesBegun() != before }
+
+	d, _ := bellui.CurrentApp().Driver().(*driver)
+	if d == nil {
+		return nil
+	}
+	w := d.currentWindow()
+	if w == nil || w.canvas != c || w.surfaceStale || !c.initialized || !d.renderReady(w) {
+		return nil
+	}
+	// Prepare the frame as handlePaint does, so refreshed objects draw their
+	// new state rather than cached textures (#565 on desktop).
+	c.FreeDirtyTextures()
+	size := d.prepareFrame(w)
+
+	if ec, ok := c.Painter().(interface{ EnableCapture() }); ok {
+		// WebGPU: arm the per-frame capture copy, then paint and present, which
+		// copies the presented surface, overlays included (#473 on desktop).
+		ec.EnableCapture()
+		d.claimNativeSurface(c, w)
+		d.paintWindow(w, size)
+		d.presentPainter(c)
+		d.app.Publish()
+		// presentPainter abandons the frame when Android destroyed the window
+		// during the paint, and nothing was copied then.
+		if !began() || !d.nativeSurfacePresentable() {
+			return nil
+		}
+		return c.Painter().Capture(c)
+	}
+
+	// GL: paint into the back buffer and read it before the swap. OpenGL ES
+	// cannot read the default framebuffer's front buffer.
+	d.paintWindow(w, size)
+	if !began() {
+		return nil
+	}
+	var img image.Image
+	if bc, ok := c.Painter().(interface{ CaptureBack(core.Canvas) image.Image }); ok {
+		img = bc.CaptureBack(c)
+	} else {
+		img = c.Painter().Capture(c)
+	}
+	// The capture paint was not presented; the next paint tick presents it.
+	c.SetDirty()
+	return img
 }
 
 func (c *canvas) Content() core.CanvasObject {
