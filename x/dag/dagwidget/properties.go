@@ -26,6 +26,12 @@ import (
 // field: typing "Merge" into an empty Name field takes five Undos to
 // reverse. That is deliberate (#640); edits are not merged per field or per
 // focus.
+//
+// On a canvas whose capabilities forbid an edit, the fields for it are
+// disabled when the panel builds them. If the capabilities change while the
+// fields are on show, an edit the canvas refuses snaps the field back to the
+// stored value, so a field never shows a value its element does not have
+// (#643).
 type PropertiesPanel struct {
 	widget.BaseWidget
 
@@ -56,6 +62,9 @@ type PropertiesPanel struct {
 	// drop its focus. Each gets the shown node's properties, loaded once per
 	// sync (empty for the other views).
 	syncers []func(props map[string]any)
+	// reverting is set while revert runs: every syncer then rewrites its
+	// field to the stored value, unfinished edits included.
+	reverting bool
 }
 
 // NewPropertiesPanel creates a new properties panel.
@@ -138,7 +147,10 @@ func (p *PropertiesPanel) nameEntry(n *dag.Node) *widget.Entry {
 	entry := widget.NewEntry()
 	entry.SetText(n.Label)
 	entry.OnChanged = func(s string) {
-		if p.rebuilding || p.node == nil || !p.CanvasRef.Capabilities.EditProperties {
+		if p.rebuilding || p.node == nil {
+			return
+		}
+		if !p.canvasAllows(p.CanvasRef.Capabilities.EditProperties) {
 			return
 		}
 		p.doCommand(&RenameNodeCommand{
@@ -154,6 +166,7 @@ func (p *PropertiesPanel) nameEntry(n *dag.Node) *widget.Entry {
 		p.header.SetText(cur.Label)
 		syncText(entry, cur.Label)
 	})
+	enableIf(p.CanvasRef.Capabilities.EditProperties, entry)
 	return entry
 }
 
@@ -190,7 +203,7 @@ func (p *PropertiesPanel) SetGroup(g *dag.Group) {
 		if p.rebuilding || p.group == nil {
 			return
 		}
-		if p.CanvasRef == nil || !p.CanvasRef.Capabilities.EditProperties {
+		if !p.canvasAllows(p.elementsEditable()) {
 			return
 		}
 		p.doCommand(&SetGroupLabelCommand{
@@ -214,7 +227,7 @@ func (p *PropertiesPanel) SetGroup(g *dag.Group) {
 		if p.rebuilding || p.group == nil {
 			return
 		}
-		if p.CanvasRef == nil || !p.CanvasRef.Capabilities.EditProperties {
+		if !p.canvasAllows(p.elementsEditable()) {
 			return
 		}
 		if _, ok := parseHexColor(s); !ok && s != "" {
@@ -235,7 +248,7 @@ func (p *PropertiesPanel) SetGroup(g *dag.Group) {
 		cur := live().Color
 		changed := cur != lastColor
 		lastColor = cur
-		if changed {
+		if changed || p.reverting {
 			syncText(colorEntry, cur)
 		}
 	})
@@ -244,6 +257,7 @@ func (p *PropertiesPanel) SetGroup(g *dag.Group) {
 		widget.NewFormItem("Label", labelEntry),
 		widget.NewFormItem("Color", colorEntry),
 	)
+	enableIf(p.elementsEditable(), labelEntry, colorEntry)
 	p.form = form
 	p.content.Objects = []core.CanvasObject{
 		p.header,
@@ -282,7 +296,7 @@ func (p *PropertiesPanel) SetAnnotation(a *dag.Annotation) {
 		if p.rebuilding || p.annotation == nil {
 			return
 		}
-		if p.CanvasRef == nil || !p.CanvasRef.Capabilities.Annotations {
+		if !p.canvasAllows(p.annotationsEditable()) {
 			return
 		}
 		p.doCommand(&SetAnnotationTextCommand{
@@ -310,7 +324,7 @@ func (p *PropertiesPanel) SetAnnotation(a *dag.Annotation) {
 		if p.annotation == nil {
 			return
 		}
-		if p.CanvasRef == nil || !p.CanvasRef.Capabilities.Annotations {
+		if !p.canvasAllows(p.annotationsEditable()) {
 			return
 		}
 		p.doCommand(&SetAnnotationAnchorCommand{
@@ -335,7 +349,7 @@ func (p *PropertiesPanel) SetAnnotation(a *dag.Annotation) {
 	}
 
 	kindSelect := widget.NewSelect(kindNames, func(name string) {
-		if p.rebuilding {
+		if p.rebuilding || !p.canvasAllows(p.annotationsEditable()) {
 			return
 		}
 		kind := kindByName[name]
@@ -384,7 +398,7 @@ func (p *PropertiesPanel) SetAnnotation(a *dag.Annotation) {
 		// A kind picked with no target yet stores nothing. Keep it until the
 		// user picks a target or the stored anchor changes; a picked target
 		// the model rejected does snap back.
-		if !changed && targetSelect.Selected == "" {
+		if !changed && !p.reverting && targetSelect.Selected == "" {
 			return
 		}
 		if kindSelect.Selected != kindNames[cur.AnchorKind] {
@@ -401,6 +415,7 @@ func (p *PropertiesPanel) SetAnnotation(a *dag.Annotation) {
 		widget.NewFormItem("Anchor", kindSelect),
 		widget.NewFormItem("Target", targetSelect),
 	)
+	enableIf(p.annotationsEditable(), textEntry, kindSelect, targetSelect)
 	p.form = form
 	p.content.Objects = []core.CanvasObject{
 		p.header,
@@ -437,7 +452,7 @@ func (p *PropertiesPanel) SetLinkEdge(le *dag.LinkEdge) {
 		if p.rebuilding || p.linkEdge == nil {
 			return
 		}
-		if p.CanvasRef == nil || !p.CanvasRef.Capabilities.EditProperties {
+		if !p.canvasAllows(p.elementsEditable()) {
 			return
 		}
 		p.doCommand(&SetLinkEdgeLabelCommand{
@@ -459,6 +474,7 @@ func (p *PropertiesPanel) SetLinkEdge(le *dag.LinkEdge) {
 	form := widget.NewForm(
 		widget.NewFormItem("Label", labelEntry),
 	)
+	enableIf(p.elementsEditable(), labelEntry)
 	p.form = form
 	p.content.Objects = []core.CanvasObject{
 		p.header,
@@ -565,7 +581,7 @@ func (p *PropertiesPanel) setProp(key string, newValue any) {
 	if p.rebuilding {
 		return // suppress callbacks during form rebuild
 	}
-	if p.CanvasRef != nil && !p.CanvasRef.Capabilities.EditProperties {
+	if !p.canvasAllows(p.propsEditable()) {
 		return
 	}
 	oldProps := p.loadProps()
@@ -598,6 +614,51 @@ func (p *PropertiesPanel) syncForm() {
 	props := p.loadProps()
 	for _, sync := range p.syncers {
 		sync(props)
+	}
+}
+
+// revert rewrites every field to its element's stored value. Called when the
+// canvas refuses an edit, so the refused text does not stay on show.
+func (p *PropertiesPanel) revert() {
+	p.reverting = true
+	defer func() { p.reverting = false }()
+	p.syncForm()
+}
+
+// canvasAllows reports whether an edit may go ahead, reverting the fields
+// when it may not.
+func (p *PropertiesPanel) canvasAllows(ok bool) bool {
+	if !ok {
+		p.revert()
+	}
+	return ok
+}
+
+// propsEditable reports whether node properties may be edited. Without a
+// canvas there are no capabilities to forbid it, and edits go to the node.
+func (p *PropertiesPanel) propsEditable() bool {
+	return p.CanvasRef == nil || p.CanvasRef.Capabilities.EditProperties
+}
+
+// elementsEditable reports whether group and link fields may be edited:
+// their commands need the canvas.
+func (p *PropertiesPanel) elementsEditable() bool {
+	return p.CanvasRef != nil && p.CanvasRef.Capabilities.EditProperties
+}
+
+// annotationsEditable reports whether annotation fields may be edited.
+func (p *PropertiesPanel) annotationsEditable() bool {
+	return p.CanvasRef != nil && p.CanvasRef.Capabilities.Annotations
+}
+
+// enableIf disables the given fields unless ok.
+func enableIf(ok bool, fields ...core.Disableable) {
+	for _, f := range fields {
+		if ok {
+			f.Enable()
+		} else {
+			f.Disable()
+		}
 	}
 }
 
@@ -656,7 +717,7 @@ func (p *PropertiesPanel) syncNumber(entry *widget.Entry, pd dag.PropertyDef, in
 		v := propValue(pd, props)
 		changed := formatNumber(v) != last
 		last = formatNumber(v)
-		if changed && !sameNumber(entry.Text, v) {
+		if (changed || p.reverting) && !sameNumber(entry.Text, v) {
 			entry.SetText(formatNumber(v))
 		}
 	})
@@ -679,6 +740,7 @@ func (p *PropertiesPanel) createFormItem(pd dag.PropertyDef, props map[string]an
 				check.SetChecked(b)
 			}
 		})
+		enableIf(p.propsEditable(), check)
 		return widget.NewFormItem(pd.Label, check)
 
 	case dag.PropertyEnum:
@@ -700,6 +762,7 @@ func (p *PropertiesPanel) createFormItem(pd dag.PropertyDef, props map[string]an
 				sel.ClearSelected()
 			}
 		})
+		enableIf(p.propsEditable(), sel)
 		return widget.NewFormItem(pd.Label, sel)
 
 	case dag.PropertyInt:
@@ -708,11 +771,17 @@ func (p *PropertiesPanel) createFormItem(pd dag.PropertyDef, props map[string]an
 			entry.SetText(formatNumber(currentVal))
 		}
 		entry.OnChanged = func(s string) {
+			// Refuse before parsing: text that is not a number yet must snap
+			// back on a read-only canvas too.
+			if p.rebuilding || !p.canvasAllows(p.propsEditable()) {
+				return
+			}
 			if v, err := strconv.Atoi(s); err == nil {
 				p.setProp(pd.Key, v)
 			}
 		}
 		p.syncNumber(entry, pd, currentVal)
+		enableIf(p.propsEditable(), entry)
 		return widget.NewFormItem(pd.Label, entry)
 
 	case dag.PropertyFloat:
@@ -721,11 +790,15 @@ func (p *PropertiesPanel) createFormItem(pd dag.PropertyDef, props map[string]an
 			entry.SetText(formatNumber(currentVal))
 		}
 		entry.OnChanged = func(s string) {
+			if p.rebuilding || !p.canvasAllows(p.propsEditable()) {
+				return
+			}
 			if v, err := strconv.ParseFloat(s, 64); err == nil {
 				p.setProp(pd.Key, v)
 			}
 		}
 		p.syncNumber(entry, pd, currentVal)
+		enableIf(p.propsEditable(), entry)
 		return widget.NewFormItem(pd.Label, entry)
 
 	default: // PropertyString
@@ -745,6 +818,7 @@ func (p *PropertiesPanel) createFormItem(pd dag.PropertyDef, props map[string]an
 			s, _ := propValue(pd, props).(string)
 			syncText(entry, s)
 		})
+		enableIf(p.propsEditable(), entry)
 		return widget.NewFormItem(pd.Label, entry)
 	}
 }

@@ -37,6 +37,8 @@ func newPanelFixture(t *testing.T) *panelFixture {
 			{Key: "batch", Label: "Batch size", Kind: dag.PropertyInt},
 			{Key: "ratio", Label: "Ratio", Kind: dag.PropertyFloat},
 			{Key: "conn", Label: "Connection", Kind: dag.PropertyString},
+			{Key: "live", Label: "Live", Kind: dag.PropertyBool},
+			{Key: "mode", Label: "Mode", Kind: dag.PropertyEnum, EnumValues: []string{"append", "replace"}},
 		},
 	})
 	first := &dag.Node{ID: "dash", Label: "Dashboard", TypeTag: "dashboard"}
@@ -494,4 +496,155 @@ func TestPropertiesPanelWithoutCanvasRefStoresNothing(t *testing.T) {
 	if a := c.Graph.Annotations["an1"]; a.Text != "note" || a.AnchorKind != dag.AnchorNode {
 		t.Errorf("annotation edited without a canvas: %+v", a)
 	}
+}
+
+// readOnlyFixture is a panel fixture whose canvas also holds a group, a link
+// and an annotation, so every view of the panel can be shown.
+func readOnlyFixture(t *testing.T) *panelFixture {
+	t.Helper()
+	f := newPanelFixture(t)
+	if err := f.c.AddGroup(&dag.Group{ID: "g1", Label: "Stage", Color: "#336699", Size: [2]float32{200, 100}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.c.AddLinkEdge(&dag.LinkEdge{ID: "l1", Source: "dash", Target: "orders", Label: "feeds"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.c.AddAnnotation(&dag.Annotation{ID: "an1", Text: "note", AnchorKind: dag.AnchorNode, AnchorID: "dash"}); err != nil {
+		t.Fatal(err)
+	}
+	return f
+}
+
+// tryEveryField types into each entry the panel shows, through the window's
+// focused object, and picks a new value in each check and select. After each
+// field it requires the stored values to be unchanged, and that field to be
+// disabled (when wantDisabled) and to show what its element stores.
+func tryEveryField(t *testing.T, f *panelFixture, view string, wantDisabled bool, stored func() map[string]string) {
+	t.Helper()
+	before := stored()
+	for _, it := range f.p.form.Items {
+		switch w := it.Widget.(type) {
+		case *widget.Entry:
+			f.w.Canvas().Focus(w)
+			// "9" is a number, "z" makes it not one: both must be refused.
+			for _, r := range "9z" {
+				if fo := f.w.Canvas().Focused(); fo != nil {
+					fo.TypedRune(r)
+				}
+			}
+		case *widget.Check:
+			w.SetChecked(!w.Checked)
+		case *widget.Select:
+			for _, o := range w.Options {
+				if o != w.Selected {
+					w.SetSelected(o)
+					break
+				}
+			}
+		}
+		after := stored()
+		for k, v := range before {
+			if after[k] != v {
+				t.Errorf("%s: %s changed from %q to %q on a read-only canvas", view, k, v, after[k])
+			}
+		}
+		if d, ok := it.Widget.(core.Disableable); ok && wantDisabled && !d.Disabled() {
+			t.Errorf("%s: %s field is enabled on a read-only canvas", view, it.Text)
+		}
+		var shown string
+		switch w := it.Widget.(type) {
+		case *widget.Entry:
+			shown = w.Text
+		case *widget.Check:
+			shown = fmt.Sprint(w.Checked)
+		case *widget.Select:
+			shown = w.Selected
+			if it.Text == "Target" {
+				shown = anchorIDFromOption(w.Selected) // "label (id)"
+			}
+		}
+		if want, ok := after[it.Text]; ok && shown != want {
+			t.Errorf("%s: %s field shows %q, its element has %q", view, it.Text, shown, want)
+		}
+	}
+}
+
+// What each field's element stores, keyed by the field's label.
+func nodeStored(f *panelFixture) func() map[string]string {
+	return func() map[string]string {
+		props := f.p.loadProps()
+		str := func(k string) string {
+			if v, ok := props[k]; ok && v != nil {
+				return fmt.Sprint(v)
+			}
+			return ""
+		}
+		live := "false"
+		if b, _ := props["live"].(bool); b {
+			live = "true"
+		}
+		return map[string]string{
+			"Name": f.c.Graph.Nodes["orders"].Label, "Batch size": str("batch"),
+			"Ratio": str("ratio"), "Connection": str("conn"), "Live": live, "Mode": str("mode"),
+		}
+	}
+}
+
+func groupStored(f *panelFixture) func() map[string]string {
+	return func() map[string]string {
+		g := f.c.Graph.Groups["g1"]
+		return map[string]string{"Label": g.Label, "Color": g.Color}
+	}
+}
+
+func linkStored(f *panelFixture) func() map[string]string {
+	return func() map[string]string { return map[string]string{"Label": f.c.Graph.LinkEdges["l1"].Label} }
+}
+
+func annotationStored(f *panelFixture) func() map[string]string {
+	return func() map[string]string {
+		a := f.c.Graph.Annotations["an1"]
+		return map[string]string{"Text": a.Text, "Anchor": []string{"None", "Node", "Edge", "Group", "Link"}[a.AnchorKind], "Target": a.AnchorID}
+	}
+}
+
+// showAll shows each view of the panel in turn and runs check on it.
+func showAll(f *panelFixture, check func(view string, stored func() map[string]string)) {
+	f.p.SetNode(f.other)
+	check("node", nodeStored(f))
+	f.p.SetGroup(f.c.Graph.Groups["g1"])
+	check("group", groupStored(f))
+	f.p.SetLinkEdge(f.c.Graph.LinkEdges["l1"])
+	check("link", linkStored(f))
+}
+
+// On a canvas that forbids edits, the panel's fields are disabled and keep
+// their element's values (#643).
+func TestPropertiesPanelReadOnlyFieldsAreDisabled(t *testing.T) {
+	f := readOnlyFixture(t)
+	f.c.Capabilities.EditProperties = false
+	showAll(f, func(view string, stored func() map[string]string) {
+		tryEveryField(t, f, view, true, stored)
+	})
+
+	f.c.Capabilities = AllCapabilities()
+	f.c.Capabilities.Annotations = false
+	f.p.SetAnnotation(f.c.Graph.Annotations["an1"])
+	tryEveryField(t, f, "annotation", true, annotationStored(f))
+}
+
+// When the canvas turns read-only while fields are on show, an edit it
+// refuses snaps the field back to the stored value (#643). The gallery's
+// Editable switch does this without rebuilding the panel.
+func TestPropertiesPanelSnapsBackWhenTheCanvasTurnsReadOnly(t *testing.T) {
+	f := readOnlyFixture(t)
+	showAll(f, func(view string, stored func() map[string]string) {
+		f.c.Capabilities.EditProperties = false
+		tryEveryField(t, f, view, false, stored)
+		f.c.Capabilities = AllCapabilities()
+	})
+
+	f.p.SetAnnotation(f.c.Graph.Annotations["an1"])
+	f.c.Capabilities.Annotations = false
+	tryEveryField(t, f, "annotation", false, annotationStored(f))
 }
