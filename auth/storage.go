@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -16,7 +17,10 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/trendvidia/protowire-go/encoding/pxf"
+
 	"github.com/belluikit/bellui"
+	"github.com/belluikit/bellui/internal/authstore/tokenpb"
 )
 
 // ErrNoAppID is returned by SaveToken, LoadToken and ClearToken, and by
@@ -26,8 +30,9 @@ import (
 // manifest.pxf), as Preferences already require.
 var ErrNoAppID = errors.New("auth: storing a sign-in token needs an app ID; create the app with app.NewWithID")
 
-// storedToken is the serialized form of a refresh token.
-type storedToken struct {
+// legacyToken is a token record as versions before #523 saved it, in JSON.
+// Records are PXF now (tokenpb.StoredToken).
+type legacyToken struct {
 	Provider     string `json:"provider"`
 	RefreshToken string `json:"refresh_token"`
 	Email        string `json:"email"`
@@ -62,12 +67,16 @@ func SaveTokenFor(provider, issuer, refreshToken, email string) error {
 		return err
 	}
 
-	st := storedToken{
+	return writeToken(path, appID, provider, issuer, &tokenpb.StoredToken{
 		Provider:     provider,
 		RefreshToken: refreshToken,
 		Email:        email,
-	}
-	plaintext, err := json.Marshal(st)
+	})
+}
+
+// writeToken encrypts a token record, encoded as PXF, to path.
+func writeToken(path, appID, provider, issuer string, st *tokenpb.StoredToken) error {
+	plaintext, err := pxf.Marshal(st)
 	if err != nil {
 		return err
 	}
@@ -121,13 +130,37 @@ func LoadTokenFor(provider, issuer string) (refreshToken, email string, err erro
 		return "", "", nil
 	}
 
-	var st storedToken
-	if err := json.Unmarshal(plaintext, &st); err != nil {
+	st, legacy, err := unmarshalToken(plaintext)
+	if err != nil {
 		os.Remove(path)
 		return "", "", nil
 	}
+	if legacy {
+		// Rewrite a token saved as JSON by an older version as PXF, so the
+		// JSON reader can go once those have been read (#523). Best effort:
+		// the token read is good either way.
+		_ = writeToken(path, appID, provider, issuer, st)
+	}
 
-	return st.RefreshToken, st.Email, nil
+	return st.GetRefreshToken(), st.GetEmail(), nil
+}
+
+// unmarshalToken decodes a token record: PXF, or JSON as versions before #523
+// saved it, which it reports as legacy. A JSON record is an object, so it starts
+// with '{'; a PXF one starts with a field name.
+func unmarshalToken(plaintext []byte) (st *tokenpb.StoredToken, legacy bool, err error) {
+	if trimmed := bytes.TrimLeft(plaintext, " \t\r\n"); len(trimmed) > 0 && trimmed[0] == '{' {
+		var old legacyToken
+		if err := json.Unmarshal(plaintext, &old); err != nil {
+			return nil, true, err
+		}
+		return &tokenpb.StoredToken{Provider: old.Provider, RefreshToken: old.RefreshToken, Email: old.Email}, true, nil
+	}
+	st = &tokenpb.StoredToken{}
+	if err := pxf.Unmarshal(plaintext, st); err != nil {
+		return nil, false, err
+	}
+	return st, false, nil
 }
 
 // ClearToken removes the running app's stored token for a provider. It does

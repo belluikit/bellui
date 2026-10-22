@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package bellui.auth.v1;
+
+option go_package = "github.com/belluikit/bellui/internal/authstore/tokenpb;tokenpb";
+
+// StoredToken is the wire schema for a saved sign-in token, encoded in the
+// textual PXF format and then encrypted (replacing the legacy JSON record). It
+// mirrors auth's storedToken field for field (#523). See auth/storage.go.
+message StoredToken {
+  string provider = 1;
+  string refresh_token = 2;
+  string email = 3;
+}
