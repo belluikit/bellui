@@ -1,6 +1,9 @@
 package app
 
 import (
+	"bytes"
+	"encoding/binary"
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -37,4 +40,35 @@ func TestSetSingleInstance_PrimaryAndIdempotent(t *testing.T) {
 	primaryAgain, err := si.SetSingleInstance(func([]string) {})
 	require.NoError(t, err)
 	assert.Equal(t, primary, primaryAgain)
+}
+
+// Forwarded arguments are PXF, and a running copy still reads the JSON array a
+// version before #523 sends (#523).
+func TestForwardedArgs_Format(t *testing.T) {
+	args := []string{"--open", "file with spaces.txt", `quote"and\backslash`, "ünïcode", ""}
+
+	var buf bytes.Buffer
+	require.NoError(t, writeArgs(&buf, args))
+	payload := buf.Bytes()[4:]
+	assert.NotEqual(t, byte('['), payload[0], "written as PXF, not a JSON array")
+	got, err := readArgs(&buf)
+	require.NoError(t, err)
+	assert.Equal(t, args, got)
+
+	legacy, err := json.Marshal(args)
+	require.NoError(t, err)
+	buf.Reset()
+	var hdr [4]byte
+	binary.BigEndian.PutUint32(hdr[:], uint32(len(legacy)))
+	buf.Write(hdr[:])
+	buf.Write(legacy)
+	got, err = readArgs(&buf)
+	require.NoError(t, err)
+	assert.Equal(t, args, got)
+
+	buf.Reset()
+	require.NoError(t, writeArgs(&buf, nil))
+	got, err = readArgs(&buf)
+	require.NoError(t, err)
+	assert.Empty(t, got, "a launch with no arguments")
 }

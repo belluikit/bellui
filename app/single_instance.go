@@ -1,12 +1,16 @@
 package app
 
 import (
+	"bytes"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"io"
 
+	"github.com/trendvidia/protowire-go/encoding/pxf"
+
 	"github.com/belluikit/bellui"
+	"github.com/belluikit/bellui/internal/app/instancepb"
 )
 
 // siMaxPayload caps a single forwarded-argument message (defensive against a
@@ -73,10 +77,11 @@ func (a *belluiApp) onForwardedArgs(args []string) {
 	}
 }
 
-// writeArgs sends a length-prefixed JSON array of arguments to a forwarding peer.
-// The wire format (4-byte big-endian length + JSON) is shared by every transport.
+// writeArgs sends a length-prefixed message of arguments to a forwarding peer.
+// The wire format (4-byte big-endian length + PXF instancepb.ForwardedArgs) is
+// shared by every transport.
 func writeArgs(w io.Writer, args []string) error {
-	payload, err := json.Marshal(args)
+	payload, err := pxf.Marshal(&instancepb.ForwardedArgs{Args: args})
 	if err != nil {
 		return err
 	}
@@ -92,7 +97,9 @@ func writeArgs(w io.Writer, args []string) error {
 	return err
 }
 
-// readArgs decodes a message written by writeArgs.
+// readArgs decodes a message written by writeArgs, or by a version before #523,
+// which sent a JSON array: the running copy and the launch forwarding to it can
+// be different versions of the app during an upgrade.
 func readArgs(r io.Reader) ([]string, error) {
 	var hdr [4]byte
 	if _, err := io.ReadFull(r, hdr[:]); err != nil {
@@ -106,9 +113,16 @@ func readArgs(r io.Reader) ([]string, error) {
 	if _, err := io.ReadFull(r, payload); err != nil {
 		return nil, err
 	}
-	var args []string
-	if err := json.Unmarshal(payload, &args); err != nil {
+	if trimmed := bytes.TrimLeft(payload, " \t\r\n"); len(trimmed) > 0 && trimmed[0] == '[' {
+		var args []string
+		if err := json.Unmarshal(payload, &args); err != nil {
+			return nil, err
+		}
+		return args, nil
+	}
+	var msg instancepb.ForwardedArgs
+	if err := pxf.Unmarshal(payload, &msg); err != nil {
 		return nil, err
 	}
-	return args, nil
+	return msg.GetArgs(), nil
 }
