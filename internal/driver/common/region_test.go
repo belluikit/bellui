@@ -19,6 +19,8 @@ import (
 	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/cache"
+	"github.com/belluikit/bellui/internal/driver"
 	"github.com/belluikit/bellui/test"
 	"github.com/belluikit/bellui/widget"
 )
@@ -36,7 +38,7 @@ func (f *twinSizeable) Size() geo.Size { return f.size }
 
 func (f *twinSizeable) MarkPlacementDirty(o core.CanvasObject) { f.c.MarkPlacementDirty(o) }
 
-func (f *twinSizeable) MarkMinSizeDirty(core.CanvasObject) {}
+func (f *twinSizeable) MarkMinSizeDirty(o core.CanvasObject) { f.c.MarkMinSizeDirty(o) }
 
 func (f *twinSizeable) SetDirty() {}
 
@@ -60,6 +62,12 @@ func newTwinCanvases(content core.CanvasObject, size geo.Size) (c, ref *Canvas) 
 		cv.Initialize(impl, func() {})
 		cv.SetContentTreeAndFocusMgr(content)
 	}
+	// What a min-size pass registers, which a widget's refresh looks up
+	// (BaseWidget.Refresh, #619).
+	driver.WalkCompleteObjectTree(content, func(obj core.CanvasObject, _, _ geo.Position, _ geo.Size) bool {
+		cache.SetCanvasForObject(obj, impl, nil)
+		return false
+	}, nil)
 	a := bellui.CurrentApp()
 	bellui.SetCurrentApp(&regionApp{App: a, d: &regionDriver{Driver: a.Driver(), c: impl}})
 	return c, ref
@@ -198,6 +206,44 @@ func TestPartialDirtyRegion_FromReported(t *testing.T) {
 			l.Resize(geo.NewSize(80, 30))
 			l.Hide()
 			return container.NewWithoutLayout(l), l.Show
+		}, 2},
+		{"shown by field", func() (core.CanvasObject, func()) {
+			// Not through Show, which counts in paintgen: the field set and
+			// the object refreshed, which reaches a canvas with no node for
+			// it (#619).
+			r := rect(10, 10, 20, 20)
+			return container.NewWithoutLayout(r, rect(100, 100, 5, 5)), func() {
+				r.Hidden = !r.Hidden
+				r.Refresh()
+			}
+		}, 2},
+		{"widget shown by field", func() (core.CanvasObject, func()) {
+			l := widget.NewLabel("shown")
+			l.Resize(geo.NewSize(80, 30))
+			return container.NewWithoutLayout(l, rect(100, 100, 5, 5)), func() {
+				l.Hidden = !l.Hidden
+				l.Refresh()
+			}
+		}, 2},
+		{"shown by field in a hidden container", func() (core.CanvasObject, func()) {
+			// Shown under a container still hidden: nothing to draw, until
+			// the container is shown by its field too.
+			r := rect(10, 10, 20, 20)
+			r.Hidden = true
+			inner := container.NewWithoutLayout(r)
+			inner.Resize(geo.NewSize(50, 50))
+			inner.Hidden = true
+			step := 0
+			return container.NewWithoutLayout(inner, rect(100, 100, 5, 5)), func() {
+				if step == 0 {
+					r.Hidden = false
+					r.Refresh()
+				} else {
+					inner.Hidden = false
+					inner.Refresh()
+				}
+				step++
+			}
 		}, 2},
 		{"remove all", func() (core.CanvasObject, func()) {
 			inner := container.NewWithoutLayout(rect(0, 0, 10, 10), rect(20, 0, 10, 10))
@@ -367,7 +413,7 @@ func TestPartialDirtyRegion_FromReportedRandom(t *testing.T) {
 				var did []string
 				for range 1 + rnd.Intn(3) {
 					o := objects[rnd.Intn(len(objects))]
-					switch op := rnd.Intn(9); op {
+					switch op := rnd.Intn(10); op {
 					case 0, 1:
 						o.Move(pos())
 						did = append(did, fmt.Sprintf("move %T", o))
@@ -396,6 +442,26 @@ func TestPartialDirtyRegion_FromReportedRandom(t *testing.T) {
 						if r, ok := o.(*canvas.Rectangle); ok {
 							r.SetTransform(geo.NewScale(1+rnd.Float32(), 1+rnd.Float32()))
 							did = append(did, "transform")
+						}
+					case 8:
+						// Hidden or shown by the field, and refreshed: no
+						// report but the refresh (#619).
+						var flip *bool
+						switch o := o.(type) {
+						case *canvas.Rectangle:
+							flip = &o.Hidden
+						case *canvas.Text:
+							flip = &o.Hidden
+						case *widget.Label:
+							flip = &o.Hidden
+						case *bellui.Container:
+							flip = &o.Hidden
+						}
+						if flip != nil {
+							cache.SetCanvasForObject(o, c.impl, nil) // as a min-size pass would have
+							*flip = !*flip
+							o.Refresh()
+							did = append(did, fmt.Sprintf("hidden field %v %T", *flip, o))
 						}
 					default:
 						if txt, ok := o.(*canvas.Text); ok {
@@ -438,6 +504,45 @@ func TestPartialDirtyRegion_NodeAddedByAnotherWalk(t *testing.T) {
 		cv.WalkTrees(nil, nil) // the min-size pass
 	}
 	frame(t, c, ref, "added")
+}
+
+// TestPartialDirtyRegion_ShownByFieldAfterFullWalks pins that the full walk
+// keeps what it records of an object still hidden, so showing it by its field
+// later is still noticed, and drops it once the object left the tree (#619).
+func TestPartialDirtyRegion_ShownByFieldAfterFullWalks(t *testing.T) {
+	test.NewTempApp(t)
+
+	r := canvas.NewRectangle(color.White)
+	r.Move(geo.NewPos(10, 10))
+	r.Resize(geo.NewSize(20, 20))
+	r.Hidden = true
+	gone := canvas.NewRectangle(color.White)
+	gone.Hidden = true
+	inner := container.NewWithoutLayout(r, gone)
+	inner.Resize(geo.NewSize(200, 200))
+	content := container.NewWithoutLayout(inner)
+	content.Resize(geo.NewSize(400, 400))
+	c, ref := newTwinCanvases(content, geo.NewSize(400, 400))
+	frame(t, c, ref, "first frame")
+	_, ok := c.hiddenUnder.Load(gone)
+	require.True(t, ok, "a hidden object is recorded")
+
+	r.Refresh()
+	frame(t, c, ref, "refreshed while hidden")
+	assert.Zero(t, c.RegionVisits(), "a refresh of a hidden object visits nothing")
+
+	inner.Objects = inner.Objects[:1] // gone leaves without a report
+	for range 2 {
+		for _, cv := range []*Canvas{c, ref} {
+			cv.WalkTrees(nil, nil) // the min-size pass
+		}
+	}
+	_, ok = c.hiddenUnder.Load(gone)
+	assert.False(t, ok, "an object that left the tree is dropped")
+
+	r.Hidden = false
+	r.Refresh()
+	frame(t, c, ref, "shown by field after full walks")
 }
 
 // TestPartialDirtyRegion_WalksOnlyWhatChanged pins the point of #599: a frame
