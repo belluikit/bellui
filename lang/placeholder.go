@@ -17,10 +17,10 @@ import (
 // A placeholder is a name in braces, "{Name}", as in ICU MessageFormat. The
 // plain-field form of Go templates, "{{.Name}}", is filled the same way, so
 // source strings written for the text/template parser keep working. A name is
-// filled from a map with string keys or from a struct's exported field, and
-// formatted as fmt.Sprint does. A name the data does not have, a brace that
-// does not hold a name ("{}", "{ x }") and any other template action
-// ("{{if .X}}") are left as written.
+// filled from a map's key or from a struct's exported field (methods are not
+// called), and formatted as text/template printed it. A name the data does
+// not have, a brace that does not hold a name ("{}", "{ x }") and any other
+// template action ("{{if .X}}") are left as written.
 var placeholders template.Parser = placeholderParser{}
 
 type placeholderParser struct{}
@@ -137,7 +137,7 @@ func (m *parsedMessage) Execute(data any) (string, error) {
 			continue
 		}
 		if v, ok := lookupName(data, p.name); ok {
-			b.WriteString(fmt.Sprint(v))
+			b.WriteString(formatValue(v))
 		} else {
 			b.WriteString(p.text)
 		}
@@ -145,8 +145,9 @@ func (m *parsedMessage) Execute(data any) (string, error) {
 	return b.String(), nil
 }
 
-// lookupName finds name in data: a key of a map with string keys, or an
-// exported field of a struct, through any pointers.
+// lookupName finds name in data: a key of a map whose keys are strings (or
+// interfaces a string fits), or an exported field of a struct, through any
+// pointers.
 func lookupName(data any, name string) (any, bool) {
 	switch d := data.(type) {
 	case nil:
@@ -171,10 +172,15 @@ func lookupName(data any, name string) (any, bool) {
 	}
 	switch v.Kind() {
 	case reflect.Map:
-		if v.Type().Key().Kind() != reflect.String {
+		key := reflect.ValueOf(name)
+		switch kt := v.Type().Key(); {
+		case key.Type().AssignableTo(kt):
+		case kt.Kind() == reflect.String:
+			key = key.Convert(kt)
+		default:
 			return nil, false
 		}
-		e := v.MapIndex(reflect.ValueOf(name).Convert(v.Type().Key()))
+		e := v.MapIndex(key)
 		if !e.IsValid() {
 			return nil, false
 		}
@@ -184,7 +190,39 @@ func lookupName(data any, name string) (any, bool) {
 		if !ok || !f.IsExported() {
 			return nil, false
 		}
-		return v.FieldByIndex(f.Index).Interface(), true
+		// A field promoted through a nil embedded pointer has no value.
+		fv, err := v.FieldByIndexErr(f.Index)
+		if err != nil {
+			return nil, false
+		}
+		return fv.Interface(), true
 	}
 	return nil, false
+}
+
+var (
+	errorType    = reflect.TypeFor[error]()
+	stringerType = reflect.TypeFor[fmt.Stringer]()
+)
+
+// formatValue prints a value as text/template printed it: as fmt.Sprint
+// does, but through any pointers, using a String or Error method the pointer
+// has when the value itself has none.
+func formatValue(x any) string {
+	v := reflect.ValueOf(x)
+	if v.Kind() != reflect.Pointer {
+		return fmt.Sprint(x)
+	}
+	for v.Kind() == reflect.Pointer || v.Kind() == reflect.Interface {
+		if v.IsNil() {
+			return fmt.Sprint(v.Interface())
+		}
+		v = v.Elem()
+	}
+	if v.CanAddr() && !v.Type().Implements(errorType) && !v.Type().Implements(stringerType) {
+		if p := reflect.PointerTo(v.Type()); p.Implements(errorType) || p.Implements(stringerType) {
+			v = v.Addr()
+		}
+	}
+	return fmt.Sprint(v.Interface())
 }

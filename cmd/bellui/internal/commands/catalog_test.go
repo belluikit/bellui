@@ -55,6 +55,42 @@ func TestCatalog_FormatAndRead(t *testing.T) {
 	}, back)
 }
 
+// IDs PXF reads as values (true, false, null) or not as one identifier are
+// quoted; a block mixing message fields with IDs is a namespace, its IDs
+// quoted as needed. Each catalog reads back as written.
+func TestCatalog_FormatKeys(t *testing.T) {
+	for _, m := range []map[string]any{
+		{"true": "true", "false": "false", "null": "null", "": "empty", "a b": "c"},
+		{"dialog": map[string]any{"Create Folder": "x", "Other": "y"}},
+		{"dialog": map[string]any{"Other": "y", "One": "z"}},
+		{"msg": map[string]any{"translation": "t"}},
+		{"ns": map[string]any{"other": map[string]any{"one": "a"}}},
+	} {
+		out := formatCatalog(m)
+		back, err := readCatalog(out)
+		require.NoError(t, err, "%s", out)
+		assert.Equal(t, m, back, "%s", out)
+	}
+	assert.Contains(t, string(formatCatalog(map[string]any{"null": "x"})), `"null": "x"`)
+	assert.Contains(t, string(formatCatalog(map[string]any{"m": map[string]any{"Other": "y"}})), `Other = "y"`)
+}
+
+// The writer reproduces the toolkit's bundled catalogs byte for byte, which
+// the toolkit's lang package reads: the two copies of the format agree on
+// real files.
+func TestCatalog_BundledRoundTrip(t *testing.T) {
+	files, err := filepath.Glob("../../../../lang/translations/*.pxf")
+	require.NoError(t, err)
+	require.NotEmpty(t, files, "the toolkit's bundled catalogs")
+	for _, f := range files {
+		data, err := os.ReadFile(f)
+		require.NoError(t, err)
+		m, err := readCatalog(data)
+		require.NoError(t, err, f)
+		assert.Equal(t, string(data), string(formatCatalog(m)), f)
+	}
+}
+
 // A message block may be written without "=", as "name { … }"; the toolkit
 // reads that form too.
 func TestCatalog_ReadBlockForm(t *testing.T) {
@@ -81,7 +117,6 @@ func TestNamedPlaceholders(t *testing.T) {
 	assert.Equal(t, "{Name} and {Count}", namedPlaceholders("{{ .Name }} and {{.Count}}"))
 	assert.Equal(t, "{{if .X}}x{{end}}", namedPlaceholders("{{if .X}}x{{end}}"))
 	assert.Equal(t, "{Name}", namedPlaceholders("{Name}"))
-	assert.Equal(t, map[string]bool{"Count": true, "Name": true}, placeholderSet("{{.Count}} by {Name}"))
 }
 
 // Extracting into an existing PXF catalog adds the new messages, keeps the

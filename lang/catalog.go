@@ -76,8 +76,9 @@ func unmarshalCatalog(data []byte, v any) error {
 	return nil
 }
 
-// catalogMap converts a block's entries, "key: value" or "key = value", to a
-// map of strings and nested maps.
+// catalogMap converts a block's entries, "key: value", "key = value" or
+// "key { … }", to a map of strings and nested maps. A key set twice, in any
+// of these forms, is an error.
 func catalogMap(entries []pxf.Entry, at string) (map[string]any, error) {
 	m := make(map[string]any, len(entries))
 	for _, e := range entries {
@@ -89,12 +90,7 @@ func catalogMap(entries []pxf.Entry, at string) (map[string]any, error) {
 		case *pxf.Assignment:
 			key, val = e.Key, e.Value
 		case *pxf.Block:
-			nested, err := catalogMap(e.Entries, at+"."+e.Name)
-			if err != nil {
-				return nil, err
-			}
-			m[e.Name] = nested
-			continue
+			key, val = e.Name, &pxf.BlockVal{Entries: e.Entries}
 		default:
 			return nil, fmt.Errorf("lang: catalog: %s: unexpected %s", at, entryName(e))
 		}

@@ -1,10 +1,12 @@
 package commands
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/trendvidia/protowire-go/encoding/pxf"
@@ -26,12 +28,14 @@ import (
 // This reads and writes the format the toolkit's lang package reads. The CLI
 // builds against a released toolkit, so it keeps its own copy.
 
-// messageFields are the keys of a go-i18n message block. A block with any of
-// them is a message, written with "key = value"; any other block is a
-// namespace of IDs, written with "key: value".
+// messageFields are go-i18n's reserved message keys. go-i18n reads a block as
+// a message when its keys are these, matched without case; it is written with
+// "key = value". Any other block is a namespace of IDs, written with
+// "key: value".
 var messageFields = map[string]bool{
 	"id": true, "description": true, "hash": true, "leftdelim": true, "rightdelim": true,
 	"zero": true, "one": true, "two": true, "few": true, "many": true, "other": true,
+	"translation": true,
 }
 
 // readCatalog decodes a PXF catalog into a map of strings and nested maps.
@@ -99,53 +103,79 @@ func catalogMap(entries []pxf.Entry, at string) (map[string]any, error) {
 // formatCatalog encodes a catalog as PXF, with IDs in sorted order. Values are
 // strings, map[string]string (a message block) or map[string]any.
 func formatCatalog(m map[string]any) []byte {
-	doc := &pxf.Document{Entries: []pxf.Entry{
-		&pxf.Assignment{Key: "messages", Value: &pxf.BlockVal{Entries: catalogEntries(m, false)}},
-	}}
-	return pxf.FormatDocument(doc)
+	var b bytes.Buffer
+	b.WriteString("messages = ")
+	writeCatalogBlock(&b, m, false, 0)
+	b.WriteByte('\n')
+	return b.Bytes()
 }
 
-// catalogEntries lists m's entries sorted by key: as message fields
-// ("one = …") inside a message block, as map entries ("\"ID\": …") otherwise.
-func catalogEntries(m map[string]any, message bool) []pxf.Entry {
+// writeCatalogBlock writes m as a { … } block, its entries sorted by key: as
+// message fields ("one = …") in a message, as map entries ("\"ID\": …")
+// otherwise.
+func writeCatalogBlock(b *bytes.Buffer, m map[string]any, message bool, level int) {
 	keys := make([]string, 0, len(m))
 	for k := range m {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
-	entries := make([]pxf.Entry, 0, len(keys))
+	b.WriteString("{\n")
 	for _, k := range keys {
-		var val pxf.Value
+		b.WriteString(strings.Repeat("  ", level+1))
+		if message {
+			b.WriteString(k + " = ")
+		} else {
+			b.WriteString(catalogKey(k) + ": ")
+		}
 		switch v := m[k].(type) {
 		case string:
-			val = &pxf.StringVal{Value: v}
+			b.Write(pxf.FormatValue(&pxf.StringVal{Value: v}))
 		case map[string]string:
 			nested := make(map[string]any, len(v))
 			for nk, nv := range v {
 				nested[nk] = nv
 			}
-			val = &pxf.BlockVal{Entries: catalogEntries(nested, isMessage(nested))}
+			writeCatalogBlock(b, nested, isMessage(nested), level+1)
 		case map[string]any:
-			val = &pxf.BlockVal{Entries: catalogEntries(v, isMessage(v))}
+			writeCatalogBlock(b, v, isMessage(v), level+1)
 		default:
-			val = &pxf.StringVal{Value: fmt.Sprint(v)}
+			b.Write(pxf.FormatValue(&pxf.StringVal{Value: fmt.Sprint(v)}))
 		}
-		if message {
-			entries = append(entries, &pxf.Assignment{Key: k, Value: val})
-		} else {
-			entries = append(entries, &pxf.MapEntry{Key: k, Value: val})
-		}
+		b.WriteByte('\n')
 	}
-	return entries
+	b.WriteString(strings.Repeat("  ", level) + "}")
 }
 
-func isMessage(m map[string]any) bool {
-	for k := range m {
-		if messageFields[strings.ToLower(k)] {
-			return true
+// catalogKey writes a message ID as a map key: bare when PXF reads it back as
+// that identifier, quoted otherwise. true, false and null are values in PXF,
+// not identifiers.
+func catalogKey(k string) string {
+	switch k {
+	case "", "true", "false", "null":
+		return strconv.Quote(k)
+	}
+	for i, r := range k {
+		letter := r == '_' || (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')
+		if !letter && (i == 0 || r < '0' || r > '9') {
+			return strconv.Quote(k)
 		}
 	}
-	return false
+	return k
+}
+
+// isMessage reports whether go-i18n reads m as a message: every key is a
+// message field, holding a string ("translation" may hold anything). A block
+// mixing fields and IDs is not a message to go-i18n either.
+func isMessage(m map[string]any) bool {
+	for k, v := range m {
+		if !messageFields[strings.ToLower(k)] {
+			return false
+		}
+		if _, ok := v.(string); !ok && k != "translation" {
+			return false
+		}
+	}
+	return len(m) > 0
 }
 
 // goTemplateField matches a Go template plain-field action, "{{.Name}}".
@@ -157,16 +187,4 @@ var goTemplateField = regexp.MustCompile(`\{\{\s*\.([A-Za-z_][A-Za-z0-9_]*)\s*\}
 // source strings.
 func namedPlaceholders(s string) string {
 	return goTemplateField.ReplaceAllString(s, "{$1}")
-}
-
-// placeholderName matches a named placeholder, "{Name}".
-var placeholderName = regexp.MustCompile(`\{([A-Za-z_][A-Za-z0-9_]*)\}`)
-
-// placeholderSet returns the names of the placeholders in s, in either form.
-func placeholderSet(s string) map[string]bool {
-	set := map[string]bool{}
-	for _, m := range placeholderName.FindAllStringSubmatch(namedPlaceholders(s), -1) {
-		set[m[1]] = true
-	}
-	return set
 }

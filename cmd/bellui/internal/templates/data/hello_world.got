@@ -9,7 +9,7 @@ import (
 	"github.com/belluikit/bellui/widget"
 )
 
-//go:embed translations/*.json
+//go:embed translations/*.pxf
 var translationsFS embed.FS
 
 func main() {

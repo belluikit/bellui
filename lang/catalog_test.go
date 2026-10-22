@@ -68,6 +68,8 @@ func TestCatalog_ReadErrors(t *testing.T) {
 		`messages = { OK: 1 }`,
 		`messages = { OK: "a" OK: "b" }`,
 		"messages = { OK: \"a\" }\nmessages = { No: \"b\" }",
+		"messages = { a: \"x\"\n a { other = \"y\" } }",
+		"messages = { a { other = \"x\" }\n a { other = \"y\" } }",
 	} {
 		_, err := readCatalog(t, src)
 		assert.Error(t, err, src)

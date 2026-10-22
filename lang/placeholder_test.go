@@ -14,6 +14,23 @@ func fill(src string, data any) string {
 	return s
 }
 
+type inner struct{ Name string }
+
+type outer struct{ *inner }
+
+type ptrStringer struct{ s string }
+
+func (p *ptrStringer) String() string { return "stringer " + p.s }
+
+type stats struct{}
+
+func (stats) Count() int { return 3 }
+
+var (
+	five  = 5
+	pfive = &five
+)
+
 func TestPlaceholders(t *testing.T) {
 	type person struct {
 		Name    string
@@ -48,6 +65,16 @@ func TestPlaceholders(t *testing.T) {
 		{"unclosed", "Hello {Name", m, "Hello {Name"},
 		{"unicode around", "Grüße, {Name}! 👋", m, "Grüße, Ada! 👋"},
 		{"other data", "{Name}", 42, "{Name}"},
+		{"field through a nil embedded pointer", "Hi {Name}", outer{}, "Hi {Name}"},
+		{"field through an embedded pointer", "Hi {Name}", outer{&inner{Name: "Ada"}}, "Hi Ada"},
+		{"pointer value", "{N} items", map[string]any{"N": &five}, "5 items"},
+		{"pointer to pointer", "{N} items", map[string]any{"N": &pfive}, "5 items"},
+		{"nil pointer value", "{N}", map[string]any{"N": (*int)(nil)}, "<nil>"},
+		{"String method on the pointer", "{S}", map[string]any{"S": &ptrStringer{"x"}}, "stringer x"},
+		{"pointer field", "{P}", struct{ P *int }{&five}, "5"},
+		{"map[any]any", "{Name}", map[any]any{"Name": "Ada"}, "Ada"},
+		{"map with int keys", "{Name}", map[int]string{1: "Ada"}, "{Name}"},
+		{"method is not called", "{Count} items", stats{}, "{Count} items"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equal(t, tt.want, fill(tt.src, tt.data))

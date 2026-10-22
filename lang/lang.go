@@ -6,10 +6,10 @@
 //
 //	lang.L("Hello {Name}", map[string]any{"Name": name})
 //
-// Values come from a map with string keys or a struct's exported fields. The
-// Go template form "{{.Name}}" is filled the same way, so source strings
-// written for earlier versions keep working, but translations should use
-// "{Name}". A name the data does not have is left as written.
+// Values come from a map or a struct's exported fields; methods are not
+// called. The Go template form "{{.Name}}" is filled the same way, so source
+// strings written for earlier versions keep working, but translations should
+// use "{Name}". A name the data does not have is left as written.
 //
 // # Translation catalogs
 //
