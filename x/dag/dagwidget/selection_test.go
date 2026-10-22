@@ -283,3 +283,39 @@ func TestTraversalPansOffscreenElementIntoView(t *testing.T) {
 		t.Fatalf("panned center %v, want viewport center %v", center, want)
 	}
 }
+
+// DeleteSelected reports a cleared selection only when it removed the
+// selection: on a canvas that may not delete it, the element stays selected
+// and the app must not be told otherwise (#638).
+func TestDeleteSelectedClearsOnlyWhatItRemoved(t *testing.T) {
+	c := fullCanvas(t)
+	cleared := 0
+	c.OnSelectionCleared = func() { cleared++ }
+
+	c.SelectNode("a")
+	c.Capabilities = Capabilities{}
+	c.TypedKey(&event.KeyEvent{Name: event.KeyDelete})
+	if c.Graph.Nodes["a"] == nil {
+		t.Fatal("read-only canvas deleted the node")
+	}
+	if cleared != 0 {
+		t.Fatalf("OnSelectionCleared fired %d times for a delete that removed nothing", cleared)
+	}
+	if ref, ok := c.currentSelection(); !ok || ref.id != "a" {
+		t.Fatal("node lost its selection on a read-only delete")
+	}
+
+	c.Capabilities = AllCapabilities()
+	c.DeleteSelected()
+	if c.Graph.Nodes["a"] != nil {
+		t.Fatal("DeleteSelected did not remove the node")
+	}
+	if cleared != 1 {
+		t.Fatalf("OnSelectionCleared fired %d times after removing the selection, want 1", cleared)
+	}
+
+	c.DeleteSelected()
+	if cleared != 1 {
+		t.Fatalf("DeleteSelected with nothing selected fired OnSelectionCleared (%d)", cleared)
+	}
+}

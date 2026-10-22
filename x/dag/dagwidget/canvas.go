@@ -1655,7 +1655,14 @@ func (c *DAGCanvas) TypedShortcut(s core.Shortcut) {
 // them, so each removal command captures accurate undo state. Every command
 // no-ops gracefully when its target was already cascade-deleted. Each element
 // kind is skipped when the canvas capabilities forbid removing it.
+//
+// OnSelectionCleared fires only when the delete left nothing selected and
+// removed something: an element the capabilities kept stays selected, and the
+// app is not told otherwise.
 func (c *DAGCanvas) DeleteSelected() {
+	if _, selected := c.currentSelection(); !selected {
+		return
+	}
 	caps := c.Capabilities
 	for _, ew := range c.groupEdges {
 		if ew.Selected && caps.GroupEdges {
@@ -1704,6 +1711,9 @@ func (c *DAGCanvas) DeleteSelected() {
 		}
 	}
 	c.Refresh()
+	if _, still := c.currentSelection(); still {
+		return
+	}
 	if f := c.OnSelectionCleared; f != nil {
 		f()
 	}
