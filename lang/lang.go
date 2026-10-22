@@ -7,9 +7,16 @@
 //	lang.L("Hello {Name}", map[string]any{"Name": name})
 //
 // Values come from a map or a struct's exported fields; methods are not
-// called. The Go template form "{{.Name}}" is filled the same way, so source
-// strings written for earlier versions keep working, but translations should
-// use "{Name}". A name the data does not have is left as written.
+// called. Pass several values to mix them; the first that has a name fills it:
+//
+//	lang.L("{Name} sent {Count} files", user, map[string]any{"Count": stats.Count()})
+//
+// A name the data does not have is left as written; one that only a method of
+// the data has is also logged once.
+//
+// The Go template form "{{.Name}}" is deprecated. It is still filled the same
+// way, so source strings written for earlier versions keep working, and each
+// spelling is logged once; write "{Name}" instead.
 //
 // # Translation catalogs
 //
@@ -95,10 +102,7 @@ func Localize(in string, data ...any) string {
 // The string can hold {Name} placeholders, filled from data: a struct with exported fields,
 // or a map of string keys to any suitable value.
 func LocalizeKey(key, fallback string, data ...any) string {
-	var d0 any
-	if len(data) > 0 {
-		d0 = data[0]
-	}
+	d0 := templateData(data)
 
 	ret, err := localize(&i18n.LocalizeConfig{
 		DefaultMessage: &i18n.Message{
@@ -128,10 +132,7 @@ func LocalizePlural(in string, count int, data ...any) string {
 // The string can hold {Name} placeholders, filled from data: a struct with exported fields,
 // or a map of string keys to any suitable value.
 func LocalizePluralKey(key, fallback string, count int, data ...any) string {
-	var d0 any
-	if len(data) > 0 {
-		d0 = data[0]
-	}
+	d0 := templateData(data)
 
 	ret, err := localize(&i18n.LocalizeConfig{
 		DefaultMessage: &i18n.Message{

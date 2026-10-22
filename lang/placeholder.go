@@ -15,12 +15,15 @@ import (
 // strings passed to L, X and their variants alike.
 //
 // A placeholder is a name in braces, "{Name}", as in ICU MessageFormat. The
-// plain-field form of Go templates, "{{.Name}}", is filled the same way, so
-// source strings written for the text/template parser keep working. A name is
-// filled from a map's key or from a struct's exported field (methods are not
-// called), and formatted as text/template printed it. A name the data does
-// not have, a brace that does not hold a name ("{}", "{ x }") and any other
-// template action ("{{if .X}}") are left as written.
+// plain-field form of Go templates, "{{.Name}}", is deprecated: it is filled
+// the same way, so source strings written for the text/template parser keep
+// working, and each is logged once (#667). A name is filled from a map's key or
+// from a struct's exported field (methods are not called), and formatted as
+// text/template printed it. With several data values, the first that has the
+// name fills it. A name the data does not have, a brace that does not hold a
+// name ("{}", "{ x }") and any other template action ("{{if .X}}") are left as
+// written; a name that only a method of the data has is logged once, pointing
+// to a map.
 var placeholders template.Parser = placeholderParser{}
 
 type placeholderParser struct{}
@@ -68,6 +71,9 @@ func parsePlaceholders(src string) *parsedMessage {
 		}
 		if literal < i {
 			m.parts = append(m.parts, messagePart{text: src[literal:i]})
+		}
+		if src[i+1] == '{' {
+			warnDeprecatedForm(src[i:i+n], name)
 		}
 		m.parts = append(m.parts, messagePart{text: src[i : i+n], name: name})
 		i += n
@@ -125,6 +131,61 @@ func warnUnsupportedAction(action string) {
 	}
 }
 
+// warnDeprecatedForm logs, once per spelling, a placeholder written in the Go
+// template form, which is deprecated in favour of "{Name}" (#667).
+func warnDeprecatedForm(written, name string) {
+	if _, seen := warnedActions.LoadOrStore(written, true); !seen {
+		log.Printf("lang: placeholder %q is deprecated; write {%s}", written, name)
+	}
+}
+
+// warnedMethods keeps the type-and-name pairs already logged by warnMethodOnly.
+var warnedMethods sync.Map
+
+// warnMethodOnly logs, once per type and name, a placeholder left unfilled
+// although a data value has a method of that name: values come from map keys
+// and struct fields only, and text/template used to call the method (#667).
+func warnMethodOnly(data any, name string) {
+	for _, d := range dataValues(data) {
+		t := reflect.TypeOf(d)
+		if t == nil {
+			continue
+		}
+		if _, ok := t.MethodByName(name); !ok {
+			continue
+		}
+		key := t.String() + "." + name
+		if _, seen := warnedMethods.LoadOrStore(key, true); !seen {
+			log.Printf("lang: {%s} is left as written: %s has a method %s, but placeholders are filled only from map keys and struct fields; pass map[string]any{%q: v.%s()}", name, t, name, name, name)
+		}
+		return
+	}
+}
+
+// dataList holds the data values of a call that passed more than one. A name
+// is filled from the first value that has it.
+type dataList []any
+
+// templateData is the data go-i18n passes to a message for a call's data
+// arguments: nil, the one value, or a dataList of them all.
+func templateData(data []any) any {
+	switch len(data) {
+	case 0:
+		return nil
+	case 1:
+		return data[0]
+	}
+	return dataList(data)
+}
+
+// dataValues lists the values in data, which may be a dataList.
+func dataValues(data any) []any {
+	if l, ok := data.(dataList); ok {
+		return l
+	}
+	return []any{data}
+}
+
 // Execute fills the message's placeholders from data.
 func (m *parsedMessage) Execute(data any) (string, error) {
 	if len(m.parts) == 1 && m.parts[0].name == "" {
@@ -140,6 +201,7 @@ func (m *parsedMessage) Execute(data any) (string, error) {
 			b.WriteString(formatValue(v))
 		} else {
 			b.WriteString(p.text)
+			warnMethodOnly(data, p.name)
 		}
 	}
 	return b.String(), nil
@@ -147,10 +209,17 @@ func (m *parsedMessage) Execute(data any) (string, error) {
 
 // lookupName finds name in data: a key of a map whose keys are strings (or
 // interfaces a string fits), or an exported field of a struct, through any
-// pointers.
+// pointers. In a dataList, the first value that has the name wins.
 func lookupName(data any, name string) (any, bool) {
 	switch d := data.(type) {
 	case nil:
+		return nil, false
+	case dataList:
+		for _, v := range d {
+			if x, ok := lookupName(v, name); ok {
+				return x, true
+			}
+		}
 		return nil, false
 	case map[string]any:
 		v, ok := d[name]
