@@ -40,10 +40,7 @@ func TestCapture_BoxShadowEdgeProfile(t *testing.T) {
 	repaintWindow(w)
 	repaintWindow(w)
 
-	img := w.Canvas().Capture()
-	if img == nil || img.Bounds().Empty() {
-		t.Skip("no capture available")
-	}
+	img := captureOrSkip(t, w)
 	scale := float64(img.Bounds().Dx()) / float64(w.Canvas().Size().Width)
 	y := int(100 * scale)
 	// Opaque black over white leaves red at 1 - coverage.
@@ -87,10 +84,7 @@ func TestCapture_BoxShadowColor(t *testing.T) {
 	repaintWindow(w)
 	repaintWindow(w)
 
-	img := w.Canvas().Capture()
-	if img == nil || img.Bounds().Empty() {
-		t.Skip("no capture available")
-	}
+	img := captureOrSkip(t, w)
 	scale := float64(img.Bounds().Dx()) / float64(w.Canvas().Size().Width)
 	middle := color.NRGBAModel.Convert(img.At(int(120*scale), int(100*scale))).(color.NRGBA)
 	assert.InDelta(t, 255, int(middle.R), 1, "red stays red")

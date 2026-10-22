@@ -113,6 +113,10 @@ type Canvas interface {
 	AddShortcut(shortcut Shortcut, handler func(shortcut Shortcut))
 	RemoveShortcut(shortcut Shortcut)
 
+	// Capture returns an image of the canvas as it is drawn now, or nil when
+	// it cannot be drawn: on macOS the system gives a window it reports
+	// occluded (covered, minimised, or not yet on screen after Show) nothing
+	// to draw into, and a capture then shows nothing of the canvas.
 	Capture() image.Image
 
 	PixelCoordinateForPosition(geo.Position) (int, int)

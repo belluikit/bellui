@@ -10,7 +10,9 @@ import (
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/gpu"
 	"github.com/belluikit/bellui/widget"
+	"github.com/stretchr/testify/assert"
 )
 
 // ensureCanvasSizeOrSkip waits for the window's canvas to reach size, SKIPPING
@@ -73,13 +75,7 @@ func TestWindowedSurfaceCapture(t *testing.T) {
 	repaintWindow(w)
 	repaintWindow(w)
 
-	// safeWindow.Canvas() and safeCanvas.Capture() each marshal onto the main
-	// thread themselves, so call them directly — wrapping in another runOnMain
-	// would deadlock (nested main-thread dispatch).
-	img := w.Canvas().Capture()
-	if img == nil || img.Bounds().Empty() {
-		t.Skip("no capture available (headless / no GPU surface)")
-	}
+	img := captureOrSkip(t, w)
 
 	// Sample the top-left quadrant: solid rectangle, away from the centered label.
 	b := img.Bounds()
@@ -137,10 +133,7 @@ func TestWindowedSurfaceCaptureResizeStorm(t *testing.T) {
 	repaintWindow(w)
 	repaintWindow(w)
 
-	img := w.Canvas().Capture()
-	if img == nil || img.Bounds().Empty() {
-		t.Skip("no capture available (headless / no GPU surface)")
-	}
+	img := captureOrSkip(t, w)
 
 	// Sample the top-left quadrant: solid rectangle, away from the centered label.
 	b := img.Bounds()
@@ -150,7 +143,9 @@ func TestWindowedSurfaceCaptureResizeStorm(t *testing.T) {
 
 	const tol = 16
 	if absInt(gr-int(want.R)) > tol || absInt(gg-int(want.G)) > tol || absInt(gb-int(want.B)) > tol {
-		t.Fatalf("after resize storm, captured pixel (%d,%d) = R%d G%d B%d, want ~R%d G%d B%d — surface recovery regression (#385)",
+		// Only software Vulkan reaches #385's Outdated reconfigure here; on
+		// Metal and D3D12 this is a frame drawn wrong after the storm (#309).
+		t.Fatalf("after resize storm, captured pixel (%d,%d) = R%d G%d B%d, want ~R%d G%d B%d",
 			sx, sy, gr, gg, gb, want.R, want.G, want.B)
 	}
 }
@@ -194,10 +189,7 @@ func TestWindowedSurfaceCaptureOverlays(t *testing.T) {
 		pop.ShowAtPosition(geo.NewPos(40, 40))
 	})
 
-	img := w.Canvas().Capture()
-	if img == nil || img.Bounds().Empty() {
-		t.Skip("no capture available (headless / no GPU surface)")
-	}
+	img := captureOrSkip(t, w)
 
 	found := false
 	b := img.Bounds()
@@ -219,4 +211,36 @@ func TestWindowedSurfaceCaptureOverlays(t *testing.T) {
 			"capture %v for canvas %v, marker centre holds %d,%d,%d,%d",
 			b, w.Canvas().Size(), r>>8, g>>8, bl>>8, a>>8)
 	}
+}
+
+// unbegunPainter is a WebGPU painter whose frames never begin, as for a
+// window macOS reports occluded: its frame count stands still.
+type unbegunPainter struct {
+	gpu.Painter
+}
+
+func (p unbegunPainter) EnableCapture()      { p.Painter.(interface{ EnableCapture() }).EnableCapture() }
+func (p unbegunPainter) FramesBegun() uint64 { return 7 }
+
+// TestCapture_NilWhenNoFrameBegins pins #631: a capture whose frame never
+// began returns nil, where it returned the painter's last frame or a blank
+// image, which a caller could not tell from a real capture.
+func TestCapture_NilWhenNoFrameBegins(t *testing.T) {
+	w := createWindow("capture unbegun")
+	defer w.Close()
+	w.SetContent(canvas.NewRectangle(color.NRGBA{G: 180, B: 80, A: 255}))
+	runOnMain(func() { w.window.Show() })
+	w.Resize(geo.NewSize(100, 100))
+	ensureCanvasSizeOrSkip(t, w, geo.NewSize(100, 100))
+	repaintWindow(w)
+
+	real := w.canvas.Painter()
+	if _, ok := real.(interface{ EnableCapture() }); !ok {
+		t.Skip("the GL painter draws regardless of the surface")
+	}
+	captureOrSkip(t, w) // the window can be captured at all
+
+	runOnMain(func() { w.canvas.SetPainter(unbegunPainter{real}) })
+	defer runOnMain(func() { w.canvas.SetPainter(real) })
+	assert.Nil(t, w.Canvas().Capture(), "a capture whose frame never began")
 }

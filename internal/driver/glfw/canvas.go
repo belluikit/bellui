@@ -65,6 +65,16 @@ func (c *glCanvas) Capture() image.Image {
 func (c *glCanvas) capture() image.Image {
 	var img image.Image
 	w := c.context.(*window)
+	// A painter that counts its frames tells whether the one painted for the
+	// capture began: on macOS a window the system reports occluded gets no
+	// surface and begins none, and what the painter still holds is an
+	// earlier frame or nothing. Capture returns nil then (#631).
+	counter, counts := c.Painter().(interface{ FramesBegun() uint64 })
+	var before uint64
+	if counts {
+		before = counter.FramesBegun()
+	}
+	began := func() bool { return !counts || counter.FramesBegun() != before }
 
 	// Capture must contain overlays and menus (pre-rebrand tracker #473). Both painters scrape
 	// rendered frames rather than re-rendering for capture, and on a static
@@ -78,6 +88,9 @@ func (c *glCanvas) capture() image.Image {
 		ec.EnableCapture()
 		c.SetDirty()
 		w.driver.repaintWindow(w)
+		if !began() {
+			return nil
+		}
 		w.RunWithContext(func() {
 			img = c.Painter().Capture(c)
 		})

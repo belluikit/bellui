@@ -50,10 +50,7 @@ func TestCapture_BoundaryMatchesDrawingInPlace(t *testing.T) {
 	repaintWindow(w)
 	repaintWindow(w)
 
-	img := w.Canvas().Capture()
-	if img == nil || img.Bounds().Empty() {
-		t.Skip("no capture available")
-	}
+	img := captureOrSkip(t, w)
 	// A capture that drew nothing would match itself: require the card's fill
 	// just inside its top edge, clear of the label.
 	scale := float32(img.Bounds().Dx()) / w.Canvas().Size().Width

@@ -3,6 +3,7 @@
 package glfw
 
 import (
+	"image"
 	"runtime"
 	"testing"
 	"time"
@@ -28,6 +29,26 @@ func ensureCanvasSize(t *testing.T, w *safeWindow, size geo.Size) {
 		waitForCanvasSize(t, w, size, true)
 	}
 	require.Equal(t, size, w.Canvas().Size())
+}
+
+// captureOrSkip captures w, retrying while Capture returns nil: macOS begins
+// no frame for a window it reports occluded, as it does for a moment after
+// showing one (#309, #631). It skips after two seconds, or on an empty image.
+func captureOrSkip(t *testing.T, w *safeWindow) image.Image {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		if img := w.Canvas().Capture(); img != nil {
+			if img.Bounds().Empty() {
+				t.Skip("no capture available (headless / no GPU surface)")
+			}
+			return img
+		}
+		if time.Now().After(deadline) {
+			t.Skip("Capture returned nil for 2s: the window began no frame (occluded, or no GPU surface)")
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
 }
 
 func repaintWindow(w *safeWindow) {
