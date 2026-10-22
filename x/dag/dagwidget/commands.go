@@ -133,9 +133,13 @@ type AddNodeCommand struct {
 	Node   *dag.Node
 
 	rejected bool
+	err      error
 }
 
-func (c *AddNodeCommand) Execute()     { c.rejected = c.Canvas.addNode(c.Node) != nil }
+func (c *AddNodeCommand) Execute() {
+	c.err = c.Canvas.addNode(c.Node)
+	c.rejected = c.err != nil
+}
 func (c *AddNodeCommand) Failed() bool { return c.rejected }
 func (c *AddNodeCommand) Undo() {
 	if c.rejected {
