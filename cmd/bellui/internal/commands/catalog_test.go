@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
@@ -78,6 +79,10 @@ func TestCatalog_FormatKeys(t *testing.T) {
 // The writer reproduces the toolkit's bundled catalogs byte for byte, which
 // the toolkit's lang package reads: the two copies of the format agree on
 // real files.
+//
+// The committed files use LF line endings, as the writer does. A Windows
+// checkout with core.autocrlf (the GitHub-hosted runners' default) turns them
+// into CRLF, so line endings are compared as committed, not as checked out.
 func TestCatalog_BundledRoundTrip(t *testing.T) {
 	files, err := filepath.Glob("../../../../lang/translations/*.pxf")
 	require.NoError(t, err)
@@ -85,6 +90,7 @@ func TestCatalog_BundledRoundTrip(t *testing.T) {
 	for _, f := range files {
 		data, err := os.ReadFile(f)
 		require.NoError(t, err)
+		data = bytes.ReplaceAll(data, []byte("\r\n"), []byte("\n"))
 		m, err := readCatalog(data)
 		require.NoError(t, err, f)
 		assert.Equal(t, string(data), string(formatCatalog(m)), f)
