@@ -117,9 +117,14 @@ func (h *TouchHandler) endPinchOf(tapID int, released bool) {
 	}
 }
 
+// within reports whether pos lies inside the rectangle at origin with size.
+func within(pos, origin geo.Position, size geo.Size) bool {
+	return pos.X >= origin.X && pos.Y >= origin.Y && pos.X <= origin.X+size.Width && pos.Y <= origin.Y+size.Height
+}
+
 // startPinch turns the contact that just went down and the one already down
 // into a two-finger gesture, if there are exactly two. A Pinchable under their
-// midpoint, if any, is the pinch target. It reports whether the gesture took
+// midpoint that both fingers are on, if any, is the pinch target. It reports whether the gesture took
 // the new contact: without a Pinchable it is tentative, and both contacts go
 // on as single ones until it turns into a pan.
 func (h *TouchHandler) startPinch(tapID int) bool {
@@ -139,6 +144,13 @@ func (h *TouchHandler) startPinch(tapID int) bool {
 		return ok
 	})
 	target, _ := co.(event.Pinchable)
+	// The Pinchable takes the gesture only if both fingers are on it, as
+	// UIKit's and Android's pinch recognisers require (#393). Two fingers on
+	// widgets either side of it, such as one on a slider and one on a
+	// button, keep their own gestures.
+	if target != nil && !(within(a, mid.Subtract(objPos), co.Size()) && within(b, mid.Subtract(objPos), co.Size())) {
+		target = nil
+	}
 	canPan := h.ScrollCallback != nil
 	// Without a Pinchable the gesture can only pan. A driver that cannot pan
 	// forms none, and neither does a first finger that already latched its own
