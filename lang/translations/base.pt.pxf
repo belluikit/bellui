@@ -1,0 +1,108 @@
+messages = {
+  AM: "AM"
+  Advanced: "Avançado"
+  Cancel: "Cancelar"
+  Confirm: "Confirmar"
+  Copy: "Copiar"
+  "Create Folder": "Criar Pasta"
+  Cut: "Recortar"
+  Date: "Data"
+  "Enter filename": "Digite o nome do ficheiro"
+  Error: "Erro"
+  Favourites: "Favoritos"
+  File: "Ficheiro"
+  Folder: "Pasta"
+  "New Folder": "Pasta nova"
+  No: "Não"
+  OK: "OK"
+  Open: "Abrir"
+  PM: "PM"
+  Paste: "Colar"
+  Quit: "Sair"
+  Redo: "Refazer"
+  Save: "Gravar"
+  "Select all": "Selecionar tudo"
+  "Select time": "Selecionar hora"
+  "Show Hidden Files": "Mostrar ficheiros escondidos"
+  Time: "Hora"
+  Undo: "Desfazer"
+  Yes: "Sim"
+  april: "Abril"
+  august: "Agosto"
+  december: "Dezembro"
+  february: "Fevereiro"
+  "file.name": {
+    other = "Nome"
+  }
+  "file.parent": {
+    other = "Origem"
+  }
+  friday: "Sexta"
+  "friday.narrow": "S"
+  "friday.short": "Sex"
+  january: "Janeiro"
+  july: "Julho"
+  june: "Junho"
+  "list.end": "{0} e {1}"
+  "list.middle": "{0}, {1}"
+  "list.start": "{0}, {1}"
+  "list.two": "{0} e {1}"
+  march: "Março"
+  may: "Maio"
+  monday: "Segunda"
+  "monday.narrow": "S"
+  "monday.short": "Seg"
+  november: "Novembro"
+  october: "Outubro"
+  saturday: "Sábado"
+  "saturday.narrow": "S"
+  "saturday.short": "Sáb"
+  september: "Setembro"
+  sunday: "Domingo"
+  "sunday.narrow": "D"
+  "sunday.short": "Dom"
+  thursday: "Quinta"
+  "thursday.narrow": "Q"
+  "thursday.short": "Qui"
+  tuesday: "Terça"
+  "tuesday.narrow": "T"
+  "tuesday.short": "Ter"
+  "unit.foot": {
+    many = "{Value} ft"
+    one = "{Value} ft"
+    other = "{Value} ft"
+  }
+  "unit.gram": {
+    many = "{Value} g"
+    one = "{Value} g"
+    other = "{Value} g"
+  }
+  "unit.kilogram": {
+    many = "{Value} kg"
+    one = "{Value} kg"
+    other = "{Value} kg"
+  }
+  "unit.kilometer": {
+    many = "{Value} km"
+    one = "{Value} km"
+    other = "{Value} km"
+  }
+  "unit.meter": {
+    many = "{Value} m"
+    one = "{Value} m"
+    other = "{Value} m"
+  }
+  "unit.mile": {
+    many = "{Value} mi"
+    one = "{Value} mi"
+    other = "{Value} mi"
+  }
+  "unit.pound": {
+    many = "{Value} lb"
+    one = "{Value} lb"
+    other = "{Value} lb"
+  }
+  wednesday: "Quarta"
+  "wednesday.narrow": "Q"
+  "wednesday.short": "Qua"
+}

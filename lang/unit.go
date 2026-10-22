@@ -36,16 +36,16 @@ const (
 
 // unitPattern maps each unit to its catalog key and English fallback pattern.
 // The catalog value is a CLDR plural message (one/few/many/other, keyed by count)
-// whose "{{.Value}}" placeholder is the locale-formatted number; the fallback is
+// whose "{Value}" placeholder is the locale-formatted number; the fallback is
 // the English "other" form used when the key is absent.
 var unitPattern = map[Unit]struct{ key, fallback string }{
-	UnitMeter:     {"unit.meter", "{{.Value}} m"},
-	UnitKilometer: {"unit.kilometer", "{{.Value}} km"},
-	UnitMile:      {"unit.mile", "{{.Value}} mi"},
-	UnitFoot:      {"unit.foot", "{{.Value}} ft"},
-	UnitGram:      {"unit.gram", "{{.Value}} g"},
-	UnitKilogram:  {"unit.kilogram", "{{.Value}} kg"},
-	UnitPound:     {"unit.pound", "{{.Value}} lb"},
+	UnitMeter:     {"unit.meter", "{Value} m"},
+	UnitKilometer: {"unit.kilometer", "{Value} km"},
+	UnitMile:      {"unit.mile", "{Value} mi"},
+	UnitFoot:      {"unit.foot", "{Value} ft"},
+	UnitGram:      {"unit.gram", "{Value} g"},
+	UnitKilogram:  {"unit.kilogram", "{Value} kg"},
+	UnitPound:     {"unit.pound", "{Value} lb"},
 }
 
 // FormatUnit renders value with the given unit using the current locale's unit

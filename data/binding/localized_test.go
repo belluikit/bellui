@@ -42,7 +42,7 @@ func TestNewLocalizedString_TemplateData(t *testing.T) {
 
 	// Unknown key falls back to the key, with template data filled in, and the
 	// data is re-applied on every re-derivation rather than being baked in.
-	s := NewLocalizedString("Hello {{.Name}}", map[string]any{"Name": "Ada"})
+	s := NewLocalizedString("Hello {Name}", map[string]any{"Name": "Ada"})
 	s.AddListener(NewDataListener(func() {}))
 
 	v, err := s.Get()
@@ -103,10 +103,10 @@ func TestNewLocalizedStringWithKey(t *testing.T) {
 func TestNewLocalizedPlural(t *testing.T) {
 	test.NewApp()
 	assert.NoError(t, lang.AddTranslationsForLocale(
-		[]byte(`{"TestApples":{"one":"{{.Count}} apple","other":"{{.Count}} apples"}}`), "en",
+		[]byte(`messages = { TestApples: { one = "{Count} apple" other = "{Count} apples" } }`), "en",
 	))
 	assert.NoError(t, lang.AddTranslationsForLocale(
-		[]byte(`{"TestApples":{"one":"{{.Count}} pomme","other":"{{.Count}} pommes"}}`), "fr",
+		[]byte(`messages = { TestApples: { one = "{Count} pomme" other = "{Count} pommes" } }`), "fr",
 	))
 	lang.SetLocale("en")
 	t.Cleanup(func() { lang.SetLocale("") })
@@ -134,7 +134,7 @@ func TestNewLocalizedPlural(t *testing.T) {
 func TestNewLocalizedPluralWithKey(t *testing.T) {
 	test.NewApp()
 	assert.NoError(t, lang.AddTranslationsForLocale(
-		[]byte(`{"plural.cart":{"one":"{{.Count}} item","other":"{{.Count}} items"}}`), "en",
+		[]byte(`messages = { "plural.cart": { one = "{Count} item" other = "{Count} items" } }`), "en",
 	))
 	lang.SetLocale("en")
 	t.Cleanup(func() { lang.SetLocale("") })
@@ -142,13 +142,13 @@ func TestNewLocalizedPluralWithKey(t *testing.T) {
 	count := NewInt()
 	assert.NoError(t, count.Set(2))
 
-	s := NewLocalizedPluralWithKey("plural.cart", "{{.Count}} thing(s)", count)
+	s := NewLocalizedPluralWithKey("plural.cart", "{Count} thing(s)", count)
 	v, err := s.Get()
 	assert.NoError(t, err)
 	assert.Equal(t, "2 items", v)
 
 	// Unknown key falls back to the supplied template, still pluralised by count.
-	u := NewLocalizedPluralWithKey("plural.missing", "{{.Count}} widget", count)
+	u := NewLocalizedPluralWithKey("plural.missing", "{Count} widget", count)
 	uv, err := u.Get()
 	assert.NoError(t, err)
 	assert.Equal(t, "2 widget", uv)

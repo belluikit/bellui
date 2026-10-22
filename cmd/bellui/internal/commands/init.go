@@ -14,6 +14,10 @@ import (
 	"github.com/belluikit/bellui/cmd/bellui/internal/templates"
 )
 
+// initCatalog is the translation catalog bellui init creates; the main.go it
+// writes embeds it.
+const initCatalog = "translations/en.pxf"
+
 func Init() *cli.Command {
 	return &cli.Command{
 		Name:      "init",
@@ -160,7 +164,7 @@ func initAction(ctx *cli.Context) error {
 	if verbose {
 		args = append(args, "-v")
 	}
-	args = append(args, "translations/en.json")
+	args = append(args, initCatalog)
 	args = append(args, "main.go")
 	if err := ctx.App.Run(args); err != nil {
 		return fmt.Errorf("failed to run command: %v", err)

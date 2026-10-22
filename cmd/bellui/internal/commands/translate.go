@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"go/ast"
@@ -29,7 +28,8 @@ func Translate() *cli.Command {
 		Usage:     "Scans for new translation strings",
 		ArgsUsage: "translationsFile [source ...]",
 		Description: "Recursively scans the current or given directories/files for\n" +
-			"translation strings, and creates or updates the translations file.",
+			"translation strings, and creates or updates the translations file,\n" +
+			"a PXF catalog such as translations/en.pxf.",
 		Flags: []cli.Flag{
 			&cli.BoolFlag{
 				Name:    "imports",
@@ -66,8 +66,13 @@ func Translate() *cli.Command {
 				usage()
 			}
 
-			if translationsFile != "-" && filepath.Ext(translationsFile) != ".json" {
-				fmt.Fprintln(os.Stderr, "Need .json extension for translationsFile")
+			switch ext := filepath.Ext(translationsFile); {
+			case translationsFile == "-", ext == ".pxf":
+			case ext == ".json":
+				fmt.Fprintln(os.Stderr, "JSON translation catalogs are no longer supported: use a .pxf translationsFile")
+				usage()
+			default:
+				fmt.Fprintln(os.Stderr, "Need .pxf extension for translationsFile")
 				usage()
 			}
 
@@ -137,17 +142,13 @@ type translateOpts struct {
 func updateTranslationsFile(file string, files []string, opts *translateOpts) error {
 	translations := make(map[string]any)
 
-	f, err := os.Open(file)
+	data, err := os.ReadFile(file)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
-
-	if f != nil {
-		dec := json.NewDecoder(f)
-		err := dec.Decode(&translations)
-		f.Close()
-		if err != nil && err != io.EOF {
-			return err
+	if len(data) > 0 {
+		if translations, err = readCatalog(data); err != nil {
+			return fmt.Errorf("%s: %w", file, err)
 		}
 	}
 
@@ -166,13 +167,10 @@ func updateTranslationsFile(file string, files []string, opts *translateOpts) er
 		return nil
 	}
 
-	b, err := json.MarshalIndent(translations, "", "    ")
-	if err != nil {
-		return err
-	}
+	b := formatCatalog(translations)
 
 	if file == "-" {
-		fmt.Printf("%s\n", string(b))
+		fmt.Print(string(b))
 		return nil
 	}
 
@@ -512,10 +510,13 @@ func translateFinish(v *visitor) stateFn {
 }
 
 // addTranslation records a discovered key with its fallback, honouring the
-// found/Update/verbose bookkeeping. A plural key is stored as a {"other": …}
-// message so it matches the plural catalog shape. Shared by the singular/plural
-// finishers and the select seams.
+// found/Update/verbose bookkeeping. A plural key is stored as a {other = …}
+// message so it matches the plural catalog shape. The fallback is written
+// with named placeholders, {Name}, whichever form the source used; the key is
+// kept as written, since it is the ID the code looks up. Shared by the
+// singular/plural finishers and the select seams.
 func addTranslation(v *visitor, key, fallback string, plural bool) {
+	fallback = namedPlaceholders(fallback)
 	_, found := v.m[key]
 	if found {
 		if !v.opts.Update {

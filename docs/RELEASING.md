@@ -44,6 +44,11 @@ releases have one, and commit as `docs: changelog for <version>`. When the
 `bellui` command is released alongside, do the same for its changelog with
 `-C cmd/bellui` and its own version.
 
+A `bellui` command that writes PXF translation catalogs (#522) is released
+with or after the first toolkit release that reads them, never before:
+`bellui init` resolves the newest toolkit, and v1.2.0 fails on a PXF catalog
+with `no unmarshaler registered for pxf`.
+
 ### 2. Green CI on main
 
 The tag should name a verified commit. Wait for main's checks — a tag is

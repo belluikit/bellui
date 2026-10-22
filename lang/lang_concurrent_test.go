@@ -81,7 +81,7 @@ func TestAddTranslations_Concurrent(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for i := 0; i < 50; i++ {
-			_ = AddTranslations(bellui.NewStaticResource("de.json", []byte(`{"OK":"OK"}`)))
+			_ = AddTranslations(bellui.NewStaticResource("de.pxf", []byte(`messages = { OK: "OK" }`)))
 		}
 		close(stop)
 	}()
