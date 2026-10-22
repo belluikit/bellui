@@ -19,6 +19,566 @@ one per change, so that open pull requests do not conflict here. Run
 `go run ./hack/changelog preview` to see them assembled; the release folds them
 into a section below.
 
+## v1.2.0 — 2026-10-21
+
+Mostly about speed. Screens with many widgets, labels that change every frame
+and long scrolled lists cost far less CPU and memory than in v1.1.2, idle apps
+no longer use CPU, and animations follow the display's refresh rate (the
+report in [#427](https://github.com/belluikit/bellui/issues/427) has the
+numbers). New in this release: pinch-to-zoom and two-finger scrolling on
+phones, tablets and desktop touchscreens, and sign-in tokens per issuer. The
+minor bump is for those APIs (`event.Pinchable`, `event.PinchEvent`,
+`auth.SaveTokenFor` and its siblings). Three changes may need a look:
+`Canvas.Capture` now returns nil when the window could not be drawn, partial
+repaint is on by default on desktop, and an `AuthButton` with its own
+`Issuer` saves its token under that issuer (see *Added*). Linux web views
+move to Chromium 154. The `x/*` modules are released at v1.2.0, and the
+`bellui` command alongside as `cmd/bellui` v1.1.0 (see
+`cmd/bellui/CHANGELOG.md`).
+
+### Security
+
+* **Linux web views bundle Chromium 154**
+  ([#510](https://github.com/belluikit/bellui/issues/510)). `bellui package`
+  now lays out CEF 154.0.34 (Chromium 154.0.8037.98) beside a Linux app,
+  replacing CEF 151, which had fallen four major versions behind Chrome stable.
+  The subprocess helper is also built so that CEF 154's child processes no
+  longer abort with "stack smashing detected" when they exit.
+
+### Added
+
+* **x/dag: rename a node from the properties panel**
+  ([#629](https://github.com/belluikit/bellui/issues/629)). `PropertiesPanel`
+  shows a Name field for the selected node when its `CanvasRef` is set, gated
+  by `Capabilities.EditProperties` like the panel's other edits. The new
+  `RenameNodeCommand` changes a node's label with undo, for apps that rename
+  from a menu or dialog of their own.
+* **Two-finger pan scrolls**
+  ([#398](https://github.com/belluikit/bellui/issues/398)). Two fingers moving
+  together scroll what is under them, in both directions, on the web and on
+  desktop touchscreens. A page of charts or 3D views, which take one-finger drags
+  for themselves, can now be scrolled past them. Charts pass two-finger
+  scrolling on to the page; the x/dag canvas pans with it. Two fingers moving
+  apart or together over a Pinchable are still a pinch.
+* **Pinch-to-zoom** ([#379](https://github.com/belluikit/bellui/issues/379)).
+  New `event.Pinchable` (`Pinched(*PinchEvent)`, `PinchEnded()`): two fingers
+  on a Pinchable widget report the change in their distance and the point
+  between them, on phones, tablets and desktop touchscreens. Both fingers must be on the
+  widget: two fingers on widgets either side of it keep their own taps and
+  drags ([#393](https://github.com/belluikit/bellui/issues/393)). The web follows
+  once the browser driver handles touch input
+  ([#378](https://github.com/belluikit/bellui/issues/378)). The x/dag canvas
+  zooms on pinch and pans with the fingers; x/charts (data window, 3D camera
+  and maps) zooms on pinch.
+* **Sign-in tokens per issuer**
+  ([#356](https://github.com/belluikit/bellui/issues/356)). New
+  `auth.SaveTokenFor`, `LoadTokenFor` and `ClearTokenFor` take an issuer as
+  well as a provider, so an app that signs in to two issuers under one provider
+  name (two Keycloak realms, two Okta tenants) keeps a token for each; with
+  one token per provider name, the second sign-in replaced the first.
+  `widget.AuthButton` saves this way with its `Issuer`; an empty `Issuer`, or
+  the provider preset's own, is the same as no issuer.
+  **Behaviour change:** a button whose `Issuer` is not the preset's (every
+  "okta", "keycloak" and "custom" button, and a "microsoft" button set to one
+  tenant) saves a token that is read back with `auth.LoadTokenFor(provider,
+  issuer)` and removed with `auth.ClearTokenFor(provider, issuer)`.
+  `auth.LoadToken(provider)` no longer finds it and `auth.ClearToken(provider)`
+  no longer removes it, so an app that signs out with `ClearToken` leaves the
+  refresh token on disk until it switches. A token saved before upgrading
+  stays in the provider's old file, where `LoadToken` still reads it; an app
+  that switches to `LoadTokenFor` can remove it with one `ClearToken` call.
+  Buttons on a preset issuer (Google, Apple, GitHub, Microsoft's common
+  endpoint) are unchanged.
+
+### Changed
+
+* **`Canvas.Capture` returns nil when the window cannot be drawn**
+  ([#631](https://github.com/belluikit/bellui/issues/631)). On macOS, a window
+  the system reports as occluded (covered, minimised, or just shown) gets
+  nothing to draw into, and `Capture` returned a black or out-of-date image
+  with no sign that it had failed. It now returns nil, so a caller can tell a
+  real capture from none and try again. With the WebGPU painter only; GL
+  draws regardless.
+* **Partial repaint finds what changed without visiting every object**
+  ([#599](https://github.com/belluikit/bellui/issues/599)). Each frame used to
+  walk every visible object to notice what had moved, which in a scroll of
+  2,000 cards cost more than a full repaint saved. Bellui's objects now tell
+  their canvas when they are moved, resized or hidden, and the frame visits
+  only those: on an M1 Mac the region for one refreshed object costs about
+  0.3 µs instead of 120–390 µs. An app's own `CanvasObject` types that do not
+  embed Bellui's need no change; their parent is checked every frame as
+  before.
+* **On Linux, an app given only an X display now opens on it**
+  ([#534](https://github.com/belluikit/bellui/issues/534)). With `DISPLAY`
+  set and `WAYLAND_DISPLAY` unset, bellui now picks X11. It used to leave the
+  choice to GLFW, which tries Wayland first and falls back to the logged-in
+  desktop's Wayland socket, so an app started over `ssh -X` on a machine with
+  a Wayland desktop open appeared on that machine's screen. `BELLUI_PLATFORM`
+  still overrides the choice.
+* **Partial repaint is on by default on desktop**
+  ([#496](https://github.com/belluikit/bellui/issues/496)). On macOS, Linux and
+  Windows, each frame now clears and redraws only what changed. On a window
+  where little moves (a caret, a spinner, a hover) that's about 4.8× less GPU
+  work, at no CPU cost worth measuring (+1.5% on a scene where every object
+  moves). It was checked pixel for pixel against a full repaint on all three.
+  Build with `-tags nopartialrepaint`, or run with `BELLUI_PARTIAL_REPAINT=0`,
+  to turn it off. Mobile and the web keep full repaints until it's validated on
+  devices there ([#593](https://github.com/belluikit/bellui/issues/593)); the
+  `partialrepaint` tag still turns it on anywhere.
+
+### Fixed
+
+* **x/dag: tapped-in nodes no longer stack, and adding one can be undone**
+  ([#629](https://github.com/belluikit/bellui/issues/629)). Tapping a palette
+  item used to put every new node on the centre of the view, on top of the last
+  one. It now uses the centre while it is free and otherwise the nearest spot
+  clear of other nodes and groups. Dropping a dragged item still places it
+  where it is released. `DAGCanvas.AddComponentNode` now records the add on the
+  canvas's undo stack, so Undo removes a node added from the palette.
+* **Android APKs work on devices with 16 KB memory pages**
+  ([#626](https://github.com/belluikit/bellui/issues/626)). `bellui package`
+  now links every Android build for 16 KB pages, not only release builds, and
+  keeps any `CGO_LDFLAGS` you set instead of replacing them. Inside the APK,
+  native libraries now start on a 16 KB boundary and other files on a 4-byte
+  one, as `zipalign -P 16` checks. Before, the 4-byte padding was miscounted,
+  so files landed on unaligned offsets. An app built without `--release`
+  showed "LOAD segment not aligned" when installed on an Android 17 Pixel.
+* **Elevated buttons cast their shadow**
+  ([#609](https://github.com/belluikit/bellui/issues/609)). `ButtonStyleElevated`
+  was documented with a shadow but drew none. It now sits at MD3 elevation 1,
+  rises to 2 under the pointer, and lies flat when disabled. The other button
+  styles stay flat, as MD3 specifies.
+* **The navigation drawer keeps its destinations clear of the system bars**
+  ([#608](https://github.com/belluikit/bellui/issues/608)). On phones and
+  tablets the drawer's first destination was drawn under the status bar,
+  because the drawer ignored the canvas's interactive area. The drawer surface
+  still reaches the screen edges, but its content now starts below the status
+  bar, scrolls clear of the home indicator, and keeps clear of a left-side
+  notch in landscape.
+* **Partial repaint no longer darkens or undims a modal drawer's page**
+  ([#605](https://github.com/belluikit/bellui/issues/605)). Two faults showed
+  when a modal navigation drawer was open over an animation. On a frame with
+  nothing to repaint, an object reaching across the canvas origin, such as the
+  drawer's shadow or content scrolled past the edge, was painted anyway with
+  no clip. The semi-transparent shadow built up until the drawer turned black.
+  Such frames now paint nothing. Separately, a modal pop-up's scrim fades with
+  its entrance and exit animations but was never refreshed itself, so partial
+  repaint redrew it only where the pop-up's content was. On an iPad that left
+  the page beside the drawer undimmed. The scrim is now refreshed with the
+  pop-up.
+* **Partial repaint no longer cuts text that is placed but not sized**
+  ([#602](https://github.com/belluikit/bellui/issues/602)). Painters draw a
+  `canvas.Text` at its natural size even when its own box is smaller. Partial
+  repaint looked only at the box, so when a dirty region crossed just the
+  overflowing glyphs, they were cleared and not drawn again. In the gallery
+  this cut the bottom half off a navigation drawer caption whenever a progress
+  indicator animated behind the drawer. Partial repaint now goes by where an
+  object actually draws: text grown to its natural size, strokes and italic
+  overflow, and box-shadow blur. The navigation drawer also sizes its captions
+  now.
+* **Hiding the only visible child of a container clears it on desktop**
+  ([#599](https://github.com/belluikit/bellui/issues/599)). With partial
+  repaint, which desktop uses by default, the object stayed on screen until
+  something else repainted over it, because the walk that finds what changed
+  visited no child there and kept the hidden one as if it were still shown.
+  Hiding one of several children was not affected.
+* **A window first drawn while covered no longer comes up empty**
+  ([#595](https://github.com/belluikit/bellui/issues/595)). With partial
+  repaint, now the desktop default, frames the WebGPU painter couldn't open,
+  such as while a window is still being shown, drew nothing. The dirty-region
+  bookkeeping moved on as if they had drawn, so the window could show only its
+  background until something in it changed. The next frame that opens now
+  repaints in full.
+* **Mobile partial repaint keeps the screen's content, and actually runs**
+  ([#591](https://github.com/belluikit/bellui/issues/591)). With the
+  `partialrepaint` tag, a frame that redrew a small area also redrew any
+  full-screen background unclipped, so everything outside that area
+  disappeared until it was redrawn (seen on an iPad). Separately, the
+  fallback to full repaint meant for a background→resume also ran when the
+  app first started, so partial repaint never ran at all on mobile.
+* **GL: box shadows draw at their colour's opacity, anti-aliased edges keep the
+  window opaque, and `RepaintBoundary` edges match drawing in place**
+  ([#580](https://github.com/belluikit/bellui/issues/580)). The GL painter
+  blended the alpha channel like the colour, which squared an edge's coverage. A
+  shadow's alpha came out squared, so shadows drew lighter than their colour
+  asked: a black shadow at alpha 160 over white drew at 153 instead of 94. The
+  window's alpha fell along anti-aliased edges, which `Canvas.Capture()` returned
+  as a dark fringe. And a boundary's cached image stored the wrong coverage.
+  Alpha now blends as coverage, and boundaries are blitted premultiplied.
+* **Windows: programs starting at once load ANGLE reliably**
+  ([#577](https://github.com/belluikit/bellui/issues/577)). The #438 fix
+  still renamed each program's copy of a DLL over the one already installed.
+  Windows holds a file exclusively while it is being replaced, so a program
+  checking it at that moment could not open it and failed with "unable to
+  load ANGLE after installation: <nil>". A complete copy is now never
+  replaced, and when loading still fails the error says why.
+* **Content inside a `RepaintBoundary` draws like content outside it**
+  ([#570](https://github.com/belluikit/bellui/issues/570)). A boundary's cached
+  image was drawn at its exact, fractional position and resampled, so text and
+  edges inside it came out softer than the same content drawn directly, and an
+  edge flush with the boundary lost its anti-aliased fringe. The image is now
+  placed on whole device pixels with a small margin, and rendered again when the
+  boundary moves by a fraction of a pixel; with the WebGPU painter it matches
+  drawing in place to within one colour level on partly transparent edges.
+* **On mobile, boundary content that was off screen appears when scrolled into
+  view** ([#564](https://github.com/belluikit/bellui/issues/564)), as on desktop
+  since #571: the mobile paint walk now culls, and culled a boundary's render by
+  clips outside it.
+* **A `RepaintBoundary` that leaves the window frees its GPU texture**
+  ([#569](https://github.com/belluikit/bellui/issues/569)). Both painters
+  kept every boundary's off-screen texture, width × height × 4 bytes, until
+  the window closed, so pages built with boundaries added to GPU memory each
+  time they were left. A boundary nothing has drawn for a minute is now freed.
+* **Taps no longer reach widgets scrolled out of view inside a nested scroll**
+  ([#566](https://github.com/belluikit/bellui/issues/566)). A scroll or other
+  clipping container inside another gave its children its own bounds as their
+  clip, without the clip it sits in, so a horizontal list scrolled up under a
+  header could take a tap meant for the header. Hit testing, the hit-test
+  index, the software painter and the accessibility tree now use the region
+  the clipping ancestors leave visible, as the GPU painters already did.
+  `driver.ClipBoundsForObject` and `driver.GeometryForObject` report that
+  region too, which is narrower than before for an object in nested clips.
+* **`Canvas.Capture()` with the GL painter includes changes made just before
+  it** ([#565](https://github.com/belluikit/bellui/issues/565)). The capture
+  painted without first taking the frame's refreshes off the queue, so a
+  `RepaintBoundary` whose content had just changed was captured from its old
+  image.
+* **Cards and other boundary content inside a scroll draw, and no longer crash
+  the WebGPU painter** ([#564](https://github.com/belluikit/bellui/issues/564)).
+  A `RepaintBoundary` painted while the window was still occluded crashed the
+  WebGPU painter, or was left cached blank; a rounded clip inside a boundary,
+  such as a `Card`'s, was stamped at the boundary's share of the window, so the
+  card drew only its top-left corner; and with either painter, content that was
+  off screen when its boundary first rendered stayed missing after scrolling
+  into view.
+* **`Canvas.Capture` from a goroutine no longer crashes on desktop**
+  ([#562](https://github.com/belluikit/bellui/issues/562)). With `-tags gl`, a
+  capture from a goroutine could segfault inside a GL call; with either
+  painter, it painted the window at the same time as the render loop. A
+  capture called off the main thread now paints and reads back on the main
+  thread, and waits for it.
+* **Scroll containers inside a `RepaintBoundary` paint again**
+  ([#559](https://github.com/belluikit/bellui/issues/559)). With `-tags gl`, a
+  scroll inside a boundary painted nothing, and a boundary inside a scroll lost
+  its content; with either painter, a scroll inside a boundary inside a scroll
+  painted nothing. A boundary now renders its content with clips of its own, and
+  the clips around it apply where its cached image is drawn.
+* **Labels no longer allocate on every frame**
+  ([#554](https://github.com/belluikit/bellui/issues/554)). A label's renderer
+  built a new list of its objects each time the toolkit walked the tree, several
+  times a frame. It now hands back the same list until the label's objects
+  change (it becomes selectable, or gains a tooltip). With 100 animated cards
+  (`hack/perfscenes -scene spinner -n 100`, M3 Max) that is about 60 fewer
+  allocations and 1 KB less garbage per frame.
+* **Mobile, `partialrepaint`: the screen-reader focus ring no longer leaves a
+  ghost** ([#551](https://github.com/belluikit/bellui/issues/551)). The ring is
+  painted over the content after the walk and stood for no canvas object, so
+  the dirty region ignored it: a ring that moved left its old outline in the
+  retained canvas texture, and one that stayed was painted over itself every
+  frame. The driver now marks where the ring was and where it is.
+* **Frames where many objects change spend less time freeing textures**
+  ([#543](https://github.com/belluikit/bellui/issues/543)). With 2,000
+  labels re-texted every frame, the step that frees the textures of refreshed
+  objects went from about 0.41 ms to 0.35 ms of CPU per frame on an M3 Max.
+  It now looks each object up once instead of twice, and the WebGPU painter
+  skips its 3D-scene cache for objects that aren't 3D scenes.
+* **x/mmedia: pausing a looping player sticks**
+  ([#527](https://github.com/belluikit/bellui/issues/527)). A pause or stop
+  that landed as a looping clip ended was undone when the player restarted
+  the clip. A looping `AudioPlayer` stopped for good at the end of its first
+  pass; it now loops. A clip paused straight after `Play` no longer jumps to
+  its end.
+* **macOS and Windows apps no longer carry Linux D-Bus code**
+  ([#526](https://github.com/belluikit/bellui/pull/526)). The system tray's
+  Linux notifier, and the D-Bus library it uses, were compiled into every
+  platform's build. With systray v1.12.2 they are built only for Linux and
+  the BSDs, which makes a macOS app about 0.3 MB smaller.
+* **x/mmedia: no freeze after seeking back**
+  ([#513](https://github.com/belluikit/bellui/issues/513)). A seek could throw
+  away the first frames decoded at its target, so the picture froze until the
+  first remaining frame was due, about half a second and sometimes over a
+  second. The seek now discards only what was decoded before it.
+* **Typing into a large text field no longer leaks memory**
+  ([#508](https://github.com/belluikit/bellui/issues/508)). Each keystroke in
+  a multi-line `Entry` kept a full copy of the document in memory: about 30 MB
+  per key on a 500,000-line document. Old copies are now freed.
+* **Audio files at different sample rates play at the right speed**
+  ([#506](https://github.com/belluikit/bellui/issues/506)). In `x/mmedia`, a
+  48 kHz file played after a 44.1 kHz one in the same app ran at 0.92× speed,
+  picture included.
+* **Smooth 60 fps video with sound**
+  ([#504](https://github.com/belluikit/bellui/issues/504)). In `x/mmedia`, a
+  1080p 60 fps video with audio played in slow motion at about 0.6× speed and
+  31 fps, and 720p60 dropped about 8 frames a second. Both now play at full
+  speed and 60 fps with no drops. Picture and sound line up better on every
+  video: on average within about 1 ms instead of 25 ms, with peaks of about
+  10 ms instead of 100 ms.
+* **Video seeking, looping and the end of playback**
+  ([#501](https://github.com/belluikit/bellui/issues/501),
+  [#502](https://github.com/belluikit/bellui/issues/502)). In `x/mmedia`:
+  * Seeking back no longer freezes the picture until playback catches up.
+    On a real clip the picture now moves within 0.2 s of any seek, where
+    backward seeks used to freeze it for 1 to over 5 seconds.
+  * A looping player keeps playing after it wraps. Before, the picture froze
+    at the end, the time kept counting, and pause left the player "playing".
+  * Clips shorter than a second play instead of showing nothing.
+  * The progress bar reaches the end when a video finishes, and the time stops
+    there instead of running on.
+* **Infinite progress bars animate again**
+  ([#497](https://github.com/belluikit/bellui/issues/497)). A
+  `ProgressBarInfinite` drew a still bar: nothing started its animation once
+  it was created. It now starts when the bar is first drawn, and stops while
+  the bar is hidden instead of running on unseen.
+* **Default widgets follow the Material 3 spec more closely**
+  ([#494](https://github.com/belluikit/bellui/issues/494)). The light theme's
+  surfaces were 2 to 10 tones darker than Material's, so fields and containers
+  came out heavy grey; they now use Material's tones. Unchecked checkboxes and
+  radios are empty outlines instead of grey blocks. A filled text field has a
+  bottom line in place of a full frame. A split's divider no longer draws a
+  black strip in dark mode. Card titles are 16 px medium weight (Material's
+  Title Medium) instead of 24 px bold, and card content lines up with the
+  title, which makes it 2×padding narrower.
+* **Busy screens use 12–15% less CPU and about half the memory churn**
+  ([#492](https://github.com/belluikit/bellui/issues/492)). Four sources of
+  per-frame overhead are gone: a refresh-queue set that allocated on every
+  refresh, a text measurement that allocated on every change, a theme lookup
+  that allocated on every call, and repeated renderer lookups during painting.
+  On an M3 Max, re-texting 2,000 labels every frame went from 101 to 111 fps
+  and from 1.5 MB to 0.68 MB of garbage per frame.
+* **Updating label text costs about a sixth less CPU**
+  ([#492](https://github.com/belluikit/bellui/issues/492)). A screen that
+  re-texts 2,000 labels every frame went from 9.1 to 7.6 ms of CPU per frame,
+  and from 678 to 637 KB allocated. A label no longer looks up its window to
+  check whether it can be selected, works out the locale's text direction
+  once per locale instead of per row, refreshes its text once instead of once
+  per line, and keeps its average character size between frames.
+* **Label text updates cost about a fifth less CPU and a third less memory**
+  ([#492](https://github.com/belluikit/bellui/issues/492)). A screen that
+  re-texts 2,000 labels every frame spends 2.2 ms on it instead of 2.8 ms, and
+  allocates 416 KB per frame instead of 638 KB. A one-line label now builds its
+  single row directly, shows its text without copying it, and reuses its layout
+  buffers; looking up a text measurement no longer hashes the whole key the
+  slow way.
+* **Updating a label or an entry costs about a third less**
+  ([#488](https://github.com/belluikit/bellui/issues/488)). Each SetText laid
+  out and refreshed the widget's text twice. It now does it once: on an M3
+  Max, a label's SetText went from 1.6 to 1.05 µs and 22 to 15 allocations,
+  and a screen re-texting 2,000 labels every frame from 85 to 100 fps.
+* **A screen where little changes does almost no layout work**
+  ([#487](https://github.com/belluikit/bellui/issues/487)). Every frame still
+  visited every object to check its minimum size. Now a frame visits only the
+  paths to what was refreshed: on an M3 Max, a static screen of 500 cards with
+  a spinner went from 1.8 ms to 0.01 ms of layout work per frame, and from 3.6
+  to 2.5 ms of CPU. Show, Hide and SetMinSize, which refresh nothing, still
+  re-lay out the window.
+* **Screens where many widgets change every frame lay out a third faster**
+  ([#487](https://github.com/belluikit/bellui/issues/487)). With 500 cards
+  each updating a label and a progress bar every frame, the per-frame layout
+  pass went from about 1.5 ms to 0.94 ms of CPU, and drawing got a little
+  cheaper too. The layout and drawing walks look objects up in global maps
+  only when the answer can have changed, and a progress bar no longer
+  re-measures its text on every update.
+* **Long scrolled screens stay smooth on phones and tablets**
+  ([#481](https://github.com/belluikit/bellui/issues/481)). The mobile driver
+  still drew everything a scroll container holds, including what was scrolled
+  out of view, so its cost grew with the length of the list. It now skips cards
+  and other clip-owners out of view, as the desktop driver does. Both drivers
+  also stop setting up a clip for each skipped card and stop indexing its
+  contents for touch. On a Pixel 9a, a screen of 500 cards and a spinner went
+  from 40 fps at 26 ms of CPU per frame to 60 fps at 10.7 ms, and 2000 cards
+  from 15 fps at 67 ms to 60 fps at 14.7 ms. On an iPad (10th generation), 2000
+  cards went from 30 fps at 19.9 ms to 60 fps at 7.1 ms; 500 cards were already
+  at 60 fps there and cost about the same. On an M3 Max, 2000 cards went from
+  3.2 to 2.5 ms per frame. Pixels are unchanged.
+* **Animations follow the display's refresh rate**
+  ([#480](https://github.com/belluikit/bellui/issues/480)). The desktop event
+  loop drew at most 60 frames a second, whatever the display. It now paces
+  to the fastest monitor a window is on: on a 144 Hz display, a screen of 500
+  cards with a spinner animates at 144 fps instead of 60.
+* **Shapes and text draw in batches on WebGPU**
+  ([#475](https://github.com/belluikit/bellui/issues/475),
+  [#467](https://github.com/belluikit/bellui/issues/467)). Every rectangle,
+  circle and text was its own GPU draw, and every text its own texture.
+  Rectangles, rounded rectangles, circles and single-line text are now drawn
+  as instances of one pipeline, many per draw, with text from a shared glyph
+  atlas. On an M3 Max, 20,000 moving shapes went from 32 to 60 fps at about
+  half the CPU, and their 274 MB of allocator cache is gone; 2,000 changing
+  labels use about 30% less CPU, screens of cards 5–12% less. Text on
+  fractional pixel positions is placed at quarter pixels instead of being
+  filtered, so it is slightly sharper there. `BELLUI_BATCH=0` turns batching
+  off.
+* **Idle apps no longer use CPU**
+  ([#470](https://github.com/belluikit/bellui/issues/470)). The desktop event
+  loop woke 60 times a second even when nothing changed. While no window needs
+  painting and no animation runs, it now wakes once a second for housekeeping;
+  input and work from other goroutines still wake it at once. On an M3 Max, a
+  small idle window went from 170 ms of CPU per 10 s to under 10 ms.
+* **Apps use about 25 MB less memory, and allocate 60 MB less at startup**
+  ([#469](https://github.com/belluikit/bellui/issues/469)). Measuring the
+  first text scanned every font installed on the system, to find one for the
+  user's language, even when the bundled fonts covered all the text. The scan
+  now runs only when text needs a character the bundled fonts lack. On an M3
+  Max, a small window allocates 15 MB at startup instead of 77 MB, and idles
+  at 52 MB instead of 76–79 MB.
+* **Cards cost less memory and CPU on WebGPU**
+  ([#466](https://github.com/belluikit/bellui/issues/466)). Each card clips its
+  content to its rounded corners, and every clip cleared the whole window's
+  stencil buffer first, once per card per frame, including cards scrolled out
+  of view. Clips now erase only what they drew, and skip cards outside the
+  visible area. On an M3 Max, a grid of 500 cards uses about 33 MB less memory
+  and 5–10% less CPU per frame.
+* **Static and scrolled screens use about 40% less CPU**
+  ([#464](https://github.com/belluikit/bellui/issues/464)). Every frame walked
+  every object a scroll container holds, including the ones scrolled out of
+  view, and asked every widget for its minimum size again. Cards and other
+  clip-owners out of view are now skipped when painting, and a widget is asked
+  for its minimum size only when it was refreshed or resized. On an M3 Max, a
+  screen of 500 cards and a spinner went from 9.7 to 5.6 ms of CPU per frame
+  (Fyne: 4.0 ms). Pixels are unchanged.
+* **Less CPU per frame on screens with many widgets**
+  ([#458](https://github.com/belluikit/bellui/issues/458)). Every frame read
+  the system clock once for each widget, to keep its cached renderer alive. It
+  now reads it once per frame. A static screen of 500 cards uses about 15% less
+  CPU per frame on an M3 Max.
+* **Screens that update many widgets are up to 4× faster**
+  ([#457](https://github.com/belluikit/bellui/issues/457)). Every widget
+  setter checks that it runs on the main goroutine, and the check took a stack
+  trace, which cost most of a busy frame's CPU. It now reads the goroutine's
+  ID directly on amd64 and arm64, in about 2 ns instead of 1.4 µs. On an M3
+  Max, 2000 labels re-texted every frame went from 10 to 47 fps, and 500
+  updating cards from 16 to 50–54 fps.
+* **Content moved to another window repaints there**
+  ([#448](https://github.com/belluikit/bellui/issues/448)). Moving a widget
+  from one open window to another left it registered to the first, so its
+  refreshes repainted the window it had left instead of the one showing it,
+  for as long as both were open. It now belongs to the window that paints it.
+* **Drawing a frame with the default (WebGPU) painter no longer allocates per
+  draw** ([#447](https://github.com/belluikit/bellui/issues/447)). Each draw
+  built its vertices and uniform block in new memory, and each rounded clip
+  built two rectangles for its stencil stamp. Draws now reuse buffers the
+  painter keeps. With 100 animated cards (`hack/perfscenes -scene spinner -n
+  100`, M3 Max) a frame allocates 2.0 KB instead of 43 KB, 93 allocations
+  instead of 684, and the measured window runs no garbage collections where
+  it ran two or three. Frame time is unchanged within noise.
+* **Apps parse each bundled font once, not once per text style**
+  ([#446](https://github.com/belluikit/bellui/issues/446)). Every text style
+  (regular, bold, italic, monospace, …) built its own font chain and parsed
+  the 4.2 MB bundled emoji font again for it. Chains now share one parse of
+  each font file. A window of 100 cards parses 7 font files at startup instead
+  of 10, and allocates 4 MB for them instead of 12 MB.
+* **GL painter: box shadows are cached, and no longer leak out of scroll
+  containers** ([#444](https://github.com/belluikit/bellui/issues/444)). With
+  `-tags gl`, every shadow was re-rendered into new textures every frame,
+  scrolled out of view or not; a static screen of 100 cards now costs 2.2 ms of
+  CPU per frame instead of 10.6 ms. A shadow is now also clipped like the rest
+  of its container, as it already was with the default WebGPU painter: before,
+  the shadows of cards scrolled partly out of a scroll container were painted
+  outside it.
+* **Box shadows are soft again**
+  ([#442](https://github.com/belluikit/bellui/issues/442)). Both painters
+  divided a `canvas.BoxShadow`'s blur radius by the texture width twice, so
+  the blur did nothing and Card, Button, menu and dialog elevation showed as
+  a hard-edged dark band. `BlurRadius` now means what it does in CSS: the
+  shadow is blurred by a Gaussian of sigma `BlurRadius/2`. `canvas.BackdropBlur`
+  uses the same meaning; it used to blur by about 1.7 times its radius, so the
+  same radius now blurs about a third as much. Wide blurs are drawn at reduced
+  resolution, so they cost less and show no bands.
+* **Windows: programs starting at once no longer fail to load ANGLE**
+  ([#438](https://github.com/belluikit/bellui/issues/438)). On a machine
+  without ANGLE, programs using the mobile driver download it and install it
+  into the user's profile. Two of them starting together could each read a
+  DLL the other was still writing, or fail to replace one the other had
+  already loaded, and panic with "unable to load ANGLE after installation".
+  Each DLL is now written to a temporary file and renamed into place, and an
+  install another program already finished is used as it is.
+* **Desktop windows animate at a steady 60 fps**
+  ([#427](https://github.com/belluikit/bellui/issues/427)). The event loop
+  timed each frame from the moment it woke up, so every slightly late wake-up
+  pushed all later frames back. Animations ran at about 57.6 fps on macOS even
+  with time to spare. Frames now stay on a 1/60 s grid.
+* **Scrolled content out of view no longer costs GPU encoding**
+  ([#427](https://github.com/belluikit/bellui/issues/427)). A scroll container
+  paints all its content every frame, and the WebGPU painter encoded a draw for
+  every object, even the ones the clip hides. It now skips a draw that lies
+  wholly outside the clip. A static screen of 500 cards uses 20% less CPU per
+  frame on an M3 Max, and 500 cards updating every frame 31% less. The pixels
+  drawn are unchanged.
+* **Two fingers scroll in native Android and iOS apps**
+  ([#402](https://github.com/belluikit/bellui/issues/402)). Two fingers moving
+  together now scroll the page, as they already did in the browser and on
+  desktop touchscreens, including past widgets that keep one-finger drags for
+  themselves, such as charts and the data grid. A released flick carries on
+  and stops when a finger lands. One finger scrolls by dragging as before.
+* **x/charts: a 3D chart with several series rotates as a whole**
+  ([#399](https://github.com/belluikit/bellui/issues/399)). Each 3D series drew
+  its own scene, so orbiting or zooming moved only one of them and the series
+  could not hide each other in depth. All 3D series of a chart now share one
+  scene and one camera.
+* **x/charts: charts no longer rebuild on every frame**
+  ([#396](https://github.com/belluikit/bellui/issues/396)). Every layout rebuilt
+  the chart, and the rebuild triggered another layout, so idle charts were
+  rebuilt about 60 times a second. For 3D charts each rebuild allocated a new
+  GPU texture, which took a phone browser's GPU memory past 4 GB in seconds and
+  crashed it. A chart now rebuilds only when its size or content changes.
+* **x/tables: the data grid scrolls by finger**
+  ([#394](https://github.com/belluikit/bellui/issues/394)). A touch drag on the
+  grid reached its mouse drag handler, which ignored it, so the grid could not
+  be scrolled on phones and tablets. Drags without a mouse button down now
+  scroll the body; mouse drags still don't.
+* **Mobile: touches are no longer lost or renumbered mid-gesture**
+  ([#392](https://github.com/belluikit/bellui/issues/392)). On iOS, lifting one
+  finger gave a finger still down a new id, so after a pinch the remaining
+  finger could pan or tap. On Android, a touch the system cancelled (another
+  app opened on top while the finger was down) was reported as a move and never
+  ended. iOS now keeps each touch's id until it ends, Android and iOS report a
+  cancelled touch as a cancel (no tap, no long press), and a touch keeps the
+  window it began in if another window opens while the finger is down. If its
+  window closes instead, the touch is cancelled there, and it no longer taps
+  the closed window's content.
+* **Web: a page wider than the screen no longer squeezes the whole UI**
+  ([#387](https://github.com/belluikit/bellui/issues/387)). When content needed
+  more room than the browser viewport, the canvas grew past it and the frame
+  was drawn squeezed sideways until the next window resize. In the browser the
+  canvas now stays the size of the viewport and wider content is clipped, as
+  on mobile.
+* **Web: GPU memory was never freed, so Android killed the tab**
+  ([#385](https://github.com/belluikit/bellui/issues/385)). In the browser,
+  releasing a WebGPU texture or buffer did nothing; its memory waited for
+  JavaScript's garbage collector, which ignores GPU memory pressure. The
+  shadow, off-screen and per-frame resources bellui creates piled up — on a
+  Pixel 9a Chrome's GPU memory reached 2.1 GB and the tab crashed within 40
+  seconds. They are now destroyed when bellui is done with them; the same
+  test ran 3 minutes with GPU memory bounded at 600–750 MB.
+* **Web: touch works on phones and tablets**
+  ([#378](https://github.com/belluikit/bellui/issues/378)). Only the click a
+  browser synthesises after a tap reached the app, so nothing could be scrolled
+  or dragged by finger. Finger contacts now go through the same gesture
+  handler as the mobile driver — drags, flick scrolling, long-press and
+  double-tap — and the page no longer pans or zooms under the app.
+* **Web: keyboard users can leave a multi-line field**
+  ([#357](https://github.com/belluikit/bellui/issues/357)). A multi-line
+  `Entry` and the x/dag canvas keep Tab for themselves, and the way out,
+  Ctrl+Tab, never reaches a web page because browsers use it to switch tabs, so
+  a keyboard-only user was trapped (WCAG 2.1.2). Escape followed by Tab or
+  Shift+Tab now moves focus out of such a widget, on every platform. Escape
+  still closes a pop-up or dialog first; the Escape after that frees the next
+  Tab.
+* **Sign-in tokens from before v1.1.0 are deleted**
+  ([#355](https://github.com/belluikit/bellui/issues/355)). Since tokens are
+  stored per app, the old shared `bellui-auth/<provider>.enc` was no longer
+  read, but nothing removed it, and signing out did not either, so a refresh
+  token that still decrypts stayed on disk. It is now deleted the first time
+  any app saves or clears a token for that provider, even when that save or
+  clear fails, as it does for an app without an ID.
+* **x/mmedia: video playback uses far less memory at high resolution**
+  ([#110](https://github.com/belluikit/bellui/issues/110)). The decode-ahead
+  queue held 120 frames whatever their size: about 1 GB at 1080p and 4 GB at
+  4K. It is now sized to a 128 MB budget, between 8 and 120 frames, so small
+  videos are unchanged. Playing a 1080p clip peaked at 2.1 GB of memory and
+  now peaks at about 470 MB on a Mac, with no more frames dropped than
+  before. A shallower queue tolerates a shorter decode stall (about half a
+  second at 1080p30); that has not yet been measured on a phone.
+
 ## v1.1.2 — 2026-10-16
 
 Fixes a memory leak that every app had: content removed from a window was
