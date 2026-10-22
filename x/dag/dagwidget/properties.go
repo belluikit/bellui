@@ -43,6 +43,11 @@ type PropertiesPanel struct {
 	content    *bellui.Container
 	empty      *widget.Label
 	rebuilding bool // true while a Set* rebuild is running, suppresses callbacks
+
+	// syncers write the shown node's current values into the fields SetNode
+	// built, in place. An edit or an undo goes through them rather than a
+	// rebuild, which would replace the entry being typed in and drop its focus.
+	syncers []func()
 }
 
 // NewPropertiesPanel creates a new properties panel.
@@ -57,16 +62,23 @@ func NewPropertiesPanel(registry *dag.Registry, cmds *CommandStack) *PropertiesP
 		empty:      widget.NewLabel("Select a node to view properties"),
 	}
 	p.header.TextStyle.Bold = true
+	// Node labels and port summaries can be long; wrap them inside the
+	// panel's column rather than widening it.
+	for _, l := range []*widget.Label{p.header, p.typeLabel, p.streamInfo} {
+		l.Wrapping = bellui.TextWrapWord
+	}
 	p.content = container.NewVBox(p.empty)
 	p.ExtendBaseWidget(p)
 	return p
 }
 
-// SetNode updates the panel to show the properties of the given node.
-// Pass nil to clear the panel entirely (any mode).
+// SetNode updates the panel to show the properties of the given node, with a
+// new form: a widget.Form keeps the rows it has drawn, so its Items cannot be
+// swapped for another node's. Pass nil to clear the panel entirely (any mode).
 func (p *PropertiesPanel) SetNode(n *dag.Node) {
 	p.rebuilding = true
 	defer func() { p.rebuilding = false }()
+	p.syncers = nil
 
 	p.node = n
 	p.group = nil
@@ -87,9 +99,9 @@ func (p *PropertiesPanel) SetNode(n *dag.Node) {
 	p.header.SetText(n.Label)
 	p.typeLabel.SetText("Type: " + n.TypeTag)
 	p.streamInfo.SetText(p.buildStreamInfo())
-	p.form.Items = nil
+	var items []*widget.FormItem
 	if p.CanvasRef != nil {
-		p.form.Items = append(p.form.Items, widget.NewFormItem("Name", p.nameEntry(n)))
+		items = append(items, widget.NewFormItem("Name", p.nameEntry(n)))
 	}
 
 	if p.component != nil {
@@ -97,11 +109,10 @@ func (p *PropertiesPanel) SetNode(n *dag.Node) {
 		props := p.loadProps()
 
 		for _, pd := range p.component.Properties {
-			pd := pd // capture
-			item := p.createFormItem(pd, props)
-			p.form.Items = append(p.form.Items, item)
+			items = append(items, p.createFormItem(pd, props))
 		}
 	}
+	p.form = widget.NewForm(items...)
 
 	p.content.Objects = []core.CanvasObject{
 		p.header,
@@ -127,13 +138,13 @@ func (p *PropertiesPanel) nameEntry(n *dag.Node) *widget.Entry {
 			NodeID: p.node.ID,
 			Old:    p.node.Label,
 			New:    s,
-			OnDone: func() {
-				if p.node != nil {
-					p.header.SetText(p.node.Label)
-				}
-			},
+			OnDone: p.syncForm,
 		})
 	}
+	p.syncers = append(p.syncers, func() {
+		p.header.SetText(n.Label)
+		syncText(entry, n.Label)
+	})
 	return entry
 }
 
@@ -481,7 +492,7 @@ func (p *PropertiesPanel) setProp(key string, newValue any) {
 			Key:      key,
 			OldValue: oldValue,
 			NewValue: newValue,
-			OnDone:   func() { p.refreshForm() },
+			OnDone:   p.syncForm,
 		}
 		p.Commands.Do(cmd)
 	} else {
@@ -489,19 +500,68 @@ func (p *PropertiesPanel) setProp(key string, newValue any) {
 	}
 }
 
-// refreshForm re-renders the form with current metadata values.
-// Called after undo/redo to keep the UI in sync.
-func (p *PropertiesPanel) refreshForm() {
-	if p.node != nil {
-		p.SetNode(p.node)
+// syncForm writes the node's current label and property values into the
+// fields on show. Called after an edit, undo or redo; it leaves alone a field
+// that already holds the value, so the entry being typed in keeps its text,
+// caret and focus.
+func (p *PropertiesPanel) syncForm() {
+	if p.node == nil {
+		return
+	}
+	p.rebuilding = true
+	defer func() { p.rebuilding = false }()
+	for _, sync := range p.syncers {
+		sync()
 	}
 }
 
-func (p *PropertiesPanel) createFormItem(pd dag.PropertyDef, props map[string]any) *widget.FormItem {
-	currentVal := props[pd.Key]
-	if currentVal == nil {
-		currentVal = pd.Default
+// syncText sets an entry's text only when it differs, so the caret of an
+// entry being typed in stays where it is.
+func syncText(e *widget.Entry, s string) {
+	if e.Text != s {
+		e.SetText(s)
 	}
+}
+
+// propValue is a property's stored value, or its default when unset.
+func propValue(pd dag.PropertyDef, props map[string]any) any {
+	if v := props[pd.Key]; v != nil {
+		return v
+	}
+	return pd.Default
+}
+
+// sameNumber reports whether an entry's text already denotes v, so "1." or
+// "1.50" is not rewritten to "1" or "1.5" while being typed.
+func sameNumber(text string, v any) bool {
+	got, err := strconv.ParseFloat(text, 64)
+	if err != nil {
+		return text == "" && v == nil
+	}
+	switch n := v.(type) {
+	case int:
+		return got == float64(n)
+	case float64:
+		return got == n
+	case json.Number:
+		want, err := n.Float64()
+		return err == nil && got == want
+	}
+	return false
+}
+
+// syncNumber keeps a number entry showing the stored value.
+func (p *PropertiesPanel) syncNumber(entry *widget.Entry, pd dag.PropertyDef) {
+	p.syncers = append(p.syncers, func() {
+		v := propValue(pd, p.loadProps())
+		if !sameNumber(entry.Text, v) {
+			entry.SetText(formatNumber(v))
+		}
+	})
+}
+
+func (p *PropertiesPanel) createFormItem(pd dag.PropertyDef, props map[string]any) *widget.FormItem {
+	currentVal := propValue(pd, props)
 
 	switch pd.Kind {
 	case dag.PropertyBool:
@@ -511,6 +571,12 @@ func (p *PropertiesPanel) createFormItem(pd dag.PropertyDef, props map[string]an
 		if b, ok := currentVal.(bool); ok {
 			check.Checked = b
 		}
+		p.syncers = append(p.syncers, func() {
+			b, _ := propValue(pd, p.loadProps()).(bool)
+			if check.Checked != b {
+				check.SetChecked(b)
+			}
+		})
 		return widget.NewFormItem(pd.Label, check)
 
 	case dag.PropertyEnum:
@@ -520,6 +586,16 @@ func (p *PropertiesPanel) createFormItem(pd dag.PropertyDef, props map[string]an
 		if s, ok := currentVal.(string); ok {
 			sel.SetSelected(s)
 		}
+		p.syncers = append(p.syncers, func() {
+			s, _ := propValue(pd, p.loadProps()).(string)
+			switch {
+			case s == sel.Selected:
+			case s == "":
+				sel.ClearSelected()
+			default:
+				sel.SetSelected(s)
+			}
+		})
 		return widget.NewFormItem(pd.Label, sel)
 
 	case dag.PropertyInt:
@@ -532,6 +608,7 @@ func (p *PropertiesPanel) createFormItem(pd dag.PropertyDef, props map[string]an
 				p.setProp(pd.Key, v)
 			}
 		}
+		p.syncNumber(entry, pd)
 		return widget.NewFormItem(pd.Label, entry)
 
 	case dag.PropertyFloat:
@@ -544,6 +621,7 @@ func (p *PropertiesPanel) createFormItem(pd dag.PropertyDef, props map[string]an
 				p.setProp(pd.Key, v)
 			}
 		}
+		p.syncNumber(entry, pd)
 		return widget.NewFormItem(pd.Label, entry)
 
 	default: // PropertyString
@@ -559,6 +637,10 @@ func (p *PropertiesPanel) createFormItem(pd dag.PropertyDef, props map[string]an
 			hint = "required"
 		}
 		entry.SetPlaceHolder(hint)
+		p.syncers = append(p.syncers, func() {
+			s, _ := propValue(pd, p.loadProps()).(string)
+			syncText(entry, s)
+		})
 		return widget.NewFormItem(pd.Label, entry)
 	}
 }
