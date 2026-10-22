@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/belluikit/bellui"
+	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/cache"
 	"github.com/belluikit/bellui/storage"
 	"github.com/belluikit/bellui/test"
@@ -66,6 +67,37 @@ func TestFileTree_AsyncPlaceholder(t *testing.T) {
 
 	ids = tree.ChildUIDs(root.String())
 	assert.Len(t, ids, 2, "children served from cache once the listing landed")
+}
+
+// TestFileTree_AsyncListingUnderTestDriver lays out a tree whose listings
+// complete through bellui.Do while the test resizes it. The test goroutine
+// touches the window only through bellui.DoAndWait, which the test driver
+// serializes with the listings' callbacks, so -race must stay quiet with and
+// without the mobile tag (#639: on mobile both ran outside that mutex).
+func TestFileTree_AsyncListingUnderTestDriver(t *testing.T) {
+	test.NewTempApp(t)
+	tree, _ := newTestFileTree(t)
+	tree.listSynchronously = false
+
+	var w bellui.Window
+	bellui.DoAndWait(func() {
+		tree.OpenAllBranches()
+		w = test.NewWindow(tree)
+	})
+	for i := 0; i < 50; i++ {
+		bellui.DoAndWait(func() {
+			w.Resize(geo.NewSize(float32(100+i), 200))
+			tree.Refresh()
+		})
+	}
+
+	// Let the last listings land before the test app is torn down.
+	inFlight := true
+	for deadline := time.Now().Add(10 * time.Second); inFlight; {
+		require.True(t, time.Now().Before(deadline), "listings never landed")
+		bellui.DoAndWait(func() { inFlight = len(tree.pending) > 0 })
+	}
+	bellui.DoAndWait(func() { w.Close() })
 }
 
 func TestFileTree_ShowHidden(t *testing.T) {

@@ -38,6 +38,15 @@ jobs:
       - name: Tests (GLES fallback)
         run: ./.github/scripts/xvfb-run-safe go test -race -tags gl,mobile,ci,migrated_belluido ./...
 
+      # Apps' own tests run without migrated_belluido, and there the mobile
+      # build reports every goroutine as main until one is registered. The test
+      # driver must still serialize bellui.Do under that rule (#639); the leg
+      # above sets the tag and so never sees it.
+      - name: Test driver threading without migrated_belluido
+        run: |
+          go test -race -tags mobile,ci ./test/ ./storage/repository/
+          go test -race -tags mobile,ci -run 'TestFileTree_' ./widget/
+
       - name: Partial-repaint build + region logic
         run: |
           # Dirty-region partial repaint is on by default on desktop and off on
