@@ -1,24 +1,52 @@
 package mmedia
 
 import (
+	"fmt"
 	"image"
 	"os"
+	"sync"
 	"testing"
 
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/test"
+	"github.com/belluikit/bellui/x/mmedia/internal/audio"
+	"github.com/belluikit/bellui/x/mmedia/internal/pipeline"
 )
 
 // TestMain starts a test app so bellui.Do has a driver to queue onto. Without
 // one it panics with "Attempt to access current Bellui app when none is started",
 // which is also what a library consumer would hit if a frame arrived before the
 // app was running.
+//
+// It also lets these tests build players with sound where there is no sound
+// card, as on a Linux CI runner: there a player's construction fails on the
+// device (#690), and these tests are about the widgets, not the device, which
+// internal/audio and internal/pipeline test. Where a device opens, it is used.
 func TestMain(m *testing.M) {
 	test.NewApp()
-	os.Exit(m.Run())
+	restore := pipeline.SetAudioOutputForTests(audioOrDetached)
+	code := m.Run()
+	restore()
+	os.Exit(code)
 }
+
+// audioOrDetached opens the audio device, or, where it will not open, an
+// Output on no device that plays nothing.
+func audioOrDetached(channels int) (*audio.Output, error) {
+	out, err := audio.NewOutput(channels)
+	if err != nil {
+		reportNoDevice.Do(func() {
+			fmt.Fprintf(os.Stderr, "mmedia tests: no audio device, players play silent: %v\n", err)
+		})
+		return audio.NewDetachedOutput(channels), nil
+	}
+	return out, nil
+}
+
+// reportNoDevice says once that there is no device.
+var reportNoDevice sync.Once
 
 func TestAspectLayoutLetterboxes(t *testing.T) {
 	// 16:9 video in a 4:3 area — bars top and bottom, full width.

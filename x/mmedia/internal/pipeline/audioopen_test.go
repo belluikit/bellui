@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"errors"
+	"image"
 	"testing"
 	"time"
 
@@ -116,6 +117,11 @@ func TestConstructionFailsWhenTheRateCannotBeConverted(t *testing.T) {
 	if src.askedRate != audio.DeviceSampleRate {
 		t.Errorf("the source was asked for %d Hz, want %d", src.askedRate, audio.DeviceSampleRate)
 	}
+	// The caller keeps the source, so it must not still feed the pipeline
+	// that was thrown away.
+	if src.vcb != nil {
+		t.Error("the refused source was left wired to the discarded pipeline")
+	}
 }
 
 // TestConstructionFailsWhenTheChannelsCannotBeConverted is #698's other half,
@@ -167,22 +173,36 @@ func TestAnOwnedSourceIsClosedWhenConstructionFails(t *testing.T) {
 	}
 }
 
-// TestSwapSourceReportsAFailedConversion: after construction there is no
-// constructor to fail, and the new source is already adopted, so a conversion
-// failure on a swap goes to OnError, as it always did.
-func TestSwapSourceReportsAFailedConversion(t *testing.T) {
+// TestSwapSourceRefusesAFailedConversion: a replacement whose audio cannot be
+// converted to the device's format is refused like one of the wrong shape,
+// before anything is torn down. It used to be adopted anyway and played at its
+// own rate, with the error sent to an OnError that may not be set (#698).
+func TestSwapSourceRefusesAFailedConversion(t *testing.T) {
 	withAudioOutput(t, detachedDevice)
-	p := newTestPipeline(t, newAudioSource(audio.DeviceSampleRate, 2))
+	old := newAudioSource(audio.DeviceSampleRate, 2)
+	p := newTestPipeline(t, old)
+	p.SetOnFrame(func(*image.RGBA) {})
+	p.Play()
 	defer p.Close()
-	var reported error
-	p.SetOnError(func(err error) { reported = err })
 
 	fresh := newAudioSource(44100, 2)
 	fresh.rateErr = errors.New("swr_init failed")
-	if err := p.SwapSource(fresh); err != nil {
-		t.Fatalf("SwapSource: %v", err)
+	if err := p.SwapSource(fresh); !errors.Is(err, fresh.rateErr) {
+		t.Fatalf("SwapSource error = %v, want it to wrap %v", err, fresh.rateErr)
 	}
-	if !errors.Is(reported, fresh.rateErr) {
-		t.Errorf("OnError got %v, want it to wrap %v", reported, fresh.rateErr)
+	if p.State() != StatePlaying {
+		t.Errorf("state = %v, want playback undisturbed by a refused swap", p.State())
+	}
+	if p.src != source.Source(old) {
+		t.Error("the source that could not be converted was adopted")
+	}
+	if old.closed {
+		t.Error("the original source was closed despite the refusal")
+	}
+	if fresh.closed {
+		t.Error("a refused source must not be closed by the pipeline")
+	}
+	if fresh.vcb != nil {
+		t.Error("the refused source was wired to the pipeline")
 	}
 }

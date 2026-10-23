@@ -2,6 +2,7 @@ package audio
 
 import (
 	"fmt"
+	"io"
 	"math"
 	"sync"
 	"time"
@@ -26,7 +27,7 @@ const defaultChannels = 2
 // Output manages audio playback via ebitengine/oto.
 type Output struct {
 	mu         sync.Mutex
-	ctx        *oto.Context
+	ctx        otoContext // nil for a detached Output
 	player     *oto.Player
 	buffer     *RingBuffer
 	sampleRate int
@@ -43,14 +44,28 @@ type Output struct {
 // NewOutput and never again: oto allows a single context per process.
 var device struct {
 	once     sync.Once
-	ctx      *oto.Context
+	ctx      otoContext
 	channels int   // channel count the device was opened with
 	err      error // why it could not be opened, for every later NewOutput
 }
 
+// otoContext is what an Output uses of *oto.Context. It is an interface so a
+// test can stand in a context that opened and then failed, the way oto reports
+// a missing device on Linux, which a real *oto.Context cannot be made to do.
+type otoContext interface {
+	NewPlayer(r io.Reader) *oto.Player
+	Err() error
+}
+
 // newOtoContext is oto.NewContext, a variable so a test can make the device
 // refuse to open.
-var newOtoContext = oto.NewContext
+var newOtoContext = func(op *oto.NewContextOptions) (otoContext, chan struct{}, error) {
+	ctx, ready, err := oto.NewContext(op)
+	if err != nil {
+		return nil, nil, err // not a nil *oto.Context in a non-nil interface
+	}
+	return ctx, ready, nil
+}
 
 // openDevice opens the audio device once per process and returns it, or the
 // error it failed with.
@@ -63,7 +78,7 @@ var newOtoContext = oto.NewContext
 // only answer that is both true and does not block. It used to discard the
 // error and receive on the nil ready channel oto returns with it, which blocked
 // forever inside the Once and so blocked every later player too (#690).
-func openDevice(channels int) (*oto.Context, int, error) {
+func openDevice(channels int) (otoContext, int, error) {
 	device.once.Do(func() {
 		op := &oto.NewContextOptions{
 			SampleRate:   DeviceSampleRate,
@@ -76,9 +91,11 @@ func openDevice(channels int) (*oto.Context, int, error) {
 			return
 		}
 		<-ready
-		// Some backends (CoreAudio) finish opening on their own goroutine and
-		// report a failure there: ready is closed either way, and the error is
-		// only in Err.
+		// Most backends finish opening on their own goroutine and report a
+		// failure there, with a nil error from NewContext: ALSA when no device
+		// opens (a headless Linux box), CoreAudio when its queue will not
+		// start. ready is closed either way, and the error is only in Err.
+		// An error here is final: oto's write loop has stopped on it.
 		if err := ctx.Err(); err != nil {
 			device.err = fmt.Errorf("open audio device (%d Hz, %d channels): %w", DeviceSampleRate, channels, err)
 			return
@@ -111,8 +128,8 @@ func NewOutput(channels int) (*Output, error) {
 
 // NewDetachedOutput is an Output on no device, for tests above this package
 // that need a pipeline with audio and no sound card. It plays nothing: Start
-// must not be called on it, and writes past its capacity overwrite the oldest
-// samples, as on a device that has stalled.
+// does nothing, so its position never moves, and writes past its capacity
+// overwrite the oldest samples, as on a device that has stalled.
 func NewDetachedOutput(channels int) *Output {
 	return newOutput(nil, channels)
 }
@@ -124,7 +141,7 @@ func NewDetachedOutput(channels int) *Output {
 // pull sizes) uses that rate, which is the device's: a stream's own rate never
 // reaches here, because its decoder converts it. Counting the position at the
 // stream's rate is how a 48 kHz stream once played at 0.918x (#506).
-func newOutput(ctx *oto.Context, channels int) *Output {
+func newOutput(ctx otoContext, channels int) *Output {
 	const rate = DeviceSampleRate
 	return &Output{
 		ctx:        ctx,
@@ -152,7 +169,7 @@ func (o *Output) WriteSamples(data []byte) {
 func (o *Output) Start() {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	if o.started {
+	if o.started || o.ctx == nil {
 		return
 	}
 	o.player = o.ctx.NewPlayer(o.buffer)

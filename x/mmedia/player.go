@@ -51,9 +51,8 @@ type MediaPlayer struct {
 // works here only when r is an *os.File whose name is still reachable. Any other
 // reader is an error rather than a silent absence of preview.
 //
-// A stream with audio is an error here when the audio device cannot be opened
-// or the stream cannot be converted to the device's format, rather than a
-// player that plays silent or at the wrong speed.
+// A stream with audio fails here when the audio device will not open or the
+// stream cannot be converted to its format; see the package documentation.
 func NewMediaPlayer(r io.Reader, opts ...Option) (*MediaPlayer, error) {
 	o := buildOptions(opts)
 	pipe, err := pipeline.NewPipeline(r, pipeline.Config{Downmix: o.downmix})
@@ -95,9 +94,8 @@ func reopenableURL(r io.Reader) string {
 // http and https are compiled in, as are the hls and rtsp demuxers and the
 // rtmp protocol.
 //
-// A stream with audio is an error here when the audio device cannot be opened
-// or the stream cannot be converted to the device's format, rather than a
-// player that plays silent or at the wrong speed.
+// A stream with audio fails here when the audio device will not open or the
+// stream cannot be converted to its format; see the package documentation.
 func NewMediaPlayerURL(url string, opts ...Option) (*MediaPlayer, error) {
 	o := buildOptions(opts)
 	pipe, err := pipeline.NewPipelineURL(url, pipeline.Config{Downmix: o.downmix})

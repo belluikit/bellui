@@ -208,9 +208,8 @@ func videoOnly(all []CaptureDevice) []CaptureDevice {
 // Stop releases the device, so the camera's indicator light goes out and other
 // applications can claim it; Play reacquires it. Close releases it permanently.
 //
-// A stream with audio is an error here when the audio device cannot be opened
-// or the stream cannot be converted to the device's format, rather than a
-// player that plays silent or at the wrong speed.
+// A stream with audio fails here when the audio device will not open or the
+// stream cannot be converted to its format; see the package documentation.
 func NewCapturePlayer(device string, opts ...Option) (*MediaPlayer, error) {
 	format := captureFormat()
 	url, err := resolveCaptureDevice(format, device)
@@ -229,9 +228,8 @@ func NewCapturePlayer(device string, opts ...Option) (*MediaPlayer, error) {
 // as that list is — prefer a name from VideoCaptureDevices for anything the user
 // chose and you intend to remember.
 //
-// A stream with audio is an error here when the audio device cannot be opened
-// or the stream cannot be converted to the device's format, rather than a
-// player that plays silent or at the wrong speed.
+// A stream with audio fails here when the audio device will not open or the
+// stream cannot be converted to its format; see the package documentation.
 func NewCapturePlayerIndex(index int, opts ...Option) (*MediaPlayer, error) {
 	format := captureFormat()
 	url, err := resolveCaptureIndex(format, index)
