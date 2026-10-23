@@ -41,6 +41,7 @@ package lang
 
 import (
 	"embed"
+	"errors"
 	"sync"
 	"sync/atomic"
 
@@ -364,11 +365,21 @@ func setCurrentTag(tag language.Tag) {
 // localizer reads while resolving a message (mutated by AddTranslations), so the
 // lock is held for the whole call. It is a read lock: concurrent translations
 // proceed in parallel and only block while a writer holds tagMu, which is rare.
+//
+// A message missing from the user's language is not an error when go-i18n
+// fell back to the default language's catalog or to the default message: it
+// returns that text together with a MessageNotFoundErr, and a real tag. Only
+// a lookup that found nothing at all (tag und) reports the error (#339).
 func localize(cfg *i18n.LocalizeConfig) (string, error) {
 	cfg.TemplateParser = placeholders
 	tagMu.RLock()
 	defer tagMu.RUnlock()
-	return localizer.Localize(cfg)
+	msg, tag, err := localizer.LocalizeWithTag(cfg)
+	var notFound *i18n.MessageNotFoundErr
+	if errors.As(err, &notFound) && tag != language.Und {
+		return msg, nil
+	}
+	return msg, err
 }
 
 // getLocalizer returns the active localizer under the read lock.
