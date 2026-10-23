@@ -272,9 +272,10 @@ func TestPackageAndroidLibs(t *testing.T) {
 		"R.txt":               []byte("int string aar_greeting 0x7f010000\n"),
 	})
 
-	// App Java that uses both libraries.
+	// App Java that uses both libraries, and a lambda: javac needs
+	// core-lambda-stubs.jar for it, which android.jar does not provide.
 	require.NoError(t, os.WriteFile(filepath.Join(app, "android", "Shim.java"), []byte(
-		`package com.example.app; public class Shim { public static String go() { return com.example.plain.Plain.hi() + com.example.aar.Greeter.id(); } }`,
+		`package com.example.app; public class Shim { public static String go() { return com.example.plain.Plain.hi() + com.example.aar.Greeter.id(); } public static Runnable later() { return () -> go(); } }`,
 	), 0o644))
 	require.NoError(t, os.MkdirAll(filepath.Join(app, "assets"), 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(app, "assets", "shared.txt"), []byte("app version"), 0o644))

@@ -689,7 +689,14 @@ func compileAppJava(javaFiles, jars []string, androidJar string) ([]string, erro
 	if err := os.MkdirAll(work, 0o755); err != nil {
 		return nil, err
 	}
-	javacArgs := []string{"-source", "1.8", "-target", "1.8", "-bootclasspath", androidJar, "-d", work}
+	// core-lambda-stubs.jar holds the java.lang.invoke classes that javac
+	// needs to compile a lambda and android.jar lacks; d8 then desugars the
+	// lambda. The Android Gradle plugin puts it on the boot classpath too.
+	boot := androidJar
+	if stubs := filepath.Join(util.AndroidBuildToolsPath(), "core-lambda-stubs.jar"); util.Exists(stubs) {
+		boot += string(os.PathListSeparator) + stubs
+	}
+	javacArgs := []string{"-source", "1.8", "-target", "1.8", "-bootclasspath", boot, "-d", work}
 	if len(jars) > 0 {
 		javacArgs = append(javacArgs, "-classpath", strings.Join(jars, string(os.PathListSeparator)))
 	}
