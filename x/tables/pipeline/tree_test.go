@@ -85,3 +85,57 @@ func TestTreeTransform_CollapseAll(t *testing.T) {
 		t.Fatalf("expected 1 after collapse all, got %d", len(result))
 	}
 }
+
+// GetParent returns the parent's ID, not its row index (#339: the doc comment
+// said row index). Here the two differ: row 2's parent ID is 10, which is row
+// 0's ID, while row index 10 does not exist.
+func TestTreeTransform_ParentIsAnIDNotAnIndex(t *testing.T) {
+	data := []any{
+		map[string]any{"id": 10, "parent": -1},
+		map[string]any{"id": 20, "parent": -1},
+		map[string]any{"id": 30, "parent": 10},
+	}
+	src := NewSliceSource(data)
+	tt := NewTreeTransform(
+		func(row any) any { return row.(map[string]any)["id"] },
+		func(row any) int { return row.(map[string]any)["parent"].(int) },
+	)
+	tt.ExpandAll([]int{0, 1, 2}, src)
+
+	got := tt.Apply([]int{0, 1, 2}, src)
+	want := []int{0, 2, 1} // id 30 sits under id 10
+	if len(got) != len(want) {
+		t.Fatalf("Apply = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("Apply = %v, want %v", got, want)
+		}
+	}
+	if tt.TreeNodes[1].Depth != 1 {
+		t.Errorf("row with parent ID 10 at depth %d, want 1", tt.TreeNodes[1].Depth)
+	}
+}
+
+// The parent ID is an int compared with GetID's values as an interface, so
+// IDs of any other type never match and every row becomes a root. This pins
+// the limitation the GetParent doc comment states; changing GetParent's type
+// would lift it.
+func TestTreeTransform_NonIntIDsNeverMatch(t *testing.T) {
+	data := []any{
+		map[string]any{"id": int64(1), "parent": -1},
+		map[string]any{"id": int64(2), "parent": 1},
+	}
+	src := NewSliceSource(data)
+	tt := NewTreeTransform(
+		func(row any) any { return row.(map[string]any)["id"] },
+		func(row any) int { return row.(map[string]any)["parent"].(int) },
+	)
+	tt.ExpandAll([]int{0, 1}, src)
+	tt.Apply([]int{0, 1}, src)
+	for i, n := range tt.TreeNodes {
+		if n.Depth != 0 {
+			t.Errorf("node %d at depth %d; int64 IDs were expected never to match an int parent", i, n.Depth)
+		}
+	}
+}

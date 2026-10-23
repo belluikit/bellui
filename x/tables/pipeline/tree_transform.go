@@ -14,7 +14,14 @@ type TreeNode struct {
 
 // TreeTransform converts flat rows into a tree structure based on parent-child relationships.
 type TreeTransform struct {
-	// GetParent returns the parent row index for a given row, or -1 for root nodes.
+	// GetParent returns the ID of a row's parent — the value GetID returns
+	// for the parent row, not the parent's row index — or a negative value
+	// for a root. A row whose parent ID matches no row becomes a root.
+	//
+	// The parent ID is an int and is compared with GetID's values as an
+	// interface value, so it only matches IDs that GetID returns as Go ints:
+	// with int64 or string IDs no parent is ever found and every row is a
+	// root.
 	GetParent func(rowData any) int
 	// GetID returns a unique ID for a row (used for parent-child matching).
 	GetID func(rowData any) any
@@ -24,7 +31,8 @@ type TreeTransform struct {
 	TreeNodes []TreeNode
 }
 
-// NewTreeTransform creates a tree transform.
+// NewTreeTransform creates a tree transform. getParent returns a row's parent
+// ID, as [TreeTransform.GetParent] describes.
 func NewTreeTransform(getID func(any) any, getParent func(any) int) *TreeTransform {
 	return &TreeTransform{
 		GetID:     getID,
