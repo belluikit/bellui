@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>fycoder — wasm runtime spike</title>
+  <title>x/editor — wasm harness</title>
   <style>
     html, body { margin: 0; padding: 0; }
     /* Bellui's glfw-js creates the canvas and sizes it to the viewport;
@@ -13,11 +13,12 @@
     #action { font: 14px/1.6 system-ui, sans-serif; color: #888; padding: 16px; }
   </style>
 </head>
-<!-- Structure mirrors the trendvidia/fyne web template: a #main host that is
+<!-- Structure mirrors the bellui CLI's web template
+     (cmd/bellui/internal/templates/data/index.html): a #main host that is
      cleared once the app starts, and the #dummyEntry input the wasm driver
-     (internal/driver/glfw/device_wasm.go) looks up by id for keyboard/IME
-     focus. Omitting #dummyEntry breaks text input — exactly what this spike
-     needs to test. -->
+     (internal/driver/glfw/device_wasm.go) focuses and listens on for IME
+     composition. Without #dummyEntry the page still renders and takes plain
+     keystrokes, but composed (IME) text never reaches the editor. -->
 <body scroll="no" style="overflow: hidden">
   <div id="main"><div id="action">Loading…</div></div>
   <input id="dummyEntry" style="position: absolute; left: 0; top: -100pt; z-index: -10; font-size: 32pt;" />
@@ -51,7 +52,15 @@
       const go = new Go();
       action.textContent = "Downloading WebAssembly…";
       WebAssembly.instantiateStreaming(fetch("editor.wasm"), go.importObject)
-        .then((result) => { main.innerHTML = ""; go.run(result.instance); })
+        .then((result) => {
+          main.innerHTML = "";
+          // The WebGPU painter's JS glue reads Go's linear memory through a
+          // global `wasm` (queue writes); without it the first text paint
+          // panics with "wasm is not defined". Same as the bellui CLI's web
+          // template; harmless for the -tags gl build. See docs/webgpu.md.
+          window.wasm = result;
+          go.run(result.instance);
+        })
         .catch((err) => { action.textContent = "Failed to load wasm: " + err; console.error(err); });
     })();
   </script>

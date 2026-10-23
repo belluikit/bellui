@@ -1,117 +1,124 @@
-# x/editor — WASM runtime / F1–F5 acceptance harness
+# x/editor — WASM browser harness
 
 A browser harness for exercising the *complete* x/editor widget under
-`GOOS=js GOARCH=wasm`. It backs the runtime half of
-[`docs/roadmap/10-wasm-web-target.md`](../../docs/roadmap/10-wasm-web-target.md)
-and is the acceptance harness for the F1–F5 browser-verify
-(pre-rebrand tracker #376,
-pre-rebrand tracker #150).
+`GOOS=js GOARCH=wasm`. It is the runtime half of
+[`docs/roadmap/10-wasm-web-target.md`](../../docs/roadmap/10-wasm-web-target.md).
 
-**Why this exists:** compilation to WASM is already proven. What a compiler
-*cannot* tell us is whether Bellui's **web layer** carries a real code editor —
-IME composition, clipboard, large-file virtualisation, code folding, protected
-ranges, and secret redaction. Those need a browser. This harness makes each
-check one click, on both the **WebGPU** default and the **`-tags gl`** WebGL
-fallback.
+**Why this exists:** a compiler can prove the editor builds for WASM, but not
+whether Bellui's **web layer** carries a real code editor: IME composition,
+clipboard, large-file virtualisation, code folding, protected ranges and secret
+redaction. Those need a browser. This harness makes each check one click, on
+both the **WebGPU** default and the **`-tags gl`** WebGL fallback.
 
-This is a **separate Go module** (its own `go.mod`, with `replace` pointing at
-the repo root) so pulling the full Bellui app stack does not add those deps to the
-fycoder library's `go.mod`. `go build ./...` at the repo root does not descend
-into it.
+This is a **separate Go module** (its own `go.mod`), so pulling the full Bellui
+app stack does not add those dependencies to x/editor's `go.mod`. `go build ./...`
+in x/editor does not descend into it. Its `go.mod` replaces
+`github.com/belluikit/bellui/x/editor` with `../..`, so the harness always runs
+the editor in this checkout. The toolkit itself, `github.com/belluikit/bellui`,
+comes from the release that `go.mod` pins, unless you build with `LOCAL=1`.
 
 ## Run
 
 ```bash
-cd examples/wasm
-make serve          # builds editor.wasm + copies wasm_exec.js, then serves
-# open http://localhost:8080
+cd x/editor/examples/wasm
+make serve            # WebGPU build of editor.wasm + wasm_exec.js, then serve
+make serve TAGS=gl    # the same with the WebGL fallback painter
+make serve LOCAL=1    # build against the bellui toolkit in this checkout
+# open http://localhost:8080 in a browser with WebGPU (or WebGL for TAGS=gl)
 ```
 
-`make build` alone produces `editor.wasm` + `wasm_exec.js` (both gitignored).
-`PORT=9000 make serve` changes the port.
+`make build` alone produces `editor.wasm` and `wasm_exec.js`; both are
+gitignored. `PORT=9000 make serve` changes the port.
+
+`LOCAL=1` writes a gitignored `go.local.mod`: `go.mod` plus a `replace` of
+`github.com/belluikit/bellui` onto the repository root. This is the same
+ephemeral replace that CI's `x_tests.yml` uses. Use it to test toolkit changes
+that are not released yet. Never commit a `replace` into `go.mod`.
 
 ## Manual test checklist
 
 The editor opens with a Starlark strategy sample: a header comment block, a
 `META` dict, a pre-collapsed `PARAMS` dict, and an `evaluate()` function. The
-`api_key` line is a protected (read-only) range and its secret value is a masked
-redaction. Toolbar: **Fold all · Unfold all | Reveal/Mask secret ·
-Load 50000 lines** and a status label. (Deep scroll is driven by the editor's
-own keyboard paging — see below — not a button; the old "Jump to end"
-`RevealRange` workaround was retired once glfw-js v1.0.2 let paging keys reach
-the browser, pre-rebrand tracker #120.)
+`api_key` line is a protected (read-only) range, and its secret value is masked
+by a redaction. The toolbar has **Fold all**, **Unfold all**, **Reveal secret**
+(which becomes **Mask secret**), **Load 50000 lines** (which becomes **Load
+sample**) and a status label. Deep scrolling uses the editor's own keyboard
+paging, described below.
 
-Run each on **both** backends — `make serve` (WebGPU default) and
-`make serve TAGS=gl` (WebGL fallback):
+Run each check on **both** backends: `make serve` (WebGPU) and
+`make serve TAGS=gl` (WebGL).
 
-- [ ] **AutoFold on load** — `PARAMS` opens pre-collapsed, showing its summary
-      placeholder (`... 3 params`); the gutter numbers jump across the hidden
-      interior (11 → 16 → 17) with the header line still visible.
-- [ ] **Redaction (caret-opaque masking)** — the `api_key` value renders as a
-      solid opaque bar. **Reveal secret** shows the real text in the clear;
-      **Mask secret** restores the bar. The caret cannot enter a masked span.
-- [ ] **Fold via chevron** — click a `∨` chevron in the fold gutter (e.g. line 5
-      `META`); the interior collapses to `META = {...`, the chevron flips to
-      `>`, and the external line-number gutter stays aligned across the fold.
-- [ ] **Protected-range veto** — put the caret on the `api_key` line and type /
-      paste; the edit is rejected and the status shows
-      `VETOED: line 8 is protected (read-only)`. The text does not change.
-- [ ] **Large file + virtualisation** — click **Load 50000 lines**; the document
-      renders promptly (scrollbar shows the full 50k extent) and `SetText` does
-      not stall — the highlighter is windowed to the visible rows (pre-rebrand tracker #106). Press
-      **Ctrl+End** to jump to the last line — the gutter reads ~49965–50001 with
-      highlighting intact, proving rows are windowed to the viewport, not
-      materialised whole.
-- [ ] **Keyboard paging** (pre-rebrand tracker #120, needs glfw-js ≥ v1.0.2) — in the 50k doc:
-      **PageDown**/**PageUp** move the caret by a viewport screenful (preserving
-      the column, not one line); **Ctrl+Home**/**Ctrl+End** (macOS **Cmd+↑/↓**)
-      jump to document start/end; **Shift+** variants extend the selection. Each
-      key must actually reach the editor (pre-v1.0.2 they were silently dropped).
-- [ ] **IME composition** *(interactive only)* — type into a string with a
-      CJK IME; composition preview shows and the commit lands correctly.
-
-Record results back in the Phase 10 doc / on pre-rebrand tracker #376.
+- [ ] **AutoFold on load:** `PARAMS` opens pre-collapsed and shows its summary
+      placeholder (`... 3 params`). The gutter numbers jump across the hidden
+      interior (11 → 16 → 17), and the header line stays visible.
+- [ ] **Redaction (caret-opaque masking):** the `api_key` value renders as a
+      solid opaque bar. **Reveal secret** shows the real text, and **Mask
+      secret** restores the bar. The caret cannot enter a masked span.
+- [ ] **Fold via chevron:** click a `∨` chevron in the fold gutter (for example
+      on line 5, `META`). The interior collapses to `META = {...`, the chevron
+      flips to `>`, and the line-number gutter stays aligned across the fold.
+- [ ] **Protected-range veto:** put the caret on the `api_key` line and type or
+      paste. The edit is rejected, the text does not change, and the status
+      shows `VETOED: line 8 is protected (read-only)`.
+- [ ] **Large file and virtualisation:** click **Load 50000 lines**. The
+      document renders promptly, the scrollbar shows the full extent, and
+      `SetText` does not stall, because the highlighter only works on the
+      visible rows. Press **Ctrl+End** to jump to the last line. The gutter
+      should read about 49965–50001 with highlighting intact, which shows rows
+      are built for the viewport, not for the whole file.
+- [ ] **Keyboard paging:** in the 50k document, **PageDown** and **PageUp**
+      move the caret by a screenful and keep its column. **Ctrl+Home** and
+      **Ctrl+End** (**Cmd+↑/↓** on macOS) jump to the start and end of the
+      document. The **Shift+** variants extend the selection.
+- [ ] **IME composition** *(interactive only)*: type into a string with a CJK
+      IME. The composition preview shows, and the committed text lands at the
+      caret. The harness does not import `theme/cjk`, so CJK characters draw
+      as boxes; check that the right number of characters lands and that the
+      caret moves by that many.
 
 ## Notes
 
-- Served over plain HTTP; `index.html` falls back from streaming to
-  ArrayBuffer instantiation if the server doesn't send
+- The page is served over plain HTTP. `index.html` falls back from streaming
+  to ArrayBuffer instantiation when the server does not send
   `Content-Type: application/wasm`, so `python3 -m http.server` is fine.
-- `wasm_exec.js` is copied from your toolchain (`go env GOROOT`) at build time
-  so it always matches the Go version that built the binary — do not commit it.
-- `index.html` is hand-written to match the **trendvidia/fyne** web template,
-  including the `#dummyEntry` input the wasm driver looks up by id for
-  keyboard/IME focus. Do not strip it.
+- `wasm_exec.js` is copied from your toolchain (`go env GOROOT`) at build time,
+  so it always matches the Go version that built the binary. Do not commit it.
+- `index.html` is hand-written to match the `bellui` CLI's web template
+  (`cmd/bellui/internal/templates/data/index.html`). Two parts of it are
+  load-bearing; see the first two troubleshooting items.
 
 ## Troubleshooting
 
-- **Black screen / no UI, but `editor.wasm` returned 200.** The page is
-  missing the structure the Bellui wasm driver expects — most importantly the
-  `<input id="dummyEntry">` element. Use the `index.html` shipped here; a bare
-  loader page will run the binary but render nothing usable.
-- **Renderer fix is wired in via `replace`.** Upstream `fyne-io/gl-js@v0.2.0`
-  panics on first paint (`index out of range [0] with length 0` in
-  `gl-js.TexImage2D` during `EnsureCanvasFBO`): the canvas FBO path passes a
-  typed-nil pixel slice that gl-js converts to a zero-length array instead of
-  WebGL `null`. This `go.mod` `replace`s gl-js with the fixed `trendvidia/gl-js`
-  fork (trendvidia/gl-js#1). If you see that panic, your build isn't picking up
-  the replace. Root cause + fix detail:
-  [`docs/roadmap/10-wasm-web-target.md`](../../docs/roadmap/10-wasm-web-target.md).
-- **Don't use the upstream `fyne serve` / `fyne package` CLI here.** This module
-  builds against the `github.com/trendvidia/fyne` fork, and the upstream `fyne`
-  CLI fails with `fyne version not found` because it can't resolve the fork.
-  `make serve` (plain `go build` + `python3 -m http.server`) is the supported
-  path.
+- **Black screen, and the console shows `panic: wgpu.(*Queue).TryWriteTexture:
+  JavaScript error: wasm is not defined`.** The loader page did not set
+  `window.wasm = result` before `go.run(...)`. The WebGPU painter's JavaScript
+  glue reads Go's memory through that global, so the first text it draws
+  panics. The `index.html` here sets it; a hand-written loader page must too
+  (see `docs/webgpu.md`). The WebGL build (`TAGS=gl`) does not need it.
+- **IME text never arrives, though plain typing works.** The page is missing
+  `<input id="dummyEntry">`. The wasm driver focuses that hidden input and
+  listens on it for IME composition. Without it the editor still renders and
+  takes ordinary keystrokes, but composed text is dropped. Keep the input from
+  the `index.html` here.
+- **Black screen on the WebGPU build with bellui v1.2.0, and the console shows
+  `Error while parsing WGSL: :85:24 error: 'textureSample' must only be called
+  from uniform control flow`.** Chrome's WebGPU rejects that release's
+  batched-quad shader, so nothing draws. It is fixed after v1.2.0. Until
+  `go.mod` pins a release with the fix, use `make serve LOCAL=1` or
+  `make serve TAGS=gl`.
+- **`bellui serve` fails here with `open …/wasm/index.html: not a directory`.**
+  The CLI names the built binary after the module's last path element, `wasm`,
+  which collides with its `wasm/` output folder
+  ([#683](https://github.com/belluikit/bellui/issues/683)). It would also use
+  its own page template and has no `TAGS=gl` switch. Use `make serve`.
 - **`main module (github.com/belluikit/bellui/x/editor) does not contain package
-  .../examples/wasm`.** A `go.work` somewhere up the directory tree (a
-  multi-module dev workspace) has put Go in workspace mode and pinned the main
-  module to the fycoder *root*, which excludes this nested module. The Makefile
-  already sets `GOWORK=off` to prevent this; if you build by hand, use
-  `GOWORK=off go build .`, or run `go work use ./examples/wasm` from the
-  workspace root. Confirm the cause with `go env GOWORK`.
-- **`os/user … undefined: current / lookupUser / …`.** You have
-  `CGO_ENABLED=1` set explicitly (shell export or `go env -w`), and Go honors
-  it for the `js/wasm` cross-compile — but `os/user` has no cgo path for `js`,
-  so it fails to build. `js/wasm` never uses cgo. The Makefile already sets
-  `CGO_ENABLED=0`; building by hand, use `CGO_ENABLED=0 go build .`. Check with
+  .../examples/wasm`.** A `go.work` somewhere up the directory tree has put Go
+  in workspace mode with x/editor as the main module, which excludes this
+  nested module. The Makefile sets `GOWORK=off` to prevent this. If you build
+  by hand, use `GOWORK=off go build .`. Check the cause with `go env GOWORK`.
+- **`os/user … undefined: current / lookupUser / …`.** `CGO_ENABLED=1` is set
+  explicitly (a shell export or `go env -w`), and Go honors it for the
+  `js/wasm` cross-compile, but `os/user` has no cgo path for `js`. `js/wasm`
+  never uses cgo. The Makefile sets `CGO_ENABLED=0`; when building by hand,
+  use `CGO_ENABLED=0 GOOS=js GOARCH=wasm go build .`. Check with
   `go env CGO_ENABLED`.
