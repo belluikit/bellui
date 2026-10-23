@@ -30,6 +30,21 @@ make serve LOCAL=1    # build against the bellui toolkit in this checkout
 `make build` alone produces `editor.wasm` and `wasm_exec.js`; both are
 gitignored. `PORT=9000 make serve` changes the port.
 
+`bellui serve` also runs the harness, for a quick look with the CLI:
+
+```bash
+GOWORK=off CGO_ENABLED=0 bellui serve --http-port 8080
+```
+
+It builds the WebGPU default only, serves the CLI's own page template rather
+than the `index.html` here, and builds against the toolkit that `go.mod` pins
+(so the v1.2.0 shader item under Troubleshooting applies to it).
+For the checklist below, which needs `TAGS=gl`, `LOCAL=1` and this page, use
+`make serve`. The CLI must include the fix for a module named `wasm`
+([#683](https://github.com/belluikit/bellui/issues/683)); older ones fail here
+with `open …/wasm/index.html: not a directory`. Its output goes to a
+gitignored `wasm/` folder.
+
 `LOCAL=1` writes a gitignored `go.local.mod`: `go.mod` plus a `replace` of
 `github.com/belluikit/bellui` onto the repository root. This is the same
 ephemeral replace that CI's `x_tests.yml` uses. Use it to test toolkit changes
@@ -106,11 +121,6 @@ Run each check on **both** backends: `make serve` (WebGPU) and
   batched-quad shader, so nothing draws. It is fixed after v1.2.0. Until
   `go.mod` pins a release with the fix, use `make serve LOCAL=1` or
   `make serve TAGS=gl`.
-- **`bellui serve` fails here with `open …/wasm/index.html: not a directory`.**
-  The CLI names the built binary after the module's last path element, `wasm`,
-  which collides with its `wasm/` output folder
-  ([#683](https://github.com/belluikit/bellui/issues/683)). It would also use
-  its own page template and has no `TAGS=gl` switch. Use `make serve`.
 - **`main module (github.com/belluikit/bellui/x/editor) does not contain package
   .../examples/wasm`.** A `go.work` somewhere up the directory tree has put Go
   in workspace mode with x/editor as the main module, which excludes this
