@@ -8,8 +8,8 @@ github.com/belluikit/gl-js v0.2.1 h1:DWtRW7ztetpAfztJ3msW9YWFWVaydmMlfT2sa6GrAEY
 github.com/belluikit/gl-js v0.2.1/go.mod h1:2/qoK/hK1zTuTBiZ7DYdMS6vapNN3KoYhAfpUb2vh1k=
 github.com/belluikit/goffmpeg v0.4.1 h1:M1xnd8w1V+NII+F9zAF0Xa1twyiDQj6LVbetxI71MW4=
 github.com/belluikit/goffmpeg v0.4.1/go.mod h1:dGEnd+cd0d9Zyh7E61isgT9ouVC5Rpoh6m2zSM5migw=
-github.com/belluikit/goffmpeg v0.4.2-0.20261023053024-404b1b7f92a0 h1:Zjmi+B3eZO/V9sJBeFFHzTyQEqvNvzCxAb+nYkQb9Uc=
-github.com/belluikit/goffmpeg v0.4.2-0.20261023053024-404b1b7f92a0/go.mod h1:dGEnd+cd0d9Zyh7E61isgT9ouVC5Rpoh6m2zSM5migw=
+github.com/belluikit/goffmpeg v0.5.0 h1:3ookbQSlPIz1MqQ92v8WxhrFAsVFiXOy9Nxpe4jG4lY=
+github.com/belluikit/goffmpeg v0.5.0/go.mod h1:dGEnd+cd0d9Zyh7E61isgT9ouVC5Rpoh6m2zSM5migw=
 github.com/belluikit/goffmpeg-libs/android_amd64 v0.3.1 h1:pmudLMNGiDocJ7nRSs4oLfJ/OIuXetGvmZlMgFSi4PE=
 github.com/belluikit/goffmpeg-libs/android_amd64 v0.3.1/go.mod h1:7ixvLucbYVV9YE+1zYmoB7UWsehbEGuwtgWjTqiIwqA=
 github.com/belluikit/goffmpeg-libs/android_arm v0.3.1 h1:KOrUiRBh/ZrNAX48UVYwDlaxPZfDi54NvgPXBldhVz0=
