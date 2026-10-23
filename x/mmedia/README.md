@@ -61,19 +61,17 @@ the overlay by hand if you are not using the helper.
 
 ## Painters
 
-The video surface takes a different path under each painter, selected at build
-time:
+The video surface draws through a streaming `canvas.Raster`, and every painter
+updates it in place: **WebGPU** (the default on desktop) writes each frame into
+the existing texture ([#34](https://github.com/belluikit/bellui/issues/34),
+[#100](https://github.com/belluikit/bellui/issues/100)), **GL** (`-tags gl`)
+uses `TexSubImage2D`, and the software painter redraws the current pixels on
+each paint. The raster still carries a generator, because the WebGPU painter
+calls it unconditionally and a nil one crashes on the first paint.
 
-* **WebGPU** (the default on desktop) has no streaming path for
-  `canvas.Raster`, so frames go through the raster generator. Setting
-  `Raster.Streaming` here would not merely fail to help — it would freeze the
-  video on its first frame, because `Canvas.freeObject` skips releasing a
-  streaming raster's texture on the assumption the painter updates it in place.
-* **GL** (`-tags gl`) implements streaming, so `SetPixels` updates the existing
-  texture via `TexSubImage2D`.
-
-A change to `videosurface.go` therefore has to be built and tested **both**
-ways. See `PROVENANCE.md`.
+The two GPU painters are separate code paths, so a change to `videosurface.go`
+is still worth testing both ways: `go test` and `go test -tags gl`, and on a
+GPU, `hack/playprobe -auto` under each.
 
 ## Platform support
 
