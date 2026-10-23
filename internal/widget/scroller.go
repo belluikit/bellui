@@ -637,8 +637,12 @@ func (s *Scroll) CreateRenderer() core.WidgetRenderer {
 // ScrollToBottom will scroll content to container bottom - to show latest info which end user just added.
 // Like every programmatic scroll it reports the move through OnScrolled.
 func (s *Scroll) ScrollToBottom() {
-	// Past the end; ScrollToOffset clamps it to the true bottom.
-	s.ScrollToOffset(geo.NewPos(s.Offset.X, s.Content.MinSize().Height))
+	// Past the end; moveTo clamps it to the true bottom. Only a real move
+	// supersedes the RTL start pin: before the first layout this clamps to
+	// nothing, and the horizontal offset is not the caller's to choose here.
+	if s.moveTo(geo.NewPos(s.Offset.X, s.Content.MinSize().Height)) {
+		s.rtlPinned = true
+	}
 }
 
 // ScrollToTop will scroll content to container top.
@@ -700,14 +704,22 @@ func (s *Scroll) ScrollToOffset(p geo.Position) {
 		return
 	}
 
+	s.rtlPinned = true // explicit positioning supersedes the initial right-edge pin
+	s.moveTo(p)
+}
+
+// moveTo sets the offset to p, clamped to the content, refreshes, and reports
+// a resulting move. It returns whether the offset changed.
+func (s *Scroll) moveTo(p geo.Position) bool {
 	old := s.Offset
 	s.Offset = p
-	s.rtlPinned = true // explicit positioning supersedes the initial right-edge pin
 	s.clampOffset(0, 0)
 	s.refreshWithoutOffsetUpdate()
-	if s.Offset != old {
-		s.notifyScrolled(s.Offset)
+	if s.Offset == old {
+		return false
 	}
+	s.notifyScrolled(s.Offset)
+	return true
 }
 
 func (s *Scroll) refreshWithoutOffsetUpdate() {

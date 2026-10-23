@@ -3,6 +3,7 @@ package lang
 import (
 	"math"
 	"strconv"
+	"strings"
 
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 
@@ -89,11 +90,19 @@ func localizeUnit(key, fallback string, count any, value string) string {
 // number as a decimal string, whose visible-fraction operands select the
 // fractional category (usually "other"). go-i18n rejects a float operand
 // outright, so a float64 here made every fractional value fail (#339).
+//
+// The operand is the number as FormatUnit shows it: rounded to the 10 fraction
+// digits FormatDecimal prints, trailing zeros dropped, so the label agrees with
+// the digits beside it ("1 mila", not "1 mili", for 1.00000000001).
 func pluralCount(value float64) any {
-	if value == math.Trunc(value) && math.Abs(value) < 1e15 {
-		return int64(value)
+	s := strconv.FormatFloat(value, 'f', 10, 64)
+	s = strings.TrimRight(strings.TrimRight(s, "0"), ".")
+	if !strings.Contains(s, ".") && math.Abs(value) < 1e15 {
+		if n, err := strconv.ParseInt(s, 10, 64); err == nil {
+			return n
+		}
 	}
-	return strconv.FormatFloat(value, 'f', -1, 64)
+	return s
 }
 
 // PreferredLengthUnit reports the road-distance length unit the current locale

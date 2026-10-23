@@ -127,14 +127,14 @@ func watchTheme(s *settings) {
 		themeVariant := findFreedesktopColorScheme()
 		if themeVariant != systemTheme {
 			internalapp.CurrentVariant.Store(uint64(themeVariant))
-			bellui.Do(func() { s.applyVariant(themeVariant) })
+			bellui.Do(s.setupTheme)
 		}
 
 		portalSettings.OnSignalSettingChanged(func(changed portalSettings.Changed) {
 			if changed.Namespace == appearance.Namespace && changed.Key == "color-scheme" {
 				themeVariant := colorSchemeToThemeVariant(appearance.ColorScheme(changed.Value.(uint32)))
 				internalapp.CurrentVariant.Store(uint64(themeVariant))
-				bellui.Do(func() { s.applyVariant(themeVariant) })
+				bellui.Do(s.setupTheme)
 			}
 		})
 	}()
@@ -142,9 +142,4 @@ func watchTheme(s *settings) {
 
 func (a *belluiApp) registerRepositories() {
 	// no-op
-}
-
-func (s *settings) applyVariant(variant bellui.ThemeVariant) {
-	s.variant = variant
-	s.apply()
 }

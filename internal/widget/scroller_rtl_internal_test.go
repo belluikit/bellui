@@ -107,3 +107,19 @@ func TestScrollContainer_RTL_TouchScrollDirectionAbsolute(t *testing.T) {
 	scroll.Scrolled(&event.ScrollEvent{Scrolled: geo.NewDelta(30, 0), Source: event.ScrollSourceTouch})
 	assert.Equal(t, float32(870), scroll.Offset.X)
 }
+
+// A ScrollToBottom issued before the first layout — a log view appending rows
+// while the window is still being built — clamps to nothing and must not cancel
+// the RTL right-edge start the first layout applies. It did once ScrollToBottom
+// went through ScrollToOffset, which pinned before it knew whether anything
+// moved (review of #688).
+func TestScrollContainer_RTL_EarlyScrollToBottomKeepsPin(t *testing.T) {
+	rtlScroll(t, bellui.DirectionRTL)
+
+	rect := canvas.NewRectangle(color.Black)
+	rect.SetMinSize(geo.NewSize(1000, 1000))
+	scroll := NewScroll(rect)
+	scroll.ScrollToBottom()
+	scroll.Resize(geo.NewSize(100, 100))
+	assert.Equal(t, float32(900), scroll.Offset.X, "the RTL start pin was lost")
+}

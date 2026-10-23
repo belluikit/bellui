@@ -28,3 +28,11 @@ func TestFormatUnit_FractionalPluralCount(t *testing.T) {
 	assert.NotContains(t, buf.String(), "plural count")
 	assert.NotContains(t, buf.String(), "Unit format failure")
 }
+
+// The plural operand is the number as shown: a value that displays as "1"
+// takes the "one" label, not the label of its unshown 11th fraction digit.
+func TestFormatUnit_PluralFollowsDisplayedDigits(t *testing.T) {
+	SetLocaleForTests(t, "pl")
+	assert.Equal(t, "1 mila", FormatUnit(1.00000000001, UnitMile))
+	assert.Equal(t, "2,5 mili", FormatUnit(2.50000000001, UnitMile))
+}

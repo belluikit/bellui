@@ -42,3 +42,43 @@ func TestLocalize_FallsBackToDefaultLanguageCatalog(t *testing.T) {
 
 	assert.NotContains(t, buf.String(), "Translation failure")
 }
+
+// A fallback whose template fails to execute is still a failure. go-i18n
+// reports the fallback's not-found error ahead of the execution error, so
+// treating every fallback as a success returned "" with no log.
+func TestLocalize_FailedFallbackStillFails(t *testing.T) {
+	require.NoError(t, AddTranslationsForLocale([]byte(`messages = {
+		"fail688.items": { one = "{Count} item" }
+	}`), "en"))
+	SetLocaleForTests(t, "fr")
+
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+
+	// English has no "other" form for 3, so nothing renders.
+	assert.Equal(t, "fail688.items", N("fail688.items", 3, map[string]any{"Count": 3}))
+	assert.Contains(t, buf.String(), "Translation failure")
+}
+
+// In a partly translated app the user's own ".other" variant beats a selector
+// variant that exists only in the default language: LSelect answers in the
+// user's language, as it did before default-language fallbacks counted as
+// found.
+func TestLSelect_PrefersOwnLanguageOtherOverFallbackVariant(t *testing.T) {
+	require.NoError(t, AddTranslationsForLocale([]byte(`messages = {
+		"partial688.updated.female": "{Name} updated her profile"
+		"partial688.updated.other": "{Name} updated their profile"
+		"partial688.items.female": { one = "{Name} added her item" other = "{Name} added her items" }
+		"partial688.items.other": { one = "{Name} added an item" other = "{Name} added items" }
+	}`), "en"))
+	require.NoError(t, AddTranslationsForLocale([]byte(`messages = {
+		"partial688.updated.other": "{Name} a mis à jour son profil"
+		"partial688.items.other": { one = "{Name} a ajouté un élément" other = "{Name} a ajouté des éléments" }
+	}`), "fr"))
+	SetLocaleForTests(t, "fr")
+
+	data := map[string]any{"Name": "Ada"}
+	assert.Equal(t, "Ada a mis à jour son profil", LSelect("partial688.updated", "female", data))
+	assert.Equal(t, "Ada a ajouté des éléments", LSelectPlural("partial688.items", "female", 2, data))
+}

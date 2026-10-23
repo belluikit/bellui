@@ -371,15 +371,27 @@ func setCurrentTag(tag language.Tag) {
 // returns that text together with a MessageNotFoundErr, and a real tag. Only
 // a lookup that found nothing at all (tag und) reports the error (#339).
 func localize(cfg *i18n.LocalizeConfig) (string, error) {
+	msg, _, err := localizeTracked(cfg)
+	return msg, err
+}
+
+// localizeTracked is localize that also reports whether the message came from
+// outside the user's languages (the default language's catalog or the default
+// message), for callers that rank a fallback below a match.
+//
+// go-i18n reports the MessageNotFoundErr of a fallback in preference to a
+// failure to execute the fallback template, so a fallback that rendered
+// nothing is taken as that failure and keeps its error, as it did before #339.
+func localizeTracked(cfg *i18n.LocalizeConfig) (msg string, fellBack bool, err error) {
 	cfg.TemplateParser = placeholders
 	tagMu.RLock()
 	defer tagMu.RUnlock()
 	msg, tag, err := localizer.LocalizeWithTag(cfg)
 	var notFound *i18n.MessageNotFoundErr
-	if errors.As(err, &notFound) && tag != language.Und {
-		return msg, nil
+	if errors.As(err, &notFound) && tag != language.Und && msg != "" {
+		return msg, true, nil
 	}
-	return msg, err
+	return msg, false, err
 }
 
 // getLocalizer returns the active localizer under the read lock.

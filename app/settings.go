@@ -67,12 +67,13 @@ func (s *settings) PrimaryColor() string {
 // and re-applies the current theme. Unlike the settings app it does not write
 // the system-wide settings file — apps that want to remember the choice should
 // store it in their own Preferences (see widget.SaveThemeSelection). The choice
-// is kept when the system-wide settings file changes.
+// is kept when the system-wide settings file changes; an empty name withdraws
+// it, so the settings file's colour applies again.
 //
 // Since: 1.0
 func (s *settings) SetPrimaryColor(name string) {
 	s.primary = name
-	s.primarySpecified = true
+	s.primarySpecified = name != ""
 	s.apply()
 }
 

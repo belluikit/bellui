@@ -135,3 +135,18 @@ func TestSettings_ExplicitPrimarySurvivesFileReload(t *testing.T) {
 	require.NoError(t, set.loadFromFile(p))
 	assert.Equal(t, "blue", set.PrimaryColor())
 }
+
+// SetPrimaryColor("") withdraws the app's choice: the settings file's colour
+// applies again rather than an empty pin that hides it for the session.
+func TestSettings_EmptyPrimaryWithdrawsChoice(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "settings.pxf")
+	require.NoError(t, os.WriteFile(p, []byte("primary_color = \"blue\"\n"), 0o600))
+
+	set := &settings{}
+	require.NoError(t, set.loadFromFile(p))
+	set.SetPrimaryColor(theme.ColorRed)
+	set.SetPrimaryColor("")
+	assert.Equal(t, "blue", set.PrimaryColor())
+	require.NoError(t, set.loadFromFile(p))
+	assert.Equal(t, "blue", set.PrimaryColor())
+}
