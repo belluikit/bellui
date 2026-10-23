@@ -56,8 +56,9 @@ if err := so.LoadSRT(srt); err != nil {
 w.SetContent(mmedia.MediaPlayerWithSubtitles(mp, so))
 ```
 
-`LoadWebVTT` and `LoadTrack` are the other entry points; `SetPosition` drives
-the overlay by hand if you are not using the helper.
+`LoadWebVTT` is the other parser. To show cues from anywhere else, build a
+`SubtitleTrack` of `SubtitleCue`s and pass it to `LoadTrack`. `SetPosition`
+drives the overlay by hand if you are not using the helper.
 
 ## Painters
 
