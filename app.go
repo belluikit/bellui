@@ -307,11 +307,33 @@ type AppMetadata struct {
 
 // Lifecycle represents the various phases that an app can transition through.
 //
+// The foreground hooks follow input focus, so what "background" means
+// depends on the platform:
+//
+//   - Android: exited when the activity pauses (onPause) — another activity,
+//     even a translucent one such as the share sheet, took the screen's
+//     focus, or the user left the app. Entered again when the activity
+//     resumes with its window intact, or else once the new window has been
+//     drawn.
+//   - iOS: exited when the app resigns active (an incoming call, Control
+//     Center, the app switcher, going home). Entered when it becomes active
+//     again. Nothing is painted while the app is off screen.
+//   - Desktop and web: exited when focus moves from the app's windows to
+//     another application, and on Quit; entered when one of its windows
+//     gains focus again. Focus moving between the app's own windows fires
+//     neither. Nothing is suspended: the app keeps running and painting
+//     while unfocused.
+//
+// On mobile, exiting the foreground is the moment to pause sensors and save
+// state: the operating system may suspend the process soon after.
+//
 // Since: 1.0
 type Lifecycle interface {
-	// SetOnEnteredForeground hooks into the app becoming foreground and gaining focus.
+	// SetOnEnteredForeground hooks into the app becoming foreground and
+	// gaining focus. See Lifecycle for what that means on each platform.
 	SetOnEnteredForeground(func())
-	// SetOnExitedForeground hooks into the app losing input focus and going into the background.
+	// SetOnExitedForeground hooks into the app losing input focus and going
+	// into the background. See Lifecycle for what that means on each platform.
 	SetOnExitedForeground(func())
 	// SetOnStarted hooks into an event that says the app is now running.
 	SetOnStarted(func())

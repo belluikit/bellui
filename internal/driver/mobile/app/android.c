@@ -73,11 +73,16 @@ static int main_running = 0;
 void onResume(ANativeActivity *activity) {
 	JNIEnv* env = activity->env;
 	setCurrentContext(activity->vm, (*env)->NewGlobalRef(env, activity->clazz));
+	activityResumed();
 }
 
 void onStart(ANativeActivity *activity) {}
-void onPause(ANativeActivity *activity) {}
-void onStop(ANativeActivity *activity) {}
+
+// onPause and onStop report the background as it happens (#673). The native
+// window can outlive both (a translucent activity over this one never
+// destroys it), so the window-destroyed path alone reported it late or never.
+void onPause(ANativeActivity *activity) { activityPaused(); }
+void onStop(ANativeActivity *activity) { activityStopped(); }
 
 // Entry point from our subclassed NativeActivity.
 //

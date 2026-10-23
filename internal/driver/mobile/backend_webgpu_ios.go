@@ -164,9 +164,14 @@ var (
 	iosWindowLayers = map[*window]unsafe.Pointer{}
 )
 
-// renderReady is true once the window exists; the CAMetalLayer surface is built
-// from the key window (no per-event handle plumbing, unlike Android).
-func (d *driver) renderReady(w *window) bool { return w != nil }
+// renderReady is true once the window exists and the app is on screen; the
+// CAMetalLayer surface is built from the key window (no per-event handle
+// plumbing, unlike Android). Painting stops when the app leaves the screen:
+// the layer survives backgrounding, but iOS may kill an app that submits
+// Metal work while backgrounded (#673). The last frame before that — the
+// app-switcher snapshot — is painted on the focused crossing off, while the
+// app is still visible.
+func (d *driver) renderReady(w *window) bool { return w != nil && d.surfaceVisible }
 
 // nativeSurfacePresentable is always true on iOS: the CAMetalLayer lives with
 // the view hierarchy and is never destroyed under a live painter the way

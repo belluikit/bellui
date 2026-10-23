@@ -168,6 +168,15 @@ func onDestroy(activity *C.ANativeActivity) {
 	activityDestroyed <- struct{}{}
 }
 
+//export activityPaused
+func activityPaused() { activityLifecycle <- activityPause }
+
+//export activityStopped
+func activityStopped() { activityLifecycle <- activityStop }
+
+//export activityResumed
+func activityResumed() { activityLifecycle <- activityResume }
+
 //export onWindowFocusChanged
 func onWindowFocusChanged(activity *C.ANativeActivity, hasFocus C.int) {
 }
@@ -292,6 +301,7 @@ var (
 	windowRedrawDone   = make(chan struct{})
 	windowConfigChange = make(chan windowConfig)
 	activityDestroyed  = make(chan struct{})
+	activityLifecycle  = make(chan activityEvent)
 
 	currentSize size.Event
 	darkMode    bool
@@ -585,6 +595,10 @@ func mainUI(vm, jniEnv, ctx uintptr) error {
 
 	var pixelsPerPt float32
 	var surfaceInitialized, wasDestroyed bool
+	// windowReady is true while the window has been drawn into and not
+	// destroyed since: the state in which a resume can raise the app straight
+	// back to focused (#673).
+	var windowReady bool
 
 	for {
 		select {
@@ -633,6 +647,7 @@ func mainUI(vm, jniEnv, ctx uintptr) error {
 				DisplayMetrics.WidthPx = int(C.ANativeWindow_getWidth(w))
 				DisplayMetrics.HeightPx = int(C.ANativeWindow_getHeight(w))
 			}
+			windowReady = true
 			theApp.sendLifecycle(lifecycle.StageFocused)
 			widthPx := int(C.ANativeWindow_getWidth(w))
 			heightPx := int(C.ANativeWindow_getHeight(w))
@@ -664,7 +679,12 @@ func mainUI(vm, jniEnv, ctx uintptr) error {
 			}
 			C.surface = nil
 			wasDestroyed = true
+			windowReady = false
 			theApp.sendLifecycle(lifecycle.StageAlive)
+		case e := <-activityLifecycle:
+			if to, ok := activityStage(e, theApp.lifecycleStage, windowReady); ok {
+				theApp.sendLifecycle(to)
+			}
 		case <-activityDestroyed:
 			theApp.sendLifecycle(lifecycle.StageDead)
 		case <-workAvailable:
