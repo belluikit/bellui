@@ -200,16 +200,24 @@ func newPipelineForSource(src source.Source, cfg Config) *Pipeline {
 	}
 
 	if p.hasAudio {
-		// Ask for the stream's own layout unless the caller wants stereo.
-		want := src.Channels()
-		if cfg.Downmix {
-			want = 2
-		}
-		p.audioOutput = audio.NewOutput(src.SampleRate(), want)
+		p.audioOutput = audio.NewOutput(deviceChannels(src.Channels(), cfg.Downmix))
 	}
 
 	p.adoptSource(src)
 	return p
+}
+
+// deviceChannels is the channel count a pipeline asks the audio device for:
+// stereo, unless the stream is surround (any layout above stereo) and the
+// caller did not ask for a downmix, when it is the stream's own layout. Only the first Output in the
+// process opens the device, so only its request takes effect. Mono is played
+// as stereo, so a mono stream first no longer makes every later one mono
+// (#506).
+func deviceChannels(stream int, downmix bool) int {
+	if !downmix && stream > 2 {
+		return stream
+	}
+	return 2
 }
 
 // NewPipelineForSource assembles a pipeline around an already-created source.
@@ -254,16 +262,20 @@ func (p *Pipeline) adoptSource(src source.Source) {
 	}
 
 	if p.hasAudio {
-		// The audio device is opened once per process and its channel count is
-		// fixed for the life of it, so a new source is asked for exactly what the
-		// device already plays and swresample does the mixing. Only the sample
-		// rate is negotiable, via the resampler.
+		// The audio device is opened once per process and its format is fixed
+		// for the life of it, so a new source is asked for exactly what the
+		// device plays, and its decoder's swresample converts the channels and
+		// the rate.
 		if got := p.audioOutput.Channels(); got != src.Channels() {
 			if err := src.SetAudioChannels(got); err != nil && p.onError != nil {
 				p.onError(fmt.Errorf("audio channel negotiation to %d: %w", got, err))
 			}
 		}
-		p.audioOutput.SetSourceSampleRate(src.SampleRate())
+		if rate := p.audioOutput.SampleRate(); rate != src.SampleRate() {
+			if err := src.SetAudioSampleRate(rate); err != nil && p.onError != nil {
+				p.onError(fmt.Errorf("audio sample rate conversion to %d: %w", rate, err))
+			}
+		}
 	}
 
 	// Wire up source callbacks.
@@ -577,9 +589,10 @@ var ErrSwapMedia = errors.New("mmedia: the replacement source does not carry the
 //     its first frame, which it can only do against a clock that starts where it
 //     expects.
 //   - The frame pool is rebuilt when the geometry moves, and only then.
-//   - The sample rate is renegotiated. The channel count is not: the audio
-//     device is opened once per process and cannot change, so the new source is
-//     asked for what the device already plays.
+//   - The audio format is asked of the new source, not of the device. The
+//     device is opened once per process, at DeviceSampleRate and the channel
+//     count the first stream chose, and cannot change, so the new source's
+//     decoder is asked to convert to both.
 //
 // Playback counters are left running. They measure the session rather than the
 // device, the same way they survive a seek.

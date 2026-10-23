@@ -17,7 +17,7 @@ require (
 	github.com/belluikit/gl-js v0.2.1 // indirect
 	github.com/belluikit/glfw v1.10.0 // indirect
 	github.com/belluikit/glfw-js v1.0.4 // indirect
-	github.com/belluikit/goffmpeg v0.4.1 // indirect
+	github.com/belluikit/goffmpeg v0.5.0 // indirect
 	github.com/belluikit/goffmpeg-libs/android_amd64 v0.3.1 // indirect
 	github.com/belluikit/goffmpeg-libs/android_arm v0.3.1 // indirect
 	github.com/belluikit/goffmpeg-libs/android_arm64 v0.3.1 // indirect

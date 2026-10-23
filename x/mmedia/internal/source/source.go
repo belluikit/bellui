@@ -32,6 +32,11 @@ type Source interface {
 	// which may differ from n. Call before decoding starts.
 	SetAudioChannels(n int) error
 
+	// SetAudioSampleRate asks the source to emit audio at rate Hz; rate <= 0
+	// restores the stream's own rate. SampleRate reports the result. Call
+	// before decoding starts.
+	SetAudioSampleRate(rate int) error
+
 	// Decode decodes media for the given elapsed duration, calling callbacks as needed.
 	Decode(elapsed time.Duration)
 

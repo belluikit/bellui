@@ -1,3 +1,5 @@
+github.com/BurntSushi/toml v1.5.0 h1:W5quZX/G/csjUnuI8SUYlsHs9M38FC7znL0lIO+DvMg=
+github.com/BurntSushi/toml v1.5.0/go.mod h1:ukJfTF/6rtPPRCnwkur4qwRxa8vTRFBF0uk2lLoLwho=
 github.com/belluikit/bellui v1.2.0 h1:wjSDc0LzN+d1z774ruDc9RhQfyNe/4A9Bro4ySp0gU8=
 github.com/belluikit/bellui v1.2.0/go.mod h1:7lftNGCBL7tMfFcEwoHLO6VX3WMPPfwUP5841stJJBQ=
 github.com/belluikit/fsnotify v1.10.2 h1:Kbop0VxWluUIAKunk+4op1v0KCkHfAFnAGAmVrD3Lc8=
@@ -6,6 +8,8 @@ github.com/belluikit/gl-js v0.2.1 h1:DWtRW7ztetpAfztJ3msW9YWFWVaydmMlfT2sa6GrAEY
 github.com/belluikit/gl-js v0.2.1/go.mod h1:2/qoK/hK1zTuTBiZ7DYdMS6vapNN3KoYhAfpUb2vh1k=
 github.com/belluikit/goffmpeg v0.4.1 h1:M1xnd8w1V+NII+F9zAF0Xa1twyiDQj6LVbetxI71MW4=
 github.com/belluikit/goffmpeg v0.4.1/go.mod h1:dGEnd+cd0d9Zyh7E61isgT9ouVC5Rpoh6m2zSM5migw=
+github.com/belluikit/goffmpeg v0.5.0 h1:3ookbQSlPIz1MqQ92v8WxhrFAsVFiXOy9Nxpe4jG4lY=
+github.com/belluikit/goffmpeg v0.5.0/go.mod h1:dGEnd+cd0d9Zyh7E61isgT9ouVC5Rpoh6m2zSM5migw=
 github.com/belluikit/goffmpeg-libs/android_amd64 v0.3.1 h1:pmudLMNGiDocJ7nRSs4oLfJ/OIuXetGvmZlMgFSi4PE=
 github.com/belluikit/goffmpeg-libs/android_amd64 v0.3.1/go.mod h1:7ixvLucbYVV9YE+1zYmoB7UWsehbEGuwtgWjTqiIwqA=
 github.com/belluikit/goffmpeg-libs/android_arm v0.3.1 h1:KOrUiRBh/ZrNAX48UVYwDlaxPZfDi54NvgPXBldhVz0=
@@ -32,8 +36,6 @@ github.com/belluikit/typesetting v0.3.6 h1:M27Rx+fhz1IV2n6Tei3fNhs/Oe9gGAnq3QMrB
 github.com/belluikit/typesetting v0.3.6/go.mod h1:vOvJAyUaoKpOpxqHeDglX6xNuG1zv2C3IOG3yEnHuLQ=
 github.com/bufbuild/protocompile v0.14.1 h1:iA73zAf/fyljNjQKwYzUHD6AD4R8KMasmwa/FBatYVw=
 github.com/bufbuild/protocompile v0.14.1/go.mod h1:ppVdAIhbr2H8asPk6k4pY7t9zB1OU5DoEw9xY/FUi1c=
-github.com/BurntSushi/toml v1.5.0 h1:W5quZX/G/csjUnuI8SUYlsHs9M38FC7znL0lIO+DvMg=
-github.com/BurntSushi/toml v1.5.0/go.mod h1:ukJfTF/6rtPPRCnwkur4qwRxa8vTRFBF0uk2lLoLwho=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/ebitengine/oto/v3 v3.4.0 h1:br0PgASsEWaoWn38b2Goe7m1GKFYfNgnsjSd5Gg+/bQ=

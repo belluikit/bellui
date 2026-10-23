@@ -30,6 +30,7 @@ func (s *clipSource) SetVideoCallback(f source.VideoCallback) {
 }
 func (s *clipSource) SetAudioCallback(source.AudioCallback) {}
 func (s *clipSource) SetAudioChannels(int) error            { return nil }
+func (s *clipSource) SetAudioSampleRate(int) error          { return nil }
 func (s *clipSource) Decode(time.Duration) {
 	if s.next >= s.frames || s.vcb == nil {
 		return
