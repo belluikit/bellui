@@ -148,7 +148,7 @@ func runBuildImpl(cmd *command) (*packages.Package, error) {
 			}
 			return pkg, nil
 		}
-		nmpkgs, err = goIOSBuild(pkg, buildBundleID, targetArchs, cmd.AppName, cmd.Version, cmd.Build, buildRelease, cmd.Cert, cmd.Profile, buildIOSUsageDescriptions)
+		nmpkgs, err = goIOSBuild(pkg, buildBundleID, targetArchs, cmd.AppName, cmd.Version, cmd.Build, buildRelease, cmd.Cert, cmd.Profile, buildIOSUsageDescriptions, cmd.IconPath)
 		if err != nil {
 			return nil, err
 		}

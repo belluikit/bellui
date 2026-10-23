@@ -24,7 +24,7 @@ import (
 
 func goIOSBuild(pkg *packages.Package, bundleID string, archs []string,
 	appName, version string, build int, release bool, cert, profile string,
-	usageDescriptions map[string]string,
+	usageDescriptions map[string]string, iconPath string,
 ) (map[string]bool, error) {
 	src := pkg.PkgPath
 	buildO = rfc1034Label(appName) + ".app"
@@ -60,13 +60,12 @@ func goIOSBuild(pkg *packages.Package, bundleID string, archs []string,
 		return nil, err
 	}
 
-	files := []struct {
-		name     string
-		contents []byte
-	}{
+	files := []projectFile{
 		{tmpdir + "/main.xcodeproj/project.pbxproj", projPbxproj.Bytes()},
 		{tmpdir + "/main/Info.plist", infoplistBytes},
-		{tmpdir + "/main/Images.xcassets/AppIcon.appiconset/Contents.json", []byte(contentsJSON)},
+	}
+	if err := writeIOSAppIcon(iconPath, tmpdir+"/main/Images.xcassets/AppIcon.appiconset"); err != nil {
+		return nil, err
 	}
 
 	// Signed in via CODE_SIGN_ENTITLEMENTS: Associated Domains for Universal
@@ -74,24 +73,10 @@ func goIOSBuild(pkg *packages.Package, bundleID string, archs []string,
 	// xcodebuild -allowProvisioningUpdates registers the capabilities with the
 	// App ID under automatic signing.
 	if entitlements != nil {
-		files = append(files, struct {
-			name     string
-			contents []byte
-		}{tmpdir + "/main/main.entitlements", encodePlist(entitlements)})
+		files = append(files, projectFile{tmpdir + "/main/main.entitlements", encodePlist(entitlements)})
 	}
-
-	for _, file := range files {
-		if err := mkdir(filepath.Dir(file.name)); err != nil {
-			return nil, err
-		}
-		if buildX {
-			printcmd("echo \"%s\" > %s", file.contents, file.name)
-		}
-		if !buildN {
-			if err := os.WriteFile(file.name, file.contents, 0o600); err != nil {
-				return nil, err
-			}
-		}
+	if err := writeProjectFiles(files); err != nil {
+		return nil, err
 	}
 
 	// We are using lipo tool to build multiarchitecture binaries.
@@ -213,6 +198,31 @@ func copyIOSEmbeds(embed []iosFramework) error {
 		}
 		if err := runCmd(exec.Command("cp", "-R", f.Path, dst)); err != nil {
 			return err
+		}
+	}
+	return nil
+}
+
+// projectFile is one file of the generated Xcode project.
+type projectFile struct {
+	name     string
+	contents []byte
+}
+
+// writeProjectFiles writes the generated Xcode project's files, creating
+// their directories; -x prints them and -n only prints.
+func writeProjectFiles(files []projectFile) error {
+	for _, file := range files {
+		if err := mkdir(filepath.Dir(file.name)); err != nil {
+			return err
+		}
+		if buildX {
+			printcmd("echo \"%s\" > %s", file.contents, file.name)
+		}
+		if !buildN {
+			if err := os.WriteFile(file.name, file.contents, 0o600); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
