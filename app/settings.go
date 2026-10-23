@@ -37,6 +37,14 @@ type settings struct {
 	theme          bellui.Theme
 	themeSpecified bool
 	variant        bellui.ThemeVariant
+	// variantSpecified records an explicit SetThemeVariant: like
+	// themeSpecified for the theme, it keeps setupTheme (run on OS appearance
+	// changes and settings-file reloads) from replacing the app's choice.
+	variantSpecified bool
+	// primary is the colour from an explicit SetPrimaryColor, kept apart from
+	// schema so a settings-file reload does not replace it.
+	primary          string
+	primarySpecified bool
 
 	listeners []func(bellui.Settings)
 	watcher   any // normally *fsnotify.Watcher or nil - avoid import in this file
@@ -49,17 +57,23 @@ func (s *settings) BuildType() bellui.BuildType {
 }
 
 func (s *settings) PrimaryColor() string {
+	if s.primarySpecified {
+		return s.primary
+	}
 	return s.schema.PrimaryColor
 }
 
 // SetPrimaryColor sets the named primary color preference for the running app
 // and re-applies the current theme. Unlike the settings app it does not write
 // the system-wide settings file — apps that want to remember the choice should
-// store it in their own Preferences (see widget.SaveThemeSelection).
+// store it in their own Preferences (see widget.SaveThemeSelection). The choice
+// is kept when the system-wide settings file changes; an empty name withdraws
+// it, so the settings file's colour applies again.
 //
 // Since: 1.0
 func (s *settings) SetPrimaryColor(name string) {
-	s.schema.PrimaryColor = name
+	s.primary = name
+	s.primarySpecified = name != ""
 	s.apply()
 }
 
@@ -84,7 +98,11 @@ func (s *settings) ThemeVariant() bellui.ThemeVariant {
 	return s.variant
 }
 
+// SetThemeVariant sets the variant for the running app. The choice is kept
+// across later OS appearance changes and settings-file reloads, as SetTheme's
+// is.
 func (s *settings) SetThemeVariant(variant bellui.ThemeVariant) {
+	s.variantSpecified = true
 	s.applyTheme(s.theme, variant)
 }
 
@@ -132,6 +150,9 @@ func (s *settings) setupTheme() {
 		variant = theme.VariantLight
 	case "dark":
 		variant = theme.VariantDark
+	}
+	if s.variantSpecified {
+		variant = s.variant
 	}
 
 	s.applyTheme(effectiveTheme, variant)

@@ -22,6 +22,8 @@ type Settings interface {
 	// Since: 1.0
 	ThemeVariant() ThemeVariant
 	// SetThemeVariant sets the preferred theme variant (light or dark) and re-applies the current theme.
+	// The app's choice then stands: later OS appearance changes and edits to the
+	// system-wide settings file no longer change the variant.
 	SetThemeVariant(ThemeVariant)
 	Scale() float32
 	// PrimaryColor indicates a user preference for a named primary color
@@ -49,6 +51,8 @@ type PrimaryColorSettings interface {
 
 	// SetPrimaryColor sets the preference for a named primary color and
 	// re-applies the current theme. The change affects the running app only;
-	// it is not written to the system-wide Bellui settings.
+	// it is not written to the system-wide Bellui settings, and it is kept when
+	// that settings file changes. An empty name withdraws the app's choice, so
+	// the system-wide colour applies again.
 	SetPrimaryColor(name string)
 }

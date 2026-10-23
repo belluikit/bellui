@@ -40,6 +40,8 @@ func TestIndexChecksTheRendererTheBuildNeeds(t *testing.T) {
 	page := renderIndex(t, true)
 	assert.Contains(t, page, "webgpu_support().then(")
 	assert.Contains(t, page, noWebGPUMessage)
+	// A WebGPU build must not also demand WebGL (#339).
+	assert.NotContains(t, page, "if (webgl_support()) {")
 
 	page = renderIndex(t, false)
 	assert.NotContains(t, page, "webgpu_support().then(")

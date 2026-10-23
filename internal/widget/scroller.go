@@ -634,16 +634,21 @@ func (s *Scroll) CreateRenderer() core.WidgetRenderer {
 	return scr
 }
 
-// ScrollToBottom will scroll content to container bottom - to show latest info which end user just added
+// ScrollToBottom will scroll content to container bottom - to show latest info which end user just added.
+// Like every programmatic scroll it reports the move through OnScrolled.
 func (s *Scroll) ScrollToBottom() {
-	s.scrollBy(0, -1*(s.Content.MinSize().Height-s.Size().Height-s.Offset.Y))
-	s.refreshBars()
+	// Past the end; moveTo clamps it to the true bottom. Only a real move
+	// supersedes the RTL start pin: before the first layout this clamps to
+	// nothing, and the horizontal offset is not the caller's to choose here.
+	if s.moveTo(geo.NewPos(s.Offset.X, s.Content.MinSize().Height)) {
+		s.rtlPinned = true
+	}
 }
 
-// ScrollToTop will scroll content to container top
+// ScrollToTop will scroll content to container top.
+// Like every programmatic scroll it reports the move through OnScrolled.
 func (s *Scroll) ScrollToTop() {
 	s.ScrollToOffset(geo.Position{})
-	s.refreshBars()
 }
 
 // MinSize returns the smallest size this widget can shrink to
@@ -690,6 +695,8 @@ func (s *Scroll) Resize(sz geo.Size) {
 }
 
 // ScrollToOffset will update the location of the content of this scroll container.
+// The offset is clamped to the content, and a resulting move is reported
+// through OnScrolled and the scroll listeners, as a user scroll is.
 //
 // Since: 1.0
 func (s *Scroll) ScrollToOffset(p geo.Position) {
@@ -697,9 +704,22 @@ func (s *Scroll) ScrollToOffset(p geo.Position) {
 		return
 	}
 
-	s.Offset = p
 	s.rtlPinned = true // explicit positioning supersedes the initial right-edge pin
-	s.refreshBars()
+	s.moveTo(p)
+}
+
+// moveTo sets the offset to p, clamped to the content, refreshes, and reports
+// a resulting move. It returns whether the offset changed.
+func (s *Scroll) moveTo(p geo.Position) bool {
+	old := s.Offset
+	s.Offset = p
+	s.clampOffset(0, 0)
+	s.refreshWithoutOffsetUpdate()
+	if s.Offset == old {
+		return false
+	}
+	s.notifyScrolled(s.Offset)
+	return true
 }
 
 func (s *Scroll) refreshWithoutOffsetUpdate() {
@@ -811,11 +831,6 @@ func (s *Scroll) swapAxesIfNeeded(dx, dy float32) (float32, float32) {
 	return dx, dy
 }
 
-func (s *Scroll) scrollBy(dx, dy float32) {
-	dx, dy = s.resolveScrollDelta(dx, dy)
-	s.applyScroll(dx, dy)
-}
-
 // applyScroll moves the offset by an already-resolved delta.
 func (s *Scroll) applyScroll(dx, dy float32) {
 	if s.updateOffset(dx, dy) {
@@ -824,7 +839,19 @@ func (s *Scroll) applyScroll(dx, dy float32) {
 	}
 }
 
+// updateOffset moves the offset by a delta, clamped to the content, and
+// reports a resulting move.
 func (s *Scroll) updateOffset(deltaX, deltaY float32) bool {
+	moved := s.clampOffset(deltaX, deltaY)
+	if moved {
+		s.notifyScrolled(s.Offset)
+	}
+	return moved
+}
+
+// clampOffset moves the offset by a delta, clamped to the content, without
+// reporting it. It returns whether the offset changed.
+func (s *Scroll) clampOffset(deltaX, deltaY float32) bool {
 	size := s.Size()
 	contentSize := s.Content.Size()
 	if contentSize.Width <= size.Width && contentSize.Height <= size.Height {
@@ -841,11 +868,7 @@ func (s *Scroll) updateOffset(deltaX, deltaY float32) bool {
 	s.Offset.X = computeOffset(s.Offset.X, -deltaX, size.Width, min.Width)
 	s.Offset.Y = computeOffset(s.Offset.Y, -deltaY, size.Height, min.Height)
 
-	moved := s.Offset.X != oldX || s.Offset.Y != oldY
-	if moved {
-		s.notifyScrolled(s.Offset)
-	}
-	return moved
+	return s.Offset.X != oldX || s.Offset.Y != oldY
 }
 
 func computeOffset(start, delta, outerWidth, innerWidth float32) float32 {
