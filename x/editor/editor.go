@@ -590,11 +590,10 @@ func (e *Editor) warnIfNestedInScroll() {
 	// Within the editor's own composition nothing clips the entry, so a clipping
 	// ancestor here means a host wrapped the editor in an outer scroll/clip.
 	if _, clipped := driver.ClipBoundsForObject(c, e.entry); clipped {
-		log.Println("fycoder: Editor is hosted inside an outer clipping/scrolling " +
+		log.Println("x/editor: Editor is hosted inside an outer clipping/scrolling " +
 			"container (e.g. container.Scroll); it manages its own scrolling, overlays " +
 			"and pointer capture, so an outer scroll intercepts clicks and the editor " +
-			"never focuses. Give the Editor its own viewport (no outer container.Scroll). " +
-			"See github.com/belluikit/bellui/x/editor/issues/111.")
+			"never focuses. Give the Editor its own viewport (no outer container.Scroll).")
 	}
 }
 

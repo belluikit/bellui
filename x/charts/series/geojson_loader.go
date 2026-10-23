@@ -93,7 +93,7 @@ func (l *geoJSONLoader) Get(url string, onLoaded func()) *geojson.FeatureCollect
 func (l *geoJSONLoader) load(url string, onLoaded func()) {
 	fc, err := l.download(url)
 	if err != nil {
-		log.Printf("fycharts: choropleth GeoJSON load failed for %s: %v", url, err)
+		log.Printf("x/charts: choropleth GeoJSON load failed for %s: %v", url, err)
 	}
 
 	l.mu.Lock()

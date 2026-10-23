@@ -149,7 +149,7 @@ func (r *choroplethRenderer) Render(ctx RenderContext) []core.CanvasObject {
 
 			polygons, err := feature.Geometry.Polygons()
 			if err != nil {
-				log.Printf("fycharts: choropleth feature %q polygons error: %v", name, err)
+				log.Printf("x/charts: choropleth feature %q polygons error: %v", name, err)
 				continue
 			}
 
@@ -195,7 +195,7 @@ func (r *choroplethRenderer) getGeoJSON(cs *ChoroplethSeries, onLoaded func()) *
 		}
 		fc, err := geojson.Parse(cs.GeoJSON)
 		if err != nil {
-			log.Printf("fycharts: choropleth inline GeoJSON parse error: %v", err)
+			log.Printf("x/charts: choropleth inline GeoJSON parse error: %v", err)
 			return nil
 		}
 		cs.inline = &inlineGeoJSON{src: cs.GeoJSON, fc: fc}

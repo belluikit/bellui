@@ -1,4 +1,4 @@
-// Package fycoder provides a composable code editor widget for Bellui applications.
+// Package editor provides a composable code editor widget for Bellui applications.
 //
 // The editor supports pluggable syntax highlighting, a customizable gutter
 // (line numbers, breakpoints, annotations), row-level decorations (current line

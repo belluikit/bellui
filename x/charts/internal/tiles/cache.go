@@ -132,25 +132,25 @@ func (c *Cache) download(tc coord.TileCoord) {
 	url := c.tileURL(tc)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		log.Printf("fycharts: tile request creation failed for %s: %v", url, err)
+		log.Printf("x/charts: tile request creation failed for %s: %v", url, err)
 		return
 	}
 	req.Header.Set("User-Agent", "fycharts/1.0 (github.com/belluikit/bellui/x/charts)")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		log.Printf("fycharts: tile download failed for %s: %v", url, err)
+		log.Printf("x/charts: tile download failed for %s: %v", url, err)
 		return
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		log.Printf("fycharts: tile download returned status %d for %s", resp.StatusCode, url)
+		log.Printf("x/charts: tile download returned status %d for %s", resp.StatusCode, url)
 		return
 	}
 
 	img, _, err := image.Decode(resp.Body)
 	if err != nil {
-		log.Printf("fycharts: tile image decode failed for %s: %v", url, err)
+		log.Printf("x/charts: tile image decode failed for %s: %v", url, err)
 		return
 	}
 

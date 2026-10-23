@@ -1,4 +1,4 @@
-// Package fytables provides an AG Grid-equivalent data table widget for the Bellui GUI framework.
+// Package tables provides an AG Grid-equivalent data table widget for the Bellui GUI framework.
 //
 // The main entry point is [NewDataGrid], which creates a virtual-scrolling data grid
 // that can handle 100k+ rows with features including sorting, filtering, cell editing,

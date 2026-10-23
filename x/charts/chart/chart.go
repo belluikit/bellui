@@ -37,7 +37,7 @@ const (
 	dirtyDrawing                        // drawing gesture/selection change (interactive layer)
 )
 
-// Chart is the main fycharts widget. It renders chart data using Fyne canvas primitives.
+// Chart is the x/charts widget. It renders chart data using Bellui canvas primitives.
 type Chart struct {
 	widget.BaseWidget
 

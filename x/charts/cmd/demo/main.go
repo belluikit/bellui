@@ -1,4 +1,4 @@
-// Command demo showcases all fycharts capabilities: 21+ chart types organized in
+// Command demo showcases the x/charts capabilities: its chart types organized in
 // 9 tabbed categories (Basic, Financial, Hierarchical, Specialized, Advanced,
 // Drilldown, 3D, Trading, Geo) with interactions, overlays, builder API, dataset,
 // animation, and real-time trading chart features.
@@ -29,7 +29,7 @@ import (
 
 func main() {
 	a := app.NewWithID("com.trendvidia.charts.demo")
-	w := a.NewWindow("fycharts Demo — All Capabilities")
+	w := a.NewWindow("x/charts demo — all capabilities")
 	w.Resize(geo.NewSize(1400, 900))
 
 	legend := &component.LegendConfig{Position: component.LegendBottom}
