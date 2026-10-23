@@ -37,6 +37,10 @@ type settings struct {
 	theme          bellui.Theme
 	themeSpecified bool
 	variant        bellui.ThemeVariant
+	// variantSpecified records an explicit SetThemeVariant: like
+	// themeSpecified for the theme, it keeps setupTheme (run on OS appearance
+	// changes and settings-file reloads) from replacing the app's choice.
+	variantSpecified bool
 
 	listeners []func(bellui.Settings)
 	watcher   any // normally *fsnotify.Watcher or nil - avoid import in this file
@@ -84,7 +88,11 @@ func (s *settings) ThemeVariant() bellui.ThemeVariant {
 	return s.variant
 }
 
+// SetThemeVariant sets the variant for the running app. The choice is kept
+// across later OS appearance changes and settings-file reloads, as SetTheme's
+// is.
 func (s *settings) SetThemeVariant(variant bellui.ThemeVariant) {
+	s.variantSpecified = true
 	s.applyTheme(s.theme, variant)
 }
 
@@ -132,6 +140,9 @@ func (s *settings) setupTheme() {
 		variant = theme.VariantLight
 	case "dark":
 		variant = theme.VariantDark
+	}
+	if s.variantSpecified {
+		variant = s.variant
 	}
 
 	s.applyTheme(effectiveTheme, variant)
