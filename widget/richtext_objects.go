@@ -26,7 +26,7 @@ var (
 		SizeName:  theme.SizeNameBodyMedium,
 		TextStyle: bellui.TextStyle{Italic: true},
 	}
-	// RichTextStyleCodeBlock represents a code blog segment.
+	// RichTextStyleCodeBlock represents a code block segment.
 	//
 	// Since: 1.0
 	RichTextStyleCodeBlock = RichTextStyle{

@@ -119,8 +119,13 @@ Gotchas:
 
 - Set `ANDROID_HOME` / `ANDROID_NDK_HOME`, and use a clean `CGO_LDFLAGS` /
   `CGO_CFLAGS`.
-- API&nbsp;30+ requires `resources.arsc` stored **and** 4-byte aligned: re-pack with
-  `zipalign -f -p 4` then re-sign with `apksigner`.
+- API&nbsp;30+ requires `resources.arsc` stored **and** 4-byte aligned, and a v2
+  signature. The CLI handles both: its APK writer stores every entry uncompressed
+  and 4-byte aligned, and `bellui package` then runs `zipalign` (when present)
+  and re-signs with `apksigner` (v1+v2, debug key) from the Android build-tools;
+  `bellui release` zipaligns and signs with your keystore (`apksigner` for an
+  APK, `jarsigner` for a distribution bundle). Install the build-tools: without `apksigner`
+  the package step only warns, and the APK will not install on API&nbsp;30+.
 
 ### iOS / iOS Simulator
 

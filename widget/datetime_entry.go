@@ -33,8 +33,6 @@ type DateTimeEntry struct {
 }
 
 // NewDateTimeEntry creates a new DateTimeEntry with a picker action button.
-// The 12h/24h mode is auto-detected from the current locale.
-// NewDateTimeEntry creates a new DateTimeEntry with a picker action button.
 // The 12h/24h mode is auto-detected from the current locale. Use the
 // DateTimeEntry.OnChanged field (not Entry.OnChanged) to receive parsed values.
 //

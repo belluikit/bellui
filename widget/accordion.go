@@ -311,7 +311,7 @@ func (r *accordionRenderer) updateObjects() {
 	r.SetObjects(objects)
 }
 
-// AccordionItem represents a single item in an Acc rdion.
+// AccordionItem represents a single item in an Accordion.
 type AccordionItem struct {
 	Title  string
 	Detail core.CanvasObject

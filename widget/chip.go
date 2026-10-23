@@ -18,7 +18,7 @@ type ChipStyle int
 
 const (
 	ChipStyleAssist     ChipStyle = iota // Outlined, icon+label
-	ChipStyleFilter                      // Selectable, checkmark when selected
+	ChipStyleFilter                      // Selectable; secondary-container fill when selected (no checkmark)
 	ChipStyleInput                       // Label + delete button
 	ChipStyleSuggestion                  // Outlined, label only
 )

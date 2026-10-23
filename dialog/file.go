@@ -1325,9 +1325,11 @@ func ShowFileOpen(callback func(reader bellui.URIReadCloser, err error), parent 
 // callback receives every chosen file (or a nil slice when the user cancels).
 // Each non-nil reader must be closed by the callback.
 //
-// Multi-select is only available in the canvas-drawn dialog for now, so a
-// multi-select open dialog always uses it even when [UseNativeFileDialogs] is
-// enabled (native multi-select is a follow-up).
+// When [UseNativeFileDialogs] is enabled, multi-select is passed through to the
+// platform picker on macOS, Windows, Linux/BSD (XDG desktop portal), iOS and
+// Android. On the web, and wherever no native picker is available (no portal,
+// or an Android build without the multi picker), the canvas-drawn dialog is
+// used, which supports multi-select itself.
 //
 // The dialog will appear over the window specified when Show() is called.
 //

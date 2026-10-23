@@ -8,7 +8,8 @@ import (
 )
 
 // AssertWidgetSize asserts that a widget's current size matches the expected size.
-// Uses approximate comparison (within 1 pixel) to handle float rounding.
+// Uses approximate comparison (each dimension within 1.5 pixels, exclusive) to
+// handle float rounding.
 func AssertWidgetSize(t *testing.T, obj core.CanvasObject, expectedW, expectedH float32) bool {
 	t.Helper()
 	s := obj.Size()
@@ -20,6 +21,7 @@ func AssertWidgetSize(t *testing.T, obj core.CanvasObject, expectedW, expectedH 
 }
 
 // AssertWidgetPosition asserts that a widget's current position matches expected values.
+// Uses the same approximate comparison as AssertWidgetSize (within 1.5 pixels).
 func AssertWidgetPosition(t *testing.T, obj core.CanvasObject, expectedX, expectedY float32) bool {
 	t.Helper()
 	p := obj.Position()

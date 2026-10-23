@@ -1,7 +1,10 @@
-# pre-rebrand tracker #515 Part B — Drag-out to other applications (design + macOS spike)
+# pre-rebrand tracker #515 Part B — Drag-out to other applications (design)
 
-Status: **spike** — public API defined, macOS proof implemented, Windows/Linux
-designed-on-paper. Tracks bellui pre-rebrand tracker #515 Part B.
+Status: **shipped.** Drag-out is implemented on macOS, Windows, Linux X11 and
+Wayland (the BSDs use the X11 backend), and on the web through a separate
+pull-based path (see *Web* below). This document began as the design plus a
+macOS-only spike; the per-platform sections keep that design and note where the
+built backend differs from it. Tracks bellui pre-rebrand tracker #515 Part B.
 
 ## Problem
 
@@ -61,11 +64,13 @@ not need a `bellui.Window` reference it usually lacks.
 
 ## Per-platform mechanism
 
-All four backends reach the native handle through `driver.NativeWindow.RunNative`
-(the `MacWindowContext` / `WindowsWindowContext` / `X11WindowContext` /
-Wayland context already used by dialogs, modality and clipboard).
+The design had all four desktop backends reach the native handle through
+`driver.NativeWindow.RunNative` (the `MacWindowContext` / `WindowsWindowContext` /
+`X11WindowContext` / Wayland context already used by dialogs, modality and
+clipboard). As built, X11 runs on its own Xlib connection and Wayland goes
+through the glfw fork; see those sections.
 
-### macOS — `NSDraggingSession` (implemented in this spike)
+### macOS — `NSDraggingSession` (implemented; the original spike)
 
 `internal/driver/glfw/dragsource_darwin.{go,m,h}`, MRC ObjC cgo, mirroring
 `dialog/file_darwin_native.*`:
@@ -88,7 +93,7 @@ Wayland context already used by dialogs, modality and clipboard).
 deprecated `dragImage:…slideBack:`): it returns immediately and AppKit drives the
 drag, so bellui's event loop is not stalled.
 
-### Windows — OLE `DoDragDrop` (design)
+### Windows — OLE `DoDragDrop` (implemented, pre-rebrand tracker #837)
 
 - `DoDragDrop(pDataObject, pDropSource, effects, &effect)` **blocks in a modal
   loop** until the drop completes — so it must NOT run on the render/UI thread.
@@ -101,8 +106,9 @@ drag, so bellui's event loop is not stalled.
   `GiveFeedback`). cgo-free via `x/sys/windows` COM syscalls, as pre-rebrand tracker #514 did for the
   file dialog.
 - The drag image uses `IDragSourceHelper::InitializeFromBitmap`.
+- As built: `internal/driver/glfw/dragsource_windows.go` + `dragsource_windows_com.go`.
 
-### Linux/X11 — XDND source protocol (design)
+### Linux/X11 — XDND source protocol (implemented, pre-rebrand tracker #838)
 
 - Hand-roll the XDND source side: own the `XdndSelection`, advertise
   `XdndAware`, send `XdndEnter`/`XdndPosition`/`XdndDrop` client messages to the
@@ -112,14 +118,37 @@ drag, so bellui's event loop is not stalled.
   codecs as the pre-rebrand tracker #513 clipboard.
 - Needs the X11 `Display`/`Window` from the glfw fork's `GetX11Window/Display`
   (already used by pre-rebrand tracker #513/#598). A grab + motion-tracking loop drives it.
+- As built (`dragsource_x11.{go,c,h}`): the drag runs on a dedicated locked OS
+  thread with its **own private Xlib `Display` connection**, polling the pointer,
+  so it never touches GLFW's connection or event loop. An optional cursor image
+  trails the pointer in a click-through window (pre-rebrand tracker #865). The
+  BSDs use this backend too.
 
-### Wayland — `wl_data_device.start_drag` (design)
+### Wayland — `wl_data_device.start_drag` (implemented)
 
 - Create a `wl_data_source`, `offer` each MIME type, `wl_data_device.start_drag`
   with the origin surface + an icon surface, and answer the `send` events with
   the payload. Needs a serial from a real input event (the mouse-down) — same
   focus/serial constraint as the pre-rebrand tracker #513 Wayland clipboard. Route through the glfw
   fork's Wayland accessors.
+- As built (`dragsource_wayland.go`): GLFW itself creates the data source and
+  calls `start_drag` via the belluikit/glfw fork's `StartWaylandDrag` (v1.7.0+),
+  which owns the seat, data device and pointer serial. The fork exposes no
+  completion signal and no icon surface, so on Wayland `DragData.OnCompleted` is
+  **not** called and no drag icon is attached.
+- The default Linux binary carries both X11 and Wayland backends and picks one
+  at runtime via `build.IsWayland` (`dragsource_xdg.go`).
+
+### Web — HTML5 drag and drop (implemented, pre-rebrand tracker #857/#874)
+
+The push model above (`desktop.StartDrag` from `Dragged`) cannot work in a
+browser: a native drag starts only from a user gesture, and once `dragstart`
+fires the page stops receiving the mouse events that would run `Dragged`. So
+`StartDrag` declines on wasm, and `dragsource_wasm.go` is **pull-based**
+instead: on mousedown it hit-tests the bellui tree, and if the deepest
+`event.Draggable` under the pointer implements `desktop.DragOutProvider` it marks
+the canvas element draggable for that gesture; `dragstart` then pulls
+`DragOutData()` into `dataTransfer`, and `dragend` reports the outcome.
 
 ## Threading & lifecycle
 
@@ -138,9 +167,10 @@ fired on the main goroutine via `bellui.Do`. The shared
 in-flight drag and exposes `notifyDragOutCompleted(accepted)`; each backend
 calls it from its native completion signal:
 `NSDraggingSource.draggingSession:endedAtPoint:operation:` (macOS, wired),
-`DoDragDrop`'s returned effect (Windows), `wl_data_source.dnd_finished`/
-`cancelled` (Wayland), `XdndFinished` (X11). `accepted` is true when the
-operation is anything other than none.
+`DoDragDrop`'s returned effect (Windows), `XdndFinished` (X11) and `dragend`
+(web). Wayland does not report completion (the glfw fork keeps
+`wl_data_source.dnd_finished` internal), so `OnCompleted` is not called there.
+`accepted` is true when the operation is anything other than none.
 
 ## CanvasObject drag image (pre-rebrand tracker #842, done)
 
@@ -159,17 +189,19 @@ A raw `Image` always wins.
 
 ## Follow-ups
 
-- **Windows `DoDragDrop`** (OLE, COM-STA thread) — pre-rebrand tracker #837.
-- **Linux X11 XDND source** — pre-rebrand tracker #838.
-- **Linux Wayland `wl_data_device.start_drag`** — pre-rebrand tracker #838.
+- ~~**Windows `DoDragDrop`** (OLE, COM-STA thread)~~ — done (pre-rebrand tracker #837).
+- ~~**Linux X11 XDND source**~~ — done (pre-rebrand tracker #838).
+- ~~**Linux Wayland `wl_data_device.start_drag`**~~ — done (pre-rebrand tracker #838), without completion reporting or a drag icon.
 - ~~Completion callback (`DragData.OnCompleted`)~~ — done (pre-rebrand tracker #841).
 - ~~`core.CanvasObject` drag-image rendering (bridge to pre-rebrand tracker #819 `DragImageProvider`)~~ — done (pre-rebrand tracker #842).
 - Human GUI verification of the macOS proof (drag into Finder / TextEdit) — pre-rebrand tracker #843.
 
 ### Platform backend files
 
-`startNativeDrag` is partitioned per GOOS so each backend owns one file:
-`dragsource_darwin.{go,m,h}` (done), `dragsource_windows.go` (pre-rebrand tracker #837),
-`dragsource_linux.go` (pre-rebrand tracker #838), and `dragsource_other.go`
-(`(!darwin || ios || wasm || js) && !windows && !linux`) declining on every
-other platform (ios/wasm/js and the BSDs — a later XDND follow-up).
+`startNativeDrag` is partitioned per platform, all in `internal/driver/glfw/`:
+`dragsource_darwin.{go,m,h}` (macOS), `dragsource_windows.go` +
+`dragsource_windows_com.go` (Windows), `dragsource_xdg.go` (Linux and the BSDs,
+choosing at runtime between `dragsource_x11.{go,c,h}` and
+`dragsource_wayland.go`; the `_stub` files cover forced single-backend builds),
+and `dragsource_other.go` declining everywhere else — iOS, and wasm/js, where
+the pull-based `dragsource_wasm.go` handles drag-out instead.

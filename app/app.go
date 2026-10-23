@@ -163,7 +163,7 @@ func (a *belluiApp) Clipboard() bellui.Clipboard {
 // New returns a new application instance with the default driver and no unique ID (unless specified in manifest.pxf)
 func New() bellui.App {
 	if meta.ID == "" {
-		checkLocalMetadata() // if no ID passed, check if it was in toml
+		checkLocalMetadata() // if no ID passed, check the project's manifest.pxf (development builds only)
 		if meta.ID == "" {
 			internal.LogHint("Applications should be created with a unique ID using app.NewWithID()")
 		}

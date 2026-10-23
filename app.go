@@ -12,8 +12,10 @@ import (
 // Alternatively use the [ShowAndRun] function for your main window.
 type App interface {
 	// Create a new window for the application.
-	// The first window to open is considered the "master" and when closed
-	// the application will exit.
+	// No window is the "master" by default: the application exits when its
+	// last window closes. To make closing one particular window exit the
+	// application, call SetMaster on it through the [MasterWindow] optional
+	// interface (desktop only; it is a no-op on web and mobile).
 	//
 	// How additional windows are presented depends on the platform:
 	//   - Desktop: each window is a real, independent OS window; any number
@@ -118,12 +120,12 @@ type NotifierWithOptionsApp interface {
 
 // BadgeApp is an optional interface that an [App] can implement to display a
 // count badge on its icon in the OS launcher: the dock icon on macOS, the
-// taskbar button on Windows, and the launcher entry on Linux desktops that
-// support the Unity LauncherEntry protocol (KDE and others).
+// taskbar button on Windows, the launcher entry on Linux desktops that
+// support the Unity LauncherEntry protocol (KDE and others), and the home-screen
+// app icon on iOS.
 //
-// It is best-effort — desktops without a badge affordance silently ignore it —
-// and only implemented on desktop platforms; mobile and web apps do not satisfy
-// this interface.
+// It is best-effort — desktops without a badge affordance silently ignore it.
+// Android and web apps do not satisfy this interface.
 //
 // Since: 1.0
 type BadgeApp interface {

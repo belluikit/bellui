@@ -1,15 +1,19 @@
 # Accessibility Roadmap
 
-Accessibility gaps and planned improvements for the Bellui fork.
+Accessibility gaps and planned improvements for the Bellui fork. The design,
+invariants and per-platform detail live in `docs/notes/accessibility.md`.
 
 ## Status
 
-Core type infrastructure is done (`Accessible`, `AccessibleDescriber`, `AccessibleValuer`, `AccessibleStateful`, `AccessibleActioner` interfaces, 47 roles, 9 state flags, 8 action constants, 36 widgets annotated). What remains is platform integration, UX enforcement, and widget coverage.
+The public semantics (`core/accessible.go`: `Accessible`, `AccessibleDescriber`,
+`AccessibleValuer`, `AccessibleStateful`, `AccessibleActioner`, with the `Role*`,
+`State*` and `Action*` constants) are implemented by most stock widgets (see
+`widget/accessible_test.go`). Behind `-tags accessibility`, a bounds-aware walker
+feeds five platform bridges. What remains is UX enforcement and the gaps listed
+below.
 
-## Platform Bridges
+## Remaining UX Work
 
-- Platform accessibility bridges (NSAccessibility on macOS, ATK/AT-SPI on Linux, UIA on Windows)
-- Live region announcements (for toasts, status updates, dynamic content)
 - Focus indicator styling enforcement
 - Keyboard shortcut help/documentation system
 - Skip links / landmark navigation
@@ -18,19 +22,18 @@ Core type infrastructure is done (`Accessible`, `AccessibleDescriber`, `Accessib
 
 - Alt-text for `canvas.Image` (no `Description` field)
 - Form-level labeling (associating a Form item's label with its Entry for screen readers)
-- `widget.Chip` delete button is a raw `canvas.Image` with no accessible role — invisible to screen readers
+- `widget.Chip` delete button is a raw `canvas.Image` with no accessible role or
+  delete action — invisible to screen readers
 
 ## Widgets Missing `core.Accessible` Implementation
 
-Identified during full codebase audit (2026-04-19). These are all interactive, user-facing widgets that should expose accessible roles, labels, and values.
-
-- `widget.DatePicker` / `widget.DateEntry`
-- `widget.TimePicker` / `widget.DateTimePicker` / `widget.DateTimeEntry`
-- `widget.ContextMenu`
-- `widget.ScrollIndicator`
-- `widget.SearchField`
-- `widget.SpinBox`
+- `widget.ContextMenu` — the wrapped content is exposed, but the decorator itself
+  has no role and offers no action to open its menu, so the menu is reachable
+  only by a secondary tap.
 
 ## Completed
 
-- **Core type infrastructure** — `Accessible`, `AccessibleDescriber`, `AccessibleValuer`, `AccessibleStateful`, `AccessibleActioner` interfaces. 47 roles, 9 state flags, 8 action constants. 36 widgets annotated. Generic `WalkAccessibleTree`.
+- **Core type infrastructure** — `Accessible`, `AccessibleDescriber`, `AccessibleValuer`, `AccessibleStateful`, `AccessibleActioner` interfaces, role/state/action constants, generic `WalkAccessibleTree`.
+- **Platform bridges** (`-tags accessibility`) — macOS NSAccessibility, Windows UIA, Linux AT-SPI2 (pure Go), Android virtual nodes, iOS. Verify with `hack/a11yprobe`.
+- **Live region announcements** — `bellui.AnnounceToScreenReader`; `Toast` and `Snackbar` announce their text.
+- **Date/time and input widgets** — `DatePicker`, `TimePicker`, `DateTimePicker` (RoleGroup with a locale-formatted value), `DateEntry` / `DateTimeEntry` (through the embedded `Entry`), `ScrollIndicator` (RoleScrollBar), `SearchField` (RoleSearchField), `SpinBox` (RoleSpinButton with value, range and increment/decrement actions).

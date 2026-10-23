@@ -25,9 +25,13 @@ type PopUp struct {
 	Canvas  core.Canvas
 
 	// OnDismissed, when set, replaces hiding as the response to the user
-	// dismissing this pop-up. A host that has its own close path — a dialog
-	// with a result to report — sets it so that path runs whatever the user
-	// dismissed with.
+	// pressing Escape on this pop-up (see DismissOnEscape). A host that has its
+	// own close path — a dialog with a result to report — sets it so that path
+	// runs instead of a plain Hide.
+	//
+	// It is only consulted on the Escape path. An outside tap or secondary tap
+	// (when the pop-up dismisses on tap) and the accessibility dismiss action
+	// call Hide directly and do not run it.
 	//
 	// Since: 1.0
 	OnDismissed func() `json:"-"`
@@ -321,7 +325,8 @@ func newPopUpWithBgColor(content core.CanvasObject, canvas core.Canvas, bg color
 	return ret
 }
 
-// NewPopUp creates a new popUp for the specified content and displays it on the passed canvas.
+// NewPopUp creates a new popUp for the specified content on the passed canvas.
+// It is not shown until Show is called; use ShowPopUp to create and show in one call.
 func NewPopUp(content core.CanvasObject, canvas core.Canvas) *PopUp {
 	return newPopUp(content, canvas)
 }
@@ -337,7 +342,8 @@ func newModalPopUp(content core.CanvasObject, canvas core.Canvas) *PopUp {
 	return p
 }
 
-// NewModalPopUp creates a new popUp for the specified content and displays it on the passed canvas.
+// NewModalPopUp creates a new modal popUp for the specified content on the passed canvas.
+// It is not shown until Show is called; use ShowModalPopUp to create and show in one call.
 // A modal PopUp blocks interactions with underlying elements, covered with a semi-transparent overlay.
 func NewModalPopUp(content core.CanvasObject, canvas core.Canvas) *PopUp {
 	return newModalPopUp(content, canvas)

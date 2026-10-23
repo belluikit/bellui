@@ -101,8 +101,10 @@ func namespacedThemeName(name string) bool {
 	return strings.ContainsAny(name, ".:")
 }
 
-// ValidateTheme checks a theme implementation against all known keys and reports
-// any that return fallback values (transparent colors, zero sizes, nil icons).
+// ValidateTheme checks a theme implementation against the known color and size
+// names and reports any that return fallback values: a nil or transparent color
+// in either the dark or light variant, or a zero size. Icons and fonts are not
+// checked.
 // Returns a list of issues found. Useful in tests and development.
 func ValidateTheme(t bellui.Theme) []string {
 	var issues []string
