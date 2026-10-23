@@ -27,6 +27,10 @@ type AudioPlayer struct {
 }
 
 // NewAudioPlayer creates a new audio player widget from an io.Reader.
+//
+// A stream with audio is an error here when the audio device cannot be opened
+// or the stream cannot be converted to the device's format, rather than a
+// player that plays silent or at the wrong speed.
 func NewAudioPlayer(r io.Reader, opts ...Option) (*AudioPlayer, error) {
 	o := buildOptions(opts)
 	pipe, err := pipeline.NewPipeline(r, pipeline.Config{Downmix: o.downmix})
@@ -44,6 +48,10 @@ func NewAudioPlayer(r io.Reader, opts ...Option) (*AudioPlayer, error) {
 //
 // http and https are compiled in, as are the hls and rtsp demuxers and the
 // rtmp protocol.
+//
+// A stream with audio is an error here when the audio device cannot be opened
+// or the stream cannot be converted to the device's format, rather than a
+// player that plays silent or at the wrong speed.
 func NewAudioPlayerURL(url string, opts ...Option) (*AudioPlayer, error) {
 	o := buildOptions(opts)
 	pipe, err := pipeline.NewPipelineURL(url, pipeline.Config{Downmix: o.downmix})

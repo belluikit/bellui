@@ -27,6 +27,13 @@
 // cameras, and [MediaPlayer.SetCaptureDevice] switches one for another inside
 // the running player rather than rebuilding it.
 //
+// A player is not built on audio it cannot play. Every constructor returns an
+// error when the stream has audio and the audio device will not open (no device,
+// as on a headless machine, or one that refuses the format), or when the
+// stream's decoder cannot convert it to the device's format. The device is
+// opened once per process, so once it has failed to open, every later player
+// with audio gets the same error.
+//
 // [NewVideoPlayer] and [NewAudioPlayer] expose the single-medium widgets, and
 // [NewSubtitleOverlay] renders SRT or WebVTT tracks over a player;
 // [MediaPlayerWithSubtitles] wires the two together so the overlay follows
