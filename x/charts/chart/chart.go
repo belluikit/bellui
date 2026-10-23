@@ -1060,11 +1060,21 @@ func (c *Chart) resolveZoom(x float32, s zoomStep) scrollResult {
 		return scrollResult{}
 	}
 	centerNorm := float64(x) / float64(c.Size().Width)
+	if c.xInverseLocked() {
+		centerNorm = 1 - centerNorm
+	}
 	if s.window(c.zoomState, centerNorm) {
 		c.zoomState.FollowLatest = false
 		return scrollResult{kind: "zoom", window: c.zoomState.Window, onZoom: c.OnZoomChange}
 	}
 	return scrollResult{}
+}
+
+// xInverseLocked reports whether the X axis runs right to left
+// (axis.Config.Inverse), so screen-space zoom anchors and pan deltas must be
+// mirrored into the data window. The caller holds c.mu.
+func (c *Chart) xInverseLocked() bool {
+	return len(c.option.XAxis) > 0 && c.option.XAxis[0].Inverse
 }
 
 // --- Draggable (Pan + Brush) ---
@@ -1137,6 +1147,9 @@ func (c *Chart) resolveDrag(e *event.DragEvent) dragResult {
 	if c.zoomState != nil && c.zoomState.IsZoomed() {
 		size := c.Size()
 		deltaNorm := -float64(e.Dragged.DX) / float64(size.Width) * c.zoomState.Window.Span()
+		if c.xInverseLocked() {
+			deltaNorm = -deltaNorm // data runs right to left
+		}
 		if c.zoomState.Pan(deltaNorm) {
 			c.zoomState.FollowLatest = false
 			return dragResult{kind: "pan", window: c.zoomState.Window, onZoom: c.OnZoomChange}

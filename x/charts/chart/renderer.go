@@ -671,18 +671,22 @@ func (r *chartRenderer) renderCartesian(
 		yScales[i].SetRange(yr.min, yr.max)
 	}
 
-	// Build one coordinate system per Y axis, all sharing the same X scale and bounds
+	// Build one coordinate system per Y axis, all sharing the same X scale and
+	// bounds. An Inverse axis reverses the mapping itself, so series, hit
+	// testing and pixel-to-data conversion all follow it.
 	coordSystems := make([]*coord.Cartesian2D, len(yScales))
 	for i, ys := range yScales {
 		cs := coord.NewCartesian2D(xScale, ys)
 		cs.SetBounds(plotRect)
+		cs.SetInvert(xConfigs[0].Inverse, yConfigs[i].Inverse)
 		coordSystems[i] = cs
 	}
 
-	// Render axes: left axis for yScales[0], right axis for yScales[1+]
-	objects = append(objects, r.renderAxes(coordSystems[0], xScale, yScales[0], plotRect, resolver)...)
-	for i := 1; i < len(yScales); i++ {
-		objects = append(objects, r.renderRightAxis(yScales[i], i, plotRect, resolver)...)
+	// Render axes. The first Y axis draws the grid lines; by default it sits
+	// on the left and every other Y axis on the right (see yAxisSide).
+	objects = append(objects, r.renderXAxis(xConfigs[0], xScale, plotRect, resolver)...)
+	for i, ys := range yScales {
+		objects = append(objects, r.renderYAxis(yConfigs[i], ys, i, i == 0, plotRect, resolver)...)
 	}
 
 	// Shared stack offsets for stacked bar/line series
@@ -924,120 +928,201 @@ func (r *chartRenderer) seriesIndex(s series.Series) int {
 	return 0
 }
 
-func (r *chartRenderer) renderAxes(
-	coordSys *coord.Cartesian2D,
-	xScale, yScale axis.Scale,
-	plotRect coord.Rect,
-	resolver *style.Resolver,
-) []core.CanvasObject {
+// axisSide is the edge of the plot area an axis is drawn along.
+type axisSide int
+
+const (
+	sideBottom axisSide = iota
+	sideTop
+	sideLeft
+	sideRight
+)
+
+// xAxisSide is where an X axis is drawn: at the top for PositionTop, otherwise
+// at the bottom.
+func xAxisSide(cfg axis.Config) axisSide {
+	if cfg.Position == axis.PositionTop {
+		return sideTop
+	}
+	return sideBottom
+}
+
+// yAxisSide is where the Y axis at index is drawn. PositionLeft and
+// PositionRight choose a side; anything else — including the zero value,
+// PositionBottom, which means nothing for a Y axis — keeps the default: the
+// first Y axis on the left, every other one on the right.
+func yAxisSide(cfg axis.Config, index int) axisSide {
+	switch cfg.Position {
+	case axis.PositionLeft:
+		return sideLeft
+	case axis.PositionRight:
+		return sideRight
+	}
+	if index == 0 {
+		return sideLeft
+	}
+	return sideRight
+}
+
+// axisColors resolves an axis's line and label colours: the config's when
+// set, the theme's otherwise.
+func axisColors(cfg axis.Config, resolver *style.Resolver) (line, label color.Color) {
+	line, label = cfg.LineColor, cfg.LabelColor
+	if line == nil {
+		line = resolver.AxisLineColor()
+	}
+	if label == nil {
+		label = resolver.AxisLabelColor()
+	}
+	return line, label
+}
+
+// tickNorm is a tick's position along its axis in [0, 1], reversed for an
+// Inverse axis.
+func tickNorm(t axis.Tick, inverse bool) float32 {
+	if inverse {
+		return float32(1 - t.Norm)
+	}
+	return float32(t.Norm)
+}
+
+// textWidth estimates the drawn width of s at size, as the tick labels do.
+func textWidth(s string, size float32) float32 {
+	return float32(len(s)) * size * 0.6
+}
+
+// renderXAxis draws an X axis along the bottom or top of the plot: the axis
+// line, a tick mark and label per tick, and the axis name centred beyond the
+// labels.
+func (r *chartRenderer) renderXAxis(cfg axis.Config, xScale axis.Scale, plotRect coord.Rect, resolver *style.Resolver) []core.CanvasObject {
 	var objects []core.CanvasObject
 	labelSize := resolver.LabelTextSize()
-	gridColor := resolver.GridLineColor()
-	axisColor := resolver.AxisLineColor()
-	labelColor := resolver.AxisLabelColor()
+	lineColor, labelColor := axisColors(cfg, resolver)
+	top := xAxisSide(cfg) == sideTop
 
-	bottomLine := &canvas.Line{
-		Position1:   geo.NewPos(plotRect.X, plotRect.Y+plotRect.H),
-		Position2:   geo.NewPos(plotRect.X+plotRect.W, plotRect.Y+plotRect.H),
-		StrokeColor: axisColor,
-		StrokeWidth: 1,
+	y := plotRect.Y + plotRect.H
+	dir := float32(1) // away from the plot: down for the bottom axis
+	if top {
+		y = plotRect.Y
+		dir = -1
 	}
-	leftLine := &canvas.Line{
-		Position1:   geo.NewPos(plotRect.X, plotRect.Y),
-		Position2:   geo.NewPos(plotRect.X, plotRect.Y+plotRect.H),
-		StrokeColor: axisColor,
+
+	objects = append(objects, &canvas.Line{
+		Position1:   geo.NewPos(plotRect.X, y),
+		Position2:   geo.NewPos(plotRect.X+plotRect.W, y),
+		StrokeColor: lineColor,
 		StrokeWidth: 1,
-	}
-	objects = append(objects, bottomLine, leftLine)
+	})
 
-	for _, tick := range yScale.Ticks() {
-		py := plotRect.Y + float32(1-tick.Norm)*plotRect.H
-
-		gl := &canvas.Line{
-			Position1:   geo.NewPos(plotRect.X, py),
-			Position2:   geo.NewPos(plotRect.X+plotRect.W, py),
-			StrokeColor: gridColor,
-			StrokeWidth: 0.5,
+	// labelY places a box of height h at distance gap beyond the axis line.
+	labelY := func(gap, h float32) float32 {
+		if top {
+			return y - gap - h
 		}
-		objects = append(objects, gl)
-
-		label := canvas.NewText(tick.Label, labelColor)
-		label.TextSize = labelSize
-		label.Alignment = bellui.TextAlignTrailing
-		labelWidth := plotRect.X - resolver.Padding()
-		label.Move(geo.NewPos(0, py-labelSize/2))
-		label.Resize(geo.NewSize(labelWidth, labelSize+4))
-		objects = append(objects, label)
+		return y + gap
 	}
 
 	for _, tick := range xScale.Ticks() {
-		px := plotRect.X + float32(tick.Norm)*plotRect.W
+		px := plotRect.X + tickNorm(tick, cfg.Inverse)*plotRect.W
 
-		tm := &canvas.Line{
-			Position1:   geo.NewPos(px, plotRect.Y+plotRect.H),
-			Position2:   geo.NewPos(px, plotRect.Y+plotRect.H+4),
-			StrokeColor: axisColor,
+		objects = append(objects, &canvas.Line{
+			Position1:   geo.NewPos(px, y),
+			Position2:   geo.NewPos(px, y+4*dir),
+			StrokeColor: lineColor,
 			StrokeWidth: 1,
-		}
-		objects = append(objects, tm)
+		})
 
 		label := canvas.NewText(tick.Label, labelColor)
 		label.TextSize = labelSize
 		label.Alignment = bellui.TextAlignCenter
-		estWidth := float32(len(tick.Label)) * labelSize * 0.6
-		label.Move(geo.NewPos(px-estWidth/2, plotRect.Y+plotRect.H+6))
+		estWidth := textWidth(tick.Label, labelSize)
+		label.Move(geo.NewPos(px-estWidth/2, labelY(6, labelSize+4)))
 		label.Resize(geo.NewSize(estWidth, labelSize+4))
 		objects = append(objects, label)
+	}
+
+	if cfg.Name != "" {
+		name := canvas.NewText(cfg.Name, labelColor)
+		name.TextSize = labelSize
+		name.Alignment = bellui.TextAlignCenter
+		name.Move(geo.NewPos(plotRect.X, labelY(6+labelSize+4, labelSize+4)))
+		name.Resize(geo.NewSize(plotRect.W, labelSize+4))
+		objects = append(objects, name)
 	}
 
 	return objects
 }
 
-// renderRightAxis renders a Y axis on the right side of the plot area.
-// axisIndex is used to offset multiple right-side axes.
-func (r *chartRenderer) renderRightAxis(
-	yScale axis.Scale,
-	axisIndex int,
-	plotRect coord.Rect,
-	resolver *style.Resolver,
-) []core.CanvasObject {
+// renderYAxis draws the Y axis at index on the side yAxisSide picks: the axis
+// line, a label per tick and the axis name above the axis. A right-hand axis
+// also draws tick marks. splitLines draws the horizontal grid lines at its
+// ticks, which only the first Y axis does.
+func (r *chartRenderer) renderYAxis(cfg axis.Config, yScale axis.Scale, index int, splitLines bool, plotRect coord.Rect, resolver *style.Resolver) []core.CanvasObject {
 	var objects []core.CanvasObject
 	labelSize := resolver.LabelTextSize()
-	axisColor := resolver.AxisLineColor()
-	labelColor := resolver.AxisLabelColor()
+	lineColor, labelColor := axisColors(cfg, resolver)
+	gridColor := resolver.GridLineColor()
+	right := yAxisSide(cfg, index) == sideRight
 
-	// Offset for multiple right axes (first right axis at plot right edge, subsequent shifted further)
-	rightX := plotRect.X + plotRect.W
-
-	// Axis line
-	axisLine := &canvas.Line{
-		Position1:   geo.NewPos(rightX, plotRect.Y),
-		Position2:   geo.NewPos(rightX, plotRect.Y+plotRect.H),
-		StrokeColor: axisColor,
-		StrokeWidth: 1,
+	x := plotRect.X
+	if right {
+		x = plotRect.X + plotRect.W
 	}
-	objects = append(objects, axisLine)
 
-	// Tick labels on the right
+	objects = append(objects, &canvas.Line{
+		Position1:   geo.NewPos(x, plotRect.Y),
+		Position2:   geo.NewPos(x, plotRect.Y+plotRect.H),
+		StrokeColor: lineColor,
+		StrokeWidth: 1,
+	})
+
 	for _, tick := range yScale.Ticks() {
-		py := plotRect.Y + float32(1-tick.Norm)*plotRect.H
+		// Screen Y grows downwards, so the top of the axis is norm 1.
+		py := plotRect.Y + (1-tickNorm(tick, cfg.Inverse))*plotRect.H
 
-		// Tick mark
-		tm := &canvas.Line{
-			Position1:   geo.NewPos(rightX, py),
-			Position2:   geo.NewPos(rightX+4, py),
-			StrokeColor: axisColor,
-			StrokeWidth: 1,
+		if splitLines {
+			objects = append(objects, &canvas.Line{
+				Position1:   geo.NewPos(plotRect.X, py),
+				Position2:   geo.NewPos(plotRect.X+plotRect.W, py),
+				StrokeColor: gridColor,
+				StrokeWidth: 0.5,
+			})
 		}
-		objects = append(objects, tm)
 
-		// Label
 		label := canvas.NewText(tick.Label, labelColor)
 		label.TextSize = labelSize
-		label.Alignment = bellui.TextAlignLeading
-		label.Move(geo.NewPos(rightX+6, py-labelSize/2))
-		label.Resize(geo.NewSize(50, labelSize+4))
+		if right {
+			objects = append(objects, &canvas.Line{
+				Position1:   geo.NewPos(x, py),
+				Position2:   geo.NewPos(x+4, py),
+				StrokeColor: lineColor,
+				StrokeWidth: 1,
+			})
+			label.Alignment = bellui.TextAlignLeading
+			label.Move(geo.NewPos(x+6, py-labelSize/2))
+			label.Resize(geo.NewSize(50, labelSize+4))
+		} else {
+			label.Alignment = bellui.TextAlignTrailing
+			label.Move(geo.NewPos(0, py-labelSize/2))
+			label.Resize(geo.NewSize(x-resolver.Padding(), labelSize+4))
+		}
 		objects = append(objects, label)
+	}
+
+	if cfg.Name != "" {
+		name := canvas.NewText(cfg.Name, labelColor)
+		name.TextSize = labelSize
+		ny := plotRect.Y - labelSize - 8
+		if right {
+			name.Alignment = bellui.TextAlignLeading
+			name.Move(geo.NewPos(x, ny))
+			name.Resize(geo.NewSize(textWidth(cfg.Name, labelSize), labelSize+4))
+		} else {
+			name.Alignment = bellui.TextAlignTrailing
+			name.Move(geo.NewPos(0, ny))
+			name.Resize(geo.NewSize(x, labelSize+4))
+		}
+		objects = append(objects, name)
 	}
 
 	return objects
