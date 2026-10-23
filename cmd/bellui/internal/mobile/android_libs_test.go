@@ -10,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/belluikit/bellui/cmd/bellui/internal/mobile/binres"
 	"github.com/belluikit/bellui/cmd/bellui/internal/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -96,6 +97,80 @@ func TestMergeLibraryManifests(t *testing.T) {
 	assert.Greater(t, strings.Index(m, "android.permission.VIBRATE"), appEnd)
 }
 
+// Two libraries declaring one component: androidx.lifecycle-process and
+// androidx.emoji2 each put their initializer's meta-data under one
+// androidx.startup InitializationProvider. Keeping only the first library's
+// declaration silently dropped the second initializer.
+func TestMergeLibraryManifestsJoinsSharedComponents(t *testing.T) {
+	provider := func(pkg, initializer string) []byte {
+		return []byte(`<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="` + pkg + `">
+	<application>
+		<provider android:name="androidx.startup.InitializationProvider"
+			android:authorities="${applicationId}.androidx-startup" android:exported="false">
+			<meta-data android:name="` + initializer + `" android:value="androidx.startup" />
+			<meta-data android:name="androidx.profileinstaller.ProfileInstallerInitializer" android:value="androidx.startup" />
+		</provider>
+	</application>
+</manifest>`)
+	}
+	dir := t.TempDir()
+	writeZip(t, filepath.Join(dir, "android", "libs", "a-emoji2.aar"), map[string][]byte{
+		"AndroidManifest.xml": provider("androidx.emoji2", "androidx.emoji2.text.EmojiCompatInitializer"),
+	})
+	writeZip(t, filepath.Join(dir, "android", "libs", "b-lifecycle.aar"), map[string][]byte{
+		"AndroidManifest.xml": provider("androidx.lifecycle.process", "androidx.lifecycle.ProcessLifecycleInitializer"),
+	})
+	libs, err := collectAndroidLibs(dir, t.TempDir())
+	require.NoError(t, err)
+	merged, err := mergeLibraryManifests([]byte(testAppManifest), libs)
+	require.NoError(t, err)
+	m := string(merged)
+
+	assert.Equal(t, 1, strings.Count(m, `"androidx.startup.InitializationProvider"`), m)
+	assert.Contains(t, m, `"androidx.emoji2.text.EmojiCompatInitializer"`)
+	assert.Contains(t, m, `"androidx.lifecycle.ProcessLifecycleInitializer"`, "the second library's initializer survives")
+	assert.Equal(t, 1, strings.Count(m, `"androidx.profileinstaller.ProfileInstallerInitializer"`), "a child both declare appears once")
+	// Both meta-data sit inside the one provider.
+	p := m[strings.Index(m, "<provider"):strings.Index(m, "</provider>")]
+	assert.Contains(t, p, "ProcessLifecycleInitializer")
+}
+
+// A library's relative component names resolve against its own package, not
+// the app's it ends up in; so does the deduplication key.
+func TestMergeLibraryManifestsQualifiesClassNames(t *testing.T) {
+	dir := t.TempDir()
+	writeZip(t, filepath.Join(dir, "android", "libs", "rel.aar"), map[string][]byte{
+		"AndroidManifest.xml": []byte(`<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.lib">
+	<application>
+		<service android:name=".SyncService" />
+		<receiver android:name="BootReceiver" />
+		<activity android:name=".Main" android:parentActivityName=".Home" />
+		<activity-alias android:name=".Alias" android:targetActivity=".Main" />
+		<provider android:name="com.other.Provider" android:authorities="x" />
+		<meta-data android:name=".not.a.class" android:value="v" />
+	</application>
+</manifest>`),
+	})
+	writeZip(t, filepath.Join(dir, "android", "libs", "rel2.aar"), map[string][]byte{
+		"AndroidManifest.xml": []byte(`<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.lib2">
+	<application><service android:name=".SyncService" /></application>
+</manifest>`),
+	})
+	libs, err := collectAndroidLibs(dir, t.TempDir())
+	require.NoError(t, err)
+	merged, err := mergeLibraryManifests([]byte(testAppManifest), libs)
+	require.NoError(t, err)
+	m := string(merged)
+
+	assert.Contains(t, m, `<service android:name="com.lib.SyncService">`)
+	assert.Contains(t, m, `<service android:name="com.lib2.SyncService">`, "another library's .SyncService is a different class")
+	assert.Contains(t, m, `<receiver android:name="com.lib.BootReceiver">`)
+	assert.Contains(t, m, `android:name="com.lib.Main" android:parentActivityName="com.lib.Home"`)
+	assert.Contains(t, m, `android:name="com.lib.Alias" android:targetActivity="com.lib.Main"`)
+	assert.Contains(t, m, `android:name="com.other.Provider"`)
+	assert.Contains(t, m, `<meta-data android:name=".not.a.class"`, "meta-data names are not classes")
+}
+
 func TestMergeLibraryManifestsWithoutAARsIsIdentity(t *testing.T) {
 	merged, err := mergeLibraryManifests([]byte(testAppManifest), &androidLibs{jars: []string{"x.jar"}})
 	require.NoError(t, err)
@@ -160,9 +235,9 @@ func sdkTools(t *testing.T) (androidJar, buildTools string) {
 	if _, err := exec.LookPath("javac"); err != nil {
 		t.Skip("javac not on PATH")
 	}
-	platform, err := findLastPlatform(home)
-	if err != nil {
-		t.Skip(err)
+	androidJar, err := binres.LatestAPIResourcesPath()
+	if err != nil || !util.Exists(androidJar) {
+		t.Skipf("no android.jar: %v", err)
 	}
 	buildTools = util.AndroidBuildToolsPath()
 	for _, tool := range []string{"d8", "aapt2", "dexdump"} {
@@ -170,7 +245,7 @@ func sdkTools(t *testing.T) (androidJar, buildTools string) {
 			t.Skipf("%s not in %s", tool, buildTools)
 		}
 	}
-	return filepath.Join(platform, "android.jar"), buildTools
+	return androidJar, buildTools
 }
 
 // javacJar compiles sources (path → source) and returns the classes as jar
@@ -410,31 +485,73 @@ func readZipEntry(t *testing.T, f *zip.File) string {
 	return string(b)
 }
 
-// TestFindLastPlatform pins numeric API-level ordering: name order would
-// pick android-9 over android-35, and a codename preview over both.
-func TestFindLastPlatform(t *testing.T) {
-	for _, tc := range []struct {
-		dirs []string
-		want string
-	}{
-		{[]string{"android-35", "android-9"}, "android-35"},
-		{[]string{"android-34", "android-34-ext12", "android-33"}, "android-34-ext12"},
-		{[]string{"android-36", "android-36.1", "android-35"}, "android-36.1"},
-		{[]string{"android-Baklava", "android-35"}, "android-35"},
-		{[]string{"android-Baklava"}, "android-Baklava"},
-	} {
-		home := t.TempDir()
-		for _, d := range tc.dirs {
-			if err := os.MkdirAll(filepath.Join(home, "platforms", d), 0o755); err != nil {
-				t.Fatal(err)
-			}
-		}
-		got, err := findLastPlatform(home)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if filepath.Base(got) != tc.want {
-			t.Errorf("findLastPlatform(%v) = %s, want %s", tc.dirs, filepath.Base(got), tc.want)
-		}
+// TestDryRunSkipsLibraryTools pins that -n neither extracts android/libs nor
+// runs javac/d8: under -n tmpdir is the literal "$WORK", so a real step would
+// write a "$WORK" directory into the current one.
+func TestDryRunSkipsLibraryTools(t *testing.T) {
+	prevN, prevTmp, prevOut := buildN, tmpdir, xout
+	t.Cleanup(func() { buildN, tmpdir, xout = prevN, prevTmp, prevOut })
+	var out bytes.Buffer
+	buildN, tmpdir, xout = true, "$WORK", &out
+
+	cwd := t.TempDir()
+	t.Chdir(cwd)
+	app := t.TempDir()
+	writeZip(t, filepath.Join(app, "android", "libs", "greeter.aar"), map[string][]byte{
+		"AndroidManifest.xml": []byte(testAARManifest),
+		"classes.jar":         {},
+	})
+	require.NoError(t, os.WriteFile(filepath.Join(app, "android", "Shim.java"), []byte("class Shim {}"), 0o644))
+
+	libs, err := prepareAndroidLibs(app, []byte(testAppManifest), []string{"arm64"}, "app", "", "", "", "", 35, 7, "1.2")
+	require.NoError(t, err)
+	assert.Empty(t, libs.nativeFiles)
+	assert.Nil(t, libs.linked)
+	dex, err := mergeAppJavaDex(app, libs.libs.jars, libs.rJava())
+	require.NoError(t, err)
+	assert.Nil(t, dex)
+
+	assert.NoFileExists(t, filepath.Join(cwd, "$WORK"))
+	assert.NoDirExists(t, filepath.Join(cwd, "$WORK"))
+	assert.Contains(t, out.String(), "package android/libs")
+	assert.Contains(t, out.String(), "javac android/*.java")
+}
+
+// TestBuildAPKRefusesDuplicateOpenAL pins that an AAR's libopenal.so and the
+// one exp/audio/al bundles do not both go into the APK as one zip name.
+func TestBuildAPKRefusesDuplicateOpenAL(t *testing.T) {
+	prevN, prevGomobile := buildN, gomobilepath
+	t.Cleanup(func() { buildN, gomobilepath = prevN, prevGomobile })
+	buildN = true
+	gomobilepath = t.TempDir()
+	openal := filepath.Join(gomobilepath, "lib", "arm64-v8a", "libopenal.so")
+	require.NoError(t, os.MkdirAll(filepath.Dir(openal), 0o755))
+	require.NoError(t, os.WriteFile(openal, []byte("al"), 0o644))
+	nm := map[string]map[string]bool{"arm64": {"github.com/belluikit/bellui/internal/driver/mobile/exp/audio/al": true}}
+
+	_, err := buildAPK(nil, nm, []string{"lib/arm64-v8a/libapp.so"}, []string{"arm64"}, nil)
+	require.NoError(t, err)
+
+	_, err = buildAPK(nil, nm, []string{"lib/arm64-v8a/libapp.so", "lib/arm64-v8a/libopenal.so"}, []string{"arm64"}, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "lib/arm64-v8a/libopenal.so")
+}
+
+// TestBundleModuleLayout pins the AAB base-module layout: every dex d8 wrote
+// goes under dex/, not only classes.dex.
+func TestBundleModuleLayout(t *testing.T) {
+	dir := t.TempDir()
+	for _, name := range []string{"AndroidManifest.xml", "classes.dex", "classes2.dex", "resources.pb"} {
+		require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(name), 0o644))
 	}
+	require.NoError(t, bundleModuleLayout(dir))
+	assert.FileExists(t, filepath.Join(dir, "manifest", "AndroidManifest.xml"))
+	assert.FileExists(t, filepath.Join(dir, "dex", "classes.dex"))
+	assert.FileExists(t, filepath.Join(dir, "dex", "classes2.dex"))
+	assert.FileExists(t, filepath.Join(dir, "resources.pb"))
+	assert.NoFileExists(t, filepath.Join(dir, "classes2.dex"))
+
+	empty := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(empty, "AndroidManifest.xml"), nil, 0o644))
+	require.Error(t, bundleModuleLayout(empty))
 }

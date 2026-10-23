@@ -288,19 +288,89 @@ func (l *androidLibs) writeLibraryAssets(apkw *Writer, written map[string]bool) 
 	return nil
 }
 
-// manifestSnippet is one element subtree lifted out of a library manifest.
-type manifestSnippet struct {
-	key  string // element name + android:name, "" when the element has no name
-	text string
+// manifestElem is one element lifted out of a manifest, keeping only the
+// attributes that survive the merge (prefixed android: or unprefixed), with
+// ${applicationId} and relative class names resolved. An element with an
+// empty name is a run of text.
+type manifestElem struct {
+	name     string
+	attrs    [][2]string // prefixed name, value
+	text     string
+	children []*manifestElem
+}
+
+// key identifies an element for deduplication: its name and android:name, or
+// "" when it has none.
+func (e *manifestElem) key() string {
+	for _, a := range e.attrs {
+		if a[0] == "android:name" && a[1] != "" {
+			return e.name + " " + a[1]
+		}
+	}
+	return ""
+}
+
+func (e *manifestElem) write(b *strings.Builder) {
+	if e.name == "" {
+		_ = xml.EscapeText(b, []byte(e.text))
+		return
+	}
+	b.WriteString("<" + e.name)
+	for _, a := range e.attrs {
+		b.WriteString(" " + a[0] + `="`)
+		_ = xml.EscapeText(b, []byte(a[1]))
+		b.WriteString(`"`)
+	}
+	b.WriteString(">")
+	for _, c := range e.children {
+		c.write(b)
+	}
+	b.WriteString("</" + e.name + ">")
+}
+
+func (e *manifestElem) String() string {
+	var b strings.Builder
+	e.write(&b)
+	return b.String()
+}
+
+// mergeChildren adds other's children to e, the way the Gradle manifest
+// merger joins two libraries' declarations of one component: a named child e
+// already has is merged in turn, an unnamed one is added unless e holds an
+// identical one, and e's attributes stay.
+func (e *manifestElem) mergeChildren(other *manifestElem) {
+	for _, c := range other.children {
+		if c.name == "" {
+			continue
+		}
+		var match *manifestElem
+		k, text := c.key(), c.String()
+		for _, have := range e.children {
+			if (k != "" && have.key() == k) || (k == "" && have.String() == text) {
+				match = have
+				break
+			}
+		}
+		switch {
+		case match == nil:
+			e.children = append(e.children, c)
+		case k != "":
+			match.mergeChildren(c)
+		}
+	}
 }
 
 // mergeLibraryManifests copies each AAR manifest's uses-permission,
 // uses-permission-sdk-23, uses-feature and queries elements, and the children
 // of its <application>, into the app manifest. ${applicationId} becomes the
-// app's package. An element whose android:name the app (or an earlier
-// library) already declares is skipped, so the app's own entry wins. tools:*
-// attributes are dropped: there are no merge directives, and <application>
-// attributes from libraries (e.g. appComponentFactory) are not merged.
+// app's package, and a relative component class name (".Foo") is qualified
+// with the library's package. An element whose android:name the app already
+// declares is skipped, so the app's own entry wins; one that two libraries
+// declare is kept once, with the children of both (androidx.startup's
+// InitializationProvider carries one meta-data per initializer, from each
+// library that has one). tools:* attributes are dropped: there are no merge
+// directives, and <application> attributes from libraries (e.g.
+// appComponentFactory) are not merged.
 func mergeLibraryManifests(appManifest []byte, libs *androidLibs) ([]byte, error) {
 	if !libs.hasAARs() {
 		return appManifest, nil
@@ -309,54 +379,67 @@ func mergeLibraryManifests(appManifest []byte, libs *androidLibs) ([]byte, error
 	if err != nil {
 		return nil, err
 	}
-	topSeen, appSeen, err := liftManifestSnippets(appManifest, "")
+	topSeen, appSeen, err := liftManifestElems(appManifest, appPkg, appPkg)
 	if err != nil {
 		return nil, fmt.Errorf("app AndroidManifest.xml: %w", err)
 	}
-	seen := map[string]bool{}
-	for _, s := range append(topSeen, appSeen...) {
-		if s.key != "" {
-			seen[s.key] = true
+	fromApp := map[string]bool{}
+	for _, e := range append(topSeen, appSeen...) {
+		if k := e.key(); k != "" {
+			fromApp[k] = true
 		}
 	}
 
-	var top, app strings.Builder
+	fromLibs := map[string]*manifestElem{}
+	var top, app []*manifestElem
 	for _, a := range libs.aars {
-		t, ap, err := liftManifestSnippets(a.manifest, appPkg)
+		t, ap, err := liftManifestElems(a.manifest, appPkg, a.pkg)
 		if err != nil {
 			return nil, fmt.Errorf("android/libs/%s AndroidManifest.xml: %w", a.name, err)
 		}
 		for _, list := range []struct {
-			snippets []manifestSnippet
-			into     *strings.Builder
+			elems []*manifestElem
+			into  *[]*manifestElem
 		}{{t, &top}, {ap, &app}} {
-			for _, s := range list.snippets {
-				if s.key != "" && seen[s.key] {
+			for _, e := range list.elems {
+				k := e.key()
+				switch {
+				case k == "":
+				case fromApp[k]:
 					continue
+				case fromLibs[k] != nil:
+					fromLibs[k].mergeChildren(e)
+					continue
+				default:
+					fromLibs[k] = e
 				}
-				if s.key != "" {
-					seen[s.key] = true
-				}
-				list.into.WriteString("\n\t")
-				list.into.WriteString(s.text)
+				*list.into = append(*list.into, e)
 			}
 		}
 	}
 
+	join := func(elems []*manifestElem) string {
+		var b strings.Builder
+		for _, e := range elems {
+			b.WriteString("\n\t")
+			e.write(&b)
+		}
+		return b.String()
+	}
 	out := string(appManifest)
-	if app.Len() > 0 {
+	if len(app) > 0 {
 		i := strings.LastIndex(out, "</application>")
 		if i < 0 {
 			return nil, fmt.Errorf("library manifests add <application> entries, but the app manifest has no </application> to put them in")
 		}
-		out = out[:i] + app.String() + "\n\t" + out[i:]
+		out = out[:i] + join(app) + "\n\t" + out[i:]
 	}
-	if top.Len() > 0 {
+	if len(top) > 0 {
 		i := strings.LastIndex(out, "</manifest>")
 		if i < 0 {
 			return nil, fmt.Errorf("app manifest has no </manifest>")
 		}
-		out = out[:i] + top.String() + "\n" + out[i:]
+		out = out[:i] + join(top) + "\n" + out[i:]
 	}
 	return []byte(out), nil
 }
@@ -368,10 +451,11 @@ var liftedTopLevel = map[string]bool{
 	"queries":                true,
 }
 
-// liftManifestSnippets returns the mergeable top-level elements and the
-// <application> children of a manifest, re-serialized with only android:
-// prefixes. appPkg replaces ${applicationId} in attribute values.
-func liftManifestSnippets(manifest []byte, appPkg string) (top, app []manifestSnippet, err error) {
+// liftManifestElems returns the mergeable top-level elements and the
+// <application> children of a manifest. appPkg replaces ${applicationId} in
+// attribute values; relative class names resolve against pkg, the package of
+// the manifest being read.
+func liftManifestElems(manifest []byte, appPkg, pkg string) (top, app []*manifestElem, err error) {
 	dec := xml.NewDecoder(bytes.NewReader(manifest))
 	var path []string
 	for {
@@ -387,14 +471,14 @@ func liftManifestSnippets(manifest []byte, appPkg string) (top, app []manifestSn
 			depth := len(path)
 			inApp := depth == 2 && path[1] == "application"
 			if (depth == 1 && liftedTopLevel[t.Name.Local]) || inApp {
-				s, err := serializeSubtree(dec, t, appPkg)
+				e, err := readManifestElem(dec, t, appPkg, pkg)
 				if err != nil {
 					return nil, nil, err
 				}
 				if inApp {
-					app = append(app, s)
+					app = append(app, e)
 				} else {
-					top = append(top, s)
+					top = append(top, e)
 				}
 				continue
 			}
@@ -405,40 +489,43 @@ func liftManifestSnippets(manifest []byte, appPkg string) (top, app []manifestSn
 	}
 }
 
-// serializeSubtree writes start and everything up to its matching end.
-func serializeSubtree(dec *xml.Decoder, start xml.StartElement, appPkg string) (manifestSnippet, error) {
-	var b strings.Builder
-	key := start.Name.Local
-	if name := attrValue(start, androidNS, "name"); name != "" {
-		key += " " + strings.ReplaceAll(name, "${applicationId}", appPkg)
-	} else {
-		key = ""
-	}
-	writeStart(&b, start, appPkg)
-	depth := 1
-	for depth > 0 {
+// readManifestElem reads start and everything up to its matching end.
+func readManifestElem(dec *xml.Decoder, start xml.StartElement, appPkg, pkg string) (*manifestElem, error) {
+	e := newManifestElem(start, appPkg, pkg)
+	for {
 		tok, err := dec.Token()
 		if err != nil {
-			return manifestSnippet{}, err
+			return nil, err
 		}
 		switch t := tok.(type) {
 		case xml.StartElement:
-			depth++
-			writeStart(&b, t, appPkg)
+			c, err := readManifestElem(dec, t, appPkg, pkg)
+			if err != nil {
+				return nil, err
+			}
+			e.children = append(e.children, c)
 		case xml.EndElement:
-			depth--
-			b.WriteString("</" + t.Name.Local + ">")
+			return e, nil
 		case xml.CharData:
 			if s := strings.TrimSpace(string(t)); s != "" {
-				_ = xml.EscapeText(&b, []byte(s))
+				e.children = append(e.children, &manifestElem{text: s})
 			}
 		}
 	}
-	return manifestSnippet{key: key, text: b.String()}, nil
 }
 
-func writeStart(b *strings.Builder, se xml.StartElement, appPkg string) {
-	b.WriteString("<" + se.Name.Local)
+// classNameAttrs are the attributes, per element, that name a class and so
+// may be relative to the manifest's package.
+var classNameAttrs = map[string][]string{
+	"activity":       {"name", "parentActivityName"},
+	"activity-alias": {"name", "targetActivity"},
+	"service":        {"name"},
+	"receiver":       {"name"},
+	"provider":       {"name"},
+}
+
+func newManifestElem(se xml.StartElement, appPkg, pkg string) *manifestElem {
+	e := &manifestElem{name: se.Name.Local}
 	for _, a := range se.Attr {
 		var name string
 		switch a.Name.Space {
@@ -456,20 +543,29 @@ func writeStart(b *strings.Builder, se xml.StartElement, appPkg string) {
 				a.Name.Space, a.Name.Local, se.Name.Local)
 			continue
 		}
-		b.WriteString(" " + name + `="`)
-		_ = xml.EscapeText(b, []byte(strings.ReplaceAll(a.Value, "${applicationId}", appPkg)))
-		b.WriteString(`"`)
+		v := strings.ReplaceAll(a.Value, "${applicationId}", appPkg)
+		if a.Name.Space == androidNS && slices.Contains(classNameAttrs[se.Name.Local], a.Name.Local) {
+			v = qualifyClassName(v, pkg)
+		}
+		e.attrs = append(e.attrs, [2]string{name, v})
 	}
-	b.WriteString(">")
+	return e
 }
 
-func attrValue(se xml.StartElement, space, local string) string {
-	for _, a := range se.Attr {
-		if a.Name.Space == space && a.Name.Local == local {
-			return a.Value
-		}
+// qualifyClassName resolves a manifest class name the way Android does: one
+// that starts with a dot, or has none, is relative to the manifest's package.
+// Once a library's entry sits in the app manifest, the app's package would
+// otherwise be the one it resolves against.
+func qualifyClassName(name, pkg string) string {
+	switch {
+	case pkg == "" || name == "":
+		return name
+	case strings.HasPrefix(name, "."):
+		return pkg + name
+	case !strings.Contains(name, "."):
+		return pkg + "." + name
 	}
-	return ""
+	return name
 }
 
 // linkedResources is the output of linking the app's and the libraries'
@@ -707,6 +803,14 @@ func (p *preparedLibs) rJava() []string {
 func prepareAndroidLibs(dir string, manifest []byte, archs []string, libName, iconPath, iconFG, iconBG, iconMono string,
 	target, build int, version string,
 ) (*preparedLibs, error) {
+	if buildN {
+		// -n only prints commands. Every step here extracts files or runs an
+		// SDK tool, and tmpdir is the literal "$WORK", not a directory.
+		if util.Exists(filepath.Join(dir, "android", "libs")) {
+			printcmd("# package android/libs: extract AARs, merge manifests, aapt2 link (not run under -n)")
+		}
+		return &preparedLibs{libs: &androidLibs{}}, nil
+	}
 	libs, err := collectAndroidLibs(dir, filepath.Join(tmpdir, "androidlibs"))
 	if err != nil {
 		return nil, err

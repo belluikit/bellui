@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 )
@@ -120,6 +121,11 @@ func iosEntitlements(appDir string, associatedDomains []string) (*plistValue, er
 	}
 	if frag != nil {
 		for i, k := range frag.Keys {
+			if k == "application-identifier" {
+				// Xcode and `bellui release` both derive it from the team and
+				// the app ID; a fragment's copy would only fail at release.
+				return nil, fmt.Errorf("ios/%s: application-identifier is set by the signing step", iosEntitlementsFile)
+			}
 			if k == associatedDomainsKey && len(associatedDomains) > 0 {
 				return nil, fmt.Errorf("ios/%s: %s is set twice: it is generated from Details.AssociatedDomains in manifest.pxf",
 					iosEntitlementsFile, associatedDomainsKey)
@@ -137,6 +143,11 @@ func iosEntitlements(appDir string, associatedDomains []string) (*plistValue, er
 // re-signs the app with: the application identifier, then everything
 // `bellui package` signed in from the manifest and ios/Entitlements.plist.
 // Signing with the identifier alone dropped them from the store build.
+//
+// codesign does not expand build settings the way Xcode does at package
+// time, so the ones an entitlements file uses ($(AppIdentifierPrefix), …)
+// are expanded here; any other $(…) is an error rather than a literal in the
+// store build's signature.
 func IOSReleaseEntitlements(appDir, teamID, appID string, associatedDomains []string) ([]byte, error) {
 	ent, err := iosEntitlements(appDir, associatedDomains)
 	if err != nil {
@@ -145,14 +156,60 @@ func IOSReleaseEntitlements(appDir, teamID, appID string, associatedDomains []st
 	out := &plistValue{Kind: "dict"}
 	out.set("application-identifier", plistString(teamID+"."+appID))
 	if ent != nil {
+		vars := map[string]string{
+			"AppIdentifierPrefix":       teamID + ".",
+			"TeamIdentifierPrefix":      teamID + ".",
+			"DEVELOPMENT_TEAM":          teamID,
+			"PRODUCT_BUNDLE_IDENTIFIER": appID,
+		}
 		for i, k := range ent.Keys {
-			if k == "application-identifier" {
-				return nil, fmt.Errorf("ios/%s: application-identifier is set by the signing step", iosEntitlementsFile)
+			if err := expandBuildSettings(ent.Vals[i], vars); err != nil {
+				return nil, fmt.Errorf("ios/%s: %s: %w", iosEntitlementsFile, k, err)
 			}
 			out.set(k, ent.Vals[i])
 		}
 	}
 	return encodePlist(out), nil
+}
+
+// buildSettingRef matches an Xcode build-setting reference, $(NAME) or
+// ${NAME}, with an optional :modifier.
+var buildSettingRef = regexp.MustCompile(`\$[({]([A-Za-z0-9_]+)(:[^)}]*)?[)}]`)
+
+// expandBuildSettings replaces the build-setting references in v's strings,
+// recursively, with their values from vars.
+func expandBuildSettings(v *plistValue, vars map[string]string) error {
+	var unknown string
+	if v.Kind == "string" {
+		v.Text = buildSettingRef.ReplaceAllStringFunc(v.Text, func(ref string) string {
+			m := buildSettingRef.FindStringSubmatch(ref)
+			if val, ok := vars[m[1]]; ok && m[2] == "" {
+				return val
+			}
+			if unknown == "" {
+				unknown = ref
+			}
+			return ref
+		})
+	}
+	if unknown != "" {
+		return fmt.Errorf("%s is not a build setting `bellui release` can expand (it knows %s)", unknown, knownSettings(vars))
+	}
+	for _, c := range append(v.Vals, v.Items...) {
+		if err := expandBuildSettings(c, vars); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func knownSettings(vars map[string]string) string {
+	names := make([]string, 0, len(vars))
+	for k := range vars {
+		names = append(names, "$("+k+")")
+	}
+	sort.Strings(names)
+	return strings.Join(names, ", ")
 }
 
 // iosFramework is one framework or library from ios/Frameworks, resolved to
@@ -350,19 +407,45 @@ func iosLinkFlags(fws []iosFramework) (cflags, ldflags []string) {
 }
 
 // withIOSFlags appends cflags and ldflags to env's CGO_CFLAGS and CGO_LDFLAGS,
-// which darwinEnv always sets.
-func withIOSFlags(env, cflags, ldflags []string) []string {
+// which darwinEnv always sets. go splits those variables on spaces, so a flag
+// holding one (an app under "~/My Projects") is quoted.
+func withIOSFlags(env, cflags, ldflags []string) ([]string, error) {
 	out := make([]string, len(env))
 	copy(out, env)
 	for i, kv := range out {
+		var add []string
 		switch {
-		case strings.HasPrefix(kv, "CGO_CFLAGS=") && len(cflags) > 0:
-			out[i] = kv + " " + strings.Join(cflags, " ")
-		case strings.HasPrefix(kv, "CGO_LDFLAGS=") && len(ldflags) > 0:
-			out[i] = kv + " " + strings.Join(ldflags, " ")
+		case strings.HasPrefix(kv, "CGO_CFLAGS="):
+			add = cflags
+		case strings.HasPrefix(kv, "CGO_LDFLAGS="):
+			add = ldflags
 		}
+		for _, f := range add {
+			q, err := quoteCgoFlag(f)
+			if err != nil {
+				return nil, err
+			}
+			kv += " " + q
+		}
+		out[i] = kv
 	}
-	return out
+	return out, nil
+}
+
+// quoteCgoFlag quotes f the way go reads CGO_CFLAGS and CGO_LDFLAGS: a field
+// in single or double quotes is taken as it is, with no escapes, so a flag
+// holding both quote characters cannot be passed.
+func quoteCgoFlag(f string) (string, error) {
+	if f != "" && !strings.ContainsAny(f, " \t\n\r\v\f'\"") {
+		return f, nil
+	}
+	switch {
+	case !strings.Contains(f, "'"):
+		return "'" + f + "'", nil
+	case !strings.Contains(f, `"`):
+		return `"` + f + `"`, nil
+	}
+	return "", fmt.Errorf("cannot pass %q to cgo: it holds both quote characters", f)
 }
 
 // iosEmbed is a dynamic framework the generated Xcode project copies into

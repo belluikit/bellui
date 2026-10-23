@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"strings"
+
+	"github.com/belluikit/bellui/cmd/bellui/internal/templates"
 )
 
 // plistValue is one value of an XML property list, kept as a tree that
@@ -199,7 +201,7 @@ func writePlistValue(b *bytes.Buffer, v *plistValue, indent string) {
 		}
 		b.WriteString(indent + "<dict>\n")
 		for i, k := range v.Keys {
-			b.WriteString(indent + "  <key>" + xmlEscape(k) + "</key>\n")
+			b.WriteString(indent + "  <key>" + templates.XMLEscape(k) + "</key>\n")
 			writePlistValue(b, v.Vals[i], indent+"  ")
 		}
 		b.WriteString(indent + "</dict>\n")
@@ -216,6 +218,6 @@ func writePlistValue(b *bytes.Buffer, v *plistValue, indent string) {
 	case "true", "false":
 		b.WriteString(indent + "<" + v.Kind + "/>\n")
 	default:
-		b.WriteString(indent + "<" + v.Kind + ">" + xmlEscape(v.Text) + "</" + v.Kind + ">\n")
+		b.WriteString(indent + "<" + v.Kind + ">" + templates.XMLEscape(v.Text) + "</" + v.Kind + ">\n")
 	}
 }

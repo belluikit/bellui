@@ -263,11 +263,20 @@ description is in `cmd/bellui/README.md`, the code in
   pins the manifest byte-identical with and without a jar.
 - **Simplified manifest merge**: permissions, features, queries and
   `<application>` children, deduplicated by `android:name` with the app first.
+  A component two libraries share has its children merged (androidx.startup's
+  `InitializationProvider` carries one `<meta-data>` per library), and
+  relative class names are qualified with the declaring library's package, as
+  the Gradle merger does.
   No `tools:` directives, no `<application>` attribute merge, no placeholder
   other than `${applicationId}`. Upgrade path if a library needs more: the
   app's own `AndroidManifest.xml`.
 - **Missing ABI is an error**: an AAR with `jni/` for some ABIs but not a built
   one would install and then fail `System.loadLibrary` on exactly those devices.
+- **One platform for javac, d8 and aapt2**: app Java is compiled and dexed
+  against `binres.LatestAPIResourcesPath`, the `android.jar` aapt2 links
+  against, so the R classes and the code agree on one API level.
+- **Multidex in the AAB**: d8 may write `classes2.dex`…; the bundle's base
+  module takes every `classes*.dex` into `dex/`.
 - **Build-tools selection**: `util.AndroidBuildToolsPath` used to take the
   lexically first (oldest) build-tools; d8 2.1.7 from 30.0.3 crashed on the
   android-35 `android.jar` given as `--lib`. It now takes the newest.

@@ -239,6 +239,30 @@ func TestIOSReleaseEntitlements(t *testing.T) {
 	writeIOSFile(t, dir, iosEntitlementsFile, `<plist><dict><key>application-identifier</key><string>x</string></dict></plist>`)
 	_, err = IOSReleaseEntitlements(dir, "TEAM", "com.example.t", nil)
 	assert.Error(t, err)
+	_, err = iosEntitlements(dir, nil)
+	assert.ErrorContains(t, err, "application-identifier", "bellui package refuses it too, not only the release")
+
+	// codesign does not expand build settings: the release does, the way
+	// Xcode does for bellui package. The probe's keychain group is this shape.
+	writeIOSFile(t, dir, iosEntitlementsFile, `<plist><dict>
+	<key>keychain-access-groups</key><array><string>$(AppIdentifierPrefix)com.example.shared</string></array>
+	<key>com.apple.developer.icloud-container-identifiers</key><array><string>iCloud.${PRODUCT_BUNDLE_IDENTIFIER}</string></array>
+	<key>com.apple.developer.team-identifier</key><string>$(DEVELOPMENT_TEAM)</string>
+</dict></plist>`)
+	out, err = IOSReleaseEntitlements(dir, "TEAM", "com.example.t", nil)
+	require.NoError(t, err)
+	assert.NotContains(t, string(out), "$")
+	v, err = parsePlist(out)
+	require.NoError(t, err)
+	assert.Equal(t, "TEAM.com.example.shared", v.get("keychain-access-groups").Items[0].Text)
+	assert.Equal(t, "iCloud.com.example.t", v.get("com.apple.developer.icloud-container-identifiers").Items[0].Text)
+	assert.Equal(t, "TEAM", v.get("com.apple.developer.team-identifier").Text)
+
+	writeIOSFile(t, dir, iosEntitlementsFile, `<plist><dict>
+	<key>keychain-access-groups</key><array><string>$(SOMETHING_ELSE).x</string></array>
+</dict></plist>`)
+	_, err = IOSReleaseEntitlements(dir, "TEAM", "com.example.t", nil)
+	assert.ErrorContains(t, err, "$(SOMETHING_ELSE)", "an unknown setting must not be signed in literally")
 }
 
 func TestPbxprojEmbedFrameworks(t *testing.T) {
@@ -283,8 +307,56 @@ func TestIOSLinkFlags(t *testing.T) {
 	_, ldflags = iosLinkFlags([]iosFramework{{Name: "Stat", Path: "/f/Stat.framework"}})
 	assert.NotContains(t, ldflags, "-Wl,-rpath,@executable_path/Frameworks", "static code needs no rpath")
 
-	env := withIOSFlags([]string{"GOOS=ios", "CGO_CFLAGS=-a", "CGO_LDFLAGS=-b"}, []string{"-F/x"}, []string{"-framework", "X"})
+	env, err := withIOSFlags([]string{"GOOS=ios", "CGO_CFLAGS=-a", "CGO_LDFLAGS=-b"}, []string{"-F/x"}, []string{"-framework", "X"})
+	require.NoError(t, err)
 	assert.Equal(t, []string{"GOOS=ios", "CGO_CFLAGS=-a -F/x", "CGO_LDFLAGS=-b -framework X"}, env)
+
+	env, err = withIOSFlags([]string{"CGO_CFLAGS=-a", "CGO_LDFLAGS=-b"}, []string{"-F/My Projects/x"}, []string{"-F/it's here"})
+	require.NoError(t, err)
+	assert.Equal(t, []string{`CGO_CFLAGS=-a '-F/My Projects/x'`, `CGO_LDFLAGS=-b "-F/it's here"`}, env)
+	_, err = withIOSFlags([]string{"CGO_CFLAGS="}, []string{`-F/a'b"c d`}, nil)
+	assert.Error(t, err)
+}
+
+// go splits CGO_CFLAGS and CGO_LDFLAGS on spaces, so an app under a directory
+// with one in its name lost its frameworks: -F/Users/x/My, then a stray
+// argument. A real cgo build checks the quoting the way go reads it.
+func TestIOSFlagsSurviveSpacesInPaths(t *testing.T) {
+	if _, err := exec.LookPath("cc"); err != nil {
+		t.Skip("needs a C compiler for cgo")
+	}
+	root := filepath.Join(t.TempDir(), "My Projects")
+	spaced, quoted := filepath.Join(root, "inc"), filepath.Join(root, "it's inc")
+	for dir, hdr := range map[string]string{spaced: "a.h", quoted: "b.h"} {
+		require.NoError(t, os.MkdirAll(dir, 0o755))
+		require.NoError(t, os.WriteFile(filepath.Join(dir, hdr), []byte("#define "+strings.ToUpper(hdr[:1])+" 1\n"), 0o644))
+	}
+	app := filepath.Join(root, "app")
+	require.NoError(t, os.MkdirAll(app, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(app, "go.mod"), []byte("module probe\n"), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(app, "main.go"), []byte(`package main
+
+// #include <a.h>
+// #include <b.h>
+import "C"
+
+func main() { println(C.A + C.B) }
+`), 0o644))
+
+	var env []string
+	for _, kv := range os.Environ() {
+		if !strings.HasPrefix(kv, "CGO_CFLAGS=") && !strings.HasPrefix(kv, "CGO_LDFLAGS=") && !strings.HasPrefix(kv, "GOFLAGS=") {
+			env = append(env, kv)
+		}
+	}
+	env = append(env, "CGO_ENABLED=1", "GOWORK=off", "GOFLAGS=", "CGO_CFLAGS=-O2", "CGO_LDFLAGS=")
+	env, err := withIOSFlags(env, []string{"-I" + spaced, "-I" + quoted}, []string{"-L" + spaced})
+	require.NoError(t, err)
+	cmd := exec.Command("go", "build", "-o", filepath.Join(root, "out"), ".")
+	cmd.Dir, cmd.Env = app, env
+	out, err := cmd.CombinedOutput()
+	require.NoError(t, err, "%s", out)
+	assert.FileExists(t, filepath.Join(root, "out"))
 }
 
 // TestXCFrameworkSlices builds real xcframeworks with Xcode — a dynamic

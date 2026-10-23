@@ -49,8 +49,12 @@ next to the app's main package, for what `manifest.pxf` has no field for
   the fragment's value.
 - **`ios/Entitlements.plist`** — a plist `<dict>` signed in alongside the
   Associated Domains from the manifest (setting
-  `com.apple.developer.associated-domains` in both is an error). Xcode
-  expands `$(AppIdentifierPrefix)`. With automatic signing,
+  `com.apple.developer.associated-domains` in both is an error), as is
+  `application-identifier`, which signing sets. Xcode expands
+  `$(AppIdentifierPrefix)`; `bellui release` expands the same build settings
+  (`AppIdentifierPrefix`, `TeamIdentifierPrefix`, `DEVELOPMENT_TEAM`,
+  `PRODUCT_BUNDLE_IDENTIFIER`) itself and fails on any other `$(…)`. With
+  automatic signing,
   `-allowProvisioningUpdates` registers the capabilities an entitlement needs
   (HealthKit, …) on an explicit App ID for the bundle ID. `bellui release`
   signs the store build with the same entitlements. A static file cannot vary
@@ -91,14 +95,18 @@ Limits:
 - There is no Maven resolution. `android/libs` must hold the library's whole
   dependency closure, read from its POM. `hack/androidlibprobe/fetch.sh` is a
   worked example for `androidx.core`.
-- The manifest merge is simplified. An entry whose `android:name` the app
-  already declares is left out (the app wins), `tools:*` attributes and merge
-  directives are dropped, and a library's `<application>` attributes (such as
+- The manifest merge is simplified. Relative class names (`.Foo`, `Foo`) are
+  qualified with the library's package. An entry whose `android:name` the app
+  already declares is left out (the app wins). One that two libraries declare
+  (such as androidx.startup's `InitializationProvider`) is kept once, with the
+  children of both. `tools:*` attributes and merge directives are dropped, and a library's `<application>` attributes (such as
   `appComponentFactory`) are not merged. Put anything else in your own
   `AndroidManifest.xml`.
 - An AAR with native libraries for some ABIs but not for one being built
   fails the build. Build only the targets it supports (`-target
   android/arm64`).
+- An AAR that ships `libopenal.so` fails the build of an app using
+  `exp/audio/al`, which bundles its own.
 - An app asset wins over a library asset at the same path, with a warning.
 - Without an AAR, resources are packaged exactly as before; jars only change
   the dex.

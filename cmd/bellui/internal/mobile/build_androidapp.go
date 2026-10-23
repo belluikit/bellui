@@ -21,8 +21,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -489,6 +489,11 @@ func buildAPK(out io.Writer, nmpkgs map[string]map[string]bool, libFiles []strin
 		toolchain := ndk.Toolchain(arch)
 		if nmpkgs[arch]["github.com/belluikit/bellui/internal/driver/mobile/exp/audio/al"] {
 			dst := "lib/" + toolchain.abi + "/libopenal.so"
+			if slices.Contains(libFiles, dst) {
+				// An AAR in android/libs ships its own libopenal.so; a zip with
+				// two entries of one name installs whichever the reader keeps.
+				return nil, fmt.Errorf("android/libs: an AAR ships %s, which the exp/audio/al package also bundles", dst)
+			}
 			src := filepath.Join(gomobilepath, dst)
 			if _, err := os.Stat(src); err != nil {
 				return nil, errors.New("the Android requires the github.com/belluikit/bellui/internal/driver/mobile/exp/audio/al, but the OpenAL libraries was not found. Please run gomobile init with the -openal Flag pointing to an OpenAL source directory")
@@ -627,16 +632,23 @@ func mergeAppJavaDex(dir string, jars, extraJava []string) ([]string, error) {
 	if len(javaFiles) == 0 && len(jars) == 0 {
 		return nil, nil
 	}
+	if buildN {
+		// -n only prints commands; javac and d8 would write under the
+		// literal "$WORK".
+		printcmd("# javac android/*.java and d8 them with android/libs into classes*.dex (not run under -n)")
+		return nil, nil
+	}
 
 	androidHome := os.Getenv("ANDROID_HOME")
 	if androidHome == "" {
 		return nil, errors.New("found android/*.java or android/libs but ANDROID_HOME is not set (needed to compile app Java)")
 	}
-	platform, err := findLastPlatform(androidHome)
+	// The same android.jar aapt2 links the resources against: javac, d8 and
+	// aapt2 must agree on one platform.
+	androidJar, err := binres.LatestAPIResourcesPath()
 	if err != nil {
 		return nil, err
 	}
-	androidJar := filepath.Join(platform, "android.jar")
 
 	classFiles, err := compileAppJava(javaFiles, jars, androidJar)
 	if err != nil {
@@ -723,65 +735,6 @@ func compileAppJava(javaFiles, jars []string, androidJar string) ([]string, erro
 		return nil, fmt.Errorf("javac produced no classes from %v", javaFiles)
 	}
 	return classFiles, nil
-}
-
-// findLastPlatform returns the highest-sorted platforms/<android-NN> directory
-// under the Android SDK, mirroring gendex's platform selection.
-func findLastPlatform(androidHome string) (string, error) {
-	dir := filepath.Join(androidHome, "platforms")
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return "", err
-	}
-	last := ""
-	for _, e := range entries {
-		if e.IsDir() && (last == "" || newerPlatform(e.Name(), last)) {
-			last = e.Name()
-		}
-	}
-	if last == "" {
-		return "", fmt.Errorf("no android platform found in %s", dir)
-	}
-	return filepath.Join(dir, last), nil
-}
-
-// newerPlatform reports whether SDK platform directory a is newer than b. The
-// API level is compared as a number, so android-35 beats android-9; a
-// directory with no numeric level (a codename preview) ranks below every
-// numbered one. Equal levels fall back to name order (android-34-ext12 after
-// android-34).
-func newerPlatform(a, b string) bool {
-	la, oka := platformLevel(a)
-	lb, okb := platformLevel(b)
-	switch {
-	case oka != okb:
-		return oka
-	case oka && la != lb:
-		return la > lb
-	}
-	return a > b
-}
-
-// platformLevel is the API level in "android-NN", "android-NN.M" or
-// "android-NN-extK", scaled so a minor version orders after its major.
-func platformLevel(name string) (int, bool) {
-	rest, ok := strings.CutPrefix(name, "android-")
-	if !ok {
-		return 0, false
-	}
-	rest, _, _ = strings.Cut(rest, "-")
-	major, minor, _ := strings.Cut(rest, ".")
-	ma, err := strconv.Atoi(major)
-	if err != nil {
-		return 0, false
-	}
-	mi := 0
-	if minor != "" {
-		if mi, err = strconv.Atoi(minor); err != nil {
-			return 0, false
-		}
-	}
-	return ma*1000 + mi, true
 }
 
 func apkwCreate(name string, apkw *Writer) (io.Writer, error) {
@@ -884,10 +837,9 @@ func convertAPKToAAB(aabPath string) error {
 	}
 	_ = os.Remove(apkProtoPath)
 
-	_ = os.MkdirAll(filepath.Join(tmpPath, "dex"), 0o755)
-	_ = os.MkdirAll(filepath.Join(tmpPath, "manifest"), 0o755)
-	_ = os.Rename(filepath.Join(tmpPath, "AndroidManifest.xml"), filepath.Join(tmpPath, "manifest", "AndroidManifest.xml"))
-	_ = os.Rename(filepath.Join(tmpPath, "classes.dex"), filepath.Join(tmpPath, "dex", "classes.dex"))
+	if err := bundleModuleLayout(tmpPath); err != nil {
+		return err
+	}
 
 	cmd = exec.Command("zip", "../base.zip", "-r", ".")
 	cmd.Dir = tmpPath
@@ -903,6 +855,34 @@ func convertAPKToAAB(aabPath string) error {
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
 	return cmd.Run()
+}
+
+// bundleModuleLayout moves an unzipped proto APK's manifest and dex files to
+// where a bundle module keeps them: manifest/ and dex/. Every classesN.dex
+// moves, not only classes.dex: d8 splits an app whose android/libs overflow
+// one dex file (#672), and bundletool takes no dex outside dex/.
+func bundleModuleLayout(dir string) error {
+	for _, sub := range []string{"dex", "manifest"} {
+		if err := os.MkdirAll(filepath.Join(dir, sub), 0o755); err != nil {
+			return err
+		}
+	}
+	if err := os.Rename(filepath.Join(dir, "AndroidManifest.xml"), filepath.Join(dir, "manifest", "AndroidManifest.xml")); err != nil {
+		return err
+	}
+	dexes, err := filepath.Glob(filepath.Join(dir, "classes*.dex"))
+	if err != nil {
+		return err
+	}
+	if len(dexes) == 0 {
+		return fmt.Errorf("no classes.dex in %s", dir)
+	}
+	for _, dex := range dexes {
+		if err := os.Rename(dex, filepath.Join(dir, "dex", filepath.Base(dex))); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // A random uninteresting private key.

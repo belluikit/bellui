@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"crypto/x509"
 	"encoding/pem"
-	"encoding/xml"
 	"fmt"
 	"io/fs"
 	"os"
@@ -19,6 +18,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/belluikit/bellui/cmd/bellui/internal/templates"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -103,9 +103,12 @@ func goIOSBuild(pkg *packages.Package, bundleID string, archs []string,
 	var nmpkgs map[string]bool
 	for _, arch := range archs {
 		path := filepath.Join(tmpdir, arch)
-		// Disable DWARF; see golang.org/issues/25148.
 		cflags, ldflags := iosLinkFlags(perArch[arch])
-		env := withIOSFlags(darwinEnv[arch], cflags, ldflags)
+		env, err := withIOSFlags(darwinEnv[arch], cflags, ldflags)
+		if err != nil {
+			return nil, err
+		}
+		// Disable DWARF; see golang.org/issues/25148.
 		if err := goBuild(src, env, "-ldflags=-w", "-o="+path); err != nil {
 			return nil, err
 		}
@@ -448,18 +451,7 @@ func sortedPlistEntries(m map[string]string) []plistEntry {
 	return entries
 }
 
-// plistFuncs escapes manifest text for the XML templates: names, usage
-// strings and versions are user text, and a raw & or < made the generated
-// plist unparseable.
-var plistFuncs = template.FuncMap{"xml": xmlEscape}
-
-func xmlEscape(s string) string {
-	var b strings.Builder
-	_ = xml.EscapeText(&b, []byte(s))
-	return b.String()
-}
-
-var infoplistTmpl = template.Must(template.New("infoplist").Funcs(plistFuncs).Parse(`<?xml version="1.0" encoding="UTF-8"?>
+var infoplistTmpl = template.Must(template.New("infoplist").Funcs(templates.XMLFuncs).Parse(`<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
