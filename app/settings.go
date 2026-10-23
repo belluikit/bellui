@@ -41,6 +41,10 @@ type settings struct {
 	// themeSpecified for the theme, it keeps setupTheme (run on OS appearance
 	// changes and settings-file reloads) from replacing the app's choice.
 	variantSpecified bool
+	// primary is the colour from an explicit SetPrimaryColor, kept apart from
+	// schema so a settings-file reload does not replace it.
+	primary          string
+	primarySpecified bool
 
 	listeners []func(bellui.Settings)
 	watcher   any // normally *fsnotify.Watcher or nil - avoid import in this file
@@ -53,17 +57,22 @@ func (s *settings) BuildType() bellui.BuildType {
 }
 
 func (s *settings) PrimaryColor() string {
+	if s.primarySpecified {
+		return s.primary
+	}
 	return s.schema.PrimaryColor
 }
 
 // SetPrimaryColor sets the named primary color preference for the running app
 // and re-applies the current theme. Unlike the settings app it does not write
 // the system-wide settings file — apps that want to remember the choice should
-// store it in their own Preferences (see widget.SaveThemeSelection).
+// store it in their own Preferences (see widget.SaveThemeSelection). The choice
+// is kept when the system-wide settings file changes.
 //
 // Since: 1.0
 func (s *settings) SetPrimaryColor(name string) {
-	s.schema.PrimaryColor = name
+	s.primary = name
+	s.primarySpecified = true
 	s.apply()
 }
 
