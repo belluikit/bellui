@@ -203,8 +203,11 @@ func NewApp() bellui.App {
 	return test
 }
 
-// Declare conformity with the optional primary color settings interface
-var _ bellui.PrimaryColorSettings = (*testSettings)(nil)
+// Declare conformity with the optional settings interfaces
+var (
+	_ bellui.PrimaryColorSettings = (*testSettings)(nil)
+	_ bellui.ThemeVariantSettings = (*testSettings)(nil)
+)
 
 type testSettings struct {
 	primaryColor string
@@ -290,6 +293,16 @@ func (s *testSettings) SetThemeVariant(v bellui.ThemeVariant) {
 	s.propertyLock.Lock()
 	s.variant = v
 	s.variantSet = true
+	s.propertyLock.Unlock()
+
+	s.apply()
+}
+
+// ClearThemeVariant withdraws a SetThemeVariant choice, mirroring the real app
+// settings: ThemeVariant reports no preference again.
+func (s *testSettings) ClearThemeVariant() {
+	s.propertyLock.Lock()
+	s.variantSet = false
 	s.propertyLock.Unlock()
 
 	s.apply()

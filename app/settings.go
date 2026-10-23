@@ -31,7 +31,12 @@ func (sc *SettingsSchema) StoragePath() string {
 var (
 	_ bellui.Settings             = (*settings)(nil)
 	_ bellui.PrimaryColorSettings = (*settings)(nil)
+	_ bellui.ThemeVariantSettings = (*settings)(nil)
 )
+
+// osVariant reports the operating system light/dark appearance. It is a
+// variable so tests can simulate an OS appearance change.
+var osVariant = app.DefaultVariant
 
 type settings struct {
 	theme          bellui.Theme
@@ -100,10 +105,20 @@ func (s *settings) ThemeVariant() bellui.ThemeVariant {
 
 // SetThemeVariant sets the variant for the running app. The choice is kept
 // across later OS appearance changes and settings-file reloads, as SetTheme's
-// is.
+// is, until ClearThemeVariant withdraws it.
 func (s *settings) SetThemeVariant(variant bellui.ThemeVariant) {
 	s.variantSpecified = true
 	s.applyTheme(s.theme, variant)
+}
+
+// ClearThemeVariant withdraws an explicit SetThemeVariant, so the variant is
+// derived from the settings file and the OS appearance again, now and on every
+// later OS appearance change or settings-file reload.
+//
+// Since: 1.0
+func (s *settings) ClearThemeVariant() {
+	s.variantSpecified = false
+	s.setupTheme()
 }
 
 func (s *settings) applyTheme(theme bellui.Theme, variant bellui.ThemeVariant) {
@@ -140,7 +155,7 @@ func (s *settings) setupTheme() {
 		name = env
 	}
 
-	variant := app.DefaultVariant()
+	variant := osVariant()
 	effectiveTheme := s.theme
 	if !s.themeSpecified {
 		effectiveTheme = theme.DefaultTheme()

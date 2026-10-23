@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/event"
 	internalapp "github.com/belluikit/bellui/internal/app"
 	internaltheme "github.com/belluikit/bellui/internal/theme"
@@ -86,6 +87,7 @@ func TestThemeSelector_SetSelection(t *testing.T) {
 
 func TestThemeSelection_Apply(t *testing.T) {
 	a := test.NewTempApp(t)
+	unpinned := a.Settings().ThemeVariant()
 
 	ThemeSelection{Variant: ThemeVariantLight, Primary: theme.ColorGreen}.Apply()
 	assert.Equal(t, theme.ColorGreen, a.Settings().PrimaryColor())
@@ -95,11 +97,34 @@ func TestThemeSelection_Apply(t *testing.T) {
 	assert.Equal(t, theme.ColorRed, a.Settings().PrimaryColor())
 	assert.Equal(t, theme.VariantDark, a.Settings().ThemeVariant())
 
-	// System resolves the OS variant at call time; empty Primary is untouched.
+	// System withdraws the pin, so the test app reports no preference again,
+	// as before any choice; empty Primary is untouched. The live OS follow
+	// this buys is tested against the real settings in the app package.
 	ThemeSelection{Variant: ThemeVariantSystem}.Apply()
 	assert.Equal(t, theme.ColorRed, a.Settings().PrimaryColor())
+	assert.Equal(t, unpinned, a.Settings().ThemeVariant())
+}
+
+// Settings that cannot withdraw a pin get the OS appearance at call time,
+// pinned, rather than nothing (#695).
+func TestThemeSelection_ApplySystemFallback(t *testing.T) {
+	a := test.NewTempApp(t)
+	bellui.SetCurrentApp(&plainSettingsApp{App: a, set: plainSettings{a.Settings()}})
+	t.Cleanup(func() { bellui.SetCurrentApp(a) })
+
+	ThemeSelection{Variant: ThemeVariantSystem}.Apply()
 	assert.Equal(t, internalapp.DefaultVariant(), a.Settings().ThemeVariant())
 }
+
+// plainSettings hides the optional interfaces of the Settings it wraps.
+type plainSettings struct{ bellui.Settings }
+
+type plainSettingsApp struct {
+	bellui.App
+	set bellui.Settings
+}
+
+func (a *plainSettingsApp) Settings() bellui.Settings { return a.set }
 
 func TestThemeSelection_SaveLoad(t *testing.T) {
 	a := test.NewTempApp(t)
