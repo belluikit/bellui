@@ -19,10 +19,17 @@ var iosAppIconSizes = []int{120, 180, 76, 152, 1024}
 // resized to each size the set names. Xcode then compiles the set while it
 // builds and signs the app, so the icons are sealed with everything else.
 // They used to be compiled into the finished .app afterwards, which broke
-// its signature (#677).
+// its signature (#677). With no icon the set is left empty, which Xcode
+// still expects.
 func writeIOSAppIcon(icon, setDir string) error {
 	if err := mkdir(setDir); err != nil {
 		return err
+	}
+	if icon == "" {
+		if buildN {
+			return nil
+		}
+		return os.WriteFile(filepath.Join(setDir, "Contents.json"), []byte(contentsJSON), 0o600)
 	}
 	contents := new(bytes.Buffer)
 	if err := templates.XCAssetsDarwin.Execute(contents, nil); err != nil {
