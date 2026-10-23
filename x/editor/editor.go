@@ -93,10 +93,13 @@ type Editor struct {
 
 	// AutoGrow makes the editor grow vertically to fit its content.
 	// When true, MinRowsVisible adjusts to match the number of lines.
-	// MinAutoGrowRows and MaxAutoGrowRows bound the range.
+	// MinAutoGrowRows and MaxAutoGrowRows bound the range; zero or a
+	// negative value means the default (3 and 50). There is no unlimited
+	// setting: for a very tall editor set MaxAutoGrowRows to the most rows
+	// it may take.
 	AutoGrow        bool
-	MinAutoGrowRows int // default 3
-	MaxAutoGrowRows int // default 50, 0 = unlimited
+	MinAutoGrowRows int // 0 = the default, 3
+	MaxAutoGrowRows int // 0 = the default, 50
 
 	// AutoIndent governs the editor's automatic indentation. On Enter the new
 	// line starts with the current line's leading whitespace (or whatever
