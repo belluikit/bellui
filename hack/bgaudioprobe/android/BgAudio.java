@@ -46,6 +46,17 @@ public final class BgAudio {
 		}
 	}
 
+	// stop ends playback; the writer thread exits on its next write.
+	public static String stop(Context ctx) {
+		AudioTrack t = track;
+		if (t != null) {
+			t.pause();
+			t.flush();
+			t.release();
+		}
+		return "";
+	}
+
 	private static void loop() {
 		short[] buf = new short[RATE / 50]; // 20 ms
 		long pos = 0;

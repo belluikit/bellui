@@ -79,6 +79,8 @@ func startAudio() error {
 	return nil
 }
 
+func stopAudio() { _, _ = callBgAudio("stop") }
+
 // audioStats maps BgAudio.stats onto the shared log line: state is the
 // process importance Android reports (foreground, visible, cached, …).
 func audioStats() stats {

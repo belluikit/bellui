@@ -23,8 +23,9 @@
 // and state is the process importance Android reports. Android has no
 // background-audio declaration: measured on a Pixel 9a (Android 17,
 // 2026-10-22), playback and both counters continued through 90 s after Home
-// with the process reported as cached. Long playback is still expected to
-// need a foreground service on Android; this probe does not start one.
+// with the process reported as cached, and the beep went on until the app
+// was killed by hand. No foreground service is started; whether long
+// playback under memory pressure needs one is not measured here.
 //
 // Measured on an iPad (10th gen, 2026-10-22): frames kept climbing at the
 // output rate through 40 s in state=background, with no interruption.
@@ -36,7 +37,8 @@
 //	xcrun devicectl device install app --device <UDID> bgaudioprobe.app
 //	xcrun devicectl device process launch --console --device <UDID> com.trendvidia.bgaudioprobe
 //
-// then press Home (or launch another app) and watch the lines continue.
+// then press Home (or launch another app) and watch the lines continue. The
+// beep stops by itself after three minutes (audio=stopped).
 //
 // Android:
 //
@@ -80,6 +82,13 @@ func main() {
 				msg = "audio error: " + err.Error()
 			} else {
 				log.Println("bgaudioprobe audio=started")
+				// Stop by itself: a backgrounded probe otherwise beeps until
+				// someone kills it.
+				time.AfterFunc(playFor, func() {
+					stopAudio()
+					log.Printf("bgaudioprobe audio=stopped after %v", playFor)
+					bellui.Do(func() { status.SetText("stopped after " + playFor.String()) })
+				})
 			}
 			bellui.Do(func() { status.SetText(msg) })
 		}()
@@ -101,6 +110,9 @@ func main() {
 
 	bellui.ShowAndRun(w)
 }
+
+// playFor is how long the probe plays before it stops on its own.
+const playFor = 3 * time.Minute
 
 type stats struct {
 	state         string

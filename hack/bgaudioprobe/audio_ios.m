@@ -92,3 +92,10 @@ uint64_t bgaFrames(void) { return atomic_load(&framesRendered); }
 int bgaRunning(void) { return engine.isRunning ? 1 : 0; }
 int bgaState(void) { return atomic_load(&appState); }
 int bgaInterruptions(void) { return atomic_load(&interruptions); }
+
+void bgaStop(void) {
+	dispatch_async(dispatch_get_main_queue(), ^{
+		[engine stop];
+		[[AVAudioSession sharedInstance] setActive:NO error:nil];
+	});
+}

@@ -13,6 +13,7 @@ uint64_t bgaFrames(void);
 int bgaRunning(void);
 int bgaState(void);
 int bgaInterruptions(void);
+void bgaStop(void);
 */
 import "C"
 
@@ -28,6 +29,8 @@ func startAudio() error {
 	}
 	return nil
 }
+
+func stopAudio() { C.bgaStop() }
 
 func audioStats() stats {
 	states := map[C.int]string{0: "active", 1: "inactive", 2: "background"}
