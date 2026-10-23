@@ -151,13 +151,11 @@ func (r *candlestickRenderer) Render(ctx RenderContext) []core.CanvasObject {
 			c = upColor
 		}
 
-		// Body rectangle (between open and close)
-		bodyTop := closePos.Y
-		bodyBot := openPos.Y
-		if !isUp {
-			bodyTop = openPos.Y
-			bodyBot = closePos.Y
-		}
+		// Body rectangle (between open and close). Take the top and bottom
+		// from the pixels, not from the candle's direction: on an Inverse Y
+		// axis the higher price is the lower pixel.
+		bodyTop := min(openPos.Y, closePos.Y)
+		bodyBot := max(openPos.Y, closePos.Y)
 		bodyH := bodyBot - bodyTop
 		if bodyH < 1 {
 			bodyH = 1
@@ -168,30 +166,23 @@ func (r *candlestickRenderer) Render(ctx RenderContext) []core.CanvasObject {
 		body.Resize(geo.NewSize(bw, bodyH))
 		objects = append(objects, body)
 
-		// Upper wick (high to max(open, close))
-		wickTop := highPos.Y
-		wickBot := bodyTop
-		if wickBot > wickTop {
-			upperWick := &canvas.Line{
-				Position1:   geo.NewPos(cx, wickTop),
-				Position2:   geo.NewPos(cx, wickBot),
-				StrokeColor: c,
-				StrokeWidth: wickWidth,
-			}
-			objects = append(objects, upperWick)
+		// Wicks run from the high and from the low to the body edge nearest
+		// each, which is the top edge for the high unless the axis is inverse.
+		// A high or low that does not reach beyond the body draws no wick.
+		highEdge, lowEdge := bodyTop, bodyBot
+		if highPos.Y > lowPos.Y {
+			highEdge, lowEdge = bodyBot, bodyTop
 		}
-
-		// Lower wick (min(open, close) to low)
-		wickTop2 := bodyBot
-		wickBot2 := lowPos.Y
-		if wickBot2 > wickTop2 {
-			lowerWick := &canvas.Line{
-				Position1:   geo.NewPos(cx, wickTop2),
-				Position2:   geo.NewPos(cx, wickBot2),
+		for _, wick := range [2][2]float32{{highPos.Y, highEdge}, {lowPos.Y, lowEdge}} {
+			if wick[0] >= bodyTop && wick[0] <= bodyBot {
+				continue
+			}
+			objects = append(objects, &canvas.Line{
+				Position1:   geo.NewPos(cx, wick[0]),
+				Position2:   geo.NewPos(cx, wick[1]),
 				StrokeColor: c,
 				StrokeWidth: wickWidth,
-			}
-			objects = append(objects, lowerWick)
+			})
 		}
 
 		// Animation

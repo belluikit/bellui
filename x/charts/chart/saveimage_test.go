@@ -5,6 +5,9 @@ import (
 	"image/color"
 	"testing"
 
+	"github.com/belluikit/bellui"
+	"github.com/belluikit/bellui/canvas"
+	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/test"
 
@@ -62,5 +65,46 @@ func TestCaptureImage_DrawsTheChart(t *testing.T) {
 	t.Logf("captured %v, %d bar-coloured pixels", img.Bounds(), n)
 	if n < 1000 {
 		t.Errorf("captured image has %d bar-coloured pixels, want the bars drawn (>= 1000)", n)
+	}
+}
+
+// A chart partly scrolled out of view: the capture holds only the part the
+// scroll shows, not the widgets drawn where the rest of the chart would be.
+// Every other fixture puts the chart at the canvas origin, unclipped.
+func TestCaptureImage_ClippedByScroll(t *testing.T) {
+	test.NewTempApp(t)
+
+	c := New(Option{
+		XAxis:  []axis.Config{{Type: axis.TypeCategory, Data: []string{"a", "b", "c"}}},
+		YAxis:  []axis.Config{axis.DefaultConfig(axis.TypeValue)},
+		Series: []series.Series{&series.BarSeries{SeriesName: "s", Data: []float64{3, 5, 4}}},
+	})
+	// GridWrap holds the chart at 400x300, taller than the 150 px scroll.
+	scroll := container.NewVScroll(container.NewGridWrap(geo.NewSize(400, 300), c))
+	scroll.Move(geo.NewPos(0, 50))
+	scroll.Resize(geo.NewSize(400, 150))
+
+	green := color.NRGBA{G: 220, A: 255}
+	header := canvas.NewRectangle(green)
+	header.Resize(geo.NewSize(400, 50))
+
+	w := test.NewTempWindow(t, container.NewWithoutLayout(header, scroll))
+	w.SetPadded(false)
+	w.Resize(geo.NewSize(400, 200))
+	scroll.Offset = geo.NewPos(0, 100) // the chart's top 100 px are hidden
+	scroll.Refresh()
+
+	if pos := bellui.CurrentApp().Driver().AbsolutePositionForObject(c); pos.Y > 0 {
+		t.Fatalf("chart at y=%v, want it scrolled partly above the scroll's top", pos.Y)
+	}
+	img := c.captureImage()
+	if img == nil {
+		t.Fatal("captureImage returned nil for a chart partly in view")
+	}
+	if n := countNear(img, green, 12); n > 0 {
+		t.Errorf("captured %v holds %d pixels of the header above the scroll, want none", img.Bounds(), n)
+	}
+	if b := img.Bounds(); b.Dy() > 150 {
+		t.Errorf("captured %v, want at most the 150 px the scroll shows", b)
 	}
 }

@@ -476,11 +476,15 @@ func (r *chartRenderer) computeLayout(
 	if bottom := controlsBottom(opt); bottom > 0 && bottom+controlsGap > header {
 		header = bottom + controlsGap
 	}
+	var roomTop, roomBottom, roomRight float32
+	if len(cartesianSeries) > 0 {
+		roomTop, roomBottom, roomRight = axisRoom(opt, grid, header, legendHeight > 0, resolver.LabelTextSize())
+	}
 	plotRect := coord.Rect{
 		X: grid.Left,
-		Y: grid.Top + header,
-		W: size.Width - grid.Left - grid.Right,
-		H: size.Height - grid.Top - grid.Bottom - header - legendHeight,
+		Y: grid.Top + header + roomTop,
+		W: size.Width - grid.Left - grid.Right - roomRight,
+		H: size.Height - grid.Top - grid.Bottom - header - legendHeight - roomTop - roomBottom,
 	}
 
 	return layoutResult{
@@ -491,6 +495,47 @@ func (r *chartRenderer) computeLayout(
 		legendLayout:     legendLayout,
 		breadcrumbLayout: breadcrumbLayout,
 	}
+}
+
+// axisRoom is how much further in than grid, the header and the legend
+// already put it the plot's top, bottom and right edges must move, so the axis
+// text drawn beyond them stays clear of the title, breadcrumb, controls and
+// legend and inside the chart. Text above the plot sits between the header
+// and the plot, or within grid.Top when there is no header.
+func axisRoom(opt Option, grid Grid, header float32, legend bool, labelSize float32) (top, bottom, right float32) {
+	x := axis.DefaultConfig(axis.TypeCategory)
+	if len(opt.XAxis) > 0 {
+		x = opt.XAxis[0]
+	}
+	ys := opt.YAxis
+	if len(ys) == 0 {
+		ys = []axis.Config{axis.DefaultConfig(axis.TypeValue)}
+	}
+
+	if e := axisTopExtent(x, ys, labelSize); header > 0 {
+		top = e
+	} else {
+		top = max(0, e-grid.Top)
+	}
+
+	// A bottom X axis's tick labels have always lived in grid.Bottom; only
+	// its name, a second row, can outgrow it. The legend sits 5 px below the
+	// plot's margin.
+	if !xAxisOnTop(x) && x.Name != "" {
+		avail := grid.Bottom
+		if legend {
+			avail -= 5
+		}
+		bottom = max(0, xAxisExtent(x, labelSize)-avail)
+	}
+
+	for i, y := range ys {
+		if yAxisOnRight(y, i) {
+			right = max(0, axisLabelGap+yRightLabelWidth-grid.Right)
+			break
+		}
+	}
+	return top, bottom, right
 }
 
 // The zoom buttons and the toolbox sit at the top right, below grid.Top.
@@ -683,10 +728,10 @@ func (r *chartRenderer) renderCartesian(
 	}
 
 	// Render axes. The first Y axis draws the grid lines; by default it sits
-	// on the left and every other Y axis on the right (see yAxisSide).
+	// on the left and every other Y axis on the right (see yAxisOnRight).
 	objects = append(objects, r.renderXAxis(xConfigs[0], xScale, plotRect, resolver)...)
 	for i, ys := range yScales {
-		objects = append(objects, r.renderYAxis(yConfigs[i], ys, i, i == 0, plotRect, resolver)...)
+		objects = append(objects, r.renderYAxis(yConfigs[i], ys, i, xConfigs[0], plotRect, resolver)...)
 	}
 
 	// Shared stack offsets for stacked bar/line series
@@ -928,40 +973,62 @@ func (r *chartRenderer) seriesIndex(s series.Series) int {
 	return 0
 }
 
-// axisSide is the edge of the plot area an axis is drawn along.
-type axisSide int
-
-const (
-	sideBottom axisSide = iota
-	sideTop
-	sideLeft
-	sideRight
-)
-
-// xAxisSide is where an X axis is drawn: at the top for PositionTop, otherwise
-// at the bottom.
-func xAxisSide(cfg axis.Config) axisSide {
-	if cfg.Position == axis.PositionTop {
-		return sideTop
-	}
-	return sideBottom
+// xAxisOnTop reports whether an X axis is drawn along the top of the plot:
+// for PositionTop. Any other position draws it along the bottom.
+func xAxisOnTop(cfg axis.Config) bool {
+	return cfg.Position == axis.PositionTop
 }
 
-// yAxisSide is where the Y axis at index is drawn. PositionLeft and
-// PositionRight choose a side; anything else — including the zero value,
-// PositionBottom, which means nothing for a Y axis — keeps the default: the
-// first Y axis on the left, every other one on the right.
-func yAxisSide(cfg axis.Config, index int) axisSide {
+// yAxisOnRight reports whether the Y axis at index is drawn on the right of
+// the plot. PositionLeft and PositionRight choose a side; anything else —
+// including the zero value, PositionBottom, which means nothing for a Y axis
+// — keeps the default: the first Y axis on the left, every other one on the
+// right.
+func yAxisOnRight(cfg axis.Config, index int) bool {
 	switch cfg.Position {
 	case axis.PositionLeft:
-		return sideLeft
+		return false
 	case axis.PositionRight:
-		return sideRight
+		return true
 	}
-	if index == 0 {
-		return sideLeft
+	return index > 0
+}
+
+// Axis text sits in rows of one label's height, the first a gap beyond the
+// axis line.
+const axisLabelGap float32 = 6
+
+func axisRow(labelSize float32) float32 { return labelSize + 4 }
+
+// yRightLabelWidth is the width of a right-hand Y axis's tick label boxes.
+const yRightLabelWidth float32 = 50
+
+// xAxisExtent is how far an X axis's tick labels, and its name when it has
+// one, reach beyond the plot edge it is drawn along.
+func xAxisExtent(cfg axis.Config, labelSize float32) float32 {
+	e := axisLabelGap + axisRow(labelSize)
+	if cfg.Name != "" {
+		e += axisRow(labelSize)
 	}
-	return sideRight
+	return e
+}
+
+// yNameRise is how far a Y axis name's row sits above the top of the plot.
+func yNameRise(labelSize float32) float32 { return labelSize + 8 }
+
+// axisTopExtent is how far the axis text drawn above the plot reaches: an X
+// axis at the top, then the Y axis names above that.
+func axisTopExtent(x axis.Config, ys []axis.Config, labelSize float32) float32 {
+	var e float32
+	if xAxisOnTop(x) {
+		e = xAxisExtent(x, labelSize)
+	}
+	for _, y := range ys {
+		if y.Name != "" {
+			return e + yNameRise(labelSize)
+		}
+	}
+	return e
 }
 
 // axisColors resolves an axis's line and label colours: the config's when
@@ -998,7 +1065,7 @@ func (r *chartRenderer) renderXAxis(cfg axis.Config, xScale axis.Scale, plotRect
 	var objects []core.CanvasObject
 	labelSize := resolver.LabelTextSize()
 	lineColor, labelColor := axisColors(cfg, resolver)
-	top := xAxisSide(cfg) == sideTop
+	top := xAxisOnTop(cfg)
 
 	y := plotRect.Y + plotRect.H
 	dir := float32(1) // away from the plot: down for the bottom axis
@@ -1036,8 +1103,8 @@ func (r *chartRenderer) renderXAxis(cfg axis.Config, xScale axis.Scale, plotRect
 		label.TextSize = labelSize
 		label.Alignment = bellui.TextAlignCenter
 		estWidth := textWidth(tick.Label, labelSize)
-		label.Move(geo.NewPos(px-estWidth/2, labelY(6, labelSize+4)))
-		label.Resize(geo.NewSize(estWidth, labelSize+4))
+		label.Move(geo.NewPos(px-estWidth/2, labelY(axisLabelGap, axisRow(labelSize))))
+		label.Resize(geo.NewSize(estWidth, axisRow(labelSize)))
 		objects = append(objects, label)
 	}
 
@@ -1045,24 +1112,25 @@ func (r *chartRenderer) renderXAxis(cfg axis.Config, xScale axis.Scale, plotRect
 		name := canvas.NewText(cfg.Name, labelColor)
 		name.TextSize = labelSize
 		name.Alignment = bellui.TextAlignCenter
-		name.Move(geo.NewPos(plotRect.X, labelY(6+labelSize+4, labelSize+4)))
-		name.Resize(geo.NewSize(plotRect.W, labelSize+4))
+		name.Move(geo.NewPos(plotRect.X, labelY(axisLabelGap+axisRow(labelSize), axisRow(labelSize))))
+		name.Resize(geo.NewSize(plotRect.W, axisRow(labelSize)))
 		objects = append(objects, name)
 	}
 
 	return objects
 }
 
-// renderYAxis draws the Y axis at index on the side yAxisSide picks: the axis
-// line, a label per tick and the axis name above the axis. A right-hand axis
-// also draws tick marks. splitLines draws the horizontal grid lines at its
-// ticks, which only the first Y axis does.
-func (r *chartRenderer) renderYAxis(cfg axis.Config, yScale axis.Scale, index int, splitLines bool, plotRect coord.Rect, resolver *style.Resolver) []core.CanvasObject {
+// renderYAxis draws the Y axis at index on the side yAxisOnRight picks: the
+// axis line, a label per tick and the axis name above the axis, clear of an X
+// axis drawn at the top (topX). A right-hand axis also draws tick marks. The
+// first Y axis also draws the horizontal grid lines at its ticks.
+func (r *chartRenderer) renderYAxis(cfg axis.Config, yScale axis.Scale, index int, topX axis.Config, plotRect coord.Rect, resolver *style.Resolver) []core.CanvasObject {
 	var objects []core.CanvasObject
 	labelSize := resolver.LabelTextSize()
 	lineColor, labelColor := axisColors(cfg, resolver)
 	gridColor := resolver.GridLineColor()
-	right := yAxisSide(cfg, index) == sideRight
+	right := yAxisOnRight(cfg, index)
+	splitLines := index == 0
 
 	x := plotRect.X
 	if right {
@@ -1099,8 +1167,8 @@ func (r *chartRenderer) renderYAxis(cfg axis.Config, yScale axis.Scale, index in
 				StrokeWidth: 1,
 			})
 			label.Alignment = bellui.TextAlignLeading
-			label.Move(geo.NewPos(x+6, py-labelSize/2))
-			label.Resize(geo.NewSize(50, labelSize+4))
+			label.Move(geo.NewPos(x+axisLabelGap, py-labelSize/2))
+			label.Resize(geo.NewSize(yRightLabelWidth, axisRow(labelSize)))
 		} else {
 			label.Alignment = bellui.TextAlignTrailing
 			label.Move(geo.NewPos(0, py-labelSize/2))
@@ -1112,7 +1180,10 @@ func (r *chartRenderer) renderYAxis(cfg axis.Config, yScale axis.Scale, index in
 	if cfg.Name != "" {
 		name := canvas.NewText(cfg.Name, labelColor)
 		name.TextSize = labelSize
-		ny := plotRect.Y - labelSize - 8
+		ny := plotRect.Y - yNameRise(labelSize)
+		if xAxisOnTop(topX) {
+			ny -= xAxisExtent(topX, labelSize)
+		}
 		if right {
 			name.Alignment = bellui.TextAlignLeading
 			name.Move(geo.NewPos(x, ny))

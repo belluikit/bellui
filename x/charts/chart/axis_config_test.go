@@ -231,3 +231,89 @@ func TestAxisConfig_DefaultYPositions(t *testing.T) {
 		t.Errorf("second Y axis label 10 = %v, want it right of the plot (right %v)", l, plot.X+plot.W)
 	}
 }
+
+// The axis text the configs above add — a top X axis, axis names, a
+// right-hand Y axis — must get room in the layout. Every fixture above has no
+// title, no controls and only a left Y axis, so none of it ever met anything.
+func TestAxisConfig_TextHasRoom(t *testing.T) {
+	bottomOf := func(o core.CanvasObject) float32 { return o.Position().Y + o.Size().Height }
+
+	t.Run("top axis and names below the title and the controls", func(t *testing.T) {
+		test.NewTempApp(t)
+		x := categoryX()
+		x.Position, x.Name = axis.PositionTop, "Weekday"
+		y := valueY()
+		y.Name = "Sales"
+		y2 := valueY()
+		y2.Name = "Share"
+		c := New(Option{
+			Title:    &Title{Text: "Heading"},
+			DataZoom: &interact.ZoomConfig{Enabled: true, MinSpan: 0.01, MaxSpan: 1},
+			XAxis:    []axis.Config{x},
+			YAxis:    []axis.Config{y, y2},
+			Series: []series.Series{
+				&series.LineSeries{SeriesName: "s", Data: []float64{0, 50, 100}},
+				&series.LineSeries{SeriesName: "t", Data: []float64{0, 5, 10}, YAxisIndex: 1},
+			},
+		})
+		c.Resize(geo.NewSize(400, 300))
+		r := c.CreateRenderer().(*chartRenderer)
+		r.fullRebuild(geo.NewSize(400, 300))
+
+		title := findText(r.objects, "Heading")
+		if title == nil {
+			t.Fatal("title not drawn")
+		}
+		floor := bottomOf(title)
+		if zb := c.renderSnap.zoomButtons; zb != nil {
+			floor = max(floor, zb.ZoomInRect.Pos.Y+zb.ZoomInRect.Size.Height)
+		} else {
+			t.Fatal("zoom buttons not drawn")
+		}
+		for _, s := range []string{"Mon", "Weekday", "Sales", "Share"} {
+			txt := findText(r.objects, s)
+			if txt == nil {
+				t.Fatalf("%q not drawn", s)
+			}
+			if txt.Position().Y < floor {
+				t.Errorf("%q at y=%v, want it below the title and zoom buttons (y >= %v)", s, txt.Position().Y, floor)
+			}
+		}
+		// The Y names sit above the top X axis's labels, not on them.
+		if sales, mon := findText(r.objects, "Sales"), findText(r.objects, "Weekday"); bottomOf(sales) > mon.Position().Y {
+			t.Errorf("Y name Sales reaches y=%v, below the top X axis name at %v", bottomOf(sales), mon.Position().Y)
+		}
+	})
+
+	t.Run("right axis inside the chart", func(t *testing.T) {
+		y := valueY()
+		y.Position = axis.PositionRight
+		r, objs := renderAxisChart(t, categoryX(), y)
+		width := r.chart.Size().Width
+		for _, o := range objs {
+			if txt, ok := o.(*canvas.Text); ok && txt.Text == "100" {
+				if right := txt.Position().X + txt.Size().Width; right > width {
+					t.Errorf("right Y axis label 100 ends at x=%v, past the chart's width %v", right, width)
+				}
+			}
+		}
+	})
+
+	t.Run("bottom axis name inside a tight grid", func(t *testing.T) {
+		test.NewTempApp(t)
+		x := categoryX()
+		x.Name = "Weekday"
+		c := New(Option{
+			Grid:   &Grid{Left: 60, Right: 20, Top: 10, Bottom: 10},
+			XAxis:  []axis.Config{x},
+			YAxis:  []axis.Config{valueY()},
+			Series: []series.Series{&series.LineSeries{SeriesName: "s", Data: []float64{0, 50, 100}}},
+		})
+		c.Resize(geo.NewSize(400, 300))
+		r := c.CreateRenderer().(*chartRenderer)
+		r.fullRebuild(geo.NewSize(400, 300))
+		if name := findText(r.objects, "Weekday"); name == nil || bottomOf(name) > 300 {
+			t.Errorf("X axis name %v, want it to end inside the chart's 300 px", name)
+		}
+	})
+}

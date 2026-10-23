@@ -15,6 +15,7 @@ import (
 	fynecanvas "github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/dialog"
+	"github.com/belluikit/bellui/driver"
 	"github.com/belluikit/bellui/driver/desktop"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
@@ -431,9 +432,12 @@ func (c *Chart) window() bellui.Window {
 
 // captureImage returns the chart's pixels as they are drawn on its canvas —
 // series, axes, legend and overlays included — cut out of a capture of the
-// whole canvas. It returns nil when the chart is not on a canvas or the
-// canvas could not be drawn. The image is in device pixels, so on a HiDPI
-// screen it is larger than the chart's size in canvas units.
+// whole canvas. Only the part of the chart its clipping ancestors leave in
+// view is captured: a chart scrolled partly out of sight yields the visible
+// part, never the widgets drawn where the rest would be. It returns nil when
+// the chart is not on a canvas, is wholly out of view, or the canvas could
+// not be drawn. The image is in device pixels, so on a HiDPI screen it is
+// larger than the chart's size in canvas units.
 func (c *Chart) captureImage() image.Image {
 	d := bellui.CurrentApp().Driver()
 	cv := d.CanvasForObject(c)
@@ -457,6 +461,17 @@ func (c *Chart) captureImage() image.Image {
 
 	pos := d.AbsolutePositionForObject(c)
 	size := c.Size()
+	// A scroll or clipping container above the chart hides part of it, and
+	// the capture holds whatever else is drawn there.
+	if clip, clipped := driver.ClipBoundsForObject(cv, c); clipped {
+		x0, y0 := max(pos.X, clip.Pos.X), max(pos.Y, clip.Pos.Y)
+		x1 := min(pos.X+size.Width, clip.Pos.X+clip.Size.Width)
+		y1 := min(pos.Y+size.Height, clip.Pos.Y+clip.Size.Height)
+		if x1 <= x0 || y1 <= y0 {
+			return nil
+		}
+		pos, size = geo.NewPos(x0, y0), geo.NewSize(x1-x0, y1-y0)
+	}
 	r := image.Rect(
 		fb.Min.X+int(pos.X*sx), fb.Min.Y+int(pos.Y*sy),
 		fb.Min.X+int((pos.X+size.Width)*sx), fb.Min.Y+int((pos.Y+size.Height)*sy),
