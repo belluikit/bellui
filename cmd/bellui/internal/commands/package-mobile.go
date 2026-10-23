@@ -1,10 +1,7 @@
 package commands
 
 import (
-	"bytes"
-	"fmt"
 	"log"
-	"os/exec"
 	"path/filepath"
 
 	"github.com/belluikit/bellui/cmd/bellui/internal/mobile"
@@ -39,28 +36,4 @@ func (p *Packager) packageIOS(target string, tags []string) error {
 	// with the rest of the bundle (#677).
 	return mobile.RunNewBuild(target, p.AppID, p.icon, p.Name, p.AppVersion, p.AppBuild, p.release, p.distribution,
 		p.certificate, p.profile, tags, "", "", "", p.URLSchemes, p.fileMimeTypes(), p.IOSUsageDescriptions, p.AssociatedDomains, p.iconCredit())
-}
-
-// runCmdCaptureOutput is a exec.Command wrapper that offers better error messages from stdout and stderr.
-func runCmdCaptureOutput(name string, args ...string) error {
-	var (
-		outbuf = &bytes.Buffer{}
-		errbuf = &bytes.Buffer{}
-	)
-	cmd := exec.Command(name, args...)
-	cmd.Stdout = outbuf
-	cmd.Stderr = errbuf
-	err := cmd.Run()
-	if err != nil {
-		outstr := outbuf.String()
-		errstr := errbuf.String()
-		if outstr != "" {
-			err = fmt.Errorf(outbuf.String()+": %w", err)
-		}
-		if errstr != "" {
-			err = fmt.Errorf(outbuf.String()+": %w", err)
-		}
-		return err
-	}
-	return nil
 }
