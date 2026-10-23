@@ -73,10 +73,22 @@ func (s *Server) serve() error {
 
 	http.Handle("/", fileServer)
 
-	fmt.Printf("Serving %s at: http://localhost:%v\n", s.appData.AppID, s.port)
+	fmt.Print(servingMessage(s.appData, s.port))
 	err = http.ListenAndServe(":"+strconv.Itoa(s.port), nil)
 
 	return err
+}
+
+// servingMessage is the line serve prints once the app is up. It names the app
+// by its ID, or by its name when it has none. A web build has no ID when there
+// is no manifest or the manifest sets none (serve has no --app-id), and the
+// line then read "Serving  at:" (#703).
+func servingMessage(app *appData, port int) string {
+	name := app.AppID
+	if name == "" {
+		name = app.Name
+	}
+	return fmt.Sprintf("Serving %s at: http://localhost:%v\n", name, port)
 }
 
 // Server serve the wasm application over http
