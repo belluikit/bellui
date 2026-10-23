@@ -19,6 +19,16 @@
 // Without the background mode, iOS suspends the app a few seconds after it
 // leaves the screen: the lines stop, and the beep with them.
 //
+// On Android the same line comes from android/BgAudio.java (an AudioTrack),
+// and state is the process importance Android reports. Android has no
+// background-audio declaration: measured on a Pixel 9a (Android 17,
+// 2026-10-22), playback and both counters continued through 90 s after Home
+// with the process reported as cached. Long playback is still expected to
+// need a foreground service on Android; this probe does not start one.
+//
+// Measured on an iPad (10th gen, 2026-10-22): frames kept climbing at the
+// output rate through 40 s in state=background, with no interruption.
+//
 // Package from this directory and run on a device:
 //
 //	bellui package -os ios --app-id com.trendvidia.bgaudioprobe \
@@ -27,6 +37,14 @@
 //	xcrun devicectl device process launch --console --device <UDID> com.trendvidia.bgaudioprobe
 //
 // then press Home (or launch another app) and watch the lines continue.
+//
+// Android:
+//
+//	CGO_LDFLAGS= bellui package --target android/arm64 --app-id com.trendvidia.bgaudioprobe
+//	adb install -r bgaudioprobe.apk
+//	adb shell am start -n com.trendvidia.bgaudioprobe/org.golang.app.GoNativeActivity
+//	adb shell input keyevent KEYCODE_HOME
+//	adb logcat -s Bellui | grep bgaudioprobe
 package main
 
 import (
