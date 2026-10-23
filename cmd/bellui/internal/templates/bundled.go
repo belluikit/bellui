@@ -23,9 +23,6 @@ var appxManifestXML string
 //go:embed data/entitlements-darwin.plist
 var entitlementsDarwinPlist string
 
-//go:embed data/entitlements-ios.plist
-var entitlementsIosPlist string
-
 //go:embed data/hello_world.got
 var helloWorld string
 

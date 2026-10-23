@@ -18,6 +18,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/belluikit/bellui/cmd/bellui/internal/templates"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -33,15 +34,29 @@ func goIOSBuild(pkg *packages.Package, bundleID string, archs []string,
 		return nil, fmt.Errorf("failed to look up certificate %s: %s", cert, err.Error())
 	}
 
+	// The app's ios/ directory adds what the manifest cannot express (#672):
+	// Info.plist and entitlement fragments, and frameworks to link and embed.
+	appDir := filepath.Dir(pkg.GoFiles[0])
+	entitlements, err := iosEntitlements(appDir, buildAssociatedDomains)
+	if err != nil {
+		return nil, err
+	}
+	perArch, embed, err := resolveIOSFrameworks(appDir, archs, buildTarget == "iossimulator")
+	if err != nil {
+		return nil, err
+	}
+
 	projPbxproj := new(bytes.Buffer)
 	projData := iosProjectData(bundleID, cert, profile, teamID, release)
+	projData.Entitlements = entitlements != nil
+	projData.Embeds = pbxEmbeds(embed)
 	if err := projPbxprojTmpl.Execute(projPbxproj, projData); err != nil {
 		return nil, err
 	}
 
-	infoplist := new(bytes.Buffer)
-	if err := infoplistTmpl.Execute(infoplist,
-		iosInfoPlistData(bundleID, appName, version, build, len(allArchs["ios"]) > 2, usageDescriptions)); err != nil {
+	infoplistBytes, err := iosInfoPlist(appDir,
+		iosInfoPlistData(bundleID, appName, version, build, len(allArchs["ios"]) > 2, usageDescriptions))
+	if err != nil {
 		return nil, err
 	}
 
@@ -50,23 +65,19 @@ func goIOSBuild(pkg *packages.Package, bundleID string, archs []string,
 		contents []byte
 	}{
 		{tmpdir + "/main.xcodeproj/project.pbxproj", projPbxproj.Bytes()},
-		{tmpdir + "/main/Info.plist", infoplist.Bytes()},
+		{tmpdir + "/main/Info.plist", infoplistBytes},
 		{tmpdir + "/main/Images.xcassets/AppIcon.appiconset/Contents.json", []byte(contentsJSON)},
 	}
 
-	// Emit an Associated Domains entitlement so Universal Links (tapped
-	// https://<domain>/… links) route to the app (pre-rebrand tracker #622). Signed in via
-	// CODE_SIGN_ENTITLEMENTS; xcodebuild -allowProvisioningUpdates registers the
-	// capability with the App ID under automatic signing.
-	if projData.Entitlements {
-		entitlements := new(bytes.Buffer)
-		if err := entitlementsTmpl.Execute(entitlements, buildAssociatedDomains); err != nil {
-			return nil, err
-		}
+	// Signed in via CODE_SIGN_ENTITLEMENTS: Associated Domains for Universal
+	// Links (pre-rebrand tracker #622) and the app's ios/Entitlements.plist.
+	// xcodebuild -allowProvisioningUpdates registers the capabilities with the
+	// App ID under automatic signing.
+	if entitlements != nil {
 		files = append(files, struct {
 			name     string
 			contents []byte
-		}{tmpdir + "/main/main.entitlements", entitlements.Bytes()})
+		}{tmpdir + "/main/main.entitlements", encodePlist(entitlements)})
 	}
 
 	for _, file := range files {
@@ -92,8 +103,13 @@ func goIOSBuild(pkg *packages.Package, bundleID string, archs []string,
 	var nmpkgs map[string]bool
 	for _, arch := range archs {
 		path := filepath.Join(tmpdir, arch)
+		cflags, ldflags := iosLinkFlags(perArch[arch])
+		env, err := withIOSFlags(darwinEnv[arch], cflags, ldflags)
+		if err != nil {
+			return nil, err
+		}
 		// Disable DWARF; see golang.org/issues/25148.
-		if err := goBuild(src, darwinEnv[arch], "-ldflags=-w", "-o="+path); err != nil {
+		if err := goBuild(src, env, "-ldflags=-w", "-o="+path); err != nil {
 			return nil, err
 		}
 		if nmpkgs == nil {
@@ -112,6 +128,10 @@ func goIOSBuild(pkg *packages.Package, bundleID string, archs []string,
 
 	// TODO(jbd): Set the launcher icon.
 	if err := iosCopyAssets(pkg, tmpdir); err != nil {
+		return nil, err
+	}
+
+	if err := copyIOSEmbeds(embed); err != nil {
 		return nil, err
 	}
 
@@ -166,6 +186,36 @@ func goIOSBuild(pkg *packages.Package, bundleID string, archs []string,
 	}
 
 	return nmpkgs, nil
+}
+
+// iosInfoPlist renders the generated Info.plist and merges the app's
+// ios/Info.plist fragment into it.
+func iosInfoPlist(appDir string, data infoplistTmplData) ([]byte, error) {
+	buf := new(bytes.Buffer)
+	if err := infoplistTmpl.Execute(buf, data); err != nil {
+		return nil, err
+	}
+	fragment, err := readIOSFragment(appDir, iosInfoPlistFragment)
+	if err != nil {
+		return nil, err
+	}
+	return mergeInfoPlist(buf.Bytes(), fragment, data)
+}
+
+// copyIOSEmbeds puts the dynamic frameworks next to the Xcode project, whose
+// Embed Frameworks phase copies them into the app and signs them with the
+// app's identity.
+func copyIOSEmbeds(embed []iosFramework) error {
+	for _, f := range embed {
+		dst := filepath.Join(tmpdir, "main", iosFrameworksDir, filepath.Base(f.Path))
+		if err := mkdir(filepath.Dir(dst)); err != nil {
+			return err
+		}
+		if err := runCmd(exec.Command("cp", "-R", f.Path, dst)); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // DetectIOSTeamID finds the team ID used by the app certificates.
@@ -401,24 +451,7 @@ func sortedPlistEntries(m map[string]string) []plistEntry {
 	return entries
 }
 
-// entitlementsTmpl renders the iOS code-signing entitlements from the list of
-// associated domains (pre-rebrand tracker #622 Universal Links). The template data is the
-// []string of domains (without the "applinks:" prefix).
-var entitlementsTmpl = template.Must(template.New("entitlements").Parse(`<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>com.apple.developer.associated-domains</key>
-  <array>
-{{- range .}}
-    <string>applinks:{{.}}</string>
-{{- end}}
-  </array>
-</dict>
-</plist>
-`))
-
-var infoplistTmpl = template.Must(template.New("infoplist").Parse(`<?xml version="1.0" encoding="UTF-8"?>
+var infoplistTmpl = template.Must(template.New("infoplist").Funcs(templates.XMLFuncs).Parse(`<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
@@ -427,19 +460,19 @@ var infoplistTmpl = template.Must(template.New("infoplist").Parse(`<?xml version
   <key>CFBundleExecutable</key>
   <string>main</string>
   <key>CFBundleIdentifier</key>
-  <string>{{.BundleID}}</string>
+  <string>{{xml .BundleID}}</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   {{- if .Credit}}
   <key>NSHumanReadableCopyright</key>
-  <string>{{.Credit}}</string>
+  <string>{{xml .Credit}}</string>
   {{- end}}
   <key>CFBundleName</key>
-  <string>{{.Name}}</string>
+  <string>{{xml .Name}}</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-  <string>{{.Version}}</string>
+  <string>{{xml .Version}}</string>
   <key>CFBundleSignature</key>
   <string>????</string>
   <key>CFBundleVersion</key>
@@ -499,19 +532,19 @@ var infoplistTmpl = template.Must(template.New("infoplist").Parse(`<?xml version
     <string>UIInterfaceOrientationLandscapeRight</string>
   </array>
 {{- range .UsageDescriptions}}
-  <key>{{.Key}}</key>
-  <string>{{.Value}}</string>
+  <key>{{xml .Key}}</key>
+  <string>{{xml .Value}}</string>
 {{- end}}
 {{- if .URLSchemes}}
   <key>CFBundleURLTypes</key>
   <array>
     <dict>
       <key>CFBundleURLName</key>
-      <string>{{.BundleID}}</string>
+      <string>{{xml .BundleID}}</string>
       <key>CFBundleURLSchemes</key>
       <array>
 {{- range .URLSchemes}}
-        <string>{{.}}</string>
+        <string>{{xml .}}</string>
 {{- end}}
       </array>
     </dict>
@@ -522,7 +555,7 @@ var infoplistTmpl = template.Must(template.New("infoplist").Parse(`<?xml version
   <array>
     <dict>
       <key>CFBundleTypeName</key>
-      <string>{{.Name}} Document</string>
+      <string>{{xml .Name}} Document</string>
       <key>CFBundleTypeRole</key>
       <string>Editor</string>
       <key>LSHandlerRank</key>
@@ -531,14 +564,14 @@ var infoplistTmpl = template.Must(template.New("infoplist").Parse(`<?xml version
       <key>LSItemContentTypes</key>
       <array>
 {{- range .ContentTypes}}
-        <string>{{.}}</string>
+        <string>{{xml .}}</string>
 {{- end}}
       </array>
 {{- end}}
       <key>CFBundleTypeMIMETypes</key>
       <array>
 {{- range .MimeTypes}}
-        <string>{{.}}</string>
+        <string>{{xml .}}</string>
 {{- end}}
       </array>
     </dict>
@@ -559,7 +592,6 @@ func iosProjectData(bundleID, cert, profile, teamID string, release bool) projPb
 		Profile:          profile,
 		TeamID:           teamID,
 		Type:             "Manual",
-		Entitlements:     len(buildAssociatedDomains) > 0,
 		DeploymentTarget: IOSDeploymentTarget(),
 	}
 	if profile == "" {
@@ -579,6 +611,9 @@ type projPbxprojTmplData struct {
 	// Entitlements is true when a main/main.entitlements file is generated (e.g.
 	// for Associated Domains / Universal Links) and must be code-signed in.
 	Entitlements bool
+	// Embeds are the dynamic frameworks from ios/Frameworks the Embed
+	// Frameworks build phase copies into the app and signs (#672).
+	Embeds []iosEmbed
 	// DeploymentTarget is the lowest iOS version the app runs on, from
 	// IOSDeploymentTarget. It used to be a fixed 14.0, which Xcode 27 rejects
 	// (#410).
@@ -597,6 +632,9 @@ var projPbxprojTmpl = template.Must(template.New("projPbxproj").Parse(`// !$*UTF
     254BB84F1B1FD08900C56DE9 /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 254BB84E1B1FD08900C56DE9 /* Images.xcassets */; };
     254BB8681B1FD16500C56DE9 /* main in Resources */ = {isa = PBXBuildFile; fileRef = 254BB8671B1FD16500C56DE9 /* main */; };
     25FB30331B30FDEE0005924C /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 25FB30321B30FDEE0005924C /* assets */; };
+{{- range .Embeds}}
+    {{.BuildFile}} /* {{.Name}} in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = {{.FileRef}} /* {{.Name}} */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+{{- end}}
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -605,6 +643,9 @@ var projPbxprojTmpl = template.Must(template.New("projPbxproj").Parse(`// !$*UTF
     254BB84E1B1FD08900C56DE9 /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Images.xcassets; sourceTree = "<group>"; };
     254BB8671B1FD16500C56DE9 /* main */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; path = main; sourceTree = "<group>"; };
     25FB30321B30FDEE0005924C /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = assets; path = main/assets; sourceTree = "<group>"; };
+{{- range .Embeds}}
+    {{.FileRef}} /* {{.Name}} */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = "{{.Name}}"; path = "main/Frameworks/{{.Name}}"; sourceTree = "<group>"; };
+{{- end}}
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -612,6 +653,9 @@ var projPbxprojTmpl = template.Must(template.New("projPbxproj").Parse(`// !$*UTF
       isa = PBXGroup;
       children = (
         25FB30321B30FDEE0005924C /* assets */,
+{{- range .Embeds}}
+        {{.FileRef}} /* {{.Name}} */,
+{{- end}}
         254BB8401B1FD08900C56DE9 /* main */,
         254BB83F1B1FD08900C56DE9 /* Products */,
       );
@@ -646,12 +690,33 @@ var projPbxprojTmpl = template.Must(template.New("projPbxproj").Parse(`// !$*UTF
     };
 /* End PBXGroup section */
 
+{{- if .Embeds}}
+/* Begin PBXCopyFilesBuildPhase section */
+    B5E1F0C00000000000000000 /* Embed Frameworks */ = {
+      isa = PBXCopyFilesBuildPhase;
+      buildActionMask = 2147483647;
+      dstPath = "";
+      dstSubfolderSpec = 10;
+      files = (
+{{- range .Embeds}}
+        {{.BuildFile}} /* {{.Name}} in Embed Frameworks */,
+{{- end}}
+      );
+      name = "Embed Frameworks";
+      runOnlyForDeploymentPostprocessing = 0;
+    };
+/* End PBXCopyFilesBuildPhase section */
+{{- end}}
+
 /* Begin PBXNativeTarget section */
     254BB83D1B1FD08900C56DE9 /* main */ = {
       isa = PBXNativeTarget;
       buildConfigurationList = 254BB8611B1FD08900C56DE9 /* Build configuration list for PBXNativeTarget "main" */;
       buildPhases = (
         254BB83C1B1FD08900C56DE9 /* Resources */,
+{{- if .Embeds}}
+        B5E1F0C00000000000000000 /* Embed Frameworks */,
+{{- end}}
       );
       buildRules = (
       );

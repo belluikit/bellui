@@ -2,10 +2,12 @@ package templates
 
 import (
 	"bytes"
+	"encoding/xml"
 	"html"
 	"image"
 	"image/gif"
 	"image/png"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -80,4 +82,34 @@ func TestIndexHTMLHasViewport(t *testing.T) {
 // without escaping it, so it must not need any.
 func TestGopherCreditNeedsNoEscaping(t *testing.T) {
 	assert.Equal(t, html.EscapeString(GopherCredit), GopherCredit)
+}
+
+// TestAndroidManifestEscapesText checks that manifest text containing XML
+// metacharacters still renders a well-formed AndroidManifest.xml.
+func TestAndroidManifestEscapesText(t *testing.T) {
+	var b strings.Builder
+	data := struct {
+		JavaPkgPath, Name, LibName, Version, Credit string
+		Debug, AdaptiveIcon                         bool
+		Build                                       int
+		URLSchemes, MimeTypes                       []string
+	}{
+		JavaPkgPath: "com.example.app", Name: `Tom & Jerry's <"Cat">`, LibName: "app",
+		Version: "1.0", Credit: "a & b", Build: 1,
+		URLSchemes: []string{"x&y"}, MimeTypes: []string{"text/<plain>"},
+	}
+	if err := ManifestAndroid.Execute(&b, data); err != nil {
+		t.Fatal(err)
+	}
+	var doc struct {
+		App struct {
+			Label string `xml:"http://schemas.android.com/apk/res/android label,attr"`
+		} `xml:"application"`
+	}
+	if err := xml.Unmarshal([]byte(b.String()), &doc); err != nil {
+		t.Fatalf("manifest is not well-formed: %v\n%s", err, b.String())
+	}
+	if doc.App.Label != data.Name {
+		t.Errorf("label = %q, want %q", doc.App.Label, data.Name)
+	}
 }

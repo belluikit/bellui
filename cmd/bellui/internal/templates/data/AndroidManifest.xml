@@ -1,14 +1,14 @@
 <manifest
 	xmlns:android="http://schemas.android.com/apk/res/android"
-	package="{{.JavaPkgPath}}"
+	package="{{xml .JavaPkgPath}}"
 	android:versionCode="{{.Build}}"
-	android:versionName="{{.Version}}">
+	android:versionName="{{xml .Version}}">
 
-	<application android:label="{{.Name}}" android:debuggable="{{.Debug}}"
+	<application android:label="{{xml .Name}}" android:debuggable="{{.Debug}}"
 				 {{if .AdaptiveIcon}}android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round"{{end}}>
 	{{- if .Credit}}
 	<!-- The default icon is CC BY 4.0 artwork, which must be credited (bellui #362). -->
-	<meta-data android:name="bellui.icon_credit" android:value="{{.Credit}}" />
+	<meta-data android:name="bellui.icon_credit" android:value="{{xml .Credit}}" />
 	{{- end}}
 	<!-- configChanges locale|layoutDirection: the pair that lets an Android
 	     13+ per-app language change reach the app as onConfigurationChanged
@@ -24,11 +24,11 @@
 	     changes carrying the undeclared screenSize/smallestScreenSize bits
 	     (fold/unfold, split resize crossings) keep recreating as before. -->
 	<activity android:name="org.golang.app.GoNativeActivity"
-		android:label="{{.Name}}"
+		android:label="{{xml .Name}}"
 		android:configChanges="orientation|keyboardHidden|uiMode|locale|layoutDirection|screenLayout"
 		android:exported="true"
 		android:theme="@android:style/Theme">
-		<meta-data android:name="android.app.lib_name" android:value="{{.LibName}}" />
+		<meta-data android:name="android.app.lib_name" android:value="{{xml .LibName}}" />
 		<intent-filter>
 			<action android:name="android.intent.action.MAIN" />
 			<category android:name="android.intent.category.LAUNCHER" />
@@ -38,14 +38,14 @@
 			<action android:name="android.intent.action.VIEW" />
 			<category android:name="android.intent.category.DEFAULT" />
 			<category android:name="android.intent.category.BROWSABLE" />
-			<data android:scheme="{{.}}" />
+			<data android:scheme="{{xml .}}" />
 		</intent-filter>
 		{{- end}}
 		{{- range .MimeTypes}}
 		<intent-filter>
 			<action android:name="android.intent.action.VIEW" />
 			<category android:name="android.intent.category.DEFAULT" />
-			<data android:mimeType="{{.}}" />
+			<data android:mimeType="{{xml .}}" />
 		</intent-filter>
 		{{- end}}
 	</activity>
@@ -54,7 +54,7 @@
 			  android:exported="false" />
 
 	<provider android:name="org.golang.app.BelluiFileProvider"
-			  android:authorities="{{.JavaPkgPath}}.fileprovider"
+			  android:authorities="{{xml .JavaPkgPath}}.fileprovider"
 			  android:exported="false"
 			  android:grantUriPermissions="true" />
 	</application>

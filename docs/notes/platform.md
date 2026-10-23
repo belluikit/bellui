@@ -213,3 +213,72 @@ Two defects in the Windows `ReadDirectoryChangesW` backend, **both still present
 
 **Verify:** `go run ./hack/winwatchprobe -rounds 200` on a Windows box reports the two numbers that track this — bail-out rate (a `Destroy` taking ≥5s means `closeWatcher` gave up and leaked the reader; was 4 per 200 rounds, now 0) and process handle drift (was creeping, now flat). Retire the fork when the fixes land upstream.
 
+
+### iOS Packaging — the `ios/` Directory (#672)
+
+`bellui package -os ios` takes what `manifest.pxf` cannot express from files
+next to the app's main package, the way `android/*.java` works on Android:
+`ios/Info.plist` and `ios/Entitlements.plist` (plist dict fragments) and
+`ios/Frameworks/` (`.xcframework` / `.framework`). The user-facing rules are in
+`cmd/bellui/README.md`; the design points:
+
+- **Files, not manifest fields** (owner decision, 2026-10-22). A plist fragment
+  holds any plist type with no typed-value encoding in PXF or the manifest
+  proto. The cost: a static file cannot vary per build, so dev/release-split
+  entitlements (`aps-environment`) are not expressible.
+- **One source of truth per key.** A fragment key the packager owns or derives
+  from the manifest is an error, never a silent override. Generated defaults
+  (orientations, `UIRequiresFullScreen`, …) are the fragment's to replace.
+  The merge is a real plist tree (`internal/mobile/plist.go`), so key order is
+  deterministic.
+- **Frameworks link through cgo, embed through Xcode.** The Go binary is built
+  outside Xcode and copied in as a resource, so the slice for each GOARCH is
+  added to that architecture's `CGO_CFLAGS`/`CGO_LDFLAGS` (plus
+  `-rpath @executable_path/Frameworks` when one is dynamic). Dynamic
+  frameworks are copied into the Xcode project and an Embed Frameworks phase
+  with `CodeSignOnCopy` signs them with the app's identity; copying into the
+  .app after xcodebuild would break the seal. `bellui release` re-signs each
+  with the release certificate before the app.
+- **Swift is not compiled** by the packager; it ships as an xcframework.
+- Verified with `hack/iosframeworkprobe` (bundle inspection; see its doc
+  comment for the device run).
+
+### Android library dependencies in `bellui package` (#672)
+
+`<appdir>/android/libs/*.jar|*.aar` are packaged without Gradle; the user-facing
+description is in `cmd/bellui/README.md`, the code in
+`cmd/bellui/internal/mobile/android_libs.go`.
+
+- **File convention, not manifest.pxf fields** (owner decision, 2026-10-22): the
+  same envelope as `android/*.java` and a custom `AndroidManifest.xml`. A static
+  directory cannot vary per Development/Release build.
+- **AARs switch resources to aapt2.** Library res needs a real link and R
+  classes, which binres cannot do. Libraries are `-R` overlays in file-name
+  order and the app's own resources come last, so the app wins a name clash.
+  `--extra-packages` generates an R class for every library package with
+  resources, or with a non-empty `R.txt` (an AAR built with transitive R reads
+  its dependencies' resources through its own R). The R sources are compiled
+  and dexed with the app, which is why linking now runs before dexing.
+- **No AAR, no change.** Without an AAR the binres path is untouched; a test
+  pins the manifest byte-identical with and without a jar.
+- **Simplified manifest merge**: permissions, features, queries and
+  `<application>` children, deduplicated by `android:name` with the app first.
+  A component two libraries share has its children merged (androidx.startup's
+  `InitializationProvider` carries one `<meta-data>` per library), and
+  relative class names are qualified with the declaring library's package, as
+  the Gradle merger does.
+  No `tools:` directives, no `<application>` attribute merge, no placeholder
+  other than `${applicationId}`. Upgrade path if a library needs more: the
+  app's own `AndroidManifest.xml`.
+- **Missing ABI is an error**: an AAR with `jni/` for some ABIs but not a built
+  one would install and then fail `System.loadLibrary` on exactly those devices.
+- **One platform for javac, d8 and aapt2**: app Java is compiled and dexed
+  against `binres.LatestAPIResourcesPath`, the `android.jar` aapt2 links
+  against, so the R classes and the code agree on one API level.
+- **Multidex in the AAB**: d8 may write `classes2.dex`…; the bundle's base
+  module takes every `classes*.dex` into `dex/`.
+- **Build-tools selection**: `util.AndroidBuildToolsPath` used to take the
+  lexically first (oldest) build-tools; d8 2.1.7 from 30.0.3 crashed on the
+  android-35 `android.jar` given as `--lib`. It now takes the newest.
+- **Verify** with `hack/androidlibprobe` (androidx.core 1.3.2 closure; expects
+  `androidlibprobe ok color=#ff9e9e9e overflow=999+ arrayset=2`).

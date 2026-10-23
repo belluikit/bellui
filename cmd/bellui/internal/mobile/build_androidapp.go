@@ -21,6 +21,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -125,6 +127,14 @@ func goAndroidBuild(pkg *packages.Package, bundleID string, androidArchs []strin
 		return nil, err
 	}
 
+	// Library dependencies from android/libs (#672): merged into the
+	// manifest, linked with aapt2 and dexed below.
+	libs, err := prepareAndroidLibs(dir, manifestData, androidArchs, libName, iconPath, iconFG, iconBG, iconMono,
+		target, build, version)
+	if err != nil {
+		return nil, err
+	}
+
 	libFiles := []string{}
 	nmpkgs := make(map[string]map[string]bool) // map: arch -> extractPkgs' output
 
@@ -154,6 +164,7 @@ func goAndroidBuild(pkg *packages.Package, bundleID string, androidArchs []strin
 		}
 		libFiles = append(libFiles, libPath)
 	}
+	libFiles = append(libFiles, libs.nativeFiles...)
 
 	// Only a distribution build ("bellui release") produces the .aab store
 	// bundle; a --release package stays an installable .apk (#144).
@@ -182,16 +193,16 @@ func goAndroidBuild(pkg *packages.Package, bundleID string, androidArchs []strin
 		out = f
 	}
 
-	appDexPath, err := mergeAppJavaDex(dir)
+	appDex, err := mergeAppJavaDex(dir, libs.libs.jars, libs.rJava())
 	if err != nil {
 		return nil, err
 	}
 
-	apkw, err := buildAPK(out, nmpkgs, libFiles, androidArchs, appDexPath)
+	apkw, err := buildAPK(out, nmpkgs, libFiles, androidArchs, appDex)
 	if err != nil {
 		return nil, err
 	}
-	err = addAssets(apkw, manifestData, dir, iconPath, target, build, version, iconFG, iconBG, iconMono)
+	err = addAssets(apkw, manifestData, dir, iconPath, target, build, version, iconFG, iconBG, iconMono, libs)
 	if err != nil {
 		return nil, err
 	}
@@ -264,8 +275,9 @@ func detectAdaptiveIcons(dir, foreground, background, monochrome string) (string
 }
 
 func addAssets(apkw *Writer, manifestData []byte, dir, iconPath string, target int, versionCode int,
-	versionName, iconFG, iconBG, iconMono string,
+	versionName, iconFG, iconBG, iconMono string, libs *preparedLibs,
 ) error {
+	written := map[string]bool{}
 	// Add any assets.
 	var arsc struct {
 		iconPath string
@@ -309,12 +321,22 @@ func addAssets(apkw *Writer, manifestData []byte, dir, iconPath string, target i
 				return nil
 			}
 
-			name := "assets/" + path[len(assetsDir)+1:]
+			name := "assets/" + filepath.ToSlash(path[len(assetsDir)+1:])
+			written[name] = true
 			return apkwWriteFile(name, path, apkw)
 		})
 		if err != nil {
 			return fmt.Errorf("asset %v", err)
 		}
+	}
+
+	if err := libs.libs.writeLibraryAssets(apkw, written); err != nil {
+		return err
+	}
+	if libs.linked != nil {
+		// Library resources were linked with the app's before dexing, so
+		// their R classes could be compiled in (#672).
+		return writeLinkedResources(apkw, libs.linked)
 	}
 
 	iconForeground, iconBackground, iconMonochrome := detectAdaptiveIcons(dir, iconFG, iconBG, iconMono)
@@ -420,7 +442,7 @@ func legacyAddAssets(apkw *Writer, manifestData []byte, iconPath string, target 
 	return nil
 }
 
-func buildAPK(out io.Writer, nmpkgs map[string]map[string]bool, libFiles []string, androidArchs []string, appDexPath string) (*Writer, error) {
+func buildAPK(out io.Writer, nmpkgs map[string]map[string]bool, libFiles []string, androidArchs []string, appDex []string) (*Writer, error) {
 	block, _ := pem.Decode([]byte(debugCert))
 	if block == nil {
 		return nil, errors.New("no debug cert")
@@ -435,25 +457,26 @@ func buildAPK(out io.Writer, nmpkgs map[string]map[string]bool, libFiles []strin
 		apkw = NewWriter(out, privKey)
 	}
 
-	w, err := apkwCreate("classes.dex", apkw)
-	if err != nil {
-		return nil, err
-	}
-	var dexData []byte
-	if appDexPath != "" {
-		// The app shipped android/*.java; use the merged dex (built-in + app).
-		dexData, err = os.ReadFile(appDexPath)
+	if len(appDex) > 0 {
+		// The app shipped android/*.java or android/libs; use the merged dex
+		// (built-in + app + libraries), which d8 may split over several files.
+		for _, dex := range appDex {
+			if err := apkwWriteFile(filepath.Base(dex), dex, apkw); err != nil {
+				return nil, err
+			}
+		}
+	} else {
+		w, err := apkwCreate("classes.dex", apkw)
 		if err != nil {
 			return nil, err
 		}
-	} else {
-		dexData, err = base64.StdEncoding.DecodeString(dexStr)
+		dexData, err := base64.StdEncoding.DecodeString(dexStr)
 		if err != nil {
 			log.Fatalf("internal error bad dexStr: %v", err)
 		}
-	}
-	if _, err := w.Write(dexData); err != nil {
-		return nil, err
+		if _, err := w.Write(dexData); err != nil {
+			return nil, err
+		}
 	}
 
 	for _, libFile := range libFiles {
@@ -466,6 +489,11 @@ func buildAPK(out io.Writer, nmpkgs map[string]map[string]bool, libFiles []strin
 		toolchain := ndk.Toolchain(arch)
 		if nmpkgs[arch]["github.com/belluikit/bellui/internal/driver/mobile/exp/audio/al"] {
 			dst := "lib/" + toolchain.abi + "/libopenal.so"
+			if slices.Contains(libFiles, dst) {
+				// An AAR in android/libs ships its own libopenal.so; a zip with
+				// two entries of one name installs whichever the reader keeps.
+				return nil, fmt.Errorf("android/libs: an AAR ships %s, which the exp/audio/al package also bundles", dst)
+			}
 			src := filepath.Join(gomobilepath, dst)
 			if _, err := os.Stat(src); err != nil {
 				return nil, errors.New("the Android requires the github.com/belluikit/bellui/internal/driver/mobile/exp/audio/al, but the OpenAL libraries was not found. Please run gomobile init with the -openal Flag pointing to an OpenAL source directory")
@@ -583,50 +611,115 @@ func writeDebugSigningFiles() (keyPath, certPath string, cleanup func(), err err
 }
 
 // mergeAppJavaDex compiles any android/*.java the app ships in its main package
-// directory and merges the resulting classes with bellui's built-in dex into a
-// single classes.dex, returning its path. It returns ("", nil) when the app
-// ships no android/*.java (the common case), in which case the built-in dex is
-// used unchanged.
+// directory, plus extraJava (the R classes generated for library resources),
+// against android.jar and the library jars, then merges the classes and the
+// jars with bellui's built-in dex. It returns the dex files d8 wrote
+// (classes.dex, then classes2.dex… when the methods overflow one file), or nil
+// when the app ships neither android/*.java nor android/libs (the common
+// case), in which case the built-in dex is used unchanged.
 //
 // This lets apps provide small JNI shims (e.g. a LocationListener for GPS)
-// without a gradle project: drop a .java in <appdir>/android/ and `bellui package`
-// compiles and bundles it. Requires ANDROID_HOME (javac + android.jar) and the
-// build-tools (d8) on the system.
-func mergeAppJavaDex(dir string) (string, error) {
+// and library dependencies (#672) without a gradle project: drop a .java in
+// <appdir>/android/, or a .jar/.aar in <appdir>/android/libs/, and `bellui
+// package` compiles and bundles it. Requires ANDROID_HOME (javac + android.jar)
+// and the build-tools (d8) on the system.
+func mergeAppJavaDex(dir string, jars, extraJava []string) ([]string, error) {
 	javaFiles, err := filepath.Glob(filepath.Join(dir, "android", "*.java"))
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	if len(javaFiles) == 0 {
-		return "", nil
+	javaFiles = append(javaFiles, extraJava...)
+	if len(javaFiles) == 0 && len(jars) == 0 {
+		return nil, nil
+	}
+	if buildN {
+		// -n only prints commands; javac and d8 would write under the
+		// literal "$WORK".
+		printcmd("# javac android/*.java and d8 them with android/libs into classes*.dex (not run under -n)")
+		return nil, nil
 	}
 
 	androidHome := os.Getenv("ANDROID_HOME")
 	if androidHome == "" {
-		return "", errors.New("found android/*.java but ANDROID_HOME is not set (needed to compile app Java)")
+		return nil, errors.New("found android/*.java or android/libs but ANDROID_HOME is not set (needed to compile app Java)")
 	}
-	platform, err := findLastPlatform(androidHome)
+	// The same android.jar aapt2 links the resources against: javac, d8 and
+	// aapt2 must agree on one platform.
+	androidJar, err := binres.LatestAPIResourcesPath()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	androidJar := filepath.Join(platform, "android.jar")
 
+	classFiles, err := compileAppJava(javaFiles, jars, androidJar)
+	if err != nil {
+		return nil, err
+	}
+
+	// Write bellui's built-in dex so d8 can merge into it.
+	baseDex := filepath.Join(tmpdir, "bellui-classes.dex")
+	builtin, err := base64.StdEncoding.DecodeString(dexStr)
+	if err != nil {
+		return nil, err
+	}
+	if err := os.WriteFile(baseDex, builtin, 0o644); err != nil {
+		return nil, err
+	}
+
+	// d8 merges the built-in dex, the app classes and the library jars.
+	// android.jar is the library d8 desugars against (default and static
+	// interface methods in library bytecode need it).
+	outDir := filepath.Join(tmpdir, "appdex")
+	if err := os.MkdirAll(outDir, 0o755); err != nil {
+		return nil, err
+	}
+	d8 := filepath.Join(util.AndroidBuildToolsPath(), "d8")
+	d8Args := []string{"--min-api", "21", "--lib", androidJar, "--output", outDir, baseDex}
+	d8Args = append(d8Args, classFiles...)
+	d8Args = append(d8Args, jars...)
+	if out, err := exec.Command(d8, d8Args...).CombinedOutput(); err != nil {
+		os.Stderr.Write(out)
+		return nil, fmt.Errorf("d8 merge app dex: %w", err)
+	}
+	dexes, err := filepath.Glob(filepath.Join(outDir, "classes*.dex"))
+	if err != nil {
+		return nil, err
+	}
+	if len(dexes) == 0 {
+		return nil, fmt.Errorf("d8 wrote no dex to %s", outDir)
+	}
+	sort.Strings(dexes) // classes.dex sorts before classes2.dex
+	return dexes, nil
+}
+
+// compileAppJava runs javac over javaFiles with the jars on the classpath and
+// returns the .class files it wrote. No sources means no classes.
+func compileAppJava(javaFiles, jars []string, androidJar string) ([]string, error) {
+	if len(javaFiles) == 0 {
+		return nil, nil
+	}
 	work := filepath.Join(tmpdir, "appjava")
 	if err := os.MkdirAll(work, 0o755); err != nil {
-		return "", err
+		return nil, err
 	}
-
-	// 1. Compile the app's Java against android.jar.
-	javacArgs := []string{"-source", "1.8", "-target", "1.8", "-bootclasspath", androidJar, "-d", work}
+	// core-lambda-stubs.jar holds the java.lang.invoke classes that javac
+	// needs to compile a lambda and android.jar lacks; d8 then desugars the
+	// lambda. The Android Gradle plugin puts it on the boot classpath too.
+	boot := androidJar
+	if stubs := filepath.Join(util.AndroidBuildToolsPath(), "core-lambda-stubs.jar"); util.Exists(stubs) {
+		boot += string(os.PathListSeparator) + stubs
+	}
+	javacArgs := []string{"-source", "1.8", "-target", "1.8", "-bootclasspath", boot, "-d", work}
+	if len(jars) > 0 {
+		javacArgs = append(javacArgs, "-classpath", strings.Join(jars, string(os.PathListSeparator)))
+	}
 	javacArgs = append(javacArgs, javaFiles...)
 	if out, err := exec.Command("javac", javacArgs...).CombinedOutput(); err != nil {
 		os.Stderr.Write(out)
-		return "", fmt.Errorf("javac app android sources: %w", err)
+		return nil, fmt.Errorf("javac app android sources: %w", err)
 	}
 
-	// 2. Gather the compiled .class files.
 	var classFiles []string
-	err = filepath.WalkDir(work, func(p string, d fs.DirEntry, err error) error {
+	err := filepath.WalkDir(work, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -636,55 +729,12 @@ func mergeAppJavaDex(dir string) (string, error) {
 		return nil
 	})
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if len(classFiles) == 0 {
-		return "", fmt.Errorf("javac produced no classes from %v", javaFiles)
+		return nil, fmt.Errorf("javac produced no classes from %v", javaFiles)
 	}
-
-	// 3. Write bellui's built-in dex so d8 can merge into it.
-	baseDex := filepath.Join(tmpdir, "bellui-classes.dex")
-	builtin, err := base64.StdEncoding.DecodeString(dexStr)
-	if err != nil {
-		return "", err
-	}
-	if err := os.WriteFile(baseDex, builtin, 0o644); err != nil {
-		return "", err
-	}
-
-	// 4. d8 merges the app classes with the built-in dex into one classes.dex.
-	outDir := filepath.Join(tmpdir, "appdex")
-	if err := os.MkdirAll(outDir, 0o755); err != nil {
-		return "", err
-	}
-	d8 := filepath.Join(util.AndroidBuildToolsPath(), "d8")
-	d8Args := []string{"--min-api", "21", "--output", outDir, baseDex}
-	d8Args = append(d8Args, classFiles...)
-	if out, err := exec.Command(d8, d8Args...).CombinedOutput(); err != nil {
-		os.Stderr.Write(out)
-		return "", fmt.Errorf("d8 merge app dex: %w", err)
-	}
-	return filepath.Join(outDir, "classes.dex"), nil
-}
-
-// findLastPlatform returns the highest-sorted platforms/<android-NN> directory
-// under the Android SDK, mirroring gendex's platform selection.
-func findLastPlatform(androidHome string) (string, error) {
-	dir := filepath.Join(androidHome, "platforms")
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return "", err
-	}
-	last := ""
-	for _, e := range entries {
-		if e.IsDir() {
-			last = e.Name() // os.ReadDir returns entries in sorted order
-		}
-	}
-	if last == "" {
-		return "", fmt.Errorf("no android platform found in %s", dir)
-	}
-	return filepath.Join(dir, last), nil
+	return classFiles, nil
 }
 
 func apkwCreate(name string, apkw *Writer) (io.Writer, error) {
@@ -787,10 +837,9 @@ func convertAPKToAAB(aabPath string) error {
 	}
 	_ = os.Remove(apkProtoPath)
 
-	_ = os.MkdirAll(filepath.Join(tmpPath, "dex"), 0o755)
-	_ = os.MkdirAll(filepath.Join(tmpPath, "manifest"), 0o755)
-	_ = os.Rename(filepath.Join(tmpPath, "AndroidManifest.xml"), filepath.Join(tmpPath, "manifest", "AndroidManifest.xml"))
-	_ = os.Rename(filepath.Join(tmpPath, "classes.dex"), filepath.Join(tmpPath, "dex", "classes.dex"))
+	if err := bundleModuleLayout(tmpPath); err != nil {
+		return err
+	}
 
 	cmd = exec.Command("zip", "../base.zip", "-r", ".")
 	cmd.Dir = tmpPath
@@ -806,6 +855,34 @@ func convertAPKToAAB(aabPath string) error {
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
 	return cmd.Run()
+}
+
+// bundleModuleLayout moves an unzipped proto APK's manifest and dex files to
+// where a bundle module keeps them: manifest/ and dex/. Every classesN.dex
+// moves, not only classes.dex: d8 splits an app whose android/libs overflow
+// one dex file (#672), and bundletool takes no dex outside dex/.
+func bundleModuleLayout(dir string) error {
+	for _, sub := range []string{"dex", "manifest"} {
+		if err := os.MkdirAll(filepath.Join(dir, sub), 0o755); err != nil {
+			return err
+		}
+	}
+	if err := os.Rename(filepath.Join(dir, "AndroidManifest.xml"), filepath.Join(dir, "manifest", "AndroidManifest.xml")); err != nil {
+		return err
+	}
+	dexes, err := filepath.Glob(filepath.Join(dir, "classes*.dex"))
+	if err != nil {
+		return err
+	}
+	if len(dexes) == 0 {
+		return fmt.Errorf("no classes.dex in %s", dir)
+	}
+	for _, dex := range dexes {
+		if err := os.Rename(dex, filepath.Join(dir, "dex", filepath.Base(dex))); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // A random uninteresting private key.

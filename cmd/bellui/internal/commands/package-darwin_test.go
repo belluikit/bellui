@@ -2,6 +2,8 @@ package commands
 
 import (
 	"bytes"
+	"encoding/xml"
+	"io"
 	"strings"
 	"testing"
 
@@ -98,4 +100,29 @@ func TestInfoPlistUsageDescriptions(t *testing.T) {
 	empty := &bytes.Buffer{}
 	assert.NoError(t, templates.InfoPlistDarwin.Execute(empty, darwinData{Name: "Bare"}))
 	assert.False(t, strings.Contains(empty.String(), "UsageDescription"))
+}
+
+// Manifest text reaches the plist escaped: a raw & or < made it unparseable.
+func TestInfoPlistDarwinEscapesValues(t *testing.T) {
+	buf := &bytes.Buffer{}
+	assert.NoError(t, templates.InfoPlistDarwin.Execute(buf, darwinData{
+		Name:              "Tom & Jerry",
+		UsageDescriptions: []darwinUsageDescription{{Key: "NSCameraUsageDescription", Value: "Scan <docs>"}},
+		FileAssociations: darwinFileAssociations([]metadata.FileAssociation{
+			{Extensions: []string{"tj"}, Description: "Cat & Mouse"},
+		}),
+	}))
+	d := xml.NewDecoder(bytes.NewReader(buf.Bytes()))
+	for {
+		_, err := d.Token()
+		if err == io.EOF {
+			break
+		}
+		if !assert.NoError(t, err, buf.String()) {
+			return
+		}
+	}
+	assert.Contains(t, buf.String(), "<string>Tom &amp; Jerry</string>")
+	assert.Contains(t, buf.String(), "<string>Scan &lt;docs&gt;</string>")
+	assert.Contains(t, buf.String(), "<string>Cat &amp; Mouse</string>")
 }

@@ -168,14 +168,29 @@ func (r *Releaser) packageIOSRelease() error {
 		return err
 	}
 
-	cleanup, err := r.writeEntitlements(templates.EntitlementsDarwinMobile, struct{ TeamID, AppID string }{
-		TeamID: team,
-		AppID:  r.AppID,
-	})
+	// Re-sign with everything `bellui package` signed in (Associated Domains,
+	// ios/Entitlements.plist), not the application identifier alone (#672).
+	entitlements, err := mobile.IOSReleaseEntitlements(r.srcDir, team, r.AppID, r.AssociatedDomains)
 	if err != nil {
-		return errors.New("failed to write entitlements plist template")
+		return err
 	}
-	defer cleanup()
+	entitlementPath := filepath.Join(r.dir, "entitlements.plist")
+	if err := os.WriteFile(entitlementPath, entitlements, 0o600); err != nil {
+		return errors.New("failed to write entitlements plist")
+	}
+	defer os.Remove(entitlementPath)
+
+	// Embedded frameworks (ios/Frameworks) carry the development signature
+	// from packaging; the store checks every nested binary, so each is
+	// re-signed with the release certificate before the app itself.
+	frameworks, _ := filepath.Glob(filepath.Join(payloadAppDir, "Frameworks", "*.framework"))
+	for _, fw := range frameworks {
+		cmd := exec.Command("codesign", "-f", "-vv", "-s", r.certificate, fw)
+		if out, err := cmd.CombinedOutput(); err != nil {
+			bellui.LogError("Codesign failed: "+string(out), err)
+			return errors.New("unable to codesign embedded framework " + filepath.Base(fw))
+		}
+	}
 
 	cmd := exec.Command("codesign", "-f", "-vv", "-s", r.certificate, "--entitlements",
 		"entitlements.plist", "Payload/"+appName+"/")
