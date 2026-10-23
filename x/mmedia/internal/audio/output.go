@@ -8,10 +8,19 @@ import (
 	"github.com/ebitengine/oto/v3"
 )
 
-const (
-	defaultSampleRate = 44100
-	defaultChannels   = 2
-)
+// DeviceSampleRate is the rate the audio device is opened at, whatever the
+// media. oto allows one device per process, so its format is fixed by the
+// first Output. Fixing the rate at 48 kHz, the usual rate for video, makes it
+// the same in every process; every stream at another rate is converted to it
+// by its decoder's swresample (FFmpeg quality), not here. It used to follow
+// the first stream, and later streams at other rates went through a linear
+// resampler that lost 3.4 dB at 15 kHz and dropped frames at chunk
+// boundaries (#506, #582).
+const DeviceSampleRate = 48000
+
+// defaultChannels is the device's channel count unless the first stream is
+// surround and asks for more.
+const defaultChannels = 2
 
 // Output manages audio playback via ebitengine/oto.
 type Output struct {
@@ -19,7 +28,6 @@ type Output struct {
 	ctx        *oto.Context
 	player     *oto.Player
 	buffer     *RingBuffer
-	resampler  *Resampler
 	sampleRate int
 	channels   int
 	volume     float64
@@ -31,18 +39,16 @@ type Output struct {
 }
 
 var (
-	otoOnce       sync.Once
-	otoCtx        *oto.Context
-	otoSampleRate int // rate the oto context was initialized with
-	otoChannels   int
+	otoOnce     sync.Once
+	otoCtx      *oto.Context
+	otoChannels int // channel count the oto context was initialized with
 )
 
-func initOto(sampleRate int, channels int) *oto.Context {
+func initOto(channels int) *oto.Context {
 	otoOnce.Do(func() {
-		otoSampleRate = sampleRate
 		otoChannels = channels
 		op := &oto.NewContextOptions{
-			SampleRate:   sampleRate,
+			SampleRate:   DeviceSampleRate,
 			ChannelCount: channels,
 			Format:       oto.FormatSignedInt16LE,
 		}
@@ -53,70 +59,38 @@ func initOto(sampleRate int, channels int) *oto.Context {
 	return otoCtx
 }
 
-// NewOutput creates a new audio output.
-func NewOutput(sampleRate, channels int) *Output {
-	if sampleRate <= 0 {
-		sampleRate = defaultSampleRate
-	}
-	if channels <= 0 {
+// NewOutput creates an audio output. channels is what the first Output in
+// the process opens the device with (below 2 means stereo); every later
+// Output plays at the channel count the device already has. The rate is
+// always DeviceSampleRate. Callers have their decoder convert to SampleRate
+// and Channels before writing.
+func NewOutput(channels int) *Output {
+	if channels < defaultChannels {
 		channels = defaultChannels
 	}
-
-	ctx := initOto(sampleRate, channels)
-	return newOutput(ctx, sampleRate, channels, otoSampleRate, otoChannels)
+	ctx := initOto(channels)
+	return newOutput(ctx, DeviceSampleRate, otoChannels)
 }
 
-// newOutput builds an Output for a stream of streamRate and channels played on
-// a device fixed at deviceRate and deviceChannels (0: not known, take the
-// stream's).
+// newOutput builds an Output playing PCM at rate and channels on ctx.
 //
-// sampleRate is the rate of the bytes the Output holds and plays, which is the
-// device's: a stream at another rate is resampled to it before it reaches the
-// ring. Everything that turns bytes into time (the playback position, the ring
-// and pull sizes) uses it. The position used to divide device-rate bytes by
-// the stream's rate, so a 48 kHz stream on a device the process had opened at
-// 44.1 kHz played at 0.918x (#506).
-func newOutput(ctx *oto.Context, streamRate, channels, deviceRate, deviceChannels int) *Output {
-	// oto's context is created once per process, so the first stream fixes the
-	// device's channel count for every stream after it. Unlike a sample-rate
-	// mismatch, which the resampler absorbs, feeding the device a different
-	// number of interleaved channels would garble both the audio and the
-	// byte-derived playback clock. Report what the device actually plays so
-	// the caller can ask its decoder for exactly that many channels.
-	if deviceChannels > 0 {
-		channels = deviceChannels
-	}
-	rate := streamRate
-	if deviceRate > 0 {
-		rate = deviceRate
-	}
-
-	o := &Output{
+// Everything that turns bytes into time (the playback position, the ring and
+// pull sizes) uses rate, which is the device's: a stream's own rate never
+// reaches here, because its decoder converts it. Counting the position at the
+// stream's rate is how a 48 kHz stream once played at 0.918x (#506).
+func newOutput(ctx *oto.Context, rate, channels int) *Output {
+	return &Output{
 		ctx:        ctx,
 		buffer:     NewRingBuffer(audioBytes(rate, channels, ringDuration)),
 		sampleRate: rate,
 		channels:   channels,
 		volume:     1.0,
 	}
-	o.SetSourceSampleRate(streamRate)
-	return o
 }
 
-// SetSourceSampleRate configures resampling from srcRate to the rate the
-// Output plays at, or none when they agree.
-func (o *Output) SetSourceSampleRate(srcRate int) {
-	o.resampler = nil
-	if srcRate != o.sampleRate && srcRate > 0 {
-		o.resampler = NewResampler(srcRate, o.sampleRate, o.channels)
-	}
-}
-
-// WriteSamples writes PCM audio data to the buffer for playback.
-// Automatically resamples if source and output rates differ.
+// WriteSamples writes PCM audio data, at SampleRate and Channels, to the
+// buffer for playback.
 func (o *Output) WriteSamples(data []byte) {
-	if o.resampler != nil && o.resampler.NeedsResampling() {
-		data = o.resampler.Resample(data)
-	}
 	if o.volume < 1.0 {
 		scaled := make([]byte, len(data))
 		copy(scaled, data)
@@ -237,8 +211,8 @@ func (o *Output) PlaybackPosition() time.Duration {
 	return posBase + time.Duration(frames)*time.Second/time.Duration(o.sampleRate)
 }
 
-// SampleRate is the rate the Output plays at: the device's, which a stream
-// at another rate is resampled to.
+// SampleRate is the rate the Output plays at: DeviceSampleRate, which a
+// stream's decoder converts to.
 func (o *Output) SampleRate() int {
 	return o.sampleRate
 }

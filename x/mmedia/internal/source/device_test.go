@@ -32,7 +32,8 @@ func (f *fakeDecoder) Duration() float64             { return f.duration }
 
 func (f *fakeDecoder) Seek(float64) error { f.seeks++; return nil }
 
-func (f *fakeDecoder) SetAudioChannels(int) error { return nil }
+func (f *fakeDecoder) SetAudioChannels(int) error   { return nil }
+func (f *fakeDecoder) SetAudioSampleRate(int) error { return nil }
 
 func (f *fakeDecoder) Next() (goffmpeg.MediaType, error) {
 	f.nexts++

@@ -35,6 +35,7 @@ func (s *vfrSource) Channels() int           { return 0 }
 func (s *vfrSource) SetVideoCallback(f source.VideoCallback) { s.vcb = f }
 func (s *vfrSource) SetAudioCallback(source.AudioCallback)   {}
 func (s *vfrSource) SetAudioChannels(int) error              { return nil }
+func (s *vfrSource) SetAudioSampleRate(int) error            { return nil }
 
 func (s *vfrSource) Decode(time.Duration) {
 	if s.vcb != nil {

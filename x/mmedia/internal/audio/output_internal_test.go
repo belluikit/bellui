@@ -36,22 +36,20 @@ func TestAudioCanLeadTheThreadedVideoDecoder(t *testing.T) {
 	}
 }
 
-// TestPositionCountsAtTheDeviceRate pins #506: a stream resampled to the
-// device's rate must have its playback position counted at that rate. A 48 kHz
-// stream on a device opened at 44.1 kHz used to count device bytes at 48 kHz,
-// and played at 0.918x.
+// TestPositionCountsAtTheDeviceRate pins #506: the playback position counts
+// bytes at the rate they are played at. A 48 kHz stream on a device opened at
+// 44.1 kHz once had its bytes counted at the stream's rate and played at
+// 0.918x. Streams are converted to the device's rate by their decoder now, so
+// the Output only ever knows that one rate.
 func TestPositionCountsAtTheDeviceRate(t *testing.T) {
-	o := newOutput(nil, 48000, 1, 44100, 1) // no device: nothing is played
-	if o.SampleRate() != 44100 {
-		t.Fatalf("output plays at %d Hz; want the device's 44100", o.SampleRate())
-	}
+	o := newOutput(nil, DeviceSampleRate, 1) // no device: nothing is played
 
-	second := make([]byte, 48000*2) // one second of 48 kHz mono silence
+	second := make([]byte, DeviceSampleRate*2) // one second of mono silence
 	o.WriteSamples(second)
 	drained := make([]byte, o.Buffered())
 	o.buffer.Read(drained) // as the device would
 
 	if pos := o.PlaybackPosition(); pos < 990*time.Millisecond || pos > 1010*time.Millisecond {
-		t.Errorf("a second of 48 kHz audio played reads as %v; want 1s", pos)
+		t.Errorf("a second of audio played reads as %v; want 1s", pos)
 	}
 }

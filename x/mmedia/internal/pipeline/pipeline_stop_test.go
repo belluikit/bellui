@@ -28,6 +28,7 @@ func (s *stubSource) SetVideoCallback(f source.VideoCallback) {
 }
 func (s *stubSource) SetAudioCallback(source.AudioCallback) {}
 func (s *stubSource) SetAudioChannels(int) error            { return nil }
+func (s *stubSource) SetAudioSampleRate(int) error          { return nil }
 func (s *stubSource) Decode(time.Duration) {
 	if s.vcb != nil {
 		s.vcb(s.frame, s.pts)

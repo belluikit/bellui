@@ -137,6 +137,19 @@ func (s *FFmpegSource) SetAudioChannels(n int) error {
 	return nil
 }
 
+// SetAudioSampleRate has the decoder's swresample convert the rate too, so
+// the audio device, fixed at one rate for the process, can play any stream.
+func (s *FFmpegSource) SetAudioSampleRate(rate int) error {
+	if !s.hasAudio || s.dec == nil {
+		return nil
+	}
+	if err := s.dec.SetAudioSampleRate(rate); err != nil {
+		return err
+	}
+	s.aInfo = s.dec.AudioInfo()
+	return nil
+}
+
 // Decode decodes one unit of media per call: for video streams it decodes
 // up to the next video frame (dispatching any interleaved audio along the
 // way); for audio-only streams it decodes one audio packet. The pipeline's

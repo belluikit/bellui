@@ -409,6 +409,7 @@ func (liveStubSource) Channels() int                         { return 0 }
 func (liveStubSource) SetVideoCallback(source.VideoCallback) {}
 func (liveStubSource) SetAudioCallback(source.AudioCallback) {}
 func (liveStubSource) SetAudioChannels(int) error            { return nil }
+func (liveStubSource) SetAudioSampleRate(int) error          { return nil }
 func (liveStubSource) Decode(time.Duration)                  {}
 func (liveStubSource) Seek(time.Duration)                    {}
 func (liveStubSource) Rewind()                               {}
