@@ -28,6 +28,10 @@ type tracker struct {
 	enabled bool
 	loaded  bool // spool has been drained from disk since enabling
 	queue   []Event
+	// inflight is the batch a send has taken out of queue, until the send's
+	// outcome is known. The spool keeps it ahead of queue meanwhile, so a crash
+	// mid-send still finds it on the next launch (#670).
+	inflight []Event
 	// backoff state
 	attempt     int
 	nextRetryAt time.Time
@@ -180,6 +184,7 @@ func (t *tracker) SetEnabled(enabled bool) {
 	}
 	// Disabling: drop everything and clear the disk spool.
 	t.queue = nil
+	t.inflight = nil
 	t.attempt = 0
 	t.nextRetryAt = time.Time{}
 	t.loaded = false
@@ -204,9 +209,18 @@ func (t *tracker) loadSpoolLocked() {
 	t.evictLocked()
 }
 
-// persistLocked checkpoints the queue to the disk spool.
+// persistLocked checkpoints the disk spool: any in-flight batch, then the
+// queue, newest maxSpool events at most (the cap the queue's own eviction
+// keeps, oldest first).
 func (t *tracker) persistLocked() {
-	data, err := marshalSpool(t.queue)
+	events := t.queue
+	if len(t.inflight) > 0 {
+		events = append(append(make([]Event, 0, len(t.inflight)+len(t.queue)), t.inflight...), t.queue...)
+	}
+	if over := len(events) - t.cfg.maxSpool; over > 0 {
+		events = events[over:]
+	}
+	data, err := marshalSpool(events)
 	if err != nil {
 		return
 	}
@@ -255,16 +269,20 @@ func (t *tracker) doFlush(force bool) error {
 	// (unlocked) send are preserved, and concurrent eviction — which trims the
 	// front, i.e. the very events being sent — cannot corrupt the post-send
 	// accounting. On failure the batch is returned to the front of the queue.
-	// The disk spool is deliberately left intact until the outcome is known, so
-	// a crash mid-send still recovers the batch on the next launch (at-least-once).
+	// The batch stays on disk until the outcome is known: it is kept as
+	// inflight, which persistLocked writes ahead of the queue, so a Track during
+	// the send cannot save a spool without it, and a crash mid-send still
+	// recovers it on the next launch (at-least-once, #670).
 	batch := t.queue
 	t.queue = nil
+	t.inflight = batch
 	t.mu.Unlock()
 
 	// Network happens with mu released so Track never blocks behind a send.
 	err := t.sink.Send(batch)
 
 	t.mu.Lock()
+	t.inflight = nil
 	if !t.enabled {
 		// Consent was withdrawn during the send: SetEnabled(false) already
 		// dropped the queue and cleared the spool. Do not re-queue the in-flight

@@ -383,3 +383,76 @@ func TestNoDeviceIdentifierGenerated(t *testing.T) {
 		assert.NotEmpty(t, e.SessionID, "ephemeral session id only")
 	}
 }
+
+// TestTrackDuringSend_SpoolKeepsInFlightBatch pins the at-least-once promise
+// (#670): while a batch is being sent, the disk spool must still hold it. A
+// Track during the send used to save only the events queued after it, so a
+// crash before the send's outcome lost the whole in-flight batch.
+func TestTrackDuringSend_SpoolKeepsInFlightBatch(t *testing.T) {
+	sink := newFakeSink()
+	sink.block = make(chan struct{})
+	sink.started = make(chan struct{})
+
+	tr, _, store, flushCh := newTestTracker(t, sink, WithBatchSize(2))
+	tr.SetEnabled(true)
+	waitFlush(t, flushCh) // enable-time flush (empty queue → no-op)
+
+	tr.Track("a", nil)
+	tr.Track("b", nil) // crosses the threshold → worker flush enters Send
+	select {
+	case <-sink.started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("worker never reached the sink")
+	}
+
+	tr.Track("c", nil) // saves the spool while [a, b] is in flight
+
+	names := func() []string {
+		data, err := store.Load()
+		require.NoError(t, err)
+		events, err := unmarshalSpool(data)
+		require.NoError(t, err)
+		out := make([]string, len(events))
+		for i, e := range events {
+			out[i] = e.Name
+		}
+		return out
+	}
+	assert.Equal(t, []string{"a", "b", "c"}, names(), "the in-flight batch stays on disk until its send succeeds")
+
+	close(sink.block)
+	require.NoError(t, waitFlush(t, flushCh))
+	assert.Equal(t, []string{"c"}, names(), "a delivered batch leaves the spool")
+}
+
+// TestFailedSendDuringTrack_SpoolKeepsAll checks the failure side of #670: a
+// failed send puts its batch back in front of what was tracked meanwhile, and
+// the spool says so.
+func TestFailedSendDuringTrack_SpoolKeepsAll(t *testing.T) {
+	sink := newFakeSink()
+	sink.block = make(chan struct{})
+	sink.started = make(chan struct{})
+	sink.failNext = 1
+
+	tr, _, store, flushCh := newTestTracker(t, sink, WithBatchSize(2))
+	tr.SetEnabled(true)
+	waitFlush(t, flushCh)
+
+	tr.Track("a", nil)
+	tr.Track("b", nil)
+	select {
+	case <-sink.started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("worker never reached the sink")
+	}
+	tr.Track("c", nil)
+	close(sink.block)
+	require.Error(t, waitFlush(t, flushCh))
+
+	data, err := store.Load()
+	require.NoError(t, err)
+	events, err := unmarshalSpool(data)
+	require.NoError(t, err)
+	require.Len(t, events, 3)
+	assert.Equal(t, []string{"a", "b", "c"}, []string{events[0].Name, events[1].Name, events[2].Name})
+}
