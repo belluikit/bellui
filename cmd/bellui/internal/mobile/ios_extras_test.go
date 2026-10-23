@@ -269,10 +269,13 @@ func TestIOSLinkFlags(t *testing.T) {
 		{Name: "Stat", Path: "/f/ios-arm64/Stat.framework"},
 		{Name: "libz2.a", Path: "/l/ios-arm64/libz2.a", Headers: "/l/ios-arm64/Headers"},
 	})
-	assert.Equal(t, []string{"-F/f/ios-arm64", "-F/f/ios-arm64", "-I/l/ios-arm64/Headers"}, cflags)
+	// -F takes the framework's directory through filepath.Dir, which uses
+	// the host's separator (iOS packaging itself only runs on macOS).
+	fdir := "-F" + filepath.Dir("/f/ios-arm64/Dyn.framework")
+	assert.Equal(t, []string{fdir, fdir, "-I/l/ios-arm64/Headers"}, cflags)
 	assert.Equal(t, []string{
-		"-F/f/ios-arm64", "-framework", "Dyn",
-		"-F/f/ios-arm64", "-framework", "Stat",
+		fdir, "-framework", "Dyn",
+		fdir, "-framework", "Stat",
 		"/l/ios-arm64/libz2.a",
 		"-Wl,-rpath,@executable_path/Frameworks",
 	}, ldflags)
