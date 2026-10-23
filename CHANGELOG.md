@@ -768,6 +768,14 @@ the harness's own script
   vendored packages, every bundled font, the Material Design icons and the
   sign-in logos ([#325](https://github.com/belluikit/bellui/pull/325)).
   Attributions the rebrand had rewritten to "bellui-x" name fyne-x again.
+* `x/mmedia` users on v1.0.0 should upgrade for the FFmpeg license files.
+  x/mmedia v1.0.0 resolves `belluikit/goffmpeg` v0.4.0 and `goffmpeg-libs`
+  v0.3.0, whose module zips carry no LICENSE, NOTICE or COPYING file; v0.4.1
+  and v0.3.1, required since this release (see *Dependencies*), carry them.
+  On all eleven platforms the static FFmpeg archives in the two
+  `goffmpeg-libs` versions are byte-identical; besides the license files,
+  only the prebuilt bridge library differs. (Added after the release, from
+  [#339](https://github.com/belluikit/bellui/issues/339).)
 
 ### CI
 
