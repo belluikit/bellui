@@ -1,6 +1,7 @@
 package analytics
 
 import (
+	"bytes"
 	"encoding/json"
 
 	"github.com/trendvidia/protowire-go/encoding/pxf"
@@ -17,17 +18,67 @@ import (
 func marshalSpool(events []Event) ([]byte, error) {
 	msg := &spoolpb.Spool{Events: make([]*spoolpb.Event, len(events))}
 	for i, e := range events {
-		msg.Events[i] = &spoolpb.Event{
-			Kind:      pxfmigrate.ValidUTF8(string(e.Kind)),
-			Name:      pxfmigrate.ValidUTF8(e.Name),
-			Props:     toStruct(e.Props),
-			Traits:    toStruct(e.Traits),
-			UserId:    pxfmigrate.ValidUTF8(e.UserID),
-			SessionId: pxfmigrate.ValidUTF8(e.SessionID),
-			Timestamp: timestamppb.New(e.Timestamp),
-		}
+		msg.Events[i] = spoolEvent(e)
 	}
 	return pxf.Marshal(msg)
+}
+
+func spoolEvent(e Event) *spoolpb.Event {
+	return &spoolpb.Event{
+		Kind:      pxfmigrate.ValidUTF8(string(e.Kind)),
+		Name:      pxfmigrate.ValidUTF8(e.Name),
+		Props:     toStruct(e.Props),
+		Traits:    toStruct(e.Traits),
+		UserId:    pxfmigrate.ValidUTF8(e.UserID),
+		SessionId: pxfmigrate.ValidUTF8(e.SessionID),
+		Timestamp: timestamppb.New(e.Timestamp),
+	}
+}
+
+// The tracker saves the spool on every Track, and encoding the whole queue each
+// time made Track cost milliseconds on the UI goroutine with an offline queue
+// (#657). So each event is encoded once, when it is queued, as the text it has
+// inside the spool's events list, and a save joins those pieces. The result is
+// byte for byte what marshalSpool writes (TestSpoolPiecesMatchMarshal), so the
+// format does not change.
+
+// spoolPiece encodes one event as it appears in the spool's events list: the
+// event's own PXF, indented two levels, between braces.
+func spoolPiece(e Event) ([]byte, error) {
+	body, err := pxf.Marshal(spoolEvent(e))
+	if err != nil {
+		return nil, err
+	}
+	var b bytes.Buffer
+	b.Grow(len(body) + len(body)/8 + 8)
+	b.WriteString("  {\n")
+	for line := range bytes.Lines(body) {
+		b.WriteString("    ")
+		b.Write(line)
+	}
+	b.WriteString("  }")
+	return b.Bytes(), nil
+}
+
+// joinSpool assembles a spool from the pieces of its events, in order. No
+// events is an empty spool, as marshalSpool writes it.
+func joinSpool(pieces [][]byte) []byte {
+	if len(pieces) == 0 {
+		return []byte{}
+	}
+	n := len("events = [\n") + len("\n]\n")
+	for _, p := range pieces {
+		n += len(p) + len(",\n")
+	}
+	out := make([]byte, 0, n)
+	out = append(out, "events = [\n"...)
+	for i, p := range pieces {
+		if i > 0 {
+			out = append(out, ",\n"...)
+		}
+		out = append(out, p...)
+	}
+	return append(out, "\n]\n"...)
 }
 
 // unmarshalSpool decodes a disk spool: PXF, or the JSON array versions before

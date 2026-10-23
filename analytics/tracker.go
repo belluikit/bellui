@@ -28,6 +28,16 @@ type tracker struct {
 	enabled bool
 	loaded  bool // spool has been drained from disk since enabling
 	queue   []Event
+	// inflight is the batch a send has taken out of queue, until the send's
+	// outcome is known. The spool keeps it ahead of queue meanwhile, so a crash
+	// mid-send still finds it on the next launch (#670).
+	inflight []Event
+	// queuePieces and inflightPieces hold each event's spool encoding, index
+	// for index with queue and inflight, so a save joins them rather than
+	// encoding every queued event again (#657). A nil piece (its encoding
+	// failed) makes the save encode the whole spool instead.
+	queuePieces    [][]byte
+	inflightPieces [][]byte
 	// backoff state
 	attempt     int
 	nextRetryAt time.Time
@@ -127,7 +137,9 @@ func (t *tracker) enqueue(e Event) {
 	if e.UserID == "" {
 		e.UserID = t.userID
 	}
+	piece, _ := spoolPiece(e)
 	t.queue = append(t.queue, e)
+	t.queuePieces = append(t.queuePieces, piece)
 	t.evictLocked()
 	t.persistLocked()
 	trigger := len(t.queue) >= t.cfg.batchSize
@@ -142,6 +154,7 @@ func (t *tracker) enqueue(e Event) {
 func (t *tracker) evictLocked() {
 	if over := len(t.queue) - t.cfg.maxSpool; over > 0 {
 		t.queue = t.queue[over:]
+		t.queuePieces = t.queuePieces[over:]
 	}
 }
 
@@ -179,7 +192,8 @@ func (t *tracker) SetEnabled(enabled bool) {
 		return
 	}
 	// Disabling: drop everything and clear the disk spool.
-	t.queue = nil
+	t.queue, t.queuePieces = nil, nil
+	t.inflight, t.inflightPieces = nil, nil
 	t.attempt = 0
 	t.nextRetryAt = time.Time{}
 	t.loaded = false
@@ -200,13 +214,28 @@ func (t *tracker) loadSpoolLocked() {
 		return
 	}
 	// Spooled events are older, so they lead.
+	pieces := make([][]byte, len(spooled), len(spooled)+len(t.queuePieces))
+	for i, e := range spooled {
+		pieces[i], _ = spoolPiece(e)
+	}
 	t.queue = append(spooled, t.queue...)
+	t.queuePieces = append(pieces, t.queuePieces...)
 	t.evictLocked()
 }
 
-// persistLocked checkpoints the queue to the disk spool.
+// persistLocked checkpoints the disk spool: any in-flight batch, then the
+// queue, newest maxSpool events at most (the cap the queue's own eviction
+// keeps, oldest first).
 func (t *tracker) persistLocked() {
-	data, err := marshalSpool(t.queue)
+	events, pieces := t.queue, t.queuePieces
+	if len(t.inflight) > 0 {
+		events = append(append(make([]Event, 0, len(t.inflight)+len(t.queue)), t.inflight...), t.queue...)
+		pieces = append(append(make([][]byte, 0, len(events)), t.inflightPieces...), t.queuePieces...)
+	}
+	if over := len(events) - t.cfg.maxSpool; over > 0 {
+		events, pieces = events[over:], pieces[over:]
+	}
+	data, err := spoolData(events, pieces)
 	if err != nil {
 		return
 	}
@@ -219,6 +248,20 @@ func (t *tracker) persistLocked() {
 			bellui.LogError("analytics: failed to persist spool (offline durability disabled)", err)
 		})
 	}
+}
+
+// spoolData is the spool for events: joined from their cached pieces, or
+// encoded whole when a piece is missing.
+func spoolData(events []Event, pieces [][]byte) ([]byte, error) {
+	for _, p := range pieces {
+		if p == nil {
+			return marshalSpool(events)
+		}
+	}
+	if len(pieces) != len(events) {
+		return marshalSpool(events) // never expected; the slices move together
+	}
+	return joinSpool(pieces), nil
 }
 
 // backoff returns the retry delay for the given attempt (1-based), capped and
@@ -255,23 +298,27 @@ func (t *tracker) doFlush(force bool) error {
 	// (unlocked) send are preserved, and concurrent eviction — which trims the
 	// front, i.e. the very events being sent — cannot corrupt the post-send
 	// accounting. On failure the batch is returned to the front of the queue.
-	// The disk spool is deliberately left intact until the outcome is known, so
-	// a crash mid-send still recovers the batch on the next launch (at-least-once).
-	batch := t.queue
-	t.queue = nil
+	// The batch stays on disk until the outcome is known: it is kept as
+	// inflight, which persistLocked writes ahead of the queue, so a Track during
+	// the send cannot save a spool without it, and a crash mid-send still
+	// recovers it on the next launch (at-least-once, #670).
+	batch, batchPieces := t.queue, t.queuePieces
+	t.queue, t.queuePieces = nil, nil
+	t.inflight, t.inflightPieces = batch, batchPieces
 	t.mu.Unlock()
 
 	// Network happens with mu released so Track never blocks behind a send.
 	err := t.sink.Send(batch)
 
 	t.mu.Lock()
+	t.inflight, t.inflightPieces = nil, nil
 	if !t.enabled {
 		// Consent was withdrawn during the send: SetEnabled(false) already
 		// dropped the queue and cleared the spool. Do not re-queue the in-flight
 		// batch or persist — a persistLocked here would save the now-nil queue
 		// as an empty spool *after* SetEnabled's store.Clear(), resurrecting a
 		// spool the user opted out of (a rare drain-race, but real).
-		t.queue = nil
+		t.queue, t.queuePieces = nil, nil
 		t.mu.Unlock()
 		return err
 	}
@@ -279,6 +326,7 @@ func (t *tracker) doFlush(force bool) error {
 		// Return the events to the front (oldest lead), re-bound the spool, and
 		// schedule a backed-off retry.
 		t.queue = append(batch, t.queue...)
+		t.queuePieces = append(batchPieces, t.queuePieces...)
 		t.evictLocked()
 		t.attempt++
 		t.nextRetryAt = now.Add(t.backoff(t.attempt))

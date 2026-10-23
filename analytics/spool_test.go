@@ -207,3 +207,46 @@ func docExists(s bellui.Storage, name string) bool {
 	_ = r.Close()
 	return true
 }
+
+// TestSpoolPiecesMatchMarshal pins what the per-event spool cache relies on
+// (#657): joining the pieces spoolPiece encodes gives exactly the bytes
+// marshalSpool writes for the same events, so a spool saved from the cache is
+// the same file, in the same format.
+func TestSpoolPiecesMatchMarshal(t *testing.T) {
+	ts := time.Date(2026, 10, 22, 9, 30, 15, 123, time.UTC)
+	odd := []Event{
+		{Kind: KindTrack, Name: "a\nb\t\"q\" \\ ü 😀", Timestamp: ts, Props: map[string]any{
+			"list":    []any{1, "two", map[string]any{"k": nil}, []any{}},
+			"empty":   map[string]any{},
+			"when":    ts, // goes through JSON (jsonValue)
+			"big":     1 << 53,
+			"neg":     -0.5,
+			"bad\xff": "x\xfey",
+		}},
+		{Kind: KindIdentify, UserID: "u\x00", SessionID: "s", Timestamp: ts, Traits: map[string]any{"plan": "pro"}},
+		{Kind: KindTrack, Timestamp: time.Time{}},
+		{Kind: KindTrack, Name: "no props", Props: map[string]any{}, Timestamp: ts},
+	}
+	for name, events := range map[string][]Event{
+		"none":   nil,
+		"one":    odd[:1],
+		"odd":    odd,
+		"golden": {{Kind: KindTrack, Name: "opened", SessionID: "s1", Timestamp: ts, Props: map[string]any{"screen": "home", "count": 3, "dark": true}}},
+		"bench":  benchQueue(DefaultMaxSpool),
+	} {
+		t.Run(name, func(t *testing.T) {
+			want, err := marshalSpool(events)
+			require.NoError(t, err)
+			pieces := make([][]byte, len(events))
+			for i, e := range events {
+				pieces[i], err = spoolPiece(e)
+				require.NoError(t, err)
+			}
+			got := joinSpool(pieces)
+			require.Equal(t, string(want), string(got))
+			back, err := unmarshalSpool(got)
+			require.NoError(t, err)
+			assert.Len(t, back, len(events))
+		})
+	}
+}
