@@ -38,14 +38,15 @@ func BindEntry(entry *Entry, value *flow.Value[string]) func() {
 	}
 }
 
-// BindLabel creates a one-way binding from a flow.Source to a Label.
+// BindLabel creates a one-way binding from a StringSource to a Label.
 // The Label's text is updated whenever the source value changes.
-// Works with both flow.Value[string] and flow.Derived[string].
+// A flow.Value[string] or flow.Derived[string] is passed through its wrapper,
+// StringValue or StringDerived; any other flow.Value through FormatValue.
 // Returns an unsubscribe function.
 //
 //	name := flow.New("Hello")
 //	label := widget.NewLabel("")
-//	unbind := widget.BindLabel(label, name)
+//	unbind := widget.BindLabel(label, widget.StringValue{name})
 func BindLabel(label *Label, source StringSource) func() {
 	label.SetText(source.GetString())
 	return source.OnChange(func() {
@@ -137,7 +138,8 @@ type StringDerived struct{ *flow.Derived[string] }
 
 func (s StringDerived) GetString() string { return s.Get() }
 
-// FormatValue creates a StringSource from any flow.Value by formatting with fmt.Sprint.
+// FormatValue creates a StringSource from any flow.Value by formatting its value
+// with fmt.Sprintf(format, value).
 // Useful for binding non-string values to Labels:
 //
 //	count := flow.New(0)

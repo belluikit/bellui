@@ -1796,8 +1796,10 @@ func (d *driver) DoubleTapDelay() time.Duration {
 
 // AnnounceToScreenReader implements the optional bellui.AccessibilityAnnouncer
 // interface by fanning the message out to the registered accessibility
-// backends (pre-rebrand tracker #525). Until the mobile backends land (pre-rebrand tracker #488) no listener is
-// registered, so this is a structural no-op kept for API uniformity.
+// backends (pre-rebrand tracker #525). With -tags accessibility the iOS and
+// Android backends register a listener in their init (accessibility_ios.go,
+// accessibility_android.go) that hands the text to VoiceOver / TalkBack;
+// without that tag no listener is registered and this is a no-op.
 func (d *driver) AnnounceToScreenReader(text string, assertive bool) {
 	accessibility.Announce(text, assertive)
 }

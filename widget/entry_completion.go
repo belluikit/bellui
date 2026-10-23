@@ -6,8 +6,9 @@ import (
 
 // ShowCompletion displays an application-driven completion popup anchored at the
 // Entry's caret. The optional title is shown as a header above the items; pass
-// an empty string for no header. When the user accepts an item (Enter, Space or
-// tap), OnCompletionSelected is called. Passing no items hides any open popup.
+// an empty string for no header. When the user accepts an item (Enter, Return,
+// Tab or tap), OnCompletionSelected is called; other keys, Space included, keep
+// editing the Entry. Passing no items hides any open popup.
 //
 // The popup is placed just below the caret line, flipping above it when there is
 // not enough room beneath, so it never covers the text being edited. It is the

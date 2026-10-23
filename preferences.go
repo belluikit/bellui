@@ -10,7 +10,7 @@ type Preferences interface {
 	// supported [PreferenceType] types.
 	SetValue(key string, value any)
 
-	// RemoveValue removes a value for the given key (not currently supported on iOS).
+	// RemoveValue removes a value for the given key.
 	RemoveValue(key string)
 
 	// AddChangeListener allows code to be notified when some preferences change.

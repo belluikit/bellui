@@ -69,7 +69,11 @@ type Button struct {
 	DisableableWidget
 	Text string
 	Icon bellui.Resource
-	// Specify how prominent the button should be, High will highlight the button and Low will remove some decoration.
+	// Specify how prominent the button should be. It only applies while Style is
+	// ButtonStyleDefault: High draws the button Filled; Danger, Success and Warning
+	// fill it with that status colour; Medium and Low both draw it FilledTonal.
+	// Low differs from Medium only when disabled, where it draws no disabled
+	// background. For a low-emphasis button, set Style to ButtonStyleText.
 	//
 	// Since: 1.0
 	Importance Importance

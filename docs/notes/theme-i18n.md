@@ -57,7 +57,7 @@ Pre-built `TextStyle` presets in `theme/typography.go` bundle weight, line-heigh
 - `RenderStyleClassic` (default for themes without `RenderStyleTheme`) — the original Fyne look
 - `RenderStyleModern` — gradient button backgrounds, card background fills, deeper shadows
 
-`DarkTheme()`/`LightTheme()` still return the original `builtinTheme` for backward compatibility. Only `DefaultTheme()` returns the `enhancedTheme`.
+The fixed-variant constructors are not public API: `theme/theme.go`'s unexported `darkTheme()`/`lightTheme()` return the original `builtinTheme` and are exposed only to the package's own tests (`theme/export_test.go`). Applications follow the user's preference through `DefaultTheme()`, which returns the `enhancedTheme`, or set a custom theme.
 
 ### Dense Theme
 `theme.DenseTheme()` (`theme/dense.go`) — high-density desktop theme for information-packed applications (trading systems, monitoring dashboards). Key differences from enhanced theme:

@@ -16,13 +16,15 @@ type GradientStop struct {
 }
 
 // LinearGradient defines a Gradient travelling straight at a given angle.
-// The only supported values for the angle are `0.0` (vertical) and `90.0` (horizontal), currently.
+// The supported angles are multiples of 45 degrees: 0/180 (vertical), 90/270 (horizontal)
+// and 45/135/225/315 (diagonal); negative equivalents are accepted. Any other
+// value is drawn as vertical (0).
 type LinearGradient struct {
 	baseObject
 
 	StartColor color.Color // The beginning color of the gradient
 	EndColor   color.Color // The end color of the gradient
-	Angle      float64     // The angle of the gradient (0/180 for vertical; 90/270 for horizontal)
+	Angle      float64     // The angle of the gradient (0/180 vertical; 90/270 horizontal; 45/135/225/315 diagonal)
 	// Stops defines a multi-stop gradient. When non-empty, StartColor and EndColor are ignored.
 	// Stops must be sorted by Position (0.0 to 1.0).
 	Stops []GradientStop
