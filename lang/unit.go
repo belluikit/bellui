@@ -2,6 +2,7 @@ package lang
 
 import (
 	"math"
+	"strconv"
 
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 
@@ -67,7 +68,7 @@ func FormatUnit(value float64, unit Unit) string {
 }
 
 // localizeUnit resolves a unit plural message. It mirrors LocalizePluralKey but
-// accepts a flexible count operand (int64/float64) so fractional magnitudes pick
+// accepts a flexible count operand (int64 or decimal string) so fractional magnitudes pick
 // the right CLDR plural category — the exported wrapper is int-only.
 func localizeUnit(key, fallback string, count any, value string) string {
 	data := map[string]any{"Value": value}
@@ -84,14 +85,15 @@ func localizeUnit(key, fallback string, count any, value string) string {
 }
 
 // pluralCount reduces value to the operand the plural-rule engine keys on: an
-// integer when value is whole (so "1"/"5" pick one/many cleanly), else the float
-// (whose visible-fraction operands select the fractional category, usually
-// "other").
+// integer when value is whole (so "1"/"5" pick one/many cleanly), else the
+// number as a decimal string, whose visible-fraction operands select the
+// fractional category (usually "other"). go-i18n rejects a float operand
+// outright, so a float64 here made every fractional value fail (#339).
 func pluralCount(value float64) any {
 	if value == math.Trunc(value) && math.Abs(value) < 1e15 {
 		return int64(value)
 	}
-	return value
+	return strconv.FormatFloat(value, 'f', -1, 64)
 }
 
 // PreferredLengthUnit reports the road-distance length unit the current locale
