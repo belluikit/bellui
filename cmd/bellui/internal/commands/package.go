@@ -259,7 +259,7 @@ func (p *Packager) validate() (err error) {
 	exeName := calculateExeName(p.srcDir, p.os)
 
 	if p.exe == "" {
-		p.exe = filepath.Join(p.srcDir, exeName)
+		p.exe = p.defaultExePath(exeName)
 
 		if util.Exists(p.exe) { // the exe was not specified, assume stale
 			p.removeBuild([]string{p.exe})
@@ -310,6 +310,24 @@ func (p *Packager) validate() (err error) {
 	}
 
 	return nil
+}
+
+// defaultExePath is where packaging builds the executable when --executable
+// does not name one. Only on Windows is that executable the product (packaging
+// embeds the icon and manifest into it and leaves it beside the sources), so
+// only there does it go into the source directory. Every other target copies
+// the binary into its package and deletes it, so it is built in the temporary
+// directory instead: a binary in the source directory takes the module's name,
+// and that name can be one packaging also uses for its output — a module named
+// wasm builds a file "wasm" where the web package wants a "wasm" folder (#683),
+// one named tmp-pkg collides with the UNIX staging folder the same way, and a
+// directory that happens to carry the module's name makes go build write the
+// binary inside it.
+func (p *Packager) defaultExePath(exeName string) string {
+	if p.os == "windows" {
+		return filepath.Join(p.srcDir, exeName)
+	}
+	return filepath.Join(p.tempDir, exeName)
 }
 
 func calculateExeName(sourceDir, osys string) string {
