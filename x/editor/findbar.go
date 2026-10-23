@@ -289,18 +289,19 @@ func (e *findEntry) TypedKey(ev *event.KeyEvent) {
 	e.Entry.TypedKey(ev)
 }
 
-// addFindShortcuts registers Cmd+F, Cmd+G, Shift+Cmd+G on this entry.
+// addFindShortcuts registers Cmd+F, Cmd+G and Shift+Cmd+G on this entry (Ctrl
+// instead of Cmd off macOS).
 func (e *findEntry) addFindShortcuts(onFind, onFindNext, onFindPrev func()) {
 	e.Entry.AddShortcut(&desktop.CustomShortcut{
 		KeyName:  event.KeyF,
-		Modifier: event.KeyModifierSuper,
+		Modifier: event.KeyModifierShortcutDefault,
 	}, func(_ core.Shortcut) { onFind() })
 	e.Entry.AddShortcut(&desktop.CustomShortcut{
 		KeyName:  event.KeyG,
-		Modifier: event.KeyModifierSuper,
+		Modifier: event.KeyModifierShortcutDefault,
 	}, func(_ core.Shortcut) { onFindNext() })
 	e.Entry.AddShortcut(&desktop.CustomShortcut{
 		KeyName:  event.KeyG,
-		Modifier: event.KeyModifierSuper | event.KeyModifierShift,
+		Modifier: event.KeyModifierShortcutDefault | event.KeyModifierShift,
 	}, func(_ core.Shortcut) { onFindPrev() })
 }
