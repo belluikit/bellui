@@ -208,8 +208,8 @@ func newPipelineForSource(src source.Source, cfg Config) *Pipeline {
 }
 
 // deviceChannels is the channel count a pipeline asks the audio device for:
-// stereo, unless the stream is surround and the caller did not ask for a
-// downmix, when it is the stream's own layout. Only the first Output in the
+// stereo, unless the stream is surround (any layout above stereo) and the
+// caller did not ask for a downmix, when it is the stream's own layout. Only the first Output in the
 // process opens the device, so only its request takes effect. Mono is played
 // as stereo, so a mono stream first no longer makes every later one mono
 // (#506).
@@ -589,9 +589,10 @@ var ErrSwapMedia = errors.New("mmedia: the replacement source does not carry the
 //     its first frame, which it can only do against a clock that starts where it
 //     expects.
 //   - The frame pool is rebuilt when the geometry moves, and only then.
-//   - The sample rate is renegotiated. The channel count is not: the audio
-//     device is opened once per process and cannot change, so the new source is
-//     asked for what the device already plays.
+//   - The audio format is asked of the new source, not of the device. The
+//     device is opened once per process, at DeviceSampleRate and the channel
+//     count the first stream chose, and cannot change, so the new source's
+//     decoder is asked to convert to both.
 //
 // Playback counters are left running. They measure the session rather than the
 // device, the same way they survive a seek.

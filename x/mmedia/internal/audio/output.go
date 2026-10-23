@@ -60,25 +60,28 @@ func initOto(channels int) *oto.Context {
 }
 
 // NewOutput creates an audio output. channels is what the first Output in
-// the process opens the device with (below 2 means stereo); every later
-// Output plays at the channel count the device already has. The rate is
+// the process opens the device with (0 or less means stereo; which count to
+// ask for is the caller's policy); every later Output plays at the channel
+// count the device already has. The rate is
 // always DeviceSampleRate. Callers have their decoder convert to SampleRate
 // and Channels before writing.
 func NewOutput(channels int) *Output {
-	if channels < defaultChannels {
+	if channels <= 0 {
 		channels = defaultChannels
 	}
 	ctx := initOto(channels)
-	return newOutput(ctx, DeviceSampleRate, otoChannels)
+	return newOutput(ctx, otoChannels)
 }
 
-// newOutput builds an Output playing PCM at rate and channels on ctx.
+// newOutput builds an Output playing PCM at DeviceSampleRate and channels on
+// ctx.
 //
 // Everything that turns bytes into time (the playback position, the ring and
-// pull sizes) uses rate, which is the device's: a stream's own rate never
+// pull sizes) uses that rate, which is the device's: a stream's own rate never
 // reaches here, because its decoder converts it. Counting the position at the
 // stream's rate is how a 48 kHz stream once played at 0.918x (#506).
-func newOutput(ctx *oto.Context, rate, channels int) *Output {
+func newOutput(ctx *oto.Context, channels int) *Output {
+	const rate = DeviceSampleRate
 	return &Output{
 		ctx:        ctx,
 		buffer:     NewRingBuffer(audioBytes(rate, channels, ringDuration)),

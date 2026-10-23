@@ -35,6 +35,14 @@ type FFmpegSource struct {
 	ptsOrigin time.Duration
 	ptsBased  bool
 
+	// wantChannels and wantRate are the audio format the pipeline asked for
+	// through SetAudioChannels and SetAudioSampleRate; 0 is the stream's own.
+	// They are kept because the decoder forgets them: a reacquired device opens
+	// at its own format (see acquire), and a seek leaves swresample holding
+	// audio from before it (see Seek).
+	wantChannels int
+	wantRate     int
+
 	videoCallback VideoCallback
 	audioCallback AudioCallback
 	ended         bool
@@ -127,8 +135,12 @@ func (s *FFmpegSource) SetAudioCallback(f AudioCallback) { s.audioCallback = f }
 // the mix, so a 5.1 source folded to stereo gets proper downmix coefficients
 // rather than dropped channels.
 func (s *FFmpegSource) SetAudioChannels(n int) error {
-	if !s.hasAudio || s.dec == nil {
+	if !s.hasAudio {
 		return nil
+	}
+	s.wantChannels = n
+	if s.dec == nil {
+		return nil // a released device; acquire applies it on reopening
 	}
 	if err := s.dec.SetAudioChannels(n); err != nil {
 		return err
@@ -140,8 +152,12 @@ func (s *FFmpegSource) SetAudioChannels(n int) error {
 // SetAudioSampleRate has the decoder's swresample convert the rate too, so
 // the audio device, fixed at one rate for the process, can play any stream.
 func (s *FFmpegSource) SetAudioSampleRate(rate int) error {
-	if !s.hasAudio || s.dec == nil {
+	if !s.hasAudio {
 		return nil
+	}
+	s.wantRate = rate
+	if s.dec == nil {
+		return nil // a released device; acquire applies it on reopening
 	}
 	if err := s.dec.SetAudioSampleRate(rate); err != nil {
 		return err
@@ -290,6 +306,17 @@ func (s *FFmpegSource) acquire() bool {
 		s.ended = true
 		return false
 	}
+	// A reopened decoder emits the device's own rate and layout. The pipeline
+	// asked for the audio device's format once, when it adopted this source, and
+	// the audio device cannot follow the decoder back: its format is fixed for
+	// the process. Without this, a 44.1 kHz mono microphone stopped and played
+	// again wrote mono 44.1 kHz into a 48 kHz stereo device, garbled and fast.
+	if err := applyAudioFormat(dec, s.wantChannels, s.wantRate); err != nil {
+		dec.Close()
+		s.err = err
+		s.ended = true
+		return false
+	}
 	s.dec = dec
 	// A reacquired device is not required to come back with the geometry it had.
 	// Refresh what the decoder reports so frames are allocated at the size it is
@@ -298,6 +325,23 @@ func (s *FFmpegSource) acquire() bool {
 	// pipeline was assembled around them.
 	s.vInfo, s.aInfo = dec.VideoInfo(), dec.AudioInfo()
 	return true
+}
+
+// applyAudioFormat asks dec for the channels and rate a pipeline asked of the
+// source (0: the stream's own). A decoder with no audio stream is left alone.
+func applyAudioFormat(dec goffmpeg.IDecoder, channels, rate int) error {
+	if dec.AudioInfo().SampleRate <= 0 {
+		return nil
+	}
+	if channels != 0 {
+		if err := dec.SetAudioChannels(channels); err != nil {
+			return err
+		}
+	}
+	if rate != 0 {
+		return dec.SetAudioSampleRate(rate)
+	}
+	return nil
 }
 
 // release closes the current decoder but leaves the source usable: the next
@@ -330,6 +374,16 @@ func (s *FFmpegSource) Seek(pos time.Duration) {
 		return
 	}
 	s.ended = false
+
+	// A rate conversion holds a few frames of filter delay, which seeking the
+	// demuxer does not flush: the first audio after the seek would start with
+	// audio from before it, a click at every seek and every loop. Rebuilding the
+	// resampler discards what it buffered (goffmpeg's decoder_set_audio_channels).
+	// Should the rebuild fail, goffmpeg restores a working resampler, so the cost
+	// is only the stale frames this avoids.
+	if s.hasAudio && s.wantRate != 0 {
+		_ = s.dec.SetAudioSampleRate(s.wantRate)
+	}
 
 	// av_seek_frame lands on the keyframe at or before the target (which
 	// can be several seconds earlier depending on the GOP size). Decode and

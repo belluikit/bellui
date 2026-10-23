@@ -42,7 +42,7 @@ func TestAudioCanLeadTheThreadedVideoDecoder(t *testing.T) {
 // 0.918x. Streams are converted to the device's rate by their decoder now, so
 // the Output only ever knows that one rate.
 func TestPositionCountsAtTheDeviceRate(t *testing.T) {
-	o := newOutput(nil, DeviceSampleRate, 1) // no device: nothing is played
+	o := newOutput(nil, 1) // no device: nothing is played
 
 	second := make([]byte, DeviceSampleRate*2) // one second of mono silence
 	o.WriteSamples(second)
