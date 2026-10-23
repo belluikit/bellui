@@ -4487,8 +4487,9 @@ func (r *entryContentRenderer) ensureCursorVisible() {
 	}
 	if r.content.scroll.Content != nil {
 		r.content.scroll.ScrollToOffset(r.content.scroll.Offset.Add(move))
-		// ScrollToOffset (programmatic) does not fire OnScrolled, so re-window the
-		// virtualised text here for cursor-driven scrolling (keyboard nav, paging).
+		// ScrollToOffset fires OnScrolled (which re-windows) only when the offset
+		// moved; re-window here too so cursor-driven scrolling (keyboard nav,
+		// paging) always sees the current text, moved or not.
 		r.content.entry.updateTextViewport()
 	}
 }
