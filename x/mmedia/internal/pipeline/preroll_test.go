@@ -10,7 +10,7 @@ import (
 // showing any, and a clip shorter than that never filled the wait, so it sat the
 // full two-second limit before its first frame, and again on every loop.
 func TestShortClipStartsPromptly(t *testing.T) {
-	p := newPipelineForSource(&clipSource{frames: 15}, Config{}) // half a second
+	p := newTestPipeline(t, &clipSource{frames: 15}) // half a second
 	defer p.Close()
 	first := make(chan time.Time, 1)
 	p.SetOnFrame(func(*image.RGBA) {

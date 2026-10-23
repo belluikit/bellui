@@ -53,7 +53,7 @@ func frameIndex(img *image.RGBA) int { return int(binary.LittleEndian.Uint32(img
 // from the old position, and then showed frames from before the seek. The
 // picture froze for as long as the seek went back.
 func TestBackwardSeekShowsTheTargetPromptly(t *testing.T) {
-	p := newPipelineForSource(&clipSource{frames: 300}, Config{})
+	p := newTestPipeline(t, &clipSource{frames: 300})
 	defer p.Close()
 
 	type shown struct {

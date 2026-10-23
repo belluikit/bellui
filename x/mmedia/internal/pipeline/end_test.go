@@ -13,7 +13,7 @@ import (
 // it the clock ran on past the duration.
 func TestEndReportsTheFullDuration(t *testing.T) {
 	clip := &clipSource{frames: 20} // two thirds of a second
-	p := newPipelineForSource(clip, Config{})
+	p := newTestPipeline(t, clip)
 	defer p.Close()
 	p.SetOnFrame(func(*image.RGBA) {})
 

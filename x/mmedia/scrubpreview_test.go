@@ -15,7 +15,6 @@ import (
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/test"
-	"github.com/belluikit/bellui/x/mmedia/internal/pipeline"
 	"github.com/belluikit/bellui/x/mmedia/internal/source"
 )
 
@@ -426,7 +425,7 @@ func (liveStubSource) IsLive() bool                          { return true }
 // ErrNoScrubPreviewSource, so the ordering of the two checks is what is being
 // pinned here.
 func TestWithScrubPreviewIsInertForALiveSource(t *testing.T) {
-	pipe := pipeline.NewPipelineForSource(liveStubSource{}, pipeline.Config{})
+	pipe := newTestPipeline(t, liveStubSource{})
 	mp, err := newMediaPlayerFromPipeline(pipe, buildOptions([]Option{WithScrubPreview()}), "")
 	if err != nil {
 		t.Fatalf("a live player must accept WithScrubPreview without complaint: %v", err)

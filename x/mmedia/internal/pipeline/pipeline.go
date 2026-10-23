@@ -139,7 +139,7 @@ func NewPipeline(r io.Reader, cfg ...Config) (*Pipeline, error) {
 	if f, ok := r.(*os.File); ok {
 		if _, err := f.Seek(0, io.SeekStart); err == nil {
 			if src, err := source.NewFFmpegSourceURL(f.Name()); err == nil {
-				return newPipelineForSource(src, firstConfig(cfg)), nil
+				return newOwnedPipeline(src, firstConfig(cfg))
 			}
 			// Fall through to the reader path — the file may not be
 			// reachable by name (unlinked, or an inherited descriptor).
@@ -153,7 +153,7 @@ func NewPipeline(r io.Reader, cfg ...Config) (*Pipeline, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newPipelineForSource(src, firstConfig(cfg)), nil
+	return newOwnedPipeline(src, firstConfig(cfg))
 }
 
 // NewPipelineURL creates a playback pipeline from a file path or network URL
@@ -163,7 +163,18 @@ func NewPipelineURL(url string, cfg ...Config) (*Pipeline, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newPipelineForSource(src, firstConfig(cfg)), nil
+	return newOwnedPipeline(src, firstConfig(cfg))
+}
+
+// newOwnedPipeline builds a pipeline around a source this package opened, and
+// closes the source if the pipeline cannot be built, since no caller has it.
+func newOwnedPipeline(src source.Source, cfg Config) (*Pipeline, error) {
+	p, err := newPipelineForSource(src, cfg)
+	if err != nil {
+		src.Close()
+		return nil, err
+	}
+	return p, nil
 }
 
 // There is deliberately no NewPipelineDevice alongside these. Opening a capture
@@ -189,8 +200,19 @@ func firstConfig(cfg []Config) Config {
 	return Config{}
 }
 
+// newAudioOutput is audio.NewOutput, a variable so a test can build a pipeline
+// with audio on a machine with no device, or make the device refuse to open.
+var newAudioOutput = audio.NewOutput
+
 // newPipelineForSource assembles a pipeline around an already-created source.
-func newPipelineForSource(src source.Source, cfg Config) *Pipeline {
+//
+// It fails when the stream has audio and the device will not open (#690), or
+// the source cannot be converted to the device's format (#698): a player built
+// on either would play silent or at the wrong speed, and nothing would say why.
+// On failure it leaves src open, for the caller to close; nothing else it
+// built needs releasing, since no goroutine starts before Play and the device
+// itself is the process's.
+func newPipelineForSource(src source.Source, cfg Config) (*Pipeline, error) {
 	p := &Pipeline{
 		clock:    NewClock(),
 		state:    NewStateMachine(nil),
@@ -200,11 +222,17 @@ func newPipelineForSource(src source.Source, cfg Config) *Pipeline {
 	}
 
 	if p.hasAudio {
-		p.audioOutput = audio.NewOutput(deviceChannels(src.Channels(), cfg.Downmix))
+		out, err := newAudioOutput(deviceChannels(src.Channels(), cfg.Downmix))
+		if err != nil {
+			return nil, err
+		}
+		p.audioOutput = out
 	}
 
-	p.adoptSource(src)
-	return p
+	if err := p.adoptSource(src); err != nil {
+		return nil, err
+	}
+	return p, nil
 }
 
 // deviceChannels is the channel count a pipeline asks the audio device for:
@@ -225,7 +253,11 @@ func deviceChannels(stream int, downmix bool) int {
 // It is what the capture entry points use: they have to build the source
 // themselves, because opening a device is where the per-platform selector rules
 // and the framerate fallback live, and neither belongs down here.
-func NewPipelineForSource(src source.Source, cfg ...Config) *Pipeline {
+//
+// It returns an error when the source has audio and the audio device cannot
+// be opened, or the source cannot be converted to the device's format. The
+// source is then left open, and the caller still owns it.
+func NewPipelineForSource(src source.Source, cfg ...Config) (*Pipeline, error) {
 	return newPipelineForSource(src, firstConfig(cfg))
 }
 
@@ -233,12 +265,16 @@ func NewPipelineForSource(src source.Source, cfg ...Config) *Pipeline {
 // and audio configuration from it, sizes the frame pool to match, and wires the
 // decode callbacks.
 //
+// It returns the error from converting src's audio to the device's format,
+// after adopting src all the same. Construction fails on it; SwapSource,
+// whose source is already adopted by then, reports it through OnError.
+//
 // Shared by construction and SwapSource, which is the point — a swapped-in
 // source must end up configured exactly as one passed to the constructor would,
 // and two copies of this would drift. hasVideo/hasAudio are deliberately *not*
 // set here: they are fixed at construction, because the widget above was built
 // around them, and SwapSource refuses a source that would change them.
-func (p *Pipeline) adoptSource(src source.Source) {
+func (p *Pipeline) adoptSource(src source.Source) error {
 	p.src = src
 	p.duration = src.Duration()
 
@@ -261,19 +297,20 @@ func (p *Pipeline) adoptSource(src source.Source) {
 		}
 	}
 
+	var convErr error
 	if p.hasAudio {
 		// The audio device is opened once per process and its format is fixed
 		// for the life of it, so a new source is asked for exactly what the
 		// device plays, and its decoder's swresample converts the channels and
 		// the rate.
 		if got := p.audioOutput.Channels(); got != src.Channels() {
-			if err := src.SetAudioChannels(got); err != nil && p.onError != nil {
-				p.onError(fmt.Errorf("audio channel negotiation to %d: %w", got, err))
+			if err := src.SetAudioChannels(got); err != nil {
+				convErr = errors.Join(convErr, fmt.Errorf("audio channel negotiation to %d: %w", got, err))
 			}
 		}
 		if rate := p.audioOutput.SampleRate(); rate != src.SampleRate() {
-			if err := src.SetAudioSampleRate(rate); err != nil && p.onError != nil {
-				p.onError(fmt.Errorf("audio sample rate conversion to %d: %w", rate, err))
+			if err := src.SetAudioSampleRate(rate); err != nil {
+				convErr = errors.Join(convErr, fmt.Errorf("audio sample rate conversion to %d: %w", rate, err))
 			}
 		}
 	}
@@ -305,6 +342,7 @@ func (p *Pipeline) adoptSource(src source.Source) {
 		p.audioOutput.WriteSamples(data)
 		p.clock.SetAudioTime(p.audioOutput.PlaybackPosition())
 	})
+	return convErr
 }
 
 // allocFramePool builds the decode-ahead buffer: all RGBA frames are allocated
@@ -616,7 +654,9 @@ func (p *Pipeline) SwapSource(src source.Source) error {
 	p.halt()
 
 	old := p.src
-	p.adoptSource(src)
+	if err := p.adoptSource(src); err != nil && p.onError != nil {
+		p.onError(err)
+	}
 	if old != nil {
 		old.Close()
 	}

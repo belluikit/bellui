@@ -207,6 +207,10 @@ func videoOnly(all []CaptureDevice) []CaptureDevice {
 //
 // Stop releases the device, so the camera's indicator light goes out and other
 // applications can claim it; Play reacquires it. Close releases it permanently.
+//
+// A stream with audio is an error here when the audio device cannot be opened
+// or the stream cannot be converted to the device's format, rather than a
+// player that plays silent or at the wrong speed.
 func NewCapturePlayer(device string, opts ...Option) (*MediaPlayer, error) {
 	format := captureFormat()
 	url, err := resolveCaptureDevice(format, device)
@@ -224,6 +228,10 @@ func NewCapturePlayer(device string, opts ...Option) (*MediaPlayer, error) {
 // index is resolved against the enumerated list, so it is stable only for as long
 // as that list is — prefer a name from VideoCaptureDevices for anything the user
 // chose and you intend to remember.
+//
+// A stream with audio is an error here when the audio device cannot be opened
+// or the stream cannot be converted to the device's format, rather than a
+// player that plays silent or at the wrong speed.
 func NewCapturePlayerIndex(index int, opts ...Option) (*MediaPlayer, error) {
 	format := captureFormat()
 	url, err := resolveCaptureIndex(format, index)
@@ -241,9 +249,12 @@ func newCapturePlayer(format, url string, opts []Option) (*MediaPlayer, error) {
 	}
 	// No preview URL: a capture device has no timeline to preview along, and
 	// WithScrubPreview is documented as inert rather than an error for one.
-	mp, err := newMediaPlayerFromPipeline(
-		pipeline.NewPipelineForSource(src, pipeline.Config{Downmix: o.downmix}), o, "",
-	)
+	pipe, err := pipeline.NewPipelineForSource(src, pipeline.Config{Downmix: o.downmix})
+	if err != nil {
+		src.Close() // the pipeline did not take it, and nothing else has it
+		return nil, err
+	}
+	mp, err := newMediaPlayerFromPipeline(pipe, o, "")
 	if err != nil {
 		return nil, err
 	}

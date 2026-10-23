@@ -53,7 +53,7 @@ var _ source.LiveSource = liveShapedSource{}
 // running and the source underneath it is exchanged.
 func TestSwapSourceReplacesAndClosesTheOld(t *testing.T) {
 	old := newShapedSource(16, 16)
-	p := newPipelineForSource(old, Config{})
+	p := newTestPipeline(t, old)
 	p.SetOnFrame(func(*image.RGBA) {})
 
 	p.Play()
@@ -87,7 +87,7 @@ func TestSwapSourceReplacesAndClosesTheOld(t *testing.T) {
 // the video callback copies into them, so a larger frame would be truncated
 // against buffers sized for the old device.
 func TestSwapSourceResizesTheFramePool(t *testing.T) {
-	p := newPipelineForSource(newShapedSource(16, 16), Config{})
+	p := newTestPipeline(t, newShapedSource(16, 16))
 	before := <-p.frameRecycle
 	p.RecycleFrame(before)
 	if got := before.Bounds().Dx(); got != 16 {
@@ -112,7 +112,7 @@ func TestSwapSourceResizesTheFramePool(t *testing.T) {
 // between two cameras of the same resolution must not drop and reallocate the
 // whole pool.
 func TestSwapSourceKeepsThePoolWhenGeometryIsUnchanged(t *testing.T) {
-	p := newPipelineForSource(newShapedSource(16, 16), Config{})
+	p := newTestPipeline(t, newShapedSource(16, 16))
 	pool := p.frameRecycle
 
 	if err := p.SwapSource(newShapedSource(16, 16)); err != nil {
@@ -130,7 +130,7 @@ func TestSwapSourceKeepsThePoolWhenGeometryIsUnchanged(t *testing.T) {
 // down here, so a source that would change them is refused rather than adopted.
 func TestSwapSourceRefusesADifferentMediaShape(t *testing.T) {
 	old := newShapedSource(16, 16)
-	p := newPipelineForSource(old, Config{})
+	p := newTestPipeline(t, old)
 	p.SetOnFrame(func(*image.RGBA) {})
 	p.Play()
 	defer p.Close()
@@ -159,7 +159,7 @@ func TestSwapSourceRefusesADifferentMediaShape(t *testing.T) {
 }
 
 func TestSwapSourceRefusesNil(t *testing.T) {
-	p := newPipelineForSource(newShapedSource(16, 16), Config{})
+	p := newTestPipeline(t, newShapedSource(16, 16))
 	defer p.Close()
 
 	if err := p.SwapSource(nil); !errors.Is(err, ErrSwapMedia) {
@@ -170,7 +170,7 @@ func TestSwapSourceRefusesNil(t *testing.T) {
 // TestSwapSourceLeavesAStoppedPipelineStopped checks the state handover in the
 // direction that is easy to get wrong: a swap is not a Play.
 func TestSwapSourceLeavesAStoppedPipelineStopped(t *testing.T) {
-	p := newPipelineForSource(newShapedSource(16, 16), Config{})
+	p := newTestPipeline(t, newShapedSource(16, 16))
 	p.SetOnFrame(func(*image.RGBA) {})
 	defer p.Close()
 
@@ -186,7 +186,7 @@ func TestSwapSourceLeavesAStoppedPipelineStopped(t *testing.T) {
 // disables seeking and turns end-of-stream into a lost device. Carrying the old
 // source's answer across would leave a file pretending to be a camera.
 func TestSwapSourceTakesTheLiveFlagFromTheNewSource(t *testing.T) {
-	p := newPipelineForSource(liveShapedSource{newShapedSource(16, 16)}, Config{})
+	p := newTestPipeline(t, liveShapedSource{newShapedSource(16, 16)})
 	defer p.Close()
 	if !p.IsLive() {
 		t.Fatal("precondition: the pipeline should have started live")
@@ -204,7 +204,7 @@ func TestSwapSourceTakesTheLiveFlagFromTheNewSource(t *testing.T) {
 // host time and FFmpegSource rebases on its first frame, which only works
 // against a clock that starts where it expects.
 func TestSwapSourceRebasesTheClock(t *testing.T) {
-	p := newPipelineForSource(newShapedSource(16, 16), Config{})
+	p := newTestPipeline(t, newShapedSource(16, 16))
 	p.SetOnFrame(func(*image.RGBA) {})
 	p.Play()
 	time.Sleep(120 * time.Millisecond)

@@ -1,6 +1,7 @@
 package audio
 
 import (
+	"fmt"
 	"math"
 	"sync"
 	"time"
@@ -38,25 +39,53 @@ type Output struct {
 	readBase int64
 }
 
-var (
-	otoOnce     sync.Once
-	otoCtx      *oto.Context
-	otoChannels int // channel count the oto context was initialized with
-)
+// device is the process's one audio device. It is opened by the first
+// NewOutput and never again: oto allows a single context per process.
+var device struct {
+	once     sync.Once
+	ctx      *oto.Context
+	channels int   // channel count the device was opened with
+	err      error // why it could not be opened, for every later NewOutput
+}
 
-func initOto(channels int) *oto.Context {
-	otoOnce.Do(func() {
-		otoChannels = channels
+// newOtoContext is oto.NewContext, a variable so a test can make the device
+// refuse to open.
+var newOtoContext = oto.NewContext
+
+// openDevice opens the audio device once per process and returns it, or the
+// error it failed with.
+//
+// A failure is remembered, not retried. oto marks its one context as created
+// before the platform backend runs and never clears the mark (context.go in
+// v3.4.0: contextCreated = true precedes newContext), so a second
+// oto.NewContext can only fail with "context is already created", which would
+// hide the real cause. Returning the first error to every later caller is the
+// only answer that is both true and does not block. It used to discard the
+// error and receive on the nil ready channel oto returns with it, which blocked
+// forever inside the Once and so blocked every later player too (#690).
+func openDevice(channels int) (*oto.Context, int, error) {
+	device.once.Do(func() {
 		op := &oto.NewContextOptions{
 			SampleRate:   DeviceSampleRate,
 			ChannelCount: channels,
 			Format:       oto.FormatSignedInt16LE,
 		}
-		var readyChan chan struct{}
-		otoCtx, readyChan, _ = oto.NewContext(op)
-		<-readyChan
+		ctx, ready, err := newOtoContext(op)
+		if err != nil {
+			device.err = fmt.Errorf("open audio device (%d Hz, %d channels): %w", DeviceSampleRate, channels, err)
+			return
+		}
+		<-ready
+		// Some backends (CoreAudio) finish opening on their own goroutine and
+		// report a failure there: ready is closed either way, and the error is
+		// only in Err.
+		if err := ctx.Err(); err != nil {
+			device.err = fmt.Errorf("open audio device (%d Hz, %d channels): %w", DeviceSampleRate, channels, err)
+			return
+		}
+		device.ctx, device.channels = ctx, channels
 	})
-	return otoCtx
+	return device.ctx, device.channels, device.err
 }
 
 // NewOutput creates an audio output. channels is what the first Output in
@@ -65,12 +94,27 @@ func initOto(channels int) *oto.Context {
 // count the device already has. The rate is
 // always DeviceSampleRate. Callers have their decoder convert to SampleRate
 // and Channels before writing.
-func NewOutput(channels int) *Output {
+//
+// It returns an error when the device cannot be opened: no audio device, or
+// one that refuses the format. That error is the first open's, returned to
+// every later call too, because the device is opened only once.
+func NewOutput(channels int) (*Output, error) {
 	if channels <= 0 {
 		channels = defaultChannels
 	}
-	ctx := initOto(channels)
-	return newOutput(ctx, otoChannels)
+	ctx, got, err := openDevice(channels)
+	if err != nil {
+		return nil, err
+	}
+	return newOutput(ctx, got), nil
+}
+
+// NewDetachedOutput is an Output on no device, for tests above this package
+// that need a pipeline with audio and no sound card. It plays nothing: Start
+// must not be called on it, and writes past its capacity overwrite the oldest
+// samples, as on a device that has stalled.
+func NewDetachedOutput(channels int) *Output {
+	return newOutput(nil, channels)
 }
 
 // newOutput builds an Output playing PCM at DeviceSampleRate and channels on

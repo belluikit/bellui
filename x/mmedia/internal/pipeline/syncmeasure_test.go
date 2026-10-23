@@ -63,7 +63,7 @@ func TestSyncOffsetStaysBounded(t *testing.T) {
 		realRate:     25,
 		declaredRate: 30, // deliberately wrong
 	}
-	p := newPipelineForSource(src, Config{})
+	p := newTestPipeline(t, src)
 	p.SetOnFrame(func(*image.RGBA) {})
 
 	p.Play()
@@ -96,7 +96,7 @@ func TestStatsAreRaceFree(t *testing.T) {
 		realRate:     30,
 		declaredRate: 30,
 	}
-	p := newPipelineForSource(src, Config{})
+	p := newTestPipeline(t, src)
 	p.SetOnFrame(func(*image.RGBA) {})
 
 	done := make(chan struct{})
