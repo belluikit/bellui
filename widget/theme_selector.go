@@ -22,7 +22,8 @@ import (
 type ThemeVariantSelection int
 
 const (
-	// ThemeVariantSystem follows the operating system light/dark appearance.
+	// ThemeVariantSystem follows the operating system light/dark appearance,
+	// including later changes to it (see [ThemeSelection.Apply]).
 	ThemeVariantSystem ThemeVariantSelection = iota
 	// ThemeVariantLight always uses the light theme variant.
 	ThemeVariantLight
@@ -54,8 +55,12 @@ type ThemeSelection struct {
 
 // Apply re-themes the running app to this selection via its Settings.
 // It only affects the current app — nothing is written to the system-wide
-// Bellui settings. [ThemeVariantSystem] resolves the operating system
-// appearance at call time; it does not follow later OS changes.
+// Bellui settings. [ThemeVariantLight] and [ThemeVariantDark] pin the variant:
+// later OS appearance changes leave it alone. [ThemeVariantSystem] withdraws
+// any pin, so the app follows the operating system appearance live, when the
+// app settings implement [bellui.ThemeVariantSettings] (the default app and
+// the test app do). Other settings get the operating system appearance at
+// call time instead, pinned like an explicit choice.
 // The primary color is applied when the app settings implement
 // [bellui.PrimaryColorSettings] (the default app and the test app do);
 // an empty Primary leaves the current primary color untouched.
@@ -72,14 +77,20 @@ func (t ThemeSelection) Apply() {
 		}
 	}
 
-	variant := internalapp.DefaultVariant()
 	switch t.Variant {
 	case ThemeVariantLight:
-		variant = theme.VariantLight
+		s.SetThemeVariant(theme.VariantLight)
 	case ThemeVariantDark:
-		variant = theme.VariantDark
+		s.SetThemeVariant(theme.VariantDark)
+	default:
+		if tv, ok := s.(bellui.ThemeVariantSettings); ok {
+			tv.ClearThemeVariant()
+			return
+		}
+		// Settings that cannot withdraw a pin get a snapshot of the OS
+		// appearance, the behaviour before live following existed.
+		s.SetThemeVariant(internalapp.DefaultVariant())
 	}
-	s.SetThemeVariant(variant)
 }
 
 const (

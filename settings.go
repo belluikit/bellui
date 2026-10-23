@@ -23,7 +23,8 @@ type Settings interface {
 	ThemeVariant() ThemeVariant
 	// SetThemeVariant sets the preferred theme variant (light or dark) and re-applies the current theme.
 	// The app's choice then stands: later OS appearance changes and edits to the
-	// system-wide settings file no longer change the variant.
+	// system-wide settings file no longer change the variant. Settings that
+	// implement [ThemeVariantSettings] can withdraw the choice again.
 	SetThemeVariant(ThemeVariant)
 	Scale() float32
 	// PrimaryColor indicates a user preference for a named primary color
@@ -55,4 +56,21 @@ type PrimaryColorSettings interface {
 	// that settings file changes. An empty name withdraws the app's choice, so
 	// the system-wide colour applies again.
 	SetPrimaryColor(name string)
+}
+
+// ThemeVariantSettings describes the optional capability of [Settings]
+// implementations that can withdraw an explicit [Settings.SetThemeVariant]
+// choice, so the variant follows the system again. The settings of a running
+// app (and of the test app) implement it.
+//
+// Since: 1.0
+type ThemeVariantSettings interface {
+	Settings
+
+	// ClearThemeVariant withdraws the app's SetThemeVariant choice and
+	// re-applies the current theme. The variant is then derived as if the app
+	// had never chosen one — from the system-wide settings file if it names
+	// light or dark, otherwise from the operating system appearance — and
+	// follows later OS appearance changes and settings-file edits again.
+	ClearThemeVariant()
 }
