@@ -342,8 +342,9 @@ func (a *GridAPI) CollapseAllGroups() {
 // SetTreeData enables hierarchical tree data. getID returns a unique ID for a
 // row; getParent returns the parent row's ID (matched against getID values), or
 // a negative value for root rows. Rows whose parent ID is not found are treated
-// as roots. The parent ID is an int, so it only matches IDs that getID returns
-// as Go ints (see [pipeline.TreeTransform.GetParent]). Pass a nil getID or
+// as roots, as is the first row of a loop of rows that are each other's
+// parents. The parent ID is an int, so it only matches IDs that getID returns
+// as Go integers (see [pipeline.TreeTransform.GetParent]). Pass a nil getID or
 // getParent to disable tree data.
 //
 // The hierarchy is rendered on the first main (non-pinned) column with a depth
