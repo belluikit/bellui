@@ -25,13 +25,12 @@ type PopUp struct {
 	Canvas  core.Canvas
 
 	// OnDismissed, when set, replaces hiding as the response to the user
-	// pressing Escape on this pop-up (see DismissOnEscape). A host that has its
-	// own close path — a dialog with a result to report — sets it so that path
-	// runs instead of a plain Hide.
-	//
-	// It is only consulted on the Escape path. An outside tap or secondary tap
-	// (when the pop-up dismisses on tap) and the accessibility dismiss action
-	// call Hide directly and do not run it.
+	// dismissing this pop-up: pressing Escape (see DismissOnEscape), tapping or
+	// secondary-tapping outside the content (when the pop-up dismisses on tap),
+	// or invoking the accessibility dismiss action. A host that has its own
+	// close path — a dialog with a result to report — sets it so that path runs
+	// whatever the user dismissed with; it is then responsible for hiding the
+	// pop-up. Calling Hide from code does not run it.
 	//
 	// Since: 1.0
 	OnDismissed func() `json:"-"`
@@ -202,6 +201,16 @@ func (p *PopUp) PerformAccessibleAction(name string) {
 	if p.noDismissOnTap || (p.modal && !p.modalDismissOnTap) {
 		return
 	}
+	p.dismiss()
+}
+
+// dismiss responds to a user-initiated dismissal: the host's OnDismissed when
+// set, otherwise a plain Hide.
+func (p *PopUp) dismiss() {
+	if p.OnDismissed != nil {
+		p.OnDismissed()
+		return
+	}
 	p.Hide()
 }
 
@@ -220,12 +229,9 @@ func (p *PopUp) DismissOnEscape() bool {
 		return false
 	}
 
-	if p.OnDismissed != nil {
-		// The host owns the close path — a dialog has a result to report.
-		p.OnDismissed()
-		return true
-	}
-	p.Hide()
+	// A host with OnDismissed owns the close path — a dialog has a result to
+	// report.
+	p.dismiss()
 	return true
 }
 
@@ -239,7 +245,7 @@ func (p *PopUp) Tapped(e *event.PointEvent) {
 		return
 	}
 	if !p.modal || p.modalDismissOnTap {
-		p.Hide()
+		p.dismiss()
 	}
 }
 
@@ -253,7 +259,7 @@ func (p *PopUp) TappedSecondary(e *event.PointEvent) {
 		return
 	}
 	if !p.modal || p.modalDismissOnTap {
-		p.Hide()
+		p.dismiss()
 	}
 }
 
