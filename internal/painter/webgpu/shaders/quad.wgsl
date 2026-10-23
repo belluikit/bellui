@@ -82,7 +82,12 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         return in.fill_color;
     }
     if (in.params.z > 0.5) {
-        let coverage = textureSample(atlas, samp, in.tex).a;
+        // textureSampleLevel, not textureSample: this branch depends on a
+        // per-instance value, and WGSL allows implicit-derivative sampling
+        // only in uniform control flow. Chrome's WebGPU (Tint) rejects the
+        // whole shader module otherwise, and nothing draws (#333). The atlas has a
+        // single mip level, so level 0 is what textureSample would pick.
+        let coverage = textureSampleLevel(atlas, samp, in.tex, 0.0).a;
         let a = in.fill_color.a * coverage;
         if (!(a > 0.0)) {
             discard;
