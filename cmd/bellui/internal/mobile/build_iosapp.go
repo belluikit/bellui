@@ -24,7 +24,7 @@ import (
 
 func goIOSBuild(pkg *packages.Package, bundleID string, archs []string,
 	appName, version string, build int, release bool, cert, profile string,
-	usageDescriptions map[string]string,
+	usageDescriptions map[string]string, iconPath string,
 ) (map[string]bool, error) {
 	src := pkg.PkgPath
 	buildO = rfc1034Label(appName) + ".app"
@@ -66,7 +66,15 @@ func goIOSBuild(pkg *packages.Package, bundleID string, archs []string,
 	}{
 		{tmpdir + "/main.xcodeproj/project.pbxproj", projPbxproj.Bytes()},
 		{tmpdir + "/main/Info.plist", infoplistBytes},
-		{tmpdir + "/main/Images.xcassets/AppIcon.appiconset/Contents.json", []byte(contentsJSON)},
+	}
+	if iconPath == "" {
+		// No icon: an empty AppIcon set, which Xcode still expects.
+		files = append(files, struct {
+			name     string
+			contents []byte
+		}{tmpdir + "/main/Images.xcassets/AppIcon.appiconset/Contents.json", []byte(contentsJSON)})
+	} else if err := writeIOSAppIcon(iconPath, tmpdir+"/main/Images.xcassets/AppIcon.appiconset"); err != nil {
+		return nil, err
 	}
 
 	// Signed in via CODE_SIGN_ENTITLEMENTS: Associated Domains for Universal
