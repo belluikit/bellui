@@ -1,6 +1,8 @@
 package analytics
 
 import (
+	"math/rand/v2"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -455,4 +457,51 @@ func TestFailedSendDuringTrack_SpoolKeepsAll(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, events, 3)
 	assert.Equal(t, []string{"a", "b", "c"}, []string{events[0].Name, events[1].Name, events[2].Name})
+}
+
+// TestSpoolCacheStaysInStep drives a tracker through random Tracks, failing and
+// succeeding flushes, evictions and a disable/enable, and checks after each
+// step that the cached spool pieces line up with the queue and that the saved
+// spool is exactly what encoding the queue whole would give (#657).
+func TestSpoolCacheStaysInStep(t *testing.T) {
+	sink := newFakeSink()
+	tr, _, store, _ := newTestTracker(t, sink, WithBatchSize(1<<30), WithMaxSpool(7))
+	tr.SetEnabled(true)
+	rng := rand.New(rand.NewPCG(1, 2))
+	check := func(step int) {
+		t.Helper()
+		tr.mu.Lock()
+		defer tr.mu.Unlock()
+		require.Equal(t, len(tr.queue), len(tr.queuePieces), "queue pieces out of step at step %d", step)
+		require.Equal(t, len(tr.inflight), len(tr.inflightPieces), "in-flight pieces out of step at step %d", step)
+		if !store.saved() {
+			return
+		}
+		held := append(append([]Event(nil), tr.inflight...), tr.queue...)
+		if over := len(held) - tr.cfg.maxSpool; over > 0 {
+			held = held[over:]
+		}
+		want, err := marshalSpool(held)
+		require.NoError(t, err)
+		got, err := store.Load()
+		require.NoError(t, err)
+		require.Equal(t, string(want), string(got), "step %d", step)
+	}
+	for step := range 300 {
+		switch r := rng.IntN(10); {
+		case r < 6:
+			tr.Track("e"+strconv.Itoa(step), map[string]any{"step": step, "odd": step%2 == 1})
+		case r < 8:
+			sink.mu.Lock()
+			sink.failNext = rng.IntN(2)
+			sink.mu.Unlock()
+			_ = tr.Flush()
+		case r < 9:
+			tr.Identify("u"+strconv.Itoa(step), map[string]any{"n": step})
+		default:
+			tr.SetEnabled(false)
+			tr.SetEnabled(true)
+		}
+		check(step)
+	}
 }
