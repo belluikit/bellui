@@ -20,6 +20,7 @@ import (
 	"github.com/belluikit/bellui/theme"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSettingsLoad(t *testing.T) {
@@ -115,4 +116,22 @@ func TestCustomTheme(t *testing.T) {
 	set.setupTheme()
 	assert.Equal(t, set.Theme(), ctheme)
 	assert.Equal(t, theme.VariantDark, set.ThemeVariant())
+}
+
+// An in-app SetPrimaryColor (ThemeSelection.Apply's other half) survives a
+// reload of the system-wide settings file, which replaced the whole schema,
+// primary colour included (found alongside #339's variant reset).
+func TestSettings_ExplicitPrimarySurvivesFileReload(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "settings.pxf")
+	require.NoError(t, os.WriteFile(p, []byte("primary_color = \"blue\"\n"), 0o600))
+
+	set := &settings{}
+	set.SetPrimaryColor(theme.ColorRed)
+	require.NoError(t, set.loadFromFile(p))
+	assert.Equal(t, theme.ColorRed, set.PrimaryColor(), "file reload overrode the app's explicit primary")
+
+	// Without an explicit choice the file's colour applies.
+	set = &settings{}
+	require.NoError(t, set.loadFromFile(p))
+	assert.Equal(t, "blue", set.PrimaryColor())
 }
