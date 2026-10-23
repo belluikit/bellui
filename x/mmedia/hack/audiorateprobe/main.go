@@ -55,7 +55,12 @@ func run(first, second string) int {
 	p1.Close()
 
 	// The device is open now; a new Output reports the format it has.
-	channels := audio.NewOutput(1).Channels()
+	out, err := audio.NewOutput(1)
+	if err != nil {
+		fmt.Println("FAIL: audio device", err)
+		return 1
+	}
+	channels := out.Channels()
 	fmt.Printf("audiorateprobe device=%d Hz x %d after %s\n", audio.DeviceSampleRate, channels, first)
 
 	p2, err := mmedia.NewAudioPlayerURL(second)

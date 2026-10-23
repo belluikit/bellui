@@ -46,7 +46,7 @@ func (s *stubSource) Close()             { s.closed = true }
 func TestPipeline_CloseDuringPlayback(t *testing.T) {
 	// Build a pipeline around the stub via the exported surface.
 	src := &stubSource{frame: image.NewRGBA(image.Rect(0, 0, 16, 16))}
-	p := newPipelineForSource(src, Config{})
+	p := newTestPipeline(t, src)
 
 	p.Play()
 	time.Sleep(200 * time.Millisecond) // let the loops spin
@@ -75,7 +75,7 @@ func TestPipeline_CloseDuringPlayback(t *testing.T) {
 // decode and dropped about twenty million frames in 300 ms.
 func TestStopReturnsEveryFrameToThePool(t *testing.T) {
 	src := &stubSource{frame: image.NewRGBA(image.Rect(0, 0, 16, 16))}
-	p := newPipelineForSource(src, Config{})
+	p := newTestPipeline(t, src)
 	p.SetOnFrame(func(*image.RGBA) {})
 	defer p.Close()
 	pool := cap(p.frameRecycle)

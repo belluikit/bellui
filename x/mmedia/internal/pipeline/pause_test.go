@@ -16,7 +16,7 @@ import (
 // enough to sit wholly in the queue reached its end marker, so the pipeline
 // reported the end and moved its time to the clip's length.
 func TestPauseKeepsTheQueuedFrames(t *testing.T) {
-	p := newPipelineForSource(&clipSource{frames: 15}, Config{}) // half a second at 30 fps
+	p := newTestPipeline(t, &clipSource{frames: 15}) // half a second at 30 fps
 	defer p.Close()
 
 	var mu sync.Mutex

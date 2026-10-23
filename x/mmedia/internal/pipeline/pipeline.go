@@ -139,7 +139,7 @@ func NewPipeline(r io.Reader, cfg ...Config) (*Pipeline, error) {
 	if f, ok := r.(*os.File); ok {
 		if _, err := f.Seek(0, io.SeekStart); err == nil {
 			if src, err := source.NewFFmpegSourceURL(f.Name()); err == nil {
-				return newPipelineForSource(src, firstConfig(cfg)), nil
+				return newOwnedPipeline(src, firstConfig(cfg))
 			}
 			// Fall through to the reader path — the file may not be
 			// reachable by name (unlinked, or an inherited descriptor).
@@ -153,7 +153,7 @@ func NewPipeline(r io.Reader, cfg ...Config) (*Pipeline, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newPipelineForSource(src, firstConfig(cfg)), nil
+	return newOwnedPipeline(src, firstConfig(cfg))
 }
 
 // NewPipelineURL creates a playback pipeline from a file path or network URL
@@ -163,7 +163,18 @@ func NewPipelineURL(url string, cfg ...Config) (*Pipeline, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newPipelineForSource(src, firstConfig(cfg)), nil
+	return newOwnedPipeline(src, firstConfig(cfg))
+}
+
+// newOwnedPipeline builds a pipeline around a source this package opened, and
+// closes the source if the pipeline cannot be built, since no caller has it.
+func newOwnedPipeline(src source.Source, cfg Config) (*Pipeline, error) {
+	p, err := newPipelineForSource(src, cfg)
+	if err != nil {
+		src.Close()
+		return nil, err
+	}
+	return p, nil
 }
 
 // There is deliberately no NewPipelineDevice alongside these. Opening a capture
@@ -189,8 +200,31 @@ func firstConfig(cfg []Config) Config {
 	return Config{}
 }
 
+// newAudioOutput is audio.NewOutput, a variable so a test can build a pipeline
+// with audio on a machine with no device, or make the device refuse to open.
+var newAudioOutput = audio.NewOutput
+
+// SetAudioOutputForTests makes every pipeline built from now on open its audio
+// output with open, until restore is called. It is for tests above this
+// package, which build real players on files with sound and so would fail on a
+// machine with no sound card (a CI runner), since a device that will not open
+// fails construction. Not for use outside tests: it is not safe to call while
+// pipelines are being built.
+func SetAudioOutputForTests(open func(channels int) (*audio.Output, error)) (restore func()) {
+	saved := newAudioOutput
+	newAudioOutput = open
+	return func() { newAudioOutput = saved }
+}
+
 // newPipelineForSource assembles a pipeline around an already-created source.
-func newPipelineForSource(src source.Source, cfg Config) *Pipeline {
+//
+// It fails when the stream has audio and the device will not open (#690), or
+// the source cannot be converted to the device's format (#698): a player built
+// on either would play silent or at the wrong speed, and nothing would say why.
+// On failure it leaves src open, for the caller to close; nothing else it
+// built needs releasing, since no goroutine starts before Play and the device
+// itself is the process's.
+func newPipelineForSource(src source.Source, cfg Config) (*Pipeline, error) {
 	p := &Pipeline{
 		clock:    NewClock(),
 		state:    NewStateMachine(nil),
@@ -200,11 +234,18 @@ func newPipelineForSource(src source.Source, cfg Config) *Pipeline {
 	}
 
 	if p.hasAudio {
-		p.audioOutput = audio.NewOutput(deviceChannels(src.Channels(), cfg.Downmix))
+		out, err := newAudioOutput(deviceChannels(src.Channels(), cfg.Downmix))
+		if err != nil {
+			return nil, err
+		}
+		p.audioOutput = out
 	}
 
+	if err := p.convertAudio(src); err != nil {
+		return nil, err
+	}
 	p.adoptSource(src)
-	return p
+	return p, nil
 }
 
 // deviceChannels is the channel count a pipeline asks the audio device for:
@@ -225,13 +266,20 @@ func deviceChannels(stream int, downmix bool) int {
 // It is what the capture entry points use: they have to build the source
 // themselves, because opening a device is where the per-platform selector rules
 // and the framerate fallback live, and neither belongs down here.
-func NewPipelineForSource(src source.Source, cfg ...Config) *Pipeline {
+//
+// It returns an error when the source has audio and the audio device cannot
+// be opened, or the source cannot be converted to the device's format. The
+// source is then left open, and the caller still owns it.
+func NewPipelineForSource(src source.Source, cfg ...Config) (*Pipeline, error) {
 	return newPipelineForSource(src, firstConfig(cfg))
 }
 
 // adoptSource makes src the pipeline's source: it takes the geometry, timing
 // and audio configuration from it, sizes the frame pool to match, and wires the
 // decode callbacks.
+//
+// src's audio has already been converted to the device's format
+// (convertAudio), so nothing here can fail.
 //
 // Shared by construction and SwapSource, which is the point — a swapped-in
 // source must end up configured exactly as one passed to the constructor would,
@@ -258,23 +306,6 @@ func (p *Pipeline) adoptSource(src source.Source) {
 		if w != p.videoWidth || h != p.videoHeight || p.frameQueue == nil {
 			p.videoWidth, p.videoHeight = w, h
 			p.allocFramePool(w, h)
-		}
-	}
-
-	if p.hasAudio {
-		// The audio device is opened once per process and its format is fixed
-		// for the life of it, so a new source is asked for exactly what the
-		// device plays, and its decoder's swresample converts the channels and
-		// the rate.
-		if got := p.audioOutput.Channels(); got != src.Channels() {
-			if err := src.SetAudioChannels(got); err != nil && p.onError != nil {
-				p.onError(fmt.Errorf("audio channel negotiation to %d: %w", got, err))
-			}
-		}
-		if rate := p.audioOutput.SampleRate(); rate != src.SampleRate() {
-			if err := src.SetAudioSampleRate(rate); err != nil && p.onError != nil {
-				p.onError(fmt.Errorf("audio sample rate conversion to %d: %w", rate, err))
-			}
 		}
 	}
 
@@ -305,6 +336,33 @@ func (p *Pipeline) adoptSource(src source.Source) {
 		p.audioOutput.WriteSamples(data)
 		p.clock.SetAudioTime(p.audioOutput.PlaybackPosition())
 	})
+}
+
+// convertAudio asks src for exactly what the audio device plays. The device is
+// opened once per process and its format is fixed for the life of it, so the
+// source's decoder (swresample) converts the channels and the rate.
+//
+// It runs before adoptSource, on construction and on SwapSource alike, and
+// touches nothing but src, so a failure leaves the pipeline as it was and src
+// unwired: construction fails on it, and SwapSource refuses the source. Either
+// way a stream is never played at its own rate on the device, which is 8.8%
+// fast for a 44.1 kHz stream (#698).
+func (p *Pipeline) convertAudio(src source.Source) error {
+	if !p.hasAudio {
+		return nil
+	}
+	var err error
+	if got := p.audioOutput.Channels(); got != src.Channels() {
+		if e := src.SetAudioChannels(got); e != nil {
+			err = errors.Join(err, fmt.Errorf("audio channel negotiation to %d: %w", got, e))
+		}
+	}
+	if rate := p.audioOutput.SampleRate(); rate != src.SampleRate() {
+		if e := src.SetAudioSampleRate(rate); e != nil {
+			err = errors.Join(err, fmt.Errorf("audio sample rate conversion to %d: %w", rate, e))
+		}
+	}
+	return err
 }
 
 // allocFramePool builds the decode-ahead buffer: all RGBA frames are allocated
@@ -592,7 +650,8 @@ var ErrSwapMedia = errors.New("mmedia: the replacement source does not carry the
 //   - The audio format is asked of the new source, not of the device. The
 //     device is opened once per process, at DeviceSampleRate and the channel
 //     count the first stream chose, and cannot change, so the new source's
-//     decoder is asked to convert to both.
+//     decoder is asked to convert to both. A source that cannot convert is
+//     refused, before anything is torn down, like one of the wrong shape.
 //
 // Playback counters are left running. They measure the session rather than the
 // device, the same way they survive a seek.
@@ -606,6 +665,9 @@ func (p *Pipeline) SwapSource(src source.Source) error {
 		return fmt.Errorf("%w: this pipeline carries %s and the replacement carries %s",
 			ErrSwapMedia, describeMedia(p.hasVideo, p.hasAudio),
 			describeMedia(src.HasVideo(), src.HasAudio()))
+	}
+	if err := p.convertAudio(src); err != nil {
+		return err
 	}
 
 	// Paused counts as running: the user switching camera mid-pause expects to

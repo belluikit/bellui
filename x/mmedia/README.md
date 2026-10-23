@@ -29,6 +29,12 @@ w.SetContent(mp)
 Every constructor takes the same functional options: `WithAutoPlay`, `WithLoop`,
 `WithVolume`, `WithDownmix`, `WithOnEnd`, `WithOnError`, `WithOnTimeUpdate`.
 
+A stream with audio fails its constructor when the audio device will not open
+(no device, as on a headless box, or one that refuses the format) or its
+decoder cannot convert it to the device's format. The device is opened once per
+process, so after one failure every later player with audio returns the same
+error. A video with no audio stream never touches the device.
+
 ## Reader or URL
 
 The two constructor forms are not interchangeable.

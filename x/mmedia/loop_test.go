@@ -48,7 +48,7 @@ func (s *shortClip) Close()                 {}
 func TestLoopKeepsPlaying(t *testing.T) {
 	test.NewTempApp(t)
 	clip := &shortClip{frames: 15} // half a second
-	mp, err := newMediaPlayerFromPipeline(pipeline.NewPipelineForSource(clip), buildOptions([]Option{WithLoop()}), "")
+	mp, err := newMediaPlayerFromPipeline(newTestPipeline(t, clip), buildOptions([]Option{WithLoop()}), "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +82,7 @@ func TestLoopKeepsPlaying(t *testing.T) {
 func TestVideoPlayerLoopKeepsPlaying(t *testing.T) {
 	test.NewTempApp(t)
 	clip := &shortClip{frames: 15}
-	vp, err := newVideoPlayerFromPipeline(pipeline.NewPipelineForSource(clip), buildOptions([]Option{WithLoop()}))
+	vp, err := newVideoPlayerFromPipeline(newTestPipeline(t, clip), buildOptions([]Option{WithLoop()}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +136,7 @@ func closeWithin(t *testing.T, closeFn func()) {
 func TestAudioPlayerLoopKeepsPlaying(t *testing.T) {
 	test.NewTempApp(t)
 	clip := &shortClip{frames: 15}
-	ap, err := newAudioPlayerFromPipeline(pipeline.NewPipelineForSource(clip), buildOptions([]Option{WithLoop()}))
+	ap, err := newAudioPlayerFromPipeline(newTestPipeline(t, clip), buildOptions([]Option{WithLoop()}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,7 +158,7 @@ func TestAudioPlayerLoopKeepsPlaying(t *testing.T) {
 // playback again, the restart happens.
 func TestLoopRestartRespectsPause(t *testing.T) {
 	test.NewTempApp(t)
-	mp, err := newMediaPlayerFromPipeline(pipeline.NewPipelineForSource(&shortClip{frames: 15}), buildOptions([]Option{WithLoop()}), "")
+	mp, err := newMediaPlayerFromPipeline(newTestPipeline(t, &shortClip{frames: 15}), buildOptions([]Option{WithLoop()}), "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -190,4 +190,15 @@ func TestLoopRestartRespectsPause(t *testing.T) {
 	if !mp.IsPlaying() {
 		t.Error("not playing after the restart")
 	}
+}
+
+// newTestPipeline builds a pipeline around a test source, failing the test if
+// it cannot be built.
+func newTestPipeline(t *testing.T, src source.Source) *pipeline.Pipeline {
+	t.Helper()
+	p, err := pipeline.NewPipelineForSource(src)
+	if err != nil {
+		t.Fatalf("NewPipelineForSource: %v", err)
+	}
+	return p
 }

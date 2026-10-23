@@ -70,7 +70,7 @@ func TestPlayStartsPromptlyAtHighResolution(t *testing.T) {
 		declaredRate: 30,
 	}}
 	var _ source.Source = src
-	p := newPipelineForSource(src, Config{})
+	p := newTestPipeline(t, src)
 	p.SetOnFrame(func(*image.RGBA) {}) // displayLoop recycles the frame itself
 	defer p.Close()
 

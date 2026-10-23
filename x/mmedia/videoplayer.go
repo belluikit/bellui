@@ -31,6 +31,9 @@ type VideoPlayer struct {
 // NewVideoPlayer creates a new video player widget from an io.Reader.
 // The container and codecs are probed automatically. A reader that also
 // implements io.Seeker supports seeking; a plain stream is forward-only.
+//
+// A stream with audio fails here when the audio device will not open or the
+// stream cannot be converted to its format; see the package documentation.
 func NewVideoPlayer(r io.Reader, opts ...Option) (*VideoPlayer, error) {
 	o := buildOptions(opts)
 	pipe, err := pipeline.NewPipeline(r, pipeline.Config{Downmix: o.downmix})
@@ -48,6 +51,9 @@ func NewVideoPlayer(r io.Reader, opts ...Option) (*VideoPlayer, error) {
 //
 // http and https are compiled in, as are the hls and rtsp demuxers and the
 // rtmp protocol.
+//
+// A stream with audio fails here when the audio device will not open or the
+// stream cannot be converted to its format; see the package documentation.
 func NewVideoPlayerURL(url string, opts ...Option) (*VideoPlayer, error) {
 	o := buildOptions(opts)
 	pipe, err := pipeline.NewPipelineURL(url, pipeline.Config{Downmix: o.downmix})
