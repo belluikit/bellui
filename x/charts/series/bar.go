@@ -159,11 +159,13 @@ func (r *barRenderer) Render(ctx RenderContext) []core.CanvasObject {
 			barH = -barH
 		}
 
-		// Animation: scale height from 0
+		// Animation: scale height from 0, growing from the baseline towards
+		// the value: upwards unless the value's pixel is below its base, as
+		// it is for a negative value or on an Inverse Y axis.
 		if ctx.Animate && ctx.AnimProgress < 1 {
 			barH = mathutil.LerpF32(0, barH, ctx.AnimProgress)
 			barY = baseY - barH
-			if v < 0 {
+			if pos.Y > basePos.Y {
 				barY = baseY
 			}
 		}

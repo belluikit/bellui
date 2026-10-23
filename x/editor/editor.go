@@ -40,10 +40,10 @@ type Editor struct {
 	// default; batched to sync points under [Editor.DeferTextSync].
 	OnChanged func(string)
 
-	// OnRun is called when the user presses Cmd+R / Ctrl+R.
+	// OnRun is called when the user presses Cmd+R on macOS, Ctrl+R elsewhere.
 	OnRun func()
 
-	// OnSave is called when the user presses Cmd+S / Ctrl+S.
+	// OnSave is called when the user presses Cmd+S on macOS, Ctrl+S elsewhere.
 	OnSave func()
 
 	// OnCursorChanged is called when the cursor position changes.
@@ -93,10 +93,13 @@ type Editor struct {
 
 	// AutoGrow makes the editor grow vertically to fit its content.
 	// When true, MinRowsVisible adjusts to match the number of lines.
-	// MinAutoGrowRows and MaxAutoGrowRows bound the range.
+	// MinAutoGrowRows and MaxAutoGrowRows bound the range; zero or a
+	// negative value means the default (3 and 50). There is no unlimited
+	// setting: for a very tall editor set MaxAutoGrowRows to the most rows
+	// it may take.
 	AutoGrow        bool
-	MinAutoGrowRows int // default 3
-	MaxAutoGrowRows int // default 50, 0 = unlimited
+	MinAutoGrowRows int // 0 = the default, 3
+	MaxAutoGrowRows int // 0 = the default, 50
 
 	// AutoIndent governs the editor's automatic indentation. On Enter the new
 	// line starts with the current line's leading whitespace (or whatever
@@ -447,7 +450,7 @@ func NewEditor() *Editor {
 		func() { e.FindPrev() },
 	)
 
-	// Cmd+F / Cmd+G / Shift+Cmd+G on the main entry.
+	// Cmd/Ctrl+F, Cmd/Ctrl+G and Shift+Cmd/Ctrl+G on the main entry.
 	e.entry.addFindShortcuts(
 		func() { e.ShowFind() },
 		func() { e.FindNext() },
@@ -458,20 +461,20 @@ func NewEditor() *Editor {
 	// via e.KeyMap and installed lazily in CreateRenderer, so a host can rebind
 	// them after construction. See installKeyMapShortcuts.
 
-	// Cmd+R on the main entry — run cell.
+	// Cmd+R (Ctrl+R off macOS) on the main entry — run cell.
 	e.entry.Entry.AddShortcut(&desktop.CustomShortcut{
 		KeyName:  event.KeyR,
-		Modifier: event.KeyModifierSuper,
+		Modifier: event.KeyModifierShortcutDefault,
 	}, func(_ core.Shortcut) {
 		if e.OnRun != nil {
 			e.OnRun()
 		}
 	})
 
-	// Cmd+S on the main entry — save notebook.
+	// Cmd+S (Ctrl+S off macOS) on the main entry — save notebook.
 	e.entry.Entry.AddShortcut(&desktop.CustomShortcut{
 		KeyName:  event.KeyS,
-		Modifier: event.KeyModifierSuper,
+		Modifier: event.KeyModifierShortcutDefault,
 	}, func(_ core.Shortcut) {
 		if e.OnSave != nil {
 			e.OnSave()
@@ -590,11 +593,10 @@ func (e *Editor) warnIfNestedInScroll() {
 	// Within the editor's own composition nothing clips the entry, so a clipping
 	// ancestor here means a host wrapped the editor in an outer scroll/clip.
 	if _, clipped := driver.ClipBoundsForObject(c, e.entry); clipped {
-		log.Println("fycoder: Editor is hosted inside an outer clipping/scrolling " +
+		log.Println("x/editor: Editor is hosted inside an outer clipping/scrolling " +
 			"container (e.g. container.Scroll); it manages its own scrolling, overlays " +
 			"and pointer capture, so an outer scroll intercepts clicks and the editor " +
-			"never focuses. Give the Editor its own viewport (no outer container.Scroll). " +
-			"See github.com/belluikit/bellui/x/editor/issues/111.")
+			"never focuses. Give the Editor its own viewport (no outer container.Scroll).")
 	}
 }
 
@@ -732,7 +734,7 @@ func (e *Editor) FindPrev() {
 }
 
 // Focus gives keyboard focus to the editor's text area.
-// Keyboard shortcuts (Cmd+F, Cmd+S, etc.) require focus to fire.
+// Keyboard shortcuts (Cmd/Ctrl+F, Cmd/Ctrl+S, etc.) require focus to fire.
 func (e *Editor) Focus() {
 	if c := bellui.CurrentApp().Driver().CanvasForObject(e.entry); c != nil {
 		c.Focus(e.entry)
@@ -1435,14 +1437,14 @@ func (e *editorEntry) FocusLost() {
 func (e *editorEntry) addFindShortcuts(onFind, onFindNext, onFindPrev func()) {
 	e.Entry.AddShortcut(&desktop.CustomShortcut{
 		KeyName:  event.KeyF,
-		Modifier: event.KeyModifierSuper,
+		Modifier: event.KeyModifierShortcutDefault,
 	}, func(_ core.Shortcut) { onFind() })
 	e.Entry.AddShortcut(&desktop.CustomShortcut{
 		KeyName:  event.KeyG,
-		Modifier: event.KeyModifierSuper,
+		Modifier: event.KeyModifierShortcutDefault,
 	}, func(_ core.Shortcut) { onFindNext() })
 	e.Entry.AddShortcut(&desktop.CustomShortcut{
 		KeyName:  event.KeyG,
-		Modifier: event.KeyModifierSuper | event.KeyModifierShift,
+		Modifier: event.KeyModifierShortcutDefault | event.KeyModifierShift,
 	}, func(_ core.Shortcut) { onFindPrev() })
 }

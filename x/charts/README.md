@@ -4,15 +4,15 @@ A native Go charting library inspired by [Apache ECharts](https://echarts.apache
 
 ## Features
 
-- **21 chart types**: Line, Bar, Scatter, Pie, Candlestick, Heatmap, Radar, Gauge, Funnel, Boxplot, Treemap, Sankey, Sunburst, Graph, Tree, Parallel, Pictorial Bar, Effect Scatter, Custom, 3D Bar, 3D Scatter, 3D Surface
+- **27 chart types** (the constants of `series.Type`): Line, Bar, Scatter, Pie, Candlestick, Heatmap, Radar, Gauge, Funnel, Boxplot, Treemap, Sankey, Sunburst, Graph, Tree, Parallel, Pictorial Bar, Effect Scatter, Custom, Map, Geo Scatter, Choropleth, Geo Lines, 3D Bar, 3D Scatter, 3D Surface, 3D Line
 - **Declarative API**: Single `Option` struct configures the entire chart, mirroring the ECharts mental model
 - **Builder / fluent API**: `builder.LineChart().Title("X").AddLine("Y", data...).Done().Widget()`
 - **Stacked series**: Bar and area charts support stacking via a `Stack` group name
 - **LTTB downsampling**: Automatically applied when data points exceed pixel width, preserving visual shape
 - **Overlays**: ReferenceLine, ReferenceBand, and Annotation overlays with data-space positioning
 - **Drilldown**: Hierarchical data navigation with breadcrumb trail and back button
-- **3D charts**: Bar, Scatter, and Surface charts rendered via Bellui's `canvas.Scene3D` with orbit rotation and scroll zoom
-- **VisualMap**: Data-to-color gradient and data-to-size mapping for heatmaps, scatter, and other series
+- **3D charts**: Bar, Scatter, Surface and Line charts rendered via Bellui's `canvas.Scene3D` with orbit rotation and scroll zoom
+- **VisualMap helpers**: `VisualMapConfig.MapColor` and `MapSize` map a value to a gradient colour or a symbol size. `Option.VisualMap` itself is not applied by any renderer yet ([#343](https://github.com/belluikit/bellui/issues/343)); call the helpers by hand
 - **Toolbox**: Save-as-image and magic type (chart type switching) toolbar buttons
 - **Dataset with transforms**: Column-oriented data storage, Encode mapping, Filter/Sort transforms, and Pipeline chaining
 - **Animation**: Entrance animations (400ms ease-decelerate) and data transition animations (300ms ease-standard)
@@ -145,7 +145,7 @@ Each chart type implements the sealed `Series` interface and has a corresponding
 | Scatter | `ScatterSeries` | Paired (x,y) data, multiple symbol types |
 | Pie | `PieSeries` | Doughnut (via `InnerRadius`), labels, per-slice colors |
 | Candlestick | `CandlestickSeries` | OHLC financial charts with bullish/bearish coloring |
-| Heatmap | `HeatmapSeries` | Color matrix with VisualMap color mapping |
+| Heatmap | `HeatmapSeries` | Color matrix with its own gradient (`ColorStops`) |
 | Radar | `RadarSeries` | Spider/web charts on polar coordinate system |
 | Gauge | `GaugeSeries` | Arc + needle meter visualization |
 | Funnel | `FunnelSeries` | Funnel/pipeline stage visualization |
@@ -159,9 +159,14 @@ Each chart type implements the sealed `Series` interface and has a corresponding
 | Pictorial Bar | `PictorialSeries` | Pictorial/symbolic bar chart |
 | Effect Scatter | `EffectScatterSeries` | Animated scatter with visual effects |
 | Custom | `CustomSeries` | User-defined rendering callback |
+| Map | `MapSeries` | Tile-based geographic map (OpenStreetMap by default) |
+| Geo Scatter | `GeoScatterSeries` | Points placed by longitude/latitude on a map |
+| Choropleth | `ChoroplethSeries` | Regions from GeoJSON coloured by value |
+| Geo Lines | `GeoLinesSeries` | Directional lines between map coordinates |
 | 3D Bar | `Bar3DSeries` | 3D bars via `canvas.Scene3D`, orbit rotation, scroll zoom |
 | 3D Scatter | `Scatter3DSeries` | 3D point cloud via `canvas.Scene3D` |
 | 3D Surface | `SurfaceSeries` | 3D surface mesh via `canvas.Scene3D` |
+| 3D Line | `Line3DSeries` | 3D line ribbon via `canvas.Scene3D` |
 
 Adding a new chart type:
 
@@ -192,7 +197,7 @@ Maps data-space `(x, y)` to pixel-space `bellui.Position` and back.
 | `Polar` | Radar, Sunburst charts |
 | `None` | Pie, Gauge, Funnel, Treemap, Sankey, Graph, Tree -- series handle their own layout |
 
-3D chart types (Bar3D, Scatter3D, Surface) bypass the coordinate system entirely and render directly to `canvas.Scene3D`.
+3D chart types (Bar3D, Scatter3D, Surface, Line3D) bypass the coordinate system entirely and render directly to `canvas.Scene3D`.
 
 #### `component/` -- UI Components
 
@@ -205,7 +210,7 @@ Maps data-space `(x, y)` to pixel-space `bellui.Position` and back.
 | Zoom Buttons | `zoombuttons.go` | +/-/Reset buttons for zoom control |
 | Overlay | `overlay.go` | ReferenceLine, ReferenceBand, and Annotation rendering |
 | Breadcrumb | `breadcrumb.go` | Drilldown navigation trail with back button and clickable crumbs |
-| VisualMap | `visualmap.go` | Data-to-color gradient and data-to-size mapping |
+| VisualMap | `visualmap.go` | Data-to-color gradient and data-to-size mapping helpers (not applied by the renderer yet, #343) |
 | Toolbox | `toolbox.go` | Save-as-image and magic type (chart switching) buttons |
 
 #### `builder/` -- Fluent API
@@ -270,7 +275,7 @@ type Option struct {
     Brush     *interact.BrushConfig       // drag-to-select configuration
     Drilldown *DrilldownConfig            // hierarchical data navigation
     Toolbox   *component.ToolboxConfig    // save, magic type buttons
-    VisualMap []component.VisualMapConfig  // data-to-color/size mapping
+    VisualMap []component.VisualMapConfig  // not applied by any renderer yet (#343)
     Overlays  []Overlay                   // ReferenceLine, ReferenceBand, Annotation
     Grid      *Grid                       // plot area margins (Left, Right, Top, Bottom)
     XAxis     []axis.Config               // X axis configurations
@@ -278,6 +283,7 @@ type Option struct {
     Series    []series.Series             // data series to render
     Color     []color.Color               // palette override
     Animation bool                        // enable entrance animation on first render
+    Decal     *component.DecalConfig      // not applied by any renderer yet (#343)
 }
 ```
 
@@ -285,13 +291,25 @@ type Option struct {
 
 ```go
 type Config struct {
-    Type       Type     // TypeValue, TypeCategory, TypeTime, TypeLog
-    Name       string   // axis title
-    Data       []string // category labels (for TypeCategory)
-    Min, Max   *float64 // explicit range bounds (nil = auto)
-    SplitCount int      // desired number of tick splits
+    Type       Type        // TypeValue, TypeCategory, TypeTime, TypeLog
+    Name       string      // axis title: below an X axis's labels, above a Y axis
+    Position   Position    // X: PositionBottom (default) or PositionTop;
+                           // Y: PositionLeft or PositionRight (default: first Y axis left, the rest right)
+    Data       []string    // category labels (for TypeCategory)
+    Min, Max   *float64    // explicit range bounds (nil = auto)
+    SplitCount int         // desired number of tick splits
+    Inverse    bool        // reverse the axis direction
+    LineColor  color.Color // axis line and tick marks (nil = theme)
+    LabelColor color.Color // tick labels and axis name (nil = theme)
+    TimeFormat string      // Go time layout for TypeTime labels
+
+    // ShowLine, ShowTicks, ShowLabels, ShowSplitLine: declared but not applied
+    // yet; the axis line, labels and first Y axis's grid lines are always drawn
+    // (#684).
 }
 ```
+
+A chart draws one X axis, from the first entry of `XAxis`.
 
 ### Tooltip Config
 

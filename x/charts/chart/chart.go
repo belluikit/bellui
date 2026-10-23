@@ -4,6 +4,7 @@ package chart
 import (
 	"image"
 	"image/color"
+	"image/draw"
 	"image/png"
 	"log"
 	"math"
@@ -14,6 +15,7 @@ import (
 	fynecanvas "github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/dialog"
+	"github.com/belluikit/bellui/driver"
 	"github.com/belluikit/bellui/driver/desktop"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
@@ -24,7 +26,6 @@ import (
 	"github.com/belluikit/bellui/x/charts/coord"
 	"github.com/belluikit/bellui/x/charts/interact"
 	"github.com/belluikit/bellui/x/charts/series"
-	"github.com/belluikit/bellui/x/charts/style"
 )
 
 // dirtyFlags indicates what state changed and needs re-rendering.
@@ -37,7 +38,7 @@ const (
 	dirtyDrawing                        // drawing gesture/selection change (interactive layer)
 )
 
-// Chart is the main fycharts widget. It renders chart data using Fyne canvas primitives.
+// Chart is the x/charts widget. It renders chart data using Bellui canvas primitives.
 type Chart struct {
 	widget.BaseWidget
 
@@ -382,16 +383,21 @@ func (c *Chart) handleToolboxAction(action string) {
 	}
 }
 
-// SaveAsImage captures the chart as a PNG file via a save dialog.
+// SaveAsImage captures the chart as it is drawn on screen and offers to save
+// it as a PNG through a file-save dialog. Call it on the main goroutine: the
+// capture reads the window's canvas. A chart that is not on a canvas, or whose
+// window could not be drawn, has nothing to capture; that is logged and no
+// dialog opens.
 func (c *Chart) SaveAsImage() {
-	// Render chart to image using Fyne's snapshot
 	img := c.captureImage()
 	if img == nil {
+		log.Println("x/charts: SaveAsImage: the chart is not on a drawn canvas, nothing to capture")
 		return
 	}
 
-	w := bellui.CurrentApp().Driver().AllWindows()
-	if len(w) == 0 {
+	w := c.window()
+	if w == nil {
+		log.Println("x/charts: SaveAsImage: no window to show the save dialog in")
 		return
 	}
 
@@ -401,40 +407,82 @@ func (c *Chart) SaveAsImage() {
 		}
 		defer writer.Close()
 		if err := png.Encode(writer, img); err != nil {
-			log.Printf("fycharts: SaveAsImage png.Encode failed: %v", err)
+			log.Printf("x/charts: SaveAsImage png.Encode failed: %v", err)
 		}
-	}, w[0])
+	}, w)
 }
 
-// captureImage renders the chart's current state to an image.
-func (c *Chart) captureImage() image.Image {
-	size := c.Size()
-	w := int(size.Width)
-	h := int(size.Height)
-	if w <= 0 || h <= 0 {
-		return nil
-	}
-
-	img := image.NewNRGBA(image.Rect(0, 0, w, h))
-	// Draw background
-	c.mu.RLock()
-	opt := c.option
-	c.mu.RUnlock()
-
-	th := c.Theme()
-	variant := bellui.CurrentApp().Settings().ThemeVariant()
-	resolver := style.NewResolver(th, variant)
-
-	bgColor := resolver.BackgroundColor()
-	if bgColor != nil {
-		for y := 0; y < h; y++ {
-			for x := 0; x < w; x++ {
-				img.Set(x, y, bgColor)
+// window returns the window whose canvas holds the chart, falling back to the
+// app's first window, or nil when the app has none.
+func (c *Chart) window() bellui.Window {
+	d := bellui.CurrentApp().Driver()
+	all := d.AllWindows()
+	if cv := d.CanvasForObject(c); cv != nil {
+		for _, w := range all {
+			if w.Canvas() == cv {
+				return w
 			}
 		}
 	}
-	_ = opt
-	return img
+	if len(all) > 0 {
+		return all[0]
+	}
+	return nil
+}
+
+// captureImage returns the chart's pixels as they are drawn on its canvas —
+// series, axes, legend and overlays included — cut out of a capture of the
+// whole canvas. Only the part of the chart its clipping ancestors leave in
+// view is captured: a chart scrolled partly out of sight yields the visible
+// part, never the widgets drawn where the rest would be. It returns nil when
+// the chart is not on a canvas, is wholly out of view, or the canvas could
+// not be drawn. The image is in device pixels, so on a HiDPI screen it is
+// larger than the chart's size in canvas units.
+func (c *Chart) captureImage() image.Image {
+	d := bellui.CurrentApp().Driver()
+	cv := d.CanvasForObject(c)
+	if cv == nil {
+		return nil
+	}
+	full := cv.Capture()
+	if full == nil {
+		return nil
+	}
+	cvSize := cv.Size()
+	fb := full.Bounds()
+	if cvSize.Width <= 0 || cvSize.Height <= 0 || fb.Empty() {
+		return nil
+	}
+	// Derive the scale from the capture itself rather than Canvas.Scale: the
+	// capture is in framebuffer pixels, which on some drivers also carry the
+	// texture scale on top of the canvas scale.
+	sx := float32(fb.Dx()) / cvSize.Width
+	sy := float32(fb.Dy()) / cvSize.Height
+
+	pos := d.AbsolutePositionForObject(c)
+	size := c.Size()
+	// A scroll or clipping container above the chart hides part of it, and
+	// the capture holds whatever else is drawn there.
+	if clip, clipped := driver.ClipBoundsForObject(cv, c); clipped {
+		x0, y0 := max(pos.X, clip.Pos.X), max(pos.Y, clip.Pos.Y)
+		x1 := min(pos.X+size.Width, clip.Pos.X+clip.Size.Width)
+		y1 := min(pos.Y+size.Height, clip.Pos.Y+clip.Size.Height)
+		if x1 <= x0 || y1 <= y0 {
+			return nil
+		}
+		pos, size = geo.NewPos(x0, y0), geo.NewSize(x1-x0, y1-y0)
+	}
+	r := image.Rect(
+		fb.Min.X+int(pos.X*sx), fb.Min.Y+int(pos.Y*sy),
+		fb.Min.X+int((pos.X+size.Width)*sx), fb.Min.Y+int((pos.Y+size.Height)*sy),
+	).Intersect(fb)
+	if r.Empty() {
+		return nil
+	}
+
+	out := image.NewNRGBA(image.Rect(0, 0, r.Dx(), r.Dy()))
+	draw.Draw(out, out.Bounds(), full, r.Min, draw.Src)
+	return out
 }
 
 // MagicTypeSwitch swaps series between bar and line types.
@@ -1027,11 +1075,21 @@ func (c *Chart) resolveZoom(x float32, s zoomStep) scrollResult {
 		return scrollResult{}
 	}
 	centerNorm := float64(x) / float64(c.Size().Width)
+	if c.xInverseLocked() {
+		centerNorm = 1 - centerNorm
+	}
 	if s.window(c.zoomState, centerNorm) {
 		c.zoomState.FollowLatest = false
 		return scrollResult{kind: "zoom", window: c.zoomState.Window, onZoom: c.OnZoomChange}
 	}
 	return scrollResult{}
+}
+
+// xInverseLocked reports whether the X axis runs right to left
+// (axis.Config.Inverse), so screen-space zoom anchors and pan deltas must be
+// mirrored into the data window. The caller holds c.mu.
+func (c *Chart) xInverseLocked() bool {
+	return len(c.option.XAxis) > 0 && c.option.XAxis[0].Inverse
 }
 
 // --- Draggable (Pan + Brush) ---
@@ -1104,6 +1162,9 @@ func (c *Chart) resolveDrag(e *event.DragEvent) dragResult {
 	if c.zoomState != nil && c.zoomState.IsZoomed() {
 		size := c.Size()
 		deltaNorm := -float64(e.Dragged.DX) / float64(size.Width) * c.zoomState.Window.Span()
+		if c.xInverseLocked() {
+			deltaNorm = -deltaNorm // data runs right to left
+		}
 		if c.zoomState.Pan(deltaNorm) {
 			c.zoomState.FollowLatest = false
 			return dragResult{kind: "pan", window: c.zoomState.Window, onZoom: c.OnZoomChange}

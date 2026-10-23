@@ -18,6 +18,17 @@ import (
 	"github.com/belluikit/bellui/x/mmedia/internal/subtitle"
 )
 
+// SubtitleTrack is a list of timed subtitle cues, as LoadSRT and LoadWebVTT
+// parse them. Build one to give a SubtitleOverlay cues from another source,
+// such as a stream's embedded subtitles or a format this package does not
+// parse, and pass it to [SubtitleOverlay.LoadTrack].
+type SubtitleTrack = subtitle.Track
+
+// SubtitleCue is one subtitle in a [SubtitleTrack]: its text, shown from
+// Start to End inclusive. Settings carries WebVTT cue settings verbatim; the
+// overlay does not apply them.
+type SubtitleCue = subtitle.Cue
+
 // SubtitleOverlay is a Bellui widget that renders timed subtitle text
 // over a video player. It supports SRT and WebVTT formats.
 type SubtitleOverlay struct {
@@ -64,8 +75,10 @@ func (so *SubtitleOverlay) LoadWebVTT(r io.Reader) error {
 	return nil
 }
 
-// LoadTrack sets the subtitle track directly.
-func (so *SubtitleOverlay) LoadTrack(track *subtitle.Track) {
+// LoadTrack sets the subtitle track directly, replacing any loaded one. The
+// overlay reads the track whenever SetPosition is called, so do not change it
+// after loading.
+func (so *SubtitleOverlay) LoadTrack(track *SubtitleTrack) {
 	so.mu.Lock()
 	so.track = track
 	so.mu.Unlock()

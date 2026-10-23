@@ -16,7 +16,10 @@ type GroupRow struct {
 	Expanded bool
 	// SourceIndex is the original source row index (for data rows).
 	SourceIndex int
-	// AggValues holds computed aggregations for group rows.
+	// AggValues is meant to hold computed aggregations for group rows, but
+	// nothing fills it yet: GroupTransform has no aggregation settings, so
+	// it is always nil. pipeline.Aggregate computes them when called by
+	// hand. Where aggregation should be configured is #689.
 	AggValues map[string]any
 }
 

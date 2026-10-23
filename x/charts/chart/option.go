@@ -18,15 +18,20 @@ type Option struct {
 	Brush     *interact.BrushConfig
 	Drilldown *DrilldownConfig
 	Toolbox   *component.ToolboxConfig
+	// VisualMap is not applied by any renderer yet (#343): series draw in
+	// their own colours whatever it says. VisualMapConfig.MapColor and
+	// MapSize work when called by hand.
 	VisualMap []component.VisualMapConfig
 	Overlays  []Overlay
 	Grid      *Grid
 	XAxis     []axis.Config
 	YAxis     []axis.Config
 	Series    []series.Series
-	Color     []color.Color          // palette override
-	Animation bool                   // enable entrance animation on first render
-	Decal     *component.DecalConfig // accessibility decal patterns
+	Color     []color.Color // palette override
+	Animation bool          // enable entrance animation on first render
+	// Decal (accessibility hatch patterns) is not applied by any renderer yet
+	// (#343). component.RenderDecalOverlay draws a pattern when called by hand.
+	Decal *component.DecalConfig
 }
 
 // DrilldownConfig configures hierarchical data navigation.

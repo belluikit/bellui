@@ -14,7 +14,16 @@ type TreeNode struct {
 
 // TreeTransform converts flat rows into a tree structure based on parent-child relationships.
 type TreeTransform struct {
-	// GetParent returns the parent row index for a given row, or -1 for root nodes.
+	// GetParent returns the ID of a row's parent — the value GetID returns
+	// for the parent row, not the parent's row index — or a negative value
+	// for a root. A row whose parent ID matches no row becomes a root, and so
+	// does the first row, in row order, of a loop of rows that are each
+	// other's parents (a row that is its own parent included).
+	//
+	// The parent ID is an int. It matches IDs that GetID returns as any Go
+	// integer type whose value fits in an int (int64 database keys, say);
+	// IDs of any other type, such as strings, never match and every row is a
+	// root.
 	GetParent func(rowData any) int
 	// GetID returns a unique ID for a row (used for parent-child matching).
 	GetID func(rowData any) any
@@ -24,7 +33,8 @@ type TreeTransform struct {
 	TreeNodes []TreeNode
 }
 
-// NewTreeTransform creates a tree transform.
+// NewTreeTransform creates a tree transform. getParent returns a row's parent
+// ID, as [TreeTransform.GetParent] describes.
 func NewTreeTransform(getID func(any) any, getParent func(any) int) *TreeTransform {
 	return &TreeTransform{
 		GetID:     getID,
@@ -54,18 +64,57 @@ func (t *TreeTransform) Apply(indices []int, source DataSource) []int {
 		id := t.GetID(row)
 		parent := t.GetParent(row)
 		nodes[i] = node{idx: srcIdx, id: id, parentID: parent}
-		idToIdx[id] = i
+		idToIdx[intKey(id)] = i
 	}
 
 	// Find roots (parentID == -1 or parent not found)
-	var roots []int
+	isRoot := make([]bool, len(nodes))
 	for i, n := range nodes {
 		if n.parentID < 0 {
-			roots = append(roots, i)
+			isRoot[i] = true
 		} else if parentIdx, ok := idToIdx[n.parentID]; ok {
 			nodes[parentIdx].children = append(nodes[parentIdx].children, i)
 		} else {
-			roots = append(roots, i) // orphan becomes root
+			isRoot[i] = true // orphan becomes root
+		}
+	}
+
+	// A row no root reaches sits in a parent loop, or hangs off one. The
+	// first such row becomes a root, detached from its parent so the loop
+	// is broken, and the rows it reaches are placed under it.
+	reached := make([]bool, len(nodes))
+	var mark func(i int)
+	mark = func(i int) {
+		reached[i] = true
+		for _, c := range nodes[i].children {
+			if !reached[c] {
+				mark(c)
+			}
+		}
+	}
+	for i := range nodes {
+		if isRoot[i] {
+			mark(i)
+		}
+	}
+	for i := range nodes {
+		if reached[i] {
+			continue
+		}
+		isRoot[i] = true
+		parent := &nodes[idToIdx[nodes[i].parentID]]
+		for k, c := range parent.children {
+			if c == i {
+				parent.children = append(parent.children[:k:k], parent.children[k+1:]...)
+				break
+			}
+		}
+		mark(i)
+	}
+	var roots []int
+	for i := range nodes {
+		if isRoot[i] {
+			roots = append(roots, i)
 		}
 	}
 
@@ -99,6 +148,41 @@ func (t *TreeTransform) Apply(indices []int, source DataSource) []int {
 	}
 
 	return result
+}
+
+// intKey returns an integer ID as an int, so that it matches the int parent
+// IDs GetParent returns; any other ID is returned unchanged.
+func intKey(id any) any {
+	const maxInt = int(^uint(0) >> 1)
+	switch v := id.(type) {
+	case int8:
+		return int(v)
+	case int16:
+		return int(v)
+	case int32:
+		return int(v)
+	case int64:
+		if int64(int(v)) == v {
+			return int(v)
+		}
+	case uint:
+		if v <= uint(maxInt) {
+			return int(v)
+		}
+	case uint8:
+		return int(v)
+	case uint16:
+		return int(v)
+	case uint32:
+		if uint64(v) <= uint64(maxInt) {
+			return int(v)
+		}
+	case uint64:
+		if v <= uint64(maxInt) {
+			return int(v)
+		}
+	}
+	return id
 }
 
 // ToggleNode toggles the expanded state of a node by its ID.

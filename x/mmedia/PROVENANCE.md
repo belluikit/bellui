@@ -82,8 +82,12 @@ last pair is a defect in `goffmpeg`'s own build workflow, not in the path this
 module consumes: `x/mmedia` resolves the published modules, which is what the
 verification below exercises.
 
-`goffmpeg-libs` is also why this module declares `go 1.26.2` while its `x/`
-siblings declare `1.25.0`.
+`goffmpeg` is also why this module declares `go 1.26.2` while its `x/`
+siblings declare `1.25.0`: the binding's own `go.mod` says `go 1.26.2` (in
+`v0.4.0` and `v0.4.1` alike), and a module cannot declare less than its
+dependencies. The `goffmpeg-libs` modules declare only `go 1.24` (`v0.3.0`
+and `v0.3.1`). An earlier version of this file blamed `goffmpeg-libs`; that
+was wrong (belluikit/bellui#339).
 
 **It has no CI.** `fyplayer` carried `.github/workflows/ci.yml`; it was dropped
 rather than copied, because a workflow file inside a subdirectory of another

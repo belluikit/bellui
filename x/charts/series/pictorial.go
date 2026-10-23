@@ -87,8 +87,15 @@ func (r *pictorialRenderer) Render(ctx RenderContext) []core.CanvasObject {
 			numSymbols = 1
 		}
 
+		// Stack the symbols from the baseline towards the value: upwards
+		// unless the value's pixel is below the baseline, as it is for a
+		// negative value or on an Inverse Y axis.
+		down := pos.Y > baselineY
 		for j := 0; j < numSymbols; j++ {
 			sy := baselineY - float32(j)*(symSize+2) - symSize
+			if down {
+				sy = baselineY + float32(j)*(symSize+2)
+			}
 			half := symSize / 2
 
 			switch ps.Symbol {

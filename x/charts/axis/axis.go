@@ -21,6 +21,10 @@ const (
 )
 
 // Position specifies where the axis is drawn.
+//
+// An X axis uses PositionBottom (the zero value) or PositionTop. A Y axis uses
+// PositionLeft or PositionRight; any other value keeps its default side, which
+// is the left for the first Y axis and the right for every other one.
 type Position int
 
 const (
@@ -31,10 +35,16 @@ const (
 )
 
 // Config holds the user-configurable axis options (maps to ECharts xAxis/yAxis).
+//
+// A chart draws one X axis, from the first entry of Option.XAxis; further X
+// axis entries are ignored.
 type Config struct {
-	Type     Type
-	Name     string   // axis title
-	Position Position // which side to draw on
+	Type Type
+	// Name is the axis title. An X axis draws it centred below its tick
+	// labels (above them for PositionTop); a Y axis draws it above the top
+	// of the axis.
+	Name     string
+	Position Position // which side to draw on; see Position
 
 	// For TypeCategory axes
 	Data []string // category labels
@@ -43,16 +53,26 @@ type Config struct {
 	Min *float64 // nil = auto
 	Max *float64 // nil = auto
 
-	SplitCount int  // desired number of tick splits (default 5)
-	Inverse    bool // reverse the axis direction
+	SplitCount int // desired number of tick splits (default 5)
+	// Inverse reverses the axis: an X axis runs right to left and a Y axis
+	// top to bottom. Series, tooltips, zoom and pan all follow it.
+	Inverse bool
 
-	// Visual style
-	ShowLine      bool // draw the axis line (default true)
-	ShowTicks     bool // draw tick marks (default true)
-	ShowLabels    bool // draw tick labels (default true)
-	ShowSplitLine bool // draw grid lines at ticks (default true for Y, false for X)
+	// The four Show* switches are not applied yet: the renderer always draws
+	// the axis line, tick labels and, for the first Y axis, the grid lines,
+	// whatever they say. Their zero value is false, so honouring them as
+	// declared would strip the axes from every Config written as a literal;
+	// how to make them work without that break is #684.
+	ShowLine      bool // draw the axis line (default true); not applied yet, see #684
+	ShowTicks     bool // draw tick marks (default true); not applied yet, see #684
+	ShowLabels    bool // draw tick labels (default true); not applied yet, see #684
+	ShowSplitLine bool // draw grid lines at ticks (default true for Y, false for X); not applied yet, see #684
 
-	LineColor  color.Color
+	// LineColor colours the axis line and tick marks; nil uses the theme's
+	// axis colour. Grid lines keep the theme's grid colour.
+	LineColor color.Color
+	// LabelColor colours the tick labels and the axis name; nil uses the
+	// theme's axis label colour.
 	LabelColor color.Color
 
 	// For TypeTime axes

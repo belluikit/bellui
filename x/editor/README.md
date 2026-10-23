@@ -25,7 +25,7 @@ editor.Decorators = []editor.RowDecorator{
 }
 
 editor.OnChanged = func(text string) { /* user edited */ }
-editor.OnSave = func() { /* Cmd+S pressed */ }
+editor.OnSave = func() { /* Cmd+S (macOS) or Ctrl+S pressed */ }
 
 window.SetContent(editor)
 editor.Focus() // enable keyboard shortcuts immediately
@@ -58,7 +58,7 @@ Markers (breakpoints, diagnostics, and any provider that does not declare a colu
 - **Syntax highlighting** with multi-line state tracking (triple-quoted strings, block comments)
 - **Line number gutter** with configurable minimum digit width
 - **Breakpoint markers** with click-to-toggle and callback
-- **Find bar** — Cmd+F to open, Cmd+G / Shift+Cmd+G for next/prev, case-sensitive toggle
+- **Find bar** — Cmd+F to open, Cmd+G / Shift+Cmd+G for next/prev (Ctrl instead of Cmd off macOS), case-sensitive toggle
 - **Row decorators** — current line highlight, search match highlight, or custom
 - **Theme integration** — semantic color names with built-in Monokai-inspired fallbacks
 - **Rich StyleRun** — supports ForegroundColor, BackgroundColor, Bold, Italic, Underline
@@ -79,13 +79,14 @@ Use the semantic color names (`ColorNameSyntaxKeyword`, `ColorNameSyntaxString`,
 
 ## Keyboard Shortcuts
 
-| Shortcut | Action |
+| Shortcut (macOS / elsewhere) | Action |
 |----------|--------|
-| Cmd+F | Open find bar |
-| Cmd+G | Next match |
-| Shift+Cmd+G | Previous match |
+| Cmd+F / Ctrl+F | Open find bar |
+| Cmd+G / Ctrl+G | Next match |
+| Shift+Cmd+G / Shift+Ctrl+G | Previous match |
 | Escape | Close find bar |
-| Cmd+S | Save (fires `OnSave`) |
+| Cmd+S / Ctrl+S | Save (fires `OnSave`) |
+| Cmd+R / Ctrl+R | Run (fires `OnRun`) |
 
 Shortcuts require the editor to have keyboard focus. Call `editor.Focus()` after adding to the window, or the user can click in the editor.
 

@@ -38,8 +38,8 @@ func TestEditor_WarnsWhenNestedInScroll(t *testing.T) {
 	w.Resize(geo.NewSize(300, 200))
 
 	out := buf.String()
-	if !strings.Contains(out, "issues/111") {
-		t.Errorf("expected a warning referencing issue 111, got %q", out)
+	if !strings.Contains(out, "x/editor: Editor is hosted") {
+		t.Errorf("expected the x/editor nested-scroll warning, got %q", out)
 	}
 	if !strings.Contains(out, "container.Scroll") {
 		t.Errorf("warning should name container.Scroll, got %q", out)
@@ -59,7 +59,7 @@ func TestEditor_WarnsOnlyOnce(t *testing.T) {
 	w.Resize(geo.NewSize(320, 240))
 	e.Resize(geo.NewSize(400, 400))
 
-	if n := strings.Count(buf.String(), "issues/111"); n != 1 {
+	if n := strings.Count(buf.String(), "x/editor: Editor is hosted"); n != 1 {
 		t.Errorf("warning should be logged exactly once, logged %d times", n)
 	}
 }
@@ -76,7 +76,7 @@ func TestEditor_NoWarnWhenOwnViewport(t *testing.T) {
 	t.Cleanup(w.Close)
 	w.Resize(geo.NewSize(300, 200))
 
-	if strings.Contains(buf.String(), "fycoder:") {
+	if strings.Contains(buf.String(), "x/editor:") {
 		t.Errorf("editor in its own viewport must not warn, got %q", buf.String())
 	}
 }
