@@ -101,6 +101,23 @@ jobs:
           "$RUNNER_TEMP/browser-bin/chromium" --headless --disable-gpu --dump-dom about:blank > /dev/null
           echo "chromium shim launches OK ($real)"
 
+      # Every painter WGSL shader through Chrome's WebGPU compiler, Tint (#685).
+      # Native wgpu accepted a shader Tint rejected, and v1.2.0 shipped a black
+      # page on every wasm WebGPU app. The test runs headless Chrome on its
+      # SwiftShader software adapter, so no GPU is needed. BELLUI_REQUIRE_TINT
+      # turns "no browser" / "no adapter" into failures, and the grep requires
+      # the line the test logs only when it ran — a skip or an empty -run
+      # match must not read as green.
+      - name: WGSL compiles with Chrome's Tint
+        env:
+          BELLUI_REQUIRE_TINT: "1"
+          CGO_ENABLED: "0"
+        run: |
+          set -euo pipefail
+          go test -count=1 -v -run '^TestShadersCompileWithTint$' ./internal/painter/webgpu/tintcheck/ | tee tint.log
+          grep -E 'compiled [0-9]+ shaders via Tint' tint.log
+          rm -f tint.log
+
       # Real-DOM execution leg (#73). wasmbrowsertest runs the test binary in
       # headless Chromium, so the wasm packages are exercised against a real
       # browser — real IndexedDB for app's storage tests, a real
