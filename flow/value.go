@@ -38,13 +38,44 @@ type Source interface {
 type Value[T comparable] struct {
 	mu        sync.RWMutex
 	value     T
-	listeners []listener
+	listeners []listener[T]
 	nextID    int
 }
 
-type listener struct {
+// listener is one subscriber. fn receives the value before and after the
+// change, both captured under the lock that made it, so a listener sees the
+// transition it is told about even when another Set races in.
+type listener[T any] struct {
 	id int
-	fn func()
+	fn func(old, new T)
+}
+
+// addListener appends fn to *ls under mu and returns the unsubscribe function.
+func addListener[T any](mu sync.Locker, ls *[]listener[T], nextID *int, fn func(old, new T)) func() {
+	mu.Lock()
+	id := *nextID
+	*nextID++
+	*ls = append(*ls, listener[T]{id: id, fn: fn})
+	mu.Unlock()
+
+	return func() {
+		mu.Lock()
+		defer mu.Unlock()
+		for i, l := range *ls {
+			if l.id == id {
+				*ls = append((*ls)[:i], (*ls)[i+1:]...)
+				return
+			}
+		}
+	}
+}
+
+// notify calls each listener with the transition. Callers copy ls under the
+// lock and call this after releasing it.
+func notify[T any](ls []listener[T], old, new T) {
+	for _, l := range ls {
+		l.fn(old, new)
+	}
 }
 
 // New creates a Value with the given initial value.
@@ -63,50 +94,30 @@ func (v *Value[T]) Get() T {
 // all listeners are notified. Safe to call from any goroutine.
 func (v *Value[T]) Set(new T) {
 	v.mu.Lock()
-	if v.value == new {
+	old := v.value
+	if old == new {
 		v.mu.Unlock()
 		return
 	}
 	v.value = new
 	// Copy listeners under lock, notify without lock.
-	ls := make([]listener, len(v.listeners))
+	ls := make([]listener[T], len(v.listeners))
 	copy(ls, v.listeners)
 	v.mu.Unlock()
 
-	for _, l := range ls {
-		l.fn()
-	}
+	notify(ls, old, new)
 }
 
 // Listen registers a typed callback that is called whenever the value changes.
-// The callback receives the old and new values. Returns an unsubscribe function.
+// The callback receives the value before and after the change. Returns an
+// unsubscribe function.
 func (v *Value[T]) Listen(fn func(old, new T)) func() {
-	return v.OnChange(func() {
-		// We read the current value; the "old" is not available at this
-		// abstraction level, so both are the new value. For typed callbacks
-		// that need old values, use ListenChange.
-		fn(v.Get(), v.Get())
-	})
+	return addListener(&v.mu, &v.listeners, &v.nextID, fn)
 }
 
 // OnChange implements Source.
 func (v *Value[T]) OnChange(fn func()) func() {
-	v.mu.Lock()
-	id := v.nextID
-	v.nextID++
-	v.listeners = append(v.listeners, listener{id: id, fn: fn})
-	v.mu.Unlock()
-
-	return func() {
-		v.mu.Lock()
-		defer v.mu.Unlock()
-		for i, l := range v.listeners {
-			if l.id == id {
-				v.listeners = append(v.listeners[:i], v.listeners[i+1:]...)
-				return
-			}
-		}
-	}
+	return addListener(&v.mu, &v.listeners, &v.nextID, func(_, _ T) { fn() })
 }
 
 // Modify atomically reads, modifies, and sets the value using the given function.
@@ -122,11 +133,9 @@ func (v *Value[T]) Modify(fn func(T) T) {
 		return
 	}
 	v.value = new
-	ls := make([]listener, len(v.listeners))
+	ls := make([]listener[T], len(v.listeners))
 	copy(ls, v.listeners)
 	v.mu.Unlock()
 
-	for _, l := range ls {
-		l.fn()
-	}
+	notify(ls, old, new)
 }

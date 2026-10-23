@@ -20,7 +20,7 @@ type Derived[T comparable] struct {
 	mu        sync.RWMutex
 	value     T
 	compute   func() T
-	listeners []listener
+	listeners []listener[T]
 	nextID    int
 	cancels   []func() // unsubscribe from sources
 }
@@ -51,50 +51,33 @@ func (d *Derived[T]) Get() T {
 	return d.value
 }
 
-// Listen registers a callback called when the computed value changes.
-// Returns an unsubscribe function.
+// Listen registers a callback called when the computed value changes. The
+// callback receives the value before and after the change. Returns an
+// unsubscribe function.
 func (d *Derived[T]) Listen(fn func(old, new T)) func() {
-	return d.OnChange(func() {
-		fn(d.Get(), d.Get())
-	})
+	return addListener(&d.mu, &d.listeners, &d.nextID, fn)
 }
 
 // OnChange implements Source.
 func (d *Derived[T]) OnChange(fn func()) func() {
-	d.mu.Lock()
-	id := d.nextID
-	d.nextID++
-	d.listeners = append(d.listeners, listener{id: id, fn: fn})
-	d.mu.Unlock()
-
-	return func() {
-		d.mu.Lock()
-		defer d.mu.Unlock()
-		for i, l := range d.listeners {
-			if l.id == id {
-				d.listeners = append(d.listeners[:i], d.listeners[i+1:]...)
-				return
-			}
-		}
-	}
+	return addListener(&d.mu, &d.listeners, &d.nextID, func(_, _ T) { fn() })
 }
 
 func (d *Derived[T]) recompute() {
 	new := d.compute()
 
 	d.mu.Lock()
-	if d.value == new {
+	old := d.value
+	if old == new {
 		d.mu.Unlock()
 		return
 	}
 	d.value = new
-	ls := make([]listener, len(d.listeners))
+	ls := make([]listener[T], len(d.listeners))
 	copy(ls, d.listeners)
 	d.mu.Unlock()
 
-	for _, l := range ls {
-		l.fn()
-	}
+	notify(ls, old, new)
 }
 
 // Close unsubscribes from all source dependencies.
