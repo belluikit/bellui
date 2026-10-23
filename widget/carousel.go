@@ -1,6 +1,8 @@
 package widget
 
 import (
+	"math"
+
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
@@ -14,11 +16,17 @@ import (
 var _ event.Draggable = (*Carousel)(nil)
 
 // Carousel is an MD3 horizontally-scrolling showcase of items with snapping.
+// It pages with its previous/next buttons or a horizontal swipe: on release,
+// a swipe past a fifth of the width snaps to the neighbouring item and a
+// shorter one snaps back. Under a right-to-left layout the order, buttons and
+// swipe direction are mirrored.
 type Carousel struct {
 	BaseWidget
 	Items       []core.CanvasObject
 	CurrentItem int
 	OnChanged   func(int) `json:"-"`
+
+	drag geo.Delta // accumulated over the current drag gesture
 }
 
 // NewCarousel creates a carousel with the given items.
@@ -58,12 +66,36 @@ func (c *Carousel) Previous() {
 	}
 }
 
+// minSwipe is the shortest horizontal swipe, in points, that pages the carousel
+// however narrow it is.
+const minSwipe = 24
+
+// Dragged accumulates a swipe; the page changes on DragEnd.
 func (c *Carousel) Dragged(e *event.DragEvent) {
-	// Handled on DragEnd for snap behavior.
+	c.drag.DX += e.Dragged.DX
+	c.drag.DY += e.Dragged.DY
 }
 
+// DragEnd snaps to the neighbouring item when the gesture was a mostly
+// horizontal swipe longer than a fifth of the carousel's width (and at least
+// minSwipe), and otherwise stays on the current item.
 func (c *Carousel) DragEnd() {
-	// Snap handled by button taps; drag-to-snap can be added later.
+	d := c.drag
+	c.drag = geo.Delta{}
+
+	dx, dy := float32(math.Abs(float64(d.DX))), float32(math.Abs(float64(d.DY)))
+	if dx <= dy || dx < geo.Max(c.Size().Width/5, minSwipe) {
+		return
+	}
+	forward := d.DX < 0 // the content moves left to reveal the next item
+	if lang.IsRTLDirection() {
+		forward = !forward
+	}
+	if forward {
+		c.Next()
+	} else {
+		c.Previous()
+	}
 }
 
 func (c *Carousel) MinSize() geo.Size {
