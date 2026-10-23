@@ -819,11 +819,6 @@ func (s *Scroll) swapAxesIfNeeded(dx, dy float32) (float32, float32) {
 	return dx, dy
 }
 
-func (s *Scroll) scrollBy(dx, dy float32) {
-	dx, dy = s.resolveScrollDelta(dx, dy)
-	s.applyScroll(dx, dy)
-}
-
 // applyScroll moves the offset by an already-resolved delta.
 func (s *Scroll) applyScroll(dx, dy float32) {
 	if s.updateOffset(dx, dy) {
