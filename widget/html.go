@@ -28,9 +28,10 @@ func NewRichTextFromHTML(content string) *RichText {
 // It will replace the content of this widget similarly to SetText, but with the appropriate formatting.
 func (t *RichText) ParseHTML(content string) {
 	t.Segments = parseHTML(content, t.namedFonts)
-	t.rowBoundsVersion++ // invalidate row bounds cache
-	t.visualCache = nil  // new segments — old cache keys are stale
+	t.rowBoundsVersion++           // invalidate row bounds cache
+	dropped := t.takeVisualCache() // new segments — old cache keys are stale
 	t.Refresh()
+	releaseVisuals(dropped)
 }
 
 // AppendHTML parses the given HTML string and appends the content to the widget,

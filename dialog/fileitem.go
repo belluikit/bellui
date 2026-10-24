@@ -10,6 +10,7 @@ import (
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
+	intdriver "github.com/belluikit/bellui/internal/driver"
 	"github.com/belluikit/bellui/lang"
 	"github.com/belluikit/bellui/theme"
 	"github.com/belluikit/bellui/widget"
@@ -42,6 +43,16 @@ type fileDialogItem struct {
 	lastClick time.Time
 }
 
+// measureLabel measures a label that is never shown, then destroys the
+// renderers measuring it cached: no window holds the label, so nothing else
+// releases them before the cache expiry (#722).
+func measureLabel(text string) geo.Size {
+	l := widget.NewLabel(text)
+	size := l.MinSize()
+	intdriver.DestroyRenderers(l)
+	return size
+}
+
 func (i *fileDialogItem) CreateRenderer() core.WidgetRenderer {
 	text := widget.NewLabelWithStyle(i.name, bellui.TextAlignCenter, bellui.TextStyle{})
 	text.Truncation = bellui.TextTruncateEllipsis
@@ -57,7 +68,7 @@ func (i *fileDialogItem) CreateRenderer() core.WidgetRenderer {
 		text:         text,
 		bg:           bg,
 		objects:      []core.CanvasObject{bg, icon, text},
-		fileTextSize: widget.NewLabel("M\nM").MinSize().Height, // cache two-line label height,
+		fileTextSize: measureLabel("M\nM").Height, // cache two-line label height,
 	}
 }
 
@@ -187,7 +198,7 @@ func (s *fileItemRenderer) MinSize() geo.Size {
 }
 
 func (s *fileItemRenderer) Refresh() {
-	s.fileTextSize = widget.NewLabel("M\nM").MinSize().Height
+	s.fileTextSize = measureLabel("M\nM").Height
 
 	th := s.item.Theme()
 	v := bellui.CurrentApp().Settings().ThemeVariant()

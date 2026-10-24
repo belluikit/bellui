@@ -1,6 +1,7 @@
 package widget
 
 import (
+	"fmt"
 	"image/color"
 	"testing"
 	"time"
@@ -974,4 +975,34 @@ func addTreePath(data map[string][]string, path ...string) {
 		}
 		parent = p
 	}
+}
+
+// TestTree_SeparatorsBoundedByViewport scrolls through a tree far taller than
+// its viewport and checks that the content keeps no more separators than it
+// has shown at once: each kept separator holds a renderer for the widget's
+// life, so one per node above the viewport would grow with the tree (#722).
+func TestTree_SeparatorsBoundedByViewport(t *testing.T) {
+	test.NewTempApp(t)
+
+	data := make(map[string][]string)
+	for i := range 200 {
+		addTreePath(data, fmt.Sprintf("node%03d", i))
+	}
+	tree := NewTreeWithStrings(data)
+
+	w := test.NewWindow(tree)
+	defer w.Close()
+	w.Resize(geo.NewSize(200, 200))
+
+	content := test.WidgetRenderer(tree).(*treeRenderer).content
+	cr := test.WidgetRenderer(content).(*treeContentRenderer)
+	mostShown := 0
+	for offset := float32(0); offset < content.MinSize().Height; offset += 50 {
+		tree.ScrollToOffset(offset)
+		cr.Layout(content.Size())
+		mostShown = max(mostShown, len(cr.visible))
+	}
+
+	assert.Positive(t, mostShown)
+	assert.LessOrEqual(t, len(cr.separators), mostShown)
 }

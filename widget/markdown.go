@@ -31,9 +31,10 @@ func (t *RichText) ParseMarkdown(content string) {
 	}
 	t.markdownCache = content
 	t.Segments = parseMarkdown(content, t.namedFonts)
-	t.rowBoundsVersion++ // invalidate row bounds cache
-	t.visualCache = nil  // new segments — old cache keys are stale
+	t.rowBoundsVersion++           // invalidate row bounds cache
+	dropped := t.takeVisualCache() // new segments — old cache keys are stale
 	t.Refresh()
+	releaseVisuals(dropped)
 }
 
 // AppendMarkdown parses the given markdown string and appends the

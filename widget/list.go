@@ -875,7 +875,9 @@ func (l *listLayout) updateList(newOnly bool) {
 		}
 
 		// a full refresh may change theme, we should drain the pool of unused items instead of refreshing them.
-		for l.itemPool.Get() != nil {
+		// A drained item is dropped, so its renderers go with it (#722).
+		for item := l.itemPool.Get(); item != nil; item = l.itemPool.Get() {
+			intdriver.DestroyRenderers(item)
 		}
 	}
 

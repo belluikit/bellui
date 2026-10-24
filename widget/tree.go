@@ -747,10 +747,11 @@ func (r *treeContentRenderer) Layout(size geo.Size) {
 		}
 
 		// If this is not the first item, add a separator
+		// separatorCount counts the separators shown, so that only as many are
+		// kept as the viewport needs, not one per node above it (#722).
 		addSeparator := y > 0
 		if addSeparator {
 			y += pad
-			separatorCount++
 		}
 
 		m := r.treeContent.tree.leafMinSize
