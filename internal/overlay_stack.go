@@ -5,6 +5,8 @@ import (
 
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/internal/app"
+	"github.com/belluikit/bellui/internal/dirhook"
+	"github.com/belluikit/bellui/internal/uidir"
 	"github.com/belluikit/bellui/internal/widget"
 )
 
@@ -28,18 +30,21 @@ func (s *OverlayStack) Add(overlay core.CanvasObject) {
 	s.mu.Lock()
 
 	s.overlays = append(s.overlays, overlay)
+	s.focusManagers = append(s.focusManagers, app.NewFocusManager(overlay))
+
+	s.mu.Unlock()
+	dirhook.Changed() // the direction cache must see the new tree (#749)
 
 	// TODO this should probably apply to all once pre-rebrand tracker #707 is addressed
+	//
+	// Sized after the lock is released: the layout asks for the overlay's
+	// direction, which lists this stack (#749).
 	if _, ok := overlay.(*widget.OverlayContainer); ok {
 		safePos, safeSize := s.Canvas.InteractiveArea()
 
 		overlay.Resize(safeSize)
 		overlay.Move(safePos)
 	}
-
-	s.focusManagers = append(s.focusManagers, app.NewFocusManager(overlay))
-
-	s.mu.Unlock()
 
 	if s.OnChange != nil {
 		s.OnChange()
@@ -80,7 +85,9 @@ func (s *OverlayStack) Remove(overlay core.CanvasObject) {
 		return
 	}
 	// set removed elements in backing array to nil to release memory references
+	removed := make([]core.CanvasObject, 0, len(s.overlays)-overlayIdx)
 	for i := overlayIdx; i < len(s.overlays); i++ {
+		removed = append(removed, s.overlays[i])
 		s.overlays[i] = nil
 		s.focusManagers[i] = nil
 	}
@@ -88,6 +95,14 @@ func (s *OverlayStack) Remove(overlay core.CanvasObject) {
 	s.focusManagers = s.focusManagers[:overlayIdx]
 
 	s.mu.Unlock()
+	// A removed overlay no longer takes its opener's direction (#749).
+	for _, o := range removed {
+		uidir.ForgetInherited(o)
+		if oc, ok := o.(*widget.OverlayContainer); ok {
+			uidir.ForgetInherited(oc.Content) // a PopUpMenu inherits as the content
+		}
+	}
+	dirhook.Changed()
 
 	if s.OnChange != nil {
 		s.OnChange()

@@ -21,6 +21,8 @@ import (
 	"github.com/belluikit/bellui/internal"
 	intapp "github.com/belluikit/bellui/internal/app"
 	"github.com/belluikit/bellui/internal/cache"
+	"github.com/belluikit/bellui/internal/dirhook"
+	"github.com/belluikit/bellui/internal/driver"
 	"github.com/belluikit/bellui/internal/scale"
 	"github.com/belluikit/bellui/internal/uidir"
 	"github.com/belluikit/bellui/theme"
@@ -238,6 +240,9 @@ func (c *Canvas) doResize(size geo.Size) {
 	if content == nil {
 		return
 	}
+	// The test canvas' frame: the direction cache is rebuilt on its next
+	// use, as the real canvas' EnsureMinSize has it (#749).
+	dirhook.Changed()
 
 	// Ensure testcanvas mimics real canvas.Resize behavior.
 	// OverlayStack locks internally; copying it would copy its mutex.
@@ -258,6 +263,9 @@ func (c *Canvas) doResize(size geo.Size) {
 	// Scope layout to the per-canvas direction, mirroring the real drivers'
 	// common.Canvas.EnsureMinSize push, so a window-wide SetDirection mirrors
 	// containers and resolves leading/trailing alignment on the test canvas too.
+	// An automatic canvas pushes the resolved global direction once a
+	// direction can differ anywhere, as the real walk does (#760).
+	dir = driver.RootDirection(dir)
 	uidir.Push(dir)
 	defer uidir.Pop(dir)
 
@@ -297,6 +305,10 @@ func (c *Canvas) SetDirection(d bellui.Direction) {
 	size := c.size
 	content := c.content
 	c.propertyLock.Unlock()
+	if d != bellui.DirectionAuto {
+		uidir.NoteDirectedCanvas()
+	}
+	dirhook.Changed()
 
 	c.doResize(size)
 	// An unchanged size lays nothing out again, so refresh the content under

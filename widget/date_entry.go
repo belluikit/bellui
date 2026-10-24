@@ -208,6 +208,7 @@ func (e *DateEntry) showCalendarPopup(c core.Canvas) {
 
 	popUp = NewPopUp(content, c)
 	popUp.bgColor = bgColor
+	inheritDirection(popUp, e.super()) // #749
 	popUp.ShowAtPosition(e.popUpPos())
 	e.popUp = popUp
 }

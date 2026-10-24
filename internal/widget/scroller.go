@@ -797,9 +797,9 @@ func (s *Scroll) pinToRTLStart() {
 		return
 	}
 	// The ambient direction, not a lookup: this runs on every layout of an
-	// unpinned horizontal scroller, too often for driver.IsRTLAt's tree walk
-	// (#696). A Refresh outside a layout walk therefore sees the global
-	// direction (#749).
+	// unpinned horizontal scroller (#696). A layout walk pushes it, and a
+	// Refresh or Resize outside one runs in the scroller's own direction
+	// (#749).
 	if !lang.IsRTLDirection() {
 		return
 	}

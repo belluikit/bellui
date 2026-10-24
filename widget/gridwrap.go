@@ -12,6 +12,7 @@ import (
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/async"
+	"github.com/belluikit/bellui/internal/dirhook"
 	"github.com/belluikit/bellui/internal/uidir"
 	"github.com/belluikit/bellui/internal/widget"
 	"github.com/belluikit/bellui/lang"
@@ -194,6 +195,17 @@ func (l *GridWrap) focusedItemObject() core.CanvasObject {
 
 // Resize is called when this GridWrap should change size. We refresh to ensure invisible items are drawn.
 func (l *GridWrap) Resize(s geo.Size) {
+	// Resized by hand, outside a layout walk, the items are placed in the
+	// grid's own direction (#749). Inside a walk the direction is already
+	// ambient and this costs no lookup.
+	if !dirhook.InUse() {
+		l.resize(s)
+		return
+	}
+	inDirectionOf(l.super(), func() { l.resize(s) })
+}
+
+func (l *GridWrap) resize(s geo.Size) {
 	oldColCount := l.ColumnCount()
 	oldHeight := l.size.Height
 	l.colCountCache = 0

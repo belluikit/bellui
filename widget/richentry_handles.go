@@ -138,7 +138,9 @@ func (e *RichEntry) showContextMenu(pos geo.Position) {
 			}
 		}))
 
-	ShowPopUpMenuAtPosition(bellui.NewMenu("", menuItems...), c, pos)
+	pop := NewPopUpMenu(bellui.NewMenu("", menuItems...), c)
+	inheritDirection(pop, super) // #749
+	pop.ShowAtPosition(pos)
 }
 
 // markTouchSelection flags the current selection as touch-initiated and

@@ -6,6 +6,7 @@ import (
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/cache"
+	"github.com/belluikit/bellui/internal/dirhook"
 	"github.com/belluikit/bellui/internal/paintgen"
 )
 
@@ -45,7 +46,12 @@ func (w *Base) Resize(size geo.Size) {
 	if impl == nil {
 		return
 	}
-	cache.Renderer(impl).Layout(size)
+	r := cache.Renderer(impl)
+	if dirhook.InUse() {
+		dirhook.Run(impl, func() { r.Layout(size) }) // in impl's direction (#749)
+	} else {
+		r.Layout(size)
+	}
 	Repaint(impl)
 }
 
@@ -122,7 +128,12 @@ func (w *Base) Refresh() {
 		return
 	}
 
-	cache.Renderer(impl).Refresh()
+	r := cache.Renderer(impl)
+	if dirhook.InUse() {
+		dirhook.Run(impl, r.Refresh) // in impl's direction (#749)
+		return
+	}
+	r.Refresh()
 }
 
 // super will return the actual object that this represents.

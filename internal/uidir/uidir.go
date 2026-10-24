@@ -16,6 +16,8 @@ import (
 	"sync/atomic"
 
 	"github.com/belluikit/bellui"
+	"github.com/belluikit/bellui/core"
+	"github.com/belluikit/bellui/internal/dirhook"
 	"github.com/belluikit/bellui/internal/thread"
 )
 
@@ -34,16 +36,156 @@ var activeScopes atomic.Int64
 
 // scopesSeen records that a direction scope has been rendered in this process.
 // Until one has, no object can sit inside a scope, so a direction lookup
-// (internal/driver.DirectionOf) can skip walking the canvas — the common case.
+// (internal/driver.DirectionOf) can skip its scope cache — the common case.
 var scopesSeen atomic.Bool
 
 // NoteScope records that a direction scope exists. A scope calls it when its
 // renderer is created, which precedes it having any laid-out content.
-func NoteScope() { scopesSeen.Store(true) }
+func NoteScope() {
+	scopesSeen.Store(true)
+	dirhook.Note()
+}
 
-// ScopesInUse reports whether any direction scope has been rendered in this
-// process; see [NoteScope].
+// NoteDirectedCanvas records that a canvas was given a direction of its own
+// (Canvas.SetDirection), so re-layout outside a walk must ask for an object's
+// direction from now on (internal/dirhook). Unlike [NoteScope] it does not
+// make a lookup walk for scopes.
+func NoteDirectedCanvas() { dirhook.Note() }
+
+// scopes holds every direction scope rendered in this process, weakly: each
+// entry returns its scope, or nil once the scope was collected. The direction
+// cache (internal/driver) walks their subtrees rather than every window, so
+// its cost follows what the scopes hold, not the size of the app (#749).
+var (
+	scopesMu sync.Mutex
+	scopes   []func() core.CanvasObject
+)
+
+// RegisterScope records a rendered direction scope; get returns it, or nil
+// once it is gone (a weak reference, so the registry keeps nothing alive).
+func RegisterScope(get func() core.CanvasObject) {
+	scopesMu.Lock()
+	scopes = append(scopes, get)
+	scopesMu.Unlock()
+	NoteScope()
+	dirhook.Changed()
+}
+
+// Scopes returns the registered scopes still alive, and the overlays that
+// inherited a direction, dropping the scopes that are gone.
+func Scopes() []core.CanvasObject {
+	scopesMu.Lock()
+	live := make([]core.CanvasObject, 0, len(scopes))
+	kept := scopes[:0]
+	for _, get := range scopes {
+		if o := get(); o != nil {
+			live = append(live, o)
+			kept = append(kept, get)
+		}
+	}
+	for i := len(kept); i < len(scopes); i++ {
+		scopes[i] = nil
+	}
+	scopes = kept
+	scopesMu.Unlock()
+
+	if inheritedCount.Load() > 0 {
+		inheritedMu.Lock()
+		for _, e := range inherited {
+			live = append(live, e.overlay)
+		}
+		inheritedMu.Unlock()
+	}
+	return live
+}
+
+// ScopesInUse reports whether any direction scope has been rendered, or an
+// overlay inherited a direction, in this process; see [NoteScope].
 func ScopesInUse() bool { return scopesSeen.Load() }
+
+// inherited holds the directions overlays take from the widget that opened
+// them (a Select's popup menu, a context menu): an overlay sits outside the
+// content tree, so no scope encloses it (#749). Entries are set by
+// [SetInherited] when the overlay is opened and dropped by [ForgetInherited]
+// when it leaves its canvas' overlay stack. It is a short slice, not a map:
+// few overlays are open at once, and comparing an object against the stored
+// (pointer) overlays cannot panic the way hashing an uncomparable object
+// value as a map key would.
+var (
+	inheritedMu    sync.Mutex
+	inherited      []inheritedEntry
+	inheritedCount atomic.Int64
+)
+
+type inheritedEntry struct {
+	overlay core.CanvasObject
+	dir     bellui.Direction
+}
+
+// SetInherited makes overlay lay out and paint its subtree in d, as a
+// direction scope around it would. A DirectionAuto d forgets overlay.
+func SetInherited(overlay core.CanvasObject, d bellui.Direction) {
+	if overlay == nil {
+		return
+	}
+	if d == bellui.DirectionAuto {
+		ForgetInherited(overlay)
+		return
+	}
+	inheritedMu.Lock()
+	found := false
+	for i := range inherited {
+		if inherited[i].overlay == overlay {
+			inherited[i].dir, found = d, true
+			break
+		}
+	}
+	if !found {
+		inherited = append(inherited, inheritedEntry{overlay, d})
+		inheritedCount.Add(1)
+	}
+	inheritedMu.Unlock()
+	NoteScope()
+	dirhook.Changed()
+}
+
+// ForgetInherited drops overlay's inherited direction, if it has one.
+func ForgetInherited(overlay core.CanvasObject) {
+	if inheritedCount.Load() == 0 || overlay == nil {
+		return
+	}
+	inheritedMu.Lock()
+	removed := false
+	for i := range inherited {
+		if inherited[i].overlay == overlay {
+			inherited = append(inherited[:i], inherited[i+1:]...)
+			inheritedCount.Add(-1)
+			removed = true
+			break
+		}
+	}
+	inheritedMu.Unlock()
+	if removed {
+		dirhook.Changed()
+	}
+}
+
+// Inherited returns the direction obj, an overlay, took from its opener; ok
+// is false when it took none. It is a single atomic load while no overlay has
+// one.
+func Inherited(obj core.CanvasObject) (bellui.Direction, bool) {
+	if inheritedCount.Load() == 0 || obj == nil {
+		return bellui.DirectionAuto, false
+	}
+	inheritedMu.Lock()
+	defer inheritedMu.Unlock()
+	for _, e := range inherited {
+		if e.overlay == obj {
+			return e.dir, true
+		}
+	}
+	return bellui.DirectionAuto, false
+}
 
 // Current returns the ambient direction override in effect on the calling
 // goroutine, if any. The bool is false when no scope is active, in which case

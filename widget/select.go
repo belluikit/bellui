@@ -348,6 +348,7 @@ func (s *Select) showPopUp() {
 	}
 	pop := NewPopUpMenu(bellui.NewMenu("", items...), c)
 	pop.alignment = s.Alignment
+	inheritDirection(pop, s.super()) // a scope around the Select applies to its menu (#749)
 	pop.ShowAtPosition(s.popUpPos())
 	pop.Resize(geo.NewSize(s.Size().Width, pop.MinSize().Height))
 	pop.OnDismiss = func() {
