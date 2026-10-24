@@ -73,6 +73,7 @@ type chartRenderer struct {
 	cachedSeriesColors map[int]color.Color
 	cachedTooltipCfg   *component.TooltipConfig
 	cachedPlotArea     component.PlotArea
+	cachedRightSeries  map[int]bool // series plotted against a Y axis on the right (see pointerPlotArea)
 	cachedPalette      []color.Color
 	cachedSize         geo.Size
 	hasCachedBase      bool
@@ -216,7 +217,8 @@ func (r *chartRenderer) refreshInteractive() {
 	objects = append(objects, renderBrushOverlay(&brushState)...)
 	tooltipObjs := component.RenderTooltip(
 		&tooltipState, r.cachedTooltipCfg, resolver,
-		r.cachedSeriesColors, r.cachedSize, r.cachedPlotArea,
+		r.cachedSeriesColors, r.cachedSize,
+		pointerPlotArea(r.cachedPlotArea, r.cachedRightSeries, &tooltipState),
 	)
 	objects = append(objects, tooltipObjs...)
 
@@ -363,6 +365,10 @@ func (r *chartRenderer) fullRebuild(size geo.Size) {
 	copy(baseObjs, objects)
 
 	plotArea := component.PlotArea{X: plotRect.X, Y: plotRect.Y, W: plotRect.W, H: plotRect.H}
+	var rightSeries map[int]bool
+	if len(cartesianSeries) > 0 {
+		plotArea.XAxisTop, rightSeries = r.pointerAxisSides(opt, cartesianSeries)
+	}
 
 	// Interactive layer: drawing preview + measure + brush + tooltip.
 	if drawingGesture.Active && len(coordIfaces) > 0 {
@@ -376,7 +382,8 @@ func (r *chartRenderer) fullRebuild(size geo.Size) {
 		)...)
 	}
 	objects = append(objects, renderBrushOverlay(&brushState)...)
-	tooltipObjs := component.RenderTooltip(&tooltipState, opt.Tooltip, resolver, seriesColors, size, plotArea)
+	tooltipObjs := component.RenderTooltip(&tooltipState, opt.Tooltip, resolver, seriesColors, size,
+		pointerPlotArea(plotArea, rightSeries, &tooltipState))
 	objects = append(objects, tooltipObjs...)
 
 	// Store interaction state back on the chart atomically.
@@ -399,6 +406,7 @@ func (r *chartRenderer) fullRebuild(size geo.Size) {
 	r.cachedSeriesColors = seriesColors
 	r.cachedTooltipCfg = opt.Tooltip
 	r.cachedPlotArea = plotArea
+	r.cachedRightSeries = rightSeries
 	r.cachedPalette = opt.Color
 	r.cachedSize = size
 	r.hasCachedBase = true
@@ -971,6 +979,41 @@ func (r *chartRenderer) seriesIndex(s series.Series) int {
 		}
 	}
 	return 0
+}
+
+// pointerAxisSides reports where the axes the pointer tags sit beside are
+// drawn: whether the X axis is on top, and which cartesian series (by series
+// index) are plotted against a Y axis on the right. It resolves a series' Y
+// axis as renderCartesian does, so the tag follows the axis the series is
+// drawn against.
+func (r *chartRenderer) pointerAxisSides(opt Option, cartesian []series.Series) (xTop bool, rightSeries map[int]bool) {
+	if len(opt.XAxis) > 0 {
+		xTop = xAxisOnTop(opt.XAxis[0])
+	}
+	ys := opt.YAxis
+	for _, s := range cartesian {
+		yIdx := seriesYAxisIndex(s)
+		if yIdx < 0 || yIdx >= len(ys) {
+			yIdx = 0 // as renderCartesian falls back
+		}
+		if yIdx >= len(ys) || !yAxisOnRight(ys[yIdx], yIdx) {
+			continue
+		}
+		if rightSeries == nil {
+			rightSeries = make(map[int]bool)
+		}
+		rightSeries[r.seriesIndex(s)] = true
+	}
+	return xTop, rightSeries
+}
+
+// pointerPlotArea is the plot area the tooltip draws the pointer tags
+// against: base, with YAxisRight set for the Y axis of the first hit's series.
+func pointerPlotArea(base component.PlotArea, rightSeries map[int]bool, state *component.TooltipState) component.PlotArea {
+	if state != nil && len(state.Hits) > 0 {
+		base.YAxisRight = rightSeries[state.Hits[0].SeriesIndex]
+	}
+	return base
 }
 
 // xAxisOnTop reports whether an X axis is drawn along the top of the plot:
