@@ -16,10 +16,11 @@ type GroupRow struct {
 	Expanded bool
 	// SourceIndex is the original source row index (for data rows).
 	SourceIndex int
-	// AggValues is meant to hold computed aggregations for group rows, but
-	// nothing fills it yet: GroupTransform has no aggregation settings, so
-	// it is always nil. pipeline.Aggregate computes them when called by
-	// hand. Where aggregation should be configured is #689.
+	// AggValues holds the group's aggregates, keyed by AggColumn.Field, for
+	// group header rows: Apply sets it to Aggregate(AggColumns, rows, source)
+	// over every row in the group, so a collapsed group carries the same
+	// values as an expanded one. Each value is a float64. It is nil on data
+	// rows, and on header rows when the transform has no AggColumns.
 	AggValues map[string]any
 }
 
@@ -32,6 +33,9 @@ type GroupTransform struct {
 	Field string
 	// Collapsed tracks which group keys are collapsed.
 	Collapsed map[string]bool
+	// AggColumns are the aggregates computed for each group header row
+	// (GroupRow.AggValues). Empty means no aggregation.
+	AggColumns []AggColumn
 	// GroupRows is the output list of group/data rows, used by the renderer
 	// to distinguish group headers from data rows.
 	GroupRows []GroupRow
@@ -83,6 +87,12 @@ func (t *GroupTransform) Apply(indices []int, source DataSource) []int {
 
 		// Group header row (uses -1 - groupIndex as a sentinel)
 		groupIdx := -(len(t.GroupRows) + 1)
+		var agg map[string]any
+		if len(t.AggColumns) > 0 {
+			// Over all of the group's rows, collapsed or not: a collapsed
+			// header is where the summary matters most.
+			agg = Aggregate(t.AggColumns, g.indices, source)
+		}
 		t.GroupRows = append(t.GroupRows, GroupRow{
 			IsGroup:    true,
 			GroupKey:   g.key,
@@ -90,6 +100,7 @@ func (t *GroupTransform) Apply(indices []int, source DataSource) []int {
 			ChildCount: len(g.indices),
 			Depth:      0,
 			Expanded:   expanded,
+			AggValues:  agg,
 		})
 		result = append(result, groupIdx)
 

@@ -7,6 +7,7 @@ import (
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/x/tables/cell"
 	"github.com/belluikit/bellui/x/tables/export"
+	"github.com/belluikit/bellui/x/tables/pipeline"
 )
 
 // ColumnDef defines the configuration for a single column in the data grid.
@@ -70,6 +71,21 @@ type ColumnDef struct {
 	// ValueFormatter formats the cell value for display.
 	// If nil, the value is converted to string using fmt.Sprint.
 	ValueFormatter func(value any) string
+
+	// AggFunc aggregates this column over each row group's rows when the grid
+	// is grouped (GridAPI.SetRowGroupColumn); the group header row shows the
+	// result in this column and includes it in its accessible label. Nil
+	// means no aggregate. Wrap the function with bellui.Ptr, since AggSum is
+	// the zero value: AggFunc: bellui.Ptr(pipeline.AggAvg).
+	//
+	// The cell values are read as numbers (any Go integer or float type); a
+	// value of any other type, nil included, counts as 0. AggCount counts the
+	// group's rows. A collapsed group still aggregates all of its rows. The
+	// aggregate, a float64, is shown through ValueFormatter when set (which
+	// must therefore accept a float64), else through a NumberRenderer's
+	// Format, else rounded to two decimals. A count is always shown as a
+	// whole number, never through the formatter.
+	AggFunc *pipeline.AggFunc
 
 	// CellRenderer overrides the default cell renderer for this column.
 	CellRenderer cell.RendererFactory

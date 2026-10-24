@@ -10,6 +10,7 @@ import (
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/widget"
+	"github.com/belluikit/bellui/x/tables/cell"
 )
 
 // GroupRowOverlay renders group-header rows at the DataGrid level, spanning the
@@ -69,6 +70,14 @@ type groupRowOverlayRenderer struct {
 	// does not clip on its own).
 	band *bellui.Container
 	clip *container.Clip
+
+	// Aggregates (#689): pooled texts, and a clip for the ones in the
+	// horizontally scrolling main band so they cannot draw over the pinned
+	// bands. The main clip spans the overlay's height; its content is in
+	// clip-local coordinates.
+	aggTexts []*canvas.Text
+	mainAgg  *bellui.Container
+	mainClip *container.Clip
 }
 
 func (r *groupRowOverlayRenderer) Layout(size geo.Size) { r.refresh(size) }
@@ -103,7 +112,9 @@ func (r *groupRowOverlayRenderer) refresh(size geo.Size) {
 		lastRow = rowCount - 1
 	}
 
-	var content []core.CanvasObject
+	geom := newAggGeometry(grid, size)
+	var content, mainAggs []core.CanvasObject
+	aggIdx := 0
 	idx := 0
 	for row := firstRow; row <= lastRow; row++ {
 		if !grid.IsGroupRow(row) {
@@ -128,12 +139,43 @@ func (r *groupRowOverlayRenderer) refresh(size geo.Size) {
 		gw.update(key, childCount, expanded, depth, geo.NewPos(0, y), geo.NewSize(size.Width, rowH), tc)
 		content = append(content, gw.objects...)
 
+		aggs := grid.GroupRowAggregates(row)
+		for _, a := range aggs {
+			x, w, inMain, ok := geom.column(a.Col)
+			if !ok {
+				continue
+			}
+			if aggIdx >= len(r.aggTexts) {
+				r.aggTexts = append(r.aggTexts, newAggText())
+			}
+			t := r.aggTexts[aggIdx]
+			aggIdx++
+			placeAggText(t, a.Text, x, y, w, rowH, tc)
+			if inMain {
+				mainAggs = append(mainAggs, t)
+			} else {
+				content = append(content, t)
+			}
+		}
+
 		// Accessible RoleTableRow node (semantics only, invisible), spanning
 		// the full row so touch exploration finds it over any band (#111).
-		ga.set(key, childCount, expanded)
+		ga.set(key, childCount, expanded, aggs)
 		ga.Move(geo.NewPos(0, y))
 		ga.Resize(geo.NewSize(size.Width, rowH))
 		content = append(content, ga)
+	}
+
+	if len(mainAggs) > 0 {
+		if r.mainAgg == nil {
+			r.mainAgg = container.NewWithoutLayout()
+			r.mainClip = container.NewClip(r.mainAgg)
+		}
+		r.mainAgg.Objects = mainAggs
+		r.mainClip.Move(geo.NewPos(geom.mainX, 0))
+		r.mainClip.Resize(geo.NewSize(geom.mainRight-geom.mainX, size.Height))
+		r.mainClip.Refresh()
+		content = append(content, r.mainClip)
 	}
 
 	if r.band == nil {
@@ -148,6 +190,90 @@ func (r *groupRowOverlayRenderer) refresh(size geo.Size) {
 	r.clip.Refresh()
 
 	r.objects = []core.CanvasObject{r.clip}
+}
+
+// aggGeometry places a group row's aggregates in their columns using the same
+// band anchors the header and body use (RegionLayoutAccess): pinned-left fixed
+// from 0, main translated by -ScrollOffsetX and clipped to [mainX, mainRight),
+// pinned-right fixed from pinnedRightX.
+type aggGeometry struct {
+	widths                []float32
+	padding               float32
+	plCount, mainCount    int
+	mainX, mainRight      float32
+	pinnedRightX, offsetX float32
+	hasPinnedRight        bool
+}
+
+func newAggGeometry(grid GridAccess, size geo.Size) aggGeometry {
+	widths := grid.HeaderColumnWidths()
+	pl, pr := grid.PinnedLeftCount(), grid.PinnedRightCount()
+	mainX, prX, prW := grid.HeaderRegions()
+	g := aggGeometry{
+		widths:       widths,
+		padding:      grid.CellPadding(),
+		plCount:      pl,
+		mainCount:    max(len(widths)-pl-pr, 0),
+		mainX:        mainX,
+		mainRight:    size.Width,
+		pinnedRightX: prX,
+		offsetX:      grid.ScrollOffsetX(),
+	}
+	if pr > 0 && prW > 0 {
+		g.mainRight = prX
+		g.hasPinnedRight = true
+	}
+	if g.mainRight < g.mainX {
+		g.mainRight = g.mainX
+	}
+	return g
+}
+
+// column returns where absolute display column col is drawn: x (clip-local for
+// a main-band column, overlay-local otherwise), its width, whether it is in the
+// main band, and false for a column out of range.
+func (g aggGeometry) column(col int) (x, w float32, inMain, ok bool) {
+	if col < 0 || col >= len(g.widths) {
+		return 0, 0, false, false
+	}
+	start, base := 0, float32(0)
+	switch {
+	case col < g.plCount:
+	case col < g.plCount+g.mainCount:
+		start, base, inMain = g.plCount, -g.offsetX, true
+	default:
+		if !g.hasPinnedRight {
+			return 0, 0, false, false
+		}
+		start, base = g.plCount+g.mainCount, g.pinnedRightX
+	}
+	x = base
+	for i := start; i < col; i++ {
+		x += g.widths[i] + g.padding
+	}
+	return x, g.widths[col], inMain, true
+}
+
+func newAggText() *canvas.Text {
+	t := canvas.NewText("", nil)
+	t.TextStyle = bellui.TextStyle{Bold: true}
+	t.TextSize = 13
+	t.Alignment = bellui.TextAlignTrailing
+	return t
+}
+
+// placeAggText draws an aggregate right-aligned inside its column, inset like
+// the group label, truncated to the column width.
+func placeAggText(t *canvas.Text, text string, x, y, w, h float32, tc ThemeColors) {
+	const inset = 4
+	inner := w - 2*inset
+	if inner < 0 {
+		inner = 0
+	}
+	t.Text = cell.TruncateText(text, inner, t.TextSize, t.TextStyle)
+	t.Color = tc.GroupRowFg
+	t.Move(geo.NewPos(x+inset, y+2))
+	t.Resize(geo.NewSize(inner, h-4))
 }
 
 // groupRowWidget is the visual content of one group-header row: a full-width
@@ -211,9 +337,16 @@ func newGroupRowA11y(grid GridAccess) *groupRowA11y {
 	return g
 }
 
-func (g *groupRowA11y) set(key string, childCount int, expanded bool) {
+// set updates the node. The label is the visible "key (count)" followed by
+// each aggregate's spoken form, e.g. "West (3), Salary sum 300", so a screen
+// reader hears the summary a sighted user sees on the row.
+func (g *groupRowA11y) set(key string, childCount int, expanded bool, aggs []GroupAggregate) {
 	g.key = key
-	g.label = fmt.Sprintf("%s (%d)", key, childCount)
+	label := fmt.Sprintf("%s (%d)", key, childCount)
+	for _, a := range aggs {
+		label += ", " + a.Label
+	}
+	g.label = label
 	g.expanded = expanded
 }
 

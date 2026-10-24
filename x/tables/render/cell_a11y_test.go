@@ -34,6 +34,8 @@ type fakeGrid struct {
 	masterExpanded map[int]bool // per-row expanded (DetailBandHeight > 0)
 
 	groupRows map[int]fakeGroupInfo // display row -> group-header info
+	groupAggs map[int][]GroupAggregate
+	scrollX   float32
 }
 
 // fakeGroupInfo is one group-header row's metadata (GroupRowInfo return values).
@@ -78,6 +80,20 @@ func (f *fakeGrid) GroupRowInfo(row int) (string, int, bool, int) {
 	gi := f.groupRows[row]
 	return gi.key, gi.count, gi.expanded, gi.depth
 }
+
+func (f *fakeGrid) GroupRowAggregates(row int) []GroupAggregate { return f.groupAggs[row] }
+
+// HeaderRegions mirrors the real grid: main starts after the pinned-left
+// columns; pinned-right occupies the trailing columns of a 600-wide body.
+func (f *fakeGrid) HeaderRegions() (mainX, pinnedRightX, pinnedRightW float32) {
+	mainX = float32(f.pinnedLeft) * 102
+	if f.pinnedRt > 0 {
+		pinnedRightW = float32(f.pinnedRt)*102 - 2
+		pinnedRightX = 600 - pinnedRightW
+	}
+	return mainX, pinnedRightX, pinnedRightW
+}
+func (f *fakeGrid) ScrollOffsetX() float32 { return f.scrollX }
 
 func (f *fakeGrid) ToggleGroup(groupKey string)                { f.toggled = append(f.toggled, groupKey) }
 func (f *fakeGrid) IsAlternateRow(row int) bool                { return false }

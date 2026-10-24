@@ -29,7 +29,9 @@
 //     the virtualization contract of pre-rebrand tracker #16 and the absolute column model of pre-rebrand tracker #15;
 //   - DataItem (cell) elements exposing a GridItem pattern with row/column in
 //     that absolute space, for both main and pinned columns (pre-rebrand tracker #15);
-//   - Group elements for the region group-header rows, carrying an
+//   - Group elements for the region group-header rows, whose label carries the
+//     Score column's average after the key and count, e.g.
+//     "North (125), Score average 49.4" (#689), and an
 //     ExpandCollapse pattern (pre-rebrand tracker #15). With -checkbox, invoking that pattern's
 //     Collapse()/Expand() toggles the group (routed through ToggleGroup) — the
 //     action half of pre-rebrand tracker #31 — and works the same without the flag.
@@ -46,12 +48,14 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/app"
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
 
 	"github.com/belluikit/bellui/x/tables"
+	"github.com/belluikit/bellui/x/tables/pipeline"
 )
 
 // rowCount is deliberately far larger than the visible window so the grid
@@ -162,7 +166,7 @@ func main() {
 			{ColID: "id", Field: "id", HeaderName: "ID", Width: 70, Pinned: tables.PinLeft, Type: tables.ColumnNumber},
 			{ColID: "name", Field: "name", HeaderName: "Name", Width: 160},
 			{ColID: "region", Field: "region", HeaderName: "Region", Width: 110},
-			{ColID: "score", Field: "score", HeaderName: "Score", Width: 90, Type: tables.ColumnNumber},
+			{ColID: "score", Field: "score", HeaderName: "Score", Width: 90, Type: tables.ColumnNumber, AggFunc: bellui.Ptr(pipeline.AggAvg)},
 			{ColID: "status", Field: "status", HeaderName: "Status", Width: 110, Pinned: tables.PinRight},
 		},
 		func() int { return len(data) },

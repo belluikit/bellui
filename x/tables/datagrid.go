@@ -436,8 +436,10 @@ func (g *DataGrid) onScrolled(pos geo.Position) {
 	g.pinnedLeftCells.SetOffsetY(pos.Y)
 	g.pinnedRightCells.SetOffsetY(pos.Y)
 
-	// The group-header overlay shares the body's vertical scroll (it is fixed
-	// horizontally — its labels span the full row across all bands).
+	// The group-header overlay shares the body's vertical scroll. Its label is
+	// fixed horizontally (it spans the full row across all bands), but its
+	// aggregates sit in their columns, so the refresh SetOffsetY triggers also
+	// moves them with the horizontal scroll.
 	g.groupRowOverlay.SetOffsetY(pos.Y)
 
 	// The inline editor overlay is anchored to its cell, so it must translate
@@ -1109,6 +1111,7 @@ func (g *DataGrid) buildTransforms(includePaginate bool) []pipeline.Transform {
 
 	// 5. Group transform (after sort so rows within groups are sorted)
 	if g.groupTransform != nil {
+		g.groupTransform.AggColumns = g.groupAggColumns()
 		transforms = append(transforms, g.groupTransform)
 	}
 
