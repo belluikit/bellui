@@ -553,10 +553,12 @@ byte-for-byte unchanged.
   (`Chip`/`SplitButton`/`AuthButton` labels sized first).
 - **Hand-tuned.** `GridWrap` is virtualised, so the column flip lives in the grid
   math (`x = (colCount−1−col)·stride` under RTL; rows and scrolling unchanged).
-  `Carousel` mirrors via the blanket pass (prev/next swap, dots reverse, the
-  centred content page maps onto itself). `SegmentedButton` bakes its pill corner
-  rounding from `first`/`last`, so that assignment is swapped under RTL to keep the
-  pill ends on the outer edges after the row reflects.
+  `Carousel` mirrors its controls via the blanket pass (prev/next swap, dots
+  reverse, the centred item track maps onto itself) and places the items on the
+  track in reading order itself, so later items sit to the left under RTL (#686).
+  `SegmentedButton` bakes its pill corner rounding from `first`/`last`, so that
+  assignment is swapped under RTL to keep the pill ends on the outer edges after
+  the row reflects.
 - **Spatial arrow nav.** `GridWrap` `KeyLeft`/`KeyRight` swap under RTL (extracted
   `focusPrevItem`/`focusNextItem`), and `SegmentedButton` gains `event.Focusable`
   with RTL-aware arrow-key selection cycling (the `widget.Select` pattern) and a
