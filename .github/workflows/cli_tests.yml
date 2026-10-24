@@ -52,6 +52,14 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version: stable
+      # The generated-app compile test (#710) vets an app that imports the
+      # toolkit's glfw driver, and cgo needs its X11/Wayland/GL headers even to
+      # type-check. vet does not link, so the headers are all it needs.
+      - name: Desktop headers for the generated-app compile test
+        if: matrix.os == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libgl1-mesa-dev libwayland-dev libx11-dev libxkbcommon-dev xorg-dev
       - name: Resolve the toolkit from this checkout
         working-directory: cmd/bellui
         run: go mod edit -replace github.com/belluikit/bellui=../..
@@ -64,6 +72,27 @@ jobs:
       - name: Tests
         working-directory: cmd/bellui
         run: go test -race -tags ci ./...
+      # The generated-app compile check (#710) needs cgo and a C compiler; if
+      # it ever skipped on a leg, the plain run above would still pass. These
+      # steps fail unless the test reports PASS.
+      - name: Generated app compiles against this checkout
+        if: matrix.os != 'windows'
+        working-directory: cmd/bellui
+        env:
+          T: TestGeneratedAppSourcesCompileAgainstToolkit
+        run: |
+          out=$(go test -count=1 -v -run "^${T}\$" ./internal/templates/ 2>&1) || { echo "$out"; exit 1; }
+          echo "$out"
+          grep -qF -- "--- PASS: $T " <<<"$out" || { echo "::error::$T did not PASS (skipped?)"; exit 1; }
+      - name: Generated app compiles against this checkout (Windows)
+        if: matrix.os == 'windows'
+        working-directory: cmd/bellui
+        env:
+          T: TestGeneratedAppSourcesCompileAgainstToolkit
+        run: |
+          go test -count=1 -v -run "^$env:T`$" ./internal/templates/ | Tee-Object -Variable out
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          if (-not ($out | Select-String -SimpleMatch "--- PASS: $env:T ")) { Write-Output "::error::$env:T did not PASS (skipped?)"; exit 1 }
       # The packaging tests that run the real Android SDK tools skip when the
       # SDK is missing, so a plain `go test` passing proves nothing about them.
       # The Windows image ships the SDK and a JDK; there d8 and apksigner are
