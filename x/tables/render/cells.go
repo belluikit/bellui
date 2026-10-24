@@ -19,6 +19,17 @@ type CellsWidget struct {
 	pool     *CellPool
 }
 
+// GroupAggregate is one aggregate shown on a group header row.
+type GroupAggregate struct {
+	// Col is the absolute display column (pinned-left + main + pinned-right).
+	Col int
+	// Text is the formatted value drawn in the column.
+	Text string
+	// Label is the spoken form, e.g. "Salary sum 300", appended to the
+	// row's accessible label.
+	Label string
+}
+
 // GridAccess is the interface the CellsWidget needs from the DataGrid.
 // This avoids a circular dependency between the render and root packages.
 type GridAccess interface {
@@ -67,6 +78,16 @@ type GridAccess interface {
 	IsGroupRow(row int) bool
 	// GroupRowInfo returns the group key and child count for a group header row.
 	GroupRowInfo(row int) (key string, childCount int, expanded bool, depth int)
+	// GroupRowAggregates returns the aggregates a group header row shows, one
+	// per visible aggregated column in display order (nil for none). The
+	// GroupRowOverlay draws each in its column and adds it to the row's
+	// accessible label.
+	GroupRowAggregates(row int) []GroupAggregate
+	// HeaderRegions and ScrollOffsetX are the body's column-band geometry
+	// (see RegionLayoutAccess), which the GroupRowOverlay uses to place each
+	// aggregate where its column is drawn.
+	HeaderRegions() (mainX, pinnedRightX, pinnedRightW float32)
+	ScrollOffsetX() float32
 	// ToggleGroup expands or collapses the row group with the given key, routing
 	// through the same path a pointer tap on the group header uses. It backs the
 	// group-header row's accessible expand/collapse action.

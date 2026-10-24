@@ -176,3 +176,93 @@ func TestCellsAndPinnedRenderers_SkipGroupRows(t *testing.T) {
 		}
 	}
 }
+
+// A group row's aggregates are drawn in their own columns — pinned-left fixed,
+// main translated by the horizontal scroll inside the main clip, pinned-right
+// fixed — and appended to the row's accessible label (#689).
+func TestGroupRowOverlay_Aggregates(t *testing.T) {
+	test.NewTempApp(t)
+	g := &fakeGrid{
+		rows: 20, cols: 2, pinnedLeft: 1, pinnedRt: 1, scrollX: 30,
+		groupRows: map[int]fakeGroupInfo{
+			0: {key: "West", count: 3, expanded: true},
+			4: {key: "East", count: 2, expanded: false},
+		},
+		groupAggs: map[int][]GroupAggregate{
+			0: {
+				{Col: 0, Text: "7", Label: "ID count 7"},
+				{Col: 2, Text: "300", Label: "Salary sum 300"},
+				{Col: 3, Text: "42.5", Label: "Score average 42.5"},
+			},
+			4: {{Col: 2, Text: "90", Label: "Salary sum 90"}},
+		},
+	}
+	vp := newOverlayViewport(g, 400, 300)
+	w := NewGroupRowOverlay(g, vp)
+	size := geo.NewSize(600, 300)
+	r := w.CreateRenderer().(*groupRowOverlayRenderer)
+	r.refresh(size)
+
+	texts := map[string]*canvas.Text{}
+	inMainClip := map[string]bool{}
+	var nodes []*groupRowA11y
+	for _, o := range overlayContent(r) {
+		switch v := o.(type) {
+		case *canvas.Text:
+			texts[v.Text] = v
+		case *groupRowA11y:
+			nodes = append(nodes, v)
+		}
+	}
+	if r.mainAgg == nil {
+		t.Fatal("no main-band aggregate clip was built")
+	}
+	for _, o := range r.mainAgg.Objects {
+		if v, ok := o.(*canvas.Text); ok {
+			texts[v.Text] = v
+			inMainClip[v.Text] = true
+		}
+	}
+
+	// Columns are 100 wide with padding 2; aggregates are inset by 4.
+	// mainX = 102, pinnedRightX = 600 - 100 = 500, scroll 30.
+	cases := []struct {
+		text   string
+		x, y   float32
+		inMain bool
+	}{
+		{"7", 4, 2, false},             // pinned-left col 0, row 0
+		{"300", 102 - 30 + 4, 2, true}, // main col 2, after main col 1 (100 + 2): clip-local x = 102 - 30
+		{"42.5", 500 + 4, 2, false},    // pinned-right col 3
+		{"90", 102 - 30 + 4, 4*32 + 2, true},
+	}
+	for _, c := range cases {
+		tx := texts[c.text]
+		if tx == nil {
+			t.Errorf("aggregate %q not drawn", c.text)
+			continue
+		}
+		if tx.Position() != geo.NewPos(c.x, c.y) {
+			t.Errorf("aggregate %q at %v, want (%v, %v)", c.text, tx.Position(), c.x, c.y)
+		}
+		if inMainClip[c.text] != c.inMain {
+			t.Errorf("aggregate %q in main clip = %v, want %v", c.text, inMainClip[c.text], c.inMain)
+		}
+	}
+	if r.mainClip.Position().X != 102 || r.mainClip.Size().Width != 500-102 {
+		t.Errorf("main clip x=%v w=%v, want x=102 w=398", r.mainClip.Position().X, r.mainClip.Size().Width)
+	}
+
+	labels := map[string]bool{}
+	for _, n := range nodes {
+		labels[n.AccessibleLabel()] = true
+	}
+	for _, want := range []string{
+		"West (3), ID count 7, Salary sum 300, Score average 42.5",
+		"East (2), Salary sum 90",
+	} {
+		if !labels[want] {
+			t.Errorf("no group node labelled %q; got %v", want, labels)
+		}
+	}
+}

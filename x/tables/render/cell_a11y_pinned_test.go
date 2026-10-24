@@ -255,7 +255,7 @@ func TestGroupRowA11y(t *testing.T) {
 	fg := &fakeGrid{}
 	g := newGroupRowA11y(fg)
 
-	g.set("East", 12, true)
+	g.set("East", 12, true, nil)
 	if g.AccessibleRole() != core.RoleTableRow {
 		t.Errorf("role = %v, want RoleTableRow", g.AccessibleRole())
 	}
@@ -266,7 +266,7 @@ func TestGroupRowA11y(t *testing.T) {
 		t.Error("expanded group should report StateExpanded")
 	}
 
-	g.set("East", 12, false)
+	g.set("East", 12, false, nil)
 	if g.AccessibleState()&core.StateExpanded != 0 {
 		t.Error("collapsed group must not report StateExpanded")
 	}
@@ -280,7 +280,7 @@ func TestGroupRowA11y_ExpandCollapseAction(t *testing.T) {
 	g := newGroupRowA11y(fg)
 
 	// Collapsed group offers Expand; performing it toggles.
-	g.set("East", 12, false)
+	g.set("East", 12, false, nil)
 	if acts := g.AccessibleActions(); len(acts) != 1 || acts[0].Name != core.ActionExpand {
 		t.Fatalf("collapsed actions = %v, want single expand", acts)
 	}
@@ -291,7 +291,7 @@ func TestGroupRowA11y_ExpandCollapseAction(t *testing.T) {
 	}
 
 	// Expanded group offers Collapse; the mismatched Expand is a no-op.
-	g.set("East", 12, true)
+	g.set("East", 12, true, nil)
 	if acts := g.AccessibleActions(); len(acts) != 1 || acts[0].Name != core.ActionCollapse {
 		t.Fatalf("expanded actions = %v, want single collapse", acts)
 	}

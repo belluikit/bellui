@@ -27,14 +27,43 @@ x/tables provides a high-performance, feature-rich data grid with virtual scroll
 - **State persistence** - Save/restore column widths, order, pinning, visibility
 
 ### Data
-- **Row grouping** - Group rows by column values with expand/collapse
+- **Row grouping** - Group rows by column values with expand/collapse, and per-column aggregates (sum, average, min, max, count, first, last) on each group header
 - **Aggregation** - Sum, Avg, Min, Max, Count, First, Last + custom functions
 - **Pagination** - Configurable page size with navigation API
 - **Pivot tables** - Dynamic columns from unique values with aggregation
 - **Tree data** - Hierarchical parent-child rows with expand/collapse
 - **Master-detail** - Expandable detail rows
 
-### Sparklines
+### Group aggregates
+
+Give a column an `AggFunc` and, when the grid is grouped, each group header row
+shows that column's aggregate over the group's rows, in that column. A collapsed
+group still aggregates all of its rows. The header row's accessible label reads
+the aggregates too, e.g. "Engineering (12), Salary sum $1250000".
+
+```go
+cols := []*tables.ColumnDef{
+    {Field: "dept"},
+    {Field: "name"},
+    {Field: "salary", HeaderName: "Salary", AggFunc: bellui.Ptr(pipeline.AggSum),
+        ValueFormatter: func(v any) string { return fmt.Sprintf("$%.0f", v) }},
+    {Field: "age", HeaderName: "Age", AggFunc: bellui.Ptr(pipeline.AggAvg)},
+}
+grid.API().SetRowGroupColumn("dept")
+```
+
+`AggFunc` is a pointer because `AggSum` is the zero value; nil means no
+aggregate. Cell values are read as numbers (any Go integer or float type), and
+anything else, nil included, counts as 0. The aggregate is a `float64`: it is
+shown through the column's `ValueFormatter` when set (so the formatter must
+accept a `float64`), else through a `NumberRenderer`'s `Format`, else rounded to
+two decimals. A count is always shown as a whole number.
+
+Code that drives the pipeline directly sets the same thing on the transform:
+`GroupTransform.AggColumns` fills each header's `GroupRow.AggValues`, keyed by
+`AggColumn.Field`.
+
+## Sparklines
 Four chart types rendered in cells via `canvas.Raster`:
 - **Line** - With optional markers and area fill
 - **Area** - Line with filled area below
@@ -149,6 +178,35 @@ api.SetGridState(state)
 api.Undo()
 api.Redo()
 ```
+
+## Group aggregates
+
+Give a column an `AggFunc` and, when the grid is grouped, each group header row
+shows that column's aggregate over the group's rows, in that column. A collapsed
+group still aggregates all of its rows. The header row's accessible label reads
+the aggregates too, e.g. "Engineering (12), Salary sum $1250000".
+
+```go
+cols := []*tables.ColumnDef{
+    {Field: "dept"},
+    {Field: "name"},
+    {Field: "salary", HeaderName: "Salary", AggFunc: bellui.Ptr(pipeline.AggSum),
+        ValueFormatter: func(v any) string { return fmt.Sprintf("$%.0f", v) }},
+    {Field: "age", HeaderName: "Age", AggFunc: bellui.Ptr(pipeline.AggAvg)},
+}
+grid.API().SetRowGroupColumn("dept")
+```
+
+`AggFunc` is a pointer because `AggSum` is the zero value; nil means no
+aggregate. Cell values are read as numbers (any Go integer or float type), and
+anything else, nil included, counts as 0. The aggregate is a `float64`: it is
+shown through the column's `ValueFormatter` when set (so the formatter must
+accept a `float64`), else through a `NumberRenderer`'s `Format`, else rounded to
+two decimals. A count is always shown as a whole number.
+
+Code that drives the pipeline directly sets the same thing on the transform:
+`GroupTransform.AggColumns` fills each header's `GroupRow.AggValues`, keyed by
+`AggColumn.Field`.
 
 ## Sparklines
 
