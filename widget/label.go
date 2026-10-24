@@ -462,6 +462,13 @@ type labelRenderer struct {
 }
 
 func (r *labelRenderer) Destroy() {
+	// The selection is laid out with the label but is one of Objects only
+	// while the label is selectable, so a release of the tree does not reach
+	// its renderer, and CreateRenderer replaces it: left cached, it outlived
+	// the label's (#720).
+	if r.l.selection != nil {
+		cache.DestroyRenderer(r.l.selection)
+	}
 	// Labels are recycled in List/Tree/Table rows on scroll. If a row is
 	// destroyed while the truncation-tooltip timer is pending, cancel it so it
 	// doesn't fire on a removed widget, and hide any tooltip already shown so
