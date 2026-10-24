@@ -54,6 +54,7 @@ type Chart struct {
 	animCtrl      *animate.Controller
 	animStarted   bool       // tracks whether entrance animation has fired
 	pendingDirty  dirtyFlags // what changed since last render; protected by mu
+	capturing     bool       // a capture is under way: draw the chart without its controls (see captureImage); protected by mu
 
 	// Renderer reference for direct rebuilds (bypassing widget.Refresh).
 	renderer *chartRenderer
@@ -383,11 +384,13 @@ func (c *Chart) handleToolboxAction(action string) {
 	}
 }
 
-// SaveAsImage captures the chart as it is drawn on screen and offers to save
-// it as a PNG through a file-save dialog. Call it on the main goroutine: the
-// capture reads the window's canvas. A chart that is not on a canvas, or whose
-// window could not be drawn, has nothing to capture; that is logged and no
-// dialog opens.
+// SaveAsImage captures the chart and offers to save it as a PNG through a
+// file-save dialog. The image holds the chart only — title, series, axes,
+// legend, overlays and drawings — without the toolbox, the zoom buttons, the
+// tooltip or the axis pointer, as ECharts' saveAsImage leaves its toolbox out
+// (see captureImage). Call it on the main goroutine: the capture reads the
+// window's canvas. A chart that is not on a canvas, or whose window could not
+// be drawn, has nothing to capture; that is logged and no dialog opens.
 func (c *Chart) SaveAsImage() {
 	img := c.captureImage()
 	if img == nil {
@@ -430,20 +433,29 @@ func (c *Chart) window() bellui.Window {
 	return nil
 }
 
-// captureImage returns the chart's pixels as they are drawn on its canvas —
-// series, axes, legend and overlays included — cut out of a capture of the
-// whole canvas. Only the part of the chart its clipping ancestors leave in
-// view is captured: a chart scrolled partly out of sight yields the visible
-// part, never the widgets drawn where the rest would be. It returns nil when
-// the chart is not on a canvas, is wholly out of view, or the canvas could
-// not be drawn. The image is in device pixels, so on a HiDPI screen it is
-// larger than the chart's size in canvas units.
+// captureImage returns the chart's pixels as they are drawn on its canvas,
+// cut out of a capture of the whole canvas, with the controls left out: the
+// toolbox, the zoom buttons, and the tooltip and axis pointer (crosshair and
+// value tags) when they are showing. Title, series, axes, legend, overlays and
+// committed drawings are included. For the capture the chart is redrawn
+// without the controls, then redrawn as it was, whether or not the capture
+// succeeded; the tooltip's state is not touched, so a tooltip that was showing
+// shows again afterwards.
+//
+// Only the part of the chart its clipping ancestors leave in view is captured:
+// a chart scrolled partly out of sight yields the visible part, never the
+// widgets drawn where the rest would be. It returns nil when the chart is not
+// on a canvas, is wholly out of view, or the canvas could not be drawn. The
+// image is in device pixels, so on a HiDPI screen it is larger than the
+// chart's size in canvas units.
 func (c *Chart) captureImage() image.Image {
 	d := bellui.CurrentApp().Driver()
 	cv := d.CanvasForObject(c)
 	if cv == nil {
 		return nil
 	}
+	c.setCapturing(true)
+	defer c.setCapturing(false)
 	full := cv.Capture()
 	if full == nil {
 		return nil
@@ -483,6 +495,16 @@ func (c *Chart) captureImage() image.Image {
 	out := image.NewNRGBA(image.Rect(0, 0, r.Dx(), r.Dy()))
 	draw.Draw(out, out.Bounds(), full, r.Min, draw.Src)
 	return out
+}
+
+// setCapturing turns the capture drawing on or off and redraws the chart in
+// it at once, so the frame a capture paints next has the controls left out
+// (on) or back (off).
+func (c *Chart) setCapturing(on bool) {
+	c.mu.Lock()
+	c.capturing = on
+	c.mu.Unlock()
+	c.refreshDirty(dirtyFull)
 }
 
 // MagicTypeSwitch swaps series between bar and line types.
