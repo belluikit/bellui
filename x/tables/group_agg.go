@@ -21,30 +21,31 @@ func (g *DataGrid) groupAggColumns() []pipeline.AggColumn {
 		}
 		getter := rc.def.valueGetter()
 		cols = append(cols, pipeline.AggColumn{
-			Field:       rc.def.ID(),
-			ValueGetter: func(row any) float64 { return aggNumber(getter(row)) },
-			Func:        *rc.def.AggFunc,
+			Field:   rc.def.ID(),
+			ValueOK: func(row any) (float64, bool) { return aggNumber(getter(row)) },
+			Func:    *rc.def.AggFunc,
 		})
 	}
 	return cols
 }
 
 // aggNumber reads a cell value as a number for aggregation: any Go integer or
-// float kind (named types included); anything else, nil included, is 0.
-func aggNumber(v any) float64 {
+// float kind (named types included). Anything else, nil and "" included, has
+// no value (ok false), so the aggregate skips it (#747).
+func aggNumber(v any) (float64, bool) {
 	if v == nil {
-		return 0
+		return 0, false
 	}
 	rv := reflect.ValueOf(v)
 	switch rv.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return float64(rv.Int())
+		return float64(rv.Int()), true
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr:
-		return float64(rv.Uint())
+		return float64(rv.Uint()), true
 	case reflect.Float32, reflect.Float64:
-		return rv.Float()
+		return rv.Float(), true
 	}
-	return 0
+	return 0, false
 }
 
 // aggFuncName is the word a screen reader hears for an aggregate.
@@ -109,7 +110,7 @@ func (g *DataGrid) GroupRowAggregates(row int) []render.GroupAggregate {
 		}
 		v, ok := gr.AggValues[rc.def.ID()].(float64)
 		if !ok {
-			continue
+			continue // no value (every cell blank): the cell stays empty
 		}
 		text := formatAggregate(rc, v)
 		out = append(out, render.GroupAggregate{

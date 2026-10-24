@@ -19,7 +19,8 @@ type GroupRow struct {
 	// AggValues holds the group's aggregates, keyed by AggColumn.Field, for
 	// group header rows: Apply sets it to Aggregate(AggColumns, rows, source)
 	// over every row in the group, so a collapsed group carries the same
-	// values as an expanded one. Each value is a float64. It is nil on data
+	// values as an expanded one. Each value is a float64, or nil when the
+	// column has no value for the group (AggColumn.ValueOK). It is nil on data
 	// rows, and on header rows when the transform has no AggColumns.
 	AggValues map[string]any
 }
