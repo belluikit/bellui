@@ -3,6 +3,7 @@
 package webgpu
 
 import (
+	"os"
 	"testing"
 
 	"github.com/belluikit/webgpu/wgpu"
@@ -16,9 +17,16 @@ import (
 // is fatal inside wgpu-native: before the cap this test aborted the binary
 // instead of failing.
 func TestSurfaceBeyondDeviceLimitIsCapped(t *testing.T) {
+	// A Metal surface on an instance without the Metal backend makes
+	// wgpuInstanceCreateSurface panic inside wgpu-native, which aborts the
+	// test binary rather than returning an error NewDevice could report. So
+	// an instance narrowed to other backends has no adapter for this test.
+	if desc := chooseInstanceBackends(); desc != nil && desc.Backends != 0 && desc.Backends&instanceBackendMetal == 0 {
+		noGPU(t, "no WebGPU adapter available: BELLUI_WEBGPU_BACKENDS=%q leaves out metal", os.Getenv("BELLUI_WEBGPU_BACKENDS"))
+	}
 	d, err := NewDevice(bareMetalLayerSurfaceDescriptor(), 1920, 52006)
 	if err != nil {
-		t.Skipf("no WebGPU device available: %v", err)
+		noGPU(t, "no WebGPU device available: %v", err)
 	}
 	defer d.Destroy()
 	limit := d.maxSurfaceDim

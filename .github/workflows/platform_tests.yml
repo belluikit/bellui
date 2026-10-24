@@ -142,6 +142,11 @@ jobs:
       # wgpu-native links cleanly only without the host's -fuse-ld=lld / CFLAGS.
       CGO_LDFLAGS: ""
       CGO_CFLAGS: ""
+      # Both legs have an adapter (lavapipe, Metal), so a GPU test that cannot
+      # get one, or a windowed test that gets no window or cannot size it,
+      # fails instead of skipping: a skip prints the same "ok" as a pass. An
+      # occluded macOS window still skips (#449, #631).
+      BELLUI_REQUIRE_WEBGPU: "1"
     steps:
       - uses: actions/checkout@v7
         with:
@@ -162,7 +167,7 @@ jobs:
         run: go build ./...
 
       - name: WebGPU painter GPU tests
-        run: ${{ matrix.runner }} go test ./internal/painter/webgpu/...
+        run: ${{ matrix.runner }} go test -v -count=1 ./internal/painter/webgpu/...
 
       # Real-window surface configure → present → Canvas().Capture() coverage on
       # the default WebGPU backend (Metal on macOS, Vulkan/lavapipe on Linux).
@@ -172,13 +177,13 @@ jobs:
       # self-skips if no window/adapter is available. ./.github/scripts/xvfb-run-safe
       # supplies the Linux display.
       - name: WebGPU windowed present + Capture (#329)
-        run: ${{ matrix.runner }} go test -run TestWindowedSurfaceCapture -count=1 -timeout 120s ./internal/driver/glfw/
+        run: ${{ matrix.runner }} go test -v -run TestWindowedSurfaceCapture -count=1 -timeout 120s ./internal/driver/glfw/
 
       # The same with partial repaint off (#496). It is on by default on
       # desktop, so this keeps the full-repaint paint path, which mobile and the
       # web use, covered too.
       - name: WebGPU windowed present + Capture, nopartialrepaint (#496)
-        run: ${{ matrix.runner }} go test -tags nopartialrepaint -run TestWindowedSurfaceCapture -count=1 -timeout 120s ./internal/driver/glfw/
+        run: ${{ matrix.runner }} go test -v -tags nopartialrepaint -run TestWindowedSurfaceCapture -count=1 -timeout 120s ./internal/driver/glfw/
 
 
   windows_tests:
@@ -228,13 +233,15 @@ jobs:
 
       # Headless readback via the default all-backends instance. The hosted
       # runner has no GPU, so D3D12 runs on whatever adapter the image offers
-      # (WARP); the tests self-skip when no adapter is available.
+      # (WARP). BELLUI_REQUIRE_WEBGPU makes a missing adapter fail rather than
+      # skip (#449).
       - name: WebGPU painter GPU tests (D3D12)
         shell: bash
         env:
           CGO_LDFLAGS: ""
           CGO_CFLAGS: ""
-        run: go test -count=1 ./internal/painter/webgpu/...
+          BELLUI_REQUIRE_WEBGPU: "1"
+        run: go test -v -count=1 ./internal/painter/webgpu/...
 
       # Real-window present + Canvas().Capture() coverage on D3D12 (pre-rebrand tracker #329);
       # self-skips if no window/adapter.
@@ -250,7 +257,8 @@ jobs:
         env:
           CGO_LDFLAGS: ""
           CGO_CFLAGS: ""
-        run: go test -run TestWindowedSurfaceCapture -count=1 -timeout 120s ./internal/driver/glfw/
+          BELLUI_REQUIRE_WEBGPU: "1"
+        run: go test -v -run TestWindowedSurfaceCapture -count=1 -timeout 120s ./internal/driver/glfw/
 
 
   # Windows on ARM64, the second mingw flavor. The x64 job builds the UIA cgo
@@ -322,12 +330,34 @@ jobs:
         shell: bash
         run: go test -tags accessibility,gl,ci,no_glfw,migrated_belluido ./internal/accessibility/... ./core/... ./internal/driver/glfw/
 
-      # Build-only. wgpu-native ships a windows/arm64 slice, so this guards the
-      # link; the GPU test steps the x64 job runs are omitted here until a
-      # D3D12 adapter is confirmed usable on this runner — see #15.
+      # wgpu-native ships a windows/arm64 slice, so this guards the link.
       - name: WebGPU build (D3D12)
         shell: bash
         env:
           CGO_LDFLAGS: ""
           CGO_CFLAGS: ""
         run: go build ./...
+
+      # The x64 job's two GPU steps. The hosted windows-11-arm image
+      # offers a D3D12 adapter, WARP (software, like x64's), so the goldens
+      # match; probe run 40051597502 passed both with all backends enabled
+      # (#15, #449). The Parallels GL crash that once forced
+      # BELLUI_WEBGPU_BACKENDS=dx12 here does not reproduce on this image.
+      # WARP is not a real Windows-on-ARM GPU; that stays open in #449.
+      - name: WebGPU painter GPU tests (D3D12, arm64)
+        shell: bash
+        env:
+          CGO_LDFLAGS: ""
+          CGO_CFLAGS: ""
+          BELLUI_REQUIRE_WEBGPU: "1"
+        run: go test -v -count=1 ./internal/painter/webgpu/
+
+      # Real-window present + Canvas().Capture() on D3D12. The session caveat
+      # on the x64 step applies here too.
+      - name: WebGPU windowed present + Capture (D3D12, arm64)
+        shell: bash
+        env:
+          CGO_LDFLAGS: ""
+          CGO_CFLAGS: ""
+          BELLUI_REQUIRE_WEBGPU: "1"
+        run: go test -v -run TestWindowedSurfaceCapture -count=1 -timeout 120s ./internal/driver/glfw/

@@ -25,14 +25,18 @@ import (
 // surface is a gap to skip, matching the tests' existing no-window / no-capture
 // skips — not a regression to fail on. A real sizing bug is caught by the
 // dedicated resize tests on a healthy runner.
+//
+// Under BELLUI_REQUIRE_WEBGPU=1 (CI's GPU legs) that gap fails the test
+// instead (#449): those legs are expected to size the window.
 func ensureCanvasSizeOrSkip(t *testing.T, w *safeWindow, size geo.Size) {
+	t.Helper()
 	const maxAttempts = 100 // ~1s at 10ms, matching waitForCanvasSize
 	for attempts := 0; ; attempts++ {
 		if w.Canvas().Size() == size {
 			return
 		}
 		if attempts >= maxAttempts {
-			t.Skipf("canvas did not reach %v (got %v) — headless/degraded surface (e.g. no DRI3); "+
+			noWindowGPU(t, "canvas did not reach %v (got %v) — headless/degraded surface (e.g. no DRI3); "+
 				"cannot exercise present/capture", size, w.Canvas().Size())
 		}
 		if attempts%20 == 0 {
@@ -58,9 +62,7 @@ func TestWindowedSurfaceCapture(t *testing.T) {
 	want := color.NRGBA{R: 0, G: 180, B: 80, A: 255}
 
 	w := createWindow("WebGPU surface capture")
-	if w == nil || w.window == nil {
-		t.Skip("no window available (headless / no GPU surface)")
-	}
+	windowOrSkip(t, w)
 	defer w.Close()
 	w.SetPadded(false)
 
@@ -103,9 +105,7 @@ func TestWindowedSurfaceCaptureResizeStorm(t *testing.T) {
 	want := color.NRGBA{R: 0, G: 180, B: 80, A: 255}
 
 	w := createWindow("WebGPU resize storm")
-	if w == nil || w.window == nil {
-		t.Skip("no window available (headless / no GPU surface)")
-	}
+	windowOrSkip(t, w)
 	defer w.Close()
 	w.SetPadded(false)
 
@@ -165,9 +165,7 @@ func TestWindowedSurfaceCaptureOverlays(t *testing.T) {
 	marker := color.NRGBA{R: 220, G: 30, B: 30, A: 255}
 
 	w := createWindow("capture overlays")
-	if w == nil || w.window == nil {
-		t.Skip("no window available (headless / no GPU surface)")
-	}
+	windowOrSkip(t, w)
 	defer w.Close()
 	w.SetPadded(false)
 
