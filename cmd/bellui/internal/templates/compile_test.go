@@ -89,9 +89,13 @@ func TestGeneratedAppSourcesCompileAgainstToolkit(t *testing.T) {
 	write("translations/en.pxf", []byte("\"Hello World!\" = \"Hello World!\"\n"))
 	write("go.mod", []byte("module example.com/hello\n\ngo "+mf.Go.Version+"\n"))
 
-	work := filepath.Join(dir, "go.work")
-	require.NoError(t, os.WriteFile(work, []byte("go "+mf.Go.Version+"\n\nuse (\n\t"+
-		quoteModPath(app)+"\n\t"+quoteModPath(root)+"\n)\n"), 0o644))
+	// The app is "use ." from a go.work beside its go.mod: go vet ./... needs
+	// the working directory to match a use entry, and an absolute temp path can
+	// be spelled two ways on Windows (8.3 short name or long name), which made
+	// "directory prefix . does not contain modules listed in go.work".
+	work := filepath.Join(app, "go.work")
+	require.NoError(t, os.WriteFile(work, []byte("go "+mf.Go.Version+"\n\nuse (\n\t.\n\t"+
+		quoteModPath(root)+"\n)\n"), 0o644))
 
 	// GOWORK picks the workspace above rather than whatever the test runs
 	// under; GOFLAGS is cleared so a -mod or -tags meant for this module's
@@ -115,7 +119,8 @@ func TestGeneratedAppSourcesCompileAgainstToolkit(t *testing.T) {
 	vet.Dir, vet.Env = app, env
 	out, err = vet.CombinedOutput()
 	if err != nil {
-		t.Fatalf("go vet of the generated app failed: %v\n%s\nmain.go:\n%s", err, out, mustRead(t, filepath.Join(app, "main.go")))
+		t.Fatalf("go vet of the generated app failed: %v\n%s\napp dir: %s\ngo.work:\n%s\nmain.go:\n%s",
+			err, out, app, mustRead(t, work), mustRead(t, filepath.Join(app, "main.go")))
 	}
 }
 
