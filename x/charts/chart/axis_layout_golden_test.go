@@ -4,8 +4,10 @@ import (
 	"flag"
 	"fmt"
 	"image/color"
+	"math"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -21,9 +23,16 @@ import (
 var updateAxisGolden = flag.Bool("update-axis-golden", false, "rewrite testdata/axis_literal_layout.golden")
 
 // describeObjects writes every drawn object's type, geometry, colour and text
-// in order, so two renders compare exactly.
+// in order, so two renders compare exactly. Coordinates are rounded to 0.01 px:
+// Go may fuse x*y+z into one rounding on arm64 but not on amd64, so the last
+// float32 digit of a position differs between them.
 func describeObjects(objs []core.CanvasObject) string {
 	var b strings.Builder
+	num := func(v float32) string {
+		return strconv.FormatFloat(math.Round(float64(v)*100)/100, 'f', -1, 64)
+	}
+	pos := func(p geo.Position) string { return "{" + num(p.X) + " " + num(p.Y) + "}" }
+	size := func(s geo.Size) string { return "{" + num(s.Width) + " " + num(s.Height) + "}" }
 	col := func(c color.Color) string {
 		if c == nil {
 			return "nil"
@@ -34,13 +43,13 @@ func describeObjects(objs []core.CanvasObject) string {
 	for _, o := range objs {
 		switch v := o.(type) {
 		case *canvas.Line:
-			fmt.Fprintf(&b, "line %v %v %s %v\n", v.Position1, v.Position2, col(v.StrokeColor), v.StrokeWidth)
+			fmt.Fprintf(&b, "line %s %s %s %s\n", pos(v.Position1), pos(v.Position2), col(v.StrokeColor), num(v.StrokeWidth))
 		case *canvas.Text:
-			fmt.Fprintf(&b, "text %q %v %v %s %v %d\n", v.Text, v.Position(), v.Size(), col(v.Color), v.TextSize, v.Alignment)
+			fmt.Fprintf(&b, "text %q %s %s %s %s %d\n", v.Text, pos(v.Position()), size(v.Size()), col(v.Color), num(v.TextSize), v.Alignment)
 		case *canvas.Rectangle:
-			fmt.Fprintf(&b, "rect %v %v %s %s %v\n", v.Position(), v.Size(), col(v.FillColor), col(v.StrokeColor), v.StrokeWidth)
+			fmt.Fprintf(&b, "rect %s %s %s %s %s\n", pos(v.Position()), size(v.Size()), col(v.FillColor), col(v.StrokeColor), num(v.StrokeWidth))
 		default:
-			fmt.Fprintf(&b, "%T %v %v %v\n", o, o.Position(), o.Size(), o.Visible())
+			fmt.Fprintf(&b, "%T %s %s %v\n", o, pos(o.Position()), size(o.Size()), o.Visible())
 		}
 	}
 	return b.String()
@@ -53,7 +62,8 @@ func describeObjects(objs []core.CanvasObject) string {
 // draws exactly the same objects in the same places and colours.
 //
 // The golden file was written by this test on the code before those fields
-// existed (go test -run TestAxisLiteralConfigs_RenderAsBefore -update-axis-golden).
+// existed (go test -run TestAxisLiteralConfigs_RenderAsBefore -update-axis-golden),
+// and must match on both arm64 and amd64.
 func TestAxisLiteralConfigs_RenderAsBefore(t *testing.T) {
 	lo, hi := 0.0, 100.0
 	cases := []struct {

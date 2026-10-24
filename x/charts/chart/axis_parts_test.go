@@ -274,23 +274,64 @@ func TestAxisOffset_ThreeYAxes(t *testing.T) {
 // Two left Y axes, the second offset by the grid's left margin, keep their
 // labels apart and inside the chart; the plot moves right to make room.
 func TestAxisOffset_TwoLeftYAxes(t *testing.T) {
-	grid := DefaultGrid()
-	without, _ := renderOpt(t, partsOption(nil))
-	opt := partsOption(func(_, _, y2 *axis.Config) {
-		y2.Position, y2.Offset = axis.PositionLeft, grid.Left
+	// The left labels fill the grid's left margin, so the custom grid checks
+	// that the band and the room follow opt.Grid, not DefaultGrid.
+	for name, custom := range map[string]*Grid{"default grid": nil, "custom grid": {Left: 90, Right: 30, Top: 40, Bottom: 50}} {
+		t.Run(name, func(t *testing.T) {
+			grid := DefaultGrid()
+			if custom != nil {
+				grid = *custom
+			}
+			base := partsOption(nil)
+			base.Grid = custom
+			without, _ := renderOpt(t, base)
+			opt := partsOption(func(_, _, y2 *axis.Config) {
+				y2.Position, y2.Offset = axis.PositionLeft, grid.Left
+			})
+			opt.Grid = custom
+			c, r := renderOpt(t, opt)
+			plot := c.renderSnap.plotRect
+			if want := without.renderSnap.plotRect.X + grid.Left; plot.X != want {
+				t.Errorf("plot starts at x=%v, want %v: moved right by the offset", plot.X, want)
+			}
+			l1, h1 := labelSpan(textsIn(r.objects, yText))
+			l2, h2 := labelSpan(textsIn(r.objects, y2Text))
+			if l1 < 0 || l2 < 0 || h1 > plot.X || h2 > plot.X {
+				t.Errorf("left labels span %v..%v and %v..%v, want both inside 0..%v", l1, h1, l2, h2, plot.X)
+			}
+			if l1 < h2 && l2 < h1 {
+				t.Errorf("left axis labels (x %v..%v) overlap the offset left axis's (x %v..%v)", l1, h1, l2, h2)
+			}
+			// Each axis's label boxes fill the grid.Left-wide band that ends at it.
+			if want := plot.X - grid.Left; l1 != want {
+				t.Errorf("left axis labels start at x=%v, want %v: a band grid.Left wide", l1, want)
+			}
+			if want := plot.X - 2*grid.Left; l2 != want {
+				t.Errorf("offset left axis labels start at x=%v, want %v: a band grid.Left wide", l2, want)
+			}
+		})
+	}
+}
+
+// A negative Offset counts as 0 everywhere it is read: the axes, the room
+// the layout makes and the pointer tags.
+func TestAxisOffset_NegativeIsZero(t *testing.T) {
+	c0, r0 := renderOpt(t, partsOption(nil))
+	opt := partsOption(func(x, y, y2 *axis.Config) {
+		x.Offset, y.Offset, y2.Offset = -30, -30, -30
 	})
 	c, r := renderOpt(t, opt)
-	plot := c.renderSnap.plotRect
-	if want := without.renderSnap.plotRect.X + grid.Left; plot.X != want {
-		t.Errorf("plot starts at x=%v, want %v: moved right by the offset", plot.X, want)
+	if c.renderSnap.plotRect != c0.renderSnap.plotRect {
+		t.Errorf("plot %v with negative offsets, want %v as with none", c.renderSnap.plotRect, c0.renderSnap.plotRect)
 	}
-	l1, h1 := labelSpan(textsIn(r.objects, yText))
-	l2, h2 := labelSpan(textsIn(r.objects, y2Text))
-	if l1 < 0 || l2 < 0 || h1 > plot.X || h2 > plot.X {
-		t.Errorf("left labels span %v..%v and %v..%v, want both inside 0..%v", l1, h1, l2, h2, plot.X)
+	if got, want := describeObjects(r.objects), describeObjects(r0.objects); got != want {
+		t.Errorf("negative offsets draw differently from none:\n got: %s\nwant: %s", got, want)
 	}
-	if l1 < h2 && l2 < h1 {
-		t.Errorf("left axis labels (x %v..%v) overlap the offset left axis's (x %v..%v)", l1, h1, l2, h2)
+	if r.cachedPlotArea != r0.cachedPlotArea {
+		t.Errorf("pointer plot area %+v with negative offsets, want %+v", r.cachedPlotArea, r0.cachedPlotArea)
+	}
+	if r.cachedYAxisSeries[1] != r0.cachedYAxisSeries[1] {
+		t.Errorf("series 1's pointer axis %+v with a negative offset, want %+v", r.cachedYAxisSeries[1], r0.cachedYAxisSeries[1])
 	}
 }
 
@@ -349,6 +390,30 @@ func TestPointerTags_FollowAxisOffset(t *testing.T) {
 		}
 		if y := xTag.Position().Y; y < plot.Y+plot.H+20 {
 			t.Errorf("%s: X tag at y=%v, want it below the offset X axis at %v", name, y, plot.Y+plot.H+20)
+		}
+	}
+}
+
+// The Y tag of a series on a left-hand Y axis moved out by Offset sits to
+// the left of that axis, not of the plot edge.
+func TestPointerTags_FollowLeftAxisOffset(t *testing.T) {
+	grid := DefaultGrid()
+	opt := partsOption(func(_, _, y2 *axis.Config) {
+		y2.Position, y2.Offset = axis.PositionLeft, grid.Left
+	})
+	opt.Tooltip = pointerTags
+	c, r := renderOpt(t, opt)
+	plot := c.renderSnap.plotRect
+
+	full, partial := hoverPoint(t, c, r, 1, 1, 1, 2)
+	for name, objs := range map[string][]core.CanvasObject{"full rebuild": full, "partial refresh": partial} {
+		yTag := findText(objs, "2.00")
+		if yTag == nil {
+			t.Fatalf("%s: no Y tag", name)
+		}
+		axisX := plot.X - grid.Left
+		if r := yTag.Position().X + yTag.Size().Width; r > axisX {
+			t.Errorf("%s: Y tag ends at x=%v, want it left of the offset axis at %v", name, r, axisX)
 		}
 	}
 }

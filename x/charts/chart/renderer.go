@@ -36,6 +36,7 @@ type renderState struct {
 // layoutResult holds the outputs of the layout-computation phase of rebuild().
 type layoutResult struct {
 	plotRect         coord.Rect
+	grid             Grid // the margins plotRect was laid out in
 	titleObjs        []core.CanvasObject
 	breadcrumbObjs   []core.CanvasObject
 	legendObjs       []core.CanvasObject
@@ -73,7 +74,7 @@ type chartRenderer struct {
 	cachedSeriesColors map[int]color.Color
 	cachedTooltipCfg   *component.TooltipConfig
 	cachedPlotArea     component.PlotArea
-	cachedRightSeries  map[int]pointerYAxis // where each series' Y axis is drawn, when not at the plot's left edge (see pointerPlotArea)
+	cachedYAxisSeries  map[int]pointerYAxis // where each series' Y axis is drawn, when not at the plot's left edge (see pointerPlotArea)
 	cachedPalette      []color.Color
 	cachedSize         geo.Size
 	hasCachedBase      bool
@@ -220,7 +221,7 @@ func (r *chartRenderer) refreshInteractive() {
 		tooltipObjs := component.RenderTooltip(
 			&tooltipState, r.cachedTooltipCfg, resolver,
 			r.cachedSeriesColors, r.cachedSize,
-			pointerPlotArea(r.cachedPlotArea, r.cachedRightSeries, &tooltipState),
+			pointerPlotArea(r.cachedPlotArea, r.cachedYAxisSeries, &tooltipState),
 		)
 		objects = append(objects, tooltipObjs...)
 	}
@@ -318,7 +319,7 @@ func (r *chartRenderer) fullRebuild(size geo.Size) {
 	// Render cartesian series
 	var cartesianCoords []*coord.Cartesian2D
 	if len(cartesianSeries) > 0 {
-		objs, cs := r.renderCartesian(opt, cartesianSeries, plotRect, resolver, hitTester, seriesColors, zoomWindow, animActive, animProgress)
+		objs, cs := r.renderCartesian(opt, cartesianSeries, plotRect, layout.grid.Left, resolver, hitTester, seriesColors, zoomWindow, animActive, animProgress)
 		objects = append(objects, objs...)
 		cartesianCoords = cs
 	}
@@ -369,9 +370,9 @@ func (r *chartRenderer) fullRebuild(size geo.Size) {
 	copy(baseObjs, objects)
 
 	plotArea := component.PlotArea{X: plotRect.X, Y: plotRect.Y, W: plotRect.W, H: plotRect.H}
-	var rightSeries map[int]pointerYAxis
+	var ySeries map[int]pointerYAxis
 	if len(cartesianSeries) > 0 {
-		plotArea.XAxisTop, plotArea.XAxisOffset, rightSeries = r.pointerAxisSides(opt, cartesianSeries)
+		plotArea.XAxisTop, plotArea.XAxisOffset, ySeries = r.pointerAxisSides(opt, cartesianSeries)
 	}
 
 	// Interactive layer: drawing preview + measure + brush + tooltip.
@@ -388,7 +389,7 @@ func (r *chartRenderer) fullRebuild(size geo.Size) {
 	objects = append(objects, renderBrushOverlay(&brushState)...)
 	if !capturing { // a saved image leaves the tooltip and axis pointer out
 		tooltipObjs := component.RenderTooltip(&tooltipState, opt.Tooltip, resolver, seriesColors, size,
-			pointerPlotArea(plotArea, rightSeries, &tooltipState))
+			pointerPlotArea(plotArea, ySeries, &tooltipState))
 		objects = append(objects, tooltipObjs...)
 	}
 
@@ -412,7 +413,7 @@ func (r *chartRenderer) fullRebuild(size geo.Size) {
 	r.cachedSeriesColors = seriesColors
 	r.cachedTooltipCfg = opt.Tooltip
 	r.cachedPlotArea = plotArea
-	r.cachedRightSeries = rightSeries
+	r.cachedYAxisSeries = ySeries
 	r.cachedPalette = opt.Color
 	r.cachedSize = size
 	r.hasCachedBase = true
@@ -504,6 +505,7 @@ func (r *chartRenderer) computeLayout(
 
 	return layoutResult{
 		plotRect:         plotRect,
+		grid:             grid,
 		titleObjs:        titleObjs,
 		breadcrumbObjs:   breadcrumbObjs,
 		legendObjs:       legendObjs,
@@ -575,14 +577,6 @@ func axisRoom(opt Option, grid Grid, header float32, legend bool, labelSize floa
 // axisOffset is how far an axis is drawn outward from its plot edge: its
 // Offset, or 0 for a negative one.
 func axisOffset(cfg axis.Config) float32 { return max(0, cfg.Offset) }
-
-// chartGrid is the grid a cartesian chart lays its plot out in.
-func chartGrid(opt Option) Grid {
-	if opt.Grid != nil {
-		return *opt.Grid
-	}
-	return DefaultGrid()
-}
 
 // The zoom buttons and the toolbox sit at the top right, below grid.Top.
 const (
@@ -722,6 +716,7 @@ func (r *chartRenderer) renderCartesian(
 	opt Option,
 	seriesList []series.Series,
 	plotRect coord.Rect,
+	leftBand float32, // the grid's left margin, where a left Y axis puts its labels
 	resolver *style.Resolver,
 	hitTester *interact.HitTester,
 	seriesColors map[int]color.Color,
@@ -781,7 +776,6 @@ func (r *chartRenderer) renderCartesian(
 	// Render axes. By default the first Y axis draws the grid lines; it sits
 	// on the left and every other Y axis on the right (see yAxisOnRight).
 	objects = append(objects, r.renderXAxis(xConfigs[0], xScale, plotRect, resolver)...)
-	leftBand := chartGrid(opt).Left
 	for i, ys := range yScales {
 		objects = append(objects, r.renderYAxis(yConfigs[i], ys, i, xConfigs[0], plotRect, leftBand, resolver)...)
 	}
@@ -1178,28 +1172,6 @@ func (r *chartRenderer) renderXAxis(cfg axis.Config, xScale axis.Scale, plotRect
 		dir = -1
 	}
 
-	if cfg.SplitLine == axis.SplitLineShow {
-		gridColor := resolver.GridLineColor()
-		for _, tick := range xScale.Ticks() {
-			px := plotRect.X + tickNorm(tick, cfg.Inverse)*plotRect.W
-			objects = append(objects, &canvas.Line{
-				Position1:   geo.NewPos(px, plotRect.Y),
-				Position2:   geo.NewPos(px, plotRect.Y+plotRect.H),
-				StrokeColor: gridColor,
-				StrokeWidth: 0.5,
-			})
-		}
-	}
-
-	if !cfg.Hide.Line {
-		objects = append(objects, &canvas.Line{
-			Position1:   geo.NewPos(plotRect.X, y),
-			Position2:   geo.NewPos(plotRect.X+plotRect.W, y),
-			StrokeColor: lineColor,
-			StrokeWidth: 1,
-		})
-	}
-
 	// labelY places a box of height h at distance gap beyond the axis line.
 	labelY := func(gap, h float32) float32 {
 		if top {
@@ -1208,11 +1180,25 @@ func (r *chartRenderer) renderXAxis(cfg axis.Config, xScale axis.Scale, plotRect
 		return y + gap
 	}
 
+	// One pass over the ticks: grid lines go under the axis line, tick marks
+	// and labels over it.
+	var splits, marks []core.CanvasObject
+	splitLines := cfg.SplitLine == axis.SplitLineShow
+	gridColor := resolver.GridLineColor()
 	for _, tick := range xScale.Ticks() {
 		px := plotRect.X + tickNorm(tick, cfg.Inverse)*plotRect.W
 
+		if splitLines {
+			splits = append(splits, &canvas.Line{
+				Position1:   geo.NewPos(px, plotRect.Y),
+				Position2:   geo.NewPos(px, plotRect.Y+plotRect.H),
+				StrokeColor: gridColor,
+				StrokeWidth: 0.5,
+			})
+		}
+
 		if !cfg.Hide.Ticks {
-			objects = append(objects, &canvas.Line{
+			marks = append(marks, &canvas.Line{
 				Position1:   geo.NewPos(px, y),
 				Position2:   geo.NewPos(px, y+4*dir),
 				StrokeColor: lineColor,
@@ -1227,9 +1213,20 @@ func (r *chartRenderer) renderXAxis(cfg axis.Config, xScale axis.Scale, plotRect
 			estWidth := textWidth(tick.Label, labelSize)
 			label.Move(geo.NewPos(px-estWidth/2, labelY(axisLabelGap, axisRow(labelSize))))
 			label.Resize(geo.NewSize(estWidth, axisRow(labelSize)))
-			objects = append(objects, label)
+			marks = append(marks, label)
 		}
 	}
+
+	objects = append(objects, splits...)
+	if !cfg.Hide.Line {
+		objects = append(objects, &canvas.Line{
+			Position1:   geo.NewPos(plotRect.X, y),
+			Position2:   geo.NewPos(plotRect.X+plotRect.W, y),
+			StrokeColor: lineColor,
+			StrokeWidth: 1,
+		})
+	}
+	objects = append(objects, marks...)
 
 	if cfg.Name != "" {
 		name := canvas.NewText(cfg.Name, labelColor)
