@@ -307,13 +307,13 @@ func (l *GridWrap) TypedKey(ev *event.KeyEvent) {
 	case event.KeyLeft:
 		// Under RTL the visual reading order is reversed, so the left arrow
 		// advances to the next item rather than the previous one.
-		if lang.IsRTLDirection() {
+		if isRTLAt(l.super()) {
 			l.focusNextItem()
 		} else {
 			l.focusPrevItem()
 		}
 	case event.KeyRight:
-		if lang.IsRTLDirection() {
+		if isRTLAt(l.super()) {
 			l.focusPrevItem()
 		} else {
 			l.focusNextItem()
@@ -449,9 +449,13 @@ func (l *gridWrapRenderer) Refresh() {
 
 		l.list.itemMin = item.MinSize()
 	}
-	l.Layout(l.list.Size())
-	l.scroller.Refresh()
-	l.layout.Layout.(*gridWrapLayout).updateGrid(false)
+	// Outside a layout walk (a data change, an arrow key), so lay out in the
+	// grid's own direction (#696).
+	inDirectionOf(l.list.super(), func() {
+		l.Layout(l.list.Size())
+		l.scroller.Refresh()
+		l.layout.Layout.(*gridWrapLayout).updateGrid(false)
+	})
 	canvas.Refresh(l.list)
 }
 
@@ -647,7 +651,9 @@ func (l *gridWrapLayout) offsetUpdated(pos geo.Position) {
 		return
 	}
 	l.gw.offsetY = pos.Y
-	l.updateGrid(true)
+	// A scroll event, outside a layout walk: place the items in the grid's own
+	// direction (#696).
+	inDirectionOf(l.gw.super(), func() { l.updateGrid(true) })
 }
 
 func (l *gridWrapLayout) setupGridItem(li *gridWrapItem, id GridWrapItemID, focus bool) {

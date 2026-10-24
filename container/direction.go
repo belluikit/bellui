@@ -4,7 +4,9 @@ import (
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/driver"
 	"github.com/belluikit/bellui/internal/uidir"
+	"github.com/belluikit/bellui/lang"
 	"github.com/belluikit/bellui/widget"
 )
 
@@ -49,12 +51,15 @@ func NewDirectionScope(obj core.CanvasObject, dir bellui.Direction) *DirectionSc
 
 	// obj may have been measured/laid-out under the previous (global) direction
 	// before being wrapped, so recompute it within the new scope.
+	uidir.Push(dir)
 	obj.Refresh()
+	uidir.Pop(dir)
 	return d
 }
 
 // CreateRenderer is an internal method.
 func (d *DirectionScope) CreateRenderer() core.WidgetRenderer {
+	uidir.NoteScope() // from now on a direction lookup must walk for scopes
 	return &directionScopeRenderer{scope: d, objs: []core.CanvasObject{d.holder}}
 }
 
@@ -88,8 +93,52 @@ func (d *DirectionScope) Refresh() {
 		d.holder.Refresh()
 	}
 
+	// Refresh runs outside a layout walk, so push the direction the content
+	// takes here, or its re-layout would read the global one (#696).
+	dir := d.contentDirection()
+	uidir.Push(dir)
+	defer uidir.Pop(dir)
+
 	d.Content.Refresh()
 	d.BaseWidget.Refresh()
+}
+
+// DirectionOf returns the layout direction that applies to obj where it sits,
+// always [github.com/belluikit/bellui.DirectionLTR] or
+// [github.com/belluikit/bellui.DirectionRTL]: the
+// innermost [DirectionScope] enclosing obj, else the direction of obj's canvas
+// (an optional SetDirection on the window canvas), else the process-wide
+// direction ([github.com/belluikit/bellui.CurrentLayoutDirection], or the
+// locale's when that is automatic). An object not on any canvas gets the
+// process-wide direction. A scope's own direction applies to its content, so
+// for a scope this is the direction it sits in.
+//
+// [github.com/belluikit/bellui/lang.IsRTLDirection] gives the same answer only
+// inside a layout or paint walk, which pushes the scopes it crosses. Widgets
+// call DirectionOf instead from code that runs outside one: an event handler
+// (a swipe, a tap's hit-test, an arrow key), or a Refresh triggered by a timer
+// or a data binding that re-lays-out the widget. Outside a walk it looks obj up
+// in its canvas' tree, a cost that grows with the tree; call it once per event
+// or Refresh, not per frame.
+//
+// Since: 1.0
+func DirectionOf(obj core.CanvasObject) bellui.Direction {
+	if d, ok := driver.DirectionOf(obj); ok {
+		return d
+	}
+	if lang.IsRTLDirection() {
+		return bellui.DirectionRTL
+	}
+	return bellui.DirectionLTR
+}
+
+// contentDirection is the direction the scope's content takes: its own, or
+// the one it sits in when it is automatic.
+func (d *DirectionScope) contentDirection() bellui.Direction {
+	if d.Direction != bellui.DirectionAuto {
+		return d.Direction
+	}
+	return DirectionOf(d)
 }
 
 type directionScopeRenderer struct {

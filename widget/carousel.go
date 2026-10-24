@@ -88,7 +88,7 @@ func (c *Carousel) DragEnd() {
 		return
 	}
 	forward := d.DX < 0 // the content moves left to reveal the next item
-	if lang.IsRTLDirection() {
+	if isRTLAt(c.super()) {
 		forward = !forward
 	}
 	if forward {
@@ -222,6 +222,8 @@ func (r *carouselRenderer) Refresh() {
 		r.nextBtn.Show()
 	}
 
-	r.Layout(r.carousel.Size())
+	// Outside a layout walk (Next, Previous, a swipe), so lay out in the
+	// carousel's own direction, not the global one (#696).
+	inDirectionOf(r.carousel.super(), func() { r.Layout(r.carousel.Size()) })
 	canvas.Refresh(r.carousel.super())
 }

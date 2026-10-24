@@ -11,7 +11,6 @@ import (
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
 	internaltheme "github.com/belluikit/bellui/internal/theme"
-	"github.com/belluikit/bellui/lang"
 	"github.com/belluikit/bellui/theme"
 )
 
@@ -281,13 +280,13 @@ func (s *Select) TypedKey(ev *event.KeyEvent) {
 	case event.KeyRight:
 		// Under a right-to-left layout the visual reading order is reversed, so
 		// the right arrow steps to the previous option rather than the next.
-		if lang.IsRTLDirection() {
+		if isRTLAt(s.super()) {
 			s.cycleSelection(-1)
 		} else {
 			s.cycleSelection(1)
 		}
 	case event.KeyLeft:
-		if lang.IsRTLDirection() {
+		if isRTLAt(s.super()) {
 			s.cycleSelection(1)
 		} else {
 			s.cycleSelection(-1)

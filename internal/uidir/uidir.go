@@ -32,6 +32,19 @@ var goroutineStacks sync.Map // map[uint64][]bellui.Direction
 // theme stack's activeOverrides (pre-rebrand tracker #138).
 var activeScopes atomic.Int64
 
+// scopesSeen records that a direction scope has been rendered in this process.
+// Until one has, no object can sit inside a scope, so a direction lookup
+// (internal/driver.DirectionOf) can skip walking the canvas — the common case.
+var scopesSeen atomic.Bool
+
+// NoteScope records that a direction scope exists. A scope calls it when its
+// renderer is created, which precedes it having any laid-out content.
+func NoteScope() { scopesSeen.Store(true) }
+
+// ScopesInUse reports whether any direction scope has been rendered in this
+// process; see [NoteScope].
+func ScopesInUse() bool { return scopesSeen.Load() }
+
 // Current returns the ambient direction override in effect on the calling
 // goroutine, if any. The bool is false when no scope is active, in which case
 // callers fall back to the process-global direction. The returned direction is

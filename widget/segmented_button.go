@@ -9,7 +9,6 @@ import (
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
 	internalWidget "github.com/belluikit/bellui/internal/widget"
-	"github.com/belluikit/bellui/lang"
 	"github.com/belluikit/bellui/theme"
 )
 
@@ -56,13 +55,13 @@ func (s *SegmentedButton) TypedRune(rune) {}
 func (s *SegmentedButton) TypedKey(ev *event.KeyEvent) {
 	switch ev.Name {
 	case event.KeyRight:
-		if lang.IsRTLDirection() {
+		if isRTLAt(s.super()) {
 			s.cycleSelection(-1)
 		} else {
 			s.cycleSelection(1)
 		}
 	case event.KeyLeft:
-		if lang.IsRTLDirection() {
+		if isRTLAt(s.super()) {
 			s.cycleSelection(1)
 		} else {
 			s.cycleSelection(-1)
@@ -215,7 +214,7 @@ func (r *segmentRenderer) Refresh() {
 	// which side is rounded so the pill ends stay on the visual outer edges.
 	radius := th.Size(theme.SizeNameButtonMinHeight) / 2
 	roundLeft, roundRight := r.seg.first, r.seg.last
-	if lang.IsRTLDirection() {
+	if isRTLAt(r.seg.super()) { // Refresh runs outside a layout walk (#696)
 		roundLeft, roundRight = r.seg.last, r.seg.first
 	}
 	if roundLeft {
@@ -294,12 +293,17 @@ func (r *segButtonRenderer) Layout(size geo.Size) {
 
 func (r *segButtonRenderer) Refresh() {
 	r.updateSegments()
-	for i, seg := range r.segments {
-		seg.selected = i == r.btn.Selected
-		seg.focused = r.btn.focused && i == r.btn.Selected
-		seg.Refresh()
-	}
-	r.Layout(r.btn.Size())
+	// Outside a layout walk (a tap, an arrow key, a binding), so refresh and
+	// lay out in the button's own direction (#696); the segments' Refresh then
+	// reads it without a lookup of their own.
+	inDirectionOf(r.btn.super(), func() {
+		for i, seg := range r.segments {
+			seg.selected = i == r.btn.Selected
+			seg.focused = r.btn.focused && i == r.btn.Selected
+			seg.Refresh()
+		}
+		r.Layout(r.btn.Size())
+	})
 	canvas.Refresh(r.btn.super())
 }
 

@@ -125,6 +125,9 @@ func (d *driver) AllWindows() []bellui.Window {
 func (d *driver) CanvasForObject(core.CanvasObject) core.Canvas {
 	d.windowsMutex.RLock()
 	defer d.windowsMutex.RUnlock()
+	if len(d.windows) == 0 {
+		return nil // no window, so no canvas — as the mobile driver reports
+	}
 	// cheating: probably the last created window is meant
 	return d.windows[len(d.windows)-1].Canvas()
 }

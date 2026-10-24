@@ -229,7 +229,7 @@ func (p *CompletionPopup) AccessibleVirtualNodes() []core.AccessibleVirtualNode 
 		return nil
 	}
 	m := p.metrics()
-	listX0, listW := m.listArea(p.Size().Width, lang.IsRTLDirection())
+	listX0, listW := m.listArea(p.Size().Width, isRTLAt(p.super()))
 	top, visible := p.top, p.visibleRows()
 
 	nodes := make([]core.AccessibleVirtualNode, 0, visible)
@@ -726,7 +726,7 @@ func (p *CompletionPopup) infoIconRect(row int) geo.Rectangle {
 		return geo.Rectangle{} // outside the scrolled window: not on screen
 	}
 	m := p.metrics()
-	rtl := lang.IsRTLDirection()
+	rtl := isRTLAt(p.super())
 	listX0, listW := m.listArea(p.Size().Width, rtl)
 	trailX := listX0 + listW - m.pad - m.iconSize
 	if rtl {
@@ -743,7 +743,7 @@ func (p *CompletionPopup) infoIconRect(row int) geo.Rectangle {
 // is not a row.
 func (p *CompletionPopup) rowAt(pos geo.Position) int {
 	m := p.metrics()
-	listX0, listW := m.listArea(p.Size().Width, lang.IsRTLDirection())
+	listX0, listW := m.listArea(p.Size().Width, isRTLAt(p.super()))
 	if pos.X < listX0 || pos.X > listX0+listW {
 		return -1
 	}
@@ -1146,7 +1146,9 @@ func (r *completionPopupRenderer) Refresh() {
 		row.text.Refresh()
 	}
 
-	r.Layout(p.Size())
+	// Outside a layout walk (typing, arrow keys), so lay out in the popup's
+	// own direction (#696).
+	inDirectionOf(p.super(), func() { r.Layout(p.Size()) })
 	canvas.Refresh(p)
 }
 
