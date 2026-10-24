@@ -106,7 +106,10 @@ func TestGeneratedAppSourcesCompileAgainstToolkit(t *testing.T) {
 	list.Dir, list.Env = app, env
 	out, err := list.CombinedOutput()
 	require.NoError(t, err, "%s", out)
-	require.Equal(t, root, string(bytes.TrimSpace(out)), "the app must resolve the toolkit to the checkout")
+	// The go command reports the use path as go.work spells it (forward
+	// slashes on Windows), so compare cleaned native paths.
+	got := filepath.Clean(filepath.FromSlash(string(bytes.TrimSpace(out))))
+	require.Equal(t, root, got, "the app must resolve the toolkit to the checkout")
 
 	vet := exec.Command(goTool, "vet", "./...")
 	vet.Dir, vet.Env = app, env

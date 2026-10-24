@@ -52,6 +52,14 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version: stable
+      # The generated-app compile test (#710) vets an app that imports the
+      # toolkit's glfw driver, and cgo needs its X11/Wayland/GL headers even to
+      # type-check. vet does not link, so the headers are all it needs.
+      - name: Desktop headers for the generated-app compile test
+        if: matrix.os == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libgl1-mesa-dev libwayland-dev libx11-dev libxkbcommon-dev xorg-dev
       - name: Resolve the toolkit from this checkout
         working-directory: cmd/bellui
         run: go mod edit -replace github.com/belluikit/bellui=../..
