@@ -60,6 +60,9 @@ type driver struct {
 	// touchWindows is the window each touch that is down began in (#392).
 	touchWindows map[touch.Sequence]*window
 
+	// coast carries a released drag on; the next touch stops it (#751).
+	coast common.DragCoast
+
 	app   app.App
 	glctx gl.Context
 
@@ -1480,6 +1483,7 @@ func (d *driver) tapCancelCanvas(w *window, x, y float32, tapID touch.Sequence) 
 }
 
 func (d *driver) tapDownCanvas(w *window, x, y float32, tapID touch.Sequence) {
+	d.coast.Stop() // a new touch stops a coasting drag dead (#751)
 	w.canvas.TapDown(canvasPos(w, x, y), int(tapID))
 }
 
@@ -1502,23 +1506,7 @@ func (d *driver) tapUpCanvas(w *window, x, y float32, tapID touch.Sequence) {
 	}, func(wid event.DoubleTappable, ev *event.PointEvent) {
 		wid.DoubleTapped(ev)
 	}, func(wid event.Draggable, ev *event.DragEvent) {
-		if math.Abs(float64(ev.Dragged.DX)) <= common.TapMoveEndThreshold && math.Abs(float64(ev.Dragged.DY)) <= common.TapMoveEndThreshold {
-			wid.DragEnd()
-			return
-		}
-
-		go func() {
-			for math.Abs(float64(ev.Dragged.DX)) > common.TapMoveEndThreshold || math.Abs(float64(ev.Dragged.DY)) > common.TapMoveEndThreshold {
-				ev.Dragged = common.DragDecay(ev.Dragged)
-
-				d.DoFromGoroutine(func() {
-					wid.Dragged(ev)
-				}, false)
-				time.Sleep(time.Millisecond * 16)
-			}
-
-			d.DoFromGoroutine(wid.DragEnd, false)
-		}()
+		d.coast.Release(wid, ev, func(f func()) { d.DoFromGoroutine(f, false) })
 	})
 }
 

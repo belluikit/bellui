@@ -2,7 +2,6 @@ package embedded
 
 import (
 	"image"
-	"math"
 	"time"
 
 	"github.com/belluikit/bellui"
@@ -26,6 +25,7 @@ type noosDriver struct {
 	done   bool
 
 	wins    []bellui.Window
+	coast   common.DragCoast // a released drag coasting on; the next touch stops it (#751)
 	current int
 	device  noosDevice
 }
@@ -153,6 +153,7 @@ func (n *noosDriver) doRun() {
 }
 
 func (n *noosDriver) handleTouchDown(ev *embedded.TouchDownEvent, w *noosWindow) {
+	n.coast.Stop() // a new touch stops a coasting drag dead (#751)
 	w.c.TapDown(ev.Position, ev.ID)
 	n.renderWindow(w)
 }
@@ -177,23 +178,7 @@ func (n *noosDriver) handleTouchUp(ev *embedded.TouchUpEvent, w *noosWindow) {
 	}, func(wid event.DoubleTappable, ev *event.PointEvent) {
 		wid.DoubleTapped(ev)
 	}, func(wid event.Draggable, ev *event.DragEvent) {
-		if math.Abs(float64(ev.Dragged.DX)) <= common.TapMoveEndThreshold && math.Abs(float64(ev.Dragged.DY)) <= common.TapMoveEndThreshold {
-			wid.DragEnd()
-			return
-		}
-
-		go func() {
-			for math.Abs(float64(ev.Dragged.DX)) > common.TapMoveEndThreshold || math.Abs(float64(ev.Dragged.DY)) > common.TapMoveEndThreshold {
-				ev.Dragged = common.DragDecay(ev.Dragged)
-
-				n.DoFromGoroutine(func() {
-					wid.Dragged(ev)
-				}, false)
-				time.Sleep(time.Millisecond * 16)
-			}
-
-			n.DoFromGoroutine(wid.DragEnd, false)
-		}()
+		n.coast.Release(wid, ev, func(f func()) { n.DoFromGoroutine(f, false) })
 	})
 	n.renderWindow(w)
 }
