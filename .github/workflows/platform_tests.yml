@@ -47,6 +47,26 @@ jobs:
             runs-on: macos-15
             tags: gl,no_glfw,ci,migrated_belluido
             coverage: false
+          # The oldest Go an app may build Bellui with: the toolchain go.mod's
+          # `go` directive pins (#719). Without it, a change that uses a newer
+          # standard-library API passes CI and breaks those builds. One leg is
+          # enough to catch that, since the failure is a compile error, not
+          # platform behaviour; it runs on ARM64 Linux, the same image as the
+          # coverage leg and the cheapest runner in this matrix. GOTOOLCHAIN=local
+          # stops the go command from switching to another toolchain, so the
+          # leg cannot quietly test something newer.
+          - platform: linux-gomod
+            runs-on: ubuntu-24.04-arm
+            go-version: ""
+            go-version-file: go.mod
+            gotoolchain: local
+            runner: ./.github/scripts/xvfb-run-safe
+            tags: gl,ci,migrated_belluido
+            coverage: false
+
+    env:
+      # Empty on the stable legs, which leaves the go command's default.
+      GOTOOLCHAIN: ${{ matrix.gotoolchain }}
 
     steps:
       - uses: actions/checkout@v7
@@ -55,6 +75,21 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version: ${{ matrix.go-version }}
+          go-version-file: ${{ matrix.go-version-file }}
+
+      # Positive marker: the toolchain the tests below run on. On the
+      # go.mod leg it must be exactly the `go` directive's version.
+      - name: Go version
+        run: |
+          go version
+          if [ -n "${{ matrix.go-version-file }}" ]; then
+            want="go$(go mod edit -json | jq -r .Go)"
+            got="$(go env GOVERSION)"
+            if [ "$got" != "$want" ]; then
+              echo "::error::expected $want from go.mod, running $got"
+              exit 1
+            fi
+          fi
 
       - name: Get dependencies
         run: |

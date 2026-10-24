@@ -19,6 +19,21 @@ env:
 jobs:
   mobile_tests:
     runs-on: ubuntu-24.04-arm
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - go: stable
+            go-version: stable
+          # The toolchain go.mod's `go` directive pins, the oldest Go an app
+          # may build Bellui with (#719). GOTOOLCHAIN=local stops the go
+          # command from switching to another toolchain.
+          - go: go.mod
+            go-version-file: go.mod
+            gotoolchain: local
+    env:
+      # Empty on the stable leg, which leaves the go command's default.
+      GOTOOLCHAIN: ${{ matrix.gotoolchain }}
 
     steps:
       - uses: actions/checkout@v7
@@ -26,7 +41,22 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@v7
         with:
-          go-version: stable
+          go-version: ${{ matrix.go-version }}
+          go-version-file: ${{ matrix.go-version-file }}
+
+      # Positive marker: the toolchain the tests below run on. On the
+      # go.mod leg it must be exactly the `go` directive's version.
+      - name: Go version
+        run: |
+          go version
+          if [ -n "${{ matrix.go-version-file }}" ]; then
+            want="go$(go mod edit -json | jq -r .Go)"
+            got="$(go env GOVERSION)"
+            if [ "$got" != "$want" ]; then
+              echo "::error::expected $want from go.mod, running $got"
+              exit 1
+            fi
+          fi
 
       - name: Get dependencies
         run: |
