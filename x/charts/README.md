@@ -303,13 +303,31 @@ type Config struct {
     LabelColor color.Color // tick labels and axis name (nil = theme)
     TimeFormat string      // Go time layout for TypeTime labels
 
-    // ShowLine, ShowTicks, ShowLabels, ShowSplitLine: declared but not applied
-    // yet; the axis line, labels and first Y axis's grid lines are always drawn
-    // (#684).
+    Hide      Parts     // parts to hide: Hide.Line, Hide.Ticks, Hide.Labels (zero value hides nothing)
+    SplitLine SplitLine // grid lines: SplitLineAuto (first Y axis only), SplitLineShow, SplitLineHide
+    Offset    float32   // px outward from the plot edge (ECharts offset); the layout makes room
+
+    // Deprecated, no effect: ShowLine, ShowTicks, ShowLabels, ShowSplitLine.
+    // Use Hide and SplitLine.
 }
 ```
 
 A chart draws one X axis, from the first entry of `XAxis`.
+
+Every part of an axis is drawn unless `Hide` says otherwise, so a `Config`
+written as a literal draws the whole axis. Grid lines follow `SplitLine`: by
+default only the first Y axis draws them; `SplitLineShow` adds them for the X
+axis (vertical) or another Y axis, `SplitLineHide` removes them. A left-hand Y
+axis draws no tick marks, so `Hide.Ticks` changes nothing there.
+
+```go
+x := axis.Config{Type: axis.TypeCategory, Data: days, SplitLine: axis.SplitLineShow}
+y := axis.Config{Type: axis.TypeValue, Hide: axis.Parts{Line: true, Ticks: true}}
+```
+
+The four `Show*` fields were never applied, and their zero value would have
+hidden the axes of every literal config, so they are deprecated and ignored.
+`DefaultConfig` still sets them as before for code that reads them.
 
 ### Tooltip Config
 
@@ -450,6 +468,22 @@ chart.New(chart.Option{
         },
     },
 })
+```
+
+A third Y axis also goes on the right by default, and two axes on one side
+are drawn in the same place unless one is moved out with `Offset` (ECharts
+`yAxis.offset`): the number of pixels the axis sits outward from the plot edge.
+The chart reserves room for the largest offset on each side, so the axis stays
+inside it. A right-hand axis's labels reach 56 px beyond its line, so an `Offset` of 60
+puts a second right axis clear of the first; on the left, an `Offset` of
+`Grid.Left` does. The axis pointer tags follow the offset axis.
+
+```go
+YAxis: []axis.Config{
+    {Type: axis.TypeValue},                                          // left
+    {Type: axis.TypeValue},                                          // right
+    {Type: axis.TypeValue, Position: axis.PositionRight, Offset: 60}, // right, beyond the second
+},
 ```
 
 ## Stacked Bar / Area

@@ -89,6 +89,12 @@ type PlotArea struct {
 	// one. A chart with several Y axes sets it for each hover, from the hit's
 	// series.
 	YAxisRight bool
+
+	// XAxisOffset and YAxisOffset are how far outward from the plot edge the
+	// X axis, and the Y axis of the first hit's series, are drawn
+	// (axis.Config.Offset). The tags move out with them, to stay beside the
+	// axis. Zero keeps them at the plot edge.
+	XAxisOffset, YAxisOffset float32
 }
 
 // RenderTooltip produces canvas objects for a tooltip near the given hits.
@@ -340,17 +346,17 @@ func renderAxisTags(state *TooltipState, cfg *TooltipConfig, crosshairMode Cross
 	var objects []core.CanvasObject
 	if crosshairMode == CrosshairVertical || crosshairMode == CrosshairBoth {
 		w := float32(len(xLabel))*6.5 + 8
-		y := plotArea.Y + plotArea.H + tagGap
+		y := plotArea.Y + plotArea.H + plotArea.XAxisOffset + tagGap
 		if plotArea.XAxisTop {
-			y = plotArea.Y - tagH - tagGap
+			y = plotArea.Y - plotArea.XAxisOffset - tagH - tagGap
 		}
 		objects = append(objects, tag(xLabel, hitPos.X-w/2, y, w, bellui.TextAlignCenter)...)
 	}
 	if crosshairMode == CrosshairHorizontal || crosshairMode == CrosshairBoth {
 		w := float32(len(yLabel))*6.5 + 8
-		x, align := plotArea.X-w-tagGap, bellui.TextAlignTrailing
+		x, align := plotArea.X-plotArea.YAxisOffset-w-tagGap, bellui.TextAlignTrailing
 		if plotArea.YAxisRight {
-			x, align = plotArea.X+plotArea.W+tagGap, bellui.TextAlignLeading
+			x, align = plotArea.X+plotArea.W+plotArea.YAxisOffset+tagGap, bellui.TextAlignLeading
 		}
 		objects = append(objects, tag(yLabel, x, hitPos.Y-tagH/2, w, align)...)
 	}

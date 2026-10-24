@@ -73,7 +73,7 @@ type chartRenderer struct {
 	cachedSeriesColors map[int]color.Color
 	cachedTooltipCfg   *component.TooltipConfig
 	cachedPlotArea     component.PlotArea
-	cachedRightSeries  map[int]bool // series plotted against a Y axis on the right (see pointerPlotArea)
+	cachedRightSeries  map[int]pointerYAxis // where each series' Y axis is drawn, when not at the plot's left edge (see pointerPlotArea)
 	cachedPalette      []color.Color
 	cachedSize         geo.Size
 	hasCachedBase      bool
@@ -369,9 +369,9 @@ func (r *chartRenderer) fullRebuild(size geo.Size) {
 	copy(baseObjs, objects)
 
 	plotArea := component.PlotArea{X: plotRect.X, Y: plotRect.Y, W: plotRect.W, H: plotRect.H}
-	var rightSeries map[int]bool
+	var rightSeries map[int]pointerYAxis
 	if len(cartesianSeries) > 0 {
-		plotArea.XAxisTop, rightSeries = r.pointerAxisSides(opt, cartesianSeries)
+		plotArea.XAxisTop, plotArea.XAxisOffset, rightSeries = r.pointerAxisSides(opt, cartesianSeries)
 	}
 
 	// Interactive layer: drawing preview + measure + brush + tooltip.
@@ -490,14 +490,15 @@ func (r *chartRenderer) computeLayout(
 	if bottom := controlsBottom(opt); bottom > 0 && bottom+controlsGap > header {
 		header = bottom + controlsGap
 	}
-	var roomTop, roomBottom, roomRight float32
+	var room axisSpace
 	if len(cartesianSeries) > 0 {
-		roomTop, roomBottom, roomRight = axisRoom(opt, grid, header, legendHeight > 0, resolver.LabelTextSize())
+		room = axisRoom(opt, grid, header, legendHeight > 0, resolver.LabelTextSize())
 	}
+	roomTop, roomBottom, roomLeft, roomRight := room.top, room.bottom, room.left, room.right
 	plotRect := coord.Rect{
-		X: grid.Left,
+		X: grid.Left + roomLeft,
 		Y: grid.Top + header + roomTop,
-		W: size.Width - grid.Left - grid.Right - roomRight,
+		W: size.Width - grid.Left - grid.Right - roomLeft - roomRight,
 		H: size.Height - grid.Top - grid.Bottom - header - legendHeight - roomTop - roomBottom,
 	}
 
@@ -511,12 +512,18 @@ func (r *chartRenderer) computeLayout(
 	}
 }
 
+// axisSpace is extra room on each side of the plot, beyond grid.
+type axisSpace struct{ top, bottom, left, right float32 }
+
 // axisRoom is how much further in than grid, the header and the legend
-// already put it the plot's top, bottom and right edges must move, so the axis
-// text drawn beyond them stays clear of the title, breadcrumb, controls and
-// legend and inside the chart. Text above the plot sits between the header
-// and the plot, or within grid.Top when there is no header.
-func axisRoom(opt Option, grid Grid, header float32, legend bool, labelSize float32) (top, bottom, right float32) {
+// already put it each of the plot's edges must move, so the axis text drawn
+// beyond them stays clear of the title, breadcrumb, controls and legend and
+// inside the chart. Text above the plot sits between the header and the plot,
+// or within grid.Top when there is no header. An axis's Offset moves it, and
+// its text, that much further out, so the room grows by the largest Offset on
+// each side.
+func axisRoom(opt Option, grid Grid, header float32, legend bool, labelSize float32) axisSpace {
+	var top, bottom, left, right float32
 	x := axis.DefaultConfig(axis.TypeCategory)
 	if len(opt.XAxis) > 0 {
 		x = opt.XAxis[0]
@@ -535,21 +542,46 @@ func axisRoom(opt Option, grid Grid, header float32, legend bool, labelSize floa
 	// A bottom X axis's tick labels have always lived in grid.Bottom; only
 	// its name, a second row, can outgrow it. The legend sits 5 px below the
 	// plot's margin.
-	if !xAxisOnTop(x) && x.Name != "" {
-		avail := grid.Bottom
-		if legend {
-			avail -= 5
+	// An Offset moves the whole axis, so it needs that much more room on top
+	// of what the axis needed before.
+	if !xAxisOnTop(x) {
+		bottom = axisOffset(x)
+		if x.Name != "" {
+			avail := grid.Bottom
+			if legend {
+				avail -= 5
+			}
+			bottom += max(0, xAxisExtent(x, labelSize)-avail)
 		}
-		bottom = max(0, xAxisExtent(x, labelSize)-avail)
 	}
 
+	// A left Y axis's labels fill the grid.Left band beside it, so an offset
+	// left axis needs its Offset more. A right Y axis's labels need their
+	// own width beyond grid.Right, plus the Offset.
+	rightReach := float32(-1)
 	for i, y := range ys {
 		if yAxisOnRight(y, i) {
-			right = max(0, axisLabelGap+yRightLabelWidth-grid.Right)
-			break
+			rightReach = max(rightReach, axisOffset(y)+axisLabelGap+yRightLabelWidth)
+		} else {
+			left = max(left, axisOffset(y))
 		}
 	}
-	return top, bottom, right
+	if rightReach >= 0 {
+		right = max(0, rightReach-grid.Right)
+	}
+	return axisSpace{top: top, bottom: bottom, left: left, right: right}
+}
+
+// axisOffset is how far an axis is drawn outward from its plot edge: its
+// Offset, or 0 for a negative one.
+func axisOffset(cfg axis.Config) float32 { return max(0, cfg.Offset) }
+
+// chartGrid is the grid a cartesian chart lays its plot out in.
+func chartGrid(opt Option) Grid {
+	if opt.Grid != nil {
+		return *opt.Grid
+	}
+	return DefaultGrid()
 }
 
 // The zoom buttons and the toolbox sit at the top right, below grid.Top.
@@ -746,11 +778,12 @@ func (r *chartRenderer) renderCartesian(
 		coordSystems[i] = cs
 	}
 
-	// Render axes. The first Y axis draws the grid lines; by default it sits
+	// Render axes. By default the first Y axis draws the grid lines; it sits
 	// on the left and every other Y axis on the right (see yAxisOnRight).
 	objects = append(objects, r.renderXAxis(xConfigs[0], xScale, plotRect, resolver)...)
+	leftBand := chartGrid(opt).Left
 	for i, ys := range yScales {
-		objects = append(objects, r.renderYAxis(yConfigs[i], ys, i, xConfigs[0], plotRect, resolver)...)
+		objects = append(objects, r.renderYAxis(yConfigs[i], ys, i, xConfigs[0], plotRect, leftBand, resolver)...)
 	}
 
 	// Shared stack offsets for stacked bar/line series
@@ -992,14 +1025,23 @@ func (r *chartRenderer) seriesIndex(s series.Series) int {
 	return 0
 }
 
+// pointerYAxis is where a series' Y axis is drawn, for its pointer tag: on
+// which side of the plot, and how far out.
+type pointerYAxis struct {
+	right  bool
+	offset float32
+}
+
 // pointerAxisSides reports where the axes the pointer tags sit beside are
-// drawn: whether the X axis is on top, and which cartesian series (by series
-// index) are plotted against a Y axis on the right. It resolves a series' Y
-// axis as renderCartesian does, so the tag follows the axis the series is
-// drawn against.
-func (r *chartRenderer) pointerAxisSides(opt Option, cartesian []series.Series) (xTop bool, rightSeries map[int]bool) {
+// drawn: whether the X axis is on top and its Offset, and for each cartesian
+// series (by series index) plotted against a Y axis on the right or offset
+// from its edge, that axis's side and Offset. It resolves a series' Y axis as
+// renderCartesian does, so the tag follows the axis the series is drawn
+// against.
+func (r *chartRenderer) pointerAxisSides(opt Option, cartesian []series.Series) (xTop bool, xOffset float32, ySeries map[int]pointerYAxis) {
 	if len(opt.XAxis) > 0 {
 		xTop = xAxisOnTop(opt.XAxis[0])
+		xOffset = axisOffset(opt.XAxis[0])
 	}
 	ys := opt.YAxis
 	for _, s := range cartesian {
@@ -1007,22 +1049,28 @@ func (r *chartRenderer) pointerAxisSides(opt Option, cartesian []series.Series) 
 		if yIdx < 0 || yIdx >= len(ys) {
 			yIdx = 0 // as renderCartesian falls back
 		}
-		if yIdx >= len(ys) || !yAxisOnRight(ys[yIdx], yIdx) {
+		if yIdx >= len(ys) {
 			continue
 		}
-		if rightSeries == nil {
-			rightSeries = make(map[int]bool)
+		at := pointerYAxis{right: yAxisOnRight(ys[yIdx], yIdx), offset: axisOffset(ys[yIdx])}
+		if at == (pointerYAxis{}) {
+			continue
 		}
-		rightSeries[r.seriesIndex(s)] = true
+		if ySeries == nil {
+			ySeries = make(map[int]pointerYAxis)
+		}
+		ySeries[r.seriesIndex(s)] = at
 	}
-	return xTop, rightSeries
+	return xTop, xOffset, ySeries
 }
 
 // pointerPlotArea is the plot area the tooltip draws the pointer tags
-// against: base, with YAxisRight set for the Y axis of the first hit's series.
-func pointerPlotArea(base component.PlotArea, rightSeries map[int]bool, state *component.TooltipState) component.PlotArea {
+// against: base, with YAxisRight and YAxisOffset set for the Y axis of the
+// first hit's series.
+func pointerPlotArea(base component.PlotArea, ySeries map[int]pointerYAxis, state *component.TooltipState) component.PlotArea {
 	if state != nil && len(state.Hits) > 0 {
-		base.YAxisRight = rightSeries[state.Hits[0].SeriesIndex]
+		at := ySeries[state.Hits[0].SeriesIndex]
+		base.YAxisRight, base.YAxisOffset = at.right, at.offset
 	}
 	return base
 }
@@ -1075,7 +1123,7 @@ func yNameRise(labelSize float32) float32 { return labelSize + 8 }
 func axisTopExtent(x axis.Config, ys []axis.Config, labelSize float32) float32 {
 	var e float32
 	if xAxisOnTop(x) {
-		e = xAxisExtent(x, labelSize)
+		e = axisOffset(x) + xAxisExtent(x, labelSize)
 	}
 	for _, y := range ys {
 		if y.Name != "" {
@@ -1112,28 +1160,45 @@ func textWidth(s string, size float32) float32 {
 	return float32(len(s)) * size * 0.6
 }
 
-// renderXAxis draws an X axis along the bottom or top of the plot: the axis
-// line, a tick mark and label per tick, and the axis name centred beyond the
-// labels.
+// renderXAxis draws an X axis along the bottom or top of the plot, moved
+// out by its Offset: the axis line, a tick mark and label per tick, and the
+// axis name centred beyond the labels, less the parts cfg.Hide hides. With
+// SplitLineShow it also draws vertical grid lines across the plot at its
+// ticks.
 func (r *chartRenderer) renderXAxis(cfg axis.Config, xScale axis.Scale, plotRect coord.Rect, resolver *style.Resolver) []core.CanvasObject {
 	var objects []core.CanvasObject
 	labelSize := resolver.LabelTextSize()
 	lineColor, labelColor := axisColors(cfg, resolver)
 	top := xAxisOnTop(cfg)
 
-	y := plotRect.Y + plotRect.H
+	y := plotRect.Y + plotRect.H + axisOffset(cfg)
 	dir := float32(1) // away from the plot: down for the bottom axis
 	if top {
-		y = plotRect.Y
+		y = plotRect.Y - axisOffset(cfg)
 		dir = -1
 	}
 
-	objects = append(objects, &canvas.Line{
-		Position1:   geo.NewPos(plotRect.X, y),
-		Position2:   geo.NewPos(plotRect.X+plotRect.W, y),
-		StrokeColor: lineColor,
-		StrokeWidth: 1,
-	})
+	if cfg.SplitLine == axis.SplitLineShow {
+		gridColor := resolver.GridLineColor()
+		for _, tick := range xScale.Ticks() {
+			px := plotRect.X + tickNorm(tick, cfg.Inverse)*plotRect.W
+			objects = append(objects, &canvas.Line{
+				Position1:   geo.NewPos(px, plotRect.Y),
+				Position2:   geo.NewPos(px, plotRect.Y+plotRect.H),
+				StrokeColor: gridColor,
+				StrokeWidth: 0.5,
+			})
+		}
+	}
+
+	if !cfg.Hide.Line {
+		objects = append(objects, &canvas.Line{
+			Position1:   geo.NewPos(plotRect.X, y),
+			Position2:   geo.NewPos(plotRect.X+plotRect.W, y),
+			StrokeColor: lineColor,
+			StrokeWidth: 1,
+		})
+	}
 
 	// labelY places a box of height h at distance gap beyond the axis line.
 	labelY := func(gap, h float32) float32 {
@@ -1146,20 +1211,24 @@ func (r *chartRenderer) renderXAxis(cfg axis.Config, xScale axis.Scale, plotRect
 	for _, tick := range xScale.Ticks() {
 		px := plotRect.X + tickNorm(tick, cfg.Inverse)*plotRect.W
 
-		objects = append(objects, &canvas.Line{
-			Position1:   geo.NewPos(px, y),
-			Position2:   geo.NewPos(px, y+4*dir),
-			StrokeColor: lineColor,
-			StrokeWidth: 1,
-		})
+		if !cfg.Hide.Ticks {
+			objects = append(objects, &canvas.Line{
+				Position1:   geo.NewPos(px, y),
+				Position2:   geo.NewPos(px, y+4*dir),
+				StrokeColor: lineColor,
+				StrokeWidth: 1,
+			})
+		}
 
-		label := canvas.NewText(tick.Label, labelColor)
-		label.TextSize = labelSize
-		label.Alignment = bellui.TextAlignCenter
-		estWidth := textWidth(tick.Label, labelSize)
-		label.Move(geo.NewPos(px-estWidth/2, labelY(axisLabelGap, axisRow(labelSize))))
-		label.Resize(geo.NewSize(estWidth, axisRow(labelSize)))
-		objects = append(objects, label)
+		if !cfg.Hide.Labels {
+			label := canvas.NewText(tick.Label, labelColor)
+			label.TextSize = labelSize
+			label.Alignment = bellui.TextAlignCenter
+			estWidth := textWidth(tick.Label, labelSize)
+			label.Move(geo.NewPos(px-estWidth/2, labelY(axisLabelGap, axisRow(labelSize))))
+			label.Resize(geo.NewSize(estWidth, axisRow(labelSize)))
+			objects = append(objects, label)
+		}
 	}
 
 	if cfg.Name != "" {
@@ -1174,29 +1243,46 @@ func (r *chartRenderer) renderXAxis(cfg axis.Config, xScale axis.Scale, plotRect
 	return objects
 }
 
-// renderYAxis draws the Y axis at index on the side yAxisOnRight picks: the
-// axis line, a label per tick and the axis name above the axis, clear of an X
-// axis drawn at the top (topX). A right-hand axis also draws tick marks. The
-// first Y axis also draws the horizontal grid lines at its ticks.
-func (r *chartRenderer) renderYAxis(cfg axis.Config, yScale axis.Scale, index int, topX axis.Config, plotRect coord.Rect, resolver *style.Resolver) []core.CanvasObject {
+// ySplitLines reports whether the Y axis at index draws grid lines: by
+// default only the first one does.
+func ySplitLines(cfg axis.Config, index int) bool {
+	switch cfg.SplitLine {
+	case axis.SplitLineShow:
+		return true
+	case axis.SplitLineHide:
+		return false
+	}
+	return index == 0
+}
+
+// renderYAxis draws the Y axis at index on the side yAxisOnRight picks,
+// moved out from the plot edge by its Offset: the axis line, a label per tick
+// and the axis name above the axis, clear of an X axis drawn at the top
+// (topX), less the parts cfg.Hide hides. A right-hand axis also draws tick
+// marks. A left-hand axis's labels and name fill a band leftBand wide (the
+// grid's left margin) ending at the axis. The first Y axis, or any with
+// SplitLineShow, also draws the horizontal grid lines at its ticks.
+func (r *chartRenderer) renderYAxis(cfg axis.Config, yScale axis.Scale, index int, topX axis.Config, plotRect coord.Rect, leftBand float32, resolver *style.Resolver) []core.CanvasObject {
 	var objects []core.CanvasObject
 	labelSize := resolver.LabelTextSize()
 	lineColor, labelColor := axisColors(cfg, resolver)
 	gridColor := resolver.GridLineColor()
 	right := yAxisOnRight(cfg, index)
-	splitLines := index == 0
+	splitLines := ySplitLines(cfg, index)
 
-	x := plotRect.X
+	x := plotRect.X - axisOffset(cfg)
 	if right {
-		x = plotRect.X + plotRect.W
+		x = plotRect.X + plotRect.W + axisOffset(cfg)
 	}
 
-	objects = append(objects, &canvas.Line{
-		Position1:   geo.NewPos(x, plotRect.Y),
-		Position2:   geo.NewPos(x, plotRect.Y+plotRect.H),
-		StrokeColor: lineColor,
-		StrokeWidth: 1,
-	})
+	if !cfg.Hide.Line {
+		objects = append(objects, &canvas.Line{
+			Position1:   geo.NewPos(x, plotRect.Y),
+			Position2:   geo.NewPos(x, plotRect.Y+plotRect.H),
+			StrokeColor: lineColor,
+			StrokeWidth: 1,
+		})
+	}
 
 	for _, tick := range yScale.Ticks() {
 		// Screen Y grows downwards, so the top of the axis is norm 1.
@@ -1211,22 +1297,27 @@ func (r *chartRenderer) renderYAxis(cfg axis.Config, yScale axis.Scale, index in
 			})
 		}
 
-		label := canvas.NewText(tick.Label, labelColor)
-		label.TextSize = labelSize
-		if right {
+		if right && !cfg.Hide.Ticks {
 			objects = append(objects, &canvas.Line{
 				Position1:   geo.NewPos(x, py),
 				Position2:   geo.NewPos(x+4, py),
 				StrokeColor: lineColor,
 				StrokeWidth: 1,
 			})
+		}
+		if cfg.Hide.Labels {
+			continue
+		}
+		label := canvas.NewText(tick.Label, labelColor)
+		label.TextSize = labelSize
+		if right {
 			label.Alignment = bellui.TextAlignLeading
 			label.Move(geo.NewPos(x+axisLabelGap, py-labelSize/2))
 			label.Resize(geo.NewSize(yRightLabelWidth, axisRow(labelSize)))
 		} else {
 			label.Alignment = bellui.TextAlignTrailing
-			label.Move(geo.NewPos(0, py-labelSize/2))
-			label.Resize(geo.NewSize(x-resolver.Padding(), labelSize+4))
+			label.Move(geo.NewPos(x-leftBand, py-labelSize/2))
+			label.Resize(geo.NewSize(leftBand-resolver.Padding(), labelSize+4))
 		}
 		objects = append(objects, label)
 	}
@@ -1236,7 +1327,7 @@ func (r *chartRenderer) renderYAxis(cfg axis.Config, yScale axis.Scale, index in
 		name.TextSize = labelSize
 		ny := plotRect.Y - yNameRise(labelSize)
 		if xAxisOnTop(topX) {
-			ny -= xAxisExtent(topX, labelSize)
+			ny -= axisOffset(topX) + xAxisExtent(topX, labelSize)
 		}
 		if right {
 			name.Alignment = bellui.TextAlignLeading
@@ -1244,8 +1335,8 @@ func (r *chartRenderer) renderYAxis(cfg axis.Config, yScale axis.Scale, index in
 			name.Resize(geo.NewSize(textWidth(cfg.Name, labelSize), labelSize+4))
 		} else {
 			name.Alignment = bellui.TextAlignTrailing
-			name.Move(geo.NewPos(0, ny))
-			name.Resize(geo.NewSize(x, labelSize+4))
+			name.Move(geo.NewPos(x-leftBand, ny))
+			name.Resize(geo.NewSize(leftBand, labelSize+4))
 		}
 		objects = append(objects, name)
 	}
