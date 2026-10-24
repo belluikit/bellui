@@ -278,6 +278,7 @@ func (p *CompletionPopup) ShowAtCaret(caret geo.Rectangle) {
 	if len(p.items) == 0 {
 		return
 	}
+	p.inheritHostDirection()
 	p.Resize(p.MinSize())
 	p.placeAt(caret)
 	p.Show()
@@ -341,6 +342,15 @@ func (p *CompletionPopup) notifyMoved() {
 	p.OnMoved(r)
 }
 
+// inheritHostDirection makes the popup lay out in the direction its host Entry
+// sits in, so a popup opened inside a container.DirectionScope follows the
+// scope (#749). A popup without a host Entry keeps its canvas' direction.
+func (p *CompletionPopup) inheritHostDirection() {
+	if p.host != nil {
+		inheritDirection(p, p.host.super())
+	}
+}
+
 // Show makes the popup visible and gives it keyboard focus on desktop. When the
 // popup has a host Entry it stays focused but forwards typing back to the host
 // (see TypedKey/TypedRune), so the Entry keeps its caret and edits live. With
@@ -355,6 +365,7 @@ func (p *CompletionPopup) Show() {
 	// places the caret in one click.
 	p.overlay.FocusTransparent = p.KeepHostFocus
 	p.overlay.TapThrough = p.KeepHostFocus
+	p.inheritHostDirection()
 	p.overlay.Show()
 	p.BaseWidget.Show()
 	if !p.KeepHostFocus && !bellui.CurrentDevice().IsMobile() {

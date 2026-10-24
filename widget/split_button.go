@@ -89,6 +89,7 @@ func (s *SplitButton) showMenu() {
 	menu := bellui.NewMenu("", s.MenuItems...)
 	absPos := bellui.CurrentApp().Driver().AbsolutePositionForObject(s)
 	s.popUp = NewPopUpMenu(menu, c)
+	inheritDirection(s.popUp, s) // #749
 	s.popUp.ShowAtPosition(geo.NewPos(absPos.X, absPos.Y+s.Size().Height))
 }
 

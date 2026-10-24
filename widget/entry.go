@@ -1709,6 +1709,7 @@ func (e *Entry) showContextMenu(pos geo.Position) {
 		return
 	}
 	e.popUp = NewPopUpMenu(bellui.NewMenu("", menuItems...), c)
+	inheritDirection(e.popUp, super) // #749
 	e.popUp.ShowAtPosition(pos)
 }
 

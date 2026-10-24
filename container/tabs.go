@@ -8,6 +8,7 @@ import (
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal"
 	"github.com/belluikit/bellui/internal/build"
+	"github.com/belluikit/bellui/internal/driver"
 	intTheme "github.com/belluikit/bellui/internal/theme"
 	"github.com/belluikit/bellui/theme"
 	"github.com/belluikit/bellui/widget"
@@ -150,6 +151,7 @@ func buildPopUpMenu(t baseTabs, button *widget.Button, items []*bellui.MenuItem)
 	if popUpPos.Y < 0 {
 		popUpPos.Y = 0
 	}
+	driver.InheritDirection(popUpMenu, button) // a scope around the tabs applies to the menu (#749)
 	popUpMenu.ShowAtPosition(popUpPos)
 	return popUpMenu
 }

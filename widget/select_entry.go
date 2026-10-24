@@ -119,6 +119,7 @@ func (e *SelectEntry) setupDropDown() *Button {
 			return
 		}
 		e.popUp = NewPopUpMenu(e.dropDown, c)
+		inheritDirection(e.popUp, e.super()) // #749
 		e.popUp.ShowAtPosition(e.popUpPos())
 		e.popUp.Resize(geo.NewSize(e.Size().Width, e.popUp.MinSize().Height))
 	})
