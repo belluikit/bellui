@@ -12,6 +12,7 @@ import (
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/async"
+	"github.com/belluikit/bellui/internal/uidir"
 	"github.com/belluikit/bellui/internal/widget"
 	"github.com/belluikit/bellui/lang"
 	"github.com/belluikit/bellui/theme"
@@ -618,6 +619,11 @@ type gridWrapLayout struct {
 	itemPool   async.Pool[core.CanvasObject]
 	visible    []gridItemAndID
 	wasVisible []gridItemAndID
+
+	// dir is the direction updateGrid last placed the items in: the grid's
+	// own, read under the layout walk or a Refresh's lookup. DirectionAuto
+	// until the first placement.
+	dir bellui.Direction
 }
 
 func newGridWrapLayout(gw *GridWrap) core.Layout {
@@ -651,9 +657,15 @@ func (l *gridWrapLayout) offsetUpdated(pos geo.Position) {
 		return
 	}
 	l.gw.offsetY = pos.Y
-	// A scroll event, outside a layout walk: place the items in the grid's own
-	// direction (#696).
-	inDirectionOf(l.gw.super(), func() { l.updateGrid(true) })
+	// A scroll event, outside a layout walk, and up to once a frame: place the
+	// items in the direction of their last placement rather than looking the
+	// grid up in the tree each time (#696). Push it only when it differs from
+	// the ambient one, to keep uidir's no-scope fast path.
+	if d := l.dir; d != bellui.DirectionAuto && (d == bellui.DirectionRTL) != lang.IsRTLDirection() {
+		uidir.Push(d)
+		defer uidir.Pop(d)
+	}
+	l.updateGrid(true)
 }
 
 func (l *gridWrapLayout) setupGridItem(li *gridWrapItem, id GridWrapItemID, focus bool) {
@@ -740,6 +752,10 @@ func (l *gridWrapLayout) updateGrid(newOnly bool) {
 	curItemID := minItem
 	stride := l.gw.itemMin.Width + padding
 	rtl := lang.IsRTLDirection()
+	l.dir = bellui.DirectionLTR
+	if rtl {
+		l.dir = bellui.DirectionRTL
+	}
 	for row := minRow; row <= maxRow && curItemID <= maxItem; row++ {
 		for col := 0; col < colCount && curItemID <= maxItem; col++ {
 			item, ok := l.searchVisible(l.wasVisible, curItemID)

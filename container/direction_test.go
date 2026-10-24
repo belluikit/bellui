@@ -222,3 +222,19 @@ func TestCanvasDirection_SetAfterLayoutMirrors(t *testing.T) {
 	w.Canvas().(interface{ SetDirection(bellui.Direction) }).SetDirection(bellui.DirectionRTL)
 	assert.Greater(t, first.Position().X, second.Position().X, "mirrored after SetDirection")
 }
+
+// panicOnRefresh is a rectangle whose Refresh panics.
+type panicOnRefresh struct{ *canvas.Rectangle }
+
+func (panicOnRefresh) Refresh() { panic("refresh") }
+
+// A Refresh that panics under NewDirectionScope's push must not leave the
+// scope's direction ambient once the panic is recovered.
+func TestNewDirectionScope_PanickingRefreshPopsDirection(t *testing.T) {
+	test.NewTempApp(t)
+	lang.SetLocaleForTests(t, "en-US")
+	assert.Panics(t, func() {
+		container.NewDirectionScope(panicOnRefresh{canvas.NewRectangle(nil)}, bellui.DirectionRTL)
+	})
+	assert.False(t, lang.IsRTLDirection(), "the scope's RTL does not outlive the panic")
+}

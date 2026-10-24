@@ -1,7 +1,6 @@
 package widget
 
 import (
-	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/internal/driver"
 	"github.com/belluikit/bellui/internal/uidir"
@@ -38,12 +37,19 @@ func isRTLAt(obj core.CanvasObject) bool { return driver.IsRTLAt(obj) }
 // inDirectionOf runs f with obj's direction as the ambient one, so a layout f
 // performs outside a layout walk — a renderer's Refresh re-laying itself out
 // after a tap, a timer or a data binding — mirrors as the walk would (#696).
-// It pushes the resolved direction even when that is the global one, so the
-// lookups of children refreshed inside f return at once instead of walking.
+// Once a scope has been rendered it pushes the resolved direction even when
+// that is the global one, so the lookups of children refreshed inside f return
+// at once instead of walking. Before then nothing is pushed unless obj's
+// canvas has a direction of its own: pushing would switch off uidir's
+// no-scope fast path for every text measurement inside f.
 func inDirectionOf(obj core.CanvasObject, f func()) {
-	d := bellui.DirectionLTR
-	if isRTLAt(obj) {
-		d = bellui.DirectionRTL
+	d, ok := driver.DirectionOf(obj)
+	if !ok {
+		if !uidir.ScopesInUse() {
+			f() // the global direction applies, and lookups inside f are cheap
+			return
+		}
+		d = driver.GlobalDirection()
 	}
 	uidir.Push(d)
 	defer uidir.Pop(d)

@@ -6,7 +6,6 @@ import (
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/driver"
 	"github.com/belluikit/bellui/internal/uidir"
-	"github.com/belluikit/bellui/lang"
 	"github.com/belluikit/bellui/widget"
 )
 
@@ -51,9 +50,11 @@ func NewDirectionScope(obj core.CanvasObject, dir bellui.Direction) *DirectionSc
 
 	// obj may have been measured/laid-out under the previous (global) direction
 	// before being wrapped, so recompute it within the new scope.
-	uidir.Push(dir)
-	obj.Refresh()
-	uidir.Pop(dir)
+	func() {
+		uidir.Push(dir)
+		defer uidir.Pop(dir) // a panicking Refresh must not leave dir ambient
+		obj.Refresh()
+	}()
 	return d
 }
 
@@ -123,13 +124,7 @@ func (d *DirectionScope) Refresh() {
 //
 // Since: 1.0
 func DirectionOf(obj core.CanvasObject) bellui.Direction {
-	if d, ok := driver.DirectionOf(obj); ok {
-		return d
-	}
-	if lang.IsRTLDirection() {
-		return bellui.DirectionRTL
-	}
-	return bellui.DirectionLTR
+	return driver.ResolvedDirectionOf(obj)
 }
 
 // contentDirection is the direction the scope's content takes: its own, or

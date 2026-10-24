@@ -818,7 +818,10 @@ func (s *Scroll) pinToRTLStart() {
 // moves toward the content's left edge.
 func (s *Scroll) resolveScrollDelta(dx, dy float32) (float32, float32) {
 	dx, dy = s.swapAxesIfNeeded(dx, dy)
-	if driver.IsRTLAt(s.super()) { // an input event: no layout walk is running (#696)
+	// An input event, so no layout walk is running: look the direction up
+	// (#696), but only when there is a horizontal delta to flip — vertical
+	// wheel scrolling is the hot path and must not walk the tree.
+	if dx != 0 && driver.IsRTLAt(s.super()) {
 		dx = -dx
 	}
 	return dx, dy

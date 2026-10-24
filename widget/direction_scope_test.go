@@ -120,3 +120,56 @@ func TestDirectionScope_ReadersOutsideScopeFollowApp(t *testing.T) {
 	assert.Equal(t, bellui.DirectionLTR, container.DirectionOf(sb))
 	assert.Equal(t, bellui.DirectionRTL, container.DirectionOf(scoped))
 }
+
+// Scrolling places the newly visible rows outside a layout walk, once a frame;
+// in an RTL scope their first column must still sit on the right.
+func TestGridWrap_ScrollPlacementInRTLScope(t *testing.T) {
+	labels := map[widget.GridWrapItemID]*widget.Label{}
+	g := widget.NewGridWrap(
+		func() int { return 200 },
+		func() core.CanvasObject { return widget.NewLabel("item") },
+		func(id widget.GridWrapItemID, o core.CanvasObject) { labels[id] = o.(*widget.Label) },
+	)
+	inRTLScope(t, g)
+	cols := g.ColumnCount()
+	require.Greater(t, cols, 1)
+
+	g.ScrollToOffset(1000) // well past the rows laid out by the walk
+	pos := bellui.CurrentApp().Driver().AbsolutePositionForObject
+	var row int
+	for id := range labels {
+		if r := int(id) / cols; r > row {
+			row = r
+		}
+	}
+	first, second := labels[widget.GridWrapItemID(row*cols)], labels[widget.GridWrapItemID(row*cols+1)]
+	require.NotNil(t, first)
+	require.NotNil(t, second)
+	assert.Greater(t, pos(first).X, pos(second).X, "the first column leads on the right after a scroll")
+}
+
+// An object on no window gets the app's direction, even while a window with
+// its own direction is open.
+func TestDirectionOf_OffCanvasWithDirectedWindow(t *testing.T) {
+	test.NewTempApp(t)
+	lang.SetLocaleForTests(t, "en-US")
+	w := test.NewTempWindow(t, widget.NewLabel("shown"))
+	w.Canvas().(interface{ SetDirection(bellui.Direction) }).SetDirection(bellui.DirectionRTL)
+
+	assert.Equal(t, bellui.DirectionLTR, container.DirectionOf(widget.NewLabel("loose")))
+}
+
+// The lookup finds an object in its own window, not the one the test driver's
+// CanvasForObject guesses (the last created).
+func TestDirectionOf_ScopeInEarlierWindow(t *testing.T) {
+	test.NewTempApp(t)
+	lang.SetLocaleForTests(t, "en-US")
+	sb := widget.NewSegmentedButton([]string{"A", "B", "C"}, nil)
+	sb.Selected = 1
+	test.NewTempWindow(t, container.NewDirectionScope(sb, bellui.DirectionRTL))
+	test.NewTempWindow(t, widget.NewLabel("opened later"))
+
+	assert.Equal(t, bellui.DirectionRTL, container.DirectionOf(sb))
+	sb.TypedKey(&event.KeyEvent{Name: event.KeyRight})
+	assert.Equal(t, 0, sb.Selected, "RTL KeyRight retreats")
+}

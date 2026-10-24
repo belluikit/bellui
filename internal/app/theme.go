@@ -4,6 +4,7 @@ import (
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/internal/cache"
+	"github.com/belluikit/bellui/internal/driver"
 	"github.com/belluikit/bellui/internal/uidir"
 )
 
@@ -25,21 +26,12 @@ func ApplyThemeTo(content core.CanvasObject, canv core.Canvas) {
 	applyThemeTo(content, canv)
 }
 
-// directionScoped is implemented by container.DirectionScope, detected
-// structurally because container imports this package.
-type directionScoped interface {
-	ScopedDirection() bellui.Direction
-}
-
 func applyThemeTo(content core.CanvasObject, canv core.Canvas) {
 	if content == nil {
 		return
 	}
-	if ds, ok := content.(directionScoped); ok {
-		d := ds.ScopedDirection()
-		uidir.Push(d)
-		defer uidir.Pop(d)
-	}
+	driver.PushDirectionScope(content) // a no-op unless content is a direction scope
+	defer driver.PopDirectionScope(content)
 
 	switch o := content.(type) {
 	case core.Widget:
