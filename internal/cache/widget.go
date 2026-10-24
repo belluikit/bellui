@@ -65,7 +65,7 @@ func DestroyRenderer(wid core.Widget) {
 	if rinfo != nil {
 		rinfo.renderer.Destroy()
 	}
-	overrides.Delete(wid)
+	DeleteOverride(wid)
 }
 
 // IsRendered returns true of the widget currently has a renderer.
