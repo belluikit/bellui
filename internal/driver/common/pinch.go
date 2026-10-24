@@ -59,7 +59,7 @@ type pinchState struct {
 	down    [2]geo.Position // where each finger was when the second one landed
 	start   geo.Position    // midpoint when the second finger landed: the pan's scroll origin
 	lastMid geo.Position    // midpoint at the previous pan step
-	steps   [2]geo.Delta    // each finger's latest pan step; their sum seeds momentum
+	vel     velocityTracker // the midpoint's recent pan steps; they seed momentum (#751)
 }
 
 type twoFingerMode int
@@ -112,7 +112,7 @@ func (h *TouchHandler) endPinchOf(tapID int, released bool) {
 		p.target.PinchEnded()
 	case twoFingerPan:
 		if released && h.ScrollEndCallback != nil {
-			h.ScrollEndCallback(p.start, geo.Delta{DX: p.steps[0].DX + p.steps[1].DX, DY: p.steps[0].DY + p.steps[1].DY})
+			h.ScrollEndCallback(p.start, p.vel.seed(p.lastMid, h.clock()))
 		}
 	}
 }
@@ -168,6 +168,7 @@ func (h *TouchHandler) startPinch(tapID int) bool {
 		start:   mid,
 		lastMid: mid,
 	}
+	h.pinch.vel.reset(mid, h.clock())
 	if target == nil {
 		return false
 	}
@@ -243,13 +244,7 @@ func (h *TouchHandler) movePinch(tapID int) bool {
 		if delta == (geo.Delta{}) {
 			return true
 		}
-		// Each finger's move shifts the midpoint by half of it, so one finger's
-		// step is half the frame's motion; the two together are all of it.
-		if tapID == p.ids[0] {
-			p.steps[0] = delta
-		} else {
-			p.steps[1] = delta
-		}
+		p.vel.add(mid, h.clock())
 		if h.ScrollCallback != nil {
 			h.ScrollCallback(p.start, delta)
 		}

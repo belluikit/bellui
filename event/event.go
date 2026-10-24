@@ -136,6 +136,29 @@ type Draggable interface {
 	DragEnd()
 }
 
+// MomentumDraggable is a Draggable that keeps moving after a touch drag is let
+// go at speed, the way flung content does. It is optional: a Draggable that
+// does not implement it, or whose DragMomentum reports false, gets DragEnd
+// where the finger lifted.
+//
+// On the mobile and embedded drivers, a touch drag of a MomentumDraggable
+// released while the finger was still moving carries on: the object gets
+// decaying Dragged events, seeded from the finger's speed at release, and then
+// DragEnd. A finger held still before lifting does not coast, and the next
+// touch stops a coast at once. Desktop drags, mouse or touch, never coast.
+//
+// Direct manipulation — a slider thumb, a divider, a selection handle, a
+// drag-reorder — must not opt in: what the user let go of has to stay there.
+// Scroll containers do.
+type MomentumDraggable interface {
+	Draggable
+	// DragMomentum reports whether the drag being released should coast. It
+	// is asked once per release, on the main goroutine, before any coast
+	// step or DragEnd, so the answer may depend on what the drag is doing
+	// (panning but not resizing), and a type embedding one can return false.
+	DragMomentum() bool
+}
+
 // PinchEvent describes one step of a two-finger pinch. Position and
 // AbsolutePosition are the focus, the midpoint between the fingers, relative
 // to the receiving object and to the canvas. Scale is relative to the previous

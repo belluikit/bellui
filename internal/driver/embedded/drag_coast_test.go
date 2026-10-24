@@ -20,11 +20,14 @@ import (
 // the coast kept dragging for about half a second after the next touch went
 // down, and its late DragEnd could end that touch's own drag of the widget.
 
-// coastRecorder logs its drag events. Only the driver's loop touches it:
+// coastRecorder logs its drag events, and coasts like a Scroll. Only the driver's loop touches it:
 // tests read it through onLoop.
 type coastRecorder struct {
 	widget.BaseWidget
 	log []string
+	// direct makes it a direct-manipulation Draggable, which asks for no
+	// momentum, like a Slider.
+	direct bool
 }
 
 func newCoastRecorder() *coastRecorder {
@@ -39,6 +42,10 @@ func (r *coastRecorder) CreateRenderer() core.WidgetRenderer {
 
 func (r *coastRecorder) Dragged(*event.DragEvent) { r.log = append(r.log, "drag") }
 func (r *coastRecorder) DragEnd()                 { r.log = append(r.log, "end") }
+
+// DragMomentum opts the recorder into coasting (event.MomentumDraggable):
+// only a Draggable that asks for momentum coasts (#751).
+func (r *coastRecorder) DragMomentum() bool { return !r.direct }
 
 // coastDriver runs a driver whose window is filled by a coastRecorder. Its
 // event channel is unbuffered, so a send returns once the loop has the event,
@@ -70,9 +77,10 @@ func flickEvents(events chan embedded.Event) {
 	events <- &embedded.TouchUpEvent{Position: geo.NewPos(160, 100)}
 }
 
-// coastFor is longer than any coast from a flick: 50pt a step decays under
-// the end threshold in about 40 steps of 16ms.
-const coastFor = time.Second
+// coastFor is longer than any coast from a flick. Its moves arrive within one
+// 16ms step, so it seeds the whole 150pt it covered (velocity.go, #751), which
+// decays under the end threshold in about 52 steps: 0.85s.
+const coastFor = 1500 * time.Millisecond
 
 func TestNoOSDriver_TouchStopsDragCoast(t *testing.T) {
 	d, events, rec := coastDriver(t)
@@ -116,4 +124,19 @@ func TestNoOSDriver_DragCoastDoesNotEndALaterDrag(t *testing.T) {
 		assert.Equal(t, "end", second[len(second)-1], "its own release ends it")
 		assert.NotContains(t, second[:len(second)-1], "end", "once")
 	})
+}
+
+// Only a Draggable that asks for momentum coasts (#751): any other gets
+// DragEnd where the finger lifted, however fast it was moving.
+func TestNoOSDriver_DirectDragDoesNotCoast(t *testing.T) {
+	d, events, rec := coastDriver(t)
+	onLoop := func(fn func()) { d.DoFromGoroutine(fn, true) }
+	onLoop(func() { rec.direct = true })
+
+	flickEvents(events)
+	var atRelease []string
+	onLoop(func() { atRelease = append([]string(nil), rec.log...) })
+	assert.Equal(t, []string{"drag", "drag", "end"}, atRelease, "the release ends it at once")
+	time.Sleep(coastFor)
+	onLoop(func() { assert.Equal(t, atRelease, rec.log, "and nothing coasts after it") })
 }

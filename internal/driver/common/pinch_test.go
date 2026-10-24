@@ -3,6 +3,7 @@ package common
 import (
 	"image/color"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -461,18 +462,21 @@ func TestTouchHandler_FastFlickWithoutPinchablePans(t *testing.T) {
 	assert.Zero(t, target.dragged, "a two-finger flick is not a drag")
 }
 
-// Momentum is seeded with a frame's motion — both fingers' steps — as a
-// one-finger flick's is with its last move.
+// Momentum is seeded with the midpoint's speed at release, as the distance it
+// covers in a momentum step (#751): fingers moving 6 px each 16ms frame seed 6.
 func TestTouchHandler_PanMomentumIsTheFramesMotion(t *testing.T) {
 	target := &pinchRect{Rectangle: canvas.NewRectangle(color.Black)}
 	h := newPinchHandler(target)
+	clk := useFakeClock(h)
 	h.ScrollCallback = func(geo.Position, geo.Delta) {}
 	var seeds []geo.Delta
 	h.ScrollEndCallback = func(_ geo.Position, d geo.Delta) { seeds = append(seeds, d) }
 	h.TapDown(geo.NewPos(100, 100), 1)
 	h.TapDown(geo.NewPos(200, 100), 2)
-	for y := float32(106); y <= 160; y += 6 { // 6 px a frame
+	for y := float32(106); y <= 160; y += 6 { // 6 px a frame, each finger reported 8ms apart
+		clk.advance(8 * time.Millisecond)
 		h.TapMove(geo.NewPos(100, y), 1, nil)
+		clk.advance(8 * time.Millisecond)
 		h.TapMove(geo.NewPos(200, y), 2, nil)
 	}
 	pinchTapUp(h, geo.NewPos(100, 160), 1)

@@ -79,7 +79,9 @@ type TouchHandler struct {
 	// neither, and two fingers over a Pinchable always pinch.
 	ScrollCallback func(origin geo.Position, delta geo.Delta)
 	// ScrollEndCallback is called when a scroll gesture's contact lifts, with
-	// the last move's delta as the momentum seed. A system cancel ends the
+	// the momentum seed: the distance the finger was covering per momentum
+	// step when it let go, from its recent moves (velocity.go), and nothing
+	// when it was held still before lifting (#751). A system cancel ends the
 	// gesture without it — momentum from a contact the system took over would
 	// keep content moving after a palm rejection.
 	ScrollEndCallback func(origin geo.Position, delta geo.Delta)
@@ -113,6 +115,49 @@ type TouchHandler struct {
 	contacts   map[int]geo.Position
 	pinch      *pinchState
 	pinchSpent map[int]bool
+
+	// velocity tracks each single contact's recent moves, which seed a
+	// released drag's or scroll's momentum (#751).
+	velocity map[int]*velocityTracker
+	// now is the clock the velocity samples read; nil is time.Now. Tests
+	// set it to drive release speeds deterministically.
+	now func() time.Time
+}
+
+// clock reads the time the velocity samples are stamped with.
+func (h *TouchHandler) clock() time.Time {
+	if h.now != nil {
+		return h.now()
+	}
+	return time.Now()
+}
+
+// trackVelocity records a single contact at pos; reset starts its movement
+// afresh (a new touch).
+func (h *TouchHandler) trackVelocity(tapID int, pos geo.Position, reset bool) {
+	if h.velocity == nil {
+		h.velocity = make(map[int]*velocityTracker)
+	}
+	v := h.velocity[tapID]
+	if v == nil {
+		v = &velocityTracker{}
+		h.velocity[tapID] = v
+		reset = true
+	}
+	if reset {
+		v.reset(pos, h.clock())
+		return
+	}
+	v.add(pos, h.clock())
+}
+
+// releaseSeed is the momentum seed for contact tapID lifting at pos.
+func (h *TouchHandler) releaseSeed(tapID int, pos geo.Position) geo.Delta {
+	v := h.velocity[tapID]
+	if v == nil {
+		return geo.Delta{}
+	}
+	return v.seed(pos, h.clock())
 }
 
 // InitTouchHandler initializes the maps. Call from the canvas constructor.
@@ -126,6 +171,7 @@ func (h *TouchHandler) InitTouchHandler(finder ObjectFinder) {
 	h.longPressFired = make(map[int]bool)
 	h.contacts = make(map[int]geo.Position)
 	h.pinchSpent = make(map[int]bool)
+	h.velocity = make(map[int]*velocityTracker)
 }
 
 // TapDown handles a pointer-down event.
@@ -142,6 +188,7 @@ func (h *TouchHandler) TapDown(pos geo.Position, tapID int) {
 func (h *TouchHandler) tapDownSingle(pos geo.Position, tapID int) {
 	h.LastTapDown[tapID] = time.Now()
 	h.LastTapDownPos[tapID] = pos
+	h.trackVelocity(tapID, pos, true)
 	h.Dragging = nil
 	h.scrolling = false
 	h.scrollingID = 0
@@ -303,6 +350,7 @@ func (h *TouchHandler) TapMove(pos geo.Position, tapID int,
 	h.LastTapDownPos[tapID] = pos
 	offset := geo.Delta{DX: deltaX, DY: deltaY}
 	h.LastTapDelta[tapID] = offset
+	h.trackVelocity(tapID, pos, false)
 
 	co, objPos, _ := h.Finder.FindObjectAtPositionMatching(pos, func(object core.CanvasObject) bool {
 		if _, ok := object.(event.Draggable); ok {
@@ -416,14 +464,16 @@ func (h *TouchHandler) TapUp(pos geo.Position, tapID int,
 		h.scrolling = false
 		h.scrollingID = 0
 		if h.ScrollEndCallback != nil {
-			h.ScrollEndCallback(h.scrollOrigin, h.LastTapDelta[tapID])
+			h.ScrollEndCallback(h.scrollOrigin, h.releaseSeed(tapID, pos))
 		}
 		return // a scroll gesture's release is not a tap
 	}
 
 	if h.Dragging != nil {
-		previousDelta := h.LastTapDelta[tapID]
-		ev := &event.DragEvent{Dragged: previousDelta}
+		// The release's Dragged is not a move — the last move was dispatched
+		// already — but the momentum seed for a driver that coasts the drag
+		// (DragCoast): the finger's speed at release, not its last move (#751).
+		ev := &event.DragEvent{Dragged: h.releaseSeed(tapID, pos)}
 		draggedObjDelta := h.DragStart.Subtract(h.Dragging.(core.CanvasObject).Position())
 		ev.Position = pos.Subtract(h.DragOffset).Add(draggedObjDelta)
 		ev.AbsolutePosition = pos
@@ -554,6 +604,7 @@ func (h *TouchHandler) forgetTouch(tapID int) {
 	delete(h.LastTapDownPos, tapID)
 	delete(h.LastTapDelta, tapID)
 	delete(h.Touched, tapID)
+	delete(h.velocity, tapID)
 }
 
 // CancelPendingTap abandons a double-tap wait that has not fired yet. Call it

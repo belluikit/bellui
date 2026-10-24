@@ -106,21 +106,25 @@ func tapUp(h *TouchHandler, pos geo.Position, tapID int) *int {
 func TestTouchHandler_ScrollLatchesOverScrollable(t *testing.T) {
 	sc := &scrollableRect{Rectangle: canvas.NewRectangle(color.Black)}
 	h, moves, ends := newScrollTestHandler(sc)
+	clk := useFakeClock(h)
 
 	h.TapDown(geo.NewPos(50, 50), 1)
+	clk.advance(coastStep)
 	h.TapMove(geo.NewPos(50, 30), 1, noopDrag)
 	require.Len(t, *moves, 1, "a past-slop move over a Scrollable latches a scroll gesture")
 	assert.Equal(t, geo.NewPos(50, 50), (*moves)[0].origin, "the gesture origin is latched, not the finger position")
 	assert.Equal(t, geo.NewDelta(0, -20), (*moves)[0].delta)
 
 	// Once latched, sub-slop moves keep scrolling — a slow finger must not stutter.
+	clk.advance(coastStep)
 	h.TapMove(geo.NewPos(50, 29), 1, noopDrag)
 	require.Len(t, *moves, 2, "a sub-slop move keeps scrolling once latched")
 	assert.Equal(t, geo.NewDelta(0, -1), (*moves)[1].delta)
 
 	taps := tapUp(h, geo.NewPos(50, 29), 1)
-	require.Len(t, *ends, 1, "the release seeds momentum with the last move's delta")
-	assert.Equal(t, geo.NewDelta(0, -1), (*ends)[0].delta)
+	require.Len(t, *ends, 1, "the release seeds momentum")
+	assert.InDelta(t, -10.5, (*ends)[0].delta.DY, 1e-3,
+		"from the finger's speed over the gesture, 21pt in two 16ms steps, not the last move's 1pt (#751)")
 	assert.Zero(t, *taps, "a scroll gesture's release is not a tap")
 }
 
