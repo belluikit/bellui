@@ -12,6 +12,7 @@ import (
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	intdriver "github.com/belluikit/bellui/internal/driver"
 	"github.com/belluikit/bellui/internal/scale"
 	"github.com/belluikit/bellui/theme"
 )
@@ -625,6 +626,10 @@ func (r *richTableRenderer) buildObjects() {
 	total := numCols * (1 + numRows)
 
 	if len(r.objects) != total+1 { // +1 for separator
+		// The old cells leave the tree, so their renderers go with them (#722).
+		for _, o := range r.objects {
+			intdriver.DestroyRenderers(o)
+		}
 		r.objects = make([]core.CanvasObject, 0, total+1)
 		for i, h := range r.table.header {
 			l := NewLabel(h)
@@ -686,7 +691,7 @@ func (r *richTableRenderer) buildObjects() {
 	for i, h := range r.table.header {
 		ref := NewLabel(h)
 		ref.TextStyle.Bold = true
-		w := ref.MinSize().Width
+		w := measureTemplate(ref).Width
 		r.table.cellNatWidths = append(r.table.cellNatWidths, w)
 		r.table.headerWidths[i] = w
 		if w > r.table.naturalColWidths[i] {
@@ -699,8 +704,7 @@ func (r *richTableRenderer) buildObjects() {
 			if i < len(row) {
 				text = row[i]
 			}
-			ref := NewLabel(text)
-			w := ref.MinSize().Width
+			w := measureTemplate(NewLabel(text)).Width
 			r.table.cellNatWidths = append(r.table.cellNatWidths, w)
 			if w > r.table.naturalColWidths[i] {
 				r.table.naturalColWidths[i] = w
@@ -709,11 +713,10 @@ func (r *richTableRenderer) buildObjects() {
 	}
 
 	// Reference line height, min column width, separator height
-	ref := NewLabel("X")
-	r.table.refLineHeight = ref.MinSize().Height
-	r.table.minColWidth = NewLabel("XXXXX").MinSize().Width
+	r.table.refLineHeight = measureTemplate(NewLabel("X")).Height
+	r.table.minColWidth = measureTemplate(NewLabel("XXXXX")).Width
 
-	r.table.sepHeight = NewSeparator().MinSize().Height
+	r.table.sepHeight = measureTemplate(NewSeparator()).Height
 
 	// Enforce minimum on natural column widths
 	for i := range r.table.naturalColWidths {

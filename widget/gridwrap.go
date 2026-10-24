@@ -110,9 +110,7 @@ func (l *GridWrap) CreateRenderer() core.WidgetRenderer {
 	l.ExtendBaseWidget(l)
 
 	if f := l.CreateItem; f != nil && l.itemMin.IsZero() {
-		item := createItemAndApplyThemeScope(f, l)
-
-		l.itemMin = item.MinSize()
+		l.itemMin = measureTemplate(createItemAndApplyThemeScope(f, l))
 	}
 
 	layout := &bellui.Container{Layout: newGridWrapLayout(l)}
@@ -445,9 +443,7 @@ func (l *gridWrapRenderer) MinSize() geo.Size {
 
 func (l *gridWrapRenderer) Refresh() {
 	if f := l.list.CreateItem; f != nil {
-		item := createItemAndApplyThemeScope(f, l.list)
-
-		l.list.itemMin = item.MinSize()
+		l.list.itemMin = measureTemplate(createItemAndApplyThemeScope(f, l.list))
 	}
 	l.Layout(l.list.Size())
 	l.scroller.Refresh()

@@ -6,6 +6,8 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/belluikit/bellui/canvas"
+	"github.com/belluikit/bellui/internal/cache"
+	intdriver "github.com/belluikit/bellui/internal/driver"
 	"github.com/belluikit/bellui/storage"
 	"github.com/belluikit/bellui/test"
 	"github.com/belluikit/bellui/widget"
@@ -85,4 +87,27 @@ func TestFileItem_Wrap(t *testing.T) {
 	texts = test.TempWidgetRenderer(t, rich).Objects()
 	assert.Len(t, texts, 2)
 	assert.Equal(t, "averylo", texts[0].(*canvas.Text).Text)
+}
+
+// TestFileItem_ReleasesMeasuringLabel checks that a file item leaves no
+// renderer behind for the label it builds only to measure the text height,
+// on creation and on every Refresh (#722).
+func TestFileItem_ReleasesMeasuringLabel(t *testing.T) {
+	test.NewTempApp(t)
+	f := &fileDialog{file: &FileDialog{}}
+	_ = f.makeUI()
+	before := cache.RenderedWidgets()
+
+	item := f.newFileItem(storage.NewFileURI("/path/to/filename.txt"), false, false)
+	r := cache.Renderer(item)
+	for range 3 {
+		r.Refresh()
+	}
+	intdriver.DestroyRenderers(item)
+
+	for w := range cache.RenderedWidgets() {
+		if _, ok := before[w]; !ok {
+			t.Errorf("renderer left behind for a %T", w)
+		}
+	}
 }

@@ -165,7 +165,7 @@ func NewTableWithHeaders(length func() (rows int, cols int), create func() core.
 func (t *Table) CreateRenderer() core.WidgetRenderer {
 	t.ExtendBaseWidget(t)
 
-	t.headerSize = t.createHeader().MinSize()
+	t.headerSize = measureTemplate(t.createHeader())
 	if t.columnWidths != nil {
 		if v, ok := t.columnWidths[-1]; ok {
 			t.headerSize.Width = v
@@ -842,11 +842,11 @@ func (t *Table) tapped(pos geo.Position) {
 
 func (t *Table) templateSize() geo.Size {
 	if f := t.CreateCell; f != nil {
-		template := createItemAndApplyThemeScope(f, t) // don't use cache, we need new template
+		size := measureTemplate(createItemAndApplyThemeScope(f, t)) // don't use cache, we need new template
 		if !t.ShowHeaderRow && !t.ShowHeaderColumn {
-			return template.MinSize()
+			return size
 		}
-		return template.MinSize().Max(t.createHeader().MinSize())
+		return size.Max(measureTemplate(t.createHeader()))
 	}
 
 	bellui.LogError("Missing CreateCell callback required for Table", nil)
@@ -1146,7 +1146,7 @@ func (t *tableRenderer) MinSize() geo.Size {
 
 func (t *tableRenderer) Refresh() {
 	th := t.t.Theme()
-	t.t.headerSize = t.t.createHeader().MinSize()
+	t.t.headerSize = measureTemplate(t.t.createHeader())
 	if t.t.columnWidths != nil {
 		if v, ok := t.t.columnWidths[-1]; ok {
 			t.t.headerSize.Width = v
@@ -1589,10 +1589,12 @@ func (r *tableCellsRenderer) moveIndicators() {
 		r.cells.t.dividerLayer.Content.(*bellui.Container).Objects = append(objs, r.dividers...)
 		r.cells.t.dividerLayer.Content.Refresh()
 	} else if needed < len(r.dividers) {
-		for i := needed; i < len(r.dividers); i++ {
-			r.dividers[i].Hide()
+		// A dropped divider leaves the tree, so its renderer goes with it:
+		// nothing else would release it before the cache expiry (#722).
+		for _, d := range r.dividers[needed:] {
+			d.Hide()
 		}
-		r.dividers = r.dividers[:needed]
+		r.dividers = dropObjects(r.dividers, needed)
 		objs := []core.CanvasObject{r.marker, r.hover}
 		r.cells.t.dividerLayer.Content.(*bellui.Container).Objects = append(objs, r.dividers...)
 		r.cells.t.dividerLayer.Content.Refresh()

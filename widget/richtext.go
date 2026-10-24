@@ -18,6 +18,7 @@ import (
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/cache"
+	intdriver "github.com/belluikit/bellui/internal/driver"
 	paint "github.com/belluikit/bellui/internal/painter"
 	"github.com/belluikit/bellui/internal/textbuf"
 	"github.com/belluikit/bellui/internal/widget"
@@ -1025,7 +1026,36 @@ func (t *RichText) cachedSegmentVisual(seg RichTextSegment, offset int) core.Can
 	return vis
 }
 
+// takeVisualCache empties the visual cache and returns the visuals it held,
+// for the caller to release with releaseVisuals once a Refresh has taken them
+// out of the tree (#722).
+func (t *RichText) takeVisualCache() []core.CanvasObject {
+	t.visualMu.Lock()
+	defer t.visualMu.Unlock()
+
+	var dropped []core.CanvasObject
+	for _, bySeg := range t.visualCache {
+		for _, vis := range bySeg {
+			dropped = append(dropped, vis)
+		}
+	}
+	t.visualCache = nil
+	return dropped
+}
+
+// releaseVisuals destroys the renderers of segment visuals that have left the
+// tree: nothing else releases them before the cache expiry (#722).
+func releaseVisuals(dropped []core.CanvasObject) {
+	for _, vis := range dropped {
+		intdriver.DestroyRenderers(vis)
+	}
+}
+
 func (t *RichText) cleanVisualCache() {
+	// An evicted visual leaves the tree, so its renderers go with it. They are
+	// released once the lock is, so that no Destroy runs under it.
+	var dropped []core.CanvasObject
+	defer func() { releaseVisuals(dropped) }()
 	t.visualMu.Lock()
 	defer t.visualMu.Unlock()
 
@@ -1045,6 +1075,9 @@ func (t *RichText) cleanVisualCache() {
 			// The per-object measurement memo (pre-rebrand tracker #923) lives on the canvas.Text
 			// itself, so a removed segment's memo is collected with its visual —
 			// no side-table pruning needed here.
+			for _, vis := range t.visualCache[seg] {
+				dropped = append(dropped, vis)
+			}
 			delete(t.visualCache, seg)
 		}
 	}

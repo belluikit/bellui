@@ -644,10 +644,10 @@ func (r *treeRenderer) Refresh() {
 func (r *treeRenderer) updateMinSizes() {
 	if f := r.tree.CreateNode; f != nil {
 		branch := createItemAndApplyThemeScope(func() core.CanvasObject { return f(true) }, r.tree)
-		r.tree.branchMinSize = newBranch(r.tree, branch).MinSize()
+		r.tree.branchMinSize = measureTemplate(newBranch(r.tree, branch))
 
 		leaf := createItemAndApplyThemeScope(func() core.CanvasObject { return f(false) }, r.tree)
-		r.tree.leafMinSize = newLeaf(r.tree, leaf).MinSize()
+		r.tree.leafMinSize = measureTemplate(newLeaf(r.tree, leaf))
 	}
 }
 
@@ -747,10 +747,11 @@ func (r *treeContentRenderer) Layout(size geo.Size) {
 		}
 
 		// If this is not the first item, add a separator
+		// separatorCount counts the separators shown, so that only as many are
+		// kept as the viewport needs, not one per node above it (#722).
 		addSeparator := y > 0
 		if addSeparator {
 			y += pad
-			separatorCount++
 		}
 
 		m := r.treeContent.tree.leafMinSize
@@ -873,6 +874,15 @@ func (r *treeContentRenderer) MinSize() (min geo.Size) {
 
 	r.minSizeCache = min
 	return min
+}
+
+// Destroy releases the renderers of the separators the content keeps for
+// reuse: those it is not showing are not among its objects, so destroying the
+// tree's renderers would not reach them (#722).
+func (r *treeContentRenderer) Destroy() {
+	for _, s := range r.separators {
+		releaseRenderer(s)
+	}
 }
 
 func (r *treeContentRenderer) Objects() []core.CanvasObject {

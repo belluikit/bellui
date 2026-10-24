@@ -55,18 +55,14 @@ func (r *treeViewRenderer) Refresh() {
 func (r *treeViewRenderer) updateMinSizes() {
 	if f := r.tree.CreateNode; f != nil {
 		branch := createItemAndApplyThemeScope(func() core.CanvasObject { return f(true) }, r.tree)
-		item := newTreeViewItem(r.tree, branch, true)
-		r.tree.branchMinSize = item.MinSize()
+		r.tree.branchMinSize = measureTemplate(newTreeViewItem(r.tree, branch, true))
 
 		leaf := createItemAndApplyThemeScope(func() core.CanvasObject { return f(false) }, r.tree)
-		item2 := newTreeViewItem(r.tree, leaf, false)
-		r.tree.leafMinSize = item2.MinSize()
+		r.tree.leafMinSize = measureTemplate(newTreeViewItem(r.tree, leaf, false))
 	} else {
 		// Default: icon + label
-		item := newTreeViewItem(r.tree, NewLabel("Template"), true)
-		r.tree.branchMinSize = item.MinSize()
-		item2 := newTreeViewItem(r.tree, NewLabel("Template"), false)
-		r.tree.leafMinSize = item2.MinSize()
+		r.tree.branchMinSize = measureTemplate(newTreeViewItem(r.tree, NewLabel("Template"), true))
+		r.tree.leafMinSize = measureTemplate(newTreeViewItem(r.tree, NewLabel("Template"), false))
 	}
 }
 
@@ -490,11 +486,18 @@ func (r *treeViewContentRenderer) Objects() []core.CanvasObject {
 	return r.objects
 }
 
-// Destroy has nothing to release: every child — including the load-more Activity
-// widgets, whose own renderer.Destroy stops their animation — is reachable via
-// Objects and torn down by the framework's destroy walk. The itemPool and the
-// indicator maps are plain memory freed when the renderer itself is collected.
-func (r *treeViewContentRenderer) Destroy() {}
+// Destroy releases the renderers of the separators the content keeps for
+// reuse: those it is not showing are not among its objects, so the framework's
+// destroy walk would not reach them (#722). Every shown child, including the
+// load-more Activity widgets, whose own renderer.Destroy stops their
+// animation, is reachable via Objects and torn down by that walk. The
+// indicator maps are plain memory. Items in the itemPool keep their cached
+// renderers, which nothing here can reach (#740).
+func (r *treeViewContentRenderer) Destroy() {
+	for _, s := range r.separators {
+		releaseRenderer(s)
+	}
+}
 
 func (r *treeViewContentRenderer) showDropIndicator(drop dropPosition, tree *TreeView) {
 	if drop.targetID == "" {
