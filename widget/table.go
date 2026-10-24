@@ -1869,3 +1869,10 @@ func (c *clip) DragEnd() {
 func (c *clip) Dragged(e *event.DragEvent) {
 	c.t.Dragged(e)
 }
+
+// DragMomentum turns off the coast the embedded Scroll would give a touch
+// drag (#751): a clip's drag resizes a column or row, which must stop where
+// the finger lifts.
+func (c *clip) DragMomentum() bool {
+	return false
+}

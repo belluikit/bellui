@@ -10,7 +10,8 @@ import (
 
 // DragCoast carries a released touch drag on with decaying deltas
 // (DragDecay, about 60 steps a second) and then ends it, for the drivers that
-// give touch drags momentum (mobile, embedded). A driver keeps one and calls
+// give touch drags momentum (mobile, embedded) — only for Draggables that ask
+// for it (event.MomentumDraggable, #751). A driver keeps one and calls
 // Stop before it delivers any new touch, so a touch during a coast stops it
 // dead (#751).
 //
@@ -29,11 +30,18 @@ type DragCoast struct {
 	wid event.Draggable
 }
 
-// Release ends a touch drag released with ev on wid. A slow release ends the
-// drag at once; a moving one coasts first, queueing each step and the final
-// DragEnd with do, which must run its function on the main goroutine.
+// Release ends a touch drag released with ev on wid, whose Dragged is the
+// momentum seed (TouchHandler.TapUp sets it from the finger's speed at
+// release). Only a Draggable that opts in through event.MomentumDraggable
+// coasts (#751); any other, and a slow release, ends the drag at once. A
+// coasting one queues each step and the final DragEnd with do, which must run
+// its function on the main goroutine.
 func (c *DragCoast) Release(wid event.Draggable, ev *event.DragEvent, do func(func())) {
 	c.Stop()
+	if m, ok := wid.(event.MomentumDraggable); !ok || !m.DragMomentum() {
+		wid.DragEnd() // no momentum is the default: stop where the finger lifted
+		return
+	}
 	if math.Abs(float64(ev.Dragged.DX)) <= TapMoveEndThreshold && math.Abs(float64(ev.Dragged.DY)) <= TapMoveEndThreshold {
 		wid.DragEnd()
 		return

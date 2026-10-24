@@ -1805,6 +1805,14 @@ func (c *DAGCanvas) DragEnd() {
 	}
 }
 
+// DragMomentum lets a released touch pan of the graph coast, as its
+// two-finger pan already does through touch-scroll momentum (#751). Every
+// other drag — connecting ports, links or groups — stops where the finger
+// lifts. It is the event.MomentumDraggable opt-in, matched structurally.
+func (c *DAGCanvas) DragMomentum() bool {
+	return c.dragState == dragPanning
+}
+
 // Scrolled handles zoom.
 func (c *DAGCanvas) Scrolled(ev *event.ScrollEvent) {
 	c.TryScrolled(ev)

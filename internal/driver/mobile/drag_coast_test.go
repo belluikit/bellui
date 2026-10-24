@@ -20,7 +20,7 @@ import (
 // half a second after the next touch went down, and its late DragEnd could
 // end that touch's own drag of the same widget.
 
-// coastRecorder logs its drag events. It is only touched on the main
+// coastRecorder logs its drag events, and coasts like a Scroll. It is only touched on the main
 // goroutine: tests read it through onMain.
 type coastRecorder struct {
 	widget.BaseWidget
@@ -39,6 +39,10 @@ func (r *coastRecorder) CreateRenderer() core.WidgetRenderer {
 
 func (r *coastRecorder) Dragged(*event.DragEvent) { r.log = append(r.log, "drag") }
 func (r *coastRecorder) DragEnd()                 { r.log = append(r.log, "end") }
+
+// DragMomentum opts the recorder into coasting (event.MomentumDraggable):
+// only a Draggable that asks for momentum coasts (#751).
+func (r *coastRecorder) DragMomentum() bool { return true }
 
 // onMain runs fn on the test app's main goroutine and waits for it.
 func onMain(fn func()) { d.DoFromGoroutine(fn, true) }
@@ -71,9 +75,10 @@ func flick(cd *driver, w *window, seq touch.Sequence) {
 	cd.handleTouch(w, touch.Event{X: 160 * s, Y: y, Sequence: seq, Type: touch.TypeEnd})
 }
 
-// coastFor is longer than any coast from a flick: 50pt a step decays under
-// the end threshold in about 40 steps of 16ms.
-const coastFor = time.Second
+// coastFor is longer than any coast from a flick. Its moves arrive within one
+// 16ms step, so it seeds the whole 150pt it covered (velocity.go, #751), which
+// decays under the end threshold in about 52 steps: 0.85s.
+const coastFor = 1500 * time.Millisecond
 
 func Test_driver_TouchStopsDragCoast(t *testing.T) {
 	cd, w, rec := coastWindow(t)
@@ -115,7 +120,8 @@ func Test_driver_DragCoastDoesNotEndALaterDrag(t *testing.T) {
 	onMain(func() {
 		assert.Equal(t, []string{"drag"}, rec.log[started:],
 			"the second drag is still going: no coast step or DragEnd landed in it")
-		// Its release coasts too (the last move was 40pt), and ends it.
+		// Held still for coastFor, its release does not coast (#751): it
+		// just ends the drag.
 		cd.handleTouch(w, touch.Event{X: 140 * s, Y: y, Sequence: 1, Type: touch.TypeEnd})
 	})
 	time.Sleep(coastFor)
