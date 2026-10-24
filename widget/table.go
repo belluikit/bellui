@@ -846,7 +846,7 @@ func (t *Table) templateSize() geo.Size {
 		if !t.ShowHeaderRow && !t.ShowHeaderColumn {
 			return size
 		}
-		return size.Max(measureTemplate(t.createHeader()))
+		return size.Max(measureTemplate(createItemAndApplyThemeScope(t.createHeader, t)))
 	}
 
 	bellui.LogError("Missing CreateCell callback required for Table", nil)
@@ -1146,7 +1146,7 @@ func (t *tableRenderer) MinSize() geo.Size {
 
 func (t *tableRenderer) Refresh() {
 	th := t.t.Theme()
-	t.t.headerSize = measureTemplate(t.t.createHeader())
+	t.t.headerSize = measureTemplate(createItemAndApplyThemeScope(t.t.createHeader, t.t))
 	if t.t.columnWidths != nil {
 		if v, ok := t.t.columnWidths[-1]; ok {
 			t.t.headerSize.Width = v
@@ -1428,6 +1428,7 @@ func (r *tableCellsRenderer) refreshForID(toDraw TableCellID) {
 			if c == nil {
 				return
 			}
+			c = matchThemeScope(c, r.cells.t)
 		}
 		if host, isHost := c.(*tableCellHost); isHost {
 			host.id = id
@@ -1582,7 +1583,7 @@ func (r *tableCellsRenderer) moveIndicators() {
 	needed := colDivs + rowDivs
 	if len(r.dividers) < needed {
 		for i := len(r.dividers); i < needed; i++ {
-			r.dividers = append(r.dividers, NewSeparator())
+			r.dividers = append(r.dividers, matchThemeScope(NewSeparator(), r.cells.t))
 		}
 
 		objs := []core.CanvasObject{r.marker, r.hover}
@@ -1750,6 +1751,7 @@ func (r *tableCellsRenderer) refreshHeaders(visibleRowHeights, visibleColWidths 
 				if c == nil {
 					return
 				}
+				c = matchThemeScope(c, r.cells.t)
 			}
 
 			c.Move(geo.NewPos(cellXOffset, 0))
@@ -1792,6 +1794,7 @@ func (r *tableCellsRenderer) refreshHeaders(visibleRowHeights, visibleColWidths 
 				if c == nil {
 					return
 				}
+				c = matchThemeScope(c, r.cells.t)
 			}
 
 			c.Move(geo.NewPos(0, cellYOffset))

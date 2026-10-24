@@ -769,10 +769,11 @@ func (r *treeContentRenderer) Layout(size geo.Size) {
 			if addSeparator && !hideSeparators {
 				var separator core.CanvasObject
 				if separatorCount < len(r.separators) {
-					separator = r.separators[separatorCount]
+					// a parked separator missed any override applied since
+					separator = matchThemeScope(r.separators[separatorCount], r.treeContent.tree)
 					separator.Show() // it may previously have been hidden
 				} else {
-					separator = NewSeparator()
+					separator = matchThemeScope(NewSeparator(), r.treeContent.tree)
 					r.separators = append(r.separators, separator)
 				}
 				separator.Move(geo.NewPos(0, y-separatorOff))
@@ -942,7 +943,7 @@ func (r *treeContentRenderer) getBranch() (b *branch) {
 		}
 		b = newBranch(r.treeContent.tree, content)
 	}
-	return b
+	return matchThemeScope(b, r.treeContent.tree)
 }
 
 func (r *treeContentRenderer) getLeaf() (l *leaf) {
@@ -956,7 +957,7 @@ func (r *treeContentRenderer) getLeaf() (l *leaf) {
 		}
 		l = newLeaf(r.treeContent.tree, content)
 	}
-	return l
+	return matchThemeScope(l, r.treeContent.tree)
 }
 
 var (

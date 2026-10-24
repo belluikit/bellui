@@ -756,7 +756,7 @@ func (l *listLayout) getItem() *listItem {
 			item = newListItem(item2, nil)
 		}
 	}
-	return item.(*listItem)
+	return matchThemeScope(item.(*listItem), l.list)
 }
 
 func (l *listLayout) offsetUpdated(pos geo.Position) {
@@ -899,13 +899,7 @@ func (l *listLayout) updateSeparators() {
 			l.separators = dropObjects(l.separators, lenChildren)
 		} else {
 			for i := lenSep; i < lenChildren; i++ {
-
-				sep := NewSeparator()
-				if cache.OverrideThemeMatchingScope(sep, l.list) {
-					sep.Refresh()
-				}
-
-				l.separators = append(l.separators, sep)
+				l.separators = append(l.separators, matchThemeScope(NewSeparator(), l.list))
 			}
 		}
 	} else {
@@ -977,11 +971,25 @@ func dropObjects(s []core.CanvasObject, n int) []core.CanvasObject {
 }
 
 func createItemAndApplyThemeScope(f func() core.CanvasObject, scope core.Widget) core.CanvasObject {
-	item := f()
-	if !cache.OverrideThemeMatchingScope(item, scope) {
-		return item
-	}
+	return matchThemeScope(f(), scope)
+}
 
-	item.Refresh()
-	return item
+// matchThemeScope gives o the theme override scope that parent carries, when o
+// does not carry that scope already, and returns o. An override is applied by
+// walking the tree as it stands, so an object a collection makes after it — a
+// divider, a separator, a row wrapper — or takes back from a pool it parked
+// before it, would otherwise draw with the app theme (#755). Comparing the
+// scope first keeps the walk and its cache reset off objects that match.
+func matchThemeScope[T core.CanvasObject](o T, parent core.CanvasObject) T {
+	if any(o) == nil {
+		return o
+	}
+	id := cache.WidgetScopeID(parent)
+	if id == "" || cache.WidgetScopeID(o) == id {
+		return o
+	}
+	if cache.OverrideThemeMatchingScope(o, parent) {
+		o.Refresh()
+	}
+	return o
 }
