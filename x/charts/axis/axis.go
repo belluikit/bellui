@@ -61,8 +61,8 @@ type Config struct {
 	// Hide hides parts of the axis. Its zero value hides nothing, so a Config
 	// written as a literal draws the whole axis.
 	Hide Parts
-	// SplitLine says whether the axis draws grid lines across the plot at its
-	// ticks. SplitLineAuto, the zero value, draws them for the first Y axis
+	// SplitLine says whether the axis draws grid lines across the plot: at
+	// its ticks, or between the bands of a category axis. SplitLineAuto, the zero value, draws them for the first Y axis
 	// only: not for the X axis and not for any further Y axis. SplitLineShow
 	// and SplitLineHide turn them on or off for this axis.
 	SplitLine SplitLine
@@ -126,14 +126,17 @@ type Parts struct {
 	Labels bool // the tick labels (the axis Name stays; leave it empty to drop it)
 }
 
-// SplitLine says whether an axis draws grid lines at its ticks.
+// SplitLine says whether an axis draws grid lines across the plot.
 type SplitLine int
 
 const (
 	// SplitLineAuto draws grid lines for the first Y axis only.
 	SplitLineAuto SplitLine = iota
-	// SplitLineShow draws grid lines at this axis's ticks: horizontal for a
-	// Y axis, vertical for an X axis.
+	// SplitLineShow draws grid lines for this axis: horizontal for a Y axis,
+	// vertical for an X axis. A value, log or time axis draws them at its
+	// ticks. A category axis draws them between its bands, one fewer than
+	// its categories and none on the plot edges, so each line separates two
+	// bars; its tick marks and labels stay at the band centres.
 	SplitLineShow
 	// SplitLineHide draws no grid lines for this axis.
 	SplitLineHide

@@ -182,8 +182,8 @@ func TestAxisHide_Parts(t *testing.T) {
 			t.Errorf("SplitLineHide on the first Y axis: %d/%d grid lines, want none", h, v)
 		}
 		_, r = renderOpt(t, partsOption(func(x, _, _ *axis.Config) { x.SplitLine = axis.SplitLineShow }))
-		if h, v := gridLines(r, r.objects); h != 6 || v != 3 {
-			t.Errorf("SplitLineShow on the X axis: %d horizontal, %d vertical grid lines; want 6 and 3", h, v)
+		if h, v := gridLines(r, r.objects); h != 6 || v != 2 {
+			t.Errorf("SplitLineShow on the X axis: %d horizontal, %d vertical grid lines; want 6 and 2 (between the 3 categories, #757)", h, v)
 		}
 		_, r = renderOpt(t, partsOption(func(_, y, y2 *axis.Config) {
 			y.SplitLine, y2.SplitLine = axis.SplitLineHide, axis.SplitLineShow
