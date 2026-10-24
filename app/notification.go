@@ -1,7 +1,6 @@
 package app
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/belluikit/bellui"
@@ -101,15 +100,4 @@ func writeTempNotificationIcon(res bellui.Resource, pattern string) (string, err
 		return "", err
 	}
 	return name, nil
-}
-
-// removeTempIcon deletes a temp icon file written by writeTempNotificationIcon,
-// ignoring an already-removed file.
-func removeTempIcon(path string) {
-	if path == "" {
-		return
-	}
-	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-		bellui.LogError(fmt.Sprintf("Unable to remove temp notification icon %q", path), err)
-	}
 }
