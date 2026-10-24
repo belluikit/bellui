@@ -1282,7 +1282,7 @@ func ySplitLines(cfg axis.Config, index int) bool {
 // (topX), less the parts cfg.Hide hides. A right-hand axis also draws tick
 // marks. A left-hand axis's labels and name fill a band leftBand wide (the
 // grid's left margin) ending at the axis. The first Y axis, or any with
-// SplitLineShow, also draws the horizontal grid lines at its ticks.
+// SplitLineShow, also draws horizontal grid lines where splitTicks puts them.
 func (r *chartRenderer) renderYAxis(cfg axis.Config, yScale axis.Scale, index int, topX axis.Config, plotRect coord.Rect, leftBand float32, resolver *style.Resolver) []core.CanvasObject {
 	var objects []core.CanvasObject
 	labelSize := resolver.LabelTextSize()
@@ -1305,17 +1305,32 @@ func (r *chartRenderer) renderYAxis(cfg axis.Config, yScale axis.Scale, index in
 		})
 	}
 
+	gridLine := func(tick axis.Tick) {
+		// Screen Y grows downwards, so the top of the axis is norm 1.
+		py := plotRect.Y + (1-tickNorm(tick, cfg.Inverse))*plotRect.H
+		objects = append(objects, &canvas.Line{
+			Position1:   geo.NewPos(plotRect.X, py),
+			Position2:   geo.NewPos(plotRect.X+plotRect.W, py),
+			StrokeColor: gridColor,
+			StrokeWidth: 0.5,
+		})
+	}
+	// A category axis's grid lines sit between its ticks, so they are drawn
+	// first. Any other axis draws each one with its tick, in the order it
+	// always did (TestAxisLiteralConfigs_RenderAsBefore).
+	atTicks := splitLines && cfg.Type != axis.TypeCategory
+	if splitLines && !atTicks {
+		for _, tick := range splitTicks(cfg, yScale) {
+			gridLine(tick)
+		}
+	}
+
 	for _, tick := range yScale.Ticks() {
 		// Screen Y grows downwards, so the top of the axis is norm 1.
 		py := plotRect.Y + (1-tickNorm(tick, cfg.Inverse))*plotRect.H
 
-		if splitLines {
-			objects = append(objects, &canvas.Line{
-				Position1:   geo.NewPos(plotRect.X, py),
-				Position2:   geo.NewPos(plotRect.X+plotRect.W, py),
-				StrokeColor: gridColor,
-				StrokeWidth: 0.5,
-			})
+		if atTicks {
+			gridLine(tick)
 		}
 
 		if right && !cfg.Hide.Ticks {

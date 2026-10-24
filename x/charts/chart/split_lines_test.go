@@ -101,6 +101,26 @@ func TestSplitLineShow_ValueXAxisAtTicks(t *testing.T) {
 	assertAt(t, "value X grid lines", xs, ticks)
 }
 
+// A category Y axis is treated the same way: its horizontal grid lines sit
+// between its bands, whether SplitLineAuto (the first Y axis) or SplitLineShow
+// turned them on.
+func TestSplitLine_CategoryYAxisBetweenBands(t *testing.T) {
+	for _, sl := range []axis.SplitLine{axis.SplitLineAuto, axis.SplitLineShow} {
+		_, r := renderOpt(t, Option{
+			XAxis:  []axis.Config{{Type: axis.TypeValue}},
+			YAxis:  []axis.Config{{Type: axis.TypeCategory, Data: []string{"a", "b", "c"}, SplitLine: sl}},
+			Series: []series.Series{&series.ScatterSeries{SeriesName: "s", Data: []float64{1, 0, 2, 1, 3, 2}}},
+		})
+		p := r.cachedPlotArea
+		band := p.H / 3
+		xs, ys := gridLinePositions(r)
+		if len(xs) != 0 {
+			t.Errorf("SplitLine %d: vertical grid lines at %v, want none", sl, xs)
+		}
+		assertAt(t, "category Y grid lines", ys, []float32{p.Y + band, p.Y + 2*band})
+	}
+}
+
 // A zoomed category axis (DataZoom) still draws its lines between the visible
 // bands, strictly inside the plot.
 func TestSplitTicks_ZoomedCategoryAxis(t *testing.T) {
