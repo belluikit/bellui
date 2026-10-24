@@ -64,6 +64,23 @@ jobs:
       - name: Tests
         working-directory: cmd/bellui
         run: go test -race -tags ci ./...
+      # The packaging tests that run the real Android SDK tools skip when the
+      # SDK is missing, so a plain `go test` passing proves nothing about them.
+      # The Windows image ships the SDK and a JDK; there d8 and apksigner are
+      # .bat files run through cmd.exe (#674). This step fails unless the tests
+      # report PASS, so a silent skip cannot pass for a run.
+      - name: Android SDK tools on Windows
+        if: matrix.os == 'windows'
+        working-directory: cmd/bellui
+        run: |
+          Write-Output "ANDROID_HOME=$env:ANDROID_HOME"
+          Get-ChildItem "$env:ANDROID_HOME\build-tools" | Select-Object -ExpandProperty Name
+          Get-Command javac | Select-Object -ExpandProperty Source
+          go test -race -tags ci -count=1 -v -run 'TestPackageAndroid|TestCommandRunsBatchFile' ./internal/mobile/ ./internal/util/ | Tee-Object -Variable out
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          foreach ($t in 'TestPackageAndroidLibs', 'TestPackageAndroidJarsOnlyKeepsBinresPath', 'TestCommandRunsBatchFile') {
+            if (-not ($out | Select-String -SimpleMatch "--- PASS: $t ")) { Write-Output "::error::$t did not PASS (skipped?)"; exit 1 }
+          }
 
   cli_static_analysis:
     runs-on: ubuntu-24.04
