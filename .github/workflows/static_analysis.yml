@@ -157,6 +157,10 @@ jobs:
             || { echo "::error::the Linux webview build no longer depends on belluikit/gocef — this gate is checking nothing"; exit 1; }
           echo "linux: gocef present (positive control)"
 
+      # gofumpt -d already gates: it exits 1 whenever it prints a diff (measured
+      # v0.9.2 to v0.12.0). goimports -d exits 0, hence its test -z wrapper. Do not
+      # wrap gofumpt the same way: the wrapper would drop its exit status, so a
+      # parse error (stderr only under -e) would pass (#700).
       - name: Formatting
         run: |
           gofumpt -d -e .
