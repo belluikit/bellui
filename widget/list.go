@@ -13,6 +13,7 @@ import (
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/async"
 	"github.com/belluikit/bellui/internal/cache"
+	intdriver "github.com/belluikit/bellui/internal/driver"
 	internaltheme "github.com/belluikit/bellui/internal/theme"
 	"github.com/belluikit/bellui/internal/widget"
 	"github.com/belluikit/bellui/theme"
@@ -116,9 +117,7 @@ func (l *List) CreateRenderer() core.WidgetRenderer {
 	l.ExtendBaseWidget(l)
 
 	if f := l.CreateItem; f != nil && l.itemMin.IsZero() {
-		item := createItemAndApplyThemeScope(f, l)
-
-		l.itemMin = item.MinSize()
+		l.itemMin = measureTemplate(createItemAndApplyThemeScope(f, l))
 	}
 
 	layout := &bellui.Container{Layout: newListLayout(l)}
@@ -540,8 +539,7 @@ func (l *listRenderer) MinSize() geo.Size {
 func (l *listRenderer) Refresh() {
 	l.list.minSizeCache = geo.Size{}
 	if f := l.list.CreateItem; f != nil {
-		item := createItemAndApplyThemeScope(f, l.list)
-		l.list.itemMin = item.MinSize()
+		l.list.itemMin = measureTemplate(createItemAndApplyThemeScope(f, l.list))
 	}
 	l.Layout(l.list.Size())
 	l.scroller.Refresh()
@@ -889,14 +887,30 @@ func (l *listLayout) updateList(newOnly bool) {
 	l.wasVisible = l.wasVisible[:0]
 }
 
+// dropSeparators keeps the first n separators and releases the renderers of
+// the rest, which leave the tree (#722).
+func (l *listLayout) dropSeparators(n int) {
+	if n >= len(l.separators) {
+		return
+	}
+	for _, s := range l.separators[n:] {
+		releaseRenderer(s)
+	}
+	clear(l.separators[n:])
+	l.separators = l.separators[:n]
+	if n == 0 {
+		l.separators = nil
+	}
+}
+
 func (l *listLayout) updateSeparators() {
 	if l.list.HideSeparators {
-		l.separators = nil
+		l.dropSeparators(0)
 		return
 	}
 	if lenChildren := len(l.children); lenChildren > 1 {
 		if lenSep := len(l.separators); lenSep > lenChildren {
-			l.separators = l.separators[:lenChildren]
+			l.dropSeparators(lenChildren)
 		} else {
 			for i := lenSep; i < lenChildren; i++ {
 
@@ -909,7 +923,7 @@ func (l *listLayout) updateSeparators() {
 			}
 		}
 	} else {
-		l.separators = nil
+		l.dropSeparators(0)
 	}
 
 	th := l.list.Theme()
@@ -941,6 +955,25 @@ func (l *listLayout) nilOldSliceData(objs []core.CanvasObject, len, oldLen int) 
 		for i := len; i < oldLen; i++ {
 			objs[i] = nil
 		}
+	}
+}
+
+// measureTemplate measures an item template that is never shown, then
+// destroys the renderers measuring it cached, for the whole tree under it. No
+// window holds the template, so nothing else releases them before the cache
+// expiry, and without a driver nothing ever does (#722).
+func measureTemplate(template core.CanvasObject) geo.Size {
+	size := template.MinSize()
+	intdriver.DestroyRenderers(template)
+	return size
+}
+
+// releaseRenderer destroys the cached renderer of an object a widget stops
+// holding, such as a separator it no longer needs: once the object is out of
+// the tree, nothing else releases it before the cache expiry (#722).
+func releaseRenderer(o core.CanvasObject) {
+	if w, ok := o.(core.Widget); ok {
+		cache.DestroyRenderer(w)
 	}
 }
 

@@ -245,29 +245,14 @@ func TempWidgetRenderer(t *testing.T, wid core.Widget) core.WidgetRenderer {
 // and the objects of each widget's cached renderer, hidden ones included. It
 // never creates a renderer: a widget without one is skipped, and so are
 // objects only that widget's renderer would have held. Popups and overlays
-// are not under o and are not released, nor are widgets a widget made and
-// dropped without showing them, such as the item template a List measures
-// (#722). A widget used again afterwards gets a new renderer, as it would
-// after its window closed.
+// are not under o and are not released, and neither are the items a
+// collection widget keeps in its pool of unused items (#740). A widget used
+// again afterwards gets a new renderer, as it would after its window closed.
 //
 // Since: 1.3
 func DestroyRenderers(tb testing.TB, o core.CanvasObject) {
 	tb.Helper()
-	if o == nil {
-		return
-	}
-	var widgets []core.Widget
-	// A complete walk, unlike a visible one, reads only cached renderers.
-	intdriver.WalkCompleteObjectTree(o, nil, func(obj core.CanvasObject, _ geo.Position, _ core.CanvasObject) {
-		if w, ok := obj.(core.Widget); ok {
-			widgets = append(widgets, w)
-		}
-	})
-	// Destroy only after the walk, so that no Destroy can change what the walk
-	// reads.
-	for _, w := range widgets {
-		cache.DestroyRenderer(w)
-	}
+	intdriver.DestroyRenderers(o)
 }
 
 // WithTestTheme runs a function with the testTheme temporarily set.

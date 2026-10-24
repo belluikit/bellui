@@ -654,3 +654,28 @@ func IsPathClip(o core.CanvasObject) (any, bool) {
 	}
 	return nil, false
 }
+
+// DestroyRenderers destroys the cached renderers of o and of every widget
+// under it, hidden ones included. It never creates a renderer: the walk reads
+// only cached ones, so a widget without a renderer is skipped, and so is
+// everything only its renderer would have held.
+//
+// A widget calls it on objects it built and drops without showing, such as an
+// item template it only measures: no window holds them, so nothing else would
+// release their renderers before the cache expiry (#722).
+func DestroyRenderers(o core.CanvasObject) {
+	if o == nil {
+		return
+	}
+	var widgets []core.Widget
+	WalkCompleteObjectTree(o, nil, func(obj core.CanvasObject, _ geo.Position, _ core.CanvasObject) {
+		if w, ok := obj.(core.Widget); ok {
+			widgets = append(widgets, w)
+		}
+	})
+	// Destroy only after the walk, so that no Destroy can change what the walk
+	// reads.
+	for _, w := range widgets {
+		cache.DestroyRenderer(w)
+	}
+}
