@@ -169,15 +169,24 @@ grid.API().SetRowGroupColumn("dept")
 ```
 
 `AggFunc` is a pointer because `AggSum` is the zero value; nil means no
-aggregate. Cell values are read as numbers (any Go integer or float type), and
-anything else, nil included, counts as 0. The aggregate is a `float64`: it is
+aggregate. Cell values are read as numbers (any Go integer or float type).
+Anything else, nil and `""` included, is a blank cell and is skipped: average,
+min and max are taken over the group's other rows (10, 20 and a blank average
+15, not 10), sum adds nothing for it, and first and last take the first and last
+cell with a number. Count counts rows, so it includes blank cells (3 in that
+example). When every cell in a group is blank, average, min, max, first and last
+have no value and the header leaves that column empty; sum shows 0. The
+aggregate is a `float64`: it is
 shown through the column's `ValueFormatter` when set (so the formatter must
 accept a `float64`), else through a `NumberRenderer`'s `Format`, else rounded to
 two decimals. A count is always shown as a whole number.
 
 Code that drives the pipeline directly sets the same thing on the transform:
 `GroupTransform.AggColumns` fills each header's `GroupRow.AggValues`, keyed by
-`AggColumn.Field`.
+`AggColumn.Field`. To skip blanks there too, set `AggColumn.ValueOK`, a getter
+that reports whether the row has a value; it is used instead of `ValueGetter`,
+and a column with no value maps to `nil` in `AggValues`. With only
+`ValueGetter`, every row counts.
 
 ## Sparklines
 

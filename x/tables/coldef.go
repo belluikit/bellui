@@ -79,8 +79,13 @@ type ColumnDef struct {
 	// the zero value: AggFunc: bellui.Ptr(pipeline.AggAvg).
 	//
 	// The cell values are read as numbers (any Go integer or float type); a
-	// value of any other type, nil included, counts as 0. AggCount counts the
-	// group's rows. A collapsed group still aggregates all of its rows. The
+	// value of any other type, nil and "" included, is blank and skipped:
+	// AggAvg, AggMin and AggMax are taken over the other rows, AggSum adds
+	// nothing for it, and AggFirst and AggLast take the first and last row
+	// with a number. AggCount counts the group's rows, blank ones included.
+	// When every cell in a group is blank, AggAvg, AggMin, AggMax, AggFirst
+	// and AggLast have no value and the header leaves the column empty; AggSum
+	// shows 0. A collapsed group still aggregates all of its rows. The
 	// aggregate, a float64, is shown through ValueFormatter when set (which
 	// must therefore accept a float64), else through a NumberRenderer's
 	// Format, else rounded to two decimals. A count is always shown as a
