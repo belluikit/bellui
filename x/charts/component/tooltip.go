@@ -69,9 +69,26 @@ func (s *TooltipState) IsPinExpired(duration time.Duration) bool {
 	return time.Since(s.PinTime) > duration
 }
 
-// PlotArea describes the plot region for clipping crosshairs.
+// PlotArea describes the plot region, which clips the crosshair lines, and
+// the sides its axes are drawn on, where the axis value tags go.
+//
+// The zero value of each side field is the default layout — X axis below the
+// plot, Y axis to its left — so a PlotArea that sets only X, Y, W and H places
+// the tags as before those fields existed.
 type PlotArea struct {
 	X, Y, W, H float32
+
+	// XAxisTop is true when the X axis is drawn along the top of the plot
+	// (axis.PositionTop). The X value tag then sits above the plot instead of
+	// below it.
+	XAxisTop bool
+
+	// YAxisRight is true when the Y axis that the first hit's series is
+	// plotted against is drawn to the right of the plot. The Y value tag, which
+	// shows that series' value, then sits beside that axis instead of the left
+	// one. A chart with several Y axes sets it for each hover, from the hit's
+	// series.
+	YAxisRight bool
 }
 
 // RenderTooltip produces canvas objects for a tooltip near the given hits.
@@ -234,52 +251,7 @@ func RenderTooltip(state *TooltipState, cfg *TooltipConfig, resolver *style.Reso
 		}
 
 		// Axis value tags at crosshair/axis intersections.
-		if cfg != nil && cfg.ShowAxisTags {
-			tagBg := color.NRGBA{R: 50, G: 50, B: 55, A: 220}
-			tagText := color.NRGBA{R: 220, G: 220, B: 220, A: 255}
-			tagH := float32(16)
-			tagFontSize := float32(10)
-
-			xLabel := fmt.Sprintf("%.1f", state.Hits[0].Value.X)
-			yLabel := fmt.Sprintf("%.2f", state.Hits[0].Value.Y)
-			if cfg.AxisTagFormatter != nil {
-				xLabel, yLabel = cfg.AxisTagFormatter(state.Hits[0].Value.X, state.Hits[0].Value.Y)
-			}
-
-			// X-axis tag (bottom of plot)
-			if crosshairMode == CrosshairVertical || crosshairMode == CrosshairBoth {
-				xTagW := float32(len(xLabel))*6.5 + 8
-				xTagX := hitPos.X - xTagW/2
-				xTagY := plotArea.Y + plotArea.H + 2
-				xBg := canvas.NewRectangle(tagBg)
-				xBg.CornerRadius = 3
-				xBg.Move(geo.NewPos(xTagX, xTagY))
-				xBg.Resize(geo.NewSize(xTagW, tagH))
-				xTxt := canvas.NewText(xLabel, tagText)
-				xTxt.TextSize = tagFontSize
-				xTxt.Alignment = bellui.TextAlignCenter
-				xTxt.Move(geo.NewPos(xTagX, xTagY+1))
-				xTxt.Resize(geo.NewSize(xTagW, tagH))
-				objects = append(objects, xBg, xTxt)
-			}
-
-			// Y-axis tag (left of plot)
-			if crosshairMode == CrosshairHorizontal || crosshairMode == CrosshairBoth {
-				yTagW := float32(len(yLabel))*6.5 + 8
-				yTagX := plotArea.X - yTagW - 2
-				yTagY := hitPos.Y - tagH/2
-				yBg := canvas.NewRectangle(tagBg)
-				yBg.CornerRadius = 3
-				yBg.Move(geo.NewPos(yTagX, yTagY))
-				yBg.Resize(geo.NewSize(yTagW, tagH))
-				yTxt := canvas.NewText(yLabel, tagText)
-				yTxt.TextSize = tagFontSize
-				yTxt.Alignment = bellui.TextAlignTrailing
-				yTxt.Move(geo.NewPos(yTagX, yTagY+1))
-				yTxt.Resize(geo.NewSize(yTagW, tagH))
-				objects = append(objects, yBg, yTxt)
-			}
-		}
+		objects = append(objects, renderAxisTags(state, cfg, crosshairMode, hitPos, plotArea)...)
 	}
 
 	return objects
@@ -326,50 +298,62 @@ func renderCrosshairOnly(state *TooltipState, cfg *TooltipConfig, resolver *styl
 	}
 
 	// Axis value tags.
-	if cfg != nil && cfg.ShowAxisTags {
-		tagBg := color.NRGBA{R: 50, G: 50, B: 55, A: 220}
-		tagText := color.NRGBA{R: 220, G: 220, B: 220, A: 255}
-		tagH := float32(16)
-		tagFontSize := float32(10)
+	objects = append(objects, renderAxisTags(state, cfg, crosshairMode, hitPos, plotArea)...)
 
-		xLabel := fmt.Sprintf("%.1f", state.Hits[0].Value.X)
-		yLabel := fmt.Sprintf("%.2f", state.Hits[0].Value.Y)
-		if cfg.AxisTagFormatter != nil {
-			xLabel, yLabel = cfg.AxisTagFormatter(state.Hits[0].Value.X, state.Hits[0].Value.Y)
-		}
+	return objects
+}
 
-		if crosshairMode == CrosshairVertical || crosshairMode == CrosshairBoth {
-			xTagW := float32(len(xLabel))*6.5 + 8
-			xTagX := hitPos.X - xTagW/2
-			xTagY := plotArea.Y + plotArea.H + 2
-			xBg := canvas.NewRectangle(tagBg)
-			xBg.CornerRadius = 3
-			xBg.Move(geo.NewPos(xTagX, xTagY))
-			xBg.Resize(geo.NewSize(xTagW, tagH))
-			xTxt := canvas.NewText(xLabel, tagText)
-			xTxt.TextSize = tagFontSize
-			xTxt.Alignment = bellui.TextAlignCenter
-			xTxt.Move(geo.NewPos(xTagX, xTagY+1))
-			xTxt.Resize(geo.NewSize(xTagW, tagH))
-			objects = append(objects, xBg, xTxt)
-		}
-		if crosshairMode == CrosshairHorizontal || crosshairMode == CrosshairBoth {
-			yTagW := float32(len(yLabel))*6.5 + 8
-			yTagX := plotArea.X - yTagW - 2
-			yTagY := hitPos.Y - tagH/2
-			yBg := canvas.NewRectangle(tagBg)
-			yBg.CornerRadius = 3
-			yBg.Move(geo.NewPos(yTagX, yTagY))
-			yBg.Resize(geo.NewSize(yTagW, tagH))
-			yTxt := canvas.NewText(yLabel, tagText)
-			yTxt.TextSize = tagFontSize
-			yTxt.Alignment = bellui.TextAlignTrailing
-			yTxt.Move(geo.NewPos(yTagX, yTagY+1))
-			yTxt.Resize(geo.NewSize(yTagW, tagH))
-			objects = append(objects, yBg, yTxt)
-		}
+// renderAxisTags draws the axis value tags where the crosshair meets the axes:
+// the X value beside the X axis, above or below the plot, and the Y value
+// beside the Y axis of the first hit's series, left or right of the plot.
+func renderAxisTags(state *TooltipState, cfg *TooltipConfig, crosshairMode CrosshairMode, hitPos geo.Position, plotArea PlotArea) []core.CanvasObject {
+	if cfg == nil || !cfg.ShowAxisTags {
+		return nil
+	}
+	tagBg := color.NRGBA{R: 50, G: 50, B: 55, A: 220}
+	tagText := color.NRGBA{R: 220, G: 220, B: 220, A: 255}
+	const (
+		tagH        float32 = 16
+		tagGap      float32 = 2
+		tagFontSize float32 = 10
+	)
+
+	xLabel := fmt.Sprintf("%.1f", state.Hits[0].Value.X)
+	yLabel := fmt.Sprintf("%.2f", state.Hits[0].Value.Y)
+	if cfg.AxisTagFormatter != nil {
+		xLabel, yLabel = cfg.AxisTagFormatter(state.Hits[0].Value.X, state.Hits[0].Value.Y)
 	}
 
+	tag := func(label string, x, y, w float32, align bellui.TextAlign) []core.CanvasObject {
+		bg := canvas.NewRectangle(tagBg)
+		bg.CornerRadius = 3
+		bg.Move(geo.NewPos(x, y))
+		bg.Resize(geo.NewSize(w, tagH))
+		txt := canvas.NewText(label, tagText)
+		txt.TextSize = tagFontSize
+		txt.Alignment = align
+		txt.Move(geo.NewPos(x, y+1))
+		txt.Resize(geo.NewSize(w, tagH))
+		return []core.CanvasObject{bg, txt}
+	}
+
+	var objects []core.CanvasObject
+	if crosshairMode == CrosshairVertical || crosshairMode == CrosshairBoth {
+		w := float32(len(xLabel))*6.5 + 8
+		y := plotArea.Y + plotArea.H + tagGap
+		if plotArea.XAxisTop {
+			y = plotArea.Y - tagH - tagGap
+		}
+		objects = append(objects, tag(xLabel, hitPos.X-w/2, y, w, bellui.TextAlignCenter)...)
+	}
+	if crosshairMode == CrosshairHorizontal || crosshairMode == CrosshairBoth {
+		w := float32(len(yLabel))*6.5 + 8
+		x, align := plotArea.X-w-tagGap, bellui.TextAlignTrailing
+		if plotArea.YAxisRight {
+			x, align = plotArea.X+plotArea.W+tagGap, bellui.TextAlignLeading
+		}
+		objects = append(objects, tag(yLabel, x, hitPos.Y-tagH/2, w, align)...)
+	}
 	return objects
 }
 
