@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 )
@@ -26,7 +25,7 @@ func AndroidBuildToolsPath() string {
 
 	childDir := ""
 	for _, f := range files {
-		if f.Name() == "zipalign" { // no version subdir
+		if f.Name() == "zipalign" || f.Name() == "zipalign.exe" { // no version subdir
 			return dir
 		}
 		if f.IsDir() && (childDir == "" || newerBuildTools(f.Name(), childDir)) {
@@ -90,15 +89,7 @@ func RequireAndroidSDK() error {
 	return nil
 }
 
-// Aapt2Path returns the path to aapt2 executable
+// Aapt2Path returns the path to the aapt2 executable in the build-tools.
 func Aapt2Path() (string, error) {
-	buildTools := AndroidBuildToolsPath()
-	aapt2 := filepath.Join(buildTools, "aapt2")
-	if runtime.GOOS == "windows" {
-		aapt2 += ".exe"
-	}
-	if !Exists(aapt2) {
-		return "", fmt.Errorf("aapt2 not found in Android SDK build-tools (%s)", buildTools)
-	}
-	return aapt2, nil
+	return AndroidBuildTool("aapt2")
 }

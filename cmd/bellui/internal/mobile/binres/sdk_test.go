@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -91,6 +92,26 @@ func TestLatestAPIResourcesPath(t *testing.T) {
 		platformsFixture(t, "android-VanillaIceCream", "android-35", "android-36-ext4", "android-9")
 		require.Equal(t, "android-35", latest(t))
 	})
+
+	// A minor release is a stable platform, numbered just after its API
+	// level; extension SDKs and previews stay behind it (#674).
+	for _, tc := range []struct {
+		installed []string
+		want      string
+	}{
+		{[]string{"android-35", "android-36.1", "android-36-ext4"}, "android-36.1"},
+		{[]string{"android-36", "android-36.1"}, "android-36.1"},
+		{[]string{"android-36.1", "android-36.2"}, "android-36.2"},
+		{[]string{"android-36.10", "android-36.9"}, "android-36.10"},
+		{[]string{"android-36.1", "android-37"}, "android-37"},
+		{[]string{"android-36-ext4"}, "android-36-ext4"},
+		{[]string{"android-36.x", "android-35"}, "android-35"},
+	} {
+		t.Run("minor releases "+strings.Join(tc.installed, ","), func(t *testing.T) {
+			platformsFixture(t, tc.installed...)
+			require.Equal(t, tc.want, latest(t))
+		})
+	}
 
 	t.Run("preview wins only when nothing numbered is installed", func(t *testing.T) {
 		platformsFixture(t, "android-Baklava", "android-VanillaIceCream")
