@@ -16,6 +16,11 @@ import (
 // is fatal inside wgpu-native: before the cap this test aborted the binary
 // instead of failing.
 func TestSurfaceBeyondDeviceLimitIsCapped(t *testing.T) {
+	// The no-adapter switch leaves Metal out of the instance, and a Metal
+	// surface on such an instance aborts the binary in wgpu-native (#731).
+	if simulatingNoAdapter() {
+		t.Skipf("no WebGPU device available: %s=1", noAdapterEnv)
+	}
 	d, err := NewDevice(bareMetalLayerSurfaceDescriptor(), 1920, 52006)
 	if err != nil {
 		t.Skipf("no WebGPU device available: %v", err)

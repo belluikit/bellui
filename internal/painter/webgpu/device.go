@@ -9,6 +9,7 @@ import (
 	"image"
 	"image/draw"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"unsafe"
@@ -395,8 +396,6 @@ type DrawCall struct {
 	InstanceCount int
 }
 
-// NewDevice brings up WebGPU against the given surface (created from a native
-// window handle by the platform surface bridge) at the initial pixel size.
 // chooseInstanceBackends selects which wgpu-native backends the instance
 // initializes. The default (a nil descriptor) initializes *all* backends and
 // lets wgpu pick the best adapter — the right choice on real hardware.
@@ -409,6 +408,14 @@ type DrawCall struct {
 // (pre-rebrand tracker #612 / pre-rebrand tracker #609). Because that failure is a hard segfault *inside*
 // CreateInstance — not a returnable error — the backend set must be narrowed
 // here, up-front; it cannot be recovered from after the call.
+//
+// The list always keeps the platform's native backend: Metal on macOS and
+// iOS, D3D12 on Windows, Vulkan on Linux and Android. A list without it gains
+// it, with a logged warning (#731). Without a backend that can create a
+// surface for the window system, wgpuInstanceCreateSurface panics inside
+// wgpu-native and the process aborts; with only "gl" on Linux or Windows the
+// window stays blank. So the escape hatch drops a non-native backend that
+// crashes at init; it cannot drop the native one.
 //
 // Backend names: all, primary, secondary, vulkan, gl, metal, dx12 (d3d12
 // accepted as an alias). Note wgpu encodes "All" as 0, so combining "all" with
@@ -428,8 +435,50 @@ const (
 	instanceBackendSecondary = instanceBackendGL
 )
 
+// instanceBackendsOverride, when non-zero, is returned by
+// chooseInstanceBackends as-is: no BELLUI_WEBGPU_BACKENDS parsing and no
+// native backend added. Only tests set it, to simulate a machine with no
+// usable adapter (see the package's tests); it is zero in every app.
+var instanceBackendsOverride wgpu.InstanceBackend
+
 func chooseInstanceBackends() *wgpu.InstanceDescriptor {
-	spec := strings.TrimSpace(os.Getenv("BELLUI_WEBGPU_BACKENDS"))
+	if instanceBackendsOverride != 0 {
+		return &wgpu.InstanceDescriptor{Backends: instanceBackendsOverride}
+	}
+	return instanceBackendsFor(os.Getenv("BELLUI_WEBGPU_BACKENDS"), runtime.GOOS, logBackendsOnce)
+}
+
+// loggedBackends holds the BELLUI_WEBGPU_BACKENDS messages already logged.
+// chooseInstanceBackends runs for every device, so without it each window
+// (and each test) would repeat the same warning.
+var loggedBackends sync.Map
+
+func logBackendsOnce(msg string) {
+	if _, seen := loggedBackends.LoadOrStore(msg, struct{}{}); !seen {
+		bellui.LogError(msg, nil)
+	}
+}
+
+// nativeInstanceBackend is the backend that creates surfaces for goos's
+// window system, or 0 where there is none to insist on (the web).
+func nativeInstanceBackend(goos string) wgpu.InstanceBackend {
+	switch goos {
+	case "darwin", "ios":
+		return instanceBackendMetal
+	case "windows":
+		return instanceBackendDX12
+	case "js", "wasip1":
+		return 0
+	default: // linux, android, and the BSDs
+		return instanceBackendVulkan
+	}
+}
+
+// instanceBackendsFor parses a BELLUI_WEBGPU_BACKENDS value for goos. An empty
+// value gives nil (all backends). A list that leaves out goos's native
+// backend gets it added, and logf is told which one.
+func instanceBackendsFor(spec, goos string, logf func(string)) *wgpu.InstanceDescriptor {
+	spec = strings.TrimSpace(spec)
 	if spec == "" {
 		return nil // all backends (default, unchanged behavior)
 	}
@@ -451,15 +500,37 @@ func chooseInstanceBackends() *wgpu.InstanceDescriptor {
 		case "dx12", "d3d12":
 			backends |= instanceBackendDX12
 		default:
-			bellui.LogError(fmt.Sprintf("webgpu: ignoring unknown BELLUI_WEBGPU_BACKENDS entry %q", name), nil)
+			logf(fmt.Sprintf("webgpu: ignoring unknown BELLUI_WEBGPU_BACKENDS entry %q", name))
 		}
 	}
+	// 0 is All, which already includes the native backend.
+	if native := nativeInstanceBackend(goos); backends != 0 && native != 0 && backends&native == 0 {
+		backends |= native
+		logf(fmt.Sprintf("webgpu: BELLUI_WEBGPU_BACKENDS=%q leaves out %s, the backend that creates surfaces on %s; added it, since without it the window cannot open (#731)",
+			spec, instanceBackendName(native), goos))
+	}
 	if os.Getenv("BELLUI_WEBGPU_DEBUG") != "" {
-		bellui.LogError(fmt.Sprintf("webgpu: BELLUI_WEBGPU_BACKENDS=%q -> backends=0x%x", spec, uint32(backends)), nil)
+		logf(fmt.Sprintf("webgpu: BELLUI_WEBGPU_BACKENDS=%q -> backends=0x%x", spec, uint32(backends)))
 	}
 	return &wgpu.InstanceDescriptor{Backends: backends}
 }
 
+// instanceBackendName names a single native backend as BELLUI_WEBGPU_BACKENDS
+// spells it.
+func instanceBackendName(b wgpu.InstanceBackend) string {
+	switch b {
+	case instanceBackendMetal:
+		return "metal"
+	case instanceBackendDX12:
+		return "dx12"
+	case instanceBackendVulkan:
+		return "vulkan"
+	}
+	return fmt.Sprintf("backend 0x%x", uint32(b))
+}
+
+// NewDevice brings up WebGPU against the given surface (created from a native
+// window handle by the platform surface bridge) at the initial pixel size.
 func NewDevice(sd *wgpu.SurfaceDescriptor, width, height int) (d *Device, err error) {
 	defer func() {
 		if err != nil && d != nil {
