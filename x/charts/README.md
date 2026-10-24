@@ -317,8 +317,11 @@ A chart draws one X axis, from the first entry of `XAxis`.
 Every part of an axis is drawn unless `Hide` says otherwise, so a `Config`
 written as a literal draws the whole axis. Grid lines follow `SplitLine`: by
 default only the first Y axis draws them; `SplitLineShow` adds them for the X
-axis (vertical) or another Y axis, `SplitLineHide` removes them. A left-hand Y
-axis draws no tick marks, so `Hide.Ticks` changes nothing there.
+axis (vertical) or another Y axis, `SplitLineHide` removes them. A value, log or
+time axis draws its grid lines at its ticks; a category axis draws them between
+its categories, so in the example below each vertical line separates two days'
+bars while the tick marks and labels stay under the bars. A left-hand
+Y axis draws no tick marks, so `Hide.Ticks` changes nothing there.
 
 ```go
 x := axis.Config{Type: axis.TypeCategory, Data: days, SplitLine: axis.SplitLineShow}

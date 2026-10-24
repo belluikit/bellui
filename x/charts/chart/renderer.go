@@ -1160,8 +1160,8 @@ func textWidth(s string, size float32) float32 {
 // renderXAxis draws an X axis along the bottom or top of the plot, moved
 // out by its Offset: the axis line, a tick mark and label per tick, and the
 // axis name centred beyond the labels, less the parts cfg.Hide hides. With
-// SplitLineShow it also draws vertical grid lines across the plot at its
-// ticks.
+// SplitLineShow it also draws vertical grid lines across the plot where
+// splitTicks puts them: at its ticks, or between the bands of a category axis.
 func (r *chartRenderer) renderXAxis(cfg axis.Config, xScale axis.Scale, plotRect coord.Rect, resolver *style.Resolver) []core.CanvasObject {
 	var objects []core.CanvasObject
 	labelSize := resolver.LabelTextSize()
@@ -1188,10 +1188,9 @@ func (r *chartRenderer) renderXAxis(cfg axis.Config, xScale axis.Scale, plotRect
 	var splits, marks []core.CanvasObject
 	splitLines := cfg.SplitLine == axis.SplitLineShow
 	gridColor := resolver.GridLineColor()
-	for _, tick := range xScale.Ticks() {
-		px := plotRect.X + tickNorm(tick, cfg.Inverse)*plotRect.W
-
-		if splitLines {
+	if splitLines {
+		for _, tick := range splitTicks(cfg, xScale) {
+			px := plotRect.X + tickNorm(tick, cfg.Inverse)*plotRect.W
 			splits = append(splits, &canvas.Line{
 				Position1:   geo.NewPos(px, plotRect.Y),
 				Position2:   geo.NewPos(px, plotRect.Y+plotRect.H),
@@ -1199,6 +1198,9 @@ func (r *chartRenderer) renderXAxis(cfg axis.Config, xScale axis.Scale, plotRect
 				StrokeWidth: 0.5,
 			})
 		}
+	}
+	for _, tick := range xScale.Ticks() {
+		px := plotRect.X + tickNorm(tick, cfg.Inverse)*plotRect.W
 
 		if !cfg.Hide.Ticks {
 			marks = append(marks, &canvas.Line{
@@ -1241,6 +1243,25 @@ func (r *chartRenderer) renderXAxis(cfg axis.Config, xScale axis.Scale, plotRect
 	}
 
 	return objects
+}
+
+// splitTicks returns where an axis's grid lines go. A value, log or time axis
+// draws them at its ticks. A category axis puts its ticks at the band centres,
+// where its bars and points sit, so it draws its grid lines between the bands
+// instead: n-1 lines for n visible categories, none at the plot edges (#757).
+func splitTicks(cfg axis.Config, scale axis.Scale) []axis.Tick {
+	ticks := scale.Ticks()
+	if cfg.Type != axis.TypeCategory {
+		return ticks
+	}
+	var between []axis.Tick
+	for i := 1; i < len(ticks); i++ {
+		between = append(between, axis.Tick{
+			Value: (ticks[i-1].Value + ticks[i].Value) / 2,
+			Norm:  (ticks[i-1].Norm + ticks[i].Norm) / 2,
+		})
+	}
+	return between
 }
 
 // ySplitLines reports whether the Y axis at index draws grid lines: by
