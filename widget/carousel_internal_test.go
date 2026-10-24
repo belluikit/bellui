@@ -6,6 +6,8 @@ import (
 
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/event"
+
+	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/cache"
 	"github.com/belluikit/bellui/lang"
@@ -389,4 +391,48 @@ func TestCarousel_SettleWithoutRendererBuildsNone(t *testing.T) {
 	c.offset = 30
 	c.settle()
 	assert.False(t, cache.IsRendered(c))
+}
+
+// An item appended after the renderer was built is on the track, gets a dot,
+// and shows when paged to (#761). Before the fix the track kept the slice
+// header captured at creation, so the new item was laid out but never drawn.
+func TestCarousel_AppendedItemIsDrawn(t *testing.T) {
+	c, _, _, _ := newCarouselBench(t, true)
+	r := test.TempWidgetRenderer(t, c).(*carouselRenderer)
+	added := NewLabel("4")
+	c.Items = append(c.Items, added)
+	c.Refresh()
+
+	assert.Contains(t, r.track.Objects, core.CanvasObject(added), "the track holds the new item")
+	assert.Len(t, r.dots, 4, "one dot per item")
+	for _, dot := range r.dots {
+		assert.Contains(t, r.Objects(), core.CanvasObject(dot), "every dot is drawn")
+	}
+	c.Next()
+	c.Next()
+	c.Next()
+	assert.Equal(t, 3, c.CurrentItem)
+	assert.True(t, added.Visible())
+	assert.Equal(t, float32(0), added.Position().X)
+}
+
+// Truncating Items below CurrentItem clamps it on Refresh instead of paging
+// from out of range (#761).
+func TestCarousel_TruncatedItemsClampCurrent(t *testing.T) {
+	c, _, _, _ := newCarouselBench(t, true)
+	r := test.TempWidgetRenderer(t, c).(*carouselRenderer)
+	c.Next()
+	c.Next()
+	require.Equal(t, 2, c.CurrentItem)
+
+	c.Items = c.Items[:1]
+	assert.NotPanics(t, c.Refresh)
+	assert.Equal(t, 0, c.CurrentItem)
+	assert.Len(t, r.dots, 1)
+	assert.True(t, c.Items[0].Visible())
+
+	c.Items = nil
+	assert.NotPanics(t, c.Refresh)
+	assert.Equal(t, 0, c.CurrentItem)
+	assert.Empty(t, r.dots)
 }

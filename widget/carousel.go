@@ -441,11 +441,8 @@ func (c *Carousel) CreateRenderer() core.WidgetRenderer {
 	track := &bellui.Container{Objects: c.Items, ClipToBounds: true}
 	objects := []core.CanvasObject{track}
 
-	// Dot indicators.
-	var dots []*canvas.Circle
-	for range c.Items {
-		dot := &canvas.Circle{}
-		dots = append(dots, dot)
+	dots := newCarouselDots(len(c.Items))
+	for _, dot := range dots {
 		objects = append(objects, dot)
 	}
 
@@ -553,7 +550,41 @@ func (r *carouselRenderer) layoutTrack() {
 	}
 }
 
+// newCarouselDots makes the page indicator, one dot per item.
+func newCarouselDots(n int) []*canvas.Circle {
+	dots := make([]*canvas.Circle, n)
+	for i := range dots {
+		dots[i] = &canvas.Circle{}
+	}
+	return dots
+}
+
+// syncItems re-reads Carousel.Items, which the app may have replaced or
+// resized since the renderer was built (#761, the #234 class): the track gets
+// the live slice, the dots are rebuilt when the count changed, and CurrentItem
+// is clamped into range when the slice shrank below it.
+func (r *carouselRenderer) syncItems() {
+	c := r.carousel
+	if c.CurrentItem >= len(c.Items) {
+		c.CurrentItem = len(c.Items) - 1
+	}
+	if c.CurrentItem < 0 {
+		c.CurrentItem = 0
+	}
+	r.track.Objects = c.Items
+	if len(r.dots) == len(c.Items) {
+		return
+	}
+	r.dots = newCarouselDots(len(c.Items))
+	objects := []core.CanvasObject{r.track}
+	for _, dot := range r.dots {
+		objects = append(objects, dot)
+	}
+	r.SetObjects(append(objects, r.prevBtn, r.nextBtn))
+}
+
 func (r *carouselRenderer) Refresh() {
+	r.syncItems()
 	th := r.carousel.Theme()
 	v := bellui.CurrentApp().Settings().ThemeVariant()
 
