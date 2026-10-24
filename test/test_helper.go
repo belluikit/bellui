@@ -18,6 +18,7 @@ import (
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/cache"
+	intdriver "github.com/belluikit/bellui/internal/driver"
 	"github.com/belluikit/bellui/internal/painter/software"
 	"github.com/belluikit/bellui/internal/test"
 )
@@ -223,6 +224,50 @@ func ApplyTheme(t *testing.T, theme bellui.Theme) {
 func TempWidgetRenderer(t *testing.T, wid core.Widget) core.WidgetRenderer {
 	t.Cleanup(func() { cache.DestroyRenderer(wid) })
 	return cache.Renderer(wid)
+}
+
+// DestroyRenderers releases the cached renderers of o and of every object
+// under it, the way closing a window releases the renderers of its content.
+// Widgets outside the tree keep theirs.
+//
+// Code that builds widgets without a running driver needs it: a benchmark, or
+// any test whose widgets are never shown in a window that later closes. Their
+// renderers otherwise stay cached, with everything they reference, for the
+// rest of the process (#720).
+//
+// The renderers are destroyed when DestroyRenderers is called, not at
+// tb.Cleanup: a benchmark calls it at the end of each iteration, so the heap
+// stays near where it started however many trees the benchmark builds, while
+// a cleanup would hold every tree until the benchmark returned. To release a
+// tree when a test ends, call it from tb.Cleanup yourself.
+//
+// The walk reaches the children of each [github.com/belluikit/bellui.Container]
+// and the objects of each widget's cached renderer, hidden ones included. It
+// never creates a renderer: a widget without one is skipped, and so are
+// objects only that widget's renderer would have held. Popups and overlays
+// are not under o and are not released, nor are widgets a widget made and
+// dropped without showing them, such as the item template a List measures
+// (#722). A widget used again afterwards gets a new renderer, as it would
+// after its window closed.
+//
+// Since: 1.3
+func DestroyRenderers(tb testing.TB, o core.CanvasObject) {
+	tb.Helper()
+	if o == nil {
+		return
+	}
+	var widgets []core.Widget
+	// A complete walk, unlike a visible one, reads only cached renderers.
+	intdriver.WalkCompleteObjectTree(o, nil, func(obj core.CanvasObject, _ geo.Position, _ core.CanvasObject) {
+		if w, ok := obj.(core.Widget); ok {
+			widgets = append(widgets, w)
+		}
+	})
+	// Destroy only after the walk, so that no Destroy can change what the walk
+	// reads.
+	for _, w := range widgets {
+		cache.DestroyRenderer(w)
+	}
 }
 
 // WithTestTheme runs a function with the testTheme temporarily set.
