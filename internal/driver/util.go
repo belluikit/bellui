@@ -667,7 +667,10 @@ func DestroyRenderers(o core.CanvasObject) {
 	if o == nil {
 		return
 	}
-	var widgets []core.Widget
+	// A measured template holds a few widgets: the buffer keeps the walk from
+	// allocating on the Refresh path that measures one.
+	var buf [8]core.Widget
+	widgets := buf[:0]
 	WalkCompleteObjectTree(o, nil, func(obj core.CanvasObject, _ geo.Position, _ core.CanvasObject) {
 		if w, ok := obj.(core.Widget); ok {
 			widgets = append(widgets, w)

@@ -887,30 +887,14 @@ func (l *listLayout) updateList(newOnly bool) {
 	l.wasVisible = l.wasVisible[:0]
 }
 
-// dropSeparators keeps the first n separators and releases the renderers of
-// the rest, which leave the tree (#722).
-func (l *listLayout) dropSeparators(n int) {
-	if n >= len(l.separators) {
-		return
-	}
-	for _, s := range l.separators[n:] {
-		releaseRenderer(s)
-	}
-	clear(l.separators[n:])
-	l.separators = l.separators[:n]
-	if n == 0 {
-		l.separators = nil
-	}
-}
-
 func (l *listLayout) updateSeparators() {
 	if l.list.HideSeparators {
-		l.dropSeparators(0)
+		l.separators = dropObjects(l.separators, 0)
 		return
 	}
 	if lenChildren := len(l.children); lenChildren > 1 {
 		if lenSep := len(l.separators); lenSep > lenChildren {
-			l.dropSeparators(lenChildren)
+			l.separators = dropObjects(l.separators, lenChildren)
 		} else {
 			for i := lenSep; i < lenChildren; i++ {
 
@@ -923,7 +907,7 @@ func (l *listLayout) updateSeparators() {
 			}
 		}
 	} else {
-		l.dropSeparators(0)
+		l.separators = dropObjects(l.separators, 0)
 	}
 
 	th := l.list.Theme()
@@ -975,6 +959,19 @@ func releaseRenderer(o core.CanvasObject) {
 	if w, ok := o.(core.Widget); ok {
 		cache.DestroyRenderer(w)
 	}
+}
+
+// dropObjects keeps the first n objects of s and releases the renderers of
+// the rest, which leave the tree (#722).
+func dropObjects(s []core.CanvasObject, n int) []core.CanvasObject {
+	if n >= len(s) {
+		return s
+	}
+	for _, o := range s[n:] {
+		releaseRenderer(o)
+	}
+	clear(s[n:])
+	return s[:n]
 }
 
 func createItemAndApplyThemeScope(f func() core.CanvasObject, scope core.Widget) core.CanvasObject {

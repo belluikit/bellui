@@ -1593,10 +1593,8 @@ func (r *tableCellsRenderer) moveIndicators() {
 		// nothing else would release it before the cache expiry (#722).
 		for _, d := range r.dividers[needed:] {
 			d.Hide()
-			releaseRenderer(d)
 		}
-		clear(r.dividers[needed:])
-		r.dividers = r.dividers[:needed]
+		r.dividers = dropObjects(r.dividers, needed)
 		objs := []core.CanvasObject{r.marker, r.hover}
 		r.cells.t.dividerLayer.Content.(*bellui.Container).Objects = append(objs, r.dividers...)
 		r.cells.t.dividerLayer.Content.Refresh()
