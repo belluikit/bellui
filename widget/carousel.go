@@ -25,7 +25,8 @@ var _ event.Draggable = (*Carousel)(nil)
 // content animates, with the MD3 standard easing and medium duration, to the
 // neighbouring item when the swipe was longer than a fifth of the width or was a
 // flick of at least 400 points per second (and 24 points long), and back to the
-// current item otherwise. With animations turned off in the app settings
+// current item otherwise; a flick back towards the current item returns to it
+// however far the content was moved. With animations turned off in the app settings
 // it snaps instantly. Past the first or last item the drag meets resistance and
 // always snaps back. Under a right-to-left layout the order, buttons and swipe
 // direction are mirrored.
@@ -40,11 +41,17 @@ type Carousel struct {
 
 	dragging bool
 	axis     carouselAxis // the current gesture's locked axis
-	dragBase float32      // offset when the gesture began
+	dragBase float32      // finger travel, before edge resistance, the offset started from
 	drag     geo.Delta    // accumulated over the current drag gesture
 	samples  []carouselSample
 	lastPos  geo.Position     // Position of the gesture's latest finger event
+	lastEv   *event.DragEvent // the gesture's latest finger event
+	lastStep geo.Delta        // the drag lastEv added
 	coastEv  *event.DragEvent // the event a driver is coasting a released gesture with
+	// coastEnd is set while the DragEnd of a coast this carousel already took
+	// as the release is still to come, so that DragEnd does not end a later
+	// gesture.
+	coastEnd bool
 
 	// offset is how far, in points and in screen terms (positive is to the
 	// right), the content sits from its resting place on CurrentItem.
@@ -96,9 +103,9 @@ func (c *Carousel) page(by int) {
 		return
 	}
 	c.CurrentItem = to
-	if shift := float32(by) * c.dirSign() * c.pitch(); c.dragging {
-		c.dragBase += shift // a tap during a drag: keep the finger's content in place
-		c.offset += shift
+	if shift := float32(by) * c.dirSign() * c.pitch(); c.dragging && c.axis == carouselAxisHorizontal {
+		c.offset += shift // a tap during a drag: keep the finger's content in place
+		c.dragBase = c.unresisted(c.offset) - c.drag.DX
 	} else if c.offset != 0 {
 		c.offset += shift
 		c.settle()
@@ -159,17 +166,30 @@ func (c *Carousel) Dragged(e *event.DragEvent) {
 	if e == c.coastEv {
 		return // the driver's coast after a release this carousel already settled
 	}
-	if c.dragging && c.axis == carouselAxisHorizontal && e.Position == c.lastPos && !e.Dragged.IsZero() {
-		// The pointer did not move, yet a drag is reported: the finger has
-		// lifted and the mobile and embedded drivers are coasting the gesture
-		// (they re-send one event with decaying deltas before DragEnd). Treat
-		// it as the release, so the flick speed is the finger's and the
-		// content settles now instead of gliding by the coast's distance (#751).
-		c.coastEv = e
-		c.release()
-		return
+	if c.dragging && c.axis == carouselAxisHorizontal {
+		// The finger has lifted and the mobile and embedded drivers are
+		// coasting the gesture: they re-send one event with decaying deltas,
+		// at the release position, before DragEnd (#751). Treat the coast as
+		// the release, so the flick speed is the finger's and the content
+		// settles now instead of gliding by the coast's distance. A driver
+		// sends each finger move as a new event, so a repeated event is the
+		// coast's second step: the first was taken for a finger move, since
+		// the release position can differ from the last move's, and is undone.
+		// Otherwise the coast shows as a drag without the pointer moving.
+		repeat := e == c.lastEv
+		if repeat || (e.Position == c.lastPos && !e.Dragged.IsZero()) {
+			if repeat {
+				c.undoLastStep()
+			}
+			c.coastEv = e
+			c.coastEnd = true
+			c.release()
+			return
+		}
 	}
 	c.lastPos = e.Position
+	c.lastEv = e
+	c.lastStep = e.Dragged
 	if !c.dragging {
 		c.dragging = true
 		c.rtl = isRTLAt(c.super()) // once per gesture: a DirectionScope may hold it (#696)
@@ -185,7 +205,7 @@ func (c *Carousel) Dragged(e *event.DragEvent) {
 		case dx > dy:
 			c.axis = carouselAxisHorizontal
 			c.stopSettle()
-			c.dragBase = c.offset
+			c.dragBase = c.unresisted(c.offset)
 		case dy > dx:
 			c.axis = carouselAxisVertical
 		}
@@ -200,22 +220,59 @@ func (c *Carousel) Dragged(e *event.DragEvent) {
 		c.samples = c.samples[1:]
 	}
 
-	off := c.dragBase + c.drag.DX
-	if !c.hasItemRevealedBy(off) {
-		off /= carouselEdgeResistance
-	}
+	c.followFinger()
+}
+
+// followFinger places the content at the gesture's finger travel, with the
+// edge resistance applied.
+func (c *Carousel) followFinger() {
 	pitch := c.pitch()
-	c.offset = geo.Max(-pitch, geo.Min(pitch, off))
+	c.offset = geo.Max(-pitch, geo.Min(pitch, c.resisted(c.dragBase+c.drag.DX)))
 	c.relayoutTrack()
 }
 
-// DragEnd settles a horizontal gesture: it pages towards the side the content
-// was moved to reveal when the content moved more than a fifth of the width,
-// or when the release was a flick in that direction (at least minSwipe long),
-// and otherwise animates back to the current item.
+// undoLastStep takes back the latest finger event of a horizontal gesture: its
+// drag, its speed sample and the content's move.
+func (c *Carousel) undoLastStep() {
+	c.drag.DX -= c.lastStep.DX
+	c.drag.DY -= c.lastStep.DY
+	if n := len(c.samples); n > 0 {
+		c.samples = c.samples[:n-1]
+	}
+	c.followFinger()
+}
+
+// resisted is the offset a finger travel of raw moves the content to: past the
+// first or last item it moves a carouselEdgeResistance-th as far.
+func (c *Carousel) resisted(raw float32) float32 {
+	if !c.hasItemRevealedBy(raw) {
+		return raw / carouselEdgeResistance
+	}
+	return raw
+}
+
+// unresisted is the inverse of resisted: the finger travel that puts the
+// content at offset off. A drag that catches content in motion starts from it,
+// so a snap-back caught past the edge does not jump.
+func (c *Carousel) unresisted(off float32) float32 {
+	if !c.hasItemRevealedBy(off) {
+		return off * carouselEdgeResistance
+	}
+	return off
+}
+
+// DragEnd settles a horizontal gesture. A flick (at least minSwipe long) pages
+// towards the side the content was moved to reveal when it was flicked that
+// way, and animates back to the current item when it was flicked back. A
+// release that is not a flick pages towards that side when the content sits
+// more than a fifth of the width from rest, and otherwise animates back.
 func (c *Carousel) DragEnd() {
-	if !c.dragging {
+	if c.coastEnd {
+		c.coastEnd = false
 		return // the end of a coast whose release was already handled
+	}
+	if !c.dragging {
+		return
 	}
 	c.release()
 }
@@ -231,10 +288,18 @@ func (c *Carousel) release() {
 	}
 
 	off := c.offset
-	dist := abs32(off)
-	paging := dist >= minSwipe && c.hasItemRevealedBy(off) &&
-		(dist > c.Size().Width/5 || (abs32(v) >= carouselFlickVelocity && (v < 0) == (off < 0)))
-	if !paging {
+	var paging bool
+	if abs32(c.drag.DX) >= minSwipe && abs32(v) >= carouselFlickVelocity {
+		// A flick goes the way it was flicked: on to the side the content
+		// was moved to reveal, or back to the current item. The offset can
+		// point the other way from the finger's travel when the drag caught
+		// content still settling.
+		paging = off != 0 && (v < 0) == (off < 0)
+	} else {
+		dist := abs32(off)
+		paging = dist >= minSwipe && dist > c.Size().Width/5
+	}
+	if !paging || !c.hasItemRevealedBy(off) {
 		c.settle()
 		return
 	}
@@ -334,7 +399,13 @@ func (c *Carousel) stopSettle() {
 // relayoutTrack repositions the items for the current offset without
 // refreshing the controls.
 func (c *Carousel) relayoutTrack() {
-	r, ok := cache.Renderer(c.super()).(*carouselRenderer)
+	// A settle can outlive the renderer (the carousel removed or its renderer
+	// expired); do not build one for it.
+	cr, ok := cache.CachedRenderer(c.super())
+	if !ok {
+		return
+	}
+	r, ok := cr.(*carouselRenderer)
 	if !ok {
 		return
 	}
