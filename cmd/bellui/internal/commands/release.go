@@ -2,6 +2,7 @@ package commands
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -277,6 +278,23 @@ func (r *Releaser) packageWindowsRelease(outFile string) error {
 }
 
 func (r *Releaser) signAndroid(path string) error {
+	cmd, err := r.androidSignCommand(path)
+	if err != nil {
+		return err
+	}
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+	return cmd.Run()
+}
+
+// androidSignCommand returns the command that signs the package at path:
+// jarsigner for a distribution .aab, apksigner otherwise. Neither gets a
+// password on its command line, where any user could read it from the
+// process list (#729): both read them from variables set on the child alone.
+// That also keeps them away from cmd.exe, which runs apksigner.bat on Windows
+// and would expand a % in an argument.
+func (r *Releaser) androidSignCommand(path string) (*exec.Cmd, error) {
 	signer := "jarsigner"
 	var args []string
 	if r.distribution {
@@ -286,44 +304,39 @@ func (r *Releaser) signAndroid(path string) error {
 		args = []string{"sign", "--ks", r.keyStore}
 	}
 
-	// apksigner reads the passwords from the environment, not the command
-	// line: on Windows it is a .bat, and cmd.exe would expand a % in one.
 	var env []string
 	if r.keyStorePass != "" {
 		if r.distribution {
-			args = append(args, "-storepass", r.keyStorePass)
+			args = append(args, "-storepass:env", "BELLUI_KEYSTORE_PASS")
 		} else {
 			args = append(args, "--ks-pass", "env:BELLUI_KEYSTORE_PASS")
-			env = append(env, "BELLUI_KEYSTORE_PASS="+r.keyStorePass)
 		}
+		env = append(env, "BELLUI_KEYSTORE_PASS="+r.keyStorePass)
 	}
 	if r.keyPass != "" {
 		if r.distribution {
-			args = append(args, "-keypass", r.keyPass)
+			args = append(args, "-keypass:env", "BELLUI_KEY_PASS")
 		} else {
 			args = append(args, "--key-pass", "env:BELLUI_KEY_PASS")
-			env = append(env, "BELLUI_KEY_PASS="+r.keyPass)
 		}
+		env = append(env, "BELLUI_KEY_PASS="+r.keyPass)
 	}
 	args = append(args, path)
 	if r.distribution {
 		if r.keyName == "" { // Required to sign Google Play .aab
-			return errors.New("missing required --key-name (alias) parameter")
+			return nil, errors.New("missing required --key-name (alias) parameter")
 		}
 		args = append(args, r.keyName)
 	}
 
 	cmd, err := realUtil.Command(signer, args...)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if env != nil {
 		cmd.Env = append(os.Environ(), env...)
 	}
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	cmd.Stdin = os.Stdin
-	return cmd.Run()
+	return cmd, nil
 }
 
 func (r *Releaser) signWindows(appx string) error {
@@ -419,15 +432,19 @@ func (r *Releaser) writeEntitlements(tmpl *template.Template, entitlementData an
 
 func (r *Releaser) zipAlign(path string) error {
 	unaligned := filepath.Join(filepath.Dir(path), "unaligned.apk")
-	err := os.Rename(path, unaligned)
-	if err != nil {
-		return nil
+	if err := os.Rename(path, unaligned); err != nil {
+		return fmt.Errorf("moving the package aside to align it: %w", err)
 	}
 
 	cmd := filepath.Join(util.AndroidBuildToolsPath(), realUtil.BuildToolFile("zipalign"))
-	err = exec.Command(cmd, "16", unaligned, path).Run()
+	out, err := exec.Command(cmd, "16", unaligned, path).CombinedOutput()
 	if err != nil {
-		_ = os.Rename(path, unaligned) // ignore error, return previous
+		err = fmt.Errorf("zipalign: %w: %s", err, strings.TrimSpace(string(out)))
+		// Put the input back over whatever zipalign left at path: it is
+		// the only good copy of the package (#728).
+		if rerr := os.Rename(unaligned, path); rerr != nil {
+			return errors.Join(err, fmt.Errorf("restoring %s: %w", path, rerr))
+		}
 		return err
 	}
 	return os.Remove(unaligned)

@@ -67,7 +67,8 @@ jobs:
       # The packaging tests that run the real Android SDK tools skip when the
       # SDK is missing, so a plain `go test` passing proves nothing about them.
       # The Windows image ships the SDK and a JDK; there d8 and apksigner are
-      # .bat files run through cmd.exe (#674). This step fails unless the tests
+      # .bat files run through cmd.exe (#674), and jarsigner.exe signs a release
+      # bundle with its passwords from the environment (#729). This step fails unless the tests
       # report PASS, so a silent skip cannot pass for a run.
       - name: Android SDK tools on Windows
         if: matrix.os == 'windows'
@@ -76,9 +77,9 @@ jobs:
           Write-Output "ANDROID_HOME=$env:ANDROID_HOME"
           Get-ChildItem "$env:ANDROID_HOME\build-tools" | Select-Object -ExpandProperty Name
           Get-Command javac | Select-Object -ExpandProperty Source
-          go test -race -tags ci -count=1 -v -run 'TestPackageAndroid|TestCommandRunsBatchFile' ./internal/mobile/ ./internal/util/ | Tee-Object -Variable out
+          go test -race -tags ci -count=1 -v -run 'TestPackageAndroid|TestCommandRunsBatchFile|TestReleaser' ./internal/mobile/ ./internal/util/ ./internal/commands/ | Tee-Object -Variable out
           if ($LASTEXITCODE -ne 0) { exit 1 }
-          foreach ($t in 'TestPackageAndroidLibs', 'TestPackageAndroidJarsOnlyKeepsBinresPath', 'TestCommandRunsBatchFile') {
+          foreach ($t in 'TestPackageAndroidLibs', 'TestPackageAndroidJarsOnlyKeepsBinresPath', 'TestCommandRunsBatchFile', 'TestReleaserAfterPackageAndroid', 'TestReleaserSignsWithJarsigner') {
             if (-not ($out | Select-String -SimpleMatch "--- PASS: $t ")) { Write-Output "::error::$t did not PASS (skipped?)"; exit 1 }
           }
       # A real `bellui package -os android/arm64` of an app with its own
