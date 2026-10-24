@@ -4393,6 +4393,12 @@ type entryContentRenderer struct {
 
 func (r *entryContentRenderer) Destroy() {
 	r.content.entry.cursorAnim.stop()
+	// The selection is laid out with the text but is one of Objects only while
+	// it is selecting, so a release of the tree does not reach its renderer:
+	// left cached, it outlived the entry's (#720).
+	if sel := r.content.entry.sel; sel != nil {
+		cache.DestroyRenderer(sel)
+	}
 }
 
 func (r *entryContentRenderer) Layout(size geo.Size) {
