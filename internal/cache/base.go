@@ -109,6 +109,7 @@ func CleanCanvas(canvas core.Canvas) {
 
 		wid, ok := obj.(core.Widget)
 		if !ok {
+			DeleteOverride(obj)
 			return true
 		}
 		rinfo, ok := renderers.LoadAndDelete(wid)
@@ -116,7 +117,7 @@ func CleanCanvas(canvas core.Canvas) {
 			return true
 		}
 		rinfo.renderer.Destroy()
-		overrides.Delete(wid)
+		DeleteOverride(wid)
 		return true
 	})
 
@@ -155,7 +156,7 @@ func destroyExpiredRenderers(now time.Time) {
 	renderers.Range(func(wid core.Widget, rinfo *rendererInfo) bool {
 		if rinfo.isExpired(now) {
 			rinfo.renderer.Destroy()
-			overrides.Delete(wid)
+			DeleteOverride(wid)
 			renderers.Delete(wid)
 		}
 		return true
