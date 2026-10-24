@@ -515,9 +515,8 @@ func buildAPK(out io.Writer, nmpkgs map[string]map[string]bool, libFiles []strin
 // It is a no-op that only warns (does not fail the build) when the Android
 // build-tools are unavailable, so builds on machines without an SDK still work.
 func resignDebugAPK(apkPath string) error {
-	buildTools := util.AndroidBuildToolsPath()
-	apksigner := filepath.Join(buildTools, "apksigner")
-	if !util.Exists(apksigner) {
+	apksigner, err := util.AndroidBuildTool("apksigner")
+	if err != nil {
 		if p, err := exec.LookPath("apksigner"); err == nil {
 			apksigner = p
 		} else {
@@ -537,7 +536,7 @@ func resignDebugAPK(apkPath string) error {
 	// apksigner preserves the alignment of its input, so zipalign (uncompressed
 	// entries to 4 bytes) must run before signing. The Writer already 4-aligns,
 	// but align defensively when the tool is present.
-	if zipalign := filepath.Join(buildTools, "zipalign"); util.Exists(zipalign) {
+	if zipalign, err := util.AndroidBuildTool("zipalign"); err == nil {
 		aligned := apkPath + ".aligned"
 		cmd := exec.Command(zipalign, "-f", "4", apkPath, aligned)
 		cmd.Stderr = os.Stderr
@@ -549,10 +548,13 @@ func resignDebugAPK(apkPath string) error {
 		}
 	}
 
-	cmd := exec.Command(apksigner, "sign",
+	cmd, err := util.Command(apksigner, "sign",
 		"--key", keyPath, "--cert", certPath,
 		"--v1-signing-enabled", "true", "--v2-signing-enabled", "true",
 		apkPath)
+	if err != nil {
+		return fmt.Errorf("apksigner sign debug apk: %w", err)
+	}
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
@@ -672,11 +674,14 @@ func mergeAppJavaDex(dir string, jars, extraJava []string) ([]string, error) {
 	if err := os.MkdirAll(outDir, 0o755); err != nil {
 		return nil, err
 	}
-	d8 := filepath.Join(util.AndroidBuildToolsPath(), "d8")
+	d8, err := util.AndroidBuildTool("d8")
+	if err != nil {
+		return nil, err
+	}
 	d8Args := []string{"--min-api", "21", "--lib", androidJar, "--output", outDir, baseDex}
 	d8Args = append(d8Args, classFiles...)
 	d8Args = append(d8Args, jars...)
-	if out, err := exec.Command(d8, d8Args...).CombinedOutput(); err != nil {
+	if out, err := runD8(d8, d8Args); err != nil {
 		os.Stderr.Write(out)
 		return nil, fmt.Errorf("d8 merge app dex: %w", err)
 	}
@@ -689,6 +694,27 @@ func mergeAppJavaDex(dir string, jars, extraJava []string) ([]string, error) {
 	}
 	sort.Strings(dexes) // classes.dex sorts before classes2.dex
 	return dexes, nil
+}
+
+// runD8 runs d8 with args passed in an argument file (one per line, read
+// verbatim). An app's class files and jars are one argument each, which on
+// Windows would soon outgrow the 8191 characters cmd.exe allows the d8.bat
+// command line; the file also keeps the paths away from cmd.exe's quoting.
+func runD8(d8 string, args []string) ([]byte, error) {
+	for _, a := range args {
+		if strings.ContainsAny(a, "\r\n") {
+			return nil, fmt.Errorf("cannot pass %q to d8: an argument file holds one argument per line", a)
+		}
+	}
+	argFile := filepath.Join(tmpdir, "d8-args.txt")
+	if err := os.WriteFile(argFile, []byte(strings.Join(args, "\n")+"\n"), 0o644); err != nil {
+		return nil, err
+	}
+	cmd, err := util.Command(d8, "@"+argFile)
+	if err != nil {
+		return nil, err
+	}
+	return cmd.CombinedOutput()
 }
 
 // compileAppJava runs javac over javaFiles with the jars on the classpath and

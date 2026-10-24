@@ -13,6 +13,7 @@ import (
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/cmd/bellui/internal/mobile"
 	"github.com/belluikit/bellui/cmd/bellui/internal/templates"
+	realUtil "github.com/belluikit/bellui/cmd/bellui/internal/util"
 
 	"github.com/urfave/cli/v2"
 )
@@ -281,22 +282,27 @@ func (r *Releaser) signAndroid(path string) error {
 	if r.distribution {
 		args = []string{"-keystore", r.keyStore}
 	} else {
-		signer = filepath.Join(util.AndroidBuildToolsPath(), "/apksigner")
+		signer = filepath.Join(util.AndroidBuildToolsPath(), realUtil.BuildToolFile("apksigner"))
 		args = []string{"sign", "--ks", r.keyStore}
 	}
 
+	// apksigner reads the passwords from the environment, not the command
+	// line: on Windows it is a .bat, and cmd.exe would expand a % in one.
+	var env []string
 	if r.keyStorePass != "" {
 		if r.distribution {
 			args = append(args, "-storepass", r.keyStorePass)
 		} else {
-			args = append(args, "--ks-pass", "pass:"+r.keyStorePass)
+			args = append(args, "--ks-pass", "env:BELLUI_KEYSTORE_PASS")
+			env = append(env, "BELLUI_KEYSTORE_PASS="+r.keyStorePass)
 		}
 	}
 	if r.keyPass != "" {
 		if r.distribution {
 			args = append(args, "-keypass", r.keyPass)
 		} else {
-			args = append(args, "--key-pass", "pass:"+r.keyPass)
+			args = append(args, "--key-pass", "env:BELLUI_KEY_PASS")
+			env = append(env, "BELLUI_KEY_PASS="+r.keyPass)
 		}
 	}
 	args = append(args, path)
@@ -307,7 +313,13 @@ func (r *Releaser) signAndroid(path string) error {
 		args = append(args, r.keyName)
 	}
 
-	cmd := exec.Command(signer, args...)
+	cmd, err := realUtil.Command(signer, args...)
+	if err != nil {
+		return err
+	}
+	if env != nil {
+		cmd.Env = append(os.Environ(), env...)
+	}
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
@@ -412,7 +424,7 @@ func (r *Releaser) zipAlign(path string) error {
 		return nil
 	}
 
-	cmd := filepath.Join(util.AndroidBuildToolsPath(), "zipalign")
+	cmd := filepath.Join(util.AndroidBuildToolsPath(), realUtil.BuildToolFile("zipalign"))
 	err = exec.Command(cmd, "16", unaligned, path).Run()
 	if err != nil {
 		_ = os.Rename(path, unaligned) // ignore error, return previous

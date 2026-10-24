@@ -241,8 +241,8 @@ func sdkTools(t *testing.T) (androidJar, buildTools string) {
 	}
 	buildTools = util.AndroidBuildToolsPath()
 	for _, tool := range []string{"d8", "aapt2", "dexdump"} {
-		if !util.Exists(filepath.Join(buildTools, tool)) {
-			t.Skipf("%s not in %s", tool, buildTools)
+		if _, err := util.AndroidBuildTool(tool); err != nil {
+			t.Skip(err)
 		}
 	}
 	return androidJar, buildTools
@@ -291,10 +291,12 @@ func javacJar(t *testing.T, androidJar string, classpath []string, sources map[s
 func TestPackageAndroidLibs(t *testing.T) {
 	androidJar, buildTools := sdkTools(t)
 	prevTmp := tmpdir
-	tmpdir = t.TempDir()
+	// Every path holds a space and an &: on Windows d8 and apksigner are .bat
+	// files run through cmd.exe, which splits and interprets both (#674).
+	tmpdir = spacedDir(t)
 	t.Cleanup(func() { tmpdir = prevTmp })
 
-	app := t.TempDir()
+	app := spacedDir(t)
 	libDir := filepath.Join(app, "android", "libs")
 
 	// A plain jar.
@@ -368,7 +370,7 @@ func TestPackageAndroidLibs(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Join(tmpdir, "lib", "arm64-v8a"), 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(tmpdir, goLib), []byte("go"), 0o644))
 
-	apkPath := filepath.Join(t.TempDir(), "app.apk")
+	apkPath := filepath.Join(spacedDir(t), "app.apk")
 	f, err := os.Create(apkPath)
 	require.NoError(t, err)
 	apkw, err := buildAPK(f, nil, append([]string{goLib}, libs.nativeFiles...), []string{"arm64"}, dex)
@@ -401,7 +403,7 @@ func TestPackageAndroidLibs(t *testing.T) {
 		}
 		p := filepath.Join(t.TempDir(), e.Name)
 		require.NoError(t, os.WriteFile(p, []byte(readZipEntry(t, e)), 0o644))
-		out, err := exec.Command(filepath.Join(buildTools, "dexdump"), p).CombinedOutput()
+		out, err := exec.Command(filepath.Join(buildTools, util.BuildToolFile("dexdump")), p).CombinedOutput()
 		require.NoError(t, err, string(out))
 		descriptors.Write(out)
 	}
@@ -419,7 +421,7 @@ func TestPackageAndroidLibs(t *testing.T) {
 
 	// The binary manifest carries the merged entries; the library's string
 	// resource is in the table.
-	aapt2 := filepath.Join(buildTools, "aapt2")
+	aapt2 := filepath.Join(buildTools, util.BuildToolFile("aapt2"))
 	xmltree, err := exec.Command(aapt2, "dump", "xmltree", "--file", "AndroidManifest.xml", apkPath).CombinedOutput()
 	require.NoError(t, err, string(xmltree))
 	assert.Contains(t, string(xmltree), `"android.permission.VIBRATE"`)
@@ -430,6 +432,28 @@ func TestPackageAndroidLibs(t *testing.T) {
 	require.NoError(t, err, string(res))
 	assert.Contains(t, string(res), "string/aar_greeting")
 	assert.Contains(t, string(res), `"hello from aar"`)
+
+	// The v2 re-sign goes through zipalign and apksigner, as `bellui
+	// package` does; apksigner then verifies the scheme it added.
+	zr.Close()
+	require.NoError(t, resignDebugAPK(apkPath))
+	apksigner, err := util.AndroidBuildTool("apksigner")
+	if err != nil {
+		t.Skip(err)
+	}
+	verify, err := util.Command(apksigner, "verify", "-v", apkPath)
+	require.NoError(t, err)
+	out, err := verify.CombinedOutput()
+	require.NoError(t, err, string(out))
+	assert.Contains(t, string(out), "Verified using v2 scheme (APK Signature Scheme v2): true")
+}
+
+// spacedDir returns a new directory whose path holds a space and an &.
+func spacedDir(t *testing.T) string {
+	t.Helper()
+	dir := filepath.Join(t.TempDir(), "my app & co")
+	require.NoError(t, os.MkdirAll(dir, 0o755))
+	return dir
 }
 
 // Jars alone change only the dex: the resources stay on the binres path, so
@@ -452,7 +476,7 @@ func TestPackageAndroidJarsOnlyKeepsBinresPath(t *testing.T) {
 	dex, err := mergeAppJavaDex(app, libs.libs.jars, libs.rJava())
 	require.NoError(t, err)
 	require.NotEmpty(t, dex, "a jar alone is dexed even without android/*.java")
-	out, err := exec.Command(filepath.Join(buildTools, "dexdump"), dex[0]).CombinedOutput()
+	out, err := exec.Command(filepath.Join(buildTools, util.BuildToolFile("dexdump")), dex[0]).CombinedOutput()
 	require.NoError(t, err, string(out))
 	assert.Contains(t, string(out), "'Lcom/example/plain/Plain;'")
 

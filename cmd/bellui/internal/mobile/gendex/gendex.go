@@ -27,6 +27,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+
+	"github.com/belluikit/bellui/cmd/bellui/internal/util"
 )
 
 var outfile = flag.String("o", "dex.go", "result will be written file")
@@ -105,8 +107,11 @@ func gendex() error {
 	if err != nil {
 		return err
 	}
-	cmd = exec.Command(buildTools+"/d8", append([]string{"--output", tmpdir},
-		classFiles...)...)
+	cmd, err = util.Command(filepath.Join(buildTools, util.BuildToolFile("d8")),
+		append([]string{"--output", tmpdir}, classFiles...)...)
+	if err != nil {
+		return err
+	}
 	if out, err := cmd.CombinedOutput(); err != nil {
 		os.Stderr.Write(out)
 		return err
