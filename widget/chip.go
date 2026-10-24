@@ -9,7 +9,6 @@ import (
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
 	internalWidget "github.com/belluikit/bellui/internal/widget"
-	"github.com/belluikit/bellui/lang"
 	"github.com/belluikit/bellui/theme"
 )
 
@@ -86,7 +85,7 @@ func (c *Chip) Tapped(e *event.PointEvent) {
 func (c *Chip) inDeleteRegion(x float32) bool {
 	iconSz := c.Theme().Size(theme.SizeNameIconSize) * 0.75
 	region := iconSz + 12 // button width plus surrounding padding
-	if lang.IsRTLDirection() {
+	if isRTLAt(c.super()) {
 		return x < region
 	}
 	return x > c.Size().Width-region
@@ -231,6 +230,8 @@ func (r *chipRenderer) Refresh() {
 		r.deleteBtn.Refresh()
 	}
 
-	r.Layout(r.chip.Size())
+	// Outside a layout walk (hover, SetText), so lay out in the chip's own
+	// direction (#696).
+	inDirectionOf(r.chip.super(), func() { r.Layout(r.chip.Size()) })
 	canvas.Refresh(r.chip.super())
 }

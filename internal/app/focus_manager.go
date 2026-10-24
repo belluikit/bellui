@@ -10,7 +10,6 @@ import (
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/driver"
-	"github.com/belluikit/bellui/lang"
 )
 
 // FocusManager represents a standard manager of input focus for a canvas.
@@ -206,7 +205,11 @@ func (f *FocusManager) focusOrder() []focusEntry {
 		return false
 	}, nil)
 
-	if lang.IsRTLDirection() {
+	// Tab traversal is an input event, outside any layout walk, so the
+	// ambient direction is the global one: ask for the content's own, which
+	// honours the canvas' direction (#696). A container.DirectionScope inside
+	// the content does not reorder its own focusables (#749).
+	if driver.IsRTLAt(f.content) {
 		order = reorderRTLVisual(order)
 	}
 	return order

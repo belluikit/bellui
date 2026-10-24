@@ -295,9 +295,17 @@ func (c *Canvas) SetDirection(d bellui.Direction) {
 	}
 	c.layoutDir = d
 	size := c.size
+	content := c.content
 	c.propertyLock.Unlock()
 
 	c.doResize(size)
+	// An unchanged size lays nothing out again, so refresh the content under
+	// the new direction, as the real canvas does (#696).
+	if content != nil {
+		uidir.Push(d)
+		defer uidir.Pop(d)
+		content.Refresh()
+	}
 }
 
 func (c *Canvas) Scale() float32 {

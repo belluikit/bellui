@@ -8,6 +8,7 @@ import (
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/cache"
+	"github.com/belluikit/bellui/internal/driver"
 	"github.com/belluikit/bellui/internal/layoutgen"
 	"github.com/belluikit/bellui/lang"
 	"github.com/belluikit/bellui/theme"
@@ -795,6 +796,10 @@ func (s *Scroll) pinToRTLStart() {
 	if s.Direction != ScrollHorizontalOnly && s.Direction != ScrollBoth {
 		return
 	}
+	// The ambient direction, not a lookup: this runs on every layout of an
+	// unpinned horizontal scroller, too often for driver.IsRTLAt's tree walk
+	// (#696). A Refresh outside a layout walk therefore sees the global
+	// direction (#749).
 	if !lang.IsRTLDirection() {
 		return
 	}
@@ -813,7 +818,10 @@ func (s *Scroll) pinToRTLStart() {
 // moves toward the content's left edge.
 func (s *Scroll) resolveScrollDelta(dx, dy float32) (float32, float32) {
 	dx, dy = s.swapAxesIfNeeded(dx, dy)
-	if lang.IsRTLDirection() {
+	// An input event, so no layout walk is running: look the direction up
+	// (#696), but only when there is a horizontal delta to flip — vertical
+	// wheel scrolling is the hot path and must not walk the tree.
+	if dx != 0 && driver.IsRTLAt(s.super()) {
 		dx = -dx
 	}
 	return dx, dy
