@@ -273,59 +273,13 @@ func TestCarousel_VerticalDragIgnored(t *testing.T) {
 	assert.Empty(t, drv.started)
 }
 
-// The mobile and embedded drivers coast a released drag: they re-send the
-// release event with decaying deltas, at the release position, before
-// DragEnd (driver.tapUpCanvas). The carousel takes the first coasted event as
-// the release, so a slow drag is not carried over the distance threshold by
-// the coast, the content does not glide with it, and the late DragEnd is a
-// no-op.
-func TestCarousel_DriverCoastIsTheRelease(t *testing.T) {
-	c, _, drv, clock := newCarouselBench(t, false)
-	require.Greater(t, c.Size().Width/5, float32(55))
-
-	finger := func(x float32, dx float32) {
-		*clock += 30 * time.Millisecond
-		c.Dragged(&event.DragEvent{PointEvent: event.PointEvent{Position: geo.NewPos(x, 80)}, Dragged: geo.NewDelta(dx, 0)})
-	}
-	// A slow 50pt drag (about 100pt/s), released while still moving 3pt a step.
-	x := float32(150)
-	for range 17 {
-		x -= 3
-		finger(x, -3)
-	}
-	at := c.Items[0].Position().X
-	require.InDelta(t, -50, at, 3)
-
-	// The driver's coast: one event, re-sent with decaying deltas. Its sum
-	// (about 30pt) would carry the drag past a fifth of the width.
-	coast := &event.DragEvent{PointEvent: event.PointEvent{Position: geo.NewPos(x, 80)}, Dragged: geo.NewDelta(-3, 0)}
-	for i := 0; i < 12; i++ {
-		*clock += 16 * time.Millisecond
-		coast.Dragged.DX *= 0.92
-		c.Dragged(coast)
-		if i == 0 {
-			require.Len(t, drv.started, 1, "the first coasted event is the release: the settle starts")
-		}
-		assert.Equal(t, at, c.Items[0].Position().X, "the coast does not move the content")
-	}
-	c.DragEnd()
-	assert.Equal(t, 0, c.CurrentItem, "slow drag snapped back despite the coast")
-	assert.Len(t, drv.started, 1, "the late DragEnd starts nothing")
-	drv.started[0].Tick(1)
-	assert.Equal(t, float32(0), c.Items[0].Position().X)
-
-	// A fast flick under the threshold, then its coast: pages at the release.
-	for i, x := 0, float32(140); i < 3; i, x = i+1, x-10 { // ends at x=120
-		*clock += 10 * time.Millisecond
-		c.Dragged(&event.DragEvent{PointEvent: event.PointEvent{Position: geo.NewPos(x, 80)}, Dragged: geo.NewDelta(-10, 0)})
-	}
-	coast = &event.DragEvent{PointEvent: event.PointEvent{Position: geo.NewPos(120, 80)}, Dragged: geo.NewDelta(-9.2, 0)}
-	*clock += 16 * time.Millisecond
-	c.Dragged(coast)
-	assert.Equal(t, 1, c.CurrentItem, "the flick paged at the release")
-	c.Dragged(coast)
-	c.DragEnd()
-	assert.Equal(t, 1, c.CurrentItem)
+// NewCarouselBenchForTest exposes newCarouselBench to the external tests that
+// need internal/driver/common, which this package cannot import in its own
+// tests (common imports container, which imports widget). started reports the
+// animations started so far.
+func NewCarouselBenchForTest(t *testing.T, noAnim bool) (c *Carousel, w bellui.Window, started func() []*bellui.Animation, clock *time.Duration) {
+	c, w, drv, clock := newCarouselBench(t, noAnim)
+	return c, w, func() []*bellui.Animation { return drv.started }, clock
 }
 
 // A flick against content still settling goes the way it was flicked. After a
