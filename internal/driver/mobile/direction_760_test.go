@@ -19,7 +19,7 @@ import (
 // (#760). The rows' labels change before the pass so that it does lay them
 // out again: the visit count is the marker that the walk ran.
 func TestEnsureMinSize_NoDirectionLookupInsideWalk(t *testing.T) {
-	s := newDirectionBenchScene(true)
+	s := newDirectionBenchScene(t, true)
 	bellui.DoAndWait(func() {
 		for i, l := range s.labels {
 			l.SetText("changed " + strconv.Itoa(i) + " with a longer text")
