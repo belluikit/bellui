@@ -1,9 +1,12 @@
 package container
 
 import (
+	"weak"
+
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/dirhook"
 	"github.com/belluikit/bellui/internal/driver"
 	"github.com/belluikit/bellui/internal/uidir"
 	"github.com/belluikit/bellui/widget"
@@ -35,7 +38,8 @@ type DirectionScope struct {
 	// [DirectionScope.SetDirection], which does this for you).
 	Direction bellui.Direction
 
-	holder *bellui.Container
+	holder     *bellui.Container
+	registered bool // with uidir.RegisterScope
 }
 
 // NewDirectionScope returns a [DirectionScope] that lays out and paints obj
@@ -60,7 +64,18 @@ func NewDirectionScope(obj core.CanvasObject, dir bellui.Direction) *DirectionSc
 
 // CreateRenderer is an internal method.
 func (d *DirectionScope) CreateRenderer() core.WidgetRenderer {
-	uidir.NoteScope() // from now on a direction lookup must walk for scopes
+	if !d.registered {
+		// The direction cache walks the subtrees of the registered scopes;
+		// a weak reference, so the registry keeps no scope alive (#749).
+		d.registered = true
+		wp := weak.Make(d)
+		uidir.RegisterScope(func() core.CanvasObject {
+			if s := wp.Value(); s != nil {
+				return s
+			}
+			return nil
+		})
+	}
 	return &directionScopeRenderer{scope: d, objs: []core.CanvasObject{d.holder}}
 }
 
@@ -82,15 +97,17 @@ func (d *DirectionScope) SetDirection(dir bellui.Direction) {
 		return
 	}
 	d.Direction = dir
+	dirhook.Changed() // the direction cache holds the old one (#749)
 	d.Refresh()
 }
 
-// Refresh re-applies the scope to its content. Call it after adding items to the
-// content container (or any sub-container) so the new items adopt the direction,
-// mirroring [ThemeOverride.Refresh].
+// Refresh re-applies the scope to its content, and adopts a replaced Content.
+// Refreshing anything inside the scope, or adding to a container in it, lays it
+// out in the scope's direction without calling this.
 func (d *DirectionScope) Refresh() {
 	if d.holder.Objects[0] != d.Content {
 		d.holder.Objects[0] = d.Content
+		dirhook.Changed() // the new content enters the scope (#749)
 		d.holder.Refresh()
 	}
 
@@ -119,8 +136,11 @@ func (d *DirectionScope) Refresh() {
 // call DirectionOf instead from code that runs outside one: an event handler
 // (a swipe, a tap's hit-test, an arrow key), or a Refresh triggered by a timer
 // or a data binding that re-lays-out the widget. Outside a walk it looks obj up
-// in its canvas' tree, a cost that grows with the tree; call it once per event
-// or Refresh, not per frame.
+// in a cache of the objects inside scopes, rebuilt at most once per frame and
+// after a change that can move an object between scopes. BaseWidget.Refresh
+// and Resize and a Container's Refresh and layout already run in the
+// direction the object sits in, so a widget's renderer reads
+// lang.IsRTLDirection as it does in a layout pass.
 //
 // Since: 1.0
 func DirectionOf(obj core.CanvasObject) bellui.Direction {
