@@ -5,6 +5,7 @@ package webgpu
 import (
 	"bytes"
 	"log"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -228,39 +229,117 @@ func TestChooseSurfaceFormat_SRGBOnlyWarns(t *testing.T) {
 
 // TestChooseInstanceBackends covers the BELLUI_WEBGPU_BACKENDS parsing that lets a
 // virtual-GPU environment skip a crashing backend (e.g. the WoA GL segfault) by
-// pinning to DX12 up-front (pre-rebrand tracker #612). Pure/env-only, so it runs in
-// normal CI with no GPU.
+// pinning to DX12 up-front (pre-rebrand tracker #612), on each platform: a list
+// that leaves out the native backend gets it added, with a warning, since
+// without it the window cannot open (#731). Pure, so it runs in normal CI with
+// no GPU.
 func TestChooseInstanceBackends(t *testing.T) {
+	const (
+		vk    = instanceBackendVulkan
+		gl    = instanceBackendGL
+		metal = instanceBackendMetal
+		dx12  = instanceBackendDX12
+	)
 	cases := []struct {
-		spec string
-		want wgpu.InstanceBackend
-		nil_ bool // expect a nil descriptor (all backends)
+		goos  string
+		spec  string
+		want  wgpu.InstanceBackend
+		nil_  bool   // expect a nil descriptor (all backends)
+		added string // the native backend the warning must name; "" = no warning
 	}{
-		{spec: "", nil_: true},
-		{spec: "dx12", want: instanceBackendDX12},
-		{spec: "d3d12", want: instanceBackendDX12},
-		{spec: " DX12 ", want: instanceBackendDX12},
-		{spec: "vulkan|dx12", want: instanceBackendVulkan | instanceBackendDX12},
-		{spec: "primary", want: instanceBackendPrimary},
-		{spec: "all", want: 0}, // All == 0
-		{spec: "bogus|dx12", want: instanceBackendDX12},
+		// Unset and "all" are untouched everywhere.
+		{goos: "darwin", spec: "", nil_: true},
+		{goos: "windows", spec: "", nil_: true},
+		{goos: "linux", spec: "", nil_: true},
+		{goos: "darwin", spec: "all", want: 0},
+		{goos: "windows", spec: "all", want: 0},
+		{goos: "linux", spec: "all", want: 0},
+		{goos: "linux", spec: "bogus", want: 0}, // nothing parsed: All
+
+		// Native already listed: unchanged, no warning.
+		{goos: "windows", spec: "dx12", want: dx12},
+		{goos: "windows", spec: "d3d12", want: dx12},
+		{goos: "windows", spec: " DX12 ", want: dx12},
+		{goos: "windows", spec: "vulkan|dx12", want: vk | dx12},
+		{goos: "windows", spec: "bogus|dx12", want: dx12},
+		{goos: "darwin", spec: "metal", want: metal},
+		{goos: "linux", spec: "vulkan", want: vk},
+		{goos: "linux", spec: "gl|vulkan", want: gl | vk},
+		{goos: "darwin", spec: "primary", want: instanceBackendPrimary},
+		{goos: "windows", spec: "primary", want: instanceBackendPrimary},
+		{goos: "linux", spec: "primary", want: instanceBackendPrimary},
+
+		// Native left out: added, and the warning names it.
+		{goos: "darwin", spec: "gl", want: gl | metal, added: "metal"},
+		{goos: "darwin", spec: "vulkan", want: vk | metal, added: "metal"},
+		{goos: "darwin", spec: "dx12", want: dx12 | metal, added: "metal"},
+		{goos: "ios", spec: "gl", want: gl | metal, added: "metal"},
+		{goos: "windows", spec: "gl", want: gl | dx12, added: "dx12"},
+		{goos: "windows", spec: "vulkan", want: vk | dx12, added: "dx12"},
+		{goos: "windows", spec: "metal", want: metal | dx12, added: "dx12"},
+		{goos: "linux", spec: "gl", want: gl | vk, added: "vulkan"},
+		{goos: "linux", spec: "dx12", want: dx12 | vk, added: "vulkan"},
+		{goos: "linux", spec: "metal", want: metal | vk, added: "vulkan"},
+		{goos: "linux", spec: "secondary", want: gl | vk, added: "vulkan"},
+		{goos: "android", spec: "gl", want: gl | vk, added: "vulkan"},
+		{goos: "freebsd", spec: "gl", want: gl | vk, added: "vulkan"},
+
+		// The web has no native backend to insist on.
+		{goos: "js", spec: "gl", want: gl},
 	}
 	for _, tc := range cases {
-		t.Run(tc.spec, func(t *testing.T) {
-			t.Setenv("BELLUI_WEBGPU_BACKENDS", tc.spec)
-			got := chooseInstanceBackends()
+		t.Run(tc.goos+"/"+tc.spec, func(t *testing.T) {
+			var logs []string
+			got := instanceBackendsFor(tc.spec, tc.goos, func(msg string) { logs = append(logs, msg) })
 			if tc.nil_ {
 				if got != nil {
-					t.Fatalf("spec %q: expected nil descriptor, got %+v", tc.spec, got)
+					t.Fatalf("expected nil descriptor, got %+v", got)
 				}
 				return
 			}
 			if got == nil {
-				t.Fatalf("spec %q: expected descriptor, got nil", tc.spec)
+				t.Fatal("expected descriptor, got nil")
 			}
 			if got.Backends != tc.want {
-				t.Fatalf("spec %q: backends = 0x%x, want 0x%x", tc.spec, uint32(got.Backends), uint32(tc.want))
+				t.Fatalf("backends = 0x%x, want 0x%x", uint32(got.Backends), uint32(tc.want))
+			}
+			var warned []string
+			for _, l := range logs {
+				if strings.Contains(l, "leaves out") {
+					warned = append(warned, l)
+				}
+			}
+			if tc.added == "" {
+				if len(warned) != 0 {
+					t.Fatalf("unexpected warning: %q", warned)
+				}
+				return
+			}
+			if len(warned) != 1 || !strings.Contains(warned[0], "leaves out "+tc.added+",") {
+				t.Fatalf("want one warning naming %s, got %q", tc.added, warned)
 			}
 		})
+	}
+}
+
+// TestChooseInstanceBackendsEnv covers the wrapper: it reads
+// BELLUI_WEBGPU_BACKENDS for this platform, and the test-only override wins.
+func TestChooseInstanceBackendsEnv(t *testing.T) {
+	saved := instanceBackendsOverride
+	t.Cleanup(func() { instanceBackendsOverride = saved })
+	instanceBackendsOverride = 0 // as in an app, even under BELLUI_WEBGPU_TEST_NO_ADAPTER
+
+	native := nativeInstanceBackend(runtime.GOOS)
+	t.Setenv("BELLUI_WEBGPU_BACKENDS", "gl")
+	if got := chooseInstanceBackends(); got == nil || got.Backends != instanceBackendGL|native {
+		t.Fatalf("gl on %s: got %+v, want 0x%x", runtime.GOOS, got, uint32(instanceBackendGL|native))
+	}
+
+	instanceBackendsOverride = foreignInstanceBackend(runtime.GOOS)
+	if got := chooseInstanceBackends(); got == nil || got.Backends != instanceBackendsOverride {
+		t.Fatalf("override: got %+v, want 0x%x", got, uint32(instanceBackendsOverride))
+	}
+	if got := chooseInstanceBackends().Backends; got&native != 0 {
+		t.Fatalf("override 0x%x includes the native backend 0x%x, so it would find an adapter", uint32(got), uint32(native))
 	}
 }
