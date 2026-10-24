@@ -113,6 +113,10 @@ Fonts used only by tests:
   Google's [Terms of Service](https://policies.google.com/terms/archive/20260730)
   (effective 30 July 2026) say "Google won't claim ownership" of content
   generated with its services.
+  Bellui distributes all three images under
+  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), the license of the
+  gopher design they show, to the extent it holds any rights in them. Credit
+  the Go gopher to Renée French when you reuse them.
   `bellui package` credits the gopher in what it ships: under the spinner on
   the web splash screen, and, when an app uses `default-icon.png`, in the
   macOS and iOS Info.plist, the Windows version resource, the Android manifest
