@@ -2,6 +2,7 @@ package commands
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -419,15 +420,19 @@ func (r *Releaser) writeEntitlements(tmpl *template.Template, entitlementData an
 
 func (r *Releaser) zipAlign(path string) error {
 	unaligned := filepath.Join(filepath.Dir(path), "unaligned.apk")
-	err := os.Rename(path, unaligned)
-	if err != nil {
-		return nil
+	if err := os.Rename(path, unaligned); err != nil {
+		return fmt.Errorf("moving the package aside to align it: %w", err)
 	}
 
 	cmd := filepath.Join(util.AndroidBuildToolsPath(), realUtil.BuildToolFile("zipalign"))
-	err = exec.Command(cmd, "16", unaligned, path).Run()
+	out, err := exec.Command(cmd, "16", unaligned, path).CombinedOutput()
 	if err != nil {
-		_ = os.Rename(path, unaligned) // ignore error, return previous
+		err = fmt.Errorf("zipalign: %w: %s", err, strings.TrimSpace(string(out)))
+		// Put the input back over whatever zipalign left at path: it is
+		// the only good copy of the package (#728).
+		if rerr := os.Rename(unaligned, path); rerr != nil {
+			return errors.Join(err, fmt.Errorf("restoring %s: %w", path, rerr))
+		}
 		return err
 	}
 	return os.Remove(unaligned)
