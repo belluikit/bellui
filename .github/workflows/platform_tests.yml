@@ -214,7 +214,6 @@ jobs:
 
       # PROBE (#731): BELLUI_WEBGPU_BACKENDS=dx12
       - name: PROBE731 BACKENDS=dx12 windowed Capture
-        if: ${{ runner.os == 'Linux' }}
         continue-on-error: true
         env:
           BELLUI_WEBGPU_DEBUG: "1"
@@ -223,7 +222,6 @@ jobs:
 
       # PROBE (#731): BELLUI_WEBGPU_BACKENDS=dx12
       - name: PROBE731 BACKENDS=dx12 device tests
-        if: ${{ runner.os == 'Linux' }}
         continue-on-error: true
         env:
           BELLUI_WEBGPU_DEBUG: "1"
