@@ -81,6 +81,31 @@ jobs:
           foreach ($t in 'TestPackageAndroidLibs', 'TestPackageAndroidJarsOnlyKeepsBinresPath', 'TestCommandRunsBatchFile') {
             if (-not ($out | Select-String -SimpleMatch "--- PASS: $t ")) { Write-Output "::error::$t did not PASS (skipped?)"; exit 1 }
           }
+      # A real `bellui package -os android/arm64` of an app with its own
+      # AndroidManifest.xml must warn that the icon credit is not in it (#714).
+      # It needs the NDK, which the macOS and Windows images ship
+      # ($ANDROID_NDK_HOME). BELLUI_REQUIRE_ANDROID_NDK=1 turns a missing NDK
+      # into a failure, and the PASS check catches any other skip.
+      - name: Android packaging with the NDK (macOS)
+        if: matrix.os == 'macos'
+        working-directory: cmd/bellui
+        env:
+          BELLUI_REQUIRE_ANDROID_NDK: "1"
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
+          go test -race -tags ci -count=1 -v -run 'TestPackageAndroidOwnManifestWarnsTheCreditIsMissing$' ./internal/commands/ | tee "$RUNNER_TEMP/android-ndk.log"
+          test "${PIPESTATUS[0]}" -eq 0
+          grep -q -- '--- PASS: TestPackageAndroidOwnManifestWarnsTheCreditIsMissing ' "$RUNNER_TEMP/android-ndk.log" || { echo "::error::TestPackageAndroidOwnManifestWarnsTheCreditIsMissing did not PASS (skipped?)"; exit 1; }
+      - name: Android packaging with the NDK (Windows)
+        if: matrix.os == 'windows'
+        working-directory: cmd/bellui
+        env:
+          BELLUI_REQUIRE_ANDROID_NDK: "1"
+        run: |
+          Write-Output "ANDROID_HOME=$env:ANDROID_HOME ANDROID_NDK_HOME=$env:ANDROID_NDK_HOME"
+          go test -race -tags ci -count=1 -v -run 'TestPackageAndroidOwnManifestWarnsTheCreditIsMissing$' ./internal/commands/ | Tee-Object -Variable out
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          if (-not ($out | Select-String -SimpleMatch "--- PASS: TestPackageAndroidOwnManifestWarnsTheCreditIsMissing ")) { Write-Output "::error::TestPackageAndroidOwnManifestWarnsTheCreditIsMissing did not PASS (skipped?)"; exit 1 }
 
   cli_static_analysis:
     runs-on: ubuntu-24.04
