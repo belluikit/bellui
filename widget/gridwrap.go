@@ -635,7 +635,7 @@ func (l *gridWrapLayout) getItem() *gridWrapItem {
 			item = newGridWrapItem(child, nil)
 		}
 	}
-	return item.(*gridWrapItem)
+	return matchThemeScope(item.(*gridWrapItem), l.gw)
 }
 
 func (l *gridWrapLayout) offsetUpdated(pos geo.Position) {

@@ -316,10 +316,11 @@ func (r *treeViewContentRenderer) layoutSeparator(st *treeViewLayoutState, addSe
 	}
 	var separator core.CanvasObject
 	if st.separatorCount < len(r.separators) {
-		separator = r.separators[st.separatorCount]
+		// a parked separator missed any override applied since
+		separator = matchThemeScope(r.separators[st.separatorCount], r.treeContent.tree)
 		separator.Show()
 	} else {
-		separator = NewSeparator()
+		separator = matchThemeScope(NewSeparator(), r.treeContent.tree)
 		r.separators = append(r.separators, separator)
 	}
 	separator.Move(geo.NewPos(0, st.y-st.separatorOff))
@@ -579,9 +580,9 @@ func (r *treeViewContentRenderer) getLoadMoreIndicator(parentID TreeViewNodeID) 
 		r.loadMoreIndicators = make(map[TreeViewNodeID]*Activity)
 	}
 	if a, ok := r.loadMoreIndicators[parentID]; ok {
-		return a
+		return matchThemeScope(a, r.treeContent.tree)
 	}
-	a := NewActivity()
+	a := matchThemeScope(NewActivity(), r.treeContent.tree)
 	a.Start()
 	r.loadMoreIndicators[parentID] = a
 	return a
@@ -589,7 +590,7 @@ func (r *treeViewContentRenderer) getLoadMoreIndicator(parentID TreeViewNodeID) 
 
 func (r *treeViewContentRenderer) getItem(isBranch bool) *treeViewItem {
 	if obj := r.itemPool.Get(); obj != nil {
-		return obj.(*treeViewItem)
+		return matchThemeScope(obj.(*treeViewItem), r.treeContent.tree)
 	}
 
 	tree := r.treeContent.tree
@@ -599,12 +600,7 @@ func (r *treeViewContentRenderer) getItem(isBranch bool) *treeViewItem {
 	} else {
 		content = NewLabel("") // default
 	}
-	item := newTreeViewItem(tree, content, isBranch)
-	if !cache.OverrideThemeMatchingScope(item, tree) {
-		return item
-	}
-	item.Refresh()
-	return item
+	return matchThemeScope(newTreeViewItem(tree, content, isBranch), tree)
 }
 
 func (r *treeViewContentRenderer) updateDefaultContent(item *treeViewItem, uid TreeViewNodeID) {
