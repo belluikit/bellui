@@ -142,9 +142,10 @@ jobs:
       # wgpu-native links cleanly only without the host's -fuse-ld=lld / CFLAGS.
       CGO_LDFLAGS: ""
       CGO_CFLAGS: ""
-      # Both legs have an adapter (lavapipe, Metal), so a painter GPU test that
-      # cannot get one fails instead of skipping: a skip prints the same "ok"
-      # as a pass (#449).
+      # Both legs have an adapter (lavapipe, Metal), so a GPU test that cannot
+      # get one, or a windowed test that gets no window or cannot size it,
+      # fails instead of skipping: a skip prints the same "ok" as a pass. An
+      # occluded macOS window still skips (#449, #631).
       BELLUI_REQUIRE_WEBGPU: "1"
     steps:
       - uses: actions/checkout@v7
@@ -256,6 +257,7 @@ jobs:
         env:
           CGO_LDFLAGS: ""
           CGO_CFLAGS: ""
+          BELLUI_REQUIRE_WEBGPU: "1"
         run: go test -v -run TestWindowedSurfaceCapture -count=1 -timeout 120s ./internal/driver/glfw/
 
 
@@ -357,4 +359,5 @@ jobs:
         env:
           CGO_LDFLAGS: ""
           CGO_CFLAGS: ""
+          BELLUI_REQUIRE_WEBGPU: "1"
         run: go test -v -run TestWindowedSurfaceCapture -count=1 -timeout 120s ./internal/driver/glfw/

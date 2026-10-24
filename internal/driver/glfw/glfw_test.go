@@ -3,7 +3,9 @@
 package glfw
 
 import (
+	"fmt"
 	"image"
+	"os"
 	"runtime"
 	"testing"
 	"time"
@@ -31,16 +33,46 @@ func ensureCanvasSize(t *testing.T, w *safeWindow, size geo.Size) {
 	require.Equal(t, size, w.Canvas().Size())
 }
 
+// requireWebGPUEnv names the environment variable CI sets on its GPU legs
+// (#449). There the windowed capture tests fail, rather than skip, when no
+// window can be created, its canvas never reaches the asked size, or a capture
+// comes back empty. An occluded window still skips: hosted macOS runners
+// report one intermittently (#631).
+const requireWebGPUEnv = "BELLUI_REQUIRE_WEBGPU"
+
+// noWindowGPU skips the test because the environment cannot give it a real
+// window to present and capture, or fails it when BELLUI_REQUIRE_WEBGPU=1
+// says the environment promised one. Local runs keep skipping.
+func noWindowGPU(t testing.TB, format string, args ...any) {
+	t.Helper()
+	msg := fmt.Sprintf(format, args...)
+	if os.Getenv(requireWebGPUEnv) == "1" {
+		t.Fatalf("%s=1 but the windowed test cannot run: %s", requireWebGPUEnv, msg)
+	}
+	t.Skipf("%s (set %s=1 to make this a failure)", msg, requireWebGPUEnv)
+}
+
+// windowOrSkip stops the test through noWindowGPU when createWindow gave no
+// real window.
+func windowOrSkip(t testing.TB, w *safeWindow) {
+	t.Helper()
+	if w == nil || w.window == nil {
+		noWindowGPU(t, "no window available (headless / no GPU surface)")
+	}
+}
+
 // captureOrSkip captures w, retrying while Capture returns nil: macOS begins
 // no frame for a window it reports occluded, as it does for a moment after
-// showing one (#309, #631). It skips after two seconds, or on an empty image.
+// showing one (#309, #631). After two seconds it skips, even under
+// BELLUI_REQUIRE_WEBGPU, since that is the occlusion case. An empty image
+// goes through noWindowGPU.
 func captureOrSkip(t *testing.T, w *safeWindow) image.Image {
 	t.Helper()
 	deadline := time.Now().Add(2 * time.Second)
 	for {
 		if img := w.Canvas().Capture(); img != nil {
 			if img.Bounds().Empty() {
-				t.Skip("no capture available (headless / no GPU surface)")
+				noWindowGPU(t, "no capture available (headless / no GPU surface)")
 			}
 			return img
 		}
