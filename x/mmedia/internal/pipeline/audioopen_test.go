@@ -14,7 +14,7 @@ import (
 // it cannot be built.
 func newTestPipeline(t *testing.T, src source.Source) *Pipeline {
 	t.Helper()
-	p, err := newPipelineForSource(src, Config{})
+	p, err := newPipelineForSource(src)
 	if err != nil {
 		t.Fatalf("newPipelineForSource: %v", err)
 	}
@@ -165,7 +165,7 @@ func TestAnOwnedSourceIsClosedWhenConstructionFails(t *testing.T) {
 	src := newAudioSource(44100, 2)
 	src.rateErr = errors.New("swr_init failed")
 
-	if _, err := newOwnedPipeline(src, Config{}); !errors.Is(err, src.rateErr) {
+	if _, err := newOwnedPipeline(src); !errors.Is(err, src.rateErr) {
 		t.Fatalf("newOwnedPipeline error = %v, want it to wrap %v", err, src.rateErr)
 	}
 	if !src.closed {

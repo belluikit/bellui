@@ -36,7 +36,7 @@ type VideoPlayer struct {
 // stream cannot be converted to its format; see the package documentation.
 func NewVideoPlayer(r io.Reader, opts ...Option) (*VideoPlayer, error) {
 	o := buildOptions(opts)
-	pipe, err := pipeline.NewPipeline(r, pipeline.Config{Downmix: o.downmix})
+	pipe, err := pipeline.NewPipeline(r)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +56,7 @@ func NewVideoPlayer(r io.Reader, opts ...Option) (*VideoPlayer, error) {
 // stream cannot be converted to its format; see the package documentation.
 func NewVideoPlayerURL(url string, opts ...Option) (*VideoPlayer, error) {
 	o := buildOptions(opts)
-	pipe, err := pipeline.NewPipelineURL(url, pipeline.Config{Downmix: o.downmix})
+	pipe, err := pipeline.NewPipelineURL(url)
 	if err != nil {
 		return nil, err
 	}

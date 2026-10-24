@@ -247,7 +247,7 @@ func newCapturePlayer(format, url string, opts []Option) (*MediaPlayer, error) {
 	}
 	// No preview URL: a capture device has no timeline to preview along, and
 	// WithScrubPreview is documented as inert rather than an error for one.
-	pipe, err := pipeline.NewPipelineForSource(src, pipeline.Config{Downmix: o.downmix})
+	pipe, err := pipeline.NewPipelineForSource(src)
 	if err != nil {
 		src.Close() // the pipeline did not take it, and nothing else has it
 		return nil, err

@@ -55,7 +55,7 @@ type MediaPlayer struct {
 // stream cannot be converted to its format; see the package documentation.
 func NewMediaPlayer(r io.Reader, opts ...Option) (*MediaPlayer, error) {
 	o := buildOptions(opts)
-	pipe, err := pipeline.NewPipeline(r, pipeline.Config{Downmix: o.downmix})
+	pipe, err := pipeline.NewPipeline(r)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +98,7 @@ func reopenableURL(r io.Reader) string {
 // stream cannot be converted to its format; see the package documentation.
 func NewMediaPlayerURL(url string, opts ...Option) (*MediaPlayer, error) {
 	o := buildOptions(opts)
-	pipe, err := pipeline.NewPipelineURL(url, pipeline.Config{Downmix: o.downmix})
+	pipe, err := pipeline.NewPipelineURL(url)
 	if err != nil {
 		return nil, err
 	}

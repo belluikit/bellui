@@ -131,7 +131,7 @@ type timedFrame struct {
 // implements io.Seeker, seeking and duration work; a plain stream is
 // forward-only. When r is an *os.File the path is handed to FFmpeg directly,
 // which avoids bouncing every byte through a Go callback.
-func NewPipeline(r io.Reader, cfg ...Config) (*Pipeline, error) {
+func NewPipeline(r io.Reader) (*Pipeline, error) {
 	if r == nil {
 		return nil, fmt.Errorf("nil reader")
 	}
@@ -139,7 +139,7 @@ func NewPipeline(r io.Reader, cfg ...Config) (*Pipeline, error) {
 	if f, ok := r.(*os.File); ok {
 		if _, err := f.Seek(0, io.SeekStart); err == nil {
 			if src, err := source.NewFFmpegSourceURL(f.Name()); err == nil {
-				return newOwnedPipeline(src, firstConfig(cfg))
+				return newOwnedPipeline(src)
 			}
 			// Fall through to the reader path — the file may not be
 			// reachable by name (unlinked, or an inherited descriptor).
@@ -153,23 +153,23 @@ func NewPipeline(r io.Reader, cfg ...Config) (*Pipeline, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newOwnedPipeline(src, firstConfig(cfg))
+	return newOwnedPipeline(src)
 }
 
 // NewPipelineURL creates a playback pipeline from a file path or network URL
 // (http and https are compiled in), letting FFmpeg own the I/O.
-func NewPipelineURL(url string, cfg ...Config) (*Pipeline, error) {
+func NewPipelineURL(url string) (*Pipeline, error) {
 	src, err := source.NewFFmpegSourceURL(url)
 	if err != nil {
 		return nil, err
 	}
-	return newOwnedPipeline(src, firstConfig(cfg))
+	return newOwnedPipeline(src)
 }
 
 // newOwnedPipeline builds a pipeline around a source this package opened, and
 // closes the source if the pipeline cannot be built, since no caller has it.
-func newOwnedPipeline(src source.Source, cfg Config) (*Pipeline, error) {
-	p, err := newPipelineForSource(src, cfg)
+func newOwnedPipeline(src source.Source) (*Pipeline, error) {
+	p, err := newPipelineForSource(src)
 	if err != nil {
 		src.Close()
 		return nil, err
@@ -185,20 +185,6 @@ func newOwnedPipeline(src source.Source, cfg Config) (*Pipeline, error) {
 //
 // The resulting pipeline reports IsLive: Seek is refused, and the end of the
 // stream is reported through OnError rather than OnEnd.
-
-// Config tunes playback behaviour that cannot be inferred from the media.
-type Config struct {
-	// Downmix folds multichannel audio (5.1/7.1) to stereo. When false the
-	// stream's native layout is preserved, as far as the audio device allows.
-	Downmix bool
-}
-
-func firstConfig(cfg []Config) Config {
-	if len(cfg) > 0 {
-		return cfg[0]
-	}
-	return Config{}
-}
 
 // newAudioOutput is audio.NewOutput, a variable so a test can build a pipeline
 // with audio on a machine with no device, or make the device refuse to open.
@@ -224,7 +210,7 @@ func SetAudioOutputForTests(open func(channels int) (*audio.Output, error)) (res
 // On failure it leaves src open, for the caller to close; nothing else it
 // built needs releasing, since no goroutine starts before Play and the device
 // itself is the process's.
-func newPipelineForSource(src source.Source, cfg Config) (*Pipeline, error) {
+func newPipelineForSource(src source.Source) (*Pipeline, error) {
 	p := &Pipeline{
 		clock:    NewClock(),
 		state:    NewStateMachine(nil),
@@ -234,7 +220,7 @@ func newPipelineForSource(src source.Source, cfg Config) (*Pipeline, error) {
 	}
 
 	if p.hasAudio {
-		out, err := newAudioOutput(deviceChannels(src.Channels(), cfg.Downmix))
+		out, err := newAudioOutput(deviceChannels())
 		if err != nil {
 			return nil, err
 		}
@@ -248,17 +234,71 @@ func newPipelineForSource(src source.Source, cfg Config) (*Pipeline, error) {
 	return p, nil
 }
 
-// deviceChannels is the channel count a pipeline asks the audio device for:
-// stereo, unless the stream is surround (any layout above stereo) and the
-// caller did not ask for a downmix, when it is the stream's own layout. Only the first Output in the
-// process opens the device, so only its request takes effect. Mono is played
-// as stereo, so a mono stream first no longer makes every later one mono
-// (#506).
-func deviceChannels(stream int, downmix bool) int {
-	if !downmix && stream > 2 {
-		return stream
+// audioDevice is the channel count the audio device is opened with, and
+// whether that is settled. The device is the process's (oto allows one), so
+// this is too.
+var audioDevice struct {
+	mu       sync.Mutex
+	channels int  // 0 until SetDeviceChannels: stereo
+	fixed    bool // a pipeline with audio has asked for the device
+}
+
+// deviceChannels is the channel count a pipeline asks the audio device for,
+// and the channel policy (#707): stereo, unless the app asked for another
+// count with SetDeviceChannels before the first pipeline with audio. The
+// stream's own layout plays no part. Every stream is converted to the device's
+// channels by its decoder's swresample, so 5.1 and 7.1 are downmixed to stereo
+// by default, and mono plays on both channels.
+//
+// It used to open at the layout of the first stream when that was surround
+// (#506). A stereo-only device refusing 6 channels then failed the open, and
+// because the device opens once per process, every later player with audio
+// failed too, stereo ones included, until the app restarted (#707). Surround
+// output is now the app's choice, made knowing its device, not a side effect
+// of what happened to play first.
+//
+// Calling it settles the count: SetDeviceChannels refuses a different one from
+// then on, because the device about to be opened with it cannot be reopened.
+func deviceChannels() int {
+	audioDevice.mu.Lock()
+	defer audioDevice.mu.Unlock()
+	audioDevice.fixed = true
+	if audioDevice.channels > 0 {
+		return audioDevice.channels
 	}
-	return 2
+	return stereo
+}
+
+// stereo is the device's channel count unless the app asks for another.
+const stereo = 2
+
+// SetDeviceChannels sets the channel count the audio device is opened with,
+// in place of stereo: 6 for 5.1, 8 for 7.1. Streams with fewer channels are
+// upmixed to it and streams with more downmixed, by swresample.
+//
+// It must be called before the first pipeline with audio is built, since that
+// opens the device, once for the process. After that it returns an error unless
+// n is the count already in use; it never changes the device silently. n must
+// be positive. A device that refuses n fails every pipeline with audio, the
+// first one's error repeated (audio.NewOutput).
+func SetDeviceChannels(n int) error {
+	if n <= 0 {
+		return fmt.Errorf("audio device channels must be positive, not %d", n)
+	}
+	audioDevice.mu.Lock()
+	defer audioDevice.mu.Unlock()
+	if audioDevice.fixed {
+		cur := audioDevice.channels
+		if cur <= 0 {
+			cur = stereo
+		}
+		if n != cur {
+			return fmt.Errorf("audio device channels: already %d, cannot change to %d: the device was opened by the first player with audio, and a process has one", cur, n)
+		}
+		return nil
+	}
+	audioDevice.channels = n
+	return nil
 }
 
 // NewPipelineForSource assembles a pipeline around an already-created source.
@@ -270,8 +310,8 @@ func deviceChannels(stream int, downmix bool) int {
 // It returns an error when the source has audio and the audio device cannot
 // be opened, or the source cannot be converted to the device's format. The
 // source is then left open, and the caller still owns it.
-func NewPipelineForSource(src source.Source, cfg ...Config) (*Pipeline, error) {
-	return newPipelineForSource(src, firstConfig(cfg))
+func NewPipelineForSource(src source.Source) (*Pipeline, error) {
+	return newPipelineForSource(src)
 }
 
 // adoptSource makes src the pipeline's source: it takes the geometry, timing
@@ -648,8 +688,8 @@ var ErrSwapMedia = errors.New("mmedia: the replacement source does not carry the
 //     expects.
 //   - The frame pool is rebuilt when the geometry moves, and only then.
 //   - The audio format is asked of the new source, not of the device. The
-//     device is opened once per process, at DeviceSampleRate and the channel
-//     count the first stream chose, and cannot change, so the new source's
+//     device is opened once per process, at DeviceSampleRate and
+//     deviceChannels, and cannot change, so the new source's
 //     decoder is asked to convert to both. A source that cannot convert is
 //     refused, before anything is torn down, like one of the wrong shape.
 //

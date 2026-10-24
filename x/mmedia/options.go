@@ -9,7 +9,6 @@ type options struct {
 	autoPlay bool
 	loop     bool
 	volume   float64
-	downmix  bool // if true, multichannel audio is downmixed to stereo
 	onEnd    func()
 	onError  func(error)
 	onTime   func(current, total time.Duration)
@@ -126,12 +125,13 @@ func WithOnTimeUpdate(f func(current, total time.Duration)) Option {
 	}
 }
 
-// WithDownmix forces multichannel audio (5.1/7.1) to be downmixed to stereo.
-// Without this option the stream's native channel layout is passed through,
-// provided the audio device accepts it — the device is opened once per process,
-// so a later stream is downmixed to whatever the first one established.
+// WithDownmix asked for multichannel audio (5.1/7.1) to be downmixed to stereo.
+//
+// Deprecated: it has no effect. The audio device is stereo unless the app
+// calls [SetAudioDeviceChannels], and every stream is converted to the
+// device's channels, so surround is downmixed to stereo without this option
+// (#707). An app that wants surround output calls SetAudioDeviceChannels
+// before its first player.
 func WithDownmix() Option {
-	return func(o *options) {
-		o.downmix = true
-	}
+	return func(*options) {}
 }

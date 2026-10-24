@@ -20,8 +20,9 @@ import (
 // boundaries (#506, #582).
 const DeviceSampleRate = 48000
 
-// defaultChannels is the device's channel count unless the first stream is
-// surround and asks for more.
+// defaultChannels is the device's channel count when the caller asks for none.
+// The pipeline's deviceChannels is the policy: stereo unless the app set
+// another count (#707).
 const defaultChannels = 2
 
 // Output manages audio playback via ebitengine/oto.

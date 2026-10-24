@@ -32,7 +32,7 @@ type AudioPlayer struct {
 // stream cannot be converted to its format; see the package documentation.
 func NewAudioPlayer(r io.Reader, opts ...Option) (*AudioPlayer, error) {
 	o := buildOptions(opts)
-	pipe, err := pipeline.NewPipeline(r, pipeline.Config{Downmix: o.downmix})
+	pipe, err := pipeline.NewPipeline(r)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +52,7 @@ func NewAudioPlayer(r io.Reader, opts ...Option) (*AudioPlayer, error) {
 // stream cannot be converted to its format; see the package documentation.
 func NewAudioPlayerURL(url string, opts ...Option) (*AudioPlayer, error) {
 	o := buildOptions(opts)
-	pipe, err := pipeline.NewPipelineURL(url, pipeline.Config{Downmix: o.downmix})
+	pipe, err := pipeline.NewPipelineURL(url)
 	if err != nil {
 		return nil, err
 	}

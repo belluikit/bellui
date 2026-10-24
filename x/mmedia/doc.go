@@ -34,6 +34,12 @@
 // opened once per process, so once it has failed to open, every later player
 // with audio gets the same error.
 //
+// The audio device plays 48 kHz stereo, whatever the stream: each stream's
+// decoder converts to it, so 5.1 and 7.1 are downmixed to stereo and mono plays
+// on both channels. An app that wants surround output calls
+// [SetAudioDeviceChannels] before its first player with audio; after that the
+// device's format is fixed and the call returns an error.
+//
 // [NewVideoPlayer] and [NewAudioPlayer] expose the single-medium widgets, and
 // [NewSubtitleOverlay] renders SRT or WebVTT tracks over a player;
 // [MediaPlayerWithSubtitles] wires the two together so the overlay follows
