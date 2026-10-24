@@ -58,15 +58,38 @@ type Config struct {
 	// top to bottom. Series, tooltips, zoom and pan all follow it.
 	Inverse bool
 
-	// The four Show* switches are not applied yet: the renderer always draws
-	// the axis line, tick labels and, for the first Y axis, the grid lines,
-	// whatever they say. Their zero value is false, so honouring them as
-	// declared would strip the axes from every Config written as a literal;
-	// how to make them work without that break is #684.
-	ShowLine      bool // draw the axis line (default true); not applied yet, see #684
-	ShowTicks     bool // draw tick marks (default true); not applied yet, see #684
-	ShowLabels    bool // draw tick labels (default true); not applied yet, see #684
-	ShowSplitLine bool // draw grid lines at ticks (default true for Y, false for X); not applied yet, see #684
+	// Hide hides parts of the axis. Its zero value hides nothing, so a Config
+	// written as a literal draws the whole axis.
+	Hide Parts
+	// SplitLine says whether the axis draws grid lines across the plot at its
+	// ticks. SplitLineAuto, the zero value, draws them for the first Y axis
+	// only: not for the X axis and not for any further Y axis. SplitLineShow
+	// and SplitLineHide turn them on or off for this axis.
+	SplitLine SplitLine
+	// Offset moves the axis this many pixels outward from the plot edge it is
+	// drawn along: down for a bottom X axis, up for a top one, left for a
+	// left Y axis and right for a right one (ECharts xAxis/yAxis offset). Its
+	// line, ticks, labels and name all move with it, and the chart makes room
+	// for it, so an offset axis stays inside the chart. Use it to place
+	// several Y axes side by side on one side: for a right-hand Y axis, an
+	// Offset of 60 or more clears the labels of one at 0, and for a left-hand
+	// one an Offset of the chart's left grid margin (Grid.Left) or more does.
+	// Negative values count as 0.
+	Offset float32
+
+	// Deprecated: Use Hide.Line. ShowLine was never applied, and its zero
+	// value, false, would hide the axis line of every Config written as a
+	// literal; it has no effect.
+	ShowLine bool
+	// Deprecated: Use Hide.Ticks. ShowTicks was never applied; it has no
+	// effect.
+	ShowTicks bool
+	// Deprecated: Use Hide.Labels. ShowLabels was never applied; it has no
+	// effect.
+	ShowLabels bool
+	// Deprecated: Use SplitLine. ShowSplitLine was never applied; it has no
+	// effect.
+	ShowSplitLine bool
 
 	// LineColor colours the axis line and tick marks; nil uses the theme's
 	// axis colour. Grid lines keep the theme's grid colour.
@@ -79,7 +102,11 @@ type Config struct {
 	TimeFormat string // Go time format for labels
 }
 
-// DefaultConfig returns a Config with sensible defaults.
+// DefaultConfig returns a Config with sensible defaults: SplitCount 5, with
+// Hide, SplitLine and Offset at their zero values, so it draws the same axis
+// as a literal Config of the same Type. It still sets the deprecated Show*
+// fields as it always did (all true, ShowSplitLine for the value, log and time
+// types), for code that reads them; the renderer does not.
 func DefaultConfig(t Type) Config {
 	return Config{
 		Type:          t,
@@ -90,6 +117,27 @@ func DefaultConfig(t Type) Config {
 		ShowSplitLine: t == TypeValue || t == TypeLog || t == TypeTime,
 	}
 }
+
+// Parts lists the parts of an axis to hide; each true field hides one. The
+// zero value hides nothing.
+type Parts struct {
+	Line   bool // the axis line
+	Ticks  bool // the tick marks; a left-hand Y axis draws none
+	Labels bool // the tick labels (the axis Name stays; leave it empty to drop it)
+}
+
+// SplitLine says whether an axis draws grid lines at its ticks.
+type SplitLine int
+
+const (
+	// SplitLineAuto draws grid lines for the first Y axis only.
+	SplitLineAuto SplitLine = iota
+	// SplitLineShow draws grid lines at this axis's ticks: horizontal for a
+	// Y axis, vertical for an X axis.
+	SplitLineShow
+	// SplitLineHide draws no grid lines for this axis.
+	SplitLineHide
+)
 
 // Scale maps data values to a normalized [0, 1] range and back.
 type Scale interface {
