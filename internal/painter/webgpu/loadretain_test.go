@@ -28,12 +28,12 @@ func TestLoadOpRetainsAcrossSubmits(t *testing.T) {
 	defer instance.Release()
 	adapter, err := instance.RequestAdapter(nil)
 	if err != nil {
-		t.Skipf("no WebGPU adapter: %v", err)
+		noGPU(t, "no WebGPU adapter: %v", err)
 	}
 	defer adapter.Release()
 	device, err := adapter.RequestDevice(nil)
 	if err != nil {
-		t.Skipf("no WebGPU device: %v", err)
+		noGPU(t, "no WebGPU device: %v", err)
 	}
 	defer device.Release()
 	queue := device.GetQueue()

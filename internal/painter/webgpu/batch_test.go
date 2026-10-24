@@ -41,12 +41,12 @@ func newBatchPainter(t *testing.T) *batchPainter {
 	t.Cleanup(instance.Release)
 	adapter, err := instance.RequestAdapter(nil)
 	if err != nil {
-		t.Skipf("no WebGPU adapter available: %v", err)
+		noGPU(t, "no WebGPU adapter available: %v", err)
 	}
 	t.Cleanup(adapter.Release)
 	device, err := adapter.RequestDevice(nil)
 	if err != nil {
-		t.Skipf("no WebGPU device available: %v", err)
+		noGPU(t, "no WebGPU device available: %v", err)
 	}
 	d := &Device{
 		device:        device,

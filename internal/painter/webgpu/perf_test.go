@@ -42,13 +42,13 @@ func benchRawDevice(b *testing.B) (*wgpu.Device, *wgpu.Queue) {
 	adapter, err := instance.RequestAdapter(nil)
 	if err != nil {
 		instance.Release()
-		b.Skipf("no WebGPU adapter available: %v", err)
+		noGPU(b, "no WebGPU adapter available: %v", err)
 	}
 	device, err := adapter.RequestDevice(nil)
 	if err != nil {
 		adapter.Release()
 		instance.Release()
-		b.Skipf("no WebGPU device available: %v", err)
+		noGPU(b, "no WebGPU device available: %v", err)
 	}
 	queue := device.GetQueue()
 	b.Cleanup(func() {

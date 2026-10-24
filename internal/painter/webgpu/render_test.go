@@ -33,12 +33,12 @@ func TestOffscreenRenderReadback(t *testing.T) {
 	defer instance.Release()
 	adapter, err := instance.RequestAdapter(nil)
 	if err != nil {
-		t.Skipf("no WebGPU adapter available: %v", err)
+		noGPU(t, "no WebGPU adapter available: %v", err)
 	}
 	defer adapter.Release()
 	device, err := adapter.RequestDevice(nil)
 	if err != nil {
-		t.Skipf("no WebGPU device available: %v", err)
+		noGPU(t, "no WebGPU device available: %v", err)
 	}
 	defer device.Release()
 	queue := device.GetQueue()
@@ -194,12 +194,12 @@ func TestRippleRenderReadback(t *testing.T) {
 	defer instance.Release()
 	adapter, err := instance.RequestAdapter(nil)
 	if err != nil {
-		t.Skipf("no WebGPU adapter available: %v", err)
+		noGPU(t, "no WebGPU adapter available: %v", err)
 	}
 	defer adapter.Release()
 	device, err := adapter.RequestDevice(nil)
 	if err != nil {
-		t.Skipf("no WebGPU device available: %v", err)
+		noGPU(t, "no WebGPU device available: %v", err)
 	}
 	defer device.Release()
 	queue := device.GetQueue()
@@ -372,12 +372,12 @@ func runStencilReadback(t *testing.T, maskMode, fillMode StencilMode, ref uint32
 	defer instance.Release()
 	adapter, err := instance.RequestAdapter(nil)
 	if err != nil {
-		t.Skipf("no WebGPU adapter available: %v", err)
+		noGPU(t, "no WebGPU adapter available: %v", err)
 	}
 	defer adapter.Release()
 	device, err := adapter.RequestDevice(nil)
 	if err != nil {
-		t.Skipf("no WebGPU device available: %v", err)
+		noGPU(t, "no WebGPU device available: %v", err)
 	}
 	defer device.Release()
 	queue := device.GetQueue()
@@ -550,12 +550,12 @@ func TestScene3DRenderReadback(t *testing.T) {
 	defer instance.Release()
 	adapter, err := instance.RequestAdapter(nil)
 	if err != nil {
-		t.Skipf("no WebGPU adapter available: %v", err)
+		noGPU(t, "no WebGPU adapter available: %v", err)
 	}
 	defer adapter.Release()
 	device, err := adapter.RequestDevice(nil)
 	if err != nil {
-		t.Skipf("no WebGPU device available: %v", err)
+		noGPU(t, "no WebGPU device available: %v", err)
 	}
 	defer device.Release()
 	queue := device.GetQueue()
@@ -749,12 +749,12 @@ func runSceneStencilIsolation(t *testing.T, dedicated bool) (center, corner [4]b
 	defer instance.Release()
 	adapter, err := instance.RequestAdapter(nil)
 	if err != nil {
-		t.Skipf("no WebGPU adapter available: %v", err)
+		noGPU(t, "no WebGPU adapter available: %v", err)
 	}
 	defer adapter.Release()
 	device, err := adapter.RequestDevice(nil)
 	if err != nil {
-		t.Skipf("no WebGPU device available: %v", err)
+		noGPU(t, "no WebGPU device available: %v", err)
 	}
 	defer device.Release()
 	queue := device.GetQueue()
