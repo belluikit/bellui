@@ -1,8 +1,10 @@
 package commands
 
 import (
+	"archive/zip"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -154,4 +156,128 @@ func TestReleaserZipAlign(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "original", string(data))
 	assert.NoFileExists(t, filepath.Join(dir, "unaligned.apk"))
+}
+
+// Passwords holding the characters cmd.exe and shells treat specially.
+const (
+	testStorePass = "st0re%PATH%!pw"
+	testKeyPass   = "k3y^\"pw"
+)
+
+// No signer gets a password on its command line, where the process list
+// shows it; both read them from variables set on the child (#729, #674).
+func TestReleaserAndroidSignCommandHidesPasswords(t *testing.T) {
+	fakeAndroidSDK(t)
+	for _, distribution := range []bool{true, false} {
+		r := &Releaser{
+			Packager:     Packager{distribution: distribution},
+			keyStore:     "release.keystore",
+			keyStorePass: testStorePass,
+			keyName:      "app",
+			keyPass:      testKeyPass,
+		}
+		cmd, err := r.androidSignCommand("app.aab")
+		require.NoError(t, err)
+		for _, a := range cmd.Args {
+			assert.NotContains(t, a, "st0re", "distribution=%v", distribution)
+			assert.NotContains(t, a, "k3y", "distribution=%v", distribution)
+		}
+		assert.Contains(t, cmd.Env, "BELLUI_KEYSTORE_PASS="+testStorePass)
+		assert.Contains(t, cmd.Env, "BELLUI_KEY_PASS="+testKeyPass)
+		if distribution {
+			assert.Equal(t, []string{
+				"jarsigner", "-keystore", "release.keystore",
+				"-storepass:env", "BELLUI_KEYSTORE_PASS", "-keypass:env", "BELLUI_KEY_PASS",
+				"app.aab", "app",
+			}, cmd.Args)
+		}
+	}
+}
+
+// The signing step of `bellui release -os android`, run against a fake
+// zipalign and a fake jarsigner: the bundle is aligned in place, then signed
+// with the passwords passed through the environment only.
+func TestReleaserAfterPackageAndroid(t *testing.T) {
+	log := fakeAndroidSDK(t)
+	dir := t.TempDir()
+	r := &Releaser{
+		Packager: Packager{
+			appData:      &appData{Name: "My App"},
+			os:           "android",
+			dir:          dir,
+			distribution: true,
+		},
+		keyStore:     filepath.Join(dir, "release.keystore"),
+		keyStorePass: testStorePass,
+		keyName:      "app",
+		keyPass:      testKeyPass,
+	}
+	pkg := filepath.Join(dir, "My_App.aab")
+	require.NoError(t, os.WriteFile(pkg, []byte("bundle"), 0o644))
+
+	require.NoError(t, r.afterPackage())
+
+	assert.Equal(t, []string{"16", filepath.Join(dir, "unaligned.apk"), pkg}, readFakeToolLog(t, log, "zipalign.args"))
+	assert.Equal(t, []string{
+		"-keystore", r.keyStore,
+		"-storepass:env", "BELLUI_KEYSTORE_PASS", "-keypass:env", "BELLUI_KEY_PASS",
+		pkg, "app",
+	}, readFakeToolLog(t, log, "jarsigner.args"))
+	assert.Equal(t, []string{
+		"BELLUI_KEYSTORE_PASS=" + testStorePass, "BELLUI_KEY_PASS=" + testKeyPass,
+	}, readFakeToolLog(t, log, "jarsigner.env"))
+	assert.Empty(t, os.Getenv("BELLUI_KEYSTORE_PASS"), "the password is set on the child only")
+	data, err := os.ReadFile(pkg)
+	require.NoError(t, err)
+	assert.Equal(t, "bundle", string(data))
+	assert.NoFileExists(t, filepath.Join(dir, "unaligned.apk"))
+}
+
+// The distribution signing command run with the JDK's own jarsigner, on a
+// keystore made for the test: jarsigner reads both passwords from the
+// variables, characters cmd.exe and shells would alter included. The Windows
+// CLI leg requires this test to PASS, so a JDK missing there fails the leg.
+func TestReleaserSignsWithJarsigner(t *testing.T) {
+	keytool, err := exec.LookPath("keytool")
+	if err != nil {
+		t.Skip("no JDK keytool on PATH")
+	}
+	jarsigner, err := exec.LookPath("jarsigner")
+	if err != nil {
+		t.Skip("no JDK jarsigner on PATH")
+	}
+	dir := t.TempDir()
+	r := &Releaser{
+		Packager:     Packager{distribution: true},
+		keyStore:     filepath.Join(dir, "release.keystore"),
+		keyStorePass: testStorePass,
+		keyName:      "app",
+		keyPass:      testKeyPass,
+	}
+	gen := exec.Command(keytool, "-genkeypair", "-keystore", r.keyStore, "-storetype", "JKS",
+		"-storepass:env", "BELLUI_KEYSTORE_PASS", "-keypass:env", "BELLUI_KEY_PASS",
+		"-alias", r.keyName, "-keyalg", "RSA", "-keysize", "2048", "-validity", "1", "-dname", "CN=bellui test")
+	gen.Env = append(os.Environ(), "BELLUI_KEYSTORE_PASS="+testStorePass, "BELLUI_KEY_PASS="+testKeyPass)
+	out, err := gen.CombinedOutput()
+	require.NoError(t, err, string(out))
+
+	pkg := filepath.Join(dir, "My_App.aab")
+	f, err := os.Create(pkg)
+	require.NoError(t, err)
+	zw := zip.NewWriter(f)
+	w, err := zw.Create("base/manifest/AndroidManifest.xml")
+	require.NoError(t, err)
+	_, err = w.Write([]byte("manifest"))
+	require.NoError(t, err)
+	require.NoError(t, zw.Close())
+	require.NoError(t, f.Close())
+
+	cmd, err := r.androidSignCommand(pkg)
+	require.NoError(t, err)
+	out, err = cmd.CombinedOutput()
+	require.NoError(t, err, string(out))
+
+	out, err = exec.Command(jarsigner, "-verify", pkg).CombinedOutput()
+	require.NoError(t, err, string(out))
+	assert.Contains(t, string(out), "jar verified.")
 }
