@@ -109,3 +109,68 @@ func TestGroupTransform_ExpandCollapseAll(t *testing.T) {
 		t.Errorf("expected 6 rows after expand all, got %d", len(result))
 	}
 }
+
+// Group header rows carry the configured aggregates, computed over every row in
+// the group — including a collapsed group, whose children are not emitted (#689).
+func TestGroupTransform_AggValues(t *testing.T) {
+	data := []any{
+		map[string]any{"dept": "A", "salary": 100.0},
+		map[string]any{"dept": "B", "salary": 50.0},
+		map[string]any{"dept": "A", "salary": 300.0},
+		map[string]any{"dept": "B", "salary": 70.0},
+		map[string]any{"dept": "B", "salary": 90.0},
+	}
+	src := NewSliceSource(data)
+	salary := func(row any) float64 { return row.(map[string]any)["salary"].(float64) }
+	gt := NewGroupTransform("dept", func(row any) any {
+		return row.(map[string]any)["dept"]
+	})
+	gt.AggColumns = []AggColumn{
+		{Field: "sum", ValueGetter: salary, Func: AggSum},
+		{Field: "avg", ValueGetter: salary, Func: AggAvg},
+		{Field: "count", ValueGetter: salary, Func: AggCount},
+	}
+	gt.ToggleGroup("B") // B collapsed: only its header is emitted
+
+	result := gt.Apply([]int{0, 1, 2, 3, 4}, src)
+	if len(result) != 4 { // A header, 2 A rows, B header
+		t.Fatalf("got %d rows, want 4 (A expanded, B collapsed)", len(result))
+	}
+
+	want := map[string]map[string]any{
+		"A": {"sum": 400.0, "avg": 200.0, "count": 2.0},
+		"B": {"sum": 210.0, "avg": 70.0, "count": 3.0},
+	}
+	headers := 0
+	for _, gr := range gt.GroupRows {
+		if !gr.IsGroup {
+			if gr.AggValues != nil {
+				t.Errorf("data row %d has AggValues %v, want nil", gr.SourceIndex, gr.AggValues)
+			}
+			continue
+		}
+		headers++
+		w := want[gr.GroupKey.(string)]
+		for k, v := range w {
+			if gr.AggValues[k] != v {
+				t.Errorf("group %v %s = %v, want %v", gr.GroupKey, k, gr.AggValues[k], v)
+			}
+		}
+		if gr.GroupKey == "B" && gr.Expanded {
+			t.Error("group B should be collapsed")
+		}
+	}
+	if headers != 2 {
+		t.Fatalf("got %d group headers, want 2", headers)
+	}
+}
+
+// Without AggColumns, header rows keep AggValues nil.
+func TestGroupTransform_NoAggColumns(t *testing.T) {
+	src := NewSliceSource([]any{map[string]any{"dept": "A"}})
+	gt := NewGroupTransform("dept", func(row any) any { return row.(map[string]any)["dept"] })
+	gt.Apply([]int{0}, src)
+	if gt.GroupRows[0].AggValues != nil {
+		t.Errorf("AggValues = %v, want nil without AggColumns", gt.GroupRows[0].AggValues)
+	}
+}
