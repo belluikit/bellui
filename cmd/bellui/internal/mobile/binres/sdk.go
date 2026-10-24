@@ -102,12 +102,32 @@ func platformAPILevel(name string) (int, bool) {
 	return level, true
 }
 
+// platformRelease returns the API level and minor release of a numbered
+// platforms/ directory: "android-36" is (36, 0) and the minor release
+// "android-36.1" (Android 16 QPR2, a stable platform) is (36, 1). Anything else
+// — previews, extension SDKs ("android-36-ext4"), stray names — is not
+// numbered.
+func platformRelease(name string) (level, minor int, ok bool) {
+	major, rest, hasMinor := strings.Cut(name, ".")
+	level, ok = platformAPILevel(major)
+	if !ok || !hasMinor {
+		return level, 0, ok
+	}
+	minor, err := strconv.Atoi(rest)
+	if err != nil || minor < 0 || strings.ContainsAny(rest, "+-") {
+		return 0, 0, false
+	}
+	return level, minor, true
+}
+
 // LatestAPIResourcesPath returns the android.jar of the newest installed SDK
 // platform, by numeric API level — a lexical sort would rank android-9 above
-// android-36 (#296). Platform directories without a numeric level (previews,
-// extension SDKs) are deliberately ordered behind every numbered release and
-// compared lexically among themselves, so one is only picked when nothing
-// numbered is installed.
+// android-36 (#296). A minor release android-NN.M counts as numbered and ranks
+// just after android-NN, so android-36.1 beats android-36 and android-35, and
+// android-36.2 beats android-36.1 (#674). Platform directories without a
+// numeric level (previews, extension SDKs such as android-36-ext4) are
+// deliberately ordered behind every numbered release and compared lexically
+// among themselves, so one is only picked when nothing numbered is installed.
 func LatestAPIResourcesPath() (string, error) {
 	sdkdir := os.Getenv("ANDROID_HOME")
 	if sdkdir == "" {
@@ -119,7 +139,7 @@ func LatestAPIResourcesPath() (string, error) {
 		return "", err
 	}
 
-	maxSDK, maxLevel := "", 0
+	maxSDK, maxLevel, maxMinor := "", 0, 0
 	for _, d := range dir {
 		// A platform is a directory; a stray file named like one is not a
 		// platform. ReadDir does not follow symlinks, so a symlinked platform
@@ -131,10 +151,10 @@ func LatestAPIResourcesPath() (string, error) {
 		if !strings.HasPrefix(name, "android-") {
 			continue
 		}
-		level, numeric := platformAPILevel(name)
+		level, minor, numeric := platformRelease(name)
 		switch {
-		case numeric && level > maxLevel:
-			maxSDK, maxLevel = name, level
+		case numeric && (level > maxLevel || level == maxLevel && minor > maxMinor):
+			maxSDK, maxLevel, maxMinor = name, level, minor
 		case !numeric && maxLevel == 0 && name > maxSDK:
 			maxSDK = name
 		}
