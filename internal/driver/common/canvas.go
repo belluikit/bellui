@@ -845,7 +845,11 @@ func (c *Canvas) SetDirection(d bellui.Direction) {
 	c.layoutDir = d
 	if c.impl != nil {
 		if content := c.impl.Content(); content != nil {
+			// The refresh re-lays-out outside the layout walk, so it must
+			// run under the new direction, not the global one (#696).
+			uidir.Push(d)
 			content.Refresh()
+			uidir.Pop(d)
 		}
 	}
 	async.EnsureMain(c.SetDirty)
