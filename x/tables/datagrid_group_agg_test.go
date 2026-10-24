@@ -122,12 +122,50 @@ func TestAggNumber(t *testing.T) {
 		{uint16(7), 7},
 		{float32(1.5), 1.5},
 		{cents(250), 250},
-		{"12", 0},
-		{nil, 0},
-		{true, 0},
 	} {
-		if got := aggNumber(c.v); got != c.want {
-			t.Errorf("aggNumber(%#v) = %v, want %v", c.v, got, c.want)
+		if got, ok := aggNumber(c.v); got != c.want || !ok {
+			t.Errorf("aggNumber(%#v) = %v, %v, want %v, true", c.v, got, ok, c.want)
 		}
+	}
+	for _, v := range []any{"12", "", nil, true} {
+		if _, ok := aggNumber(v); ok {
+			t.Errorf("aggNumber(%#v) reports a value, want blank", v)
+		}
+	}
+}
+
+// Blank and non-numeric cells are skipped: 10, 20 and a blank average 15 with
+// min 10 and max 20, while count counts all 3 rows; a group whose cells are all
+// blank leaves avg/min/max empty and sums to 0 (#747).
+func TestDataGrid_GroupAggregatesSkipBlanks(t *testing.T) {
+	data := []map[string]any{
+		{"dept": "A", "v": 10, "a": 10, "lo": 10, "hi": 10, "s": 10},
+		{"dept": "A", "v": 20, "a": 20, "lo": 20, "hi": 20, "s": 20},
+		{"dept": "A", "v": nil, "a": "", "lo": nil, "hi": "n/a", "s": nil},
+		{"dept": "B", "v": nil, "a": nil, "lo": "", "hi": nil, "s": nil},
+	}
+	g := newTestGrid(t, data, []*ColumnDef{
+		{Field: "dept"},
+		{Field: "v", AggFunc: bellui.Ptr(pipeline.AggCount)},
+		{Field: "a", AggFunc: bellui.Ptr(pipeline.AggAvg)},
+		{Field: "lo", AggFunc: bellui.Ptr(pipeline.AggMin)},
+		{Field: "hi", AggFunc: bellui.Ptr(pipeline.AggMax)},
+		{Field: "s", AggFunc: bellui.Ptr(pipeline.AggSum)},
+	})
+	g.API().SetRowGroupColumn("dept")
+	texts := func(row int) map[int]string {
+		out := map[int]string{}
+		for _, a := range g.GroupRowAggregates(row) {
+			out[a.Col] = a.Text
+		}
+		return out
+	}
+	// Display columns: dept 0, v 1, a 2, lo 3, hi 4, s 5. Row 0 is A's header,
+	// row 4 B's (A's three data rows lie between).
+	if got, want := texts(0), map[int]string{1: "3", 2: "15", 3: "10", 4: "20", 5: "30"}; fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Errorf("group A aggregates = %v, want %v", got, want)
+	}
+	if got, want := texts(4), map[int]string{1: "1", 5: "0"}; fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Errorf("all-blank group B aggregates = %v, want %v", got, want)
 	}
 }
