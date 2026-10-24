@@ -179,6 +179,7 @@ func (r *chartRenderer) refreshInteractive() {
 	tooltipState := r.chart.tooltipState
 	brushState := r.chart.brushState
 	drawingGesture := r.chart.drawingGesture
+	capturing := r.chart.capturing
 	r.chart.mu.RUnlock()
 
 	// Create theme resolver (cheap — reads theme colors).
@@ -215,12 +216,14 @@ func (r *chartRenderer) refreshInteractive() {
 	}
 
 	objects = append(objects, renderBrushOverlay(&brushState)...)
-	tooltipObjs := component.RenderTooltip(
-		&tooltipState, r.cachedTooltipCfg, resolver,
-		r.cachedSeriesColors, r.cachedSize,
-		pointerPlotArea(r.cachedPlotArea, r.cachedRightSeries, &tooltipState),
-	)
-	objects = append(objects, tooltipObjs...)
+	if !capturing { // as in fullRebuild
+		tooltipObjs := component.RenderTooltip(
+			&tooltipState, r.cachedTooltipCfg, resolver,
+			r.cachedSeriesColors, r.cachedSize,
+			pointerPlotArea(r.cachedPlotArea, r.cachedRightSeries, &tooltipState),
+		)
+		objects = append(objects, tooltipObjs...)
+	}
 
 	r.objects = objects
 	canvas.Refresh(r.chart)
@@ -243,6 +246,7 @@ func (r *chartRenderer) fullRebuild(size geo.Size) {
 	opt := r.chart.option
 	tooltipState := r.chart.tooltipState
 	brushState := r.chart.brushState
+	capturing := r.chart.capturing
 	animProgress := r.chart.animCtrl.Progress
 	animActive := r.chart.animCtrl.Active
 	var zoomWindow interact.DataWindow
@@ -334,7 +338,7 @@ func (r *chartRenderer) fullRebuild(size geo.Size) {
 	// Render overlays, legend, zoom buttons, toolbox (static controls)
 	controlObjs, zoomButtonsLayout, toolboxLayout := r.renderOverlaysAndControls(
 		opt, plotRect, size, resolver, cartesianCoords,
-		layout, hitTester, seriesColors,
+		layout, hitTester, seriesColors, capturing,
 	)
 	objects = append(objects, controlObjs...)
 
@@ -382,9 +386,11 @@ func (r *chartRenderer) fullRebuild(size geo.Size) {
 		)...)
 	}
 	objects = append(objects, renderBrushOverlay(&brushState)...)
-	tooltipObjs := component.RenderTooltip(&tooltipState, opt.Tooltip, resolver, seriesColors, size,
-		pointerPlotArea(plotArea, rightSeries, &tooltipState))
-	objects = append(objects, tooltipObjs...)
+	if !capturing { // a saved image leaves the tooltip and axis pointer out
+		tooltipObjs := component.RenderTooltip(&tooltipState, opt.Tooltip, resolver, seriesColors, size,
+			pointerPlotArea(plotArea, rightSeries, &tooltipState))
+		objects = append(objects, tooltipObjs...)
+	}
 
 	// Store interaction state back on the chart atomically.
 	snap := &renderState{
@@ -580,6 +586,7 @@ func (r *chartRenderer) renderOverlaysAndControls(
 	layout layoutResult,
 	hitTester *interact.HitTester,
 	seriesColors map[int]color.Color,
+	hideControls bool, // lay the zoom buttons and toolbox out, but do not draw them (a capture)
 ) ([]core.CanvasObject, *component.ZoomButtonsLayout, *component.ToolboxLayout) {
 	var objects []core.CanvasObject
 
@@ -631,7 +638,9 @@ func (r *chartRenderer) renderOverlaysAndControls(
 		btnRightX := size.Width - grid.Right
 		btnY := grid.Top + controlsTop
 		btnObjs, btnLayout := component.RenderZoomButtons(btnRightX, btnY, resolver)
-		objects = append(objects, btnObjs...)
+		if !hideControls {
+			objects = append(objects, btnObjs...)
+		}
 		zoomButtonsLayout = btnLayout
 	}
 
@@ -644,7 +653,9 @@ func (r *chartRenderer) renderOverlaysAndControls(
 			tbY += controlsRowStep // below zoom buttons
 		}
 		tbObjs, tbLayout := component.RenderToolbox(opt.Toolbox, tbX, tbY, resolver)
-		objects = append(objects, tbObjs...)
+		if !hideControls {
+			objects = append(objects, tbObjs...)
+		}
 		toolboxLayout = tbLayout
 	}
 
