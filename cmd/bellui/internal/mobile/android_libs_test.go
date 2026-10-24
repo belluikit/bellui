@@ -365,6 +365,8 @@ func TestPackageAndroidLibs(t *testing.T) {
 	dex, err := mergeAppJavaDex(app, libs.libs.jars, libs.rJava())
 	require.NoError(t, err)
 	require.NotEmpty(t, dex)
+	d8, _ := util.AndroidBuildTool("d8")
+	t.Logf("%s wrote %q", d8, dex)
 
 	goLib := "lib/arm64-v8a/libapp.so"
 	require.NoError(t, os.MkdirAll(filepath.Join(tmpdir, "lib", "arm64-v8a"), 0o755))
@@ -446,6 +448,7 @@ func TestPackageAndroidLibs(t *testing.T) {
 	out, err := verify.CombinedOutput()
 	require.NoError(t, err, string(out))
 	assert.Contains(t, string(out), "Verified using v2 scheme (APK Signature Scheme v2): true")
+	t.Logf("%s verify %s:\n%s", apksigner, apkPath, out)
 }
 
 // spacedDir returns a new directory whose path holds a space and an &.
