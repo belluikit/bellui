@@ -180,17 +180,18 @@ func goAndroidBuild(pkg *packages.Package, bundleID string, androidArchs []strin
 	}
 
 	var out io.Writer
+	var apkFile *os.File
 	if !buildN {
-		f, err := os.Create(buildO[:len(buildO)-3] + "apk")
+		apkFile, err = os.Create(buildO[:len(buildO)-3] + "apk")
 		if err != nil {
 			return nil, err
 		}
 		defer func() {
-			if cerr := f.Close(); err == nil {
-				err = cerr
+			if apkFile != nil {
+				_ = apkFile.Close()
 			}
 		}()
-		out = f
+		out = apkFile
 	}
 
 	appDex, err := mergeAppJavaDex(dir, libs.libs.jars, libs.rJava())
@@ -211,6 +212,14 @@ func goAndroidBuild(pkg *packages.Package, bundleID string, androidArchs []strin
 
 	if !buildN {
 		if err := apkw.Close(); err != nil {
+			return nil, err
+		}
+		// Closed before the re-sign below: on Windows zipalign's output
+		// cannot be renamed over a file that is still open ("Access is
+		// denied", #714).
+		err = apkFile.Close()
+		apkFile = nil
+		if err != nil {
 			return nil, err
 		}
 	}
