@@ -1,4 +1,4 @@
-//go:build !gl && !wasm
+//go:build !gl
 
 package webgpu
 
