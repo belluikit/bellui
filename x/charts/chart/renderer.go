@@ -432,10 +432,7 @@ func (r *chartRenderer) computeLayout(
 	selfLayoutSeries []series.Series,
 ) layoutResult {
 	// Compute grid
-	grid := DefaultGrid()
-	if opt.Grid != nil {
-		grid = *opt.Grid
-	}
+	grid := chartGrid(opt)
 	if len(cartesianSeries) == 0 && len(selfLayoutSeries) > 0 && opt.Grid == nil {
 		grid = Grid{Left: 20, Right: 20, Top: 10, Bottom: 10}
 	}
@@ -578,6 +575,15 @@ func axisRoom(opt Option, grid Grid, header float32, legend bool, labelSize floa
 // Offset, or 0 for a negative one.
 func axisOffset(cfg axis.Config) float32 { return max(0, cfg.Offset) }
 
+// chartGrid is the grid opt asks for: opt.Grid, or DefaultGrid. A chart with
+// no cartesian series may lay its plot out in a tighter one (computeLayout).
+func chartGrid(opt Option) Grid {
+	if opt.Grid != nil {
+		return *opt.Grid
+	}
+	return DefaultGrid()
+}
+
 // The zoom buttons and the toolbox sit at the top right, below grid.Top.
 const (
 	controlsTop     float32 = 2  // the first row's offset below grid.Top
@@ -653,10 +659,7 @@ func (r *chartRenderer) renderOverlaysAndControls(
 	objects = append(objects, layout.legendObjs...)
 
 	// Compute grid for button positioning
-	grid := DefaultGrid()
-	if opt.Grid != nil {
-		grid = *opt.Grid
-	}
+	grid := chartGrid(opt)
 
 	// Zoom buttons at top-right, horizontal (if DataZoom enabled)
 	var zoomButtonsLayout *component.ZoomButtonsLayout
