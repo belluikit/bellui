@@ -180,6 +180,72 @@ jobs:
       - name: WebGPU windowed present + Capture, nopartialrepaint (#496)
         run: ${{ matrix.runner }} go test -tags nopartialrepaint -run TestWindowedSurfaceCapture -count=1 -timeout 120s ./internal/driver/glfw/
 
+      # PROBE (#731): BELLUI_WEBGPU_BACKENDS=gl
+      - name: PROBE731 BACKENDS=gl windowed Capture
+        continue-on-error: true
+        env:
+          BELLUI_WEBGPU_DEBUG: "1"
+          BELLUI_WEBGPU_BACKENDS: "gl"
+        run: ${{ matrix.runner }} go test -v -count=1 -run TestWindowedSurfaceCapture -timeout 120s ./internal/driver/glfw/
+
+      # PROBE (#731): BELLUI_WEBGPU_BACKENDS=gl
+      - name: PROBE731 BACKENDS=gl device tests
+        continue-on-error: true
+        env:
+          BELLUI_WEBGPU_DEBUG: "1"
+          BELLUI_WEBGPU_BACKENDS: "gl"
+        run: ${{ matrix.runner }} go test -v -count=1 -run 'TestSurfaceBeyondDeviceLimitIsCapped|TestArenaDynamicOffsetReadback' -timeout 120s ./internal/painter/webgpu/
+
+      # PROBE (#731): BELLUI_WEBGPU_BACKENDS=vulkan
+      - name: PROBE731 BACKENDS=vulkan windowed Capture
+        continue-on-error: true
+        env:
+          BELLUI_WEBGPU_DEBUG: "1"
+          BELLUI_WEBGPU_BACKENDS: "vulkan"
+        run: ${{ matrix.runner }} go test -v -count=1 -run TestWindowedSurfaceCapture -timeout 120s ./internal/driver/glfw/
+
+      # PROBE (#731): BELLUI_WEBGPU_BACKENDS=vulkan
+      - name: PROBE731 BACKENDS=vulkan device tests
+        continue-on-error: true
+        env:
+          BELLUI_WEBGPU_DEBUG: "1"
+          BELLUI_WEBGPU_BACKENDS: "vulkan"
+        run: ${{ matrix.runner }} go test -v -count=1 -run 'TestSurfaceBeyondDeviceLimitIsCapped|TestArenaDynamicOffsetReadback' -timeout 120s ./internal/painter/webgpu/
+
+      # PROBE (#731): BELLUI_WEBGPU_BACKENDS=dx12
+      - name: PROBE731 BACKENDS=dx12 windowed Capture
+        if: ${{ runner.os == 'Linux' }}
+        continue-on-error: true
+        env:
+          BELLUI_WEBGPU_DEBUG: "1"
+          BELLUI_WEBGPU_BACKENDS: "dx12"
+        run: ${{ matrix.runner }} go test -v -count=1 -run TestWindowedSurfaceCapture -timeout 120s ./internal/driver/glfw/
+
+      # PROBE (#731): BELLUI_WEBGPU_BACKENDS=dx12
+      - name: PROBE731 BACKENDS=dx12 device tests
+        if: ${{ runner.os == 'Linux' }}
+        continue-on-error: true
+        env:
+          BELLUI_WEBGPU_DEBUG: "1"
+          BELLUI_WEBGPU_BACKENDS: "dx12"
+        run: ${{ matrix.runner }} go test -v -count=1 -run 'TestSurfaceBeyondDeviceLimitIsCapped|TestArenaDynamicOffsetReadback' -timeout 120s ./internal/painter/webgpu/
+
+      # PROBE (#731): BELLUI_WEBGPU_BACKENDS=metal
+      - name: PROBE731 BACKENDS=metal windowed Capture
+        continue-on-error: true
+        env:
+          BELLUI_WEBGPU_DEBUG: "1"
+          BELLUI_WEBGPU_BACKENDS: "metal"
+        run: ${{ matrix.runner }} go test -v -count=1 -run TestWindowedSurfaceCapture -timeout 120s ./internal/driver/glfw/
+
+      # PROBE (#731): BELLUI_WEBGPU_BACKENDS=metal
+      - name: PROBE731 BACKENDS=metal device tests
+        continue-on-error: true
+        env:
+          BELLUI_WEBGPU_DEBUG: "1"
+          BELLUI_WEBGPU_BACKENDS: "metal"
+        run: ${{ matrix.runner }} go test -v -count=1 -run 'TestSurfaceBeyondDeviceLimitIsCapped|TestArenaDynamicOffsetReadback' -timeout 120s ./internal/painter/webgpu/
+
 
   windows_tests:
     runs-on: windows-2025
@@ -251,6 +317,94 @@ jobs:
           CGO_LDFLAGS: ""
           CGO_CFLAGS: ""
         run: go test -run TestWindowedSurfaceCapture -count=1 -timeout 120s ./internal/driver/glfw/
+
+      # PROBE (#731): BELLUI_WEBGPU_BACKENDS=gl
+      - name: PROBE731 BACKENDS=gl windowed Capture
+        continue-on-error: true
+        shell: bash
+        env:
+          CGO_LDFLAGS: ""
+          CGO_CFLAGS: ""
+          BELLUI_WEBGPU_DEBUG: "1"
+          BELLUI_WEBGPU_BACKENDS: "gl"
+        run: go test -v -count=1 -run TestWindowedSurfaceCapture -timeout 120s ./internal/driver/glfw/
+
+      # PROBE (#731): BELLUI_WEBGPU_BACKENDS=gl
+      - name: PROBE731 BACKENDS=gl device tests
+        continue-on-error: true
+        shell: bash
+        env:
+          CGO_LDFLAGS: ""
+          CGO_CFLAGS: ""
+          BELLUI_WEBGPU_DEBUG: "1"
+          BELLUI_WEBGPU_BACKENDS: "gl"
+        run: go test -v -count=1 -run 'TestSurfaceBeyondDeviceLimitIsCapped|TestArenaDynamicOffsetReadback' -timeout 120s ./internal/painter/webgpu/
+
+      # PROBE (#731): BELLUI_WEBGPU_BACKENDS=vulkan
+      - name: PROBE731 BACKENDS=vulkan windowed Capture
+        continue-on-error: true
+        shell: bash
+        env:
+          CGO_LDFLAGS: ""
+          CGO_CFLAGS: ""
+          BELLUI_WEBGPU_DEBUG: "1"
+          BELLUI_WEBGPU_BACKENDS: "vulkan"
+        run: go test -v -count=1 -run TestWindowedSurfaceCapture -timeout 120s ./internal/driver/glfw/
+
+      # PROBE (#731): BELLUI_WEBGPU_BACKENDS=vulkan
+      - name: PROBE731 BACKENDS=vulkan device tests
+        continue-on-error: true
+        shell: bash
+        env:
+          CGO_LDFLAGS: ""
+          CGO_CFLAGS: ""
+          BELLUI_WEBGPU_DEBUG: "1"
+          BELLUI_WEBGPU_BACKENDS: "vulkan"
+        run: go test -v -count=1 -run 'TestSurfaceBeyondDeviceLimitIsCapped|TestArenaDynamicOffsetReadback' -timeout 120s ./internal/painter/webgpu/
+
+      # PROBE (#731): BELLUI_WEBGPU_BACKENDS=dx12
+      - name: PROBE731 BACKENDS=dx12 windowed Capture
+        continue-on-error: true
+        shell: bash
+        env:
+          CGO_LDFLAGS: ""
+          CGO_CFLAGS: ""
+          BELLUI_WEBGPU_DEBUG: "1"
+          BELLUI_WEBGPU_BACKENDS: "dx12"
+        run: go test -v -count=1 -run TestWindowedSurfaceCapture -timeout 120s ./internal/driver/glfw/
+
+      # PROBE (#731): BELLUI_WEBGPU_BACKENDS=dx12
+      - name: PROBE731 BACKENDS=dx12 device tests
+        continue-on-error: true
+        shell: bash
+        env:
+          CGO_LDFLAGS: ""
+          CGO_CFLAGS: ""
+          BELLUI_WEBGPU_DEBUG: "1"
+          BELLUI_WEBGPU_BACKENDS: "dx12"
+        run: go test -v -count=1 -run 'TestSurfaceBeyondDeviceLimitIsCapped|TestArenaDynamicOffsetReadback' -timeout 120s ./internal/painter/webgpu/
+
+      # PROBE (#731): BELLUI_WEBGPU_BACKENDS=metal
+      - name: PROBE731 BACKENDS=metal windowed Capture
+        continue-on-error: true
+        shell: bash
+        env:
+          CGO_LDFLAGS: ""
+          CGO_CFLAGS: ""
+          BELLUI_WEBGPU_DEBUG: "1"
+          BELLUI_WEBGPU_BACKENDS: "metal"
+        run: go test -v -count=1 -run TestWindowedSurfaceCapture -timeout 120s ./internal/driver/glfw/
+
+      # PROBE (#731): BELLUI_WEBGPU_BACKENDS=metal
+      - name: PROBE731 BACKENDS=metal device tests
+        continue-on-error: true
+        shell: bash
+        env:
+          CGO_LDFLAGS: ""
+          CGO_CFLAGS: ""
+          BELLUI_WEBGPU_DEBUG: "1"
+          BELLUI_WEBGPU_BACKENDS: "metal"
+        run: go test -v -count=1 -run 'TestSurfaceBeyondDeviceLimitIsCapped|TestArenaDynamicOffsetReadback' -timeout 120s ./internal/painter/webgpu/
 
 
   # Windows on ARM64, the second mingw flavor. The x64 job builds the UIA cgo
@@ -331,3 +485,91 @@ jobs:
           CGO_LDFLAGS: ""
           CGO_CFLAGS: ""
         run: go build ./...
+
+      # PROBE (#731): BELLUI_WEBGPU_BACKENDS=gl
+      - name: PROBE731 BACKENDS=gl windowed Capture
+        continue-on-error: true
+        shell: bash
+        env:
+          CGO_LDFLAGS: ""
+          CGO_CFLAGS: ""
+          BELLUI_WEBGPU_DEBUG: "1"
+          BELLUI_WEBGPU_BACKENDS: "gl"
+        run: go test -v -count=1 -run TestWindowedSurfaceCapture -timeout 120s ./internal/driver/glfw/
+
+      # PROBE (#731): BELLUI_WEBGPU_BACKENDS=gl
+      - name: PROBE731 BACKENDS=gl device tests
+        continue-on-error: true
+        shell: bash
+        env:
+          CGO_LDFLAGS: ""
+          CGO_CFLAGS: ""
+          BELLUI_WEBGPU_DEBUG: "1"
+          BELLUI_WEBGPU_BACKENDS: "gl"
+        run: go test -v -count=1 -run 'TestSurfaceBeyondDeviceLimitIsCapped|TestArenaDynamicOffsetReadback' -timeout 120s ./internal/painter/webgpu/
+
+      # PROBE (#731): BELLUI_WEBGPU_BACKENDS=vulkan
+      - name: PROBE731 BACKENDS=vulkan windowed Capture
+        continue-on-error: true
+        shell: bash
+        env:
+          CGO_LDFLAGS: ""
+          CGO_CFLAGS: ""
+          BELLUI_WEBGPU_DEBUG: "1"
+          BELLUI_WEBGPU_BACKENDS: "vulkan"
+        run: go test -v -count=1 -run TestWindowedSurfaceCapture -timeout 120s ./internal/driver/glfw/
+
+      # PROBE (#731): BELLUI_WEBGPU_BACKENDS=vulkan
+      - name: PROBE731 BACKENDS=vulkan device tests
+        continue-on-error: true
+        shell: bash
+        env:
+          CGO_LDFLAGS: ""
+          CGO_CFLAGS: ""
+          BELLUI_WEBGPU_DEBUG: "1"
+          BELLUI_WEBGPU_BACKENDS: "vulkan"
+        run: go test -v -count=1 -run 'TestSurfaceBeyondDeviceLimitIsCapped|TestArenaDynamicOffsetReadback' -timeout 120s ./internal/painter/webgpu/
+
+      # PROBE (#731): BELLUI_WEBGPU_BACKENDS=dx12
+      - name: PROBE731 BACKENDS=dx12 windowed Capture
+        continue-on-error: true
+        shell: bash
+        env:
+          CGO_LDFLAGS: ""
+          CGO_CFLAGS: ""
+          BELLUI_WEBGPU_DEBUG: "1"
+          BELLUI_WEBGPU_BACKENDS: "dx12"
+        run: go test -v -count=1 -run TestWindowedSurfaceCapture -timeout 120s ./internal/driver/glfw/
+
+      # PROBE (#731): BELLUI_WEBGPU_BACKENDS=dx12
+      - name: PROBE731 BACKENDS=dx12 device tests
+        continue-on-error: true
+        shell: bash
+        env:
+          CGO_LDFLAGS: ""
+          CGO_CFLAGS: ""
+          BELLUI_WEBGPU_DEBUG: "1"
+          BELLUI_WEBGPU_BACKENDS: "dx12"
+        run: go test -v -count=1 -run 'TestSurfaceBeyondDeviceLimitIsCapped|TestArenaDynamicOffsetReadback' -timeout 120s ./internal/painter/webgpu/
+
+      # PROBE (#731): BELLUI_WEBGPU_BACKENDS=metal
+      - name: PROBE731 BACKENDS=metal windowed Capture
+        continue-on-error: true
+        shell: bash
+        env:
+          CGO_LDFLAGS: ""
+          CGO_CFLAGS: ""
+          BELLUI_WEBGPU_DEBUG: "1"
+          BELLUI_WEBGPU_BACKENDS: "metal"
+        run: go test -v -count=1 -run TestWindowedSurfaceCapture -timeout 120s ./internal/driver/glfw/
+
+      # PROBE (#731): BELLUI_WEBGPU_BACKENDS=metal
+      - name: PROBE731 BACKENDS=metal device tests
+        continue-on-error: true
+        shell: bash
+        env:
+          CGO_LDFLAGS: ""
+          CGO_CFLAGS: ""
+          BELLUI_WEBGPU_DEBUG: "1"
+          BELLUI_WEBGPU_BACKENDS: "metal"
+        run: go test -v -count=1 -run 'TestSurfaceBeyondDeviceLimitIsCapped|TestArenaDynamicOffsetReadback' -timeout 120s ./internal/painter/webgpu/
