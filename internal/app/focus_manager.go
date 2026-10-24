@@ -191,28 +191,79 @@ func (f *FocusManager) step(current event.Focusable, dir int) event.Focusable {
 // reordered to follow the visual arrangement (rows top-to-bottom, each row
 // right-to-left); under the default left-to-right layout the tree order is
 // returned unchanged.
+//
+// A container.DirectionScope (or an overlay that inherited its opener's
+// direction) orders its own focusables by its own direction, as one block
+// that takes the scope's place in its parent's order (#749): two entries
+// side by side in an RTL scope are visited right first, even in an LTR
+// window.
 func (f *FocusManager) focusOrder() []focusEntry {
-	var order []focusEntry
+	// Tab traversal is an input event, outside any layout walk, so the
+	// ambient direction is the global one: ask for the content's own, which
+	// honours the canvas' direction and the scopes around it (#696).
+	rootDir, ok := driver.ScopeDirection(f.content)
+	if !ok {
+		rootDir = driver.ResolvedDirectionOf(f.content)
+	}
+	root := &focusBlock{dir: rootDir}
+	blocks := []*focusBlock{root}
 	driver.WalkVisibleObjectTree(f.content, func(obj core.CanvasObject, pos geo.Position, _ geo.Position, _ geo.Size) bool {
 		if w, ok := obj.(core.Disableable); ok && w.Disabled() {
 			return false // disabled widget cannot receive focus
 		}
+		top := blocks[len(blocks)-1]
 		if focus, ok := obj.(event.Focusable); ok {
 			// The walker's trailing size is the clip rectangle, not the widget;
 			// use the object's own size for visual row grouping.
-			order = append(order, focusEntry{focusable: focus, pos: pos, size: obj.Size()})
+			top.items = append(top.items, focusItem{focusEntry: focusEntry{focusable: focus, pos: pos, size: obj.Size()}})
+		}
+		if obj != f.content {
+			if d, ok := driver.ScopeDirection(obj); ok {
+				inner := &focusBlock{dir: d, obj: obj}
+				top.items = append(top.items, focusItem{focusEntry: focusEntry{pos: pos, size: obj.Size()}, block: inner})
+				blocks = append(blocks, inner)
+			}
 		}
 		return false
-	}, nil)
+	}, func(obj core.CanvasObject, _ geo.Position, _ core.CanvasObject) {
+		if len(blocks) > 1 && blocks[len(blocks)-1].obj == obj {
+			blocks = blocks[:len(blocks)-1]
+		}
+	})
+	return root.flatten()
+}
 
-	// Tab traversal is an input event, outside any layout walk, so the
-	// ambient direction is the global one: ask for the content's own, which
-	// honours the canvas' direction (#696). A container.DirectionScope inside
-	// the content does not reorder its own focusables (#749).
-	if driver.IsRTLAt(f.content) {
-		order = reorderRTLVisual(order)
+// focusBlock is the focusables of one direction: a window's content, or a
+// direction scope inside it. A nested scope is one item of its parent's block,
+// placed by the scope's own bounds.
+type focusBlock struct {
+	dir   bellui.Direction
+	obj   core.CanvasObject // the scope, nil for the root
+	items []focusItem
+}
+
+// focusItem is a focusable, or a nested scope's block in its place.
+type focusItem struct {
+	focusEntry
+	block *focusBlock
+}
+
+// flatten orders b's items by its direction, expanding each nested block in
+// its place.
+func (b *focusBlock) flatten() []focusEntry {
+	items := b.items
+	if b.dir == bellui.DirectionRTL {
+		items = reorderRTLVisual(items)
 	}
-	return order
+	out := make([]focusEntry, 0, len(items))
+	for _, it := range items {
+		if it.block != nil {
+			out = append(out, it.block.flatten()...)
+			continue
+		}
+		out = append(out, it.focusEntry)
+	}
+	return out
 }
 
 // reorderRTLVisual re-sequences focusables into visual right-to-left order:
@@ -221,14 +272,14 @@ func (f *FocusManager) focusOrder() []focusEntry {
 // within each row the entries are ordered right-to-left. A column of widgets
 // (no two sharing a row) is therefore left untouched, while a horizontal
 // arrangement — a toolbar, segmented button or navigation bar — is reversed.
-func reorderRTLVisual(in []focusEntry) []focusEntry {
+func reorderRTLVisual(in []focusItem) []focusItem {
 	if len(in) < 2 {
 		return in
 	}
 
 	type row struct {
 		top, bottom float32
-		items       []focusEntry
+		items       []focusItem
 	}
 	var rows []*row
 	for _, e := range in {
@@ -241,7 +292,7 @@ func reorderRTLVisual(in []focusEntry) []focusEntry {
 			}
 		}
 		if placed == nil {
-			rows = append(rows, &row{top: top, bottom: bottom, items: []focusEntry{e}})
+			rows = append(rows, &row{top: top, bottom: bottom, items: []focusItem{e}})
 			continue
 		}
 		placed.items = append(placed.items, e)
@@ -250,7 +301,7 @@ func reorderRTLVisual(in []focusEntry) []focusEntry {
 	}
 
 	sort.SliceStable(rows, func(i, j int) bool { return rows[i].top < rows[j].top })
-	out := make([]focusEntry, 0, len(in))
+	out := make([]focusItem, 0, len(in))
 	for _, r := range rows {
 		items := r.items
 		sort.SliceStable(items, func(i, j int) bool { return items[i].pos.X > items[j].pos.X })
