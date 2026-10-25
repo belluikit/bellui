@@ -21,19 +21,19 @@ func TestHandleTextEdit_SelectionEvent(t *testing.T) {
 	entry.SetText("hello world")
 	d.textInput.Bind(entry)
 
-	d.handleTextEdit(textedit.Event{Start: 2, End: 7, Selection: true})
+	d.handleTextEdit(nil, textedit.Event{Start: 2, End: 7, Selection: true})
 	start, end := entry.AccessibleSelection()
 	assert.Equal(t, 2, start)
 	assert.Equal(t, 7, end)
 	assert.Equal(t, "hello world", entry.Text, "a selection event never edits text")
 
 	// Equal offsets place a bare caret.
-	d.handleTextEdit(textedit.Event{Start: 4, End: 4, Selection: true})
+	d.handleTextEdit(nil, textedit.Event{Start: 4, End: 4, Selection: true})
 	start, end = entry.AccessibleSelection()
 	assert.Equal(t, 4, start)
 	assert.Equal(t, 4, end)
 
 	// A plain event still replaces the range.
-	d.handleTextEdit(textedit.Event{Start: 0, End: 5, Text: "bye"})
+	d.handleTextEdit(nil, textedit.Event{Start: 0, End: 5, Text: "bye"})
 	assert.Equal(t, "bye world", entry.Text)
 }
