@@ -3,6 +3,8 @@ package component
 
 import (
 	"time"
+
+	"github.com/belluikit/bellui"
 )
 
 // TimelineConfig configures timeline playback through a sequence of chart states.
@@ -38,24 +40,33 @@ func NewTimelineState(total int, cfg TimelineConfig, onStep func(int)) *Timeline
 	}
 }
 
-// Play starts auto-advancing through steps.
+// Play starts auto-advancing through steps. Each step, and its callback, runs
+// on the UI thread; call Play, Stop and the step methods from there too.
 func (ts *TimelineState) Play() {
 	if ts.Playing || ts.Total <= 0 {
 		return
 	}
 	ts.Playing = true
-	ts.ticker = time.NewTicker(ts.Config.Interval)
-	ts.stopCh = make(chan struct{})
+	ticker := time.NewTicker(ts.Config.Interval)
+	stop := make(chan struct{})
+	ts.ticker, ts.stopCh = ticker, stop
 	go func() {
 		for {
 			select {
-			case <-ts.ticker.C:
-				ts.Next()
-				if !ts.Config.Loop && ts.Current >= ts.Total-1 {
-					ts.Stop()
-					return
-				}
-			case <-ts.stopCh:
+			case <-ticker.C:
+				// Advance on the UI thread: onStep updates the chart, and the
+				// app reads Current and Playing there too. The goroutine used
+				// to call Next itself (#343).
+				bellui.Do(func() {
+					if ts.stopCh != stop { // stopped, or restarted, since this tick
+						return
+					}
+					ts.Next()
+					if !ts.Config.Loop && ts.Current >= ts.Total-1 {
+						ts.Stop()
+					}
+				})
+			case <-stop:
 				return
 			}
 		}
@@ -67,12 +78,13 @@ func (ts *TimelineState) Stop() {
 	ts.Playing = false
 	if ts.ticker != nil {
 		ts.ticker.Stop()
+		ts.ticker = nil
 	}
 	if ts.stopCh != nil {
-		select {
-		case ts.stopCh <- struct{}{}:
-		default:
-		}
+		// Closing rather than sending: a send the goroutine was not waiting
+		// for was dropped, and the goroutine then waited forever.
+		close(ts.stopCh)
+		ts.stopCh = nil
 	}
 }
 

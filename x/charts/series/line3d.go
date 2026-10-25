@@ -27,7 +27,7 @@ type Line3DSeries struct {
 	// When non-nil, Data is treated as [x, y] pairs instead of [x, y, z] triplets.
 	ZPosition *float64
 
-	// LineWidth controls the ribbon thickness (default 0.04).
+	// LineWidth controls the ribbon thickness (default DefaultLine3DWidth, 0.15).
 	LineWidth float32
 
 	Color color.Color
@@ -43,6 +43,12 @@ func (s *Line3DSeries) SeriesType() Type { return TypeLine3D }
 func (s *Line3DSeries) Name() string { return s.SeriesName }
 
 func (s *Line3DSeries) sealed() {}
+
+// SeriesColor returns the colour set for the series, or nil for the palette
+// colour (see ColoredSeries).
+//
+// Since: 1.3
+func (s *Line3DSeries) SeriesColor() color.Color { return s.Color }
 
 // PointCount returns the number of data points.
 func (s *Line3DSeries) PointCount() int {

@@ -65,6 +65,42 @@ func TestHitTester_FindAllAtX(t *testing.T) {
 	}
 }
 
+// Bars and candles take part in the axis trigger: a pane with only bars or
+// candles had no axis tooltip or crosshair, and a bar beside a line at the
+// same X was left out of the hits (#343).
+func TestHitTester_FindAllAtX_BarsAndCandles(t *testing.T) {
+	cs := makeTestCoord()
+	p1 := cs.DataToPixel(1, 50)
+
+	bars := NewHitTester()
+	bars.AddBarSeries(0, "bars", cs, []float64{40, 60, 80}, 40)
+	if hits := bars.FindAllAtX(geo.NewPos(p1.X+5, 10), 30); len(hits) != 1 || hits[0].DataIndex != 1 {
+		t.Errorf("bars only: FindAllAtX = %+v, want bar 1", hits)
+	}
+
+	candles := NewHitTester()
+	candles.AddCandlestickBars(0, "candles", cs, []series.CandlestickData{
+		{Open: 10, Close: 20, Low: 5, High: 25},
+		{Open: 20, Close: 30, Low: 15, High: 35},
+	}, 20)
+	if hits := candles.FindAllAtX(geo.NewPos(p1.X-5, 10), 30); len(hits) != 1 || hits[0].DataIndex != 1 {
+		t.Errorf("candles only: FindAllAtX = %+v, want candle 1", hits)
+	}
+
+	mixed := NewHitTester()
+	mixed.AddLineSeries(0, "line", series.TypeLine, cs, []float64{10, 50, 90})
+	mixed.AddBarSeries(1, "bars", cs, []float64{40, 60, 80}, 40)
+	hits := mixed.FindAllAtX(geo.NewPos(p1.X, 150), 30)
+	if len(hits) != 2 || hits[0].SeriesName != "line" || hits[1].SeriesName != "bars" {
+		t.Errorf("line and bars: FindAllAtX = %+v, want the line's and the bar's point 1, in series order", hits)
+	}
+
+	mixed.Clear()
+	if hits := mixed.FindAllAtX(geo.NewPos(p1.X, 150), 30); hits != nil {
+		t.Errorf("after Clear, FindAllAtX = %+v, want nothing", hits)
+	}
+}
+
 func TestHitTester_BarRect(t *testing.T) {
 	ht := NewHitTester()
 	cs := makeTestCoord()

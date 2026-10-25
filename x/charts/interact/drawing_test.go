@@ -49,6 +49,18 @@ func TestDrawingStore_NextID_Unique(t *testing.T) {
 	}
 }
 
+// An app that names its own drawing "drawing-1" must not get a second
+// "drawing-1" from the tools, or RemoveDrawing removes the wrong one (#343).
+func TestDrawingStore_NextID_SkipsIDsAlreadyUsed(t *testing.T) {
+	ds := NewDrawingStore()
+	ds.Add(&HLineDrawing{DrawingBase: DrawingBase{ID_: "drawing-1"}, Y: 10})
+	ds.Add(&HLineDrawing{DrawingBase: DrawingBase{ID_: "drawing-2"}, Y: 20})
+
+	if id := ds.NextID(); id != "drawing-3" {
+		t.Errorf("NextID = %s, want drawing-3", id)
+	}
+}
+
 func TestDrawingStore_Clear(t *testing.T) {
 	ds := NewDrawingStore()
 	ds.Add(&HLineDrawing{DrawingBase: DrawingBase{ID_: ds.NextID()}, Y: 50})

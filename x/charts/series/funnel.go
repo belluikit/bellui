@@ -2,6 +2,7 @@ package series
 
 import (
 	"image/color"
+	"sort"
 
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/canvas"
@@ -20,7 +21,9 @@ type FunnelData struct {
 type FunnelSeries struct {
 	SeriesName string
 	Data       []FunnelData
-	// Sort: "descending" (default, widest on top), "ascending", or "none".
+	// Sort orders the stages by value: "descending" (widest on top) or
+	// "ascending". Empty or "none" keeps the order of Data. Each stage keeps
+	// its colour when sorted.
 	Sort string
 	// DynamicHeight: when true, each stage's height is proportional to its value,
 	// creating a V-shape funnel. When false (default), all stages have equal height.
@@ -71,7 +74,21 @@ func (r *funnelRenderer) Render(ctx RenderContext) []core.CanvasObject {
 	var objects []core.CanvasObject
 	currentY := vp.Y
 
-	for i, d := range fs.Data {
+	// Sort was never read (#343). Sort the stage order, not the data, so
+	// each stage keeps the palette colour of its position in Data.
+	order := make([]int, n)
+	for i := range order {
+		order[i] = i
+	}
+	switch fs.Sort {
+	case "descending":
+		sort.SliceStable(order, func(a, b int) bool { return fs.Data[order[a]].Value > fs.Data[order[b]].Value })
+	case "ascending":
+		sort.SliceStable(order, func(a, b int) bool { return fs.Data[order[a]].Value < fs.Data[order[b]].Value })
+	}
+
+	for _, i := range order {
+		d := fs.Data[i]
 		frac := float32(d.Value / maxVal)
 		w := vp.W * frac * 0.9
 

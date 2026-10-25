@@ -30,6 +30,12 @@ func (s *EffectScatterSeries) SeriesType() Type { return TypeEffectScatter }
 func (s *EffectScatterSeries) Name() string     { return s.SeriesName }
 func (s *EffectScatterSeries) sealed()          {}
 
+// SeriesColor returns the colour set for the series, or nil for the palette
+// colour (see ColoredSeries).
+//
+// Since: 1.3
+func (s *EffectScatterSeries) SeriesColor() color.Color { return s.Color }
+
 // GetYAxisIndex returns the Y axis index for this series.
 func (s *EffectScatterSeries) GetYAxisIndex() int { return s.YAxisIndex }
 

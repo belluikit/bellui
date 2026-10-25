@@ -126,3 +126,23 @@ func TestInfoPlistDarwinEscapesValues(t *testing.T) {
 	assert.Contains(t, buf.String(), "<string>Scan &lt;docs&gt;</string>")
 	assert.Contains(t, buf.String(), "<string>Cat &amp; Mouse</string>")
 }
+
+// An app with no category gets no LSApplicationCategoryType: the key used to
+// be written unconditionally as the invalid "public.app-category." (#361).
+func TestInfoPlistDarwinCategory(t *testing.T) {
+	render := func(category string) string {
+		buf := &bytes.Buffer{}
+		assert.NoError(t, templates.InfoPlistDarwin.Execute(buf, darwinData{Name: "Testing", Category: category}))
+		return buf.String()
+	}
+
+	none := render("")
+	assert.NotContains(t, none, "LSApplicationCategoryType")
+	assert.NotContains(t, none, "public.app-category.")
+	assert.Contains(t, none, "<key>LSMinimumSystemVersion</key>", "the keys around it are still written")
+
+	// The template is checked out with CRLF line endings on Windows.
+	withCategory := strings.ReplaceAll(render("utilities"), "\r\n", "\n")
+	assert.Contains(t, withCategory,
+		"<key>LSApplicationCategoryType</key>\n\t<string>public.app-category.utilities</string>")
+}

@@ -35,6 +35,12 @@ func (s *GeoLinesSeries) SeriesType() Type { return TypeGeoLines }
 func (s *GeoLinesSeries) Name() string     { return s.SeriesName }
 func (s *GeoLinesSeries) sealed()          {}
 
+// SeriesColor returns the colour set for the series, or nil for the palette
+// colour (see ColoredSeries).
+//
+// Since: 1.3
+func (s *GeoLinesSeries) SeriesColor() color.Color { return s.Color }
+
 func init() {
 	RegisterRenderer(TypeGeoLines, func() Renderer { return &geoLinesRenderer{} })
 }
