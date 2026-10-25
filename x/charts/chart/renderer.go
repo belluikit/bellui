@@ -1,7 +1,6 @@
 package chart
 
 import (
-	"fmt"
 	"image/color"
 	"math"
 
@@ -15,6 +14,7 @@ import (
 	"github.com/belluikit/bellui/x/charts/component"
 	"github.com/belluikit/bellui/x/charts/coord"
 	"github.com/belluikit/bellui/x/charts/interact"
+	"github.com/belluikit/bellui/x/charts/internal/heatgrid"
 	"github.com/belluikit/bellui/x/charts/internal/pool"
 	"github.com/belluikit/bellui/x/charts/series"
 	"github.com/belluikit/bellui/x/charts/style"
@@ -888,23 +888,14 @@ func (r *chartRenderer) renderSelfLayout(
 			r.registerPieHitTest(hitTester, idx, ps, plotRect)
 		}
 		if hs, ok := s.(*series.HeatmapSeries); ok {
-			hitTester.AddHeatmapSeries(idx, hs.SeriesName, plotRect, hs.Rows, hs.Cols, hs.Data, hs.XLabels, hs.YLabels)
+			cells := heatgrid.Layout(plotRect, hs.XLabels, hs.YLabels) // where the renderer draws them
+			hitTester.AddHeatmapSeries(idx, hs.SeriesName, cells, hs.Rows, hs.Cols, hs.Data, hs.XLabels, hs.YLabels)
 		}
 
-		// Register choropleth regions for hit testing (tooltips)
-		if cs, ok := s.(*series.ChoroplethSeries); ok && sharedGeo != nil && cs.RegionData != nil {
-			var pixelData []float64
-			var labels []string
-			for name, val := range cs.RegionData {
-				// Approximate region center: use a simple lookup for major countries
-				lon, lat := approxCountryCenter(name)
-				if lon != 0 || lat != 0 {
-					pos := sharedGeo.DataToPixel(lon, lat)
-					pixelData = append(pixelData, float64(pos.X), float64(pos.Y))
-					labels = append(labels, fmt.Sprintf("%s: %.1f", name, val))
-				}
-			}
-			hitTester.AddGeoPointsWithLabels(idx, cs.SeriesName, pixelData, labels)
+		// Choropleth regions register themselves, at each region's centre in
+		// the GeoJSON, with or without a map sharing its projection (#343).
+		if cs, ok := s.(*series.ChoroplethSeries); ok {
+			cs.RegisterHitAreas(hitTester, idx, coordSys, plotRect)
 		}
 
 		// Register geo scatter points for hit testing (tooltips)
@@ -1381,24 +1372,6 @@ func (r *chartRenderer) renderYAxis(cfg axis.Config, yScale axis.Scale, index in
 	}
 
 	return objects
-}
-
-// approxCountryCenter returns approximate (lon, lat) for major countries.
-func approxCountryCenter(name string) (float64, float64) {
-	centers := map[string][2]float64{
-		"United States of America": {-98, 39}, "China": {104, 35}, "Japan": {138, 36},
-		"Germany": {10, 51}, "India": {79, 22}, "United Kingdom": {-2, 54},
-		"France": {2, 47}, "Canada": {-106, 56}, "Italy": {12, 43}, "Brazil": {-52, -10},
-		"Russia": {105, 62}, "Australia": {134, -25}, "South Korea": {128, 36},
-		"Mexico": {-102, 24}, "Spain": {-4, 40}, "Indonesia": {118, -2},
-		"Turkey": {35, 39}, "Saudi Arabia": {45, 24}, "Argentina": {-64, -34},
-		"South Africa": {25, -29}, "Nigeria": {8, 10}, "Egypt": {30, 27},
-		"Poland": {20, 52}, "Netherlands": {5, 52}, "Sweden": {16, 62},
-	}
-	if c, ok := centers[name]; ok {
-		return c[0], c[1]
-	}
-	return 0, 0
 }
 
 func updateRange(min, max *float64, v float64) {

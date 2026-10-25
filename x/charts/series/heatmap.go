@@ -5,9 +5,12 @@ import (
 	"image/color"
 	"math"
 
+	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/x/charts/coord"
+	"github.com/belluikit/bellui/x/charts/internal/heatgrid"
 )
 
 // HeatmapSeries configures a heatmap chart series.
@@ -116,11 +119,58 @@ func (r *heatmapRenderer) Render(ctx RenderContext) []core.CanvasObject {
 		return img
 	})
 
-	raster.Move(geo.NewPos(vp.X, vp.Y))
-	raster.Resize(geo.NewSize(vp.W, vp.H))
+	// The cells leave room for the row and column labels, which were only
+	// ever shown in the tooltip (#343). The chart hit-tests the same cells.
+	cells := heatgrid.Layout(vp, hs.XLabels, hs.YLabels)
+	raster.Move(geo.NewPos(cells.X, cells.Y))
+	raster.Resize(geo.NewSize(cells.W, cells.H))
 	raster.ScaleMode = canvas.ImageScalePixels
 
-	return []core.CanvasObject{raster}
+	objects := []core.CanvasObject{raster}
+	return append(objects, heatmapLabels(ctx, hs, vp, cells)...)
+}
+
+// heatmapLabels draws the row labels right-aligned left of the cells and the
+// column labels centred below them, every one that fits: a column label
+// wider than its cell takes every n-th column so the labels do not overlap.
+func heatmapLabels(ctx RenderContext, hs *HeatmapSeries, vp, cells coord.Rect) []core.CanvasObject {
+	c := backgroundLabelColor(ctx, color.NRGBA{R: 180, G: 180, B: 180, A: 255})
+	var objects []core.CanvasObject
+	label := func(text string, x, y, w float32, align bellui.TextAlign) {
+		t := canvas.NewText(text, c)
+		t.TextSize = heatgrid.LabelSize
+		t.Alignment = align
+		t.Move(geo.NewPos(x, y))
+		t.Resize(geo.NewSize(w, heatgrid.LabelSize+2))
+		objects = append(objects, t)
+	}
+
+	cellH := cells.H / float32(hs.Rows)
+	for row := 0; row < hs.Rows && row < len(hs.YLabels); row++ {
+		y := cells.Y + (float32(row)+0.5)*cellH - (heatgrid.LabelSize+2)/2
+		label(hs.YLabels[row], vp.X, y, cells.X-vp.X-heatgrid.Gap(), bellui.TextAlignTrailing)
+	}
+
+	cellW := cells.W / float32(hs.Cols)
+	if cellW <= 0 {
+		return objects
+	}
+	var widest float32
+	for _, l := range hs.XLabels {
+		if w := heatgrid.LabelWidth(l); w > widest {
+			widest = w
+		}
+	}
+	step := int(math.Ceil(float64((widest + heatgrid.Gap()) / cellW)))
+	if step < 1 {
+		step = 1
+	}
+	y := cells.Y + cells.H + heatgrid.Gap()
+	for col := 0; col < hs.Cols && col < len(hs.XLabels); col += step {
+		x := cells.X + (float32(col)+0.5)*cellW - widest/2
+		label(hs.XLabels[col], x, y, widest, bellui.TextAlignCenter)
+	}
+	return objects
 }
 
 func defaultHeatmapStops() []HeatmapColorStop {
