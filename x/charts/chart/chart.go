@@ -1241,14 +1241,23 @@ func (c *Chart) resolveDragEnd() dragEndResult {
 	if c.renderSnap != nil {
 		ht = c.renderSnap.hitTester
 	}
-	selected := interact.FindSelectedPoints(ht, brushPos, brushSize)
+	evt := interact.BrushSelectEvent{
+		Event:    interact.Event{Type: interact.EventBrushSelect},
+		Selected: interact.FindSelectedPoints(ht, brushPos, brushSize),
+	}
+	// The selection's data range, from its two corners on the first
+	// coordinate system; it was never filled in (#343). Min and max are
+	// sorted, as pixel Y grows downwards and an axis can be inverse.
+	x1, y1, ok1 := c.pixelToData(brushPos)
+	x2, y2, ok2 := c.pixelToData(geo.NewPos(brushPos.X+brushSize.Width, brushPos.Y+brushSize.Height))
+	if ok1 && ok2 {
+		evt.DataMinX, evt.DataMaxX = math.Min(x1, x2), math.Max(x1, x2)
+		evt.DataMinY, evt.DataMaxY = math.Min(y1, y2), math.Max(y1, y2)
+	}
 
 	return dragEndResult{
-		active: true,
-		evt: interact.BrushSelectEvent{
-			Event:    interact.Event{Type: interact.EventBrushSelect},
-			Selected: selected,
-		},
+		active:  true,
+		evt:     evt,
 		onBrush: c.OnBrushSelect,
 	}
 }
