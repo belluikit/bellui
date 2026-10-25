@@ -109,6 +109,15 @@ type RenderContext struct {
 	// Nil means allocate normally. Set by the chart renderer.
 	Pool *pool.ObjectPool
 
+	// TextColor is the colour of labels a series draws on the plot's
+	// background: the theme's foreground, set by the chart. A label drawn on
+	// a coloured shape is black or white instead, whichever contrasts with the
+	// shape. Nil leaves the light grey labels had before the field existed
+	// (#343).
+	//
+	// Since: 1.3
+	TextColor color.Color
+
 	// Invalidate requests another full render of the chart. Renderers that load
 	// data asynchronously (the choropleth's GeoJSON) hand it to their loader so
 	// the arriving data is drawn, instead of waiting for an unrelated refresh.

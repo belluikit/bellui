@@ -168,7 +168,7 @@ func (r *gaugeRenderer) Render(ctx RenderContext) []core.CanvasObject {
 	// Value text
 	if gs.ShowValue {
 		valText := fmt.Sprintf("%.1f", gs.Value)
-		label := canvas.NewText(valText, color.NRGBA{R: 230, G: 230, B: 230, A: 255})
+		label := canvas.NewText(valText, backgroundLabelColor(ctx, color.NRGBA{R: 230, G: 230, B: 230, A: 255}))
 		label.TextSize = 20
 		label.TextStyle = bellui.TextStyle{Bold: true}
 		label.Alignment = bellui.TextAlignCenter

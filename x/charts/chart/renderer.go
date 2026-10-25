@@ -63,7 +63,8 @@ type chartRenderer struct {
 
 	chart      *Chart
 	objects    []core.CanvasObject
-	rebuilding bool // re-entrancy guard to prevent refresh feedback loops
+	textColor  color.Color // the theme's foreground, for series labels (RenderContext.TextColor)
+	rebuilding bool        // re-entrancy guard to prevent refresh feedback loops
 	pool       *pool.ObjectPool
 
 	// Cached state for partial re-rendering (tooltip/brush-only updates).
@@ -118,6 +119,7 @@ func (r *chartRenderer) seriesRenderContext(s series.Series, coordSys coord.Syst
 		Animate:      animActive,
 		AnimProgress: animProgress,
 		Pool:         r.pool,
+		TextColor:    r.textColor,
 		Invalidate:   r.invalidate,
 	}
 }
@@ -272,6 +274,7 @@ func (r *chartRenderer) fullRebuild(size geo.Size) {
 	if len(opt.Color) > 0 {
 		resolver.SetPalette(opt.Color)
 	}
+	r.textColor = resolver.TitleColor() // series labels on the plot (#343)
 
 	var objects []core.CanvasObject
 

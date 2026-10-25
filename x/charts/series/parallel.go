@@ -91,7 +91,7 @@ func (r *parallelRenderer) Render(ctx RenderContext) []core.CanvasObject {
 		}
 		objects = append(objects, line)
 
-		label := canvas.NewText(ax.Name, color.NRGBA{R: 180, G: 180, B: 180, A: 255})
+		label := canvas.NewText(ax.Name, backgroundLabelColor(ctx, color.NRGBA{R: 180, G: 180, B: 180, A: 255}))
 		label.TextSize = 10
 		label.Alignment = bellui.TextAlignCenter
 		labelW := float32(len(ax.Name))*6 + 4
