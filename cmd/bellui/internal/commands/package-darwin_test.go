@@ -141,6 +141,8 @@ func TestInfoPlistDarwinCategory(t *testing.T) {
 	assert.NotContains(t, none, "public.app-category.")
 	assert.Contains(t, none, "<key>LSMinimumSystemVersion</key>", "the keys around it are still written")
 
-	assert.Contains(t, render("utilities"),
+	// The template is checked out with CRLF line endings on Windows.
+	withCategory := strings.ReplaceAll(render("utilities"), "\r\n", "\n")
+	assert.Contains(t, withCategory,
 		"<key>LSApplicationCategoryType</key>\n\t<string>public.app-category.utilities</string>")
 }
