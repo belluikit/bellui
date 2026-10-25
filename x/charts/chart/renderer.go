@@ -15,6 +15,7 @@ import (
 	"github.com/belluikit/bellui/x/charts/component"
 	"github.com/belluikit/bellui/x/charts/coord"
 	"github.com/belluikit/bellui/x/charts/interact"
+	"github.com/belluikit/bellui/x/charts/internal/heatgrid"
 	"github.com/belluikit/bellui/x/charts/internal/pool"
 	"github.com/belluikit/bellui/x/charts/series"
 	"github.com/belluikit/bellui/x/charts/style"
@@ -888,7 +889,8 @@ func (r *chartRenderer) renderSelfLayout(
 			r.registerPieHitTest(hitTester, idx, ps, plotRect)
 		}
 		if hs, ok := s.(*series.HeatmapSeries); ok {
-			hitTester.AddHeatmapSeries(idx, hs.SeriesName, plotRect, hs.Rows, hs.Cols, hs.Data, hs.XLabels, hs.YLabels)
+			cells := heatgrid.Layout(plotRect, hs.XLabels, hs.YLabels) // where the renderer draws them
+			hitTester.AddHeatmapSeries(idx, hs.SeriesName, cells, hs.Rows, hs.Cols, hs.Data, hs.XLabels, hs.YLabels)
 		}
 
 		// Register choropleth regions for hit testing (tooltips)
