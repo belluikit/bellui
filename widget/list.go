@@ -984,12 +984,6 @@ func matchThemeScope[T core.CanvasObject](o T, parent core.CanvasObject) T {
 	if any(o) == nil {
 		return o
 	}
-	id := cache.WidgetScopeID(parent)
-	if id == "" || cache.WidgetScopeID(o) == id {
-		return o
-	}
-	if cache.OverrideThemeMatchingScope(o, parent) {
-		o.Refresh()
-	}
+	theme.MatchScope(parent, o)
 	return o
 }
