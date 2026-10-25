@@ -59,9 +59,8 @@ func (r *pictorialRenderer) Render(ctx RenderContext) []core.CanvasObject {
 		return nil
 	}
 
-	bounds := ctx.Coord.Bounds()
 	n := len(ps.Data)
-	categoryW := bounds.W / float32(n)
+	categoryW := categoryWidthOf(ctx.Coord, n)
 	symSize := ResolveFloat32(ps.SymbolSize, DefaultPictorialSize)
 
 	fillColor := ResolveColor(ps.Color, ctx.Color)

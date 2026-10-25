@@ -52,7 +52,7 @@ func (s *CandlestickSeries) RegisterHitAreas(collector HitAreaCollector, seriesI
 		return
 	}
 	barWidth := ResolveFloat32(s.BarWidth, DefaultBarWidth)
-	categoryWidth := plotRect.W / float32(n)
+	categoryWidth := categoryWidthOf(coordSys, n)
 	bw := categoryWidth * barWidth
 
 	bars := make([]HitBar, n)
@@ -110,11 +110,10 @@ func (r *candlestickRenderer) Render(ctx RenderContext) []core.CanvasObject {
 		return nil
 	}
 
-	bounds := ctx.Coord.Bounds()
 	n := len(cs.Data)
 
 	barWidth := ResolveFloat32(cs.BarWidth, DefaultBarWidth)
-	categoryWidth := bounds.W / float32(n)
+	categoryWidth := categoryWidthOf(ctx.Coord, n)
 	bw := categoryWidth * barWidth
 	wickWidth := float32(1)
 

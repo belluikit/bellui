@@ -61,11 +61,10 @@ func (r *boxplotRenderer) Render(ctx RenderContext) []core.CanvasObject {
 		return nil
 	}
 
-	bounds := ctx.Coord.Bounds()
 	n := len(bs.Data)
 
 	boxWidth := ResolveFloat32(bs.BoxWidth, DefaultBoxWidth)
-	categoryW := bounds.W / float32(n)
+	categoryW := categoryWidthOf(ctx.Coord, n)
 	bw := categoryW * boxWidth
 
 	fillColor := ResolveColor(bs.Color, ctx.Color)

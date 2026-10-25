@@ -57,7 +57,7 @@ func (s *BarSeries) RegisterHitAreas(collector HitAreaCollector, seriesIndex int
 		return
 	}
 	barWidth := ResolveFloat32(s.BarWidth, DefaultBarWidth)
-	categoryWidth := plotRect.W / float32(n)
+	categoryWidth := categoryWidthOf(coordSys, n)
 	bw := categoryWidth * barWidth
 
 	baselinePos := coordSys.DataToPixel(0, 0)
@@ -118,13 +118,12 @@ func (r *barRenderer) Render(ctx RenderContext) []core.CanvasObject {
 		return nil
 	}
 
-	bounds := ctx.Coord.Bounds()
 	n := len(bs.Data)
 
 	// Compute bar geometry
 	barWidth := ResolveFloat32(bs.BarWidth, DefaultBarWidth)
 
-	categoryWidth := bounds.W / float32(n)
+	categoryWidth := categoryWidthOf(ctx.Coord, n)
 	bw := categoryWidth * barWidth
 
 	fillColor := ResolveColor(bs.Color, ctx.Color)
