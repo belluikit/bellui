@@ -439,3 +439,27 @@ func TestDirectionOf_AddRemoveUpdateTheCacheInPlace(t *testing.T) {
 	assert.Greater(t, afterLookups, lookups, "the lookups reached the cache")
 	assert.Equal(t, builds, after, "no Add or Remove rebuilt it")
 }
+
+// The cache of objects on windows with a direction of their own follows an
+// object a Container takes in or gives up between frames: added to a box on
+// a right-to-left window it is right to left, and moved from there to a box on
+// a window in the global direction it is not (#772).
+func TestDirectionOf_DirectedWindowCacheFollowsAddRemove(t *testing.T) {
+	test.NewTempApp(t)
+	lang.SetLocaleForTests(t, "en-US")
+	rtlBox, ltrBox := container.NewVBox(minRect(10, 10)), container.NewVBox(minRect(10, 10))
+	ltr := test.NewTempWindow(t, ltrBox)
+	ltr.Resize(geo.NewSize(200, 200))
+	rtl := test.NewTempWindow(t, rtlBox)
+	rtl.Canvas().(interface{ SetDirection(bellui.Direction) }).SetDirection(bellui.DirectionRTL)
+	rtl.Resize(geo.NewSize(200, 200))
+	require.Equal(t, bellui.DirectionRTL, container.DirectionOf(rtlBox.Objects[0]), "the lookup builds the cache")
+
+	moved := minRect(10, 10)
+	rtlBox.Add(moved)
+	assert.Equal(t, bellui.DirectionRTL, container.DirectionOf(moved))
+
+	rtlBox.Remove(moved)
+	ltrBox.Add(moved)
+	assert.Equal(t, bellui.DirectionLTR, container.DirectionOf(moved))
+}

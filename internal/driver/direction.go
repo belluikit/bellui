@@ -16,7 +16,10 @@ import (
 
 func init() {
 	dirhook.SetAround(InDirectionOf)
-	dirhook.SetMoved(index.moved)
+	dirhook.SetMoved(func(parent, obj core.CanvasObject, added bool) {
+		index.moved(parent, obj, added)
+		windows.moved(parent, obj, added)
+	})
 }
 
 // DirectionOf reports the layout direction that applies to obj where it sits:
@@ -55,7 +58,11 @@ func DirectionOf(obj core.CanvasObject) (bellui.Direction, bool) {
 	// Not registered by a driver's layout walk (the test canvas registers
 	// nothing, and an object not yet laid out is on no canvas): look for obj
 	// in each window with a direction of its own, since the driver's
-	// CanvasForObject may only guess.
+	// CanvasForObject may only guess. The cache of those windows' objects
+	// answers most lookups (#772); a miss walks the windows themselves.
+	if d, found := windows.lookup(obj); found {
+		return d, true
+	}
 	a := bellui.CurrentApp()
 	if a == nil || a.Driver() == nil {
 		return bellui.DirectionAuto, false
@@ -366,6 +373,113 @@ func indexChildren(o core.CanvasObject) []core.CanvasObject {
 		}
 	}
 	return nil
+}
+
+// windows is the process' cache of the objects on windows with a direction
+// of their own; see windowIndex.
+var windows windowIndex
+
+// windowIndex caches, for every object in the content or overlays of a
+// window whose canvas has its own direction, that direction. It serves
+// DirectionOf for objects no driver walk registered on a canvas — every
+// object on the test canvas, an object not yet laid out — which otherwise
+// walk every such window per lookup: on the test canvas a Refresh of each of
+// 1000 labels walked the whole window (#772).
+//
+// It is built on the first lookup that reaches it after dirhook.Epoch moved,
+// so a driver whose walk registers its objects never builds it, and kept
+// current through a Container's Add and Remove as dirIndex is. Between
+// rebuilds an object a renderer put on a window on its own is missed, and the
+// caller walks the windows for it; one a renderer dropped keeps its window's
+// direction, which applies to nothing until it is shown again.
+type windowIndex struct {
+	mu    sync.Mutex
+	epoch uint64
+	valid bool
+	dirs  map[core.CanvasObject]bellui.Direction
+}
+
+// lookup returns the direction of the window obj is on; found is false when
+// obj is on no window with a direction of its own, as far as the cache knows.
+func (x *windowIndex) lookup(obj core.CanvasObject) (bellui.Direction, bool) {
+	x.mu.Lock()
+	defer x.mu.Unlock()
+	if e := dirhook.Epoch(); !x.valid || x.epoch != e {
+		x.epoch, x.valid = e, true
+		x.build()
+	}
+	d, ok := x.dirs[obj]
+	return d, ok
+}
+
+// build fills x.dirs from the overlays and content of every window whose
+// canvas has a direction of its own.
+func (x *windowIndex) build() {
+	if x.dirs == nil {
+		x.dirs = map[core.CanvasObject]bellui.Direction{}
+	} else {
+		clear(x.dirs)
+	}
+	a := bellui.CurrentApp()
+	if a == nil || a.Driver() == nil {
+		return
+	}
+	for _, w := range a.Driver().AllWindows() {
+		c := w.Canvas()
+		if c == nil || c.Content() == nil {
+			continue
+		}
+		d, ok := canvasDirection(c)
+		if !ok {
+			continue
+		}
+		for _, root := range canvasRoots(c) {
+			if root != nil {
+				x.walk(root, d)
+			}
+		}
+	}
+}
+
+// walk records o and its subtree as on a window whose direction is d.
+func (x *windowIndex) walk(o core.CanvasObject, d bellui.Direction) {
+	x.dirs[o] = d
+	for _, c := range indexChildren(o) {
+		if c != nil {
+			x.walk(c, d)
+		}
+	}
+}
+
+// forget drops o's subtree from the cache.
+func (x *windowIndex) forget(o core.CanvasObject) {
+	delete(x.dirs, o)
+	for _, c := range indexChildren(o) {
+		if c != nil {
+			x.forget(c)
+		}
+	}
+}
+
+// moved takes obj's subtree in after it was added to parent, when parent is
+// on a directed window, or out after it left parent; see dirIndex.moved. A
+// cache already stale is left for the next lookup to rebuild.
+func (x *windowIndex) moved(parent, obj core.CanvasObject, added bool) {
+	if obj == nil {
+		return
+	}
+	x.mu.Lock()
+	defer x.mu.Unlock()
+	if !x.valid || x.epoch != dirhook.Epoch() {
+		return
+	}
+	if !added {
+		x.forget(obj)
+		return
+	}
+	if d, ok := x.dirs[parent]; ok {
+		x.walk(obj, d)
+	}
 }
 
 // DirectionIndexStats reports how many times the direction cache was rebuilt,
