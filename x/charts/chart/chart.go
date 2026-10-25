@@ -283,6 +283,12 @@ func (c *Chart) SetZoomWindow(w interact.DataWindow) {
 
 // DrillInto pushes the current state and replaces the chart option with a child.
 func (c *Chart) DrillInto(label string, childOpt Option) {
+	c.drillInto(label, childOpt, nil)
+}
+
+// drillInto is DrillInto with the data point that was clicked, which the
+// DrilldownEvent carries as Hit (#343); nil when the app drills in itself.
+func (c *Chart) drillInto(label string, childOpt Option, hit *interact.HitResult) {
 	c.mu.Lock()
 	c.drilldownStack = append(c.drilldownStack, drilldownEntry{
 		Label:  label,
@@ -306,6 +312,7 @@ func (c *Chart) DrillInto(label string, childOpt Option) {
 	c.Events.Emit(interact.DrilldownEvent{
 		Event: interact.Event{Type: interact.EventDrilldown},
 		Path:  c.DrillPath(),
+		Hit:   hit,
 	})
 
 	if childOpt.Animation {
@@ -317,14 +324,21 @@ func (c *Chart) DrillInto(label string, childOpt Option) {
 
 // DrillUp pops one level from the drilldown stack.
 func (c *Chart) DrillUp() {
+	c.drillToDepth(len(c.DrillPath()) - 1)
+}
+
+// drillToDepth goes back to the level that breadcrumb depth names: depth 0 is
+// the top-level chart. A breadcrumb click and DrillUp both come here, so each
+// restores the same state and emits the same EventDrillUp; a breadcrumb click
+// used to emit nothing and keep the child's zoom (#343).
+func (c *Chart) drillToDepth(depth int) {
 	c.mu.Lock()
-	n := len(c.drilldownStack)
-	if n == 0 {
+	if depth < 0 || depth >= len(c.drilldownStack) {
 		c.mu.Unlock()
 		return
 	}
-	entry := c.drilldownStack[n-1]
-	c.drilldownStack = c.drilldownStack[:n-1]
+	entry := c.drilldownStack[depth]
+	c.drilldownStack = c.drilldownStack[:depth]
 	c.option = entry.Option
 	c.legendToggles = make(map[string]bool)
 	c.rangeDirty = true
@@ -340,24 +354,6 @@ func (c *Chart) DrillUp() {
 		Event: interact.Event{Type: interact.EventDrillUp},
 		Path:  c.DrillPath(),
 	})
-	c.refreshDirty(dirtyFull)
-}
-
-// drillToDepth pops the stack down to a specific depth.
-func (c *Chart) drillToDepth(depth int) {
-	c.mu.Lock()
-	for len(c.drilldownStack) > depth+1 {
-		c.drilldownStack = c.drilldownStack[:len(c.drilldownStack)-1]
-	}
-	if len(c.drilldownStack) > 0 {
-		entry := c.drilldownStack[len(c.drilldownStack)-1]
-		c.drilldownStack = c.drilldownStack[:len(c.drilldownStack)-1]
-		c.option = entry.Option
-		c.legendToggles = make(map[string]bool)
-		c.rangeDirty = true
-		c.animStarted = false
-	}
-	c.mu.Unlock()
 	c.refreshDirty(dirtyFull)
 }
 
@@ -895,7 +891,7 @@ func (c *Chart) Tapped(e *event.PointEvent) {
 				if hit.Value.Label != "" {
 					label = hit.Value.Label
 				}
-				c.DrillInto(label, *childOpt)
+				c.drillInto(label, *childOpt, hit)
 			}
 		}
 	default:
