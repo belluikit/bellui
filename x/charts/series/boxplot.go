@@ -28,6 +28,12 @@ func (s *BoxplotSeries) SeriesType() Type { return TypeBoxplot }
 func (s *BoxplotSeries) Name() string     { return s.SeriesName }
 func (s *BoxplotSeries) sealed()          {}
 
+// SeriesColor returns the colour set for the series, or nil for the palette
+// colour (see ColoredSeries).
+//
+// Since: 1.3
+func (s *BoxplotSeries) SeriesColor() color.Color { return s.Color }
+
 // GetYAxisIndex returns the Y axis index for this series.
 func (s *BoxplotSeries) GetYAxisIndex() int { return s.YAxisIndex }
 

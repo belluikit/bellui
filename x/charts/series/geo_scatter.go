@@ -26,6 +26,12 @@ func (s *GeoScatterSeries) SeriesType() Type { return TypeGeoScatter }
 func (s *GeoScatterSeries) Name() string     { return s.SeriesName }
 func (s *GeoScatterSeries) sealed()          {}
 
+// SeriesColor returns the colour set for the series, or nil for the palette
+// colour (see ColoredSeries).
+//
+// Since: 1.3
+func (s *GeoScatterSeries) SeriesColor() color.Color { return s.Color }
+
 func (s *GeoScatterSeries) PointCount() int { return len(s.Data) / 2 }
 func (s *GeoScatterSeries) Point(i int) (float64, float64) {
 	idx := i * 2

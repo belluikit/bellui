@@ -52,6 +52,19 @@ type Series interface {
 	sealed()
 }
 
+// ColoredSeries is implemented by the series types that can set one colour
+// for the whole series. The legend shows that colour for the series, and the
+// palette colour when SeriesColor returns nil. Series that colour each item
+// on its own (pie slices, funnel stages, gauge sectors) do not implement it.
+//
+// Since: 1.3
+type ColoredSeries interface {
+	Series
+	// SeriesColor returns the colour the series is drawn in, or nil when it
+	// takes the palette colour for its position.
+	SeriesColor() color.Color
+}
+
 // SymbolType defines data point symbol shapes.
 type SymbolType int
 

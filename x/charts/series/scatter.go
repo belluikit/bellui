@@ -34,6 +34,12 @@ func (s *ScatterSeries) Name() string { return s.SeriesName }
 
 func (s *ScatterSeries) sealed() {}
 
+// SeriesColor returns the colour set for the series, or nil for the palette
+// colour (see ColoredSeries).
+//
+// Since: 1.3
+func (s *ScatterSeries) SeriesColor() color.Color { return s.Color }
+
 // GetYAxisIndex returns the Y axis index for this series.
 func (s *ScatterSeries) GetYAxisIndex() int { return s.YAxisIndex }
 
