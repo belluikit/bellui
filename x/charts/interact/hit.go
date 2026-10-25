@@ -48,13 +48,17 @@ type HitTester struct {
 
 // spatialGrid is a simple uniform-grid spatial index that maps pixel positions
 // to the (entryIdx, pointIdx) pairs stored in HitTester.entries[].points[].
-// It maintains two indices:
+// It maintains three indices:
 //   - cells: a 2D grid for FindNearest (keyed by (cx, cy) cell coordinates)
 //   - xCols: a 1D column index for FindAllAtX (keyed by cx only)
+//   - barCols: the same column index for bars and candles, whose gridEntry
+//     pointIdx indexes entry.bars; FindAllAtX reads it so a pane of bars or
+//     candles gets an axis tooltip and crosshair too (#343)
 type spatialGrid struct {
 	cellSize float32
 	cells    map[gridKey][]gridEntry
 	xCols    map[int][]gridEntry
+	barCols  map[int][]gridEntry
 }
 
 type gridKey struct {
@@ -122,6 +126,7 @@ func NewHitTester() *HitTester {
 			cellSize: defaultGridCellSize,
 			cells:    make(map[gridKey][]gridEntry),
 			xCols:    make(map[int][]gridEntry),
+			barCols:  make(map[int][]gridEntry),
 		},
 	}
 }
@@ -151,6 +156,9 @@ func (g *spatialGrid) clear() {
 	for k := range g.xCols {
 		delete(g.xCols, k)
 	}
+	for k := range g.barCols {
+		delete(g.barCols, k)
+	}
 }
 
 // Clear removes all registered series.
@@ -163,6 +171,16 @@ func (ht *HitTester) Clear() {
 func (ht *HitTester) indexEntryPoints(entryIdx int) {
 	for pi, p := range ht.entries[entryIdx].points {
 		ht.grid.insert(p.pixelPos.X, p.pixelPos.Y, entryIdx, pi)
+	}
+}
+
+// indexEntryBars inserts the centre X of every bar of the entry at entryIdx
+// into the bar column index.
+func (ht *HitTester) indexEntryBars(entryIdx int) {
+	g := &ht.grid
+	for bi, b := range ht.entries[entryIdx].bars {
+		cx := int(math.Floor(float64(b.pixelPos.X / g.cellSize)))
+		g.barCols[cx] = append(g.barCols[cx], gridEntry{entryIdx: entryIdx, pointIdx: bi})
 	}
 }
 
@@ -204,6 +222,7 @@ func (ht *HitTester) AddHitBars(seriesIndex int, name string, sType series.Type,
 		}
 	}
 	ht.entries = append(ht.entries, e)
+	ht.indexEntryBars(len(ht.entries) - 1)
 }
 
 // AddLineSeries registers pixel positions for a line series.
@@ -255,6 +274,7 @@ func (ht *HitTester) AddBarSeries(seriesIndex int, name string, coordSys coord.S
 		}
 	}
 	ht.entries = append(ht.entries, e)
+	ht.indexEntryBars(len(ht.entries) - 1)
 }
 
 // AddScatterSeries registers pixel positions for a scatter series.
@@ -307,6 +327,7 @@ func (ht *HitTester) AddCandlestickBars(seriesIndex int, name string, coordSys c
 		}
 	}
 	ht.entries = append(ht.entries, e)
+	ht.indexEntryBars(len(ht.entries) - 1)
 }
 
 // AddGeoPoints registers pre-projected pixel positions for geo scatter hit testing.
@@ -479,12 +500,13 @@ func (ht *HitTester) FindAllAtX(pos geo.Position, threshold float32) []HitResult
 	centerCX := int(math.Floor(float64(pos.X / ht.grid.cellSize)))
 
 	for dcx := -cellRadius; dcx <= cellRadius; dcx++ {
-		for _, ge := range ht.grid.xCols[centerCX+dcx] {
-			p := ht.entries[ge.entryIdx].points[ge.pointIdx]
-			dx := float32(math.Abs(float64(pos.X - p.pixelPos.X)))
-			if dx < nearestXDist {
-				nearestXDist = dx
-				nearestX = p.pixelPos.X
+		for _, bars := range [2]bool{false, true} {
+			for _, ge := range ht.grid.columns(bars)[centerCX+dcx] {
+				x := ht.columnHit(ge, bars).PixelPos.X
+				if dx := float32(math.Abs(float64(pos.X - x))); dx < nearestXDist {
+					nearestXDist = dx
+					nearestX = x
+				}
 			}
 		}
 	}
@@ -502,19 +524,12 @@ func (ht *HitTester) FindAllAtX(pos geo.Position, threshold float32) []HitResult
 	// Scan X columns in a narrow band around nearestX.
 	nearCX := int(math.Floor(float64(nearestX / ht.grid.cellSize)))
 	for dcx := -1; dcx <= 1; dcx++ {
-		for _, ge := range ht.grid.xCols[nearCX+dcx] {
-			p := ht.entries[ge.entryIdx].points[ge.pointIdx]
-			if float32(math.Abs(float64(p.pixelPos.X-nearestX))) < 1 {
-				if _, ok := seriesHits[ge.entryIdx]; !ok {
-					e := ht.entries[ge.entryIdx]
-					seriesHits[ge.entryIdx] = &seriesHit{
-						hit: HitResult{
-							SeriesIndex: e.seriesIndex,
-							DataIndex:   p.dataIndex,
-							SeriesName:  e.seriesName,
-							Value:       p.value,
-							PixelPos:    p.pixelPos,
-						},
+		for _, bars := range [2]bool{false, true} {
+			for _, ge := range ht.grid.columns(bars)[nearCX+dcx] {
+				hit := ht.columnHit(ge, bars)
+				if float32(math.Abs(float64(hit.PixelPos.X-nearestX))) < 1 {
+					if _, ok := seriesHits[ge.entryIdx]; !ok {
+						seriesHits[ge.entryIdx] = &seriesHit{hit: hit}
 					}
 				}
 			}
@@ -534,6 +549,29 @@ func (ht *HitTester) FindAllAtX(pos geo.Position, threshold float32) []HitResult
 	}
 
 	return results
+}
+
+// columnHit is the hit for a column index entry: a bar or candle of
+// entry.bars when bars is set (barCols), else a point of entry.points (xCols).
+func (ht *HitTester) columnHit(ge gridEntry, bars bool) HitResult {
+	e := &ht.entries[ge.entryIdx]
+	h := HitResult{SeriesIndex: e.seriesIndex, SeriesName: e.seriesName}
+	if bars {
+		b := e.bars[ge.pointIdx]
+		h.DataIndex, h.Value, h.PixelPos = b.dataIndex, b.value, b.pixelPos
+	} else {
+		p := e.points[ge.pointIdx]
+		h.DataIndex, h.Value, h.PixelPos = p.dataIndex, p.value, p.pixelPos
+	}
+	return h
+}
+
+// columns returns the column index columnHit reads with the same bars flag.
+func (g *spatialGrid) columns(bars bool) map[int][]gridEntry {
+	if bars {
+		return g.barCols
+	}
+	return g.xCols
 }
 
 func (ht *HitTester) hitTestPie(e hitEntry, pos geo.Position) *HitResult {

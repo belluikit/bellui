@@ -27,7 +27,9 @@ func (b *BrushState) BrushRect() (geo.Position, geo.Size) {
 	return geo.NewPos(x1, y1), geo.NewSize(x2-x1, y2-y1)
 }
 
-// FindSelectedPoints returns all hit tester points within the brush rectangle.
+// FindSelectedPoints returns all hit tester points within the brush rectangle,
+// and every bar or candle the rectangle overlaps; bars and candles were never
+// selected (#343).
 func FindSelectedPoints(ht *HitTester, brushPos geo.Position, brushSize geo.Size) []BrushSelectedPoint {
 	var selected []BrushSelectedPoint
 	bx1 := brushPos.X
@@ -43,6 +45,16 @@ func FindSelectedPoints(ht *HitTester, brushPos geo.Position, brushSize geo.Size
 					SeriesIndex: e.seriesIndex,
 					DataIndex:   p.dataIndex,
 					Value:       p.value,
+				})
+			}
+		}
+		for _, b := range e.bars {
+			if b.rect.x <= bx2 && b.rect.x+b.rect.w >= bx1 &&
+				b.rect.y <= by2 && b.rect.y+b.rect.h >= by1 {
+				selected = append(selected, BrushSelectedPoint{
+					SeriesIndex: e.seriesIndex,
+					DataIndex:   b.dataIndex,
+					Value:       b.value,
 				})
 			}
 		}
