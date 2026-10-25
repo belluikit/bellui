@@ -90,9 +90,9 @@ func (p *PopUpMenu) Resize(size geo.Size) {
 // Show makes the pop-up menu visible.
 func (p *PopUpMenu) Show() {
 	p.Menu.alignment = p.alignment
-	p.Menu.Refresh()
-
 	p.overlay.Show()
+	// Refreshed once on its canvas, so the items take its direction (#769).
+	p.Menu.Refresh()
 	p.Menu.Show()
 	if !bellui.CurrentDevice().IsMobile() {
 		p.canvas.Focus(p)
@@ -121,10 +121,14 @@ func (p *PopUpMenu) TypedKey(e *event.KeyEvent) {
 		p.TriggerLast()
 	case event.KeyEscape:
 		p.Dismiss()
-	case event.KeyLeft:
-		p.DeactivateLastSubmenu()
-	case event.KeyRight:
-		p.ActivateLastSubmenu()
+	case event.KeyLeft, event.KeyRight:
+		// The key toward the side submenus open on opens one, the other
+		// closes it: Right and Left, swapped under right-to-left (#769).
+		if (e.Name == event.KeyRight) != isRTLAt(p) {
+			p.ActivateLastSubmenu()
+		} else {
+			p.DeactivateLastSubmenu()
+		}
 	case event.KeyUp:
 		p.ActivatePrevious()
 	}

@@ -306,18 +306,30 @@ func (r *menuRenderer) layoutActiveChild() {
 	}
 
 	itemSize := item.Size()
+	childSize := item.Child().Size()
+	// A submenu opens on the trailing side of its item: to the right, or to
+	// the left under a right-to-left layout (#769). It flips to the other side
+	// when it does not fit, and is pinned to the canvas edge when neither does.
+	rtl := isRTLAt(r.m.super())
 	cp := geo.NewPos(itemSize.Width, item.Position().Y)
+	if rtl {
+		cp.X = -childSize.Width
+	}
 	d := bellui.CurrentApp().Driver()
 	c := d.CanvasForObject(item)
 	if c != nil {
 		absPos := d.AbsolutePositionForObject(item)
-		childSize := item.Child().Size()
-		if absPos.X+itemSize.Width+childSize.Width > c.Size().Width {
-			if absPos.X-childSize.Width >= 0 {
-				cp.X = -childSize.Width
-			} else {
-				cp.X = c.Size().Width - absPos.X - childSize.Width
-			}
+		fitsRight := absPos.X+itemSize.Width+childSize.Width <= c.Size().Width
+		fitsLeft := absPos.X-childSize.Width >= 0
+		switch {
+		case rtl && !fitsLeft && fitsRight:
+			cp.X = itemSize.Width
+		case rtl && !fitsLeft:
+			cp.X = -absPos.X
+		case !rtl && !fitsRight && fitsLeft:
+			cp.X = -childSize.Width
+		case !rtl && !fitsRight:
+			cp.X = c.Size().Width - absPos.X - childSize.Width
 		}
 		requiredHeight := childSize.Height - r.m.Theme().Size(theme.SizeNamePadding)
 		availableHeight := c.Size().Height - absPos.Y
