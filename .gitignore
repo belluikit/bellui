@@ -86,3 +86,6 @@ coverage.txt
 /rasterstream
 /singleinstance
 /wasm
+
+# Release check reports and checklists (make release-run, make release-list)
+release-validation-*.md
