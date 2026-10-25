@@ -802,6 +802,15 @@ func (c *Chart) Tapped(e *event.PointEvent) {
 		c.tooltipState.Pinned = false
 	}
 	if !hasDrawingTool && c.tooltipState.Visible && len(c.tooltipState.Hits) > 0 {
+		// A click on a drawing selects it rather than pinning the tooltip the
+		// hover over it opened: with a tooltip on, a drawing was otherwise
+		// never selectable (#343).
+		c.mu.Unlock()
+		if c.handleDrawingSelect(e.Position) {
+			c.Refresh()
+			return
+		}
+		c.mu.Lock()
 		// Pin the current tooltip.
 		c.tooltipState.Pinned = true
 		c.tooltipState.PinTime = time.Now()
