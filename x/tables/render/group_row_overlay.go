@@ -9,6 +9,7 @@ import (
 	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/theme"
 	"github.com/belluikit/bellui/widget"
 	"github.com/belluikit/bellui/x/tables/cell"
 )
@@ -190,6 +191,7 @@ func (r *groupRowOverlayRenderer) refresh(size geo.Size) {
 	r.clip.Refresh()
 
 	r.objects = []core.CanvasObject{r.clip}
+	theme.MatchScope(r.widget, r.clip) // see CellsRenderer.refreshCells (#758)
 }
 
 // aggGeometry places a group row's aggregates in their columns using the same

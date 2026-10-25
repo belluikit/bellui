@@ -196,6 +196,29 @@ func CurrentForWidget(w core.CanvasObject) bellui.Theme {
 	return Current()
 }
 
+// MatchScope gives each of objs the theme override that parent carries, so
+// objects a widget makes after a ThemeOverride was applied — rows, cells or
+// dividers a collection adds as it grows — draw with the override instead of
+// the app theme. An object that already carries parent's override is left
+// alone, so calling this on every layout costs one lookup per object. It does
+// nothing when parent is not inside an override.
+//
+// Since: 1.3
+func MatchScope(parent core.CanvasObject, objs ...core.CanvasObject) {
+	id := cache.WidgetScopeID(parent)
+	if id == "" {
+		return
+	}
+	for _, o := range objs {
+		if o == nil || cache.WidgetScopeID(o) == id {
+			continue
+		}
+		if cache.OverrideThemeMatchingScope(o, parent) {
+			o.Refresh()
+		}
+	}
+}
+
 func currentVariant() bellui.ThemeVariant {
 	cur := Current()
 	if std, ok := cur.(*builtinTheme); ok {

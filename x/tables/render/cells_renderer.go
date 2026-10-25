@@ -6,6 +6,7 @@ import (
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/theme"
 	"github.com/belluikit/bellui/widget"
 )
 
@@ -521,6 +522,9 @@ func (r *CellsRenderer) refreshCells() {
 	}
 
 	r.objects = objects
+	// Rows, checkboxes and hosts made at this layout postdate any theme
+	// override around the grid, so they take its scope here (#758).
+	theme.MatchScope(r.cells, objects...)
 }
 
 func max(a, b int) int {

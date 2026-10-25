@@ -3,6 +3,7 @@ package render
 import (
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/theme"
 	"github.com/belluikit/bellui/widget"
 )
 
@@ -96,4 +97,5 @@ func (r *floatingFilterRenderer) rebuild(size geo.Size) {
 		return append(dst, entry)
 	}
 	r.objects = r.bands.layout(grid, size, place)
+	theme.MatchScope(r.row, r.objects...) // see CellsRenderer.refreshCells (#758)
 }
