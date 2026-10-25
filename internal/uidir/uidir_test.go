@@ -163,6 +163,12 @@ func TestPopOwned_PopsWhatTheOwnerPushed(t *testing.T) {
 // On the main goroutine a push and its pop allocate nothing once the stack
 // exists: a Refresh outside a walk does one of each per widget (#772).
 func TestPushPop_MainGoroutineDoesNotAllocate(t *testing.T) {
+	if testing.AllocsPerRun(10, func() { _ = thread.GoroutineID() }) > 0 {
+		// Without the runtime's goroutine record (js/wasm, gccgo, other
+		// architectures) the ID is parsed from a stack trace, whose buffer
+		// escapes: that costs an allocation per lookup, push or pop alike.
+		t.Skip("thread.GoroutineID allocates on this platform")
+	}
 	thread.SetMainGoroutine()
 	Push(bellui.DirectionRTL)
 	Pop(bellui.DirectionRTL)
