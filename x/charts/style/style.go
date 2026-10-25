@@ -158,14 +158,19 @@ func (r *Resolver) OverlayDefaultBandColor() color.Color {
 	return color.NRGBA{R: 91, G: 143, B: 249, A: 40}
 }
 
-// OverlayLabelColor returns the color for reference band labels.
+// OverlayLabelColor returns the color for reference band labels: the theme's
+// foreground, as they sit on the plot. A fixed light grey was faint on a light
+// theme (#343).
 func (r *Resolver) OverlayLabelColor() color.Color {
-	return color.NRGBA{R: 150, G: 150, B: 150, A: 200}
+	return r.themeColor(theme.ColorNameForeground, color.NRGBA{R: 150, G: 150, B: 150, A: 200})
 }
 
-// AnnotationBackgroundColor returns the background color for annotation labels.
+// AnnotationBackgroundColor returns the background color for annotation
+// labels: the theme's overlay background, under text in the theme's
+// foreground. A fixed dark grey put dark text on a dark chip on a light theme
+// (#343).
 func (r *Resolver) AnnotationBackgroundColor() color.Color {
-	return color.NRGBA{R: 50, G: 50, B: 50, A: 200}
+	return r.themeColor(theme.ColorNameOverlayBackground, color.NRGBA{R: 50, G: 50, B: 50, A: 200})
 }
 
 // BreadcrumbBackgroundColor returns the background color for breadcrumb buttons.
@@ -188,14 +193,29 @@ func (r *Resolver) BreadcrumbSeparatorColor() color.Color {
 	return color.NRGBA{R: 120, G: 120, B: 120, A: 200}
 }
 
-// LegendTextColor returns the color for legend item labels.
+// LegendTextColor returns the color for legend item labels: the theme's
+// foreground. A fixed light grey was nearly invisible on a light theme (#343).
 func (r *Resolver) LegendTextColor() color.Color {
-	return color.NRGBA{R: 200, G: 200, B: 200, A: 255}
+	return r.themeColor(theme.ColorNameForeground, color.NRGBA{R: 200, G: 200, B: 200, A: 255})
 }
 
-// LegendDimmedTextColor returns the color for hidden/toggled-off legend items.
+// LegendDimmedTextColor returns the color for hidden/toggled-off legend items:
+// the theme's disabled colour.
 func (r *Resolver) LegendDimmedTextColor() color.Color {
-	return color.NRGBA{R: 120, G: 120, B: 120, A: 255}
+	return r.themeColor(theme.ColorNameDisabled, color.NRGBA{R: 120, G: 120, B: 120, A: 255})
+}
+
+// themeColor is the theme's colour name, or fallback for a nil Resolver: the
+// component render functions accept one, and the colours that were fixed
+// before they followed the theme must keep working without it.
+func (r *Resolver) themeColor(name bellui.ThemeColorName, fallback color.Color) color.Color {
+	if r == nil || r.th == nil {
+		return fallback
+	}
+	if c := r.th.Color(name, r.variant); c != nil {
+		return c
+	}
+	return fallback
 }
 
 // LegendSwatchSize returns the size of the color swatch in legend items.

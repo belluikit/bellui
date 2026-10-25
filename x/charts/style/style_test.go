@@ -203,32 +203,20 @@ func TestOverlayDefaultBandColor(t *testing.T) {
 }
 
 func TestOverlayLabelColor(t *testing.T) {
-	r := NewResolver(&testTheme{}, 0)
-	c := r.OverlayLabelColor()
-	if c == nil {
-		t.Error("OverlayLabelColor returned nil")
-	}
-	nrgba, ok := c.(color.NRGBA)
-	if !ok {
-		t.Fatal("OverlayLabelColor did not return color.NRGBA")
-	}
-	if nrgba.R != 150 || nrgba.G != 150 || nrgba.B != 150 || nrgba.A != 200 {
-		t.Errorf("OverlayLabelColor = %v, unexpected value", nrgba)
+	for _, v := range []bellui.ThemeVariant{theme.VariantLight, theme.VariantDark} {
+		r := NewResolver(&testTheme{}, v)
+		if got, want := r.OverlayLabelColor(), theme.DefaultTheme().Color(theme.ColorNameForeground, v); got != want {
+			t.Errorf("variant %d: OverlayLabelColor = %v, want the theme's %v", v, got, want)
+		}
 	}
 }
 
 func TestAnnotationBackgroundColor(t *testing.T) {
-	r := NewResolver(&testTheme{}, 0)
-	c := r.AnnotationBackgroundColor()
-	if c == nil {
-		t.Error("AnnotationBackgroundColor returned nil")
-	}
-	nrgba, ok := c.(color.NRGBA)
-	if !ok {
-		t.Fatal("AnnotationBackgroundColor did not return color.NRGBA")
-	}
-	if nrgba.R != 50 || nrgba.G != 50 || nrgba.B != 50 || nrgba.A != 200 {
-		t.Errorf("AnnotationBackgroundColor = %v, unexpected value", nrgba)
+	for _, v := range []bellui.ThemeVariant{theme.VariantLight, theme.VariantDark} {
+		r := NewResolver(&testTheme{}, v)
+		if got, want := r.AnnotationBackgroundColor(), theme.DefaultTheme().Color(theme.ColorNameOverlayBackground, v); got != want {
+			t.Errorf("variant %d: AnnotationBackgroundColor = %v, want the theme's %v", v, got, want)
+		}
 	}
 }
 
@@ -289,5 +277,19 @@ func TestBreadcrumbSeparatorColor(t *testing.T) {
 	}
 	if nrgba.R != 120 || nrgba.G != 120 || nrgba.B != 120 || nrgba.A != 200 {
 		t.Errorf("BreadcrumbSeparatorColor = %v, unexpected value", nrgba)
+	}
+}
+
+// Legend text follows the theme; a fixed light grey was nearly invisible on a
+// light theme (#343).
+func TestLegendTextColors(t *testing.T) {
+	for _, v := range []bellui.ThemeVariant{theme.VariantLight, theme.VariantDark} {
+		r := NewResolver(&testTheme{}, v)
+		if got, want := r.LegendTextColor(), theme.DefaultTheme().Color(theme.ColorNameForeground, v); got != want {
+			t.Errorf("variant %d: LegendTextColor = %v, want the theme's foreground %v", v, got, want)
+		}
+		if got, want := r.LegendDimmedTextColor(), theme.DefaultTheme().Color(theme.ColorNameDisabled, v); got != want {
+			t.Errorf("variant %d: LegendDimmedTextColor = %v, want the theme's disabled %v", v, got, want)
+		}
 	}
 }
