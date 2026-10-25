@@ -117,7 +117,9 @@ func TestMobileCanvas_MenuChild(t *testing.T) {
 
 func dummyWin(d *driver, title string) *window {
 	ret := &window{title: title}
+	d.windowsMu.Lock()
 	d.windows = append(d.windows, ret)
+	d.windowsMu.Unlock()
 
 	return ret
 }
