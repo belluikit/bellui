@@ -3,6 +3,7 @@ package bellui
 import (
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/dirhook"
 	"github.com/belluikit/bellui/internal/layoutgen"
 	"github.com/belluikit/bellui/internal/paintgen"
 )
@@ -32,6 +33,7 @@ func (c *Container) Add(add core.CanvasObject) {
 			return
 		}
 		c.Objects = append(c.Objects, add)
+		dirhook.Added(c, add) // add may now be in a direction scope (#749)
 		c.layout()
 		placed(c)
 	})
@@ -79,10 +81,12 @@ func (c *Container) Position() geo.Position {
 
 // Refresh causes this object to be redrawn in its current state
 func (c *Container) Refresh() {
-	c.layout()
-
-	for _, child := range c.Objects {
-		child.Refresh()
+	if dirhook.InUse() {
+		// Outside a layout walk the layout and the children's refreshes run
+		// in the direction c sits in, not the global one (#749).
+		c.refreshTreeInDirection()
+	} else {
+		c.refreshTree()
 	}
 
 	// this is basically just canvas.Refresh(c) without the package loop
@@ -91,6 +95,13 @@ func (c *Container) Refresh() {
 		return
 	}
 	o.Refresh(c)
+}
+
+func (c *Container) refreshTree() {
+	c.doLayout()
+	for _, child := range c.Objects {
+		child.Refresh()
+	}
 }
 
 // Remove updates the contents of this container to no longer include the specified object.
@@ -108,6 +119,7 @@ func (c *Container) Remove(rem core.CanvasObject) {
 		copy(c.Objects[i:], c.Objects[i+1:])
 		c.Objects[len(c.Objects)-1] = nil
 		c.Objects = c.Objects[:len(c.Objects)-1]
+		dirhook.Removed(c, rem) // rem may have left a direction scope (#749)
 		c.layout()
 		placed(c)
 		return
@@ -118,7 +130,13 @@ func (c *Container) Remove(rem core.CanvasObject) {
 //
 // Since: 1.0
 func (c *Container) RemoveAll() {
+	removed := c.Objects
 	c.Objects = nil
+	if dirhook.InUse() {
+		for _, o := range removed {
+			dirhook.Removed(c, o) // o may have left a direction scope (#749)
+		}
+	}
 	c.layout()
 	placed(c)
 }
@@ -159,11 +177,38 @@ func (c *Container) Visible() bool {
 	return !c.Hidden
 }
 
+// layout lays the objects out. Outside a layout walk (Add, Remove, a Resize
+// by hand) it runs in the direction c sits in, so a container inside a
+// DirectionScope mirrors as the walk would have it (#749).
 func (c *Container) layout() {
 	if c.Layout == nil {
 		return
 	}
+	if dirhook.InUse() {
+		c.layoutInDirection()
+		return
+	}
+	c.Layout.Layout(c.Objects, c.size)
+}
 
+// refreshTreeInDirection is refreshTree in the direction c sits in. It takes
+// no closure, so a Refresh allocates nothing for it (#772).
+func (c *Container) refreshTreeInDirection() {
+	defer dirhook.Exit(dirhook.Enter(c))
+	c.refreshTree()
+}
+
+// layoutInDirection is doLayout in the direction c sits in, without a
+// closure (#772).
+func (c *Container) layoutInDirection() {
+	defer dirhook.Exit(dirhook.Enter(c))
+	c.doLayout()
+}
+
+func (c *Container) doLayout() {
+	if c.Layout == nil {
+		return
+	}
 	c.Layout.Layout(c.Objects, c.size)
 }
 

@@ -13,6 +13,7 @@ import (
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/cache"
+	"github.com/belluikit/bellui/internal/dirhook"
 	"github.com/belluikit/bellui/internal/paintgen"
 	internalWidget "github.com/belluikit/bellui/internal/widget"
 	"github.com/belluikit/bellui/theme"
@@ -151,7 +152,14 @@ func (w *BaseWidget) Resize(size geo.Size) {
 		log.Printf("[layout] Resize %T → %v (min %v)", impl, size, w.MinSize())
 	}
 
-	cache.Renderer(impl).Layout(size)
+	r := cache.Renderer(impl)
+	if dirhook.InUse() {
+		// Resized outside a layout walk (by hand, or by a parent's Refresh),
+		// the layout runs in the direction the widget sits in (#749).
+		layoutInDirection(impl, r, size)
+	} else {
+		r.Layout(size)
+	}
 	internalWidget.Repaint(impl)
 }
 
@@ -256,6 +264,24 @@ func (w *BaseWidget) Refresh() {
 
 	w.themeCache.Store(nil)
 
+	// Outside a layout walk (a timer, an animation, a binding, an event) the
+	// sync and the renderer's re-layout run in the direction the widget sits
+	// in, not the global one (#749).
+	if dirhook.InUse() {
+		refreshInDirection(impl)
+	} else {
+		refreshWidget(impl)
+	}
+
+	// 4. The renderer may refresh only its parts, so tell the canvas that the
+	// widget's own min size may have changed too (#464).
+	if m, ok := cache.GetCanvasForObject(impl).(interface{ MarkMinSizeDirty(core.CanvasObject) }); ok {
+		m.MarkMinSizeDirty(impl)
+	}
+}
+
+// refreshWidget runs steps 2 and 3 of [BaseWidget.Refresh].
+func refreshWidget(impl core.Widget) {
 	// 2. Sync state before renderer refresh.
 	if syncer, ok := impl.(StateSyncer); ok {
 		syncer.SyncState()
@@ -263,12 +289,6 @@ func (w *BaseWidget) Refresh() {
 
 	// 3. Renderer refresh.
 	cache.Renderer(impl).Refresh()
-
-	// 4. The renderer may refresh only its parts, so tell the canvas that the
-	// widget's own min size may have changed too (#464).
-	if m, ok := cache.GetCanvasForObject(impl).(interface{ MarkMinSizeDirty(core.CanvasObject) }); ok {
-		m.MarkMinSizeDirty(impl)
-	}
 }
 
 // Theme returns a cached Theme instance for this widget (or its extending widget).
@@ -401,3 +421,17 @@ type noCopy struct{}
 func (*noCopy) Lock() {}
 
 func (*noCopy) Unlock() {}
+
+// layoutInDirection lays impl's renderer out in the direction impl sits in.
+// It takes no closure, so a Resize allocates nothing for it (#772).
+func layoutInDirection(impl core.Widget, r core.WidgetRenderer, size geo.Size) {
+	defer dirhook.Exit(dirhook.Enter(impl))
+	r.Layout(size)
+}
+
+// refreshInDirection is refreshWidget in the direction impl sits in, without
+// a closure (#772).
+func refreshInDirection(impl core.Widget) {
+	defer dirhook.Exit(dirhook.Enter(impl))
+	refreshWidget(impl)
+}

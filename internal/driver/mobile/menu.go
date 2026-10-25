@@ -84,8 +84,9 @@ func (d *driver) findMenu(win *window) *bellui.MainMenu {
 	}
 
 	matched := false
-	for x := len(d.windows) - 1; x >= 0; x-- {
-		w := d.windows[x]
+	windows := d.AllWindows()
+	for x := len(windows) - 1; x >= 0; x-- {
+		w := windows[x]
 		if !matched {
 			if w == win {
 				matched = true

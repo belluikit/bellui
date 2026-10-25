@@ -14,8 +14,11 @@ package uidir
 import (
 	"sync"
 	"sync/atomic"
+	"weak"
 
 	"github.com/belluikit/bellui"
+	"github.com/belluikit/bellui/core"
+	"github.com/belluikit/bellui/internal/dirhook"
 	"github.com/belluikit/bellui/internal/thread"
 )
 
@@ -23,7 +26,18 @@ import (
 // accesses its own key, so there is no contention on individual entries;
 // sync.Map handles concurrent access to different keys. This mirrors the theme
 // stack in internal/theme/render.go.
-var goroutineStacks sync.Map // map[uint64][]bellui.Direction
+//
+// A goroutine's stack is stored once, as a pointer its owner pushes onto and
+// pops in place, so a push or pop allocates nothing once the stack has grown:
+// a Refresh outside a walk pushes and pops one entry per widget (#772). The
+// main goroutine's stack stays stored while empty, as it is pushed onto
+// again at once; any other goroutine's is deleted when it empties, so a
+// goroutine that ends leaves nothing behind.
+var goroutineStacks sync.Map // map[uint64]*dirStack
+
+// dirStack is one goroutine's direction stack. Only its goroutine reads or
+// writes entries.
+type dirStack struct{ entries []entry }
 
 // activeScopes counts the direction scopes pushed across all goroutines, so
 // Current/Mark can skip identifying the goroutine (thread.GoroutineID calls the
@@ -34,16 +48,254 @@ var activeScopes atomic.Int64
 
 // scopesSeen records that a direction scope has been rendered in this process.
 // Until one has, no object can sit inside a scope, so a direction lookup
-// (internal/driver.DirectionOf) can skip walking the canvas — the common case.
+// (internal/driver.DirectionOf) can skip its scope cache — the common case.
 var scopesSeen atomic.Bool
 
 // NoteScope records that a direction scope exists. A scope calls it when its
 // renderer is created, which precedes it having any laid-out content.
-func NoteScope() { scopesSeen.Store(true) }
+func NoteScope() {
+	scopesSeen.Store(true)
+	dirhook.Note()
+}
 
-// ScopesInUse reports whether any direction scope has been rendered in this
-// process; see [NoteScope].
+// NoteDirectedCanvas records that a canvas was given a direction of its own
+// (Canvas.SetDirection), so re-layout outside a walk must ask for an object's
+// direction from now on (internal/dirhook). Unlike [NoteScope] it does not
+// make a lookup walk for scopes.
+func NoteDirectedCanvas() { dirhook.Note() }
+
+// scopes holds every direction scope rendered in this process, weakly: each
+// entry returns its scope, or nil once the scope was collected. The direction
+// cache (internal/driver) walks their subtrees rather than every window, so
+// its cost follows what the scopes hold, not the size of the app (#749).
+var (
+	scopesMu sync.Mutex
+	scopes   []func() core.CanvasObject
+)
+
+// RegisterScope records a rendered direction scope; get returns it, or nil
+// once it is gone (a weak reference, so the registry keeps nothing alive).
+func RegisterScope(get func() core.CanvasObject) {
+	scopesMu.Lock()
+	scopes = append(scopes, get)
+	scopesMu.Unlock()
+	NoteScope()
+	dirhook.Changed()
+}
+
+// Scopes returns the registered scopes still alive, and the overlays that
+// inherited a direction, dropping the scopes that are gone.
+func Scopes() []core.CanvasObject {
+	scopesMu.Lock()
+	live := make([]core.CanvasObject, 0, len(scopes))
+	kept := scopes[:0]
+	for _, get := range scopes {
+		if o := get(); o != nil {
+			live = append(live, o)
+			kept = append(kept, get)
+		}
+	}
+	for i := len(kept); i < len(scopes); i++ {
+		scopes[i] = nil
+	}
+	scopes = kept
+	scopesMu.Unlock()
+
+	for _, e := range loadInherited() {
+		if o := e.get(); o != nil {
+			live = append(live, o)
+		}
+	}
+	pruneInherited()
+	return live
+}
+
+// ScopesInUse reports whether any direction scope has been rendered, or an
+// overlay inherited a direction, in this process; see [NoteScope].
 func ScopesInUse() bool { return scopesSeen.Load() }
+
+// inherited holds the directions overlays take from the widget that opened
+// them (a Select's popup menu, a context menu): an overlay sits outside the
+// content tree, so no scope encloses it (#749). Entries are set by
+// [SetInherited] when the overlay is opened and dropped by [ForgetInherited]
+// when it leaves its canvas' overlay stack. An entry holds its overlay weakly,
+// so an overlay that never leaves a stack through Remove (its window closed
+// with the popup open) is not kept alive by it, and its entry is pruned once
+// it is gone.
+//
+// It is a short slice, not a map: few overlays are open at once, and comparing
+// an object against the stored (pointer) overlays cannot panic the way hashing
+// an uncomparable object value as a map key would. It is copied on write and
+// read without a lock, since the walks read it at every node while an
+// overlay has an entry; inheritedMu orders the writers.
+var (
+	inheritedMu   sync.Mutex
+	inheritedList atomic.Pointer[[]inheritedEntry]
+)
+
+type inheritedEntry struct {
+	get func() core.CanvasObject // the overlay, or nil once it was collected
+	dir bellui.Direction
+}
+
+func loadInherited() []inheritedEntry {
+	if l := inheritedList.Load(); l != nil {
+		return *l
+	}
+	return nil
+}
+
+// storeInherited publishes l; callers hold inheritedMu.
+func storeInherited(l []inheritedEntry) {
+	if len(l) == 0 {
+		inheritedList.Store(nil)
+		return
+	}
+	inheritedList.Store(&l)
+}
+
+// SetInherited makes overlay lay out and paint its subtree in d, as a
+// direction scope around it would. A DirectionAuto d forgets overlay.
+func SetInherited[T any, P interface {
+	*T
+	core.CanvasObject
+}](overlay P, d bellui.Direction,
+) {
+	if overlay == nil {
+		return
+	}
+	if d == bellui.DirectionAuto {
+		ForgetInherited(overlay)
+		return
+	}
+	inheritedMu.Lock()
+	old := loadInherited()
+	l := make([]inheritedEntry, 0, len(old)+1)
+	found := false
+	for _, e := range old {
+		o := e.get()
+		if o == nil {
+			continue // collected
+		}
+		if o == core.CanvasObject(overlay) {
+			e.dir, found = d, true
+		}
+		l = append(l, e)
+	}
+	if !found {
+		wp := weak.Make((*T)(overlay))
+		l = append(l, inheritedEntry{get: func() core.CanvasObject {
+			if p := wp.Value(); p != nil {
+				return P(p)
+			}
+			return nil
+		}, dir: d})
+	}
+	storeInherited(l)
+	inheritedMu.Unlock()
+	NoteScope()
+	dirhook.Changed()
+}
+
+// ForgetInherited drops overlay's inherited direction, if it has one.
+func ForgetInherited(overlay core.CanvasObject) {
+	if inheritedList.Load() == nil || overlay == nil {
+		return
+	}
+	inheritedMu.Lock()
+	old := loadInherited()
+	l := make([]inheritedEntry, 0, len(old))
+	removed := false
+	for _, e := range old {
+		o := e.get()
+		if o == nil || o == overlay {
+			removed = removed || o != nil
+			continue
+		}
+		l = append(l, e)
+	}
+	storeInherited(l)
+	inheritedMu.Unlock()
+	if removed {
+		dirhook.Changed()
+	}
+}
+
+// pruneInherited drops the entries whose overlay was collected.
+func pruneInherited() {
+	for _, e := range loadInherited() {
+		if e.get() == nil {
+			inheritedMu.Lock()
+			old := loadInherited()
+			l := make([]inheritedEntry, 0, len(old))
+			for _, e := range old {
+				if e.get() != nil {
+					l = append(l, e)
+				}
+			}
+			storeInherited(l)
+			inheritedMu.Unlock()
+			return
+		}
+	}
+}
+
+// Inherited returns the direction obj, an overlay, took from its opener; ok
+// is false when it took none. It is a single atomic load while no overlay has
+// one, and takes no lock otherwise.
+func Inherited(obj core.CanvasObject) (bellui.Direction, bool) {
+	l := inheritedList.Load()
+	if l == nil || obj == nil {
+		return bellui.DirectionAuto, false
+	}
+	for _, e := range *l {
+		if o := e.get(); o != nil && o == obj {
+			return e.dir, true
+		}
+	}
+	return bellui.DirectionAuto, false
+}
+
+// entry is one pushed direction. owner is the walked object that pushed it
+// ([PushOwned]), nil for a plain [Push]; overlay marks an owner that pushed
+// as an overlay with an inherited direction.
+type entry struct {
+	dir     bellui.Direction
+	owner   core.CanvasObject
+	overlay bool
+}
+
+// overlayPushes counts the entries pushed by overlays with an inherited
+// direction across all goroutines, so [PopOwned] for an ordinary object can
+// skip identifying the goroutine while none is pushed.
+var overlayPushes atomic.Int64
+
+// stackOf returns the calling goroutine's stack (id is its ID), or nil when
+// it has none.
+func stackOf(id uint64) *dirStack {
+	if val, ok := goroutineStacks.Load(id); ok {
+		return val.(*dirStack)
+	}
+	return nil
+}
+
+// depth is the number of entries on s; s may be nil.
+func (s *dirStack) depth() int {
+	if s == nil {
+		return 0
+	}
+	return len(s.entries)
+}
+
+// truncate drops the entries above depth n, and the stack itself when it
+// empties on any goroutine but the main one (see goroutineStacks).
+func (s *dirStack) truncate(id uint64, n int) {
+	clear(s.entries[n:]) // release references for GC
+	s.entries = s.entries[:n]
+	if n == 0 && !thread.IsMainGoroutine() {
+		goroutineStacks.Delete(id)
+	}
+}
 
 // Current returns the ambient direction override in effect on the calling
 // goroutine, if any. The bool is false when no scope is active, in which case
@@ -53,12 +305,8 @@ func Current() (bellui.Direction, bool) {
 	if activeScopes.Load() == 0 {
 		return bellui.DirectionAuto, false // no DirectionScope anywhere — skip GoroutineID
 	}
-	id := thread.GoroutineID()
-	if val, ok := goroutineStacks.Load(id); ok {
-		stack := val.([]bellui.Direction)
-		if len(stack) > 0 {
-			return stack[len(stack)-1], true
-		}
+	if s := stackOf(thread.GoroutineID()); s.depth() > 0 {
+		return s.entries[len(s.entries)-1].dir, true
 	}
 	return bellui.DirectionAuto, false
 }
@@ -67,17 +315,48 @@ func Current() (bellui.Direction, bool) {
 // matching [Pop]. It is called by a direction scope around the layout and paint
 // of its subtree. Pushing [bellui.DirectionAuto] is a no-op so that an automatic
 // scope transparently inherits the enclosing direction.
-func Push(d bellui.Direction) {
-	if d == bellui.DirectionAuto {
+func Push(d bellui.Direction) { push(entry{dir: d}) }
+
+// PushOwned pushes d for owner, an object a walk visits, until the matching
+// [PopOwned] for owner. A walk pairs them in its before- and after-children
+// callbacks: the pop removes what owner pushed, if anything, even when
+// owner's direction changed in between (#749). overlay marks an overlay that
+// pushes a direction it inherited (see [SetInherited]).
+func PushOwned(d bellui.Direction, owner core.CanvasObject, overlay bool) {
+	push(entry{dir: d, owner: owner, overlay: overlay})
+}
+
+func push(e entry) {
+	if e.dir == bellui.DirectionAuto {
 		return
 	}
 	id := thread.GoroutineID()
-	var stack []bellui.Direction
-	if val, ok := goroutineStacks.Load(id); ok {
-		stack = val.([]bellui.Direction)
+	s := stackOf(id)
+	if s == nil {
+		s = &dirStack{}
+		goroutineStacks.Store(id, s)
 	}
-	goroutineStacks.Store(id, append(stack, d))
+	s.entries = append(s.entries, e)
 	activeScopes.Add(1)
+	if e.overlay {
+		overlayPushes.Add(1)
+	}
+}
+
+// PopOwned removes the direction owner pushed with [PushOwned], if it pushed
+// one: the top entry, when owner is its owner. mayBeScope is false for an
+// object that is not a direction scope, which can only have pushed as an
+// overlay: while no overlay has pushed, that is a single atomic load.
+func PopOwned(owner core.CanvasObject, mayBeScope bool) {
+	if activeScopes.Load() == 0 || (!mayBeScope && overlayPushes.Load() == 0) {
+		return
+	}
+	id := thread.GoroutineID()
+	s := stackOf(id)
+	if s.depth() == 0 || s.entries[len(s.entries)-1].owner != owner {
+		return
+	}
+	popTop(id, s)
 }
 
 // Mark returns the calling goroutine's current direction-stack depth. Pair it
@@ -89,11 +368,7 @@ func Mark() int {
 	if activeScopes.Load() == 0 {
 		return 0
 	}
-	id := thread.GoroutineID()
-	if val, ok := goroutineStacks.Load(id); ok {
-		return len(val.([]bellui.Direction))
-	}
-	return 0
+	return stackOf(thread.GoroutineID()).depth()
 }
 
 // Restore truncates the calling goroutine's direction stack back to the depth
@@ -105,23 +380,18 @@ func Restore(depth int) {
 		return
 	}
 	id := thread.GoroutineID()
-	val, ok := goroutineStacks.Load(id)
-	if !ok {
+	s := stackOf(id)
+	if s.depth() <= depth {
 		return
 	}
-	stack := val.([]bellui.Direction)
-	if len(stack) <= depth {
-		return
+	depth = max(depth, 0)
+	activeScopes.Add(int64(depth - len(s.entries))) // discard the orphaned entries
+	for _, e := range s.entries[depth:] {
+		if e.overlay {
+			overlayPushes.Add(-1)
+		}
 	}
-	activeScopes.Add(int64(depth - len(stack))) // discard the orphaned entries
-	if depth <= 0 {
-		goroutineStacks.Delete(id)
-		return
-	}
-	for i := depth; i < len(stack); i++ {
-		stack[i] = bellui.DirectionAuto // release references for GC
-	}
-	goroutineStacks.Store(id, stack[:depth])
+	s.truncate(id, depth)
 }
 
 // Pop removes the direction installed by the matching [Push]. A Pop balancing a
@@ -131,16 +401,27 @@ func Pop(d bellui.Direction) {
 		return
 	}
 	id := thread.GoroutineID()
-	val, ok := goroutineStacks.Load(id)
-	if !ok {
+	s := stackOf(id)
+	if s.depth() == 0 {
 		return
 	}
+	popTop(id, s)
+}
+
+// PopTop removes the calling goroutine's top direction, whatever pushed it:
+// the pop for a push the caller knows it made with a concrete direction.
+func PopTop() {
+	id := thread.GoroutineID()
+	if s := stackOf(id); s.depth() > 0 {
+		popTop(id, s)
+	}
+}
+
+func popTop(id uint64, s *dirStack) {
 	activeScopes.Add(-1)
-	stack := val.([]bellui.Direction)
-	if len(stack) <= 1 {
-		goroutineStacks.Delete(id)
-		return
+	top := len(s.entries) - 1
+	if s.entries[top].overlay {
+		overlayPushes.Add(-1)
 	}
-	stack[len(stack)-1] = bellui.DirectionAuto
-	goroutineStacks.Store(id, stack[:len(stack)-1])
+	s.truncate(id, top)
 }

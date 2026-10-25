@@ -6,6 +6,7 @@ import (
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/cache"
+	"github.com/belluikit/bellui/internal/dirhook"
 	"github.com/belluikit/bellui/internal/paintgen"
 )
 
@@ -45,7 +46,12 @@ func (w *Base) Resize(size geo.Size) {
 	if impl == nil {
 		return
 	}
-	cache.Renderer(impl).Layout(size)
+	r := cache.Renderer(impl)
+	if dirhook.InUse() {
+		layoutInDirection(impl, r, size) // in impl's direction (#749)
+	} else {
+		r.Layout(size)
+	}
 	Repaint(impl)
 }
 
@@ -122,7 +128,12 @@ func (w *Base) Refresh() {
 		return
 	}
 
-	cache.Renderer(impl).Refresh()
+	r := cache.Renderer(impl)
+	if dirhook.InUse() {
+		refreshInDirection(impl, r) // in impl's direction (#749)
+		return
+	}
+	r.Refresh()
 }
 
 // super will return the actual object that this represents.
@@ -150,4 +161,18 @@ func Repaint(obj core.CanvasObject) {
 			paint.SetDirty()
 		}
 	}
+}
+
+// layoutInDirection lays r out in the direction impl sits in. It takes no
+// closure, so a Resize allocates nothing for it (#772).
+func layoutInDirection(impl core.Widget, r core.WidgetRenderer, size geo.Size) {
+	defer dirhook.Exit(dirhook.Enter(impl))
+	r.Layout(size)
+}
+
+// refreshInDirection refreshes r in the direction impl sits in, without a
+// closure (#772).
+func refreshInDirection(impl core.Widget, r core.WidgetRenderer) {
+	defer dirhook.Exit(dirhook.Enter(impl))
+	r.Refresh()
 }

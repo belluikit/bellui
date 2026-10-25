@@ -19,23 +19,28 @@ type directionScoped interface {
 }
 
 // PushDirectionScope pushes obj's ambient layout direction onto the per-goroutine
-// uidir stack when obj is a direction scope, so paint-time text base direction and
-// leading/trailing alignment inside the subtree resolve against the scope rather
-// than the process-global direction. It is the paint-time mirror of the layout
-// hook in common.Canvas.EnsureMinSize and must be balanced by PopDirectionScope
-// in the matching after-children callback. A non-scope obj is a no-op.
+// uidir stack when obj is a direction scope (or an overlay that inherited its
+// opener's direction, see [InheritDirection]), so layout, paint-time text base
+// direction and leading/trailing alignment inside the subtree resolve against
+// the scope rather than the process-global direction. The layout walk
+// (common.Canvas.EnsureMinSize), the paint walks and the theme re-layout call
+// it, balanced by PopDirectionScope in the matching after-children callback.
+// Any other obj is a no-op.
 func PushDirectionScope(obj core.CanvasObject) {
 	if ds, ok := obj.(directionScoped); ok {
-		uidir.Push(ds.ScopedDirection())
+		uidir.PushOwned(ds.ScopedDirection(), obj, false)
+	} else if d, ok := uidir.Inherited(obj); ok {
+		uidir.PushOwned(d, obj, true)
 	}
 }
 
-// PopDirectionScope balances PushDirectionScope for obj. A non-scope obj is a
-// no-op.
+// PopDirectionScope balances PushDirectionScope for obj: it pops what obj
+// pushed there, so a scope's direction or an overlay's inherited one changed
+// while the walk was inside obj (a popup re-shown or dismissed from a layout)
+// cannot unbalance the stack. A non-scope obj is a no-op.
 func PopDirectionScope(obj core.CanvasObject) {
-	if ds, ok := obj.(directionScoped); ok {
-		uidir.Pop(ds.ScopedDirection())
-	}
+	_, scope := obj.(directionScoped)
+	uidir.PopOwned(obj, scope)
 }
 
 // AbsolutePositionForObject returns the absolute position of an object in a set of object trees.

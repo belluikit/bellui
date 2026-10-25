@@ -17,6 +17,7 @@ import (
 	"github.com/belluikit/bellui/internal/async"
 	"github.com/belluikit/bellui/internal/build"
 	"github.com/belluikit/bellui/internal/cache"
+	"github.com/belluikit/bellui/internal/dirhook"
 	"github.com/belluikit/bellui/internal/driver"
 	"github.com/belluikit/bellui/internal/gpu"
 	"github.com/belluikit/bellui/internal/layoutgen"
@@ -203,6 +204,9 @@ func (c *Canvas) EnsureMinSize() bool {
 	if c.impl.Content() == nil {
 		return false
 	}
+	// A frame starts here: the direction cache is rebuilt on its next use,
+	// since a renderer may have moved objects between scopes (#749).
+	dirhook.Changed()
 	windowNeedsMinSizeUpdate := false
 	csize := c.impl.Size()
 	min := c.impl.MinSize()
@@ -224,9 +228,7 @@ func (c *Canvas) EnsureMinSize() bool {
 		if th, ok := node.Obj().(*container.ThemeOverride); ok {
 			theme.PushRenderingTheme(th.Theme)
 		}
-		if ds, ok := node.Obj().(*container.DirectionScope); ok {
-			uidir.Push(ds.Direction)
-		}
+		driver.PushDirectionScope(node.Obj()) // a scope, or an overlay that inherited one (#749)
 	}
 	ensureMinSize := func(node *RenderCacheNode, pos geo.Position) {
 		obj := node.obj
@@ -277,16 +279,20 @@ func (c *Canvas) EnsureMinSize() bool {
 		if _, ok := node.Obj().(*container.ThemeOverride); ok {
 			theme.PopRenderingTheme()
 		}
-		if ds, ok := node.Obj().(*container.DirectionScope); ok {
-			uidir.Pop(ds.Direction)
-		}
+		driver.PopDirectionScope(node.Obj())
 	}
 	// Restore the stack to its pre-walk depth even if a layout panic unwinds
 	// past the per-node DirectionScope Pops in the visitor below.
+	//
+	// While a direction other than the global one can apply anywhere, the
+	// root pushes the resolved direction even for an automatic canvas, so a
+	// Refresh or Resize inside the walk finds it ambient instead of looking
+	// itself up (#760).
 	defer uidir.Restore(uidir.Mark())
-	uidir.Push(c.layoutDir)
+	rootDir := driver.RootDirection(c.layoutDir)
+	uidir.Push(rootDir)
 	c.walkForMinSize(measureAll, setup, ensureMinSize)
-	uidir.Pop(c.layoutDir)
+	uidir.Pop(rootDir)
 
 	shouldResize := !c.FixedSize && windowNeedsMinSizeUpdate && (csize.Width < min.Width || csize.Height < min.Height)
 	if shouldResize {
@@ -843,6 +849,10 @@ func (c *Canvas) SetDirection(d bellui.Direction) {
 		return
 	}
 	c.layoutDir = d
+	if d != bellui.DirectionAuto {
+		uidir.NoteDirectedCanvas()
+	}
+	dirhook.Changed()
 	if c.impl != nil {
 		if content := c.impl.Content(); content != nil {
 			// The refresh re-lays-out outside the layout walk, so it must
@@ -861,6 +871,7 @@ func (c *Canvas) SetDirection(d bellui.Direction) {
 //
 // This function does not use the canvas lock.
 func (c *Canvas) SetContentTreeAndFocusMgr(content core.CanvasObject) {
+	dirhook.Changed() // the content may enter or leave a scope (#749)
 	c.contentTree = &renderCacheTree{root: &RenderCacheNode{obj: content}}
 	c.minSizeFull.Store(true)
 	c.placeAll.Store(true)

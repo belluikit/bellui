@@ -343,7 +343,9 @@ func (s *selectable) TappedSecondary(ev *event.PointEvent) {
 				s.markTouchSelection() // Select all from the touch menu gets handles
 			}
 		}))
-	ShowPopUpMenuAtPosition(m, c, ev.AbsolutePosition)
+	pop := NewPopUpMenu(m, c)
+	inheritDirection(pop, s) // #749
+	pop.ShowAtPosition(ev.AbsolutePosition)
 }
 
 func (s *selectable) TouchCancel(m *mobile.TouchEvent) {

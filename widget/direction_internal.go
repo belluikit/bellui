@@ -3,7 +3,6 @@ package widget
 import (
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/internal/driver"
-	"github.com/belluikit/bellui/internal/uidir"
 	"github.com/belluikit/bellui/lang"
 	"github.com/belluikit/bellui/layout"
 )
@@ -35,23 +34,21 @@ func mirrorIfRTL(objects []core.CanvasObject, width float32) {
 func isRTLAt(obj core.CanvasObject) bool { return driver.IsRTLAt(obj) }
 
 // inDirectionOf runs f with obj's direction as the ambient one, so a layout f
-// performs outside a layout walk — a renderer's Refresh re-laying itself out
-// after a tap, a timer or a data binding — mirrors as the walk would (#696).
-// Once a scope has been rendered it pushes the resolved direction even when
-// that is the global one, so the lookups of children refreshed inside f return
-// at once instead of walking. Before then nothing is pushed unless obj's
-// canvas has a direction of its own: pushing would switch off uidir's
-// no-scope fast path for every text measurement inside f.
-func inDirectionOf(obj core.CanvasObject, f func()) {
-	d, ok := driver.DirectionOf(obj)
-	if !ok {
-		if !uidir.ScopesInUse() {
-			f() // the global direction applies, and lookups inside f are cheap
-			return
-		}
-		d = driver.GlobalDirection()
-	}
-	uidir.Push(d)
-	defer uidir.Pop(d)
-	f()
+// performs outside a layout walk mirrors as the walk would (#696). Since #749
+// BaseWidget.Refresh and Resize already run in the widget's direction, so
+// this only matters for a renderer whose Refresh is reached some other way;
+// see driver.InDirectionOf.
+func inDirectionOf(obj core.CanvasObject, f func()) { driver.InDirectionOf(obj, f) }
+
+// inheritDirection makes the overlay pop, about to be shown, lay out in the
+// direction opener sits in: a popup opened from inside a
+// container.DirectionScope takes the scope's direction although overlays sit
+// outside the content tree (#749). Every widget that opens a popup of its own
+// calls it before each show; the overlay stack forgets it on removal.
+func inheritDirection[T any, P interface {
+	*T
+	core.CanvasObject
+}](pop P, opener core.CanvasObject,
+) {
+	driver.InheritDirection(pop, opener)
 }

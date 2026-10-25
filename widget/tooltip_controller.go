@@ -95,6 +95,7 @@ func (c *toolTipController) present(obj core.CanvasObject, canvas core.Canvas, t
 	tip := c.tip
 	c.mu.Unlock()
 
+	inheritDirection(tip, obj) // the bubble's text follows a scope around obj (#749)
 	canvas.Overlays().Add(tip)
 }
 

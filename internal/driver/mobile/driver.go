@@ -7,6 +7,7 @@ import (
 	"math"
 	"runtime"
 	"strconv"
+	"sync"
 	"time"
 	"unicode"
 
@@ -66,7 +67,11 @@ type driver struct {
 	app   app.App
 	glctx gl.Context
 
+	// windows is guarded by windowsMu: a window may be opened or closed off
+	// the main goroutine while the main goroutine reads the list (a Refresh
+	// looking up its direction walks AllWindows).
 	windows     []bellui.Window
+	windowsMu   sync.RWMutex
 	device      device
 	animation   animation.Runner
 	currentSize size.Event
@@ -193,26 +198,43 @@ func (d *driver) DoFromGoroutine(fn func(), wait bool) {
 
 func (d *driver) CreateWindow(title string) bellui.Window {
 	c := newCanvas(bellui.CurrentDevice()).(*canvas) // silence lint
-	ret := &window{title: title, driver: d, canvas: c, isChild: len(d.windows) > 0}
+	ret := &window{title: title, driver: d, canvas: c, isChild: len(d.AllWindows()) > 0}
+	// Set up before it is listed, and without the lock: setting content may
+	// refresh, and a Refresh can look up the window list (AllWindows).
 	c.setContent(&belluicanvas.Rectangle{FillColor: theme.Color(theme.ColorNameBackground)})
 	c.SetPainter(newCanvasPainter(c, ret))
+	d.windowsMu.Lock()
 	d.windows = append(d.windows, ret)
+	d.windowsMu.Unlock()
 	return ret
 }
 
+// AllWindows returns the open windows, oldest first. The slice is a copy, so
+// a window closed meanwhile does not change it under the caller.
 func (d *driver) AllWindows() []bellui.Window {
-	return d.windows
+	d.windowsMu.RLock()
+	defer d.windowsMu.RUnlock()
+	return append([]bellui.Window(nil), d.windows...)
+}
+
+// removeWindow takes w out of the window list, if it is in it.
+func (d *driver) removeWindow(w *window) {
+	d.windowsMu.Lock()
+	defer d.windowsMu.Unlock()
+	for i, win := range d.windows {
+		if win == w {
+			d.windows = append(d.windows[:i:i], d.windows[i+1:]...)
+			return
+		}
+	}
 }
 
 // currentWindow returns the most recently opened window - we can only show one at a time.
 func (d *driver) currentWindow() *window {
-	if len(d.windows) == 0 {
-		return nil
-	}
-
+	windows := d.AllWindows()
 	var last *window
-	for i := len(d.windows) - 1; i >= 0; i-- {
-		last = d.windows[i].(*window)
+	for i := len(windows) - 1; i >= 0; i-- {
+		last = windows[i].(*window)
 		if last.visible {
 			return last
 		}
@@ -245,12 +267,11 @@ func (d *driver) RenderedTextSize(text string, textSize float32, style bellui.Te
 }
 
 func (d *driver) CanvasForObject(obj core.CanvasObject) core.Canvas {
-	if len(d.windows) == 0 {
-		return nil
-	}
-
 	// TODO figure out how we handle multiple windows...
-	return d.currentWindow().Canvas()
+	if w := d.currentWindow(); w != nil {
+		return w.Canvas()
+	}
+	return nil
 }
 
 func (d *driver) AbsolutePositionForObject(co core.CanvasObject) geo.Position {

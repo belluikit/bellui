@@ -692,6 +692,7 @@ func (ti *treeViewItem) TappedSecondary(e *event.PointEvent) {
 	c := bellui.CurrentApp().Driver().CanvasForObject(ti)
 	pos := bellui.CurrentApp().Driver().AbsolutePositionForObject(ti)
 	popup := NewPopUpMenu(menu, c)
+	inheritDirection(popup, ti) // #749
 	popup.ShowAtPosition(pos.Add(e.Position))
 }
 

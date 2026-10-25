@@ -192,15 +192,7 @@ func (w *window) Close() {
 
 	d := w.driver
 	d.cancelWindowTouches(w)
-	pos := -1
-	for i, win := range d.windows {
-		if win == w {
-			pos = i
-		}
-	}
-	if pos != -1 {
-		d.windows = append(d.windows[:pos], d.windows[pos+1:]...)
-	}
+	d.removeWindow(w)
 
 	w.cleanupAccessibilityForWindow()
 

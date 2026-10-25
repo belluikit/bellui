@@ -172,9 +172,11 @@ func (t *Tooltip) showPopUp() {
 	t.mu.Lock()
 	t.tip = newTooltipOverlay(content, t.tooltipPos())
 	t.tipCanvas = c
+	tip := t.tip
 	t.mu.Unlock()
 
-	c.Overlays().Add(t.tip)
+	inheritDirection(tip, t) // #749
+	c.Overlays().Add(tip)
 }
 
 func (t *Tooltip) hidePopUp() {
