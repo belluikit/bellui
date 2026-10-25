@@ -208,10 +208,16 @@ func NewDrawingStore() *DrawingStore {
 	return &DrawingStore{}
 }
 
-// NextID generates a unique DrawingID.
+// NextID generates a DrawingID that no drawing in the store uses, skipping
+// any an app already gave its own drawings (#343).
 func (ds *DrawingStore) NextID() DrawingID {
-	ds.nextSeq++
-	return DrawingID(fmt.Sprintf("drawing-%d", ds.nextSeq))
+	for {
+		ds.nextSeq++
+		id := DrawingID(fmt.Sprintf("drawing-%d", ds.nextSeq))
+		if ds.Get(id) == nil {
+			return id
+		}
+	}
 }
 
 // Add appends a drawing.
