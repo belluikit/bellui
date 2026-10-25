@@ -395,7 +395,7 @@ func (d *driver) Run() {
 				case composition.Event:
 					d.handleComposition(e) // routes through the mirror, which auto-syncs
 				case textedit.Event:
-					d.handleTextEdit(e) // committed native edit → seam Replace (auto-syncs)
+					d.handleTextEdit(c, e) // committed native edit → seam Replace (auto-syncs)
 				case undoredo.Event:
 					d.handleUndoRedo(e) // native undo/redo key/gesture → editor's accessible action (pre-rebrand tracker #1134)
 				}
@@ -512,10 +512,24 @@ func (d *driver) handleComposition(e composition.Event) {
 // text-input mirror's Replace op (pre-rebrand tracker #771). Reporting the full range (rather than a
 // caret-relative delta) lets typing over a selection replace it in one gated,
 // undo-recorded edit instead of appending (pre-rebrand tracker #748). Session.Replace auto-syncs the
-// native document afterwards. iOS drives this from its input view; a no-op when
-// the focus is not an editor.
-func (d *driver) handleTextEdit(e textedit.Event) {
-	if d.textInput == nil {
+// native document afterwards. iOS drives this from its input view.
+//
+// When the focus is not an editor, nothing takes the edit, except a newline:
+// the soft keyboard's Return key, which an Android IME commits as the text
+// "\n" on the default keyboard (IME_FLAG_NO_ENTER_ACTION). It reaches the
+// focused widget on c as a Return key press, so a widget that takes keys and
+// finishes on Return (the chart's Text tool) sees it (#666). Other text is not
+// forwarded: such a widget gets its typing as key events already.
+func (d *driver) handleTextEdit(c *canvas, e textedit.Event) {
+	if d.textInput == nil || !d.textInput.Bound() {
+		if !e.Selection && c != nil {
+			for _, r := range e.Text {
+				if r == '\n' {
+					d.dispatchKeyEvent(c, key.Event{Rune: r, Code: key.CodeReturnEnter, Direction: key.DirPress})
+					d.dispatchKeyEvent(c, key.Event{Rune: r, Code: key.CodeReturnEnter, Direction: key.DirRelease})
+				}
+			}
+		}
 		return
 	}
 	if e.Selection {
