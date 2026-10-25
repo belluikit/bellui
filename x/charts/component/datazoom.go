@@ -3,10 +3,12 @@ package component
 import (
 	"image/color"
 
+	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/theme"
 	"github.com/belluikit/bellui/widget"
 
 	"github.com/belluikit/bellui/x/charts/interact"
@@ -186,8 +188,16 @@ func (r *dataZoomRenderer) rebuild(size geo.Size) {
 	var objects []core.CanvasObject
 	w := r.slider.window
 
+	// The track and the masks over the unselected range take the theme's
+	// colours; fixed dark greys drew a dark slab on a light theme (#343).
+	th := r.slider.Theme()
+	v := bellui.CurrentApp().Settings().ThemeVariant()
+	// The masks wash the unselected range out towards the background.
+	bg := color.NRGBAModel.Convert(th.Color(theme.ColorNameBackground, v)).(color.NRGBA)
+	maskColor := color.NRGBA{R: bg.R, G: bg.G, B: bg.B, A: 180}
+
 	// Track background
-	track := canvas.NewRectangle(color.NRGBA{R: 50, G: 50, B: 50, A: 255})
+	track := canvas.NewRectangle(th.Color(theme.ColorNameInputBackground, v))
 	track.CornerRadius = 3
 	track.Move(geo.NewPos(0, 0))
 	track.Resize(size)
@@ -196,7 +206,7 @@ func (r *dataZoomRenderer) rebuild(size geo.Size) {
 	// Left mask (unselected region)
 	leftW := float32(w.Start) * size.Width
 	if leftW > 0 {
-		leftMask := canvas.NewRectangle(color.NRGBA{R: 30, G: 30, B: 30, A: 180})
+		leftMask := canvas.NewRectangle(maskColor)
 		leftMask.Move(geo.NewPos(0, 0))
 		leftMask.Resize(geo.NewSize(leftW, size.Height))
 		objects = append(objects, leftMask)
@@ -206,7 +216,7 @@ func (r *dataZoomRenderer) rebuild(size geo.Size) {
 	rightX := float32(w.End) * size.Width
 	rightW := size.Width - rightX
 	if rightW > 0 {
-		rightMask := canvas.NewRectangle(color.NRGBA{R: 30, G: 30, B: 30, A: 180})
+		rightMask := canvas.NewRectangle(maskColor)
 		rightMask.Move(geo.NewPos(rightX, 0))
 		rightMask.Resize(geo.NewSize(rightW, size.Height))
 		objects = append(objects, rightMask)
