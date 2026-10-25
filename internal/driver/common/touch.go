@@ -124,6 +124,11 @@ type TouchHandler struct {
 	now func() time.Time
 }
 
+// SetClock sets the clock the velocity samples are stamped with; nil is
+// time.Now. A driver's tests step it, so whether a release coasts does not
+// depend on how fast the test machine hands the driver its events (#786).
+func (h *TouchHandler) SetClock(now func() time.Time) { h.now = now }
+
 // clock reads the time the velocity samples are stamped with.
 func (h *TouchHandler) clock() time.Time {
 	if h.now != nil {

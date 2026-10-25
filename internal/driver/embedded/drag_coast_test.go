@@ -58,6 +58,10 @@ func coastDriver(t *testing.T) (bellui.Driver, chan embedded.Event, *coastRecord
 	rec := newCoastRecorder()
 	w := d.CreateWindow("coast")
 	w.SetContent(rec)
+	// The driver stamps each touch with the time it handles it, so on a
+	// loaded machine a 40ms stall before the release made the flick count as
+	// held still, and it did not coast (#786).
+	intNoos.StepTouchClock(w)
 	stopped := make(chan struct{})
 	go func() {
 		d.Run()
