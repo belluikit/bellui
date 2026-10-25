@@ -247,6 +247,7 @@ type menuItemRenderer struct {
 	expandIcon       *canvas.Image
 	icon             *canvas.Image
 	lastThemePadding float32
+	laidOutRTL       bool // the direction Layout last placed the parts in
 	minSize          geo.Size
 	shortcutTexts    []*canvas.Text
 	text             *canvas.Text
@@ -257,6 +258,23 @@ func (r *menuItemRenderer) Layout(size geo.Size) {
 	innerPad := th.Size(theme.SizeNameInnerPadding)
 	inlineIcon := th.Size(theme.SizeNameInlineIcon)
 
+	// Positions are worked out from the left edge, as in a left-to-right
+	// layout; place mirrors them under a right-to-left one, so the check, the
+	// icon and the label start at the right and the shortcut and the submenu
+	// arrow sit on the left (#769). It mirrors hidden parts too: the check
+	// mark is shown by a Refresh, which does not lay the item out again. The
+	// item's own direction is read, not the ambient one: a pop-up lays its
+	// items out when shown, outside a layout walk, where only the global
+	// direction would be seen.
+	rtl := isRTLAt(r.i)
+	r.laidOutRTL = rtl
+	place := func(o core.CanvasObject, x, y float32) {
+		if rtl {
+			x = size.Width - x - o.Size().Width
+		}
+		o.Move(geo.NewPos(x, y))
+	}
+
 	leftOffset := innerPad + r.checkSpace()
 	rightOffset := size.Width
 	iconSize := geo.NewSquareSize(inlineIcon)
@@ -265,34 +283,42 @@ func (r *menuItemRenderer) Layout(size geo.Size) {
 	if r.expandIcon != nil {
 		rightOffset -= inlineIcon
 		r.expandIcon.Resize(iconSize)
-		r.expandIcon.Move(geo.NewPos(rightOffset, iconTopOffset))
+		place(r.expandIcon, rightOffset, iconTopOffset)
 	}
 
 	rightOffset -= innerPad
 	textHeight := r.text.MinSize().Height
+	// The shortcut moves as one block, keeping its modifiers before its key
+	// in either direction.
+	shortcutEnd := rightOffset
 	for i := len(r.shortcutTexts) - 1; i >= 0; i-- {
-		text := r.shortcutTexts[i]
+		rightOffset -= r.shortcutTexts[i].MinSize().Width
+	}
+	shortcutStart := rightOffset
+	if rtl {
+		shortcutStart = size.Width - shortcutEnd
+	}
+	for _, text := range r.shortcutTexts {
 		text.Resize(text.MinSize())
-		rightOffset -= text.MinSize().Width
-		text.Move(geo.NewPos(rightOffset, innerPad+(textHeight-text.Size().Height)))
-
-		if i == 0 {
-			rightOffset -= innerPad
-		}
+		text.Move(geo.NewPos(shortcutStart, innerPad+(textHeight-text.Size().Height)))
+		shortcutStart += text.Size().Width
+	}
+	if len(r.shortcutTexts) > 0 {
+		rightOffset -= innerPad
 	}
 
 	r.checkIcon.Resize(iconSize)
-	r.checkIcon.Move(geo.NewPos(innerPad, iconTopOffset))
+	place(r.checkIcon, innerPad, iconTopOffset)
 
 	if r.icon != nil {
 		r.icon.Resize(iconSize)
-		r.icon.Move(geo.NewPos(leftOffset, iconTopOffset))
+		place(r.icon, leftOffset, iconTopOffset)
 		leftOffset += inlineIcon
 		leftOffset += innerPad
 	}
 
 	r.text.Resize(geo.NewSize(rightOffset-leftOffset, textHeight))
-	r.text.Move(geo.NewPos(leftOffset, innerPad))
+	place(r.text, leftOffset, innerPad)
 
 	r.background.Resize(size)
 }
@@ -356,6 +382,12 @@ func (r *menuItemRenderer) updateVisuals() {
 
 func (r *menuItemRenderer) Refresh() {
 	r.updateVisuals()
+	// A pop-up's items are laid out when it is made, before it is on a
+	// canvas, so their direction may only be known once it is shown; and a
+	// direction can change at run time. Neither resizes the item (#769).
+	if size := r.i.Size(); !size.IsZero() && isRTLAt(r.i) != r.laidOutRTL {
+		r.Layout(size)
+	}
 	canvas.Refresh(r.i)
 }
 
