@@ -4,10 +4,14 @@ import (
 	"image/color"
 	"testing"
 
+	"github.com/belluikit/bellui"
+	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/theme"
 	"github.com/belluikit/bellui/x/charts/axis"
 	"github.com/belluikit/bellui/x/charts/coord"
 	"github.com/belluikit/bellui/x/charts/interact"
+	"github.com/belluikit/bellui/x/charts/style"
 )
 
 func makeDrawingCoord() coord.System {
@@ -135,5 +139,25 @@ func TestRenderDrawingPreview_TrendLine(t *testing.T) {
 	objs := RenderDrawingPreview(gesture, geo.NewPos(400, 200), []coord.System{cs}, testPlotRect, nil)
 	if len(objs) == 0 {
 		t.Error("expected preview line for in-progress trend line")
+	}
+}
+
+// A text drawing's chip is the theme's annotation background, so it reads on a
+// light theme too; it was a fixed dark grey (#343).
+func TestRenderDrawings_TextLabelChipFollowsTheTheme(t *testing.T) {
+	cs := makeDrawingCoord()
+	drawings := []interact.Drawing{
+		&interact.TextLabelDrawing{DrawingBase: base("tl1"), Pos: interact.DataPoint{X: 5, Y: 50}, Text: "Hello"},
+	}
+	for _, v := range []bellui.ThemeVariant{theme.VariantLight, theme.VariantDark} {
+		resolver := style.NewResolver(theme.DefaultTheme(), v)
+		objs := RenderDrawings(drawings, "", []coord.System{cs}, testPlotRect, resolver)
+		bg, ok := objs[0].(*canvas.Rectangle)
+		if !ok {
+			t.Fatalf("the first object is a %T, want the chip", objs[0])
+		}
+		if want := theme.DefaultTheme().Color(theme.ColorNameOverlayBackground, v); bg.FillColor != want {
+			t.Errorf("variant %d: the chip is %v, want the theme's overlay background %v", v, bg.FillColor, want)
+		}
 	}
 }
