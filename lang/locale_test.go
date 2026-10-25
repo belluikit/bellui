@@ -5,6 +5,7 @@ import (
 
 	"github.com/jeandeaual/go-locale"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/text/language"
 )
 
@@ -99,4 +100,49 @@ func TestCurrentLocale(t *testing.T) {
 
 	SetLocaleForTests(t, "ar")
 	assert.Equal(t, "ar", CurrentLocale().String())
+}
+
+// A match the matcher has no confidence in is a guess from a shared script, so
+// the app's default language wins over it, unless the user's region speaks the
+// guessed language (#342).
+func TestClosestSupportedLocale_NoConfidenceFallsBackToDefault(t *testing.T) {
+	tagMu.Lock()
+	saved := translated
+	translated = []language.Tag{language.English, language.Arabic, language.Russian, language.SimplifiedChinese}
+	tagMu.Unlock()
+	t.Cleanup(func() {
+		tagMu.Lock()
+		translated = saved
+		tagMu.Unlock()
+	})
+
+	for user, want := range map[string]string{
+		"fa-IR":    "en", // was ar: Persian is not Arabic
+		"fa":       "en",
+		"ug-CN":    "en", // was ar
+		"sr-RS":    "en", // was ru
+		"bg":       "en", // was ru
+		"ce-RU":    "ru", // Chechen users in Russia read Russian
+		"sah":      "ru",
+		"yue-Hans": "zh", // simplified-script Cantonese reads as Simplified Chinese
+		"ar-EG":    "ar", // a real match is untouched
+		"kk":       "ru", // as is a high-confidence one
+		"pt-BR":    "en",
+	} {
+		assert.Equal(t, want, closestSupportedLocale([]string{user}).LanguageString(), user)
+	}
+	assert.Equal(t, "ar", closestSupportedLocale([]string{"fa-IR", "ar-EG"}).LanguageString(),
+		"a later entry that really matches still wins")
+}
+
+// The issue's case end to end: an app that ships Arabic but not Persian shows
+// Persian users its default language, not Arabic (#342).
+func TestPersianUserOfAnArabicApp_GetsTheDefaultLanguage(t *testing.T) {
+	require.NoError(t, AddTranslationsForLocale([]byte(`messages = { "greeting342": "مرحبا" }`), "ar"))
+
+	SetLocaleForTests(t, "fa-IR")
+	assert.Equal(t, "greeting342", L("greeting342"))
+
+	SetLocaleForTests(t, "ar-EG")
+	assert.Equal(t, "مرحبا", L("greeting342"))
 }

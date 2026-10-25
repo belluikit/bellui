@@ -57,11 +57,36 @@ func closestSupportedLocaleForTags(tags []language.Tag) bellui.Locale {
 	// translated is mutated by addLanguage; build the matcher under the read
 	// lock so a concurrent AddTranslations cannot race the slice.
 	tagMu.RLock()
-	matcher := language.NewMatcher(translated)
+	supported := translated
+	matcher := language.NewMatcher(supported)
 	tagMu.RUnlock()
 
-	best, _, _ := matcher.Match(tags...)
+	best, idx, conf := matcher.Match(tags...)
+	if conf == language.No && !spokenInUserRegion(matcher, idx, tags) {
+		return localeFromTag(supported[0])
+	}
 	return localeFromTag(best)
+}
+
+// spokenInUserRegion reports whether the supported language at idx is the main
+// language of the region of one of the user's locales. A match the matcher has
+// no confidence in is only a guess from a shared script — Persian gets Arabic,
+// Serbian gets Russian — so the app's default language is the better answer
+// (#342). The guess is kept where the region itself speaks it: Chechen or Yakut
+// users in Russia read Russian, and Cantonese written in simplified script
+// reads as Simplified Chinese.
+func spokenInUserRegion(m language.Matcher, idx int, tags []language.Tag) bool {
+	for _, tag := range tags {
+		region, _ := tag.Region() // guessed from the language when the tag names none
+		local, err := language.Compose(region)
+		if err != nil {
+			continue
+		}
+		if _, i, conf := m.Match(local); i == idx && conf >= language.High {
+			return true
+		}
+	}
+	return false
 }
 
 // parseUserLocales parses the locale strings the OS reports into language

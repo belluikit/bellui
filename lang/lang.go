@@ -256,7 +256,13 @@ func SetLocaleForTests(t interface{ Cleanup(func()) }, locale string) {
 		localeOverride.Store(prevOverride)
 	})
 	localeOverride.Store(true)
-	setupLang(locale)
+	// Resolve the catalog the way SetLocale does, so a test sees the language
+	// a user with this locale would (#342), and keep the full tag for
+	// formatting and direction.
+	setupLang(closestSupportedLocale([]string{locale}).LanguageString())
+	if tag, err := language.Parse(locale); err == nil {
+		setCurrentTag(tag)
+	}
 }
 
 // SetLocale overrides the active locale used for translations, date and number
