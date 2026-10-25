@@ -3,9 +3,7 @@ package series
 import (
 	"image/color"
 
-	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
-	"github.com/belluikit/bellui/geo"
 
 	"github.com/belluikit/bellui/x/charts/coord"
 )
@@ -63,6 +61,12 @@ func (r *geoScatterRenderer) Render(ctx RenderContext) []core.CanvasObject {
 	half := size / 2
 
 	c := ResolveColor(gs.Color, ctx.Color)
+	// Symbol was never read: every point drew a circle (#343). No symbol
+	// means a circle, as for ScatterSeries.
+	sym := gs.Symbol
+	if sym == SymbolNone {
+		sym = SymbolCircle
+	}
 
 	var objects []core.CanvasObject
 	for i := 0; i < gs.PointCount(); i++ {
@@ -75,10 +79,9 @@ func (r *geoScatterRenderer) Render(ctx RenderContext) []core.CanvasObject {
 			continue
 		}
 
-		circle := canvas.NewCircle(c)
-		circle.Position1 = geo.NewPos(pos.X-half, pos.Y-half)
-		circle.Position2 = geo.NewPos(pos.X+half, pos.Y+half)
-		objects = append(objects, circle)
+		if obj := CreatePooledSymbol(ctx.Pool, sym, size, pos, c); obj != nil {
+			objects = append(objects, obj)
+		}
 	}
 
 	return objects
