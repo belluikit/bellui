@@ -26,6 +26,12 @@ func (s *PictorialSeries) SeriesType() Type { return TypePictorial }
 func (s *PictorialSeries) Name() string     { return s.SeriesName }
 func (s *PictorialSeries) sealed()          {}
 
+// SeriesColor returns the colour set for the series, or nil for the palette
+// colour (see ColoredSeries).
+//
+// Since: 1.3
+func (s *PictorialSeries) SeriesColor() color.Color { return s.Color }
+
 // GetYAxisIndex returns the Y axis index for this series.
 func (s *PictorialSeries) GetYAxisIndex() int { return s.YAxisIndex }
 

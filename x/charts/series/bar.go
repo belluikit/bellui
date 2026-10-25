@@ -41,6 +41,12 @@ func (s *BarSeries) Name() string { return s.SeriesName }
 
 func (s *BarSeries) sealed() {}
 
+// SeriesColor returns the colour set for the series, or nil for the palette
+// colour (see ColoredSeries).
+//
+// Since: 1.3
+func (s *BarSeries) SeriesColor() color.Color { return s.Color }
+
 // GetYAxisIndex returns the Y axis index for this series.
 func (s *BarSeries) GetYAxisIndex() int { return s.YAxisIndex }
 

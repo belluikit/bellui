@@ -698,9 +698,17 @@ func (r *chartRenderer) buildLegendItems(opt Option, resolver *style.Resolver) [
 		if name == "" {
 			continue
 		}
+		// A colour the series sets for itself is the one it is drawn in, so
+		// the legend shows it too; it used to show the palette colour (#343).
+		c := resolver.SeriesColor(i)
+		if cs, ok := s.(series.ColoredSeries); ok {
+			if own := cs.SeriesColor(); own != nil {
+				c = own
+			}
+		}
 		items = append(items, component.LegendItem{
 			Name:    name,
-			Color:   resolver.SeriesColor(i),
+			Color:   c,
 			Visible: r.chart.IsSeriesVisible(name),
 		})
 	}

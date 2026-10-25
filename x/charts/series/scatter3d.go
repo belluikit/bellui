@@ -31,6 +31,12 @@ func (s *Scatter3DSeries) Name() string { return s.SeriesName }
 
 func (s *Scatter3DSeries) sealed() {}
 
+// SeriesColor returns the colour set for the series, or nil for the palette
+// colour (see ColoredSeries).
+//
+// Since: 1.3
+func (s *Scatter3DSeries) SeriesColor() color.Color { return s.Color }
+
 // PointCount returns the number of 3D data points.
 func (s *Scatter3DSeries) PointCount() int {
 	return len(s.Data) / 3
