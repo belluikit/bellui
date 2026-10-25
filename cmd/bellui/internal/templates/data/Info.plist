@@ -38,8 +38,10 @@
 		{{- end}}
 	</array>
 	{{- end}}
+	{{- if .Category}}
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.{{xml .Category}}</string>
+	{{- end}}
 	<key>LSMinimumSystemVersion</key>
 	<string>10.11</string>
 	{{- range .UsageDescriptions}}
