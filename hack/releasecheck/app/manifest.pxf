@@ -1,0 +1,10 @@
+details {
+  icon = "Icon.png"
+  name = "Release Check"
+  id = "io.bellui.releasecheck"
+  version = "1.3.0"
+  build = 1
+}
+migrations = {
+  belluiDo: true
+}
