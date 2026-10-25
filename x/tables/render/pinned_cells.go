@@ -4,6 +4,7 @@ import (
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/theme"
 	"github.com/belluikit/bellui/widget"
 )
 
@@ -326,4 +327,5 @@ func (r *pinnedCellsRenderer) refresh(size geo.Size) {
 	}
 	r.visible = newVisible
 	r.objects = objects
+	theme.MatchScope(r.widget, objects...) // see CellsRenderer.refreshCells (#758)
 }

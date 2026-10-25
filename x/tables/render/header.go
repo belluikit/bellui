@@ -7,6 +7,7 @@ import (
 	"github.com/belluikit/bellui/driver/desktop"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/theme"
 	"github.com/belluikit/bellui/widget"
 )
 
@@ -297,4 +298,5 @@ func (r *headerRenderer) rebuild(size geo.Size) {
 	// The full-width background sits behind everything; the shared helper layers
 	// the clipped main band and the fixed pinned bands on top.
 	r.objects = r.bands.layout(grid, size, placeCol, r.bg)
+	theme.MatchScope(r.header, r.objects...) // see CellsRenderer.refreshCells (#758)
 }
