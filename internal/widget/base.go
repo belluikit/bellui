@@ -48,7 +48,7 @@ func (w *Base) Resize(size geo.Size) {
 	}
 	r := cache.Renderer(impl)
 	if dirhook.InUse() {
-		dirhook.Run(impl, func() { r.Layout(size) }) // in impl's direction (#749)
+		layoutInDirection(impl, r, size) // in impl's direction (#749)
 	} else {
 		r.Layout(size)
 	}
@@ -130,7 +130,7 @@ func (w *Base) Refresh() {
 
 	r := cache.Renderer(impl)
 	if dirhook.InUse() {
-		dirhook.Run(impl, r.Refresh) // in impl's direction (#749)
+		refreshInDirection(impl, r) // in impl's direction (#749)
 		return
 	}
 	r.Refresh()
@@ -161,4 +161,18 @@ func Repaint(obj core.CanvasObject) {
 			paint.SetDirty()
 		}
 	}
+}
+
+// layoutInDirection lays r out in the direction impl sits in. It takes no
+// closure, so a Resize allocates nothing for it (#772).
+func layoutInDirection(impl core.Widget, r core.WidgetRenderer, size geo.Size) {
+	defer dirhook.Exit(dirhook.Enter(impl))
+	r.Layout(size)
+}
+
+// refreshInDirection refreshes r in the direction impl sits in, without a
+// closure (#772).
+func refreshInDirection(impl core.Widget, r core.WidgetRenderer) {
+	defer dirhook.Exit(dirhook.Enter(impl))
+	r.Refresh()
 }

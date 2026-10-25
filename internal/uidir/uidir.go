@@ -26,7 +26,18 @@ import (
 // accesses its own key, so there is no contention on individual entries;
 // sync.Map handles concurrent access to different keys. This mirrors the theme
 // stack in internal/theme/render.go.
-var goroutineStacks sync.Map // map[uint64][]entry
+//
+// A goroutine's stack is stored once, as a pointer its owner pushes onto and
+// pops in place, so a push or pop allocates nothing once the stack has grown:
+// a Refresh outside a walk pushes and pops one entry per widget (#772). The
+// main goroutine's stack stays stored while empty, as it is pushed onto
+// again at once; any other goroutine's is deleted when it empties, so a
+// goroutine that ends leaves nothing behind.
+var goroutineStacks sync.Map // map[uint64]*dirStack
+
+// dirStack is one goroutine's direction stack. Only its goroutine reads or
+// writes entries.
+type dirStack struct{ entries []entry }
 
 // activeScopes counts the direction scopes pushed across all goroutines, so
 // Current/Mark can skip identifying the goroutine (thread.GoroutineID calls the
@@ -259,11 +270,31 @@ type entry struct {
 // skip identifying the goroutine while none is pushed.
 var overlayPushes atomic.Int64
 
-func stackOf(id uint64) []entry {
+// stackOf returns the calling goroutine's stack (id is its ID), or nil when
+// it has none.
+func stackOf(id uint64) *dirStack {
 	if val, ok := goroutineStacks.Load(id); ok {
-		return val.([]entry)
+		return val.(*dirStack)
 	}
 	return nil
+}
+
+// depth is the number of entries on s; s may be nil.
+func (s *dirStack) depth() int {
+	if s == nil {
+		return 0
+	}
+	return len(s.entries)
+}
+
+// truncate drops the entries above depth n, and the stack itself when it
+// empties on any goroutine but the main one (see goroutineStacks).
+func (s *dirStack) truncate(id uint64, n int) {
+	clear(s.entries[n:]) // release references for GC
+	s.entries = s.entries[:n]
+	if n == 0 && !thread.IsMainGoroutine() {
+		goroutineStacks.Delete(id)
+	}
 }
 
 // Current returns the ambient direction override in effect on the calling
@@ -274,8 +305,8 @@ func Current() (bellui.Direction, bool) {
 	if activeScopes.Load() == 0 {
 		return bellui.DirectionAuto, false // no DirectionScope anywhere — skip GoroutineID
 	}
-	if stack := stackOf(thread.GoroutineID()); len(stack) > 0 {
-		return stack[len(stack)-1].dir, true
+	if s := stackOf(thread.GoroutineID()); s.depth() > 0 {
+		return s.entries[len(s.entries)-1].dir, true
 	}
 	return bellui.DirectionAuto, false
 }
@@ -300,7 +331,12 @@ func push(e entry) {
 		return
 	}
 	id := thread.GoroutineID()
-	goroutineStacks.Store(id, append(stackOf(id), e))
+	s := stackOf(id)
+	if s == nil {
+		s = &dirStack{}
+		goroutineStacks.Store(id, s)
+	}
+	s.entries = append(s.entries, e)
 	activeScopes.Add(1)
 	if e.overlay {
 		overlayPushes.Add(1)
@@ -316,11 +352,11 @@ func PopOwned(owner core.CanvasObject, mayBeScope bool) {
 		return
 	}
 	id := thread.GoroutineID()
-	stack := stackOf(id)
-	if len(stack) == 0 || stack[len(stack)-1].owner != owner {
+	s := stackOf(id)
+	if s.depth() == 0 || s.entries[len(s.entries)-1].owner != owner {
 		return
 	}
-	popTop(id, stack)
+	popTop(id, s)
 }
 
 // Mark returns the calling goroutine's current direction-stack depth. Pair it
@@ -332,7 +368,7 @@ func Mark() int {
 	if activeScopes.Load() == 0 {
 		return 0
 	}
-	return len(stackOf(thread.GoroutineID()))
+	return stackOf(thread.GoroutineID()).depth()
 }
 
 // Restore truncates the calling goroutine's direction stack back to the depth
@@ -344,23 +380,18 @@ func Restore(depth int) {
 		return
 	}
 	id := thread.GoroutineID()
-	stack := stackOf(id)
-	if len(stack) <= depth {
+	s := stackOf(id)
+	if s.depth() <= depth {
 		return
 	}
 	depth = max(depth, 0)
-	activeScopes.Add(int64(depth - len(stack))) // discard the orphaned entries
-	for i := depth; i < len(stack); i++ {
-		if stack[i].overlay {
+	activeScopes.Add(int64(depth - len(s.entries))) // discard the orphaned entries
+	for _, e := range s.entries[depth:] {
+		if e.overlay {
 			overlayPushes.Add(-1)
 		}
-		stack[i] = entry{} // release references for GC
 	}
-	if depth == 0 {
-		goroutineStacks.Delete(id)
-		return
-	}
-	goroutineStacks.Store(id, stack[:depth])
+	s.truncate(id, depth)
 }
 
 // Pop removes the direction installed by the matching [Push]. A Pop balancing a
@@ -370,22 +401,27 @@ func Pop(d bellui.Direction) {
 		return
 	}
 	id := thread.GoroutineID()
-	stack := stackOf(id)
-	if len(stack) == 0 {
+	s := stackOf(id)
+	if s.depth() == 0 {
 		return
 	}
-	popTop(id, stack)
+	popTop(id, s)
 }
 
-func popTop(id uint64, stack []entry) {
+// PopTop removes the calling goroutine's top direction, whatever pushed it:
+// the pop for a push the caller knows it made with a concrete direction.
+func PopTop() {
+	id := thread.GoroutineID()
+	if s := stackOf(id); s.depth() > 0 {
+		popTop(id, s)
+	}
+}
+
+func popTop(id uint64, s *dirStack) {
 	activeScopes.Add(-1)
-	if stack[len(stack)-1].overlay {
+	top := len(s.entries) - 1
+	if s.entries[top].overlay {
 		overlayPushes.Add(-1)
 	}
-	if len(stack) <= 1 {
-		goroutineStacks.Delete(id)
-		return
-	}
-	stack[len(stack)-1] = entry{}
-	goroutineStacks.Store(id, stack[:len(stack)-1])
+	s.truncate(id, top)
 }

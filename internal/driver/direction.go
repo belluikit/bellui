@@ -15,7 +15,7 @@ import (
 )
 
 func init() {
-	dirhook.SetAround(InDirectionOf)
+	dirhook.SetEnter(EnterDirectionOf, uidir.PopTop)
 	dirhook.SetMoved(func(parent, obj core.CanvasObject, added bool) {
 		index.moved(parent, obj, added)
 		windows.moved(parent, obj, added)
@@ -100,22 +100,30 @@ func GlobalDirection() bellui.Direction {
 // InDirectionOf runs f with obj's direction as the ambient one, so a layout f
 // performs outside a layout walk — a Refresh that re-lays a widget out after
 // a tap, a timer or a binding, a Container's Add, a widget resized by hand —
-// mirrors as the walk would (#696, #749). Inside a walk, or another
-// InDirectionOf, a direction is already ambient and f runs as it is, unless
-// obj is a scope or an overlay that inherited a direction: those push their
-// own, as the walk does around their subtree. While no
+// mirrors as the walk would (#696, #749). See [EnterDirectionOf].
+func InDirectionOf(obj core.CanvasObject, f func()) {
+	if EnterDirectionOf(obj) {
+		defer uidir.PopTop()
+	}
+	f()
+}
+
+// EnterDirectionOf makes obj's direction the ambient one, and reports whether
+// it pushed one; the caller pops it with uidir.PopTop. Inside a walk, or
+// another InDirectionOf, a direction is already ambient and nothing is
+// pushed, unless obj is a scope or an overlay that inherited a direction:
+// those push their own, as the walk does around their subtree. While no
 // direction other than the global one can apply anywhere (dirhook.InUse) it
 // pushes nothing, keeping uidir's no-scope fast path for the text measured
-// inside f. Otherwise it pushes the resolved direction even when that is the
-// global one, so the objects f refreshes find it ambient instead of looking
-// themselves up.
+// meanwhile. Otherwise it pushes the resolved direction even when that is
+// the global one, so the objects refreshed meanwhile find it ambient instead
+// of looking themselves up.
 //
 // It is the hook the root package's Container and the widget bases reach
 // through internal/dirhook.
-func InDirectionOf(obj core.CanvasObject, f func()) {
+func EnterDirectionOf(obj core.CanvasObject) bool {
 	if !dirhook.InUse() {
-		f()
-		return
+		return false
 	}
 	// A scope, or an overlay that inherited its opener's direction, lays its
 	// content out in its own direction, not the one it sits in, whatever
@@ -123,14 +131,12 @@ func InDirectionOf(obj core.CanvasObject, f func()) {
 	d, ok := ScopeDirection(obj)
 	if !ok {
 		if _, ok := uidir.Current(); ok {
-			f()
-			return
+			return false
 		}
 		d = ResolvedDirectionOf(obj)
 	}
 	uidir.Push(d)
-	defer uidir.Pop(d)
-	f()
+	return true
 }
 
 // RootDirection is the direction a walk of a canvas whose own direction is

@@ -156,7 +156,7 @@ func (w *BaseWidget) Resize(size geo.Size) {
 	if dirhook.InUse() {
 		// Resized outside a layout walk (by hand, or by a parent's Refresh),
 		// the layout runs in the direction the widget sits in (#749).
-		dirhook.Run(impl, func() { r.Layout(size) })
+		layoutInDirection(impl, r, size)
 	} else {
 		r.Layout(size)
 	}
@@ -268,7 +268,7 @@ func (w *BaseWidget) Refresh() {
 	// sync and the renderer's re-layout run in the direction the widget sits
 	// in, not the global one (#749).
 	if dirhook.InUse() {
-		dirhook.Run(impl, func() { refreshWidget(impl) })
+		refreshInDirection(impl)
 	} else {
 		refreshWidget(impl)
 	}
@@ -421,3 +421,17 @@ type noCopy struct{}
 func (*noCopy) Lock() {}
 
 func (*noCopy) Unlock() {}
+
+// layoutInDirection lays impl's renderer out in the direction impl sits in.
+// It takes no closure, so a Resize allocates nothing for it (#772).
+func layoutInDirection(impl core.Widget, r core.WidgetRenderer, size geo.Size) {
+	defer dirhook.Exit(dirhook.Enter(impl))
+	r.Layout(size)
+}
+
+// refreshInDirection is refreshWidget in the direction impl sits in, without
+// a closure (#772).
+func refreshInDirection(impl core.Widget) {
+	defer dirhook.Exit(dirhook.Enter(impl))
+	refreshWidget(impl)
+}

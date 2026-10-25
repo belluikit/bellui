@@ -18,10 +18,11 @@ import (
 )
 
 var (
-	inUse  atomic.Bool
-	epoch  atomic.Uint64
-	around atomic.Pointer[func(core.CanvasObject, func())]
-	moved  atomic.Pointer[func(parent, obj core.CanvasObject, added bool)]
+	inUse atomic.Bool
+	epoch atomic.Uint64
+	enter atomic.Pointer[func(core.CanvasObject) bool]
+	exit  atomic.Pointer[func()]
+	moved atomic.Pointer[func(parent, obj core.CanvasObject, added bool)]
 )
 
 // Note records that a direction other than the process-wide one may now
@@ -67,17 +68,41 @@ func SetMoved(f func(parent, obj core.CanvasObject, added bool)) { moved.Store(&
 // Epoch returns the count [Changed] raises.
 func Epoch() uint64 { return epoch.Load() }
 
-// SetAround installs f as the function [Run] delegates to. internal/driver
-// installs it at init.
-func SetAround(f func(obj core.CanvasObject, run func())) { around.Store(&f) }
+// SetEnter installs enterF as the function [Enter] delegates to, and exitF
+// as the one [Exit] calls to undo a push. internal/driver installs them at
+// init.
+func SetEnter(enterF func(obj core.CanvasObject) bool, exitF func()) {
+	exit.Store(&exitF)
+	enter.Store(&enterF)
+}
+
+// Enter makes obj's layout direction the ambient one, when [InUse] and a hook
+// is installed, until the matching [Exit]; it reports whether it pushed one.
+// Pair them with a defer, so a panic in between unwinds the push:
+//
+//	defer dirhook.Exit(dirhook.Enter(obj))
+//
+// Unlike [Run] it takes no closure, so a hot path such as a widget's Refresh
+// allocates nothing for it (#772).
+func Enter(obj core.CanvasObject) bool {
+	if h := enter.Load(); h != nil && InUse() {
+		return (*h)(obj)
+	}
+	return false
+}
+
+// Exit undoes the push of the [Enter] that returned pushed.
+func Exit(pushed bool) {
+	if pushed {
+		(*exit.Load())()
+	}
+}
 
 // Run runs f with obj's layout direction as the ambient one, when [InUse] and
 // a hook is installed; otherwise it just runs f. Callers on hot paths test
-// [InUse] first, so the closure they pass is only built when it is needed.
+// [InUse] first, so the closure they pass is only built when it is needed, or
+// use [Enter] and [Exit], which take none.
 func Run(obj core.CanvasObject, f func()) {
-	if h := around.Load(); h != nil && InUse() {
-		(*h)(obj, f)
-		return
-	}
+	defer Exit(Enter(obj))
 	f()
 }

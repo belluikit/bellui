@@ -84,7 +84,7 @@ func (c *Container) Refresh() {
 	if dirhook.InUse() {
 		// Outside a layout walk the layout and the children's refreshes run
 		// in the direction c sits in, not the global one (#749).
-		dirhook.Run(c, c.refreshTree)
+		c.refreshTreeInDirection()
 	} else {
 		c.refreshTree()
 	}
@@ -185,10 +185,24 @@ func (c *Container) layout() {
 		return
 	}
 	if dirhook.InUse() {
-		dirhook.Run(c, c.doLayout)
+		c.layoutInDirection()
 		return
 	}
 	c.Layout.Layout(c.Objects, c.size)
+}
+
+// refreshTreeInDirection is refreshTree in the direction c sits in. It takes
+// no closure, so a Refresh allocates nothing for it (#772).
+func (c *Container) refreshTreeInDirection() {
+	defer dirhook.Exit(dirhook.Enter(c))
+	c.refreshTree()
+}
+
+// layoutInDirection is doLayout in the direction c sits in, without a
+// closure (#772).
+func (c *Container) layoutInDirection() {
+	defer dirhook.Exit(dirhook.Enter(c))
+	c.doLayout()
 }
 
 func (c *Container) doLayout() {

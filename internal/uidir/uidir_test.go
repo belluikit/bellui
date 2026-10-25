@@ -11,6 +11,7 @@ import (
 
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/core"
+	"github.com/belluikit/bellui/internal/thread"
 )
 
 func TestCurrent_Empty(t *testing.T) {
@@ -157,4 +158,37 @@ func TestPopOwned_PopsWhatTheOwnerPushed(t *testing.T) {
 	d, _ = Current()
 	assert.Equal(t, bellui.DirectionLTR, d, "ov's pop removes its own entry only")
 	assert.Zero(t, overlayPushes.Load())
+}
+
+// On the main goroutine a push and its pop allocate nothing once the stack
+// exists: a Refresh outside a walk does one of each per widget (#772).
+func TestPushPop_MainGoroutineDoesNotAllocate(t *testing.T) {
+	thread.SetMainGoroutine()
+	Push(bellui.DirectionRTL)
+	Pop(bellui.DirectionRTL)
+
+	allocs := testing.AllocsPerRun(100, func() {
+		Push(bellui.DirectionRTL)
+		Pop(bellui.DirectionRTL)
+	})
+	assert.Zero(t, allocs)
+}
+
+// Another goroutine's stack is dropped once it empties, so a goroutine that
+// pushed and ended leaves nothing in goroutineStacks.
+func TestPushPop_OtherGoroutineLeavesNoStack(t *testing.T) {
+	var id uint64
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		id = thread.GoroutineID()
+		Push(bellui.DirectionRTL)
+		PushOwned(bellui.DirectionLTR, nil, false)
+		PopTop()
+		Pop(bellui.DirectionRTL)
+	}()
+	wg.Wait()
+	_, ok := goroutineStacks.Load(id)
+	assert.False(t, ok)
 }
