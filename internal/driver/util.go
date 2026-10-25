@@ -27,17 +27,20 @@ type directionScoped interface {
 // it, balanced by PopDirectionScope in the matching after-children callback.
 // Any other obj is a no-op.
 func PushDirectionScope(obj core.CanvasObject) {
-	if d, ok := ScopeDirection(obj); ok {
-		uidir.Push(d)
+	if ds, ok := obj.(directionScoped); ok {
+		uidir.PushOwned(ds.ScopedDirection(), obj, false)
+	} else if d, ok := uidir.Inherited(obj); ok {
+		uidir.PushOwned(d, obj, true)
 	}
 }
 
-// PopDirectionScope balances PushDirectionScope for obj. A non-scope obj is a
-// no-op.
+// PopDirectionScope balances PushDirectionScope for obj: it pops what obj
+// pushed there, so a scope's direction or an overlay's inherited one changed
+// while the walk was inside obj (a popup re-shown or dismissed from a layout)
+// cannot unbalance the stack. A non-scope obj is a no-op.
 func PopDirectionScope(obj core.CanvasObject) {
-	if d, ok := ScopeDirection(obj); ok {
-		uidir.Pop(d)
-	}
+	_, scope := obj.(directionScoped)
+	uidir.PopOwned(obj, scope)
 }
 
 // AbsolutePositionForObject returns the absolute position of an object in a set of object trees.

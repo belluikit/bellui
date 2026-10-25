@@ -45,4 +45,10 @@ func inDirectionOf(obj core.CanvasObject, f func()) { driver.InDirectionOf(obj, 
 // container.DirectionScope takes the scope's direction although overlays sit
 // outside the content tree (#749). Every widget that opens a popup of its own
 // calls it before each show; the overlay stack forgets it on removal.
-func inheritDirection(pop, opener core.CanvasObject) { driver.InheritDirection(pop, opener) }
+func inheritDirection[T any, P interface {
+	*T
+	core.CanvasObject
+}](pop P, opener core.CanvasObject,
+) {
+	driver.InheritDirection(pop, opener)
+}

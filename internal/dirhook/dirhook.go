@@ -21,6 +21,7 @@ var (
 	inUse  atomic.Bool
 	epoch  atomic.Uint64
 	around atomic.Pointer[func(core.CanvasObject, func())]
+	moved  atomic.Pointer[func(parent, obj core.CanvasObject, added bool)]
 )
 
 // Note records that a direction other than the process-wide one may now
@@ -37,6 +38,31 @@ func InUse() bool { return inUse.Load() }
 // overlays changed, a scope's direction changed), and a frame boundary. The
 // driver's direction cache is rebuilt after it.
 func Changed() { epoch.Add(1) }
+
+// Added records that obj was added to parent's children (a Container's Add),
+// so it may now be inside a direction scope. The driver's direction cache
+// takes obj's subtree in where it stands rather than being rebuilt, so a loop
+// of Adds costs a walk of what it adds, not of every scope each time.
+func Added(parent, obj core.CanvasObject) { move(parent, obj, true) }
+
+// Removed records that obj left parent's children (a Container's Remove or
+// RemoveAll), so it may have left a direction scope; see [Added].
+func Removed(parent, obj core.CanvasObject) { move(parent, obj, false) }
+
+func move(parent, obj core.CanvasObject, added bool) {
+	if !InUse() {
+		return // nothing is in a scope, and the cache is unused
+	}
+	if h := moved.Load(); h != nil {
+		(*h)(parent, obj, added)
+		return
+	}
+	Changed()
+}
+
+// SetMoved installs f as the function [Added] and [Removed] report to.
+// internal/driver installs it at init.
+func SetMoved(f func(parent, obj core.CanvasObject, added bool)) { moved.Store(&f) }
 
 // Epoch returns the count [Changed] raises.
 func Epoch() uint64 { return epoch.Load() }

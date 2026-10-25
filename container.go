@@ -33,6 +33,7 @@ func (c *Container) Add(add core.CanvasObject) {
 			return
 		}
 		c.Objects = append(c.Objects, add)
+		dirhook.Added(c, add) // add may now be in a direction scope (#749)
 		c.layout()
 		placed(c)
 	})
@@ -118,7 +119,7 @@ func (c *Container) Remove(rem core.CanvasObject) {
 		copy(c.Objects[i:], c.Objects[i+1:])
 		c.Objects[len(c.Objects)-1] = nil
 		c.Objects = c.Objects[:len(c.Objects)-1]
-		dirhook.Changed() // rem may move to another scope (#749)
+		dirhook.Removed(c, rem) // rem may have left a direction scope (#749)
 		c.layout()
 		placed(c)
 		return
@@ -129,8 +130,13 @@ func (c *Container) Remove(rem core.CanvasObject) {
 //
 // Since: 1.0
 func (c *Container) RemoveAll() {
+	removed := c.Objects
 	c.Objects = nil
-	dirhook.Changed() // the objects may move to another scope (#749)
+	if dirhook.InUse() {
+		for _, o := range removed {
+			dirhook.Removed(c, o) // o may have left a direction scope (#749)
+		}
+	}
 	c.layout()
 	placed(c)
 }

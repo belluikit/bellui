@@ -219,6 +219,29 @@ func TestCleanKeepsWidgetsTouchedAfterIdle(t *testing.T) {
 	assert.Zero(t, renderers.Len())
 }
 
+// A walk that only reads the tree finds a renderer with PeekRenderer without
+// keeping it from expiring, as CachedRenderer would (#749).
+func TestPeekRendererLetsTheRendererExpire(t *testing.T) {
+	testClearAll()
+	tm := &timeMock{}
+	tm.setTime(10, 0)
+	lastClean.Store(tm.now)
+	destroyed := 0
+	gone := &dummyWidget{onDestroy: func() { destroyed++ }}
+	r := Renderer(gone)
+
+	tm.now = tm.createTime(12, 0)
+	Clean(false) // a frame without a refresh samples the clock
+	peeked, ok := PeekRenderer(gone)
+	assert.True(t, ok)
+	assert.Equal(t, r, peeked)
+	tm.setTime(12, 30)
+	Clean(true)
+	assert.Equal(t, 1, destroyed, "the peek did not keep the renderer alive")
+	_, ok = PeekRenderer(gone)
+	assert.False(t, ok)
+}
+
 type dummyCanvas struct {
 	core.Canvas
 }

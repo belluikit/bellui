@@ -55,6 +55,27 @@ func CachedRenderer(wid core.Widget) (core.WidgetRenderer, bool) {
 	return rinfo.renderer, true
 }
 
+// PeekRenderer is [CachedRenderer] without marking the renderer as in use: a
+// walk that only reads the tree (the direction cache's, #749) must not keep
+// the renderers of a subtree that left its window from expiring.
+func PeekRenderer(wid core.Widget) (core.WidgetRenderer, bool) {
+	if wid == nil {
+		return nil, false
+	}
+
+	if wd, ok := wid.(isBaseWidget); ok {
+		if wd.super() != nil {
+			wid = wd.super()
+		}
+	}
+
+	rinfo, ok := renderers.Load(wid)
+	if !ok {
+		return nil, false
+	}
+	return rinfo.renderer, true
+}
+
 // DestroyRenderer frees a render implementation for a widget.
 // This is typically for internal use only.
 func DestroyRenderer(wid core.Widget) {

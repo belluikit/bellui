@@ -1,12 +1,16 @@
 package uidir
 
 import (
+	"runtime"
 	"sync"
 	"testing"
+	"weak"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/belluikit/bellui"
+	"github.com/belluikit/bellui/core"
 )
 
 func TestCurrent_Empty(t *testing.T) {
@@ -110,4 +114,47 @@ func TestPerGoroutineIsolation(t *testing.T) {
 		assert.False(t, ok, "another goroutine sees no override")
 	}()
 	wg.Wait()
+}
+
+type overlayObj struct {
+	core.CanvasObject
+	name string
+}
+
+// An overlay that never leaves its stack through Remove (its window closed
+// with the popup open) is not kept alive by its inherited direction, and its
+// entry goes once it is collected (#749).
+func TestSetInherited_HoldsTheOverlayWeakly(t *testing.T) {
+	ov := &overlayObj{name: "popup"}
+	SetInherited(ov, bellui.DirectionRTL)
+	d, ok := Inherited(ov)
+	require.True(t, ok)
+	require.Equal(t, bellui.DirectionRTL, d)
+	require.Contains(t, Scopes(), core.CanvasObject(ov))
+	wp := weak.Make(ov)
+	ov = nil
+
+	for range 3 {
+		runtime.GC()
+	}
+	assert.Nil(t, wp.Value(), "the entry did not keep the overlay alive")
+	Scopes() // prunes
+	assert.Nil(t, inheritedList.Load(), "the collected overlay's entry is gone")
+}
+
+// PopOwned pops what its owner pushed, even when the owner's direction
+// changed in between, and nothing for an owner that pushed nothing (#749).
+func TestPopOwned_PopsWhatTheOwnerPushed(t *testing.T) {
+	ov, other := &overlayObj{name: "a"}, &overlayObj{name: "b"}
+	Push(bellui.DirectionLTR)
+	defer Pop(bellui.DirectionLTR)
+
+	PushOwned(bellui.DirectionRTL, ov, true)
+	PopOwned(other, false) // pushed nothing
+	d, _ := Current()
+	assert.Equal(t, bellui.DirectionRTL, d, "another object's pop leaves ov's entry")
+	PopOwned(ov, false)
+	d, _ = Current()
+	assert.Equal(t, bellui.DirectionLTR, d, "ov's pop removes its own entry only")
+	assert.Zero(t, overlayPushes.Load())
 }

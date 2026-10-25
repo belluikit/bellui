@@ -14,7 +14,10 @@ import (
 	"github.com/belluikit/bellui/lang"
 )
 
-func init() { dirhook.SetAround(InDirectionOf) }
+func init() {
+	dirhook.SetAround(InDirectionOf)
+	dirhook.SetMoved(index.moved)
+}
 
 // DirectionOf reports the layout direction that applies to obj where it sits:
 // the innermost direction scope enclosing it on its canvas (or the direction
@@ -91,7 +94,9 @@ func GlobalDirection() bellui.Direction {
 // performs outside a layout walk — a Refresh that re-lays a widget out after
 // a tap, a timer or a binding, a Container's Add, a widget resized by hand —
 // mirrors as the walk would (#696, #749). Inside a walk, or another
-// InDirectionOf, a direction is already ambient and f runs as it is. While no
+// InDirectionOf, a direction is already ambient and f runs as it is, unless
+// obj is a scope or an overlay that inherited a direction: those push their
+// own, as the walk does around their subtree. While no
 // direction other than the global one can apply anywhere (dirhook.InUse) it
 // pushes nothing, keeping uidir's no-scope fast path for the text measured
 // inside f. Otherwise it pushes the resolved direction even when that is the
@@ -105,14 +110,15 @@ func InDirectionOf(obj core.CanvasObject, f func()) {
 		f()
 		return
 	}
-	if _, ok := uidir.Current(); ok {
-		f()
-		return
-	}
 	// A scope, or an overlay that inherited its opener's direction, lays its
-	// content out in its own direction, not the one it sits in.
+	// content out in its own direction, not the one it sits in, whatever
+	// direction is ambient where it is refreshed.
 	d, ok := ScopeDirection(obj)
 	if !ok {
+		if _, ok := uidir.Current(); ok {
+			f()
+			return
+		}
 		d = ResolvedDirectionOf(obj)
 	}
 	uidir.Push(d)
@@ -138,7 +144,11 @@ func RootDirection(d bellui.Direction) bellui.Direction {
 // out and paints in the scope's direction although overlays are outside the
 // content tree (#749). Nothing is recorded when opener is in the global
 // direction. The overlay stack forgets the overlay when it is removed.
-func InheritDirection(overlay, opener core.CanvasObject) {
+func InheritDirection[T any, P interface {
+	*T
+	core.CanvasObject
+}](overlay P, opener core.CanvasObject,
+) {
 	if overlay == nil {
 		return
 	}
@@ -215,28 +225,29 @@ var indexBuilds, indexLookups atomic.Int64
 //
 // It is rebuilt — a walk of the registered scopes' subtrees, see build — on
 // the first lookup after dirhook.Epoch moved: at each frame
-// (common.Canvas.EnsureMinSize, the test canvas' resize), and when an object
-// leaves a container, a canvas' content or overlays change, a scope's
-// direction or content changes or an overlay inherits one. An object outside
-// every scope is not in it, so a miss means the canvas' or the global
-// direction. Between rebuilds an object a widget's renderer moved into a
-// scope on its own (not through a Container) is missed until the next frame;
-// its parent's Refresh and the layout walk push the scope's direction around
-// it in the meantime.
+// (common.Canvas.EnsureMinSize, the test canvas' resize), and when a canvas'
+// content or overlays change, a scope's direction or content changes or an
+// overlay inherits one. An object added to or removed from a Container is
+// taken in or out where it stands instead (moved), so a loop of Adds does not
+// rebuild it each time. An object outside every scope is not in it, so a miss
+// means the canvas' or the global direction. Between rebuilds an object a
+// widget's renderer moved into a scope on its own (not through a Container)
+// is missed until the next frame; its parent's Refresh and the layout walk
+// push the scope's direction around it in the meantime.
 type dirIndex struct {
 	mu      sync.Mutex
 	epoch   uint64
 	valid   bool
 	dirs    map[core.CanvasObject]bellui.Direction
-	builder atomic.Uint64 // goroutine building the index, 0 when none
+	builder atomic.Uint64 // goroutine walking for the index, 0 when none
 }
 
 // lookup returns the direction of obj's innermost scope; found is false when
 // obj is in no scope on any window.
 func (x *dirIndex) lookup(obj core.CanvasObject) (bellui.Direction, bool) {
 	indexLookups.Add(1)
-	if b := x.builder.Load(); b != 0 && b == thread.GoroutineID() {
-		// A renderer asked for a direction while the index was being built
+	if x.walking() {
+		// A renderer asked for a direction while the index was being walked
 		// on this goroutine: the walk does not create renderers, so this is
 		// rare, and the answer falls back rather than deadlock.
 		return bellui.DirectionAuto, false
@@ -253,6 +264,43 @@ func (x *dirIndex) lookup(obj core.CanvasObject) (bellui.Direction, bool) {
 	return d, ok
 }
 
+// walking reports whether the calling goroutine is walking for the index.
+func (x *dirIndex) walking() bool {
+	b := x.builder.Load()
+	return b != 0 && b == thread.GoroutineID()
+}
+
+// moved takes obj's subtree into the index after it was added to parent
+// (added), or out of it after it left parent: dirhook.Added and Removed. An
+// index already stale is left for the next lookup to rebuild.
+func (x *dirIndex) moved(parent, obj core.CanvasObject, added bool) {
+	if obj == nil {
+		return
+	}
+	if x.walking() {
+		dirhook.Changed() // reached from inside our own walk: rebuild instead
+		return
+	}
+	x.mu.Lock()
+	defer x.mu.Unlock()
+	if !x.valid || x.epoch != dirhook.Epoch() {
+		return
+	}
+	x.builder.Store(thread.GoroutineID())
+	defer x.builder.Store(0)
+	if !added {
+		x.forget(obj)
+		return
+	}
+	d, ok := ScopeDirection(parent)
+	if !ok {
+		d, ok = x.dirs[parent]
+	}
+	if ok {
+		x.walk(obj, d, true)
+	}
+}
+
 // build fills x.dirs from the subtrees of the registered scopes and of the
 // overlays that inherited a direction. An object outside every scope is never
 // in the index, so only those subtrees are walked, whatever the size of the
@@ -266,28 +314,58 @@ func (x *dirIndex) build() {
 	} else {
 		clear(x.dirs)
 	}
-	var stack []bellui.Direction
-	before := func(o core.CanvasObject, _, _ geo.Position, _ geo.Size) bool {
-		if len(stack) > 0 {
-			x.dirs[o] = stack[len(stack)-1]
-		}
-		if d, ok := ScopeDirection(o); ok {
-			stack = append(stack, d)
-		}
-		return false
-	}
-	after := func(o core.CanvasObject, _ geo.Position, _ core.CanvasObject) {
-		if _, ok := ScopeDirection(o); ok && len(stack) > 0 {
-			stack = stack[:len(stack)-1]
-		}
-	}
 	for _, scope := range uidir.Scopes() {
-		if _, ok := ScopeDirection(scope); !ok {
-			continue // automatic: it takes the direction it sits in
-		}
-		stack = stack[:0]
-		WalkCompleteObjectTree(scope, before, after)
+		x.walk(scope, bellui.DirectionAuto, false)
 	}
+}
+
+// walk records o, when in a scope (in) whose direction is d, and its subtree.
+// It reads the tree the renderers already hold and creates none, and it does
+// not mark them as in use (cache.PeekRenderer): a scope that left its window
+// must not stay alive through the renderers its rebuilds touch.
+func (x *dirIndex) walk(o core.CanvasObject, d bellui.Direction, in bool) {
+	if in {
+		x.dirs[o] = d
+	}
+	if sd, ok := ScopeDirection(o); ok {
+		d, in = sd, true
+	}
+	if !in {
+		return // an automatic scope outside every other: nothing to record
+	}
+	for _, c := range indexChildren(o) {
+		if c != nil {
+			x.walk(c, d, true)
+		}
+	}
+}
+
+// forget drops o's subtree from the index, except what a scope inside it
+// encloses: that keeps its scope's direction wherever o goes.
+func (x *dirIndex) forget(o core.CanvasObject) {
+	delete(x.dirs, o)
+	if _, ok := ScopeDirection(o); ok {
+		return
+	}
+	for _, c := range indexChildren(o) {
+		if c != nil {
+			x.forget(c)
+		}
+	}
+}
+
+// indexChildren are o's children as the layout walk sees them, from the
+// renderer already cached for a widget.
+func indexChildren(o core.CanvasObject) []core.CanvasObject {
+	switch co := o.(type) {
+	case *bellui.Container:
+		return co.Objects
+	case core.Widget:
+		if r, ok := cache.PeekRenderer(co); ok {
+			return r.Objects()
+		}
+	}
+	return nil
 }
 
 // DirectionIndexStats reports how many times the direction cache was rebuilt,

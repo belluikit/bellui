@@ -39,7 +39,8 @@ type DirectionScope struct {
 	Direction bellui.Direction
 
 	holder     *bellui.Container
-	registered bool // with uidir.RegisterScope
+	registered bool             // with uidir.RegisterScope
+	applied    bellui.Direction // the Direction the direction cache was told of
 }
 
 // NewDirectionScope returns a [DirectionScope] that lays out and paints obj
@@ -49,7 +50,7 @@ type DirectionScope struct {
 //
 // Since: 1.0
 func NewDirectionScope(obj core.CanvasObject, dir bellui.Direction) *DirectionScope {
-	d := &DirectionScope{Content: obj, Direction: dir, holder: NewStack(obj)}
+	d := &DirectionScope{Content: obj, Direction: dir, holder: NewStack(obj), applied: dir}
 	d.ExtendBaseWidget(d)
 
 	// obj may have been measured/laid-out under the previous (global) direction
@@ -97,7 +98,6 @@ func (d *DirectionScope) SetDirection(dir bellui.Direction) {
 		return
 	}
 	d.Direction = dir
-	dirhook.Changed() // the direction cache holds the old one (#749)
 	d.Refresh()
 }
 
@@ -109,6 +109,12 @@ func (d *DirectionScope) Refresh() {
 		d.holder.Objects[0] = d.Content
 		dirhook.Changed() // the new content enters the scope (#749)
 		d.holder.Refresh()
+	}
+	if d.Direction != d.applied {
+		// Direction was set, by SetDirection or by hand as its doc allows:
+		// the direction cache holds the old one (#749).
+		d.applied = d.Direction
+		dirhook.Changed()
 	}
 
 	// Refresh runs outside a layout walk, so push the direction the content

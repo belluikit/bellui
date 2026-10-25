@@ -12,6 +12,7 @@ import (
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/driver"
 	"github.com/belluikit/bellui/lang"
 	"github.com/belluikit/bellui/test"
 	"github.com/belluikit/bellui/theme"
@@ -344,4 +345,97 @@ func TestDirectionScope_TabGoesRightFirst(t *testing.T) {
 
 	w.Canvas().FocusNext()
 	assert.Equal(t, right, w.Canvas().Focused(), "the first in the scope's reading order is the rightmost")
+}
+
+// An object moved into a scope gets the scope's direction from the lookup at
+// once: Add invalidates the direction cache, as Remove does (#749).
+func TestDirectionOf_ObjectMovedIntoScope(t *testing.T) {
+	moved := minRect(10, 10)
+	scoped := container.NewVBox()
+	outside := container.NewVBox(moved)
+	test.NewTempApp(t)
+	lang.SetLocaleForTests(t, "en-US")
+	w := test.NewTempWindow(t, container.NewVBox(container.NewDirectionScope(scoped, bellui.DirectionRTL), outside))
+	w.Resize(geo.NewSize(200, 200))
+	require.Equal(t, bellui.DirectionLTR, container.DirectionOf(moved))
+
+	outside.Remove(moved)
+	scoped.Add(moved)
+	assert.Equal(t, bellui.DirectionRTL, container.DirectionOf(moved))
+}
+
+// A container added to one in a scope keeps the mirroring Add gave it through
+// its own Refresh before the next frame (#749).
+func TestDirectionScope_AddedHBoxStaysMirroredAfterRefresh(t *testing.T) {
+	outer := container.NewVBox()
+	inRTLScopeWindow(t, outer)
+	require.Equal(t, bellui.DirectionRTL, container.DirectionOf(outer), "the cache is built before the Add")
+
+	a, b := minRect(50, 50), minRect(50, 50)
+	box := container.NewHBox(a, b)
+	outer.Add(box)
+	require.Greater(t, a.Position().X, b.Position().X, "Add laid it out mirrored")
+
+	box.Refresh()
+	assert.Greater(t, a.Position().X, b.Position().X, "still mirrored after its own Refresh")
+}
+
+// Setting the Direction field and calling Refresh, as its doc says, reaches
+// the direction lookup at once, as SetDirection does (#749).
+func TestDirectionScope_DirectionFieldThenRefresh(t *testing.T) {
+	inner := minRect(10, 10)
+	test.NewTempApp(t)
+	lang.SetLocaleForTests(t, "en-US")
+	scope := container.NewDirectionScope(container.NewVBox(inner), bellui.DirectionRTL)
+	w := test.NewTempWindow(t, scope)
+	w.Resize(geo.NewSize(200, 200))
+	require.Equal(t, bellui.DirectionRTL, container.DirectionOf(inner))
+
+	scope.Direction = bellui.DirectionLTR
+	scope.Refresh()
+	assert.Equal(t, bellui.DirectionLTR, container.DirectionOf(inner))
+}
+
+// Add and Remove take the object's subtree into or out of the direction cache
+// where it stands, so a loop of them does not rebuild the cache each time; a
+// nested scope moved with them keeps its own direction inside (#749).
+func TestDirectionOf_AddRemoveUpdateTheCacheInPlace(t *testing.T) {
+	scoped, outside := container.NewVBox(), container.NewVBox()
+	test.NewTempApp(t)
+	lang.SetLocaleForTests(t, "en-US")
+	w := test.NewTempWindow(t, container.NewVBox(container.NewDirectionScope(scoped, bellui.DirectionRTL), outside))
+	w.Resize(geo.NewSize(200, 200))
+	inner, innerRTL := minRect(10, 10), minRect(10, 10)
+	nested := container.NewDirectionScope(container.NewVBox(inner), bellui.DirectionLTR)
+	nestedRTL := container.NewDirectionScope(container.NewVBox(innerRTL), bellui.DirectionRTL)
+	outside.Add(nested)
+	scoped.Add(nestedRTL)
+	w.Resize(geo.NewSize(200, 300)) // a frame: the renderers exist and the cache is rebuilt
+	require.Equal(t, bellui.DirectionLTR, container.DirectionOf(nested))
+	require.Equal(t, bellui.DirectionRTL, container.DirectionOf(innerRTL))
+	builds, lookups := driver.DirectionIndexStats()
+
+	rows := make([]*canvas.Rectangle, 20)
+	for i := range rows {
+		rows[i] = minRect(10, 10)
+		scoped.Add(rows[i])
+	}
+	assert.Equal(t, bellui.DirectionRTL, container.DirectionOf(rows[len(rows)-1]), "an added row is in the scope")
+	outside.Remove(nested)
+	scoped.Add(nested)
+	assert.Equal(t, bellui.DirectionRTL, container.DirectionOf(nested), "the nested scope sits in the RTL scope now")
+	assert.Equal(t, bellui.DirectionLTR, container.DirectionOf(inner), "its content keeps its own direction")
+	for _, r := range rows {
+		scoped.Remove(r)
+	}
+	assert.Equal(t, bellui.DirectionLTR, container.DirectionOf(rows[0]), "a removed row is out of the scope")
+	scoped.Remove(nestedRTL)
+	assert.Equal(t, bellui.DirectionRTL, container.DirectionOf(innerRTL), "a scope removed keeps its content's direction")
+	scoped.RemoveAll()
+	assert.Equal(t, bellui.DirectionLTR, container.DirectionOf(nested), "RemoveAll takes the nested scope out")
+	assert.Equal(t, bellui.DirectionLTR, container.DirectionOf(inner))
+
+	after, afterLookups := driver.DirectionIndexStats()
+	assert.Greater(t, afterLookups, lookups, "the lookups reached the cache")
+	assert.Equal(t, builds, after, "no Add or Remove rebuilt it")
 }
