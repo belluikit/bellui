@@ -328,62 +328,6 @@ func TestCarousel_DragCatchesEdgeSnapBack(t *testing.T) {
 	})
 }
 
-// The DragEnd of a coast the carousel already took as the release does not end
-// the next gesture, which can begin before the coast has run out.
-func TestCarousel_CoastEndDoesNotEndNextGesture(t *testing.T) {
-	c, _, drv, clock := newCarouselBench(t, false)
-	finger := func(x, dx float32) *event.DragEvent {
-		*clock += 30 * time.Millisecond
-		e := &event.DragEvent{PointEvent: event.PointEvent{Position: geo.NewPos(x, 80)}, Dragged: geo.NewDelta(dx, 0)}
-		c.Dragged(e)
-		return e
-	}
-	finger(140, -10)
-	finger(130, -10)
-	c.Dragged(&event.DragEvent{PointEvent: event.PointEvent{Position: geo.NewPos(130, 80)}, Dragged: geo.NewDelta(-9, 0)})
-	require.Len(t, drv.started, 1, "the coast was taken as the release")
-
-	// A new gesture begins while the old coast is still running.
-	finger(140, -10)
-	finger(130, -10)
-	require.True(t, c.dragging)
-	c.DragEnd() // the old coast's, late
-	assert.True(t, c.dragging, "the new gesture is still under the finger")
-	assert.Len(t, drv.started, 1, "and nothing settles yet")
-	c.DragEnd() // the new gesture's own
-	assert.False(t, c.dragging)
-	assert.Len(t, drv.started, 2)
-}
-
-// The release position can differ from the last move's, so the coast's first
-// step looks like a finger move. Its second step re-sends the same event; the
-// carousel then undoes the first and takes the release from before it, so the
-// coast cannot carry a drag over the distance threshold.
-func TestCarousel_CoastFromAnotherReleasePosition(t *testing.T) {
-	c, _, drv, clock := newCarouselBench(t, false)
-	n := int(c.Size().Width / 5 / 3)
-	require.Greater(t, float32(n*3)+2.76, c.Size().Width/5, "the coast's first step crosses the threshold")
-
-	x := float32(200)
-	for range n { // slow, 100pt/s, ending just under a fifth of the width
-		*clock += 30 * time.Millisecond
-		x -= 3
-		c.Dragged(&event.DragEvent{PointEvent: event.PointEvent{Position: geo.NewPos(x, 80)}, Dragged: geo.NewDelta(-3, 0)})
-	}
-	at := c.Items[0].Position().X
-
-	coast := &event.DragEvent{PointEvent: event.PointEvent{Position: geo.NewPos(x-1, 80)}, Dragged: geo.NewDelta(-3, 0)}
-	for range 3 {
-		*clock += 16 * time.Millisecond
-		coast.Dragged.DX *= 0.92
-		c.Dragged(coast)
-	}
-	c.DragEnd()
-	assert.Equal(t, 0, c.CurrentItem, "snapped back: the coast added no distance")
-	require.Len(t, drv.started, 1)
-	assert.Equal(t, at, c.Items[0].Position().X, "the settle starts where the finger left the content")
-}
-
 // A settle that outlives the carousel's renderer does not build a new one.
 func TestCarousel_SettleWithoutRendererBuildsNone(t *testing.T) {
 	test.NewTempApp(t)

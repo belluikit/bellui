@@ -44,15 +44,6 @@ type Carousel struct {
 	dragBase float32      // finger travel, before edge resistance, the offset started from
 	drag     geo.Delta    // accumulated over the current drag gesture
 	samples  []carouselSample
-	lastPos  geo.Position     // Position of the gesture's latest finger event
-	lastEv   *event.DragEvent // the gesture's latest finger event
-	lastStep geo.Delta        // the drag lastEv added
-	coasting bool             // a driver is coasting a gesture this carousel already released
-	coastPos geo.Position     // the coast's (release) position
-	// coastEnd is set while the DragEnd of a coast this carousel already took
-	// as the release is still to come, so that DragEnd does not end a later
-	// gesture.
-	coastEnd bool
 
 	// offset is how far, in points and in screen terms (positive is to the
 	// right), the content sits from its resting place on CurrentItem.
@@ -164,39 +155,6 @@ func (c *Carousel) dirSign() float32 {
 // Dragged moves the content with the finger once the gesture has locked to the
 // horizontal axis; a gesture that starts vertical is ignored.
 func (c *Carousel) Dragged(e *event.DragEvent) {
-	if c.coasting {
-		if e.Position == c.coastPos {
-			return // the driver's coast after a release this carousel already settled
-		}
-		c.coasting = false // a new gesture (a touch stops the coast first, #751)
-	}
-	if c.dragging && c.axis == carouselAxisHorizontal {
-		// The finger has lifted and the mobile and embedded drivers are
-		// coasting the gesture: common.DragCoast sends the release event again
-		// with decaying deltas, at the release position, before DragEnd
-		// (#751). Treat the coast as the release, so the flick speed is the
-		// finger's and the content settles now instead of gliding by the
-		// coast's distance. The coast shows as a drag without the pointer
-		// moving. A driver that re-sends one event object (as the drivers did
-		// before #756) also shows it as a repeated event: then the first step
-		// was taken for a finger move, since the release position can differ
-		// from the last move's, and is undone. DragCoast copies each step, so
-		// with it that first step stays applied (one decayed delta).
-		repeat := e == c.lastEv
-		if repeat || (e.Position == c.lastPos && !e.Dragged.IsZero()) {
-			if repeat {
-				c.undoLastStep()
-			}
-			c.coasting = true
-			c.coastPos = e.Position
-			c.coastEnd = true
-			c.release()
-			return
-		}
-	}
-	c.lastPos = e.Position
-	c.lastEv = e
-	c.lastStep = e.Dragged
 	if !c.dragging {
 		c.dragging = true
 		c.rtl = isRTLAt(c.super()) // once per gesture: a DirectionScope may hold it (#696)
@@ -238,17 +196,6 @@ func (c *Carousel) followFinger() {
 	c.relayoutTrack()
 }
 
-// undoLastStep takes back the latest finger event of a horizontal gesture: its
-// drag, its speed sample and the content's move.
-func (c *Carousel) undoLastStep() {
-	c.drag.DX -= c.lastStep.DX
-	c.drag.DY -= c.lastStep.DY
-	if n := len(c.samples); n > 0 {
-		c.samples = c.samples[:n-1]
-	}
-	c.followFinger()
-}
-
 // resisted is the offset a finger travel of raw moves the content to: past the
 // first or last item it moves a carouselEdgeResistance-th as far.
 func (c *Carousel) resisted(raw float32) float32 {
@@ -274,13 +221,6 @@ func (c *Carousel) unresisted(off float32) float32 {
 // release that is not a flick pages towards that side when the content sits
 // more than a fifth of the width from rest, and otherwise animates back.
 func (c *Carousel) DragEnd() {
-	if c.coastEnd {
-		// The end of a coast whose release was already handled: its natural
-		// end, or DragCoast.Stop when the next touch goes down (#756).
-		c.coastEnd = false
-		c.coasting = false
-		return
-	}
 	if !c.dragging {
 		return
 	}
