@@ -61,7 +61,14 @@ func coastWindow(t *testing.T) (*driver, *window, *coastRecorder) {
 		w.Show()
 		w.canvas.Resize(geo.NewSize(200, 200))
 	})
-	t.Cleanup(func() { onMain(w.Close) })
+	t.Cleanup(func() {
+		// Stop a fling the test left running, so its steps do not reach the
+		// next test, which may be closing a window meanwhile.
+		onMain(func() {
+			cd.coast.Stop()
+			w.Close()
+		})
+	})
 	return cd, w, rec
 }
 
