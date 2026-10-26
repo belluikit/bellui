@@ -33,17 +33,34 @@ func (d *device) handleKeyboard(obj event.Focusable) {
 		isDisabled = disWid.Disabled()
 	}
 	if obj != nil && !isDisabled {
-		if keyb, ok := obj.(mobile.Keyboardable); ok {
-			d.showVirtualKeyboard(keyb.Keyboard())
-		} else {
-			d.showVirtualKeyboard(mobile.DefaultKeyboard)
-		}
+		d.showNativeKeyboard(nativeKeyboard(obj))
 	} else {
 		d.hideVirtualKeyboard()
 	}
 }
 
+// nativeKeyboard picks the keyboard for a focused object: the one it asks for,
+// the default one for a text editor, and otherwise a keyboard that sends key
+// presses. A soft keyboard composes and commits text, which reaches only an
+// editor, so a widget that takes keys but no text (a chart waiting for a
+// label) would never see the letters typed on it (#666).
+func nativeKeyboard(obj event.Focusable) (mobile.KeyboardType, app.KeyboardType) {
+	if keyb, ok := obj.(mobile.Keyboardable); ok {
+		return keyb.Keyboard(), app.KeyboardType(keyb.Keyboard())
+	}
+	if _, ok := obj.(core.AccessibleTexter); ok {
+		return mobile.DefaultKeyboard, app.DefaultKeyboard
+	}
+	return mobile.DefaultKeyboard, app.KeysKeyboard
+}
+
 func (d *device) showVirtualKeyboard(keyboard mobile.KeyboardType) {
+	d.showNativeKeyboard(keyboard, app.KeyboardType(keyboard))
+}
+
+// showNativeKeyboard shows the native keyboard native, recording keyboard as
+// the type of the focused field.
+func (d *device) showNativeKeyboard(keyboard mobile.KeyboardType, native app.KeyboardType) {
 	if drv, ok := bellui.CurrentApp().Driver().(*driver); ok {
 		if drv.app == nil { // not yet running
 			bellui.LogError("Cannot show keyboard before app is running", nil)
@@ -55,7 +72,7 @@ func (d *device) showVirtualKeyboard(keyboard mobile.KeyboardType) {
 		// native text-key echoes for prose fields, where Gboard writes through
 		// the InputConnection (pre-rebrand tracker #1061). Password/number fields have no IC writer.
 		drv.keyboardType = keyboard
-		drv.app.ShowVirtualKeyboard(app.KeyboardType(keyboard))
+		drv.app.ShowVirtualKeyboard(native)
 
 		// Bind the newly focused field to the text-input mirror and push its real
 		// content into the native IME shadow (pre-rebrand tracker #572 → pre-rebrand tracker #770 seam). Bind forces the

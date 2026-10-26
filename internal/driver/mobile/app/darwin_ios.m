@@ -1649,6 +1649,9 @@ bool isDark() {
 #define DEFAULT_KEYBOARD_CODE 0
 #define SINGLELINE_KEYBOARD_CODE 1
 #define NUMBER_KEYBOARD_CODE 2
+// A focused non-editor (app.KeysKeyboard): the default keyboard without
+// autocorrect. The proxy's insertText: reaches it as typed keys (#666).
+#define KEYS_KEYBOARD_CODE 4
 
 void showKeyboard(int keyboardType) {
     GoAppAppDelegate *appDelegate = (GoAppAppDelegate *)[[UIApplication sharedApplication] delegate];
@@ -1658,6 +1661,7 @@ void showKeyboard(int keyboardType) {
         switch (keyboardType)
         {
             case DEFAULT_KEYBOARD_CODE:
+            case KEYS_KEYBOARD_CODE:
                 [view setKeyboardType:UIKeyboardTypeDefault];
                 [view setReturnKeyType:UIReturnKeyDefault];
                 break;
@@ -1674,6 +1678,17 @@ void showKeyboard(int keyboardType) {
                 [view setKeyboardType:UIKeyboardTypeDefault];
                 [view setReturnKeyType:UIReturnKeyDefault];
                 break;
+        }
+        // The keys keyboard is iOS's "no text field": autocorrect and spell
+        // checking off, so the keyboard sends what was typed. A correction
+        // arrives as a replacement of text the non-editor never held, and is
+        // lost (#666). Every other keyboard gets them back.
+        if (keyboardType == KEYS_KEYBOARD_CODE) {
+            [view setAutocorrectionType:UITextAutocorrectionTypeNo];
+            [view setSpellCheckingType:UITextSpellCheckingTypeNo];
+        } else {
+            [view setAutocorrectionType:UITextAutocorrectionTypeDefault];
+            [view setSpellCheckingType:UITextSpellCheckingTypeDefault];
         }
         // refresh settings if keyboard is already open
         [view reloadInputViews];
