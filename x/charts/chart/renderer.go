@@ -42,6 +42,7 @@ type layoutResult struct {
 	legendObjs       []core.CanvasObject
 	legendLayout     *component.LegendLayout
 	breadcrumbLayout *component.BreadcrumbLayout
+	drawingToolsTop  float32 // where the toolbox's drawing tools start below grid.Top
 }
 
 // cachedRanges stores pre-computed data ranges to avoid re-scanning
@@ -250,6 +251,7 @@ func (r *chartRenderer) fullRebuild(size geo.Size) {
 	tooltipState := r.chart.tooltipState
 	brushState := r.chart.brushState
 	capturing := r.chart.capturing
+	drawingTool := r.chart.drawingTool
 	animProgress := r.chart.animCtrl.Progress
 	animActive := r.chart.animCtrl.Active
 	var zoomWindow interact.DataWindow
@@ -342,7 +344,7 @@ func (r *chartRenderer) fullRebuild(size geo.Size) {
 	// Render overlays, legend, zoom buttons, toolbox (static controls)
 	controlObjs, zoomButtonsLayout, toolboxLayout := r.renderOverlaysAndControls(
 		opt, plotRect, size, resolver, cartesianCoords,
-		layout, hitTester, seriesColors, capturing,
+		layout, hitTester, seriesColors, capturing, drawingTool,
 	)
 	objects = append(objects, controlObjs...)
 
@@ -488,8 +490,15 @@ func (r *chartRenderer) computeLayout(
 	// when they reach lower (#663): they sit at the top right, over the plot's
 	// first rows otherwise.
 	header := titleHeight + breadcrumbHeight
-	if bottom := controlsBottom(opt); bottom > 0 && bottom+controlsGap > header {
+	if bottom := buttonRowsBottom(opt); bottom > 0 && bottom+controlsGap > header {
 		header = bottom + controlsGap
+	}
+	// The toolbox's drawing tools take rows of their own across the chart,
+	// below the title and the buttons, and the plot starts below them (#796).
+	var drawingToolsTop float32
+	if tools := component.DrawingToolsHeight(opt.Toolbox, size.Width-grid.Left-grid.Right); tools > 0 {
+		drawingToolsTop = max(header, controlsTop)
+		header = drawingToolsTop + tools + controlsGap
 	}
 	var room axisSpace
 	if len(cartesianSeries) > 0 {
@@ -511,6 +520,7 @@ func (r *chartRenderer) computeLayout(
 		legendObjs:       legendObjs,
 		legendLayout:     legendLayout,
 		breadcrumbLayout: breadcrumbLayout,
+		drawingToolsTop:  drawingToolsTop,
 	}
 }
 
@@ -594,9 +604,9 @@ const (
 	controlsGap     float32 = 4  // space between the lowest row and the plot
 )
 
-// controlsBottom is how far below grid.Top the zoom and toolbox buttons
+// buttonRowsBottom is how far below grid.Top the zoom and toolbox buttons
 // reach, or 0 when the chart shows neither.
-func controlsBottom(opt Option) float32 {
+func buttonRowsBottom(opt Option) float32 {
 	zoom := opt.DataZoom != nil && opt.DataZoom.Enabled
 	toolbox := opt.Toolbox.HasButtons()
 	switch {
@@ -622,6 +632,7 @@ func (r *chartRenderer) renderOverlaysAndControls(
 	hitTester *interact.HitTester,
 	seriesColors map[int]color.Color,
 	hideControls bool, // lay the zoom buttons and toolbox out, but do not draw them (a capture)
+	drawingTool interact.DrawingToolMode, // the active tool, highlighted in the toolbox's drawing tools
 ) ([]core.CanvasObject, *component.ZoomButtonsLayout, *component.ToolboxLayout) {
 	var objects []core.CanvasObject
 
@@ -661,8 +672,10 @@ func (r *chartRenderer) renderOverlaysAndControls(
 	// Legend objects (on top of chart)
 	objects = append(objects, layout.legendObjs...)
 
-	// Compute grid for button positioning
-	grid := chartGrid(opt)
+	// The buttons go in the grid the plot was laid out in, which for a chart
+	// with no cartesian series may be tighter than chartGrid (computeLayout):
+	// the header reserved for them is measured from its top.
+	grid := layout.grid
 
 	// Zoom buttons at top-right, horizontal (if DataZoom enabled)
 	var zoomButtonsLayout *component.ZoomButtonsLayout
@@ -689,6 +702,14 @@ func (r *chartRenderer) renderOverlaysAndControls(
 			objects = append(objects, tbObjs...)
 		}
 		toolboxLayout = tbLayout
+
+		// The drawing tools, in rows across the chart under those buttons.
+		dtY := grid.Top + layout.drawingToolsTop
+		dtObjs := component.RenderDrawingTools(opt.Toolbox, drawingTool, grid.Left, dtY,
+			size.Width-grid.Left-grid.Right, resolver, toolboxLayout)
+		if !hideControls {
+			objects = append(objects, dtObjs...)
+		}
 	}
 
 	return objects, zoomButtonsLayout, toolboxLayout

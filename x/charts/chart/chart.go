@@ -8,6 +8,8 @@ import (
 	"image/png"
 	"log"
 	"math"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -377,6 +379,12 @@ func (c *Chart) handleToolboxAction(action string) {
 	case len(action) > 10 && action[:10] == "magicType:":
 		targetType := action[10:]
 		c.MagicTypeSwitch(targetType)
+	case strings.HasPrefix(action, component.ActionDrawingTool):
+		if n, err := strconv.Atoi(action[len(component.ActionDrawingTool):]); err == nil {
+			c.SetDrawingTool(interact.DrawingToolMode(n))
+		}
+	case action == component.ActionClearDrawings:
+		c.clearAllDrawings()
 	}
 }
 
@@ -780,10 +788,13 @@ func (c *Chart) Tapped(e *event.PointEvent) {
 	}
 
 	// Pinned tooltip: click to pin visible tooltip, click again to dismiss.
-	// Skip pin logic when a drawing tool is active — drawing takes priority.
+	// Skip pin logic when a drawing tool is active — drawing takes priority —
+	// and for a tap on one of the chart's controls, which an axis tooltip
+	// following the pointer's x is up over just as much as over the plot.
 	c.mu.Lock()
 	hasDrawingTool := c.drawingTool != interact.DrawingToolNone
-	if c.tooltipState.Pinned && !hasDrawingTool {
+	onControl := c.onControlLocked(e.Position)
+	if c.tooltipState.Pinned && !hasDrawingTool && !onControl {
 		// Dismiss pinned tooltip.
 		c.tooltipState.Pinned = false
 		c.tooltipState.Visible = false
@@ -797,7 +808,7 @@ func (c *Chart) Tapped(e *event.PointEvent) {
 		// Clear pin silently so drawing can proceed.
 		c.tooltipState.Pinned = false
 	}
-	if !hasDrawingTool && c.tooltipState.Visible && len(c.tooltipState.Hits) > 0 {
+	if !hasDrawingTool && !onControl && c.tooltipState.Visible && len(c.tooltipState.Hits) > 0 {
 		// A click on a drawing selects it rather than pinning the tooltip the
 		// hover over it opened: with a tooltip on, a drawing was otherwise
 		// never selectable (#343).
@@ -906,6 +917,26 @@ func (c *Chart) Tapped(e *event.PointEvent) {
 }
 
 // resolveTap determines what was tapped under a single lock/unlock cycle.
+// onControlLocked reports whether pos is on one of the chart's controls —
+// the zoom buttons, the toolbox, the legend or the breadcrumb, which
+// resolveTap tests first — which a tap reaches whatever the tooltip shows.
+// Unlike resolveTap it changes nothing. Must be called with c.mu held.
+func (c *Chart) onControlLocked(pos geo.Position) bool {
+	snap := c.renderSnap
+	switch {
+	case snap == nil:
+		return false
+	case snap.zoomButtons != nil && snap.zoomButtons.HitTest(pos) != "":
+		return true
+	case snap.toolboxLayout != nil && snap.toolboxLayout.HitTest(pos) != "":
+		return true
+	case snap.legendLayout != nil && snap.legendLayout.HitTest(pos) >= 0:
+		return true
+	}
+	action, depth := snap.breadcrumbLayout.HitTest(pos) // nil-safe
+	return action != "" || depth >= 0
+}
+
 func (c *Chart) resolveTap(pos geo.Position) tapResult {
 	c.mu.Lock()
 	defer c.mu.Unlock()

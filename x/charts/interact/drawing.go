@@ -25,6 +25,48 @@ const (
 	DrawingToolMeasure                        // temporary measure overlay (not persisted)
 )
 
+// DefaultDrawingTools lists every drawing tool in the order the default
+// drawing-tools UI shows them, starting with DrawingToolNone (shown as
+// "Select"). It returns a new slice, which the caller may change.
+//
+// Experimental: added with the drawing-tools UI (#796).
+func DefaultDrawingTools() []DrawingToolMode {
+	return []DrawingToolMode{
+		DrawingToolNone, DrawingToolHLine, DrawingToolVLine, DrawingToolTrendLine,
+		DrawingToolRay, DrawingToolRectangle, DrawingToolChannel,
+		DrawingToolFibRetracement, DrawingToolTextLabel, DrawingToolMeasure,
+	}
+}
+
+// String returns the tool's short name, the label the default drawing-tools UI
+// shows. DrawingToolNone is "Select": with no drawing tool active, a tap
+// selects a drawing.
+func (m DrawingToolMode) String() string {
+	switch m {
+	case DrawingToolNone:
+		return "Select"
+	case DrawingToolHLine:
+		return "H-Line"
+	case DrawingToolVLine:
+		return "V-Line"
+	case DrawingToolTrendLine:
+		return "Trend"
+	case DrawingToolRay:
+		return "Ray"
+	case DrawingToolRectangle:
+		return "Rect"
+	case DrawingToolChannel:
+		return "Channel"
+	case DrawingToolFibRetracement:
+		return "Fib"
+	case DrawingToolTextLabel:
+		return "Text"
+	case DrawingToolMeasure:
+		return "Measure"
+	}
+	return fmt.Sprintf("DrawingToolMode(%d)", int(m))
+}
+
 // DrawingID uniquely identifies a drawing within a chart.
 type DrawingID string
 

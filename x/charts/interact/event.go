@@ -11,19 +11,20 @@ import (
 type EventType int
 
 const (
-	EventClick           EventType = iota // tap/click on data point
-	EventDoubleClick                      // double-tap
-	EventHover                            // mouse over data point
-	EventMouseOut                         // mouse left chart
-	EventLegendToggle                     // legend item toggled
-	EventZoomChange                       // data window changed
-	EventBrushSelect                      // brush selection completed
-	EventDrilldown                        // navigated deeper into data
-	EventDrillUp                          // navigated back up
-	EventKeyPress                         // keyboard key pressed while chart focused
-	EventDrawingCreated                   // new drawing finalized
-	EventDrawingSelected                  // existing drawing clicked/selected
-	EventDrawingDeleted                   // drawing removed
+	EventClick              EventType = iota // tap/click on data point
+	EventDoubleClick                         // double-tap
+	EventHover                               // mouse over data point
+	EventMouseOut                            // mouse left chart
+	EventLegendToggle                        // legend item toggled
+	EventZoomChange                          // data window changed
+	EventBrushSelect                         // brush selection completed
+	EventDrilldown                           // navigated deeper into data
+	EventDrillUp                             // navigated back up
+	EventKeyPress                            // keyboard key pressed while chart focused
+	EventDrawingCreated                      // new drawing finalized
+	EventDrawingSelected                     // existing drawing clicked/selected
+	EventDrawingDeleted                      // drawing removed
+	EventDrawingToolChanged                  // active drawing tool changed (DrawingToolEvent)
 )
 
 // Event is the base payload for all chart events.
@@ -54,6 +55,19 @@ type ZoomChangeEvent struct {
 	Event
 	Start, End float64 // normalized [0, 1]
 	FromUser   bool
+}
+
+// DrawingToolEvent fires when the chart's active drawing tool changes, from
+// any source: a drawing-tools UI, the app calling SetDrawingTool, or the chart
+// itself. An app that replaces the default drawing tools keeps its own UI in
+// sync with it (#796).
+//
+// Experimental: added with the drawing-tools UI (#796) and may change until a
+// second app uses it. Chart.DrawingTool reads the same state.
+type DrawingToolEvent struct {
+	Event
+	Tool     DrawingToolMode // the tool now active
+	Previous DrawingToolMode // the tool active before
 }
 
 // BrushSelectEvent fires when brush selection completes.
@@ -226,6 +240,8 @@ func eventTypeOf(evt interface{}) EventType {
 	case KeyPressEvent:
 		return e.Type
 	case DrawingEvent:
+		return e.Type
+	case DrawingToolEvent:
 		return e.Type
 	case Event:
 		return e.Type
