@@ -24,7 +24,9 @@ var drawingColors = []color.Color{
 
 // SetDrawingTool activates a drawing tool. Pass DrawingToolNone to deactivate.
 // A change emits interact.EventDrawingToolChanged, which keeps a drawing-tools
-// UI in sync (DrawingToolbar, or an app's own).
+// UI in sync (DrawingToolbar, or an app's own). The event is delivered on the
+// main goroutine, so a subscriber can update widgets even when SetDrawingTool
+// is called from another goroutine (#800).
 func (c *Chart) SetDrawingTool(tool interact.DrawingToolMode) {
 	c.mu.Lock()
 	// Finalize any in-progress text label before switching tools.
@@ -40,10 +42,12 @@ func (c *Chart) SetDrawingTool(tool interact.DrawingToolMode) {
 		c.syncMobileFocus() // no text input is pending any more
 	}
 	if tool != previous {
-		c.Events.Emit(interact.DrawingToolEvent{
-			Event:    interact.Event{Type: interact.EventDrawingToolChanged},
-			Tool:     tool,
-			Previous: previous,
+		bellui.RunOnMain(func() {
+			c.Events.Emit(interact.DrawingToolEvent{
+				Event:    interact.Event{Type: interact.EventDrawingToolChanged},
+				Tool:     tool,
+				Previous: previous,
+			})
 		})
 	}
 }
@@ -87,12 +91,22 @@ func (c *Chart) Drawings() []interact.Drawing {
 	return c.drawingStore.All()
 }
 
-// ClearDrawings removes all drawings.
+// ClearDrawings removes all drawings. Like RemoveDrawing, it emits
+// interact.EventDrawingDeleted for each drawing it removes, in the order
+// Drawings listed them, so an app that follows the drawing events learns of a
+// Clear All too (#799).
 func (c *Chart) ClearDrawings() {
 	c.mu.Lock()
+	removed := c.drawingStore.All()
 	c.drawingStore.Clear()
 	c.selectedID = ""
 	c.mu.Unlock()
+	for _, d := range removed {
+		c.Events.Emit(interact.DrawingEvent{
+			Event:     interact.Event{Type: interact.EventDrawingDeleted},
+			DrawingID: d.ID(),
+		})
+	}
 	c.refreshDirty(dirtyFull)
 }
 
