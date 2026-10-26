@@ -5,13 +5,17 @@
 package main
 
 import (
+	"fmt"
 	"image/color"
+	"os"
+	"strings"
 
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/app"
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/core"
+	"github.com/belluikit/bellui/driver/desktop"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/layout"
 	"github.com/belluikit/bellui/theme"
@@ -33,6 +37,18 @@ func main() {
 	w.SetContent(container.New(layout.NewGridLayoutWithRows(5), cells...))
 	w.SetPadded(false)
 	w.Resize(geo.NewSize(240, 480))
+	// Place the window on the screen named by PROBE_SCREEN (a substring of its
+	// name), so a wide-gamut built-in display is the one measured.
+	if want := os.Getenv("PROBE_SCREEN"); want != "" {
+		if sd, ok := a.Driver().(desktop.ScreensDriver); ok {
+			for _, sc := range sd.Screens() {
+				fmt.Printf("PROBE803 screen %q bounds %+v primary=%v\n", sc.Name, sc.Bounds, sc.Primary)
+				if dw, ok := w.(desktop.Window); ok && strings.Contains(sc.Name, want) {
+					dw.RequestPosition(sc.WorkArea.X+80, sc.WorkArea.Y+80)
+				}
+			}
+		}
+	}
 	bellui.ShowAndRun(w)
 }
 
