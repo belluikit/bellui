@@ -166,3 +166,24 @@ func TestHitTestDrawings_TrendLine(t *testing.T) {
 		t.Errorf("expected t1, got %s", hit.DrawingID)
 	}
 }
+
+// Every default tool has a name, and DefaultDrawingTools hands out a copy.
+func TestDrawingToolNames(t *testing.T) {
+	want := []string{"Select", "H-Line", "V-Line", "Trend", "Ray", "Rect", "Channel", "Fib", "Text", "Measure"}
+	tools := DefaultDrawingTools()
+	if len(tools) != len(want) {
+		t.Fatalf("%d default tools, want %d", len(tools), len(want))
+	}
+	for i, tool := range tools {
+		if tool.String() != want[i] {
+			t.Errorf("tool %d is %q, want %q", i, tool.String(), want[i])
+		}
+	}
+	tools[0] = DrawingToolMeasure
+	if DefaultDrawingTools()[0] != DrawingToolNone {
+		t.Error("changing the returned slice changed the defaults")
+	}
+	if got := DrawingToolMode(99).String(); got != "DrawingToolMode(99)" {
+		t.Errorf("an unknown tool is %q", got)
+	}
+}

@@ -411,9 +411,37 @@ type VisualMapConfig struct {
 
 ```go
 type ToolboxConfig struct {
-    SaveAsImage bool     // show save-as-image button
-    MagicType   []string // chart type switching (e.g., ["line", "bar"])
+    SaveAsImage  bool                       // show save-as-image button
+    MagicType    []string                   // chart type switching (e.g., ["line", "bar"])
+    DrawingTools []interact.DrawingToolMode // drawing tools inside the chart (Experimental)
 }
+```
+
+### Drawing tools
+
+A chart draws horizontal and vertical lines, trend lines, rays, rectangles,
+channels, Fibonacci retracements, text labels and measurements on top of its
+data, with the tool `Chart.SetDrawingTool` selects. Three ways to offer the
+tools (Experimental, #796):
+
+- **`chart.NewDrawingToolbar(c)`**: a widget with a button per tool, the
+  active one highlighted, and Clear All. Place it anywhere; it wraps onto more
+  rows when narrow. Pass tools to choose which appear and in what order:
+  `chart.NewDrawingToolbar(c, interact.DrawingToolTrendLine, interact.DrawingToolTextLabel)`.
+- **`ToolboxConfig.DrawingTools`**: the same buttons inside the chart, in rows
+  above the plot. `interact.DefaultDrawingTools()` gives all of them.
+- **Your own UI**: call `SetDrawingTool` from your controls and follow
+  `interact.EventDrawingToolChanged` (a `DrawingToolEvent` with `Tool` and
+  `Previous`) to show the active tool. It fires on every change, including
+  the chart's own.
+
+```go
+toolbar := chart.NewDrawingToolbar(c)
+content := container.NewBorder(toolbar, nil, nil, nil, c)
+
+c.Events.On(interact.EventDrawingToolChanged, func(evt any) {
+    status.SetText("Tool: " + evt.(interact.DrawingToolEvent).Tool.String())
+})
 ```
 
 ## Interactions

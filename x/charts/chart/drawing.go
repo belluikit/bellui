@@ -23,18 +23,28 @@ var drawingColors = []color.Color{
 // --- Public API ---
 
 // SetDrawingTool activates a drawing tool. Pass DrawingToolNone to deactivate.
+// A change emits interact.EventDrawingToolChanged, which keeps a drawing-tools
+// UI in sync (DrawingToolbar, or an app's own).
 func (c *Chart) SetDrawingTool(tool interact.DrawingToolMode) {
 	c.mu.Lock()
 	// Finalize any in-progress text label before switching tools.
 	if c.drawingGesture.Active && c.drawingGesture.Tool == interact.DrawingToolTextLabel && c.drawingGesture.TextBuf != "" {
 		c.finalizeTextLabel()
 	}
+	previous := c.drawingTool
 	c.drawingTool = tool
 	c.drawingGesture.Reset()
 	c.mu.Unlock()
 	c.refreshDirty(dirtyFull)
 	if isMobile() {
 		c.syncMobileFocus() // no text input is pending any more
+	}
+	if tool != previous {
+		c.Events.Emit(interact.DrawingToolEvent{
+			Event:    interact.Event{Type: interact.EventDrawingToolChanged},
+			Tool:     tool,
+			Previous: previous,
+		})
 	}
 }
 

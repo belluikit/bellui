@@ -8,6 +8,8 @@ import (
 	"image/png"
 	"log"
 	"math"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -377,6 +379,13 @@ func (c *Chart) handleToolboxAction(action string) {
 	case len(action) > 10 && action[:10] == "magicType:":
 		targetType := action[10:]
 		c.MagicTypeSwitch(targetType)
+	case strings.HasPrefix(action, component.ActionDrawingTool):
+		if n, err := strconv.Atoi(action[len(component.ActionDrawingTool):]); err == nil {
+			c.SetDrawingTool(interact.DrawingToolMode(n))
+		}
+	case action == component.ActionClearDrawings:
+		c.ClearDrawings()
+		c.SetDrawingTool(interact.DrawingToolNone)
 	}
 }
 
