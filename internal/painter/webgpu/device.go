@@ -94,6 +94,7 @@ func surfaceConfig(caps wgpu.SurfaceCapabilities, width, height int, maxDim uint
 			"it cannot present on this adapter", where, len(caps.Formats), len(caps.AlphaModes))
 	}
 	format := chooseSurfaceFormat(caps.Formats)
+	format = probeSurfaceFormat(caps.Formats, format) // PROBE #803
 	logSurfaceFormats(where, caps.Formats, format)
 	width, height = capSurfaceSize(width, height, maxDim)
 	return &wgpu.SurfaceConfiguration{
@@ -1788,6 +1789,10 @@ func classifyAcquire(err error) acquireAction {
 }
 
 func (d *Device) BeginFrame(clear wgpu.Color) error {
+	if probeClear != "" { // PROBE #803: a float clear colour, e.g. outside sRGB
+		fmt.Sscanf(probeClear, "%g,%g,%g", &clear.R, &clear.G, &clear.B)
+		clear.A = 1
+	}
 	// Reset the per-frame arena staging and the textured bind-group position
 	// cursor, then pre-size the GPU arenas to the high-water mark so this frame's
 	// draws pack into them (a frame larger than any before still renders via the
@@ -2329,3 +2334,34 @@ func (d *Device) Destroy() {
 		d.instance = nil
 	}
 }
+
+// probeSurfaceFormat (PROBE #803, not for merge) forces the surface format named
+// by BELLUI_PROBE_SURFACE_FORMAT when the surface advertises it, and logs what
+// it advertises, to measure how each platform shows a float or 10-bit surface.
+func probeSurfaceFormat(formats []wgpu.TextureFormat, chosen wgpu.TextureFormat) wgpu.TextureFormat {
+	want := os.Getenv("BELLUI_PROBE_SURFACE_FORMAT")
+	if want == "" {
+		want, probeClear, _ = strings.Cut(probeFormat, "|") // "format|r,g,b"
+	}
+	if want == "" {
+		return chosen
+	}
+	names := make([]string, len(formats))
+	pick := chosen
+	for i, f := range formats {
+		names[i] = f.String()
+		if f.String() == want {
+			pick = f
+		}
+	}
+	bellui.LogError(fmt.Sprintf("PROBE803 surface advertises %v; asked %q; configuring %v", names, want, pick), nil)
+	return pick
+}
+
+// probeFormat is BELLUI_PROBE_SURFACE_FORMAT's build-time default (-ldflags -X),
+// for a platform where the app cannot be given an environment variable.
+var probeFormat string
+
+// probeClear (PROBE #803) overrides every frame's clear colour with "r,g,b"
+// floats, set with -ldflags -X.
+var probeClear string
