@@ -58,7 +58,7 @@ composited as linear light reads 137/188/225, sRGB's encoding of 0.251/0.502/0.7
 
 **Not measured:** Linux (Wayland colour management through wgpu), the web
 (WebGPU canvas `colorSpace: "display-p3"` and `toneMapping: "extended"`), iOS,
-and macOS end to end on a P3 display (pending a P3 Mac).
+and HDR on any platform.
 
 ## The decisions
 
@@ -141,8 +141,11 @@ measurements.
 2. Android: done, supports D1-A, extended range measured (above). Run on the
    OPPO tablet; a Pixel was not attached.
 3. D2's final pass: done, falsified the full-screen pass; D2 revised (above).
-4. **macOS end to end on a P3 Mac: pending.** A P3 red next to sRGB red,
-   captured, to confirm the whole path.
+4. macOS end to end: done. On a MacBook Pro's built-in P3 screen (Liquid
+   Retina XDR), an `rgba16float` surface reads the greys as linear
+   (137/188/225), and the band cleared to Display P3 red as extended linear
+   sRGB reads **255/1/0** in the P3-space capture, while sRGB red reads
+   234/51/35: a colour outside sRGB reaches the screen.
 
 ## Out of scope
 
