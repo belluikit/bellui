@@ -1,7 +1,9 @@
 # #803 — Wide-gamut and HDR output (design proposal)
 
-Status: **proposal, for the owner to decide.** No code. Tracks #803 (steps 3
-and 4 of #373). Every claim is marked **measured** (with how) or **inferred**.
+Status: **decided (owner, 2026-10-26), not built.** D1 and D3–D6 as proposed
+below; D2 revised after measuring (see D2). Tracks #803 (steps 3 and 4 of
+#373). Every claim is marked **measured** (with how) or **inferred**. The probe
+code is on branch `probe/wide-surface-803` (not for merge).
 
 ## What the user would get
 
@@ -38,12 +40,25 @@ first: both need values outside sRGB's 0–1 range.
   takes. Values above 1.0 or below 0.0 are colours outside sRGB, and above 1.0
   is also brighter than white, which is where EDR (Apple's HDR) starts.
 
-**Not measured:** Windows (D3D12 swap chain colour space for `rgba16float`,
-whether wgpu-native sets scRGB), Android (Vulkan `VK_EXT_swapchain_colorspace`
-through wgpu), Linux (Wayland colour management through wgpu), the web
-(WebGPU canvas `colorSpace: "display-p3"` and `toneMapping: "extended"`), and
-iOS. Each needs the same capability read-back on that platform before the
-design commits to it.
+## Measured on Windows and Android (2026-10-26)
+
+`hack/colorprobe` (probe branch) draws grey swatches at sRGB 64/128/192 with the
+surface format forced. A surface shown as sRGB reads them back unchanged; one
+composited as linear light reads 137/188/225, sRGB's encoding of 0.251/0.502/0.753.
+
+- **Windows** (D3D12, standard-gamut ASUS monitor, captured with GDI): offers
+  `rgba16float` and `rgb10a2unorm`; `rgba16float` reads **137/188/225**, so it
+  is composited as linear (scRGB). The extended range is inferred: the monitor
+  can't show beyond sRGB, but DXGI's only linear 709 colour space is scRGB.
+- **Android** (OPPO OPD2403, Adreno 750, Vulkan, Android 16, P3 panel, captured
+  with `screencap`, which comes out in Display P3 there): same formats, same
+  **137/188/225**. A float clear colour of Display P3 red in extended linear
+  sRGB, (1.2249, −0.0421, −0.0196), reads **255/0/0**, while the sRGB red
+  swatch reads 234/51/35: **a colour outside sRGB reaches the screen.**
+
+**Not measured:** Linux (Wayland colour management through wgpu), the web
+(WebGPU canvas `colorSpace: "display-p3"` and `toneMapping: "extended"`), iOS,
+and macOS end to end on a P3 display (pending a P3 Mac).
 
 ## The decisions
 
@@ -72,9 +87,19 @@ changes how every translucent edge, shadow and gradient looks, which is the
 | **A** | **Keep blending in gamma space**: draw into an offscreen float target in sRGB-encoded (extended, sign-preserving) values, as today, and convert to linear in one final full-screen pass | one extra full-screen pass per frame on wide-gamut windows only; unchanged look |
 | B | Blend linear | the physically correct result, but every app's translucency and anti-aliasing change, and every golden image changes |
 
-**Leaning: A.** *Local to the painter, reversible, inferred* (the pass cost is
-not measured). **What would flip it:** the final pass costing a noticeable
-share of a phone's frame time; measure it on the Pixel before committing.
+**Measured:** the pass, at the OPPO tablet's full 2120×3000, costs **1.15 ms**
+on its Adreno 750 (median; 1.07 ms into an 8-bit target, so reading the float
+source dominates). At its 120 Hz that is **about 14% of every frame**: the
+falsifier for A as proposed. An M3 Max takes 77 µs.
+
+**Decided (owner, 2026-10-26): A, limited to what changed.** Keep gamma-space
+blending, and run the conversion only over the region that changed this frame,
+reusing partial repaint's damage regions. Where a platform offers an extended
+*non-linear* sRGB surface, skip the pass (macOS has `kCGColorSpaceExtendedSRGB`;
+Android's extended-range sRGB dataspace is inferred; Windows has none), as a
+later optimisation. Scrolling or full-screen motion in a wide window still pays
+the full pass. **What would flip it:** wide apps that scroll full-screen most of
+the time on 120 Hz devices; then B, linear blending in wide windows only.
 
 ### D3. When a window draws wide
 
@@ -110,14 +135,14 @@ tone mapping to it. Windows (scRGB, HDR10), Android and the web each differ.
 first consumer (x/mmedia HDR video is the likely one) with its own
 measurements.
 
-## What I'd measure before you decide
+## Probes
 
-1. **Windows** (omen): surface formats and the colour space wgpu-native sets
-   for `rgba16float`. Falsifies D1-A if there's no extended-sRGB path.
-2. **Android** (Pixel 9a): the same through Vulkan. Same falsifier.
-3. **D2-A's final pass** on the Pixel: frame time with and without it.
-4. **macOS, by eye and capture on the P3 Mac:** a `WideColor` P3 red next to
-   sRGB red, in a throwaway prototype, to confirm the path end to end.
+1. Windows: done, supports D1-A (above).
+2. Android: done, supports D1-A, extended range measured (above). Run on the
+   OPPO tablet; a Pixel was not attached.
+3. D2's final pass: done, falsified the full-screen pass; D2 revised (above).
+4. **macOS end to end on a P3 Mac: pending.** A P3 red next to sRGB red,
+   captured, to confirm the whole path.
 
 ## Out of scope
 
