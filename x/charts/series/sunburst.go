@@ -117,7 +117,7 @@ func (r *sunburstRenderer) renderRing(nodes []SunburstNode, startAngle, endAngle
 			rad := float64(midAngle-90) * math.Pi / 180
 			lx := cx + float32(math.Cos(rad))*labelR
 			ly := cy + float32(math.Sin(rad))*labelR
-			label := canvas.NewText(n.Name, color.NRGBA{R: 40, G: 40, B: 40, A: 255})
+			label := canvas.NewText(n.Name, labelColorOn(c))
 			label.TextSize = 9
 			label.Alignment = bellui.TextAlignCenter
 			labelW := float32(len(n.Name))*6 + 4

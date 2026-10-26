@@ -79,7 +79,7 @@ func (r *radarRenderer) Render(ctx RenderContext) []core.CanvasObject {
 
 	var objects []core.CanvasObject
 	gridColor := color.NRGBA{R: 100, G: 100, B: 100, A: 80}
-	labelColor := color.NRGBA{R: 180, G: 180, B: 180, A: 255}
+	labelColor := backgroundLabelColor(ctx, color.NRGBA{R: 180, G: 180, B: 180, A: 255})
 
 	// Draw concentric rings (3 levels)
 	for level := 1; level <= 3; level++ {

@@ -122,11 +122,11 @@ rect {78.93 109.9} {56.8 128.1} fafac8c85858ffff nil 0
 rect {173.6 91.6} {56.8 146.4} fafac8c85858ffff nil 0
 rect {268.27 73.3} {56.8 164.7} fafac8c85858ffff nil 0
 rect {60 275} {10 10} ffffc0c08080ffff nil 0
-text "a" {76 273} {11 14} c8c8c8c8c8c8ffff 11 0
+text "a" {76 273} {11 14} ffffffffffffffff 11 0
 rect {103 275} {10 10} 5b5b8f8ff9f9ffff nil 0
-text "b" {119 273} {11 14} c8c8c8c8c8c8ffff 11 0
+text "b" {119 273} {11 14} ffffffffffffffff 11 0
 rect {146 275} {10 10} fafac8c85858ffff nil 0
-text "c" {162 273} {11 14} c8c8c8c8c8c8ffff 11 0
+text "c" {162 273} {11 14} ffffffffffffffff 11 0
 == right y axis, bottom name, tight grid
 rect {0 0} {400 300} 444444444444ffff nil 0
 line {60 264} {344 264} ffffffffffffffff 1

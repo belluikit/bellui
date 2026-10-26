@@ -113,7 +113,7 @@ func (r *funnelRenderer) Render(ctx RenderContext) []core.CanvasObject {
 
 		// Label
 		if d.Name != "" {
-			label := canvas.NewText(d.Name, color.NRGBA{R: 240, G: 240, B: 240, A: 255})
+			label := canvas.NewText(d.Name, labelColorOn(c))
 			label.TextSize = 11
 			label.Alignment = bellui.TextAlignCenter
 			label.Move(geo.NewPos(centerX-w/2, currentY+stageH/2-7))

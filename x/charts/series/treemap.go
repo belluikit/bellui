@@ -122,7 +122,7 @@ func (r *treemapRenderer) squarify(nodes []TreemapNode, x, y, w, h float32, pale
 
 		// Label if there's enough space
 		if rw > 30 && rh > 14 && node.Name != "" {
-			label := canvas.NewText(node.Name, color.NRGBA{R: 240, G: 240, B: 240, A: 255})
+			label := canvas.NewText(node.Name, labelColorOn(c))
 			label.TextSize = 10
 			label.Move(geo.NewPos(rx+3, ry+2))
 			label.Resize(geo.NewSize(rw-6, 12))

@@ -18,8 +18,11 @@ type GaugeSeries struct {
 	Min        float64 // minimum (default 0)
 	Max        float64 // maximum (default 100)
 
-	// StartAngle and EndAngle in degrees (0=top, clockwise).
-	// Defaults: StartAngle=225, EndAngle=-45 (270-degree sweep from bottom-left to bottom-right).
+	// StartAngle and EndAngle in degrees, with 0 at the top and angles growing
+	// clockwise. Min sits at StartAngle and values sweep counter-clockwise, by
+	// decreasing angle, to Max at EndAngle.
+	// Defaults: StartAngle=135, EndAngle=-135, a 270-degree arc from the
+	// bottom right over the top to the bottom left, with the gap at the bottom.
 	StartAngle float32
 	EndAngle   float32
 
@@ -46,6 +49,14 @@ func (s *GaugeSeries) SeriesType() Type { return TypeGauge }
 func (s *GaugeSeries) Name() string { return s.SeriesName }
 
 func (s *GaugeSeries) sealed() {}
+
+// valueRingOuter and valueRingInner bound the thin value ring drawn inside
+// the coloured ranges, as fractions of the gauge radius; the ranges and the
+// track take 0.7 to 1.
+const (
+	valueRingOuter float32 = 0.66
+	valueRingInner float32 = 0.58
+)
 
 func init() {
 	RegisterRenderer(TypeGauge, func() Renderer { return &gaugeRenderer{} })
@@ -80,8 +91,9 @@ func (r *gaugeRenderer) Render(ctx RenderContext) []core.CanvasObject {
 	startAngle := gs.StartAngle
 	endAngle := gs.EndAngle
 	if startAngle == 0 && endAngle == 0 {
-		startAngle = 225
-		endAngle = -45
+		// The gap at the bottom. The old 225/-45 left it on the left (#343).
+		startAngle = 135
+		endAngle = -135
 	}
 
 	totalSweep := startAngle - endAngle
@@ -141,6 +153,14 @@ func (r *gaugeRenderer) Render(ctx RenderContext) []core.CanvasObject {
 		valueArc := canvas.NewArc(valAngle, startAngle, 0.7, valueColor)
 		valueArc.Move(arcPos)
 		valueArc.Resize(arcSize)
+		if len(gs.Sectors) > 0 {
+			// With coloured ranges the value runs as a thin ring inside them,
+			// so it no longer paints over the ranges below the value (#343).
+			innerR := outerR * valueRingOuter
+			valueArc.CutoutRatio = valueRingInner / valueRingOuter
+			valueArc.Move(geo.NewPos(centerX-innerR, centerY-innerR))
+			valueArc.Resize(geo.NewSize(innerR*2, innerR*2))
+		}
 		objects = append(objects, valueArc)
 	}
 
@@ -168,7 +188,7 @@ func (r *gaugeRenderer) Render(ctx RenderContext) []core.CanvasObject {
 	// Value text
 	if gs.ShowValue {
 		valText := fmt.Sprintf("%.1f", gs.Value)
-		label := canvas.NewText(valText, color.NRGBA{R: 230, G: 230, B: 230, A: 255})
+		label := canvas.NewText(valText, backgroundLabelColor(ctx, color.NRGBA{R: 230, G: 230, B: 230, A: 255}))
 		label.TextSize = 20
 		label.TextStyle = bellui.TextStyle{Bold: true}
 		label.Alignment = bellui.TextAlignCenter

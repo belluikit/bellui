@@ -63,12 +63,13 @@ func (r *treeRenderer) Render(ctx RenderContext) []core.CanvasObject {
 
 	var objects []core.CanvasObject
 	leafIdx := 0
-	r.layout(ts.Data, 0, depth, leaves, &leafIdx, vp, margin, nodeSize, lr, palette, &objects)
+	labelColor := backgroundLabelColor(ctx, color.NRGBA{R: 220, G: 220, B: 220, A: 255})
+	r.layout(ts.Data, 0, depth, leaves, &leafIdx, vp, margin, nodeSize, lr, palette, labelColor, &objects)
 	return objects
 }
 
 func (r *treeRenderer) layout(node TreeNode, level, maxDepth, totalLeaves int, leafIdx *int,
-	vp coord.Rect, margin, nodeSize float32, lr bool, palette []color.Color, objects *[]core.CanvasObject,
+	vp coord.Rect, margin, nodeSize float32, lr bool, palette []color.Color, labelColor color.Color, objects *[]core.CanvasObject,
 ) geo.Position {
 	var px, py float32
 
@@ -86,7 +87,7 @@ func (r *treeRenderer) layout(node TreeNode, level, maxDepth, totalLeaves int, l
 		// Branch node: position at average of children
 		childPositions := make([]geo.Position, len(node.Children))
 		for i, child := range node.Children {
-			childPositions[i] = r.layout(child, level+1, maxDepth, totalLeaves, leafIdx, vp, margin, nodeSize, lr, palette, objects)
+			childPositions[i] = r.layout(child, level+1, maxDepth, totalLeaves, leafIdx, vp, margin, nodeSize, lr, palette, labelColor, objects)
 		}
 		sumX, sumY := float32(0), float32(0)
 		for _, cp := range childPositions {
@@ -125,7 +126,7 @@ func (r *treeRenderer) layout(node TreeNode, level, maxDepth, totalLeaves int, l
 
 	// Label
 	if node.Name != "" {
-		label := canvas.NewText(node.Name, color.NRGBA{R: 220, G: 220, B: 220, A: 255})
+		label := canvas.NewText(node.Name, labelColor)
 		label.TextSize = 9
 		labelW := float32(len(node.Name))*6 + 4
 		label.Move(geo.NewPos(px-labelW/2, py+nodeSize+1))

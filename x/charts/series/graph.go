@@ -127,7 +127,7 @@ func (r *graphRenderer) Render(ctx RenderContext) []core.CanvasObject {
 
 		// Label
 		if n.Name != "" {
-			label := canvas.NewText(n.Name, color.NRGBA{R: 220, G: 220, B: 220, A: 255})
+			label := canvas.NewText(n.Name, backgroundLabelColor(ctx, color.NRGBA{R: 220, G: 220, B: 220, A: 255}))
 			label.TextSize = 10
 			labelW := float32(len(n.Name))*6 + 4
 			label.Alignment = bellui.TextAlignCenter

@@ -35,6 +35,8 @@ type ChoroplethSeries struct {
 	// inline caches the parse of GeoJSON, which would otherwise re-run on
 	// every render (~155 ms for the 14 MB country data set).
 	inline *inlineGeoJSON
+	// centres caches each region's centre for hit testing (choropleth_hit.go).
+	centres *regionCentres
 }
 
 func (s *ChoroplethSeries) SeriesType() Type { return TypeChoropleth }

@@ -78,7 +78,7 @@ func renderDrawing(d interact.Drawing, selected bool, cs coord.System, plotRect 
 	case *interact.FibRetracementDrawing:
 		objects = renderFibRetracement(dt, c, w, cs, plotRect)
 	case *interact.TextLabelDrawing:
-		objects = renderTextLabel(dt, c, cs, plotRect)
+		objects = renderTextLabel(dt, c, cs, plotRect, resolver)
 	}
 
 	// Draw drag handles for selected drawings.
@@ -303,7 +303,7 @@ func renderFibRetracement(d *interact.FibRetracementDrawing, c color.Color, w fl
 	return objects
 }
 
-func renderTextLabel(d *interact.TextLabelDrawing, c color.Color, cs coord.System, pr coord.Rect) []core.CanvasObject {
+func renderTextLabel(d *interact.TextLabelDrawing, c color.Color, cs coord.System, pr coord.Rect, resolver *style.Resolver) []core.CanvasObject {
 	pos := cs.DataToPixel(d.Pos.X, d.Pos.Y)
 	if pos.X < pr.X || pos.X > pr.X+pr.W || pos.Y < pr.Y || pos.Y > pr.Y+pr.H {
 		return nil
@@ -317,8 +317,9 @@ func renderTextLabel(d *interact.TextLabelDrawing, c color.Color, cs coord.Syste
 	labelW := float32(len(text))*7 + 8
 	labelH := textSize + 6
 
-	// Background.
-	bg := canvas.NewRectangle(color.NRGBA{R: 30, G: 30, B: 35, A: 220})
+	// Background: the annotation chip of the theme, under text in the
+	// drawing's colour. It was a fixed dark grey on every theme (#343).
+	bg := canvas.NewRectangle(resolver.AnnotationBackgroundColor())
 	bg.CornerRadius = 3
 	bg.Move(geo.NewPos(pos.X, pos.Y-labelH))
 	bg.Resize(geo.NewSize(labelW, labelH))
@@ -432,7 +433,7 @@ func RenderDrawingPreview(
 			label.TextSize = 12
 			label.Move(geo.NewPos(pos.X+4, pos.Y-16))
 			label.Resize(geo.NewSize(200, 16))
-			bg := canvas.NewRectangle(color.NRGBA{R: 30, G: 30, B: 35, A: 180})
+			bg := canvas.NewRectangle(resolver.AnnotationBackgroundColor()) // as the finished label
 			bg.CornerRadius = 3
 			bg.Move(geo.NewPos(pos.X, pos.Y-18))
 			bg.Resize(geo.NewSize(float32(len(text))*7+12, 20))
