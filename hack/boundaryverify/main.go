@@ -113,7 +113,8 @@ func main() {
 	inner.SetMinSize(geo.NewSize(200, 150))
 	s3outer := container.NewVScroll(container.NewVBox(
 		widget.NewLabel("above"), container.NewRepaintBoundary(inner), widget.NewLabel("below"),
-		widget.NewLabel("more"), widget.NewLabel("more"), widget.NewLabel("more"), widget.NewLabel("more")))
+		widget.NewLabel("more"), widget.NewLabel("more"), widget.NewLabel("more"), widget.NewLabel("more"),
+	))
 
 	grid := container.NewGridWithColumns(3, b1, s2, s3outer)
 	w.SetContent(container.NewBorder(status, nil, nil, nil, grid))
