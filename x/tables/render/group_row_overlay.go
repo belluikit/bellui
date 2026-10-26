@@ -137,9 +137,12 @@ func (r *groupRowOverlayRenderer) refresh(size geo.Size) {
 		idx++
 
 		key, childCount, expanded, depth := grid.GroupRowInfo(row)
-		gw.update(key, childCount, expanded, depth, geo.NewPos(0, y), geo.NewSize(size.Width, rowH), tc)
-		content = append(content, gw.objects...)
 
+		// Aggregates first: the label ends before the leftmost one that
+		// reaches past its start, so the two never overlap (#748).
+		labelEnd := size.Width
+		labelX := groupLabelX(depth)
+		var pinnedAggs []core.CanvasObject
 		aggs := grid.GroupRowAggregates(row)
 		for _, a := range aggs {
 			x, w, inMain, ok := geom.column(a.Col)
@@ -152,12 +155,18 @@ func (r *groupRowOverlayRenderer) refresh(size geo.Size) {
 			t := r.aggTexts[aggIdx]
 			aggIdx++
 			placeAggText(t, a.Text, x, y, w, rowH, tc)
+			if left, right, shown := geom.drawnExtent(t, inMain); shown && right > labelX && left < labelEnd {
+				labelEnd = left
+			}
 			if inMain {
 				mainAggs = append(mainAggs, t)
 			} else {
-				content = append(content, t)
+				pinnedAggs = append(pinnedAggs, t)
 			}
 		}
+		gw.update(key, childCount, expanded, depth, geo.NewPos(0, y), geo.NewSize(size.Width, rowH), labelEnd, tc)
+		content = append(content, gw.objects...)
+		content = append(content, pinnedAggs...)
 
 		// Accessible RoleTableRow node (semantics only, invisible), spanning
 		// the full row so touch exploration finds it over any band (#111).
@@ -256,6 +265,29 @@ func (g aggGeometry) column(col int) (x, w float32, inMain, ok bool) {
 	return x, g.widths[col], inMain, true
 }
 
+// drawnExtent returns where an aggregate placed by placeAggText shows its text,
+// in overlay coordinates: the text is right-aligned in its box, and a
+// main-band aggregate is clip-local and shows only inside [mainX, mainRight).
+// shown is false when none of it is visible.
+func (g aggGeometry) drawnExtent(t *canvas.Text, inMain bool) (left, right float32, shown bool) {
+	right = t.Position().X + t.Size().Width
+	textW := bellui.MeasureText(t.Text, t.TextSize, t.TextStyle).Width
+	if textW > t.Size().Width {
+		textW = t.Size().Width
+	}
+	left = right - textW
+	if inMain {
+		left, right = left+g.mainX, right+g.mainX
+		if left < g.mainX {
+			left = g.mainX
+		}
+		if right > g.mainRight {
+			right = g.mainRight
+		}
+	}
+	return left, right, right > left
+}
+
 func newAggText() *canvas.Text {
 	t := canvas.NewText("", nil)
 	t.TextStyle = bellui.TextStyle{Bold: true}
@@ -298,7 +330,15 @@ func newGroupRowWidget(tc ThemeColors) *groupRowWidget {
 	return &groupRowWidget{bg: bg, icon: icon, label: label, objects: []core.CanvasObject{bg, icon, label}}
 }
 
-func (g *groupRowWidget) update(key string, childCount int, expanded bool, depth int, pos geo.Position, size geo.Size, tc ThemeColors) {
+// groupLabelX is where a group row's "key (count)" label starts, from the
+// row's left edge, at nesting depth.
+func groupLabelX(depth int) float32 { return float32(depth)*20 + 20 }
+
+// update lays the row out. The label is truncated with an ellipsis to end a
+// small gap before labelEnd, the left edge of the first aggregate it would
+// otherwise run into (#748); with no room at all it is left out.
+func (g *groupRowWidget) update(key string, childCount int, expanded bool, depth int, pos geo.Position, size geo.Size, labelEnd float32, tc ThemeColors) {
+	const gap = 8
 	indent := float32(depth) * 20
 	g.bg.FillColor = tc.GroupRowBg
 	g.bg.Move(pos)
@@ -307,9 +347,18 @@ func (g *groupRowWidget) update(key string, childCount int, expanded bool, depth
 	g.icon.Color = tc.GroupRowFg
 	g.icon.Move(geo.NewPos(pos.X+indent+4, pos.Y+2))
 	g.icon.Resize(geo.NewSize(14, size.Height-4))
-	g.label.Text = fmt.Sprintf("%s (%d)", key, childCount)
+	labelX := pos.X + groupLabelX(depth)
+	text := fmt.Sprintf("%s (%d)", key, childCount)
+	if room := pos.X + labelEnd - gap - labelX; labelEnd < pos.X+size.Width {
+		if room > 0 {
+			text = cell.TruncateText(text, room, g.label.TextSize, g.label.TextStyle)
+		} else {
+			text = ""
+		}
+	}
+	g.label.Text = text
 	g.label.Color = tc.GroupRowFg
-	g.label.Move(geo.NewPos(pos.X+indent+20, pos.Y+2))
+	g.label.Move(geo.NewPos(labelX, pos.Y+2))
 	g.label.Resize(geo.NewSize(size.Width-indent-24, size.Height-4))
 }
 

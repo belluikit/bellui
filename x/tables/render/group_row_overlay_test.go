@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
@@ -264,5 +265,78 @@ func TestGroupRowOverlay_Aggregates(t *testing.T) {
 		if !labels[want] {
 			t.Errorf("no group node labelled %q; got %v", want, labels)
 		}
+	}
+}
+
+// groupLabel returns the overlay's label for a group row (the text with the
+// row's "(count)" or an ellipsis), searched among its objects.
+func groupLabel(t *testing.T, r *groupRowOverlayRenderer, y float32) *canvas.Text {
+	t.Helper()
+	for _, gw := range r.rows {
+		if gw.label.Position().Y == y {
+			return gw.label
+		}
+	}
+	t.Fatalf("no group label at y=%v", y)
+	return nil
+}
+
+// A group label running across a column with an aggregate is cut short with
+// an ellipsis before the aggregate, so the two never overlap; the accessible
+// label keeps the whole key. A label that fits, or a row with no aggregate in
+// its way, is unchanged (#748).
+func TestGroupRowOverlay_LabelStopsBeforeAggregate(t *testing.T) {
+	test.NewTempApp(t)
+	long := "A rather long region name that runs on"
+	g := &fakeGrid{
+		rows: 20, cols: 3,
+		groupRows: map[int]fakeGroupInfo{
+			0: {key: long, count: 3, expanded: true},
+			4: {key: "West", count: 2, expanded: true},
+			8: {key: long, count: 5, expanded: true},
+		},
+		groupAggs: map[int][]GroupAggregate{
+			0: {{Col: 0, Text: "1,234", Label: "Total sum 1,234"}},
+			4: {{Col: 0, Text: "9", Label: "Total sum 9"}},
+		},
+	}
+	vp := newOverlayViewport(g, 400, 300)
+	r := NewGroupRowOverlay(g, vp).CreateRenderer().(*groupRowOverlayRenderer)
+	r.refresh(geo.NewSize(400, 300))
+
+	var agg *canvas.Text
+	for _, o := range r.mainAgg.Objects {
+		if v, ok := o.(*canvas.Text); ok && v.Text == "1,234" {
+			agg = v
+		}
+	}
+	if agg == nil {
+		t.Fatal("aggregate 1,234 not drawn")
+	}
+	aggLeft := r.mainClip.Position().X + agg.Position().X + agg.Size().Width -
+		bellui.MeasureText(agg.Text, agg.TextSize, agg.TextStyle).Width
+
+	cut := groupLabel(t, r, 2)
+	cutRight := cut.Position().X + bellui.MeasureText(cut.Text, cut.TextSize, cut.TextStyle).Width
+	if !strings.HasSuffix(cut.Text, "…") {
+		t.Errorf("long label next to an aggregate reads %q, want it cut with an ellipsis", cut.Text)
+	}
+	if cutRight >= aggLeft {
+		t.Errorf("label ends at %v, over the aggregate starting at %v", cutRight, aggLeft)
+	}
+
+	if short := groupLabel(t, r, 4*32+2); short.Text != "West (2)" {
+		t.Errorf("a label that fits reads %q, want %q", short.Text, "West (2)")
+	}
+	if free := groupLabel(t, r, 8*32+2); free.Text != long+" (5)" {
+		t.Errorf("a label with no aggregate in its way reads %q, want it whole", free.Text)
+	}
+	wantA11y := long + " (3), Total sum 1,234"
+	found := false
+	for _, n := range r.a11y {
+		found = found || n.AccessibleLabel() == wantA11y
+	}
+	if !found {
+		t.Errorf("no group node labelled %q: the accessible label must keep the whole key", wantA11y)
 	}
 }
