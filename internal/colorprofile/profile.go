@@ -40,10 +40,6 @@ var srgbToXYZ = [3][3]float64{
 	{0.0139322, 0.0971045, 0.7141733},
 }
 
-// sRGB is the profile images are converted to, and the one assumed when an
-// image declares none.
-var sRGB = &Profile{toXYZ: srgbToXYZ, trc: [3]curve{srgbCurve, srgbCurve, srgbCurve}}
-
 // srgbCurve is sRGB's tone curve as an ICC parametric curve (type 3).
 var srgbCurve = curve{kind: curveParametric, fn: 3, p: [7]float64{2.4, 1 / 1.055, 0.055 / 1.055, 1 / 12.92, 0.04045}}
 

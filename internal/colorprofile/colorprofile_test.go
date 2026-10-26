@@ -90,6 +90,32 @@ func TestToSRGB_MatchesColorSync(t *testing.T) {
 	}
 }
 
+// Each committed fixture carries exactly the profile these tests build, so a
+// change to the test profiles that is not regenerated through ColorSync shows
+// up here. Adobe RGB's is a single-gamma curv tag (curveGamma).
+func TestFixturesCarryTheTestProfiles(t *testing.T) {
+	for name, tp := range map[string]testProfile{"p3": p3, "adobergb": adobeRGB, "rec2020table": rec2020Table} {
+		data, err := os.ReadFile(filepath.Join("testdata", "grid-"+name+".png"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, ok, err := FromImageFile(data)
+		if !ok || err != nil {
+			t.Fatalf("%s: no profile read: ok=%v err=%v", name, ok, err)
+		}
+		want, err := ParseICC(tp.icc())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.toXYZ != want.toXYZ || got.trc[0].kind != want.trc[0].kind || got.trc[0].p != want.trc[0].p {
+			t.Errorf("%s: the fixture's profile differs from the test profile", name)
+		}
+	}
+	if p, _ := ParseICC(adobeRGB.icc()); p.trc[0].kind != curveGamma || p.trc[0].p[0] != 563.0/256 {
+		t.Errorf("Adobe RGB's curve parsed as %+v, want a single gamma of 563/256", p.trc[0])
+	}
+}
+
 // A JPEG's profile may be split over several APP2 segments, in any order.
 func TestFromImageFile_JPEGProfileInSegments(t *testing.T) {
 	icc := rec2020Table.icc() // over 2 KB, so 512-byte segments split it
