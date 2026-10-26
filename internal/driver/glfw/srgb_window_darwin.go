@@ -1,4 +1,4 @@
-//go:build darwin
+//go:build darwin && gl
 
 package glfw
 
@@ -20,8 +20,8 @@ import "C"
 
 import "unsafe"
 
-// tagSRGBWindow declares w's NSWindow sRGB (#373). The GL path calls it; the
-// WebGPU path tags its Metal layer instead.
+// tagSRGBWindow declares w's NSWindow sRGB (#373). Only the GL path is built
+// with it; the WebGPU path tags its Metal layer instead.
 func tagSRGBWindow(w *window) {
 	if w.viewport == nil {
 		return

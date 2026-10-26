@@ -1,4 +1,4 @@
-//go:build !darwin
+//go:build !darwin && (gl || (!linux && !windows && !wasm))
 
 package glfw
 
