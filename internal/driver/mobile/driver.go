@@ -540,7 +540,9 @@ func (d *driver) handleComposition(e composition.Event) {
 // "\n" on the default keyboard (IME_FLAG_NO_ENTER_ACTION). It reaches the
 // focused widget on c as a Return key press, so a widget that takes keys and
 // finishes on Return (the chart's Text tool) sees it (#666). Other text is not
-// forwarded: such a widget gets its typing as key events already.
+// forwarded: a non-editor gets app.KeysKeyboard, on which the IME sends key
+// presses rather than text, so its typing arrives as key events. The newline
+// stays for an IME that commits it anyway.
 func (d *driver) handleTextEdit(c *canvas, e textedit.Event) {
 	if d.textInput == nil || !d.textInput.Bound() {
 		if !e.Selection && c != nil {

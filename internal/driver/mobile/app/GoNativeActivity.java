@@ -87,6 +87,9 @@ public class GoNativeActivity extends NativeActivity {
 	private static final int SINGLELINE_KEYBOARD_CODE = 1;
 	private static final int NUMBER_KEYBOARD_CODE = 2;
 	private static final int PASSWORD_KEYBOARD_CODE = 3;
+	// A focused widget that takes keys but is not a text editor (app.KeysKeyboard
+	// in internal/driver/mobile/app/keyboard.go, no public counterpart).
+	private static final int KEYS_KEYBOARD_CODE = 4;
 
     private native void filePickerReturned(String str);
     private native void filePickerMultiReturned(String str);
@@ -117,7 +120,10 @@ public class GoNativeActivity extends NativeActivity {
 	// before the UI-thread runnable has run, so it cannot answer "is the IME
 	// already up for this type?" (pre-rebrand tracker #1016). NO_KEYBOARD_CODE = nothing applied.
 	private int mAppliedKeyboardType = NO_KEYBOARD_CODE;
-	private int mAppliedInputType = 0;
+	// mTextEdit is created with DEFAULT_INPUT_TYPE. Starting at 0 instead would
+	// read as TYPE_NULL already applied and skip the first switch to the keys
+	// keyboard (#666).
+	private int mAppliedInputType = DEFAULT_INPUT_TYPE;
 	private int mAppliedImeOptions = 0;
 	// Set (on the UI thread) by keyboardEditorChanged when the bound bellui editor's
 	// IDENTITY changes (pre-rebrand tracker #966), consumed by the next doSetKeyboardState: that push
@@ -357,6 +363,13 @@ public class GoNativeActivity extends NativeActivity {
                         imeOptions = EditorInfo.IME_ACTION_DONE;
                         inputType = InputType.TYPE_CLASS_TEXT
                                 | InputType.TYPE_TEXT_VARIATION_PASSWORD;
+                        break;
+                    case KEYS_KEYBOARD_CODE:
+                        // No text field: an IME facing TYPE_NULL sends key
+                        // presses (sendKeyEvent) instead of composing and
+                        // committing text, which only an editor can take. A
+                        // non-editor gets its letters as keys (#666).
+                        inputType = InputType.TYPE_NULL;
                         break;
                     default:
                         Log.e("Bellui", "unknown keyboard type, use default");
@@ -1136,6 +1149,11 @@ public class GoNativeActivity extends NativeActivity {
 	    // returns to 0, so a multi-op batch (e.g. autocorrect's delete+commit)
 	    // yields one settled updateSelection, not a mid-batch flicker.
 	    private int batchDepth = 0;
+	    // The key whose DOWN sendKeyEvent consumed, so its UP is consumed too. Handed
+	    // to super, that UP reaches the native queue, where processKey reads an
+	    // ACTION_UP as a press, and the key would act twice: one soft Backspace
+	    // deleted two characters on a non-editor's keyboard (#666).
+	    private int consumedDownKey = KeyEvent.KEYCODE_UNKNOWN;
 	    // Batch-edit coalescing (pre-rebrand tracker #1080, the correct redo of the reverted pre-rebrand tracker #1015).
 	    // A TalkBack/IME batch that replaces text (Select-all then type → delete-all
 	    // + commit inside one beginBatchEdit/endBatchEdit pair; autocorrect
@@ -1664,6 +1682,10 @@ public class GoNativeActivity extends NativeActivity {
 	            }
 	            return true;
 	        }
+	        if (event.getAction() == KeyEvent.ACTION_UP && event.getKeyCode() == consumedDownKey) {
+	            consumedDownKey = KeyEvent.KEYCODE_UNKNOWN;
+	            return true;
+	        }
 	        if (event.getAction() == KeyEvent.ACTION_DOWN) {
 	            int code = event.getKeyCode();
 	            // Hardware-keyboard shortcut (Ctrl/Alt/Meta + key, e.g. Ctrl+A/
@@ -1683,6 +1705,7 @@ public class GoNativeActivity extends NativeActivity {
 	                    flushBatchDiff();
 	                }
 	                keyboardShortcut(code, meta);
+	                consumedDownKey = code;
 	                return true;
 	            }
 	            if (code == KeyEvent.KEYCODE_DEL) {
@@ -1707,6 +1730,7 @@ public class GoNativeActivity extends NativeActivity {
 	                    mBelluiBuffer.delete(prev, s);
 	                }
 	                afterEdit();
+	                consumedDownKey = code;
 	                return true;
 	            }
 	            if (code == KeyEvent.KEYCODE_ENTER || code == KeyEvent.KEYCODE_NUMPAD_ENTER) {
@@ -1718,6 +1742,7 @@ public class GoNativeActivity extends NativeActivity {
 	                    flushBatchDiff();
 	                }
 	                keyboardTyped("\n");
+	                consumedDownKey = code;
 	                return true;
 	            }
 	            if (code == KeyEvent.KEYCODE_FORWARD_DEL) {
@@ -1770,6 +1795,7 @@ public class GoNativeActivity extends NativeActivity {
 	                    flushBatchDiff();
 	                }
 	                keyboardTyped(new String(Character.toChars(uch)));
+	                consumedDownKey = code;
 	                return true;
 	            }
 	        }

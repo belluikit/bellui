@@ -1649,6 +1649,9 @@ bool isDark() {
 #define DEFAULT_KEYBOARD_CODE 0
 #define SINGLELINE_KEYBOARD_CODE 1
 #define NUMBER_KEYBOARD_CODE 2
+// A focused non-editor (app.KeysKeyboard). iOS needs no special keyboard: the
+// proxy's insertText: already reaches it as typed keys (#666).
+#define KEYS_KEYBOARD_CODE 4
 
 void showKeyboard(int keyboardType) {
     GoAppAppDelegate *appDelegate = (GoAppAppDelegate *)[[UIApplication sharedApplication] delegate];
@@ -1658,6 +1661,7 @@ void showKeyboard(int keyboardType) {
         switch (keyboardType)
         {
             case DEFAULT_KEYBOARD_CODE:
+            case KEYS_KEYBOARD_CODE:
                 [view setKeyboardType:UIKeyboardTypeDefault];
                 [view setReturnKeyType:UIReturnKeyDefault];
                 break;
