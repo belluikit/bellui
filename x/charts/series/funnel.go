@@ -21,9 +21,9 @@ type FunnelData struct {
 type FunnelSeries struct {
 	SeriesName string
 	Data       []FunnelData
-	// Sort orders the stages by value: "descending" (widest on top) or
-	// "ascending". Empty or "none" keeps the order of Data. Each stage keeps
-	// its colour when sorted.
+	// Sort orders the stages by value: "descending" (widest on top), the
+	// default when empty, as in ECharts; "ascending"; or "none", which keeps
+	// the order of Data. Each stage keeps its colour when sorted.
 	Sort string
 	// DynamicHeight: when true, each stage's height is proportional to its value,
 	// creating a V-shape funnel. When false (default), all stages have equal height.
@@ -81,7 +81,7 @@ func (r *funnelRenderer) Render(ctx RenderContext) []core.CanvasObject {
 		order[i] = i
 	}
 	switch fs.Sort {
-	case "descending":
+	case "", "descending":
 		sort.SliceStable(order, func(a, b int) bool { return fs.Data[order[a]].Value > fs.Data[order[b]].Value })
 	case "ascending":
 		sort.SliceStable(order, func(a, b int) bool { return fs.Data[order[a]].Value < fs.Data[order[b]].Value })
