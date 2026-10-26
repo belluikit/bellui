@@ -372,3 +372,78 @@ func TestDrawingToolbarUnsubscribesOnDestroy(t *testing.T) {
 		t.Errorf("a re-rendered toolbar highlights %v after SetDrawingTool(Fib)", got)
 	}
 }
+
+// The zoom buttons and the legend take a tap under a tooltip too, as the
+// toolbox does: an axis tooltip is up over them just as much.
+func TestControlsTapWithTooltip(t *testing.T) {
+	test.NewTempApp(t)
+	data := make([]float64, 40) // a point every few pixels, so a tooltip at any x
+	for i := range data {
+		data[i] = float64(i % 7)
+	}
+	c := New(Option{
+		Tooltip:  &component.TooltipConfig{Trigger: component.TooltipTriggerAxis},
+		DataZoom: &interact.ZoomConfig{Enabled: true, MinSpan: 0.1, MaxSpan: 1, ZoomSensitivity: 0.1},
+		Legend:   &component.LegendConfig{},
+		XAxis:    []axis.Config{{Type: axis.TypeCategory, Data: make([]string, len(data))}},
+		YAxis:    []axis.Config{{Type: axis.TypeValue}},
+		Series:   []series.Series{&series.LineSeries{SeriesName: "s", Data: data}},
+	})
+	w := test.NewTempWindow(t, c)
+	w.Resize(geo.NewSize(800, 600))
+	test.TempWidgetRenderer(t, c).Refresh()
+
+	tapUnderTooltip := func(name string, pos geo.Position) {
+		t.Helper()
+		c.resolveHover(pos)
+		c.mu.RLock()
+		visible := c.tooltipState.Visible
+		c.mu.RUnlock()
+		if !visible {
+			t.Fatalf("hovering the %s shows no tooltip, so this does not test a tap under one", name)
+		}
+		tapAt(c, pos.X, pos.Y)
+		c.mu.RLock()
+		pinned := c.tooltipState.Pinned
+		c.mu.RUnlock()
+		if pinned {
+			t.Errorf("a tap on the %s pinned the tooltip", name)
+		}
+	}
+
+	c.mu.RLock()
+	zoomIn := c.renderSnap.zoomButtons.ZoomInRect
+	legend := c.renderSnap.legendLayout
+	c.mu.RUnlock()
+	before := c.ZoomWindow()
+	tapUnderTooltip("zoom-in button", zoomIn.Pos.Add(geo.NewPos(zoomIn.Size.Width/2, zoomIn.Size.Height/2)))
+	if c.ZoomWindow() == before {
+		t.Errorf("tapping zoom-in under a tooltip left the window at %+v", before)
+	}
+
+	if legend == nil || len(legend.Items) == 0 {
+		t.Fatal("no legend laid out")
+	}
+	item := legend.Items[0]
+	tapUnderTooltip("legend", geo.NewPos(item.Rect.X+item.Size.Width/2, item.Rect.Y+item.Size.Height/2))
+	c.mu.RLock()
+	hidden := c.legendToggles["s"]
+	c.mu.RUnlock()
+	if !hidden {
+		t.Error("tapping the legend under a tooltip did not hide the series")
+	}
+
+	c.DrillInto("child", c.Option())
+	test.TempWidgetRenderer(t, c).Refresh()
+	c.mu.RLock()
+	crumbs := c.renderSnap.breadcrumbLayout
+	c.mu.RUnlock()
+	if crumbs == nil {
+		t.Fatal("no breadcrumb laid out after drilling in")
+	}
+	back := crumbs.BackButton
+	tapUnderTooltip("breadcrumb", back.Pos.Add(geo.NewPos(back.Size.Width/2, back.Size.Height/2)))
+	if path := c.DrillPath(); len(path) != 0 {
+		t.Errorf("tapping the breadcrumb's back button under a tooltip left the path at %v", path)
+	}
+}

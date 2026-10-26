@@ -917,12 +917,24 @@ func (c *Chart) Tapped(e *event.PointEvent) {
 }
 
 // resolveTap determines what was tapped under a single lock/unlock cycle.
-// onControlLocked reports whether pos is on one of the chart's controls,
-// which a tap reaches whatever the tooltip shows. Must be called with c.mu
-// held.
+// onControlLocked reports whether pos is on one of the chart's controls —
+// the zoom buttons, the toolbox, the legend or the breadcrumb, which
+// resolveTap tests first — which a tap reaches whatever the tooltip shows.
+// Unlike resolveTap it changes nothing. Must be called with c.mu held.
 func (c *Chart) onControlLocked(pos geo.Position) bool {
 	snap := c.renderSnap
-	return snap != nil && snap.toolboxLayout != nil && snap.toolboxLayout.HitTest(pos) != ""
+	switch {
+	case snap == nil:
+		return false
+	case snap.zoomButtons != nil && snap.zoomButtons.HitTest(pos) != "":
+		return true
+	case snap.toolboxLayout != nil && snap.toolboxLayout.HitTest(pos) != "":
+		return true
+	case snap.legendLayout != nil && snap.legendLayout.HitTest(pos) >= 0:
+		return true
+	}
+	action, depth := snap.breadcrumbLayout.HitTest(pos) // nil-safe
+	return action != "" || depth >= 0
 }
 
 func (c *Chart) resolveTap(pos geo.Position) tapResult {
