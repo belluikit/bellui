@@ -83,13 +83,15 @@ func (c *DragCoast) Release(wid event.Draggable, ev *event.DragEvent, do func(fu
 // Stop ends a running coast now: its Draggable gets DragEnd before Stop
 // returns, so before whatever the caller dispatches next, and nothing the
 // coast already queued reaches it afterwards. Without a coast it does
-// nothing.
-func (c *DragCoast) Stop() {
+// nothing. It reports whether it stopped one, so the touch that did can be
+// kept from also tapping (TouchHandler.CatchCoast, #792).
+func (c *DragCoast) Stop() bool {
 	wid := c.wid
 	if wid == nil {
-		return
+		return false
 	}
 	c.wid = nil
 	c.gen.Add(1)
 	wid.DragEnd()
+	return true
 }

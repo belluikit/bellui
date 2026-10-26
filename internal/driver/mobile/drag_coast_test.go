@@ -138,3 +138,61 @@ func Test_driver_DragCoastDoesNotEndALaterDrag(t *testing.T) {
 		assert.NotContains(t, second[:len(second)-1], "end", "once")
 	})
 }
+
+// A tap that stops a list's fling only stops it: it selects nothing, as on
+// Android's and iOS's own lists. A tap on the list at rest still selects
+// (#792).
+func Test_driver_TapThatStopsAFlingDoesNotSelect(t *testing.T) {
+	cd := &driver{queuedFuncs: d.queuedFuncs}
+	var w *window
+	var selected []widget.ListItemID
+	onMain(func() {
+		list := widget.NewList(
+			func() int { return 200 },
+			func() core.CanvasObject { return widget.NewLabel("row") },
+			func(widget.ListItemID, core.CanvasObject) {},
+		)
+		list.OnSelected = func(id widget.ListItemID) { selected = append(selected, id) }
+		w = cd.CreateWindow("fling").(*window)
+		w.SetContent(list)
+		w.Show()
+		w.canvas.Resize(geo.NewSize(200, 400))
+	})
+	t.Cleanup(func() {
+		onMain(func() {
+			cd.coast.Stop()
+			w.Close()
+		})
+	})
+	s := w.canvas.Scale()
+	x := 100 * s
+
+	// Flick the list up, fast, and let go: it coasts.
+	onMain(func() {
+		for i, y := range []float32{350, 280, 210, 140} {
+			typ := touch.TypeMove
+			switch i {
+			case 0:
+				typ = touch.TypeBegin
+			case 3:
+				typ = touch.TypeEnd
+			}
+			cd.handleTouch(w, touch.Event{X: x, Y: y * s, Sequence: 0, Type: typ})
+		}
+	})
+	time.Sleep(50 * time.Millisecond) // a few coast steps in
+	onMain(func() {
+		cd.handleTouch(w, touch.Event{X: x, Y: 200 * s, Sequence: 1, Type: touch.TypeBegin})
+		cd.handleTouch(w, touch.Event{X: x, Y: 200 * s, Sequence: 1, Type: touch.TypeEnd})
+	})
+	time.Sleep(coastFor) // anything the tap could have dispatched has arrived
+	onMain(func() {
+		assert.Empty(t, selected, "the tap that stopped the fling selected a row")
+		cd.handleTouch(w, touch.Event{X: x, Y: 200 * s, Sequence: 2, Type: touch.TypeBegin})
+		cd.handleTouch(w, touch.Event{X: x, Y: 200 * s, Sequence: 2, Type: touch.TypeEnd})
+	})
+	time.Sleep(100 * time.Millisecond)
+	onMain(func() {
+		assert.Len(t, selected, 1, "a tap on the list at rest selects a row")
+	})
+}

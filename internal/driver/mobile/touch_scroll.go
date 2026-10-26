@@ -45,8 +45,12 @@ func (c *canvas) initTouchScroll() {
 
 // TapDown starts a new touch gesture, which stops any momentum still running
 // from the last one (touch-to-stop), and then hands the contact to the shared
-// handler.
+// handler. A contact that stopped momentum only stops it (CatchCoast, #792).
 func (c *canvas) TapDown(pos geo.Position, tapID int) {
+	if c.touchScrollCoast != 0 && c.touchScrollCoast == c.touchScrollGen {
+		c.CatchCoast(tapID)
+	}
+	c.touchScrollCoast = 0
 	c.touchScrollGen++
 	c.TouchHandler.TapDown(pos, tapID)
 }
@@ -118,17 +122,18 @@ func (c *canvas) startTouchScrollMomentum(origin geo.Position, delta geo.Delta) 
 	}
 	gen := c.touchScrollGen
 	chain := c.touchScroll.chain
+	c.touchScrollCoast = gen
 	go func() {
 		for {
 			time.Sleep(time.Millisecond * 16)
 			delta = common.DragDecay(delta)
-			if delta == (geo.Delta{}) {
-				return
-			}
 			stop := false
 			bellui.DoAndWait(func() {
-				if c.touchScrollGen != gen || !c.dispatchScrollChain(chain, origin, delta) {
+				if delta == (geo.Delta{}) || c.touchScrollGen != gen || !c.dispatchScrollChain(chain, origin, delta) {
 					stop = true
+					if c.touchScrollCoast == gen {
+						c.touchScrollCoast = 0 // at rest: the next touch taps
+					}
 				}
 			})
 			if stop {

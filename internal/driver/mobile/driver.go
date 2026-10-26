@@ -1531,7 +1531,9 @@ func (d *driver) tapCancelCanvas(w *window, x, y float32, tapID touch.Sequence) 
 }
 
 func (d *driver) tapDownCanvas(w *window, x, y float32, tapID touch.Sequence) {
-	d.coast.Stop() // a new touch stops a coasting drag dead (#751)
+	if d.coast.Stop() { // a new touch stops a coasting drag dead (#751)
+		w.canvas.CatchCoast(int(tapID)) // and only stops it (#792)
+	}
 	w.canvas.TapDown(canvasPos(w, x, y), int(tapID))
 }
 

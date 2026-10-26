@@ -112,6 +112,10 @@ type TouchHandler struct {
 	// contacts, pinch and pinchSpent recognise two-finger pinches (pinch.go,
 	// #379): every contact that is down, the pinch in progress, and the
 	// contacts used up by a pinch, whose release must not produce a tap.
+	// caught holds the contacts that went down on moving content and stopped
+	// it (CatchCoast): their release taps nothing (#792).
+	caught map[int]bool
+
 	contacts   map[int]geo.Position
 	pinch      *pinchState
 	pinchSpent map[int]bool
@@ -176,7 +180,21 @@ func (h *TouchHandler) InitTouchHandler(finder ObjectFinder) {
 	h.longPressFired = make(map[int]bool)
 	h.contacts = make(map[int]geo.Position)
 	h.pinchSpent = make(map[int]bool)
+	h.caught = make(map[int]bool)
 	h.velocity = make(map[int]*velocityTracker)
+}
+
+// CatchCoast marks the contact about to go down (TapDown with tapID) as the
+// one that stopped moving content: a drag's coast or a scroll's momentum. As
+// on Android and iOS, a touch that catches a fling only stops it. It taps,
+// double-taps and long-presses nothing, so stopping a list to read it does not
+// select a row (#792). It can still drag or scroll from there. The driver calls
+// it just before TapDown.
+func (h *TouchHandler) CatchCoast(tapID int) {
+	if h.caught == nil {
+		h.caught = make(map[int]bool)
+	}
+	h.caught[tapID] = true
 }
 
 // TapDown handles a pointer-down event.
@@ -254,7 +272,9 @@ func (h *TouchHandler) tapDownSingle(pos geo.Position, tapID int) {
 		}
 	}
 
-	h.armLongPress(pos, tapID)
+	if !h.caught[tapID] {
+		h.armLongPress(pos, tapID)
+	}
 }
 
 // armLongPress schedules a hold-fire long-press for the touch that just went
@@ -513,6 +533,9 @@ func (h *TouchHandler) TapUp(pos geo.Position, tapID int,
 		wid.TouchUp(touchEv)
 		h.Touched[tapID] = nil
 	}
+	if h.caught[tapID] {
+		return // it stopped moving content: no tap (#792)
+	}
 
 	ev := &event.PointEvent{
 		Position:         objPos,
@@ -605,6 +628,7 @@ func (h *TouchHandler) TapCancel(pos geo.Position, tapID int) {
 // id per contact (#266) — so entries left behind would grow these maps for the
 // life of the process.
 func (h *TouchHandler) forgetTouch(tapID int) {
+	delete(h.caught, tapID)
 	delete(h.LastTapDown, tapID)
 	delete(h.LastTapDownPos, tapID)
 	delete(h.LastTapDelta, tapID)

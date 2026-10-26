@@ -145,7 +145,9 @@ type Draggable interface {
 // released while the finger was still moving carries on: the object gets
 // decaying Dragged events, seeded from the finger's speed at release, and then
 // DragEnd. A finger held still before lifting does not coast, and the next
-// touch stops a coast at once. Desktop drags, mouse or touch, never coast.
+// touch stops a coast at once. That touch only stops it: it taps, double-taps
+// and long-presses nothing, though it can drag on. Desktop drags, mouse or
+// touch, never coast.
 //
 // Direct manipulation — a slider thumb, a divider, a selection handle, a
 // drag-reorder — must not opt in: what the user let go of has to stay there.

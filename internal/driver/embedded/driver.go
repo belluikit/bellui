@@ -153,7 +153,9 @@ func (n *noosDriver) doRun() {
 }
 
 func (n *noosDriver) handleTouchDown(ev *embedded.TouchDownEvent, w *noosWindow) {
-	n.coast.Stop() // a new touch stops a coasting drag dead (#751)
+	if n.coast.Stop() { // a new touch stops a coasting drag dead (#751)
+		w.c.CatchCoast(ev.ID) // and only stops it (#792)
+	}
 	w.c.TapDown(ev.Position, ev.ID)
 	n.renderWindow(w)
 }
