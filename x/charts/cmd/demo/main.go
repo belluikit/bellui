@@ -901,32 +901,13 @@ func main() {
 		drawStatusLabel.Refresh()
 	})
 
-	setTool := func(tool interact.DrawingToolMode, name string) func() {
-		return func() {
-			drawChart.SetDrawingTool(tool)
-			drawStatusLabel.Text = fmt.Sprintf("Tool: %s — click on chart", name)
-			drawStatusLabel.Refresh()
-		}
-	}
-	toolButtons := container.NewGridWithColumns(
-		6,
-		widget.NewButton("Select", setTool(interact.DrawingToolNone, "Select (click to select, drag to move)")),
-		widget.NewButton("H-Line", setTool(interact.DrawingToolHLine, "Horizontal Line")),
-		widget.NewButton("V-Line", setTool(interact.DrawingToolVLine, "Vertical Line")),
-		widget.NewButton("Trend", setTool(interact.DrawingToolTrendLine, "Trend Line (2 clicks)")),
-		widget.NewButton("Ray", setTool(interact.DrawingToolRay, "Ray (2 clicks)")),
-		widget.NewButton("Rect", setTool(interact.DrawingToolRectangle, "Rectangle (2 clicks)")),
-		widget.NewButton("Channel", setTool(interact.DrawingToolChannel, "Channel (3 clicks)")),
-		widget.NewButton("Fib", setTool(interact.DrawingToolFibRetracement, "Fibonacci (2 clicks)")),
-		widget.NewButton("Text", setTool(interact.DrawingToolTextLabel, "Text Label (click+type+Enter)")),
-		widget.NewButton("Measure", setTool(interact.DrawingToolMeasure, "Measure (drag)")),
-		widget.NewButton("Clear All", func() {
-			drawChart.ClearDrawings()
-			drawChart.SetDrawingTool(interact.DrawingToolNone)
-			drawStatusLabel.Text = "Tool: Select (all drawings cleared)"
-			drawStatusLabel.Refresh()
-		}),
-	)
+	// The default drawing tools. The status line follows the active tool
+	// through the chart's event, so it also tracks changes the toolbar makes.
+	drawChart.Events.On(interact.EventDrawingToolChanged, func(evt interface{}) {
+		drawStatusLabel.Text = fmt.Sprintf("Tool: %s — click on chart", evt.(interact.DrawingToolEvent).Tool)
+		drawStatusLabel.Refresh()
+	})
+	toolButtons := chart.NewDrawingToolbar(drawChart)
 	drawChartWithTools := container.NewBorder(
 		container.NewVBox(toolButtons, drawStatusLabel),
 		nil, nil, nil,
