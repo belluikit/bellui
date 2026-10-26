@@ -10,7 +10,9 @@ const (
 	MediumImportance Importance = iota
 	// HighImportance applies a prominent appearance.
 	HighImportance
-	// LowImportance applies a subtle appearance.
+	// LowImportance applies a subtle appearance where the widget has one: a
+	// Label draws its text in the disabled colour. A Button in the default
+	// style draws it like MediumImportance (see Button.Importance).
 	LowImportance
 
 	// DangerImportance applies an error theme to the widget.
