@@ -43,6 +43,9 @@ type canvas struct {
 	// chain (touch_scroll.go, #402). Main-goroutine state.
 	touchScrollGen int
 	touchScroll    touchScrollLatch
+	// touchScrollCoast is the touchScrollGen of the pan whose momentum is
+	// running, 0 when none is: a contact landing on it catches it (#792).
+	touchScrollCoast int
 
 	onTypedKey  func(ev *event.KeyEvent)
 	onTypedRune func(rune)

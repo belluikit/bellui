@@ -7,10 +7,12 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
+	intdriver "github.com/belluikit/bellui/internal/driver"
 	"github.com/belluikit/bellui/internal/driver/mobile/event/touch"
 	"github.com/belluikit/bellui/widget"
 )
@@ -136,5 +138,81 @@ func Test_driver_DragCoastDoesNotEndALaterDrag(t *testing.T) {
 		second := rec.log[started:]
 		assert.Equal(t, "end", second[len(second)-1], "its own release ends it")
 		assert.NotContains(t, second[:len(second)-1], "end", "once")
+	})
+}
+
+// rowCentre returns the y, in canvas coordinates, of the middle of the first
+// tappable row lying wholly below y=100: where a coast stopped decides whether
+// a fixed point is on a row or in the gap between two.
+func rowCentre(t *testing.T, w *window) float32 {
+	t.Helper()
+	y := float32(-1)
+	intdriver.WalkVisibleObjectTree(w.canvas.Content(), func(o core.CanvasObject, pos, _ geo.Position, _ geo.Size) bool {
+		if _, ok := o.(event.Tappable); ok && y < 0 && pos.Y > 100 && o.Size().Height < 100 {
+			y = pos.Y + o.Size().Height/2
+		}
+		return false
+	}, nil)
+	require.Positive(t, y, "no row on screen below y=100")
+	return y
+}
+
+// A tap that stops a list's fling only stops it: it selects nothing, as on
+// Android's and iOS's own lists. A tap on the list at rest still selects
+// (#792).
+func Test_driver_TapThatStopsAFlingDoesNotSelect(t *testing.T) {
+	cd := &driver{queuedFuncs: d.queuedFuncs}
+	var w *window
+	var selected []widget.ListItemID
+	onMain(func() {
+		list := widget.NewList(
+			func() int { return 200 },
+			func() core.CanvasObject { return widget.NewLabel("row") },
+			func(widget.ListItemID, core.CanvasObject) {},
+		)
+		list.OnSelected = func(id widget.ListItemID) { selected = append(selected, id) }
+		w = cd.CreateWindow("fling").(*window)
+		w.SetContent(list)
+		w.Show()
+		w.canvas.Resize(geo.NewSize(200, 400))
+	})
+	t.Cleanup(func() {
+		onMain(func() {
+			cd.coast.Stop()
+			w.Close()
+		})
+	})
+	s := w.canvas.Scale()
+	x := 100 * s
+
+	// Flick the list up, fast, and let go: it coasts.
+	onMain(func() {
+		for i, y := range []float32{350, 280, 210, 140} {
+			typ := touch.TypeMove
+			switch i {
+			case 0:
+				typ = touch.TypeBegin
+			case 3:
+				typ = touch.TypeEnd
+			}
+			cd.handleTouch(w, touch.Event{X: x, Y: y * s, Sequence: 0, Type: typ})
+		}
+	})
+	time.Sleep(50 * time.Millisecond) // a few coast steps in
+	onMain(func() {
+		y := rowCentre(t, w) * s // on a row, so a tap there would select it
+		cd.handleTouch(w, touch.Event{X: x, Y: y, Sequence: 1, Type: touch.TypeBegin})
+		cd.handleTouch(w, touch.Event{X: x, Y: y, Sequence: 1, Type: touch.TypeEnd})
+	})
+	time.Sleep(coastFor) // anything the tap could have dispatched has arrived
+	onMain(func() {
+		assert.Empty(t, selected, "the tap that stopped the fling selected a row")
+		y := rowCentre(t, w) * s
+		cd.handleTouch(w, touch.Event{X: x, Y: y, Sequence: 2, Type: touch.TypeBegin})
+		cd.handleTouch(w, touch.Event{X: x, Y: y, Sequence: 2, Type: touch.TypeEnd})
+	})
+	time.Sleep(100 * time.Millisecond)
+	onMain(func() {
+		assert.Len(t, selected, 1, "a tap on the list at rest selects a row")
 	})
 }

@@ -144,3 +144,43 @@ func offsetOnMain(s *container.Scroll) float32 {
 	bellui.DoAndWait(func() { y = s.Offset.Y })
 	return y
 }
+
+// A finger that lands on a page coasting from a two-finger flick stops it
+// and taps nothing under it; once the page is at rest, a tap taps (#792).
+func Test_canvas_TouchThatStopsPanMomentumDoesNotTap(t *testing.T) {
+	var taps int
+	button := widget.NewButton("under the finger", func() {})
+	filler := belluicanvas.NewRectangle(color.Transparent)
+	filler.SetMinSize(geo.NewSize(100, 400))
+	page := container.NewVScroll(container.NewVBox(container.NewGridWrap(geo.NewSize(120, 600), button), filler))
+	c := newCanvas(bellui.CurrentDevice()).(*canvas)
+	c.SetContent(page)
+	c.Resize(geo.NewSize(120, 200))
+	drag := func(wid event.Draggable, ev *event.DragEvent) { wid.Dragged(ev) }
+	tap := func(event.Tappable, *event.PointEvent) { taps++ }
+
+	c.TapDown(geo.NewPos(30, 190), 0)
+	c.TapDown(geo.NewPos(60, 190), 1)
+	for y := float32(180); y >= 140; y -= 10 { // 10 per frame: a flick
+		c.TapMove(geo.NewPos(30, y), 0, drag)
+		c.TapMove(geo.NewPos(60, y), 1, drag)
+	}
+	c.TapUp(geo.NewPos(30, 140), 0, tap, nil, nil, nil, drag)
+	c.TapUp(geo.NewPos(60, 140), 1, tap, nil, nil, nil, drag)
+	released := offsetOnMain(page)
+	time.Sleep(80 * time.Millisecond)
+	require.Greater(t, offsetOnMain(page), released, "the flick carries on after the release")
+
+	bellui.DoAndWait(func() {
+		c.TapDown(geo.NewPos(60, 100), 2)
+		c.TapUp(geo.NewPos(60, 100), 2, tap, nil, nil, nil, drag)
+	})
+	assert.Zero(t, taps, "the touch that stopped the flick tapped the button")
+
+	time.Sleep(80 * time.Millisecond)
+	bellui.DoAndWait(func() {
+		c.TapDown(geo.NewPos(60, 100), 3)
+		c.TapUp(geo.NewPos(60, 100), 3, tap, nil, nil, nil, drag)
+	})
+	assert.Equal(t, 1, taps, "a tap on the page at rest taps the button")
+}
