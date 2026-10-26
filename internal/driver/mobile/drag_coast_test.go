@@ -7,10 +7,12 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
+	intdriver "github.com/belluikit/bellui/internal/driver"
 	"github.com/belluikit/bellui/internal/driver/mobile/event/touch"
 	"github.com/belluikit/bellui/widget"
 )
@@ -139,6 +141,22 @@ func Test_driver_DragCoastDoesNotEndALaterDrag(t *testing.T) {
 	})
 }
 
+// rowCentre returns the y, in canvas coordinates, of the middle of the first
+// tappable row lying wholly below y=100: where a coast stopped decides whether
+// a fixed point is on a row or in the gap between two.
+func rowCentre(t *testing.T, w *window) float32 {
+	t.Helper()
+	y := float32(-1)
+	intdriver.WalkVisibleObjectTree(w.canvas.Content(), func(o core.CanvasObject, pos, _ geo.Position, _ geo.Size) bool {
+		if _, ok := o.(event.Tappable); ok && y < 0 && pos.Y > 100 && o.Size().Height < 100 {
+			y = pos.Y + o.Size().Height/2
+		}
+		return false
+	}, nil)
+	require.Positive(t, y, "no row on screen below y=100")
+	return y
+}
+
 // A tap that stops a list's fling only stops it: it selects nothing, as on
 // Android's and iOS's own lists. A tap on the list at rest still selects
 // (#792).
@@ -182,14 +200,16 @@ func Test_driver_TapThatStopsAFlingDoesNotSelect(t *testing.T) {
 	})
 	time.Sleep(50 * time.Millisecond) // a few coast steps in
 	onMain(func() {
-		cd.handleTouch(w, touch.Event{X: x, Y: 200 * s, Sequence: 1, Type: touch.TypeBegin})
-		cd.handleTouch(w, touch.Event{X: x, Y: 200 * s, Sequence: 1, Type: touch.TypeEnd})
+		y := rowCentre(t, w) * s // on a row, so a tap there would select it
+		cd.handleTouch(w, touch.Event{X: x, Y: y, Sequence: 1, Type: touch.TypeBegin})
+		cd.handleTouch(w, touch.Event{X: x, Y: y, Sequence: 1, Type: touch.TypeEnd})
 	})
 	time.Sleep(coastFor) // anything the tap could have dispatched has arrived
 	onMain(func() {
 		assert.Empty(t, selected, "the tap that stopped the fling selected a row")
-		cd.handleTouch(w, touch.Event{X: x, Y: 200 * s, Sequence: 2, Type: touch.TypeBegin})
-		cd.handleTouch(w, touch.Event{X: x, Y: 200 * s, Sequence: 2, Type: touch.TypeEnd})
+		y := rowCentre(t, w) * s
+		cd.handleTouch(w, touch.Event{X: x, Y: y, Sequence: 2, Type: touch.TypeBegin})
+		cd.handleTouch(w, touch.Event{X: x, Y: y, Sequence: 2, Type: touch.TypeEnd})
 	})
 	time.Sleep(100 * time.Millisecond)
 	onMain(func() {
