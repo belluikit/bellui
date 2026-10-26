@@ -8,8 +8,9 @@ import (
 	"github.com/belluikit/bellui/x/charts/coord"
 )
 
-// FunnelSeries.Sort orders the stages; it was never read (#343). Empty keeps
-// the data order, and a sorted stage keeps its own colour.
+// FunnelSeries.Sort orders the stages; it was never read (#343). Empty sorts
+// descending, as in ECharts, "none" keeps the data order, and a sorted stage
+// keeps its own colour.
 func TestFunnel_Sort(t *testing.T) {
 	red := color.NRGBA{R: 255, A: 255}
 	data := []FunnelData{{Name: "mid", Value: 50}, {Name: "top", Value: 90, Color: red}, {Name: "low", Value: 10}}
@@ -30,7 +31,7 @@ func TestFunnel_Sort(t *testing.T) {
 		return names, first.FillColor
 	}
 	for sortBy, want := range map[string][]string{
-		"":           {"mid", "top", "low"},
+		"":           {"top", "mid", "low"},
 		"none":       {"mid", "top", "low"},
 		"descending": {"top", "mid", "low"},
 		"ascending":  {"low", "mid", "top"},
