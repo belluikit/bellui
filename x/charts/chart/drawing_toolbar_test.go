@@ -447,3 +447,32 @@ func TestControlsTapWithTooltip(t *testing.T) {
 		t.Errorf("tapping the breadcrumb's back button under a tooltip left the path at %v", path)
 	}
 }
+
+// ClearDrawings tells an app that follows the drawing events about each
+// drawing it removes, as RemoveDrawing does (#799).
+func TestClearDrawingsEmitsDeleted(t *testing.T) {
+	c := drawingChart(t)
+	c.AddDrawing(&interact.HLineDrawing{DrawingBase: interact.DrawingBase{ID_: "h1"}})
+	c.AddDrawing(&interact.HLineDrawing{DrawingBase: interact.DrawingBase{ID_: "h2"}})
+	var deleted []interact.DrawingID
+	c.Events.On(interact.EventDrawingDeleted, func(evt any) {
+		deleted = append(deleted, evt.(interact.DrawingEvent).DrawingID)
+	})
+
+	c.ClearDrawings()
+	if len(deleted) != 2 || deleted[0] != "h1" || deleted[1] != "h2" {
+		t.Fatalf("ClearDrawings emitted deletions %v, want [h1 h2]", deleted)
+	}
+	c.ClearDrawings()
+	if len(deleted) != 2 {
+		t.Errorf("clearing an empty chart emitted %v", deleted[2:])
+	}
+
+	// The toolbar's Clear All goes through ClearDrawings.
+	c.AddDrawing(&interact.HLineDrawing{DrawingBase: interact.DrawingBase{ID_: "h3"}})
+	tb := NewDrawingToolbar(c)
+	test.Tap(tb.buttons[len(tb.buttons)-1])
+	if len(deleted) != 3 || deleted[2] != "h3" {
+		t.Errorf("Clear All emitted deletions %v, want h3 last", deleted)
+	}
+}

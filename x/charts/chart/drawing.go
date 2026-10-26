@@ -87,12 +87,22 @@ func (c *Chart) Drawings() []interact.Drawing {
 	return c.drawingStore.All()
 }
 
-// ClearDrawings removes all drawings.
+// ClearDrawings removes all drawings. Like RemoveDrawing, it emits
+// interact.EventDrawingDeleted for each drawing it removes, in the order
+// Drawings listed them, so an app that follows the drawing events learns of a
+// Clear All too (#799).
 func (c *Chart) ClearDrawings() {
 	c.mu.Lock()
+	removed := c.drawingStore.All()
 	c.drawingStore.Clear()
 	c.selectedID = ""
 	c.mu.Unlock()
+	for _, d := range removed {
+		c.Events.Emit(interact.DrawingEvent{
+			Event:     interact.Event{Type: interact.EventDrawingDeleted},
+			DrawingID: d.ID(),
+		})
+	}
 	c.refreshDirty(dirtyFull)
 }
 
