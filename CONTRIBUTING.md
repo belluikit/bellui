@@ -82,6 +82,31 @@ go install honnef.co/go/tools/cmd/staticcheck@latest
 The renderer also has an OpenGL build; if you touch rendering code, run
 `go vet -tags gl ./...` too.
 
+### With make
+
+The root `Makefile` wraps these and the other CI legs; `make` lists every
+target. The common ones:
+
+```sh
+make lint                       # formatting, vet, cyclomatic complexity, changelog
+make test                       # main module, as CI's Linux leg (-race -tags ci)
+make test-gl                    # with the OpenGL painter (under Xvfb if there is no display)
+make test-mobile                # as the mobile driver
+make test-a11y                  # the accessibility bridges
+make test-x X=charts            # an x/ module against this checkout, as CI tests it
+make test-cli                   # the bellui command
+make test-wasm PKG=./lang/      # packages under GOOS=js, in Node
+make test-pkg PKG=./widget/ RUN=TestEntry
+make stress PKG=./internal/driver/embedded/ RUN=TestNoOSDriver_TouchStopsDragCoast COUNT=50
+make bench PKG=./widget/ RUN=BenchmarkRefresh > new.txt   # then: benchstat old.txt new.txt
+make tools                      # install the lint tools at the versions CI uses
+```
+
+`make stress` runs a test with every CPU core busy, which is how a timing
+flake that only shows on loaded CI runners is reproduced locally. A full test
+run can rewrite golden images under `internal/{oksvg,rasterx,render}/testdata`;
+`make restore-goldens` puts them back, and discards any change to them.
+
 ## Style
 
 - Everything new gets a unit test where that is possible.

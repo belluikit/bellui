@@ -20,6 +20,27 @@ carry the same version as the toolkit, even when their own code is unchanged.
 
 Version line: `v1.0.0-rc.N` while the rebrand soaks, then `v1.0.0`.
 
+Each step below gives the commands; the root `Makefile` has a target for most
+of them, noted under the step. `make release-status` lists what is still open
+in the release's milestone, the open pull requests and main's latest CI runs.
+
+## Before the steps: validate by hand
+
+Unit tests and CI do not see a phone's keyboard, a screen reader or a locale
+change at run time. `hack/releasecheck` walks a tester through the release on
+a desktop, Android, iOS and the web, with steps and expected results for each
+check, and writes a report ([its README](../hack/releasecheck/README.md)):
+
+```sh
+make release-setup P=desktop    # build the bellui command, the gallery and the companion app from this checkout
+make release-run P=desktop      # one check at a time; exits non-zero if any failed
+make release-list               # the whole checklist as release-validation-<version>.md
+```
+
+`P` is `desktop`, `android`, `ios` or `web`. `make gallery`, `make gallery-web`,
+`make release-app` and `make release-app-web` start the apps the checks open.
+Tag only on reports with no failure; file each failure first.
+
 ## The one trap: ordering is forced
 
 **The main-module tag must exist and be fetchable before the `x/*` pins move.**
@@ -39,6 +60,8 @@ Entries for the release are files in `changelog.d/` (#511). Fold them into
 go run ./hack/changelog release v1.0.0-rc.7
 ```
 
+With make: `make release-changelog VERSION=v1.0.0-rc.7`.
+
 Then write the section's opening summary under its heading, as earlier
 releases have one, and commit as `docs: changelog for <version>`. When the
 `bellui` command is released alongside, do the same for its changelog with
@@ -56,6 +79,9 @@ cheap to cut and awkward to move.
 
 ### 3. Tag the main module
 
+`make release-tag-commands VERSION=v1.0.0-rc.7` prints this step's and step
+5's commands; it does not run them.
+
 ```sh
 git tag -a v1.0.0-rc.7 -m "v1.0.0-rc.7"
 git push origin v1.0.0-rc.7
@@ -72,6 +98,9 @@ go list -m github.com/belluikit/bellui@v1.0.0-rc.7   # may take a moment to appe
 ```
 
 ### 4. Bump the `x/*` pins, and verify each by hand
+
+`make release-pins VERSION=v1.0.0-rc.7` runs the loop below for every module
+(`X="charts tables"` narrows it).
 
 For each of `charts dag editor mmedia tables`:
 
@@ -140,6 +169,9 @@ that gap. A consumer of `x/charts` sees rc.5 as the newest release while the
 toolkit is at rc.6.
 
 ### 6. Fresh-consumer smoke check
+
+`make release-smoke VERSION=v1.0.0-rc.7` runs this recipe in a fresh
+temporary directory.
 
 Cheap, and it catches a release that only works from inside this checkout:
 
