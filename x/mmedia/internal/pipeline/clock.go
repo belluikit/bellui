@@ -8,7 +8,8 @@ import (
 // Clock provides the presentation clock for A/V synchronization.
 // When audio is present, the audio output drives the clock; between audio
 // updates the position is interpolated with wall time so consumers see a
-// smooth clock instead of one that advances in audio-chunk-sized steps.
+// smooth clock instead of one that advances in audio-chunk-sized steps. Until
+// the device starts playing it holds where the audio is (see acquiring).
 // When only video is present, wall-clock time is used.
 type Clock struct {
 	mu        sync.RWMutex
@@ -137,10 +138,13 @@ func (c *Clock) Time() time.Duration {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	if c.useAudio {
-		if c.running {
+		if c.running && !c.acquiring {
 			// Interpolate between audio updates for a smooth clock.
 			return c.audioNow(time.Now())
 		}
+		// Paused, or the device has not started playing: hold where the
+		// audio is. Interpolating while acquiring ran the clock ahead of a
+		// device that had not started, by up to one update interval (#787).
 		return c.audioTime
 	}
 	if c.running {

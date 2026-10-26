@@ -164,3 +164,22 @@ func TestClockWaitsForTheAudioToStart(t *testing.T) {
 		t.Errorf("clock at %v while the audio has not started; want it held near 0", got)
 	}
 }
+
+// While the device has not started, the clock holds exactly where the audio
+// is, however long it waits, instead of running ahead by up to one update
+// interval; once the device plays, it interpolates again (#787).
+func TestClockHoldsUntilTheAudioPlays(t *testing.T) {
+	c := NewClock()
+	c.Start()
+	c.SetAudioTime(0)
+	time.Sleep(30 * time.Millisecond)
+	if got := c.Time(); got != 0 {
+		t.Errorf("clock at %v 30ms after a device that has not started reported 0; want exactly 0", got)
+	}
+
+	c.SetAudioTime(50 * time.Millisecond) // the device has started
+	time.Sleep(20 * time.Millisecond)
+	if got := c.Time(); got <= 50*time.Millisecond {
+		t.Errorf("clock at %v 20ms after the audio reached 50ms; want it running on past it", got)
+	}
+}
