@@ -19,10 +19,10 @@ type GaugeSeries struct {
 	Max        float64 // maximum (default 100)
 
 	// StartAngle and EndAngle in degrees, with 0 at the top and angles growing
-	// clockwise. Min sits at StartAngle and values sweep counter-clockwise, by
-	// decreasing angle, to Max at EndAngle.
-	// Defaults: StartAngle=135, EndAngle=-135, a 270-degree arc from the
-	// bottom right over the top to the bottom left, with the gap at the bottom.
+	// clockwise. Min sits at StartAngle and values sweep clockwise, by
+	// increasing angle, to Max at EndAngle, as in ECharts.
+	// Defaults: StartAngle=-135, EndAngle=135, a 270-degree arc from the
+	// bottom left over the top to the bottom right, with the gap at the bottom.
 	StartAngle float32
 	EndAngle   float32
 
@@ -91,12 +91,14 @@ func (r *gaugeRenderer) Render(ctx RenderContext) []core.CanvasObject {
 	startAngle := gs.StartAngle
 	endAngle := gs.EndAngle
 	if startAngle == 0 && endAngle == 0 {
-		// The gap at the bottom. The old 225/-45 left it on the left (#343).
-		startAngle = 135
-		endAngle = -135
+		// The gap at the bottom, filling from the left (#343).
+		startAngle = -135
+		endAngle = 135
 	}
 
-	totalSweep := startAngle - endAngle
+	// Values sweep clockwise from startAngle; endAngle is reached after
+	// totalSweep degrees, whatever turn it was given in.
+	totalSweep := endAngle - startAngle
 	if totalSweep < 0 {
 		totalSweep += 360
 	}
@@ -108,7 +110,7 @@ func (r *gaugeRenderer) Render(ctx RenderContext) []core.CanvasObject {
 
 	// Background track arc
 	trackColor := color.NRGBA{R: 60, G: 60, B: 60, A: 180}
-	trackArc := canvas.NewArc(endAngle, startAngle, 0.7, trackColor)
+	trackArc := canvas.NewArc(startAngle, startAngle+totalSweep, 0.7, trackColor)
 	trackArc.Move(arcPos)
 	trackArc.Resize(arcSize)
 	objects = append(objects, trackArc)
@@ -123,12 +125,11 @@ func (r *gaugeRenderer) Render(ctx RenderContext) []core.CanvasObject {
 		if sMax > 1 {
 			sMax = 1
 		}
-		// Map normalized range to angle range
-		// startAngle is the beginning (min), sweeping counter-clockwise to endAngle (max)
-		sStartAngle := startAngle - float32(sMin)*totalSweep
-		sEndAngle := startAngle - float32(sMax)*totalSweep
+		// Map the normalized range onto the clockwise sweep from startAngle (min).
+		sStartAngle := startAngle + float32(sMin)*totalSweep
+		sEndAngle := startAngle + float32(sMax)*totalSweep
 
-		sectorArc := canvas.NewArc(sEndAngle, sStartAngle, 0.7, sector.Color)
+		sectorArc := canvas.NewArc(sStartAngle, sEndAngle, 0.7, sector.Color)
 		sectorArc.Move(arcPos)
 		sectorArc.Resize(arcSize)
 		objects = append(objects, sectorArc)
@@ -142,7 +143,7 @@ func (r *gaugeRenderer) Render(ctx RenderContext) []core.CanvasObject {
 	if valNorm > 1 {
 		valNorm = 1
 	}
-	valAngle := startAngle - float32(valNorm)*totalSweep
+	valAngle := startAngle + float32(valNorm)*totalSweep
 
 	valueColor := ctx.Color
 	if valueColor == nil {
@@ -150,7 +151,7 @@ func (r *gaugeRenderer) Render(ctx RenderContext) []core.CanvasObject {
 	}
 
 	if valNorm > 0.001 {
-		valueArc := canvas.NewArc(valAngle, startAngle, 0.7, valueColor)
+		valueArc := canvas.NewArc(startAngle, valAngle, 0.7, valueColor)
 		valueArc.Move(arcPos)
 		valueArc.Resize(arcSize)
 		if len(gs.Sectors) > 0 {

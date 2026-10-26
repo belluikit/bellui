@@ -19,16 +19,41 @@ func gaugeArcs(gs *GaugeSeries) []*canvas.Arc {
 	return arcs
 }
 
-// The default angles leave the gap at the bottom; 225/-45 left it on the left.
-// Angles an app sets keep their meaning (#343).
-func TestGauge_DefaultGapAtTheBottom(t *testing.T) {
-	track := gaugeArcs(&GaugeSeries{Value: 10})[0]
+// The default angles leave the gap at the bottom, and values fill clockwise
+// from the bottom left, as in ECharts. Angles an app sets are read the same
+// way: Min at StartAngle, clockwise to Max at EndAngle (#343).
+func TestGauge_FillsClockwiseFromTheBottomLeft(t *testing.T) {
+	arcs := gaugeArcs(&GaugeSeries{Value: 25})
+	track, value := arcs[0], arcs[1]
 	if track.StartAngle != -135 || track.EndAngle != 135 {
 		t.Errorf("default track runs %v to %v, want -135 to 135 (the gap at the bottom)", track.StartAngle, track.EndAngle)
 	}
-	explicit := gaugeArcs(&GaugeSeries{Value: 10, StartAngle: 225, EndAngle: -45})[0]
-	if explicit.StartAngle != -45 || explicit.EndAngle != 225 {
-		t.Errorf("explicit 225/-45 track runs %v to %v, want -45 to 225 as before", explicit.StartAngle, explicit.EndAngle)
+	// A quarter of 270 degrees from the bottom left: up the left side.
+	if value.StartAngle != -135 || value.EndAngle != -67.5 {
+		t.Errorf("value 25 of 100 runs %v to %v, want -135 to -67.5 (from the bottom left)", value.StartAngle, value.EndAngle)
+	}
+
+	explicit := gaugeArcs(&GaugeSeries{Value: 50, StartAngle: -90, EndAngle: 90})
+	if explicit[0].StartAngle != -90 || explicit[0].EndAngle != 90 {
+		t.Errorf("explicit -90/90 track runs %v to %v, want the top half, -90 to 90", explicit[0].StartAngle, explicit[0].EndAngle)
+	}
+	if explicit[1].EndAngle != 0 {
+		t.Errorf("value 50 on a -90/90 gauge ends at %v, want 0 (the top)", explicit[1].EndAngle)
+	}
+
+	// An EndAngle given below StartAngle is reached clockwise all the same.
+	wrapped := gaugeArcs(&GaugeSeries{Value: 10, StartAngle: 225, EndAngle: 135})[0]
+	if wrapped.StartAngle != 225 || wrapped.EndAngle != 495 {
+		t.Errorf("explicit 225/135 track runs %v to %v, want 225 to 495 (270 degrees clockwise)", wrapped.StartAngle, wrapped.EndAngle)
+	}
+}
+
+// Coloured ranges sit on the same clockwise sweep as the value.
+func TestGauge_RangesFollowTheSweep(t *testing.T) {
+	sectors := []GaugeSector{{Min: 0, Max: 50, Color: color.NRGBA{G: 180, A: 255}}}
+	low := gaugeArcs(&GaugeSeries{Value: 10, Sectors: sectors})[1]
+	if low.StartAngle != -135 || low.EndAngle != 0 {
+		t.Errorf("range 0-50 runs %v to %v, want -135 to 0 (bottom left to the top)", low.StartAngle, low.EndAngle)
 	}
 }
 
