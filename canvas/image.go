@@ -15,6 +15,7 @@ import (
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/cache"
+	"github.com/belluikit/bellui/internal/colorprofile"
 	"github.com/belluikit/bellui/internal/scale"
 	"github.com/belluikit/bellui/internal/svg"
 	"github.com/belluikit/bellui/storage"
@@ -207,7 +208,7 @@ func (i *Image) Refresh() {
 				return
 			}
 
-			decoded, _, err := image.Decode(rc)
+			decoded, err := decodeImage(rc)
 			if err != nil {
 				bellui.LogError("Failed to render image", err)
 				return
@@ -457,4 +458,37 @@ func (i *Image) renderSVG(width, height float32) (image.Image, error) {
 	}
 	cache.SetSvg(i.name(), i, tex, screenWidth, screenHeight)
 	return tex, nil
+}
+
+// decodeImage decodes an encoded image and converts it to sRGB from the colour
+// profile it declares, so a Display P3 or Adobe RGB photo is drawn in its own
+// colours rather than as if it were sRGB (#802). An image that declares no
+// profile, or sRGB, is drawn as decoded. One whose profile Bellui does not
+// convert (CMYK, Lab, lookup tables) or cannot read is drawn as sRGB too, and
+// logged once per kind.
+func decodeImage(r io.Reader) (image.Image, error) {
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+	img, _, err := image.Decode(bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	p, ok, perr := colorprofile.FromImageFile(data)
+	if perr != nil {
+		logProfileOnce(perr)
+	}
+	if !ok {
+		return img, nil
+	}
+	return colorprofile.ToSRGB(img, p), nil
+}
+
+var loggedProfileErrors sync.Map // error text -> struct{}
+
+func logProfileOnce(err error) {
+	if _, seen := loggedProfileErrors.LoadOrStore(err.Error(), struct{}{}); !seen {
+		bellui.LogError("Image colour profile not applied, drawing the image as sRGB", err)
+	}
 }
