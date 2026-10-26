@@ -81,6 +81,7 @@ func (c *Container) Position() geo.Position {
 
 // Refresh causes this object to be redrawn in its current state
 func (c *Container) Refresh() {
+	dirhook.Refreshed(c) // c.Objects may have been assigned (#773)
 	if dirhook.InUse() {
 		// Outside a layout walk the layout and the children's refreshes run
 		// in the direction c sits in, not the global one (#749).

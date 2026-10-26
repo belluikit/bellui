@@ -23,6 +23,7 @@ var (
 	enter atomic.Pointer[func(core.CanvasObject) bool]
 	exit  atomic.Pointer[func()]
 	moved atomic.Pointer[func(parent, obj core.CanvasObject, added bool)]
+	fresh atomic.Pointer[func(obj core.CanvasObject)]
 )
 
 // Note records that a direction other than the process-wide one may now
@@ -64,6 +65,23 @@ func move(parent, obj core.CanvasObject, added bool) {
 // SetMoved installs f as the function [Added] and [Removed] report to.
 // internal/driver installs it at init.
 func SetMoved(f func(parent, obj core.CanvasObject, added bool)) { moved.Store(&f) }
+
+// Refreshed records that obj was refreshed: a widget's renderer, or code that
+// assigned a Container's Objects, may have given it children no [Added]
+// reported. The driver's direction cache takes them in where obj stands, so a
+// lookup before the next frame finds them (#773).
+func Refreshed(obj core.CanvasObject) {
+	if !InUse() {
+		return
+	}
+	if h := fresh.Load(); h != nil {
+		(*h)(obj)
+	}
+}
+
+// SetRefreshed installs f as the function [Refreshed] reports to.
+// internal/driver installs it at init.
+func SetRefreshed(f func(obj core.CanvasObject)) { fresh.Store(&f) }
 
 // Epoch returns the count [Changed] raises.
 func Epoch() uint64 { return epoch.Load() }

@@ -272,6 +272,7 @@ func (w *BaseWidget) Refresh() {
 	} else {
 		refreshWidget(impl)
 	}
+	dirhook.Refreshed(impl) // its renderer may hold new children (#773)
 
 	// 4. The renderer may refresh only its parts, so tell the canvas that the
 	// widget's own min size may have changed too (#464).
