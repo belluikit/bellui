@@ -20,6 +20,7 @@ func init() {
 		index.moved(parent, obj, added)
 		windows.moved(parent, obj, added)
 	})
+	dirhook.SetRefreshed(index.refreshed)
 }
 
 // DirectionOf reports the layout direction that applies to obj where it sits:
@@ -242,11 +243,13 @@ var indexBuilds, indexLookups atomic.Int64
 // content or overlays change, a scope's direction or content changes or an
 // overlay inherits one. An object added to or removed from a Container is
 // taken in or out where it stands instead (moved), so a loop of Adds does not
-// rebuild it each time. An object outside every scope is not in it, so a miss
-// means the canvas' or the global direction. Between rebuilds an object a
-// widget's renderer moved into a scope on its own (not through a Container)
-// is missed until the next frame; its parent's Refresh and the layout walk
-// push the scope's direction around it in the meantime.
+// rebuild it each time. A refreshed object inside a scope has its subtree
+// walked again (refreshed), which takes in the children its renderer, or code
+// assigning a Container's Objects, gave it since (#773). An object outside
+// every scope is not in it, so a miss means the canvas' or the global
+// direction. What a refresh does not undo: an object a renderer dropped keeps
+// its old scope's direction until the next frame's rebuild, even if it now
+// sits outside every scope.
 type dirIndex struct {
 	mu      sync.Mutex
 	epoch   uint64
@@ -275,6 +278,28 @@ func (x *dirIndex) lookup(obj core.CanvasObject) (bellui.Direction, bool) {
 	}
 	d, ok := x.dirs[obj]
 	return d, ok
+}
+
+// refreshed walks obj's subtree again after obj refreshed (dirhook.Refreshed),
+// when obj is in a scope: children its renderer took in since the last
+// rebuild get obj's direction. A refresh outside every scope costs a map
+// read. An index already stale is left for the next lookup to rebuild.
+func (x *dirIndex) refreshed(obj core.CanvasObject) {
+	if obj == nil || x.walking() {
+		return
+	}
+	x.mu.Lock()
+	defer x.mu.Unlock()
+	if !x.valid || x.epoch != dirhook.Epoch() {
+		return
+	}
+	d, ok := x.dirs[obj]
+	if !ok {
+		return
+	}
+	x.builder.Store(thread.GoroutineID())
+	defer x.builder.Store(0)
+	x.walk(obj, d, true)
 }
 
 // walking reports whether the calling goroutine is walking for the index.

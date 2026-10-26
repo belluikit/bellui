@@ -463,3 +463,77 @@ func TestDirectionOf_DirectedWindowCacheFollowsAddRemove(t *testing.T) {
 	ltrBox.Add(moved)
 	assert.Equal(t, bellui.DirectionLTR, container.DirectionOf(moved))
 }
+
+// swapper is a widget whose renderer replaces its objects with next on each
+// Refresh, without a Container: the move no dirhook.Added reports (#773).
+type swapper struct {
+	widget.BaseWidget
+	next []core.CanvasObject
+}
+
+func newSwapper() *swapper {
+	s := &swapper{}
+	s.ExtendBaseWidget(s)
+	return s
+}
+
+func (s *swapper) CreateRenderer() core.WidgetRenderer { return &swapperRenderer{s: s} }
+
+type swapperRenderer struct {
+	s    *swapper
+	objs []core.CanvasObject
+}
+
+func (r *swapperRenderer) Destroy()                     {}
+func (r *swapperRenderer) Layout(geo.Size)              {}
+func (r *swapperRenderer) MinSize() geo.Size            { return geo.NewSize(10, 10) }
+func (r *swapperRenderer) Objects() []core.CanvasObject { return r.objs }
+func (r *swapperRenderer) Refresh()                     { r.objs = r.s.next }
+
+// An object a widget's renderer takes into a scope on its own, or one placed
+// by assigning a Container's Objects, is in the scope's direction as soon as
+// its new parent refreshes, before any frame, and without a rebuild of the
+// cache (#773).
+func TestDirectionOf_RefreshTakesInNewChildren(t *testing.T) {
+	test.NewTempApp(t)
+	lang.SetLocaleForTests(t, "en-US")
+	sw, box := newSwapper(), container.NewVBox()
+	w := test.NewTempWindow(t, container.NewDirectionScope(container.NewVBox(sw, box), bellui.DirectionRTL))
+	w.Resize(geo.NewSize(200, 200))
+	require.Equal(t, bellui.DirectionRTL, container.DirectionOf(sw), "the lookup builds the cache")
+	builds, lookups := driver.DirectionIndexStats()
+
+	label := widget.NewLabel("taken in by a renderer")
+	sw.next = []core.CanvasObject{label}
+	sw.Refresh()
+	assert.Equal(t, bellui.DirectionRTL, container.DirectionOf(label), "a renderer's new child")
+
+	rect := minRect(10, 10)
+	box.Objects = []core.CanvasObject{rect}
+	box.Refresh()
+	assert.Equal(t, bellui.DirectionRTL, container.DirectionOf(rect), "a child placed by assigning Objects")
+
+	after, afterLookups := driver.DirectionIndexStats()
+	assert.Greater(t, afterLookups, lookups, "the lookups reached the cache")
+	assert.Equal(t, builds, after, "no refresh rebuilt it")
+}
+
+// What a refresh does not undo, as DirectionOf documents: an object a
+// renderer dropped keeps its old scope's direction until the next frame
+// rebuilds the cache (#773). This pins that gap; it fails if it closes.
+func TestDirectionOf_RendererDropIsSeenAtTheNextFrame(t *testing.T) {
+	test.NewTempApp(t)
+	lang.SetLocaleForTests(t, "en-US")
+	label := widget.NewLabel("dropped")
+	sw := newSwapper()
+	sw.next = []core.CanvasObject{label}
+	w := test.NewTempWindow(t, container.NewDirectionScope(container.NewVBox(sw), bellui.DirectionRTL))
+	w.Resize(geo.NewSize(200, 200))
+	require.Equal(t, bellui.DirectionRTL, container.DirectionOf(label))
+
+	sw.next = nil
+	sw.Refresh()
+	assert.Equal(t, bellui.DirectionRTL, container.DirectionOf(label), "before a frame, the old scope's direction")
+	w.Resize(geo.NewSize(200, 300)) // a frame
+	assert.Equal(t, bellui.DirectionLTR, container.DirectionOf(label), "after it, the global direction")
+}

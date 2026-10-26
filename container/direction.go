@@ -143,7 +143,11 @@ func (d *DirectionScope) Refresh() {
 // (a swipe, a tap's hit-test, an arrow key), or a Refresh triggered by a timer
 // or a data binding that re-lays-out the widget. Outside a walk it looks obj up
 // in a cache of the objects inside scopes, rebuilt at most once per frame and
-// after a change that can move an object between scopes. BaseWidget.Refresh
+// after a change that can move an object between scopes. A Container's Add and
+// Remove update it in place, and so does a refresh: an object a widget's
+// renderer takes in, or one placed by assigning a Container's Objects, has its
+// scope's direction once its new parent refreshes. An object a renderer drops
+// keeps its old scope's direction until the next frame. BaseWidget.Refresh
 // and Resize and a Container's Refresh and layout already run in the
 // direction the object sits in, so a widget's renderer reads
 // lang.IsRTLDirection as it does in a layout pass.
