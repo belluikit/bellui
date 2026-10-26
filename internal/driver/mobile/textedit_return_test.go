@@ -76,3 +76,29 @@ func TestHandleTextEdit_NewlineInBoundEditorIsText(t *testing.T) {
 	d.handleTextEdit(c, textedit.Event{Start: 1, End: 1, Text: "\n"})
 	assert.Equal(t, "a\nb", entry.Text)
 }
+
+// iOS's keyboard deletes by selecting the character before the caret and
+// replacing it with nothing. With no editor bound, that reaches the focused
+// widget as one Backspace per deleted rune; a replacement that inserts text
+// (an autocorrection) still reaches nothing (#666).
+func TestHandleTextEdit_DeletionReachesNonEditorAsBackspace(t *testing.T) {
+	d := &driver{textInput: textinput.NewSession(keyboardStateBackend{})}
+	c := newCanvas(bellui.CurrentDevice()).(*canvas)
+	rec := newKeyRecorder()
+	c.SetContent(rec)
+	c.Focus(rec)
+	d.textInput.Bind(c.Focused())
+	require.False(t, d.textInput.Bound())
+
+	d.handleTextEdit(c, textedit.Event{Start: 3, End: 4})
+	assert.Equal(t, []event.KeyName{event.KeyBackspace}, rec.keys)
+
+	rec.keys = nil
+	d.handleTextEdit(c, textedit.Event{Start: 2, End: 4})
+	assert.Equal(t, []event.KeyName{event.KeyBackspace, event.KeyBackspace}, rec.keys)
+
+	rec.keys = nil
+	d.handleTextEdit(c, textedit.Event{Start: 0, End: 4, Text: "popô"})
+	assert.Empty(t, rec.keys)
+	assert.Empty(t, rec.runes)
+}
