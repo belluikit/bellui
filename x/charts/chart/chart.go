@@ -384,8 +384,7 @@ func (c *Chart) handleToolboxAction(action string) {
 			c.SetDrawingTool(interact.DrawingToolMode(n))
 		}
 	case action == component.ActionClearDrawings:
-		c.ClearDrawings()
-		c.SetDrawingTool(interact.DrawingToolNone)
+		c.clearAllDrawings()
 	}
 }
 
@@ -789,10 +788,13 @@ func (c *Chart) Tapped(e *event.PointEvent) {
 	}
 
 	// Pinned tooltip: click to pin visible tooltip, click again to dismiss.
-	// Skip pin logic when a drawing tool is active — drawing takes priority.
+	// Skip pin logic when a drawing tool is active — drawing takes priority —
+	// and for a tap on one of the chart's controls, which an axis tooltip
+	// following the pointer's x is up over just as much as over the plot.
 	c.mu.Lock()
 	hasDrawingTool := c.drawingTool != interact.DrawingToolNone
-	if c.tooltipState.Pinned && !hasDrawingTool {
+	onControl := c.onControlLocked(e.Position)
+	if c.tooltipState.Pinned && !hasDrawingTool && !onControl {
 		// Dismiss pinned tooltip.
 		c.tooltipState.Pinned = false
 		c.tooltipState.Visible = false
@@ -806,7 +808,7 @@ func (c *Chart) Tapped(e *event.PointEvent) {
 		// Clear pin silently so drawing can proceed.
 		c.tooltipState.Pinned = false
 	}
-	if !hasDrawingTool && c.tooltipState.Visible && len(c.tooltipState.Hits) > 0 {
+	if !hasDrawingTool && !onControl && c.tooltipState.Visible && len(c.tooltipState.Hits) > 0 {
 		// A click on a drawing selects it rather than pinning the tooltip the
 		// hover over it opened: with a tooltip on, a drawing was otherwise
 		// never selectable (#343).
@@ -915,6 +917,14 @@ func (c *Chart) Tapped(e *event.PointEvent) {
 }
 
 // resolveTap determines what was tapped under a single lock/unlock cycle.
+// onControlLocked reports whether pos is on one of the chart's controls,
+// which a tap reaches whatever the tooltip shows. Must be called with c.mu
+// held.
+func (c *Chart) onControlLocked(pos geo.Position) bool {
+	snap := c.renderSnap
+	return snap != nil && snap.toolboxLayout != nil && snap.toolboxLayout.HitTest(pos) != ""
+}
+
 func (c *Chart) resolveTap(pos geo.Position) tapResult {
 	c.mu.Lock()
 	defer c.mu.Unlock()

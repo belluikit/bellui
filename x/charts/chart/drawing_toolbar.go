@@ -29,8 +29,10 @@ type DrawingToolbar struct {
 }
 
 // NewDrawingToolbar returns the drawing tools for c, in the order given, or
-// interact.DefaultDrawingTools when none are. It follows c's active tool for
-// as long as c lives.
+// interact.DefaultDrawingTools when none are. It follows c's active tool while
+// it is shown: it subscribes to c's events when its renderer is created and
+// lets go when that renderer is destroyed, so a toolbar the app drops does not
+// stay subscribed for as long as c lives.
 func NewDrawingToolbar(c *Chart, tools ...interact.DrawingToolMode) *DrawingToolbar {
 	if len(tools) == 0 {
 		tools = interact.DefaultDrawingTools()
@@ -41,15 +43,9 @@ func NewDrawingToolbar(c *Chart, tools ...interact.DrawingToolMode) *DrawingTool
 			c.SetDrawingTool(tool)
 		}))
 	}
-	t.buttons = append(t.buttons, widget.NewButton("Clear All", func() {
-		c.ClearDrawings()
-		c.SetDrawingTool(interact.DrawingToolNone)
-	}))
+	t.buttons = append(t.buttons, widget.NewButton("Clear All", c.clearAllDrawings))
 	t.ExtendBaseWidget(t)
 	t.showActive(c.DrawingTool())
-	c.Events.On(interact.EventDrawingToolChanged, func(evt any) {
-		t.showActive(evt.(interact.DrawingToolEvent).Tool)
-	})
 	return t
 }
 
@@ -74,5 +70,27 @@ func (t *DrawingToolbar) CreateRenderer() core.WidgetRenderer {
 	for i, b := range t.buttons {
 		objs[i] = b
 	}
-	return widget.NewSimpleRenderer(container.New(layout.NewRowWrapLayout(), objs...))
+	t.showActive(t.chart.DrawingTool()) // it may have changed while not shown
+	id := t.chart.Events.On(interact.EventDrawingToolChanged, func(evt any) {
+		t.showActive(evt.(interact.DrawingToolEvent).Tool)
+	})
+	return &drawingToolbarRenderer{
+		WidgetRenderer: widget.NewSimpleRenderer(container.New(layout.NewRowWrapLayout(), objs...)),
+		chart:          t.chart,
+		handler:        id,
+	}
+}
+
+// drawingToolbarRenderer holds the toolbar's subscription to its chart's
+// events for as long as the toolbar is rendered.
+type drawingToolbarRenderer struct {
+	core.WidgetRenderer
+	chart   *Chart
+	handler int // the EventDrawingToolChanged handler, removed on Destroy
+}
+
+// Destroy implements core.WidgetRenderer.
+func (r *drawingToolbarRenderer) Destroy() {
+	r.chart.Events.Off(r.handler)
+	r.WidgetRenderer.Destroy()
 }

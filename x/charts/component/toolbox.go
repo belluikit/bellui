@@ -1,6 +1,7 @@
 package component
 
 import (
+	"image/color"
 	"strconv"
 
 	"github.com/belluikit/bellui"
@@ -124,6 +125,11 @@ func toolboxButtonWidth(label string, minWidth float32) float32 {
 	return minWidth
 }
 
+// activeButtonTextColor labels the active drawing tool. The other buttons'
+// light ButtonTextColor reads at under 2:1 on AccentColor; this dark one at
+// about 6:1, above WCAG's 4.5:1 for text.
+var activeButtonTextColor color.Color = color.NRGBA{R: 20, G: 20, B: 20, A: 255}
+
 // drawingToolsRowStep is the distance between two rows of drawing tools.
 const drawingToolsRowStep = ToolboxButtonHeight + 4
 
@@ -172,15 +178,15 @@ func RenderDrawingTools(cfg *ToolboxConfig, active interact.DrawingToolMode, x, 
 	activeAction := ActionDrawingTool + strconv.Itoa(int(active))
 	var objects []core.CanvasObject
 	for i, b := range buttons {
-		bgColor := resolver.ButtonBackgroundColor()
+		bgColor, textColor := resolver.ButtonBackgroundColor(), resolver.ButtonTextColor()
 		if b.Action == activeAction {
-			bgColor = resolver.AccentColor()
+			bgColor, textColor = resolver.AccentColor(), activeButtonTextColor
 		}
 		bg := canvas.NewRectangle(bgColor)
 		bg.CornerRadius = 3
 		bg.Move(b.Rect.Pos)
 		bg.Resize(b.Rect.Size)
-		txt := canvas.NewText(labels[i], resolver.ButtonTextColor())
+		txt := canvas.NewText(labels[i], textColor)
 		txt.TextSize = resolver.ButtonTextSize()
 		txt.Alignment = bellui.TextAlignCenter
 		txt.Move(geo.NewPos(b.Rect.Pos.X, b.Rect.Pos.Y+3))

@@ -888,7 +888,23 @@ func main() {
 		},
 	})
 
-	drawStatusLabel := canvas.NewText("Tool: None (select a tool below)", color.NRGBA{R: 180, G: 180, B: 180, A: 220})
+	// How to use each tool, shown when it is chosen.
+	toolHints := map[interact.DrawingToolMode]string{
+		interact.DrawingToolNone:           "click a drawing to select it, drag to move",
+		interact.DrawingToolHLine:          "click on chart",
+		interact.DrawingToolVLine:          "click on chart",
+		interact.DrawingToolTrendLine:      "2 clicks",
+		interact.DrawingToolRay:            "2 clicks",
+		interact.DrawingToolRectangle:      "2 clicks",
+		interact.DrawingToolChannel:        "3 clicks",
+		interact.DrawingToolFibRetracement: "2 clicks",
+		interact.DrawingToolTextLabel:      "click, type, Enter",
+		interact.DrawingToolMeasure:        "drag",
+	}
+	toolStatus := func(tool interact.DrawingToolMode) string {
+		return fmt.Sprintf("Tool: %s — %s", tool, toolHints[tool])
+	}
+	drawStatusLabel := canvas.NewText(toolStatus(interact.DrawingToolNone), color.NRGBA{R: 180, G: 180, B: 180, A: 220})
 	drawStatusLabel.TextSize = 12
 	drawChart.Events.On(interact.EventDrawingCreated, func(evt interface{}) {
 		e := evt.(interact.DrawingEvent)
@@ -904,7 +920,7 @@ func main() {
 	// The default drawing tools. The status line follows the active tool
 	// through the chart's event, so it also tracks changes the toolbar makes.
 	drawChart.Events.On(interact.EventDrawingToolChanged, func(evt interface{}) {
-		drawStatusLabel.Text = fmt.Sprintf("Tool: %s — click on chart", evt.(interact.DrawingToolEvent).Tool)
+		drawStatusLabel.Text = toolStatus(evt.(interact.DrawingToolEvent).Tool)
 		drawStatusLabel.Refresh()
 	})
 	toolButtons := chart.NewDrawingToolbar(drawChart)

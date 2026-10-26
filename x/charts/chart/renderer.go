@@ -496,7 +496,7 @@ func (r *chartRenderer) computeLayout(
 	// The toolbox's drawing tools take rows of their own across the chart,
 	// below the title and the buttons, and the plot starts below them (#796).
 	var drawingToolsTop float32
-	if tools := component.DrawingToolsHeight(opt.Toolbox, drawingToolsWidth(opt, size.Width)); tools > 0 {
+	if tools := component.DrawingToolsHeight(opt.Toolbox, size.Width-grid.Left-grid.Right); tools > 0 {
 		drawingToolsTop = max(header, controlsTop)
 		header = drawingToolsTop + tools + controlsGap
 	}
@@ -620,13 +620,6 @@ func buttonRowsBottom(opt Option) float32 {
 	return 0
 }
 
-// drawingToolsWidth is the width the toolbox's drawing tools wrap at: the
-// chart's width inside the grid.
-func drawingToolsWidth(opt Option, width float32) float32 {
-	grid := chartGrid(opt)
-	return width - grid.Left - grid.Right
-}
-
 // renderOverlaysAndControls renders overlays, legend, zoom buttons, and toolbox.
 // Brush and tooltip are rendered separately as the "interactive layer".
 func (r *chartRenderer) renderOverlaysAndControls(
@@ -679,8 +672,10 @@ func (r *chartRenderer) renderOverlaysAndControls(
 	// Legend objects (on top of chart)
 	objects = append(objects, layout.legendObjs...)
 
-	// Compute grid for button positioning
-	grid := chartGrid(opt)
+	// The buttons go in the grid the plot was laid out in, which for a chart
+	// with no cartesian series may be tighter than chartGrid (computeLayout):
+	// the header reserved for them is measured from its top.
+	grid := layout.grid
 
 	// Zoom buttons at top-right, horizontal (if DataZoom enabled)
 	var zoomButtonsLayout *component.ZoomButtonsLayout
@@ -711,7 +706,7 @@ func (r *chartRenderer) renderOverlaysAndControls(
 		// The drawing tools, in rows across the chart under those buttons.
 		dtY := grid.Top + layout.drawingToolsTop
 		dtObjs := component.RenderDrawingTools(opt.Toolbox, drawingTool, grid.Left, dtY,
-			drawingToolsWidth(opt, size.Width), resolver, toolboxLayout)
+			size.Width-grid.Left-grid.Right, resolver, toolboxLayout)
 		if !hideControls {
 			objects = append(objects, dtObjs...)
 		}

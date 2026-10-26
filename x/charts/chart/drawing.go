@@ -96,6 +96,17 @@ func (c *Chart) ClearDrawings() {
 	c.refreshDirty(dirtyFull)
 }
 
+// clearAllDrawings is the drawing tools' Clear All: it removes every drawing
+// and goes back to Select. A drawing still in progress is dropped first, or
+// going back to Select would finish a label being typed into the emptied chart.
+func (c *Chart) clearAllDrawings() {
+	c.mu.Lock()
+	c.drawingGesture.Reset()
+	c.mu.Unlock()
+	c.ClearDrawings()
+	c.SetDrawingTool(interact.DrawingToolNone)
+}
+
 // SelectedDrawing returns the currently selected drawing ID, or "".
 func (c *Chart) SelectedDrawing() interact.DrawingID {
 	c.mu.RLock()
