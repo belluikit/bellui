@@ -1299,6 +1299,7 @@ func (w *window) create() {
 	})
 
 	w.setDarkMode()
+	tagSRGBSurface(w) // the GL path's window is not colour-matched otherwise (#373)
 
 	win.SetCloseCallback(w.closed)
 	win.SetDragCallback(w.processDragMotion)

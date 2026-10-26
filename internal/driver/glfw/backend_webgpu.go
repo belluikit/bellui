@@ -21,6 +21,10 @@ import (
 const needsGLContext = false
 
 // applyBackendWindowHints requests a context-less window; wgpu owns the surface.
+// tagSRGBSurface does nothing on the WebGPU path: the painter tags the surface
+// it creates (the macOS Metal layer, #373).
+func tagSRGBSurface(*window) {}
+
 func applyBackendWindowHints() {
 	glfw.WindowHint(glfw.ClientAPI, glfw.NoAPI)
 }
