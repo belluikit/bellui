@@ -108,6 +108,10 @@ func newAudioPlayerFromPipeline(pipe *pipeline.Pipeline, o *options) (*AudioPlay
 	})
 
 	pipe.SetOnError(func(err error) {
+		// Playback stopped, on a lost connection or a read error (#839).
+		bellui.Do(func() {
+			ap.controls.SetPlaying(false)
+		})
 		if o.onError != nil {
 			o.onError(err)
 		}

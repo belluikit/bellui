@@ -374,6 +374,7 @@ func (s *FFmpegSource) Seek(pos time.Duration) {
 		return
 	}
 	s.ended = false
+	s.err = nil
 
 	// A rate conversion holds a few frames of filter delay, which seeking the
 	// demuxer does not flush: the first audio after the seek would start with
@@ -394,6 +395,9 @@ func (s *FFmpegSource) Seek(pos time.Duration) {
 	for {
 		mt, err := s.dec.Next()
 		if err != nil || mt == goffmpeg.MediaTypeNone {
+			// Recorded as Decode does, so a seek into a dropped stream is
+			// reported as the error it is, not as an end (#839).
+			s.err = err
 			s.ended = true
 			return
 		}
