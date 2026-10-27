@@ -112,6 +112,8 @@ type Pipeline struct {
 	// source still hands over a freshly decoded frame that is copied into one.
 	frameQueue   chan timedFrame
 	frameRecycle chan *image.RGBA
+
+	prerollEnd prerollExit // why the last Play stopped waiting (held under mu)
 }
 
 // timedFrame pairs a decoded frame with its presentation timestamp. The
@@ -536,16 +538,9 @@ func (p *Pipeline) Play() {
 	// A live capture is deliberately excluded: it produces frames only in real
 	// time, so waiting for a second of them buys no smoothness and costs a second
 	// of latency on a feed whose whole value is being current.
+	p.prerollEnd = prerollSkipped
 	if p.hasVideo && p.frameQueue != nil && !p.live {
-		target := p.prerollTarget() // ~1 second, or a full queue at high resolution
-		for i := 0; i < 200; i++ {  // up to ~2s max wait
-			// A clip shorter than the target ends first: stop waiting then,
-			// or every start and every loop of it stalls the full two seconds.
-			if len(p.frameQueue) >= target || p.audioAheadFull() || p.sourceEnded() {
-				break
-			}
-			time.Sleep(10 * time.Millisecond)
-		}
+		p.prerollEnd = p.preroll()
 	}
 
 	// Start display loop: reads from frameQueue at framerate.
@@ -554,6 +549,41 @@ func (p *Pipeline) Play() {
 		defer p.wg.Done()
 		p.displayLoop(stopCh)
 	}()
+}
+
+// prerollExit is why Play stopped waiting for frames before starting the
+// display.
+type prerollExit int
+
+const (
+	prerollSkipped     prerollExit = iota // no wait: no video, or a live feed
+	prerollQueued                         // the target number of frames is queued
+	prerollAudioAhead                     // the decoder stalled on the audio-ahead limit
+	prerollSourceEnded                    // a clip shorter than the target ended
+	prerollTimedOut                       // none of those within ~2 s
+)
+
+func (e prerollExit) String() string {
+	return [...]string{"skipped", "queued", "audio ahead", "source ended", "timed out"}[e]
+}
+
+// preroll waits, up to ~2 s, for prerollTarget frames to be queued.
+func (p *Pipeline) preroll() prerollExit {
+	target := p.prerollTarget() // ~1 second, or a full queue at high resolution
+	for i := 0; i < 200; i++ {  // up to ~2s max wait
+		switch {
+		case len(p.frameQueue) >= target:
+			return prerollQueued
+		case p.audioAheadFull():
+			return prerollAudioAhead
+		case p.sourceEnded():
+			// A clip shorter than the target ends first: stop waiting then,
+			// or every start and every loop of it stalls the full two seconds.
+			return prerollSourceEnded
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	return prerollTimedOut
 }
 
 // sourceEnded reports whether the decoder has reached the end of the source.
