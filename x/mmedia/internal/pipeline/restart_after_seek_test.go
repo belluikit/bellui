@@ -10,14 +10,21 @@ import (
 // to zero, so after a restart the clock read the old seek target until as much
 // audio had played again as had before that seek: the picture held there for
 // seconds (#833).
+//
+// It needs a sound card: a detached device consumes nothing, so its clock would
+// not move either way. internal/audio's TestStopForgetsTheSeekBase pins the
+// same fix without one.
 func TestRestartAfterSeekStartsFromZero(t *testing.T) {
+	if _, err := newAudioOutput(2); err != nil { // the device opens once per process
+		t.Skipf("no audio device: %v", err)
+	}
 	p, err := NewPipelineURL("../source/testdata/sample.mp4") // 4 s, video and audio
 	if err != nil {
 		t.Fatalf("NewPipelineURL: %v", err)
 	}
 	defer p.Close()
 	if !p.HasAudio() || p.audioOutput == nil {
-		t.Skip("no audio device: the audio clock is what this pins")
+		t.Fatal("the sample clip plays without audio: the audio clock is what this pins")
 	}
 
 	p.Play()
