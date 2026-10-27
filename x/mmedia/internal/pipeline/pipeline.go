@@ -147,24 +147,7 @@ type timedFrame struct {
 // forward-only. When r is an *os.File the path is handed to FFmpeg directly,
 // which avoids bouncing every byte through a Go callback.
 func NewPipeline(r io.Reader) (*Pipeline, error) {
-	if r == nil {
-		return nil, fmt.Errorf("nil reader")
-	}
-
-	if f, ok := r.(*os.File); ok {
-		if _, err := f.Seek(0, io.SeekStart); err == nil {
-			if src, err := source.NewFFmpegSourceURL(f.Name()); err == nil {
-				return newOwnedPipeline(src)
-			}
-			// Fall through to the reader path — the file may not be
-			// reachable by name (unlinked, or an inherited descriptor).
-			if _, err := f.Seek(0, io.SeekStart); err != nil {
-				return nil, fmt.Errorf("failed to rewind reader: %w", err)
-			}
-		}
-	}
-
-	src, err := source.NewFFmpegSource(r)
+	src, err := openReader(r)
 	if err != nil {
 		return nil, err
 	}
@@ -179,6 +162,52 @@ func NewPipelineURL(url string) (*Pipeline, error) {
 		return nil, err
 	}
 	return newOwnedPipeline(src)
+}
+
+// NewAudioPipeline is NewPipeline for a player with no picture: any video
+// stream is ignored, so it never paces playback. The embedded cover art of
+// an MP3 or M4A is such a stream, a single frame, and a pipeline waiting for
+// the next one played nothing and reported the end (#850).
+func NewAudioPipeline(r io.Reader) (*Pipeline, error) {
+	src, err := openReader(r)
+	if err != nil {
+		return nil, err
+	}
+	src.IgnoreVideo()
+	return newOwnedPipeline(src)
+}
+
+// NewAudioPipelineURL is NewPipelineURL for a player with no picture; see
+// NewAudioPipeline.
+func NewAudioPipelineURL(url string) (*Pipeline, error) {
+	src, err := source.NewFFmpegSourceURL(url)
+	if err != nil {
+		return nil, err
+	}
+	src.IgnoreVideo()
+	return newOwnedPipeline(src)
+}
+
+// openReader opens r, handing an *os.File's path to FFmpeg directly, which
+// avoids bouncing every byte through a Go callback.
+func openReader(r io.Reader) (*source.FFmpegSource, error) {
+	if r == nil {
+		return nil, fmt.Errorf("nil reader")
+	}
+
+	if f, ok := r.(*os.File); ok {
+		if _, err := f.Seek(0, io.SeekStart); err == nil {
+			if src, err := source.NewFFmpegSourceURL(f.Name()); err == nil {
+				return src, nil
+			}
+			// Fall through to the reader path — the file may not be
+			// reachable by name (unlinked, or an inherited descriptor).
+			if _, err := f.Seek(0, io.SeekStart); err != nil {
+				return nil, fmt.Errorf("failed to rewind reader: %w", err)
+			}
+		}
+	}
+	return source.NewFFmpegSource(r)
 }
 
 // newOwnedPipeline builds a pipeline around a source this package opened, and

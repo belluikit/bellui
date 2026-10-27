@@ -200,6 +200,16 @@ func (s *FFmpegSource) SetAudioSampleRate(rate int) error {
 // way); for audio-only streams it decodes one audio packet. The pipeline's
 // decode-ahead loop provides pacing through frame-queue and audio-buffer
 // back-pressure, so the elapsed argument is ignored.
+// IgnoreVideo makes the source audio-only: it reports no video, and Decode
+// skips video packets. For a player with no picture, so that a video stream,
+// such as a song's embedded cover art, never paces its audio (#850). Call it
+// before the source is handed to a pipeline.
+func (s *FFmpegSource) IgnoreVideo() {
+	s.hasVideo = false
+	s.vInfo = goffmpeg.VideoInfo{}
+	s.videoCallback = nil
+}
+
 func (s *FFmpegSource) Decode(_ time.Duration) {
 	if s.ended {
 		return
@@ -225,6 +235,9 @@ func (s *FFmpegSource) Decode(_ time.Duration) {
 
 		switch mt {
 		case goffmpeg.MediaTypeVideo:
+			if !s.hasVideo {
+				continue // IgnoreVideo
+			}
 			if s.videoCallback != nil {
 				rgba := image.NewRGBA(image.Rect(0, 0, s.vInfo.Width, s.vInfo.Height))
 				if err := s.dec.GetRGBA(rgba); err == nil {
