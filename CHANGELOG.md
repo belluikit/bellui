@@ -19,6 +19,753 @@ one per change, so that open pull requests do not conflict here. Run
 `go run ./hack/changelog preview` to see them assembled; the release folds them
 into a section below.
 
+## v1.3.0-rc.1 — 2026-10-27
+
+The first release candidate for v1.3.0, cut while the release is still being
+validated by hand so that work on top of it can start; expect an rc.2. Most of
+it is fixes (64 entries), many from the device sessions on Android tablets and
+iPads: the on-screen keyboard (Done closes it, fields stay above it, hardware
+arrow keys reach charts), touch, partial repaint, chart labels, video seeking
+and right-to-left widgets. New: images are drawn in the colours their files
+declare, x/charts has ready-made drawing tools, themes can be written in PXF,
+and `theme.MatchScope`, `event.MomentumDraggable` and surround audio output
+in x/mmedia. Things that may need a look (see *Changed*, *Deprecated* and
+*Removed*): Android and iOS now redraw only what changed, translations use
+`{Name}` placeholders and JSON catalogs are no longer read, `theme.FromJSON`
+is deprecated in favour of PXF, `PopUp.OnDismissed` runs however a pop-up is
+dismissed, and x/mmedia opens the audio device at 48 kHz stereo. The `x/*`
+modules are released at v1.3.0-rc.1 with it.
+
+### Added
+
+* **Images are drawn in the colours their files declare**
+  ([#802](https://github.com/belluikit/bellui/issues/802)). A PNG or JPEG
+  that carries a colour profile (a Display P3 photo from a phone, an Adobe
+  RGB export) used to be drawn as if its values were sRGB, so its colours
+  were off. `canvas.Image` now converts it to sRGB when it decodes it. PNG
+  `iCCP`, `sRGB`, `gAMA` and `cHRM` and JPEG ICC profiles are read; images
+  with no profile are drawn as before. Lookup-table, CMYK and greyscale
+  profiles are not converted yet: such images are drawn as sRGB, as before,
+  and the first one is logged.
+* **x/charts offers default drawing tools**
+  ([#796](https://github.com/belluikit/bellui/issues/796)). `chart.NewDrawingToolbar`
+  is a widget with a button per drawing tool, the active one highlighted, and
+  Clear All; `ToolboxConfig.DrawingTools` shows the same buttons inside the
+  chart. An app that wants its own UI follows the new
+  `interact.EventDrawingToolChanged`, which fires on every change of tool and
+  is delivered on the main goroutine, whichever goroutine changed the tool.
+  `DrawingToolMode` gains `String`, and `interact.DefaultDrawingTools` lists
+  the tools. All of it is Experimental.
+* **`theme.MatchScope` gives objects made later the theme override around them**
+  ([#758](https://github.com/belluikit/bellui/issues/758)). A `ThemeOverride`
+  reaches only the objects that exist when it is applied. A custom widget that
+  makes rows, cells or dividers as it grows can call
+  `theme.MatchScope(parent, objs...)` so they draw with the override instead of
+  the app theme. Objects that already carry the override are skipped.
+* **`event.MomentumDraggable`** ([#751](https://github.com/belluikit/bellui/issues/751)).
+  A `Draggable` that also implements `DragMomentum() bool` and returns true
+  keeps moving after a fast touch release on Android, iOS and embedded
+  devices; every other `Draggable` stops where the finger lifted. Use it for
+  widgets that pan content, not for ones the user moves directly.
+* **Benchmarks and tests can release the renderers of a widget tree they built**
+  ([#720](https://github.com/belluikit/bellui/issues/720)). Outside a driver,
+  every renderer stayed cached for the life of the process, so a benchmark that
+  built widgets in a loop kept all of them. `test.DestroyRenderers(tb, o)`
+  destroys the cached renderers of `o` and everything under it, when it is
+  called. A `Label` or `Entry` whose renderer is destroyed now also releases its
+  selection's renderer, which was left behind before.
+* **x/mmedia: `SetAudioDeviceChannels` opts in to surround output**
+  ([#707](https://github.com/belluikit/bellui/issues/707)). The audio device
+  is stereo by default; an app that wants 5.1 or 7.1 output calls
+  `mmedia.SetAudioDeviceChannels(6)` (or 8) before its first player with
+  audio. Called after the device has opened, it returns an error unless the
+  count is the one in use, since a process's device is never reopened.
+  Before, a surround stream played first opened the device in surround, and
+  on an output that refused it every later player failed, stereo files
+  included, until the app restarted.
+* **`container.DirectionOf(obj)` reports the layout direction an object sits
+  in** ([#696](https://github.com/belluikit/bellui/issues/696)): its innermost
+  `container.DirectionScope`, else its window's `Canvas.SetDirection`, else the
+  app's. `lang.IsRTLDirection` gives the same answer only while a layout or
+  paint pass is running; a custom widget's event handlers call `DirectionOf`
+  instead. A widget's `Refresh` and `Resize` already run in its own direction
+  (#749).
+* **x/mmedia: `SubtitleTrack` and `SubtitleCue`, so apps can call
+  `SubtitleOverlay.LoadTrack`** ([#691](https://github.com/belluikit/bellui/pull/691)).
+  `LoadTrack` took a type from an internal package, so no app could build
+  its argument. Build a `SubtitleTrack` of `SubtitleCue`s to show subtitles
+  from any source. The two are aliases of the types `LoadTrack` already
+  took, so existing code is unaffected.
+* **x/tables: group header rows show aggregates**
+  ([#689](https://github.com/belluikit/bellui/issues/689)). A `ColumnDef`
+  with an `AggFunc` (sum, average, min, max, count, first or last) now shows
+  that column's aggregate on each group header row of a grouped grid, in its
+  own column and through the column's `ValueFormatter`, and a screen reader
+  hears it as part of the header row's label. A collapsed group aggregates
+  all of its rows. Blank and non-numeric cells are skipped: average, min and
+  max are taken over the cells that hold a number, while count counts every
+  row ([#747](https://github.com/belluikit/bellui/issues/747)); in a group
+  with no number in the column, average, min, max, first and last are left
+  empty. For code using the
+  pipeline directly, `GroupTransform.AggColumns` fills `GroupRow.AggValues`,
+  which until now was never set, and the new optional `AggColumn.ValueOK`
+  getter reports a row as having no value so that `Aggregate` skips it.
+* **x/charts: axis parts can be hidden, grid lines turned on per axis, and
+  axes moved out with an offset**
+  ([#684](https://github.com/belluikit/bellui/issues/684)). `axis.Config`
+  gains `Hide` (an `axis.Parts` with `Line`, `Ticks` and `Labels`), `SplitLine`
+  (`SplitLineAuto`, `SplitLineShow`, `SplitLineHide`) and `Offset`, the
+  ECharts-style distance an axis sits outward from the plot. A category axis
+  draws its grid lines between its categories, so in a bar chart they separate
+  the bars instead of running through them
+  ([#757](https://github.com/belluikit/bellui/issues/757)). Two Y axes on the
+  same side used to be drawn on top of each other; with an `Offset` on one,
+  they sit side by side and the chart makes room for them. The axis pointer
+  tags follow an offset axis (`component.PlotArea` gains `XAxisOffset` and
+  `YAxisOffset`). All the new fields' zero values draw what was drawn before,
+  so existing charts look the same, apart from a category Y axis's grid lines
+  (see Changed).
+* **`lang` calls take several data values**
+  ([#667](https://github.com/belluikit/bellui/issues/667)). Pass a struct and a
+  map together, and each placeholder is filled from the first value that has
+  it: `lang.L("{Name} sent {Count} files", user, map[string]any{"Count":
+  stats.Count()})`. Before, every value after the first was ignored. A call
+  with one value behaves as before. This is how to show a value a method
+  computes, since placeholders don't call methods.
+* **Themes can be written in PXF** ([#523](https://github.com/belluikit/bellui/issues/523)).
+  `theme.FromPXF`, `FromPXFWithFallback`, `FromPXFReader` and
+  `FromPXFReaderWithFallback` read the same theme data as the `FromJSON`
+  functions, with fields named `colors`, `colors_dark`, `colors_light`,
+  `sizes`, `fonts` and `icons`. On desktop, the user-wide theme file in Bellui's
+  config folder is now `theme.pxf`; a `theme.json` there is still read when
+  there is no `theme.pxf`.
+* **x/charts: `series.ColoredSeries`**
+  ([#343](https://github.com/belluikit/bellui/issues/343)). The interface reports
+  the colour a series sets for itself, through `SeriesColor()`. Line, bar,
+  scatter, effect scatter, box plot, pictorial, geo scatter, geo lines, 3D
+  scatter and 3D line series implement it.
+* **x/charts: `series.RenderContext.TextColor`**
+  ([#343](https://github.com/belluikit/bellui/issues/343)). This is the colour
+  for labels a series draws on the plot's background. The chart sets it to the
+  theme's foreground.
+
+### Changed
+
+* **x/charts: `Chart.ClearDrawings` emits `EventDrawingDeleted` for each
+  drawing it removes** ([#799](https://github.com/belluikit/bellui/issues/799)),
+  as `RemoveDrawing` already did for one. It used to remove them silently, so
+  an app that keeps its own copy of the drawings from these events missed a
+  Clear All and brought the drawings back on its next load.
+* **x/charts: a category Y axis draws its grid lines between its categories**
+  ([#757](https://github.com/belluikit/bellui/issues/757)). The first Y axis
+  draws grid lines by default, and on a category axis they used to sit at the
+  category centres, through the middle of each row. They now sit at the
+  boundaries between rows, as on a category X axis with `SplitLineShow`. Value,
+  log and time axes are unchanged.
+* **On Android, iOS and embedded devices, only scrolling content keeps moving
+  after a touch drag is let go** ([#751](https://github.com/belluikit/bellui/issues/751)).
+  Every dragged widget used to coast for about half a second after the finger
+  lifted: a slider thumb, a split divider or a selection handle kept moving,
+  and its drag ended late. Now a drag stops where the finger lifted, as it
+  always has on desktop, unless the widget asks for momentum: scroll
+  containers do, and so does a `x/dag` graph canvas while it pans. A fling now
+  takes its speed from how fast the finger was moving when it let go, so a
+  drag held still before lifting no longer flings; this applies to touch
+  scrolling and two-finger pans too.
+* **`PopUp.OnDismissed` now runs however the user dismisses the pop-up**
+  ([#693](https://github.com/belluikit/bellui/issues/693)). It used to run
+  only on Escape: an outside tap, a secondary tap and the accessibility
+  dismiss action hid the pop-up directly, so a host that cleaned up in
+  `OnDismissed` missed the most common way to close a pop-up on touch. All
+  four paths now call it, and when it is set it replaces hiding on each of
+  them, as it already did for Escape, so the host must hide the pop-up
+  itself. `Hide` called from code still does not run it. Canvas dialogs are
+  unaffected: they are modal pop-ups, which an outside tap does not dismiss.
+* **`widget.Carousel` follows the finger and pages on a flick**
+  ([#686](https://github.com/belluikit/bellui/issues/686)). During a swipe the
+  current item moves with the finger and the neighbour slides in beside it; on
+  release the content animates to the item it snaps to (MD3 standard easing,
+  300ms), or snaps at once when animations are off. A fast flick (400 points
+  per second or more, at least 24 points long) now pages even when it is
+  shorter than a fifth of the width; a slow short drag still snaps back, and
+  a flick back towards the current item returns to it.
+  Tapping previous/next while the content is settling retargets the motion
+  instead of jumping. The type is documented as a pager; MD3's multi-browse,
+  hero and uncontained layouts are not implemented
+  ([#744](https://github.com/belluikit/bellui/issues/744)).
+* **Android and iOS apps now redraw only the part of the screen that changed**
+  ([#593](https://github.com/belluikit/bellui/issues/593)). Partial repaint, on
+  by default on desktop since v1.2.0, is now on by default on phones and tablets
+  with the default WebGPU painter. On a Pixel 9a it cut the app's GPU energy by
+  about 65%, for 0.3–1.2 ms more CPU per frame. Before the change, partial
+  frames were compared with full repaints on an iPad and a Pixel, and every pair
+  matched: no content was lost. That check can't see an object that is missed
+  for one frame and drawn on the next, the same limit the desktop check has
+  (#648). Builds with `-tags gl` and web builds keep repainting the whole
+  screen. `BELLUI_PARTIAL_REPAINT=0` or the `nopartialrepaint` build tag turns
+  it off.
+* **Bellui's remaining data formats of its own are PXF**
+  ([#523](https://github.com/belluikit/bellui/issues/523)). Saved sign-in
+  tokens are stored as PXF before encryption; a token saved as JSON by an
+  earlier version still loads, and is rewritten as PXF.
+  A second launch of a single-instance app passes its arguments to the
+  running copy as PXF. A running copy still reads the JSON an earlier version
+  sends, but a copy of an earlier version that is still running when a new
+  version is launched cannot read the new message: it logs an error and that
+  launch's arguments are lost.
+  The analytics events saved between runs are PXF, in
+  `bellui-analytics-spool.pxf`; a spool an earlier version saved as JSON is
+  still read, and removed once the new one is written.
+* **Translations use `{Name}` placeholders**
+  ([#522](https://github.com/belluikit/bellui/issues/522)). A message names
+  the values it shows in braces, `"Hello {Name}"`, filled from a map or a
+  struct's exported fields as before. The Go template form `{{.Name}}` is still
+  filled, so existing source strings keep working, except that a name is no
+  longer looked up as a method: `{{.Count}}` filled by a `Count()` method is
+  left as written. Messages are no longer run
+  as Go templates: a template action other than a plain field (`{{if …}}`, a
+  pipe, a function call) is left as written and logged once, and a name the
+  data does not have is left as written instead of showing `<no value>`. The
+  bundled catalogs give the same strings as before for every key and locale.
+* **x/mmedia: the audio device is always opened at 48 kHz stereo**
+  ([#506](https://github.com/belluikit/bellui/issues/506),
+  [#707](https://github.com/belluikit/bellui/issues/707)). A process has one
+  audio device, and its format used to be whatever the first stream played:
+  after a mono clip, every later stream in the process played in mono. Now
+  the device is 48 kHz stereo unless the app asks for more channels with
+  `SetAudioDeviceChannels`, and each stream's decoder converts to it with
+  FFmpeg's swresample, so 5.1 and 7.1 are downmixed to stereo. One audible
+  difference: a mono source now plays on both channels at -3 dB each,
+  swresample's level for a centred source, where a mono device played it at
+  full level.
+
+### Deprecated
+
+* **x/mmedia: `WithDownmix` is deprecated and has no effect**
+  ([#707](https://github.com/belluikit/bellui/issues/707)). Surround audio is
+  downmixed to stereo by default now, so the option has nothing left to do.
+  It stays for compatibility. For surround output, call
+  `SetAudioDeviceChannels` before the first player.
+* **x/charts: `axis.Config.ShowLine`, `ShowTicks`, `ShowLabels` and
+  `ShowSplitLine` are deprecated**
+  ([#684](https://github.com/belluikit/bellui/issues/684)). They were never
+  applied, and their zero value, false, would hide the axes of every config
+  written as a struct literal, so they stay ignored. Use `axis.Config.Hide` and
+  `axis.Config.SplitLine`. `axis.DefaultConfig` still sets them as before.
+* **The `{{.Name}}` placeholder form is deprecated**
+  ([#667](https://github.com/belluikit/bellui/issues/667)). Write `{Name}`.
+  `{{.Name}}` is still filled, and each spelling is logged once with the
+  replacement; `bellui translate` already writes `{Name}` in catalogs. A
+  placeholder left as written because the data only has a method of that
+  name (text/template used to call it) is now also logged once, with the map
+  to pass instead.
+* **`theme.FromJSON` and its three variants are deprecated**
+  ([#523](https://github.com/belluikit/bellui/issues/523)). Use `theme.FromPXF`
+  and its variants, which read the same theme data written in PXF. Bellui's own
+  data formats are PXF.
+
+### Removed
+
+* **JSON translation catalogs are no longer read**
+  ([#522](https://github.com/belluikit/bellui/issues/522)). Catalogs are PXF
+  files named `[prefix.]locale.pxf`, holding a `messages = { … }` map with the
+  same IDs, plural forms, descriptions and hashes the JSON catalogs had. A
+  `.json` file passed to `lang.AddTranslations`, `AddTranslationsFS` or
+  `AddTranslationsForLocale`'s data is an error. `bellui translate` writes
+  PXF catalogs; convert an existing JSON catalog by moving each key into the
+  `messages` map and writing its placeholders as `{Name}`.
+
+### Fixed
+
+* **`SplitButton` in right-to-left layouts** ([#835](https://github.com/belluikit/bellui/issues/835)).
+  The dropdown arrow is drawn at the left end under RTL, but a tap there ran
+  the primary action and the menu opened from the button's left edge. The
+  arrow now opens the menu, and the menu lines up with the button's right
+  edge (staying on the window when it is wider than the room), under an RTL
+  app or an RTL `DirectionScope` alike.
+* **`x/mmedia`: after a seek, a restart plays from the start at once**
+  ([#833](https://github.com/belluikit/bellui/issues/833)). Stopping kept the
+  last seek's audio position, so a restart (or a loop) held the picture and
+  the time at that position for seconds before playing from the start.
+* **`x/mmedia`: seeking a paused video shows the new position**
+  ([#831](https://github.com/belluikit/bellui/issues/831)). The time and the
+  seek bar moved, but the picture stayed on the frame shown at the pause until
+  Play. The frame at the target is now decoded and shown, and the video stays
+  paused.
+* **A removed overlay no longer stays partly on screen**
+  ([#826](https://github.com/belluikit/bellui/issues/826)). Under partial
+  repaint, the area an overlay was drawn in was not repainted when it was
+  removed, so it stayed wherever nothing beneath it redrew: on a phone, an
+  entry's caret handle was left as a strip between two fields after Done.
+* **Android: digits typed into a focused widget that is not a text field are
+  no longer dropped** ([#824](https://github.com/belluikit/bellui/issues/824)).
+  A chart's text label lost every digit typed on the on-screen keyboard. The
+  driver drops a digit key event only while a text keyboard is up, where the
+  same digit also arrives as text.
+* **Android: the keyboard's Done key closes the keyboard, and a tap on the
+  focused field brings it back**
+  ([#822](https://github.com/belluikit/bellui/issues/822),
+  [#806](https://github.com/belluikit/bellui/issues/806)). Done submitted a
+  single-line field but left the keyboard up. It now closes it while the field
+  keeps the focus, as on iOS. After the keyboard is closed by Done, Back or its
+  own hide key, a tap on the still-focused widget reopens it; it used to stay
+  closed until another widget took the focus.
+* **x/mmedia: a seek no longer shows one frame from the old position after
+  it** ([#819](https://github.com/belluikit/bellui/issues/819)). A frame the
+  display had already checked could reach the screen just after a seek took
+  effect. The display's last check and the hand-over are now one step a seek
+  can't land inside.
+* **Android: a hardware keyboard's arrow keys and Delete reach a widget that
+  takes keys but no text** ([#805](https://github.com/belluikit/bellui/issues/805)).
+  With a chart or another key-taking widget focused, the arrows and
+  Forward-Delete of a Bluetooth or attached keyboard were swallowed by the
+  hidden text field that carries the keyboard; Return, Escape, Backspace,
+  Page Up/Down and letters already arrived. A Forward-Delete also had no key
+  name on mobile and is now `event.KeyDelete`.
+* **x/charts: a drawing tap outside the plot no longer starts a drawing
+  there** ([#795](https://github.com/belluikit/bellui/issues/795)).
+  Drawings are drawn only inside the plot, so a text label begun beside the
+  zoom buttons showed while it was typed and vanished once finished. A tap
+  outside the plot now starts and finishes nothing, and reaches the chart's
+  other tap handling as if no drawing tool were active.
+* **On phones and tablets, a tap that stops a list's fling no longer selects
+  the row under it** ([#792](https://github.com/belluikit/bellui/issues/792)).
+  The touch that catches moving content, a flung list or scroll, or a page
+  coasting after a two-finger flick, now only stops it, as on Android's and
+  iOS's own lists. It used to also tap what was under it, so stopping a list
+  to read it selected or opened something. The same touch can still drag on.
+* **x/mmedia: video waits for the sound to start**
+  ([#787](https://github.com/belluikit/bellui/issues/787)). Before the audio
+  device starts playing, the playback clock now holds at the audio's position.
+  It used to run ahead by up to one audio update, so the first frames could
+  lead the sound.
+* **`container.DirectionOf` gives the right direction for an object moved into
+  a direction scope without `Container.Add`**
+  ([#773](https://github.com/belluikit/bellui/issues/773)). Until now, an
+  object a widget's renderer moved into a right-to-left scope by itself, or
+  one placed by assigning a Container's `Objects`, reported its old direction
+  until the next frame, so an event handler asking in between got the wrong
+  answer. It now has the scope's direction as soon as its new parent
+  refreshes. An object a renderer drops out of a scope still keeps the old
+  direction until the next frame.
+* **Menus mirror under a right-to-left layout**
+  ([#769](https://github.com/belluikit/bellui/issues/769)). In a right-to-left
+  app or window, a menu item's check mark, icon and label now start at the
+  right, and its shortcut and submenu arrow sit on the left. Submenus open to
+  the left of their item (to the right when there is no room), and in a pop-up
+  menu Left opens a submenu and Right closes it.
+* **`widget.Carousel` picks up `Items` changed after it is shown**
+  ([#761](https://github.com/belluikit/bellui/issues/761)). Appending or removing
+  items and calling `Refresh` now updates the page dots and shows the new items;
+  `CurrentItem` is clamped when the list shrinks below it.
+* **No direction lookups inside a layout pass**
+  ([#760](https://github.com/belluikit/bellui/issues/760)). Once a
+  `container.DirectionScope` existed anywhere in the app, a widget re-laid out
+  during a window's layout pass could walk the whole window to find its
+  direction. The pass now carries the direction itself, and lookups outside a
+  pass read a cache of the objects inside scopes that is rebuilt at most once
+  per frame.
+* **x/tables: a DataGrid inside a theme override now draws all of its cells
+  with the override** ([#758](https://github.com/belluikit/bellui/issues/758)).
+  Rows, cell text, row checkboxes, header cells, floating filters and group rows
+  are made at layout, after the override was applied, so most of the grid drew
+  with the app theme. They now take the override as they are made or reused.
+* **Collections inside a theme override now draw everything with the override's
+  theme** ([#755](https://github.com/belluikit/bellui/issues/755)). An override
+  reaches only the objects that exist when it is applied, so what a collection
+  made or reused afterwards fell back to the app theme: Table dividers, headers
+  and cell wrappers, Tree and TreeView separators, TreeView rows and load-more
+  indicators, and List and GridWrap row wrappers (their hover and selection
+  backgrounds), whether new or taken back from a pool. Growing a collection, by
+  a resize or a scroll, made them. Inside `container.NewThemeOverride` the
+  colors usually looked right at first, because a layout under the override
+  borrows its theme, and changed to the app theme on the next refresh outside
+  one. Table headers were also measured with the app theme, so an override
+  with a larger text size clipped them. Each of these now takes
+  its collection's override when it is shown.
+* **A touch during a drag's coast on Android, iOS and embedded devices stops it**
+  ([#751](https://github.com/belluikit/bellui/issues/751)). A released drag
+  carried on dragging its widget for about half a second, through the next
+  touch, and when the new touch dragged the same widget, the coast's late end
+  cut that drag short. The next touch now ends the coast at once, before it
+  reaches the widget.
+* **A `container.DirectionScope` now covers re-layout, Tab order and popups**
+  ([#749](https://github.com/belluikit/bellui/issues/749)). In a right-to-left
+  scope inside a left-to-right app (or the reverse):
+  - a widget or container laid out again outside a layout pass (a `Refresh`
+    from a timer, animation or binding, `Container.Add`/`Remove`, a `Resize`
+    by hand) used the app's direction, so an `HBox` un-mirrored after
+    `Refresh` until the next layout. It now keeps the scope's direction, and
+    calling `DirectionScope.Refresh` after changing its content is no longer
+    needed;
+  - Tab visited the scope's fields in the app's order. A scope now orders its
+    own fields by its direction, as one block in its place in the window;
+  - popups a widget opens (a `Select`'s menu, context menus, the
+    `CompletionPopup`, date pickers, tooltips, the tabs' overflow menu) were
+    laid out in the window's direction. They now take the direction of the
+    widget that opened them. A popup an app shows itself with `widget.PopUp`
+    keeps its window's direction: wrap its content in a `DirectionScope`.
+* **x/tables: a group row's label no longer runs over a total**
+  ([#748](https://github.com/belluikit/bellui/issues/748)). With an
+  aggregate in the first column (or any column the label crosses), the
+  "key (count)" label and the total were drawn over each other. The label is
+  now cut short with an ellipsis before the first total in its way. Screen
+  readers still hear the whole key.
+* **Dropping a theme-overridden subtree no longer leaks its entries in the
+  theme cache** ([#741](https://github.com/belluikit/bellui/issues/741)). The
+  override map stored every canvas object under an overridden tree — the
+  rectangles, texts and images of its renderers — but `DestroyRenderer`,
+  `Clean` and the expiry sweep removed only widget keys, so each themed
+  subtree that was built and then dropped left its primitives in the map for
+  the life of the process. A widget's or container's part of the walk is now
+  released when its renderer is destroyed (a container's when the window it
+  belongs to closes), and a test in `internal/cache` holds the map flat over a
+  build-and-drop loop.
+* **`BELLUI_WEBGPU_BACKENDS` can no longer abort the app or leave its window
+  blank** ([#731](https://github.com/belluikit/bellui/issues/731)). A list
+  that left out the platform's native backend (Metal on macOS, D3D12 on
+  Windows, Vulkan on Linux) aborted the process when it opened a window.
+  With only `gl` on Linux or Windows, the window opened but never drew.
+  Such a list now gains the native backend, and a warning names what was
+  added. Unset or `all` is unchanged. A list can still leave out a
+  non-native backend that crashes at init, which is what the variable is
+  for, but it can no longer leave out the native one.
+* **x/charts: the axis pointer tags sit beside the axes as they are drawn**
+  ([#724](https://github.com/belluikit/bellui/pull/724)). With
+  `TooltipConfig.ShowAxisTags`, the X value tag was always below the plot and
+  the Y value tag always on its left, even with the X axis at the top or the
+  Y axis on the right, and a series on the second Y axis had its value shown
+  beside the first. The tags now follow `axis.Config.Position` and the
+  hovered series' Y axis. `component.PlotArea` gains `XAxisTop` and
+  `YAxisRight` for this; their zero values keep the old placement.
+* **List, Table, GridWrap, Tree and TreeView no longer keep renderers for
+  objects they stop using** ([#722](https://github.com/belluikit/bellui/issues/722)).
+  Each one builds an item template only to measure it, on every Refresh, and
+  List and Table drop separators they no longer need. The renderers of those
+  objects stayed cached until the cache's one-minute expiry, and for the life
+  of the process in a test or benchmark without a driver, where
+  `test.DestroyRenderers` could not reach them. The template is now released
+  right after it is measured, and dropped separators release their
+  renderers. Tree and TreeView keep the separators they hide for reuse, and
+  now release them when the widget's renderer is destroyed.
+  The same leak is fixed where other widgets drop objects: a List's full
+  Refresh releases the rows it drains from its pool of unused items, a Tree
+  keeps only as many separators as it has shown at once rather than about one
+  per node above the viewport, Markdown tables release the labels they measure
+  and the cells they replace, RichText releases the visuals of segments it no
+  longer has, including those `ParseMarkdown` and `ParseHTML` replace, and the file and text
+  dialogs release the labels they measure.
+* **x/mmedia: a stream whose audio cannot be converted to the device's format
+  fails its constructor instead of playing at the wrong speed**
+  ([#698](https://github.com/belluikit/bellui/issues/698)). The failure was
+  reported to an `OnError` that is never set while the player is being built,
+  so it was lost, and a 44.1 kHz stream would have played 8.8% fast on the
+  48 kHz device. Not seen in use: FFmpeg's resampler should not fail for a
+  valid stream. `SetCaptureDevice` likewise refuses a camera whose audio cannot
+  be converted: it returns the error and keeps the device it has.
+* **Widgets inside a `container.DirectionScope` handle input in the scope's
+  direction** ([#696](https://github.com/belluikit/bellui/issues/696)). In a
+  right-to-left scope inside a left-to-right app (or the reverse), the
+  `Carousel` swipe paged backwards, its buttons jumped back to the unmirrored
+  side after `Next`, the input `Chip`'s delete hit area stayed on the wrong
+  edge, the arrow keys of `GridWrap`, `SegmentedButton` and `Select` moved the
+  wrong way, and a horizontal wheel scroll ran backwards. Each now asks for its
+  own direction. `CompletionPopup` hit-testing and Tab order likewise follow a
+  window's `Canvas.SetDirection`.
+* **A `container.DirectionScope` keeps its direction across a theme change**
+  ([#342](https://github.com/belluikit/bellui/issues/342),
+  [#696](https://github.com/belluikit/bellui/issues/696)). After
+  `Settings().SetThemeVariant` (or any theme change) the re-layout ignored the
+  scope, so an LTR subtree in an RTL app flipped to RTL. Calling
+  `Canvas.SetDirection` on a window that was already laid out now re-mirrors
+  its content too; before, it waited for the next resize.
+* **Choosing System in `widget.ThemeSelection` follows the OS light/dark
+  switch again** ([#695](https://github.com/belluikit/bellui/issues/695)).
+  Since [#688](https://github.com/belluikit/bellui/pull/688) made
+  `SetThemeVariant` a lasting choice, applying System pinned whatever the OS
+  showed at that moment, so an app that restored System at startup stayed
+  light after the OS turned dark. System now withdraws the app's choice through
+  the new optional `bellui.ThemeVariantSettings` interface
+  (`ClearThemeVariant()`), implemented by the app and test-app settings. Light
+  and Dark stay pinned. Settings without the interface still get the OS
+  appearance at call time.
+* **x/charts: "save as image" saves the chart**
+  ([#691](https://github.com/belluikit/bellui/pull/691),
+  [#717](https://github.com/belluikit/bellui/issues/717)). The toolbox button
+  wrote a PNG of the background colour alone. It now saves the chart (title,
+  series, axes, legend, overlays and drawings) in device pixels, and opens the
+  save dialog on the chart's own window. As in ECharts, the image leaves out
+  the toolbox and zoom buttons, and the tooltip and axis pointer if they were
+  showing; they are back on screen once the image is taken.
+* **x/charts: axis names, sides, direction and colours take effect**
+  ([#691](https://github.com/belluikit/bellui/pull/691)). `axis.Config`'s
+  `Name`, `Position`, `Inverse`, `LineColor` and `LabelColor` were ignored.
+  Now an axis can carry a title, sit at the top (X) or on either side (Y), run
+  backwards, and take its own colours. An inverse axis reverses series,
+  tooltips, zoom and pan with it. The plot shrinks to leave room for axis
+  names and for labels on the right or at the top, so a chart with a second
+  Y axis now has a wider right margin. The `Show*` switches are still not applied
+  ([#684](https://github.com/belluikit/bellui/issues/684)), and neither are
+  `Option.VisualMap` and `Option.Decal`
+  ([#343](https://github.com/belluikit/bellui/issues/343)); their doc
+  comments now say so.
+* **x/editor: Ctrl+S, Ctrl+R and Ctrl+F work on Linux and Windows**
+  ([#691](https://github.com/belluikit/bellui/pull/691)). Save, run, find,
+  find next and find previous were bound to the Super key, which outside macOS
+  is the Windows key. They now use Cmd on macOS and Ctrl elsewhere, as
+  `OnSave` and `OnRun` always said. Nothing changes on macOS.
+* **x/tables: tree rows with int64 IDs or a parent loop are shown**
+  ([#691](https://github.com/belluikit/bellui/pull/691)). A parent ID only
+  matched IDs that `getID` returned as Go `int`s, so with int64 database keys
+  every row was a root. Any integer ID now matches; string IDs still never
+  do. A row that was its own parent, or part of a loop of rows that were each
+  other's parents, vanished from the grid with every row under it. The first
+  row of such a loop is now a root.
+* **x/mmedia: a player with audio fails its constructor when the audio device
+  will not open, instead of hanging or playing silent**
+  ([#690](https://github.com/belluikit/bellui/issues/690)). When oto refused
+  the device outright, the first player with sound blocked forever, and every
+  later one behind it. When oto reported the failure only after opening, as
+  ALSA does with no sound card (a headless Linux machine or CI runner) and
+  CoreAudio does when its queue will not start, the player was built with no
+  sound and no error. `New*Player`, `New*PlayerURL` and `NewCapturePlayer*` now
+  return the error in both cases, so an app that used to play silent on a
+  machine without sound now has to handle it. The device is opened once per
+  process and oto cannot retry, so every later player with audio returns the
+  same first error. A video with no audio stream is unaffected.
+* **`flow.Value.Listen` and `flow.Derived.Listen` now pass the old value**
+  ([#688](https://github.com/belluikit/bellui/pull/688)). The callback promised
+  `(old, new)` but received the new value twice. It now gets the value before
+  and after the change.
+* **Every programmatic scroll now reports through `OnScrolled`**
+  ([#688](https://github.com/belluikit/bellui/pull/688)). `ScrollToBottom`
+  notified `OnScrolled` and scroll listeners, but `ScrollToTop` and
+  `ScrollToOffset` did not. All three now report a real move once, and nothing
+  when the offset did not change. `ScrollToBottom` also no longer scrolls
+  sideways on content that is wide but not tall.
+* **Apps without a catalog for the user's language now show their English text**
+  ([#688](https://github.com/belluikit/bellui/pull/688)). On a system set to a
+  language Bellui ships a catalog for (French, Japanese, ...) but the app does
+  not, keyed messages from `N`, `X`, `XN` and `LSelect` showed the raw message
+  ID, and every lookup logged "Translation failure". They now fall back to the
+  app's English catalog without logging.
+* **Fractional units no longer log "invalid plural count"**
+  ([#688](https://github.com/belluikit/bellui/pull/688)). `FormatUnit`,
+  `FormatDistance` and `FormatMass` logged an error for every fractional value
+  and used the English label, which was wrong where a fraction changes it
+  (Polish "2,5 mi" is now "2,5 mili").
+* **An app's Light/Dark and primary-colour choice now survives system changes**
+  ([#688](https://github.com/belluikit/bellui/pull/688)). A variant set with
+  `SetThemeVariant` (as `ThemeSelection.Apply` does) was reset to the system's
+  on the next OS appearance change, and a colour set with `SetPrimaryColor` was
+  replaced when the system-wide settings file changed. Both now stay until the
+  app changes them.
+* **`widget.Carousel` pages with a swipe**
+  ([#688](https://github.com/belluikit/bellui/pull/688)). It documented snapping
+  but ignored drags. A horizontal swipe past a fifth of its width now moves to
+  the next or previous item; a shorter one snaps back.
+* **analytics: events being sent are no longer lost if the app crashes
+  mid-send** ([#670](https://github.com/belluikit/bellui/issues/670)). A
+  `Track` during a send saved a spool without the batch being sent, so a crash
+  before the send finished dropped that batch. The spool now keeps it until the
+  send succeeds.
+* **The Android keyboard's Return reaches widgets that take keys but aren't
+  text fields** ([#666](https://github.com/belluikit/bellui/issues/666)). On the
+  default keyboard the IME commits Return as a newline, which was dropped unless
+  an `Entry` had the focus. It now arrives as a `KeyReturn` key event, so a
+  chart's Text tool finishes its label on Return.
+* **Typing on the Android keyboard reaches widgets that take keys but aren't
+  text fields** ([#666](https://github.com/belluikit/bellui/issues/666)). The
+  keyboard composed and committed the letters as text, which only an `Entry`
+  takes, so a chart's Text tool never got its label typed. Such a widget now
+  gets a keyboard that sends key presses. On iOS, Backspace now reaches such
+  a widget, and autocorrect no longer rewrites what was typed.
+* **x/charts: the toolbox buttons no longer overlap the plot**
+  ([#663](https://github.com/belluikit/bellui/issues/663)). A chart with both
+  zoom buttons and a toolbox drew the toolbox row (Save, line, bar) under the
+  zoom row, reaching into the plot, which covered and cropped it. The plot now
+  starts below the title or below the buttons, whichever ends lower. Charts
+  whose title already ends below their buttons, such as a titled chart with
+  zoom buttons only, keep their layout.
+* **A file name that isn't UTF-8 now reaches the running copy of a
+  single-instance app intact** ([#661](https://github.com/belluikit/bellui/issues/661)).
+  When a second launch forwarded an argument such as a Latin-1 file name on
+  Linux, each byte that wasn't valid UTF-8 arrived as U+FFFD, so the running
+  copy was handed the name of a file that doesn't exist. The arguments are
+  now escaped on the way and restored exactly. Displaying such a name still
+  shows U+FFFD for the bytes that aren't UTF-8.
+* **A theme of JSON `null` no longer crashes the app**
+  ([#658](https://github.com/belluikit/bellui/pull/658)). `theme.FromJSON` and
+  its variants gave a theme whose every method panicked for the document
+  `null`, and a user-wide `theme.json` holding `null` took the app down at
+  start. It now reads as a theme that sets nothing, so everything falls back.
+* **A saved sign-in token survives an interrupted save**
+  ([#658](https://github.com/belluikit/bellui/pull/658)). The token file was
+  overwritten in place, so an app killed or a disk filling up mid-save left a
+  file that did not decrypt, and the next start removed it and signed the user
+  out. The new token is now written beside the old one and renamed over it.
+* **analytics: `Track` no longer re-encodes the whole queue on every call**
+  ([#657](https://github.com/belluikit/bellui/issues/657)). Each event is now
+  encoded once, when it is queued, and saving the spool joins those pieces. With
+  1,000 events queued (an app that has been offline), a `Track` on the UI
+  goroutine costs about 0.06 ms of encoding instead of about 2.8 ms. The spool
+  file is byte for byte the same.
+* **Mobile: the on-screen keyboard no longer covers what you are typing
+  into** ([#654](https://github.com/belluikit/bellui/issues/654)). A focused
+  field is scrolled into the space above the keyboard, by every scroll
+  container that holds it, and a dialog moves up (and shrinks if it must) so
+  its buttons stay above the keyboard its own field opened. Dialogs and other
+  centred modal pop-ups are kept inside the canvas's interactive area, so
+  on a phone they also stay clear of a notch or system bar. Content placed
+  with `PopUp.Move`, such as a navigation drawer, keeps its position. A
+  scroll or drag no longer closes the keyboard, so what it covers can be
+  scrolled into view; only a tap away from the field takes its focus.
+* **x/dag: a node added from the palette no longer lands under a note**
+  ([#653](https://github.com/belluikit/bellui/pull/653)). Tapping a palette
+  item places the node at the nearest free spot, but notes didn't count as
+  taken, so a node could end up hidden under one. Notes now count, at the
+  size they are drawn.
+* **x/dag: properties panel fields no longer show edits a read-only canvas
+  refused** ([#643](https://github.com/belluikit/bellui/issues/643)). On a
+  canvas whose capabilities forbid editing, every field still took typing
+  and showed the typed text, though nothing was stored. The fields are now
+  disabled when the panel is built for such a canvas. If an app makes the
+  canvas read-only while the fields are on show, a refused edit puts the
+  stored value back in the field.
+* **The test driver serializes `bellui.Do` under the `mobile` tag**
+  ([#639](https://github.com/belluikit/bellui/issues/639)). Built with
+  `-tags mobile` and without `migrated_belluido`, every `bellui.Do` in a test
+  ran on a new goroutine outside the driver's lock, and `bellui.DoAndWait`
+  returned before its function had run. A widget that finishes background
+  work through `bellui.Do`, such as `FileTree`, could then crash a test with
+  "concurrent map read and map write". Calls are now serialized as they are
+  without the tag. Tests that lay out such a widget should still do it inside
+  `bellui.DoAndWait`; the driver cannot otherwise order the test's own work
+  against the background callbacks.
+* **`repository.Register` is safe to call while another goroutine looks up a
+  repository** ([#639](https://github.com/belluikit/bellui/issues/639)). Each
+  test app registers its repositories again, and a directory listing still
+  running from the previous test read the table at the same time.
+* **x/dag: the properties panel shows the node you selected, and typing in it
+  keeps working** ([#638](https://github.com/belluikit/bellui/issues/638)).
+  Selecting a second node used to leave the first node's fields on screen
+  while the header named the new one. With that fixed, the panel no longer
+  rebuilds its fields after each edit either: a rebuild would have replaced
+  the entry being typed in after every keystroke. Edits, undo and redo now
+  update the fields in place, so undoing an edit to a node, group,
+  annotation or link also shows the old value. Long node names and port
+  lists wrap inside the panel instead of widening it. Each keystroke is
+  still its own undo step.
+* **x/dag: `DeleteSelected` no longer reports a cleared selection it did not
+  clear** ([#638](https://github.com/belluikit/bellui/issues/638)). On a
+  canvas whose capabilities forbid the delete (a read-only canvas, say),
+  pressing Delete fired `OnSelectionCleared` while the node stayed selected,
+  so an app's properties panel emptied under it. It now fires only when the
+  delete leaves nothing selected, as its documentation already said.
+* **Partial repaint draws an object hidden or shown by its `Hidden` field**
+  ([#619](https://github.com/belluikit/bellui/issues/619)). Setting a canvas
+  object's, container's or widget's `Hidden` field to `false` and refreshing
+  it, rather than calling `Show`, left it undrawn on desktop until something
+  else on screen changed. Setting a widget's `Hidden` field to `true` and
+  refreshing it could leave it on screen the same way. Both now repaint in
+  the next frame. `Show` and `Hide` were not affected.
+* **x/mmedia: audio at a different sample rate from the device no longer
+  loses its high frequencies**
+  ([#582](https://github.com/belluikit/bellui/issues/582)). Rate conversion
+  was a linear resampler that dropped frames between decoded chunks and
+  wiped out a 15 kHz tone. FFmpeg's swresample does it now: 44.1 kHz tones
+  at 1, 15 and 18 kHz convert to 48 kHz with no measurable level change, and
+  no frames are dropped between chunks. swresample's filter delay, 17 frames
+  (0.35 ms) at 48 kHz, is still not flushed at the very end of a stream.
+  Requires goffmpeg's new `SetAudioSampleRate`.
+* **`Canvas.Capture` on mobile paints on the event loop and shows the current
+  frame** ([#573](https://github.com/belluikit/bellui/issues/573)). Called
+  from a goroutine, it read the screen on the caller's goroutine while the
+  app painted, and it returned the last frame drawn rather than one showing
+  recent changes. It now paints a fresh frame on the app's event loop and
+  reads that back, as on desktop. It returns nil when nothing can be drawn:
+  the window is not the one on screen, or its surface is not ready yet.
+* **Tapping a DAG editor or a chart on a phone or tablet no longer opens the
+  keyboard** ([#415](https://github.com/belluikit/bellui/issues/415)). Both
+  took the focus on every tap to receive keyboard shortcuts, and the mobile
+  driver opens the on-screen keyboard for whatever has the focus, so the
+  keyboard appeared on a node tap, after a dialog closed and after a delete.
+  On mobile the DAG canvas no longer takes the focus on a tap, and a chart
+  takes it only while its Text tool is waiting for text. As with List and
+  Table, a hardware keyboard's shortcuts no longer reach them on mobile:
+  Backspace no longer deletes a selected DAG node there (#660 tracks bringing
+  that back). Desktop is unchanged.
+* **x/charts: interaction fixes**
+  ([#343](https://github.com/belluikit/bellui/issues/343)).
+  - Bars and candles now get the axis tooltip and crosshair. A chart of only
+    bars or candles had none, so a trading pane needed a hidden line series
+    to get one.
+  - Bars, candles, box plots and pictorial bars widen when a zoom shows fewer
+    points. Unzoomed they are as wide as before.
+  - A brush selection reports its data range (`DataMinX`, `DataMaxX`,
+    `DataMinY`, `DataMaxY`) and selects the bars and candles it covers.
+  - With a tooltip enabled, a click on a drawing selects it instead of pinning
+    the tooltip.
+  - A drawing made with a tool never reuses an ID the app already gave its own
+    drawing, so `RemoveDrawing` removes the right one.
+  - `DrilldownEvent.Hit` carries the clicked point. A breadcrumb click emits
+    `EventDrillUp` and restores the parent's zoom, as `DrillUp` does.
+  - Timeline playback runs each step, and its callback, on the UI thread.
+* **x/charts: series options and the legend**
+  ([#343](https://github.com/belluikit/bellui/issues/343)).
+  - The legend shows the colour a series sets for itself. It used to show the
+    palette colour for the series' position.
+  - `GeoScatterSeries.Symbol` is applied. Every point used to draw a circle.
+  - `FunnelSeries.Sort` orders the stages by value with `"descending"` or
+    `"ascending"`, and `"none"` keeps the data order. An empty `Sort` now
+    sorts descending, as the doc comment always said and as ECharts does;
+    before, it kept the data order, so a funnel whose data isn't already
+    sorted changes order.
+  - The doc comment of `Line3DSeries.LineWidth` gives the real default, 0.15.
+* **x/charts: colours that ignored a light theme**
+  ([#343](https://github.com/belluikit/bellui/issues/343)). On a light theme
+  these were nearly invisible or drew dark slabs, because they used fixed
+  dark-theme colours:
+  - legend labels, reference band labels and the zoom slider;
+  - annotation and text drawing chips;
+  - labels of gauge, tree, graph, sankey, radar and parallel series.
+  They now take the theme's colours. Labels on funnel, treemap and sunburst
+  tiles are black or white, whichever contrasts with the tile.
+* **x/charts: gauge, heatmap and choropleth**
+  ([#343](https://github.com/belluikit/bellui/issues/343)).
+  - **Gauge direction and default angles:** values now fill clockwise, from
+    `StartAngle` (Min) to `EndAngle` (Max), as in ECharts, and the default
+    gauge has its gap at the bottom and fills from the bottom left. It used to
+    fill counter-clockwise with the gap on the left. **An app that sets
+    `StartAngle` and `EndAngle` sees its gauge change:** the same two angles
+    now mark out the other side of the circle. Swapping them gives back the
+    old arc, filled from its other end.
+  - **Gauge value with coloured ranges:** the value now draws as a thin ring
+    inside the ranges. It used to paint over them.
+  - **Heatmap labels:** a heatmap draws its `XLabels` and `YLabels` beside the
+    cells. Before, they appeared only in the tooltip.
+  - **Choropleth tooltips:** every region with data now has a tooltip,
+    centred on the region in its GeoJSON. Only about 25 countries from a
+    built-in list had one, and only with a map series.
+* **Persian users of an app that ships Arabic but not Persian now see the
+  app's default language, not Arabic**
+  ([#342](https://github.com/belluikit/bellui/issues/342)). When no catalog
+  really matches the user's language, the language matcher guesses one that
+  shares its script. Bellui now ignores that guess and uses the default
+  language, so Persian, Uyghur and Kashmiri users no longer get Arabic, and
+  Bulgarian, Macedonian and Serbian users no longer get Russian. The guess is
+  kept when it is the main language of the user's region, so Chechen and Yakut
+  users in Russia still get Russian. `lang.SetLocaleForTests` now resolves the
+  catalog the same way `lang.SetLocale` does.
+* **WebGPU apps in the browser draw again**
+  ([#333](https://github.com/belluikit/bellui/issues/333)). In v1.2.0 a
+  WebAssembly build on the default WebGPU painter showed a black page in
+  Chrome. The browser rejected the new batched shape-and-text shader
+  (`'textureSample' must only be called from uniform control flow`), so no
+  pipeline that used it was built. The shader now samples the glyph atlas at
+  an explicit level, which WGSL allows in that branch. Native WebGPU, which
+  accepted the old shader, and the WebGL build (`-tags gl`) were not affected.
+
 ## v1.2.0 — 2026-10-21
 
 Mostly about speed. Screens with many widgets, labels that change every frame
