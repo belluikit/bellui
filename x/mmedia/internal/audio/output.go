@@ -87,6 +87,7 @@ var newOtoContext = func(op *oto.NewContextOptions) (otoContext, chan struct{}, 
 // forever inside the Once and so blocked every later player too (#690).
 func openDevice(channels int) (otoContext, int, error) {
 	device.once.Do(func() {
+		setupSession()
 		op := &oto.NewContextOptions{
 			SampleRate:   DeviceSampleRate,
 			ChannelCount: channels,
