@@ -60,6 +60,10 @@ static void deletePrevCtx(JNIEnv* env,jobject ctx){
     if (ctx == NULL) { return; }
     (*env)->DeleteGlobalRef(env, ctx);
 }
+
+static void deleteCtx(uintptr_t jnienv, uintptr_t ctx) {
+	deletePrevCtx((JNIEnv*)jnienv, (jobject)ctx);
+}
 */
 import "C"
 
@@ -77,19 +81,21 @@ import (
 // on android.
 var currentVM *C.JavaVM
 
-// currentCtx is Android's android.context.Context. May be NULL.
-var currentCtx C.jobject
+// contexts holds Android's android.context.Context, a global reference that
+// may be 0, and keeps a replaced one alive while a callback still uses it.
+var contexts ctxRefs
 
 // SetCurrentContext populates the global Context object with the specified
 // current JavaVM instance (vm) and android.context.Context object (ctx).
 // The android.context.Context object must be a global reference.
 func SetCurrentContext(vm unsafe.Pointer, ctx uintptr) {
 	currentVM = (*C.JavaVM)(vm)
-	currentCtxPrev := currentCtx
-	currentCtx = C.jobject(ctx)
-	RunOnJVM(func(vm, jniEnv, ctx uintptr) error {
-		env := (*C.JNIEnv)(unsafe.Pointer(jniEnv))
-		C.deletePrevCtx(env, C.jobject(currentCtxPrev))
+	prev := contexts.replace(ctx)
+	if prev == 0 {
+		return // none, or still in use: its last RunOnJVM deletes it
+	}
+	RunOnJVM(func(_, env, _ uintptr) error {
+		C.deleteCtx(C.uintptr_t(env), C.uintptr_t(prev))
 		return nil
 	})
 }
@@ -118,8 +124,15 @@ func RunOnJVM(fn func(vm, env, ctx uintptr) error) error {
 			defer C.unlockJNI(currentVM)
 		}
 
+		ctx := contexts.acquire()
+		defer func() {
+			if contexts.release(ctx) { // replaced while fn used it
+				C.deleteCtx(env, C.uintptr_t(ctx))
+			}
+		}()
+
 		vm := uintptr(unsafe.Pointer(currentVM))
-		if err := fn(vm, uintptr(env), uintptr(currentCtx)); err != nil {
+		if err := fn(vm, uintptr(env), ctx); err != nil {
 			errch <- err
 			return
 		}
