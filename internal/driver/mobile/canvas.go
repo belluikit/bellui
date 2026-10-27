@@ -68,6 +68,13 @@ func newCanvas(dev bellui.Device) core.Canvas {
 		d.handleKeyboard(obj)
 		ret.revealFocused()
 	}
+	// A tap on the focused widget brings back the keyboard the system hid
+	// while the widget kept the focus (#822, #806).
+	ret.OnTapFocused = func(obj event.Focusable) {
+		if d != nil {
+			d.handleKeyboard(obj)
+		}
+	}
 	ret.InitTouchHandler(&mobileFinder{canvas: ret})
 	ret.initTouchScroll()
 	ret.LongPressCallback = func(wid event.LongPressable, ev *event.PointEvent) {

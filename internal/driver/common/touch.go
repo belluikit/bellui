@@ -62,6 +62,13 @@ type TouchHandler struct {
 	// longer anyone's to call (#310).
 	tapGeneration uint64
 
+	// OnTapFocused, when set, is called for a tap on the widget that already
+	// has the focus, before the tap is delivered. The mobile driver uses it to
+	// bring back an on-screen keyboard the system hid while the widget kept
+	// the focus: its Done key, Back, or the keyboard's own hide key (#822,
+	// #806). A drag or scroll is not a tap and does not call it.
+	OnTapFocused func(event.Focusable)
+
 	// OnTapUp is an optional hook called at the start of TapUp, before
 	// tap/drag processing. If it returns true, tap processing is skipped
 	// (the hook handled the event). Used by mobile for menu dismissal.
@@ -562,6 +569,11 @@ func (h *TouchHandler) TapUp(pos geo.Position, tapID int,
 	}
 	if h.caught[tapID] {
 		return // it stopped moving content: no tap (#792)
+	}
+	if f, ok := co.(event.Focusable); ok && h.OnTapFocused != nil {
+		if c := h.Finder.CanvasForTouch(); c != nil && c.Focused() == f {
+			h.OnTapFocused(f)
+		}
 	}
 
 	ev := &event.PointEvent{

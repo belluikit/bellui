@@ -419,12 +419,18 @@ public class GoNativeActivity extends NativeActivity {
                 // any focus/overlay change reconnects a lost IME rather than
                 // restarting a healthy one.
                 InputMethodManager m = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                // The keyboard must also be on screen: Back, or the keyboard's
+                // own hide key, closes it without doHideKeyboard, leaving the
+                // shadow focused and served, so a re-show after it (a tap on
+                // the still-focused field) was skipped and the keyboard stayed
+                // down (#806).
                 if (mAppliedKeyboardType == keyboardType
                         && mAppliedInputType == inputType
                         && mAppliedImeOptions == imeOptions
                         && mTextEdit.getVisibility() == View.VISIBLE
                         && mTextEdit.isFocused()
-                        && m.isActive(mTextEdit)) {
+                        && m.isActive(mTextEdit)
+                        && imeShown()) {
                     return;
                 }
 
@@ -456,6 +462,10 @@ public class GoNativeActivity extends NativeActivity {
                     public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
                         if (actionId == EditorInfo.IME_ACTION_DONE) {
                             keyboardTyped("\n");
+                            // Done closes the keyboard; the bellui field keeps
+                            // the focus (owner decision on #822, as iOS does),
+                            // and a tap on it brings the keyboard back.
+                            hideKeyboard();
                         }
                         return false;
                     }
@@ -476,6 +486,17 @@ public class GoNativeActivity extends NativeActivity {
                 mAppliedImeOptions = imeOptions;
             }
         });
+    }
+
+    // imeShown reports whether the soft keyboard is on screen. Before API 30
+    // there is no reliable query, and it answers true, which keeps the show
+    // gate as it was there.
+    private boolean imeShown() {
+        if (android.os.Build.VERSION.SDK_INT < 30) {
+            return true;
+        }
+        WindowInsets insets = getWindow().getDecorView().getRootWindowInsets();
+        return insets == null || insets.isVisible(WindowInsets.Type.ime());
     }
 
     static void hideKeyboard() {
