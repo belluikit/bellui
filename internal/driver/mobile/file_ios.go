@@ -39,13 +39,18 @@ type secureReadCloser struct {
 }
 
 // Declare conformity to ReadCloser interface
-var _ io.ReadCloser = (*secureReadCloser)(nil)
+var _ io.ReadSeekCloser = (*secureReadCloser)(nil)
 
-func (s *secureReadCloser) Read(p []byte) (int, error) {
+// load reads the whole document on first use; Read and Seek serve from it.
+func (s *secureReadCloser) load() {
 	if s.data == nil {
 		var length C.int
 		s.data = C.GoBytes(C.iosReadFromURL(s.url, &length), length)
 	}
+}
+
+func (s *secureReadCloser) Read(p []byte) (int, error) {
+	s.load()
 
 	count := len(p)
 	remain := len(s.data) - s.offset
@@ -64,6 +69,19 @@ func (s *secureReadCloser) Read(p []byte) (int, error) {
 	}
 	s.offset = newOffset
 	return count, err
+}
+
+// Seek moves within the document, which is already read into memory, so a
+// picked file seeks as it does on the desktop: without it a player found no
+// duration and could not seek in MP3, Ogg, Opus or WAV (#848).
+func (s *secureReadCloser) Seek(offset int64, whence int) (int64, error) {
+	s.load()
+	pos, err := seekWithin(int64(s.offset), int64(len(s.data)), offset, whence)
+	if err != nil {
+		return int64(s.offset), err
+	}
+	s.offset = int(pos)
+	return pos, nil
 }
 
 func (s *secureReadCloser) Close() error {
