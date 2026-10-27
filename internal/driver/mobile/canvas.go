@@ -62,6 +62,12 @@ func newCanvas(dev bellui.Device) core.Canvas {
 		padded: true,
 		scale:  dev.SystemScaleForWindow(nil), // we don't need a window parameter on mobile,
 	}
+	// A focused object is brought into view: when it opens the keyboard, and
+	// when the keyboard is already up and covers it (#654).
+	ret.OnFocus = func(obj event.Focusable) {
+		d.handleKeyboard(obj)
+		ret.revealFocused()
+	}
 	ret.InitTouchHandler(&mobileFinder{canvas: ret})
 	ret.initTouchScroll()
 	ret.LongPressCallback = func(wid event.LongPressable, ev *event.PointEvent) {
