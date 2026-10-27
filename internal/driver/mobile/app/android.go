@@ -368,6 +368,7 @@ func init() {
 
 // driverShowVirtualKeyboard requests the driver to show a virtual keyboard for text input
 func driverShowVirtualKeyboard(keyboard KeyboardType) {
+	shownKeyboard.Store(int32(keyboard))
 	keyboardOps.In() <- func() {
 		err := mobileinit.RunOnJVM(func(vm, jniEnv, ctx uintptr) error {
 			env := (*C.JNIEnv)(unsafe.Pointer(jniEnv)) // not a Go heap pointer
@@ -809,8 +810,8 @@ func processKey(env *C.JNIEnv, e *C.AInputEvent) {
 		Modifiers: androidKeyModifiers(int32(C.AKeyEvent_getMetaState(e))),
 		Native:    true, // raw input queue — hardware/injected, never an IC edit
 	}
-	if k.Rune >= '0' && k.Rune <= '9' { // GBoard generates key events for numbers, but we see them in textChanged
-		return
+	if nativeDigitIsEcho(k.Rune, KeyboardType(shownKeyboard.Load())) {
+		return // the text keyboard delivers this digit as text
 	}
 	switch C.AKeyEvent_getAction(e) {
 	case C.AKEY_STATE_DOWN:
