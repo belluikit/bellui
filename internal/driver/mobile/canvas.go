@@ -55,7 +55,12 @@ func newCanvas(dev bellui.Device) core.Canvas {
 	d, _ := dev.(*device)
 	ret := &canvas{
 		Canvas: common.Canvas{
-			OnFocus:   d.handleKeyboard,
+			OnFocus: func(obj event.Focusable) {
+				if d != nil {
+					d.keyboardDismissed = false
+				}
+				d.handleKeyboard(obj)
+			},
 			OnUnfocus: d.hideVirtualKeyboard,
 		},
 		device: d,
@@ -72,6 +77,7 @@ func newCanvas(dev bellui.Device) core.Canvas {
 	// while the widget kept the focus (#822, #806).
 	ret.OnTapFocused = func(obj event.Focusable) {
 		if d != nil {
+			d.keyboardDismissed = false
 			d.handleKeyboard(obj)
 		}
 	}
@@ -279,7 +285,9 @@ func (c *canvas) FindObjectAtPositionMatching(pos geo.Position, test func(object
 }
 
 func (c *canvas) overlayChanged() {
-	c.device.handleKeyboard(c.Focused())
+	if c.device == nil || !c.device.keyboardDismissed {
+		c.device.handleKeyboard(c.Focused())
+	}
 	c.SetDirty()
 }
 

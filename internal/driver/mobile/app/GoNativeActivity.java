@@ -95,6 +95,7 @@ public class GoNativeActivity extends NativeActivity {
     private native void filePickerMultiReturned(String str);
     private native void insetsChanged(int top, int bottom, int left, int right);
     private native void keyboardTyped(String str);
+    private native void keyboardDone();
     private native void keyboardReplace(int start, int end, String str);
     private native void keyboardComposing(String str, int cursor);
     private native void keyboardComposeCommit(String str);
@@ -1692,8 +1693,11 @@ public class GoNativeActivity extends NativeActivity {
 	            if (deferCommitted()) {
 	                flushBatchDiff();
 	            }
-	            keyboardTyped("\n");
-	            hideKeyboard();
+	            // Go delivers the Return and closes the keyboard, and remembers
+	            // it was dismissed: hiding it here was undone at once by the
+	            // re-show that follows any overlay change (the caret handle
+	            // leaving on Return).
+	            keyboardDone();
 	            return true;
 	        }
 	        return super.performEditorAction(actionCode);

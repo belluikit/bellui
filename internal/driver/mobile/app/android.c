@@ -345,6 +345,10 @@ void Java_org_golang_app_GoNativeActivity_keyboardTyped(JNIEnv *env, jclass claz
 	keyboardTyped((char*)cstr);
 }
 
+void Java_org_golang_app_GoNativeActivity_keyboardDone(JNIEnv *env, jclass clazz) {
+	keyboardDone();
+}
+
 void Java_org_golang_app_GoNativeActivity_keyboardReplace(JNIEnv *env, jclass clazz, jint start, jint end, jstring str) {
     const char* cstr = (*env)->GetStringUTFChars(env, str, JNI_FALSE);
 	keyboardReplace((int)start, (int)end, (char*)cstr);

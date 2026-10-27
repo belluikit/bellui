@@ -43,6 +43,16 @@ func keyboardTyped(str *C.char) {
 	}
 }
 
+// KeyboardDoneEvent is the soft keyboard's Done key on a single-line field
+// (Android IME_ACTION_DONE). The driver delivers it as Return and then closes
+// the keyboard, leaving the widget focused (#822).
+type KeyboardDoneEvent struct{}
+
+//export keyboardDone
+func keyboardDone() {
+	theApp.events.In() <- KeyboardDoneEvent{}
+}
+
 //export keyboardReplace
 func keyboardReplace(start, end C.int, str *C.char) {
 	theApp.events.In() <- textedit.Event{

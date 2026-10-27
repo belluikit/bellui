@@ -13,6 +13,11 @@ type device struct {
 	safeTop, safeLeft, safeBottom, safeRight int
 
 	keyboardShown bool
+	// keyboardDismissed is set when the user closed the keyboard with its
+	// Done key while the widget kept the focus: an overlay change then leaves
+	// it closed, and only a focus change or a tap on the widget reopens it
+	// (#822).
+	keyboardDismissed bool
 }
 
 //lint:file-ignore U1000 Var currentDPI and androidScaleForDPI are used in other files (per platform), but not here

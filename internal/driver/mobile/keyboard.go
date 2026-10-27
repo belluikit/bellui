@@ -27,6 +27,13 @@ func (d *device) hideVirtualKeyboard() {
 	}
 }
 
+// dismissKeyboard closes the keyboard the user finished with (its Done key),
+// leaving the focused widget focused; see keyboardDismissed.
+func (d *device) dismissKeyboard() {
+	d.hideVirtualKeyboard()
+	d.keyboardDismissed = true
+}
+
 func (d *device) handleKeyboard(obj event.Focusable) {
 	isDisabled := false
 	if disWid, ok := obj.(core.Disableable); ok {
