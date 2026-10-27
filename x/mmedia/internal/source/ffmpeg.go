@@ -201,9 +201,10 @@ func (s *FFmpegSource) SetAudioSampleRate(rate int) error {
 // decode-ahead loop provides pacing through frame-queue and audio-buffer
 // back-pressure, so the elapsed argument is ignored.
 // IgnoreVideo makes the source audio-only: it reports no video, and Decode
-// skips video packets. For a player with no picture, so that a video stream,
-// such as a song's embedded cover art, never paces its audio (#850). Call it
-// before the source is handed to a pipeline.
+// skips video packets. For a player with no picture, so that a video stream
+// never paces its audio (#850). A song's embedded cover art is no longer one:
+// goffmpeg skips it since v0.6.1. Call it before the source is handed to a
+// pipeline.
 func (s *FFmpegSource) IgnoreVideo() {
 	s.hasVideo = false
 	s.vInfo = goffmpeg.VideoInfo{}
