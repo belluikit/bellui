@@ -1,8 +1,10 @@
 package source
 
 import (
+	"errors"
 	"image"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/belluikit/goffmpeg"
@@ -62,12 +64,39 @@ func NewFFmpegSource(r io.Reader) (*FFmpegSource, error) {
 
 // NewFFmpegSourceURL decodes from a file path or network URL (http/https are
 // compiled in), letting libavformat own the I/O rather than reading through Go.
+// An http(s) URL reconnects on its own; see openURL.
 func NewFFmpegSourceURL(url string) (*FFmpegSource, error) {
-	dec, err := goffmpeg.Open(url)
+	dec, err := openURL(url)
 	if err != nil {
 		return nil, err
 	}
 	return newFFmpegSource(dec), nil
+}
+
+// httpOptions make FFmpeg ride out a network that drops or stalls (#839).
+// reconnect picks a dropped connection up again from the byte it stopped at,
+// and rw_timeout (in microseconds) turns a server that goes silent without
+// closing into a drop, which would otherwise block the read forever. A server
+// that stays gone still fails, within a few seconds (reconnect_delay_max), and
+// the pipeline reports it through OnError.
+//
+// Measured on an MP3 over HTTP: a drop and a 5 s stall both played on to the
+// end; without these, a drop ended playback and a stall hung it. A live stream
+// (no length, no ranges) and HLS did no better and no worse with them.
+const httpOptions = "reconnect=1,reconnect_streamed=1,reconnect_delay_max=2,rw_timeout=5000000"
+
+// openURL opens url, with httpOptions for an http(s) URL. A purego
+// libgoffmpeg too old for per-open options gets a plain open rather than none.
+func openURL(url string) (goffmpeg.IDecoder, error) {
+	lower := strings.ToLower(url)
+	if !strings.HasPrefix(lower, "http://") && !strings.HasPrefix(lower, "https://") {
+		return goffmpeg.Open(url)
+	}
+	dec, err := goffmpeg.OpenWithOptions(url, httpOptions)
+	if errors.Is(err, goffmpeg.ErrOpenOptionsUnavailable) {
+		return goffmpeg.Open(url)
+	}
+	return dec, err
 }
 
 func newFFmpegSource(dec goffmpeg.IDecoder) *FFmpegSource {

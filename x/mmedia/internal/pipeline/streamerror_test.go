@@ -1,7 +1,9 @@
 package pipeline
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
 	"image"
 	"net"
 	"net/http"
@@ -101,9 +103,12 @@ func TestCleanEndWithAnErrorSourceIsStillAnEnd(t *testing.T) {
 }
 
 // TestDroppedHTTPStreamIsAnError is #839 end to end through FFmpeg: a server
-// that announces the whole file and closes the connection halfway through it.
-// The full download is the control. It needs a real audio device, since the
-// detached one never plays out its samples.
+// that announces the whole file and closes the connection halfway through it,
+// every time. FFmpeg reconnects from where it stopped (see the source's
+// httpOptions) and is dropped again at the same byte, so this is a server that
+// stays broken, which has to end in OnError. The full download is the control.
+// It needs a real audio device, since the detached one never plays out its
+// samples.
 func TestDroppedHTTPStreamIsAnError(t *testing.T) {
 	if _, err := newAudioOutput(2); err != nil {
 		t.Skipf("no audio device: %v", err)
@@ -113,13 +118,22 @@ func TestDroppedHTTPStreamIsAnError(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	half := len(data) / 2
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Length", strconv.Itoa(len(data)))
 		if r.URL.Path != "/drop.mp4" {
-			_, _ = w.Write(data)
+			http.ServeContent(w, r, "full.mp4", time.Time{}, bytes.NewReader(data))
 			return
 		}
-		_, _ = w.Write(data[:len(data)/2])
+		var from int // where a reconnect asks to resume
+		_, _ = fmt.Sscanf(r.Header.Get("Range"), "bytes=%d-", &from)
+		from = min(from, half)
+		w.Header().Set("Accept-Ranges", "bytes")
+		w.Header().Set("Content-Length", strconv.Itoa(len(data)-from))
+		if from > 0 {
+			w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", from, len(data)-1, len(data)))
+			w.WriteHeader(http.StatusPartialContent)
+		}
+		_, _ = w.Write(data[from:half])
 		w.(http.Flusher).Flush()
 		conn, _, err := w.(http.Hijacker).Hijack()
 		if err == nil {
