@@ -653,6 +653,74 @@ var checks = []check{
 		Steps:  []string{"Open the Media Player page."},
 		Expect: []string{"The page shows \"Cannot play …\" with the audio error at once; the app does not hang or play silently."},
 	},
+	{
+		ID: "MD-03", Area: "media", Title: "Every bundled audio format plays", Platforms: native, Refs: []string{"gallery#28"},
+		Where: gallery + " → Audio Player",
+		Steps: []string{
+			"With sound on, pick each entry of Bundled clip in turn: MP3, AAC (m4a), Ogg Vorbis, Opus, FLAC, WAV.",
+			"Let one of them play to its end.",
+		},
+		Expect: []string{
+			"Each plays the same rising scale from its first note, twelve notes one second apart, and shows 0:12 as its length.",
+			"At the end the event log shows \"ended\" and the position reads 0:12 / 0:12.",
+		},
+	},
+	{
+		ID: "MD-04", Area: "media", Title: "Audio transport: seek, pause, stop, volume", Platforms: native, Refs: []string{"#831", "#833"},
+		Where: gallery + " → Audio Player, any bundled clip",
+		Steps: []string{
+			"While it plays, seek to about 0:05.",
+			"Pause, seek to about 0:08, then play.",
+			"Stop, then play.",
+			"Move the volume control down and back up.",
+		},
+		Expect: []string{
+			"After the first seek the sixth note plays (the scale has one note a second).",
+			"After the paused seek, play resumes at the ninth note, not where it was paused.",
+			"Stop returns to 0:00, and play starts again from the first note at once, without holding at an earlier position (#833).",
+			"The volume follows the control.",
+		},
+	},
+	{
+		ID: "MD-05", Area: "media", Title: "Audio loop", Platforms: native, Refs: []string{"#502", "#527"},
+		Where: gallery + " → Audio Player",
+		Steps: []string{
+			"Turn Loop on, pick a clip and let it reach the end twice.",
+			"Turn Loop off while it plays.",
+		},
+		Expect: []string{
+			"With Loop on, the scale starts again right after its last note, and the log shows no \"ended\".",
+			"With Loop off, it plays to the end once more and the log shows \"ended\".",
+		},
+	},
+	{
+		ID: "MD-06", Area: "media", Title: "Audio over the network, and a dropped connection", Platforms: native, Refs: []string{"#839"}, Special: true,
+		Where: gallery + " → Audio Player, URL field",
+		Setup: "On the computer, serve the gallery's clips: cd <gallery>/pages/media/audio && python3 -m http.server 8000. A phone must be on the same network, and the URL uses the computer's address on it.",
+		Steps: []string{
+			"Enter http://<computer>:8000/scale.mp3 and press Play URL.",
+			"Seek within it.",
+			"Play it again and, about three seconds in, stop the server (Ctrl+C).",
+		},
+		Expect: []string{
+			"It plays and seeks like the bundled clip.",
+			"When the server stops, playback stops where the data ran out and the log shows an error. It does not show \"ended\", and the position does not jump to 0:12 (#839).",
+		},
+	},
+	{
+		ID: "MD-07", Area: "media", Title: "Audio keeps playing in the background", Platforms: mobile, Refs: []string{"#672", "#673"}, Special: true,
+		Where: gallery + " → Audio Player",
+		Steps: []string{
+			"Turn Loop on and play a clip.",
+			"Press Home and wait a minute; then lock the screen and wait another minute.",
+			"Come back to the gallery.",
+		},
+		Expect: []string{
+			"The scale is heard the whole time, with the app in the background and with the screen locked.",
+			"Back in the app, the position has moved on and the controls respond.",
+		},
+		Per: map[string]string{"ios": "Also with the silent switch on (or the Control Centre silent mode): a player keeps sounding, as music apps do."},
+	},
 
 	// ---- cli ----
 	{
