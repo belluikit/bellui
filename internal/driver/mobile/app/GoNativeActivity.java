@@ -462,10 +462,6 @@ public class GoNativeActivity extends NativeActivity {
                     public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
                         if (actionId == EditorInfo.IME_ACTION_DONE) {
                             keyboardTyped("\n");
-                            // Done closes the keyboard; the bellui field keeps
-                            // the focus (owner decision on #822, as iOS does),
-                            // and a tap on it brings the keyboard back.
-                            hideKeyboard();
                         }
                         return false;
                     }
@@ -1683,6 +1679,24 @@ public class GoNativeActivity extends NativeActivity {
 	            after16 = buf.offsetByCodePoints(selMax, cps) - selMax;
 	        }
 	        return deleteSurroundingText(before16, after16);
+	    }
+
+	    // The keyboard's Done key on a single-line field submits it and closes
+	    // the keyboard; the bellui field keeps the focus, as on iOS, and a tap
+	    // on it brings the keyboard back (owner decision on #822).
+	    // BaseInputConnection would send an Enter key instead, which only
+	    // submitted, so the keyboard stayed up over the page.
+	    @Override
+	    public boolean performEditorAction(int actionCode) {
+	        if (actionCode == EditorInfo.IME_ACTION_DONE) {
+	            if (deferCommitted()) {
+	                flushBatchDiff();
+	            }
+	            keyboardTyped("\n");
+	            hideKeyboard();
+	            return true;
+	        }
+	        return super.performEditorAction(actionCode);
 	    }
 
 	    @Override
