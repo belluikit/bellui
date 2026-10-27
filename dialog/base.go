@@ -238,6 +238,11 @@ func wrapModal(body core.CanvasObject, cv core.Canvas, windowed bool, onClose fu
 		pop.Resize(win.Size().Add(geo.NewSize(ev.Dragged.DX, ev.Dragged.DY)).Max(win.MinSize()))
 	}
 
+	// On a phone or tablet a dialog shows only its close button: there is
+	// nothing to minimise to, and a dialog already spans the width (#654).
+	if bellui.CurrentDevice().IsMobile() {
+		return pop
+	}
 	var restoreSize geo.Size
 	var restorePos geo.Position
 	maximized := false

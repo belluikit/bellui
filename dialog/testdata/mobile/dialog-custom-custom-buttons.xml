@@ -4,45 +4,21 @@
 	</content>
 	<overlay>
 		<widget size="200x300" type="*widget.PopUp">
-			<widget pos="2,49" size="229x200" type="*widget.Shadow">
-				<boxShadow blurRadius="36" color="shadow" cornerRadius="4" offsetY="12" size="229x200"/>
+			<widget pos="18,49" size="163x200" type="*widget.Shadow">
+				<boxShadow blurRadius="36" color="shadow" cornerRadius="4" offsetY="12" size="163x200"/>
 			</widget>
 			<rectangle fillColor="rgba(0,0,0,255)" size="200x300"/>
-			<rectangle fillColor="rgba(26,26,26,255)" pos="2,49" radius="16" size="196x200"/>
-			<widget pos="2,49" size="196x200" type="*container.InnerWindow">
-				<widget size="196x200" type="*widget.Shadow">
-					<boxShadow blurRadius="36" color="shadow" cornerRadius="4" offsetY="12" size="196x200"/>
+			<rectangle fillColor="rgba(26,26,26,255)" pos="18,49" radius="16" size="163x200"/>
+			<widget pos="18,49" size="163x200" type="*container.InnerWindow">
+				<widget size="163x200" type="*widget.Shadow">
+					<boxShadow blurRadius="36" color="shadow" cornerRadius="4" offsetY="12" size="163x200"/>
 				</widget>
-				<rectangle fillColor="overlayBackground" radius="16" size="196x200"/>
-				<rectangle fillColor="background" pos="4,48" radius="12" size="188x148"/>
-				<container pos="4,0" size="188x48">
-					<container pos="36,0" size="152x48">
-						<container size="152x48">
+				<rectangle fillColor="overlayBackground" radius="16" size="163x200"/>
+				<rectangle fillColor="background" pos="4,48" radius="12" size="155x148"/>
+				<container pos="4,0" size="155x48">
+					<container pos="107,0" size="48x48">
+						<container size="48x48">
 							<widget size="48x48" type="*container.borderButton">
-								<container size="48x48">
-									<widget pos="4,4" size="40x40" type="*container.ThemeOverride">
-										<container size="40x40">
-											<widget size="40x40" type="*widget.Button">
-												<rectangle fillColor="disabled button" radius="20" size="40x40"/>
-												<image fillMode="contain" pos="8,8" rsc="minimize.svg" size="24x24" themed="disabled"/>
-											</widget>
-										</container>
-									</widget>
-								</container>
-							</widget>
-							<widget pos="52,0" size="48x48" type="*container.borderButton">
-								<container size="48x48">
-									<widget pos="4,4" size="40x40" type="*container.ThemeOverride">
-										<container size="40x40">
-											<widget size="40x40" type="*widget.Button">
-												<rectangle fillColor="rgba(64,53,80,255)" radius="20" size="40x40"/>
-												<image fillMode="contain" pos="8,8" rsc="maximize.svg" size="24x24" themed="foreground"/>
-											</widget>
-										</container>
-									</widget>
-								</container>
-							</widget>
-							<widget pos="104,0" size="48x48" type="*container.borderButton">
 								<container size="48x48">
 									<widget pos="4,4" size="40x40" type="*container.ThemeOverride">
 										<container size="40x40">
@@ -56,26 +32,26 @@
 							</widget>
 						</container>
 					</container>
-					<container size="36x48">
-						<widget pos="0,7" size="36x40" type="*container.draggableLabel">
-							<widget size="36x40" type="*widget.RichText">
+					<container size="107x48">
+						<widget pos="0,7" size="107x40" type="*container.draggableLabel">
+							<widget size="107x40" type="*widget.RichText">
 								<text pos="8,8" size="0x16"></text>
 							</widget>
 						</widget>
 					</container>
 				</container>
-				<container pos="4,48" size="188x148">
-					<container pos="4,4" size="180x140">
-						<spacer pos="91,-4" size="92x92"/>
-						<widget size="180x140" type="*dialog.themedBackground">
-							<rectangle fillColor="rgba(40,40,40,230)" size="180x140"/>
+				<container pos="4,48" size="155x148">
+					<container pos="4,4" size="147x140">
+						<spacer pos="58,-4" size="92x92"/>
+						<widget size="147x140" type="*dialog.themedBackground">
+							<rectangle fillColor="rgba(40,40,40,230)" size="147x140"/>
 						</widget>
-						<widget pos="16,48" size="148x32" type="*widget.Label">
-							<widget size="148x32" type="*widget.RichText">
+						<widget pos="16,48" size="115x32" type="*widget.Label">
+							<widget size="115x32" type="*widget.RichText">
 								<text pos="8,8" size="99x16">Custom buttons</text>
 							</widget>
 						</widget>
-						<container pos="49,84" size="80x40">
+						<container pos="33,84" size="80x40">
 							<widget size="24x40" type="*widget.Button">
 								<rectangle fillColor="rgba(64,53,80,255)" radius="20" size="24x40"/>
 								<widget pos="8,11" size="8x16" type="*widget.RichText">
@@ -102,7 +78,7 @@
 						</widget>
 					</container>
 				</container>
-				<widget pos="149,153" size="48x48" type="*container.draggableCorner">
+				<widget pos="116,153" size="48x48" type="*container.draggableCorner">
 					<container size="48x48">
 						<image pos="32,32" rsc="drag-corner-indicator.svg" size="16x16" themed="foreground"/>
 					</container>
