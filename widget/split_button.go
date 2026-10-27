@@ -61,9 +61,14 @@ func (s *SplitButton) Tapped(e *event.PointEvent) {
 	if s.Disabled() {
 		return
 	}
-	// Check if tap is on the dropdown area (right side).
+	// Check if tap is on the dropdown area: the trailing end, which the
+	// layout mirrors to the left under RTL (#835).
 	dropWidth := float32(36)
-	if e != nil && e.Position.X > s.Size().Width-dropWidth {
+	onDrop := e != nil && e.Position.X > s.Size().Width-dropWidth
+	if e != nil && isRTLAt(s) {
+		onDrop = e.Position.X < dropWidth
+	}
+	if onDrop {
 		s.showMenu()
 		return
 	}
@@ -90,7 +95,13 @@ func (s *SplitButton) showMenu() {
 	absPos := bellui.CurrentApp().Driver().AbsolutePositionForObject(s)
 	s.popUp = NewPopUpMenu(menu, c)
 	inheritDirection(s.popUp, s) // #749
-	s.popUp.ShowAtPosition(geo.NewPos(absPos.X, absPos.Y+s.Size().Height))
+	// The menu lines up with the button's start edge: the right one under
+	// RTL, kept on the canvas when the menu is wider than the room (#835).
+	x := absPos.X
+	if isRTLAt(s) {
+		x = max(0, absPos.X+s.Size().Width-s.popUp.MinSize().Width)
+	}
+	s.popUp.ShowAtPosition(geo.NewPos(x, absPos.Y+s.Size().Height))
 }
 
 func (s *SplitButton) CreateRenderer() core.WidgetRenderer {
