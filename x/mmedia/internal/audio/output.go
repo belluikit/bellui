@@ -238,6 +238,10 @@ func (o *Output) Stop() {
 		o.player = nil
 	}
 	o.buffer.Reset()
+	// Reset zeroes the byte count, so the last seek's base goes with it: kept,
+	// the next playback read as that seek's target until as many bytes had
+	// been read again as before it (#833).
+	o.posBase, o.readBase = 0, 0
 	o.started = false
 }
 
