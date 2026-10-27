@@ -17,6 +17,15 @@ Backlog.
 - **`Translucency` now applies to rasters on every painter (#38)**: the GL painter always passed `Raster.Alpha()`, but the WebGPU *and* software painters passed a hard-coded opaque `1.0`, so `Raster.Translucency` silently did nothing on the default desktop build and in every software-rendered test. Both now pass `Alpha()`, matching `canvas.Image`.
 - **Verify**: `hack/rasterstream` (`-auto` captures the canvas twice and reports per-raster changed-pixel counts — 0 = frozen — then compares an opaque square against a `Translucency: 0.5` one). Confirmed on-GPU under both painters, and confirmed to reproduce the original segfault, the freeze and the ignored translucency when the fixes are stashed.
 
+### Image Colour Profiles (#802, part of #373)
+`canvas.Image` converts a decoded PNG or JPEG to sRGB from the colour profile the file declares (`internal/colorprofile`, called from `canvas/image.go` `decodeImage`). Bellui draws untagged 8-bit sRGB, so without this a Display P3 or Adobe RGB photo was drawn as if its values were sRGB: washed out or shifted.
+- **Read:** PNG `iCCP` (zlib, capped at 4 MB), `sRGB`, `gAMA` + `cHRM`; JPEG `APP2` `ICC_PROFILE` segments in any order. A `gAMA` of 1/2.2 with no `cHRM` is taken as sRGB, as browsers do. Not read: PNG `cICP`, EXIF's colour-space tag, WebP/AVIF profiles.
+- **Converted:** RGB matrix/TRC profiles (primaries plus `curv`/`para` tone curves, which covers Display P3, Adobe RGB, ProPhoto and nearly every camera and display profile), relative colorimetric, clipped to sRGB. **Not converted, drawn as sRGB and logged once per kind:** lookup-table (`A2B0`-only), CMYK, Lab and greyscale profiles. An embedded profile that matches sRGB is recognised and skipped.
+- **Only images Bellui decodes:** an `image.Image` an app sets on `canvas.Image.Image` or a `Raster` is drawn as given; the app owns its colour space.
+- **Proof:** `TestToSRGB_MatchesColorSync` compares against macOS ColorSync's conversion of the same tagged grids (testdata holds both): every channel within one 8-bit step. The test profiles are built by the tests, so no third-party ICC data is in the repo.
+- **Cost** (M3 Max, 16 cores, a 12 MP JPEG): Display P3 adds 12 ms to a 116 ms decode; an embedded sRGB profile adds 18 µs; no profile, nothing measurable. Not measured on a phone.
+- Converting to sRGB clips wide-gamut colours. Wide-gamut output is #803's design question; the converter takes its source profile, so a different destination space can be added there.
+
 ### Rendering Engine Enhancements
 - **Shader-based ripple** (`canvas.Ripple`) — radial touch feedback with SDF-based rounded-corner clipping. Custom GLSL shader.
 - **FBO support** — Framebuffer Objects for off-screen rendering. `CreateFramebuffer`, `BindFramebuffer`, etc.
