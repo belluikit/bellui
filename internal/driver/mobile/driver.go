@@ -1580,6 +1580,7 @@ var keyCodeMap = map[key.Code]event.KeyName{
 	key.CodeReturnEnter:     event.KeyReturn,
 	key.CodeTab:             event.KeyTab,
 	key.CodeDeleteBackspace: event.KeyBackspace,
+	key.CodeDeleteForward:   event.KeyDelete, // a hardware keyboard's Delete (#805)
 	key.CodeInsert:          event.KeyInsert,
 	key.CodePageUp:          event.KeyPageUp,
 	key.CodePageDown:        event.KeyPageDown,
