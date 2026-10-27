@@ -14,7 +14,8 @@ import (
 
 // AudioPlayer is a Bellui widget that provides audio playback with transport controls.
 // Decoding is handled by FFmpeg, so any audio format the bundled libraries
-// support will play.
+// support will play. It plays only a file's audio: a video stream, such as a
+// song's embedded cover art, is ignored.
 type AudioPlayer struct {
 	widget.BaseWidget
 
@@ -32,7 +33,7 @@ type AudioPlayer struct {
 // stream cannot be converted to its format; see the package documentation.
 func NewAudioPlayer(r io.Reader, opts ...Option) (*AudioPlayer, error) {
 	o := buildOptions(opts)
-	pipe, err := pipeline.NewPipeline(r)
+	pipe, err := pipeline.NewAudioPipeline(r)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +53,7 @@ func NewAudioPlayer(r io.Reader, opts ...Option) (*AudioPlayer, error) {
 // stream cannot be converted to its format; see the package documentation.
 func NewAudioPlayerURL(url string, opts ...Option) (*AudioPlayer, error) {
 	o := buildOptions(opts)
-	pipe, err := pipeline.NewPipelineURL(url)
+	pipe, err := pipeline.NewAudioPipelineURL(url)
 	if err != nil {
 		return nil, err
 	}
