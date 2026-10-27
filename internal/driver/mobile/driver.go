@@ -414,6 +414,17 @@ func (d *driver) Run() {
 					// (pre-rebrand tracker #1104). exploreTouch suppresses the former and routes
 					// qualified passthrough streams into the normal pipeline.
 					d.routeTouch(current, e, app.TouchExplorationEnabled())
+				case app.KeyboardDoneEvent:
+					// Done submits like Return, then closes the keyboard; the
+					// widget keeps the focus (#822).
+					d.dispatchKeyEvent(c, key.Event{Rune: '\n', Code: key.CodeReturnEnter, Direction: key.DirPress})
+					d.dispatchKeyEvent(c, key.Event{Rune: '\n', Code: key.CodeReturnEnter, Direction: key.DirRelease})
+					d.device.dismissKeyboard()
+				case app.KeyboardDismissedEvent:
+					// The user closed the keyboard; it stays closed until a
+					// tap on the focused widget or a focus change (#806).
+					d.device.keyboardShown = false
+					d.device.keyboardDismissed = true
 				case key.Event:
 					d.dispatchKeyEvent(c, e)
 				case composition.Event:

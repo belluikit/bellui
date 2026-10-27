@@ -95,6 +95,8 @@ public class GoNativeActivity extends NativeActivity {
     private native void filePickerMultiReturned(String str);
     private native void insetsChanged(int top, int bottom, int left, int right);
     private native void keyboardTyped(String str);
+    private native void keyboardDone();
+    private native void keyboardDismissed();
     private native void keyboardReplace(int start, int end, String str);
     private native void keyboardComposing(String str, int cursor);
     private native void keyboardComposeCommit(String str);
@@ -114,6 +116,9 @@ public class GoNativeActivity extends NativeActivity {
 
 	private EditText mTextEdit;
 	private boolean keyboardUp = false;
+	// Whether the IME was on screen at the last layout (API 30+), to see the
+	// user close it: Back or its own hide key (#822, #806).
+	private boolean imeWasVisible = false;
 	// The keyboard state actually APPLIED to mTextEdit, owned by (and only ever
 	// touched on) the UI thread — unlike keyboardUp, which the static
 	// showKeyboard/hideKeyboard entry points set eagerly on the caller thread
@@ -319,6 +324,17 @@ public class GoNativeActivity extends NativeActivity {
 
             insetsChanged(insets.getSystemWindowInsetTop(), insets.getSystemWindowInsetBottom(),
                 insets.getSystemWindowInsetLeft(), insets.getSystemWindowInsetRight());
+            // The keyboard left the screen while the app still wanted it up:
+            // the user closed it. Tell Go, so the next overlay change does not
+            // raise it again; a tap on the field or a focus change does.
+            if (android.os.Build.VERSION.SDK_INT >= 30) {
+                boolean ime = insets.isVisible(WindowInsets.Type.ime());
+                if (imeWasVisible && !ime && keyboardUp) {
+                    keyboardUp = false;
+                    keyboardDismissed();
+                }
+                imeWasVisible = ime;
+            }
         } catch (java.lang.NoSuchMethodError e) {
     	    Rect insets = new Rect();
             getWindow().getDecorView().getWindowVisibleDisplayFrame(insets);
@@ -419,12 +435,18 @@ public class GoNativeActivity extends NativeActivity {
                 // any focus/overlay change reconnects a lost IME rather than
                 // restarting a healthy one.
                 InputMethodManager m = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                // The keyboard must also be on screen: Back, or the keyboard's
+                // own hide key, closes it without doHideKeyboard, leaving the
+                // shadow focused and served, so a re-show after it (a tap on
+                // the still-focused field) was skipped and the keyboard stayed
+                // down (#806).
                 if (mAppliedKeyboardType == keyboardType
                         && mAppliedInputType == inputType
                         && mAppliedImeOptions == imeOptions
                         && mTextEdit.getVisibility() == View.VISIBLE
                         && mTextEdit.isFocused()
-                        && m.isActive(mTextEdit)) {
+                        && m.isActive(mTextEdit)
+                        && imeShown()) {
                     return;
                 }
 
@@ -476,6 +498,17 @@ public class GoNativeActivity extends NativeActivity {
                 mAppliedImeOptions = imeOptions;
             }
         });
+    }
+
+    // imeShown reports whether the soft keyboard is on screen. Before API 30
+    // there is no reliable query, and it answers true, which keeps the show
+    // gate as it was there.
+    private boolean imeShown() {
+        if (android.os.Build.VERSION.SDK_INT < 30) {
+            return true;
+        }
+        WindowInsets insets = getWindow().getDecorView().getRootWindowInsets();
+        return insets == null || insets.isVisible(WindowInsets.Type.ime());
     }
 
     static void hideKeyboard() {
@@ -1664,6 +1697,27 @@ public class GoNativeActivity extends NativeActivity {
 	        return deleteSurroundingText(before16, after16);
 	    }
 
+	    // The keyboard's Done key on a single-line field submits it and closes
+	    // the keyboard; the bellui field keeps the focus, as on iOS, and a tap
+	    // on it brings the keyboard back (owner decision on #822).
+	    // BaseInputConnection would send an Enter key instead, which only
+	    // submitted, so the keyboard stayed up over the page.
+	    @Override
+	    public boolean performEditorAction(int actionCode) {
+	        if (actionCode == EditorInfo.IME_ACTION_DONE) {
+	            if (deferCommitted()) {
+	                flushBatchDiff();
+	            }
+	            // Go delivers the Return and closes the keyboard, and remembers
+	            // it was dismissed: hiding it here was undone at once by the
+	            // re-show that follows any overlay change (the caret handle
+	            // leaving on Return).
+	            keyboardDone();
+	            return true;
+	        }
+	        return super.performEditorAction(actionCode);
+	    }
+
 	    @Override
 	    public boolean sendKeyEvent(KeyEvent event) {
 	        // The IME's editing-panel arrow keys arrive here, not through the
@@ -1968,6 +2022,7 @@ public class GoNativeActivity extends NativeActivity {
     public void onBackPressed() {
         if (goNativeActivity.keyboardUp) {
             hideKeyboard();
+            keyboardDismissed(); // the user closed it (#806)
             return;
         }
 
