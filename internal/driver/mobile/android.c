@@ -138,6 +138,38 @@ jobject getContentResolver(uintptr_t jni_env, uintptr_t ctx) {
 	return (jobject)(*env)->CallObjectMethod(env, (jobject)ctx, getContentResolver);
 }
 
+// openFD opens uriCstr with ContentResolver.openFileDescriptor and detaches the
+// descriptor for the caller to own and close: a real file for a local
+// document, so it can seek (#848), or a pipe for a provider that streams.
+// -1 when the provider will not hand out a descriptor.
+int openFD(uintptr_t jni_env, uintptr_t ctx, char* uriCstr) {
+	JNIEnv *env = (JNIEnv*)jni_env;
+	jobject resolver = getContentResolver(jni_env, ctx);
+
+	jclass resolverClass = (*env)->GetObjectClass(env, resolver);
+	jmethodID openFileDescriptor = find_method(env, resolverClass, "openFileDescriptor", "(Landroid/net/Uri;Ljava/lang/String;)Landroid/os/ParcelFileDescriptor;");
+
+	jobject uri = parseURI(jni_env, ctx, uriCstr);
+	jstring mode = (*env)->NewStringUTF(env, "r");
+	jobject pfd = (*env)->CallObjectMethod(env, resolver, openFileDescriptor, uri, mode);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionClear(env);
+		return -1;
+	}
+	if (pfd == NULL) {
+		return -1;
+	}
+
+	jclass pfdClass = (*env)->GetObjectClass(env, pfd);
+	jmethodID detachFd = find_method(env, pfdClass, "detachFd", "()I");
+	jint fd = (*env)->CallIntMethod(env, pfd, detachFd);
+	if ((*env)->ExceptionCheck(env)) {
+		(*env)->ExceptionClear(env);
+		return -1;
+	}
+	return (int)fd;
+}
+
 void* openStream(uintptr_t jni_env, uintptr_t ctx, char* uriCstr) {
 	JNIEnv *env = (JNIEnv*)jni_env;
 	jobject resolver = getContentResolver(jni_env, ctx);

@@ -34,8 +34,23 @@ func fileReaderForURI(u bellui.URI, done func()) (bellui.URIReadCloser, error) {
 		}
 		return nil, err
 	}
+	return withSeek(file, read), err
+}
+
+// withSeek finishes file around read, and lets it seek when read can, as a
+// picked file on the desktop does (#848). Callers discover seeking by type
+// assertion, so a reader that cannot seek must not offer it.
+func withSeek(file *fileOpen, read io.ReadCloser) bellui.URIReadCloser {
 	file.ReadCloser = read
-	return file, err
+	if s, ok := read.(io.Seeker); ok {
+		return &seekableFileOpen{fileOpen: file, Seeker: s}
+	}
+	return file
+}
+
+type seekableFileOpen struct {
+	*fileOpen
+	io.Seeker
 }
 
 func mobileFilter(filter storage.FileFilter) *app.FileFilter {

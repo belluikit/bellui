@@ -10,6 +10,7 @@ package mobile
 
 bool deleteURI(uintptr_t jni_env, uintptr_t ctx, char* uriCstr);
 bool existsURI(uintptr_t jni_env, uintptr_t ctx, char* uriCstr);
+int openFD(uintptr_t jni_env, uintptr_t ctx, char* uriCstr);
 void* openStream(uintptr_t jni_env, uintptr_t ctx, char* uriCstr);
 char* readStream(uintptr_t jni_env, uintptr_t ctx, void* stream, int len, int* total);
 void* saveStream(uintptr_t jni_env, uintptr_t ctx, char* uriCstr, bool truncate);
@@ -108,9 +109,46 @@ func openStream(uri string) unsafe.Pointer {
 	return stream
 }
 
+// openDocumentFile opens uri as a file descriptor, or returns nil when the
+// provider will not hand one out.
+func openDocumentFile(uri string) *os.File {
+	uriStr := C.CString(uri)
+	defer C.free(unsafe.Pointer(uriStr))
+
+	fd := -1
+	app.RunOnJVM(func(_, env, ctx uintptr) error {
+		fd = int(C.openFD(C.uintptr_t(env), C.uintptr_t(ctx), uriStr))
+		return nil
+	})
+	if fd < 0 {
+		return nil
+	}
+	return os.NewFile(uintptr(fd), uri)
+}
+
+// forwardFile is a descriptor that cannot seek, a pipe from a provider that
+// streams the document, without the Seek an *os.File would offer and fail.
+type forwardFile struct{ f *os.File }
+
+func (f forwardFile) Read(p []byte) (int, error) { return f.f.Read(p) }
+func (f forwardFile) Close() error               { return f.f.Close() }
+
+// nativeFileOpen reads the document through a file descriptor where the
+// provider gives one, so a local document can seek as a file does on the
+// desktop. Through the InputStream it could only be read forward, and a
+// player found no duration and could not seek in MP3, Ogg, Opus or WAV
+// (#848). A provider that gives no descriptor is read through its
+// InputStream as before.
 func nativeFileOpen(f *fileOpen) (io.ReadCloser, error) {
 	if f.uri == nil || f.uri.String() == "" {
 		return nil, nil
+	}
+
+	if file := openDocumentFile(f.uri.String()); file != nil {
+		if _, err := file.Seek(0, io.SeekCurrent); err == nil {
+			return file, nil
+		}
+		return forwardFile{file}, nil
 	}
 
 	ret := openStream(f.uri.String())
