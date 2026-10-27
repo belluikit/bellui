@@ -366,6 +366,10 @@ func init() {
 	}()
 }
 
+// shownKeyboard is the soft keyboard last asked for, read by the native key
+// path (processKey) on the input goroutine (#824).
+var shownKeyboard atomic.Int32
+
 // driverShowVirtualKeyboard requests the driver to show a virtual keyboard for text input
 func driverShowVirtualKeyboard(keyboard KeyboardType) {
 	shownKeyboard.Store(int32(keyboard))
