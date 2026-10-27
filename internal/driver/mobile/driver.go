@@ -420,6 +420,11 @@ func (d *driver) Run() {
 					d.dispatchKeyEvent(c, key.Event{Rune: '\n', Code: key.CodeReturnEnter, Direction: key.DirPress})
 					d.dispatchKeyEvent(c, key.Event{Rune: '\n', Code: key.CodeReturnEnter, Direction: key.DirRelease})
 					d.device.dismissKeyboard()
+				case app.KeyboardDismissedEvent:
+					// The user closed the keyboard; it stays closed until a
+					// tap on the focused widget or a focus change (#806).
+					d.device.keyboardShown = false
+					d.device.keyboardDismissed = true
 				case key.Event:
 					d.dispatchKeyEvent(c, e)
 				case composition.Event:

@@ -53,6 +53,15 @@ func keyboardDone() {
 	theApp.events.In() <- KeyboardDoneEvent{}
 }
 
+// KeyboardDismissedEvent reports that the user closed the soft keyboard
+// (Back, or its own hide key) while a widget kept the focus (#806).
+type KeyboardDismissedEvent struct{}
+
+//export keyboardDismissed
+func keyboardDismissed() {
+	theApp.events.In() <- KeyboardDismissedEvent{}
+}
+
 //export keyboardReplace
 func keyboardReplace(start, end C.int, str *C.char) {
 	theApp.events.In() <- textedit.Event{

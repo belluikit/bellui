@@ -96,6 +96,7 @@ public class GoNativeActivity extends NativeActivity {
     private native void insetsChanged(int top, int bottom, int left, int right);
     private native void keyboardTyped(String str);
     private native void keyboardDone();
+    private native void keyboardDismissed();
     private native void keyboardReplace(int start, int end, String str);
     private native void keyboardComposing(String str, int cursor);
     private native void keyboardComposeCommit(String str);
@@ -115,6 +116,9 @@ public class GoNativeActivity extends NativeActivity {
 
 	private EditText mTextEdit;
 	private boolean keyboardUp = false;
+	// Whether the IME was on screen at the last layout (API 30+), to see the
+	// user close it: Back or its own hide key (#822, #806).
+	private boolean imeWasVisible = false;
 	// The keyboard state actually APPLIED to mTextEdit, owned by (and only ever
 	// touched on) the UI thread — unlike keyboardUp, which the static
 	// showKeyboard/hideKeyboard entry points set eagerly on the caller thread
@@ -320,6 +324,17 @@ public class GoNativeActivity extends NativeActivity {
 
             insetsChanged(insets.getSystemWindowInsetTop(), insets.getSystemWindowInsetBottom(),
                 insets.getSystemWindowInsetLeft(), insets.getSystemWindowInsetRight());
+            // The keyboard left the screen while the app still wanted it up:
+            // the user closed it. Tell Go, so the next overlay change does not
+            // raise it again; a tap on the field or a focus change does.
+            if (android.os.Build.VERSION.SDK_INT >= 30) {
+                boolean ime = insets.isVisible(WindowInsets.Type.ime());
+                if (imeWasVisible && !ime && keyboardUp) {
+                    keyboardUp = false;
+                    keyboardDismissed();
+                }
+                imeWasVisible = ime;
+            }
         } catch (java.lang.NoSuchMethodError e) {
     	    Rect insets = new Rect();
             getWindow().getDecorView().getWindowVisibleDisplayFrame(insets);
@@ -2007,6 +2022,7 @@ public class GoNativeActivity extends NativeActivity {
     public void onBackPressed() {
         if (goNativeActivity.keyboardUp) {
             hideKeyboard();
+            keyboardDismissed(); // the user closed it (#806)
             return;
         }
 
