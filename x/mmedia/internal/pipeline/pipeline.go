@@ -88,6 +88,9 @@ type Pipeline struct {
 	// before a seek was shown just after it (#819). onFrame must not call
 	// back into the pipeline while it is held.
 	presentMu sync.Mutex
+	// pausedSeek asks the idle decoder for the frame at a seek made while
+	// paused, which nothing else decodes or shows until Play (#831).
+	pausedSeek atomic.Bool
 
 	videoWidth  int
 	videoHeight int
@@ -890,6 +893,9 @@ func (p *Pipeline) Seek(pos time.Duration) {
 		p.audioOutput.Rebase(pos)
 	}
 	p.clock.Seek(pos)
+	if p.hasVideo && p.state.IsPaused() {
+		p.pausedSeek.Store(true)
+	}
 
 	select {
 	case p.seekWake <- struct{}{}:
@@ -991,9 +997,13 @@ func (p *Pipeline) decodeAhead(stop <-chan struct{}) {
 		}
 
 		if !p.state.IsPlaying() {
+			if p.state.IsPaused() && p.pausedSeek.CompareAndSwap(true, false) {
+				p.showPausedSeek(step)
+			}
 			time.Sleep(10 * time.Millisecond)
 			continue
 		}
+		p.pausedSeek.Store(false) // playing: the display shows the target
 
 		// Audio back-pressure: the output ring buffer overwrites its
 		// oldest samples when overrun, so pause decoding while playback
@@ -1048,6 +1058,37 @@ func (p *Pipeline) decodeAhead(stop <-chan struct{}) {
 			}
 		}
 	}
+}
+
+// showPausedSeek decodes the frame at the target of a seek made while paused
+// and shows it, leaving the pipeline paused. It bypasses the queue: the paused
+// display leaves that alone (#527), and the next decode after it is the frame
+// that follows the target, so resuming carries on from there.
+func (p *Pipeline) showPausedSeek(step time.Duration) {
+	p.decodeMu.Lock()
+	p.framePending = false
+	// One video frame per Decode; a second try covers an empty frame pool.
+	for i := 0; i < 2 && !p.framePending && !p.src.HasEnded(); i++ {
+		p.src.Decode(step)
+	}
+	img, ok := p.pendingFrame, p.framePending
+	p.framePending = false
+	gen := p.seekGen.Load()
+	p.decodeMu.Unlock()
+	if !ok {
+		return
+	}
+	p.framesDecoded.Add(1)
+
+	p.presentMu.Lock()
+	if gen == p.seekGen.Load() { // no later seek moved past it
+		if p.onFrame != nil {
+			p.onFrame(img)
+		}
+		p.framesRendered.Add(1)
+	}
+	p.presentMu.Unlock()
+	p.RecycleFrame(img)
 }
 
 // displayLoop pulls frames from the buffer and displays them.
