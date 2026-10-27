@@ -17,6 +17,144 @@ one per change, so that open pull requests do not conflict here. Run
 `go run ./hack/changelog preview -C cmd/bellui` to see them assembled; the release folds them
 into a section below.
 
+## v1.3.0-rc.1 — 2026-10-27
+
+A release candidate of the command, cut with toolkit v1.3.0-rc.1 so that apps
+can be packaged against it; it takes the toolkit's version number from here on.
+iOS apps can now declare Info.plist keys (such as background audio),
+entitlements and frameworks, and Android apps can bundle jars and AARs.
+`bellui translate` writes PXF catalogs, which only toolkit v1.3.0-rc.1 and
+later read. The rest is fixes, most of them to Android and iOS packaging and
+signing, several on Windows. Built against bellui v1.3.0-rc.1.
+
+### Added
+
+* **iOS apps can declare Info.plist values, entitlements and frameworks the
+  manifest has no field for**
+  ([#672](https://github.com/belluikit/bellui/issues/672)). `bellui package
+  -os ios` merges `ios/Info.plist` into the generated Info.plist (any value
+  type, so `UIBackgroundModes = [audio]` works) and `ios/Entitlements.plist`
+  into the signing entitlements (HealthKit and others), and links each
+  `ios/Frameworks/*.xcframework` or `*.framework` slice for the build's
+  architecture, embedding and signing dynamic ones. A key that the manifest
+  owns or also produces is an error rather than silently overridden. Swift
+  ships as an xcframework built in Xcode; the packager does not compile it.
+* **Android apps can bundle library dependencies: jars and AARs in
+  `android/libs`** ([#672](https://github.com/belluikit/bellui/issues/672)).
+  `bellui package -os android` dexes `android/libs/*.jar`, and for each
+  `android/libs/*.aar` also packages its native libraries, assets and
+  resources (with an `R` class per library) and merges its manifest's
+  permissions, features, queries and application components into the app's.
+  AndroidX and Play Services libraries can now be used from `android/*.java`.
+  There is no Maven resolution: the directory must hold the library's whole
+  dependency closure. See `cmd/bellui/README.md` for the merge's limits.
+
+### Changed
+
+* **`bellui translate` writes PXF catalogs**
+  ([#522](https://github.com/belluikit/bellui/issues/522)). The translations
+  file is a `.pxf` catalog, the format the toolkit reads, such as
+  `translations/en.pxf`; a `.json` file is refused, since the toolkit no longer
+  reads JSON catalogs. Extracted messages are written with `{Name}`
+  placeholders, also for source strings that use the Go template form
+  `{{.Name}}`; the message ID is kept as the source wrote it. `bellui init`
+  creates `translations/en.pxf`, and the `main.go` it writes embeds
+  `translations/*.pxf`. The toolkit reads PXF catalogs from the first release after bellui v1.2.0;
+  against v1.2.0 and earlier, `lang.AddTranslationsFS` fails on them with
+  `no unmarshaler registered for pxf`.
+
+### Fixed
+
+* **`bellui release -os android` no longer puts the keystore passwords on
+  `jarsigner`'s command line**
+  ([#729](https://github.com/belluikit/bellui/issues/729)), where any user on
+  the machine could read them from the process list while it ran. `jarsigner`
+  now reads them with `-storepass:env` and `-keypass:env` from variables set
+  on its process alone, as `apksigner` already did.
+* **`bellui release -os android` no longer loses the package when `zipalign`
+  fails** ([#728](https://github.com/belluikit/bellui/issues/728)). A failed
+  `zipalign` used to leave its partial output in place of the package, with
+  the good copy stranded as `unaligned.apk`. The package now stays where it
+  was, and the error carries `zipalign`'s output. A package that could not be
+  moved aside for aligning used to be signed unaligned without a word; that
+  is now an error too.
+* **`bellui serve` names the app it is serving when the app has no app ID**
+  ([#703](https://github.com/belluikit/bellui/issues/703)). With no manifest,
+  or one that sets no ID, it printed `Serving  at: http://localhost:8080`, with
+  the name missing. It now falls back to the app's name, which without a
+  manifest is the module's last path element. An app with an ID is still named
+  by its ID.
+* **`bellui serve` and `bellui package -os wasm` work for an app whose module
+  is named `wasm`** ([#683](https://github.com/belluikit/bellui/issues/683)).
+  They failed with `open …/wasm/index.html: not a directory`: packaging built
+  the binary into the source directory under the module's last path element,
+  the same path as the `wasm/` output folder. A module named `tmp-pkg` broke
+  `-os linux` (and the BSDs) the same way. Except on Windows, packaging now
+  builds the binary in a temporary directory, so its name cannot collide with
+  anything beside the sources. The outputs are where they were (`wasm/`,
+  `<name>.app`, `<name>.tar.xz`), and on Windows the `.exe` is still built
+  beside the sources, since there it is the package. One side effect: a file
+  in the source directory named like the app's binary is no longer deleted as
+  a stale build when packaging for a target other than Windows.
+* **`bellui package -os ios` produces a validly signed app**
+  ([#677](https://github.com/belluikit/bellui/issues/677)). The app icon was
+  compiled into the `.app` after Xcode had signed it, so `codesign --verify`
+  reported the icon files as added and installs that check the seal could
+  refuse it. Xcode now compiles the icon while it builds and signs the app.
+  `bellui release` was not affected: it re-signs the whole bundle.
+* **`bellui package -os android` and `bellui release -os android` run the
+  Android build tools correctly on Windows**
+  ([#674](https://github.com/belluikit/bellui/issues/674)). The tools were
+  looked up by their Unix names, but Windows ships `apksigner.bat`, `d8.bat`
+  and `zipalign.exe`. So on Windows the debug APK was never re-signed: it
+  carried only a v1 signature and would not install on Android 11 and later.
+  And an Android SDK installed under a path with a space (such as a user
+  folder named `Jane Doe`) could not run `d8.bat` at all, so apps with
+  `android/*.java` or `android/libs` failed to package. The `.bat` tools now
+  run through `cmd.exe` with every argument quoted. An argument `cmd.exe`
+  would alter (one holding `%`, `!`, `^`, `"` or a line break) is refused with
+  an error instead of being passed on changed. d8 reads its arguments from a
+  file, so an app with many classes stays under `cmd.exe`'s command-line
+  limit. `bellui release` hands apksigner the keystore and key passwords
+  through the environment, so a password may hold any character.
+* **`bellui package -os android` builds against a minor SDK platform such as
+  `android-36.1`** ([#674](https://github.com/belluikit/bellui/issues/674)).
+  The newest installed platform was picked by whole API level only, so a
+  minor release (`android-36.1` is Android 16 QPR2, a stable platform) ranked
+  behind every numbered one, and a machine with `android-35` and
+  `android-36.1` built against `android-35`. A minor release now ranks just
+  after its API level. Extension SDKs (`android-36-ext4`) and previews still
+  rank behind every numbered release.
+* **`bellui release -os ios` keeps the app's entitlements**
+  ([#672](https://github.com/belluikit/bellui/issues/672)). The store build
+  was re-signed with only the application identifier, so Associated Domains
+  (Universal Links) never reached it. It is now signed with the same
+  entitlements as `bellui package`, and embedded frameworks are re-signed
+  with the release certificate.
+* **An `&` or `<` in an app's name, usage strings or file-type descriptions
+  no longer breaks the iOS and macOS Info.plist**
+  ([#672](https://github.com/belluikit/bellui/issues/672)). The text was
+  written into the plist unescaped, which made it unparseable.
+* **Android packaging uses the newest installed build-tools**
+  ([#672](https://github.com/belluikit/bellui/issues/672)). With several
+  versions installed, `bellui package` ran the oldest one's d8 and aapt2; an
+  old d8 cannot read a new platform's `android.jar`.
+* **The generated AndroidManifest.xml escapes manifest text**
+  ([#672](https://github.com/belluikit/bellui/issues/672)). An app name,
+  version, URL scheme or MIME type containing `&`, `<` or a quote produced a
+  manifest that did not parse; it is now escaped as the Info.plist is.
+* **App Java in `android/` can use lambdas**
+  ([#672](https://github.com/belluikit/bellui/issues/672)). `bellui package`
+  compiled it against `android.jar` alone, which lacks the classes javac needs
+  for a lambda ("Unable to find method metafactory"). The build-tools'
+  `core-lambda-stubs.jar` is now on the boot classpath, as in a Gradle build.
+* **A macOS app with no category no longer gets an invalid
+  `LSApplicationCategoryType`**
+  ([#361](https://github.com/belluikit/bellui/issues/361)). `bellui package -os
+  darwin` wrote the key for every app, so an app with no category got the value
+  `public.app-category.`. The key is now left out when there is no category;
+  `bellui release`, which requires `--category` for macOS, is unchanged.
+
 ## v1.1.0 — 2026-10-21
 
 The default icon becomes the Bellui logo and the web splash screen is
