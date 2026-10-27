@@ -48,3 +48,27 @@ func TestPickedFileSeeksWhenItsReaderCan(t *testing.T) {
 		t.Error("a forward-only reader is offered as an io.Seeker")
 	}
 }
+
+// TestSeekWithin covers the in-memory seek the iOS picker's reader uses.
+func TestSeekWithin(t *testing.T) {
+	for _, tc := range []struct {
+		cur, offset int64
+		whence      int
+		want        int64
+		wantErr     bool
+	}{
+		{3, 5, io.SeekStart, 5, false},
+		{3, 2, io.SeekCurrent, 5, false},
+		{3, -4, io.SeekEnd, 6, false},
+		{3, 0, io.SeekEnd, 10, false},
+		{3, 50, io.SeekStart, 10, false}, // clamped to the end
+		{3, -4, io.SeekCurrent, 3, true},
+		{3, 0, 7, 3, true},
+	} {
+		got, err := seekWithin(tc.cur, 10, tc.offset, tc.whence)
+		if got != tc.want || (err != nil) != tc.wantErr {
+			t.Errorf("seekWithin(cur %d, size 10, %d, whence %d) = %d, %v; want %d, error %v",
+				tc.cur, tc.offset, tc.whence, got, err, tc.want, tc.wantErr)
+		}
+	}
+}

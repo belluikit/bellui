@@ -3,6 +3,7 @@
 package mobile
 
 import (
+	"errors"
 	"io"
 
 	"github.com/belluikit/bellui"
@@ -51,6 +52,26 @@ func withSeek(file *fileOpen, read io.ReadCloser) bellui.URIReadCloser {
 type seekableFileOpen struct {
 	*fileOpen
 	io.Seeker
+}
+
+// seekWithin answers where a seek lands in a document of size bytes held in
+// memory, from cur, clamping past the end as a file read would.
+func seekWithin(cur, size, offset int64, whence int) (int64, error) {
+	var base int64
+	switch whence {
+	case io.SeekStart:
+	case io.SeekCurrent:
+		base = cur
+	case io.SeekEnd:
+		base = size
+	default:
+		return cur, errors.New("seek: invalid whence")
+	}
+	pos := base + offset
+	if pos < 0 {
+		return cur, errors.New("seek: negative position")
+	}
+	return min(pos, size), nil
 }
 
 func mobileFilter(filter storage.FileFilter) *app.FileFilter {
