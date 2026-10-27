@@ -438,6 +438,7 @@ func (c *Canvas) Initialize(impl SizeableCanvas, onOverlayChanged func()) {
 		OnChange: onOverlayChanged,
 		Canvas:   impl,
 	}
+	c.overlays.forget = c.forgetNodes
 }
 
 // ObjectTrees return canvas object trees.
