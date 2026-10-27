@@ -1,7 +1,7 @@
 github.com/akavel/rsrc v0.10.2 h1:Zxm8V5eI1hW4gGaYsJQUhxpjkENuG91ki8B4zCrvEsw=
 github.com/akavel/rsrc v0.10.2/go.mod h1:uLoCtb9J+EyAqh+26kdrTgmzRBFPGOolLWKpdxkKq+c=
-github.com/belluikit/bellui v1.2.0 h1:wjSDc0LzN+d1z774ruDc9RhQfyNe/4A9Bro4ySp0gU8=
-github.com/belluikit/bellui v1.2.0/go.mod h1:7lftNGCBL7tMfFcEwoHLO6VX3WMPPfwUP5841stJJBQ=
+github.com/belluikit/bellui v1.3.0-rc.1 h1:wzl1T+J+X7Al1ODU3qmGL/YoIh81FDME0YzFranDT0Q=
+github.com/belluikit/bellui v1.3.0-rc.1/go.mod h1:7lftNGCBL7tMfFcEwoHLO6VX3WMPPfwUP5841stJJBQ=
 github.com/belluikit/gocef-libs v0.2.0 h1:DbOug5KX6grHjuBjF3+zYgTu6w+mE3wezcV6DQf/lNI=
 github.com/belluikit/gocef-libs v0.2.0/go.mod h1:pi+X7Pk8KDbUujiNhCk0tidpZQYsxmcWsQ0st4asN9E=
 github.com/bufbuild/protocompile v0.14.1 h1:iA73zAf/fyljNjQKwYzUHD6AD4R8KMasmwa/FBatYVw=
