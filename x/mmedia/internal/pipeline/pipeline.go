@@ -511,6 +511,8 @@ func (p *Pipeline) State() State { return p.state.Get() }
 
 // Play starts playback.
 func (p *Pipeline) Play() {
+	p.restAfterEnd()
+
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -637,6 +639,32 @@ func (p *Pipeline) resume() {
 	if p.hasAudio {
 		p.audioOutput.Resume()
 	}
+}
+
+// restAfterEnd brings a stream that ran out, at its end or on an error, to
+// rest before Play starts it again, and plays it from the start — or from a
+// position sought since, which is how an app resumes a dropped stream.
+//
+// Without it Play started a second set of goroutines over the first: an
+// audio-only stream's display loop outlives the end it reports, its stop
+// channel was overwritten unclosed, and the next Stop or Close waited on it
+// forever. And the source was still at its end, so nothing played (#842).
+func (p *Pipeline) restAfterEnd() {
+	p.mu.Lock()
+	ranOut := p.state.IsStopped() && p.stopCh != nil
+	p.mu.Unlock()
+	if !ranOut {
+		return
+	}
+	pos := p.CurrentTime()
+	if !p.halt() {
+		return
+	}
+	if p.src.HasEnded() {
+		p.src.Rewind()
+		return
+	}
+	p.Seek(pos) // halt reset the clock and the audio position
 }
 
 // Stop stops playback and resets position.
@@ -809,11 +837,27 @@ var ErrCaptureStopped = errors.New("mmedia: capture device stopped producing med
 // reacquired; that is reported through OnError, and OnEnd deliberately does not
 // fire, which is also what makes WithLoop inert for a capture rather than
 // spinning on a device that is gone.
+//
+// A finite source that stopped on a read error did not complete either: a
+// network stream whose connection dropped reads as an I/O error from FFmpeg,
+// and reporting that as OnEnd with the clock at the duration told the app the
+// track had finished (#839). It goes to OnError with the clock left where
+// playback stopped, so the app can show it, retry, or resume from there.
 func (p *Pipeline) reportEnd() {
 	p.state.Set(StateStopped)
 	if p.live {
 		if p.onError != nil {
 			p.onError(p.captureError())
+		}
+		return
+	}
+	if err := p.sourceError(); err != nil {
+		p.clock.Pause()
+		if p.onTime != nil {
+			p.onTime(p.clock.Time(), p.duration)
+		}
+		if p.onError != nil {
+			p.onError(err)
 		}
 		return
 	}
@@ -834,12 +878,19 @@ func (p *Pipeline) reportEnd() {
 
 // captureError prefers the source's own reason over the generic one.
 func (p *Pipeline) captureError() error {
-	if es, ok := p.src.(source.ErrorSource); ok {
-		if err := es.Err(); err != nil {
-			return fmt.Errorf("%w: %w", ErrCaptureStopped, err)
-		}
+	if err := p.sourceError(); err != nil {
+		return fmt.Errorf("%w: %w", ErrCaptureStopped, err)
 	}
 	return ErrCaptureStopped
+}
+
+// sourceError is the error that stopped the source, or nil when it ended
+// cleanly or cannot say.
+func (p *Pipeline) sourceError() error {
+	if es, ok := p.src.(source.ErrorSource); ok {
+		return es.Err()
+	}
+	return nil
 }
 
 // Seek seeks to the given position. A live capture has no timeline to move

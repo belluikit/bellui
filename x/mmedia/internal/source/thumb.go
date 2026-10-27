@@ -41,7 +41,7 @@ type Thumbnailer struct {
 // see FrameAt.
 func NewThumbnailer(url string) *Thumbnailer {
 	return newThumbnailer(func() (goffmpeg.IDecoder, error) {
-		dec, err := goffmpeg.Open(url)
+		dec, err := openURL(url)
 		if err != nil {
 			return nil, fmt.Errorf("mmedia: opening a second decoder for scrub preview: %w", err)
 		}

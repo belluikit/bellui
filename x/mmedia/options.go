@@ -104,14 +104,19 @@ func WithVolume(v float64) Option {
 	}
 }
 
-// WithOnEnd sets a callback for when playback ends.
+// WithOnEnd sets a callback for when playback reaches the end of the media.
+// A stream that stops on an error instead, such as a dropped network
+// connection, goes to the WithOnError callback and does not call this one.
 func WithOnEnd(f func()) Option {
 	return func(o *options) {
 		o.onEnd = f
 	}
 }
 
-// WithOnError sets a callback for playback errors.
+// WithOnError sets a callback for playback errors: a capture device that was
+// lost, or a file or stream that stopped on a read error before its end (a
+// dropped network connection reads as an I/O error). Playback stops, and the
+// position stays where it stopped.
 func WithOnError(f func(error)) Option {
 	return func(o *options) {
 		o.onError = f
