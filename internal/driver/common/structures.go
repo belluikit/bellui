@@ -225,6 +225,11 @@ type overlayStack struct {
 	internal.OverlayStack
 
 	renderCaches []*renderCacheTree
+	// forget is the canvas's forgetNodes: a removed overlay's nodes are
+	// forgotten like a removed object's, so under partial repaint where it was
+	// painted is repainted. Without it the overlay stayed on screen wherever
+	// nothing beneath it repainted (#826).
+	forget func(*RenderCacheNode)
 }
 
 func (o *overlayStack) Add(overlay core.CanvasObject) {
@@ -245,6 +250,9 @@ func (o *overlayStack) Remove(overlay core.CanvasObject) {
 	overlayCount := len(o.List())
 
 	for i := overlayCount; i < len(o.renderCaches); i++ {
+		if o.forget != nil && o.renderCaches[i] != nil {
+			o.forget(o.renderCaches[i].root)
+		}
 		o.renderCaches[i] = nil // release memory reference to removed element
 	}
 
