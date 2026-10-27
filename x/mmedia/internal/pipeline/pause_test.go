@@ -58,3 +58,46 @@ func TestPauseKeepsTheQueuedFrames(t *testing.T) {
 		t.Errorf("frames shown after resuming: %v; want the clip from frame 0, nothing thrown away during the pause", shown)
 	}
 }
+
+// A seek while paused shows the target frame and stays paused (#831). The
+// decoder and the display both idle while paused, so the seek bar and the time
+// moved and the picture stayed on the frame shown at the pause until Play.
+func TestSeekWhilePausedShowsTheTarget(t *testing.T) {
+	p := newTestPipeline(t, &clipSource{frames: 300})
+	defer p.Close()
+
+	var mu sync.Mutex
+	var shown []int
+	p.SetOnFrame(func(img *image.RGBA) {
+		mu.Lock()
+		shown = append(shown, frameIndex(img))
+		mu.Unlock()
+	})
+
+	p.Play()
+	time.Sleep(500 * time.Millisecond)
+	p.Pause()
+	time.Sleep(100 * time.Millisecond)
+	mu.Lock()
+	before := len(shown)
+	mu.Unlock()
+
+	p.Seek(5 * time.Second) // frame 150
+	time.Sleep(300 * time.Millisecond)
+
+	mu.Lock()
+	after := append([]int(nil), shown[before:]...)
+	mu.Unlock()
+	if len(after) == 0 || after[len(after)-1] != 150 {
+		t.Errorf("frames shown after a paused seek to frame 150: %v; want it to end on 150", after)
+	}
+	if len(after) > 1 {
+		t.Errorf("frames shown after a paused seek: %v; want the target alone, the clip still paused", after)
+	}
+	if p.State() != StatePaused {
+		t.Errorf("state %v after a paused seek, want paused", p.State())
+	}
+	if now := p.CurrentTime(); now != 5*time.Second {
+		t.Errorf("time %v after a paused seek to 5s", now)
+	}
+}
