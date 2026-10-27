@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"image"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -73,8 +74,11 @@ func TestBackwardSeekShowsTheTargetPromptly(t *testing.T) {
 
 	// Back to frame 3. The old display froze until the clock came round to the
 	// frame it held, about 1.9 s; the margins below leave room for -race.
-	seekAt := time.Now()
+	// A frame shown while Seek is still running belongs to the old position,
+	// so what counts as "after" starts when Seek returns (#819).
+	seekStart := time.Now()
 	p.Seek(100 * time.Millisecond)
+	seekAt := time.Now()
 	time.Sleep(time.Second)
 
 	mu.Lock()
@@ -88,7 +92,7 @@ func TestBackwardSeekShowsTheTargetPromptly(t *testing.T) {
 	if len(after) == 0 {
 		t.Fatal("no frame shown in the second after a backward seek")
 	}
-	if wait := after[0].at.Sub(seekAt); wait > 500*time.Millisecond {
+	if wait := after[0].at.Sub(seekStart); wait > 500*time.Millisecond {
 		t.Errorf("first frame after the seek came %v later; want within 500 ms", wait)
 	}
 	// The target itself comes first. A seek that discarded frames decoded at
@@ -100,5 +104,66 @@ func TestBackwardSeekShowsTheTargetPromptly(t *testing.T) {
 		if s.index > 3+40 { // the target plus a second at 30 fps, with room
 			t.Errorf("frame %d, from before the seek, was shown after it", s.index)
 		}
+	}
+}
+
+// After Seek returns, no frame decoded before it reaches the display. The
+// display checks a frame's seek generation and then hands it over; a seek that
+// landed between the two showed one frame from the old position after the seek
+// (#819). The hook holds the display right there while a seek runs.
+func TestSeekShowsNoFrameFromBeforeIt(t *testing.T) {
+	p := newTestPipeline(t, &clipSource{frames: 300})
+	defer p.Close()
+
+	held := make(chan int, 1)
+	release := make(chan struct{})
+	var armed atomic.Bool
+	armed.Store(true)
+	presentHook = func(img *image.RGBA) {
+		if frameIndex(img) >= 10 && armed.CompareAndSwap(true, false) {
+			held <- frameIndex(img)
+			<-release
+		}
+	}
+	t.Cleanup(func() { presentHook = nil })
+
+	var seekDone atomic.Bool
+	var mu sync.Mutex
+	var stale []int
+	p.SetOnFrame(func(img *image.RGBA) {
+		if i := frameIndex(img); seekDone.Load() && i < 150 {
+			mu.Lock()
+			stale = append(stale, i)
+			mu.Unlock()
+		}
+	})
+
+	p.Play()
+	var heldIndex int
+	select {
+	case heldIndex = <-held:
+	case <-time.After(3 * time.Second):
+		t.Fatal("the display never presented frame 10")
+	}
+	done := make(chan struct{})
+	go func() {
+		p.Seek(5 * time.Second) // forward to frame 150: any lower frame is stale
+		seekDone.Store(true)
+		close(done)
+	}()
+	// Without the fix the seek returns at once, before the held frame is
+	// shown; with it, the seek waits for that frame.
+	select {
+	case <-done:
+	case <-time.After(100 * time.Millisecond):
+	}
+	close(release)
+	<-done
+	time.Sleep(300 * time.Millisecond)
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(stale) > 0 {
+		t.Errorf("frames %v, decoded before the seek, were shown after it returned (frame %d was held at the display)", stale, heldIndex)
 	}
 }

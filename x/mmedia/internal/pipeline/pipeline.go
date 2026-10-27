@@ -82,6 +82,12 @@ type Pipeline struct {
 	// after a backward seek can be seconds away.
 	seekGen  atomic.Uint64
 	seekWake chan struct{}
+	// presentMu makes the display's last generation check and its onFrame
+	// one step a seek cannot land inside: the display holds it across both,
+	// and Seek holds it to bump seekGen. Without it a frame checked just
+	// before a seek was shown just after it (#819). onFrame must not call
+	// back into the pipeline while it is held.
+	presentMu sync.Mutex
 
 	videoWidth  int
 	videoHeight int
@@ -115,6 +121,10 @@ type Pipeline struct {
 
 	prerollEnd prerollExit // why the last Play stopped waiting (held under mu)
 }
+
+// presentHook, when set, runs in the display between its last generation
+// check and onFrame. Tests use it to hold a frame there while a seek runs.
+var presentHook func(img *image.RGBA)
 
 // timedFrame pairs a decoded frame with its presentation timestamp. The
 // display loop paces against that timestamp rather than counting frames, so
@@ -854,7 +864,11 @@ func (p *Pipeline) Seek(pos time.Duration) {
 	p.decodeMu.Lock()
 	defer p.decodeMu.Unlock()
 	p.src.Seek(pos)
-	p.seekGen.Add(1) // under decodeMu: no frame decoded before the seek gets the new generation
+	// Under decodeMu, no frame decoded before the seek gets the new
+	// generation; under presentMu, none checked before it is shown after it.
+	p.presentMu.Lock()
+	p.seekGen.Add(1)
+	p.presentMu.Unlock()
 
 	// Discard everything decoded before the seek: queued video frames and
 	// buffered (unplayed) audio. The audio position is rebased so the
@@ -1127,13 +1141,22 @@ func (p *Pipeline) displayLoop(stop <-chan struct{}) {
 				continue
 			}
 
+			p.presentMu.Lock()
+			if tf.gen != p.seekGen.Load() { // a seek landed since the last check
+				p.presentMu.Unlock()
+				p.RecycleFrame(tf.img)
+				continue
+			}
 			// Record the presentation error before handing the frame over, so
 			// the measurement reflects pacing rather than render cost.
 			p.recordSync(p.clock.Time() - tf.pts)
-
+			if presentHook != nil {
+				presentHook(tf.img)
+			}
 			if p.onFrame != nil {
 				p.onFrame(tf.img)
 			}
+			p.presentMu.Unlock()
 			p.RecycleFrame(tf.img)
 			p.framesRendered.Add(1)
 
