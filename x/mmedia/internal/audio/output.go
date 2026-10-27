@@ -5,6 +5,7 @@ import (
 	"io"
 	"math"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ebitengine/oto/v3"
@@ -39,6 +40,11 @@ type Output struct {
 	// Seek rebase: PlaybackPosition = posBase + time(totalRead - readBase).
 	posBase  time.Duration
 	readBase int64
+
+	// flushPending is set by Rebase: oto's player still holds what it pulled
+	// before the seek, and is emptied once the new position's samples fill a
+	// chunk (#855); see flushPlayer.
+	flushPending atomic.Bool
 }
 
 // device is the process's one audio device. It is opened by the first
@@ -164,6 +170,29 @@ func (o *Output) WriteSamples(data []byte) {
 	} else {
 		o.buffer.Write(data)
 	}
+	if o.flushPending.Load() {
+		o.flushPlayer()
+	}
+}
+
+// flushPlayer empties oto's player after a seek once the ring holds a chunk
+// from the new position. oto's player holds up to playerChunk it pulled from
+// the ring before the seek, and a seek played that much of the old position
+// first: 162 ms on macOS (#855). Player.Seek drops it and refills from the
+// ring. Doing it at once, at Rebase, refilled the player from the cleared
+// ring, which pads with silence (oto spins on a source that returns nothing),
+// so the old audio was traded for a gap; with a chunk waiting, it refills
+// with the new position's audio. oto pulls even while paused, so a paused
+// player is emptied the same way and stays paused.
+func (o *Output) flushPlayer() {
+	if o.buffer.Available() < playerBufferBytes(o.sampleRate, o.channels) {
+		return
+	}
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if o.flushPending.Swap(false) && o.player != nil {
+		_, _ = o.player.Seek(0, io.SeekCurrent)
+	}
 }
 
 // Start begins audio playback.
@@ -232,6 +261,7 @@ func (o *Output) Resume() {
 func (o *Output) Stop() {
 	o.mu.Lock()
 	defer o.mu.Unlock()
+	o.flushPending.Store(false)
 	if o.player != nil {
 		o.player.Pause()
 		o.player.Close()
@@ -318,6 +348,7 @@ func (o *Output) Rebase(pos time.Duration) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	o.buffer.Clear()
+	o.flushPending.Store(o.player != nil) // see flushPlayer
 	o.posBase = pos
 	o.readBase = o.buffer.TotalRead()
 }

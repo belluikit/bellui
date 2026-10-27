@@ -1,6 +1,10 @@
 package audio
 
-import "sync"
+import (
+	"errors"
+	"io"
+	"sync"
+)
 
 // RingBuffer is a thread-safe circular buffer for PCM audio samples.
 // It implements io.Reader for consumption by oto.Player.
@@ -119,4 +123,16 @@ func (rb *RingBuffer) Clear() {
 	rb.r = 0
 	rb.w = 0
 	rb.full = false
+}
+
+// Seek lets oto's Player clear what it has pulled: Player.Seek empties its own
+// buffer and then seeks its source, which needs the source to be an
+// io.Seeker. Only Seek(0, io.SeekCurrent) is meaningful, and it moves
+// nothing; it reports the bytes read so far. Clear is what discards the
+// ring's own contents (#855).
+func (rb *RingBuffer) Seek(offset int64, whence int) (int64, error) {
+	if offset != 0 || whence != io.SeekCurrent {
+		return 0, errors.New("audio: RingBuffer seeks only to where it is")
+	}
+	return rb.TotalRead(), nil
 }
