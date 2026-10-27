@@ -9,6 +9,7 @@ import (
 	belluicanvas "github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/core"
+	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
 	intdriver "github.com/belluikit/bellui/internal/driver"
 	"github.com/belluikit/bellui/widget"
@@ -61,5 +62,34 @@ func TestCanvas_RevealsTheFocusedFieldAboveTheKeyboard(t *testing.T) {
 	}
 	if top < 0 {
 		t.Errorf("the field scrolled past the top, to %v", top)
+	}
+}
+
+// Scrolling with the keyboard up keeps it up, so what it covers can be
+// scrolled into view; a tap away from the field still closes it. The focus
+// used to go at touch-down, so starting to scroll closed the keyboard (#654).
+func TestCanvas_ScrollKeepsTheFocusATapTakesIt(t *testing.T) {
+	c := newCanvas(&device{}).(*canvas)
+	c.scale = 1
+	field := widget.NewEntry()
+	filler := belluicanvas.NewRectangle(color.Transparent)
+	filler.SetMinSize(geo.NewSize(10, 2000))
+	c.SetContent(container.NewVScroll(container.NewVBox(field, filler)))
+	c.Resize(geo.NewSize(400, 600))
+	c.Focus(field)
+
+	drag := func(d event.Draggable, ev *event.DragEvent) { d.Dragged(ev) }
+	from, to := geo.NewPos(200, 400), geo.NewPos(200, 300)
+	c.TapDown(from, 1)
+	c.TapMove(to, 1, drag)
+	c.TapUp(to, 1, nil, nil, nil, nil, func(d event.Draggable, _ *event.DragEvent) { d.DragEnd() })
+	if c.Focused() != field {
+		t.Fatalf("a scroll took the focus, and the keyboard, from the field: focused %v", c.Focused())
+	}
+
+	c.TapDown(from, 2)
+	c.TapUp(from, 2, func(event.Tappable, *event.PointEvent) {}, nil, nil, nil, nil)
+	if c.Focused() != nil {
+		t.Errorf("a tap away from the field left it focused")
 	}
 }

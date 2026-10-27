@@ -115,6 +115,11 @@ type TouchHandler struct {
 	// caught holds the contacts that went down on moving content and stopped
 	// it (CatchCoast): their release taps nothing (#792).
 	caught map[int]bool
+	// unfocusOnTap holds the contacts that went down away from the focused
+	// widget. Such a touch takes the focus away, and with it the on-screen
+	// keyboard, but only once it ends as a tap: a drag or scroll keeps it, so
+	// the content the keyboard covers can be scrolled into view (#654).
+	unfocusOnTap map[int]bool
 
 	contacts   map[int]geo.Position
 	pinch      *pinchState
@@ -181,6 +186,7 @@ func (h *TouchHandler) InitTouchHandler(finder ObjectFinder) {
 	h.contacts = make(map[int]geo.Position)
 	h.pinchSpent = make(map[int]bool)
 	h.caught = make(map[int]bool)
+	h.unfocusOnTap = make(map[int]bool)
 	h.velocity = make(map[int]*velocityTracker)
 }
 
@@ -209,6 +215,7 @@ func (h *TouchHandler) TapDown(pos geo.Position, tapID int) {
 // tapDownSingle is TapDown for a contact handled on its own, not as part of a
 // two-finger gesture — also used when such a gesture dissolves (pinch.go).
 func (h *TouchHandler) tapDownSingle(pos geo.Position, tapID int) {
+	delete(h.unfocusOnTap, tapID)
 	h.LastTapDown[tapID] = time.Now()
 	h.LastTapDownPos[tapID] = pos
 	h.trackVelocity(tapID, pos, true)
@@ -267,7 +274,7 @@ func (h *TouchHandler) tapDownSingle(pos geo.Position, tapID int) {
 			// away from the editor they serve. Matched structurally to avoid
 			// a widget import (like TapThroughDismiss above).
 			if rf, ok := co.(interface{ RetainsFocus() bool }); !ok || !rf.RetainsFocus() {
-				canvas.Unfocus()
+				h.markUnfocusOnTap(tapID)
 			}
 		}
 	}
@@ -275,6 +282,15 @@ func (h *TouchHandler) tapDownSingle(pos geo.Position, tapID int) {
 	if !h.caught[tapID] {
 		h.armLongPress(pos, tapID)
 	}
+}
+
+// markUnfocusOnTap records that the contact went down away from the focused
+// widget (see unfocusOnTap).
+func (h *TouchHandler) markUnfocusOnTap(tapID int) {
+	if h.unfocusOnTap == nil {
+		h.unfocusOnTap = make(map[int]bool)
+	}
+	h.unfocusOnTap[tapID] = true
 }
 
 // armLongPress schedules a hold-fire long-press for the touch that just went
@@ -370,8 +386,10 @@ func (h *TouchHandler) TapMove(pos geo.Position, tapID int,
 
 	// The finger moved past the tap slop — this is a drag/scroll, not a
 	// press-and-hold, so cancel any pending tooltip and hold-fire long-press.
+	// It keeps the focus, and the keyboard, too (#654).
 	h.hideToolTip()
 	h.cancelLongPress(tapID)
+	delete(h.unfocusOnTap, tapID)
 	h.LastTapDownPos[tapID] = pos
 	offset := geo.Delta{DX: deltaX, DY: deltaY}
 	h.LastTapDelta[tapID] = offset
@@ -479,6 +497,15 @@ func (h *TouchHandler) TapUp(pos geo.Position, tapID int,
 	delete(h.longPressFired, tapID)
 	h.TouchCancelLock.Unlock()
 	defer h.forgetTouch(tapID) // the contact is gone whichever branch dispatches it
+
+	// A touch that never moved past the tap slop is a tap: one away from the
+	// focused widget takes its focus now, before anything it tapped can take
+	// the focus itself.
+	if h.unfocusOnTap[tapID] {
+		if c := h.Finder.CanvasForTouch(); c != nil {
+			c.Unfocus()
+		}
+	}
 
 	// Pre-hook for platform-specific handling (e.g., mobile menu dismissal).
 	if h.OnTapUp != nil && h.OnTapUp(pos) {
@@ -629,6 +656,7 @@ func (h *TouchHandler) TapCancel(pos geo.Position, tapID int) {
 // life of the process.
 func (h *TouchHandler) forgetTouch(tapID int) {
 	delete(h.caught, tapID)
+	delete(h.unfocusOnTap, tapID)
 	delete(h.LastTapDown, tapID)
 	delete(h.LastTapDownPos, tapID)
 	delete(h.LastTapDelta, tapID)
