@@ -52,10 +52,13 @@ func TestDialog_Resize(t *testing.T) {
 	theDialog.Resize(size)
 	expectedWidth = 600                                        // since win width only 600
 	assert.Equal(t, expectedWidth, theDialog.win.Size().Width) // max, also work
-	assert.Equal(t, expectedWidth, theDialog.win.Content.Size().Width+theme.Padding()*2)
+	// The content stays inside the canvas's interactive area, which the test
+	// canvas reports a few pixels smaller than the canvas (#654).
+	_, area := window.Canvas().InteractiveArea()
+	assert.Equal(t, area.Width, theDialog.win.Content.Size().Width+theme.Padding()*2)
 	expectedHeight = 400                                         // since win height only 400
 	assert.Equal(t, expectedHeight, theDialog.win.Size().Height) // max, also work
-	assert.Equal(t, expectedHeight, theDialog.win.Content.Size().Height+theme.Padding()*2)
+	assert.Equal(t, area.Height, theDialog.win.Content.Size().Height+theme.Padding()*2)
 
 	// Test again - extreme small size
 	size = geo.NewSize(1, 1)

@@ -285,9 +285,9 @@ func (p *PopUp) CreateRenderer() core.WidgetRenderer {
 		underlay := canvas.NewRectangle(th.Color(theme.ColorNameScrim, v))
 		objects := []core.CanvasObject{underlay, background, p.Content}
 		return &modalPopUpRenderer{
-			widget.NewShadowingRenderer(objects, widget.DialogLevel),
-			popUpBaseRenderer{popUp: p, background: background},
-			underlay,
+			ShadowingRenderer: widget.NewShadowingRenderer(objects, widget.DialogLevel),
+			popUpBaseRenderer: popUpBaseRenderer{popUp: p, background: background},
+			underlay:          underlay,
 		}
 	}
 	objects := []core.CanvasObject{background, p.Content}
@@ -462,25 +462,38 @@ type modalPopUpRenderer struct {
 	*widget.ShadowingRenderer
 	popUpBaseRenderer
 	underlay *canvas.Rectangle
+
+	// The canvas's interactive area at the last layout. It shrinks when a
+	// mobile keyboard opens, and the content is laid out again inside it.
+	areaPos  geo.Position
+	areaSize geo.Size
 }
 
+// Layout covers the canvas with the scrim and places the content. Content
+// with no explicit position is centred on the canvas and then kept inside the
+// canvas's interactive area, the part not under a notch, a system bar or an
+// on-screen keyboard: a dialog moves up above the keyboard its own field
+// opened, and shrinks to fit there (#654). Content placed with Move, such as
+// a navigation drawer that covers the whole edge, keeps its position.
 func (r *modalPopUpRenderer) Layout(canvasSize geo.Size) {
 	r.underlay.Resize(canvasSize)
+	r.areaPos, r.areaSize = r.popUp.Canvas.InteractiveArea()
 
 	padding := r.padding()
 	innerSize := r.popUp.innerSize.Max(r.popUp.Content.MinSize().Add(padding))
 
 	requestedSize := innerSize.Subtract(padding)
 	size := r.popUp.Content.MinSize().Max(requestedSize)
-	size = size.Min(canvasSize.Subtract(padding))
 
 	var pos geo.Position
 	if r.popUp.innerPosMoved {
 		// Explicit position requested via Move/ShowAtPosition.
+		size = size.Min(canvasSize.Subtract(padding))
 		pos = r.popUp.innerPos.Add(r.offset())
 	} else {
-		// Default: center the content.
+		size = size.Min(r.areaSize.Subtract(padding))
 		pos = geo.NewPos((canvasSize.Width-size.Width)/2, (canvasSize.Height-size.Height)/2)
+		pos = keepInside(pos, size, r.areaPos.Add(r.offset()), r.areaSize.Subtract(padding))
 	}
 	r.popUp.Content.Move(pos)
 	r.popUp.Content.Resize(size)
@@ -489,6 +502,18 @@ func (r *modalPopUpRenderer) Layout(canvasSize geo.Size) {
 	r.background.Move(innerPos)
 	r.background.Resize(size.Add(padding))
 	r.LayoutShadow(innerSize, innerPos)
+}
+
+// keepInside moves a box of size at pos the least distance that puts it inside
+// the area at areaPos of areaSize, which is at least as big.
+func keepInside(pos geo.Position, size geo.Size, areaPos geo.Position, areaSize geo.Size) geo.Position {
+	clamp := func(v, lo, extent, length float32) float32 {
+		return max(lo, min(v, lo+extent-length))
+	}
+	return geo.NewPos(
+		clamp(pos.X, areaPos.X, areaSize.Width, size.Width),
+		clamp(pos.Y, areaPos.Y, areaSize.Height, size.Height),
+	)
 }
 
 func (r *modalPopUpRenderer) MinSize() geo.Size {
@@ -513,6 +538,9 @@ func (r *modalPopUpRenderer) Refresh() {
 	r.background.CornerRadius = th.Size(theme.SizeNameShapeLarge)
 	expectedContentSize := r.popUp.innerSize.Max(r.popUp.MinSize()).Subtract(r.padding())
 	shouldLayout := r.popUp.Content.Size() != expectedContentSize
+	if areaPos, areaSize := r.popUp.Canvas.InteractiveArea(); areaPos != r.areaPos || areaSize != r.areaSize {
+		shouldLayout = true // a keyboard opened or closed
+	}
 
 	if r.background.Size() != r.popUp.innerSize || r.background.Position() != r.popUp.innerPos || shouldLayout {
 		r.Layout(r.popUp.Size())
