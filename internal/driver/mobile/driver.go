@@ -395,6 +395,9 @@ func (d *driver) Run() {
 
 					if insetChange {
 						current.canvas.sizeContent(current.canvas.size) // even if size didn't change we invalidate
+						// An on-screen keyboard arrives as a bottom inset: bring
+						// the field it was opened for above it (#654).
+						current.canvas.revealFocused()
 					}
 					// make sure that we paint on the next frame
 					c.Content().Refresh()

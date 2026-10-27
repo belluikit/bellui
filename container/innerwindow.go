@@ -71,13 +71,9 @@ func (w *InnerWindow) CreateRenderer() core.WidgetRenderer {
 	v := bellui.CurrentApp().Settings().ThemeVariant()
 
 	min := newBorderButton(theme.WindowMinimizeIcon(), modeMinimize, th, w.OnMinimized)
-	if w.OnMinimized == nil {
-		min.Disable()
-	}
+	setFrameButtonAction(min, w.OnMinimized)
 	max := newBorderButton(theme.WindowMaximizeIcon(), modeMaximize, th, w.OnMaximized)
-	if w.OnMaximized == nil {
-		max.Disable()
-	}
+	setFrameButtonAction(max, w.OnMaximized)
 
 	close := newBorderButton(theme.WindowCloseIcon(), modeClose, th, func() {
 		if f := w.CloseIntercept; f != nil {
@@ -129,6 +125,25 @@ func (w *InnerWindow) CreateRenderer() core.WidgetRenderer {
 	}
 	r.Layout(w.Size())
 	return r
+}
+
+// setFrameButtonAction gives a minimise or maximise button its action. One
+// without an action is disabled on desktop, and hidden on a phone or tablet,
+// where there is nothing to minimise to and an inner window already fills
+// most of the screen: a dialog there shows only its close button (#654).
+func setFrameButtonAction(b *borderButton, action func()) {
+	if action != nil {
+		b.SetOnTapped(action)
+		b.Enable()
+		b.Show()
+		return
+	}
+	b.Disable()
+	if bellui.CurrentDevice().IsMobile() {
+		b.Hide()
+	} else {
+		b.Show()
+	}
 }
 
 // Content returns the content of this inner window.
@@ -276,20 +291,9 @@ func (i *innerWindowRenderer) Refresh() {
 	}
 	i.bar.Refresh()
 
-	if i.win.OnMinimized == nil {
-		i.buttons[1].Disable()
-	} else {
-		i.buttons[1].SetOnTapped(i.win.OnMinimized)
-		i.buttons[1].Enable()
-	}
-
+	setFrameButtonAction(i.buttons[1], i.win.OnMinimized)
 	max := i.buttons[2]
-	if i.win.OnMaximized == nil {
-		i.buttons[2].Disable()
-	} else {
-		max.SetOnTapped(i.win.OnMaximized)
-		max.Enable()
-	}
+	setFrameButtonAction(max, i.win.OnMaximized)
 	if i.win.maximized {
 		max.b.SetIcon(theme.ViewRestoreIcon())
 	} else {

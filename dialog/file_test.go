@@ -146,10 +146,13 @@ func TestFileDialogResize(t *testing.T) {
 	file.Resize(size)
 	expectedWidth = 600                                          // since win width only 600
 	assert.Equal(t, expectedWidth, file.dialog.win.Size().Width) // max, also work
-	assert.Equal(t, expectedWidth, file.dialog.win.Content.Size().Width+theme.Padding()*2)
+	// The content stays inside the canvas's interactive area, which the test
+	// canvas reports a few pixels smaller than the canvas (#654).
+	_, area := win.Canvas().InteractiveArea()
+	assert.Equal(t, area.Width, file.dialog.win.Content.Size().Width+theme.Padding()*2)
 	expectedHeight = 400                                           // since win height only 400
 	assert.Equal(t, expectedHeight, file.dialog.win.Size().Height) // max, also work
-	assert.Equal(t, expectedHeight, file.dialog.win.Content.Size().Height+theme.Padding()*2)
+	assert.Equal(t, area.Height, file.dialog.win.Content.Size().Height+theme.Padding()*2)
 
 	// Test again - extreme small size
 	size = geo.NewSize(1, 1)

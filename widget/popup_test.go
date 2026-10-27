@@ -470,8 +470,11 @@ func TestModalPopUp_Resize_Constrained(t *testing.T) {
 	pop := NewModalPopUp(label, win.Canvas())
 
 	pop.Resize(geo.NewSize(90, 100))
-	assert.Equal(t, 80-theme.InnerPadding(), pop.Content.Size().Width)
-	assert.Equal(t, 80-theme.InnerPadding(), pop.Content.Size().Height)
+	// The content stays inside the canvas's interactive area, which the test
+	// canvas reports a few pixels smaller than the canvas (#654).
+	_, area := win.Canvas().InteractiveArea()
+	assert.Equal(t, area.Width-theme.InnerPadding(), pop.Content.Size().Width)
+	assert.Equal(t, area.Height-theme.InnerPadding(), pop.Content.Size().Height)
 	assert.Equal(t, float32(80), pop.Size().Width)
 	assert.Equal(t, float32(80), pop.Size().Height)
 }
