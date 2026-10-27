@@ -26,6 +26,10 @@ func newCanvasPainter(c core.Canvas, w *window) gpu.Painter {
 	return gl.NewPainter(c, w)
 }
 
+// tagSRGBSurface declares the window's pixels sRGB where the platform would
+// otherwise show the GL surface unmatched (macOS, #373).
+func tagSRGBSurface(w *window) { tagSRGBWindow(w) }
+
 // presentWindow swaps the GL double buffer to present the frame.
 func presentWindow(w *window) {
 	w.viewport.SwapBuffers()
