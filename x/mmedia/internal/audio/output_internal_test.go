@@ -53,3 +53,23 @@ func TestPositionCountsAtTheDeviceRate(t *testing.T) {
 		t.Errorf("a second of audio played reads as %v; want 1s", pos)
 	}
 }
+
+// TestStopForgetsTheSeekBase pins #833: Stop zeroed the bytes-read count and
+// kept the last seek's base, so the next playback's position read as that
+// seek's target until as many bytes had been read again as before it.
+func TestStopForgetsTheSeekBase(t *testing.T) {
+	o := NewDetachedOutput(2)
+	o.WriteSamples(make([]byte, 4*DeviceSampleRate)) // a second of 16-bit stereo
+	if _, err := o.buffer.Read(make([]byte, 4*DeviceSampleRate)); err != nil {
+		t.Fatal(err)
+	}
+	o.Rebase(3 * time.Second)
+	if got := o.PlaybackPosition(); got != 3*time.Second {
+		t.Fatalf("position after a seek to 3s: %v", got)
+	}
+
+	o.Stop()
+	if got := o.PlaybackPosition(); got != 0 {
+		t.Errorf("position after Stop: %v; want 0, not the earlier seek's target", got)
+	}
+}
