@@ -34,7 +34,13 @@ func (d *device) dismissKeyboard() {
 	d.keyboardDismissed = true
 }
 
+// handleKeyboard shows the keyboard for obj, or hides it for none. It is the
+// response to a focus change or a tap on the focused widget, so it ends a
+// dismissal (keyboardDismissed).
 func (d *device) handleKeyboard(obj event.Focusable) {
+	if d != nil {
+		d.keyboardDismissed = false
+	}
 	isDisabled := false
 	if disWid, ok := obj.(core.Disableable); ok {
 		isDisabled = disWid.Disabled()
