@@ -1076,6 +1076,32 @@ public class GoNativeActivity extends NativeActivity {
                             }
                             return true;
                         }
+                        // A widget that takes keys but no text gets the keys
+                        // keyboard (TYPE_NULL): no input connection edits, so a
+                        // hardware key reaches this EditText itself, which used
+                        // the arrows to move its own empty caret and Forward-Delete
+                        // on its own empty text. They never reached bellui, while
+                        // Return, Escape, Backspace, Tab, Page Up/Down and letters
+                        // did (#805, measured on the OPPO tablet). Route those keys
+                        // to bellui instead, down presses only (auto-repeat
+                        // included), and consume both directions.
+                        if (getInputType() == InputType.TYPE_NULL) {
+                            switch (keyCode) {
+                                case KeyEvent.KEYCODE_DPAD_UP:
+                                case KeyEvent.KEYCODE_DPAD_DOWN:
+                                case KeyEvent.KEYCODE_DPAD_LEFT:
+                                case KeyEvent.KEYCODE_DPAD_RIGHT:
+                                    if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                                        keyboardArrow(keyCode, event.getMetaState());
+                                    }
+                                    return true;
+                                case KeyEvent.KEYCODE_FORWARD_DEL:
+                                    if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                                        keyboardShortcut(keyCode, event.getMetaState());
+                                    }
+                                    return true;
+                            }
+                        }
                         return super.onKeyPreIme(keyCode, event);
                     }
                     @Override
