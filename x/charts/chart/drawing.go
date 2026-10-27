@@ -7,6 +7,7 @@ import (
 
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/x/charts/coord"
 	"github.com/belluikit/bellui/x/charts/interact"
 )
 
@@ -155,6 +156,12 @@ func (c *Chart) pixelToData(pos geo.Position) (float64, float64, bool) {
 	return x, y, true
 }
 
+// insidePlot reports whether pos is inside the plot rectangle pr, edges
+// included, as the drawing renderers test it.
+func insidePlot(pos geo.Position, pr coord.Rect) bool {
+	return pos.X >= pr.X && pos.X <= pr.X+pr.W && pos.Y >= pr.Y && pos.Y <= pr.Y+pr.H
+}
+
 // handleDrawingTap processes a tap in drawing mode. Returns true if consumed.
 func (c *Chart) handleDrawingTap(pos geo.Position) bool {
 	c.mu.Lock()
@@ -166,6 +173,13 @@ func (c *Chart) handleDrawingTap(pos geo.Position) bool {
 
 	// Measure tool doesn't use taps.
 	if c.drawingTool == interact.DrawingToolMeasure {
+		return false
+	}
+
+	// Drawings are drawn only inside the plot, so a tap outside it starts or
+	// finishes nothing. A text label begun there, next to the zoom buttons,
+	// showed while it was typed and vanished once finished (#795).
+	if snap := c.renderSnap; snap != nil && !insidePlot(pos, snap.plotRect) {
 		return false
 	}
 

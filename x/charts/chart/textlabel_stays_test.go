@@ -80,3 +80,45 @@ func TestChart_FirstTextLabelStays(t *testing.T) {
 		}
 	}
 }
+
+// A Text tool tap outside the plot starts no label: a label there was not
+// drawn, so it showed while typed and vanished once finished. Seen on an
+// iPad, tapping beside the zoom buttons above the plot (#795).
+func TestChart_TextLabelTapOutsideThePlotStartsNothing(t *testing.T) {
+	old := isMobile
+	isMobile = func() bool { return true }
+	t.Cleanup(func() { isMobile = old })
+	test.NewTempApp(t)
+	c := New(Option{
+		DataZoom: &interact.ZoomConfig{Enabled: true, MinSpan: 0.1, MaxSpan: 1.0, ZoomSensitivity: 0.1},
+		Grid:     &Grid{Left: 50, Right: 20, Top: 50, Bottom: 40},
+		XAxis:    []axis.Config{{Type: axis.TypeCategory, Data: []string{"a", "b", "c", "d"}}},
+		YAxis:    []axis.Config{{Type: axis.TypeValue}},
+		Series:   []series.Series{&series.LineSeries{SeriesName: "Price", Data: []float64{100, 105, 103, 108}}},
+	})
+	w := test.NewTempWindow(t, c)
+	w.Resize(geo.NewSize(800, 300))
+	drawnTexts(t, c)
+
+	c.SetDrawingTool(interact.DrawingToolTextLabel)
+	c.Tapped(&event.PointEvent{Position: geo.NewPos(400, 20)}) // above the plot, beside the zoom buttons
+	for _, r := range "lost" {
+		c.TypedRune(r)
+	}
+	c.TypedKey(&event.KeyEvent{Name: event.KeyReturn})
+	if n := len(c.Drawings()); n != 0 {
+		t.Errorf("a tap outside the plot made %d drawings, want none", n)
+	}
+	if drawn := drawnTexts(t, c); drawn["lost|"] != 0 || drawn["lost"] != 0 {
+		t.Errorf("text typed after a tap outside the plot is on screen: %v", drawn)
+	}
+
+	c.Tapped(&event.PointEvent{Position: geo.NewPos(400, 150)}) // inside: still works
+	for _, r := range "kept" {
+		c.TypedRune(r)
+	}
+	c.TypedKey(&event.KeyEvent{Name: event.KeyReturn})
+	if drawn := drawnTexts(t, c); drawn["kept"] != 1 {
+		t.Errorf("a label inside the plot is drawn %d times, want once", drawn["kept"])
+	}
+}
