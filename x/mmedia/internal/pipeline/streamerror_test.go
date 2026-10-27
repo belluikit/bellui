@@ -159,3 +159,49 @@ func TestDroppedHTTPStreamIsAnError(t *testing.T) {
 		}
 	})
 }
+
+// TestPlayAfterTheEndPlaysAgain pins #842: Play after an audio-only stream
+// ended reported the end again at once, and the display loop the first Play
+// started was never stopped, so the next Stop waited on it forever.
+func TestPlayAfterTheEndPlaysAgain(t *testing.T) {
+	if _, err := newAudioOutput(2); err != nil {
+		t.Skipf("no audio device: %v", err)
+	}
+	p, err := NewPipelineURL("../source/testdata/sample_51.m4a") // 2 s, audio only
+	if err != nil {
+		t.Fatalf("NewPipelineURL: %v", err)
+	}
+	defer p.Close()
+
+	if r := playToTheEnd(t, p, 10*time.Second); !r.ended {
+		t.Fatalf("first play: OnError(%v); want OnEnd", r.err)
+	}
+	start := time.Now()
+	r := playToTheEnd(t, p, 10*time.Second)
+	if !r.ended {
+		t.Fatalf("second play: OnError(%v); want OnEnd", r.err)
+	}
+	// It played from the start rather than reporting the old end: most of the
+	// 2 s went by (playToTheEnd adds its 200 ms after the report).
+	if took := time.Since(start); took < 1500*time.Millisecond {
+		t.Errorf("second play ended after %v; want it to play the %v clip again", took, p.Duration())
+	}
+
+	// A seek after the end is where the next Play starts.
+	p.Seek(p.Duration() - 500*time.Millisecond)
+	start = time.Now()
+	if r := playToTheEnd(t, p, 10*time.Second); !r.ended {
+		t.Fatalf("play after a seek: OnError(%v); want OnEnd", r.err)
+	}
+	if took := time.Since(start); took > 1200*time.Millisecond {
+		t.Errorf("play from 0.5 s before the end took %v; want it to start at the seek, not at 0", took)
+	}
+
+	stopped := make(chan struct{})
+	go func() { p.Stop(); close(stopped) }()
+	select {
+	case <-stopped:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Stop hung after playing a second time")
+	}
+}

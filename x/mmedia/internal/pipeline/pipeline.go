@@ -511,6 +511,8 @@ func (p *Pipeline) State() State { return p.state.Get() }
 
 // Play starts playback.
 func (p *Pipeline) Play() {
+	p.restAfterEnd()
+
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -637,6 +639,32 @@ func (p *Pipeline) resume() {
 	if p.hasAudio {
 		p.audioOutput.Resume()
 	}
+}
+
+// restAfterEnd brings a stream that ran out, at its end or on an error, to
+// rest before Play starts it again, and plays it from the start — or from a
+// position sought since, which is how an app resumes a dropped stream.
+//
+// Without it Play started a second set of goroutines over the first: an
+// audio-only stream's display loop outlives the end it reports, its stop
+// channel was overwritten unclosed, and the next Stop or Close waited on it
+// forever. And the source was still at its end, so nothing played (#842).
+func (p *Pipeline) restAfterEnd() {
+	p.mu.Lock()
+	ranOut := p.state.IsStopped() && p.stopCh != nil
+	p.mu.Unlock()
+	if !ranOut {
+		return
+	}
+	pos := p.CurrentTime()
+	if !p.halt() {
+		return
+	}
+	if p.src.HasEnded() {
+		p.src.Rewind()
+		return
+	}
+	p.Seek(pos) // halt reset the clock and the audio position
 }
 
 // Stop stops playback and resets position.
