@@ -240,6 +240,8 @@ func TestEncodeConfigChanges(t *testing.T) {
 		// ^attr-private/screenLayout, which the pre-#299 strip blanked.
 		{"screenLayout", 0x0100},
 		{"orientation|keyboardHidden|uiMode|locale|layoutDirection|screenLayout", 0x23a4},
+		{"keyboard", 0x0010},
+		{"orientation|keyboard|keyboardHidden|uiMode|locale|layoutDirection|screenLayout", 0x23b4},
 	}
 	for _, tt := range tests {
 		t.Run(tt.flags, func(t *testing.T) {

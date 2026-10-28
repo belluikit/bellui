@@ -1209,9 +1209,11 @@ public class GoNativeActivity extends NativeActivity {
 	    // yields one settled updateSelection, not a mid-batch flicker.
 	    private int batchDepth = 0;
 	    // The key whose DOWN sendKeyEvent consumed, so its UP is consumed too. Handed
-	    // to super, that UP reaches the native queue, where processKey reads an
-	    // ACTION_UP as a press, and the key would act twice: one soft Backspace
-	    // deleted two characters on a non-editor's keyboard (#666).
+	    // to super, that UP reaches the native queue without its DOWN. processKey
+	    // used to read an ACTION_UP as a press, so one soft Backspace deleted two
+	    // characters on a non-editor's keyboard (#666). Since #793 the UP is a
+	    // release, which bellui ignores, but a key is still delivered whole by one
+	    // path: a DOWN handled here never leaves its UP to another.
 	    private int consumedDownKey = KeyEvent.KEYCODE_UNKNOWN;
 	    // Batch-edit coalescing (pre-rebrand tracker #1080, the correct redo of the reverted pre-rebrand tracker #1015).
 	    // A TalkBack/IME batch that replaces text (Select-all then type → delete-all

@@ -22,10 +22,13 @@
 	     also moves screen-layout-only transitions (e.g. ColorOS split-screen
 	     entry) in place - bellui relayouts from the size events - while
 	     changes carrying the undeclared screenSize/smallestScreenSize bits
-	     (fold/unfold, split resize crossings) keep recreating as before. -->
+	     (fold/unfold, split resize crossings) keep recreating as before.
+	     keyboard: plugging in or removing a hardware keyboard changes the
+	     keyboard type as well as keyboardHidden, so without it attaching a
+	     USB or Bluetooth keyboard relaunched the activity (#793). -->
 	<activity android:name="org.golang.app.GoNativeActivity"
 		android:label="{{xml .Name}}"
-		android:configChanges="orientation|keyboardHidden|uiMode|locale|layoutDirection|screenLayout"
+		android:configChanges="orientation|keyboard|keyboardHidden|uiMode|locale|layoutDirection|screenLayout"
 		android:exported="true"
 		android:theme="@android:style/Theme">
 		<meta-data android:name="android.app.lib_name" android:value="{{xml .LibName}}" />
