@@ -63,6 +63,41 @@ const char* getString(uintptr_t jni_env, uintptr_t ctx, jstring str) {
 	return copy;
 }
 
+// takeException clears the pending Java exception and describes it for the Go
+// caller, which frees the result: its toString(), the class name and message,
+// such as "java.io.FileNotFoundException: tfe: Cello error 2." for a Drive
+// document while offline (#849). *notFound is set when it is a
+// FileNotFoundException, which Go reports as storage.ErrNotExists.
+static char *takeException(JNIEnv *env, bool *notFound) {
+	jthrowable exc = (*env)->ExceptionOccurred(env);
+	(*env)->ExceptionClear(env);
+	*notFound = false;
+	if (exc == NULL) {
+		return NULL;
+	}
+	jclass fnf = (*env)->FindClass(env, "java/io/FileNotFoundException");
+	if (fnf == NULL) {
+		(*env)->ExceptionClear(env);
+	} else {
+		*notFound = (*env)->IsInstanceOf(env, exc, fnf);
+	}
+
+	jclass excClass = (*env)->GetObjectClass(env, exc);
+	jmethodID toString = (*env)->GetMethodID(env, excClass, "toString", "()Ljava/lang/String;");
+	jstring desc = NULL;
+	if (toString != 0) {
+		desc = (jstring)(*env)->CallObjectMethod(env, exc, toString);
+	}
+	if ((*env)->ExceptionCheck(env) || desc == NULL) {
+		(*env)->ExceptionClear(env);
+		return strdup("a Java exception that could not be described");
+	}
+	const char *chars = (*env)->GetStringUTFChars(env, desc, NULL);
+	char *copy = strdup(chars);
+	(*env)->ReleaseStringUTFChars(env, desc, chars);
+	return copy;
+}
+
 jobject parseURI(uintptr_t jni_env, uintptr_t ctx, char* uriCstr) {
 	JNIEnv *env = (JNIEnv*)jni_env;
 
@@ -170,8 +205,13 @@ int openFD(uintptr_t jni_env, uintptr_t ctx, char* uriCstr) {
 	return (int)fd;
 }
 
-void* openStream(uintptr_t jni_env, uintptr_t ctx, char* uriCstr) {
+// openStream opens uriCstr for reading. On failure it returns NULL, with *err
+// describing the Java exception (see takeException) or NULL when the provider
+// returned no stream without throwing.
+void* openStream(uintptr_t jni_env, uintptr_t ctx, char* uriCstr, char **err, bool *notFound) {
 	JNIEnv *env = (JNIEnv*)jni_env;
+	*err = NULL;
+	*notFound = false;
 	jobject resolver = getContentResolver(jni_env, ctx);
 
 	jclass resolverClass = (*env)->GetObjectClass(env, resolver);
@@ -179,18 +219,22 @@ void* openStream(uintptr_t jni_env, uintptr_t ctx, char* uriCstr) {
 
 	jobject uri = parseURI(jni_env, ctx, uriCstr);
 	jobject stream = (jobject)(*env)->CallObjectMethod(env, resolver, openInputStream, uri);
-	jthrowable loadErr = (*env)->ExceptionOccurred(env);
-
-	if (loadErr != NULL) {
-		(*env)->ExceptionClear(env);
+	if ((*env)->ExceptionCheck(env)) {
+		*err = takeException(env, notFound);
+		return NULL;
+	}
+	if (stream == NULL) {
 		return NULL;
 	}
 
 	return (*env)->NewGlobalRef(env, stream);
 }
 
-void* saveStream(uintptr_t jni_env, uintptr_t ctx, char* uriCstr, bool truncate) {
+// saveStream opens uriCstr for writing, reporting a failure as openStream does.
+void* saveStream(uintptr_t jni_env, uintptr_t ctx, char* uriCstr, bool truncate, char **err, bool *notFound) {
 	JNIEnv *env = (JNIEnv*)jni_env;
+	*err = NULL;
+	*notFound = false;
 	jobject resolver = getContentResolver(jni_env, ctx);
 
 	jclass resolverClass = (*env)->GetObjectClass(env, resolver);
@@ -204,10 +248,11 @@ void* saveStream(uintptr_t jni_env, uintptr_t ctx, char* uriCstr, bool truncate)
 		modes = (*env)->NewStringUTF(env, "wa");
 	}
 	jobject stream = (jobject)(*env)->CallObjectMethod(env, resolver, saveOutputStream, uri, modes);
-	jthrowable loadErr = (*env)->ExceptionOccurred(env);
-
-	if (loadErr != NULL) {
-		(*env)->ExceptionClear(env);
+	if ((*env)->ExceptionCheck(env)) {
+		*err = takeException(env, notFound);
+		return NULL;
+	}
+	if (stream == NULL) {
 		return NULL;
 	}
 

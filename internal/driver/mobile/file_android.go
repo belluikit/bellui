@@ -11,9 +11,9 @@ package mobile
 bool deleteURI(uintptr_t jni_env, uintptr_t ctx, char* uriCstr);
 bool existsURI(uintptr_t jni_env, uintptr_t ctx, char* uriCstr);
 int openFD(uintptr_t jni_env, uintptr_t ctx, char* uriCstr);
-void* openStream(uintptr_t jni_env, uintptr_t ctx, char* uriCstr);
+void* openStream(uintptr_t jni_env, uintptr_t ctx, char* uriCstr, char **err, bool *notFound);
 char* readStream(uintptr_t jni_env, uintptr_t ctx, void* stream, int len, int* total);
-void* saveStream(uintptr_t jni_env, uintptr_t ctx, char* uriCstr, bool truncate);
+void* saveStream(uintptr_t jni_env, uintptr_t ctx, char* uriCstr, bool truncate, char **err, bool *notFound);
 void writeStream(uintptr_t jni_env, uintptr_t ctx, void* stream, char* data, int len);
 void closeStream(uintptr_t jni_env, uintptr_t ctx, void* stream);
 */
@@ -92,21 +92,36 @@ func (s *javaStream) Close() error {
 	return nil
 }
 
-func openStream(uri string) unsafe.Pointer {
+func openStream(uri string) (unsafe.Pointer, error) {
 	uriStr := C.CString(uri)
 	defer C.free(unsafe.Pointer(uriStr))
 
 	var stream unsafe.Pointer
+	var openErr error
 	app.RunOnJVM(func(_, env, ctx uintptr) error {
-		streamPtr := C.openStream(C.uintptr_t(env), C.uintptr_t(ctx), uriStr)
+		var cErr *C.char
+		var notFound C.bool
+		streamPtr := C.openStream(C.uintptr_t(env), C.uintptr_t(ctx), uriStr, &cErr, &notFound)
 		if streamPtr == C.NULL {
-			return os.ErrNotExist
+			openErr = takeOpenFailure(cErr, notFound)
+			return openErr
 		}
 
 		stream = unsafe.Pointer(streamPtr)
 		return nil
 	})
-	return stream
+	return stream, openErr
+}
+
+// takeOpenFailure turns what openStream or saveStream reported into an error,
+// freeing the description.
+func takeOpenFailure(cErr *C.char, notFound C.bool) error {
+	desc := ""
+	if cErr != nil {
+		desc = C.GoString(cErr)
+		C.free(unsafe.Pointer(cErr))
+	}
+	return openFailure(desc, bool(notFound))
 }
 
 // openDocumentFile opens uri as a file descriptor, or returns nil when the
@@ -151,9 +166,12 @@ func nativeFileOpen(f *fileOpen) (io.ReadCloser, error) {
 		return forwardFile{file}, nil
 	}
 
-	ret := openStream(f.uri.String())
+	ret, err := openStream(f.uri.String())
 	if ret == nil {
-		return nil, storage.ErrNotExists
+		if err == nil {
+			err = storage.ErrNotExists
+		}
+		return nil, err
 	}
 
 	stream := &javaStream{}
@@ -161,21 +179,25 @@ func nativeFileOpen(f *fileOpen) (io.ReadCloser, error) {
 	return stream, nil
 }
 
-func saveStream(uri string, truncate bool) unsafe.Pointer {
+func saveStream(uri string, truncate bool) (unsafe.Pointer, error) {
 	uriStr := C.CString(uri)
 	defer C.free(unsafe.Pointer(uriStr))
 
 	var stream unsafe.Pointer
+	var saveErr error
 	app.RunOnJVM(func(_, env, ctx uintptr) error {
-		streamPtr := C.saveStream(C.uintptr_t(env), C.uintptr_t(ctx), uriStr, C.bool(truncate))
+		var cErr *C.char
+		var notFound C.bool
+		streamPtr := C.saveStream(C.uintptr_t(env), C.uintptr_t(ctx), uriStr, C.bool(truncate), &cErr, &notFound)
 		if streamPtr == C.NULL {
-			return os.ErrNotExist
+			saveErr = takeOpenFailure(cErr, notFound)
+			return saveErr
 		}
 
 		stream = unsafe.Pointer(streamPtr)
 		return nil
 	})
-	return stream
+	return stream, saveErr
 }
 
 func nativeFileSave(f *fileSave, truncate bool) (io.WriteCloser, error) {
@@ -183,9 +205,12 @@ func nativeFileSave(f *fileSave, truncate bool) (io.WriteCloser, error) {
 		return nil, nil
 	}
 
-	ret := saveStream(f.uri.String(), truncate)
+	ret, err := saveStream(f.uri.String(), truncate)
 	if ret == nil {
-		return nil, storage.ErrNotExists
+		if err == nil {
+			err = storage.ErrNotExists
+		}
+		return nil, err
 	}
 
 	stream := &javaStream{}
