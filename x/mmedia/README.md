@@ -111,6 +111,29 @@ target. Eleven platforms are published (darwin, linux, windows, android, iOS
 and the iOS Simulator, amd64/arm64/arm as applicable); the module graph resolves
 only the matching one.
 
+### Background playback
+
+On **iOS**, x/mmedia sets the app's audio session to the Playback category when
+it opens the audio device ([#845](https://github.com/belluikit/bellui/issues/845)).
+Audio then keeps playing when the app is in the background or the screen is
+locked, and it plays through the silent switch, as a music or podcast app does.
+iOS only allows the background part when the app declares it, in
+`ios/Info.plist` next to `manifest.pxf`:
+
+```xml
+<key>UIBackgroundModes</key>
+<array>
+	<string>audio</string>
+</array>
+```
+
+Without that key, iOS still stops the audio when the app leaves the
+foreground (Apple's rule for the category, not measured here).
+
+On **Android**, playback continued in the background and on the lock screen
+with no extra setup on the one tablet measured (2026-10-27). Android may still
+freeze an app that sits in the background without playing.
+
 ## Provenance
 
 Migrated from `trendvidia/fyplayer`. See `PROVENANCE.md` for the source ref, the
