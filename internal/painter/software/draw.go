@@ -405,7 +405,9 @@ func drawOblong(c core.Canvas, obj core.CanvasObject, fill, stroke color.Color, 
 	scaledHeight := scale.ToScreenCoordinate(c, height)
 	scaledX, scaledY := scale.ToScreenCoordinate(c, pos.X), scale.ToScreenCoordinate(c, pos.Y)
 	bounds := clip.Intersect(image.Rect(scaledX, scaledY, scaledX+scaledWidth, scaledY+scaledHeight))
-	draw.Draw(base, bounds, image.NewUniform(fill), image.Point{}, draw.Over)
+	if fill != nil {
+		draw.Draw(base, bounds, image.NewUniform(fill), image.Point{}, draw.Over)
+	}
 }
 
 // applyRoundedCorners rounds the corners of the image in-place
