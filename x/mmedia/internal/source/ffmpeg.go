@@ -82,12 +82,28 @@ func NewFFmpegSourceURL(url string) (*FFmpegSource, error) {
 // the pipeline reports it through OnError.
 //
 // Measured on an MP3 over HTTP: a drop and a 5 s stall both played on to the
-// end; without these, a drop ended playback and a stall hung it. A live stream
-// (no length, no ranges) and HLS did no better and no worse with them.
-const httpOptions = "reconnect=1,reconnect_streamed=1,reconnect_delay_max=2,rw_timeout=5000000"
+// end; without these, a drop ended playback and a stall hung it. HLS did no
+// better and no worse with them.
+const httpOptions = "reconnect=1,reconnect_delay_max=2,rw_timeout=5000000"
+
+// liveHTTPOptions add reconnect_streamed, which reconnects a stream the server
+// cannot seek in. That is right for a live stream: a dropped one with it ends
+// in OnError, and without it in a clean end, as if the station had finished.
+// It is wrong for a file from a server that ignores Range. The reconnect asks
+// for the rest, the server answers 200 from byte 0, and FFmpeg plays the
+// file's start as the continuation, with no error (#868). Measured on a 180 s
+// MP3 cut at byte 200000 and seeked to 177 s: decoding ran on to 192.5 s.
+const liveHTTPOptions = httpOptions + ",reconnect_streamed=1"
 
 // openURL opens url, with httpOptions for an http(s) URL. A purego
 // libgoffmpeg too old for per-open options gets a plain open rather than none.
+//
+// FFmpeg reports nothing about the server, so the duration tells a live stream
+// from a file: a stream with no length has none. Such a stream is opened again
+// with liveHTTPOptions. A file pays nothing extra; a live stream pays a second
+// connection. A server that sends no length for a file whose duration FFmpeg
+// can still read (a VBR MP3's Xing header) is taken for a file, and a drop
+// there ends cleanly, as every live stream's did without reconnect_streamed.
 func openURL(url string) (goffmpeg.IDecoder, error) {
 	lower := strings.ToLower(url)
 	if !strings.HasPrefix(lower, "http://") && !strings.HasPrefix(lower, "https://") {
@@ -97,7 +113,11 @@ func openURL(url string) (goffmpeg.IDecoder, error) {
 	if errors.Is(err, goffmpeg.ErrOpenOptionsUnavailable) {
 		return goffmpeg.Open(url)
 	}
-	return dec, err
+	if err != nil || dec.Duration() > 0 {
+		return dec, err
+	}
+	dec.Close()
+	return goffmpeg.OpenWithOptions(url, liveHTTPOptions)
 }
 
 func newFFmpegSource(dec goffmpeg.IDecoder) *FFmpegSource {
