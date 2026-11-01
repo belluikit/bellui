@@ -62,8 +62,9 @@ func NewFFmpegSource(r io.Reader) (*FFmpegSource, error) {
 	return newFFmpegSource(dec), nil
 }
 
-// NewFFmpegSourceURL decodes from a file path or network URL (http/https are
-// compiled in), letting libavformat own the I/O rather than reading through Go.
+// NewFFmpegSourceURL decodes from a file path or network URL (http is compiled
+// in, and https except on Android), letting libavformat own the I/O rather than
+// reading through Go.
 // An http(s) URL reconnects on its own; see openURL.
 func NewFFmpegSourceURL(url string) (*FFmpegSource, error) {
 	dec, err := openURL(url)

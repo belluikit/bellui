@@ -50,7 +50,8 @@ func NewVideoPlayer(r io.Reader, opts ...Option) (*VideoPlayer, error) {
 // is only text.
 //
 // http and https are compiled in, as are the hls and rtsp demuxers and the
-// rtmp protocol.
+// rtmp protocol. The exception is https on Android, where FFmpeg has no TLS and
+// an https URL fails to open.
 //
 // A stream with audio fails here when the audio device will not open or the
 // stream cannot be converted to its format; see the package documentation.
