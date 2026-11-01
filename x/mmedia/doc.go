@@ -16,7 +16,8 @@
 // [NewMediaPlayerURL] plays from a file path or network URL instead, letting
 // FFmpeg own the I/O. That is the form to use for anything that fetches its own
 // data — HLS, RTSP, RTMP — or that needs range-request seeking within a network
-// stream. FFmpeg has no TLS on Android, so an https URL fails to open there.
+// stream. FFmpeg has no TLS on Android, so an https URL is read through Go
+// there, which plays a file but not an HLS playlist.
 //
 // [WithScrubPreview] shows the frame under the pointer while the seek bar is
 // hovered, so a viewer can see where a seek would land before committing to it.

@@ -73,11 +73,14 @@ RTSP, RTMP — because a playlist read as a byte stream is only text. It is also
 the form that can seek inside a network stream, via range requests. `http`,
 `https`, the `hls` and `rtsp` demuxers and the `rtmp` protocol are compiled in.
 
-The exception is `https` on Android. FFmpeg's Android libraries have no TLS, so
-an `https` URL fails to open there, with `failed to open decoder: -1`, and that
-includes an `https` HLS playlist. Plain `http` works. A single `https` file can
-instead be read through Go and passed to the `io.Reader` form, which needs an
-`io.ReadSeeker` to be seekable. HLS cannot go that way.
+`https` on Android is the exception. FFmpeg's Android libraries have no TLS, so
+there x/mmedia reads an `https` URL through Go's `net/http` instead, with range
+requests, and hands the bytes to FFmpeg. A file still streams and seeks, a
+dropped or stalled connection is resumed as FFmpeg would, and the system's
+certificates are used, so an app ships no CA bundle. An `https` HLS playlist
+cannot be read that way, since its segments are fetched by the demuxer, so it
+fails to open on Android with an error that says so. Plain `http` is FFmpeg's
+on every platform.
 
 ## Subtitles
 

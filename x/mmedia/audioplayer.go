@@ -47,8 +47,9 @@ func NewAudioPlayer(r io.Reader, opts ...Option) (*AudioPlayer, error) {
 // is only text.
 //
 // http and https are compiled in, as are the hls and rtsp demuxers and the
-// rtmp protocol. The exception is https on Android, where FFmpeg has no TLS and
-// an https URL fails to open.
+// rtmp protocol. On Android, where FFmpeg has no TLS, an https URL is read through
+// Go instead; it streams and seeks as on other platforms, but an https HLS
+// playlist fails to open.
 //
 // A stream with audio fails here when the audio device will not open or the
 // stream cannot be converted to its format; see the package documentation.
