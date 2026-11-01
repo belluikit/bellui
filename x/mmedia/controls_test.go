@@ -6,6 +6,7 @@ import (
 
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/test"
 	"github.com/belluikit/bellui/theme"
 )
 
@@ -233,5 +234,59 @@ func TestFormatDurationHours(t *testing.T) {
 		if got := formatDuration(tc.in); got != tc.want {
 			t.Errorf("formatDuration(%v) = %q, want %q", tc.in, got, tc.want)
 		}
+	}
+}
+
+func laidOutControls(t *testing.T, width float32) (*TransportControls, geo.Size) {
+	t.Helper()
+	tc := NewTransportControls()
+	tc.Resize(geo.NewSize(width, 0)) // gives the height its rows
+	size := geo.NewSize(width, tc.MinSize().Height)
+	tc.Resize(size)
+	test.TempWidgetRenderer(t, tc).Layout(size)
+	return tc, size
+}
+
+// A narrow window left the seek bar no width, so only its thumb showed, and it
+// never moved (#866).
+func TestSeekBarHasARowOfItsOwnWhenNarrow(t *testing.T) {
+	for _, width := range []float32{240, 320, 360, 420, 500} {
+		tc, _ := laidOutControls(t, width)
+		if got := tc.seekBar.Size().Width; got != width {
+			t.Errorf("at %v the seek bar is %v wide, want the whole row", width, got)
+		}
+		if tc.seekBar.Position().Y >= tc.timeLabel.Position().Y {
+			t.Errorf("at %v the seek bar is not above the buttons", width)
+		}
+		if tc.MinSize().Width > width {
+			t.Errorf("at %v the minimum width is %v", width, tc.MinSize().Width)
+		}
+	}
+}
+
+func TestControlsStayInOneRowWhenTheyFit(t *testing.T) {
+	tc, size := laidOutControls(t, 800)
+	if got := tc.seekBar.Size().Width; got < seekBarMinWidth {
+		t.Errorf("seek bar is %v wide", got)
+	}
+	if tc.seekBar.Position().X <= tc.timeLabel.Position().X {
+		t.Error("the seek bar is not after the time")
+	}
+	if size.Height >= NewTransportControls().MinSize().Height {
+		t.Errorf("height %v is not one row", size.Height)
+	}
+}
+
+func TestVolumeSliderGivesWayToTheMuteButton(t *testing.T) {
+	tc, _ := laidOutControls(t, 500)
+	if !tc.volumeBar.Visible() {
+		t.Error("slider hidden at 500")
+	}
+	tc, size := laidOutControls(t, tc.fixedWidth())
+	if tc.volumeBar.Visible() {
+		t.Error("slider shown with no room")
+	}
+	if !tc.muteBtn.Visible() || tc.muteBtn.Position().X+tc.muteBtn.Size().Width > size.Width {
+		t.Error("mute button is not in the row")
 	}
 }
