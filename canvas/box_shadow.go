@@ -6,10 +6,13 @@ import (
 	"github.com/belluikit/bellui/geo"
 )
 
-// BoxShadow is a canvas object that renders a blurred shadow behind a widget.
-// When the GL painter supports FBO blur, this produces a soft Gaussian-blurred
-// shadow. On software painters or when FBO is unavailable, it falls back to a
-// solid colored rectangle with reduced opacity.
+// BoxShadow is a canvas object that renders a blurred shadow behind a widget:
+// its rounded rect, in Color, blurred by a Gaussian. The GPU painters
+// approximate the Gaussian with a 9-tap blur; the software painter, which
+// draws headless captures and test images, computes it exactly, within a few
+// levels of the GPU result (hack/shadowprobe). The GL painter draws nothing on
+// a target without framebuffers (wasm), and no painter draws a shadow whose
+// BlurRadius is 0.
 type BoxShadow struct {
 	baseObject
 
