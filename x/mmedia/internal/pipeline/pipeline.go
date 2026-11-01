@@ -91,6 +91,9 @@ type Pipeline struct {
 	// pausedSeek asks the idle decoder for the frame at a seek made while
 	// paused, which nothing else decodes or shows until Play (#831).
 	pausedSeek atomic.Bool
+	// seekFailed asks the idle decoder of a paused pipeline to report a seek
+	// that failed, which a playing one reports as it reaches the end (#869).
+	seekFailed atomic.Bool
 
 	videoWidth  int
 	videoHeight int
@@ -948,11 +951,19 @@ func (p *Pipeline) Seek(pos time.Duration) {
 	p.decodeMu.Lock()
 	defer p.decodeMu.Unlock()
 	p.src.Seek(pos)
-	// Under decodeMu, no frame decoded before the seek gets the new
-	// generation; under presentMu, none checked before it is shown after it.
-	p.presentMu.Lock()
-	p.seekGen.Add(1)
-	p.presentMu.Unlock()
+	// A seek that failed stops the source with the reason (#869). Playback did
+	// not move, so the clock stays, and OnError reports where it stopped, not
+	// the target. The decoder still needs the drain below: paused, it is
+	// blocked sending into a full queue, and has to get free to report.
+	failed := p.src.HasEnded() && p.sourceError() != nil
+	p.seekFailed.Store(failed)
+	if !failed {
+		// Under decodeMu, no frame decoded before the seek gets the new
+		// generation; under presentMu, none checked before it is shown after it.
+		p.presentMu.Lock()
+		p.seekGen.Add(1)
+		p.presentMu.Unlock()
+	}
 
 	// Discard everything decoded before the seek: queued video frames and
 	// buffered (unplayed) audio. The audio position is rebased so the
@@ -970,12 +981,14 @@ func (p *Pipeline) Seek(pos time.Duration) {
 			}
 		}
 	}
-	if p.audioOutput != nil {
-		p.audioOutput.Rebase(pos)
-	}
-	p.clock.Seek(pos)
-	if p.hasVideo && p.state.IsPaused() {
-		p.pausedSeek.Store(true)
+	if !failed {
+		if p.audioOutput != nil {
+			p.audioOutput.Rebase(pos)
+		}
+		p.clock.Seek(pos)
+		if p.hasVideo && p.state.IsPaused() {
+			p.pausedSeek.Store(true)
+		}
 	}
 
 	select {
@@ -1078,6 +1091,10 @@ func (p *Pipeline) decodeAhead(stop <-chan struct{}) {
 		}
 
 		if !p.state.IsPlaying() {
+			if p.state.IsPaused() && p.seekFailed.CompareAndSwap(true, false) {
+				p.reportEnd()
+				return
+			}
 			if p.state.IsPaused() && p.pausedSeek.CompareAndSwap(true, false) {
 				p.showPausedSeek(step)
 			}

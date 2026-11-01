@@ -3,6 +3,7 @@ package source
 import (
 	"errors"
 	"image"
+	"strings"
 	"testing"
 	"time"
 
@@ -17,6 +18,7 @@ type fakeDecoder struct {
 	nexts    int
 	duration float64
 	nextErr  error
+	seekErr  error
 	// leadingAudio is how many audio packets Next yields before the first video
 	// frame, so a reader that assumes the first packet after a seek is video can
 	// be caught. Interleaved containers make that the common case, not an edge.
@@ -30,7 +32,7 @@ func (f *fakeDecoder) AudioInfo() goffmpeg.AudioInfo { return goffmpeg.AudioInfo
 func (f *fakeDecoder) Position() float64             { return 0 }
 func (f *fakeDecoder) Duration() float64             { return f.duration }
 
-func (f *fakeDecoder) Seek(float64) error { f.seeks++; return nil }
+func (f *fakeDecoder) Seek(float64) error { f.seeks++; return f.seekErr }
 
 func (f *fakeDecoder) SetAudioChannels(int) error   { return nil }
 func (f *fakeDecoder) SetAudioSampleRate(int) error { return nil }
@@ -258,5 +260,23 @@ func TestFileSourceIsNotLive(t *testing.T) {
 	// against real media in ffmpeg_test.go.
 	if s.reopen != nil {
 		t.Error("a non-device source must have no reacquire path")
+	}
+}
+
+// TestFailedSeekStopsTheSource pins #869: a seek the decoder refused was
+// dropped, and playback carried on from the old position as if it had landed.
+func TestFailedSeekStopsTheSource(t *testing.T) {
+	refused := errors.New("seek failed: -78")
+	dec := &fakeDecoder{duration: 10, seekErr: refused}
+	s := newFFmpegSource(dec)
+	s.Seek(5 * time.Second)
+	if !s.HasEnded() {
+		t.Error("the source plays on after a seek that failed")
+	}
+	if err := s.Err(); !errors.Is(err, refused) || !strings.Contains(err.Error(), "5s") {
+		t.Errorf("Err() = %v; want the decoder's error, with the position asked for", err)
+	}
+	if dec.nexts != 0 {
+		t.Errorf("%d packet(s) decoded after the failed seek; want none", dec.nexts)
 	}
 }
