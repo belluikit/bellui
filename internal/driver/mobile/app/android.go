@@ -801,6 +801,14 @@ func processEvent(env *C.JNIEnv, e *C.AInputEvent) {
 	}
 }
 
+// keyaction.go mirrors the NDK's key actions so its conversion is tested off
+// Android. These fail to compile if a mirrored value differs from the NDK's.
+var (
+	_ [keyActionDown - C.AKEY_EVENT_ACTION_DOWN]struct{}         = [0]struct{}{}
+	_ [keyActionUp - C.AKEY_EVENT_ACTION_UP]struct{}             = [0]struct{}{}
+	_ [keyActionMultiple - C.AKEY_EVENT_ACTION_MULTIPLE]struct{} = [0]struct{}{}
+)
+
 func processKey(env *C.JNIEnv, e *C.AInputEvent) {
 	deviceID := C.AInputEvent_getDeviceId(e)
 	if deviceID == 0 {
@@ -817,14 +825,11 @@ func processKey(env *C.JNIEnv, e *C.AInputEvent) {
 	if nativeDigitIsEcho(k.Rune, KeyboardType(shownKeyboard.Load())) {
 		return // the text keyboard delivers this digit as text
 	}
-	switch C.AKeyEvent_getAction(e) {
-	case C.AKEY_STATE_DOWN:
-		k.Direction = key.DirPress
-	case C.AKEY_STATE_UP:
-		k.Direction = key.DirRelease
-	default:
-		k.Direction = key.DirNone
+	dir, ok := nativeKeyDirection(int32(C.AKeyEvent_getAction(e)), int32(C.AKeyEvent_getRepeatCount(e)), k.Code)
+	if !ok {
+		return
 	}
+	k.Direction = dir
 	theApp.events.In() <- k
 }
 

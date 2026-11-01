@@ -361,7 +361,8 @@ func (d *driver) Run() {
 					// An in-place configuration change (Android delivers
 					// manifest-declared changes as onConfigurationChanged —
 					// orientation|keyboardHidden|uiMode|locale|layoutDirection
-					// since #287, plus screenLayout since #299). Re-resolve
+					// since #287, plus screenLayout since #299 and keyboard
+					// since #793). Re-resolve
 					// the system locale so an Android 13+ per-app language
 					// change applies with no lifecycle crossing for the
 					// StageFocused seam to catch (#288).

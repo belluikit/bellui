@@ -154,12 +154,12 @@ func TestAaptDumpTemplateManifest(t *testing.T) {
 		fmt.Sprintf("A: android:minSdkVersion(0x0101020c)=(type 0x10)%#x", MinSDK),
 		"A: android:targetSdkVersion(0x01010270)=(type 0x10)0x1e",
 		// template values across the data types: int, string, bool, flags,
-		// reference. 0x23a4 is the template's configChanges value —
+		// reference. 0x23b4 is the template's configChanges value —
 		// orientation|keyboardHidden|uiMode|locale|layoutDirection (#287)
-		// plus screenLayout (#299).
+		// plus screenLayout (#299) and keyboard (#793).
 		"A: android:versionCode(0x0101021b)=(type 0x10)0x7",
 		`A: android:versionName(0x0101021c)="1.2.3"`,
-		"A: android:configChanges(0x0101001f)=(type 0x11)0x23a4",
+		"A: android:configChanges(0x0101001f)=(type 0x11)0x23b4",
 		"A: android:exported(0x01010010)=(type 0x12)0xffffffff",
 		"A: android:debuggable(0x0101000f)=(type 0x12)0xffffffff",
 		"A: android:grantUriPermissions(0x0101001b)=(type 0x12)0xffffffff",

@@ -1,0 +1,6 @@
+details {
+  name = "keyprobe"
+  id = "io.bellui.keyprobe"
+  version = "1.0.0"
+  build = 1
+}

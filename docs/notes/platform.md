@@ -66,8 +66,9 @@ was **wrong**, disproven by goroutine dumps.
   app applies (relayout included) with no recreation and no lifecycle
   crossing; the StageFocused re-resolve remains the pickup for changes made
   while backgrounded. Every other declared change lands on the same path
-  (rotation — whose config event precedes the redraw — plus `uiMode` and
-  `keyboardHidden`), which is fine but not free: the re-resolve is
+  (rotation — whose config event precedes the redraw — plus `uiMode`,
+  `keyboardHidden`, and `keyboard`, which since #793 keeps a hardware keyboard
+  being plugged in from relaunching the activity), which is fine but not free: the re-resolve is
   override-guarded and skips the relayout while the locale is unchanged, yet
   it still costs a `GetLocales` JNI round trip plus a localizer rebuild on the
   driver goroutine. That cannot wedge the redraw handshake the config event
