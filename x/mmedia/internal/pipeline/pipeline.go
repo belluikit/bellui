@@ -155,7 +155,8 @@ func NewPipeline(r io.Reader) (*Pipeline, error) {
 }
 
 // NewPipelineURL creates a playback pipeline from a file path or network URL
-// (http is compiled in, and https except on Android), letting FFmpeg own the I/O.
+// (http and https; on Android https is read through Go, see
+// source.NewFFmpegSourceURL), letting FFmpeg own the I/O.
 func NewPipelineURL(url string) (*Pipeline, error) {
 	src, err := source.NewFFmpegSourceURL(url)
 	if err != nil {

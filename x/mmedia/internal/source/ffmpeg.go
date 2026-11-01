@@ -62,10 +62,10 @@ func NewFFmpegSource(r io.Reader) (*FFmpegSource, error) {
 	return newFFmpegSource(dec), nil
 }
 
-// NewFFmpegSourceURL decodes from a file path or network URL (http is compiled
-// in, and https except on Android), letting libavformat own the I/O rather than
-// reading through Go.
-// An http(s) URL reconnects on its own; see openURL.
+// NewFFmpegSourceURL decodes from a file path or network URL, letting
+// libavformat own the I/O rather than reading through Go. An http(s) URL
+// reconnects on its own; see openURL. On Android an https URL is read through
+// Go instead, since its FFmpeg has no TLS; see httpsInGo.
 func NewFFmpegSourceURL(url string) (*FFmpegSource, error) {
 	dec, err := openURL(url)
 	if err != nil {
@@ -90,6 +90,9 @@ const httpOptions = "reconnect=1,reconnect_streamed=1,reconnect_delay_max=2,rw_t
 // libgoffmpeg too old for per-open options gets a plain open rather than none.
 func openURL(url string) (goffmpeg.IDecoder, error) {
 	lower := strings.ToLower(url)
+	if httpsInGo && strings.HasPrefix(lower, "https://") {
+		return openHTTPSInGo(url)
+	}
 	if !strings.HasPrefix(lower, "http://") && !strings.HasPrefix(lower, "https://") {
 		return goffmpeg.Open(url)
 	}
@@ -226,7 +229,7 @@ func (s *FFmpegSource) Decode(_ time.Duration) {
 			if s.live && s.tolerateStall(err) {
 				return
 			}
-			s.err = err
+			s.err = s.readErr(err)
 			s.ended = true
 			return
 		}
@@ -441,7 +444,7 @@ func (s *FFmpegSource) Seek(pos time.Duration) {
 		if err != nil || mt == goffmpeg.MediaTypeNone {
 			// Recorded as Decode does, so a seek into a dropped stream is
 			// reported as the error it is, not as an end (#839).
-			s.err = err
+			s.err = s.readErr(err)
 			s.ended = true
 			return
 		}
@@ -467,6 +470,15 @@ func (s *FFmpegSource) Rewind() {
 }
 
 func (s *FFmpegSource) HasEnded() bool { return s.ended }
+
+// readErr is err, or for a source read through Go, the reason the read
+// failed, which the decoder can only report as an opaque code.
+func (s *FFmpegSource) readErr(err error) error {
+	if d, ok := s.dec.(*readerDecoder); ok && err != nil {
+		return d.readErr(err)
+	}
+	return err
+}
 
 func (s *FFmpegSource) Close() {
 	if s.dec != nil {
