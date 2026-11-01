@@ -74,6 +74,8 @@ func (*Painter) Paint(c core.Canvas) image.Image {
 		}
 
 		switch o := obj.(type) {
+		case *canvas.BoxShadow:
+			drawBoxShadow(c, o, pos, base, clip)
 		case *canvas.Image:
 			drawImage(c, o, pos, base, clip)
 		case *canvas.Text:
