@@ -114,9 +114,10 @@ func WithOnEnd(f func()) Option {
 }
 
 // WithOnError sets a callback for playback errors: a capture device that was
-// lost, or a file or stream that stopped on a read error before its end (a
-// dropped network connection reads as an I/O error). Playback stops, and the
-// position stays where it stopped.
+// lost, a file or stream that stopped on a read error before its end (a
+// dropped network connection reads as an I/O error), or a seek that failed,
+// such as one back into a stream the server cannot rewind. Playback stops, and
+// the position stays where it stopped, not where a failed seek asked to go.
 func WithOnError(f func(error)) Option {
 	return func(o *options) {
 		o.onError = f

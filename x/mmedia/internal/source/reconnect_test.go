@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -226,3 +227,30 @@ func mp3Frames(t *testing.T, song []byte) []byte {
 	return frames
 }
 
+// TestURLSourceReportsASeekTheServerCannotDo is #869 through real FFmpeg, as
+// measured: after a drop on a server that ignores Range, FFmpeg cannot seek
+// back, and dec.Seek fails with ENOSYS (-78 on macOS, -38 on Linux and
+// Android). That error was dropped.
+func TestURLSourceReportsASeekTheServerCannotDo(t *testing.T) {
+	song, err := os.ReadFile(coverMP3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data := bytes.Repeat(mp3Frames(t, song), 20)
+	srv, _ := dropOne(t, data, 1, len(data)/2, true)
+	s, err := NewFFmpegSourceURL(srv.URL + "/s.mp3")
+	if err != nil {
+		t.Fatalf("NewFFmpegSourceURL: %v", err)
+	}
+	defer s.Close()
+	decodeAll(t, s, 20*time.Second)
+	if s.Err() == nil {
+		t.Fatal("the drop ended with no error; the seek below needs a dropped stream")
+	}
+	s.Seek(time.Second)
+	t.Logf("ended %v, Err %v", s.HasEnded(), s.Err())
+	if !s.HasEnded() || s.Err() == nil || !strings.Contains(s.Err().Error(), "seek to 1s failed") {
+		t.Fatalf("after a seek back the server cannot serve: ended %v, Err %v; want the seek's error",
+			s.HasEnded(), s.Err())
+	}
+}

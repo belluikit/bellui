@@ -11,6 +11,7 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -217,5 +218,65 @@ func TestPlayAfterTheEndPlaysAgain(t *testing.T) {
 	case <-stopped:
 	case <-time.After(5 * time.Second):
 		t.Fatal("Stop hung after playing a second time")
+	}
+}
+
+// seekFailSource is a clip whose seeks all fail, as FFmpegSource reports one:
+// the source ends, with the reason as its error.
+type seekFailSource struct {
+	clipSource
+	err    error
+	failed atomic.Bool
+}
+
+func (s *seekFailSource) Seek(time.Duration) { s.failed.Store(true) }
+func (s *seekFailSource) HasEnded() bool     { return s.failed.Load() || s.clipSource.HasEnded() }
+func (s *seekFailSource) Err() error {
+	if s.failed.Load() {
+		return s.err
+	}
+	return nil
+}
+
+// TestFailedSeekIsAnError pins #869: a seek that failed was dropped, and
+// playback went on from where it was, so a caller could not tell it had not
+// landed. It ends in OnError instead, playing or paused, with the clock left
+// where playback stopped.
+func TestFailedSeekIsAnError(t *testing.T) {
+	for _, paused := range []bool{false, true} {
+		name := "playing"
+		if paused {
+			name = "paused"
+		}
+		t.Run(name, func(t *testing.T) {
+			refused := errors.New("mmedia: seek to 8s failed: seek failed: -78")
+			src := &seekFailSource{clipSource: clipSource{frames: 300}, err: refused}
+			p := newTestPipeline(t, src)
+			defer p.Close()
+
+			got := make(chan endReport, 2)
+			p.SetOnFrame(func(*image.RGBA) {})
+			p.SetOnEnd(func() { got <- endReport{ended: true} })
+			p.SetOnError(func(err error) { got <- endReport{err: err} })
+			p.Play()
+			time.Sleep(300 * time.Millisecond)
+			if paused {
+				p.Pause()
+			}
+			before := p.CurrentTime()
+			p.Seek(8 * time.Second)
+
+			select {
+			case r := <-got:
+				if r.ended || !errors.Is(r.err, refused) {
+					t.Fatalf("got OnEnd=%v OnError(%v); want OnError with the seek's error", r.ended, r.err)
+				}
+			case <-time.After(3 * time.Second):
+				t.Fatal("a failed seek reported neither an end nor an error")
+			}
+			if now := p.CurrentTime(); now >= 8*time.Second || now > before+time.Second {
+				t.Errorf("time %v after the failed seek, from %v; want it left near where playback was", now, before)
+			}
+		})
 	}
 }

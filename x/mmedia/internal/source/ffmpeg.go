@@ -2,6 +2,7 @@ package source
 
 import (
 	"errors"
+	"fmt"
 	"image"
 	"io"
 	"strings"
@@ -435,6 +436,11 @@ func (s *FFmpegSource) Seek(pos time.Duration) {
 		return
 	}
 	if err := s.dec.Seek(pos.Seconds()); err != nil {
+		// Playing on from where it was let the caller believe the seek had
+		// landed (#869). The source stops instead, and the pipeline reports
+		// why through OnError.
+		s.err = fmt.Errorf("mmedia: seek to %v failed: %w", pos, err)
+		s.ended = true
 		return
 	}
 	s.ended = false
