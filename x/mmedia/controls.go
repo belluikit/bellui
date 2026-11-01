@@ -11,8 +11,16 @@ import (
 	"github.com/belluikit/bellui/widget"
 )
 
-// volumeBarWidth is the on-screen width of the volume slider.
-const volumeBarWidth = 120
+const (
+	// volumeBarWidth is the volume slider's width when there is room for it.
+	volumeBarWidth = 120
+	// volumeBarMinWidth is the narrowest volume slider worth showing. Below it
+	// only the mute button stays.
+	volumeBarMinWidth = 48
+	// seekBarMinWidth is the least the seek bar gets in one row. Below it the
+	// bar takes a row of its own.
+	seekBarMinWidth = 160
+)
 
 // liveLabel marks a source with no duration, where a position fraction is
 // meaningless. SetTime keeps it in front of the elapsed time.
@@ -312,22 +320,9 @@ const scrubPreviewGap = 6
 
 // CreateRenderer returns the Bellui renderer for this widget.
 func (tc *TransportControls) CreateRenderer() core.WidgetRenderer {
-	// An HBox sizes children to their MinSize, which leaves a slider barely
-	// wide enough to click. GridWrap pins it to a usable width instead —
-	// calling Resize here would simply be overridden by the layout.
-	volumeSized := container.NewGridWrap(
-		geo.NewSize(volumeBarWidth, tc.volumeBar.MinSize().Height),
-		tc.volumeBar,
-	)
-	volumeContainer := container.NewHBox(tc.muteBtn, volumeSized)
-
 	buttons := container.NewHBox(tc.playBtn, tc.stopBtn)
-	bar := container.NewBorder(
-		nil, nil,
-		container.NewHBox(buttons, tc.timeLabel),
-		volumeContainer,
-		tc.seekBar,
-	)
+	bar := container.New(&transportLayout{controls: tc, buttons: buttons},
+		buttons, tc.timeLabel, tc.seekBar, tc.muteBtn, tc.volumeBar)
 	if tc.preview == nil {
 		return widget.NewSimpleRenderer(bar)
 	}
@@ -395,9 +390,93 @@ func (l *scrubPreviewLayout) MinSize(objects []core.CanvasObject) geo.Size {
 	return objects[0].MinSize()
 }
 
-// MinSize returns the minimum size of the controls.
+// transportLayout puts the controls in one row when the seek bar has room
+// there. When it has not, the seek bar takes a row of its own above the rest,
+// so a narrow window or a phone still shows the position. The volume slider
+// gives way first: it takes what is left of its row, and goes when too little
+// is left, because the mute button and the device's own volume still work.
+type transportLayout struct {
+	controls *TransportControls
+	buttons  core.CanvasObject
+}
+
+func (l *transportLayout) Layout(_ []core.CanvasObject, size geo.Size) {
+	tc := l.controls
+	pad := theme.Padding()
+	buttons, clock, mute := l.buttons.MinSize(), tc.timeLabel.MinSize(), tc.muteBtn.MinSize()
+	seekHeight := tc.seekBar.MinSize().Height
+
+	row := size.Height
+	y := float32(0)
+	if !tc.oneRow(size.Width) {
+		tc.seekBar.Move(geo.NewPos(0, 0))
+		tc.seekBar.Resize(geo.NewSize(size.Width, seekHeight))
+		y = seekHeight
+		row -= seekHeight
+	}
+	centred := func(o core.CanvasObject, x float32, s geo.Size) {
+		o.Move(geo.NewPos(x, y+(row-s.Height)/2))
+		o.Resize(s)
+	}
+
+	centred(l.buttons, 0, buttons)
+	centred(tc.timeLabel, buttons.Width+pad, clock)
+	start := buttons.Width + clock.Width + 2*pad
+
+	if tc.oneRow(size.Width) {
+		volume := geo.NewSize(volumeBarWidth, tc.volumeBar.MinSize().Height)
+		tc.volumeBar.Show()
+		centred(tc.volumeBar, size.Width-volumeBarWidth, volume)
+		centred(tc.muteBtn, size.Width-volumeBarWidth-pad-mute.Width, mute)
+		centred(tc.seekBar, start, geo.NewSize(size.Width-volumeBarWidth-mute.Width-2*pad-start, seekHeight))
+		return
+	}
+
+	width := min(size.Width-start-mute.Width-pad, volumeBarWidth)
+	if width < volumeBarMinWidth {
+		tc.volumeBar.Hide()
+		centred(tc.muteBtn, size.Width-mute.Width, mute)
+		return
+	}
+	tc.volumeBar.Show()
+	centred(tc.volumeBar, size.Width-width, geo.NewSize(width, tc.volumeBar.MinSize().Height))
+	centred(tc.muteBtn, size.Width-width-pad-mute.Width, mute)
+}
+
+func (l *transportLayout) MinSize([]core.CanvasObject) geo.Size {
+	return l.controls.MinSize()
+}
+
+// fixedWidth is what the controls other than the seek bar and volume slider
+// take in a row.
+func (tc *TransportControls) fixedWidth() float32 {
+	return 2*tc.playBtn.MinSize().Width + tc.timeLabel.MinSize().Width + tc.muteBtn.MinSize().Width + 3*theme.Padding()
+}
+
+// oneRow reports whether every control fits one row at this width.
+func (tc *TransportControls) oneRow(width float32) bool {
+	return width >= tc.fixedWidth()+volumeBarWidth+seekBarMinWidth+theme.Padding()
+}
+
+// MinSize returns the minimum size of the controls. The height follows the
+// width they have, so it is two rows until they have been given one that fits
+// everything in a row.
 func (tc *TransportControls) MinSize() geo.Size {
-	return geo.NewSize(400, 48)
+	row := max(tc.playBtn.MinSize().Height, tc.timeLabel.MinSize().Height, tc.muteBtn.MinSize().Height)
+	if !tc.oneRow(tc.Size().Width) {
+		row += tc.seekBar.MinSize().Height
+	}
+	return geo.NewSize(tc.fixedWidth(), row)
+}
+
+// Resize also lets the parent know when the width moves the controls between
+// one row and two, since that changes their height.
+func (tc *TransportControls) Resize(size geo.Size) {
+	changed := tc.oneRow(tc.Size().Width) != tc.oneRow(size.Width)
+	tc.BaseWidget.Resize(size)
+	if changed {
+		tc.Refresh()
+	}
 }
 
 func formatDuration(d time.Duration) string {
