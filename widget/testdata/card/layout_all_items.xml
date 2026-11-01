@@ -4,6 +4,7 @@
 			<widget pos="2,2" size="134x210" type="*widget.Shadow">
 				<boxShadow blurRadius="1.5" color="shadow" cornerRadius="4" offsetY="0.5" size="134x210"/>
 			</widget>
+			<rectangle fillColor="rgba(20,20,20,255)" pos="2,2" size="134x210"/>
 			<text pos="10,138" size="118x28" textSize="16">Longer title</text>
 			<text pos="10,170" size="118x16">subtitle with length</text>
 			<image pos="2,2" rsc="computerIcon" size="134x128" themed="foreground"/>

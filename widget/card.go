@@ -309,7 +309,13 @@ func (c *cardRenderer) applyTheme() {
 				c.bg.Show()
 				c.bg.Refresh()
 			} else {
-				c.bg.Hide()
+				// The shadow is filled, so without a surface over it the
+				// card's interior shows the shadow itself.
+				c.bg.FillColor = th.Color(theme.ColorNameSurface, v)
+				c.bg.StrokeWidth = 0
+				c.bg.StrokeColor = color.Transparent
+				c.bg.Show()
+				c.bg.Refresh()
 			}
 		}
 	}
