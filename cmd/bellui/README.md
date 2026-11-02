@@ -108,6 +108,13 @@ Limits:
 - An AAR that ships `libopenal.so` fails the build of an app using
   `exp/audio/al`, which bundles its own.
 - An app asset wins over a library asset at the same path, with a warning.
+- The generated manifest sets `android:extractNativeLibs="false"`, so every
+  `.so`, a library's included, is loaded straight from the APK and none is
+  unpacked to disk (#889). A library loaded with `System.loadLibrary` works.
+  One that needs its `.so` as a file, for example one that reads
+  `nativeLibraryDir` or runs a bundled executable, does not. For such a
+  library, use your own `AndroidManifest.xml` with the attribute set to
+  `"true"`.
 - Without an AAR, resources are packaged exactly as before; jars only change
   the dex.
 
