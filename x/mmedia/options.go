@@ -124,7 +124,11 @@ func WithOnError(f func(error)) Option {
 	}
 }
 
-// WithOnTimeUpdate sets a callback for periodic time updates.
+// WithOnTimeUpdate sets a callback for time updates. While playing it is
+// called every 100 ms. Otherwise it is called once for each change: on Pause,
+// with the position playback rests at; on Seek, in any state; and at the end,
+// with the full duration. Nothing arrives while paused or after the end, so an
+// update is a sign that the position moved or playback is running.
 func WithOnTimeUpdate(f func(current, total time.Duration)) Option {
 	return func(o *options) {
 		o.onTime = f

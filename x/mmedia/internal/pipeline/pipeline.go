@@ -650,11 +650,17 @@ func (p *Pipeline) audioAheadFull() bool {
 
 // Pause pauses playback.
 func (p *Pipeline) Pause() {
+	if p.pause() {
+		p.reportTime() // the tick stops while paused; this is where it rests
+	}
+}
+
+func (p *Pipeline) pause() bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
 	if !p.state.IsPlaying() {
-		return
+		return false
 	}
 
 	p.state.Set(StatePaused)
@@ -663,6 +669,7 @@ func (p *Pipeline) Pause() {
 	if p.hasAudio {
 		p.audioOutput.Pause()
 	}
+	return true
 }
 
 func (p *Pipeline) resume() {
@@ -886,9 +893,7 @@ func (p *Pipeline) reportEnd() {
 	}
 	if err := p.sourceError(); err != nil {
 		p.clock.Pause()
-		if p.onTime != nil {
-			p.onTime(p.clock.Time(), p.duration)
-		}
+		p.reportTime()
 		if p.onError != nil {
 			p.onError(err)
 		}
@@ -901,9 +906,7 @@ func (p *Pipeline) reportEnd() {
 	if p.duration > 0 {
 		p.clock.Seek(p.duration)
 	}
-	if p.onTime != nil {
-		p.onTime(p.clock.Time(), p.duration)
-	}
+	p.reportTime()
 	if p.onEnd != nil {
 		p.onEnd()
 	}
@@ -933,7 +936,15 @@ func (p *Pipeline) Seek(pos time.Duration) {
 	if p.live {
 		return
 	}
+	// Reported here because nothing else would: the tick runs only while
+	// playing, and a seek while paused or stopped is still a new position.
+	if p.seek(pos) {
+		p.reportTime()
+	}
+}
 
+// seek does Seek's work under the locks and reports whether the position moved.
+func (p *Pipeline) seek(pos time.Duration) bool {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -994,6 +1005,15 @@ func (p *Pipeline) Seek(pos time.Duration) {
 	select {
 	case p.seekWake <- struct{}{}:
 	default: // a wake is already pending
+	}
+	return !failed
+}
+
+// reportTime sends one time update. Callers hold no lock: OnTime is the app's
+// code, and may call back into the pipeline.
+func (p *Pipeline) reportTime() {
+	if p.onTime != nil {
+		p.onTime(p.clock.Time(), p.duration)
 	}
 }
 
@@ -1210,10 +1230,6 @@ func (p *Pipeline) displayLoop(stop <-chan struct{}) {
 			select {
 			case <-stop:
 				return
-			case <-timeTicker.C:
-				if p.onTime != nil {
-					p.onTime(p.clock.Time(), p.duration)
-				}
 			case <-time.After(10 * time.Millisecond):
 			}
 			continue
@@ -1300,8 +1316,12 @@ func (p *Pipeline) displayLoop(stop <-chan struct{}) {
 			p.framesRendered.Add(1)
 
 		case <-timeTicker.C:
-			if p.onTime != nil {
-				p.onTime(p.clock.Time(), p.duration)
+			// Only while playing (#879). Ended, an audio-only stream keeps
+			// this loop running in StateStopped, and a tick there reported
+			// the same position ten times a second for as long as the player
+			// stayed open. Pause, Seek and the end each report once instead.
+			if p.state.IsPlaying() {
+				p.reportTime()
 			}
 		}
 	}
