@@ -3,6 +3,7 @@ package pipeline
 import (
 	"image"
 	"testing"
+	"time"
 
 	"github.com/belluikit/bellui/x/mmedia/internal/source"
 )
@@ -81,9 +82,11 @@ func TestPlayStartsPromptlyAtHighResolution(t *testing.T) {
 	}
 
 	p.Play()
-	p.mu.Lock()
-	got := p.prerollEnd
-	p.mu.Unlock()
+	got := prerollWaiting
+	for deadline := time.Now().Add(5 * time.Second); got == prerollWaiting && time.Now().Before(deadline); {
+		time.Sleep(10 * time.Millisecond)
+		got = prerollExit(p.prerollEnd.Load())
+	}
 	if got != prerollQueued {
 		t.Errorf("pre-roll ended with %v, want %v (the queue full)", got, prerollQueued)
 	}

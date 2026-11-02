@@ -146,7 +146,7 @@ type Pipeline struct {
 	frameQueue   chan timedFrame
 	frameRecycle chan *image.RGBA
 
-	prerollEnd prerollExit // why the last Play stopped waiting (held under mu)
+	prerollEnd atomic.Int32 // a prerollExit: why the last Play's display stopped waiting
 }
 
 // presentHook, when set, runs in the display between its last generation
@@ -612,21 +612,29 @@ func (p *Pipeline) Play() {
 	// A live capture is deliberately excluded: it produces frames only in real
 	// time, so waiting for a second of them buys no smoothness and costs a second
 	// of latency on a feed whose whole value is being current.
-	p.prerollEnd = prerollSkipped
-	if p.hasVideo && p.frameQueue != nil && !p.live {
-		p.prerollEnd = p.preroll()
+	//
+	// The display goroutine waits, not Play. On a network stream the frames
+	// are a download away, and after a Seek or a Stop the decoder first moves
+	// the source, so Play held its caller for up to the 2 s limit (#872).
+	preroll := p.hasVideo && p.frameQueue != nil && !p.live
+	p.prerollEnd.Store(int32(prerollSkipped))
+	if preroll {
+		p.prerollEnd.Store(int32(prerollWaiting))
 	}
 
 	// Start display loop: reads from frameQueue at framerate.
 	p.wg.Add(1)
 	go func() {
 		defer p.wg.Done()
+		if preroll {
+			p.prerollEnd.Store(int32(p.preroll(stopCh)))
+		}
 		p.displayLoop(stopCh)
 	}()
 }
 
-// prerollExit is why Play stopped waiting for frames before starting the
-// display.
+// prerollExit is why the display stopped waiting for frames before it
+// started.
 type prerollExit int
 
 const (
@@ -635,16 +643,23 @@ const (
 	prerollAudioAhead                     // the decoder stalled on the audio-ahead limit
 	prerollSourceEnded                    // a clip shorter than the target ended
 	prerollTimedOut                       // none of those within ~2 s
+	prerollStopped                        // the pipeline stopped first
+	prerollWaiting                        // still waiting
 )
 
 func (e prerollExit) String() string {
-	return [...]string{"skipped", "queued", "audio ahead", "source ended", "timed out"}[e]
+	return [...]string{"skipped", "queued", "audio ahead", "source ended", "timed out", "stopped", "waiting"}[e]
 }
 
 // preroll waits, up to ~2 s, for prerollTarget frames to be queued.
-func (p *Pipeline) preroll() prerollExit {
+func (p *Pipeline) preroll(stop <-chan struct{}) prerollExit {
 	target := p.prerollTarget() // ~1 second, or a full queue at high resolution
 	for i := 0; i < 200; i++ {  // up to ~2s max wait
+		select {
+		case <-stop:
+			return prerollStopped
+		default:
+		}
 		switch {
 		case len(p.frameQueue) >= target:
 			return prerollQueued

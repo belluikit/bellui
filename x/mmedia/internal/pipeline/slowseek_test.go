@@ -68,7 +68,7 @@ func (l *frameLog) len() int {
 // Seek returns at once, the clock waits at the target, nothing from before the
 // seek is shown, and once the source is there the first frame is the target's.
 func TestSeekDoesNotWaitForTheSource(t *testing.T) {
-	for _, state := range []string{"playing", "paused"} {
+	for _, state := range []string{"playing", "paused", "stopped"} {
 		t.Run(state, func(t *testing.T) {
 			src := &slowSeekSource{clipSource: clipSource{frames: 300}, delay: 600 * time.Millisecond}
 			p := newTestPipeline(t, src)
@@ -95,7 +95,13 @@ func TestSeekDoesNotWaitForTheSource(t *testing.T) {
 
 			mark := shown.len()
 			if state == "stopped" {
+				// Play waits for frames before it shows any, and those are
+				// on the far side of the seek: that wait is the display's.
+				start := time.Now()
 				p.Play()
+				if took := time.Since(start); took > 100*time.Millisecond {
+					t.Errorf("Play after Seek took %v; want it back without waiting for the source", took)
+				}
 			}
 			time.Sleep(src.delay / 2)
 			if !src.inSeek.Load() {
