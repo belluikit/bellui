@@ -194,6 +194,92 @@ func TestHTTPSInGoRidesOutANetworkFailure(t *testing.T) {
 	}
 }
 
+// TestHTTPSInGoRetriesAnOpen is #873: an open that fails on the network, or on
+// a server error, is tried again, as a read is. On a device two opens timed out
+// together in a moment the phone's network was away, and nothing retried them.
+// A failure no retry can fix is reported at once, and a link that never answers
+// is reported within httpOpenTimeout.
+func TestHTTPSInGoRetriesAnOpen(t *testing.T) {
+	data, err := os.ReadFile(reconnectMedia)
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldTimeout, oldOpen := httpReadTimeout, httpOpenTimeout
+	httpReadTimeout, httpOpenTimeout = 300*time.Millisecond, 2*time.Second
+	t.Cleanup(func() { httpReadTimeout, httpOpenTimeout = oldTimeout, oldOpen })
+
+	drop := func(w http.ResponseWriter, _ *http.Request) {
+		if conn, _, err := w.(http.Hijacker).Hijack(); err == nil {
+			_ = conn.Close()
+		}
+	}
+	stall := func(_ http.ResponseWriter, r *http.Request) { <-r.Context().Done() }
+	// Headers, then nothing: the open succeeds and the read of its first bytes
+	// stalls.
+	stallBody := func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Length", strconv.Itoa(len(data)))
+		w.(http.Flusher).Flush()
+		<-r.Context().Done()
+	}
+	unavailable := func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "busy", http.StatusServiceUnavailable)
+	}
+	notFound := func(w http.ResponseWriter, _ *http.Request) { http.NotFound(w, nil) }
+
+	for _, tc := range []struct {
+		name     string
+		fail     func(http.ResponseWriter, *http.Request)
+		failures int // requests that fail before the server answers; -1 for all
+		requests int // requests the open should make
+		ok       bool
+	}{
+		{"dropped", drop, 2, 3, true},
+		{"stalled", stall, 1, 2, true},
+		{"stalled body", stallBody, 1, 2, true},
+		{"server error", unavailable, 3, 4, true},
+		{"not found", notFound, -1, 1, false},
+		{"never answers", stall, -1, 0, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var mu sync.Mutex
+			n := 0
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				mu.Lock()
+				n++
+				failing := tc.failures < 0 || n <= tc.failures
+				mu.Unlock()
+				if failing {
+					tc.fail(w, r)
+					return
+				}
+				http.ServeContent(w, r, "s.mp4", time.Time{}, bytes.NewReader(data))
+			}))
+			t.Cleanup(srv.Close)
+			requests := func() int { mu.Lock(); defer mu.Unlock(); return n }
+
+			start := time.Now()
+			dec, err := openHTTPSInGo(srv.URL + "/s.mp4")
+			took := time.Since(start)
+			if dec != nil {
+				dec.Close()
+			}
+			t.Logf("%s: %v after %v and %d requests", tc.name, err, took.Round(time.Millisecond), requests())
+			if tc.ok != (err == nil) {
+				t.Fatalf("open: %v; want ok=%v", err, tc.ok)
+			}
+			if tc.requests > 0 && requests() < tc.requests {
+				t.Errorf("%d request(s); want at least %d", requests(), tc.requests)
+			}
+			if !tc.ok && tc.requests == 1 && requests() != 1 {
+				t.Errorf("%d requests; want one, since no retry can fix a 404", requests())
+			}
+			if limit := httpOpenTimeout + 200*time.Millisecond; took > limit {
+				t.Errorf("open took %v; want it within httpOpenTimeout, %v", took, httpOpenTimeout)
+			}
+		})
+	}
+}
+
 // TestHTTPSInGoReportsAnExpiredLink: a signed link that expires mid-playback
 // keeps playing on the open response, and the next request, here a seek back,
 // fails with a reason a person can act on, not goffmpeg's -1. The signature in

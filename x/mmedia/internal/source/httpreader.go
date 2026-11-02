@@ -3,9 +3,11 @@ package source
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"runtime"
@@ -35,9 +37,16 @@ var errHLSOverReader = errors.New("mmedia: https HLS cannot play on this platfor
 // FFmpeg do (#839): httpReadTimeout turns a silent server into a drop, and a
 // drop is resumed from the byte it stopped at, after each of httpRetryDelays in
 // turn, which add up to about reconnect_delay_max.
+//
+// An open is retried the same way, which FFmpeg's is not (#873): on a phone
+// the network goes away for a moment more often than a link dies, and two
+// opens failed together in one such moment. httpOpenTimeout bounds the whole
+// open, retries included, so a link that never answers still fails in bounded
+// time.
 var (
 	httpReadTimeout = 5 * time.Second
 	httpRetryDelays = []time.Duration{250 * time.Millisecond, 500 * time.Millisecond, time.Second}
+	httpOpenTimeout = 10 * time.Second
 )
 
 // httpSkipLimit is how far ahead a seek reads through the open response
@@ -89,26 +98,62 @@ type httpReader struct {
 func newHTTPReader(rawURL string) (*httpReader, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	r := &httpReader{url: rawURL, client: httpClient, ctx: ctx, cancel: cancel, size: -1}
-	if err := r.open(0); err != nil {
-		cancel()
-		return nil, err
+	deadline := time.Now().Add(httpOpenTimeout)
+	for attempt := 0; ; attempt++ {
+		err := r.start(deadline)
+		if err == nil {
+			return r, nil
+		}
+		if !openRetryable(err) || attempt == len(httpRetryDelays) ||
+			time.Until(deadline) <= httpRetryDelays[attempt] {
+			r.Close()
+			return nil, err
+		}
+		time.Sleep(httpRetryDelays[attempt])
 	}
-	var head [7]byte
-	n, err := io.ReadFull(r.body, head[:])
-	if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) && !errors.Is(err, io.EOF) {
-		r.Close()
-		return nil, fmt.Errorf("mmedia: reading %s: %w", redactURL(rawURL), err)
-	}
-	if bytes.Equal(head[:n], []byte("#EXTM3U")) {
-		r.Close()
-		return nil, errHLSOverReader
-	}
-	r.head = append([]byte(nil), head[:n]...)
-	return r, nil
 }
 
-// open starts a response at off, replacing any open one.
-func (r *httpReader) open(off int64) error {
+// start opens the response at 0 and reads its first bytes, each within the
+// read timeout and before deadline.
+func (r *httpReader) start(deadline time.Time) error {
+	if err := r.open(0, min(httpReadTimeout, time.Until(deadline))); err != nil {
+		return err
+	}
+	var head [7]byte
+	var n int
+	var err error
+	withTimeout(min(httpReadTimeout, time.Until(deadline)), r.stop, func() { n, err = io.ReadFull(r.body, head[:]) })
+	if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) && !errors.Is(err, io.EOF) {
+		r.closeBody()
+		return fmt.Errorf("mmedia: reading %s: %w", redactURL(r.url), err)
+	}
+	if bytes.Equal(head[:n], []byte("#EXTM3U")) {
+		return errHLSOverReader
+	}
+	r.head = append([]byte(nil), head[:n]...)
+	return nil
+}
+
+// openRetryable is true of an open that failed on the network or on a server
+// error, which a moment can fix. A certificate the client does not trust, a
+// client error such as a 404 or an expired signature, and a playlist stay.
+func openRetryable(err error) bool {
+	var se *statusError
+	if errors.As(err, &se) {
+		return se.retryable()
+	}
+	var cert *tls.CertificateVerificationError
+	if errors.As(err, &cert) {
+		return false
+	}
+	var ue *url.Error
+	var ne net.Error
+	return errors.As(err, &ue) || errors.As(err, &ne) || errors.Is(err, context.Canceled)
+}
+
+// open starts a response at off, replacing any open one; timeout bounds the
+// wait for its headers.
+func (r *httpReader) open(off int64, timeout time.Duration) error {
 	r.closeBody()
 	ctx, stop := context.WithCancel(r.ctx)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, r.url, nil)
@@ -120,7 +165,7 @@ func (r *httpReader) open(off int64) error {
 	// A compressed body would make the offsets the server's, not the file's.
 	req.Header.Set("Accept-Encoding", "identity")
 	var resp *http.Response
-	withTimeout(stop, func() { resp, err = r.client.Do(req) })
+	withTimeout(timeout, stop, func() { resp, err = r.client.Do(req) })
 	if err != nil {
 		stop()
 		var ue *url.Error
@@ -169,10 +214,10 @@ func (r *httpReader) open(off int64) error {
 }
 
 // withTimeout runs f, cancelling the request through stop if it takes longer
-// than httpReadTimeout. f is a request or a read, which a server that goes
+// than d, which is httpReadTimeout but in an open near its deadline. f is a request or a read, which a server that goes
 // silent without closing would otherwise block forever.
-func withTimeout(stop context.CancelFunc, f func()) {
-	t := time.AfterFunc(httpReadTimeout, stop)
+func withTimeout(d time.Duration, stop context.CancelFunc, f func()) {
+	t := time.AfterFunc(d, stop)
 	defer t.Stop()
 	f()
 }
@@ -247,7 +292,7 @@ func (r *httpReader) readOnce(p []byte) (int, error) {
 	}
 	var n int
 	var err error
-	withTimeout(r.stop, func() { n, err = r.body.Read(p) })
+	withTimeout(httpReadTimeout, r.stop, func() { n, err = r.body.Read(p) })
 	r.pos += int64(n)
 	r.bodyPos = r.pos
 	if err != nil && !errors.Is(err, io.EOF) {
@@ -267,13 +312,13 @@ func (r *httpReader) seekBody() error {
 			skip -= k
 		}
 		var err error
-		withTimeout(r.stop, func() { _, err = io.CopyN(io.Discard, r.body, skip) })
+		withTimeout(httpReadTimeout, r.stop, func() { _, err = io.CopyN(io.Discard, r.body, skip) })
 		if err == nil {
 			r.bodyPos = r.pos
 			return nil
 		}
 	}
-	return r.open(r.pos)
+	return r.open(r.pos, httpReadTimeout)
 }
 
 func (r *httpReader) Seek(offset int64, whence int) (int64, error) {
