@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode"
 
@@ -101,6 +102,8 @@ type driver struct {
 	// also routes IME composition back to the editor's event.Composable.
 	textInput   *textinput.Session
 	queuedFuncs *async.UnboundedChan[func()]
+	// loopStarted is set once the run loop is draining queuedFuncs.
+	loopStarted atomic.Bool
 
 	// keyboardType is the mobile.KeyboardType of the field the soft keyboard was
 	// last shown for, tracked so the one-writer IME reroute (pre-rebrand tracker #1061) can tell a
@@ -167,8 +170,11 @@ func init() {
 
 func (d *driver) DoFromGoroutine(fn func(), wait bool) {
 	caller := func() {
-		if d.queuedFuncs == nil {
-			fn() // before the app actually starts
+		// Before the run loop starts nothing drains the queue, and main is
+		// still building the UI, so a call on main runs now. Any other goroutine
+		// waits for the loop: run here, it would race that build (#890).
+		if d.queuedFuncs == nil || (!d.loopStarted.Load() && async.IsMainGoroutine()) {
+			fn()
 			return
 		}
 		var done chan struct{}
@@ -303,7 +309,7 @@ func (d *driver) Run() {
 	app.Main(func(a app.App) {
 		async.SetMainGoroutine()
 		d.app = a
-		d.queuedFuncs = async.NewUnboundedChan[func()]()
+		d.loopStarted.Store(true)
 
 		bellui.CurrentApp().Settings().AddListener(func(s bellui.Settings) {
 			painter.ClearFontCache()
@@ -1873,8 +1879,9 @@ func NewGoMobileDriver() bellui.Driver {
 	async.SetMainGoroutine()
 
 	d := &driver{
-		theme:     bellui.ThemeVariant(2), // unspecified
-		textInput: textinput.NewSession(keyboardStateBackend{}),
+		theme:       bellui.ThemeVariant(2), // unspecified
+		textInput:   textinput.NewSession(keyboardStateBackend{}),
+		queuedFuncs: async.NewUnboundedChan[func()](),
 	}
 
 	registerRepository(d)
