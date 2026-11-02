@@ -3,6 +3,7 @@ package mobile
 import (
 	"archive/zip"
 	"bytes"
+	"debug/elf"
 	"io"
 	"os"
 	"os/exec"
@@ -581,4 +582,35 @@ func TestBundleModuleLayout(t *testing.T) {
 	empty := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(empty, "AndroidManifest.xml"), nil, 0o644))
 	require.Error(t, bundleModuleLayout(empty))
+}
+
+// TestStripLibraryDropsSymbolTables runs a release build's strip on a real Go
+// ELF binary. The symbol table goes and the Go function table stays, because a
+// panic's stack trace reads it.
+func TestStripLibraryDropsSymbolTables(t *testing.T) {
+	matches, _ := filepath.Glob(filepath.Join(os.Getenv("ANDROID_NDK_HOME"), "toolchains", "llvm", "prebuilt", "*", "bin", "llvm-strip"))
+	if len(matches) == 0 {
+		t.Skip("no llvm-strip: set ANDROID_NDK_HOME")
+	}
+	dir := t.TempDir()
+	src := filepath.Join(dir, "main.go")
+	require.NoError(t, os.WriteFile(src, []byte("package main\n\nfunc main() {}\n"), 0o644))
+	bin := filepath.Join(dir, "app")
+	build := exec.Command("go", "build", "-o", bin, src)
+	build.Env = append(os.Environ(), "GOOS=linux", "GOARCH=arm64", "CGO_ENABLED=0")
+	out, err := build.CombinedOutput()
+	require.NoError(t, err, string(out))
+
+	section := func(name string) *elf.Section {
+		f, err := elf.Open(bin)
+		require.NoError(t, err)
+		defer f.Close()
+		return f.Section(name)
+	}
+	require.NotNil(t, section(".symtab"), "the input must have a symbol table to remove")
+
+	require.NoError(t, stripLibrary(matches[0], bin))
+
+	assert.Nil(t, section(".symtab"))
+	assert.NotNil(t, section(".gopclntab"))
 }
