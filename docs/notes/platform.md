@@ -33,8 +33,9 @@ was **wrong**, disproven by goroutine dumps.
   `onNativeWindowRedrawNeeded` handshake waiting for a first frame → ANR. The
   GL path was never affected: mainUI destroys the EGL surface synchronously in
   its `windowDestroyed` case and `Publish` checks `C.surface`.
-- **Fix**: `app.NativeWindowLive()` — an atomic written only by mainUI (false on
-  `onNativeWindowDestroyed`, true on `onNativeWindowCreated`/`RedrawNeeded`).
+- **Fix**: `app.NativeWindowLive(handle)` — the live window, an atomic written
+  only by mainUI (cleared on `onNativeWindowDestroyed`, set on
+  `onNativeWindowCreated`/`RedrawNeeded`; a handle compare since #896, below).
   The Android WebGPU backend gates `renderReady` on it (whole frames skip while
   the window is dead — the handle alone can't express this, it stays stale until
   the recreated activity's paint event replaces it) and `presentPainter`
@@ -42,6 +43,20 @@ was **wrong**, disproven by goroutine dumps.
   the #337 dangling-SurfaceOutput discard) instead of presenting. Late *release*
   of the dead window's surface is harmless (the plain background→resume path
   has always done it); only the *present* poisons.
+- **A new activity can arrive before the old one leaves (#896)**: a launch
+  with `FLAG_ACTIVITY_CLEAR_TASK` into a running task (SystemUI sends one when
+  an app is opened while its install finishes) creates the new activity, its
+  input queue and its window, and only then destroys the old activity's window,
+  input queue and the activity itself. Recreation never does this, so the
+  driver held one current queue, window and lifecycle, and the old activity's
+  teardown landed on the new one: its input queue was detached, the first touch
+  timed out, and Android reported the app not responding. Now the input queue
+  given up is detached only if it is the one being read; `app.NativeWindowLive`
+  takes the painter's handle and is true only for the window created last, so
+  the old window's late destroy changes nothing and nothing presents into it;
+  and `onDestroy`, `onPause`, `onStop` and `onConfigurationChanged` from an
+  activity a later one replaced are ignored. Repro and check: the two `am
+  start` lines in `hack/recreateprobe`'s doc.
 - **Emulator diagnostic gotcha (goldfish)**: one bad present wedges the
   emulator **host process's** GPU channel permanently — after that, every app
   launch hangs in `wgpuCreateInstance` (black screen → ANR on any start, which

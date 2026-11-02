@@ -153,8 +153,22 @@ func onBackPressed() {
 	theApp.events.In() <- k
 }
 
+// currentActivity is the activity created last. Android can create a new
+// activity before it tears down the one it replaces: a launch with
+// FLAG_ACTIVITY_CLEAR_TASK into a running task gives the new activity its
+// input queue and window first, then destroys the old one (#896). The old
+// one's teardown callbacks must then leave the new one alone: they used to
+// detach its input queue, so it never saw a touch and Android reported it not
+// responding. Only the Java main thread reads and writes it.
+var currentActivity *C.ANativeActivity
+
+// replaced reports whether activity is one a later activity has replaced, so
+// its lifecycle and teardown no longer describe the app.
+func replaced(activity *C.ANativeActivity) bool { return activity != currentActivity }
+
 //export onCreate
 func onCreate(activity *C.ANativeActivity) {
+	currentActivity = activity
 	// Set the initial configuration.
 	//
 	// Note we use unbuffered channels to talk to the activity loop, and
@@ -165,14 +179,25 @@ func onCreate(activity *C.ANativeActivity) {
 
 //export onDestroy
 func onDestroy(activity *C.ANativeActivity) {
+	if replaced(activity) {
+		return
+	}
 	activityDestroyed <- struct{}{}
 }
 
 //export activityPaused
-func activityPaused() { activityLifecycle <- activityPause }
+func activityPaused(activity *C.ANativeActivity) {
+	if !replaced(activity) {
+		activityLifecycle <- activityPause
+	}
+}
 
 //export activityStopped
-func activityStopped() { activityLifecycle <- activityStop }
+func activityStopped(activity *C.ANativeActivity) {
+	if !replaced(activity) {
+		activityLifecycle <- activityStop
+	}
+}
 
 //export activityResumed
 func activityResumed() { activityLifecycle <- activityResume }
@@ -204,14 +229,20 @@ func onNativeWindowDestroyed(activity *C.ANativeActivity, window *C.ANativeWindo
 
 //export onInputQueueCreated
 func onInputQueueCreated(activity *C.ANativeActivity, q *C.AInputQueue) {
-	inputQueue <- q
+	inputQueue <- queueChange{q: q, created: true}
 	<-inputQueueDone
 }
 
 //export onInputQueueDestroyed
 func onInputQueueDestroyed(activity *C.ANativeActivity, q *C.AInputQueue) {
-	inputQueue <- nil
+	inputQueue <- queueChange{q: q}
 	<-inputQueueDone
+}
+
+// queueChange is an input queue an activity was given, or one it gave up.
+type queueChange struct {
+	q       *C.AInputQueue
+	created bool
 }
 
 //export onContentRectChanged
@@ -273,6 +304,9 @@ func windowConfigRead(activity *C.ANativeActivity) windowConfig {
 
 //export onConfigurationChanged
 func onConfigurationChanged(activity *C.ANativeActivity) {
+	if replaced(activity) {
+		return
+	}
 	// A rotation event first triggers onConfigurationChanged, then
 	// calls onNativeWindowRedrawNeeded. We extract the orientation
 	// here and save it for the redraw event.
@@ -293,7 +327,7 @@ func onLowMemory(activity *C.ANativeActivity) {
 }
 
 var (
-	inputQueue         = make(chan *C.AInputQueue)
+	inputQueue         = make(chan queueChange)
 	inputQueueDone     = make(chan struct{})
 	windowCreated      = make(chan *C.ANativeWindow)
 	windowDestroyed    = make(chan *C.ANativeWindow)
@@ -306,10 +340,13 @@ var (
 	currentSize size.Event
 	darkMode    bool
 
-	// nativeWindowLive tracks whether the ANativeWindow the driver last saw is
-	// still alive. mainUI is the sole writer: false as soon as it receives
-	// onNativeWindowDestroyed, true again on onNativeWindowCreated /
-	// onNativeWindowRedrawNeeded. The WebGPU driver reads it (NativeWindowLive)
+	// liveWindow is the ANativeWindow the driver last saw created, or 0 once
+	// that window is destroyed. mainUI is the sole writer: 0 as soon as it
+	// receives onNativeWindowDestroyed for that window, the window again on
+	// onNativeWindowCreated / onNativeWindowRedrawNeeded. It is a pointer, not
+	// a flag, because a replaced activity's window can be destroyed after the
+	// new activity's window was created (#896): that destroy must neither stop
+	// the new window painting nor let anything present into the old one. The WebGPU driver reads it (NativeWindowLive)
 	// to refuse painting or presenting into a destroyed window: during an
 	// in-process activity recreation (a per-app locale override is a guaranteed
 	// trigger on Android 13+) the destroy→create gap overlaps queued paint
@@ -319,14 +356,14 @@ var (
 	// process restarts. The GL path needs no flag: mainUI destroys the EGL
 	// surface synchronously in the windowDestroyed case and Publish checks
 	// C.surface.
-	nativeWindowLive atomic.Bool
+	liveWindow atomic.Uintptr
 )
 
-// NativeWindowLive reports whether the Android native window is currently
-// alive — false from onNativeWindowDestroyed until the next
-// onNativeWindowCreated or onNativeWindowRedrawNeeded. The WebGPU driver
-// backend gates painting, surface rebuilds and presenting on it (#283).
-func NativeWindowLive() bool { return nativeWindowLive.Load() }
+// NativeWindowLive reports whether handle is the Android native window that
+// is currently alive: false from its onNativeWindowDestroyed, and false for a
+// window that a newer activity's window replaced. The WebGPU driver backend
+// gates painting, surface rebuilds and presenting on it (#283, #896).
+func NativeWindowLive(handle uintptr) bool { return handle != 0 && handle == liveWindow.Load() }
 
 func init() {
 	theApp.registerGLViewportFilter()
@@ -612,7 +649,7 @@ func mainUI(vm, jniEnv, ctx uintptr) error {
 		case cfg := <-windowConfigChange:
 			pixelsPerPt = cfg.pixelsPerPt
 		case w := <-windowCreated:
-			nativeWindowLive.Store(true)
+			liveWindow.Store(uintptr(unsafe.Pointer(w)))
 			if surfaceInitialized && !wasDestroyed && !webgpuBackend {
 				if errStr := C.destroyEGLSurface(); errStr != nil {
 					return fmt.Errorf("%s (%s)", C.GoString(errStr), eglGetError())
@@ -634,7 +671,7 @@ func mainUI(vm, jniEnv, ctx uintptr) error {
 				theApp.events.In() <- paint.Event{External: true, Window: uintptr(unsafe.Pointer(w))}
 			}
 		case w := <-windowRedrawNeeded:
-			nativeWindowLive.Store(true)
+			liveWindow.Store(uintptr(unsafe.Pointer(w)))
 			// Under -tags webgpu the ANativeWindow is owned by wgpu (Vulkan), so
 			// no EGL surface is created; surfaceInitialized gates the one-time
 			// metrics setup instead of C.surface.
@@ -671,12 +708,18 @@ func mainUI(vm, jniEnv, ctx uintptr) error {
 			}
 			theApp.events.In() <- currentSize
 			theApp.events.In() <- paint.Event{External: true, Window: uintptr(unsafe.Pointer(w))}
-		case <-windowDestroyed:
+		case w := <-windowDestroyed:
+			if uintptr(unsafe.Pointer(w)) != liveWindow.Load() {
+				// A replaced activity's window, destroyed after the new one
+				// was created (#896). The surface is on the new window, and
+				// NativeWindowLive already refuses the old handle.
+				break
+			}
 			// Flip liveness before anything else: the onNativeWindowDestroyed
 			// callback returns (and Android destroys the window) as soon as its
 			// channel send is received, so this store is the driver's only
 			// near-synchronous signal to stop presenting (#283).
-			nativeWindowLive.Store(false)
+			liveWindow.Store(0)
 			if C.surface != nil {
 				if errStr := C.destroyEGLSurface(); errStr != nil {
 					return fmt.Errorf("%s (%s)", C.GoString(errStr), eglGetError())
@@ -717,10 +760,10 @@ func runInputQueue(vm, jniEnv, ctx uintptr) error {
 	// Android loopers select on OS file descriptors, not Go channels, so we
 	// translate the inputQueue channel to an ALooper_wake call.
 	l := C.ALooper_prepare(C.ALOOPER_PREPARE_ALLOW_NON_CALLBACKS)
-	pending := make(chan *C.AInputQueue, 1)
+	pending := make(chan queueChange, 1)
 	go func() {
-		for q := range inputQueue {
-			pending <- q
+		for c := range inputQueue {
+			pending <- c
 			C.ALooper_wake(l)
 		}
 	}()
@@ -730,13 +773,18 @@ func runInputQueue(vm, jniEnv, ctx uintptr) error {
 		if C.ALooper_pollOnce(-1, nil, nil, nil) == C.ALOOPER_POLL_WAKE {
 			select {
 			default:
-			case p := <-pending:
-				if q != nil {
+			case c := <-pending:
+				// A queue given up is detached only if it is the one being
+				// read. A replaced activity gives up its queue after the new
+				// activity's queue arrived, and that one was detached then
+				// (#896).
+				if q != nil && (c.created || c.q == q) {
 					processEvents(env, q)
 					C.AInputQueue_detachLooper(q)
+					q = nil
 				}
-				q = p
-				if q != nil {
+				if c.created {
+					q = c.q
 					C.AInputQueue_attachLooper(q, l, 0, nil, nil)
 				}
 				inputQueueDone <- struct{}{}
