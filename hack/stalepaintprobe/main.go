@@ -19,7 +19,17 @@
 // already shown; SHAPE=stack for Bellui Player's AudioPlayer shape (a widget
 // over a Stack whose child is replaced, then both refreshed).
 //
+// HIDE=1 (macOS) is the case that lost the change (#864): the app is hidden
+// 300 ms after the start, so the window can't paint, and brought back to the
+// front at 3 s. Give the change a DELAY_MS between the two, such as 1500. The
+// read-back then waits until 5.5 s. It needs System Events (Accessibility)
+// and does not raise the window if another app takes the front meanwhile, so
+// the probe then forces a repaint after the read-back and prints whether a
+// frame began: repaint-began=false means the window was still covered and the
+// run says nothing.
+//
 //	go run ./hack/stalepaintprobe
+//	HIDE=1 DELAY_MS=1500 go run ./hack/stalepaintprobe
 package main
 
 import (
@@ -27,6 +37,8 @@ import (
 	"image"
 	"image/color"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -43,6 +55,7 @@ import (
 var (
 	delay, _ = strconv.Atoi(os.Getenv("DELAY_MS"))
 	mode     = os.Getenv("MODE") // "show" builds before Show; "swap" replaces the content of a shown window
+	hide     = os.Getenv("HIDE") == "1"
 	red      = color.NRGBA{255, 0, 0, 255}
 	green    = color.NRGBA{0, 255, 0, 255}
 )
@@ -116,7 +129,13 @@ func main() {
 			}
 			time.Sleep(time.Millisecond)
 		}
-		time.Sleep(2500 * time.Millisecond)
+		readAfter := 2500 * time.Millisecond
+		if hide {
+			readAfter = 5500 * time.Millisecond
+			go setHidden(start, 300*time.Millisecond, true)
+			go setHidden(start, 3*time.Second, false)
+		}
+		time.Sleep(time.Until(start.Add(readAfter)))
 		bellui.DoAndWait(func() {
 			img := painterOf(w.Canvas()).Capture(w.Canvas())
 			b := img.Bounds()
@@ -128,11 +147,32 @@ func main() {
 			case g>>8 > 200 && r>>8 < 50:
 				shown = "green(ok)"
 			}
-			fmt.Printf("RESULT mode=%s delay=%d rect=%s label-ink-width=%d frames=%d\n", mode, delay, shown, inkWidth(img, b.Dy()/10), frames(w.Canvas()))
+			fmt.Printf("RESULT mode=%s hide=%v delay=%d rect=%s label-ink-width=%d frames=%d\n", mode, hide, delay, shown, inkWidth(img, b.Dy()/10), frames(w.Canvas()))
 		})
+		var before uint64
+		bellui.DoAndWait(func() {
+			before = frames(w.Canvas())
+			w.Canvas().Refresh(w.Content())
+		})
+		time.Sleep(500 * time.Millisecond)
+		bellui.DoAndWait(func() { fmt.Printf("CHECK repaint-began=%v\n", frames(w.Canvas()) != before) })
 		a.Quit()
 	}()
 	bellui.ShowAndRun(w)
+}
+
+// setHidden hides or shows this process' app through System Events at at
+// after start, and brings it to the front when showing it. Hidden, its window
+// is occluded and cannot paint.
+func setHidden(start time.Time, at time.Duration, hidden bool) {
+	time.Sleep(time.Until(start.Add(at)))
+	name := filepath.Base(os.Args[0])
+	script := fmt.Sprintf(`tell application "System Events" to set visible of process %q to %v`, name, !hidden)
+	if !hidden {
+		script += fmt.Sprintf("\n"+`tell application "System Events" to set frontmost of process %q to true`, name)
+	}
+	out, err := exec.Command("osascript", "-e", script).CombinedOutput()
+	fmt.Printf("HIDE hidden=%v at=%v err=%v %s\n", hidden, time.Since(start).Round(time.Millisecond), err, out)
 }
 
 // inkWidth is how far right the label's text reaches on row y: longer text
