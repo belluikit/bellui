@@ -100,6 +100,10 @@ func SetCurrentContext(vm unsafe.Pointer, ctx uintptr) {
 	})
 }
 
+// HasJVM reports whether JNI_OnLoad has handed over the JVM, which happens
+// after package init: a RunOnJVM made before it fails with "no current JVM".
+func HasJVM() bool { return currentVM != nil }
+
 // RunOnJVM runs fn on a new goroutine locked to an OS thread with a JNIEnv.
 //
 // RunOnJVM blocks until the call to fn is complete. Any Java

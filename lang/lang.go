@@ -429,6 +429,9 @@ func setupLang(lang string) {
 	setCurrentTag(tag)
 }
 
+// getLocales asks the system for its locales; a test swaps it.
+var getLocales = locale.GetLocales
+
 // updateLocalizer Finds the closest translation from the user's locale list and sets it up
 func updateLocalizer() {
 	setupOnce.Do(initRuntime)
@@ -444,7 +447,13 @@ func updateLocalizer() {
 		return
 	}
 
-	all, err := locale.GetLocales()
+	if !systemLocalesReady() {
+		// English until the system can be asked; see systemLocalesReady.
+		applyUserLocales(nil)
+		return
+	}
+
+	all, err := getLocales()
 	if err != nil {
 		bellui.LogError("Failed to load user locales", err)
 		// A failed lookup still returns a value — on Android a JNI failure
