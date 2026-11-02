@@ -138,3 +138,26 @@ func TestVideoSeekIntoTheLastSecond(t *testing.T) {
 		})
 	}
 }
+
+// TestVideoEndsWhenItsSoundHasPlayed: a video's end was reported by the
+// display when it took the end marker, after its last frame, with the last
+// 54 ms of sample.mp4's sound still to play, cut off by whatever the app did
+// on the end.
+func TestVideoEndsWhenItsSoundHasPlayed(t *testing.T) {
+	p := openSampleMP4(t)
+	var left int
+	ended := make(chan struct{})
+	p.SetOnEnd(func() {
+		left = p.audioOutput.Unplayed()
+		close(ended)
+	})
+	p.Play()
+	select {
+	case <-ended:
+	case <-time.After(8 * time.Second):
+		t.Fatal("sample.mp4 did not end")
+	}
+	if left != 0 {
+		t.Errorf("%d bytes (%v) of its sound still to play when the end was reported", left, p.audioOutput.PlaybackPosition())
+	}
+}

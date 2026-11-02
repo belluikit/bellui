@@ -1429,8 +1429,14 @@ func (p *Pipeline) displayLoop(stop <-chan struct{}) {
 				if tf.gen != p.seekGen.Load() {
 					continue // the end of where the source was before a seek
 				}
-				p.reportEnd()
-				return
+				switch p.awaitPlayedOut(stop, timeTicker.C, tf.gen) {
+				case playedOut:
+					p.reportEnd()
+					return
+				case stopped:
+					return
+				}
+				continue // a seek moved playback away from the end
 			}
 
 			if !p.state.IsPlaying() || tf.gen != p.seekGen.Load() {
@@ -1504,6 +1510,40 @@ func (p *Pipeline) displayLoop(stop <-chan struct{}) {
 			p.tick()
 		}
 	}
+}
+
+// playOut is how a wait for the end's sound ended.
+type playOut int
+
+const (
+	playedOut playOut = iota
+	stopped
+	soughtAway
+)
+
+// awaitPlayedOut waits, once the display has taken the end marker of seek
+// generation gen, for the audio to play out: the last frame is shown well
+// before the last of the sound, and an end reported then was cut off by
+// whatever the app did on it, as an audio-only track's was (#882). A seek
+// meanwhile moves playback away from the end, and the decoder decodes on
+// from the target. Time updates go on while it waits.
+func (p *Pipeline) awaitPlayedOut(stop <-chan struct{}, tick <-chan time.Time, gen uint64) playOut {
+	for p.audioOutput != nil && p.audioOutput.Unplayed() > 0 {
+		if p.seekGen.Load() != gen {
+			return soughtAway
+		}
+		select {
+		case <-stop:
+			return stopped
+		case <-tick:
+			p.tick()
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+	if p.seekGen.Load() != gen {
+		return soughtAway
+	}
+	return playedOut
 }
 
 // tick is the display's 100 ms time update, which it sends only while playing
