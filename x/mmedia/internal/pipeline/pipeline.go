@@ -1384,6 +1384,16 @@ func (p *Pipeline) displayLoop(stop <-chan struct{}) {
 			continue
 		}
 
+		// A due tick goes first. Playing, a frame is nearly always ready
+		// too, and select picks among ready cases at random, so a tick could
+		// lose to frame after frame: no time update in 300 ms of playback,
+		// about one run in eighty of TestPauseAndSeekReportOnceEach.
+		select {
+		case <-timeTicker.C:
+			p.tick()
+		default:
+		}
+
 		// Wait for the next frame (blocking). This naturally adapts to
 		// the decode rate — no pauses when the decoder is slow, it just
 		// runs at whatever fps the decoder can sustain.
@@ -1468,13 +1478,18 @@ func (p *Pipeline) displayLoop(stop <-chan struct{}) {
 			p.framesRendered.Add(1)
 
 		case <-timeTicker.C:
-			// Only while playing (#879). Ended, an audio-only stream keeps
-			// this loop running in StateStopped, and a tick there reported
-			// the same position ten times a second for as long as the player
-			// stayed open. Pause, Seek and the end each report once instead.
-			if p.state.IsPlaying() {
-				p.reportTime()
-			}
+			p.tick()
 		}
+	}
+}
+
+// tick is the display's 100 ms time update, which it sends only while playing
+// (#879). Ended, an audio-only stream keeps the display running in
+// StateStopped, and a tick there reported the same position ten times a
+// second for as long as the player stayed open. Pause, Seek and the end each
+// report once instead.
+func (p *Pipeline) tick() {
+	if p.state.IsPlaying() {
+		p.reportTime()
 	}
 }
