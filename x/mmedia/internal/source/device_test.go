@@ -51,6 +51,7 @@ func (f *fakeDecoder) Next() (goffmpeg.MediaType, error) {
 
 func (f *fakeDecoder) GetRGBA(*image.RGBA) error { return nil }
 func (f *fakeDecoder) GetAudio() ([]byte, error) { return nil, nil }
+func (f *fakeDecoder) Interrupt()                {}
 func (f *fakeDecoder) Close()                    { f.closed++ }
 
 // openCounter hands out a fresh fake per call, recording how many times the

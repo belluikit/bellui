@@ -77,3 +77,16 @@ type ErrorSource interface {
 	// cleanly or is still running.
 	Err() error
 }
+
+// Interruptible is an optional capability: a source whose blocking I/O another
+// goroutine can cut short. A far seek in a network MP3 with no seek table reads
+// the file through to the target, seconds of I/O, and the pipeline's Close,
+// Stop and SwapSource would otherwise wait for it (#884).
+type Interruptible interface {
+	// Interrupt makes a Decode, Seek or Rewind that is blocked on I/O return
+	// promptly, without recording an error: it was asked to stop, it did not
+	// fail. The interrupted call leaves the source nowhere in particular, so
+	// Decode does nothing until the next Seek or Rewind, which reopens the
+	// source first. Safe to call from any goroutine.
+	Interrupt()
+}

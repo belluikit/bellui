@@ -6,6 +6,8 @@ import (
 	"image"
 	"io"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/belluikit/goffmpeg"
@@ -49,6 +51,21 @@ type FFmpegSource struct {
 	videoCallback VideoCallback
 	audioCallback AudioCallback
 	ended         bool
+
+	// open opens the source again, for a source opened by URL; nil for a
+	// reader or a device. Interrupt leaves the decoder good only for closing,
+	// so only a source that can be reopened can be interrupted (#884).
+	open func() (goffmpeg.IDecoder, error)
+	// decMu orders Interrupt, which runs on whichever goroutine is stopping
+	// the pipeline, against the decode goroutine replacing dec. It guards
+	// writes to dec and every access to interrupts; the decode goroutine reads
+	// dec without it, as the only writer besides Close.
+	decMu sync.Mutex
+	// interrupts counts Interrupt calls, so a reopen can tell whether another
+	// came in while it was opening.
+	interrupts uint64
+	// interrupted is set by Interrupt and cleared by the reopen it calls for.
+	interrupted atomic.Bool
 }
 
 // NewFFmpegSource decodes from r. Container and codec are probed by
@@ -72,7 +89,9 @@ func NewFFmpegSourceURL(url string) (*FFmpegSource, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newFFmpegSource(dec), nil
+	s := newFFmpegSource(dec)
+	s.open = func() (goffmpeg.IDecoder, error) { return openURL(url) }
+	return s, nil
 }
 
 // httpOptions make FFmpeg ride out a network that drops or stalls (#839).
@@ -237,7 +256,9 @@ func (s *FFmpegSource) IgnoreVideo() {
 }
 
 func (s *FFmpegSource) Decode(_ time.Duration) {
-	if s.ended {
+	// An interrupted source is nowhere in particular until a Seek or Rewind
+	// reopens it; see Interrupt.
+	if s.ended || s.interrupted.Load() {
 		return
 	}
 	if !s.acquire() {
@@ -247,6 +268,9 @@ func (s *FFmpegSource) Decode(_ time.Duration) {
 	for {
 		mt, err := s.dec.Next()
 		if err != nil {
+			if s.interrupted.Load() {
+				return // asked to stop, not a failure
+			}
 			if s.live && s.tolerateStall(err) {
 				return
 			}
@@ -435,10 +459,16 @@ func (s *FFmpegSource) Seek(pos time.Duration) {
 	if s.live {
 		return
 	}
+	if !s.reopenIfInterrupted() {
+		return
+	}
 	if s.dec == nil {
 		return
 	}
 	if err := s.dec.Seek(pos.Seconds()); err != nil {
+		if s.interrupted.Load() {
+			return // asked to stop, not a failure; the next Seek reopens
+		}
 		// Playing on from where it was let the caller believe the seek had
 		// landed (#869). The source stops instead, and the pipeline reports
 		// why through OnError.
@@ -467,6 +497,9 @@ func (s *FFmpegSource) Seek(pos time.Duration) {
 	target := pos.Seconds()
 	for {
 		mt, err := s.dec.Next()
+		if s.interrupted.Load() {
+			return
+		}
 		if err != nil || mt == goffmpeg.MediaTypeNone {
 			// Recorded as Decode does, so a seek into a dropped stream is
 			// reported as the error it is, not as an end (#839).
@@ -497,6 +530,71 @@ func (s *FFmpegSource) Rewind() {
 
 func (s *FFmpegSource) HasEnded() bool { return s.ended }
 
+// Interrupt implements Interruptible: it makes the decoder abandon the I/O it
+// is blocked in, a far seek on a network stream above all, so the pipeline
+// can stop without waiting for it (#884). Measured on an https MP3 with no
+// seek table, FFmpeg returns about 2 ms after the interrupt from a seek that
+// otherwise takes seconds.
+//
+// A source opened from a reader or a device cannot be reopened, so for one
+// this does nothing.
+func (s *FFmpegSource) Interrupt() {
+	if s.open == nil || s.live {
+		return
+	}
+	s.decMu.Lock()
+	defer s.decMu.Unlock()
+	s.interrupts++
+	s.interrupted.Store(true)
+	if s.dec != nil {
+		s.dec.Interrupt()
+	}
+}
+
+// reopenIfInterrupted replaces an interrupted decoder with a fresh one, at the
+// start of the media; the caller seeks from there. It reports whether there
+// is a decoder to use. A failure to reopen ends the source with the reason.
+func (s *FFmpegSource) reopenIfInterrupted() bool {
+	if !s.interrupted.Load() {
+		return true
+	}
+	s.decMu.Lock()
+	gen := s.interrupts
+	s.decMu.Unlock()
+
+	dec, err := s.open()
+	if err == nil {
+		if err = applyAudioFormat(dec, s.wantChannels, s.wantRate); err != nil {
+			dec.Close()
+		}
+	}
+	if err != nil {
+		s.err = fmt.Errorf("mmedia: reopening after an interrupt: %w", err)
+		s.ended = true
+		return false
+	}
+
+	s.decMu.Lock()
+	old := s.dec
+	s.dec = dec
+	again := s.interrupts != gen
+	if again {
+		dec.Interrupt() // interrupted again while this one was opening
+	} else {
+		s.interrupted.Store(false)
+	}
+	s.decMu.Unlock()
+	if old != nil {
+		old.Close()
+	}
+	if s.hasVideo {
+		s.vInfo = dec.VideoInfo()
+	}
+	s.aInfo = dec.AudioInfo()
+	s.ended, s.err = false, nil
+	return !again
+}
+
 // readErr is err, or for a source read through Go, the reason the read
 // failed, which the decoder can only report as an opaque code.
 func (s *FFmpegSource) readErr(err error) error {
@@ -507,9 +605,12 @@ func (s *FFmpegSource) readErr(err error) error {
 }
 
 func (s *FFmpegSource) Close() {
-	if s.dec != nil {
-		s.dec.Close()
-		s.dec = nil
+	s.decMu.Lock()
+	dec := s.dec
+	s.dec = nil
+	s.decMu.Unlock()
+	if dec != nil {
+		dec.Close()
 	}
 	// Close is final, unlike release: nothing should reacquire the device after
 	// the caller has finished with the source.
