@@ -41,6 +41,10 @@
 // [SetAudioDeviceChannels] before its first player with audio; after that the
 // device's format is fixed and the call returns an error.
 //
+// [NewAudioPlayback] plays audio with no user interface, so playback can
+// outlive the screen that started it; [NewAudioPlayerFor] shows one with
+// transport controls, and closing that widget leaves it playing.
+//
 // [NewVideoPlayer] and [NewAudioPlayer] expose the single-medium widgets, and
 // [NewSubtitleOverlay] renders SRT or WebVTT tracks over a player;
 // [MediaPlayerWithSubtitles] wires the two together so the overlay follows
