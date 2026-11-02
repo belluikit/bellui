@@ -1276,9 +1276,12 @@ func (p *Pipeline) decodeAhead(stop <-chan struct{}) {
 				}
 				continue
 			}
-			// Audio-only: let the buffered samples play out, then finish,
-			// unless a seek moves playback away from the end meanwhile.
-			for p.audioOutput != nil && p.audioOutput.Buffered() > 0 && !p.seekPosted.Load() {
+			// Audio-only: let the samples play out, then finish, unless a
+			// seek moves playback away from the end meanwhile. Played out,
+			// not just out of the buffer: the device's player still holds
+			// up to two chunks then, and the end came 0.2 to 0.3 s before
+			// the sound did (#882).
+			for p.audioOutput != nil && p.audioOutput.Unplayed() > 0 && !p.seekPosted.Load() {
 				select {
 				case <-stop:
 					return

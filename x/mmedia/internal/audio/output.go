@@ -307,6 +307,15 @@ func (o *Output) PlaybackPosition() time.Duration {
 	return posBase + o.bytesDuration(max(0, played-playedBase))
 }
 
+// Unplayed is how much audio, in bytes, is still to be played: in the buffer,
+// or pulled by the player and not yet played. It is zero once the last of
+// what was written has played, which is the end of a track; the buffer alone
+// empties up to two of the player's chunks before that (#882).
+func (o *Output) Unplayed() int {
+	played, pulled := o.pull.played()
+	return o.buffer.Available() + int(pulled-played)
+}
+
 // bytesDuration is n bytes of audio at the Output's format, in whole sample
 // frames.
 func (o *Output) bytesDuration(n int64) time.Duration {

@@ -80,6 +80,41 @@ func TestALatePlayerStillCounts(t *testing.T) {
 	}
 }
 
+// TestPaddingIsNotUnplayedAudio pins #882's other half: with the ring empty
+// the player pads its pull with silence, and that silence was counted as
+// audio still to play. At the end of a track the position fell back by up to
+// a chunk, and the end was reported with the last 0.2 to 0.3 s still in the
+// player, cut off by whatever came next.
+func TestPaddingIsNotUnplayedAudio(t *testing.T) {
+	f := &fakePlayer{}
+	o, _ := pullerOutput(f)
+	last := tone(10*time.Millisecond, 1000) // the end of the track
+	o.WriteSamples(last)
+
+	o.pull.Read(make([]byte, chunk)) // the last of it, then silence
+	f.held = chunk
+	if got := o.Unplayed(); got != len(last) {
+		t.Errorf("unplayed %d bytes with the end of the track in the player; want %d", got, len(last))
+	}
+	if got := o.PlaybackPosition(); got != 0 {
+		t.Errorf("position %v; want 0", got)
+	}
+
+	f.held -= len(last) // played the audio; the silence is left
+	if got := o.Unplayed(); got != 0 {
+		t.Errorf("unplayed %d bytes with only silence left in the player; want 0", got)
+	}
+	if got := o.PlaybackPosition(); got != 10*time.Millisecond {
+		t.Errorf("position %v with the track played out; want its 10ms", got)
+	}
+
+	o.pull.Read(make([]byte, chunk)) // more silence
+	f.held += chunk
+	if got := o.PlaybackPosition(); got != 10*time.Millisecond {
+		t.Errorf("position %v after a pull of silence; want it to stay at 10ms", got)
+	}
+}
+
 // TestASeekCountsFromWhatItPulls: after a seek the position counts only what
 // the player plays from the new position, whether it plays out what it held
 // from before the seek or drops it.
