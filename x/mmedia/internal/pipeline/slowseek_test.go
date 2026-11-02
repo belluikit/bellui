@@ -152,8 +152,11 @@ func TestSeekDuringASeekGoesToTheLatest(t *testing.T) {
 
 	p.Play()
 	time.Sleep(200 * time.Millisecond)
-	mark := shown.len()
 	p.Seek(3 * time.Second) // frame 90
+	// Counted from when Seek returns: a frame shown just before it is from
+	// before it, and counted from before the call it read as shown after
+	// (#887, as #819 found).
+	mark := shown.len()
 	time.Sleep(src.delay / 2)
 	p.Seek(6 * time.Second) // frame 180
 	time.Sleep(2*src.delay + 300*time.Millisecond)
@@ -260,8 +263,8 @@ func TestSeekAfterTheDecoderReachedTheEnd(t *testing.T) {
 		t.Fatalf("the display has shown %d of 60 frames already: the test needs it well behind the decoder", shown.len())
 	}
 
-	mark := shown.len()
 	p.Seek(time.Second) // frame 30
+	mark := shown.len() // from when Seek returns (#887)
 	select {
 	case <-ended:
 	case <-time.After(3 * time.Second):
