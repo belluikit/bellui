@@ -147,7 +147,7 @@ func goAndroidBuild(pkg *packages.Package, bundleID string, androidArchs []strin
 		}
 		// If building release and no ldflags are set then remove the useless debug and DWARF build options
 		if release && buildLdflags == "" {
-			buildLdflags = "-w" // gomobile requires symbol check, so "-s" cannot be used yet - TODO resolve this
+			buildLdflags = "-w" // not -s: extractPkgs reads the symbols, and stripLibrary drops them after
 		}
 		err = goBuild(
 			pkg.PkgPath,
@@ -161,6 +161,11 @@ func goAndroidBuild(pkg *packages.Package, bundleID string, androidArchs []strin
 		nmpkgs[arch], err = extractPkgs(toolchain.Path(ndkRoot, "nm"), libAbsPath)
 		if err != nil {
 			return nil, err
+		}
+		if release {
+			if err := stripLibrary(toolchain.Path(ndkRoot, "strip"), libAbsPath); err != nil {
+				return nil, err
+			}
 		}
 		libFiles = append(libFiles, libPath)
 	}
@@ -449,6 +454,13 @@ func legacyAddAssets(apkw *Writer, manifestData []byte, iconPath string, target 
 		return err
 	}
 	return nil
+}
+
+// stripLibrary removes a built library's symbol tables, which are about an
+// eighth of its size. The dynamic symbols that Android loads it by stay, and so
+// does the Go function table, so a panic's stack trace still names its functions.
+func stripLibrary(strip, path string) error {
+	return runCmd(exec.Command(strip, "--strip-all", path))
 }
 
 func buildAPK(out io.Writer, nmpkgs map[string]map[string]bool, libFiles []string, androidArchs []string, appDex []string) (*Writer, error) {
