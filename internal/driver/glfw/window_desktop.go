@@ -223,6 +223,10 @@ type window struct {
 	pending []func()
 
 	lastWalkedTime time.Time
+
+	// paintRetryAt is set while the canvas holds changes a frame could not
+	// show: when to try painting them again (see noteFrameBegan).
+	paintRetryAt time.Time
 }
 
 func (w *window) SetFullScreen(full bool) {

@@ -124,7 +124,7 @@ func (d *gLDriver) runEventLoop() {
 
 		now := time.Now()
 		frame := d.frameInterval(now)
-		nextTick := nextTickDue(nextFrame, lastTick, d.idle())
+		nextTick := withPaintRetry(nextTickDue(nextFrame, lastTick, d.idle(now)), d.nextPaintRetry(now))
 		if !now.Before(nextTick) {
 			d.pollEvents()
 			d.processEventTick()
@@ -206,7 +206,7 @@ func nextTickDue(nextFrame, lastTick time.Time, idle bool) time.Time {
 // animation runs, and no visible window needs painting, resizing to fit its
 // content, or closing. It is checked before every wait, so main-thread work
 // that dirties a canvas gets its frame on time.
-func (d *gLDriver) idle() bool {
+func (d *gLDriver) idle(now time.Time) bool {
 	if d.animation.Active() {
 		return false
 	}
@@ -215,11 +215,44 @@ func (d *gLDriver) idle() bool {
 		if w.viewport == nil {
 			continue
 		}
-		if w.shouldExpand || w.viewport.ShouldClose() || (w.visible && w.canvas.IsDirty()) {
+		if w.shouldExpand || w.viewport.ShouldClose() || w.needsPaint(now) {
 			return false
 		}
 	}
 	return true
+}
+
+// needsPaint reports whether the window has changes to paint now: a window
+// waiting to retry a frame that could not begin does not, until the retry is
+// due (see nextPaintRetry).
+func (w *window) needsPaint(now time.Time) bool {
+	return w.visible && w.canvas.IsDirty() && !w.waitingToRetryPaint(now)
+}
+
+// nextPaintRetry returns the earliest time a window waiting to retry a frame
+// is due, or the zero time if none is waiting. A retry already due is not
+// waiting: needsPaint then reports the window, and its frame comes on the grid.
+func (d *gLDriver) nextPaintRetry(now time.Time) time.Time {
+	var next time.Time
+	for _, win := range d.windowList() {
+		w := win.(*window)
+		if w.viewport == nil || !w.visible || w.closing || !w.waitingToRetryPaint(now) {
+			continue
+		}
+		if next.IsZero() || w.paintRetryAt.Before(next) {
+			next = w.paintRetryAt
+		}
+	}
+	return next
+}
+
+// withPaintRetry brings the next tick forward to a paint retry due before it,
+// so an idle app retries on time rather than at its next idle tick.
+func withPaintRetry(nextTick, retry time.Time) time.Time {
+	if !retry.IsZero() && retry.Before(nextTick) {
+		return retry
+	}
+	return nextTick
 }
 
 func (d *gLDriver) Terminate() {
