@@ -1,6 +1,7 @@
 package pipeline
 
 import (
+	"image"
 	"testing"
 	"time"
 
@@ -80,5 +81,60 @@ func TestAudioEndsWhenItHasPlayed(t *testing.T) {
 	}
 	if pos := p.audioOutput.PlaybackPosition(); pos < p.Duration()-50*time.Millisecond {
 		t.Errorf("the device had played %v of %v when the end was reported", pos, p.Duration())
+	}
+}
+
+// openSampleMP4 opens sample.mp4, 4 s of video with sound, on the real audio
+// device, and skips when there is none.
+func openSampleMP4(t *testing.T) *Pipeline {
+	t.Helper()
+	if _, err := audio.NewOutput(2); err != nil {
+		t.Skipf("no audio device: %v", err)
+	}
+	p, err := NewPipelineURL("../source/testdata/sample.mp4")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(p.Close)
+	if !p.HasAudio() || !p.HasVideo() {
+		t.Fatal("sample.mp4 is not a video with sound: the test measures nothing")
+	}
+	p.SetOnFrame(func(*image.RGBA) {})
+	return p
+}
+
+// TestVideoSeekIntoTheLastSecond pins the rest of #882's freeze: a seek into
+// about the last second of a video with sound has all of that audio written
+// before the device starts playing it, and the clock, held at the target
+// until the audio is seen to move, was told where the audio was only on
+// those writes. The picture froze at the target and the end never came, for
+// a seek made before Play and, depending on timing, one made just after it.
+func TestVideoSeekIntoTheLastSecond(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		after time.Duration // after Play; negative is before it
+	}{
+		{"before Play", -1},
+		{"300ms after Play", 300 * time.Millisecond},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := openSampleMP4(t)
+			ended := make(chan struct{})
+			p.SetOnEnd(func() { close(ended) })
+			target := p.Duration() - time.Second
+			if tc.after < 0 {
+				p.Seek(target)
+			}
+			p.Play()
+			if tc.after >= 0 {
+				time.Sleep(tc.after)
+				p.Seek(target)
+			}
+			select {
+			case <-ended:
+			case <-time.After(4 * time.Second):
+				t.Fatalf("no end 4s after a seek to the last second; time %v of %v", p.CurrentTime(), p.Duration())
+			}
+		})
 	}
 }
