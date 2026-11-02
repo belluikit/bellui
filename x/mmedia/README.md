@@ -14,6 +14,7 @@ go get github.com/belluikit/bellui/x/mmedia
 | `MediaPlayer` | `NewMediaPlayer` / `NewMediaPlayerURL` | video surface + audio output + transport controls, A/V synced |
 | `VideoPlayer` | `NewVideoPlayer` / `NewVideoPlayerURL` | video only |
 | `AudioPlayer` | `NewAudioPlayer` / `NewAudioPlayerURL` | audio only, with transport controls |
+| `AudioPlayback` | `NewAudioPlayback` / `NewAudioPlaybackURL` | audio with no UI; show it with `NewAudioPlayerFor`, so playback outlives a screen |
 | `SubtitleOverlay` | `NewSubtitleOverlay` | SRT / WebVTT rendered over a player |
 | `TransportControls` | `NewTransportControls` | play/pause, seek, mute, volume, time display |
 
@@ -29,6 +30,20 @@ w.SetContent(mp)
 Every constructor takes the same functional options: `WithAutoPlay`, `WithLoop`,
 `WithVolume`, `WithOnEnd`, `WithOnError`, `WithOnTimeUpdate`. (`WithDownmix` is
 deprecated and does nothing: surround is downmixed to stereo by default.)
+
+For a song that keeps playing while screens come and go, open an
+`AudioPlayback`, which needs no widget, window or app, and give each screen a
+view of it. The view's `Close` (or `Detach`) leaves the song playing; the app
+closes the playback when it is done with it.
+
+```go
+pb, err := mmedia.NewAudioPlaybackURL(url)
+if err != nil {
+	return err
+}
+pb.Play()
+w.SetContent(mmedia.NewAudioPlayerFor(pb)) // on each screen that shows it
+```
 
 A stream with audio fails its constructor when the audio device will not open
 (no device, as on a headless box, or one that refuses the format) or its
