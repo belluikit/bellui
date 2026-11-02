@@ -70,17 +70,37 @@ type Pipeline struct {
 	stopCh chan struct{}
 	wg     sync.WaitGroup // tracks decode goroutine lifecycle
 
-	// decodeMu serializes access to the source between the decode-ahead
-	// goroutine and Seek, which both touch the decoder.
-	decodeMu sync.Mutex
+	// Only the decode goroutine touches the source while it runs. Seek posts
+	// its target here and the decoder moves the source to it: moving it is
+	// network I/O on a stream, a request and a decode up to the target, and
+	// Seek used to do that on the caller's goroutine, freezing the UI for
+	// seconds (#872). seeking is true from the post until the source is
+	// there, and the clock is held at the target meanwhile. seekPosted is a
+	// target the decoder has not taken yet; a later Seek replaces it, so the
+	// decoder only ever goes to the latest one. seekRewind posts a Rewind,
+	// which is what Stop does to a finite source. seekFrom is where playback
+	// was before the first seek still in flight, where a failed one leaves
+	// the clock.
+	seekMu     sync.Mutex
+	seeking    bool
+	seekTarget time.Duration
+	seekRewind bool
+	seekFrom   time.Duration
+	seekPosted atomic.Bool
+	// ended mirrors the source's HasEnded for Play's preroll, which runs on
+	// the caller's goroutine and so cannot ask the source.
+	ended atomic.Bool
 
-	// seekGen counts seeks. Every frame carries the generation it was decoded
-	// in, and the display drops a frame from an earlier one: after a seek, the
-	// frame the display was holding and the one the decoder was handing over
-	// both belong to the old position (#501). seekWake tells a display waiting
-	// on such a frame to look again now rather than when its time comes, which
-	// after a backward seek can be seconds away.
+	// seekGen counts seeks. Every frame carries the generation the source was
+	// at when it was decoded (srcGen), and the display drops one from other
+	// than the latest: after a seek, the frame the display was holding and the
+	// one the decoder was handing over both belong to the old position (#501),
+	// and so does everything the decoder makes until it has moved the source.
+	// seekWake tells a display waiting on such a frame to look again now
+	// rather than when its time comes, which after a backward seek can be
+	// seconds away.
 	seekGen  atomic.Uint64
+	srcGen   atomic.Uint64
 	seekWake chan struct{}
 	// presentMu makes the display's last generation check and its onFrame
 	// one step a seek cannot land inside: the display holds it across both,
@@ -88,12 +108,13 @@ type Pipeline struct {
 	// before a seek was shown just after it (#819). onFrame must not call
 	// back into the pipeline while it is held.
 	presentMu sync.Mutex
+	// audioMu does the same for audio: the decoder's generation check and its
+	// write to the device, against Seek's bump and its discarding what the
+	// device had buffered.
+	audioMu sync.Mutex
 	// pausedSeek asks the idle decoder for the frame at a seek made while
 	// paused, which nothing else decodes or shows until Play (#831).
 	pausedSeek atomic.Bool
-	// seekFailed asks the idle decoder of a paused pipeline to report a seek
-	// that failed, which a playing one reports as it reaches the end (#869).
-	seekFailed atomic.Bool
 
 	videoWidth  int
 	videoHeight int
@@ -139,7 +160,7 @@ var presentHook func(img *image.RGBA)
 type timedFrame struct {
 	img *image.RGBA
 	pts time.Duration
-	gen uint64 // the seek generation it was decoded in (see Pipeline.seekGen)
+	gen uint64 // the seek generation the source was at (see Pipeline.srcGen); the end marker has one too
 }
 
 // NewPipeline creates a new playback pipeline from a reader.
@@ -421,6 +442,11 @@ func (p *Pipeline) adoptSource(src source.Source) {
 		if p.audioOutput == nil {
 			return
 		}
+		p.audioMu.Lock()
+		defer p.audioMu.Unlock()
+		if p.srcGen.Load() != p.seekGen.Load() {
+			return // from before the latest seek, which Seek has discarded
+		}
 		p.audioOutput.WriteSamples(data)
 		p.clock.SetAudioTime(p.audioOutput.PlaybackPosition())
 	})
@@ -563,8 +589,8 @@ func (p *Pipeline) Play() {
 	// forever (Close used to hang on wg.Wait because of this).
 	stopCh := make(chan struct{})
 	p.stopCh = stopCh
-	p.state.Set(StatePlaying)
-	p.clock.Start()
+	p.ended.Store(false) // the decoder sets it from the source
+	p.setPlaying()
 
 	if p.hasAudio {
 		p.audioOutput.Start()
@@ -635,11 +661,7 @@ func (p *Pipeline) preroll() prerollExit {
 }
 
 // sourceEnded reports whether the decoder has reached the end of the source.
-func (p *Pipeline) sourceEnded() bool {
-	p.decodeMu.Lock()
-	defer p.decodeMu.Unlock()
-	return p.src.HasEnded()
-}
+func (p *Pipeline) sourceEnded() bool { return p.ended.Load() }
 
 // audioAheadFull reports whether the audio output buffer is at least half
 // full. The ring buffer overwrites its oldest samples on overflow, so the
@@ -663,8 +685,10 @@ func (p *Pipeline) pause() bool {
 		return false
 	}
 
+	p.seekMu.Lock()
 	p.state.Set(StatePaused)
 	p.clock.Pause()
+	p.seekMu.Unlock()
 
 	if p.hasAudio {
 		p.audioOutput.Pause()
@@ -673,11 +697,23 @@ func (p *Pipeline) pause() bool {
 }
 
 func (p *Pipeline) resume() {
-	p.state.Set(StatePlaying)
-	p.clock.Start()
+	p.setPlaying()
 
 	if p.hasAudio {
 		p.audioOutput.Resume()
+	}
+}
+
+// setPlaying sets the state to playing and starts the clock, unless a seek is
+// in flight: the clock then waits at the target for the decoder to get there,
+// and the decoder starts it (landSeek). Under seekMu, so the decoder sees the
+// state and the clock agree.
+func (p *Pipeline) setPlaying() {
+	p.seekMu.Lock()
+	defer p.seekMu.Unlock()
+	p.state.Set(StatePlaying)
+	if !p.seeking {
+		p.clock.Start()
 	}
 }
 
@@ -700,11 +736,14 @@ func (p *Pipeline) restAfterEnd() {
 	if !p.halt() {
 		return
 	}
-	if p.src.HasEnded() {
-		p.src.Rewind()
+	p.seekMu.Lock()
+	sought := p.seeking
+	p.seekMu.Unlock()
+	if !sought && p.src.HasEnded() {
+		p.rewind()
 		return
 	}
-	p.Seek(pos) // halt reset the clock and the audio position
+	p.seek(pos, false) // halt reset the clock and the audio position
 }
 
 // Stop stops playback and resets position.
@@ -712,7 +751,20 @@ func (p *Pipeline) Stop() {
 	if !p.halt() {
 		return
 	}
-	p.src.Rewind()
+	p.rewind()
+}
+
+// rewind returns the source to its start. A capture's Rewind releases the
+// device, which is what Stop is for there, so it happens now. A finite
+// source's is posted to the decoder like a seek and made on the next Play:
+// on a network stream it is a request and a decode, and making it here held
+// the caller for it, and made one on every Close (#872).
+func (p *Pipeline) rewind() {
+	if p.live {
+		p.src.Rewind()
+		return
+	}
+	p.seek(0, true)
 }
 
 // halt brings the pipeline to rest — decode and display goroutines joined,
@@ -827,6 +879,13 @@ func (p *Pipeline) SwapSource(src source.Source) error {
 	wasPaused := p.state.IsPaused()
 
 	p.halt()
+	// A seek still in flight was for the old source; the new one starts at
+	// its start, with the clock.
+	p.seekMu.Lock()
+	p.seeking = false
+	p.seekPosted.Store(false)
+	p.srcGen.Store(p.seekGen.Load())
+	p.seekMu.Unlock()
 
 	old := p.src
 	p.adoptSource(src)
@@ -932,19 +991,25 @@ func (p *Pipeline) sourceError() error {
 // Seek seeks to the given position. A live capture has no timeline to move
 // within, so this is refused for one rather than passed down to an undefined
 // av_seek_frame on a device.
+//
+// It returns without waiting for the source: the decode goroutine moves it
+// (landSeek), and until it is there the clock holds at the target and nothing
+// from before it is shown or heard. A seek that fails is reported through
+// OnError, as the end of the stream.
 func (p *Pipeline) Seek(pos time.Duration) {
 	if p.live {
 		return
 	}
+	p.seek(pos, false)
 	// Reported here because nothing else would: the tick runs only while
 	// playing, and a seek while paused or stopped is still a new position.
-	if p.seek(pos) {
-		p.reportTime()
-	}
+	p.reportTime()
 }
 
-// seek does Seek's work under the locks and reports whether the position moved.
-func (p *Pipeline) seek(pos time.Duration) bool {
+// seek posts a seek, or with rewind a Rewind, for the decoder to make, and
+// does at once everything that does not touch the source: it discards what
+// was decoded before it, and moves the clock to pos and holds it there.
+func (p *Pipeline) seek(pos time.Duration, rewind bool) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -955,32 +1020,33 @@ func (p *Pipeline) seek(pos time.Duration) bool {
 		pos = p.duration
 	}
 
-	// Everything up to the clock seek stays under decodeMu, so the decoder
-	// cannot decode the new position until the old one is discarded. Draining
-	// after releasing it also took the first frames decoded at the target, and
-	// the picture froze until the first frame left was due (#513).
-	p.decodeMu.Lock()
-	defer p.decodeMu.Unlock()
-	p.src.Seek(pos)
-	// A seek that failed stops the source with the reason (#869). Playback did
-	// not move, so the clock stays, and OnError reports where it stopped, not
-	// the target. The decoder still needs the drain below: paused, it is
-	// blocked sending into a full queue, and has to get free to report.
-	failed := p.src.HasEnded() && p.sourceError() != nil
-	p.seekFailed.Store(failed)
-	if !failed {
-		// Under decodeMu, no frame decoded before the seek gets the new
-		// generation; under presentMu, none checked before it is shown after it.
-		p.presentMu.Lock()
-		p.seekGen.Add(1)
-		p.presentMu.Unlock()
+	// Everything up to posting the target stays under seekMu, so the decoder
+	// cannot take it and decode the new position until the old one is
+	// discarded. Draining after the decoder could also took the first frames
+	// decoded at the target, and the picture froze until the first frame left
+	// was due (#513).
+	p.seekMu.Lock()
+	defer p.seekMu.Unlock()
+	if !p.seeking {
+		p.seekFrom = p.clock.Time()
 	}
 
-	// Discard everything decoded before the seek: queued video frames and
-	// buffered (unplayed) audio. The audio position is rebased so the
-	// consumed-bytes clock continues from the seek target. A frame the decoder
-	// was blocked sending can still arrive after the drain; it carries the old
-	// generation, and the display discards it.
+	// Under presentMu, no frame checked before the seek is shown after it;
+	// under audioMu, no audio decoded before it reaches the device after the
+	// device's buffer is discarded. The audio position is rebased so the
+	// consumed-bytes clock continues from the seek target.
+	p.audioMu.Lock()
+	p.presentMu.Lock()
+	p.seekGen.Add(1)
+	p.presentMu.Unlock()
+	if p.audioOutput != nil {
+		p.audioOutput.Rebase(pos)
+	}
+	p.audioMu.Unlock()
+
+	// Discard the queued video frames. A frame the decoder was blocked sending
+	// can still arrive after the drain; it carries the old generation, and the
+	// display discards it.
 	if p.frameQueue != nil {
 	drainLoop:
 		for {
@@ -992,21 +1058,58 @@ func (p *Pipeline) seek(pos time.Duration) bool {
 			}
 		}
 	}
-	if !failed {
-		if p.audioOutput != nil {
-			p.audioOutput.Rebase(pos)
-		}
-		p.clock.Seek(pos)
-		if p.hasVideo && p.state.IsPaused() {
-			p.pausedSeek.Store(true)
-		}
+
+	p.clock.Pause() // landSeek starts it, if playing, once the source is there
+	p.clock.Seek(pos)
+	if p.hasVideo && p.state.IsPaused() {
+		p.pausedSeek.Store(true)
 	}
+	p.seeking = true
+	p.seekTarget, p.seekRewind = pos, rewind
+	p.seekPosted.Store(true)
 
 	select {
 	case p.seekWake <- struct{}{}:
 	default: // a wake is already pending
 	}
-	return !failed
+}
+
+// landSeek moves the source to the latest seek posted, on the decode
+// goroutine, and reports whether it got there. A seek that failed stops the
+// source with the reason (#869); playback did not move, so the clock goes
+// back to where it was, and OnError reports that, not the target.
+func (p *Pipeline) landSeek() bool {
+	p.seekMu.Lock()
+	target, rewind := p.seekTarget, p.seekRewind
+	gen := p.seekGen.Load()
+	p.seekPosted.Store(false)
+	p.seekMu.Unlock()
+
+	if rewind {
+		p.src.Rewind()
+	} else {
+		p.src.Seek(target)
+	}
+	ended := p.src.HasEnded()
+	failed := ended && p.sourceError() != nil
+	p.ended.Store(ended)
+
+	p.seekMu.Lock()
+	defer p.seekMu.Unlock()
+	if p.seekPosted.Load() {
+		return true // a later seek came in meanwhile; the decoder makes that next
+	}
+	p.seeking = false
+	p.srcGen.Store(gen) // a failed seek's end-of-stream marker counts too
+	if failed {
+		p.clock.Seek(p.seekFrom)
+		return false
+	}
+	if p.state.IsPlaying() {
+		p.clock.Seek(target) // from now: the clock was held while the source moved
+		p.clock.Start()
+	}
+	return true
 }
 
 // reportTime sends one time update. Callers hold no lock: OnTime is the app's
@@ -1084,9 +1187,11 @@ func (p *Pipeline) recordSync(offset time.Duration) {
 	}
 }
 
-// Close releases all resources.
+// Close releases all resources. It does not rewind the source first, as Stop
+// does: on a network stream that was one more request, made only to close it
+// (#872).
 func (p *Pipeline) Close() {
-	p.Stop()
+	p.halt()
 	p.src.Close()
 }
 
@@ -1110,11 +1215,12 @@ func (p *Pipeline) decodeAhead(stop <-chan struct{}) {
 		default:
 		}
 
+		if p.seekPosted.Load() && !p.landSeek() && p.state.IsPaused() {
+			p.reportEnd() // a playing pipeline reports it as it reaches the end
+			return
+		}
+
 		if !p.state.IsPlaying() {
-			if p.state.IsPaused() && p.seekFailed.CompareAndSwap(true, false) {
-				p.reportEnd()
-				return
-			}
 			if p.state.IsPaused() && p.pausedSeek.CompareAndSwap(true, false) {
 				p.showPausedSeek(step)
 			}
@@ -1132,30 +1238,41 @@ func (p *Pipeline) decodeAhead(stop <-chan struct{}) {
 		}
 
 		// Decode one step — back-pressure above throttles the pace.
-		p.decodeMu.Lock()
 		p.framePending = false
 		p.src.Decode(step)
-		gen := p.seekGen.Load()
-		// Read under decodeMu: Seek clears the source's end flag while holding it.
+		gen := p.srcGen.Load()
 		ended := p.src.HasEnded()
-		p.decodeMu.Unlock()
+		p.ended.Store(ended)
 
 		if ended {
 			if p.frameQueue != nil {
 				select {
-				case p.frameQueue <- timedFrame{}: // nil img: end of stream
+				case p.frameQueue <- timedFrame{gen: gen}: // nil img: end of stream
 				case <-stop:
+					return
 				}
-				return
+				// The display reports the end when it takes the marker,
+				// unless a seek discards the marker first: then decoding goes
+				// on from the target. Returning here left a seek made just
+				// before the end with a display waiting for frames nothing
+				// would decode.
+				if !p.awaitSeekAfterEnd(stop) {
+					return
+				}
+				continue
 			}
-			// Audio-only: let the buffered samples play out, then finish.
-			for p.audioOutput != nil && p.audioOutput.Buffered() > 0 {
+			// Audio-only: let the buffered samples play out, then finish,
+			// unless a seek moves playback away from the end meanwhile.
+			for p.audioOutput != nil && p.audioOutput.Buffered() > 0 && !p.seekPosted.Load() {
 				select {
 				case <-stop:
 					return
 				default:
 				}
 				time.Sleep(20 * time.Millisecond)
+			}
+			if p.seekPosted.Load() {
+				continue
 			}
 			p.reportEnd()
 			return
@@ -1178,12 +1295,30 @@ func (p *Pipeline) decodeAhead(stop <-chan struct{}) {
 	}
 }
 
+// awaitSeekAfterEnd waits, once the end-of-stream marker is queued, for a seek
+// to move playback away from the end, and reports whether one did. It gives
+// up when the display has reported the end or the pipeline stops.
+func (p *Pipeline) awaitSeekAfterEnd(stop <-chan struct{}) bool {
+	for {
+		if p.seekPosted.Load() {
+			return true
+		}
+		if p.state.IsStopped() {
+			return false
+		}
+		select {
+		case <-stop:
+			return false
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+}
+
 // showPausedSeek decodes the frame at the target of a seek made while paused
 // and shows it, leaving the pipeline paused. It bypasses the queue: the paused
 // display leaves that alone (#527), and the next decode after it is the frame
 // that follows the target, so resuming carries on from there.
 func (p *Pipeline) showPausedSeek(step time.Duration) {
-	p.decodeMu.Lock()
 	p.framePending = false
 	// One video frame per Decode; a second try covers an empty frame pool.
 	for i := 0; i < 2 && !p.framePending && !p.src.HasEnded(); i++ {
@@ -1191,8 +1326,7 @@ func (p *Pipeline) showPausedSeek(step time.Duration) {
 	}
 	img, ok := p.pendingFrame, p.framePending
 	p.framePending = false
-	gen := p.seekGen.Load()
-	p.decodeMu.Unlock()
+	gen := p.srcGen.Load()
 	if !ok {
 		return
 	}
@@ -1244,6 +1378,9 @@ func (p *Pipeline) displayLoop(stop <-chan struct{}) {
 
 		case tf := <-p.frameQueue:
 			if tf.img == nil {
+				if tf.gen != p.seekGen.Load() {
+					continue // the end of where the source was before a seek
+				}
 				p.reportEnd()
 				return
 			}
