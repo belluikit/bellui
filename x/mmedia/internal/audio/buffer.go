@@ -42,39 +42,32 @@ func (rb *RingBuffer) Write(p []byte) (int, error) {
 	return n, nil
 }
 
-// Read reads data from the buffer into p.
-// Returns 0 if the buffer is empty (non-blocking).
+// Read reads data from the buffer into p, and fills what the buffer does not
+// have with silence, so it always fills p (non-blocking).
 func (rb *RingBuffer) Read(p []byte) (int, error) {
+	rb.read(p)
+	return len(p), nil
+}
+
+// read is Read, and reports how much of p came from the buffer: the front of
+// it; silence fills the rest.
+func (rb *RingBuffer) read(p []byte) int {
 	rb.mu.Lock()
 	defer rb.mu.Unlock()
 
-	avail := rb.available()
-	if avail == 0 {
-		// Return silence to keep audio output running smoothly.
-		for i := range p {
-			p[i] = 0
-		}
-		return len(p), nil
-	}
-
-	n := len(p)
-	if n > avail {
-		n = avail
-	}
-
+	n := min(len(p), rb.available())
 	for i := 0; i < n; i++ {
 		p[i] = rb.buf[rb.r]
 		rb.r = (rb.r + 1) % len(rb.buf)
 	}
-	rb.full = false
+	if n > 0 {
+		rb.full = false
+	}
 	rb.totalRead += int64(n)
 
-	// Fill remainder with silence if we didn't have enough data.
-	for i := n; i < len(p); i++ {
-		p[i] = 0
-	}
-
-	return len(p), nil
+	// Silence keeps the audio output running smoothly.
+	clear(p[n:])
+	return n
 }
 
 // Available returns the number of bytes available to read.
