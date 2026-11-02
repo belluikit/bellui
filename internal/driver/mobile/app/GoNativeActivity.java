@@ -317,24 +317,7 @@ public class GoNativeActivity extends NativeActivity {
 
 	void updateLayout() {
 	    try {
-            WindowInsets insets = getWindow().getDecorView().getRootWindowInsets();
-            if (insets == null) {
-                return;
-            }
-
-            insetsChanged(insets.getSystemWindowInsetTop(), insets.getSystemWindowInsetBottom(),
-                insets.getSystemWindowInsetLeft(), insets.getSystemWindowInsetRight());
-            // The keyboard left the screen while the app still wanted it up:
-            // the user closed it. Tell Go, so the next overlay change does not
-            // raise it again; a tap on the field or a focus change does.
-            if (android.os.Build.VERSION.SDK_INT >= 30) {
-                boolean ime = insets.isVisible(WindowInsets.Type.ime());
-                if (imeWasVisible && !ime && keyboardUp) {
-                    keyboardUp = false;
-                    keyboardDismissed();
-                }
-                imeWasVisible = ime;
-            }
+            updateLayout(getWindow().getDecorView().getRootWindowInsets());
         } catch (java.lang.NoSuchMethodError e) {
     	    Rect insets = new Rect();
             getWindow().getDecorView().getWindowVisibleDisplayFrame(insets);
@@ -342,6 +325,30 @@ public class GoNativeActivity extends NativeActivity {
             View view = findViewById(android.R.id.content).getRootView();
             insetsChanged(insets.top, view.getHeight() - insets.height() - insets.top,
                 insets.left, view.getWidth() - insets.width() - insets.left);
+        }
+    }
+
+    // updateLayout reports the given insets to Go. It is also called with the
+    // insets the window applies, because a keyboard that leaves an
+    // edge-to-edge window does not resize it, so no layout change follows to
+    // report that the inset is gone (#894).
+    void updateLayout(WindowInsets insets) {
+        if (insets == null) {
+            return;
+        }
+
+        insetsChanged(insets.getSystemWindowInsetTop(), insets.getSystemWindowInsetBottom(),
+            insets.getSystemWindowInsetLeft(), insets.getSystemWindowInsetRight());
+        // The keyboard left the screen while the app still wanted it up:
+        // the user closed it. Tell Go, so the next overlay change does not
+        // raise it again; a tap on the field or a focus change does.
+        if (android.os.Build.VERSION.SDK_INT >= 30) {
+            boolean ime = insets.isVisible(WindowInsets.Type.ime());
+            if (imeWasVisible && !ime && keyboardUp) {
+                keyboardUp = false;
+                keyboardDismissed();
+            }
+            imeWasVisible = ime;
         }
     }
 
@@ -1000,6 +1007,16 @@ public class GoNativeActivity extends NativeActivity {
 				GoNativeActivity.this.updateLayout();
 			}
 		});
+		if (Build.VERSION.SDK_INT >= 23) {
+			view.setOnApplyWindowInsetsListener(new View.OnApplyWindowInsetsListener() {
+				public WindowInsets onApplyWindowInsets(View v, WindowInsets insets) {
+					// The decor view still applies them itself; this only listens.
+					WindowInsets applied = v.onApplyWindowInsets(insets);
+					GoNativeActivity.this.updateLayout(insets);
+					return applied;
+				}
+			});
+		}
 
 		// Deliver a launch "open with" payload (file association / deep link).
 		// The native library is loaded above, so openIntent is safe to call; the
