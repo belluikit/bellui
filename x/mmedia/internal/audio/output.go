@@ -32,14 +32,16 @@ type Output struct {
 	ctx        otoContext // nil for a detached Output
 	player     *oto.Player
 	buffer     *RingBuffer
+	pull       *puller // what the player reads the buffer through
 	sampleRate int
 	channels   int
 	volume     float64
 	started    bool
 
-	// Seek rebase: PlaybackPosition = posBase + time(totalRead - readBase).
-	posBase  time.Duration
-	readBase int64
+	// Seek rebase: PlaybackPosition = posBase + time(played - playedBase),
+	// where played counts the audio the player has played (puller).
+	posBase    time.Duration
+	playedBase int64
 
 	// flushPending is set by Rebase: oto's player still holds what it pulled
 	// before the seek, and is emptied once the new position's samples fill a
@@ -151,9 +153,11 @@ func NewDetachedOutput(channels int) *Output {
 // stream's rate is how a 48 kHz stream once played at 0.918x (#506).
 func newOutput(ctx otoContext, channels int) *Output {
 	const rate = DeviceSampleRate
+	buffer := NewRingBuffer(audioBytes(rate, channels, ringDuration))
 	return &Output{
 		ctx:        ctx,
-		buffer:     NewRingBuffer(audioBytes(rate, channels, ringDuration)),
+		buffer:     buffer,
+		pull:       newPuller(buffer, rate*channels*2),
 		sampleRate: rate,
 		channels:   channels,
 		volume:     1.0,
@@ -203,8 +207,9 @@ func (o *Output) Start() {
 	if o.started || o.ctx == nil {
 		return
 	}
-	o.player = o.ctx.NewPlayer(o.buffer)
+	o.player = o.ctx.NewPlayer(o.pull)
 	o.player.SetBufferSize(playerBufferBytes(o.sampleRate, o.channels))
+	o.pull.setPlayer(o.player)
 	o.player.Play()
 	o.started = true
 }
@@ -269,10 +274,11 @@ func (o *Output) Stop() {
 		o.player = nil
 	}
 	o.buffer.Reset()
-	// Reset zeroes the byte count, so the last seek's base goes with it: kept,
-	// the next playback read as that seek's target until as many bytes had
-	// been read again as before it (#833).
-	o.posBase, o.readBase = 0, 0
+	o.pull.reset()
+	// The resets zero the byte counts, so the last seek's base goes with
+	// them: kept, the next playback read as that seek's target until as many
+	// bytes had been played again as before it (#833).
+	o.posBase, o.playedBase = 0, 0
 	o.started = false
 }
 
@@ -290,25 +296,31 @@ func (o *Output) Volume() float64 {
 	return o.volume
 }
 
-// PlaybackPosition returns the current audio playback position based on bytes
-// consumed, minus what is still sitting unplayed in oto's internal buffer —
-// otherwise the clock runs ahead of the actual sound by oto's buffering.
+// PlaybackPosition returns the current audio playback position: the audio
+// the player has played, counted by the puller, so neither what it holds
+// unplayed nor the silence it pads an empty buffer with reads as played.
 func (o *Output) PlaybackPosition() time.Duration {
 	o.mu.Lock()
-	posBase, readBase := o.posBase, o.readBase
-	player := o.player
+	posBase, playedBase := o.posBase, o.playedBase
 	o.mu.Unlock()
-	bytesRead := o.buffer.TotalRead() - readBase
-	if player != nil {
-		bytesRead -= int64(player.BufferedSize())
-	}
-	if bytesRead < 0 {
-		bytesRead = 0
-	}
-	bytesPerSample := 2 // 16-bit signed int
-	bytesPerFrame := bytesPerSample * o.channels
-	frames := bytesRead / int64(bytesPerFrame)
-	return posBase + time.Duration(frames)*time.Second/time.Duration(o.sampleRate)
+	played, _ := o.pull.played()
+	return posBase + o.bytesDuration(max(0, played-playedBase))
+}
+
+// Unplayed is how much audio, in bytes, is still to be played: in the buffer,
+// or pulled by the player and not yet played. It is zero once the last of
+// what was written has played, which is the end of a track; the buffer alone
+// empties up to two of the player's chunks before that (#882).
+func (o *Output) Unplayed() int {
+	played, pulled := o.pull.played()
+	return o.buffer.Available() + int(pulled-played)
+}
+
+// bytesDuration is n bytes of audio at the Output's format, in whole sample
+// frames.
+func (o *Output) bytesDuration(n int64) time.Duration {
+	frames := n / int64(2*o.channels) // 16-bit samples
+	return time.Duration(frames) * time.Second / time.Duration(o.sampleRate)
 }
 
 // SampleRate is the rate the Output plays at: DeviceSampleRate, which a
@@ -351,5 +363,5 @@ func (o *Output) Rebase(pos time.Duration) {
 	o.buffer.Clear()
 	o.flushPending.Store(o.player != nil) // see flushPlayer
 	o.posBase = pos
-	o.readBase = o.buffer.TotalRead()
+	_, o.playedBase = o.pull.played() // all of it, once played or flushed, is before pos
 }

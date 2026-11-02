@@ -47,7 +47,7 @@ func TestPositionCountsAtTheDeviceRate(t *testing.T) {
 	second := make([]byte, DeviceSampleRate*2) // one second of mono silence
 	o.WriteSamples(second)
 	drained := make([]byte, o.Buffered())
-	o.buffer.Read(drained) // as the device would
+	o.pull.Read(drained) // as the device would
 
 	if pos := o.PlaybackPosition(); pos < 990*time.Millisecond || pos > 1010*time.Millisecond {
 		t.Errorf("a second of audio played reads as %v; want 1s", pos)
@@ -60,7 +60,7 @@ func TestPositionCountsAtTheDeviceRate(t *testing.T) {
 func TestStopForgetsTheSeekBase(t *testing.T) {
 	o := NewDetachedOutput(2)
 	o.WriteSamples(make([]byte, 4*DeviceSampleRate)) // a second of 16-bit stereo
-	if _, err := o.buffer.Read(make([]byte, 4*DeviceSampleRate)); err != nil {
+	if _, err := o.pull.Read(make([]byte, 4*DeviceSampleRate)); err != nil {
 		t.Fatal(err)
 	}
 	o.Rebase(3 * time.Second)

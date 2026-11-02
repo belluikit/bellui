@@ -38,11 +38,11 @@ func TestSeekDropsWhatThePlayerPulled(t *testing.T) {
 	o.WriteSamples(tone(time.Second, 2000)) // the new position, as the decoder writes it
 
 	pulled := o.player.BufferedSize()
-	beforeRead := o.buffer.TotalRead()
+	_, beforeRead := o.pull.played()
 	t.Logf("player holds %d bytes (%v) right after the new samples", pulled, bytesDuration(pulled))
-	// What the player holds now came from the ring after the seek: the ring's
-	// read count grew by at least that much since Rebase reset its base.
-	if fromNew := beforeRead - o.readBase; fromNew < int64(pulled) {
+	// What the player holds now came from the ring after the seek: the audio
+	// pulled grew by at least that much since Rebase took its base.
+	if fromNew := beforeRead - o.playedBase; fromNew < int64(pulled) {
 		t.Errorf("the player holds %d bytes, but only %d were read from the new position: %d bytes of the old one are still queued",
 			pulled, fromNew, int64(pulled)-fromNew)
 	}

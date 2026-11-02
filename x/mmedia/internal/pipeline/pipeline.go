@@ -452,6 +452,24 @@ func (p *Pipeline) adoptSource(src source.Source) {
 	})
 }
 
+// followAudio tells the clock where the audio is, as each write of audio
+// does. The decoder calls it while it waits at the end, when nothing is
+// written: after a seek the clock holds at the target until the audio is seen
+// to move past it, and a seek into the last second or so had all its audio
+// written before the device started, so it was never seen to move. The
+// picture froze at the target, and the end never came (#882).
+func (p *Pipeline) followAudio() {
+	if p.audioOutput == nil {
+		return
+	}
+	p.audioMu.Lock()
+	defer p.audioMu.Unlock()
+	if p.srcGen.Load() != p.seekGen.Load() {
+		return // a seek is on its way; its target is the clock's
+	}
+	p.clock.SetAudioTime(p.audioOutput.PlaybackPosition())
+}
+
 // convertAudio asks src for exactly what the audio device plays. The device is
 // opened once per process and its format is fixed for the life of it, so the
 // source's decoder (swresample) converts the channels and the rate.
@@ -1276,15 +1294,19 @@ func (p *Pipeline) decodeAhead(stop <-chan struct{}) {
 				}
 				continue
 			}
-			// Audio-only: let the buffered samples play out, then finish,
-			// unless a seek moves playback away from the end meanwhile.
-			for p.audioOutput != nil && p.audioOutput.Buffered() > 0 && !p.seekPosted.Load() {
+			// Audio-only: let the samples play out, then finish, unless a
+			// seek moves playback away from the end meanwhile. Played out,
+			// not just out of the buffer: the device's player still holds
+			// up to two chunks then, and the end came 0.2 to 0.3 s before
+			// the sound did (#882).
+			for p.audioOutput != nil && p.audioOutput.Unplayed() > 0 && !p.seekPosted.Load() {
 				select {
 				case <-stop:
 					return
 				default:
 				}
 				time.Sleep(20 * time.Millisecond)
+				p.followAudio()
 			}
 			if p.seekPosted.Load() {
 				continue
@@ -1326,6 +1348,7 @@ func (p *Pipeline) awaitSeekAfterEnd(stop <-chan struct{}) bool {
 			return false
 		case <-time.After(10 * time.Millisecond):
 		}
+		p.followAudio()
 	}
 }
 
@@ -1406,8 +1429,14 @@ func (p *Pipeline) displayLoop(stop <-chan struct{}) {
 				if tf.gen != p.seekGen.Load() {
 					continue // the end of where the source was before a seek
 				}
-				p.reportEnd()
-				return
+				switch p.awaitPlayedOut(stop, timeTicker.C, tf.gen) {
+				case playedOut:
+					p.reportEnd()
+					return
+				case stopped:
+					return
+				}
+				continue // a seek moved playback away from the end
 			}
 
 			if !p.state.IsPlaying() || tf.gen != p.seekGen.Load() {
@@ -1481,6 +1510,40 @@ func (p *Pipeline) displayLoop(stop <-chan struct{}) {
 			p.tick()
 		}
 	}
+}
+
+// playOut is how a wait for the end's sound ended.
+type playOut int
+
+const (
+	playedOut playOut = iota
+	stopped
+	soughtAway
+)
+
+// awaitPlayedOut waits, once the display has taken the end marker of seek
+// generation gen, for the audio to play out: the last frame is shown well
+// before the last of the sound, and an end reported then was cut off by
+// whatever the app did on it, as an audio-only track's was (#882). A seek
+// meanwhile moves playback away from the end, and the decoder decodes on
+// from the target. Time updates go on while it waits.
+func (p *Pipeline) awaitPlayedOut(stop <-chan struct{}, tick <-chan time.Time, gen uint64) playOut {
+	for p.audioOutput != nil && p.audioOutput.Unplayed() > 0 {
+		if p.seekGen.Load() != gen {
+			return soughtAway
+		}
+		select {
+		case <-stop:
+			return stopped
+		case <-tick:
+			p.tick()
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+	if p.seekGen.Load() != gen {
+		return soughtAway
+	}
+	return playedOut
 }
 
 // tick is the display's 100 ms time update, which it sends only while playing
