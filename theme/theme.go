@@ -5,9 +5,11 @@ import (
 	"image/color"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/core"
+	"github.com/belluikit/bellui/internal/apphook"
 	"github.com/belluikit/bellui/internal/cache"
 	internaltheme "github.com/belluikit/bellui/internal/theme"
 )
@@ -114,7 +116,12 @@ func (t *builtinTheme) Color(n bellui.ThemeColorName, v bellui.ThemeVariant) col
 		v = t.variant
 	}
 
-	primary := bellui.CurrentApp().Settings().PrimaryColor()
+	primary := ColorBlue
+	if apphook.Started() {
+		if app := bellui.CurrentApp(); app != nil {
+			primary = app.Settings().PrimaryColor()
+		}
+	}
 	if n == ColorNamePrimary || n == ColorNameHyperlink {
 		return internaltheme.PrimaryColorNamed(primary)
 	} else if n == ColorNameForegroundOnPrimary {
@@ -167,11 +174,25 @@ func (t *builtinTheme) Font(style bellui.TextStyle) bellui.Resource {
 	return t.regular
 }
 
+// earlyLookup logs a theme looked up before the app started once, rather than
+// on every icon and colour an app's metadata or package variables ask for.
+// The lookup works, from the built-in theme, so it is not an error worth
+// repeating; but it cannot see a theme the app sets, so it is said once
+// (#861).
+var earlyLookup sync.Once
+
 // Current returns the theme that is currently used for the running application.
 // It looks up based on user preferences and application configuration.
 //
 // Since: 1.0
 func Current() bellui.Theme {
+	if !apphook.Started() {
+		earlyLookup.Do(func() {
+			bellui.LogError("Theme looked up before the app started; the built-in theme was used, "+
+				"not the app's. Look it up after app.New to get the app's theme", nil)
+		})
+		return darkTheme()
+	}
 	app := bellui.CurrentApp()
 	if app == nil {
 		return darkTheme()

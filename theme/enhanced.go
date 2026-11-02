@@ -4,6 +4,7 @@ import (
 	"image/color"
 
 	"github.com/belluikit/bellui"
+	"github.com/belluikit/bellui/internal/apphook"
 	internaltheme "github.com/belluikit/bellui/internal/theme"
 )
 
@@ -213,8 +214,10 @@ var legacyMD3ColorFields = map[bellui.ThemeColorName]func(*MD3Scheme) color.Colo
 
 func (t *enhancedTheme) md3Scheme(v bellui.ThemeVariant) *MD3Scheme {
 	primary := ""
-	if app := bellui.CurrentApp(); app != nil {
-		primary = app.Settings().PrimaryColor()
+	if apphook.Started() {
+		if app := bellui.CurrentApp(); app != nil {
+			primary = app.Settings().PrimaryColor()
+		}
 	}
 	if primary == "" {
 		primary = ColorBlue

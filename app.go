@@ -3,6 +3,8 @@ package bellui
 import (
 	"net/url"
 	"sync/atomic"
+
+	"github.com/belluikit/bellui/internal/apphook"
 )
 
 // An App is the definition of a graphical application.
@@ -270,6 +272,7 @@ var app atomic.Pointer[App]
 // SetCurrentApp is an internal function to set the app instance currently running.
 func SetCurrentApp(current App) {
 	app.Store(&current)
+	apphook.SetStarted(current != nil)
 }
 
 // CurrentApp returns the current application, for which there is only 1 per process.
