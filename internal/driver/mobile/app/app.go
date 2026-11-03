@@ -7,6 +7,8 @@
 package app
 
 import (
+	"time"
+
 	"github.com/belluikit/bellui/internal/async"
 	"github.com/belluikit/bellui/internal/driver/mobile/event/lifecycle"
 	"github.com/belluikit/bellui/internal/driver/mobile/event/size"
@@ -138,8 +140,33 @@ func (a *app) Publish() PublishResult {
 	if !webgpuBackend {
 		a.glctx.Flush()
 	}
-	a.publish <- struct{}{}
-	return <-a.publishResult
+	return a.handshake()
+}
+
+// publishWait bounds how long Publish waits for the platform to take a frame.
+// Zero waits for as long as it takes, which is right where taking the frame
+// presents it. iOS sets it: there the handshake only paces the paint loop,
+// and the display link that services it stops while the screen is locked
+// (#910).
+var publishWait time.Duration
+
+// handshake hands the frame to the platform and waits for its result. With
+// publishWait set, a frame nobody takes in time is dropped from the handshake.
+// Only the send is bounded: whoever receives on publish answers on
+// publishResult straight away.
+func (a *app) handshake() PublishResult {
+	if publishWait <= 0 {
+		a.publish <- struct{}{}
+		return <-a.publishResult
+	}
+	t := time.NewTimer(publishWait)
+	defer t.Stop()
+	select {
+	case a.publish <- struct{}{}:
+		return <-a.publishResult
+	case <-t.C:
+		return PublishResult{}
+	}
 }
 
 func (a *app) Filter(event any) any {

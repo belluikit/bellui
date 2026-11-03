@@ -62,6 +62,14 @@ func init() {
 	// https://groups.google.com/forum/#!msg/golang-nuts/IiWZ2hUuLDA/SNKYYZBelsYJ
 	runtime.LockOSThread()
 	initThreadID = uint64(C.threadID())
+
+	// Neither drawtick nor drawloop presents anything when it takes a frame:
+	// the WebGPU painter or the GLKView does that. The handshake only paces
+	// the paint loop, so stop waiting for it when the display link stops, as
+	// it does while the screen is locked. Waiting longer parks the main loop
+	// and with it every bellui.Do until the device wakes (#910). The bound
+	// matches drawloop's own.
+	publishWait = 100 * time.Millisecond
 }
 
 func main(f func(App)) {
