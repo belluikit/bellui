@@ -369,6 +369,7 @@ func addAssets(apkw *Writer, manifestData []byte, dir, iconPath string, target i
 	arscPath, resDir, compiledManifestPath, err := compileAndroidResources(
 		tmpdir,
 		manifestData,
+		arsc.iconPath,
 		iconForeground,
 		iconBackground,
 		iconMonochrome,

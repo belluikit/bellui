@@ -687,8 +687,8 @@ func collectLinkOutputs(work, apk, gen string) (*linkedResources, error) {
 }
 
 // writeAppIconRes writes the app's icon resources under appRes: the adaptive
-// layers when there are any, else the legacy icon as @mipmap/icon, which it
-// also names in the manifest.
+// layers when there are any, else the legacy icon as @mipmap/icon. Either way
+// it names the icon in the manifest, unless the manifest already names one.
 func writeAppIconRes(appRes string, manifest []byte, legacyIcon, iconFG, iconBG, iconMono string) ([]byte, error) {
 	if err := os.MkdirAll(appRes, 0o755); err != nil {
 		return nil, err
@@ -698,7 +698,7 @@ func writeAppIconRes(appRes string, manifest []byte, legacyIcon, iconFG, iconBG,
 		if iconBG == "" {
 			iconBG = iconFG
 		}
-		return manifest, writeAdaptiveIconResources(appRes, iconFG, iconBG, iconMono)
+		return withAdaptiveIcon(manifest), writeAdaptiveIconResources(appRes, legacyIcon, iconFG, iconBG, iconMono)
 	case legacyIcon != "":
 		mip := filepath.Join(appRes, "mipmap-xxxhdpi")
 		if err := os.MkdirAll(mip, 0o755); err != nil {
@@ -745,17 +745,31 @@ func compileLibraryRes(run func(...string) error, work string, libs *androidLibs
 // withApplicationIcon adds android:icon to <application> unless the manifest
 // already sets one.
 func withApplicationIcon(manifest []byte, icon string) []byte {
+	return withApplicationAttr(manifest, "android:icon", icon)
+}
+
+// withAdaptiveIcon names the adaptive icon resources in <application>, as the
+// generated manifest does, keeping either attribute the manifest already sets
+// (#920).
+func withAdaptiveIcon(manifest []byte) []byte {
+	manifest = withApplicationAttr(manifest, "android:icon", "@mipmap/ic_launcher")
+	return withApplicationAttr(manifest, "android:roundIcon", "@mipmap/ic_launcher_round")
+}
+
+// withApplicationAttr adds attr to <application> unless the manifest already
+// sets it.
+func withApplicationAttr(manifest []byte, attr, value string) []byte {
 	s := string(manifest)
 	i := strings.Index(s, "<application")
 	if i < 0 {
 		return manifest
 	}
 	end := strings.Index(s[i:], ">")
-	if end < 0 || strings.Contains(s[i:i+end], "android:icon=") {
+	if end < 0 || strings.Contains(s[i:i+end], attr+"=") {
 		return manifest
 	}
 	at := i + len("<application")
-	return []byte(s[:at] + ` android:icon="` + icon + `"` + s[at:])
+	return []byte(s[:at] + " " + attr + `="` + value + `"` + s[at:])
 }
 
 // writeLinkedResources puts aapt2's link output into the APK.
