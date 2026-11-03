@@ -422,6 +422,22 @@ var helpIconRes = &bellui.StaticResource{
 	StaticContent: helpIcon,
 }
 
+//go:embed icons/favorite.svg
+var favoriteIcon []byte
+
+var favoriteIconRes = &bellui.StaticResource{
+	StaticName:    "favorite.svg",
+	StaticContent: favoriteIcon,
+}
+
+//go:embed icons/favorite-border.svg
+var favoriteborderIcon []byte
+
+var favoriteborderIconRes = &bellui.StaticResource{
+	StaticName:    "favorite-border.svg",
+	StaticContent: favoriteborderIcon,
+}
+
 //go:embed icons/history.svg
 var historyIcon []byte
 
