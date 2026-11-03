@@ -3,6 +3,7 @@ package commands
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -99,12 +100,28 @@ func TestIndexReportsMissingWebGPUInChrome(t *testing.T) {
 			var stderr bytes.Buffer
 			cmd.Stderr = &stderr
 			out, err := cmd.Output()
+			if err != nil && chromeTeardownTimedOut(err, out, stderr.String()) {
+				// The page was rendered and dumped; only Chrome's own shutdown
+				// hung, which its watchdog ends with exit status 2 (#518).
+				t.Logf("Chrome hung shutting down after dumping the page; its watchdog ended it")
+				err = nil
+			}
 			// Chrome says why it failed only on stderr (#518).
 			require.NoError(t, err, "Chrome's stderr:\n%s", stderr.String())
 			require.Contains(t, string(out), `id="action"`, "Chrome rendered the page")
 			assert.Equal(t, tc.want, bytes.Contains(out, []byte(noWebGPUMessage)))
 		})
 	}
+}
+
+// chromeTeardownTimedOut reports whether Chrome failed only in shutting down:
+// it dumped the whole page, then its teardown watchdog ended it with exit
+// status 2. Seen intermittently on CI's macOS runners (#518).
+func chromeTeardownTimedOut(err error, out []byte, stderr string) bool {
+	var exit *exec.ExitError
+	return errors.As(err, &exit) && exit.ExitCode() == 2 &&
+		strings.Contains(stderr, "Teardown watchdog expired") &&
+		bytes.Contains(out, []byte("</html>"))
 }
 
 // chromeFlags runs Chrome headless with a fresh profile in dir, skipping
@@ -128,4 +145,22 @@ func findChrome() string {
 		}
 	}
 	return ""
+}
+
+// Only an exit 2 from the teardown watchdog after a whole page passes; a
+// cut-off page, another exit code or another message still fails (#518).
+func TestChromeTeardownTimedOut(t *testing.T) {
+	if _, err := exec.LookPath("sh"); err != nil {
+		t.Skip("needs sh to make an exit status")
+	}
+	exitWith := func(code string) error {
+		return exec.Command("sh", "-c", "exit "+code).Run()
+	}
+	page := []byte(`<html><body id="action"></body></html>`)
+	watchdog := "Teardown watchdog expired; recording dump and terminating."
+	assert.True(t, chromeTeardownTimedOut(exitWith("2"), page, watchdog))
+	assert.False(t, chromeTeardownTimedOut(exitWith("2"), page[:20], watchdog), "page cut off")
+	assert.False(t, chromeTeardownTimedOut(exitWith("1"), page, watchdog), "other exit code")
+	assert.False(t, chromeTeardownTimedOut(exitWith("2"), page, "something else"), "other failure")
+	assert.False(t, chromeTeardownTimedOut(context.DeadlineExceeded, page, watchdog), "not an exit")
 }
