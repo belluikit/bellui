@@ -61,19 +61,20 @@ func TestIconButton_Disabled(t *testing.T) {
 	assert.False(t, tapped)
 }
 
-// iconButtonIconSize returns the size the renderer gives the icon image.
-func iconButtonIconSize(t *testing.T, b *widget.IconButton) geo.Size {
+// iconButtonIcon returns the icon image as the renderer lays it out at the
+// button's MinSize.
+func iconButtonIcon(t *testing.T, b *widget.IconButton) *canvas.Image {
 	t.Helper()
 	r := test.TempWidgetRenderer(t, b)
 	b.Resize(b.MinSize())
 	r.Layout(b.MinSize())
 	for _, o := range r.Objects() {
 		if img, ok := o.(*canvas.Image); ok {
-			return img.Size()
+			return img
 		}
 	}
 	t.Fatal("icon button renderer has no image")
-	return geo.Size{}
+	return nil
 }
 
 func TestIconButton_ButtonSizes(t *testing.T) {
@@ -94,7 +95,10 @@ func TestIconButton_ButtonSizes(t *testing.T) {
 			b := widget.NewIconButton(theme.CancelIcon(), nil)
 			b.ButtonSize = tc.size
 			assert.Equal(t, geo.NewSize(tc.container, tc.container), b.MinSize())
-			assert.Equal(t, geo.NewSize(tc.icon, tc.icon), iconButtonIconSize(t, b))
+			icon := iconButtonIcon(t, b)
+			assert.Equal(t, geo.NewSize(tc.icon, tc.icon), icon.Size())
+			off := (tc.container - tc.icon) / 2
+			assert.Equal(t, geo.NewPos(off, off), icon.Position(), "icon not centred")
 			bg := test.TempWidgetRenderer(t, b).Objects()[0].(*canvas.Rectangle)
 			assert.Equal(t, tc.container/2, bg.CornerRadius)
 		})
@@ -109,7 +113,7 @@ func TestIconButton_DefaultSizeFollowsTheme(t *testing.T) {
 
 	b := widget.NewIconButton(theme.CancelIcon(), nil)
 	assert.Equal(t, geo.NewSize(34, 34), b.MinSize())
-	assert.Equal(t, geo.NewSize(20, 20), iconButtonIconSize(t, b))
+	assert.Equal(t, geo.NewSize(20, 20), iconButtonIcon(t, b).Size())
 
 	b = widget.NewIconButton(theme.CancelIcon(), nil)
 	b.ButtonSize = widget.IconButtonSizeLarge
