@@ -94,9 +94,13 @@ func TestIndexReportsMissingWebGPUInChrome(t *testing.T) {
 
 			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 			defer cancel()
-			out, err := exec.CommandContext(ctx, chrome,
-				append(chromeFlags(dir), "--virtual-time-budget=3000", "--dump-dom", "file://"+index)...).Output()
-			require.NoError(t, err)
+			cmd := exec.CommandContext(ctx, chrome,
+				append(chromeFlags(dir), "--virtual-time-budget=3000", "--dump-dom", "file://"+index)...)
+			var stderr bytes.Buffer
+			cmd.Stderr = &stderr
+			out, err := cmd.Output()
+			// Chrome says why it failed only on stderr (#518).
+			require.NoError(t, err, "Chrome's stderr:\n%s", stderr.String())
 			require.Contains(t, string(out), `id="action"`, "Chrome rendered the page")
 			assert.Equal(t, tc.want, bytes.Contains(out, []byte(noWebGPUMessage)))
 		})
