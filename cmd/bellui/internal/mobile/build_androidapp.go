@@ -404,7 +404,9 @@ func addAssets(apkw *Writer, manifestData []byte, dir, iconPath string, target i
 		if err != nil {
 			return err
 		}
-		return apkwWriteFile("res/"+relPath, path, apkw)
+		// Zip entries use forward slashes; filepath.Rel gives backslashes
+		// on Windows, which Android does not read as directories.
+		return apkwWriteFile("res/"+filepath.ToSlash(relPath), path, apkw)
 	})
 	if err != nil {
 		return fmt.Errorf("failed to write res directory: %w", err)
