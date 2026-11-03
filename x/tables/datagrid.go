@@ -799,6 +799,17 @@ func (g *DataGrid) ColumnHeader(col int) string {
 	return rc.def.Header()
 }
 
+// ColumnHeaderText returns the text drawn in the header cell of the column at
+// the given absolute display index, which is empty when the column sets
+// HideHeaderText (render.HeaderTextAccess). ColumnHeader still names it.
+func (g *DataGrid) ColumnHeaderText(col int) string {
+	rc := g.visibleCol(col)
+	if rc == nil {
+		return ""
+	}
+	return rc.def.headerText()
+}
+
 func (g *DataGrid) HeaderHeight() float32 {
 	if g.Options.HeaderHeight > 0 {
 		return g.Options.HeaderHeight
@@ -891,7 +902,7 @@ func (g *DataGrid) OnResizeDrag(posX float32) {
 	newWidth := g.dragStartSize + (posX - g.dragStartPos.X)
 
 	// Clamp to min — use the header text width as the floor so headers don't overlap.
-	headerText := rc.def.Header()
+	headerText := rc.def.headerText()
 	headerMinW := bellui.MeasureText(headerText, g.Theme().Size(bellui.ThemeSizeName("text")),
 		bellui.TextStyle{Bold: true}).Width + g.cellPadding()*2
 	minW := headerMinW

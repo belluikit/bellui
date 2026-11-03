@@ -45,6 +45,14 @@ type HeaderAccess interface {
 	ColumnAtX(x float32) int
 }
 
+// HeaderTextAccess is optionally implemented by a HeaderAccess whose header
+// cells can draw text other than the column's name, such as none at all for
+// a column of icons. ColumnHeader stays the column's accessible name. A grid
+// without it draws ColumnHeader.
+type HeaderTextAccess interface {
+	ColumnHeaderText(col int) string
+}
+
 // SortIndicator represents the sort state of a column header.
 type SortIndicator int
 
@@ -251,7 +259,11 @@ func (r *headerRenderer) rebuild(size geo.Size) {
 
 		// Label (leave room for sort arrow)
 		label := r.labels[i]
-		label.Text = grid.ColumnHeader(i)
+		if ht, ok := grid.(HeaderTextAccess); ok {
+			label.Text = ht.ColumnHeaderText(i)
+		} else {
+			label.Text = grid.ColumnHeader(i)
+		}
 		label.Color = tc.HeaderFg
 		labelW := w - padding*2
 		if sortState != SortIndicatorNone {

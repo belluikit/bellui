@@ -23,6 +23,13 @@ type ColumnDef struct {
 	// Defaults to Field if empty.
 	HeaderName string
 
+	// HideHeaderText leaves the column's header cell without text, for a
+	// column whose cells say what it is, such as a column of icons. The
+	// header still names the column (HeaderName, else Field) everywhere
+	// else: screen readers read it, exports use it as the column title and
+	// the filter popup shows it.
+	HideHeaderText bool
+
 	// ColID is a unique identifier for this column. Defaults to Field if empty.
 	ColID string
 
@@ -163,6 +170,15 @@ func (c *ColumnDef) Header() string {
 		return c.HeaderName
 	}
 	return c.Field
+}
+
+// headerText returns the text drawn in the column's header cell: Header(),
+// or "" when HideHeaderText is set.
+func (c *ColumnDef) headerText() string {
+	if c.HideHeaderText {
+		return ""
+	}
+	return c.Header()
 }
 
 // IsGroup returns true if this column definition has children (is a column group).
