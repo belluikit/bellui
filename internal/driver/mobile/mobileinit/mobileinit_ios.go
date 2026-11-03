@@ -21,6 +21,7 @@ import (
 
 #include <stdlib.h>
 
+void log_wrap(const char *logStr);
 void log_line(const char *line, int isErr);
 */
 import "C"
@@ -29,15 +30,22 @@ import "C"
 // not garbage collected and closed.
 var stdout, stderr *os.File
 
-// logWriter sends package log output to the unified log. It does not use
-// NSLog, which writes to stderr instead of the log whenever stderr is not
-// /dev/null: once stderr is redirected below, that would route every log line
-// back through the pipe at the error level.
+// logWriter sends package log output to NSLog, which a console (Xcode,
+// devicectl --console) shows. When stderr was redirected it writes to the
+// unified log directly instead: NSLog writes to stderr rather than the log
+// whenever stderr is not /dev/null, so it would route every line back through
+// the pipe at the error level.
 type logWriter struct{}
 
 func (logWriter) Write(p []byte) (n int, err error) {
-	cstr := C.CString(strings.TrimSuffix(string(p), "\n"))
-	C.log_line(cstr, 0)
+	if stderr != nil {
+		cstr := C.CString(strings.TrimSuffix(string(p), "\n"))
+		C.log_line(cstr, 0)
+		C.free(unsafe.Pointer(cstr))
+		return len(p), nil
+	}
+	cstr := C.CString(string(p))
+	C.log_wrap(cstr)
 	C.free(unsafe.Pointer(cstr))
 	return len(p), nil
 }

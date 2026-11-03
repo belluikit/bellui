@@ -1,6 +1,11 @@
 //go:build darwin && (arm || arm64)
 
+#import <Foundation/Foundation.h>
 #import <os/log.h>
+
+void log_wrap(const char *logStr) {
+    NSLog(@"Bellui: %s", logStr);
+}
 
 // log_line writes one line to the unified log. It uses os_log, not NSLog:
 // NSLog writes to stderr instead whenever stderr is not /dev/null, and stderr

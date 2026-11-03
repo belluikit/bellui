@@ -30,7 +30,8 @@
 // Measured on an iPad (10th gen, 2026-11-03), launched by devicectl without
 // --console: before the fix no line of any kind arrived, package log
 // included, though the app ran its 30 s and exited; after it all 30 of each,
-// the burst finished, and the long line arrived in 1 KiB pieces.
+// the burst finished, and the long line arrived in 1 KiB pieces. With
+// --console all three kinds show in the console instead.
 package main
 
 import (
