@@ -76,6 +76,7 @@ func nextFrameAfter(due, now time.Time, frame time.Duration) time.Time {
 
 func (d *gLDriver) drawSingleFrame() {
 	refreshed := false
+	now := time.Now()
 	for _, win := range d.windowList() {
 		w := win.(*window)
 		if w.closing {
@@ -86,7 +87,9 @@ func (d *gLDriver) drawSingleFrame() {
 		// because when a window becomes visible, it could be
 		// showing old content without a dirty flag set to true.
 		// Do the clear if and only if the window is visible.
-		if !w.visible || !w.canvas.CheckDirtyAndClear() {
+		// A window waiting to retry a frame that could not begin keeps its
+		// dirty flag until the retry is due.
+		if !w.visible || w.waitingToRetryPaint(now) || !w.canvas.CheckDirtyAndClear() {
 			// Window hidden or not being redrawn, mark canvasForObject
 			// cache alive if it hasn't been done recently
 			// n.b. we need to make sure threshold is a bit *after*
@@ -229,6 +232,11 @@ func (d *gLDriver) destroyWindow(w *window, index int) {
 
 func (d *gLDriver) repaintWindow(w *window) bool {
 	canvas := w.canvas
+	counter, counts := canvas.Painter().(interface{ FramesBegun() uint64 })
+	var before uint64
+	if counts {
+		before = counter.FramesBegun()
+	}
 	freed := prepareFrame(w)
 
 	updateGLContext(w)
@@ -262,8 +270,37 @@ func (d *gLDriver) repaintWindow(w *window) bool {
 	// mark that we have walked the window and don't
 	// need to walk it again to mark caches alive
 	w.lastWalkedTime = time.Now()
+	w.noteFrameBegan(!counts || counter.FramesBegun() != before, w.lastWalkedTime)
 	verifier.afterFrame(w)
 	return freed
+}
+
+// paintRetry is how long a window whose frame could not begin waits before it
+// tries again. Painting is cheap to attempt but not free, and a window can stay
+// unpaintable for hours, so the retry does not run at the frame rate. It is
+// also how long a window that becomes paintable again can show old content.
+const paintRetry = 100 * time.Millisecond
+
+// noteFrameBegan records whether the paint that just ran reached the screen.
+// The painter cannot begin a frame while it has no surface to draw on, as for
+// a window macOS reports occluded (#631), and the paint then shows nothing.
+// The walk has taken the canvas' dirty flag all the same, so without another
+// change the window would keep its old content once it can paint again (#864).
+// So the canvas is marked dirty again, to be painted after paintRetry. The
+// painters already make that next frame a full one (#564, #595).
+func (w *window) noteFrameBegan(began bool, now time.Time) {
+	if began {
+		w.paintRetryAt = time.Time{}
+		return
+	}
+	w.canvas.SetDirty()
+	w.paintRetryAt = now.Add(paintRetry)
+}
+
+// waitingToRetryPaint reports whether the window's last frame could not begin
+// and its retry is not due yet.
+func (w *window) waitingToRetryPaint(now time.Time) bool {
+	return !w.paintRetryAt.IsZero() && now.Before(w.paintRetryAt)
 }
 
 // prepareFrame does what a paint needs done first: the min-size pass, and
