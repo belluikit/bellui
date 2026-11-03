@@ -35,6 +35,16 @@
 //	adb shell settings put system font_scale 1.3   # recreation trigger (1.0 to restore)
 //	adb shell cmd locale set-app-locales com.trendvidia.recreateprobe --user 0 --locales pt-BR   # in-place since #287/#288: no lifecycle lines
 //	adb logcat -s Bellui | grep recreateprobe
+//
+// A second launch while the first is starting (#896) creates the new activity
+// before the old one is torn down. After it the app must still take a tap:
+//
+//	adb shell am start -n com.trendvidia.recreateprobe/org.golang.app.GoNativeActivity
+//	sleep 0.25
+//	adb shell am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER \
+//	  -f 0x10008000 -n com.trendvidia.recreateprobe/org.golang.app.GoNativeActivity
+//	sleep 3; adb shell input tap 300 600; sleep 7
+//	adb logcat -d | grep "ANR in"   # none; lifecycle ends at foreground, tick= keeps counting
 package main
 
 import (

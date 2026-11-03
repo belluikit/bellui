@@ -81,8 +81,8 @@ void onStart(ANativeActivity *activity) {}
 // onPause and onStop report the background as it happens (#673). The native
 // window can outlive both (a translucent activity over this one never
 // destroys it), so the window-destroyed path alone reported it late or never.
-void onPause(ANativeActivity *activity) { activityPaused(); }
-void onStop(ANativeActivity *activity) { activityStopped(); }
+void onPause(ANativeActivity *activity) { activityPaused(activity); }
+void onStop(ANativeActivity *activity) { activityStopped(activity); }
 
 // Entry point from our subclassed NativeActivity.
 //
