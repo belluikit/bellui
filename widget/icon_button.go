@@ -26,6 +26,46 @@ const (
 	IconButtonStyleOutlined
 )
 
+// IconButtonSize selects one of the Material 3 Expressive icon button sizes.
+// The zero value, [IconButtonSizeDefault], takes both the container and the
+// icon size from the theme, so dense themes stay dense. The other sizes are
+// fixed by the spec, in dp: container / icon.
+type IconButtonSize int
+
+const (
+	// IconButtonSizeDefault uses the theme's [theme.SizeNameIconButtonSize]
+	// container and [theme.SizeNameIconSize] icon (40 / 24 in the default theme).
+	IconButtonSizeDefault IconButtonSize = iota
+	// IconButtonSizeExtraSmall is 32 / 20.
+	IconButtonSizeExtraSmall
+	// IconButtonSizeSmall is 40 / 24.
+	IconButtonSizeSmall
+	// IconButtonSizeMedium is 56 / 24.
+	IconButtonSizeMedium
+	// IconButtonSizeLarge is 96 / 32.
+	IconButtonSizeLarge
+	// IconButtonSizeExtraLarge is 136 / 40.
+	IconButtonSizeExtraLarge
+)
+
+// dims returns the container and icon size for s; the default size reads th.
+func (s IconButtonSize) dims(th bellui.Theme) (container, icon float32) {
+	switch s {
+	case IconButtonSizeExtraSmall:
+		return 32, 20
+	case IconButtonSizeSmall:
+		return 40, 24
+	case IconButtonSizeMedium:
+		return 56, 24
+	case IconButtonSizeLarge:
+		return 96, 32
+	case IconButtonSizeExtraLarge:
+		return 136, 40
+	default:
+		return th.Size(theme.SizeNameIconButtonSize), th.Size(theme.SizeNameIconSize)
+	}
+}
+
 var (
 	_ event.Tappable          = (*IconButton)(nil)
 	_ event.Hoverable         = (*IconButton)(nil)
@@ -55,9 +95,12 @@ func (b *IconButton) PerformAccessibleAction(name string) {
 // IconButton is an icon-only button with MD3 visual variants.
 type IconButton struct {
 	DisableableWidget
-	Icon     bellui.Resource
-	Style    IconButtonStyle
-	OnTapped func() `json:"-"`
+	Icon  bellui.Resource
+	Style IconButtonStyle
+	// ButtonSize picks the button's size variant. It is not called Size
+	// because Size returns the widget's current size.
+	ButtonSize IconButtonSize
+	OnTapped   func() `json:"-"`
 
 	hovered bool
 }
@@ -111,14 +154,13 @@ type iconButtonRenderer struct {
 }
 
 func (r *iconButtonRenderer) MinSize() geo.Size {
-	s := r.btn.Theme().Size(theme.SizeNameIconButtonSize)
+	s, _ := r.btn.ButtonSize.dims(r.btn.Theme())
 	return geo.NewSize(s, s)
 }
 
 func (r *iconButtonRenderer) Layout(size geo.Size) {
 	r.bg.Resize(size)
-	th := r.btn.Theme()
-	iconSize := th.Size(theme.SizeNameIconSize)
+	_, iconSize := r.btn.ButtonSize.dims(r.btn.Theme())
 	r.icon.Resize(geo.NewSize(iconSize, iconSize))
 	r.icon.Move(geo.NewPos((size.Width-iconSize)/2, (size.Height-iconSize)/2))
 }
@@ -127,7 +169,8 @@ func (r *iconButtonRenderer) Refresh() {
 	th := r.btn.Theme()
 	v := bellui.CurrentApp().Settings().ThemeVariant()
 
-	r.bg.CornerRadius = r.btn.Theme().Size(theme.SizeNameIconButtonSize) / 2
+	container, _ := r.btn.ButtonSize.dims(th)
+	r.bg.CornerRadius = container / 2
 
 	var bgColorName, fgColorName bellui.ThemeColorName
 	switch r.btn.Style {
