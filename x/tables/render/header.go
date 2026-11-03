@@ -45,6 +45,13 @@ type HeaderAccess interface {
 	ColumnAtX(x float32) int
 }
 
+// HeaderTextHider is an optional capability of a HeaderAccess: a column it
+// reports hidden gets a blank header label, while ColumnHeader still names the
+// column for its accessible node. A grid without it paints every title.
+type HeaderTextHider interface {
+	ColumnHeaderTextHidden(col int) bool
+}
+
 // SortIndicator represents the sort state of a column header.
 type SortIndicator int
 
@@ -252,6 +259,9 @@ func (r *headerRenderer) rebuild(size geo.Size) {
 		// Label (leave room for sort arrow)
 		label := r.labels[i]
 		label.Text = grid.ColumnHeader(i)
+		if hider, ok := grid.(HeaderTextHider); ok && hider.ColumnHeaderTextHidden(i) {
+			label.Text = ""
+		}
 		label.Color = tc.HeaderFg
 		labelW := w - padding*2
 		if sortState != SortIndicatorNone {
