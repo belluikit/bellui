@@ -20,8 +20,16 @@ type ColumnDef struct {
 	Field string
 
 	// HeaderName is the display text shown in the column header.
-	// Defaults to Field if empty.
+	// Defaults to Field if empty; set HideHeaderText for a header that
+	// shows no text.
 	HeaderName string
+
+	// HideHeaderText leaves the column's header cell blank, for a column
+	// whose cells say what it is (an icon column, say). Only the painted
+	// label goes: the column keeps its name (Header) for assistive tech,
+	// export, the filter popup and group-aggregate labels, and its header
+	// cell still sorts, resizes and shows the sort arrow.
+	HideHeaderText bool
 
 	// ColID is a unique identifier for this column. Defaults to Field if empty.
 	ColID string

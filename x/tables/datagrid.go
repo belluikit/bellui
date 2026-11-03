@@ -799,6 +799,13 @@ func (g *DataGrid) ColumnHeader(col int) string {
 	return rc.def.Header()
 }
 
+// ColumnHeaderTextHidden reports whether the column's header cell paints no
+// text (ColumnDef.HideHeaderText); ColumnHeader still names it.
+func (g *DataGrid) ColumnHeaderTextHidden(col int) bool {
+	rc := g.visibleCol(col)
+	return rc != nil && rc.def.HideHeaderText
+}
+
 func (g *DataGrid) HeaderHeight() float32 {
 	if g.Options.HeaderHeight > 0 {
 		return g.Options.HeaderHeight
@@ -892,6 +899,9 @@ func (g *DataGrid) OnResizeDrag(posX float32) {
 
 	// Clamp to min — use the header text width as the floor so headers don't overlap.
 	headerText := rc.def.Header()
+	if rc.def.HideHeaderText {
+		headerText = ""
+	}
 	headerMinW := bellui.MeasureText(headerText, g.Theme().Size(bellui.ThemeSizeName("text")),
 		bellui.TextStyle{Bold: true}).Width + g.cellPadding()*2
 	minW := headerMinW
