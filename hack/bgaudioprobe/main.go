@@ -30,6 +30,10 @@
 // Measured on an iPad (10th gen, 2026-10-22): frames kept climbing at the
 // output rate through 40 s in state=background, with no interruption.
 //
+// Lock the screen too, not only Home: tick must keep pace with n while locked
+// (#910). If bellui.Do work waits stallAfter seconds, the probe logs
+// "stall=Ns goroutines:" and every goroutine's stack, once per stall.
+//
 // Package from this directory and run on a device:
 //
 //	bellui package -os ios --app-id com.trendvidia.bgaudioprobe \
@@ -52,6 +56,8 @@ package main
 import (
 	"fmt"
 	"log"
+	"runtime"
+	"sync/atomic"
 	"time"
 
 	"github.com/belluikit/bellui"
@@ -95,21 +101,37 @@ func main() {
 	})
 
 	go func() {
-		var ticks int
-		for n := 1; ; n++ {
+		var ticks atomic.Int64
+		var dumped bool
+		for n := int64(1); ; n++ {
 			time.Sleep(time.Second)
 			s := audioStats()
 			log.Printf("bgaudioprobe n=%d state=%s frames=%d running=%v interruptions=%d tick=%d",
-				n, s.state, s.frames, s.running, s.interruptions, ticks)
+				n, s.state, s.frames, s.running, s.interruptions, ticks.Load())
+			// A tick lagging n by stallAfter means work queued with bellui.Do
+			// has not run for that long (#910): dump every goroutine once per
+			// stall, so the log shows where the main loop is parked.
+			if lag := n - 1 - ticks.Load(); lag >= stallAfter && !dumped {
+				dumped = true
+				buf := make([]byte, 1<<20)
+				buf = buf[:runtime.Stack(buf, true)]
+				log.Printf("bgaudioprobe stall=%ds goroutines:\n%s", lag, buf)
+			} else if lag < stallAfter {
+				dumped = false
+			}
 			bellui.Do(func() {
-				ticks++
-				tick.SetText(fmt.Sprintf("tick: %d", ticks))
+				t := ticks.Add(1)
+				tick.SetText(fmt.Sprintf("tick: %d", t))
 			})
 		}
 	}()
 
 	bellui.ShowAndRun(w)
 }
+
+// stallAfter is how many seconds bellui.Do work may wait before the probe
+// dumps every goroutine's stack.
+const stallAfter = 3
 
 // playFor is how long the probe plays before it stops on its own.
 const playFor = 3 * time.Minute
