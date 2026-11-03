@@ -766,7 +766,7 @@ func (p *Pipeline) restAfterEnd() {
 		return
 	}
 	pos := p.CurrentTime()
-	if !p.halt() {
+	if !p.halt(false) {
 		return
 	}
 	p.seekMu.Lock()
@@ -781,7 +781,7 @@ func (p *Pipeline) restAfterEnd() {
 
 // Stop stops playback and resets position.
 func (p *Pipeline) Stop() {
-	if !p.halt() {
+	if !p.halt(false) {
 		return
 	}
 	p.rewind()
@@ -807,7 +807,15 @@ func (p *Pipeline) rewind() {
 // Split out of Stop because the two callers want different things done to the
 // source afterwards: Stop rewinds it (and, for a capture, that releases the
 // camera), while SwapSource is about to close it and replace it entirely.
-func (p *Pipeline) halt() bool {
+//
+// Joining the decoder meant waiting for whatever I/O it was in, and a far
+// seek on a network stream is seconds of it (#884). So an Interruptible
+// source is interrupted before the wait: always when final, since the source
+// is closed next, and otherwise only when a seek is in flight, since the
+// source then reopens on its next seek, and the rewind a Stop posts is one.
+// A Stop during plain playback leaves the source alone, which costs no
+// reopen.
+func (p *Pipeline) halt(final bool) bool {
 	p.mu.Lock()
 
 	// Stopped with the goroutines' channel still open is a stream that played
@@ -827,6 +835,15 @@ func (p *Pipeline) halt() bool {
 		p.stopCh = nil
 	}
 	p.mu.Unlock()
+
+	if in, ok := p.src.(source.Interruptible); ok {
+		p.seekMu.Lock()
+		seeking := p.seeking
+		p.seekMu.Unlock()
+		if final || seeking {
+			in.Interrupt()
+		}
+	}
 
 	// Wait for decode goroutine to exit (outside the lock to avoid deadlock).
 	p.wg.Wait()
@@ -911,7 +928,7 @@ func (p *Pipeline) SwapSource(src source.Source) error {
 	resume := p.state.IsPlaying()
 	wasPaused := p.state.IsPaused()
 
-	p.halt()
+	p.halt(true)
 	// A seek still in flight was for the old source; the new one starts at
 	// its start, with the clock.
 	p.seekMu.Lock()
@@ -1224,7 +1241,7 @@ func (p *Pipeline) recordSync(offset time.Duration) {
 // does: on a network stream that was one more request, made only to close it
 // (#872).
 func (p *Pipeline) Close() {
-	p.halt()
+	p.halt(true)
 	p.src.Close()
 }
 

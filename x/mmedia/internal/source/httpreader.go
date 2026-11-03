@@ -436,6 +436,13 @@ type readerDecoder struct {
 	r *httpReader
 }
 
+// Interrupt ends the request in flight as well: FFmpeg's interrupt stops it
+// calling the reader again, but cannot reach a Read already blocked inside it.
+func (d *readerDecoder) Interrupt() {
+	d.IDecoder.Interrupt()
+	d.r.cancel()
+}
+
 func (d *readerDecoder) Close() {
 	d.IDecoder.Close()
 	d.r.Close()
