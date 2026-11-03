@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -455,4 +456,23 @@ func Test_ListIcon_FileSource(t *testing.T) {
 func Test_GridIcon_FileSource(t *testing.T) {
 	result := theme.GridIcon().Name()
 	assert.Equal(t, "foreground_grid.svg", result)
+}
+
+// The heart icons are their own files, themed like the rest (#912).
+func TestFavoriteIcons(t *testing.T) {
+	for _, c := range []struct {
+		icon bellui.Resource
+		file string
+	}{{theme.FavoriteIcon(), "favorite.svg"}, {theme.FavoriteBorderIcon(), "favorite-border.svg"}} {
+		if c.icon == nil || !strings.HasSuffix(c.icon.Name(), c.file) {
+			t.Errorf("icon %v, want one named for %s", c.icon, c.file)
+			continue
+		}
+		if !strings.Contains(string(c.icon.Content()), "<path") {
+			t.Errorf("%s has no path", c.file)
+		}
+	}
+	if theme.FavoriteIcon().Name() == theme.FavoriteBorderIcon().Name() {
+		t.Error("filled and outlined hearts are the same icon")
+	}
 }

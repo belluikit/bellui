@@ -364,6 +364,18 @@ const (
 	// Since: 1.0
 	IconNameHelp bellui.ThemeIconName = "help"
 
+	// IconNameFavorite is the name of theme lookup for the filled favorite
+	// (heart) icon, for a Like that is on.
+	//
+	// Since: 1.3
+	IconNameFavorite bellui.ThemeIconName = "favorite"
+
+	// IconNameFavoriteBorder is the name of theme lookup for the outlined
+	// favorite (heart) icon, for a Like that is off.
+	//
+	// Since: 1.3
+	IconNameFavoriteBorder bellui.ThemeIconName = "favoriteBorder"
+
 	// IconNameHistory is the name of theme lookup for history icon.
 	//
 	// Since: 1.0
@@ -588,6 +600,8 @@ var icons = map[bellui.ThemeIconName]bellui.Resource{
 	IconNameFolderNew:       NewThemedResource(foldernewIconRes),
 	IconNameFolderOpen:      NewThemedResource(folderopenIconRes),
 	IconNameHelp:            NewThemedResource(helpIconRes),
+	IconNameFavorite:        NewThemedResource(favoriteIconRes),
+	IconNameFavoriteBorder:  NewThemedResource(favoriteborderIconRes),
 	IconNameHistory:         NewThemedResource(historyIconRes),
 	IconNameHome:            NewThemedResource(homeIconRes),
 	IconNameSettings:        NewThemedResource(settingsIconRes),
@@ -1087,6 +1101,22 @@ func FolderOpenIcon() bellui.Resource {
 // HelpIcon returns a resource containing the standard help icon for the current theme
 func HelpIcon() bellui.Resource {
 	return safeIconLookup(IconNameHelp)
+}
+
+// FavoriteIcon returns a resource containing the standard filled favorite
+// (heart) icon for the current theme
+//
+// Since: 1.3
+func FavoriteIcon() bellui.Resource {
+	return safeIconLookup(IconNameFavorite)
+}
+
+// FavoriteBorderIcon returns a resource containing the standard outlined
+// favorite (heart) icon for the current theme
+//
+// Since: 1.3
+func FavoriteBorderIcon() bellui.Resource {
+	return safeIconLookup(IconNameFavoriteBorder)
 }
 
 // HistoryIcon returns a resource containing the standard history icon for the current theme
