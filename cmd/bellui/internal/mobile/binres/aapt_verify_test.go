@@ -162,6 +162,8 @@ func TestAaptDumpTemplateManifest(t *testing.T) {
 		"A: android:configChanges(0x0101001f)=(type 0x11)0x23b4",
 		"A: android:exported(0x01010010)=(type 0x12)0xffffffff",
 		"A: android:debuggable(0x0101000f)=(type 0x12)0xffffffff",
+		// the library runs from the APK, not a second extracted copy (#889)
+		"A: android:extractNativeLibs(0x010104ea)=(type 0x12)0x0",
 		"A: android:grantUriPermissions(0x0101001b)=(type 0x12)0xffffffff",
 		fmt.Sprintf("A: android:theme(0x01010000)=@0x%08x", uint32(theme)),
 		// the synthesized icon reference into the mipmap table

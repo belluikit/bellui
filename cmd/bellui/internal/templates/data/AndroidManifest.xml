@@ -4,7 +4,12 @@
 	android:versionCode="{{.Build}}"
 	android:versionName="{{xml .Version}}">
 
+	<!-- extractNativeLibs false: the .so is stored uncompressed and 16 KB
+	     aligned (#626), so Android maps it straight from the APK. Without the
+	     attribute it also unpacked a second copy at install, which doubled the
+	     installed size (#889). API levels below 23 ignore it and extract. -->
 	<application android:label="{{xml .Name}}" android:debuggable="{{.Debug}}"
+				 android:extractNativeLibs="false"
 				 {{if .AdaptiveIcon}}android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher_round"{{end}}>
 	{{- if .Credit}}
 	<!-- The default icon is CC BY 4.0 artwork, which must be credited (bellui #362). -->

@@ -188,3 +188,40 @@ func TestOwnAndroidManifestWarnsTheCreditIsMissing(t *testing.T) {
 		})
 	}
 }
+
+// TestOwnAndroidManifestWarnsItExtractsLibs: an app's own manifest is used
+// unchanged, so the generated manifest's extractNativeLibs="false" cannot
+// reach it, and without it the installed app keeps a second copy of its
+// library (#889). The warning says so, and stays quiet once the manifest
+// chooses either way.
+func TestOwnAndroidManifestWarnsItExtractsLibs(t *testing.T) {
+	const ns = `xmlns:android="http://schemas.android.com/apk/res/android"`
+	for _, tc := range []struct {
+		name, manifest string
+		warns          bool
+	}{
+		{"no own manifest", "", false},
+		{"attribute missing", `<manifest ` + ns + `><application android:label="A"/></manifest>`, true},
+		{"set false", `<manifest ` + ns + `><application android:extractNativeLibs="false"/></manifest>`, false},
+		{"set true", `<manifest ` + ns + `><application android:extractNativeLibs="true"/></manifest>`, false},
+		{"only on an activity", `<manifest ` + ns + `><application><activity android:extractNativeLibs="false"/></application></manifest>`, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			if tc.manifest != "" {
+				require.NoError(t, os.WriteFile(filepath.Join(dir, "AndroidManifest.xml"), []byte(tc.manifest), 0o644))
+			}
+			var out bytes.Buffer
+			log.SetOutput(&out)
+			t.Cleanup(func() { log.SetOutput(os.Stderr) })
+
+			p := &Packager{appData: &appData{}, srcDir: dir}
+			p.warnOwnManifestExtractsLibs()
+			if tc.warns {
+				assert.Contains(t, out.String(), `android:extractNativeLibs="false"`)
+			} else {
+				assert.Empty(t, out.String())
+			}
+		})
+	}
+}
