@@ -33,6 +33,10 @@
 // Lock the screen too, not only Home: tick must keep pace with n while locked
 // (#910). If bellui.Do work waits stallAfter seconds, the probe logs
 // "stall=Ns goroutines:" and every goroutine's stack, once per stall.
+// Measured on the same iPad (2026-11-02), 42 s locked each run: before the
+// fix tick froze for all 42 s and the dump showed the main loop in
+// app.Publish, sent there by handleLifecycle's last paint before the
+// background; after it, tick kept pace with n throughout.
 //
 // Package from this directory and run on a device:
 //
