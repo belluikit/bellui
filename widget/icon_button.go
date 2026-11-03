@@ -26,6 +26,26 @@ const (
 	IconButtonStyleOutlined
 )
 
+// IconButtonSize selects one of the Material 3 Expressive icon button sizes.
+// The zero value, [IconButtonSizeDefault], takes both sizes from the theme.
+type IconButtonSize int
+
+const (
+	// IconButtonSizeDefault uses the theme's SizeNameIconButtonSize container
+	// and SizeNameIconSize icon, so a dense theme stays dense.
+	IconButtonSizeDefault IconButtonSize = iota
+	// IconButtonSizeXSmall is a 32 dp container with a 20 dp icon.
+	IconButtonSizeXSmall
+	// IconButtonSizeSmall is a 40 dp container with a 24 dp icon.
+	IconButtonSizeSmall
+	// IconButtonSizeMedium is a 56 dp container with a 24 dp icon.
+	IconButtonSizeMedium
+	// IconButtonSizeLarge is a 96 dp container with a 32 dp icon.
+	IconButtonSizeLarge
+	// IconButtonSizeXLarge is a 136 dp container with a 40 dp icon.
+	IconButtonSizeXLarge
+)
+
 var (
 	_ event.Tappable          = (*IconButton)(nil)
 	_ event.Hoverable         = (*IconButton)(nil)
@@ -58,6 +78,10 @@ type IconButton struct {
 	Icon     bellui.Resource
 	Style    IconButtonStyle
 	OnTapped func() `json:"-"`
+
+	// ButtonSize picks the container and icon size. The zero value takes
+	// both from the theme. (A field named Size would clash with Size().)
+	ButtonSize IconButtonSize
 
 	hovered bool
 }
@@ -110,15 +134,32 @@ type iconButtonRenderer struct {
 	btn  *IconButton
 }
 
+// metrics returns the container and icon size for the button's ButtonSize.
+func (r *iconButtonRenderer) metrics() (container, icon float32) {
+	switch r.btn.ButtonSize {
+	case IconButtonSizeXSmall:
+		return 32, 20
+	case IconButtonSizeSmall:
+		return 40, 24
+	case IconButtonSizeMedium:
+		return 56, 24
+	case IconButtonSizeLarge:
+		return 96, 32
+	case IconButtonSizeXLarge:
+		return 136, 40
+	}
+	th := r.btn.Theme()
+	return th.Size(theme.SizeNameIconButtonSize), th.Size(theme.SizeNameIconSize)
+}
+
 func (r *iconButtonRenderer) MinSize() geo.Size {
-	s := r.btn.Theme().Size(theme.SizeNameIconButtonSize)
+	s, _ := r.metrics()
 	return geo.NewSize(s, s)
 }
 
 func (r *iconButtonRenderer) Layout(size geo.Size) {
 	r.bg.Resize(size)
-	th := r.btn.Theme()
-	iconSize := th.Size(theme.SizeNameIconSize)
+	_, iconSize := r.metrics()
 	r.icon.Resize(geo.NewSize(iconSize, iconSize))
 	r.icon.Move(geo.NewPos((size.Width-iconSize)/2, (size.Height-iconSize)/2))
 }
@@ -127,7 +168,8 @@ func (r *iconButtonRenderer) Refresh() {
 	th := r.btn.Theme()
 	v := bellui.CurrentApp().Settings().ThemeVariant()
 
-	r.bg.CornerRadius = r.btn.Theme().Size(theme.SizeNameIconButtonSize) / 2
+	container, _ := r.metrics()
+	r.bg.CornerRadius = container / 2
 
 	var bgColorName, fgColorName bellui.ThemeColorName
 	switch r.btn.Style {
