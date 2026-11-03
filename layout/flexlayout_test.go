@@ -122,3 +122,78 @@ func TestFlexHBoxLayout_CrossClampDoesNotAffectMainAxis(t *testing.T) {
 	// Main axis: b gets 3x a's width (widths sum to the available main extent).
 	assert.InDelta(t, 3.0, float64(b.Size().Width/a.Size().Width), 0.01)
 }
+
+// TestFlexHBoxLayout_CrossAlign verifies that a shorter child keeps its
+// natural height and is placed at the top, centre or bottom of the row, and
+// that the default still stretches (#921).
+func TestFlexHBoxLayout_CrossAlign(t *testing.T) {
+	for _, tt := range []struct {
+		align  layout.CrossAlign
+		wantY  float32
+		wantH  float32
+		reason string
+	}{
+		{layout.CrossStretch, 0, 96, "default stretches to the row"},
+		{layout.CrossStart, 0, 56, "top"},
+		{layout.CrossCenter, 20, 56, "centred"},
+		{layout.CrossEnd, 40, 56, "bottom"},
+	} {
+		small := NewMinSizeRect(geo.NewSize(56, 56))
+		big := NewMinSizeRect(geo.NewSize(96, 96))
+		objs := []core.CanvasObject{small, big}
+		l := &layout.FlexHBoxLayout{CrossAlign: tt.align, Padding: 4}
+		assert.Equal(t, float32(96), l.MinSize(objs).Height)
+		l.Layout(objs, geo.NewSize(156, 96))
+
+		assert.Equal(t, geo.NewPos(0, tt.wantY), small.Position(), tt.reason)
+		assert.Equal(t, geo.NewSize(56, tt.wantH), small.Size(), tt.reason)
+		assert.Equal(t, geo.NewPos(60, 0), big.Position(), tt.reason)
+		assert.Equal(t, geo.NewSize(96, 96), big.Size(), tt.reason)
+	}
+}
+
+// TestFlexHBoxLayout_CrossAlignClamp verifies that a non-stretch alignment
+// still honours the per-child cross MinHeight/MaxHeight.
+func TestFlexHBoxLayout_CrossAlignClamp(t *testing.T) {
+	a := NewMinSizeRect(geo.NewSize(10, 10))
+	b := NewMinSizeRect(geo.NewSize(10, 60))
+	l := &layout.FlexHBoxLayout{
+		CrossAlign: layout.CrossCenter,
+		MinHeight:  []float32{30, 0},
+		MaxHeight:  []float32{0, 40},
+	}
+	l.Layout([]core.CanvasObject{a, b}, geo.NewSize(100, 100))
+
+	assert.Equal(t, float32(30), a.Size().Height, "raised to MinHeight")
+	assert.Equal(t, float32(35), a.Position().Y)
+	assert.Equal(t, float32(40), b.Size().Height, "capped at MaxHeight")
+	assert.Equal(t, float32(30), b.Position().Y)
+}
+
+// TestFlexVBoxLayout_CrossAlign is the column counterpart: a narrower child
+// keeps its natural width and is placed left, centre or right.
+func TestFlexVBoxLayout_CrossAlign(t *testing.T) {
+	for _, tt := range []struct {
+		align  layout.CrossAlign
+		wantX  float32
+		wantW  float32
+		reason string
+	}{
+		{layout.CrossStretch, 0, 96, "default stretches to the column"},
+		{layout.CrossStart, 0, 56, "left"},
+		{layout.CrossCenter, 20, 56, "centred"},
+		{layout.CrossEnd, 40, 56, "right"},
+	} {
+		small := NewMinSizeRect(geo.NewSize(56, 56))
+		big := NewMinSizeRect(geo.NewSize(96, 96))
+		objs := []core.CanvasObject{small, big}
+		l := &layout.FlexVBoxLayout{CrossAlign: tt.align, Padding: 4}
+		assert.Equal(t, float32(96), l.MinSize(objs).Width)
+		l.Layout(objs, geo.NewSize(96, 156))
+
+		assert.Equal(t, geo.NewPos(tt.wantX, 0), small.Position(), tt.reason)
+		assert.Equal(t, geo.NewSize(tt.wantW, 56), small.Size(), tt.reason)
+		assert.Equal(t, geo.NewPos(0, 60), big.Position(), tt.reason)
+		assert.Equal(t, geo.NewSize(96, 96), big.Size(), tt.reason)
+	}
+}
