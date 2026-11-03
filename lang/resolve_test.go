@@ -1,6 +1,9 @@
 package lang
 
 import (
+	"bytes"
+	"errors"
+	"log"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -112,4 +115,41 @@ func TestUpdateLocalizer_KeepsOverrideOnAddTranslations(t *testing.T) {
 	// still picking up the newly added messages.
 	assert.Equal(t, bellui.Locale("fr"), CurrentLocale())
 	assert.Equal(t, "clé", L("resolve-test-key"))
+}
+
+// TestNoLookupBeforeTheJVM pins #892: on Android the locales cannot be read
+// until JNI_OnLoad hands over the JVM, after package init. A lookup made
+// earlier failed and logged "Failed to load user locales" on every launch.
+// Until the system can be asked, nothing asks it and nothing is logged; once
+// it can, ResolveSystemLocale seats the system's locale.
+func TestNoLookupBeforeTheJVM(t *testing.T) {
+	snapshotLocaleState(t)
+	localeOverride.Store(false)
+	oldReady, oldGet := systemLocalesReady, getLocales
+	t.Cleanup(func() { systemLocalesReady, getLocales = oldReady, oldGet })
+
+	ready, lookups := false, 0
+	systemLocalesReady = func() bool { return ready }
+	getLocales = func() ([]string, error) {
+		lookups++
+		if !ready {
+			return []string{""}, errors.New("no current JVM")
+		}
+		return []string{"pt-BR"}, nil
+	}
+	var out bytes.Buffer
+	prev := log.Writer()
+	log.SetOutput(&out)
+	t.Cleanup(func() { log.SetOutput(prev) })
+
+	updateLocalizer() // what package init and an early AddTranslations do
+	assert.Zero(t, lookups, "the system was asked before it could answer")
+	assert.NotContains(t, out.String(), "Failed to load user locales")
+	assert.Equal(t, "en", getCurrentTag().String())
+
+	ready = true
+	ResolveSystemLocale() // what the driver does once the JVM is attached
+	assert.Equal(t, 1, lookups)
+	assert.Equal(t, "pt-BR", getCurrentTag().String())
+	assert.Empty(t, out.String())
 }
