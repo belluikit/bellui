@@ -1,3 +1,5 @@
+//go:build freebsd || linux || darwin || windows || openbsd
+
 package app
 
 import (
