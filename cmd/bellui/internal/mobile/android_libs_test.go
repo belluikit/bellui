@@ -614,3 +614,77 @@ func TestStripLibraryDropsSymbolTables(t *testing.T) {
 	assert.Nil(t, section(".symtab"))
 	assert.NotNil(t, section(".gopclntab"))
 }
+
+// TestPackageAndroidAppRes pins that the app's own android/res reaches the
+// APK and resolves from its manifest (#928): Android 12's
+// android:dataExtractionRules names an XML resource, which only an app
+// resource can supply. Without a library it still switches resources to
+// aapt2, and with one it is linked last, so the app's value wins.
+func TestPackageAndroidAppRes(t *testing.T) {
+	_, buildTools := sdkTools(t)
+	prevTmp := tmpdir
+	t.Cleanup(func() { tmpdir = prevTmp })
+
+	app := spacedDir(t)
+	res := filepath.Join(app, "android", "res")
+	require.NoError(t, os.MkdirAll(filepath.Join(res, "xml"), 0o755))
+	require.NoError(t, os.MkdirAll(filepath.Join(res, "values"), 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(res, "xml", "rules.xml"), []byte(
+		`<data-extraction-rules><device-transfer><exclude domain="root" /></device-transfer></data-extraction-rules>`,
+	), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(res, "values", "strings.xml"), []byte(
+		`<resources><string name="aar_greeting">hello from app</string></resources>`,
+	), 0o644))
+	manifest := strings.Replace(testAppManifest, `<application `, `<application android:dataExtractionRules="@xml/rules" `, 1)
+
+	aapt2 := filepath.Join(buildTools, util.BuildToolFile("aapt2"))
+	pkg := func() (string, string, map[string]*zip.File) {
+		tmpdir = spacedDir(t)
+		libs, err := prepareAndroidLibs(app, []byte(manifest), []string{"arm64"}, "app", "", "", "", "", 35, 1, "1")
+		require.NoError(t, err)
+		require.NotNil(t, libs.linked, "android/res switches resources to aapt2")
+
+		dex, err := mergeAppJavaDex(app, libs.libs.jars, libs.rJava())
+		require.NoError(t, err)
+		assert.Nil(t, dex, "with no Java or jar to read them, the R classes are not dexed")
+
+		apkPath := filepath.Join(spacedDir(t), "app.apk")
+		f, err := os.Create(apkPath)
+		require.NoError(t, err)
+		apkw, err := buildAPK(f, nil, nil, nil, dex)
+		require.NoError(t, err)
+		require.NoError(t, addAssets(apkw, []byte(manifest), app, "", 35, 1, "1", "", "", "", libs))
+		require.NoError(t, apkw.Close())
+		require.NoError(t, f.Close())
+
+		zr, err := zip.OpenReader(apkPath)
+		require.NoError(t, err)
+		t.Cleanup(func() { zr.Close() })
+		entries := map[string]*zip.File{}
+		for _, e := range zr.File {
+			entries[e.Name] = e
+		}
+		xmltree, err := exec.Command(aapt2, "dump", "xmltree", "--file", "AndroidManifest.xml", apkPath).CombinedOutput()
+		require.NoError(t, err, string(xmltree))
+		table, err := exec.Command(aapt2, "dump", "resources", apkPath).CombinedOutput()
+		require.NoError(t, err, string(table))
+		return string(xmltree), string(table), entries
+	}
+
+	xmltree, table, entries := pkg()
+	assert.Contains(t, entries, "res/xml/rules.xml")
+	assert.Contains(t, table, "xml/rules")
+	assert.Regexp(t, `dataExtractionRules\(0x[0-9a-f]+\)=@0x7f[0-9a-f]+`, xmltree, "the manifest attribute is a resolved reference")
+	assert.Contains(t, table, `"hello from app"`)
+
+	// A library defining the same string: the app's still wins.
+	writeZip(t, filepath.Join(app, "android", "libs", "greeter.aar"), map[string][]byte{
+		"AndroidManifest.xml":   []byte(testAARManifest),
+		"res/values/values.xml": []byte(`<resources><string name="aar_greeting">hello from aar</string></resources>`),
+	})
+	xmltree, table, entries = pkg()
+	assert.Contains(t, entries, "res/xml/rules.xml")
+	assert.Regexp(t, `dataExtractionRules\(0x[0-9a-f]+\)=@0x7f[0-9a-f]+`, xmltree)
+	assert.Contains(t, table, `"hello from app"`)
+	assert.NotContains(t, table, `"hello from aar"`)
+}

@@ -654,10 +654,12 @@ func mergeAppJavaDex(dir string, jars, extraJava []string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	javaFiles = append(javaFiles, extraJava...)
 	if len(javaFiles) == 0 && len(jars) == 0 {
+		// Nothing would read the R classes: an app whose only extra is
+		// android/res keeps the built-in dex (#928).
 		return nil, nil
 	}
+	javaFiles = append(javaFiles, extraJava...)
 	if buildN {
 		// -n only prints commands; javac and d8 would write under the
 		// literal "$WORK".

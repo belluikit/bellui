@@ -32,6 +32,10 @@ import (
 //
 // There is no Maven resolution: the directory must hold the library's whole
 // dependency closure.
+//
+// The app's own resources sit in <appdir>/android/res/, laid out as a Gradle
+// module's res/ (#928). They are linked last, over the libraries' and the
+// generated icon's, so the app wins a name clash.
 
 const (
 	androidNS = "http://schemas.android.com/apk/res/android"
@@ -575,13 +579,14 @@ type linkedResources struct {
 	rJava                  []string
 }
 
-// linkResourcesWithLibs compiles and links the app's resources (its icon)
-// together with every AAR's res/, generating an R class for each library
-// package. Library resources are overlays in file-name order and the app's
-// come last, so the app overrides a library resource of the same name.
-// legacyIcon, when set (and there is no adaptive icon), becomes
-// @mipmap/icon, the same resource the binres path writes.
-func linkResourcesWithLibs(work string, manifest []byte, libs *androidLibs, legacyIcon, iconFG, iconBG, iconMono string,
+// linkResourcesWithLibs compiles and links the app's resources (its icon, then
+// ownRes, its android/res when it has one) together with every AAR's res/,
+// generating an R class for each library package. Library resources are
+// overlays in file-name order and the app's come last, so the app overrides a
+// library resource of the same name. legacyIcon, when set (and there is no
+// adaptive icon), becomes @mipmap/icon, the same resource the binres path
+// writes.
+func linkResourcesWithLibs(work string, manifest []byte, libs *androidLibs, ownRes, legacyIcon, iconFG, iconBG, iconMono string,
 	target, versionCode int, versionName string,
 ) (*linkedResources, error) {
 	aapt2, err := util.Aapt2Path()
@@ -622,6 +627,13 @@ func linkResourcesWithLibs(work string, manifest []byte, libs *androidLibs, lega
 		out := filepath.Join(work, "app.zip")
 		if err := run("compile", "--dir", appRes, "-o", out); err != nil {
 			return nil, err
+		}
+		overlays = append(overlays, out)
+	}
+	if ownRes != "" {
+		out := filepath.Join(work, "own.zip")
+		if err := run("compile", "--dir", ownRes, "-o", out); err != nil {
+			return nil, fmt.Errorf("android/res: %w", err)
 		}
 		overlays = append(overlays, out)
 	}
@@ -795,7 +807,7 @@ func writeLinkedResources(apkw *Writer, linked *linkedResources) error {
 
 // preparedLibs is the build's library state: the libraries themselves, the
 // native libraries copied under tmpdir (as APK paths, for buildAPK), and the
-// linked resources when any AAR is present.
+// linked resources when any AAR or android/res is present.
 type preparedLibs struct {
 	libs        *androidLibs
 	nativeFiles []string
@@ -811,9 +823,9 @@ func (p *preparedLibs) rJava() []string {
 
 // prepareAndroidLibs collects android/libs and does everything that must
 // precede dexing: the manifest merge and the aapt2 link (which writes the R
-// sources), and the native libraries' placement. Without an AAR the resource
-// path is left untouched, so an app with no libraries (or only jars) packages
-// exactly as before.
+// sources), and the native libraries' placement. Without an AAR or
+// android/res the resource path is left untouched, so an app with no
+// libraries (or only jars) packages exactly as before.
 func prepareAndroidLibs(dir string, manifest []byte, archs []string, libName, iconPath, iconFG, iconBG, iconMono string,
 	target, build int, version string,
 ) (*preparedLibs, error) {
@@ -823,6 +835,9 @@ func prepareAndroidLibs(dir string, manifest []byte, archs []string, libName, ic
 		if util.Exists(filepath.Join(dir, "android", "libs")) {
 			printcmd("# package android/libs: extract AARs, merge manifests, aapt2 link (not run under -n)")
 		}
+		if util.Exists(filepath.Join(dir, "android", "res")) {
+			printcmd("# aapt2 compile android/res and link it with the app (not run under -n)")
+		}
 		return &preparedLibs{libs: &androidLibs{}}, nil
 	}
 	libs, err := collectAndroidLibs(dir, filepath.Join(tmpdir, "androidlibs"))
@@ -830,7 +845,8 @@ func prepareAndroidLibs(dir string, manifest []byte, archs []string, libName, ic
 		return nil, err
 	}
 	p := &preparedLibs{libs: libs}
-	if !libs.hasAARs() {
+	ownRes := nonEmptyDir(filepath.Join(dir, "android", "res"))
+	if !libs.hasAARs() && ownRes == "" {
 		return p, nil
 	}
 
@@ -861,7 +877,7 @@ func prepareAndroidLibs(dir string, manifest []byte, archs []string, libName, ic
 		fmt.Fprintf(os.Stderr, "merged AndroidManifest.xml:\n%s\n", merged)
 	}
 	fg, bg, mono := detectAdaptiveIcons(dir, iconFG, iconBG, iconMono)
-	p.linked, err = linkResourcesWithLibs(filepath.Join(tmpdir, "libres"), merged, libs, appLegacyIcon(dir, iconPath),
+	p.linked, err = linkResourcesWithLibs(filepath.Join(tmpdir, "libres"), merged, libs, ownRes, appLegacyIcon(dir, iconPath),
 		fg, bg, mono, target, build, version)
 	return p, err
 }

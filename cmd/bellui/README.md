@@ -89,6 +89,11 @@ build-tools).
   elements, and the children of its `<application>`, are merged into the app
   manifest (the generated one or the app's own `AndroidManifest.xml`), with
   `${applicationId}` resolved.
+- `android/res/` holds the app's own resources, laid out like a Gradle
+  module's `res/` (for example `android/res/xml/rules.xml`, for
+  `android:dataExtractionRules="@xml/rules"` in your own
+  `AndroidManifest.xml`). They are linked after the libraries' resources and
+  the generated icon, so the app's resource wins a name clash.
 
 Limits:
 
