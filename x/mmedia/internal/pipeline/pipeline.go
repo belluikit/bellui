@@ -1163,10 +1163,15 @@ func (p *Pipeline) landSeek() bool {
 }
 
 // reportTime sends one time update. Callers hold no lock: OnTime is the app's
-// code, and may call back into the pipeline.
+// code, and may call back into the pipeline. An update never reads past the
+// duration (#846).
 func (p *Pipeline) reportTime() {
 	if p.onTime != nil {
-		p.onTime(p.clock.Time(), p.duration)
+		t := p.clock.Time()
+		if p.duration > 0 {
+			t = min(t, p.duration)
+		}
+		p.onTime(t, p.duration)
 	}
 }
 
@@ -1568,8 +1573,16 @@ func (p *Pipeline) awaitPlayedOut(stop <-chan struct{}, tick <-chan time.Time, g
 // StateStopped, and a tick there reported the same position ten times a
 // second for as long as the player stayed open. Pause, Seek and the end each
 // report once instead.
+//
+// It asks the device where the audio is before reporting. Between audio
+// writes the clock runs on wall time, and while iOS has a backgrounded app's
+// audio stopped nothing is written, so the first ticks after it returned read
+// the time spent away: 21 s of a 12 s song, back to 7 s a second later
+// (#846). The device's position stood still meanwhile, and the clock jumps
+// back to it.
 func (p *Pipeline) tick() {
 	if p.state.IsPlaying() {
+		p.followAudio()
 		p.reportTime()
 	}
 }
