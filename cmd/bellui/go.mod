@@ -1,6 +1,6 @@
 module github.com/belluikit/bellui/cmd/bellui
 
-go 1.25.0
+go 1.26.2
 
 require (
 	github.com/belluikit/gocef-libs v0.2.0
@@ -12,15 +12,17 @@ require (
 	github.com/lucor/goinfo v0.9.0
 	github.com/natefinch/atomic v1.0.1
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
-	github.com/stretchr/testify v1.11.1
-	github.com/trendvidia/protowire-go v1.2.2
+	github.com/stretchr/testify v1.12.1
+	github.com/trendvidia/protowire-go v1.16.0
 	github.com/urfave/cli/v2 v2.27.1
 	golang.org/x/mod v0.35.0
 	golang.org/x/sys v0.47.0
 	golang.org/x/tools v0.44.0
 	golang.org/x/tools/go/vcs v0.1.0-deprecated
-	google.golang.org/protobuf v1.36.11
+	google.golang.org/protobuf v1.36.12
 )
+
+require go.yaml.in/yaml/v3 v3.0.5 // indirect
 
 require (
 	github.com/akavel/rsrc v0.10.2 // indirect
@@ -33,7 +35,7 @@ require (
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 // indirect
 	golang.org/x/image v0.44.0 // indirect
-	golang.org/x/sync v0.20.0 // indirect
+	golang.org/x/sync v0.24.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
