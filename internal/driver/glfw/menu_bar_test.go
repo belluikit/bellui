@@ -1,4 +1,4 @@
-//go:build !mobile && !no_glfw && !ci && !windows
+//go:build !mobile && !no_glfw && !ci && !windows && !wasm
 
 package glfw
 

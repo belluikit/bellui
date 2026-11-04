@@ -1,4 +1,4 @@
-//go:build gl || (!darwin && !linux && !windows && !wasm)
+//go:build (gl || (!darwin && !linux && !windows && !wasm)) && !wasm
 
 package gl
 

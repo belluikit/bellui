@@ -78,6 +78,24 @@ jobs:
         working-directory: cmd/bellui_settings
         run: go build -tags gl
 
+      # The builds above compile one app, and the browser leg below runs
+      # -tags ci only, so a wasm compile break in any other package, or in a
+      # test file outside the ci set, went unseen: an untagged file using
+      # symbols from a !wasm or cgo-only file broke the whole tree from #824
+      # until #950 (#949). `go vet ./...` type-checks every package and its tests. Each
+      # tag set builds a different file set, so each one is vetted.
+      - name: Vet WebAssembly (whole module, tests included)
+        env:
+          GOOS: js
+          GOARCH: wasm
+          CGO_ENABLED: "0"
+        run: |
+          set -euo pipefail
+          for tags in "" ci gl; do
+            echo "go vet -tags '$tags' ./..."
+            go vet -tags "$tags" ./...
+          done
+
       # wasmbrowsertest drives a headless browser through chromedp, which finds
       # it as `chromium` on PATH. The runner image ships Google Chrome; a shim
       # named `chromium` launches it with --no-sandbox, because Ubuntu 24.04's

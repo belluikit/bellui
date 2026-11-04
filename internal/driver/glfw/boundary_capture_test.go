@@ -1,4 +1,4 @@
-//go:build !no_glfw && !ci && !mobile
+//go:build !no_glfw && !ci && !mobile && !wasm
 
 // (!ci, like window_test.go: it captures from a real window.)
 

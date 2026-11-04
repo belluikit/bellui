@@ -1,4 +1,4 @@
-//go:build !no_glfw && !ci && !mobile && flakey
+//go:build !no_glfw && !ci && !mobile && flakey && !wasm
 
 package glfw
 
