@@ -60,9 +60,15 @@ func goIOSBuild(pkg *packages.Package, bundleID string, archs []string,
 		return nil, err
 	}
 
+	privacyInfo, err := iosPrivacyInfo(appDir)
+	if err != nil {
+		return nil, err
+	}
+
 	files := []projectFile{
 		{tmpdir + "/main.xcodeproj/project.pbxproj", projPbxproj.Bytes()},
 		{tmpdir + "/main/Info.plist", infoplistBytes},
+		{tmpdir + "/main/" + iosPrivacyManifest, privacyInfo},
 	}
 	if err := writeIOSAppIcon(iconPath, tmpdir+"/main/Images.xcassets/AppIcon.appiconset"); err != nil {
 		return nil, err
@@ -642,6 +648,7 @@ var projPbxprojTmpl = template.Must(template.New("projPbxproj").Parse(`// !$*UTF
     254BB84F1B1FD08900C56DE9 /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 254BB84E1B1FD08900C56DE9 /* Images.xcassets */; };
     254BB8681B1FD16500C56DE9 /* main in Resources */ = {isa = PBXBuildFile; fileRef = 254BB8671B1FD16500C56DE9 /* main */; };
     25FB30331B30FDEE0005924C /* assets in Resources */ = {isa = PBXBuildFile; fileRef = 25FB30321B30FDEE0005924C /* assets */; };
+    B5E1F0D10000000000000000 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = B5E1F0D00000000000000000 /* PrivacyInfo.xcprivacy */; };
 {{- range .Embeds}}
     {{.BuildFile}} /* {{.Name}} in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = {{.FileRef}} /* {{.Name}} */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 {{- end}}
@@ -653,6 +660,7 @@ var projPbxprojTmpl = template.Must(template.New("projPbxproj").Parse(`// !$*UTF
     254BB84E1B1FD08900C56DE9 /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Images.xcassets; sourceTree = "<group>"; };
     254BB8671B1FD16500C56DE9 /* main */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; path = main; sourceTree = "<group>"; };
     25FB30321B30FDEE0005924C /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; name = assets; path = main/assets; sourceTree = "<group>"; };
+    B5E1F0D00000000000000000 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 {{- range .Embeds}}
     {{.FileRef}} /* {{.Name}} */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = "{{.Name}}"; path = "main/Frameworks/{{.Name}}"; sourceTree = "<group>"; };
 {{- end}}
@@ -685,6 +693,7 @@ var projPbxprojTmpl = template.Must(template.New("projPbxproj").Parse(`// !$*UTF
       children = (
         254BB8671B1FD16500C56DE9 /* main */,
         254BB84E1B1FD08900C56DE9 /* Images.xcassets */,
+        B5E1F0D00000000000000000 /* PrivacyInfo.xcprivacy */,
         254BB8411B1FD08900C56DE9 /* Supporting Files */,
       );
       path = main;
@@ -779,6 +788,7 @@ var projPbxprojTmpl = template.Must(template.New("projPbxproj").Parse(`// !$*UTF
         25FB30331B30FDEE0005924C /* assets in Resources */,
         254BB8681B1FD16500C56DE9 /* main in Resources */,
         254BB84F1B1FD08900C56DE9 /* Images.xcassets in Resources */,
+        B5E1F0D10000000000000000 /* PrivacyInfo.xcprivacy in Resources */,
       );
       runOnlyForDeploymentPostprocessing = 0;
     };

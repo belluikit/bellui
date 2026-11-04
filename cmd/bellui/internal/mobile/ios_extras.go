@@ -19,6 +19,7 @@ import (
 //
 //	ios/Info.plist         a plist dict merged into the generated Info.plist
 //	ios/Entitlements.plist a plist dict merged into the signing entitlements
+//	ios/PrivacyInfo.xcprivacy a plist dict merged into the privacy manifest
 //	ios/Frameworks/        *.xcframework and *.framework to link and embed
 const (
 	iosExtrasDir          = "ios"

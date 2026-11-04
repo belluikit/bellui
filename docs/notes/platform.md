@@ -234,7 +234,8 @@ Two defects in the Windows `ReadDirectoryChangesW` backend, **both still present
 
 `bellui package -os ios` takes what `manifest.pxf` cannot express from files
 next to the app's main package, the way `android/*.java` works on Android:
-`ios/Info.plist` and `ios/Entitlements.plist` (plist dict fragments) and
+`ios/Info.plist`, `ios/Entitlements.plist` and `ios/PrivacyInfo.xcprivacy`
+(plist dict fragments) and
 `ios/Frameworks/` (`.xcframework` / `.framework`). The user-facing rules are in
 `cmd/bellui/README.md`; the design points:
 
@@ -242,6 +243,16 @@ next to the app's main package, the way `android/*.java` works on Android:
   holds any plist type with no typed-value encoding in PXF or the manifest
   proto. The cost: a static file cannot vary per build, so dev/release-split
   entitlements (`aps-environment`) are not expressible.
+- **Privacy manifest** (#932). App Store Connect refuses an upload whose
+  binary calls a required-reason API without a `PrivacyInfo.xcprivacy`
+  (ITMS-91053; iOS, iPadOS, tvOS, visionOS and watchOS only, so macOS
+  packaging writes none). The packager declares only what every Go program
+  imports, file timestamps (`C617.1`) and boot time (`35F9.1`), measured with
+  `nm -u`; `TestIOSRuntimeAPIReasonsCoverGo` rebuilds a Go program for iOS and
+  fails if the runtime starts importing another category. Disk space and
+  `NSUserDefaults` are not declared: a one-label bellui app does not import
+  them, and a reason for them is the app's to state. Tracking and collected
+  data are never defaulted, for the same reason.
 - **One source of truth per key.** A fragment key the packager owns or derives
   from the manifest is an error, never a silent override. Generated defaults
   (orientations, `UIRequiresFullScreen`, …) are the fragment's to replace.
