@@ -1,10 +1,12 @@
 package theme
 
 import (
+	"fmt"
 	"image/color"
 
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/core"
+	col "github.com/belluikit/bellui/internal/color"
 	"github.com/belluikit/bellui/internal/svg"
 )
 
@@ -680,6 +682,41 @@ func NewColoredResource(src bellui.Resource, name bellui.ThemeColorName) *Themed
 		source:    src,
 		ColorName: name,
 	}
+}
+
+// NewColorizedResource creates a resource that draws an SVG icon in a fixed colour,
+// whatever the theme, for an icon that must stand out against content of the app's own,
+// such as artwork behind it. NewColoredResource is the theme-following counterpart.
+// A themed source is tinted from its original SVG. A source that is not an SVG is
+// returned unchanged.
+func NewColorizedResource(src bellui.Resource, c color.Color) bellui.Resource {
+	base := unwrapResource(src)
+	if !svg.IsResourceSVG(base) {
+		return src
+	}
+	r, g, b, a := col.ToNRGBA(c)
+	return &colorizedResource{
+		source:  base,
+		name:    fmt.Sprintf("colorized_%02x%02x%02x%02x_%s", r, g, b, a, base.Name()),
+		content: colorizeLogError(base.Content(), c),
+	}
+}
+
+// colorizedResource is an SVG resource tinted once with a fixed colour.
+type colorizedResource struct {
+	source  bellui.Resource
+	name    string
+	content []byte
+}
+
+// Name returns the source's name with the colour, so each tint caches apart.
+func (res *colorizedResource) Name() string {
+	return res.name
+}
+
+// Content returns the tinted SVG.
+func (res *colorizedResource) Content() []byte {
+	return res.content
 }
 
 // NewSuccessThemedResource creates a resource that adapts to the current theme success color.
@@ -1417,6 +1454,8 @@ func unwrapResource(res bellui.Resource) bellui.Resource {
 		case *PrimaryThemedResource:
 			res = typedRes.source
 		case *ThemedResource:
+			res = typedRes.source
+		case *colorizedResource:
 			res = typedRes.source
 		default:
 			return res

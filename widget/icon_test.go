@@ -1,6 +1,7 @@
 package widget_test
 
 import (
+	"image/color"
 	"testing"
 
 	"github.com/belluikit/bellui"
@@ -72,5 +73,33 @@ func TestIcon_IconSize(t *testing.T) {
 	box.Refresh()
 	if got := icon.Size(); got != themed {
 		t.Errorf("IconSize back to 0: laid out at %v, want the theme's %v", got, themed)
+	}
+}
+
+// TestIcon_ColorizedResource pins #939: an icon tinted with
+// theme.NewColorizedResource paints its own colour under both test themes.
+func TestIcon_ColorizedResource(t *testing.T) {
+	test.NewTempApp(t)
+	red := color.NRGBA{R: 0xff, A: 0xff}
+
+	for i, th := range []bellui.Theme{test.Theme(), test.NewTheme()} {
+		test.ApplyTheme(t, th)
+		icon := widget.NewIcon(theme.NewColorizedResource(theme.CancelIcon(), red))
+		icon.IconSize = 48
+		window := test.NewTempWindow(t, &bellui.Container{Layout: layout.NewCenterLayout(), Objects: []core.CanvasObject{icon}})
+		window.Resize(geo.NewSize(100, 100))
+
+		img := window.Canvas().Capture()
+		reds := 0
+		for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y++ {
+			for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x++ {
+				if color.NRGBAModel.Convert(img.At(x, y)) == red {
+					reds++
+				}
+			}
+		}
+		if reds == 0 {
+			t.Errorf("theme %d: no pixel of the icon is red", i)
+		}
 	}
 }
