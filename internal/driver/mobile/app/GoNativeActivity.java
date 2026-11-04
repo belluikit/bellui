@@ -1024,6 +1024,10 @@ public class GoNativeActivity extends NativeActivity {
 		handleIntent(getIntent());
 		// A launch from tapping a rich notification (pre-rebrand tracker #723).
 		handleNotifyIntent(getIntent());
+
+		if (Build.VERSION.SDK_INT >= 33) {
+			BackCallback.register(this);
+		}
     }
 
     @Override
@@ -2063,8 +2067,16 @@ public class GoNativeActivity extends NativeActivity {
         }
     }
 
+    // Back arrives here on Android 12 and older, and on 13 to 15 unless the
+    // manifest opts into android:enableOnBackInvokedCallback. An app targeting
+    // API 36 on Android 16 gets neither this call nor KEYCODE_BACK; Back comes
+    // through BackCallback instead (#935).
     @Override
     public void onBackPressed() {
+        handleBack();
+    }
+
+    private void handleBack() {
         if (goNativeActivity.keyboardUp) {
             hideKeyboard();
             keyboardDismissed(); // the user closed it (#806)
@@ -2073,6 +2085,32 @@ public class GoNativeActivity extends NativeActivity {
 
         // skip the default behaviour - we can call finishActivity if we want to go back
         backPressed();
+    }
+
+    // BackCallback receives Back where the system dispatches it to
+    // OnBackInvokedCallbacks: always on Android 16 for an app targeting API 36,
+    // and on 13 to 15 when the manifest sets enableOnBackInvokedCallback. It is
+    // registered for the activity's whole life, so the system never handles
+    // Back itself; bellui closes the keyboard, an overlay or a dialog, and
+    // only finishActivity leaves the app, as on the onBackPressed path. A
+    // class of its own keeps the API 33 types out of GoNativeActivity, which
+    // still loads on API 21.
+    private static final class BackCallback implements android.window.OnBackInvokedCallback {
+        private final GoNativeActivity activity;
+
+        private BackCallback(GoNativeActivity activity) {
+            this.activity = activity;
+        }
+
+        static void register(GoNativeActivity activity) {
+            activity.getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                    android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT, new BackCallback(activity));
+        }
+
+        @Override
+        public void onBackInvoked() {
+            activity.handleBack();
+        }
     }
 
     public void finishActivity() {
