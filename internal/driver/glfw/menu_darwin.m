@@ -163,9 +163,10 @@ void createBelluiMainMenu(const char* appNameC) {
                     keyEquivalent:@"f"]
         setKeyEquivalentModifierMask:NSEventModifierFlagControl | NSEventModifierFlagCommand];
 
-    // Semi-private API that wires the app menu to the Apple/application menu slot.
-    SEL setAppleMenuSelector = NSSelectorFromString(@"setAppleMenu:");
-    [NSApp performSelector:setAppleMenuSelector withObject:appMenu];
+    // The first item of the main menu is the application menu. The undeclared
+    // -[NSApplication setAppleMenu:] that used to name it was only needed before
+    // Mac OS X 10.6, and calling it puts a non-public selector in every binary,
+    // a Mac App Store risk (#934).
 }
 
 // ensureRegularActivationPolicy promotes the process to a regular foreground UI
