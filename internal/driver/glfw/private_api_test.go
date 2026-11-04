@@ -16,11 +16,6 @@ import (
 // can reject as private API (guideline 2.5.1, #934).
 var undeclaredSelectors = []string{"setAppleMenu"}
 
-// glfwVersionsWithSetAppleMenu are the releases of the GLFW fork that still
-// call setAppleMenu: (belluikit/glfw#6). Pinning one of them skips the fork
-// half of the check with a message; any other version must be clean.
-var glfwVersionsWithSetAppleMenu = map[string]bool{"v1.10.0": true}
-
 func TestNoUndeclaredAppKitSelectors_Bellui(t *testing.T) {
 	assertNoUndeclaredSelectors(t, "menu_darwin.m")
 }
@@ -42,10 +37,6 @@ func TestNoUndeclaredAppKitSelectors_GLFWFork(t *testing.T) {
 	}
 	if mod.Dir == "" {
 		t.Fatalf("github.com/belluikit/glfw %s is not in the module cache", mod.Version)
-	}
-	if glfwVersionsWithSetAppleMenu[mod.Version] {
-		t.Skipf("github.com/belluikit/glfw %s still calls setAppleMenu: (belluikit/glfw#6); "+
-			"move the pin to a release without it (#934)", mod.Version)
 	}
 	assertNoUndeclaredSelectors(t, filepath.Join(mod.Dir, "glfw", "src", "cocoa_init.m"))
 }
