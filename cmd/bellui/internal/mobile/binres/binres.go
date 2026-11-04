@@ -438,7 +438,7 @@ func buildXML(q []ltoken) (*XML, error) {
 		bx.Map.rs = append(bx.Map.rs, ref)
 	}
 
-	resolveElements(bx.Children, pool, bx.Pool)
+	resolveElements(bx.Children, pool, bx.Pool, bx.Map)
 	for i, s := range bx.Pool.strings {
 		switch s {
 		case androidSchema:
@@ -453,7 +453,7 @@ func buildXML(q []ltoken) (*XML, error) {
 	return bx, nil
 }
 
-func resolveElements(elms []*Element, pool, bxPool *Pool) {
+func resolveElements(elms []*Element, pool, bxPool *Pool, bxMap *Map) {
 	// resolve tmp pool refs to final pool refs
 	// TODO drop this in favor of sort directly on Table
 	var resolve func(el *Element)
@@ -486,45 +486,9 @@ func resolveElements(elms []*Element, pool, bxPool *Pool) {
 
 	var asort func(*Element)
 	asort = func(el *Element) {
-		sort.Sort(byType(el.attrs))
-		sort.Sort(byNamespace(el.attrs))
-		sort.Sort(byName(el.attrs))
-
-		if el.Name.Resolve(bxPool) == "application" {
-			// The android manifest seems to be very delicate - though it may be code in this package
-			// set the order very carefully... pre-rebrand tracker #2653 and others
-			sort.Slice(el.attrs, func(i, j int) bool {
-				a := el.attrs[i].Name.Resolve(bxPool)
-				if a == "configChanges" || a == "debuggable" {
-					return false
-				}
-				if a == "label" {
-					return true
-				}
-
-				b := el.attrs[j].Name.Resolve(bxPool)
-				return a < b
-			})
-		} else if el.Name.Resolve(bxPool) == "activity" {
-			// As above the android manifest seems to be very delicate - name must be first then exported before configChanges
-			sort.Slice(el.attrs, func(i, j int) bool {
-				a := el.attrs[i].Name.Resolve(bxPool)
-				if a == "name" {
-					return true
-				}
-
-				b := el.attrs[j].Name.Resolve(bxPool)
-				if a == "exported" {
-					return b != "name"
-				}
-
-				if b == "name" {
-					return false
-				}
-				return a < b
-			})
-		}
-
+		sort.SliceStable(el.attrs, func(i, j int) bool {
+			return attrLess(el.attrs[i], el.attrs[j], bxMap)
+		})
 		for _, child := range el.Children {
 			asort(child)
 		}
@@ -532,6 +496,30 @@ func resolveElements(elms []*Element, pool, bxPool *Pool) {
 	for _, el := range elms {
 		asort(el)
 	}
+}
+
+// attrLess orders an element's attributes as aapt does: attributes with a
+// resource ID first, in ascending ID order, then the rest in source order
+// (the caller's sort is stable). Android reads manifest attributes in one
+// ascending pass over the resource IDs, so an attribute placed after one with
+// a higher ID is silently missed (#930). Attributes without an ID are never
+// looked up that way, so their order is only matched to aapt's golden output.
+func attrLess(a, b *Attribute, m *Map) bool {
+	ida, oka := attrResID(a, m)
+	idb, okb := attrResID(b, m)
+	if oka && okb {
+		return ida < idb
+	}
+	return oka && !okb
+}
+
+// attrResID is the resource ID Android reads for attr: the resource map entry
+// at its name's string-pool index, as ResXMLParser.getAttributeNameResID does.
+func attrResID(attr *Attribute, m *Map) (TableRef, bool) {
+	if m == nil || int(attr.Name) >= len(m.rs) {
+		return 0, false
+	}
+	return m.rs[attr.Name], true
 }
 
 // handleTokens encodes tkn, attaching it to the binary xml
@@ -1035,37 +1023,6 @@ func poolTrim(s string) string {
 
 	return s[start:end]
 }
-
-// byNamespace sorts attributes based on string pool position of namespace.
-// Given that "android" always precedes "" in the pool, this results in the
-// correct ordering of attributes.
-type byNamespace []*Attribute
-
-func (a byNamespace) Len() int { return len(a) }
-func (a byNamespace) Less(i, j int) bool {
-	return a[i].NS < a[j].NS
-}
-func (a byNamespace) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
-
-// byType sorts attributes by the uint8 value of the type.
-type byType []*Attribute
-
-func (a byType) Len() int { return len(a) }
-func (a byType) Less(i, j int) bool {
-	return a[i].TypedValue.Type < a[j].TypedValue.Type
-}
-func (a byType) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
-
-// byName sorts attributes that have matching types based on string pool position of name.
-type byName []*Attribute
-
-func (a byName) Len() int { return len(a) }
-func (a byName) Less(i, j int) bool {
-	return (a[i].TypedValue.Type == DataString || a[i].TypedValue.Type == DataIntDec) &&
-		(a[j].TypedValue.Type == DataString || a[j].TypedValue.Type == DataIntDec) &&
-		a[i].Name < a[j].Name
-}
-func (a byName) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 
 type lineReader struct {
 	off   int64
