@@ -1,6 +1,6 @@
 module github.com/belluikit/bellui
 
-go 1.25.0
+go 1.26.2
 
 require (
 	github.com/BurntSushi/toml v1.5.0 // indirect
@@ -27,7 +27,7 @@ require (
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/nicksnyder/go-i18n/v2 v2.5.1
 	github.com/rymdport/portal v0.4.2
-	github.com/stretchr/testify v1.11.1
+	github.com/stretchr/testify v1.12.1
 	github.com/yuin/goldmark v1.8.5
 	golang.org/x/image v0.44.0
 	golang.org/x/net v0.57.0
@@ -41,8 +41,8 @@ require (
 	github.com/belluikit/gocef v0.5.0
 	github.com/go-text/typesetting-utils v0.0.0-20260419141703-4ffe8874dabc
 	github.com/jsummers/gobmp v0.0.0-20230614200233-a9de23ed2e25
-	github.com/trendvidia/protowire-go v1.2.2
-	google.golang.org/protobuf v1.36.11
+	github.com/trendvidia/protowire-go v1.16.0
+	google.golang.org/protobuf v1.36.12
 )
 
 require (
@@ -51,10 +51,7 @@ require (
 	github.com/belluikit/webgpu/libs-ios v0.0.0-20260727093643-fcde44a448a6 // indirect
 	github.com/belluikit/webgpu/libs-linux v0.0.0-20260731101015-884076933a5d // indirect
 	github.com/belluikit/webgpu/libs-windows v0.0.0-20260727093645-6b8e55d25f27 // indirect
-	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-gl/glfw/v3.4/glfw v0.1.0-pre.1.0.20260628091122-0bd588dc30cf // indirect
 	github.com/hack-pad/safejs v0.1.0 // indirect
-	github.com/kr/text v0.2.0 // indirect
-	github.com/pmezard/go-difflib v1.0.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
 )

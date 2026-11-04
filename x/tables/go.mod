@@ -1,10 +1,10 @@
 module github.com/belluikit/bellui/x/tables
 
-go 1.25.0
+go 1.26.2
 
 require (
 	github.com/belluikit/bellui v1.3.0-rc.1
-	github.com/stretchr/testify v1.11.1
+	github.com/stretchr/testify v1.12.1
 )
 
 require (
@@ -19,12 +19,13 @@ require (
 	github.com/jeandeaual/go-locale v0.0.0-20250612000132-0ef82f21eade // indirect
 	github.com/nicksnyder/go-i18n/v2 v2.5.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/trendvidia/protowire-go v1.2.2 // indirect
+	github.com/trendvidia/protowire-go v1.16.0 // indirect
 	github.com/yuin/goldmark v1.8.5 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/image v0.44.0 // indirect
 	golang.org/x/net v0.57.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.40.0 // indirect
-	google.golang.org/protobuf v1.36.11 // indirect
+	google.golang.org/protobuf v1.36.12 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
