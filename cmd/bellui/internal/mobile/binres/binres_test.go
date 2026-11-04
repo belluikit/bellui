@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"sort"
 	"strings"
 	"testing"
 
@@ -179,6 +178,75 @@ func TestEncode(t *testing.T) {
 
 	err = compareElements(bx, bxml)
 	r.NoError(err)
+}
+
+// TestEncodeAttrsInResourceIDOrder verifies every element's encoded attributes
+// are in ascending resource-ID order, with the attributes that have no ID
+// last. Android reads them in one ascending pass, so one out of order is
+// silently missed: an activity-alias's exported, sorted after targetActivity
+// and permission, failed install on Android 12+ as if it were absent (#930).
+// The source order below is deliberately not the ID order.
+func TestEncodeAttrsInResourceIDOrder(t *testing.T) {
+	r := require.New(t)
+	const manifest = `<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.example.order"
+	android:versionName="1.0" android:versionCode="1">
+	<application android:debuggable="true" android:label="Order" android:hasCode="true">
+		<activity android:name="org.golang.app.GoNativeActivity"
+			android:configChanges="orientation|keyboardHidden"
+			android:exported="true"
+			android:label="Order">
+			<intent-filter>
+				<action android:name="android.intent.action.MAIN" />
+			</intent-filter>
+		</activity>
+		<activity-alias android:name="com.example.order.ViewPermissionUsageActivity"
+			android:exported="true"
+			android:targetActivity="org.golang.app.GoNativeActivity"
+			android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
+			<intent-filter>
+				<action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+			</intent-filter>
+		</activity-alias>
+	</application>
+</manifest>`
+
+	restore := skipSynthesize
+	skipSynthesize = false // the build-platform and uses-sdk attributes a real build adds
+	t.Cleanup(func() { skipSynthesize = restore })
+
+	bx, err := UnmarshalXML(strings.NewReader(manifest), true, 34)
+	r.NoError(err)
+	bin, err := bx.MarshalBinary()
+	r.NoError(err)
+
+	// check what was encoded, not the in-memory tree
+	got := new(XML)
+	r.NoError(got.UnmarshalBinary(bin))
+
+	seen := map[string]int{}
+	for el := range got.iterElements() {
+		name := el.Name.Resolve(got.Pool)
+		seen[name]++
+		var prev TableRef
+		var prevName string
+		noID := false
+		for _, attr := range el.attrs {
+			aname := attr.Name.Resolve(got.Pool)
+			id, ok := attrResID(attr, got.Map)
+			if !ok {
+				noID = true
+				continue
+			}
+			r.False(noID, "<%s> %s has a resource ID but follows an attribute without one", name, aname)
+			r.Greater(uint32(id), uint32(prev), "<%s> %s (%#x) follows %s (%#x)", name, aname, uint32(id), prevName, uint32(prev))
+			prev, prevName = id, aname
+		}
+	}
+	// the walk saw the elements the regression is about
+	r.Equal(1, seen["activity-alias"])
+	r.Equal(1, seen["activity"])
+	r.Equal(1, seen["application"])
+	r.Equal(1, seen["manifest"])
 }
 
 // configChangesManifest returns a minimal manifest declaring the given
@@ -372,12 +440,6 @@ func TestRawValueByName(t *testing.T) {
 	r.Equal("com.zentus.balloon", pkgname)
 }
 
-type byAttrName []*Attribute
-
-func (a byAttrName) Len() int           { return len(a) }
-func (a byAttrName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a byAttrName) Less(i, j int) bool { return a[i].Name < a[j].Name }
-
 func compareElements(have, want *XML) error {
 	h, w := have.iterElements(), want.iterElements()
 	buf := new(bytes.Buffer)
@@ -401,11 +463,10 @@ func compareElements(have, want *XML) error {
 			return fmt.Errorf("element attribute lengths don't match, have %v, want %v", len(a.attrs), len(b.attrs))
 		}
 
-		// discards order of aapt and binres as some sorting details of apt have eluded this package but do not
-		// affect final output from functioning correctly
-		sort.Sort(byAttrName(a.attrs))
-		sort.Sort(byAttrName(b.attrs))
-
+		// order is compared too: Android reads attributes in one ascending
+		// pass over their resource IDs, so aapt's order is part of the
+		// contract, not a detail (#930).
+		mark := buf.Len()
 		for i, attr := range a.attrs {
 			bttr := b.attrs[i]
 			if attr.NS != bttr.NS ||
@@ -423,7 +484,7 @@ func compareElements(have, want *XML) error {
 				fmt.Fprintf(buf, "attrs don't match\nhave: %+v\nwant: %+v\n", attr, bttr)
 			}
 		}
-		if buf.Len() > 0 {
+		if buf.Len() > mark {
 			buf.WriteString("-------------\n")
 		}
 	}
