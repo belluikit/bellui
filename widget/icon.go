@@ -17,6 +17,9 @@ type iconRenderer struct {
 }
 
 func (i *iconRenderer) MinSize() geo.Size {
+	if i.image.IconSize > 0 {
+		return geo.NewSquareSize(i.image.IconSize)
+	}
 	return geo.NewSquareSize(i.image.Theme().Size(theme.SizeNameInlineIcon))
 }
 
@@ -47,7 +50,13 @@ func (i *iconRenderer) Refresh() {
 type Icon struct {
 	BaseWidget
 
-	Resource  bellui.Resource // The resource for this icon
+	Resource bellui.Resource // The resource for this icon
+
+	// IconSize is the icon's width and height in dp. Zero, the default,
+	// keeps the theme's inline icon size (#937). Call Refresh after
+	// changing it.
+	IconSize float32
+
 	cachedRes bellui.Resource
 }
 
