@@ -1,10 +1,14 @@
 package widget_test
 
 import (
+	"bytes"
+	"image"
 	"image/color"
+	"image/png"
 	"testing"
 
 	"github.com/belluikit/bellui"
+	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/layout"
@@ -89,17 +93,80 @@ func TestIcon_ColorizedResource(t *testing.T) {
 		window := test.NewTempWindow(t, &bellui.Container{Layout: layout.NewCenterLayout(), Objects: []core.CanvasObject{icon}})
 		window.Resize(geo.NewSize(100, 100))
 
-		img := window.Canvas().Capture()
-		reds := 0
-		for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y++ {
-			for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x++ {
-				if color.NRGBAModel.Convert(img.At(x, y)) == red {
-					reds++
-				}
-			}
-		}
-		if reds == 0 {
+		if countPixels(window.Canvas().Capture(), red) == 0 {
 			t.Errorf("theme %d: no pixel of the icon is red", i)
 		}
 	}
+}
+
+// TestIcon_Color pins #952: Color tints the icon under both test themes,
+// keeps the tint across SetResource, and nil gives the theme's colour back.
+func TestIcon_Color(t *testing.T) {
+	test.NewTempApp(t)
+	red := color.NRGBA{R: 0xff, A: 0xff}
+
+	for i, th := range []bellui.Theme{test.Theme(), test.NewTheme()} {
+		test.ApplyTheme(t, th)
+		icon := widget.NewIcon(theme.CancelIcon())
+		icon.IconSize = 48
+		window := test.NewTempWindow(t, &bellui.Container{Layout: layout.NewCenterLayout(), Objects: []core.CanvasObject{icon}})
+		window.Resize(geo.NewSize(100, 100))
+		fg := color.NRGBAModel.Convert(th.Color(theme.ColorNameForeground, bellui.CurrentApp().Settings().ThemeVariant()))
+		if countPixels(window.Canvas().Capture(), fg) == 0 {
+			t.Fatalf("theme %d: control: no pixel of the untinted icon has the foreground colour", i)
+		}
+
+		icon.Color = red
+		icon.Refresh()
+		if countPixels(window.Canvas().Capture(), red) == 0 {
+			t.Errorf("theme %d: Color red: no pixel of the icon is red", i)
+		}
+
+		icon.SetResource(theme.ConfirmIcon())
+		if countPixels(window.Canvas().Capture(), red) == 0 {
+			t.Errorf("theme %d: SetResource with Color set: no pixel of the icon is red", i)
+		}
+
+		icon.Color = nil
+		icon.Refresh()
+		img := window.Canvas().Capture()
+		if n := countPixels(img, red); n != 0 {
+			t.Errorf("theme %d: Color back to nil: %d pixels still red", i, n)
+		}
+		if countPixels(img, fg) == 0 {
+			t.Errorf("theme %d: Color back to nil: no pixel has the foreground colour", i)
+		}
+	}
+}
+
+// TestIcon_ColorNotSVG pins #952: a resource that is not an SVG is drawn as
+// given when Color is set.
+func TestIcon_ColorNotSVG(t *testing.T) {
+	test.NewTempApp(t)
+
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, image.NewNRGBA(image.Rect(0, 0, 4, 4))); err != nil {
+		t.Fatal(err)
+	}
+	src := bellui.NewStaticResource("dot.png", buf.Bytes())
+	icon := widget.NewIcon(src)
+	icon.Color = color.NRGBA{R: 0xff, A: 0xff}
+	icon.Refresh()
+	img := test.WidgetRenderer(icon).Objects()[0].(*canvas.Image)
+	if img.Resource != src {
+		t.Errorf("non-SVG with Color set: drawn resource %q, want the source %q", img.Resource.Name(), src.Name())
+	}
+}
+
+func countPixels(img image.Image, c color.Color) int {
+	want := color.NRGBAModel.Convert(c)
+	n := 0
+	for y := img.Bounds().Min.Y; y < img.Bounds().Max.Y; y++ {
+		for x := img.Bounds().Min.X; x < img.Bounds().Max.X; x++ {
+			if color.NRGBAModel.Convert(img.At(x, y)) == want {
+				n++
+			}
+		}
+	}
+	return n
 }
