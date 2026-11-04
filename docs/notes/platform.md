@@ -277,6 +277,12 @@ description is in `cmd/bellui/README.md`, the code in
   and dexed with the app, which is why linking now runs before dexing.
 - **No AAR, no change.** Without an AAR the binres path is untouched; a test
   pins the manifest byte-identical with and without a jar.
+- **App resources in `android/res/`** (#928) take the same aapt2 path as an
+  AAR, as the last overlay (after the generated icon), so the app wins a
+  clash. Whole `res/`, not only `res/xml/` (owner decision, 2026-11-03):
+  aapt2 compiles every resource type the same way. Their R class is dexed only
+  when there is app Java or a jar to read it, so a res-only app keeps the
+  built-in dex and needs no javac or d8.
 - **Simplified manifest merge**: permissions, features, queries and
   `<application>` children, deduplicated by `android:name` with the app first.
   A component two libraries share has its children merged (androidx.startup's

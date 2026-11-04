@@ -108,7 +108,7 @@ jobs:
           Get-Command javac | Select-Object -ExpandProperty Source
           go test -race -tags ci -count=1 -v -run 'TestPackageAndroid|TestCommandRunsBatchFile|TestReleaser' ./internal/mobile/ ./internal/util/ ./internal/commands/ | Tee-Object -Variable out
           if ($LASTEXITCODE -ne 0) { exit 1 }
-          foreach ($t in 'TestPackageAndroidLibs', 'TestPackageAndroidJarsOnlyKeepsBinresPath', 'TestCommandRunsBatchFile', 'TestReleaserAfterPackageAndroid', 'TestReleaserSignsWithJarsigner') {
+          foreach ($t in 'TestPackageAndroidLibs', 'TestPackageAndroidJarsOnlyKeepsBinresPath', 'TestPackageAndroidAppRes', 'TestCommandRunsBatchFile', 'TestReleaserAfterPackageAndroid', 'TestReleaserSignsWithJarsigner') {
             if (-not ($out | Select-String -SimpleMatch "--- PASS: $t ")) { Write-Output "::error::$t did not PASS (skipped?)"; exit 1 }
           }
       # A real `bellui package -os android/arm64` of an app with its own
