@@ -25,6 +25,7 @@ uint64_t threadID();
 
 UIEdgeInsets getDevicePadding();
 bool isDark();
+void localTimeZone(void **data, int *len, char **abbr, int *offset);
 void showKeyboard(int keyboardType);
 void hideKeyboard();
 void setKeyboardState(char* text, int selStart, int selEnd);
@@ -70,6 +71,29 @@ func init() {
 	// and with it every bellui.Do until the device wakes (#910). The bound
 	// matches drawloop's own.
 	publishWait = 100 * time.Millisecond
+
+	time.Local = deviceLocation()
+}
+
+// deviceLocation is the device's time zone. Go's time package leaves
+// time.Local at UTC on iOS, since the app sandbox has no zoneinfo for it to
+// read, so ask Foundation instead (#944). The zone's own TZif rules keep
+// daylight saving right for other dates; if Foundation cannot hand them over,
+// fall back to the current offset, as the Android driver does.
+func deviceLocation() *time.Location {
+	var data unsafe.Pointer
+	var n, offset C.int
+	var abbr *C.char
+	C.localTimeZone(&data, &n, &abbr, &offset)
+	defer C.free(unsafe.Pointer(abbr))
+	if data != nil {
+		tzif := C.GoBytes(data, n)
+		C.free(data)
+		if loc, err := time.LoadLocationFromTZData("Local", tzif); err == nil {
+			return loc
+		}
+	}
+	return time.FixedZone(C.GoString(abbr), int(offset))
 }
 
 func main(f func(App)) {

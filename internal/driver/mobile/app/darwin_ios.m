@@ -1646,6 +1646,24 @@ bool isDark() {
     return rootVC.traitCollection.userInterfaceStyle == UIUserInterfaceStyleDark;
 }
 
+// localTimeZone reports the device's zone: its TZif rules in *data (malloc'd,
+// *len bytes, NULL when Foundation has none), and its current abbreviation and
+// offset from UTC for when the rules cannot be read (#944).
+void localTimeZone(void **data, int *len, char **abbr, int *offset) {
+    NSTimeZone *tz = [NSTimeZone localTimeZone];
+    NSData *d = tz.data;
+    *data = NULL;
+    *len = 0;
+    if (d.length > 0) {
+        *data = malloc(d.length);
+        memcpy(*data, d.bytes, d.length);
+        *len = (int)d.length;
+    }
+    NSString *a = tz.abbreviation;
+    *abbr = strdup(a != nil ? a.UTF8String : "");
+    *offset = (int)tz.secondsFromGMT;
+}
+
 #define DEFAULT_KEYBOARD_CODE 0
 #define SINGLELINE_KEYBOARD_CODE 1
 #define NUMBER_KEYBOARD_CODE 2
