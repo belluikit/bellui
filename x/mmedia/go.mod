@@ -4,7 +4,7 @@ go 1.26.2
 
 require (
 	github.com/belluikit/bellui v1.3.0-rc.1
-	github.com/belluikit/goffmpeg v0.6.2-0.20261102214528-3bbd4168d7a2
+	github.com/belluikit/goffmpeg v0.6.2-0.20261104072850-0c55fa46fd7d
 	github.com/ebitengine/oto/v3 v3.4.0
 )
 

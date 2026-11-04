@@ -1,10 +1,12 @@
 package source
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"image"
 	"io"
+	"net/http"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -52,6 +54,10 @@ type FFmpegSource struct {
 	audioCallback AudioCallback
 	ended         bool
 
+	// url is what a source opened by URL was opened from, for asking the
+	// server why a stream stopped early (truncatedErr); "" otherwise.
+	url string
+
 	// open opens the source again, for a source opened by URL; nil for a
 	// reader or a device. Interrupt leaves the decoder good only for closing,
 	// so only a source that can be reopened can be interrupted (#884).
@@ -90,6 +96,7 @@ func NewFFmpegSourceURL(url string) (*FFmpegSource, error) {
 		return nil, err
 	}
 	s := newFFmpegSource(dec)
+	s.url = url
 	s.open = func() (goffmpeg.IDecoder, error) { return openURL(url) }
 	return s, nil
 }
@@ -601,7 +608,39 @@ func (s *FFmpegSource) readErr(err error) error {
 	if d, ok := s.dec.(*readerDecoder); ok && err != nil {
 		return d.readErr(err)
 	}
+	if errors.Is(err, goffmpeg.ErrStreamTruncated) {
+		return s.truncatedErr(err)
+	}
 	return err
+}
+
+// truncatedErr says why a stream opened by URL stopped before its end
+// (player#237). FFmpeg's http reconnects a dropped file and, when the server
+// refuses that, reports the end of file it had; goffmpeg tells that apart as
+// ErrStreamTruncated but FFmpeg keeps the server's answer to itself. So the
+// server is asked once more, for one byte: an error status is the reason
+// (a 403 is a signed link that expired), and anything else means the
+// connection dropped and could not be resumed. Either way it is an error,
+// never the end of the song.
+func (s *FFmpegSource) truncatedErr(err error) error {
+	lower := strings.ToLower(s.url)
+	if !strings.HasPrefix(lower, "http://") && !strings.HasPrefix(lower, "https://") {
+		return err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), httpReadTimeout)
+	defer cancel()
+	req, rerr := http.NewRequestWithContext(ctx, http.MethodGet, s.url, nil)
+	if rerr == nil {
+		req.Header.Set("Range", "bytes=0-0")
+		resp, derr := httpClient.Do(req)
+		if derr == nil {
+			resp.Body.Close()
+			if resp.StatusCode >= 400 {
+				return fmt.Errorf("%w (decoder: %w)", &statusError{url: s.url, code: resp.StatusCode}, err)
+			}
+		}
+	}
+	return fmt.Errorf("mmedia: %s stopped before its end: the connection dropped and could not be resumed (decoder: %w)", redactURL(s.url), err)
 }
 
 func (s *FFmpegSource) Close() {
