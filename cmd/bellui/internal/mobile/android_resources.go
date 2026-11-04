@@ -31,11 +31,24 @@ func generateAdaptiveIconXML(hasMonochrome bool) string {
 	return xml
 }
 
-// writeAdaptiveIconResources creates all necessary resource files for adaptive icons
-func writeAdaptiveIconResources(resDir, foregroundPath, backgroundPath, monochromePath string) error {
+// writeAdaptiveIconResources creates all necessary resource files for adaptive
+// icons. The adaptive XML only resolves from API 26, below binres.MinSDK, so
+// ic_launcher and ic_launcher_round also get a plain PNG for API 21-25: the
+// legacy icon when there is one, else the foreground layer (#920).
+func writeAdaptiveIconResources(resDir, legacyPath, foregroundPath, backgroundPath, monochromePath string) error {
 	xxxhdpiDir := filepath.Join(resDir, "mipmap-xxxhdpi")
 	if err := os.MkdirAll(xxxhdpiDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create mipmap-xxxhdpi directory: %w", err)
+	}
+
+	fallback := legacyPath
+	if fallback == "" {
+		fallback = foregroundPath
+	}
+	for _, name := range []string{"ic_launcher.png", "ic_launcher_round.png"} {
+		if err := util.CopyFile(fallback, filepath.Join(xxxhdpiDir, name)); err != nil {
+			return fmt.Errorf("failed to copy pre-API-26 icon: %w", err)
+		}
 	}
 
 	if err := util.CopyFile(foregroundPath, filepath.Join(xxxhdpiDir, "ic_launcher_foreground.png")); err != nil {
@@ -92,7 +105,7 @@ func writeAdaptiveIconResources(resDir, foregroundPath, backgroundPath, monochro
 
 // compileAndroidResources compiles Android resources using aapt2
 // Returns: resources.arsc path, res/ directory path, compiled AndroidManifest.xml path, error
-func compileAndroidResources(tempDir string, manifestData []byte, foregroundPath, backgroundPath, monochromePath string, targetSDK, versionCode int, versionName string) (arscPath string, resDir string, manifestPath string, err error) {
+func compileAndroidResources(tempDir string, manifestData []byte, legacyPath, foregroundPath, backgroundPath, monochromePath string, targetSDK, versionCode int, versionName string) (arscPath string, resDir string, manifestPath string, err error) {
 	aapt2, err := util.Aapt2Path()
 	if err != nil {
 		return "", "", "", err
@@ -103,9 +116,11 @@ func compileAndroidResources(tempDir string, manifestData []byte, foregroundPath
 		return "", "", "", fmt.Errorf("failed to create res directory: %w", err)
 	}
 
-	if err := writeAdaptiveIconResources(resDir, foregroundPath, backgroundPath, monochromePath); err != nil {
+	if err := writeAdaptiveIconResources(resDir, legacyPath, foregroundPath, backgroundPath, monochromePath); err != nil {
 		return "", "", "", err
 	}
+	// An app's own manifest names no icon unless its author added one (#920).
+	manifestData = withAdaptiveIcon(manifestData)
 
 	compiledDir := filepath.Join(tempDir, "compiled")
 	if err := os.MkdirAll(compiledDir, 0o755); err != nil {
