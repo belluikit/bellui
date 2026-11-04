@@ -149,16 +149,19 @@ func (r *fabRenderer) Layout(size geo.Size) {
 	r.bg.Resize(size)
 	th := r.fab.Theme()
 	iconSize := th.Size(theme.SizeNameIconSize)
-	fabSize := th.Size(theme.SizeNameFABSize)
-	pad := (fabSize - iconSize) / 2
 
 	if r.fab.Text != "" {
-		// Extended: icon left, label right
+		// Extended: icon leading, label after it
 		r.icon.Resize(geo.NewSize(iconSize, iconSize))
-		r.icon.Move(geo.NewPos(pad, (size.Height-iconSize)/2))
+		r.icon.Move(geo.NewPos(fabExtendedPadLeading, (size.Height-iconSize)/2))
 		if r.label != nil {
-			r.label.Move(geo.NewPos(pad+iconSize+8, (size.Height-r.label.MinSize().Height)/2))
+			labelSize := r.label.MinSize()
+			r.label.Move(geo.NewPos(fabExtendedPadLeading+iconSize+fabExtendedIconTextGap, (size.Height-labelSize.Height)/2))
+			r.label.Resize(labelSize) // tight box so the RTL reflection lands correctly
 		}
+		// Under RTL the icon leads from the right and the label follows to its
+		// left; the full-width bg maps onto itself (#945).
+		mirrorIfRTL(r.Objects(), size.Width)
 	} else {
 		// Standard: centered icon
 		r.icon.Resize(geo.NewSize(iconSize, iconSize))
