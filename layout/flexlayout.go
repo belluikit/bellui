@@ -6,6 +6,58 @@ import (
 	"github.com/belluikit/bellui/theme"
 )
 
+// CrossAlign says where a flex box places a child on its cross axis: the
+// vertical one of a FlexHBoxLayout, the horizontal one of a FlexVBoxLayout.
+//
+// Since: 1.3
+type CrossAlign int
+
+const (
+	// CrossStretch, the default, stretches each child to the container's
+	// cross extent, clamped by the per-child cross Min/Max arrays; a clamped
+	// child sits at the start of the freed space.
+	CrossStretch CrossAlign = iota
+	// CrossStart gives each child its MinSize on the cross axis (within the
+	// per-child cross Min/Max) and puts it at the start: the top of a row, the
+	// leading edge of a column.
+	CrossStart
+	// CrossCenter sizes a child as CrossStart does and centres it.
+	CrossCenter
+	// CrossEnd sizes a child as CrossStart does and puts it at the end.
+	CrossEnd
+)
+
+// place returns a child's cross-axis offset and size within extent. natural
+// is its MinSize on that axis; minC and maxC are its cross Min/Max entries,
+// 0 meaning unset.
+func (a CrossAlign) place(extent, natural, minC, maxC float32) (pos, size float32) {
+	size = extent
+	if a != CrossStretch {
+		size = natural
+	}
+	if minC > 0 && size < minC {
+		size = minC
+	}
+	if maxC > 0 && size > maxC {
+		size = maxC
+	}
+	switch a {
+	case CrossCenter:
+		pos = (extent - size) / 2
+	case CrossEnd:
+		pos = extent - size
+	}
+	return pos, size
+}
+
+// entry returns s[i], or 0 when s is too short.
+func entry(s []float32, i int) float32 {
+	if i < len(s) {
+		return s[i]
+	}
+	return 0
+}
+
 // FlexHBoxLayout is a horizontal layout where children can have flex grow
 // factors and min/max width constraints. Children with flex=0 get their
 // natural MinSize. Remaining space is distributed proportionally among
@@ -14,16 +66,18 @@ import (
 // The main axis is horizontal: Flex/MinWidth/MaxWidth constrain width. The
 // cross axis is vertical and children are stretched to the container height by
 // default; the optional MinHeight/MaxHeight arrays clamp a child's height
-// instead (start/top-aligned within the freed space).
+// instead (start/top-aligned within the freed space). CrossAlign places
+// children at their natural height instead, at the top, centre or bottom.
 //
 // Since: 1.0
 type FlexHBoxLayout struct {
-	Flex      []float32 // flex grow factor per child (0 = fixed size)
-	MinWidth  []float32 // minimum width per child (0 = use MinSize)
-	MaxWidth  []float32 // maximum width per child (0 = no limit)
-	MinHeight []float32 // cross-axis minimum height per child (0 = unset); Since: 1.0
-	MaxHeight []float32 // cross-axis maximum height per child (0 = no limit, full stretch); Since: 1.0
-	Padding   float32   // spacing between children (0 = theme default)
+	Flex       []float32  // flex grow factor per child (0 = fixed size)
+	MinWidth   []float32  // minimum width per child (0 = use MinSize)
+	MaxWidth   []float32  // maximum width per child (0 = no limit)
+	MinHeight  []float32  // cross-axis minimum height per child (0 = unset); Since: 1.0
+	MaxHeight  []float32  // cross-axis maximum height per child (0 = no limit, full stretch); Since: 1.0
+	Padding    float32    // spacing between children (0 = theme default)
+	CrossAlign CrossAlign // cross-axis placement (default CrossStretch); Since: 1.3
 }
 
 // NewFlexHBoxLayout creates a horizontal flex layout with the given per-child
@@ -123,15 +177,9 @@ func (l *FlexHBoxLayout) Layout(objects []core.CanvasObject, size geo.Size) {
 		}
 
 		// Cross axis (height): full stretch by default, clamped to [MinHeight, MaxHeight].
-		h := size.Height
-		if i < len(l.MinHeight) && l.MinHeight[i] > 0 && h < l.MinHeight[i] {
-			h = l.MinHeight[i]
-		}
-		if i < len(l.MaxHeight) && l.MaxHeight[i] > 0 && h > l.MaxHeight[i] {
-			h = l.MaxHeight[i]
-		}
+		y, h := l.CrossAlign.place(size.Height, o.MinSize().Height, entry(l.MinHeight, i), entry(l.MaxHeight, i))
 
-		o.Move(geo.NewPos(x, 0)) // start/top-aligned on the cross axis
+		o.Move(geo.NewPos(x, y))
 		o.Resize(geo.NewSize(w, h))
 		x += w
 		first = false
@@ -144,16 +192,18 @@ func (l *FlexHBoxLayout) Layout(objects []core.CanvasObject, size geo.Size) {
 // The main axis is vertical: Flex/MinHeight/MaxHeight constrain height. The
 // cross axis is horizontal and children are stretched to the container width by
 // default; the optional MinWidth/MaxWidth arrays clamp a child's width instead
-// (start/left-aligned within the freed space).
+// (start/left-aligned within the freed space). CrossAlign places children at
+// their natural width instead, at the left, centre or right.
 //
 // Since: 1.0
 type FlexVBoxLayout struct {
-	Flex      []float32 // flex grow factor per child
-	MinHeight []float32 // minimum height per child
-	MaxHeight []float32 // maximum height per child
-	MinWidth  []float32 // cross-axis minimum width per child (0 = unset); Since: 1.0
-	MaxWidth  []float32 // cross-axis maximum width per child (0 = no limit, full stretch); Since: 1.0
-	Padding   float32   // spacing between children (0 = theme default)
+	Flex       []float32  // flex grow factor per child
+	MinHeight  []float32  // minimum height per child
+	MaxHeight  []float32  // maximum height per child
+	MinWidth   []float32  // cross-axis minimum width per child (0 = unset); Since: 1.0
+	MaxWidth   []float32  // cross-axis maximum width per child (0 = no limit, full stretch); Since: 1.0
+	Padding    float32    // spacing between children (0 = theme default)
+	CrossAlign CrossAlign // cross-axis placement (default CrossStretch); Since: 1.3
 }
 
 // NewFlexVBoxLayout creates a vertical flex layout with the given per-child
@@ -250,15 +300,9 @@ func (l *FlexVBoxLayout) Layout(objects []core.CanvasObject, size geo.Size) {
 		}
 
 		// Cross axis (width): full stretch by default, clamped to [MinWidth, MaxWidth].
-		w := size.Width
-		if i < len(l.MinWidth) && l.MinWidth[i] > 0 && w < l.MinWidth[i] {
-			w = l.MinWidth[i]
-		}
-		if i < len(l.MaxWidth) && l.MaxWidth[i] > 0 && w > l.MaxWidth[i] {
-			w = l.MaxWidth[i]
-		}
+		x, w := l.CrossAlign.place(size.Width, o.MinSize().Width, entry(l.MinWidth, i), entry(l.MaxWidth, i))
 
-		o.Move(geo.NewPos(0, y)) // start/left-aligned on the cross axis
+		o.Move(geo.NewPos(x, y))
 		o.Resize(geo.NewSize(w, h))
 		y += h
 		first = false
