@@ -1,0 +1,6 @@
+details {
+  name = "bgposprobe"
+  id = "io.bellui.bgposprobe"
+  version = "1.0.0"
+  build = 1
+}
