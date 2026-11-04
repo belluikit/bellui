@@ -22,7 +22,7 @@ const MinSDK = 21
 // installed one — so the generated output is reproducible. Bump it
 // deliberately when the table needs attribute or flag values introduced by a
 // newer API level, then regenerate.
-const SDKPlatform = "android-35"
+const SDKPlatform = "android-36"
 
 // SDKPlatformVersion and SDKPlatformCodename are what aapt records for
 // SDKPlatform when packaging a manifest against it: the API level goes into
@@ -31,8 +31,8 @@ const SDKPlatform = "android-35"
 // UnmarshalXML synthesizes the same four attributes. Bump together with
 // SDKPlatform.
 const (
-	SDKPlatformVersion  = 35
-	SDKPlatformCodename = "15"
+	SDKPlatformVersion  = 36
+	SDKPlatformCodename = "16"
 )
 
 // Requires environment variable ANDROID_HOME to be set.
