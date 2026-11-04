@@ -1,0 +1,6 @@
+details {
+  name = "backprobe"
+  id = "io.bellui.backprobe"
+  version = "1.0.0"
+  build = 1
+}
