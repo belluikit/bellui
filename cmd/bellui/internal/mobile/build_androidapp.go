@@ -233,8 +233,8 @@ func goAndroidBuild(pkg *packages.Package, bundleID string, androidArchs []strin
 		// signature, which Android 11+ (API >= 30) rejects at install. Re-sign
 		// the debug APK with apksigner (v1+v2) so `bellui package` output installs
 		// directly on modern devices — required for the plain debug build
-		// (targetSdk 34) and just as much for a --release one (targetSdk 35,
-		// non-debuggable, still debug-key-signed so it sideloads, #144). Only
+		// and just as much for a --release one (non-debuggable, still
+		// debug-key-signed so it sideloads, #144). Only
 		// a distribution build skips this: its signing belongs to the caller's
 		// keystore in `bellui release`.
 		apkPath := buildO[:len(buildO)-3] + "apk"

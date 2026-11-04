@@ -31,6 +31,17 @@ var cmdBuild = &command{
 
 const (
 	minAndroidAPI = 15
+
+	// androidTargetSDK is the targetSdkVersion of every Android build, debug
+	// and release alike, so a debug build on a device takes the same paths
+	// as the store build (#935). Google Play refuses an app or update that
+	// targets less than its current floor, API 36 since 2026-08-31. Raising
+	// it is never only a number: read that level's behaviour changes first
+	// (36 stopped delivering onBackPressed, which needed BackCallback in
+	// GoNativeActivity). Debug builds also need API 30 or more for Play
+	// Protect, and goAndroidBuild re-signs them with apksigner so they
+	// install on Android 11 and later.
+	androidTargetSDK = 36
 )
 
 func runBuild(cmd *command) error {
@@ -109,18 +120,8 @@ func runBuildImpl(cmd *command) (*packages.Package, error) {
 			}
 			return pkg, nil
 		}
-		target := 35
-		if !buildRelease {
-			// Debug builds still target a modern API so Play Protect does not
-			// block sideloaded installs ("older version / privacy protections").
-			// API >= 30 requires an APK Signature Scheme v2+ to install on
-			// Android 11+; goAndroidBuild re-signs the debug APK with apksigner
-			// (the built-in Writer only does v1/JAR signing) so it installs
-			// directly without a manual re-sign.
-			target = 34
-		}
 		nmpkgs, err = goAndroidBuild(pkg, buildBundleID, targetArchs, cmd.IconPath, cmd.AppName, cmd.Version, cmd.Build,
-			target, buildRelease, buildDistribution, cmd.iconFG, cmd.iconBG, cmd.iconMono)
+			androidTargetSDK, buildRelease, buildDistribution, cmd.iconFG, cmd.iconBG, cmd.iconMono)
 		if err != nil {
 			return nil, err
 		}
