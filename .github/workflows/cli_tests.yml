@@ -126,6 +126,19 @@ jobs:
           go test -race -tags ci -count=1 -v -run 'TestPackageAndroidOwnManifestWarnsTheCreditIsMissing$' ./internal/commands/ | tee "$RUNNER_TEMP/android-ndk.log"
           test "${PIPESTATUS[0]}" -eq 0
           grep -q -- '--- PASS: TestPackageAndroidOwnManifestWarnsTheCreditIsMissing ' "$RUNNER_TEMP/android-ndk.log" || { echo "::error::TestPackageAndroidOwnManifestWarnsTheCreditIsMissing did not PASS (skipped?)"; exit 1; }
+      # The iOS privacy manifest declares what the Go runtime imports (#932).
+      # The pin builds a Go program for iOS, which needs Xcode's iOS SDK;
+      # BELLUI_REQUIRE_IOS_SDK=1 turns a missing SDK into a failure, and the
+      # PASS check catches any other skip.
+      - name: iOS privacy manifest covers the Go runtime (macOS)
+        if: matrix.os == 'macos'
+        working-directory: cmd/bellui
+        env:
+          BELLUI_REQUIRE_IOS_SDK: "1"
+        run: |
+          go test -count=1 -v -run 'TestIOSRuntimeAPIReasonsCoverGo$' ./internal/mobile/ | tee "$RUNNER_TEMP/ios-privacy.log"
+          test "${PIPESTATUS[0]}" -eq 0
+          grep -q -- '--- PASS: TestIOSRuntimeAPIReasonsCoverGo ' "$RUNNER_TEMP/ios-privacy.log" || { echo "::error::TestIOSRuntimeAPIReasonsCoverGo did not PASS (skipped?)"; exit 1; }
       - name: Android packaging with the NDK (Windows)
         if: matrix.os == 'windows'
         working-directory: cmd/bellui

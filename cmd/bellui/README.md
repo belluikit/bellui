@@ -60,6 +60,17 @@ next to the app's main package, for what `manifest.pxf` has no field for
   signs the store build with the same entitlements. A static file cannot vary
   between development and release builds, so `aps-environment` is not
   expressible yet.
+- **`ios/PrivacyInfo.xcprivacy`** — a plist `<dict>` merged into the privacy
+  manifest every iOS app now ships. The toolkit declares the required-reason
+  APIs every Go program calls: file timestamps for files in the app's container
+  (`C617.1`) and system boot time for measuring elapsed time (`35F9.1`). Your
+  `NSPrivacyAccessedAPITypes` are merged with those per category, so declare
+  what your own code and libraries call, for example `3B52.1` when you read the
+  dates of files the user picked, or `CA92.1` for `NSUserDefaults`. Tracking
+  (`NSPrivacyTracking`, `NSPrivacyTrackingDomains`) and collected data
+  (`NSPrivacyCollectedDataTypes`) are yours alone to declare; the toolkit never
+  sets them. Without the manifest App Store Connect refuses the upload
+  (ITMS-91053).
 - **`ios/Frameworks/*.xcframework`, `*.framework`** — for each build
   architecture the matching slice is linked into the app: the packager adds
   `-F<slice> -framework <Name>` (or the static `.a` and its headers) to that
