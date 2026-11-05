@@ -1586,3 +1586,12 @@ func (p *Pipeline) tick() {
 		p.reportTime()
 	}
 }
+
+// Level is the RMS, 0 to 1, of the audio being heard, volume applied. It is 0
+// unless the pipeline is playing audio.
+func (p *Pipeline) Level() float32 {
+	if p.audioOutput == nil || !p.state.IsPlaying() {
+		return 0
+	}
+	return p.audioOutput.Level()
+}

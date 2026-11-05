@@ -54,6 +54,7 @@ type puller struct {
 	// it microseconds after we return unless its goroutine is held off for
 	// longer than that half.
 	pending    bool
+	level      levels // the RMS of what is pulled, by window
 	pendingLen int
 	heldAtPull int
 	pulledAt   time.Time
@@ -73,7 +74,7 @@ const pullHistory = 8
 
 // newPuller reads ring, whose audio plays at bytesPerSec.
 func newPuller(ring *RingBuffer, bytesPerSec int) *puller {
-	return &puller{ring: ring, bytesPerSec: bytesPerSec, now: time.Now}
+	return &puller{ring: ring, bytesPerSec: bytesPerSec, now: time.Now, level: newLevels(bytesPerSec)}
 }
 
 // Read is the player's pull. It must not take the Output's lock: oto calls it
@@ -84,6 +85,7 @@ func (p *puller) Read(b []byte) (int, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	n := p.ring.read(b)
+	p.level.add(p.audio, b[:n])
 	p.pulled += int64(len(b))
 	p.audio += int64(n)
 	p.recent[p.n%pullHistory] = pull{end: p.pulled, audio: n}
@@ -191,4 +193,5 @@ func (p *puller) reset() {
 	p.seq++
 	p.pulled, p.audio, p.n = 0, 0, 0
 	p.pending = false
+	p.level.reset()
 }

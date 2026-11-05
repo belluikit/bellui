@@ -143,6 +143,14 @@ func (pb *AudioPlayback) CurrentTime() time.Duration {
 	return pb.pipe.CurrentTime()
 }
 
+// Level is how loud the playback is right now: the RMS, 0 to 1, of the 20 ms
+// of audio being heard, with the volume applied. It is 0 while paused or
+// stopped. It is a pull API, cheap enough to call once a frame, for a
+// visualizer or an animation that follows the music (belluikit/player#258).
+func (pb *AudioPlayback) Level() float32 {
+	return pb.pipe.Level()
+}
+
 // IsPlaying returns true if playback is active.
 func (pb *AudioPlayback) IsPlaying() bool {
 	return pb.pipe.State() == pipeline.StatePlaying
