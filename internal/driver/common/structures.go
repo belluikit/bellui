@@ -163,6 +163,17 @@ func (r *RenderCacheNode) IsBoundary() bool {
 	return r.isBoundary
 }
 
+// CachesAsBoundary reports whether the paint walks draw this node through its
+// RepaintBoundary texture: it is a boundary, and its world transform at most
+// moves it. The texture is blitted axis-aligned and unscaled, so under a
+// rotation, a scale or a skew, on the boundary or above it, the walks draw the
+// subtree directly instead, and use the texture again once the transform is
+// back to a move (#1003).
+func (r *RenderCacheNode) CachesAsBoundary() bool {
+	m := r.worldTransform
+	return r.isBoundary && m.A == 1 && m.B == 0 && m.C == 0 && m.D == 1
+}
+
 // Obj returns the node object.
 func (r *RenderCacheNode) Obj() core.CanvasObject {
 	return r.obj

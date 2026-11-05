@@ -570,7 +570,7 @@ func (w *glPaintWalk) skipObjectForDirtyRegion(obj core.CanvasObject, wt geo.Mat
 // not painted).
 func (w *glPaintWalk) enterBoundary(node *common.RenderCacheNode, pos geo.Position) bool {
 	obj := node.Obj()
-	if !w.hasBoundary || !node.IsBoundary() {
+	if !w.hasBoundary || !node.CachesAsBoundary() {
 		return false
 	}
 

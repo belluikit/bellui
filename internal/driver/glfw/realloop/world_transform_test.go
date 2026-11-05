@@ -90,6 +90,23 @@ func TestWorldTransformDraws(t *testing.T) {
 			drawn: geo.NewPos(125, 125), no: geo.NewPos(115, 55),
 		},
 		{
+			// The same scene with the child in a RepaintBoundary: under a
+			// rotation the boundary draws its content directly, turned with
+			// its parent (#1003). Its texture, blitted axis-aligned from the
+			// rotated corner, would cover (130, 120)-(140, 130) instead.
+			name: "boundary under a rotation",
+			scene: func() core.CanvasObject {
+				b := container.NewRepaintBoundary(rect(0, 0, 10, 10))
+				b.Move(geo.NewPos(80, 10))
+				b.Resize(geo.NewSize(10, 10))
+				box := newTiltBox(geo.NewRotationAround(math.Pi/2, 50, 50), b)
+				box.Move(geo.NewPos(40, 40))
+				box.Resize(geo.NewSize(100, 100))
+				return box
+			},
+			drawn: geo.NewPos(125, 125), no: geo.NewPos(135, 125),
+		},
+		{
 			// A clipping container moved by its parent's transform clips its
 			// larger child where it is drawn: (110, 10)-(150, 50).
 			name: "clip under a transform",
