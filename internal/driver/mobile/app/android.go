@@ -222,6 +222,16 @@ func onNativeWindowRedrawNeeded(activity *C.ANativeActivity, window *C.ANativeWi
 	<-windowRedrawDone
 }
 
+// signalRedrawDone releases an onNativeWindowRedrawNeeded waiting for a frame,
+// once one has been published. Nothing waits for most frames, so it does not
+// block.
+func signalRedrawDone() {
+	select {
+	case windowRedrawDone <- struct{}{}:
+	default:
+	}
+}
+
 //export onNativeWindowDestroyed
 func onNativeWindowDestroyed(activity *C.ANativeActivity, window *C.ANativeWindow) {
 	windowDestroyed <- window
@@ -745,10 +755,7 @@ func mainUI(vm, jniEnv, ctx uintptr) error {
 					log.Printf("app: failed to swap buffers (%s)", eglGetError())
 				}
 			}
-			select {
-			case windowRedrawDone <- struct{}{}:
-			default:
-			}
+			signalRedrawDone()
 			theApp.publishResult <- PublishResult{}
 		}
 	}
