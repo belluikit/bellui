@@ -23,6 +23,18 @@ type spatialEntry struct {
 	screenMinX, screenMinY, screenMaxX, screenMaxY float32
 	// clipBB: effective clip region in screen coordinates.
 	clipMinX, clipMinY, clipMaxX, clipMaxY float32
+	// cut is the innermost turned clip the object lies in, an index into
+	// SpatialIndex.cuts, or -1.
+	cut int32
+}
+
+// turnedCut is a clip whose world transform turns or skews it. The clip
+// boxes the entries carry hold the box around it, so a point in that box is
+// also tested against the turned rectangle itself (#1003).
+type turnedCut struct {
+	wt     geo.Matrix
+	w, h   float32
+	parent int32 // the turned clip this one lies in, or -1
 }
 
 // SpatialIndex provides O(1) broadphase hit testing via a uniform grid.
@@ -47,6 +59,7 @@ type SpatialIndex struct {
 	cols, rows   int
 
 	entries   []spatialEntry
+	cuts      []turnedCut
 	cellStart []int32
 	items     []int32
 
@@ -76,6 +89,7 @@ func (idx *SpatialIndex) reset(canvasW, canvasH float32) {
 	idx.cols = max(1, int(canvasW/idx.cellW)+1)
 	idx.rows = max(1, int(canvasH/idx.cellH)+1)
 	idx.entries = idx.entries[:0]
+	idx.cuts = idx.cuts[:0]
 	idx.spans = idx.spans[:0]
 	idx.items = idx.items[:0]
 	idx.cellStart = idx.cellStart[:0]
@@ -90,7 +104,7 @@ func (b *spatialIndexBuilder) add(
 	w, h float32,
 	clipPos geo.Position, clipSize geo.Size,
 ) {
-	b.idx.add(obj, wt, w, h, clipPos, clipSize)
+	b.idx.add(obj, wt, w, h, clipPos, clipSize, -1)
 }
 
 func (idx *SpatialIndex) add(
@@ -98,6 +112,7 @@ func (idx *SpatialIndex) add(
 	wt geo.Matrix,
 	w, h float32,
 	clipPos geo.Position, clipSize geo.Size,
+	cut int32,
 ) {
 	if w <= 0 || h <= 0 {
 		return
@@ -130,6 +145,7 @@ func (idx *SpatialIndex) add(
 		obj: obj, wt: wt, w: w, h: h,
 		screenMinX: sMinX, screenMinY: sMinY, screenMaxX: sMaxX, screenMaxY: sMaxY,
 		clipMinX: cMinX, clipMinY: cMinY, clipMaxX: cMaxX, clipMaxY: cMaxY,
+		cut: cut,
 	})
 	idx.spans = append(idx.spans, cellSpan{int32(colMin), int32(colMax), int32(rowMin), int32(rowMax)})
 }
@@ -229,7 +245,7 @@ func (idx *SpatialIndex) FindObjectAtPositionMatching(
 
 		// Narrowphase: inverse-transform into object-local coordinates.
 		localX, localY, ok := inverseHitTest(e, mouse)
-		if !ok {
+		if !ok || !idx.insideCuts(e.cut, mouse) {
 			continue
 		}
 
@@ -277,7 +293,7 @@ func (idx *SpatialIndex) FindAllObjectsAtPositionMatching(
 		}
 
 		localX, localY, ok := inverseHitTest(e, mouse)
-		if !ok {
+		if !ok || !idx.insideCuts(e.cut, mouse) {
 			continue
 		}
 
@@ -302,6 +318,18 @@ func (idx *SpatialIndex) FindAllObjectsAtPositionMatching(
 func inverseHitTest(e *spatialEntry, mouse geo.Position) (localX, localY float32, ok bool) {
 	local, ok := driver.LocalHitPoint(e.wt, mouse, e.w, e.h)
 	return local.X, local.Y, ok
+}
+
+// insideCuts reports whether mouse lies inside the turned clip cut and every
+// turned clip it lies in.
+func (idx *SpatialIndex) insideCuts(cut int32, mouse geo.Position) bool {
+	for ; cut >= 0; cut = idx.cuts[cut].parent {
+		c := &idx.cuts[cut]
+		if _, in := driver.LocalHitPoint(c.wt, mouse, c.w, c.h); !in {
+			return false
+		}
+	}
+	return true
 }
 
 // spatialIndexHolder wraps an atomic pointer for lock-free read/write of

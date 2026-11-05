@@ -37,6 +37,18 @@ func (b *tiltBox) CreateRenderer() core.WidgetRenderer {
 	return widget.NewSimpleRenderer(container.NewWithoutLayout(b.objs...))
 }
 
+// rotatedClip is a 60x60 clip holding content, at (20, 20) in a 100x100 box
+// at (40, 40) turned an eighth about its centre.
+func rotatedClip(content core.CanvasObject) core.CanvasObject {
+	clip := &bellui.Container{ClipToBounds: true, Objects: []core.CanvasObject{content}}
+	clip.Move(geo.NewPos(20, 20))
+	clip.Resize(geo.NewSize(60, 60))
+	box := newTiltBox(geo.NewRotationAround(math.Pi/4, 50, 50), clip)
+	box.Move(geo.NewPos(40, 40))
+	box.Resize(geo.NewSize(100, 100))
+	return box
+}
+
 // TestWorldTransformDraws pins #997 on the GPU painters, WebGPU by default and
 // GL under -tags gl: an object is drawn where its world transform puts it,
 // translation included. Each case reads one point where the transform puts
@@ -120,6 +132,26 @@ func TestWorldTransformDraws(t *testing.T) {
 			},
 			drawn: geo.NewPos(130, 30), no: geo.NewPos(165, 30),
 		},
+		{
+			// A clip turned an eighth about its centre clips its larger child
+			// to the turned square, a diamond about (90, 90), not to the box
+			// around it, (47.6, 47.6)-(132.4, 132.4) (#1003). (52, 52) is in
+			// that box's corner, outside the diamond.
+			name:  "clip under a rotation",
+			scene: func() core.CanvasObject { return rotatedClip(rect(-50, -50, 160, 160)) },
+			drawn: geo.NewPos(90, 90), no: geo.NewPos(52, 52),
+		},
+		{
+			// The same inside a rounded clip: the turned clip's stencil nests
+			// in the rounded one's (#1012).
+			name: "clip under a rotation, in a rounded clip",
+			scene: func() core.CanvasObject {
+				outer := &bellui.Container{ClipToBounds: true, ClipCornerRadius: 10, Objects: []core.CanvasObject{rotatedClip(rect(-50, -50, 160, 160))}}
+				outer.Resize(geo.NewSize(200, 200))
+				return outer
+			},
+			drawn: geo.NewPos(90, 90), no: geo.NewPos(52, 52),
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			root := container.NewWithoutLayout(tc.scene())
@@ -149,7 +181,7 @@ func TestWorldTransformDraws(t *testing.T) {
 				t.Errorf("at %v, where the transform puts it: %v, want red", tc.drawn, c)
 			}
 			if c := at(tc.no); red(c) {
-				t.Errorf("at %v, where it is without its translation: %v, want not red", tc.no, c)
+				t.Errorf("at %v, where it must not be drawn: %v, want not red", tc.no, c)
 			}
 		})
 	}
