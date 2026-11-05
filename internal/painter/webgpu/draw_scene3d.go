@@ -127,19 +127,20 @@ func (p *painter) renderScene(scene *canvas.Scene3D, pixW, pixH int) *Texture {
 // depth-enabled pipeline (z-buffering) and Replace blend (opaque 3D, depth
 // resolves occlusion — mirrors the GL painter's BlendFunc(one, 0)).
 func (p *painter) recordScene3D(verts []float32, uniform []byte) {
-	staged, ok := p.stage(uniform)
+	key := PipelineKey{
+		Shader:   "scene3d",
+		Fragment: FragmentEntry,
+		Blend:    BlendReplace,
+		Stencil:  StencilNone,
+		Depth:    true,
+		Format:   p.dev.Format(),
+	}
+	staged, ok := p.stage(key, uniform)
 	if !ok {
 		return
 	}
 	_ = p.dev.Record(DrawCall{
-		Key: PipelineKey{
-			Shader:   "scene3d",
-			Fragment: FragmentEntry,
-			Blend:    BlendReplace,
-			Stencil:  StencilNone,
-			Depth:    true,
-			Format:   p.dev.Format(),
-		},
+		Key:         key,
 		Vertices:    verts,
 		VertexCount: len(verts) / 10,
 		Uniform:     staged,
