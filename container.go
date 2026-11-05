@@ -21,6 +21,13 @@ type Container struct {
 	Layout       core.Layout         // The Layout algorithm for arranging child [core.CanvasObject]s
 	Objects      []core.CanvasObject // The set of [core.CanvasObject]s this container holds
 	ClipToBounds bool                // When true, children are clipped to the container's bounds
+
+	// ClipCornerRadius rounds the corners of the clip ClipToBounds sets up,
+	// so children are cut to a rounded rectangle, as a Card cuts its content.
+	// It has no effect without ClipToBounds, and 0 keeps square corners.
+	//
+	// Since: 1.3
+	ClipCornerRadius float32
 }
 
 // Add appends the specified object to the items this container manages.
