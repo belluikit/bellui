@@ -208,14 +208,14 @@ func (w *WheelPicker) pitch() float32 {
 	return s.Width / float32(w.visible())
 }
 
-// Dragged spins the wheel with the finger once the gesture has locked to the
-// wheel's axis; a gesture that starts across it is left alone.
 // ClaimsDrag takes a touch drag along the wheel and leaves one across it to
 // the scroll around the picker (event.DragClaimer, #662).
 func (w *WheelPicker) ClaimsDrag(d geo.Delta) bool {
 	return !w.Disabled() && len(w.Items) > 0 && abs32(w.along(d)) > abs32(w.across(d))
 }
 
+// Dragged spins the wheel with the finger once the gesture has locked to the
+// wheel's axis; a gesture that starts across it is left alone.
 func (w *WheelPicker) Dragged(e *event.DragEvent) {
 	if w.Disabled() || len(w.Items) == 0 {
 		return
