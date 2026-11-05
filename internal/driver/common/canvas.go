@@ -405,8 +405,7 @@ func (c *Canvas) FreeDirtyTextures() uint64 {
 		// for this, the partial-repaint region and the boundary below (#543).
 		node, mapped := c.noteRefreshed(object)
 		if mapped {
-			wt := node.worldTransform
-			c.dirtyRegion.Union(geo.NewPos(wt.TX, wt.TY), object.Size())
+			c.dirtyRegion.Union(WorldBox(node.worldTransform, object.Size()))
 		}
 
 		// Propagate dirty state to the nearest ancestor RepaintBoundary.
@@ -589,7 +588,7 @@ func (c *Canvas) PartialDirtyRegion() (pos geo.Position, size geo.Size, set bool
 			node.childrenCulled = false
 		}
 
-		newPos, newSize := paintBounds(node)
+		newPos, newSize := PaintBounds(node)
 
 		isRefreshed := node.paintRefreshed
 		node.paintRefreshed = false
@@ -697,16 +696,31 @@ func clampRect(r dirtyRect, canvas geo.Size) geo.Size {
 // overflow drawn by its children.
 func (c *Canvas) unionSubtreeBounds(node *RenderCacheNode, region *dirtyRect) {
 	for child := node.firstChild; child != nil; child = child.nextSibling {
-		region.Union(padRect(paintBounds(child)))
+		region.Union(padRect(PaintBounds(child)))
 		c.unionSubtreeBounds(child, region)
 	}
 }
 
-// paintBounds returns the world-space box node's object paints in: its
+// PaintBounds returns the world-space box node's object paints in: its
 // PaintExtent, through its world transform.
-func paintBounds(node *RenderCacheNode) (geo.Position, geo.Size) {
-	off, s := PaintExtent(node.obj)
-	m := node.worldTransform
+func PaintBounds(node *RenderCacheNode) (geo.Position, geo.Size) {
+	return PaintBoundsAt(node.obj, node.worldTransform)
+}
+
+// WorldBox is the canvas box an object of size size with world transform m
+// covers: its own box moved, or under a rotation or skew the bounding box of
+// where m puts it (#997). A clipping object clips its children to it.
+func WorldBox(m geo.Matrix, size geo.Size) (geo.Position, geo.Size) {
+	if m.A == 1 && m.B == 0 && m.C == 0 && m.D == 1 {
+		return geo.NewPos(m.TX, m.TY), size // exactly, with no rounding through the corners
+	}
+	minX, minY, maxX, maxY := m.AABB(size.Width, size.Height)
+	return geo.NewPos(minX, minY), geo.NewSize(maxX-minX, maxY-minY)
+}
+
+// PaintBoundsAt is PaintBounds for obj with world transform m.
+func PaintBoundsAt(obj core.CanvasObject, m geo.Matrix) (geo.Position, geo.Size) {
+	off, s := PaintExtent(obj)
 	if !off.IsZero() {
 		m = m.Multiply(geo.NewTranslation(off.X, off.Y))
 	}
@@ -1283,7 +1297,7 @@ func (c *Canvas) walkTreeFrom(
 		prev = node
 		node = node.nextSibling
 	}
-	driver.WalkVisibleSubtreeCulled(start.obj, parentObj, offset, clipPos, clipSize, cull, hidden, bc, ac)
+	driver.WalkVisibleSubtreeCulled(start.obj, parentObj, offset, clipPos, clipSize, start.walkXf(), cull, hidden, bc, ac)
 }
 
 // addChild adds a node for obj to parent, after prev or first.
@@ -1309,6 +1323,18 @@ func (r *RenderCacheNode) walkStart() (parent core.CanvasObject, offset, clipPos
 		return nil, geo.Position{}, geo.Position{}, driver.NoClipBounds
 	}
 	return p.obj, p.walkPos, p.clipPos, p.clipSize
+}
+
+// walkXf is what the transforms above r do to walk positions, as a walk from
+// the root passes it to r: the identity when there are none, and otherwise
+// the parent's world transform, which already carries the parent's walk
+// position, undoing that position.
+func (r *RenderCacheNode) walkXf() geo.Matrix {
+	p := r.parent
+	if p == nil || !p.noCullBelow {
+		return geo.Identity()
+	}
+	return p.worldTransform.Multiply(geo.NewTranslation(-p.walkPos.X, -p.walkPos.Y))
 }
 
 // setWorldTransform computes the node's accumulated world transform,

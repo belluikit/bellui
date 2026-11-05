@@ -179,6 +179,15 @@ func (r *RenderCacheNode) WorldTransform() geo.Matrix {
 	return r.worldTransform
 }
 
+// PaintOrigin is where the node's object is drawn from: its world transform's
+// image of the object's origin, (0, 0) in its own coordinates (#997). With no
+// transform above or on it, that is the walk position. A transform's
+// translation, a pivot's and a transformed ancestor's all move it; a painter
+// applies the transform's linear part about it.
+func (r *RenderCacheNode) PaintOrigin() geo.Position {
+	return geo.NewPos(r.worldTransform.TX, r.worldTransform.TY)
+}
+
 // dirtyRect tracks a rectangular dirty region using position + size.
 // When set is false, the region is undefined (full repaint needed).
 type dirtyRect struct {

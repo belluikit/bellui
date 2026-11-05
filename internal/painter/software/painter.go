@@ -33,7 +33,7 @@ func (*Painter) Paint(c core.Canvas) image.Image {
 	// Transform stack for composing parent + child transforms.
 	wtStack := []geo.Matrix{geo.Identity()}
 
-	paint := func(obj core.CanvasObject, pos, clipPos geo.Position, clipSize geo.Size) bool {
+	paint := func(obj core.CanvasObject, _, clipPos geo.Position, clipSize geo.Size) bool {
 		// Scope the subtree's paint to a container DirectionScope's direction so
 		// paint-time text base direction and leading/trailing alignment resolve
 		// against the scope. paint always returns false, so afterPaint (which
@@ -62,14 +62,18 @@ func (*Painter) Paint(c core.Canvas) image.Image {
 		wt := parentWT.Multiply(localT)
 		wtStack = append(wtStack, wt)
 
+		// The object is drawn from the worldTransform's translation, the image
+		// of its origin: the walk position, moved by any transform on it or
+		// above it, a pure translation included (#997).
+		pos := geo.NewPos(wt.TX, wt.TY)
+
 		// Check if any non-trivial transform (rotation/scale/skew) is active.
 		hasNonTrivialTransform := !(wt.A == 1 && wt.B == 0 && wt.C == 0 && wt.D == 1)
 
 		if hasNonTrivialTransform {
-			// Use the worldTransform's translation as position and linear part as matrix.
-			transformedPos := geo.NewPos(wt.TX, wt.TY)
+			// The worldTransform's linear part is the matrix.
 			linearOnly := geo.Matrix{A: wt.A, B: wt.B, C: wt.C, D: wt.D}
-			drawTransformed(c, obj, transformedPos, linearOnly, base, clip)
+			drawTransformed(c, obj, pos, linearOnly, base, clip)
 			return false
 		}
 

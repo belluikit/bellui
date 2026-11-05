@@ -20,16 +20,17 @@ func Test_glPaintWalk_SkipsByPaintExtent(t *testing.T) {
 	text := canvas.NewText("File Transfer", color.White)
 	min := text.MinSize()
 	pos := geo.NewPos(20, 20)
+	at := geo.NewTranslation(pos.X, pos.Y)
 
 	w := &glPaintWalk{partialRepaint: true, drPos: geo.NewPos(0, 20+min.Height/2), drSize: geo.NewSize(300, 4)}
-	assert.False(t, w.skipObjectForDirtyRegion(text, pos), "the region crosses the glyphs")
+	assert.False(t, w.skipObjectForDirtyRegion(text, at), "the region crosses the glyphs")
 	assert.True(t, w.shouldSkipForDirtyRegion(pos, text.Size()), "precondition: the 0x0 box alone misses it")
 
 	w.drPos = geo.NewPos(0, 20+min.Height+10)
-	assert.True(t, w.skipObjectForDirtyRegion(text, pos), "a region below the glyphs skips the text")
+	assert.True(t, w.skipObjectForDirtyRegion(text, at), "a region below the glyphs skips the text")
 
 	w.partialRepaint = false
-	assert.False(t, w.skipObjectForDirtyRegion(text, pos), "a full repaint skips nothing")
+	assert.False(t, w.skipObjectForDirtyRegion(text, at), "a full repaint skips nothing")
 }
 
 // Test_glPaintWalk_EmptyRegionSkipsEverything pins #605 on desktop: a frame
@@ -43,6 +44,22 @@ func Test_glPaintWalk_EmptyRegionSkipsEverything(t *testing.T) {
 	shadow.Resize(geo.NewSize(200, 300))
 
 	w := &glPaintWalk{partialRepaint: true}
-	assert.True(t, w.skipObjectForDirtyRegion(shadow, geo.NewPos(0, 0)), "a shadow's blur across the origin")
+	assert.True(t, w.skipObjectForDirtyRegion(shadow, geo.Identity()), "a shadow's blur across the origin")
 	assert.True(t, w.shouldSkipForDirtyRegion(geo.NewPos(-40, -40), geo.NewSize(120, 120)), "content scrolled across the origin")
+}
+
+// Test_glPaintWalk_SkipsByWorldTransform pins #997 on desktop: an object is
+// skipped by where its world transform draws it, not by where it would be
+// without the transform.
+func Test_glPaintWalk_SkipsByWorldTransform(t *testing.T) {
+	test.NewTempApp(t)
+
+	rect := canvas.NewRectangle(color.White)
+	rect.Resize(geo.NewSize(20, 20))
+	moved := geo.NewTranslation(20, 10).Multiply(geo.NewTranslation(100, 0)) // at (20, 10), translated by (100, 0)
+
+	w := &glPaintWalk{partialRepaint: true, drPos: geo.NewPos(115, 0), drSize: geo.NewSize(50, 50)}
+	assert.False(t, w.skipObjectForDirtyRegion(rect, moved), "the region holds where it is drawn")
+	w.drPos = geo.NewPos(0, 0)
+	assert.True(t, w.skipObjectForDirtyRegion(rect, moved), "a region where it would be without its translation skips it")
 }

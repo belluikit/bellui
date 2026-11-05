@@ -996,14 +996,15 @@ func (w *mobileTreeWalker) shouldSkipForDirtyRegion(pos geo.Position, objSize ge
 	return w.partialRepaint && !common.InDirtyRegion(pos, objSize, w.drPos, w.drSize)
 }
 
-// skipObjectForDirtyRegion is shouldSkipForDirtyRegion for obj at pos, by
-// where it draws rather than its bounds (#602).
-func (w *mobileTreeWalker) skipObjectForDirtyRegion(obj core.CanvasObject, pos geo.Position) bool {
+// skipObjectForDirtyRegion is shouldSkipForDirtyRegion for obj with world
+// transform wt, by where it draws rather than its bounds (#602), and where its
+// transform puts that (#997).
+func (w *mobileTreeWalker) skipObjectForDirtyRegion(obj core.CanvasObject, wt geo.Matrix) bool {
 	if !w.partialRepaint {
 		return false
 	}
-	off, size := common.PaintExtent(obj)
-	return w.shouldSkipForDirtyRegion(pos.Add(off), size)
+	pos, size := common.PaintBoundsAt(obj, wt)
+	return w.shouldSkipForDirtyRegion(pos, size)
 }
 
 // pushBoundary handles a RepaintBoundary node in the draw pass. It returns true
@@ -1052,8 +1053,11 @@ func (w *mobileTreeWalker) pushBoundary(node *common.RenderCacheNode, pos geo.Po
 	return true
 }
 
-func (w *mobileTreeWalker) draw(node *common.RenderCacheNode, pos geo.Position) {
+func (w *mobileTreeWalker) draw(node *common.RenderCacheNode, _ geo.Position) {
 	obj := node.Obj()
+	// Where the object is drawn from: the walk position, moved by any transform
+	// on it or above it (#997).
+	pos := node.PaintOrigin()
 
 	// Scope the subtree's paint to a container DirectionScope's direction, the
 	// paint-time mirror of the EnsureMinSize layout hook. Done before any early
@@ -1075,10 +1079,13 @@ func (w *mobileTreeWalker) draw(node *common.RenderCacheNode, pos geo.Position) 
 	paintFrame := w.size
 	paintTransform := node.WorldTransform()
 	if ab := w.activeBoundary(); ab != nil && ab.wasDirty {
-		paintPos = geo.NewPos(pos.X-ab.origin.X, pos.Y-ab.origin.Y)
 		paintFrame = ab.size
 		paintTransform = ab.invWT.Multiply(node.WorldTransform())
+		paintPos = geo.NewPos(paintTransform.TX, paintTransform.TY)
 	}
+	// Set before the clips: a rounded clip stamps its shape with the
+	// transform the painter holds, which must be this object's.
+	w.c.Painter().SetTransform(paintTransform)
 
 	// Establish this object's clips BEFORE the dirty-region cull check, so a culled
 	// clip-owner (scroll/ClipToBounds) still constrains its descendants; otherwise
@@ -1088,7 +1095,7 @@ func (w *mobileTreeWalker) draw(node *common.RenderCacheNode, pos geo.Position) 
 	// gets no clip (#481).
 	clips := common.PaintClips(node)
 	if clips.Rect {
-		inner := w.clips.Push(paintPos, obj.Size())
+		inner := w.clips.Push(common.WorldBox(paintTransform, obj.Size()))
 		w.c.Painter().StartClipping(inner.Rect())
 	}
 	if clips.Rounded {
@@ -1100,11 +1107,10 @@ func (w *mobileTreeWalker) draw(node *common.RenderCacheNode, pos geo.Position) 
 		}
 	}
 
-	if w.activeBoundary() == nil && w.skipObjectForDirtyRegion(obj, pos) {
+	if w.activeBoundary() == nil && w.skipObjectForDirtyRegion(obj, paintTransform) {
 		return
 	}
 
-	w.c.Painter().SetTransform(paintTransform)
 	if paintFrame.Width <= 0 || paintFrame.Height <= 0 || w.opacity.Transparent() {
 		return
 	}
@@ -1121,8 +1127,9 @@ func (w *mobileTreeWalker) applyClip() {
 	}
 }
 
-func (w *mobileTreeWalker) afterDraw(node *common.RenderCacheNode, pos geo.Position) {
+func (w *mobileTreeWalker) afterDraw(node *common.RenderCacheNode, _ geo.Position) {
 	obj := node.Obj()
+	pos := node.PaintOrigin() // as draw has it
 
 	// Pop the DirectionScope pushed in draw (before any early return, to pair).
 	// The group opacity pops last, after a boundary's blit, which is drawn with
@@ -1152,7 +1159,7 @@ func (w *mobileTreeWalker) afterDraw(node *common.RenderCacheNode, pos geo.Posit
 		return
 	}
 
-	culled := w.activeBoundary() == nil && w.skipObjectForDirtyRegion(node.Obj(), pos)
+	culled := w.activeBoundary() == nil && w.skipObjectForDirtyRegion(node.Obj(), node.WorldTransform())
 
 	// Tear down clips even when culled: draw establishes them unconditionally for
 	// clip-owners so descendants stay clipped (pre-rebrand tracker #333), so push/pop must stay paired.
