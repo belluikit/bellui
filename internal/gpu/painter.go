@@ -73,6 +73,23 @@ type BoundaryPainter interface {
 	InvalidateAllBoundaries()
 }
 
+// FramePainter is an optional interface for painters that can fail to begin a
+// frame, as WebGPU does when the surface gives it none (a window the system
+// reports occluded, #631). The paint walk asks it after the frame's setup and
+// does not walk a window whose frame is not open: every draw would be refused,
+// and a clip's stencil writes are logged as dropped (#1019).
+type FramePainter interface {
+	// FrameOpen reports whether a frame is open to draw into.
+	FrameOpen() bool
+}
+
+// FrameOpen reports whether p has a frame open to draw into. A painter that
+// does not implement FramePainter (GL) always begins its frame, so it has one.
+func FrameOpen(p Painter) bool {
+	f, ok := p.(FramePainter)
+	return !ok || f.FrameOpen()
+}
+
 // DirtyRegionPainter is an optional interface for painters that support
 // a persistent canvas FBO for dirty-region culling. The paint walk
 // type-asserts to this interface.

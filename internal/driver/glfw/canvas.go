@@ -432,6 +432,14 @@ func (c *glCanvas) paint(size geo.Size) {
 		c.Painter().SetOutputSize(canvasPixW, canvasPixH)
 		c.Painter().Clear()
 	}
+	// Without a frame every draw is refused, and a rounded clip's stencil
+	// writes are logged as dropped. The window is painted again once the
+	// surface gives a frame (noteFrameBegan, #864); hit-testing still follows
+	// the content (#1019).
+	if !gpu.FrameOpen(c.Painter()) {
+		c.RebuildSpatialIndex()
+		return
+	}
 
 	// Check if the painter supports boundary FBO caching.
 	bp, hasBoundary := c.Painter().(gpu.BoundaryPainter)
