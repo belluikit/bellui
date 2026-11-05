@@ -1032,7 +1032,7 @@ func (w *mobileTreeWalker) skipObjectForDirtyRegion(obj core.CanvasObject, wt ge
 // pushBoundary handles a RepaintBoundary node in the draw pass. It returns true
 // when the node was a boundary (and thus fully handled here).
 func (w *mobileTreeWalker) pushBoundary(node *common.RenderCacheNode, pos geo.Position) bool {
-	if !w.hasBoundary || !node.IsBoundary() {
+	if !w.hasBoundary || !node.CachesAsBoundary() {
 		return false
 	}
 
