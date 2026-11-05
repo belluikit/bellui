@@ -365,3 +365,13 @@ func (o *Output) Rebase(pos time.Duration) {
 	o.posBase = pos
 	_, o.playedBase = o.pull.played() // all of it, once played or flushed, is before pos
 }
+
+// Level is the RMS, 0 to 1, of the audio playing now: the 20 ms window at the
+// playback position, with the volume applied. It is what is heard, not what
+// was last handed to the device, which runs a pull ahead.
+func (o *Output) Level() float32 {
+	played, _ := o.pull.played()
+	o.pull.mu.Lock()
+	defer o.pull.mu.Unlock()
+	return o.pull.level.at(played)
+}
