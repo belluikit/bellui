@@ -183,6 +183,27 @@ func Test_canvas_DragOverEntryTextScrolls(t *testing.T) {
 	lprTapUp(c, press.AddXY(60, 0))
 }
 
+// A selectable Label or RichText in a page takes a touch drag and selects
+// (#999: asking whether it claimed the drag used to recurse forever).
+func Test_canvas_DragOverSelectableTextSelects(t *testing.T) {
+	label := widget.NewLabel("word word word word")
+	label.Selectable = true
+	rich := widget.NewRichTextWithText("word word word word")
+	rich.Selectable = true
+	page := container.NewVScroll(container.NewVBox(label, rich, filler(100, 600)))
+	c := claimCanvas(page, geo.NewSize(200, 300))
+
+	on := geo.NewPos(10, label.Size().Height/2)
+	swipe(c, 1, on, on.AddXY(80, 0))
+	assert.NotEmpty(t, label.SelectedText(), "the drag selected the label's text")
+	assert.Zero(t, page.Offset.Y)
+
+	on = geo.NewPos(10, rich.Position().Y+rich.Size().Height/2)
+	swipe(c, 2, on, on.AddXY(80, 0))
+	assert.NotEmpty(t, rich.SelectedText(), "the drag selected the rich text")
+	assert.Zero(t, page.Offset.Y)
+}
+
 // entryScroll finds the Scroll inside an Entry's renderer.
 func entryScroll(t *testing.T, e *widget.Entry) *container.Scroll {
 	t.Helper()
