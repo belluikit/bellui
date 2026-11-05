@@ -926,6 +926,11 @@ type mobileTreeWalker struct {
 	partialRepaint bool
 	drPos          geo.Position
 	drSize         geo.Size
+
+	// opacity is the group opacity of the subtree being drawn, from the
+	// core.OpacityGroup objects above it. The mobile walk does not dim
+	// disabled widgets.
+	opacity intdriver.OpacityStack
 }
 
 // paint walks the content and overlay trees with draw/afterDraw, then rebuilds
@@ -1031,6 +1036,7 @@ func (w *mobileTreeWalker) pushBoundary(node *common.RenderCacheNode, pos geo.Po
 		w.clips = &internal.ClipStack{}
 		w.c.Painter().StopClipping()
 		w.bp.BindBoundaryFBO(state)
+		w.opacity.EnterBoundary(w.c.Painter())
 		invWT, ok := node.WorldTransform().Inverse()
 		if !ok {
 			invWT = geo.Identity()
@@ -1051,8 +1057,10 @@ func (w *mobileTreeWalker) draw(node *common.RenderCacheNode, pos geo.Position) 
 
 	// Scope the subtree's paint to a container DirectionScope's direction, the
 	// paint-time mirror of the EnsureMinSize layout hook. Done before any early
-	// return so it always pairs with the pop in afterDraw.
+	// return so it always pairs with the pop in afterDraw. The group opacity
+	// pairs the same way.
 	intdriver.PushDirectionScope(obj)
+	w.opacity.Push(w.c.Painter(), obj)
 
 	// --- RepaintBoundary handling ---
 	if w.pushBoundary(node, pos) {
@@ -1097,7 +1105,7 @@ func (w *mobileTreeWalker) draw(node *common.RenderCacheNode, pos geo.Position) 
 	}
 
 	w.c.Painter().SetTransform(paintTransform)
-	if paintFrame.Width <= 0 || paintFrame.Height <= 0 {
+	if paintFrame.Width <= 0 || paintFrame.Height <= 0 || w.opacity.Transparent() {
 		return
 	}
 	w.c.Painter().Paint(obj, paintPos, paintFrame)
@@ -1117,7 +1125,10 @@ func (w *mobileTreeWalker) afterDraw(node *common.RenderCacheNode, pos geo.Posit
 	obj := node.Obj()
 
 	// Pop the DirectionScope pushed in draw (before any early return, to pair).
+	// The group opacity pops last, after a boundary's blit, which is drawn with
+	// the opacity the boundary itself was pushed with.
 	intdriver.PopDirectionScope(obj)
+	defer w.opacity.Pop(w.c.Painter())
 
 	if w.hasBoundary && node.IsBoundary() && len(w.bStack) > 0 && w.bStack[len(w.bStack)-1].obj == obj {
 		entry := w.bStack[len(w.bStack)-1]
@@ -1129,8 +1140,9 @@ func (w *mobileTreeWalker) afterDraw(node *common.RenderCacheNode, pos geo.Posit
 			node.SetBoundaryRenderedAt(entry.phase)
 			w.clips = entry.outerClips
 			w.applyClip()
+			w.opacity.ExitBoundary(w.c.Painter())
 		}
-		if !w.shouldSkipForDirtyRegion(entry.origin, entry.size) {
+		if !w.shouldSkipForDirtyRegion(entry.origin, entry.size) && !w.opacity.Transparent() {
 			w.bp.BlitBoundaryTexture(entry.state, entry.origin, w.size)
 		}
 		return

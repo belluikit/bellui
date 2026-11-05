@@ -124,7 +124,9 @@ func (p *painter) BlitBoundaryTexture(s gpu.BoundaryFBO, pos geo.Position, frame
 	p.updateBuffer(p.program.buff, points)
 	p.UpdateVertexArray(p.program, "vert", 3, 5, 0)
 	p.UpdateVertexArray(p.program, "vertTexCoord", 2, 5, 3)
-	p.SetUniform1f(p.program, "alpha", 1)
+	// The cached content was rendered opaque; the group opacity of the
+	// boundary's ancestors applies here, once.
+	p.SetUniform1f(p.program, "alpha", p.effectiveAlpha(1))
 	p.SetUniform1f(p.program, "cornerRadius", 0)
 	p.SetUniform2f(p.program, "size", 0, 0)
 	p.SetUniform4f(p.program, "inset", 0, 0, 1, 1)

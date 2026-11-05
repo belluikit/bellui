@@ -447,6 +447,7 @@ func (c *glCanvas) paint(size geo.Size) {
 		drSize:         drSize,
 		canvasPixW:     canvasPixW,
 		canvasPixH:     canvasPixH,
+		opacity:        driver.OpacityStack{DimDisabled: true},
 	}
 
 	// Scope the whole paint pass to this canvas' direction so paint-time
@@ -509,6 +510,10 @@ type glPaintWalk struct {
 
 	// bStack is the boundary stack for RepaintBoundary FBO management.
 	bStack []boundaryEntry
+
+	// opacity is the group opacity of the subtree being drawn: disabled
+	// widgets and core.OpacityGroup objects.
+	opacity driver.OpacityStack
 }
 
 // insideCleanBoundary reports whether we are inside a clean (non-dirty) boundary.
@@ -597,6 +602,7 @@ func (w *glPaintWalk) enterBoundary(node *common.RenderCacheNode, pos geo.Positi
 		w.clips = &internal.ClipStack{}
 		w.c.Painter().StopClipping()
 		w.bp.BindBoundaryFBO(state)
+		w.opacity.EnterBoundary(w.c.Painter())
 
 		invWT, ok := node.WorldTransform().Inverse()
 		if !ok {
@@ -630,7 +636,9 @@ func (w *glPaintWalk) draw(node *common.RenderCacheNode, pos geo.Position) {
 	// paint-time mirror of the EnsureMinSize layout hook. Done before any early
 	// return so it always pairs with the pop in afterDraw (walkTree invokes both
 	// callbacks for every node regardless of boundary/dirty-region skips).
+	// The group opacity pairs the same way.
 	driver.PushDirectionScope(obj)
+	w.opacity.Push(w.c.Painter(), obj)
 
 	// --- RepaintBoundary handling ---
 	if w.enterBoundary(node, pos) {
@@ -683,12 +691,8 @@ func (w *glPaintWalk) draw(node *common.RenderCacheNode, pos geo.Position) {
 		return
 	}
 
-	// MD3 disabled state: reduce opacity for disabled widget subtrees.
-	if d, ok := obj.(core.Disableable); ok && d.Disabled() {
-		w.c.Painter().SetGroupOpacity(0.38)
-	}
 	w.c.Painter().SetTransform(paintTransform)
-	if paintFrame.Width <= 0 || paintFrame.Height <= 0 {
+	if paintFrame.Width <= 0 || paintFrame.Height <= 0 || w.opacity.Transparent() {
 		return
 	}
 	w.c.Painter().Paint(obj, paintPos, paintFrame)
@@ -712,12 +716,13 @@ func (w *glPaintWalk) exitBoundary(node *common.RenderCacheNode, pos geo.Positio
 		node.SetBoundaryRenderedAt(entry.phase)
 		w.clips = entry.outerClips
 		w.applyClip()
+		w.opacity.ExitBoundary(w.c.Painter())
 	}
 
 	// Blit the boundary's cached FBO texture at its snapped origin, where it
 	// lands pixel for pixel, unless doing partial repaint and the boundary is
-	// outside the dirty region.
-	if !w.shouldSkipForDirtyRegion(entry.origin, entry.size) {
+	// outside the dirty region, or the ancestors' opacity hides it.
+	if !w.shouldSkipForDirtyRegion(entry.origin, entry.size) && !w.opacity.Transparent() {
 		w.bp.BlitBoundaryTexture(entry.state, entry.origin, w.size)
 	}
 	return true
@@ -737,7 +742,10 @@ func (w *glPaintWalk) afterDraw(node *common.RenderCacheNode, pos geo.Position) 
 	obj := node.Obj()
 
 	// Pop the DirectionScope pushed in draw (before any early return, to pair).
+	// The group opacity pops last, after a boundary's blit, which is drawn with
+	// the opacity the boundary itself was pushed with.
 	driver.PopDirectionScope(obj)
+	defer w.opacity.Pop(w.c.Painter())
 
 	// --- RepaintBoundary exit handling ---
 	if w.exitBoundary(node, pos) {
@@ -750,14 +758,6 @@ func (w *glPaintWalk) afterDraw(node *common.RenderCacheNode, pos geo.Position) 
 	}
 
 	culled := w.activeBoundary() == nil && w.skipObjectForDirtyRegion(node.Obj(), pos)
-
-	// Group opacity is only set for objects that actually drew (not culled), so
-	// only clear it then.
-	if !culled {
-		if d, ok := obj.(core.Disableable); ok && d.Disabled() {
-			w.c.Painter().ClearGroupOpacity()
-		}
-	}
 
 	// Tear down clips even when the object was culled: draw establishes them
 	// unconditionally for clip-owners so descendants stay clipped (pre-rebrand tracker #333), so the
