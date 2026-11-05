@@ -100,6 +100,9 @@ func (p *painter) BindBoundaryFBO(state gpu.BoundaryFBO) {
 	p.dev.PushTarget(s.tex, s.width, s.height)
 	s.bound = true
 	p.boundaryFrames = append(p.boundaryFrames, s.logical)
+	// The boundary's stencil starts empty: the clips around it are not in it.
+	p.clipBases = append(p.clipBases, len(p.roundClips))
+	p.stencilMode = StencilNone
 }
 
 func (p *painter) UnbindBoundaryFBO(canvasPixW, canvasPixH int) {
@@ -111,6 +114,10 @@ func (p *painter) UnbindBoundaryFBO(canvasPixW, canvasPixH int) {
 	}
 	p.boundaryFrames = p.boundaryFrames[:n-1]
 	p.dev.PopTarget()
+	if m := len(p.clipBases); m > 0 {
+		p.clipBases = p.clipBases[:m-1]
+	}
+	p.applyRoundClip() // the enclosing target's clips apply again
 }
 
 func (p *painter) BlitBoundaryTexture(state gpu.BoundaryFBO, pos geo.Position, frame geo.Size) {

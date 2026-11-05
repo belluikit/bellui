@@ -570,8 +570,10 @@ func (p *painter) drawPathFillStencil(path *canvas.Path, fanTris []float32, subp
 	bb := p.pathVertsToNDCWithAlpha(quad[:], pos, frame)
 	p.record("path", bb, len(bb)/3, uniformBytes(&fu), nil)
 
-	// Pass 3: anti-aliased fringe along the fill boundary, no stencil.
-	p.stencilMode = StencilNone
+	// Pass 3: anti-aliased fringe along the fill boundary, inside the rounded
+	// clips around the path, stamped again over the winding counts (#1012).
+	// The bounding-box pass above is confined to the path only.
+	p.restampRoundClips()
 	fringe := paint.ExpandFillFringe(subpaths, fringeWidth)
 	if len(fringe) >= 9 {
 		fr := p.pathVertsToNDCWithAlpha(fringe, pos, frame)

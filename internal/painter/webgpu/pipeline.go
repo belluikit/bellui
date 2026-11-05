@@ -29,6 +29,14 @@ const (
 	// StencilTestNotEqual draws color only where stencil != reference (path clip
 	// content and the path-fill bounding-box quad; reference is 0).
 	StencilTestNotEqual
+	// StencilTestEqualIncr increments the stencil where it equals the reference,
+	// color masked off: a rounded clip nested at depth d stamps where the
+	// enclosing clip left d-1, so it can only narrow it (#1012).
+	StencilTestEqualIncr
+	// StencilTestEqualDecr decrements the stencil where it equals the reference,
+	// color masked off: a rounded clip's Stop returns its area to the enclosing
+	// clip's depth (#1012).
+	StencilTestEqualDecr
 )
 
 // PipelineKey identifies a unique render pipeline (PSO). A pipeline is keyed by

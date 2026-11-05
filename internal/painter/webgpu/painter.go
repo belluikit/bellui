@@ -61,8 +61,13 @@ type painter struct {
 	stencilMode StencilMode
 
 	// roundClips holds the active rounded clips, innermost last, so
-	// StopRoundedClipping can erase what its Start stamped (#466).
+	// StopRoundedClipping can erase what its Start stamped (#466), and a
+	// path op can stamp them again after clearing the stencil (#1012).
 	roundClips []roundClip
+	// clipBases holds, for each bound RepaintBoundary target, how many rounded
+	// clips were active when it was bound: its own stencil starts empty, so
+	// only the clips above that index stamp into it.
+	clipBases []int
 	// stencilDirties counts path ops that left winding counts in the stencil.
 	// A rounded clip records it at Start; if it is unchanged at Stop, nothing
 	// but the clip itself wrote the stencil, so the erase leaves it zero.
@@ -229,6 +234,7 @@ func (p *painter) beginFrame() {
 	p.framing = true
 	p.frame++
 	p.roundClips = p.roundClips[:0] // a frame never inherits an unpaired clip
+	p.clipBases = p.clipBases[:0]
 	p.evictShadows()
 	p.evictLayouts()
 	p.evictBoundaries()
@@ -357,69 +363,159 @@ func (p *painter) StopClipping() {
 	}
 }
 
-// roundClip is an active rounded clip: the rect its stamp lies in and the
-// transform it was stamped with, so StopRoundedClipping can erase it.
+// roundClip is an active rounded clip: the rect its stamp lies in, its corner
+// radius and the transform it was stamped with, so StopRoundedClipping can
+// erase it and a path op can stamp it again.
+//
+// Clips nest by depth (#1012): a clip at depth d stamps d into the stencil
+// only where its enclosing clip left d-1, and draws test for d. So an inner
+// clip narrows the outer one, and Stop returns its area to d-1, which is the
+// outer clip again. Outside every clip the stencil stays zero (#466).
 type roundClip struct {
 	pos       geo.Position
 	size      geo.Size
+	radius    float32
 	transform geo.Matrix
+	depth     uint32
 	skipped   bool   // nothing was stamped: the rect lies outside the pass's clip
-	dirties   uint64 // stencilDirties when the clip was stamped
+	dirties   uint64 // stencilDirties when the clip was last stamped
 }
 
-// StartRoundedClipping stencils a rounded-rect mask (ref=1) and restricts
-// subsequent draws to it. Mirrors the GL painter's stencil rounded clip.
+// rejectRef is the stencil reference a skipped clip's content is tested
+// against: no stamp reaches it, so nothing inside the clip is drawn.
+const rejectRef = 0xFF
+
+// StartRoundedClipping stencils a rounded-rect mask and restricts subsequent
+// draws to it, inside any rounded clip already active.
 //
 // WebGPU cannot clear the stencil mid-pass, and clearing the whole target with
 // a full-target quad for every clip cost a grid of cards one full-screen fill
 // per card per frame, and on Apple GPUs tens of MB (#466). So the stencil is
 // kept zero outside active clips: StopRoundedClipping erases the clip's rect
 // again, and a clip that finds the stencil known to be zero just stamps. When
-// it is not known to be zero (a path fill or path clip left winding counts, or
-// the clip is nested in another), the whole target is cleared first, as before.
+// it is not known to be zero (a path fill or path clip left winding counts),
+// the whole target is cleared first, as before.
 func (p *painter) StartRoundedClipping(pos geo.Position, size geo.Size, cornerRadius float32) {
 	if p.dev == nil {
 		return
 	}
-	clip := roundClip{pos: pos, size: size, transform: p.transform}
-	zero := p.stencilMode == StencilNone && p.dev.StencilZero()
+	clip := roundClip{pos: pos, size: size, radius: cornerRadius, transform: p.transform}
+	top := p.topRoundClip()
+	if top != nil && top.skipped {
+		// Inside a skipped clip nothing is drawn, so nothing is stamped either.
+		clip.skipped = true
+		p.roundClips = append(p.roundClips, clip)
+		return
+	}
+	zero := top == nil && p.stencilMode == StencilNone && p.dev.StencilZero()
 	if zero && !p.hasTransform() && p.dev.Culls(
 		int(p.textureScale(pos.X)), int(p.textureScale(pos.Y)),
 		int(p.textureScale(size.Width)), int(p.textureScale(size.Height)),
 	) {
 		// The clip lies outside everything the pass can draw, and the stencil is
-		// zero: testing for 1 rejects every draw in the subtree without stamping.
+		// zero: testing for rejectRef rejects every draw in the subtree without
+		// stamping.
 		clip.skipped = true
 		p.roundClips = append(p.roundClips, clip)
-		p.dev.SetStencilRef(1)
+		p.dev.SetStencilRef(rejectRef)
 		p.stencilMode = StencilTestEqual
 		return
 	}
-	if !zero {
+	switch {
+	case top == nil && !zero:
 		p.clearStencil()
+	case top != nil && top.dirties != p.stencilDirties:
+		// A path op cleared the stencil inside the enclosing clips and they
+		// were not stamped again (a rounded clip inside a path clip).
+		p.restampRoundClips()
+	}
+	clip.depth = 1
+	if top != nil {
+		clip.depth = top.depth + 1
 	}
 	clip.dirties = p.stencilDirties
 	p.roundClips = append(p.roundClips, clip)
 	p.dev.SetStencilZero(false)
-	// Stamp the rounded-rect shape into the stencil as 1 (the round_rectangle
-	// shader discards outside the shape, so only the interior is marked), color
-	// writes masked off via the StencilWriteReplace pipeline.
-	//
-	// The shader keeps every fragment with any anti-aliasing coverage
-	// (alpha > 0), so a stamp at the exact geometry would mark one
+	p.stampRoundClip(&clip)
+	p.dev.SetStencilRef(clip.depth)
+	p.stencilMode = StencilTestEqual
+}
+
+// stampRoundClip draws clip's rounded rect into the stencil, raising it from
+// the enclosing clip's depth to clip's, color writes masked off.
+func (p *painter) stampRoundClip(clip *roundClip) {
+	// The round_rectangle shader discards outside the shape, so only the
+	// interior is marked. It keeps every fragment with any anti-aliasing
+	// coverage (alpha > 0), so a stamp at the exact geometry would mark one
 	// edge-softness band BEYOND the shape — clipped content then pokes past
 	// the visibly drawn arc by a couple of hidpi pixels (pre-rebrand tracker #469). Inset the
 	// stamp by 1.5 softness (concentric radius): its coverage then ends half
 	// a band INSIDE the geometric boundary — the midpoint of the drawn
 	// edge's own anti-aliasing, which is where the eye reads the outline.
-	p.dev.SetStencilRef(1)
-	p.stencilMode = StencilWriteReplace
+	prev := p.transform
+	p.transform = clip.transform
+	p.dev.SetStencilRef(clip.depth - 1)
+	p.stencilMode = StencilTestEqualIncr
 	inset := float32(edgeSoftness) * 1.5
-	p.stamp = stencilBox{pos: pos.Add(geo.NewSquareOffsetPos(inset)), size: size.Subtract(geo.NewSquareSize(inset * 2))}
-	r := geo.Max(0, cornerRadius-inset)
+	p.stamp = stencilBox{pos: clip.pos.Add(geo.NewSquareOffsetPos(inset)), size: clip.size.Subtract(geo.NewSquareSize(inset * 2))}
+	r := geo.Max(0, clip.radius-inset)
 	p.drawOblong(&p.stamp, stampFill, nil, 0, r, r, r, r, 0, p.stamp.pos, p.targetFrame())
-	// Restrict subsequent draws to where the stencil == 1.
-	p.stencilMode = StencilTestEqual
+	p.transform = prev
+}
+
+// topRoundClip returns the innermost rounded clip active in the bound target,
+// or nil.
+func (p *painter) topRoundClip() *roundClip {
+	if n := len(p.roundClips); n > p.roundClipBase() {
+		return &p.roundClips[n-1]
+	}
+	return nil
+}
+
+// roundClipBase is the index of the first rounded clip that stamps into the
+// bound target.
+func (p *painter) roundClipBase() int {
+	if n := len(p.clipBases); n > 0 {
+		return p.clipBases[n-1]
+	}
+	return 0
+}
+
+// applyRoundClip sets the stencil test for the innermost active rounded clip
+// in the bound target, or turns it off when there is none.
+func (p *painter) applyRoundClip() {
+	top := p.topRoundClip()
+	switch {
+	case top == nil:
+		p.stencilMode = StencilNone
+	case top.skipped:
+		p.dev.SetStencilRef(rejectRef)
+		p.stencilMode = StencilTestEqual
+	default:
+		p.dev.SetStencilRef(top.depth)
+		p.stencilMode = StencilTestEqual
+	}
+}
+
+// restampRoundClips clears the stencil and stamps the active rounded clips of
+// the bound target again, outermost first, then restores the innermost one's
+// test. A path fill or path clip uses the whole stencil, so once it is done
+// the clips around it have to be put back (#1012).
+func (p *painter) restampRoundClips() {
+	base := p.roundClipBase()
+	if len(p.roundClips) == base {
+		p.stencilMode = StencilNone
+		return
+	}
+	p.clearStencil()
+	for i := base; i < len(p.roundClips); i++ {
+		clip := &p.roundClips[i]
+		if !clip.skipped {
+			p.stampRoundClip(clip)
+		}
+		clip.dirties = p.stencilDirties
+	}
+	p.applyRoundClip()
 }
 
 // targetFrame returns the logical size of the render target draws land in: a
@@ -433,40 +529,41 @@ func (p *painter) targetFrame() geo.Size {
 	return p.canvas.Size()
 }
 
-// StopRoundedClipping disables stencil clipping (GL: Disable(stencilTest)),
-// and erases the clip's stamp so the stencil is zero again outside clips.
+// StopRoundedClipping ends the innermost rounded clip: it erases the clip's
+// stamp back to the enclosing clip's depth and restores that clip's test, or
+// turns the test off when no clip encloses it, leaving the stencil zero again.
 func (p *painter) StopRoundedClipping() {
 	if p.dev == nil {
 		return
 	}
-	p.stencilMode = StencilNone
-	n := len(p.roundClips)
-	if n == 0 {
+	if len(p.roundClips) == p.roundClipBase() {
+		p.stencilMode = StencilNone
 		return
 	}
-	clip := p.roundClips[n-1]
-	p.roundClips = p.roundClips[:n-1]
-	if clip.skipped {
-		return
+	clip := p.roundClips[len(p.roundClips)-1]
+	p.roundClips = p.roundClips[:len(p.roundClips)-1]
+	if !clip.skipped {
+		prev := p.transform
+		p.transform = clip.transform
+		p.fillStencilRect(clip.pos, clip.size, clip.depth, StencilTestEqualDecr)
+		p.transform = prev
 	}
-	prev := p.transform
-	p.transform = clip.transform
-	p.fillStencilRect(clip.pos, clip.size, 0)
-	p.transform = prev
+	p.applyRoundClip()
 	// Start left the stencil zero outside the stamp (it was zero, or cleared),
 	// and the erase covers the stamp, so the stencil is zero again unless a path
-	// op wrote it in between.
-	if p.stencilDirties == clip.dirties {
+	// op wrote it in between, or a clip still encloses this one.
+	if !clip.skipped && p.topRoundClip() == nil && p.stencilDirties == clip.dirties {
 		p.dev.SetStencilZero(true)
 	}
 }
 
-// fillStencilRect writes ref into the stencil over the rect (pos, size), color
-// writes masked off. It uses the current transform, as the stamp does.
-func (p *painter) fillStencilRect(pos geo.Position, size geo.Size, ref uint32) {
+// fillStencilRect draws the rect (pos, size) into the stencil in mode, with
+// reference ref, color writes masked off. It uses the current transform, as
+// the stamp does.
+func (p *painter) fillStencilRect(pos geo.Position, size geo.Size, ref uint32, mode StencilMode) {
 	prev := p.stencilMode
 	p.dev.SetStencilRef(ref)
-	p.stencilMode = StencilWriteReplace
+	p.stencilMode = mode
 	p.stamp = stencilBox{pos: pos, size: size}
 	p.drawOblong(&p.stamp, stampFill, nil, 0, 0, 0, 0, 0, 0, pos, p.targetFrame())
 	p.stencilMode = prev
@@ -517,10 +614,12 @@ func (p *painter) StartPathClipping(path *canvas.Path, pos geo.Position, size ge
 	p.stencilMode = StencilTestNotEqual
 }
 
-// StopPathClipping disables stencil path clipping.
+// StopPathClipping ends a path clip. The winding pass used the whole stencil,
+// so the rounded clips around it are stamped again (#1012). A path clip's own
+// content is confined to the path, not to the rounded clips around it.
 func (p *painter) StopPathClipping() {
 	if p.dev != nil {
-		p.stencilMode = StencilNone
+		p.restampRoundClips()
 	}
 }
 

@@ -875,6 +875,16 @@ func depthStencilState(mode StencilMode, depth bool) *wgpu.DepthStencilState {
 	case StencilTestNotEqual:
 		front.Compare = wgpu.CompareFunctionNotEqual
 		back = front
+	case StencilTestEqualIncr:
+		front.Compare = wgpu.CompareFunctionEqual
+		front.PassOp = wgpu.StencilOperationIncrementClamp
+		back = front
+		writeMask = 0xFF
+	case StencilTestEqualDecr:
+		front.Compare = wgpu.CompareFunctionEqual
+		front.PassOp = wgpu.StencilOperationDecrementClamp
+		back = front
+		writeMask = 0xFF
 	}
 	depthCompare := wgpu.CompareFunctionAlways
 	if depth {
@@ -907,7 +917,7 @@ func optionalBool(b bool) wgpu.OptionalBool {
 // the stencil) and writes all channels otherwise.
 func colorWriteMask(mode StencilMode) wgpu.ColorWriteMask {
 	switch mode {
-	case StencilWriteReplace, StencilWriteIncrDecr, StencilWriteInvert:
+	case StencilWriteReplace, StencilWriteIncrDecr, StencilWriteInvert, StencilTestEqualIncr, StencilTestEqualDecr:
 		return wgpu.ColorWriteMaskNone
 	}
 	return wgpu.ColorWriteMaskAll
