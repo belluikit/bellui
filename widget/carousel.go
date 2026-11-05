@@ -43,7 +43,7 @@ type Carousel struct {
 	axis     carouselAxis // the current gesture's locked axis
 	dragBase float32      // finger travel, before edge resistance, the offset started from
 	drag     geo.Delta    // accumulated over the current drag gesture
-	samples  []carouselSample
+	speed    dragSpeed
 
 	// offset is how far, in points and in screen terms (positive is to the
 	// right), the content sits from its resting place on CurrentItem.
@@ -59,11 +59,6 @@ const (
 	carouselAxisHorizontal
 	carouselAxisVertical
 )
-
-type carouselSample struct {
-	at time.Time
-	x  float32 // accumulated horizontal drag at that time
-}
 
 // NewCarousel creates a carousel with the given items.
 func NewCarousel(items ...core.CanvasObject) *Carousel {
@@ -168,7 +163,7 @@ func (c *Carousel) Dragged(e *event.DragEvent) {
 		c.rtl = isRTLAt(c.super()) // once per gesture: a DirectionScope may hold it (#696)
 		c.axis = carouselAxisNone
 		c.drag = geo.Delta{}
-		c.samples = c.samples[:0]
+		c.speed.reset()
 	}
 	c.drag.DX += e.Dragged.DX
 	c.drag.DY += e.Dragged.DY
@@ -187,11 +182,7 @@ func (c *Carousel) Dragged(e *event.DragEvent) {
 		return
 	}
 
-	now := carouselNow()
-	c.samples = append(c.samples, carouselSample{at: now, x: c.drag.DX})
-	for len(c.samples) > 2 && now.Sub(c.samples[0].at) > carouselVelocityWindow {
-		c.samples = c.samples[1:]
-	}
+	c.speed.add(carouselNow(), c.drag.DX)
 
 	c.followFinger()
 }
@@ -237,10 +228,10 @@ func (c *Carousel) DragEnd() {
 
 func (c *Carousel) release() {
 	horizontal := c.axis == carouselAxisHorizontal
-	v := c.releaseVelocity()
+	v := c.speed.at(carouselNow())
 	c.dragging = false
 	c.axis = carouselAxisNone
-	c.samples = c.samples[:0]
+	c.speed.reset()
 	if !horizontal {
 		return
 	}
@@ -270,32 +261,6 @@ func (c *Carousel) release() {
 	} else {
 		c.Previous()
 	}
-}
-
-// releaseVelocity is the horizontal drag speed, in points per second, over the
-// last carouselVelocityWindow before now; zero when the finger had stopped.
-func (c *Carousel) releaseVelocity() float32 {
-	n := len(c.samples)
-	if n < 2 {
-		return 0
-	}
-	now := carouselNow()
-	last := c.samples[n-1]
-	if now.Sub(last.at) > carouselStoppedAfter {
-		return 0
-	}
-	first := c.samples[0]
-	for _, s := range c.samples[:n-1] {
-		if now.Sub(s.at) <= carouselVelocityWindow {
-			first = s
-			break
-		}
-	}
-	dt := last.at.Sub(first.at).Seconds()
-	if dt <= 0 {
-		return 0
-	}
-	return (last.x - first.x) / float32(dt)
 }
 
 // hasItemRevealedBy reports whether an item exists on the side the content
