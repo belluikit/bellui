@@ -103,6 +103,23 @@ type RippleUniforms struct {
 	InvTransform [12]float32 // offset 80
 }
 
+// GradientUniforms matches shaders/gradient.wgsl (size 256, the most a
+// uniform block may be: uniformBlockStride).
+type GradientUniforms struct {
+	FrameSize    [2]float32    // offset 0
+	Size         [2]float32    // offset 8
+	Origin       [2]float32    // offset 16
+	Kind         float32       // offset 24
+	StopCount    float32       // offset 28
+	Linear       [4]float32    // offset 32
+	Radial       [4]float32    // offset 48
+	Alpha        float32       // offset 64
+	_            [3]float32    // pad before inv_transform (mat3x3 align 16)
+	InvTransform [12]float32   // offset 80
+	StopPos      [8]float32    // offset 128
+	StopCol      [6][4]float32 // offset 160
+}
+
 // BlurUniforms matches shaders/blur.wgsl (size 16, incl. trailing pad to 16).
 type BlurUniforms struct {
 	Resolution [2]float32 // offset 0
