@@ -30,6 +30,10 @@ func TestTouchHandler_TapOnTheFocusedWidget(t *testing.T) {
 	h := &common.TouchHandler{}
 	h.InitTouchHandler(&lifetimeFinder{canvas: c})
 	h.OnTapFocused = func(f event.Focusable) { calls = append(calls, f) }
+	// Every driver scrolls by touch. An entry leaves a plain drag to scrolling
+	// (#801), so without this the drag would latch nothing and its release
+	// would tap.
+	h.ScrollCallback = func(geo.Position, geo.Delta) {}
 	tap := func(wid event.Tappable, ev *event.PointEvent) { wid.Tapped(ev) }
 	drag := func(wid event.Draggable, ev *event.DragEvent) { wid.Dragged(ev) }
 	end := func(wid event.Draggable, _ *event.DragEvent) { wid.DragEnd() }

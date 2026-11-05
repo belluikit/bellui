@@ -31,8 +31,10 @@ func Test_canvas_Dragged(t *testing.T) {
 	// renders permanently at full width (~16px) and occupies the right of this
 	// 40px-wide canvas, so a drag there would grab the bar instead of the
 	// content we want to fling-scroll.
-	c.TapDown(geo.NewPos(10, 3), 0)
-	c.TapMove(geo.NewPos(10, 10), 0, func(wid event.Draggable, ev *event.DragEvent) {
+	// Upward first: a drag pushing against the top is left to whatever is
+	// around the Scroll (event.DragClaimer, #662).
+	c.TapDown(geo.NewPos(10, 10), 0)
+	c.TapMove(geo.NewPos(10, 3), 0, func(wid event.Draggable, ev *event.DragEvent) {
 		wid.Dragged(ev)
 		dragged = true
 		draggedObj = wid

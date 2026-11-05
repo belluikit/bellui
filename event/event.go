@@ -161,6 +161,32 @@ type MomentumDraggable interface {
 	DragMomentum() bool
 }
 
+// DragClaimer is a Draggable that takes a touch drag only in some directions,
+// leaving the rest to the Draggables around it. It is optional: a Draggable
+// that does not implement it takes every drag that starts on it.
+//
+// When a touch moves past the tap slop, the mobile and embedded drivers (and
+// the desktop driver's touchscreen path) offer the drag to the Draggables under
+// the point where it started, innermost first, and give it to the first one
+// that claims it. A horizontal carousel inside a vertical scroll claims a
+// sideways drag and leaves an upward one to the scroll; a scroll whose content
+// cannot move that way leaves the drag to the scroll around it. A drag nobody
+// claims scrolls whatever is scrollable there, if anything. The claim is made
+// once, at the start of the drag: the Draggable that claims it keeps it until
+// the finger lifts. A drag that follows a long-press is not offered: it goes to
+// the innermost Draggable, as before, so a held finger still drags what it
+// picked up. Mouse drags are not offered either.
+//
+// Since: 1.3
+type DragClaimer interface {
+	Draggable
+	// ClaimsDrag reports whether the object takes a touch drag whose first
+	// move past the slop is delta. It is asked on the main goroutine, for
+	// every Draggable along the path while the target is being chosen, so it
+	// must not change state.
+	ClaimsDrag(delta geo.Delta) bool
+}
+
 // PinchEvent describes one step of a two-finger pinch. Position and
 // AbsolutePosition are the focus, the midpoint between the fingers, relative
 // to the receiving object and to the canvas. Scale is relative to the previous
