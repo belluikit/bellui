@@ -582,6 +582,10 @@ type Clips struct {
 func ClipsOf(o core.CanvasObject) Clips {
 	r := cachedRenderer(o)
 	c := Clips{Rect: isClip(o, r)}
+	if cont, ok := o.(*bellui.Container); ok {
+		c.Rounded, c.Radius = containerRoundedClip(cont)
+		return c
+	}
 	if r == nil {
 		return c
 	}
@@ -620,9 +624,21 @@ func RepaintBoundaryStatus(o core.CanvasObject) (boundary, settled bool) {
 	return isBoundary, true
 }
 
+// containerRoundedClip reports a container's rounded clip: its
+// ClipCornerRadius, when it clips to its bounds.
+func containerRoundedClip(c *bellui.Container) (bool, float32) {
+	if c.ClipToBounds && c.ClipCornerRadius > 0 {
+		return true, c.ClipCornerRadius
+	}
+	return false, 0
+}
+
 // IsRoundedClip checks if a canvas object's renderer implements rounded-corner
 // stencil clipping. Returns the corner radius if so.
 func IsRoundedClip(o core.CanvasObject) (bool, float32) {
+	if cont, ok := o.(*bellui.Container); ok {
+		return containerRoundedClip(cont)
+	}
 	w, isWid := o.(core.Widget)
 	if !isWid {
 		return false, 0
