@@ -308,7 +308,7 @@ func prepareTap(obj any, pos geo.Position) (*event.PointEvent, core.Canvas) {
 	var c core.Canvas
 	if co, ok := obj.(core.CanvasObject); ok {
 		c = d.CanvasForObject(co)
-		ev.AbsolutePosition = d.AbsolutePositionForObject(co).Add(pos)
+		ev.AbsolutePosition = bellui.AbsolutePositionForPoint(co, pos)
 	}
 	return ev, c
 }
