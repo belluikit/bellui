@@ -274,6 +274,39 @@ type Device struct {
 	captureH         int
 	captureSwap      bool // surface format is BGRA: swap R/B on readback
 	captureRequested bool // EndFrame maintains the capture copy only after this is set
+
+	// refused holds the draws already reported as refused, by pipeline key and
+	// reason, so a refusal is logged once and not on every frame (#958).
+	refused map[refusal]bool
+}
+
+// refusal is one kind of refused draw: the pipeline it was for and why.
+type refusal struct {
+	key    PipelineKey
+	reason string
+}
+
+// errUnknownShader refuses a draw through a shader with no descriptor.
+var errUnknownShader = errors.New("no such shader")
+
+// reportRefused logs a draw that will not appear because it was refused, once
+// per pipeline key and reason. A refused draw is otherwise invisible: the
+// first gradient shader's uniform block was 32 bytes too large and every
+// gradient vanished with no word in the log (#958).
+func (d *Device) reportRefused(key PipelineKey, err error) {
+	if d == nil || err == nil {
+		return
+	}
+	r := refusal{key, err.Error()}
+	if d.refused[r] {
+		return
+	}
+	if d.refused == nil {
+		d.refused = map[refusal]bool{}
+	}
+	d.refused[r] = true
+	bellui.LogError(fmt.Sprintf("webgpu: a draw through shader %q (fragment %q) was refused and will not appear",
+		key.Shader, key.Fragment), err)
 }
 
 // scissorRect is the active scissor rectangle (pixels) plus whether one is set.
@@ -1161,7 +1194,9 @@ func (d *Device) nextTexBind(view *wgpu.TextureView) (*wgpu.BindGroup, error) {
 // next frame). Must be called between BeginFrame and EndFrame.
 func (d *Device) Record(dc DrawCall) error {
 	d.flushBatch()
-	return d.record(dc)
+	err := d.record(dc)
+	d.reportRefused(dc.Key, err)
+	return err
 }
 
 func (d *Device) record(dc DrawCall) error {
@@ -1242,10 +1277,10 @@ func (d *Device) flushBatch() {
 	}
 	n := d.batchN
 	d.batchN = 0
-	_ = d.record(DrawCall{
+	d.reportRefused(d.batchKey, d.record(DrawCall{
 		Key: d.batchKey, Vertices: d.batchData, VertexCount: 4, InstanceCount: n,
 		Uniform: d.batchUniform, TexView: d.batchView,
-	})
+	}))
 	d.batchData = d.batchData[:0]
 }
 

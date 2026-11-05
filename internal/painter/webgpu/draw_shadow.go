@@ -263,18 +263,19 @@ func (p *painter) blurTexture(src *wgpu.TextureView, w, h int, sigma float32) *T
 // stencil (it must ignore any enclosing clip). The quad maps NDC top to texcoord
 // v=0 so the top-down render-to-texture stays consistent across the ping-pong.
 func (p *painter) recordBlur(view *wgpu.TextureView, uniform []byte, fragment string) {
-	staged, ok := p.stage(uniform)
+	key := PipelineKey{
+		Shader:   "blur",
+		Fragment: fragment,
+		Blend:    BlendPremul,
+		Stencil:  StencilNone,
+		Format:   p.dev.Format(),
+	}
+	staged, ok := p.stage(key, uniform)
 	if !ok {
 		return
 	}
 	_ = p.dev.Record(DrawCall{
-		Key: PipelineKey{
-			Shader:   "blur",
-			Fragment: fragment,
-			Blend:    BlendPremul,
-			Stencil:  StencilNone,
-			Format:   p.dev.Format(),
-		},
+		Key:         key,
 		Vertices:    fullScreenTexQuad,
 		VertexCount: 4,
 		Uniform:     staged,
@@ -292,20 +293,22 @@ func (p *painter) blitTextureAlpha(view *wgpu.TextureView, logical geo.Size, pos
 	u := SimpleUniforms{Alpha: alpha, Inset: insets}
 	desc, ok := DescriptorFor("simple")
 	if !ok {
+		p.dev.reportRefused(PipelineKey{Shader: "simple", Fragment: SimpleSoftFragmentEntry}, errUnknownShader)
 		return
 	}
-	staged, ok := p.stage(uniformBytes(&u))
+	key := PipelineKey{
+		Shader:   "simple",
+		Fragment: SimpleSoftFragmentEntry,
+		Blend:    desc.DefaultBlend,
+		Stencil:  p.stencilMode,
+		Format:   p.dev.Format(),
+	}
+	staged, ok := p.stage(key, uniformBytes(&u))
 	if !ok {
 		return
 	}
 	_ = p.dev.Record(DrawCall{
-		Key: PipelineKey{
-			Shader:   "simple",
-			Fragment: SimpleSoftFragmentEntry,
-			Blend:    desc.DefaultBlend,
-			Stencil:  p.stencilMode,
-			Format:   p.dev.Format(),
-		},
+		Key:         key,
 		Vertices:    points,
 		VertexCount: 4,
 		Uniform:     staged,

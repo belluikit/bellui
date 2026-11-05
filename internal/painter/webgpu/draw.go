@@ -3,6 +3,7 @@
 package webgpu
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"math"
@@ -945,6 +946,7 @@ func (p *painter) textureScale(v float32) float32 {
 func (p *painter) record(shader string, verts []float32, vertexCount int, uniform []byte, texView *wgpu.TextureView) {
 	desc, ok := DescriptorFor(shader)
 	if !ok {
+		p.dev.reportRefused(PipelineKey{Shader: shader, Fragment: FragmentEntry}, errUnknownShader)
 		return
 	}
 	p.recordWithBlend(shader, verts, vertexCount, uniform, texView, desc.DefaultBlend)
@@ -954,20 +956,22 @@ func (p *painter) record(shader string, verts []float32, vertexCount int, unifor
 // shader's default (e.g. a Replace blit of the canvas FBO).
 func (p *painter) recordWithBlend(shader string, verts []float32, vertexCount int, uniform []byte, texView *wgpu.TextureView, blend BlendMode) {
 	if _, ok := DescriptorFor(shader); !ok {
+		p.dev.reportRefused(PipelineKey{Shader: shader, Fragment: FragmentEntry}, errUnknownShader)
 		return
 	}
-	staged, ok := p.stage(uniform)
+	key := PipelineKey{
+		Shader:   shader,
+		Fragment: FragmentEntry,
+		Blend:    blend,
+		Stencil:  p.stencilMode,
+		Format:   p.dev.Format(),
+	}
+	staged, ok := p.stage(key, uniform)
 	if !ok {
 		return
 	}
 	_ = p.dev.Record(DrawCall{
-		Key: PipelineKey{
-			Shader:   shader,
-			Fragment: FragmentEntry,
-			Blend:    blend,
-			Stencil:  p.stencilMode,
-			Format:   p.dev.Format(),
-		},
+		Key:         key,
 		Vertices:    verts,
 		VertexCount: vertexCount,
 		Uniform:     staged,
@@ -977,9 +981,11 @@ func (p *painter) recordWithBlend(shader string, verts []float32, vertexCount in
 
 // stage copies a draw's uniform block into p.uni, so the caller's uniform
 // struct does not escape through Record (#447). It reports false for a block
-// larger than an arena slot, which Record would refuse.
-func (p *painter) stage(uniform []byte) ([]byte, bool) {
+// larger than an arena slot, which Record would refuse, and logs the refusal
+// as Record would (#958).
+func (p *painter) stage(key PipelineKey, uniform []byte) ([]byte, bool) {
 	if len(uniform) > len(p.uni) {
+		p.dev.reportRefused(key, fmt.Errorf("uniform block %d bytes exceeds arena stride %d", len(uniform), len(p.uni)))
 		return nil, false
 	}
 	return p.uni[:copy(p.uni[:], uniform)], true
