@@ -1,0 +1,6 @@
+details {
+  name = "rotprobe"
+  id = "io.bellui.rotprobe"
+  version = "1.0.0"
+  build = 4
+}

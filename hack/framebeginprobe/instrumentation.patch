@@ -1,0 +1,62 @@
+diff --git a/internal/driver/mobile/driver.go b/internal/driver/mobile/driver.go
+index 9ea078f2..be8b66ed 100644
+--- a/internal/driver/mobile/driver.go
++++ b/internal/driver/mobile/driver.go
+@@ -4,6 +4,7 @@ package mobile
+ 
+ import (
+ 	"image/color"
++	"log"
+ 	"math"
+ 	"runtime"
+ 	"strconv"
+@@ -765,6 +766,8 @@ func (d *driver) handleLifecycle(e lifecycle.Event, w *window) {
+ 	}
+ }
+ 
++var fbPaints int
++
+ func (d *driver) handlePaint(e paint.Event, w *window) {
+ 	c := w.Canvas().(*canvas)
+ 	if e.Window != 0 { // not all paint events come from hardware
+@@ -819,8 +822,20 @@ func (d *driver) handlePaint(e paint.Event, w *window) {
+ 	d.animation.TickAnimations()
+ 	canvasNeedRefresh := c.FreeDirtyTextures() > 0 || c.CheckDirtyAndClear()
+ 	if canvasNeedRefresh {
++		fbCounter, fbCounts := c.Painter().(interface{ FramesBegun() uint64 })
++		var fbBefore uint64
++		if fbCounts {
++			fbBefore = fbCounter.FramesBegun()
++		}
+ 		newSize := d.prepareFrame(w)
+ 		d.paintWindow(w, newSize)
++		if fbCounts && fbCounter.FramesBegun() == fbBefore {
++			log.Printf("framebegin: DIRTY PAINT DID NOT BEGIN A FRAME (frames=%d visible=%v)", fbBefore, d.surfaceVisible)
++		}
++		fbPaints++
++		if fbPaints%50 == 0 {
++			log.Printf("framebegin: paints=%d frames=%d counts=%v", fbPaints, fbCounter.FramesBegun(), fbCounts)
++		}
+ 		d.presentPainter(c)
+ 		d.app.Publish()
+ 		// Sync the screen-reader tree with what was just presented (pre-rebrand tracker #488);
+diff --git a/internal/painter/webgpu/painter.go b/internal/painter/webgpu/painter.go
+index c3be34cd..95f3fd62 100644
+--- a/internal/painter/webgpu/painter.go
++++ b/internal/painter/webgpu/painter.go
+@@ -13,6 +13,7 @@ package webgpu
+ import (
+ 	"image"
+ 	"image/color"
++	"log"
+ 
+ 	"github.com/belluikit/webgpu/wgpu"
+ 
+@@ -224,6 +225,7 @@ func (p *painter) beginFrame() {
+ 	bg := backgroundColor()
+ 	clear := wgpu.Color{R: float64(bg[0]), G: float64(bg[1]), B: float64(bg[2]), A: float64(bg[3])}
+ 	if err := p.dev.BeginFrame(clear); err != nil {
++		log.Printf("framebegin: BeginFrame err=%v", err)
+ 		return
+ 	}
+ 	p.framing = true
