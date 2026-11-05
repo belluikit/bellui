@@ -133,9 +133,13 @@ func (p *painter) drawObject(o core.CanvasObject, pos geo.Position, frame geo.Si
 	case *canvas.Text:
 		p.drawText(obj, pos, frame)
 	case *canvas.LinearGradient:
-		p.drawGradient(obj, p.newGlLinearGradientTexture, pos, frame)
+		if !p.drawGradientShader(obj, pos, frame) {
+			p.drawGradient(obj, p.newGlLinearGradientTexture, pos, frame)
+		}
 	case *canvas.RadialGradient:
-		p.drawGradient(obj, p.newGlRadialGradientTexture, pos, frame)
+		if !p.drawGradientShader(obj, pos, frame) {
+			p.drawGradient(obj, p.newGlRadialGradientTexture, pos, frame)
+		}
 	case *canvas.Polygon:
 		p.drawPolygon(obj, pos, frame)
 	case *canvas.Arc:

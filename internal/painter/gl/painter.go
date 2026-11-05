@@ -4,6 +4,7 @@
 package gl
 
 import (
+	"errors"
 	"fmt"
 	"image/color"
 	"log"
@@ -42,6 +43,7 @@ type painter struct {
 	polygonProgram        ProgramState
 	arcProgram            ProgramState
 	rippleProgram         ProgramState
+	gradientProgram       ProgramState // zero when its shader did not build: gradients keep their CPU texture
 	blurHProgram          ProgramState
 	blurVProgram          ProgramState
 	pathProgram           ProgramState
@@ -558,21 +560,33 @@ func (p *painter) compileShader(source string, shaderType uint32) (Shader, error
 }
 
 func (p *painter) createProgram(shaderFilename string) Program {
+	prog, reason, err := p.buildProgram(shaderFilename)
+	if err != nil {
+		return p.shaderInitFailure(reason, shaderFilename, err)
+	}
+	return prog
+}
+
+// buildProgram compiles and links the named program. On failure it returns
+// why, for the caller to report: createProgram degrades the painter, and an
+// optional program (initGradientProgram) falls back instead.
+func (p *painter) buildProgram(shaderFilename string) (Program, string, error) {
+	var zero Program
 	// Why a switch over a filename?
 	// Because this allows for a minimal change, once we reach Go 1.16 and use go:embed instead of
 	// bellui bundle.
 	vertexSrc, fragmentSrc := shaderSourceNamed(shaderFilename)
 	if vertexSrc == nil {
-		return p.shaderInitFailure("shader not found", shaderFilename, nil)
+		return zero, "shader not found", errors.New("no shader named " + shaderFilename)
 	}
 
 	vertShader, err := p.compileShader(string(vertexSrc), vertexShader)
 	if err != nil {
-		return p.shaderInitFailure("vertex shader compile failed", shaderFilename, err)
+		return zero, "vertex shader compile failed", err
 	}
 	fragShader, err := p.compileShader(string(fragmentSrc), fragmentShader)
 	if err != nil {
-		return p.shaderInitFailure("fragment shader compile failed", shaderFilename, err)
+		return zero, "fragment shader compile failed", err
 	}
 
 	prog := p.ctx.CreateProgram()
@@ -582,8 +596,7 @@ func (p *painter) createProgram(shaderFilename string) Program {
 
 	info := p.ctx.GetProgramInfoLog(prog)
 	if p.ctx.GetProgrami(prog, linkStatus) == glFalse {
-		return p.shaderInitFailure("program link failed", shaderFilename,
-			fmt.Errorf("link log:\n%s", info))
+		return zero, "program link failed", fmt.Errorf("link log:\n%s", info)
 	}
 
 	// The info is probably a null terminated string.
@@ -593,13 +606,12 @@ func (p *painter) createProgram(shaderFilename string) Program {
 	}
 
 	if glErr := p.ctx.GetError(); glErr != 0 {
-		return p.shaderInitFailure("program link reported a GL error", shaderFilename,
-			fmt.Errorf("GL error code: %x", glErr))
+		return zero, "program link reported a GL error", fmt.Errorf("GL error code: %x", glErr)
 	}
 
 	p.ctx.UseProgram(prog)
 
-	return prog
+	return prog, "", nil
 }
 
 // shaderInitFailure records that a shader/program could not be built (e.g. on an
