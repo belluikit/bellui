@@ -28,8 +28,8 @@ var (
 //
 // A drag along the axis moves the items with the finger and a fling coasts;
 // the wheel always settles with one item centred. Tapping an item off the
-// centre spins it there. Items away from the centre are drawn smaller, down to
-// ShrinkTo at the edge of the wheel.
+// centre spins it there. Items away from the centre are drawn smaller and
+// fainter, down to ShrinkTo and FadeTo at the edge of the wheel.
 //
 // With Wrap the items form a ring: past the last item comes the first. Without
 // it the wheel stops at both ends, and a drag past them meets resistance. A
@@ -66,6 +66,10 @@ type WheelPicker struct {
 	// wheel; items between the centre and the edge scale in proportion. Zero
 	// means 0.7.
 	ShrinkTo float32
+	// FadeTo is the opacity, between 0 and 1, of an item at the edge of the
+	// wheel; items between the centre and the edge fade in proportion. Zero
+	// means 0.3; 1 turns the fade off.
+	FadeTo float32
 
 	// pos is the wheel's position in items: Selected at rest, fractional
 	// while it spins. Without Wrap it may run past either end during a drag.
@@ -94,6 +98,7 @@ type wheelSample struct {
 const (
 	wheelDefaultVisible = 5
 	wheelDefaultShrink  = 0.7
+	wheelDefaultFade    = 0.3
 
 	// wheelEdgeResistance divides a drag past the first or last item of a
 	// wheel that does not wrap, as carouselEdgeResistance does.
@@ -168,6 +173,13 @@ func (w *WheelPicker) shrinkTo() float32 {
 		return wheelDefaultShrink
 	}
 	return w.ShrinkTo
+}
+
+func (w *WheelPicker) fadeTo() float32 {
+	if w.FadeTo <= 0 || w.FadeTo > 1 {
+		return wheelDefaultFade
+	}
+	return w.FadeTo
 }
 
 func (w *WheelPicker) vertical() bool { return w.Orientation == Vertical }
@@ -460,8 +472,9 @@ func (w *WheelPicker) CreateRenderer() core.WidgetRenderer {
 	w.Selected = w.normalise(w.Selected)
 	w.pos = float32(w.Selected)
 	// Items moving in and out at the ends are cut at the wheel's edge.
-	track := &bellui.Container{Objects: w.Items, ClipToBounds: true}
+	track := &bellui.Container{ClipToBounds: true}
 	r := &wheelPickerRenderer{BaseRenderer: internalWidget.NewBaseRenderer([]core.CanvasObject{track}), track: track, wheel: w}
+	r.syncSlots()
 	return r
 }
 
@@ -469,7 +482,57 @@ type wheelPickerRenderer struct {
 	internalWidget.BaseRenderer
 	track *bellui.Container
 	wheel *WheelPicker
+	slots []*wheelSlot
 }
+
+// syncSlots gives each item a slot, keeping the slots of items still there.
+func (r *wheelPickerRenderer) syncSlots() {
+	items := r.wheel.Items
+	same := len(r.slots) == len(items)
+	for i := 0; same && i < len(items); i++ {
+		same = r.slots[i].item == items[i]
+	}
+	if same {
+		return
+	}
+	r.slots = make([]*wheelSlot, len(items))
+	objs := make([]core.CanvasObject, len(items))
+	for i, it := range items {
+		r.slots[i] = newWheelSlot(it)
+		objs[i] = r.slots[i]
+	}
+	r.track.Objects = objs
+}
+
+// wheelSlot holds one item at an opacity. It covers the whole track and
+// leaves the item where layoutItems puts it.
+type wheelSlot struct {
+	BaseWidget
+	item    core.CanvasObject
+	opacity float32
+}
+
+var _ core.OpacityGroup = (*wheelSlot)(nil)
+
+func newWheelSlot(item core.CanvasObject) *wheelSlot {
+	s := &wheelSlot{item: item, opacity: 1}
+	s.ExtendBaseWidget(s)
+	return s
+}
+
+func (s *wheelSlot) GroupOpacity() float32 { return s.opacity }
+
+func (s *wheelSlot) CreateRenderer() core.WidgetRenderer {
+	return &wheelSlotRenderer{objects: []core.CanvasObject{s.item}}
+}
+
+type wheelSlotRenderer struct{ objects []core.CanvasObject }
+
+func (*wheelSlotRenderer) Destroy()                       {}
+func (*wheelSlotRenderer) Layout(geo.Size)                {}
+func (*wheelSlotRenderer) MinSize() geo.Size              { return geo.Size{} }
+func (r *wheelSlotRenderer) Objects() []core.CanvasObject { return r.objects }
+func (*wheelSlotRenderer) Refresh()                       {}
 
 // itemSize is the largest item's MinSize, the size of the centred slot.
 func (r *wheelPickerRenderer) itemSize() geo.Size {
@@ -507,7 +570,7 @@ func (r *wheelPickerRenderer) layoutItems() {
 	}
 	pitch := w.pitch()
 	half := float32(w.visible()) / 2
-	shrink := w.shrinkTo()
+	shrink, fade := w.shrinkTo(), w.fadeTo()
 	slot := r.itemSize()
 	if w.vertical() {
 		slot.Width = geo.Max(slot.Width, size.Width)
@@ -522,11 +585,16 @@ func (r *wheelPickerRenderer) layoutItems() {
 			// The nearest copy of the item around the ring.
 			d = d - float32(n)*float32(math.Round(float64(d/float32(n))))
 		}
+		holder := r.slots[i]
+		holder.Move(geo.Position{})
+		holder.Resize(size)
 		if abs32(d) > half+0.5 || size.IsZero() {
 			it.Hide()
 			continue
 		}
-		scale := 1 - (1-shrink)*geo.Min(1, abs32(d)/half)
+		edge := geo.Min(1, abs32(d)/half)
+		holder.opacity = 1 - (1-fade)*edge
+		scale := 1 - (1-shrink)*edge
 		is := geo.NewSize(slot.Width*scale, slot.Height*scale)
 		if w.vertical() {
 			is.Width = geo.Min(is.Width, it.MinSize().Width*scale)
@@ -542,7 +610,7 @@ func (r *wheelPickerRenderer) layoutItems() {
 
 func (r *wheelPickerRenderer) Refresh() {
 	w := r.wheel
-	r.track.Objects = w.Items
+	r.syncSlots()
 	if !w.dragging && w.settling == nil {
 		w.Selected = w.normalise(w.Selected)
 		w.pos = float32(w.Selected)

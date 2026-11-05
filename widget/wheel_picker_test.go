@@ -238,3 +238,27 @@ func TestWheelPicker_Shrinks(t *testing.T) {
 	assert.InDelta(t, 30, h(0), 0.5, "two out of 2.5: 0.6")
 	assert.InDelta(t, h(1), h(3), 0.01)
 }
+
+// Items away from the centre fade, down to FadeTo at the edge; 1 turns the
+// fade off.
+func TestWheelPicker_Fades(t *testing.T) {
+	wp, _, _ := newWheelBench(t, 5, Vertical, false)
+	wp.FadeTo = 0.5
+	wp.SetSelectedSilently(2)
+	wp.Refresh()
+
+	r := test.TempWidgetRenderer(t, wp).(*wheelPickerRenderer)
+	op := func(i int) float32 { return r.slots[i].GroupOpacity() }
+	assert.InDelta(t, 1, op(2), 1e-6, "the centred item is opaque")
+	assert.InDelta(t, 0.8, op(1), 1e-6, "one item out of 2.5")
+	assert.InDelta(t, 0.6, op(0), 1e-6, "two out of 2.5")
+	assert.InDelta(t, op(1), op(3), 1e-6)
+
+	wp.FadeTo = 1
+	wp.Refresh()
+	assert.InDelta(t, 1, op(0), 1e-6, "FadeTo 1: no fade")
+
+	wp.FadeTo = 0
+	wp.Refresh()
+	assert.InDelta(t, 1-(1-0.3)*0.8, op(0), 1e-6, "zero means the default, 0.3")
+}
