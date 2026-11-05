@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/event"
@@ -232,11 +233,16 @@ func TestWheelPicker_Shrinks(t *testing.T) {
 	wp.SetSelectedSilently(2)
 	wp.Refresh()
 
+	// A label is shorter than the 50 point pitch: it keeps its own height
+	// and is not stretched to the slot.
+	natural := wp.Items[2].MinSize()
+	require.Less(t, natural.Height, float32(50))
 	h := func(i int) float32 { return wp.Items[i].Size().Height }
-	assert.InDelta(t, 50, h(2), 0.5, "the centred item fills its slot")
-	assert.InDelta(t, 40, h(1), 0.5, "one item out of 2.5: 0.8")
-	assert.InDelta(t, 30, h(0), 0.5, "two out of 2.5: 0.6")
+	assert.InDelta(t, natural.Height, h(2), 0.01, "the centred item at its own size")
+	assert.InDelta(t, natural.Height*0.8, h(1), 0.01, "one item out of 2.5: 0.8")
+	assert.InDelta(t, natural.Height*0.6, h(0), 0.01, "two out of 2.5: 0.6")
 	assert.InDelta(t, h(1), h(3), 0.01)
+	assert.InDelta(t, natural.Width*0.6, wp.Items[0].Size().Width, 0.01, "both sides scale alike")
 }
 
 // Items away from the centre fade, down to FadeTo at the edge; 1 turns the

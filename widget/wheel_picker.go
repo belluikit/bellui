@@ -595,12 +595,12 @@ func (r *wheelPickerRenderer) layoutItems() {
 		edge := geo.Min(1, abs32(d)/half)
 		holder.opacity = 1 - (1-fade)*edge
 		scale := 1 - (1-shrink)*edge
-		is := geo.NewSize(slot.Width*scale, slot.Height*scale)
+		// The item keeps its own size, at most the slot's, scaled.
+		ms := it.MinSize()
+		is := geo.NewSize(geo.Min(ms.Width, slot.Width)*scale, geo.Min(ms.Height, slot.Height)*scale)
 		if w.vertical() {
-			is.Width = geo.Min(is.Width, it.MinSize().Width*scale)
 			it.Move(geo.NewPos((size.Width-is.Width)/2, size.Height/2+d*pitch-is.Height/2))
 		} else {
-			is.Height = geo.Min(is.Height, it.MinSize().Height*scale)
 			it.Move(geo.NewPos(size.Width/2+d*pitch-is.Width/2, (size.Height-is.Height)/2))
 		}
 		it.Resize(is)
