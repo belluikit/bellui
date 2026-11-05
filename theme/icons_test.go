@@ -476,3 +476,22 @@ func TestFavoriteIcons(t *testing.T) {
 		t.Error("filled and outlined hearts are the same icon")
 	}
 }
+
+// The bookmark icons are their own files, themed like the rest (#968).
+func TestBookmarkIcons(t *testing.T) {
+	for _, c := range []struct {
+		icon bellui.Resource
+		file string
+	}{{theme.BookmarkIcon(), "bookmark.svg"}, {theme.BookmarkBorderIcon(), "bookmark-border.svg"}} {
+		if c.icon == nil || !strings.HasSuffix(c.icon.Name(), c.file) {
+			t.Errorf("icon %v, want one named for %s", c.icon, c.file)
+			continue
+		}
+		if !strings.Contains(string(c.icon.Content()), "<path") {
+			t.Errorf("%s has no path", c.file)
+		}
+	}
+	if theme.BookmarkIcon().Name() == theme.BookmarkBorderIcon().Name() {
+		t.Error("filled and outlined bookmarks are the same icon")
+	}
+}
