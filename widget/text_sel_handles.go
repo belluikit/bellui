@@ -58,9 +58,13 @@ type selectionHandleHost interface {
 // interactive-area origin back restores canvas-absolute; a no-op on
 // inset-free drivers. The test driver's deliberate non-zero inset keeps
 // this honest in the host tests.
+//
+// The origin is where a transform draws it (#1003), so a translated host
+// gets its handles in place. The offsets added to it are not rotated or
+// scaled with the host (#1008).
 func hostAbsolutePosition(obj core.CanvasObject) geo.Position {
 	driver := bellui.CurrentApp().Driver()
-	pos := driver.AbsolutePositionForObject(obj)
+	pos := bellui.AbsolutePositionForPoint(obj, geo.Position{})
 	if cnv := driver.CanvasForObject(obj); cnv != nil {
 		origin, _ := cnv.InteractiveArea()
 		pos = pos.Add(origin)

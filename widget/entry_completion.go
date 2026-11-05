@@ -51,7 +51,7 @@ func (e *Entry) ShowCompletion(title string, items []CompletionItem) {
 	// PreeditCursorRectangle reports the caret in content coordinates (already
 	// adjusted for scroll); translate it to canvas-absolute for the popup.
 	caret := e.PreeditCursorRectangle()
-	caret.Pos = caret.Pos.Add(d.AbsolutePositionForObject(e))
+	caret.Pos = bellui.AbsolutePositionForPoint(e, caret.Pos)
 	e.completion.ShowAtCaret(caret)
 }
 

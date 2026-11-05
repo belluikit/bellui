@@ -239,8 +239,7 @@ func (r *tooltipOverlayRenderer) Refresh() { canvas.Refresh(r.overlay) }
 func (r *tooltipOverlayRenderer) Destroy() {}
 
 func (t *Tooltip) tooltipPos() geo.Position {
-	absPos := bellui.CurrentApp().Driver().AbsolutePositionForObject(t)
-	return absPos.Add(geo.NewPos(0, t.Size().Height))
+	return bellui.AbsolutePositionForPoint(t, geo.NewPos(0, t.Size().Height))
 }
 
 // --- hoverOverlay: transparent widget that intercepts hover events ---

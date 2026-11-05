@@ -256,7 +256,7 @@ func (h *entrySelectionHandles) showHostMenu(hd *entrySelectionHandle) {
 	rect := h.host.selectionHandleCaretRect(row, col)
 	pos := rect.Pos.Subtract(h.host.selectionHandleScroll()).
 		AddXY(0, rect.Size.Height) // just below the adjusted edge
-	abs := bellui.CurrentApp().Driver().AbsolutePositionForObject(hostObj).Add(pos)
+	abs := bellui.AbsolutePositionForPoint(hostObj, pos)
 	st.TappedSecondary(&event.PointEvent{AbsolutePosition: abs, Position: pos})
 }
 

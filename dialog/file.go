@@ -325,7 +325,8 @@ func (f *fileDialog) makeUI() core.CanvasObject {
 
 	var optionsButton *widget.IconButton
 	optionsButton = widget.NewIconButton(theme.SettingsIcon(), func() {
-		f.optionsMenu(bellui.CurrentApp().Driver().AbsolutePositionForObject(optionsButton), optionsButton.Size())
+		// Anchored at the button's bottom-right corner (#1003).
+		f.optionsMenu(bellui.AbsolutePositionForPoint(optionsButton, geo.NewPos(optionsButton.Size().Width, optionsButton.Size().Height)))
 	})
 
 	newFolderButton := widget.NewIconButton(theme.FolderNewIcon(), func() {
@@ -505,7 +506,7 @@ func (f *fileDialog) reportCancel() {
 	}
 }
 
-func (f *fileDialog) optionsMenu(position geo.Position, buttonSize geo.Size) {
+func (f *fileDialog) optionsMenu(corner geo.Position) {
 	hiddenFiles := widget.NewCheck(lang.L("Show Hidden Files"), func(changed bool) {
 		f.showHidden = changed
 		f.refreshDir(f.dir)
@@ -514,8 +515,7 @@ func (f *fileDialog) optionsMenu(position geo.Position, buttonSize geo.Size) {
 	hiddenFiles.Refresh()
 	content := container.NewVBox(hiddenFiles)
 
-	p := position.Add(buttonSize)
-	pos := geo.NewPos(p.X-content.MinSize().Width-theme.Padding()*2, p.Y+theme.Padding()*2)
+	pos := geo.NewPos(corner.X-content.MinSize().Width-theme.Padding()*2, corner.Y+theme.Padding()*2)
 	widget.ShowPopUpAtPosition(content, f.canvas(), pos)
 }
 

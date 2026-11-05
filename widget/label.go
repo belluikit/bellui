@@ -415,8 +415,7 @@ func (l *Label) showTooltip() {
 	l.tooltipPopUp = newPopUpWithBgColor(content, c, th.Color(theme.ColorNameForeground, v))
 	l.tooltipMu.Unlock()
 
-	absPos := bellui.CurrentApp().Driver().AbsolutePositionForObject(l)
-	l.tooltipPopUp.ShowAtPosition(geo.NewPos(absPos.X, absPos.Y+l.Size().Height))
+	l.tooltipPopUp.ShowAtPosition(bellui.AbsolutePositionForPoint(l, geo.NewPos(0, l.Size().Height)))
 }
 
 func (l *Label) hideTooltip() {

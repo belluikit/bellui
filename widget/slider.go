@@ -263,13 +263,12 @@ func (s *Slider) showValueIndicator() {
 		s.valueIndicatorText.Refresh()
 	}
 
-	// Position above the thumb.
-	absPos := bellui.CurrentApp().Driver().AbsolutePositionForObject(s)
-	thumbPos := s.CursorPosition()
+	// Position above the thumb, wherever a transform draws it (#1003).
+	thumb := bellui.AbsolutePositionForPoint(s, s.CursorPosition())
 	indicatorSize := s.valueIndicatorContent.MinSize()
 	pos := geo.NewPos(
-		absPos.X+thumbPos.X-indicatorSize.Width/2,
-		absPos.Y+thumbPos.Y-indicatorSize.Height-th.Size(theme.SizeNamePadding)*2,
+		thumb.X-indicatorSize.Width/2,
+		thumb.Y-indicatorSize.Height-th.Size(theme.SizeNamePadding)*2,
 	)
 	if created {
 		s.valueIndicator.ShowAtPosition(pos)

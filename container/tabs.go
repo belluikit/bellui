@@ -127,23 +127,21 @@ func buildPopUpMenu(t baseTabs, button *widget.Button, items []*bellui.MenuItem)
 	d := bellui.CurrentApp().Driver()
 	c := d.CanvasForObject(button)
 	popUpMenu := widget.NewPopUpMenu(bellui.NewMenu("", items...), c)
-	buttonPos := d.AbsolutePositionForObject(button)
 	buttonSize := button.Size()
 	popUpMin := popUpMenu.MinSize()
+	// Each case anchors the menu at a corner of the button, mapped to where a
+	// transform draws it (#1003), and offsets by the menu's size on the canvas.
+	corner := func(x, y float32) geo.Position { return bellui.AbsolutePositionForPoint(button, geo.NewPos(x, y)) }
 	var popUpPos geo.Position
 	switch t.tabLocation() {
 	case TabLocationLeading:
-		popUpPos.X = buttonPos.X + buttonSize.Width
-		popUpPos.Y = buttonPos.Y + buttonSize.Height - popUpMin.Height
+		popUpPos = corner(buttonSize.Width, buttonSize.Height).SubtractXY(0, popUpMin.Height)
 	case TabLocationTrailing:
-		popUpPos.X = buttonPos.X - popUpMin.Width
-		popUpPos.Y = buttonPos.Y + buttonSize.Height - popUpMin.Height
+		popUpPos = corner(0, buttonSize.Height).SubtractXY(popUpMin.Width, popUpMin.Height)
 	case TabLocationTop:
-		popUpPos.X = buttonPos.X + buttonSize.Width - popUpMin.Width
-		popUpPos.Y = buttonPos.Y + buttonSize.Height
+		popUpPos = corner(buttonSize.Width, buttonSize.Height).SubtractXY(popUpMin.Width, 0)
 	case TabLocationBottom:
-		popUpPos.X = buttonPos.X + buttonSize.Width - popUpMin.Width
-		popUpPos.Y = buttonPos.Y - popUpMin.Height
+		popUpPos = corner(buttonSize.Width, 0).SubtractXY(popUpMin.Width, popUpMin.Height)
 	}
 	if popUpPos.X < 0 {
 		popUpPos.X = 0

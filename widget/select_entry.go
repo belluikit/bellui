@@ -108,8 +108,7 @@ func (e *SelectEntry) SetOptions(options []string) {
 }
 
 func (e *SelectEntry) popUpPos() geo.Position {
-	entryPos := bellui.CurrentApp().Driver().AbsolutePositionForObject(e.super())
-	return entryPos.Add(geo.NewPos(0, e.Size().Height-e.Theme().Size(theme.SizeNameInputBorder)))
+	return bellui.AbsolutePositionForPoint(e.super(), geo.NewPos(0, e.Size().Height-e.Theme().Size(theme.SizeNameInputBorder)))
 }
 
 func (e *SelectEntry) setupDropDown() *Button {

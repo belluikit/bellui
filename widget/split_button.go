@@ -92,16 +92,17 @@ func (s *SplitButton) showMenu() {
 		return
 	}
 	menu := bellui.NewMenu("", s.MenuItems...)
-	absPos := bellui.CurrentApp().Driver().AbsolutePositionForObject(s)
 	s.popUp = NewPopUpMenu(menu, c)
 	inheritDirection(s.popUp, s) // #749
 	// The menu lines up with the button's start edge: the right one under
 	// RTL, kept on the canvas when the menu is wider than the room (#835).
-	x := absPos.X
+	// The corner is where a transform draws it (#1003).
 	if isRTLAt(s) {
-		x = max(0, absPos.X+s.Size().Width-s.popUp.MinSize().Width)
+		corner := bellui.AbsolutePositionForPoint(s, geo.NewPos(s.Size().Width, s.Size().Height))
+		s.popUp.ShowAtPosition(geo.NewPos(max(0, corner.X-s.popUp.MinSize().Width), corner.Y))
+		return
 	}
-	s.popUp.ShowAtPosition(geo.NewPos(x, absPos.Y+s.Size().Height))
+	s.popUp.ShowAtPosition(bellui.AbsolutePositionForPoint(s, geo.NewPos(0, s.Size().Height)))
 }
 
 func (s *SplitButton) CreateRenderer() core.WidgetRenderer {

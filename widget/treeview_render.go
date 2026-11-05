@@ -690,10 +690,9 @@ func (ti *treeViewItem) TappedSecondary(e *event.PointEvent) {
 	}
 	menu := bellui.NewMenu("", items...)
 	c := bellui.CurrentApp().Driver().CanvasForObject(ti)
-	pos := bellui.CurrentApp().Driver().AbsolutePositionForObject(ti)
 	popup := NewPopUpMenu(menu, c)
 	inheritDirection(popup, ti) // #749
-	popup.ShowAtPosition(pos.Add(e.Position))
+	popup.ShowAtPosition(bellui.AbsolutePositionForPoint(ti, e.Position))
 }
 
 // contextMenuItems builds the row's right-click menu: the built-in entries the
