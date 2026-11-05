@@ -215,6 +215,21 @@ uintptr_t processFn(struct fnargs* args, char* parg) {
 	case glfnDeleteFramebuffer:
 		glDeleteFramebuffers(1, (const GLuint*)(&args->a0));
 		break;
+	case glfnCreateRenderbuffer:
+		glGenRenderbuffers(1, (GLuint*)&ret);
+		break;
+	case glfnBindRenderbuffer:
+		glBindRenderbuffer((GLenum)args->a0, (GLuint)args->a1);
+		break;
+	case glfnRenderbufferStorage:
+		glRenderbufferStorage((GLenum)args->a0, (GLenum)args->a1, (GLsizei)args->a2, (GLsizei)args->a3);
+		break;
+	case glfnFramebufferRenderbuffer:
+		glFramebufferRenderbuffer((GLenum)args->a0, (GLenum)args->a1, (GLenum)args->a2, (GLuint)args->a3);
+		break;
+	case glfnDeleteRenderbuffer:
+		glDeleteRenderbuffers(1, (const GLuint*)(&args->a0));
+		break;
 	case glfnCopyTexSubImage2D:
 		glCopyTexSubImage2D((GLenum)args->a0, (GLint)args->a1, (GLint)args->a2, (GLint)args->a3, (GLint)args->a4, (GLint)args->a5, (GLsizei)args->a6, (GLsizei)args->a7);
 		break;

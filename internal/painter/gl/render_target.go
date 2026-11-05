@@ -38,3 +38,15 @@ func (p *painter) rebindRenderTarget(fallbackW, fallbackH int) {
 		p.ctx.Viewport(0, 0, fallbackW, fallbackH)
 	}
 }
+
+// attachStencil gives the bound framebuffer an 8-bit stencil buffer of w×h
+// pixels and returns it. Rounded and path clips and stencil path fills draw
+// into the stencil buffer, and an FBO has none unless it is given one: without
+// it the stencil test always passes and nothing clips (#990).
+func (p *painter) attachStencil(w, h int) Renderbuffer {
+	rb := p.ctx.CreateRenderbuffer()
+	p.ctx.BindRenderbuffer(renderbuffer, rb)
+	p.ctx.RenderbufferStorage(renderbuffer, stencilIndex8, w, h)
+	p.ctx.FramebufferRenderbuffer(glFramebuffer, stencilAttachment, renderbuffer, rb)
+	return rb
+}

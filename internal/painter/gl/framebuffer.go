@@ -6,6 +6,10 @@ package gl
 // Desktop and mobile GL expose framebuffers as integer names.
 type Framebuffer uint32
 
+// Renderbuffer represents an OpenGL renderbuffer object, an integer name like
+// Framebuffer.
+type Renderbuffer uint32
+
 // defaultFramebuffer is the window-provided framebuffer (name 0). Binding it
 // directs subsequent draws to the on-screen back buffer.
 var defaultFramebuffer Framebuffer

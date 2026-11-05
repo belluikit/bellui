@@ -86,6 +86,11 @@ const (
 	ColorAttachment0    = 0x8CE0
 	FramebufferComplete = 0x8CD5
 
+	// Renderbuffer constants. RenderbufferTarget is GL_RENDERBUFFER.
+	RenderbufferTarget = 0x8D41
+	StencilAttachment  = 0x8D20
+	StencilIndex8      = 0x8D48
+
 	// Depth constants
 	DepthAttachment = 0x8D00
 	DepthComponent  = 0x1902

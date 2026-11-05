@@ -13,6 +13,7 @@ import (
 type canvasFBOState struct {
 	fbo          Framebuffer
 	texture      Texture
+	stencil      Renderbuffer
 	width        int // pixel dimensions
 	height       int
 	initialClear bool // true after first full clear with background color
@@ -33,6 +34,7 @@ func (p *painter) EnsureCanvasFBO(pixW, pixH int) {
 		p.ctx.Flush()
 		p.ctx.DeleteFramebuffer(p.canvasFBO.fbo)
 		p.ctx.DeleteTexture(p.canvasFBO.texture)
+		p.ctx.DeleteRenderbuffer(p.canvasFBO.stencil)
 	}
 
 	fbo := p.ctx.CreateFramebuffer()
@@ -46,6 +48,7 @@ func (p *painter) EnsureCanvasFBO(pixW, pixH int) {
 	p.ctx.TexParameteri(texture2D, textureWrapT, clampToEdge)
 	p.ctx.BindFramebuffer(glFramebuffer, fbo)
 	p.ctx.FramebufferTexture2D(glFramebuffer, colorAttachment0, tex, 0)
+	stencil := p.attachStencil(pixW, pixH)
 	p.checkFBOComplete()
 	p.ctx.BindFramebuffer(glFramebuffer, defaultFramebuffer)
 	p.logError()
@@ -53,6 +56,7 @@ func (p *painter) EnsureCanvasFBO(pixW, pixH int) {
 	p.canvasFBO = &canvasFBOState{
 		fbo:          fbo,
 		texture:      tex,
+		stencil:      stencil,
 		width:        pixW,
 		height:       pixH,
 		initialClear: false, // needs a full clear on first use

@@ -65,6 +65,13 @@ const (
 	glBack           = gl.BACK
 )
 
+// Renderbuffer constants, for a framebuffer's stencil attachment.
+const (
+	renderbuffer      = gl.RENDERBUFFER
+	stencilAttachment = gl.STENCIL_ATTACHMENT
+	stencilIndex8     = gl.STENCIL_INDEX8
+)
+
 type (
 	// Attribute represents a GL attribute
 	Attribute gl.Attrib
@@ -526,6 +533,26 @@ func (c *xjsContext) CheckFramebufferStatus(target uint32) uint32 {
 
 func (c *xjsContext) DeleteFramebuffer(fb Framebuffer) {
 	gl.DeleteFramebuffer(gl.Framebuffer(fb))
+}
+
+func (c *xjsContext) CreateRenderbuffer() Renderbuffer {
+	return Renderbuffer(gl.CreateRenderbuffer())
+}
+
+func (c *xjsContext) BindRenderbuffer(target uint32, rb Renderbuffer) {
+	gl.BindRenderbuffer(gl.Enum(target), gl.Renderbuffer(rb))
+}
+
+func (c *xjsContext) RenderbufferStorage(target, internalFormat uint32, width, height int) {
+	gl.RenderbufferStorage(gl.Enum(target), gl.Enum(internalFormat), width, height)
+}
+
+func (c *xjsContext) FramebufferRenderbuffer(target, attachment, rbTarget uint32, rb Renderbuffer) {
+	gl.FramebufferRenderbuffer(gl.Enum(target), gl.Enum(attachment), gl.Enum(rbTarget), gl.Renderbuffer(rb))
+}
+
+func (c *xjsContext) DeleteRenderbuffer(rb Renderbuffer) {
+	gl.DeleteRenderbuffer(gl.Renderbuffer(rb))
 }
 
 // --- Methods with working wasm implementations ---

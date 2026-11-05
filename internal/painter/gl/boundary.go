@@ -19,6 +19,7 @@ import (
 type BoundaryFBOState struct {
 	fbo         Framebuffer
 	texture     Texture
+	stencil     Renderbuffer
 	width       int      // pixel dimensions
 	height      int      // pixel dimensions
 	LogicalSize geo.Size // logical size for coordinate adjustment
@@ -63,6 +64,7 @@ func (p *painter) EnsureBoundaryFBO(obj core.CanvasObject, pixW, pixH int, logic
 	if exists {
 		p.ctx.DeleteFramebuffer(state.fbo)
 		p.ctx.DeleteTexture(state.texture)
+		p.ctx.DeleteRenderbuffer(state.stencil)
 	}
 
 	fbo := p.ctx.CreateFramebuffer()
@@ -76,6 +78,7 @@ func (p *painter) EnsureBoundaryFBO(obj core.CanvasObject, pixW, pixH int, logic
 	p.ctx.TexParameteri(texture2D, textureWrapT, clampToEdge)
 	p.ctx.BindFramebuffer(glFramebuffer, fbo)
 	p.ctx.FramebufferTexture2D(glFramebuffer, colorAttachment0, tex, 0)
+	stencil := p.attachStencil(pixW, pixH)
 	p.checkFBOComplete()
 	p.rebindRenderTarget(0, 0) // EnsureBoundaryFBO runs mid-frame; restore the active target
 	p.logError()
@@ -83,6 +86,7 @@ func (p *painter) EnsureBoundaryFBO(obj core.CanvasObject, pixW, pixH int, logic
 	state = &BoundaryFBOState{
 		fbo:         fbo,
 		texture:     tex,
+		stencil:     stencil,
 		width:       pixW,
 		height:      pixH,
 		LogicalSize: logicalSize,
@@ -152,6 +156,7 @@ func (p *painter) FreeBoundaryFBO(obj core.CanvasObject) {
 	}
 	p.ctx.DeleteFramebuffer(state.fbo)
 	p.ctx.DeleteTexture(state.texture)
+	p.ctx.DeleteRenderbuffer(state.stencil)
 	delete(p.boundaries, obj)
 }
 
@@ -170,6 +175,7 @@ func (p *painter) evictBoundaries() {
 		if p.frame-state.usedFrame > boundaryKeepFrames && now.Sub(state.used) > cache.ValidDuration {
 			p.ctx.DeleteFramebuffer(state.fbo)
 			p.ctx.DeleteTexture(state.texture)
+			p.ctx.DeleteRenderbuffer(state.stencil)
 			delete(p.boundaries, obj)
 		}
 	}

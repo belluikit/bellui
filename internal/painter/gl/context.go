@@ -69,6 +69,13 @@ type context interface {
 	CheckFramebufferStatus(target uint32) uint32
 	DeleteFramebuffer(fb Framebuffer)
 
+	// Renderbuffer methods, for a framebuffer's stencil attachment.
+	CreateRenderbuffer() Renderbuffer
+	BindRenderbuffer(target uint32, rb Renderbuffer)
+	RenderbufferStorage(target, internalFormat uint32, width, height int)
+	FramebufferRenderbuffer(target, attachment, rbTarget uint32, rb Renderbuffer)
+	DeleteRenderbuffer(rb Renderbuffer)
+
 	// Color mask for stencil write pass.
 	ColorMask(r, g, b, a bool)
 
