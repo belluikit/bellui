@@ -268,3 +268,47 @@ func TestWheelPicker_Fades(t *testing.T) {
 	wp.Refresh()
 	assert.InDelta(t, 1-(1-0.3)*0.8, op(0), 1e-6, "zero means the default, 0.3")
 }
+
+// Items set after the renderer exists, then a selection with no Refresh in
+// between, lay out against slots for the new items (#984): no panic, and the
+// selected item is centred.
+func TestWheelPicker_ItemsSetAfterTheRenderer(t *testing.T) {
+	test.NewTempApp(t)
+	wp := NewWheelPicker(nil, nil)
+	wp.VisibleItems = 5
+	w := test.NewTempWindow(t, wp)
+	w.SetPadded(false)
+	w.Resize(geo.NewSize(100, 250))
+	wp.Refresh() // the renderer is built with no slots
+
+	for i := range 3 {
+		wp.Items = append(wp.Items, NewLabel(strconv.Itoa(i)))
+	}
+	require.NotPanics(t, func() { wp.SetSelectedSilently(1) })
+	assert.Equal(t, 1, wp.Selected)
+	assert.InDelta(t, 125, centre(wp.Items[1]).Y, 0.5, "item 1 is centred")
+	assert.True(t, wp.Items[1].Visible())
+}
+
+// A selection made before the items arrive survives a Refresh of the empty
+// wheel, and is clamped to the items once they are there (#984).
+func TestWheelPicker_SelectionBeforeItemsSurvivesARefresh(t *testing.T) {
+	test.NewTempApp(t)
+	wp := NewWheelPicker(nil, nil)
+	w := test.NewTempWindow(t, wp)
+	w.Resize(geo.NewSize(100, 250))
+
+	wp.SetSelectedSilently(2)
+	wp.Refresh()
+	assert.Equal(t, 2, wp.Selected, "an empty wheel keeps the selection")
+
+	for i := range 4 {
+		wp.Items = append(wp.Items, NewLabel(strconv.Itoa(i)))
+	}
+	wp.Refresh()
+	assert.Equal(t, 2, wp.Selected)
+
+	wp.Items = wp.Items[:2]
+	wp.Refresh()
+	assert.Equal(t, 1, wp.Selected, "clamped to the items it has")
+}

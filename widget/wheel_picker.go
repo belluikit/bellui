@@ -145,11 +145,12 @@ func (w *WheelPicker) setSelected(i int) bool {
 }
 
 // normalise maps an index onto the items: around the ring with Wrap,
-// clamped without it.
+// clamped without it. A wheel with no items keeps the index, so a selection
+// made before the items arrive survives a Refresh in between (#984).
 func (w *WheelPicker) normalise(i int) int {
 	n := len(w.Items)
 	if n == 0 {
-		return 0
+		return i
 	}
 	if w.Wrap {
 		return ((i % n) + n) % n
@@ -561,8 +562,11 @@ func (r *wheelPickerRenderer) Layout(size geo.Size) {
 
 // layoutItems centres each item at its distance from the wheel's position,
 // scaled down with that distance, and hides the items past the wheel's ends.
+// It first gives any items set since the last Refresh their slots: a
+// selection change lays the wheel out without one (#984).
 func (r *wheelPickerRenderer) layoutItems() {
 	w := r.wheel
+	r.syncSlots()
 	size := r.track.Size()
 	n := len(w.Items)
 	if n == 0 {
