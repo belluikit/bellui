@@ -193,6 +193,8 @@ func (p *painter) Init() {
 	p.getMatrixUniformLocations(p.rippleProgram, "inv_transform")
 	p.enableAttribArrays(p.rippleProgram, "vert", "normal")
 
+	p.initGradientProgram("gradient_es")
+
 	p.pathProgram = ProgramState{
 		ref:        p.createProgram("path_es"),
 		buff:       p.createBuffer(64),

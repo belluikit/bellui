@@ -255,6 +255,8 @@ func (p *painter) Init() {
 		p.getMatrixUniformLocations(p.rippleProgram, "inv_transform")
 		p.enableAttribArrays(p.rippleProgram, "vert", "normal")
 
+		p.initGradientProgram("gradient_es")
+
 		compiled = []ProgramState{
 			p.program,
 			p.lineProgram,
@@ -267,6 +269,7 @@ func (p *painter) Init() {
 			p.blurHProgram,
 			p.blurVProgram,
 			p.rippleProgram,
+			p.gradientProgram,
 		}
 	}
 
@@ -281,6 +284,7 @@ func (p *painter) Init() {
 	p.blurHProgram = compiled[8]
 	p.blurVProgram = compiled[9]
 	p.rippleProgram = compiled[10]
+	p.gradientProgram = compiled[11]
 }
 
 func (p *painter) getUniformLocations(pState ProgramState, names ...string) {

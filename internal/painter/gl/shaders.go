@@ -35,6 +35,9 @@ var (
 	//go:embed shaders/ripple.frag
 	shaderRippleFrag []byte
 
+	//go:embed shaders/gradient.frag
+	shaderGradientFrag []byte
+
 	//go:embed shaders/blur.vert
 	shaderBlurVert []byte
 
@@ -73,6 +76,8 @@ func shaderSourceNamed(name string) ([]byte, []byte) {
 		return shaderRectangleVert, shaderArcFrag
 	case "ripple":
 		return shaderRectangleVert, shaderRippleFrag
+	case "gradient":
+		return shaderRectangleVert, shaderGradientFrag
 	case "blur_h":
 		return shaderBlurVert, shaderBlurHFrag
 	case "blur_v":
