@@ -53,27 +53,36 @@ func TestTransformedRectCoordsAnchored(t *testing.T) {
 }
 
 // TestAnchorMatchesSoftwareModel checks anchor() against the software painter's
-// transform model (worldTransform split into translation=pos + linear part).
+// transform model: the object is drawn from its paint origin, the world
+// transform's translation, which the drivers pass as pos, and the transform's
+// linear part applies about it. So anchor(pos) takes the absolute corner
+// pos + off to wt·off, the world transform applied to the local offset — for a
+// leaf transform about its origin, a translation, a pivot, and a child of a
+// transformed parent alike (#997).
 func TestAnchorMatchesSoftwareModel(t *testing.T) {
-	pos := geo.NewPos(120, 260)
-	cases := []geo.Matrix{
-		geo.NewScale(1.5, 1.5),
-		geo.NewRotation(math.Pi / 4),
-		geo.NewScale(2, 2).Multiply(geo.NewRotation(math.Pi / 3)),
+	at := geo.NewTranslation(120, 260) // the object's position
+	cases := map[string]geo.Matrix{
+		"scale":                  at.Multiply(geo.NewScale(1.5, 1.5)),
+		"uneven scale":           at.Multiply(geo.NewScale(2, 3)),
+		"rotation":               at.Multiply(geo.NewRotation(math.Pi / 4)),
+		"scaled rotation":        at.Multiply(geo.NewScale(2, 2).Multiply(geo.NewRotation(math.Pi / 3))),
+		"translation":            at.Multiply(geo.NewTranslation(100, -30)),
+		"rotation about a pivot": at.Multiply(geo.NewRotationAround(math.Pi/6, 20, 10)),
+		"child of a tilted parent": geo.NewTranslation(40, 40).
+			Multiply(geo.NewRotationAround(math.Pi/2, 50, 50)).
+			Multiply(geo.NewTranslation(80, 10)),
 	}
 	approx := func(a, b float32) bool { return math.Abs(float64(a-b)) < 1e-3 }
 
-	for _, lin := range cases {
-		wt := geo.NewTranslation(pos.X, pos.Y).Multiply(lin)
+	for name, wt := range cases {
 		p := &painter{pixScale: 1, currentTransform: wt}
+		pos := geo.NewPos(wt.TX, wt.TY) // RenderCacheNode.PaintOrigin
 		a := p.anchor(pos)
 		for _, off := range [][2]float32{{0, 0}, {40, 0}, {0, 20}, {40, 20}} {
-			cx, cy := pos.X+off[0], pos.Y+off[1]
-			gotX, gotY := a.TransformPoint(cx, cy)
-			lx, ly := lin.TransformVector(off[0], off[1])
-			wantX, wantY := pos.X+lx, pos.Y+ly
+			gotX, gotY := a.TransformPoint(pos.X+off[0], pos.Y+off[1])
+			wantX, wantY := wt.TransformPoint(off[0], off[1])
 			if !approx(gotX, wantX) || !approx(gotY, wantY) {
-				t.Errorf("anchor corner off %v = (%v,%v), want (%v,%v)", off, gotX, gotY, wantX, wantY)
+				t.Errorf("%s: anchor corner off %v = (%v,%v), want (%v,%v)", name, off, gotX, gotY, wantX, wantY)
 			}
 		}
 	}

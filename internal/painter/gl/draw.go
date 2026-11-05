@@ -1107,6 +1107,12 @@ func (p *painter) hasTransform() bool {
 // it yields pos + L·localOffset — i.e. the object scales/rotates about its own
 // top-left instead of the canvas origin.
 //
+// The drivers pass as pos the object's paint origin, the world transform's
+// image of its (0, 0) (RenderCacheNode.PaintOrigin), so pos + L·localOffset is
+// the world transform applied to the local offset: a translation, a pivot and
+// a transformed parent all move the object, and the children of a transformed
+// widget turn with it as one piece (#997).
+//
 // This is the fix for pre-rebrand tracker #960. The paint walk hands the painter the full
 // worldTransform, which already carries Translate(pos) (worldTransform =
 // parentWT · Translate(objPos) · objTransform). The draw helpers below feed that

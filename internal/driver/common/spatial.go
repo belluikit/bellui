@@ -300,26 +300,8 @@ func (idx *SpatialIndex) FindAllObjectsAtPositionMatching(
 // inverseHitTest maps the mouse point into the entry's object-local
 // coordinate system and checks whether it falls within [0, w) × [0, h).
 func inverseHitTest(e *spatialEntry, mouse geo.Position) (localX, localY float32, ok bool) {
-	if e.wt.B == 0 && e.wt.C == 0 {
-		// Axis-aligned (translation + optional scale). Fast path.
-		if e.wt.A == 0 || e.wt.D == 0 {
-			return 0, 0, false // degenerate scale
-		}
-		localX = (mouse.X - e.wt.TX) / e.wt.A
-		localY = (mouse.Y - e.wt.TY) / e.wt.D
-	} else {
-		// General affine transform — use full matrix inverse.
-		inv, invertible := e.wt.Inverse()
-		if !invertible {
-			return 0, 0, false
-		}
-		localX, localY = inv.TransformPoint(mouse.X, mouse.Y)
-	}
-
-	if localX < 0 || localY < 0 || localX >= e.w || localY >= e.h {
-		return 0, 0, false
-	}
-	return localX, localY, true
+	local, ok := driver.LocalHitPoint(e.wt, mouse, e.w, e.h)
+	return local.X, local.Y, ok
 }
 
 // spatialIndexHolder wraps an atomic pointer for lock-free read/write of

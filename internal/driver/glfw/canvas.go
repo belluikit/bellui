@@ -554,14 +554,15 @@ func (w *glPaintWalk) shouldSkipForDirtyRegion(pos geo.Position, objSize geo.Siz
 	return w.partialRepaint && !common.InDirtyRegion(pos, objSize, w.drPos, w.drSize)
 }
 
-// skipObjectForDirtyRegion is shouldSkipForDirtyRegion for obj at pos, by
-// where it draws rather than its bounds (#602).
-func (w *glPaintWalk) skipObjectForDirtyRegion(obj core.CanvasObject, pos geo.Position) bool {
+// skipObjectForDirtyRegion is shouldSkipForDirtyRegion for obj with world
+// transform wt, by where it draws rather than its bounds (#602), and where its
+// transform puts that (#997).
+func (w *glPaintWalk) skipObjectForDirtyRegion(obj core.CanvasObject, wt geo.Matrix) bool {
 	if !w.partialRepaint {
 		return false
 	}
-	off, size := common.PaintExtent(obj)
-	return w.shouldSkipForDirtyRegion(pos.Add(off), size)
+	pos, size := common.PaintBoundsAt(obj, wt)
+	return w.shouldSkipForDirtyRegion(pos, size)
 }
 
 // enterBoundary handles a RepaintBoundary node on the way down. It reports
@@ -629,8 +630,11 @@ func (w *glPaintWalk) enterBoundary(node *common.RenderCacheNode, pos geo.Positi
 	return true
 }
 
-func (w *glPaintWalk) draw(node *common.RenderCacheNode, pos geo.Position) {
+func (w *glPaintWalk) draw(node *common.RenderCacheNode, _ geo.Position) {
 	obj := node.Obj()
+	// Where the object is drawn from: the walk position, moved by any transform
+	// on it or above it (#997).
+	pos := node.PaintOrigin()
 
 	// Scope the subtree's paint to a container DirectionScope's direction, the
 	// paint-time mirror of the EnsureMinSize layout hook. Done before any early
@@ -655,11 +659,16 @@ func (w *glPaintWalk) draw(node *common.RenderCacheNode, pos geo.Position) {
 	paintFrame := w.size
 	paintTransform := node.WorldTransform()
 	if ab := w.activeBoundary(); ab != nil && ab.wasDirty {
-		// Inside a dirty boundary: adjust coordinates to FBO space.
-		paintPos = geo.NewPos(pos.X-ab.origin.X, pos.Y-ab.origin.Y)
+		// Inside a dirty boundary: adjust coordinates to FBO space, where the
+		// object's origin is where the boundary-relative transform puts it.
 		paintFrame = ab.size
 		paintTransform = ab.invWT.Multiply(node.WorldTransform())
+		paintPos = geo.NewPos(paintTransform.TX, paintTransform.TY)
 	}
+	// Set before the clips: a rounded clip stamps its shape with the
+	// transform the painter holds, which must be this object's and not the
+	// last one drawn.
+	w.c.Painter().SetTransform(paintTransform)
 
 	// Establish this object's clips BEFORE the dirty-region cull check, so a
 	// clip-owner (scroll/ClipToBounds/Card) that is itself outside the dirty region
@@ -671,7 +680,7 @@ func (w *glPaintWalk) draw(node *common.RenderCacheNode, pos geo.Position) {
 	// culled has no children to constrain, and gets no clip (#481).
 	clips := common.PaintClips(node)
 	if clips.Rect {
-		inner := w.clips.Push(paintPos, obj.Size())
+		inner := w.clips.Push(common.WorldBox(paintTransform, obj.Size()))
 		w.c.Painter().StartClipping(inner.Rect())
 	}
 	if clips.Rounded {
@@ -687,11 +696,10 @@ func (w *glPaintWalk) draw(node *common.RenderCacheNode, pos geo.Position) {
 	// outside the dirty region. Only applies when not inside a boundary FBO
 	// (boundary FBOs manage their own dirty state). Clips were already established
 	// above so descendants stay correctly clipped; afterDraw tears them down.
-	if w.activeBoundary() == nil && w.skipObjectForDirtyRegion(obj, pos) {
+	if w.activeBoundary() == nil && w.skipObjectForDirtyRegion(obj, paintTransform) {
 		return
 	}
 
-	w.c.Painter().SetTransform(paintTransform)
 	if paintFrame.Width <= 0 || paintFrame.Height <= 0 || w.opacity.Transparent() {
 		return
 	}
@@ -738,8 +746,9 @@ func (w *glPaintWalk) applyClip() {
 	}
 }
 
-func (w *glPaintWalk) afterDraw(node *common.RenderCacheNode, pos geo.Position) {
+func (w *glPaintWalk) afterDraw(node *common.RenderCacheNode, _ geo.Position) {
 	obj := node.Obj()
+	pos := node.PaintOrigin() // as draw has it
 
 	// Pop the DirectionScope pushed in draw (before any early return, to pair).
 	// The group opacity pops last, after a boundary's blit, which is drawn with
@@ -757,7 +766,7 @@ func (w *glPaintWalk) afterDraw(node *common.RenderCacheNode, pos geo.Position) 
 		return
 	}
 
-	culled := w.activeBoundary() == nil && w.skipObjectForDirtyRegion(node.Obj(), pos)
+	culled := w.activeBoundary() == nil && w.skipObjectForDirtyRegion(node.Obj(), node.WorldTransform())
 
 	// Tear down clips even when the object was culled: draw establishes them
 	// unconditionally for clip-owners so descendants stay clipped (pre-rebrand tracker #333), so the

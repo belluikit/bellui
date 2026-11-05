@@ -107,7 +107,7 @@ func FindObjectAtPositionMatching(mouse geo.Position, matches func(object core.C
 	// Transform stack for composing worldTransform through the tree.
 	wtStack := []geo.Matrix{geo.Identity()}
 
-	beforeFunc := func(walked core.CanvasObject, pos geo.Position, clipPos geo.Position, clipSize geo.Size) bool {
+	beforeFunc := func(walked core.CanvasObject, _ geo.Position, clipPos geo.Position, clipSize geo.Size) bool {
 		if !walked.Visible() {
 			return false
 		}
@@ -136,32 +136,9 @@ func FindObjectAtPositionMatching(mouse geo.Position, matches func(object core.C
 		w := walked.Size().Width
 		h := walked.Size().Height
 
-		if wt.B == 0 && wt.C == 0 {
-			// Pure translation (possibly scale): use fast AABB check.
-			if mouse.X < pos.X || mouse.Y < pos.Y {
-				return false
-			}
-			if mouse.X >= pos.X+w || mouse.Y >= pos.Y+h {
-				return false
-			}
-			if matchesHitTarget(walked, matches) {
-				found = walked
-				foundPos = geo.NewPos(mouse.X-pos.X, mouse.Y-pos.Y)
-			}
-		} else {
-			// Non-trivial transform: inverse-transform mouse into local space.
-			invWT, ok := wt.Inverse()
-			if !ok {
-				return false
-			}
-			localX, localY := invWT.TransformPoint(mouse.X, mouse.Y)
-			if localX < 0 || localY < 0 || localX >= w || localY >= h {
-				return false
-			}
-			if matchesHitTarget(walked, matches) {
-				found = walked
-				foundPos = geo.NewPos(localX, localY)
-			}
+		if local, in := LocalHitPoint(wt, mouse, w, h); in && matchesHitTarget(walked, matches) {
+			found = walked
+			foundPos = local
 		}
 		return false
 	}
@@ -205,6 +182,33 @@ func FindObjectAtPositionMatching(mouse geo.Position, matches func(object core.C
 	return found, foundPos, layer
 }
 
+// LocalHitPoint maps mouse, in canvas coordinates, into the coordinates of an
+// object of size w×h whose world transform is wt, and reports whether it falls
+// inside the object, [0, w) × [0, h). The world transform carries the object's
+// position, so a translation, a pivot or a transformed ancestor moves where it
+// is hit as it moves where it is drawn (#997).
+func LocalHitPoint(wt geo.Matrix, mouse geo.Position, w, h float32) (geo.Position, bool) {
+	var localX, localY float32
+	if wt.B == 0 && wt.C == 0 {
+		// Axis-aligned (translation + optional scale). Fast path.
+		if wt.A == 0 || wt.D == 0 {
+			return geo.Position{}, false // degenerate scale
+		}
+		localX = (mouse.X - wt.TX) / wt.A
+		localY = (mouse.Y - wt.TY) / wt.D
+	} else {
+		inv, ok := wt.Inverse()
+		if !ok {
+			return geo.Position{}, false
+		}
+		localX, localY = inv.TransformPoint(mouse.X, mouse.Y)
+	}
+	if localX < 0 || localY < 0 || localX >= w || localY >= h {
+		return geo.Position{}, false
+	}
+	return geo.NewPos(localX, localY), true
+}
+
 // InputPassThrough is implemented by overlay roots that must not block
 // input to the content beneath them — a tooltip, not a dialog. When the
 // top overlay reports true, hit-testing falls through to the lower
@@ -246,7 +250,7 @@ func FindAllObjectsAtPositionMatching(mouse geo.Position, matches func(object co
 
 	wtStack := []geo.Matrix{geo.Identity()}
 
-	beforeFunc := func(walked core.CanvasObject, pos geo.Position, clipPos geo.Position, clipSize geo.Size) bool {
+	beforeFunc := func(walked core.CanvasObject, _ geo.Position, clipPos geo.Position, clipSize geo.Size) bool {
 		if !walked.Visible() {
 			return false
 		}
@@ -273,34 +277,8 @@ func FindAllObjectsAtPositionMatching(mouse geo.Position, matches func(object co
 		w := walked.Size().Width
 		h := walked.Size().Height
 
-		if wt.B == 0 && wt.C == 0 {
-			if mouse.X < pos.X || mouse.Y < pos.Y {
-				return false
-			}
-			if mouse.X >= pos.X+w || mouse.Y >= pos.Y+h {
-				return false
-			}
-			if matches(walked) {
-				results = append(results, ObjectAtPosition{
-					Object:   walked,
-					Position: geo.NewPos(mouse.X-pos.X, mouse.Y-pos.Y),
-				})
-			}
-		} else {
-			invWT, ok := wt.Inverse()
-			if !ok {
-				return false
-			}
-			localX, localY := invWT.TransformPoint(mouse.X, mouse.Y)
-			if localX < 0 || localY < 0 || localX >= w || localY >= h {
-				return false
-			}
-			if matches(walked) {
-				results = append(results, ObjectAtPosition{
-					Object:   walked,
-					Position: geo.NewPos(localX, localY),
-				})
-			}
+		if local, in := LocalHitPoint(wt, mouse, w, h); in && matches(walked) {
+			results = append(results, ObjectAtPosition{Object: walked, Position: local})
 		}
 		return false
 	}
@@ -361,7 +339,7 @@ func ReverseWalkVisibleObjectTree(
 	afterChildren func(core.CanvasObject, geo.Position, core.CanvasObject),
 ) bool {
 	clipSize := geo.NewSize(math.MaxInt32, math.MaxInt32)
-	return walkObjectTree(obj, true, nil, geo.NewPos(0, 0), geo.NewPos(0, 0), clipSize, nil, nil, beforeChildren, afterChildren, true)
+	return walkObjectTree(obj, true, nil, geo.NewPos(0, 0), geo.NewPos(0, 0), clipSize, geo.Identity(), nil, nil, beforeChildren, afterChildren, true)
 }
 
 // WalkCompleteObjectTree will walk an object tree for all objects (ignoring visible state) executing the passed
@@ -379,7 +357,7 @@ func WalkCompleteObjectTree(
 	afterChildren func(core.CanvasObject, geo.Position, core.CanvasObject),
 ) bool {
 	clipSize := geo.NewSize(math.MaxInt32, math.MaxInt32)
-	return walkObjectTree(obj, false, nil, geo.NewPos(0, 0), geo.NewPos(0, 0), clipSize, nil, nil, beforeChildren, afterChildren, false)
+	return walkObjectTree(obj, false, nil, geo.NewPos(0, 0), geo.NewPos(0, 0), clipSize, geo.Identity(), nil, nil, beforeChildren, afterChildren, false)
 }
 
 // WalkVisibleObjectTree will walk an object tree for all visible objects executing the passed functions following
@@ -397,7 +375,7 @@ func WalkVisibleObjectTree(
 	afterChildren func(core.CanvasObject, geo.Position, core.CanvasObject),
 ) bool {
 	clipSize := geo.NewSize(math.MaxInt32, math.MaxInt32)
-	return walkObjectTree(obj, false, nil, geo.NewPos(0, 0), geo.NewPos(0, 0), clipSize, nil, nil, beforeChildren, afterChildren, true)
+	return walkObjectTree(obj, false, nil, geo.NewPos(0, 0), geo.NewPos(0, 0), clipSize, geo.Identity(), nil, nil, beforeChildren, afterChildren, true)
 }
 
 // WalkVisibleObjectTreeCulled walks as WalkVisibleObjectTree does, except that
@@ -413,7 +391,7 @@ func WalkVisibleObjectTreeCulled(
 	afterChildren func(core.CanvasObject, geo.Position, core.CanvasObject),
 ) bool {
 	clipSize := geo.NewSize(math.MaxInt32, math.MaxInt32)
-	return walkObjectTree(obj, false, nil, geo.NewPos(0, 0), geo.NewPos(0, 0), clipSize, cull, nil, beforeChildren, afterChildren, true)
+	return walkObjectTree(obj, false, nil, geo.NewPos(0, 0), geo.NewPos(0, 0), clipSize, geo.Identity(), cull, nil, beforeChildren, afterChildren, true)
 }
 
 // WalkVisibleSubtreeCulled walks as WalkVisibleObjectTreeCulled does, from
@@ -421,30 +399,40 @@ func WalkVisibleObjectTreeCulled(
 // offset its position on the canvas and (clipPos, clipSize) the clip obj sits
 // in, as a walk from the root would have passed them. cull is nil below an
 // object with a transform, as the walk from the root would have it; the
-// caller passes nil when an ancestor of obj has one. hidden, if set, is called
-// for each hidden object the walk skips, with the object it belongs to.
+// caller passes nil when an ancestor of obj has one. xf is what the transforms
+// above obj do to walk positions, the identity when there are none (see
+// walkObjectTree). hidden, if set, is called for each hidden object the walk
+// skips, with the object it belongs to.
 func WalkVisibleSubtreeCulled(
 	obj, parent core.CanvasObject,
 	offset, clipPos geo.Position,
 	clipSize geo.Size,
+	xf geo.Matrix,
 	cull CullFunc,
 	hidden func(obj, parent core.CanvasObject),
 	beforeChildren func(core.CanvasObject, geo.Position, geo.Position, geo.Size) bool,
 	afterChildren func(core.CanvasObject, geo.Position, core.CanvasObject),
 ) bool {
-	return walkObjectTree(obj, false, parent, offset, clipPos, clipSize, cull, hidden, beforeChildren, afterChildren, true)
+	return walkObjectTree(obj, false, parent, offset, clipPos, clipSize, xf, cull, hidden, beforeChildren, afterChildren, true)
 }
 
 // CullFunc reports whether obj, at the absolute position pos, draws nothing
 // inside the clip (clipPos, clipSize) its parent applies.
 type CullFunc func(obj core.CanvasObject, pos, clipPos geo.Position, clipSize geo.Size) bool
 
+// walkObjectTree walks obj and its subtree. Positions are walk positions, the
+// sum of the objects' positions. xf maps them to the canvas: the identity
+// until the walk crosses an object with a transform, whose world transform is
+// xf·Translate(pos)·Transform(), so below it xf is that times Translate(-pos).
+// Clips are on the canvas: a clipping object's is the bounding box of where xf
+// puts it (#997).
 func walkObjectTree(
 	obj core.CanvasObject,
 	reverse bool,
 	parent core.CanvasObject,
 	offset, clipPos geo.Position,
 	clipSize geo.Size,
+	xf geo.Matrix,
 	cull CullFunc,
 	hidden func(obj, parent core.CanvasObject),
 	beforeChildren func(core.CanvasObject, geo.Position, geo.Position, geo.Size) bool,
@@ -462,10 +450,15 @@ func walkObjectTree(
 	}
 	pos := obj.Position().Add(offset)
 
-	culled := cull != nil && cull(obj, pos, clipPos, clipSize)
-	if t, ok := obj.(core.Transformable); ok && !t.Transform().IsIdentity() {
-		cull = nil // positions below no longer match the clip
+	if t, ok := obj.(core.Transformable); ok {
+		if m := t.Transform(); !m.IsIdentity() {
+			// Positions here and below no longer match the clip: the object is
+			// drawn where its transform puts it, not at pos (#997).
+			cull = nil
+			xf = xf.Multiply(geo.NewTranslation(pos.X, pos.Y)).Multiply(m).Multiply(geo.NewTranslation(-pos.X, -pos.Y))
+		}
 	}
+	culled := cull != nil && cull(obj, pos, clipPos, clipSize)
 
 	// One renderer lookup serves both the children and the clip check (#492).
 	var children []core.CanvasObject
@@ -489,7 +482,12 @@ func walkObjectTree(
 	}
 
 	if isClip(obj, r) {
-		clipPos, clipSize = intersectClip(clipPos, clipSize, pos, obj.Size())
+		boxPos, boxSize := pos, obj.Size()
+		if !xf.IsIdentity() {
+			minX, minY, maxX, maxY := xf.Multiply(geo.NewTranslation(pos.X, pos.Y)).AABB(boxSize.Width, boxSize.Height)
+			boxPos, boxSize = geo.NewPos(minX, minY), geo.NewSize(maxX-minX, maxY-minY)
+		}
+		clipPos, clipSize = intersectClip(clipPos, clipSize, boxPos, boxSize)
 	}
 
 	if beforeChildren != nil {
@@ -500,7 +498,7 @@ func walkObjectTree(
 
 	cancelled := false
 	followChild := func(child core.CanvasObject) bool {
-		if walkObjectTree(child, reverse, obj, pos, clipPos, clipSize, cull, hidden, beforeChildren, afterChildren, requireVisible) {
+		if walkObjectTree(child, reverse, obj, pos, clipPos, clipSize, xf, cull, hidden, beforeChildren, afterChildren, requireVisible) {
 			cancelled = true
 			return true
 		}

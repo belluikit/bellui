@@ -262,13 +262,8 @@ func (s *SwipeArea) place(offset float32) {
 }
 
 // layoutCard puts the card at the offset, tilted about its centre by how far
-// it went sideways.
-//
-// The card moves by its position and tilts by a transform that only rotates.
-// The painters draw a transform's rotation about each object's own origin and
-// drop any translation in it (#997), so a rotation about the centre is a
-// rotation about the origin, with the position moved by where the centre
-// would otherwise go.
+// it went sideways. The card moves by its position and tilts by a rotation
+// about its centre.
 func (s *SwipeArea) layoutCard() {
 	if s.card == nil {
 		return
@@ -283,11 +278,8 @@ func (s *SwipeArea) layoutCard() {
 	if size.Width > 0 {
 		share = geo.Max(-1, geo.Min(1, s.offset/size.Width))
 	}
-	r := geo.NewRotation(share * swipeCardTilt)
-	cx, cy := size.Width/2, size.Height/2
-	rx, ry := r.TransformVector(cx, cy)
-	s.card.SetTransform(r)
-	s.card.Move(geo.NewPos(s.offset+cx-rx, cy-ry))
+	s.card.SetTransform(geo.NewRotationAround(share*swipeCardTilt, size.Width/2, size.Height/2))
+	s.card.Move(geo.NewPos(s.offset, 0))
 }
 
 // flyOff carries the card off the side it was thrown to, then lands it.
