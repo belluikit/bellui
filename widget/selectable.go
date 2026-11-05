@@ -115,7 +115,7 @@ func (s *selectable) DragEnd() {
 		if a, _ := s.selection(); a >= 0 {
 			rect := s.selectionHandleCaretRect(s.cursorRow, s.cursorColumn)
 			pos := rect.Pos.AddXY(0, rect.Size.Height)
-			abs := bellui.CurrentApp().Driver().AbsolutePositionForObject(s.super()).Add(pos)
+			abs := bellui.AbsolutePositionForPoint(s.super(), pos)
 			s.TappedSecondary(&event.PointEvent{AbsolutePosition: abs, Position: pos})
 		}
 	}

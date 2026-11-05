@@ -80,8 +80,7 @@ func (cm *ContextMenu) TappedSecondary(pe *event.PointEvent) {
 		return
 	}
 
-	entryPos := bellui.CurrentApp().Driver().AbsolutePositionForObject(cm)
-	popUpPos := entryPos.Add(pe.Position)
+	popUpPos := bellui.AbsolutePositionForPoint(cm, pe.Position)
 	cm.popUp = NewPopUpMenu(menu, c)
 	inheritDirection(cm.popUp, cm) // #749
 	cm.popUp.ShowAtPosition(popUpPos)

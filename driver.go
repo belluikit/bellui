@@ -24,6 +24,8 @@ type Driver interface {
 	// CanvasForObject returns the canvas that is associated with a given [core.CanvasObject].
 	CanvasForObject(core.CanvasObject) core.Canvas
 	// AbsolutePositionForObject returns the position of a given [core.CanvasObject] relative to the top/left of a canvas.
+	// It is the position from layout and ignores transforms ([core.Transformable]); to find where a point of
+	// an object is drawn, use [AbsolutePositionForPoint].
 	AbsolutePositionForObject(core.CanvasObject) geo.Position
 
 	// Device returns the device that the application is currently running on.
@@ -54,6 +56,53 @@ type Driver interface {
 // the maximum duration for double-tap recognition.
 type DoubleTapDriver interface {
 	DoubleTapDelay() time.Duration
+}
+
+// PositionMappingDriver is an optional interface that a [Driver] can implement
+// to map positions between an object's own coordinates and its canvas through
+// the object's world transform, the one it is drawn and hit with
+// ([core.Transformable]). Positions on the canvas are measured from the same
+// origin as [Driver.AbsolutePositionForObject]. Use [AbsolutePositionForPoint]
+// and [PositionForAbsolutePoint], which fall back when the driver does not
+// implement it.
+type PositionMappingDriver interface {
+	// AbsolutePositionForPoint returns where pos, in obj's own coordinates, is
+	// drawn on obj's canvas.
+	AbsolutePositionForPoint(obj core.CanvasObject, pos geo.Position) geo.Position
+	// PositionForAbsolutePoint maps abs, a position on obj's canvas, into obj's
+	// own coordinates. ok is false when obj is on no canvas or its transform
+	// cannot be inverted.
+	PositionForAbsolutePoint(obj core.CanvasObject, abs geo.Position) (pos geo.Position, ok bool)
+}
+
+// AbsolutePositionForPoint returns where pos, in obj's own coordinates, is
+// drawn on obj's canvas: under a translation, a rotation or a scale on obj or
+// an ancestor, the point moves with the drawing. Popups anchored to a widget
+// use it, for example the point just below its bottom-left corner. Without a
+// transform it is [Driver.AbsolutePositionForObject] plus pos, which is also
+// the fallback when the driver does not implement [PositionMappingDriver].
+// Call it on the main goroutine.
+func AbsolutePositionForPoint(obj core.CanvasObject, pos geo.Position) geo.Position {
+	d := CurrentApp().Driver()
+	if m, ok := d.(PositionMappingDriver); ok {
+		return m.AbsolutePositionForPoint(obj, pos)
+	}
+	return d.AbsolutePositionForObject(obj).Add(pos)
+}
+
+// PositionForAbsolutePoint maps abs, a position on obj's canvas, into obj's own
+// coordinates, the inverse of [AbsolutePositionForPoint]. When the driver does
+// not implement [PositionMappingDriver], or obj's transform cannot be inverted,
+// it returns abs minus [Driver.AbsolutePositionForObject].
+// Call it on the main goroutine.
+func PositionForAbsolutePoint(obj core.CanvasObject, abs geo.Position) geo.Position {
+	d := CurrentApp().Driver()
+	if m, ok := d.(PositionMappingDriver); ok {
+		if pos, ok := m.PositionForAbsolutePoint(obj, abs); ok {
+			return pos
+		}
+	}
+	return abs.Subtract(d.AbsolutePositionForObject(obj))
 }
 
 // ScreenBlankingDriver is an optional interface that a [Driver] can implement

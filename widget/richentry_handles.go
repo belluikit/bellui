@@ -91,8 +91,7 @@ func (e *RichEntry) MouseUp(*desktop.MouseEvent) {
 // "text toolbar reappears" behavior (pre-rebrand tracker #945).
 func (e *RichEntry) TappedSecondary(pe *event.PointEvent) {
 	e.requestFocus()
-	pos := bellui.CurrentApp().Driver().AbsolutePositionForObject(e.super()).Add(pe.Position)
-	e.showContextMenu(pos)
+	e.showContextMenu(bellui.AbsolutePositionForPoint(e.super(), pe.Position))
 }
 
 // showContextMenu builds and presents the editor's context menu at the given

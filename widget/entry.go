@@ -1076,7 +1076,7 @@ func (e *Entry) DragEnd() {
 		if _, ok := e.SelectionRange(); ok {
 			rect := e.caretRect(e.CursorRow, e.CursorColumn, true)
 			pos := rect.Pos.Subtract(e.scroll.Offset).AddXY(0, rect.Size.Height)
-			abs := bellui.CurrentApp().Driver().AbsolutePositionForObject(e.super()).Add(pos)
+			abs := bellui.AbsolutePositionForPoint(e.super(), pos)
 			e.TappedSecondary(&event.PointEvent{AbsolutePosition: abs, Position: pos})
 		}
 	}
@@ -1656,8 +1656,7 @@ func (e *Entry) TappedSecondary(pe *event.PointEvent) {
 	}
 
 	e.requestFocus()
-	entryPos := bellui.CurrentApp().Driver().AbsolutePositionForObject(e.super())
-	e.showContextMenu(entryPos.Add(pe.Position))
+	e.showContextMenu(bellui.AbsolutePositionForPoint(e.super(), pe.Position))
 }
 
 // showContextMenu builds and presents the edit context menu (Cut / Copy / Paste

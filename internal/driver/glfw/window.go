@@ -1054,7 +1054,8 @@ func (w *window) dispatchScrollChain(scrollables []driver.ObjectAtPosition, pos 
 	for _, oap := range scrollables {
 		ev.Position = oap.Position
 		if relocate {
-			ev.Position = pos.Subtract(driver.AbsolutePositionForObject(oap.Object, w.canvas.ObjectTrees()))
+			// Through the inverse world transform, as the hit-test found it (#1003).
+			ev.Position, _ = driver.PositionForAbsolutePoint(oap.Object, pos, w.canvas.ObjectTrees())
 		}
 		if consumer, ok := oap.Object.(driver.ScrollConsumer); ok {
 			if consumer.TryScrolled(ev) {

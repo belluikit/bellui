@@ -111,6 +111,5 @@ func toolTipTheme(obj core.CanvasObject) (bellui.Theme, bellui.ThemeVariant) {
 
 // toolTipPos anchors the bubble just below the object.
 func toolTipPos(obj core.CanvasObject) geo.Position {
-	abs := bellui.CurrentApp().Driver().AbsolutePositionForObject(obj)
-	return abs.Add(geo.NewPos(0, obj.Size().Height))
+	return bellui.AbsolutePositionForPoint(obj, geo.NewPos(0, obj.Size().Height))
 }

@@ -25,9 +25,8 @@ type menuLabel struct {
 }
 
 func (m *menuLabel) Tapped(*event.PointEvent) {
-	pos := bellui.CurrentApp().Driver().AbsolutePositionForObject(m)
 	menu := widget.NewPopUpMenu(m.menu, m.canvas)
-	menu.ShowAtPosition(geo.NewPos(pos.X+m.Size().Width, pos.Y))
+	menu.ShowAtPosition(bellui.AbsolutePositionForPoint(m, geo.NewPos(m.Size().Width, 0)))
 
 	menuDismiss := menu.OnDismiss // this dismisses the menu stack
 	menu.OnDismiss = func() {

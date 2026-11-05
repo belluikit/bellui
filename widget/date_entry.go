@@ -161,8 +161,7 @@ func (e *DateEntry) setupCalendarButton() *Button {
 }
 
 func (e *DateEntry) popUpPos() geo.Position {
-	entryPos := bellui.CurrentApp().Driver().AbsolutePositionForObject(e.super())
-	return entryPos.Add(geo.NewPos(0, e.Size().Height))
+	return bellui.AbsolutePositionForPoint(e.super(), geo.NewPos(0, e.Size().Height))
 }
 
 func (e *DateEntry) showCalendarPopup(c core.Canvas) {

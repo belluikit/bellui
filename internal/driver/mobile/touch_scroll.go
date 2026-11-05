@@ -95,7 +95,8 @@ func (c *canvas) dispatchScrollChain(chain []intdriver.ObjectAtPosition, pos geo
 	ev.AbsolutePosition = pos
 	ev.Source = event.ScrollSourceTouch
 	for _, oap := range chain {
-		ev.Position = pos.Subtract(intdriver.AbsolutePositionForObject(oap.Object, c.ObjectTrees()))
+		// Through the inverse world transform, as the hit-test found it (#1003).
+		ev.Position, _ = intdriver.PositionForAbsolutePoint(oap.Object, pos, c.ObjectTrees())
 		if consumer, ok := oap.Object.(intdriver.ScrollConsumer); ok {
 			if consumer.TryScrolled(ev) {
 				return true

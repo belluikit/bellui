@@ -170,8 +170,7 @@ func (e *DateTimeEntry) setupPickerButton() *Button {
 }
 
 func (e *DateTimeEntry) popUpPos() geo.Position {
-	entryPos := bellui.CurrentApp().Driver().AbsolutePositionForObject(e.super())
-	return entryPos.Add(geo.NewPos(0, e.Size().Height))
+	return bellui.AbsolutePositionForPoint(e.super(), geo.NewPos(0, e.Size().Height))
 }
 
 func (e *DateTimeEntry) showPickerPopup(c core.Canvas) {

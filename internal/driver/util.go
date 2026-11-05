@@ -45,6 +45,10 @@ func PopDirectionScope(obj core.CanvasObject) {
 
 // AbsolutePositionForObject returns the absolute position of an object in a set of object trees.
 // If the object is not part of any of the trees, the position (0,0) is returned.
+//
+// It is the position from layout, the sum of the positions of the object and
+// its ancestors, and ignores transforms (#1003). [AbsolutePositionForPoint]
+// and [PositionForAbsolutePoint] follow the world transform.
 func AbsolutePositionForObject(object core.CanvasObject, trees []core.CanvasObject) geo.Position {
 	var pos geo.Position
 	findPos := func(o core.CanvasObject, p geo.Position, _ geo.Position, _ geo.Size) bool {
@@ -60,6 +64,73 @@ func AbsolutePositionForObject(object core.CanvasObject, trees []core.CanvasObje
 		}
 	}
 	return pos
+}
+
+// WorldTransformForObject returns the world transform of object within the
+// trees, composed the way the painters and the hit-test compose it:
+// parent · Translate(Position()) · Transform() (core.Transformable). ok is
+// false when object is not in any of the trees.
+func WorldTransformForObject(object core.CanvasObject, trees []core.CanvasObject) (wt geo.Matrix, ok bool) {
+	stack := []geo.Matrix{geo.Identity()}
+	before := func(o core.CanvasObject, _ geo.Position, _ geo.Position, _ geo.Size) bool {
+		pos := o.Position()
+		local := geo.NewTranslation(pos.X, pos.Y)
+		if t, is := o.(core.Transformable); is {
+			if lt := t.Transform(); !lt.IsIdentity() {
+				local = local.Multiply(lt)
+			}
+		}
+		m := stack[len(stack)-1].Multiply(local)
+		if o == object {
+			wt, ok = m, true
+			return true
+		}
+		stack = append(stack, m)
+		return false
+	}
+	after := func(core.CanvasObject, geo.Position, core.CanvasObject) {
+		if len(stack) > 1 {
+			stack = stack[:len(stack)-1]
+		}
+	}
+	for _, tree := range trees {
+		stack = stack[:1]
+		if WalkVisibleObjectTree(tree, before, after) {
+			break
+		}
+	}
+	return wt, ok
+}
+
+// AbsolutePositionForPoint returns where pos, in object's own coordinates, is
+// drawn within the trees: pos mapped through object's world transform. When
+// object is not in the trees it returns pos, as AbsolutePositionForObject's
+// (0,0) plus pos would.
+func AbsolutePositionForPoint(object core.CanvasObject, pos geo.Position, trees []core.CanvasObject) geo.Position {
+	wt, ok := WorldTransformForObject(object, trees)
+	if !ok {
+		return pos
+	}
+	x, y := wt.TransformPoint(pos.X, pos.Y)
+	return geo.NewPos(x, y)
+}
+
+// PositionForAbsolutePoint maps abs, a position within the trees, into
+// object's own coordinates through the inverse of its world transform, the
+// mapping the hit-test uses (LocalHitPoint). ok is false when object is not in
+// the trees or its transform cannot be inverted (a zero scale); abs is then
+// returned unchanged.
+func PositionForAbsolutePoint(object core.CanvasObject, abs geo.Position, trees []core.CanvasObject) (geo.Position, bool) {
+	wt, ok := WorldTransformForObject(object, trees)
+	if !ok {
+		return abs, false
+	}
+	inv, ok := wt.Inverse()
+	if !ok {
+		return abs, false
+	}
+	x, y := inv.TransformPoint(abs.X, abs.Y)
+	return geo.NewPos(x, y), true
 }
 
 // NoClipBounds is the open clip rectangle walkObjectTree starts with: an object

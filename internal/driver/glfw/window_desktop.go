@@ -1167,9 +1167,9 @@ func (w *window) updatePreeditCursorRect() {
 	}
 
 	rect := pp.PreeditCursorRectangle()
-	abs := w.driver.AbsolutePositionForObject(co)
-	x := scale.ToScreenCoordinate(w.canvas, abs.X+rect.Pos.X)
-	y := scale.ToScreenCoordinate(w.canvas, abs.Y+rect.Pos.Y)
+	abs := w.driver.AbsolutePositionForPoint(co, rect.Pos)
+	x := scale.ToScreenCoordinate(w.canvas, abs.X)
+	y := scale.ToScreenCoordinate(w.canvas, abs.Y)
 	width := scale.ToScreenCoordinate(w.canvas, rect.Size.Width)
 	height := scale.ToScreenCoordinate(w.canvas, rect.Size.Height)
 	v.SetPreeditCursorRectangle(x, y, width, height)

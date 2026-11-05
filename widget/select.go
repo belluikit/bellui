@@ -328,8 +328,7 @@ func (s *Select) Unbind() {
 }
 
 func (s *Select) popUpPos() geo.Position {
-	buttonPos := bellui.CurrentApp().Driver().AbsolutePositionForObject(s.super())
-	return buttonPos.Add(geo.NewPos(0, s.Size().Height-s.Theme().Size(theme.SizeNameInputBorder)))
+	return bellui.AbsolutePositionForPoint(s.super(), geo.NewPos(0, s.Size().Height-s.Theme().Size(theme.SizeNameInputBorder)))
 }
 
 func (s *Select) showPopUp() {

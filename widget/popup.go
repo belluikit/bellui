@@ -565,8 +565,7 @@ func withRelativePosition(rel geo.Position, to core.CanvasObject, f func(positio
 		return
 	}
 
-	pos := d.AbsolutePositionForObject(to).Add(rel)
-	f(pos)
+	f(bellui.AbsolutePositionForPoint(to, rel))
 }
 
 // SetPadded controls whether the pop-up surrounds its content with inner

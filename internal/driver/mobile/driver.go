@@ -46,6 +46,8 @@ import (
 	"github.com/belluikit/bellui/theme"
 )
 
+var _ bellui.PositionMappingDriver = (*driver)(nil)
+
 // Tap constants are now in common.TapMoveDecay, common.TapDoubleDelay, etc.
 
 // Configuration is the system information about the current device
@@ -290,6 +292,26 @@ func (d *driver) AbsolutePositionForObject(co core.CanvasObject) geo.Position {
 	pos := intdriver.AbsolutePositionForObject(co, mc.ObjectTrees())
 	inset, _ := c.InteractiveArea()
 	return pos.Subtract(inset)
+}
+
+// AbsolutePositionForPoint implements bellui.PositionMappingDriver.
+func (d *driver) AbsolutePositionForPoint(co core.CanvasObject, pos geo.Position) geo.Position {
+	c := d.CanvasForObject(co)
+	if c == nil {
+		return pos
+	}
+	inset, _ := c.InteractiveArea()
+	return intdriver.AbsolutePositionForPoint(co, pos, c.(*canvas).ObjectTrees()).Subtract(inset)
+}
+
+// PositionForAbsolutePoint implements bellui.PositionMappingDriver.
+func (d *driver) PositionForAbsolutePoint(co core.CanvasObject, abs geo.Position) (geo.Position, bool) {
+	c := d.CanvasForObject(co)
+	if c == nil {
+		return abs, false
+	}
+	inset, _ := c.InteractiveArea()
+	return intdriver.PositionForAbsolutePoint(co, abs.Add(inset), c.(*canvas).ObjectTrees())
 }
 
 func (d *driver) GoBack() {

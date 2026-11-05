@@ -610,7 +610,7 @@ func (e *RichEntry) DragEnd() {
 			row, col := e.doc.offsetToRowCol(e.caret)
 			rect := e.selectionHandleCaretRect(row, col)
 			pos := rect.Pos.AddXY(0, rect.Size.Height)
-			abs := bellui.CurrentApp().Driver().AbsolutePositionForObject(e.super()).Add(pos)
+			abs := bellui.AbsolutePositionForPoint(e.super(), pos)
 			e.TappedSecondary(&event.PointEvent{AbsolutePosition: abs, Position: pos})
 		}
 	}
