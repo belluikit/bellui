@@ -183,9 +183,11 @@ func Test_canvas_DragOverEntryTextScrolls(t *testing.T) {
 	lprTapUp(c, press.AddXY(60, 0))
 }
 
-// A selectable Label or RichText in a page takes a touch drag and selects
-// (#999: asking whether it claimed the drag used to recurse forever).
-func Test_canvas_DragOverSelectableTextSelects(t *testing.T) {
+// A selectable Label or RichText in a page (#986): a plain drag over its text
+// scrolls the page and selects nothing, as over an Entry (#801); a long-press
+// still selects, and a drag that follows it extends the selection. Before
+// #999 asking the selectable whether it claimed the drag recursed forever.
+func Test_canvas_DragOverSelectableTextScrolls(t *testing.T) {
 	label := widget.NewLabel("word word word word")
 	label.Selectable = true
 	rich := widget.NewRichTextWithText("word word word word")
@@ -193,15 +195,34 @@ func Test_canvas_DragOverSelectableTextSelects(t *testing.T) {
 	page := container.NewVScroll(container.NewVBox(label, rich, filler(100, 600)))
 	c := claimCanvas(page, geo.NewSize(200, 300))
 
-	on := geo.NewPos(10, label.Size().Height/2)
-	swipe(c, 1, on, on.AddXY(80, 0))
-	assert.NotEmpty(t, label.SelectedText(), "the drag selected the label's text")
-	assert.Zero(t, page.Offset.Y)
+	for i, tc := range []struct {
+		name     string
+		at       geo.Position
+		selected func() string
+	}{
+		{"label", geo.NewPos(40, label.Size().Height/2), label.SelectedText},
+		{"rich text", geo.NewPos(40, rich.Position().Y+rich.Size().Height/2), rich.SelectedText},
+	} {
+		id := 10 * (i + 1)
+		on := tc.at
+		page.ScrollToTop()
+		swipe(c, id, on, on.SubtractXY(0, 30))
+		assert.Equal(t, float32(30), page.Offset.Y, "%s: the page took the drag", tc.name)
+		assert.Empty(t, tc.selected(), "%s: a plain drag selects nothing", tc.name)
+		swipe(c, id+1, on, on.AddXY(80, 0))
+		assert.Empty(t, tc.selected(), "%s: a sideways drag selects nothing either", tc.name)
 
-	on = geo.NewPos(10, rich.Position().Y+rich.Size().Height/2)
-	swipe(c, 2, on, on.AddXY(80, 0))
-	assert.NotEmpty(t, rich.SelectedText(), "the drag selected the rich text")
-	assert.Zero(t, page.Offset.Y)
+		// Contact 0, the one lprTapUp lifts.
+		page.ScrollToTop()
+		c.TapDown(on, 0)
+		waitAndCheck(400, func() {
+			assert.Equal(t, "word", tc.selected(), "%s: the long-press selected a word", tc.name)
+		})
+		c.TapMove(on.AddXY(60, 0), 0, claimDrag)
+		assert.Greater(t, len(tc.selected()), len("word"), "%s: the drag extended the selection", tc.name)
+		assert.Zero(t, page.Offset.Y, tc.name)
+		lprTapUp(c, on.AddXY(60, 0))
+	}
 }
 
 // entryScroll finds the Scroll inside an Entry's renderer.
