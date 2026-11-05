@@ -180,3 +180,23 @@ func TestScroll_ReserveBarSpace_Layout(t *testing.T) {
 	contentWidth2 := scroll2.Content.Size().Width
 	assert.Equal(t, float32(100), contentWidth2, "content should get full width with ReserveBarSpace=false")
 }
+
+// Content that grew since it was last laid out can be scrolled into at once
+// (#1005). The content's size is still the old one until the
+// next layout, but its MinSize is already the new one, and the offset must be
+// judged against what the layout will give it: when the old size fit the
+// view, the scroll used to snap back to 0.
+func TestScroll_ScrollToOffsetIntoGrownContent(t *testing.T) {
+	test.NewTempApp(t)
+	rect := canvas.NewRectangle(color.Black)
+	rect.SetMinSize(geo.NewSize(50, 50)) // fits the 100×100 view
+	scroll := widget.NewScroll(rect)
+	scroll.Resize(geo.NewSize(100, 100))
+
+	rect.SetMinSize(geo.NewSize(50, 500)) // grown, not laid out again yet
+	scroll.ScrollToOffset(geo.NewPos(0, 300))
+	assert.Equal(t, float32(300), scroll.Offset.Y, "the offset into the grown content")
+
+	scroll.Refresh()
+	assert.Equal(t, float32(300), scroll.Offset.Y, "a refresh keeps it")
+}
