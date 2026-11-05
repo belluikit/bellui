@@ -1,0 +1,13 @@
+diff --git a/internal/painter/webgpu/device.go b/internal/painter/webgpu/device.go
+index 669861fd..ae383ef7 100644
+--- a/internal/painter/webgpu/device.go
++++ b/internal/painter/webgpu/device.go
+@@ -97,7 +97,7 @@ func surfaceConfig(caps wgpu.SurfaceCapabilities, width, height int, maxDim uint
+ 	logSurfaceFormats(where, caps.Formats, format)
+ 	width, height = capSurfaceSize(width, height, maxDim)
+ 	return &wgpu.SurfaceConfiguration{
+-		Usage:       wgpu.TextureUsageRenderAttachment | wgpu.TextureUsageCopySrc, // CopySrc enables Capture
++		Usage:       wgpu.TextureUsageRenderAttachment, // E1: no CopySrc (#909 experiment)
+ 		Format:      format,
+ 		Width:       uint32(width),
+ 		Height:      uint32(height),

@@ -1,0 +1,103 @@
+diff --git a/internal/driver/mobile/app/android.go b/internal/driver/mobile/app/android.go
+index 50392436..33673642 100644
+--- a/internal/driver/mobile/app/android.go
++++ b/internal/driver/mobile/app/android.go
+@@ -659,6 +659,7 @@ func mainUI(vm, jniEnv, ctx uintptr) error {
+ 		case cfg := <-windowConfigChange:
+ 			pixelsPerPt = cfg.pixelsPerPt
+ 		case w := <-windowCreated:
++			log.Printf("E4 windowCreated %p", w)
+ 			liveWindow.Store(uintptr(unsafe.Pointer(w)))
+ 			if surfaceInitialized && !wasDestroyed && !webgpuBackend {
+ 				if errStr := C.destroyEGLSurface(); errStr != nil {
+@@ -681,6 +682,7 @@ func mainUI(vm, jniEnv, ctx uintptr) error {
+ 				theApp.events.In() <- paint.Event{External: true, Window: uintptr(unsafe.Pointer(w))}
+ 			}
+ 		case w := <-windowRedrawNeeded:
++			log.Printf("E4 redrawNeeded %p %dx%d", w, int(C.ANativeWindow_getWidth(w)), int(C.ANativeWindow_getHeight(w)))
+ 			liveWindow.Store(uintptr(unsafe.Pointer(w)))
+ 			// Under -tags webgpu the ANativeWindow is owned by wgpu (Vulkan), so
+ 			// no EGL surface is created; surfaceInitialized gates the one-time
+@@ -719,6 +721,7 @@ func mainUI(vm, jniEnv, ctx uintptr) error {
+ 			theApp.events.In() <- currentSize
+ 			theApp.events.In() <- paint.Event{External: true, Window: uintptr(unsafe.Pointer(w))}
+ 		case w := <-windowDestroyed:
++			log.Printf("E4 windowDestroyed %p", w)
+ 			if uintptr(unsafe.Pointer(w)) != liveWindow.Load() {
+ 				// A replaced activity's window, destroyed after the new one
+ 				// was created (#896). The surface is on the new window, and
+diff --git a/internal/driver/mobile/driver.go b/internal/driver/mobile/driver.go
+index 75893fb9..ae23921f 100644
+--- a/internal/driver/mobile/driver.go
++++ b/internal/driver/mobile/driver.go
+@@ -4,6 +4,7 @@ package mobile
+ 
+ import (
+ 	"image/color"
++	"log"
+ 	"math"
+ 	"runtime"
+ 	"strconv"
+@@ -775,6 +776,7 @@ func (d *driver) handlePaint(e paint.Event, w *window) {
+ 		// note it and let the liveness gate below pick the moment.
+ 		d.nativeWindow = e.Window // the shared Android ANativeWindow
+ 		if c.initialized && e.Window != w.handle {
++			log.Printf("E4 paint handle changed %#x -> %#x external=%v", w.handle, e.Window, e.External)
+ 			w.surfaceStale = true
+ 		}
+ 		w.handle = e.Window
+diff --git a/internal/painter/webgpu/device.go b/internal/painter/webgpu/device.go
+index 669861fd..6a4709e5 100644
+--- a/internal/painter/webgpu/device.go
++++ b/internal/painter/webgpu/device.go
+@@ -3,6 +3,7 @@
+ package webgpu
+ 
+ import (
++	"time"
+ 	"bytes"
+ 	"errors"
+ 	"fmt"
+@@ -713,6 +714,7 @@ func (d *Device) Resize(width, height int) {
+ 	}
+ 	d.config.Width = uint32(width)
+ 	d.config.Height = uint32(height)
++	d.e3Drain("resize")
+ 	d.surface.Configure(d.device, d.config)
+ 	// Drop cached depth-stencil attachments; they are recreated on demand at the
+ 	// new size (and any boundary FBOs are reallocated on resize too).
+@@ -729,6 +731,7 @@ func (d *Device) RecreateSurface(sd *wgpu.SurfaceDescriptor) {
+ 		return
+ 	}
+ 	d.endPass() // no frame should straddle the swap, but be safe
++	bellui.LogError(fmt.Sprintf("E4 RecreateSurface hadSurface=%v %dx%d", d.surface != nil, d.config.Width, d.config.Height), nil)
+ 	if d.surface != nil {
+ 		d.surface.Release()
+ 	}
+@@ -761,6 +764,7 @@ func (d *Device) ReleaseSurface() {
+ 		return
+ 	}
+ 	d.endPass() // no frame should straddle the release, but be safe
++	bellui.LogError("E4 ReleaseSurface", nil)
+ 	d.surface.Release()
+ 	d.surface = nil
+ }
+@@ -1845,6 +1849,7 @@ func (d *Device) BeginFrame(clear wgpu.Color) error {
+ 			// dropping until some other event reconfigures (pre-rebrand tracker #385). Mirrors Resize's
+ 			// reconfigure + depth-stencil drop; BeginFrame below re-sizes the render
+ 			// target from the freshly acquired texture, so no size bookkeeping is needed.
++			d.e3Drain("outdated")
+ 			d.surface.Configure(d.device, d.config)
+ 			d.releaseDepthStencils()
+ 			st, err = d.acquireSurfaceTexture()
+@@ -2365,3 +2370,10 @@ func (d *Device) Destroy() {
+ 		d.instance = nil
+ 	}
+ }
++
++// e3Drain is a #909 experiment: drain the device and wait before a reconfigure.
++func (d *Device) e3Drain(where string) {
++	d.device.Poll(true, nil)
++	time.Sleep(100 * time.Millisecond)
++	bellui.LogError(fmt.Sprintf("E3 reconfigure %s %dx%d", where, d.config.Width, d.config.Height), nil)
++}

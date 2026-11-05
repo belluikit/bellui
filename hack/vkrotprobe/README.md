@@ -13,3 +13,8 @@ pixel143 rotation ANR is an emulator bug.
   stall: `on_vkDestroySemaphore → DeviceOpTracker::PollAndProcessGarbage →
   Poll → vkGetFenceStatus`.
 - `emurestart.sh` restarts only the pixel143 qemu on port 5554.
+
+`experiments/` holds the two ruled-out changes to bellui main (cb1d0ab2), as
+patches: `e1` drops `CopySrc` from the surface usage (hung at rotation 24),
+`e2` drains the device and waits 100 ms before every reconfigure (hung at
+rotations 3, 19 and 9).
