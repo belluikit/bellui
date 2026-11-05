@@ -119,15 +119,17 @@ func (p *painter) BlitBoundaryTexture(state gpu.BoundaryFBO, pos geo.Position, f
 		return
 	}
 	// The boundary quad is drawn in canvas space; reset the world transform.
+	// The cached content was rendered opaque; the group opacity of the
+	// boundary's ancestors applies here, once.
 	p.transform = geo.Identity()
-	p.blitTexture(s.tex.View(), s.logical, pos, frame)
+	p.blitTexture(s.tex.View(), s.logical, pos, frame, p.effectiveAlpha(1))
 }
 
 // blitTexture draws a texture view as a stretched quad at pos via the simple
-// shader (no corner radius, full alpha).
-func (p *painter) blitTexture(view *wgpu.TextureView, logical geo.Size, pos geo.Position, frame geo.Size) {
+// shader (no corner radius) at the given alpha.
+func (p *painter) blitTexture(view *wgpu.TextureView, logical geo.Size, pos geo.Position, frame geo.Size, alpha float32) {
 	points, insets := p.rectCoords(logical, pos, frame, canvas.ImageFillStretch, 0, 0)
-	u := SimpleUniforms{Alpha: 1, Inset: insets}
+	u := SimpleUniforms{Alpha: alpha, Inset: insets}
 	p.record("simple", points, 4, uniformBytes(&u), view)
 }
 

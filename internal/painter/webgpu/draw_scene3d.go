@@ -40,7 +40,7 @@ func (p *painter) drawScene3D(scene *canvas.Scene3D, pos geo.Position, frame geo
 		return
 	}
 	// Draw the rendered scene as a stretched canvas quad (top-down, no V-flip).
-	p.blitTexture(tex.View(), size, pos, frame)
+	p.blitTexture(tex.View(), size, pos, frame, 1)
 }
 
 // scenePixSize returns the scene's pixel dimensions (at least 1x1).
