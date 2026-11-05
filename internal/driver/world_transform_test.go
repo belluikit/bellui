@@ -153,3 +153,32 @@ func TestFindObjectAtPosition_ClipUnderTransform(t *testing.T) {
 	assert.True(t, ok)
 	assert.Equal(t, geo.Rectangle{Pos: geo.NewPos(110, 10), Size: geo.NewSize(40, 40)}, bounds)
 }
+
+// TestFindObjectAtPosition_ClipUnderRotation pins #1003 for the hit-test: a
+// clip turned an eighth clips its children to the turned square, as the
+// painters draw it, not to the box around it. The scene is the real-loop
+// test's (TestWorldTransformDraws, "clip under a rotation"): a diamond about
+// (90, 90), whose box is (47.6, 47.6)-(132.4, 132.4).
+func TestFindObjectAtPosition_ClipUnderRotation(t *testing.T) {
+	inner := canvas.NewRectangle(color.Black)
+	inner.Move(geo.NewPos(-50, -50))
+	inner.Resize(geo.NewSize(160, 160)) // past the clip on every side
+	clip := &bellui.Container{ClipToBounds: true, Objects: []core.CanvasObject{inner}}
+	clip.Move(geo.NewPos(20, 20))
+	clip.Resize(geo.NewSize(60, 60))
+	box := newTiltBox(geo.NewRotationAround(math.Pi/4, 50, 50), clip)
+	box.Move(geo.NewPos(40, 40))
+	box.Resize(geo.NewSize(100, 100))
+	root := &bellui.Container{Objects: []core.CanvasObject{box}}
+	root.Resize(geo.NewSize(200, 200))
+	isInner := func(o core.CanvasObject) bool { return o == inner }
+
+	found, _, _ := driver.FindObjectAtPositionMatching(geo.NewPos(90, 90), isInner, nil, root)
+	assert.Equal(t, core.CanvasObject(inner), found, "hit inside the turned clip")
+	found, _, _ = driver.FindObjectAtPositionMatching(geo.NewPos(60, 60), isInner, nil, root)
+	assert.Nil(t, found, "not in the corner of the box around it, where it is not drawn")
+	all := driver.FindAllObjectsAtPositionMatching(geo.NewPos(60, 60), isInner, nil, root)
+	assert.Empty(t, all, "nor among all the objects there")
+	found, _, _ = driver.FindObjectAtPositionMatching(geo.NewPos(60, 60), func(o core.CanvasObject) bool { return o == box }, nil, root)
+	assert.Equal(t, core.CanvasObject(box), found, "what holds the clip is still hit there")
+}

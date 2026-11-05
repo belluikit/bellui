@@ -177,6 +177,9 @@ func FindObjectAtPositionMatching(mouse geo.Position, matches func(object core.C
 
 	// Transform stack for composing worldTransform through the tree.
 	wtStack := []geo.Matrix{geo.Identity()}
+	// Whether each walked object's children lie outside a turned clip at
+	// mouse (#1003).
+	var cutStack []bool
 
 	beforeFunc := func(walked core.CanvasObject, _ geo.Position, clipPos geo.Position, clipSize geo.Size) bool {
 		if !walked.Visible() {
@@ -195,6 +198,11 @@ func FindObjectAtPositionMatching(mouse geo.Position, matches func(object core.C
 		}
 		wt := parentWT.Multiply(localT)
 		wtStack = append(wtStack, wt)
+		cut := len(cutStack) > 0 && cutStack[len(cutStack)-1]
+		cutStack = append(cutStack, cut || turnedClipMisses(walked, wt, mouse))
+		if cut {
+			return false
+		}
 
 		// Clip check (coarse, unchanged).
 		if mouse.X < clipPos.X || mouse.Y < clipPos.Y {
@@ -218,6 +226,9 @@ func FindObjectAtPositionMatching(mouse geo.Position, matches func(object core.C
 		if len(wtStack) > 1 {
 			wtStack = wtStack[:len(wtStack)-1]
 		}
+		if len(cutStack) > 0 {
+			cutStack = cutStack[:len(cutStack)-1]
+		}
 	}
 
 	layer := 0
@@ -233,6 +244,7 @@ func FindObjectAtPositionMatching(mouse geo.Position, matches func(object core.C
 			continue
 		}
 		wtStack = wtStack[:1] // reset stack between walks
+		cutStack = cutStack[:0]
 		WalkVisibleObjectTree(overlay, beforeFunc, afterFunc)
 		if found != nil || !overlayPassesInput(overlay) {
 			return found, foundPos, layer
@@ -244,6 +256,7 @@ func FindObjectAtPositionMatching(mouse geo.Position, matches func(object core.C
 			continue
 		}
 		wtStack = wtStack[:1] // reset stack between roots
+		cutStack = cutStack[:0]
 		WalkVisibleObjectTree(root, beforeFunc, afterFunc)
 		if found != nil {
 			break
@@ -278,6 +291,19 @@ func LocalHitPoint(wt geo.Matrix, mouse geo.Position, w, h float32) (geo.Positio
 		return geo.Position{}, false
 	}
 	return geo.NewPos(localX, localY), true
+}
+
+// turnedClipMisses reports whether obj clips its children and, its world
+// transform wt turning or skewing it, mouse lies outside the turned rectangle
+// it clips to. The walks' clips are boxes on the canvas, which around a turned
+// rectangle take in corners the painters clip away (#1003). Rounded corners
+// are not tested: the hit-test leaves them coarse.
+func turnedClipMisses(obj core.CanvasObject, wt geo.Matrix, mouse geo.Position) bool {
+	if wt.B == 0 && wt.C == 0 || !IsClip(obj) {
+		return false
+	}
+	_, in := LocalHitPoint(wt, mouse, obj.Size().Width, obj.Size().Height)
+	return !in
 }
 
 // InputPassThrough is implemented by overlay roots that must not block
@@ -320,6 +346,7 @@ func FindAllObjectsAtPositionMatching(mouse geo.Position, matches func(object co
 	var results []ObjectAtPosition
 
 	wtStack := []geo.Matrix{geo.Identity()}
+	var cutStack []bool // as in FindObjectAtPositionMatching
 
 	beforeFunc := func(walked core.CanvasObject, _ geo.Position, clipPos geo.Position, clipSize geo.Size) bool {
 		if !walked.Visible() {
@@ -337,6 +364,11 @@ func FindAllObjectsAtPositionMatching(mouse geo.Position, matches func(object co
 		}
 		wt := parentWT.Multiply(localT)
 		wtStack = append(wtStack, wt)
+		cut := len(cutStack) > 0 && cutStack[len(cutStack)-1]
+		cutStack = append(cutStack, cut || turnedClipMisses(walked, wt, mouse))
+		if cut {
+			return false
+		}
 
 		if mouse.X < clipPos.X || mouse.Y < clipPos.Y {
 			return false
@@ -358,6 +390,9 @@ func FindAllObjectsAtPositionMatching(mouse geo.Position, matches func(object co
 		if len(wtStack) > 1 {
 			wtStack = wtStack[:len(wtStack)-1]
 		}
+		if len(cutStack) > 0 {
+			cutStack = cutStack[:len(cutStack)-1]
+		}
 	}
 
 	if overlay != nil {
@@ -372,6 +407,7 @@ func FindAllObjectsAtPositionMatching(mouse geo.Position, matches func(object co
 				continue
 			}
 			wtStack = wtStack[:1]
+			cutStack = cutStack[:0]
 			WalkVisibleObjectTree(root, beforeFunc, afterFunc)
 			if len(results) > 0 {
 				break

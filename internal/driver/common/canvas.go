@@ -1089,6 +1089,13 @@ func (c *Canvas) RebuildSpatialIndex() {
 // nodes still say where they were. Visiting them also costs more than the
 // culled paint walk saved on a phone: the walk left them out of the CPU cache.
 func (c *Canvas) walkCacheNodeDFS(node *RenderCacheNode, b *SpatialIndex) {
+	c.addCacheNodes(node, b, -1)
+}
+
+// addCacheNodes is walkCacheNodeDFS below the innermost turned clip node lies
+// in, cut, -1 for none. A clip-owner its world transform turns or skews
+// starts one for its children (#1003).
+func (c *Canvas) addCacheNodes(node *RenderCacheNode, b *SpatialIndex, cut int32) {
 	if node == nil {
 		return
 	}
@@ -1097,16 +1104,20 @@ func (c *Canvas) walkCacheNodeDFS(node *RenderCacheNode, b *SpatialIndex) {
 	if obj != nil && obj.Visible() {
 		s := obj.Size()
 		if s.Width > 0 && s.Height > 0 {
-			b.add(obj, node.worldTransform, s.Width, s.Height, node.clipPos, node.clipSize)
+			b.add(obj, node.worldTransform, s.Width, s.Height, node.clipPos, node.clipSize, cut)
 			if node.paintCulled {
 				return
+			}
+			if wt := node.worldTransform; (wt.B != 0 || wt.C != 0) && driver.IsClip(obj) {
+				b.cuts = append(b.cuts, turnedCut{wt: wt, w: s.Width, h: s.Height, parent: cut})
+				cut = int32(len(b.cuts) - 1)
 			}
 		}
 	}
 
 	// Children: firstChild, then firstChild.nextSibling, ...
 	for child := node.firstChild; child != nil; child = child.nextSibling {
-		c.walkCacheNodeDFS(child, b)
+		c.addCacheNodes(child, b, cut)
 	}
 }
 
