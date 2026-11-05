@@ -26,6 +26,15 @@ Backlog.
 - **Cost** (M3 Max, 16 cores, a 12 MP JPEG): Display P3 adds 12 ms to a 116 ms decode; an embedded sRGB profile adds 18 µs; no profile, nothing measurable. Not measured on a phone.
 - Converting to sRGB clips wide-gamut colours. Wide-gamut output is #803's design question; the converter takes its source profile, so a different destination space can be added there.
 
+### Transforms (#997)
+`core.Transformable` objects compose: a child's world transform is `parent.worldTransform * Translate(child.Position()) * child.Transform()`. Every part of the pipeline uses that one product.
+- **Drawing:** each object is drawn from its paint origin, the world transform's image of its (0, 0) (`RenderCacheNode.PaintOrigin`), with the transform's linear part applied about it (the GPU painters' `anchor`, the software painter's `drawTransformed`). So a pure translation moves an object, a `NewRotationAround` pivot is honoured, and the children of a transformed widget turn with it as one piece. Before #997 the GPU painters turned each leaf about its own origin and dropped every translation, and the software painter dropped a pure translation.
+- **Hit-testing** (`driver.LocalHitPoint`, shared by the tree walk and the spatial index) maps the pointer through the inverse world transform.
+- **Clips:** the walk carries what the transforms above it do to walk positions, so a clipping object clips its children where it is drawn: its box moved, or under a rotation the bounding box of where it is drawn (`common.WorldBox`). A rounded clip is exact under any transform, because its stencil is stamped with the object's transform (set before the clips since #997; it used to be the last drawn object's).
+- **Partial repaint and culling:** the region and the dirty-region skip use the world box (`common.PaintBounds`); the clip cull is off at and below a transformed object.
+- **Not yet:** `AbsolutePositionForObject` (and the scroll-chain relocation built on it), a `RepaintBoundary` under a rotation or scale, and exact rectangle clips under a rotation (#1003).
+- **Verify:** `TestWorldTransformDraws` in `internal/driver/glfw/realloop` (darwin, WebGPU, and GL under `-tags gl`), and `hack/swipecardprobe -auto -composite`, which prints how far the GPU painter draws the label from where the software painter does.
+
 ### Rendering Engine Enhancements
 - **Shader-based ripple** (`canvas.Ripple`) — radial touch feedback with SDF-based rounded-corner clipping. Custom GLSL shader.
 - **FBO support** — Framebuffer Objects for off-screen rendering. `CreateFramebuffer`, `BindFramebuffer`, etc.
