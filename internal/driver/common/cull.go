@@ -71,11 +71,22 @@ func (r *RenderCacheNode) clipInfo() (bool, float32) {
 // PaintClips is the clips a paint walk sets up for node's object: none for a
 // clip-owner whose children the walk culled, as they would constrain nothing
 // (#481). Each one costs the painter a stencil or scissor change.
+//
+// A rectangle clip that its world transform turns or skews is also a stencil
+// clip with no corner radius, stamped with that transform: the scissor can
+// only hold the box around the turned rectangle, so alone it would let the
+// children show in that box's corners (#1003). The scissor stays, as the
+// bound of the stencil's area. A scale or a move keeps the rectangle upright,
+// and the scissor alone is exact.
 func PaintClips(node *RenderCacheNode) driver.Clips {
 	if node.paintCulled {
 		return driver.Clips{}
 	}
-	return driver.ClipsOf(node.obj)
+	c := driver.ClipsOf(node.obj)
+	if c.Rect && !c.Rounded && (node.worldTransform.B != 0 || node.worldTransform.C != 0) {
+		c.Rounded = true
+	}
+	return c
 }
 
 // outside reports whether the rect (pos, size) widened by m misses the clip.
