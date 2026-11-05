@@ -276,10 +276,12 @@ func (p *painter) SetOutputSize(width, height int) {
 }
 
 func (p *painter) StartClipping(pos geo.Position, size geo.Size) {
+	// The edges are scaled, not the origin and the size, so clips sharing an
+	// edge in dp share it in pixels (#975; see the WebGPU painter).
 	x := p.textureScale(pos.X)
 	y := p.textureScale(p.targetHeight() - pos.Y - size.Height)
-	w := p.textureScale(size.Width)
-	h := p.textureScale(size.Height)
+	w := p.textureScale(pos.X+size.Width) - x
+	h := p.textureScale(p.targetHeight()-pos.Y) - y
 	p.scissor = [4]int32{int32(x), int32(y), int32(w), int32(h)}
 	p.ctx.Scissor(p.scissor[0], p.scissor[1], p.scissor[2], p.scissor[3])
 	p.ctx.Enable(scissorTest)

@@ -50,3 +50,24 @@ func TestStartClippingFlipsAgainstTarget(t *testing.T) {
 		{20, 2 * (400 - 20 - 50), 200, 100},
 	}, ctx.scissors)
 }
+
+// A partial repaint clears the dirty region under one scissor and redraws a
+// ClipToBounds container under the container's clip within it. Rects sharing
+// an edge in dp must share it in pixels, or a row is cleared and never redrawn
+// (#975). At 2.625 the region (0, 11.4 high) and the clip (1.7, 9.7 high) share
+// their bottom edge, which, scaling y and h separately, landed a row apart.
+func TestStartClippingSharedEdgesMatch(t *testing.T) {
+	ctx := &scissorContext{}
+	c := test.NewCanvas()
+	c.Resize(geo.NewSize(40, 40))
+	p := &painter{ctx: ctx, canvas: c, pixScale: 2.625}
+
+	p.StartClipping(geo.NewPos(0, 0), geo.NewSize(40, 11.4))
+	p.StartClipping(geo.NewPos(0, 1.7), geo.NewSize(40, 9.7))
+
+	region, clip := ctx.scissors[0], ctx.scissors[1]
+	assert.Equal(t, region[1], clip[1], "bottom edges (GL y-up: the scissor's y)")
+	assert.Equal(t, region[0]+region[2], clip[0]+clip[2], "right edges")
+	// The clip's top edge is its own: 1.7 dp down, rounded once.
+	assert.Equal(t, int32(105-4), clip[1]+clip[3], "the clip's top edge")
+}
