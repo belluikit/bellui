@@ -39,6 +39,7 @@ func (d *gLDriver) runEventLoop() {
 			return
 		case f := <-funcQueue.Out():
 			f.f()
+			pendingFuncs.Add(-1)
 			if f.done != nil {
 				f.done <- struct{}{}
 			}
