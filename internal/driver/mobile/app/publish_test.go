@@ -73,3 +73,27 @@ func TestHandshake_UnboundedWaitsForTaker(t *testing.T) {
 	a.publishResult <- PublishResult{BackBufferPreserved: true}
 	assert.True(t, (<-done).BackBufferPreserved)
 }
+
+// With publishDirect set, a frame is published without a taker and without
+// offering anything on publish: Android under WebGPU has already presented,
+// and nothing in the main loop needs the round trip (#967).
+func TestHandshake_DirectSkipsTheMainLoop(t *testing.T) {
+	setPublishWait(t, 0)
+	called := 0
+	old := publishDirect
+	publishDirect = func() PublishResult { called++; return PublishResult{BackBufferPreserved: true} }
+	t.Cleanup(func() { publishDirect = old })
+	a := &app{publish: make(chan struct{}), publishResult: make(chan PublishResult)}
+
+	done := make(chan PublishResult)
+	go func() { done <- a.handshake() }()
+	select {
+	case r := <-done:
+		assert.True(t, r.BackBufferPreserved)
+	case <-a.publish:
+		t.Fatal("a direct publish still offered the frame to the main loop")
+	case <-time.After(5 * time.Second):
+		t.Fatal("a direct publish waited for a taker")
+	}
+	assert.Equal(t, 1, called)
+}

@@ -150,11 +150,20 @@ func (a *app) Publish() PublishResult {
 // (#910).
 var publishWait time.Duration
 
+// publishDirect, when set, publishes a frame without the handshake. Android
+// under WebGPU sets it: the painter has already presented the frame, so the
+// main loop would only answer, and that round trip parks and wakes two threads
+// every frame, ~6 points of a core on a Pixel 9a at 60 fps (#967).
+var publishDirect func() PublishResult
+
 // handshake hands the frame to the platform and waits for its result. With
 // publishWait set, a frame nobody takes in time is dropped from the handshake.
 // Only the send is bounded: whoever receives on publish answers on
 // publishResult straight away.
 func (a *app) handshake() PublishResult {
+	if publishDirect != nil {
+		return publishDirect()
+	}
 	if publishWait <= 0 {
 		a.publish <- struct{}{}
 		return <-a.publishResult
