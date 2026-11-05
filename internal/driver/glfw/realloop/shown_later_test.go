@@ -25,7 +25,9 @@ func TestMain(m *testing.M) {
 	code := make(chan int, 1)
 	go func() {
 		code <- m.Run()
-		testApp.Quit()
+		// On main: Quit closes every window, which raced the loop's own
+		// window list from here and crashed (player#287).
+		bellui.Do(testApp.Quit)
 	}()
 	testApp.Run() // the draw loop needs the process's main goroutine
 	os.Exit(<-code)
