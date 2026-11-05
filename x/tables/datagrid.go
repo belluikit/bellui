@@ -91,6 +91,12 @@ type DataGrid struct {
 	OnFilterChanged    func()
 	OnCellValueChanged func(id CellID, oldValue, newValue any)
 	OnRowMoved         func(fromSourceRow, toSourceRow int)
+	// OnVisibleRowsChanged fires when the range of display rows in view
+	// changes: by scrolling, a resize, or new data. first and last are
+	// display rows, inclusive; an empty grid reports 0, -1. An app that loads
+	// rows in pages compares last with RowCount to fetch the next page as the
+	// listener nears the end (#983, player#277).
+	OnVisibleRowsChanged func(first, last int)
 
 	// MasterDetail configures expandable detail rows.
 	MasterDetail MasterDetailConfig
@@ -103,6 +109,8 @@ type DataGrid struct {
 	pipe              *pipeline.Pipeline
 	resolvedCols      []*resolvedColumn
 	viewport          *render.Viewport
+	reportedRows      render.Range // last range OnVisibleRowsChanged was given
+	rowsReported      bool         // whether it has been given one
 	pool              *render.CellPool
 	cellsWidget       *render.CellsWidget
 	headerWidget      *render.HeaderWidget
@@ -420,6 +428,7 @@ func (g *DataGrid) cellPadding() float32 {
 func (g *DataGrid) onScrolled(pos geo.Position) {
 	g.offset = pos
 	g.viewport.Update(pos, g.scrollContent.Scroll.Size())
+	g.noteVisibleRows()
 	g.cellsWidget.Refresh()
 
 	// The header's main band scrolls horizontally in sync with the body, so it
@@ -447,6 +456,19 @@ func (g *DataGrid) onScrolled(pos geo.Position) {
 	g.layoutEditOverlay(g.Size())
 }
 
+// noteVisibleRows tells OnVisibleRowsChanged the viewport's visible rows, if
+// they differ from what it was last told. Call after each viewport.Update.
+func (g *DataGrid) noteVisibleRows() {
+	vis := g.viewport.VisibleRows
+	if g.rowsReported && vis == g.reportedRows {
+		return
+	}
+	g.reportedRows, g.rowsReported = vis, true
+	if g.OnVisibleRowsChanged != nil {
+		g.OnVisibleRowsChanged(vis.Min, vis.Max)
+	}
+}
+
 // CreateRenderer returns the DataGrid's renderer.
 func (g *DataGrid) CreateRenderer() core.WidgetRenderer {
 	g.ExtendBaseWidget(g)
@@ -464,6 +486,7 @@ func (g *DataGrid) RefreshData() {
 	g.pipe.MarkDirty()
 	g.updateViewportGeometry()
 	g.viewport.Update(g.offset, g.scrollContent.Scroll.Size())
+	g.noteVisibleRows()
 	g.cellsWidget.Refresh()
 	g.headerWidget.Refresh()
 }
@@ -1146,6 +1169,7 @@ func (g *DataGrid) rebuildPipeline() {
 	g.remapCursorAfterReindex()
 	g.updateViewportGeometry()
 	g.viewport.Update(g.offset, g.scrollContent.Scroll.Size())
+	g.noteVisibleRows()
 	g.cellsWidget.Refresh()
 	g.headerWidget.Refresh()
 }

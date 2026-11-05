@@ -132,6 +132,7 @@ func (r *dataGridRenderer) doLayout(size geo.Size) {
 		effectiveViewW = 0
 	}
 	g.viewport.Update(g.offset, geo.NewSize(effectiveViewW, contentH))
+	g.noteVisibleRows()
 
 	// Pinned left cells
 	if pinnedLeftW > 0 {
