@@ -1,7 +1,4 @@
-//go:build darwin && !ci && !gl
-
-// Not under -tags gl: the GL painter's rounded clips do not clip on macOS
-// (#990), for a container or a widget alike. Remove !gl when that is fixed.
+//go:build darwin && !ci
 
 package realloop_test
 
@@ -16,6 +13,7 @@ import (
 	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/widget"
 )
 
 // TestContainerClipCornerRadiusDraws pins #991 (player#268) in a real window: the
@@ -24,7 +22,39 @@ import (
 // except, with ClipCornerRadius 40, its corners; with radius 0 (the control)
 // the corners are red too, so the test can tell them apart. Points are read
 // in the clip's own coordinates.
+//
+// It runs under -tags gl too: the GL painter draws into an offscreen canvas
+// FBO, which had no stencil buffer, so no rounded clip clipped (#990). The
+// widget path (a renderer's RoundedClipCornerRadius, as Card and Entry use)
+// and a clip inside a RepaintBoundary, which has an FBO of its own, are
+// checked the same way.
 func TestContainerClipCornerRadiusDraws(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		// clip returns the 200x200 clipping object with the red fill inside
+		// it, and the object to place in the window.
+		clip func(radius float32, fill core.CanvasObject) (clip, content core.CanvasObject)
+	}{
+		{"container", func(radius float32, fill core.CanvasObject) (core.CanvasObject, core.CanvasObject) {
+			c := &bellui.Container{ClipToBounds: true, ClipCornerRadius: radius, Objects: []core.CanvasObject{fill}}
+			return c, c
+		}},
+		{"widget", func(radius float32, fill core.CanvasObject) (core.CanvasObject, core.CanvasObject) {
+			w := newRoundClipWidget(radius, fill)
+			return w, w
+		}},
+		{"container in a RepaintBoundary", func(radius float32, fill core.CanvasObject) (core.CanvasObject, core.CanvasObject) {
+			c := &bellui.Container{ClipToBounds: true, ClipCornerRadius: radius, Objects: []core.CanvasObject{fill}}
+			return c, container.NewRepaintBoundary(c)
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			testClipCornerRadiusDraws(t, tc.clip)
+		})
+	}
+}
+
+func testClipCornerRadiusDraws(t *testing.T, build func(float32, core.CanvasObject) (core.CanvasObject, core.CanvasObject)) {
 	red := func(c color.Color) bool {
 		r, g, b, _ := c.RGBA()
 		return r>>8 > 200 && g>>8 < 60 && b>>8 < 60
@@ -35,13 +65,13 @@ func TestContainerClipCornerRadiusDraws(t *testing.T) {
 		fill := canvas.NewRectangle(color.NRGBA{R: 255, A: 255})
 		fill.Move(geo.NewPos(-60, -60))
 		fill.Resize(geo.NewSize(320, 320))
-		clip := &bellui.Container{ClipToBounds: true, ClipCornerRadius: radius, Objects: []core.CanvasObject{fill}}
-		clip.Move(geo.NewPos(50, 50))
-		clip.Resize(geo.NewSize(200, 200))
+		clip, content := build(radius, fill)
+		content.Move(geo.NewPos(50, 50))
+		content.Resize(geo.NewSize(200, 200))
 		var w bellui.Window
 		bellui.DoAndWait(func() {
 			w = testApp.NewWindow("clip corners")
-			w.SetContent(container.NewWithoutLayout(clip))
+			w.SetContent(container.NewWithoutLayout(content))
 			w.Resize(geo.NewSize(300, 300))
 			w.Show()
 		})
@@ -86,3 +116,32 @@ func TestContainerClipCornerRadiusDraws(t *testing.T) {
 		}
 	}
 }
+
+// roundClipWidget clips its one object to its bounds with rounded corners,
+// the way Card and Entry do: through its renderer's IsClip and
+// RoundedClipCornerRadius. A radius of 0 makes it a square clip.
+type roundClipWidget struct {
+	widget.BaseWidget
+	radius float32
+	fill   core.CanvasObject
+}
+
+func newRoundClipWidget(radius float32, fill core.CanvasObject) *roundClipWidget {
+	w := &roundClipWidget{radius: radius, fill: fill}
+	w.ExtendBaseWidget(w)
+	return w
+}
+
+func (w *roundClipWidget) CreateRenderer() core.WidgetRenderer {
+	return &roundClipRenderer{w: w}
+}
+
+type roundClipRenderer struct{ w *roundClipWidget }
+
+func (r *roundClipRenderer) Destroy()                         {}
+func (r *roundClipRenderer) Layout(geo.Size)                  {} // the fill keeps its own place
+func (r *roundClipRenderer) MinSize() geo.Size                { return geo.Size{} }
+func (r *roundClipRenderer) Objects() []core.CanvasObject     { return []core.CanvasObject{r.w.fill} }
+func (r *roundClipRenderer) Refresh()                         {}
+func (r *roundClipRenderer) IsClip()                          {}
+func (r *roundClipRenderer) RoundedClipCornerRadius() float32 { return r.w.radius }

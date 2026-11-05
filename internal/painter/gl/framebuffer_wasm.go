@@ -9,6 +9,10 @@ import "github.com/belluikit/gl-js"
 // mirrors gl.Framebuffer rather than the desktop uint32 name.
 type Framebuffer gl.Framebuffer
 
+// Renderbuffer represents a WebGL renderbuffer object, a js.Value wrapper like
+// Framebuffer.
+type Renderbuffer gl.Renderbuffer
+
 // defaultFramebuffer is the canvas back buffer. WebGL identifies it with the
 // null framebuffer; binding it directs subsequent draws to the screen. Its
 // zero value is not usable (a zero js.Value is not WebGL null), so it must be

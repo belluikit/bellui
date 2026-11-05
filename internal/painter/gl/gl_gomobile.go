@@ -77,6 +77,13 @@ const (
 	glBack           = gl.Back
 )
 
+// Renderbuffer constants, for a framebuffer's stencil attachment.
+const (
+	renderbuffer      = gl.RenderbufferTarget
+	stencilAttachment = gl.StencilAttachment
+	stencilIndex8     = gl.StencilIndex8
+)
+
 type (
 	// Attribute represents a GL attribute
 	Attribute gl.Attrib
@@ -547,6 +554,26 @@ func (c *mobileContext) CheckFramebufferStatus(target uint32) uint32 {
 
 func (c *mobileContext) DeleteFramebuffer(fb Framebuffer) {
 	c.glContext.DeleteFramebuffer(gl.Framebuffer{Value: uint32(fb)})
+}
+
+func (c *mobileContext) CreateRenderbuffer() Renderbuffer {
+	return Renderbuffer(c.glContext.CreateRenderbuffer().Value)
+}
+
+func (c *mobileContext) BindRenderbuffer(target uint32, rb Renderbuffer) {
+	c.glContext.BindRenderbuffer(gl.Enum(target), gl.Renderbuffer{Value: uint32(rb)})
+}
+
+func (c *mobileContext) RenderbufferStorage(target, internalFormat uint32, width, height int) {
+	c.glContext.RenderbufferStorage(gl.Enum(target), gl.Enum(internalFormat), width, height)
+}
+
+func (c *mobileContext) FramebufferRenderbuffer(target, attachment, rbTarget uint32, rb Renderbuffer) {
+	c.glContext.FramebufferRenderbuffer(gl.Enum(target), gl.Enum(attachment), gl.Enum(rbTarget), gl.Renderbuffer{Value: uint32(rb)})
+}
+
+func (c *mobileContext) DeleteRenderbuffer(rb Renderbuffer) {
+	c.glContext.DeleteRenderbuffer(gl.Renderbuffer{Value: uint32(rb)})
 }
 
 func (c *mobileContext) Flush() {

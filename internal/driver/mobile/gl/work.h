@@ -93,6 +93,13 @@ typedef enum {
 	glfnCheckFramebufferStatus,
 	glfnDeleteFramebuffer,
 
+	// Renderbuffer methods.
+	glfnCreateRenderbuffer,
+	glfnBindRenderbuffer,
+	glfnRenderbufferStorage,
+	glfnFramebufferRenderbuffer,
+	glfnDeleteRenderbuffer,
+
 	// Additional methods.
 	glfnCopyTexSubImage2D,
 	glfnColorMask,

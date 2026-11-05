@@ -37,9 +37,9 @@ func TestStartClippingFlipsAgainstTarget(t *testing.T) {
 	clip := func() {
 		p.StartClipping(geo.NewPos(10, 20), geo.NewSize(100, 50))
 	}
-	p.pushRenderTarget(1, 1200, 800, 0) // the canvas FBO
+	p.pushRenderTarget(1, 1200, 800, geo.Size{}) // the canvas FBO
 	clip()
-	p.pushRenderTarget(2, 300, 160, 80) // a boundary 80 high
+	p.pushRenderTarget(2, 300, 160, geo.NewSize(150, 80)) // a boundary 80 high
 	clip()
 	p.popRenderTarget(0, 0)
 	clip()

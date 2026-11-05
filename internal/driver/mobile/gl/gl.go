@@ -685,6 +685,60 @@ func (ctx *context) DeleteFramebuffer(fb Framebuffer) {
 	})
 }
 
+// --- Renderbuffer methods ---
+
+func (ctx *context) CreateRenderbuffer() Renderbuffer {
+	return Renderbuffer{Value: uint32(ctx.enqueue(call{
+		args: fnargs{
+			fn: glfnCreateRenderbuffer,
+		},
+		blocking: true,
+	}))}
+}
+
+func (ctx *context) BindRenderbuffer(target Enum, rb Renderbuffer) {
+	ctx.enqueue(call{
+		args: fnargs{
+			fn: glfnBindRenderbuffer,
+			a0: target.c(),
+			a1: uintptr(rb.Value),
+		},
+	})
+}
+
+func (ctx *context) RenderbufferStorage(target, internalFormat Enum, width, height int) {
+	ctx.enqueue(call{
+		args: fnargs{
+			fn: glfnRenderbufferStorage,
+			a0: target.c(),
+			a1: internalFormat.c(),
+			a2: uintptr(width),
+			a3: uintptr(height),
+		},
+	})
+}
+
+func (ctx *context) FramebufferRenderbuffer(target, attachment, rbTarget Enum, rb Renderbuffer) {
+	ctx.enqueue(call{
+		args: fnargs{
+			fn: glfnFramebufferRenderbuffer,
+			a0: target.c(),
+			a1: attachment.c(),
+			a2: rbTarget.c(),
+			a3: uintptr(rb.Value),
+		},
+	})
+}
+
+func (ctx *context) DeleteRenderbuffer(rb Renderbuffer) {
+	ctx.enqueue(call{
+		args: fnargs{
+			fn: glfnDeleteRenderbuffer,
+			a0: uintptr(rb.Value),
+		},
+	})
+}
+
 // --- Additional methods ---
 
 func (ctx *context) CopyTexSubImage2D(target Enum, level, xoffset, yoffset, x, y, width, height int) {

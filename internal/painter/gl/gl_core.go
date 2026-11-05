@@ -68,6 +68,13 @@ const (
 	glBack           = gl.BACK
 )
 
+// Renderbuffer constants, for a framebuffer's stencil attachment.
+const (
+	renderbuffer      = gl.RENDERBUFFER
+	stencilAttachment = gl.STENCIL_ATTACHMENT
+	stencilIndex8     = gl.STENCIL_INDEX8
+)
+
 const (
 	noBuffer = Buffer(0)
 	noShader = Shader(0)
@@ -524,6 +531,29 @@ func (c *coreContext) CheckFramebufferStatus(target uint32) uint32 {
 func (c *coreContext) DeleteFramebuffer(fb Framebuffer) {
 	f := uint32(fb)
 	gl.DeleteFramebuffers(1, &f)
+}
+
+func (c *coreContext) CreateRenderbuffer() Renderbuffer {
+	var rb uint32
+	gl.GenRenderbuffers(1, &rb)
+	return Renderbuffer(rb)
+}
+
+func (c *coreContext) BindRenderbuffer(target uint32, rb Renderbuffer) {
+	gl.BindRenderbuffer(target, uint32(rb))
+}
+
+func (c *coreContext) RenderbufferStorage(target, internalFormat uint32, width, height int) {
+	gl.RenderbufferStorage(target, internalFormat, int32(width), int32(height))
+}
+
+func (c *coreContext) FramebufferRenderbuffer(target, attachment, rbTarget uint32, rb Renderbuffer) {
+	gl.FramebufferRenderbuffer(target, attachment, rbTarget, uint32(rb))
+}
+
+func (c *coreContext) DeleteRenderbuffer(rb Renderbuffer) {
+	r := uint32(rb)
+	gl.DeleteRenderbuffers(1, &r)
 }
 
 func (c *coreContext) Flush() {

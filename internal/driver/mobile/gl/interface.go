@@ -291,6 +291,21 @@ type Context interface {
 	// DeleteFramebuffer deletes a framebuffer object.
 	DeleteFramebuffer(fb Framebuffer)
 
+	// CreateRenderbuffer creates a renderbuffer object.
+	CreateRenderbuffer() Renderbuffer
+
+	// BindRenderbuffer binds a renderbuffer.
+	BindRenderbuffer(target Enum, rb Renderbuffer)
+
+	// RenderbufferStorage allocates a renderbuffer's storage.
+	RenderbufferStorage(target, internalFormat Enum, width, height int)
+
+	// FramebufferRenderbuffer attaches a renderbuffer to a framebuffer.
+	FramebufferRenderbuffer(target, attachment, rbTarget Enum, rb Renderbuffer)
+
+	// DeleteRenderbuffer deletes a renderbuffer object.
+	DeleteRenderbuffer(rb Renderbuffer)
+
 	// CopyTexSubImage2D copies pixels from the framebuffer into a 2D texture.
 	CopyTexSubImage2D(target Enum, level, xoffset, yoffset, x, y, width, height int)
 

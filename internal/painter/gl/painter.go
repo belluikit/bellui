@@ -83,8 +83,8 @@ type painter struct {
 // renderTarget is one entry of the painter's render-target stack.
 type renderTarget struct {
 	fbo     Framebuffer
-	w, h    int     // viewport pixel dimensions
-	logical float32 // logical height, for the scissor's y flip; 0 means the canvas's
+	w, h    int      // viewport pixel dimensions
+	logical geo.Size // logical size, for the scissor's y flip and clip stamps; zero means the canvas's
 }
 
 // beginFrame counts a frame and frees the cached shadows and boundaries no
@@ -294,10 +294,18 @@ func (p *painter) StartClipping(pos geo.Position, size geo.Size) {
 // boundary's height, not the canvas's: the paint walk hands StartClipping
 // boundary-local rects there (#559).
 func (p *painter) targetHeight() float32 {
-	if n := len(p.targetStack); n > 0 && p.targetStack[n-1].logical > 0 {
+	return p.targetFrame().Height
+}
+
+// targetFrame returns the logical size of the bound render target: a
+// boundary FBO's, or the canvas's. Clip stamps take no frame from the walk,
+// and stamped against the canvas inside a boundary they came out scaled by
+// the boundary's share of it (as the WebGPU painter found in #564).
+func (p *painter) targetFrame() geo.Size {
+	if n := len(p.targetStack); n > 0 && !p.targetStack[n-1].logical.IsZero() {
 		return p.targetStack[n-1].logical
 	}
-	return p.canvas.Size().Height
+	return p.canvas.Size()
 }
 
 func (p *painter) StopClipping() {
@@ -428,7 +436,7 @@ func (p *painter) StartRoundedClipping(pos geo.Position, size geo.Size, cornerRa
 	p.ctx.ColorMask(false, false, false, false)
 
 	// Draw a rounded rectangle to the stencil buffer
-	frame := p.canvas.Size()
+	frame := p.targetFrame()
 	r := canvas.NewRectangle(color.Transparent)
 	r.Resize(size)
 	r.Move(pos)
@@ -471,7 +479,7 @@ func (p *painter) StartPathClipping(path *canvas.Path, pos geo.Position, size ge
 		return
 	}
 
-	frame := p.canvas.Size()
+	frame := p.targetFrame()
 	program := p.pathProgram
 	p.ctx.UseProgram(program.ref)
 
