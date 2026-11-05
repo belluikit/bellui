@@ -36,6 +36,7 @@ var shaderNames = []string{
 	"path",
 	"arc",
 	"ripple",
+	"gradient",
 	"blur",
 	"scene3d",
 	"quad",

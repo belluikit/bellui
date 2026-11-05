@@ -136,6 +136,7 @@ var descriptors = map[string]Descriptor{
 	"polygon":         {Name: "polygon", Vertex: quadVertex, DefaultBlend: BlendOver, Topology: TriangleStrip},
 	"arc":             {Name: "arc", Vertex: quadVertex, DefaultBlend: BlendOver, Topology: TriangleStrip},
 	"ripple":          {Name: "ripple", Vertex: quadVertex, DefaultBlend: BlendPremul, Topology: TriangleStrip},
+	"gradient":        {Name: "gradient", Vertex: quadVertex, DefaultBlend: BlendPremul, Topology: TriangleStrip},
 	"line":            {Name: "line", Vertex: quadVertex, DefaultBlend: BlendOver, Topology: TriangleList},
 	"path": {Name: "path", DefaultBlend: BlendOver, Topology: TriangleList, Vertex: VertexLayout{
 		Stride: 12,

@@ -1605,6 +1605,7 @@ var clipPositions = map[string]clipPosition{
 	"polygon":         {stride: 4, offset: 2},
 	"arc":             {stride: 4, offset: 2},
 	"ripple":          {stride: 4, offset: 2},
+	"gradient":        {stride: 4, offset: 2},
 	"simple":          {stride: 5}, // vert.xy
 	"blur":            {stride: 5},
 	"path":            {stride: 3},
