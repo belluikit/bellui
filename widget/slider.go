@@ -195,6 +195,23 @@ func (s *Slider) Dragging() bool {
 }
 
 // Dragged is called when a drag event occurs.
+// ClaimsDrag takes a touch drag along the slider and leaves one across it to
+// the scroll around the slider, as a disabled slider leaves every drag
+// (event.DragClaimer, #662).
+func (s *Slider) ClaimsDrag(d geo.Delta) bool {
+	return !s.disabled && claimsAlong(s.Orientation, d)
+}
+
+// claimsAlong reports whether a drag starting with d runs mostly along an
+// object laid out with orientation o.
+func claimsAlong(o Orientation, d geo.Delta) bool {
+	dx, dy := abs32(d.DX), abs32(d.DY)
+	if o == Vertical {
+		return dy > dx
+	}
+	return dx > dy
+}
+
 func (s *Slider) Dragged(e *event.DragEvent) {
 	if s.disabled {
 		return

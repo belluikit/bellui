@@ -333,6 +333,13 @@ func (s *RangeSlider) fireChangeEnded() {
 	}
 }
 
+// ClaimsDrag takes a touch drag along the slider and leaves one across it to
+// the scroll around the slider, as a disabled slider leaves every drag
+// (event.DragClaimer, #662).
+func (s *RangeSlider) ClaimsDrag(d geo.Delta) bool {
+	return !s.disabled && claimsAlong(s.Orientation, d)
+}
+
 func (s *RangeSlider) Dragged(e *event.DragEvent) {
 	if s.disabled {
 		return

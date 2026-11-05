@@ -152,8 +152,16 @@ func (c *Carousel) dirSign() float32 {
 	return 1
 }
 
+// ClaimsDrag takes a touch drag that starts mostly sideways and leaves one that
+// starts mostly up or down to the scroll around the carousel
+// (event.DragClaimer, #662).
+func (c *Carousel) ClaimsDrag(d geo.Delta) bool {
+	return abs32(d.DX) > abs32(d.DY)
+}
+
 // Dragged moves the content with the finger once the gesture has locked to the
-// horizontal axis; a gesture that starts vertical is ignored.
+// horizontal axis; a gesture that starts vertical is ignored. On touch a
+// vertical one never arrives (ClaimsDrag); a mouse drag still can.
 func (c *Carousel) Dragged(e *event.DragEvent) {
 	if !c.dragging {
 		c.dragging = true
