@@ -9,12 +9,18 @@
 //	go run -tags gl ./hack/swipecardprobe -auto -dx 150 -shot /tmp/gl.png
 //
 // -composite puts a label below a coloured block instead of one rectangle, to
-// see how a card made of several objects tilts (#997).
+// see how a card made of several objects tilts (#997). With -auto it also paints
+// the window with the software painter, the reference for where each object
+// goes, and prints how far the label's glyphs are from where it draws them:
+//
+//	go run ./hack/swipecardprobe -auto -composite -dx 150
+//	go run -tags gl ./hack/swipecardprobe -auto -composite -dx 150
 package main
 
 import (
 	"flag"
 	"fmt"
+	"image"
 	"image/color"
 	"image/png"
 	"os"
@@ -27,6 +33,7 @@ import (
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/painter/software"
 	"github.com/belluikit/bellui/widget"
 )
 
@@ -85,9 +92,57 @@ func main() {
 				}
 				p := area.Position()
 				fmt.Printf("area at %v size %v, capture %v, scale %v\n", p, area.Size(), img.Bounds(), w.Canvas().Scale())
+				if *composite {
+					ref := software.NewPainter().Paint(w.Canvas())
+					// Below the status bar, where only the card draws.
+					top := int((status.MinSize().Height + 4) * w.Canvas().Scale())
+					gx, gy, gok := glyphCentre(img, top)
+					rx, ry, rok := glyphCentre(ref, top)
+					px := float32(img.Bounds().Dx()) / w.Canvas().Size().Width
+					rpx := float32(ref.Bounds().Dx()) / w.Canvas().Size().Width
+					if gok && rok {
+						fmt.Printf("label glyphs: painter (%.1f, %.1f) pt, software (%.1f, %.1f) pt, off by (%.1f, %.1f) pt\n",
+							gx/px, gy/px, rx/rpx, ry/rpx, gx/px-rx/rpx, gy/px-ry/rpx)
+					} else {
+						fmt.Printf("label glyphs not found: painter %v, software %v\n", gok, rok)
+					}
+				}
 			})
 			bellui.DoAndWait(a.Quit)
 		}()
 	}
 	bellui.ShowAndRun(w)
+}
+
+// glyphCentre is the centre of the bounding box of the label's glyph pixels
+// below row top: grey pixels (the theme's text colour, or its blend with the
+// background) far from the background, which it reads at the bottom-left
+// corner. The red block and its anti-aliased edges are not grey.
+func glyphCentre(img image.Image, top int) (x, y float32, ok bool) {
+	b := img.Bounds()
+	br, bg, bb, _ := img.At(b.Min.X, b.Max.Y-1).RGBA()
+	minX, minY, maxX, maxY := b.Max.X, b.Max.Y, b.Min.X, b.Min.Y
+	for py := b.Min.Y + top; py < b.Max.Y; py++ {
+		for px := b.Min.X; px < b.Max.X; px++ {
+			r, g, bl, _ := img.At(px, py).RGBA()
+			r, g, bl = r>>8, g>>8, bl>>8
+			if diff(r, g) > 30 || diff(g, bl) > 30 {
+				continue
+			}
+			if diff(r, br>>8)+diff(g, bg>>8)+diff(bl, bb>>8) < 150 {
+				continue
+			}
+			ok = true
+			minX, maxX = min(minX, px), max(maxX, px)
+			minY, maxY = min(minY, py), max(maxY, py)
+		}
+	}
+	return float32(minX+maxX+1)/2 - float32(b.Min.X), float32(minY+maxY+1)/2 - float32(b.Min.Y), ok
+}
+
+func diff(a, b uint32) uint32 {
+	if a > b {
+		return a - b
+	}
+	return b - a
 }
