@@ -1082,6 +1082,13 @@ func (e *Entry) DragEnd() {
 	}
 }
 
+// ClaimsDrag leaves a plain touch drag to scrolling (event.DragClaimer, #801):
+// it scrolls the entry's own text, or the page around the entry once the text
+// cannot move that way, as a native text field does. A touch selects with a
+// long-press, which a drag then extends, or with the selection handles. A
+// mouse drag still selects.
+func (e *Entry) ClaimsDrag(geo.Delta) bool { return false }
+
 // Dragged is called when the pointer moves while a button is held down.
 // It updates the selection accordingly.
 func (e *Entry) Dragged(d *event.DragEvent) {
@@ -4360,6 +4367,9 @@ func (e *entryContent) DragEnd() {
 
 	e.entry.DragEnd()
 }
+
+// ClaimsDrag is the entry's (see Entry.ClaimsDrag).
+func (e *entryContent) ClaimsDrag(d geo.Delta) bool { return e.entry.ClaimsDrag(d) }
 
 // Dragged is called when the pointer moves while a button is held down.
 // It updates the selection accordingly.

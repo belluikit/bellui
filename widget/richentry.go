@@ -564,6 +564,12 @@ func (e *RichEntry) DoubleTapped(ev *event.PointEvent) {
 
 // --- Draggable (pointer / touch range selection) ---
 
+// ClaimsDrag leaves a plain touch drag to the scroll around the editor
+// (event.DragClaimer, #801), as Entry.ClaimsDrag does. A touch selects with a
+// long-press, which a drag then extends, or with the selection handles. A
+// mouse drag still selects.
+func (e *RichEntry) ClaimsDrag(geo.Delta) bool { return false }
+
 // Dragged extends a text selection as the pointer (or touch) moves. The first
 // event of a drag anchors the selection at the drag's start position; later
 // events move the caret end. This is the only selection path on mobile, which

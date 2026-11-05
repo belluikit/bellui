@@ -430,13 +430,15 @@ func (h *TouchHandler) TapMove(pos geo.Position, tapID int,
 		// position (matching the desktop driver): a fast first move can jump
 		// clear across a small Draggable — a selection handle, a slider thumb —
 		// and would otherwise start dragging whatever lies beyond it (pre-rebrand tracker #945
-		// device finding).
+		// device finding). The target is the innermost Draggable there that
+		// claims a drag this way (event.DragClaimer, #662): a carousel leaves
+		// an upward drag to the scroll around it.
+		claims := h.dragClaims(tapID, offset)
 		dragCo, dragPos := co, objPos
-		if originCo, originPos, _ := h.Finder.FindObjectAtPositionMatching(previousPos, func(object core.CanvasObject) bool {
-			_, ok := object.(event.Draggable)
-			return ok
-		}); originCo != nil {
+		if originCo, originPos, _ := h.Finder.FindObjectAtPositionMatching(previousPos, claims); originCo != nil {
 			dragCo, dragPos = originCo, originPos
+		} else if co != nil && !claims(co) {
+			dragCo = nil
 		}
 		if drag, ok := dragCo.(event.Draggable); ok {
 			h.Dragging = drag
@@ -456,6 +458,26 @@ func (h *TouchHandler) TapMove(pos geo.Position, tapID int,
 	ev.Dragged = offset
 
 	dragCallback(h.Dragging, ev)
+}
+
+// dragClaims returns the hit test that picks the drag target for contact
+// tapID, whose first move past the slop is delta: a Draggable that is not an
+// event.DragClaimer, or one that claims delta. A drag after a hold-fired
+// long-press is not offered (the held finger drags what it picked up), so any
+// Draggable takes it.
+func (h *TouchHandler) dragClaims(tapID int, delta geo.Delta) func(core.CanvasObject) bool {
+	h.TouchCancelLock.Lock()
+	held := h.longPressFired[tapID]
+	h.TouchCancelLock.Unlock()
+	return func(object core.CanvasObject) bool {
+		if _, ok := object.(event.Draggable); !ok {
+			return false
+		}
+		if c, ok := object.(event.DragClaimer); ok && !held {
+			return c.ClaimsDrag(delta)
+		}
+		return true
+	}
 }
 
 // tryLatchScroll begins a scroll gesture for a drag that latched no Draggable

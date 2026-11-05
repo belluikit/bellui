@@ -121,6 +121,20 @@ func (s *selectable) DragEnd() {
 	}
 }
 
+// ClaimsDrag defers to the editor the selectable belongs to (an Entry or
+// RichEntry), which leaves a plain touch drag to scrolling (#801). A
+// selectable Label or RichText takes every drag, so a touch drag over it
+// selects.
+func (s *selectable) ClaimsDrag(d geo.Delta) bool {
+	if c, ok := s.host.(event.DragClaimer); ok {
+		return c.ClaimsDrag(d)
+	}
+	if c, ok := s.focus.(event.DragClaimer); ok {
+		return c.ClaimsDrag(d)
+	}
+	return true
+}
+
 func (s *selectable) Dragged(d *event.DragEvent) {
 	if s.host != nil {
 		s.host.Dragged(d)
