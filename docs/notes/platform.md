@@ -64,6 +64,23 @@ was **wrong**, disproven by goroutine dumps.
   **guest reboot does not clear it — only restarting the emulator process
   does**. If pixel143 starts hanging every bellui app at launch, restart the
   emulator before debugging anything else.
+- **Rotation can't be verified on the emulator (#909)**: on pixel143
+  (emulator 35.4.9, `-gpu swiftshader_indirect`) a WebGPU app rotated a few
+  times ANRs, then wedges the GPU channel as above. Rotate on a physical device
+  instead (the Pixel 9a rotates cleanly). The bug is in the emulator's host
+  side, not in bellui: gfxstream tracks the fence an app passes to
+  `vkAcquireNextImageKHR`, and when the app destroys that fence and then a
+  semaphore, the host polls the destroyed fence and `vkGetFenceStatus` never
+  returns. Its decoder thread for the app stops, so the app's next Vulkan call
+  that waits for an answer waits forever. wgpu destroys exactly those objects
+  on every surface reconfigure, and every rotation reconfigures. A plain C
+  Vulkan app that does the same (no bellui, no wgpu) hangs the same way,
+  stuck at the same host frame. The guest's ANR names whatever call came next:
+  `vkGetSwapchainGrallocUsage2ANDROID` for bellui, `vkCreateSemaphore` for the
+  C app. Nothing on our side avoids it: the fence's lifetime is wgpu-hal's.
+  Host stack, from `sample` on the qemu process during the hang:
+  `on_vkDestroySemaphore → DeviceOpTracker::PollAndProcessGarbage → Poll →
+  vkGetFenceStatus`.
 - **Manifest**: the packaging template declares `locale|layoutDirection` in
   `configChanges` (and `screenLayout` since #299, below) — the framework adds
   `layoutDirection` to every locale change mask, so both are required for an
