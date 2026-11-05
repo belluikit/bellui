@@ -113,6 +113,7 @@ func (d *gLDriver) runEventLoop() {
 				return
 			case f := <-funcQueue.Out():
 				f.f()
+				pendingFuncs.Add(-1)
 				if f.done != nil {
 					f.done <- struct{}{}
 				}
@@ -138,6 +139,11 @@ func (d *gLDriver) runEventLoop() {
 		// here and clamped: time advances between the tick-due check above
 		// and this call, and GLFW asserts on a negative timeout.
 		if wait := time.Until(nextTick); wait > 0 {
+			// Work posted but not yet on funcQueue.Out() has already spent
+			// its wake-up, so wait only briefly for it (#981, player#287).
+			if pendingFuncs.Load() > 0 {
+				wait = min(wait, pendingWait)
+			}
 			glfw.WaitEventsTimeout(wait.Seconds())
 		}
 	}
@@ -186,6 +192,11 @@ func frameForRates(rates []int) time.Duration {
 	best = min(max(best, 30), 240)
 	return time.Second / time.Duration(best)
 }
+
+// pendingWait bounds the loop's wait while posted work has not reached
+// funcQueue.Out(): the goroutine moving it there runs within this, unless the
+// machine is very busy, and the loop then looks again.
+const pendingWait = time.Millisecond
 
 // idleTick is how far apart ticks are while the app is idle. Ticks then only
 // do housekeeping (cache expiry, keeping cached renderers alive), whose

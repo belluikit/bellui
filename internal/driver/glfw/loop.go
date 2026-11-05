@@ -26,6 +26,14 @@ type funcData struct {
 var (
 	funcQueue        = async.NewUnboundedChan[funcData]()
 	running, drained atomic.Bool
+
+	// pendingFuncs counts work posted to funcQueue and not yet run. It goes up
+	// before the work is queued and the loop is woken, and down once the work
+	// has run, so the loop can tell work is on its way even before it reaches
+	// funcQueue.Out(). A goroutine moves it there from In(), and when that
+	// goroutine runs late, the loop used to wake, find nothing, and sleep a
+	// whole idle tick with the work queued (#981, player#287).
+	pendingFuncs atomic.Int64
 )
 
 // Arrange that main.main runs on main thread.
@@ -52,10 +60,12 @@ func runOnMainWithWait(f func(), wait bool) {
 		done := common.DonePool.Get()
 		defer common.DonePool.Put(done)
 
+		pendingFuncs.Add(1)
 		funcQueue.In() <- funcData{f: f, done: done}
 		wakeMainLoop()
 		<-done
 	} else {
+		pendingFuncs.Add(1)
 		funcQueue.In() <- funcData{f: f}
 		wakeMainLoop()
 	}
@@ -169,6 +179,7 @@ func (d *gLDriver) shutdownLoop() {
 	// as we are shutting down make sure we drain the pending funcQueue and close it out.
 	for len(funcQueue.Out()) > 0 {
 		f := <-funcQueue.Out()
+		pendingFuncs.Add(-1)
 		if f.done != nil {
 			f.done <- struct{}{}
 		}
