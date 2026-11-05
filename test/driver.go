@@ -18,6 +18,8 @@ import (
 	"github.com/belluikit/bellui/storage/repository"
 )
 
+var _ bellui.PositionMappingDriver = (*driver)(nil)
+
 // SoftwarePainter describes a simple type that can render canvases
 type SoftwarePainter = memcanvas.Painter
 
@@ -114,6 +116,26 @@ func (d *driver) AbsolutePositionForObject(co core.CanvasObject) geo.Position {
 	pos := intdriver.AbsolutePositionForObject(co, tc.ObjectTrees())
 	inset, _ := c.InteractiveArea()
 	return pos.Subtract(inset)
+}
+
+// AbsolutePositionForPoint implements bellui.PositionMappingDriver.
+func (d *driver) AbsolutePositionForPoint(co core.CanvasObject, pos geo.Position) geo.Position {
+	c := d.CanvasForObject(co)
+	if c == nil {
+		return pos
+	}
+	inset, _ := c.InteractiveArea()
+	return intdriver.AbsolutePositionForPoint(co, pos, c.(*memcanvas.Canvas).ObjectTrees()).Subtract(inset)
+}
+
+// PositionForAbsolutePoint implements bellui.PositionMappingDriver.
+func (d *driver) PositionForAbsolutePoint(co core.CanvasObject, abs geo.Position) (geo.Position, bool) {
+	c := d.CanvasForObject(co)
+	if c == nil {
+		return abs, false
+	}
+	inset, _ := c.InteractiveArea()
+	return intdriver.PositionForAbsolutePoint(co, abs.Add(inset), c.(*memcanvas.Canvas).ObjectTrees())
 }
 
 func (d *driver) AllWindows() []bellui.Window {

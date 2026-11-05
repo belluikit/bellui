@@ -27,6 +27,8 @@ import (
 	"github.com/belluikit/bellui/storage/repository"
 )
 
+var _ bellui.PositionMappingDriver = (*gLDriver)(nil)
+
 var curWindow *window
 
 // Declare conformity with Driver — including the desktop extensions on the
@@ -156,6 +158,24 @@ func (d *gLDriver) AbsolutePositionForObject(co core.CanvasObject) geo.Position 
 
 	glc := c.(*glCanvas)
 	return driver.AbsolutePositionForObject(co, glc.ObjectTrees())
+}
+
+// AbsolutePositionForPoint implements bellui.PositionMappingDriver.
+func (d *gLDriver) AbsolutePositionForPoint(co core.CanvasObject, pos geo.Position) geo.Position {
+	c := d.CanvasForObject(co)
+	if c == nil {
+		return pos
+	}
+	return driver.AbsolutePositionForPoint(co, pos, c.(*glCanvas).ObjectTrees())
+}
+
+// PositionForAbsolutePoint implements bellui.PositionMappingDriver.
+func (d *gLDriver) PositionForAbsolutePoint(co core.CanvasObject, abs geo.Position) (geo.Position, bool) {
+	c := d.CanvasForObject(co)
+	if c == nil {
+		return abs, false
+	}
+	return driver.PositionForAbsolutePoint(co, abs, c.(*glCanvas).ObjectTrees())
 }
 
 func (d *gLDriver) Device() bellui.Device {

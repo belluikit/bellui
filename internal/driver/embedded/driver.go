@@ -16,6 +16,8 @@ import (
 	"github.com/belluikit/bellui/internal/painter"
 )
 
+var _ bellui.PositionMappingDriver = (*noosDriver)(nil)
+
 type noosDriver struct {
 	events chan embedded.Event
 	queue  chan funcData
@@ -62,6 +64,26 @@ func (n *noosDriver) AbsolutePositionForObject(o core.CanvasObject) geo.Position
 	pos := intdriver.AbsolutePositionForObject(o, []core.CanvasObject{c.Content()})
 	inset, _ := c.InteractiveArea()
 	return pos.Subtract(inset)
+}
+
+// AbsolutePositionForPoint implements bellui.PositionMappingDriver.
+func (n *noosDriver) AbsolutePositionForPoint(co core.CanvasObject, pos geo.Position) geo.Position {
+	c := n.CanvasForObject(co)
+	if c == nil {
+		return pos
+	}
+	inset, _ := c.InteractiveArea()
+	return intdriver.AbsolutePositionForPoint(co, pos, []core.CanvasObject{c.Content()}).Subtract(inset)
+}
+
+// PositionForAbsolutePoint implements bellui.PositionMappingDriver.
+func (n *noosDriver) PositionForAbsolutePoint(co core.CanvasObject, abs geo.Position) (geo.Position, bool) {
+	c := n.CanvasForObject(co)
+	if c == nil {
+		return abs, false
+	}
+	inset, _ := c.InteractiveArea()
+	return intdriver.PositionForAbsolutePoint(co, abs.Add(inset), []core.CanvasObject{c.Content()})
 }
 
 func (n *noosDriver) Device() bellui.Device {
