@@ -104,6 +104,9 @@ func (p *painter) BindBoundaryFBO(s gpu.BoundaryFBO) {
 	p.pushRenderTarget(state.fbo, state.width, state.height, state.LogicalSize)
 	p.ctx.ClearColor(0, 0, 0, 0)
 	p.ctx.Clear(bitColorBuffer | bitDepthBuffer)
+	// The boundary's stencil holds none of the clips around it (#1012).
+	p.clipBases = append(p.clipBases, len(p.roundClips))
+	p.ctx.Disable(stencilTest)
 	p.logError()
 }
 
@@ -111,6 +114,10 @@ func (p *painter) BindBoundaryFBO(s gpu.BoundaryFBO) {
 // parent boundary FBO, or the default framebuffer with the given viewport).
 func (p *painter) UnbindBoundaryFBO(canvasPixW, canvasPixH int) {
 	p.popRenderTarget(canvasPixW, canvasPixH)
+	if n := len(p.clipBases); n > 0 {
+		p.clipBases = p.clipBases[:n-1]
+	}
+	p.applyRoundClip() // the enclosing target's clips apply again
 	p.logError()
 }
 

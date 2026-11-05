@@ -242,3 +242,87 @@ func TestNestedRoundedClips(t *testing.T) {
 	assert.Equal(t, clipBlue, pixel(img, 4, 4), "outside the inner clip")
 	assert.True(t, zeroAfter, "nested clips left the stencil not zero")
 }
+
+// TestNestedRoundedClipKeepsOuterAfterInner pins #1012: once an inner rounded
+// clip ends, the outer one still confines what is drawn after it. Before, the
+// inner clip replaced the outer one and its Stop turned the test off.
+func TestNestedRoundedClipKeepsOuterAfterInner(t *testing.T) {
+	o := newOffscreenPainter(t)
+	var zeroAfter bool
+	img := o.frame(t, func() {
+		o.StartRoundedClipping(geo.NewPos(8, 8), geo.NewSquareSize(48), 0)
+		o.StartRoundedClipping(geo.NewPos(24, 24), geo.NewSquareSize(16), 0)
+		o.StopRoundedClipping()
+		o.fill() // after the inner clip, inside the outer one
+		o.StopRoundedClipping()
+		zeroAfter = o.dev.StencilZero()
+	})
+	assert.Equal(t, clipRed, pixel(img, 12, 12), "inside the outer clip")
+	assert.Equal(t, clipBlue, pixel(img, 4, 4), "outside the outer clip, after an inner clip ended")
+	assert.Equal(t, clipBlue, pixel(img, 60, 32), "right of the outer clip")
+	assert.True(t, zeroAfter, "nested clips left the stencil not zero")
+}
+
+// TestNestedRoundedClipIsCutByOuter checks that an inner clip sticking out past
+// the outer one confines its content to both (#1012).
+func TestNestedRoundedClipIsCutByOuter(t *testing.T) {
+	o := newOffscreenPainter(t)
+	img := o.frame(t, func() {
+		o.StartRoundedClipping(geo.Position{}, geo.NewSize(32, clipDim), 0)
+		o.StartRoundedClipping(geo.NewPos(16, 0), geo.NewSize(48, clipDim), 0)
+		o.fill()
+		o.StopRoundedClipping()
+		o.StopRoundedClipping()
+	})
+	assert.Equal(t, clipRed, pixel(img, 24, 32), "inside both clips")
+	assert.Equal(t, clipBlue, pixel(img, 8, 32), "inside the outer clip only")
+	assert.Equal(t, clipBlue, pixel(img, 48, 32), "inside the inner clip only")
+}
+
+// TestRoundedClipSurvivesPathOps checks that a path fill or a path clip inside
+// a rounded clip, which use the whole stencil, leave the rounded clip in
+// force for what follows them (#1012).
+func TestRoundedClipSurvivesPathOps(t *testing.T) {
+	square := func() *canvas.Path {
+		return canvas.NewPath(func(p *canvas.Path) {
+			p.MoveTo(0, 0)
+			p.LineTo(8, 0)
+			p.LineTo(8, 8)
+			p.LineTo(0, 8)
+			p.Close()
+		})
+	}
+	green := color.NRGBA{G: 255, A: 255}
+	for name, op := range map[string]func(o *offscreenPainter){
+		"path fill": func(o *offscreenPainter) {
+			path := square()
+			path.FillColor = green
+			o.drawPath(path, geo.NewPos(24, 24), geo.NewSquareSize(clipDim))
+		},
+		"path clip": func(o *offscreenPainter) {
+			o.StartPathClipping(square(), geo.NewPos(24, 24), geo.NewSquareSize(8))
+			o.StopPathClipping()
+		},
+		"path clip in a nested clip": func(o *offscreenPainter) {
+			o.StartRoundedClipping(geo.NewPos(16, 16), geo.NewSquareSize(32), 0)
+			o.StartPathClipping(square(), geo.NewPos(24, 24), geo.NewSquareSize(8))
+			o.StopPathClipping()
+			o.StopRoundedClipping()
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			o := newOffscreenPainter(t)
+			var zeroAfter bool
+			img := o.frame(t, func() {
+				o.StartRoundedClipping(geo.NewPos(8, 8), geo.NewSquareSize(48), 0)
+				op(o)
+				o.fill()
+				o.StopRoundedClipping()
+				zeroAfter = o.dev.StencilZero()
+			})
+			assert.Equal(t, clipRed, pixel(img, 12, 12), "inside the clip")
+			assert.Equal(t, clipBlue, pixel(img, 4, 4), "outside the clip, after the path op")
+			assert.True(t, zeroAfter, "the clip left the stencil not zero")
+		})
+	}
+}

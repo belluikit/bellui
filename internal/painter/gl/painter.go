@@ -78,6 +78,12 @@ type painter struct {
 	// usually targets the canvas FBO, and binding 0 silently discards every
 	// subsequent draw call of the frame.
 	targetStack []renderTarget
+
+	// roundClips holds the active rounded clips, innermost last, and
+	// clipBases, for each bound boundary FBO, how many were active when it
+	// was bound: its stencil starts empty (#1012).
+	roundClips []glRoundClip
+	clipBases  []int
 }
 
 // renderTarget is one entry of the painter's render-target stack.
@@ -93,6 +99,8 @@ type renderTarget struct {
 // nothing to redraw, which then never counted, so eviction stalled (#496).
 func (p *painter) beginFrame() {
 	p.frame++
+	p.roundClips = p.roundClips[:0] // a frame never inherits an unpaired clip
+	p.clipBases = p.clipBases[:0]
 	p.evictShadows()
 	p.evictBoundaries()
 }
@@ -425,36 +433,130 @@ func (p *painter) blurPass(program ProgramState, fbo Framebuffer, width, height 
 	p.logError()
 }
 
-// StartRoundedClipping enables stencil-based rounded-corner clipping.
+// glRoundClip is an active rounded clip, kept so its Stop can erase it and a
+// path op can stamp it again.
+//
+// Clips nest by depth (#1012): a clip at depth d stamps d into the stencil
+// only where its enclosing clip left d-1, and draws test for d. So an inner
+// clip narrows the outer one, and Stop returns its area to d-1, which is the
+// outer clip again.
+type glRoundClip struct {
+	pos       geo.Position
+	size      geo.Size
+	radius    float32
+	transform geo.Matrix
+	depth     int
+}
+
+// StartRoundedClipping enables stencil-based rounded-corner clipping, inside
+// any rounded clip already active.
 func (p *painter) StartRoundedClipping(pos geo.Position, size geo.Size, cornerRadius float32) {
-	p.ctx.Enable(stencilTest)
-	p.ctx.ClearStencil(0)
-	p.ctx.Clear(bitStencilBuffer)
-	p.ctx.StencilFunc(glAlways, 1, 0xFF)
-	p.ctx.StencilOp(glKeep, glKeep, glReplace)
+	clip := glRoundClip{pos: pos, size: size, radius: cornerRadius, transform: p.currentTransform, depth: 1}
+	if top := p.topRoundClip(); top != nil {
+		clip.depth = top.depth + 1
+	} else {
+		p.ctx.Enable(stencilTest)
+		p.ctx.ClearStencil(0)
+		p.ctx.Clear(bitStencilBuffer)
+	}
+	p.roundClips = append(p.roundClips, clip)
+	p.stampRoundClip(&clip)
+	p.applyRoundClip()
+}
+
+// stampRoundClip draws clip's rounded rect into the stencil, raising it from
+// the enclosing clip's depth to clip's, color writes off.
+func (p *painter) stampRoundClip(clip *glRoundClip) {
+	p.ctx.StencilFunc(glEqual, int32(clip.depth-1), 0xFF)
+	p.ctx.StencilOp(glKeep, glKeep, glIncrWrap)
+	p.drawStencilRect(clip.pos, clip.size, clip.radius, clip.transform)
+}
+
+// drawStencilRect draws a rounded rect into the stencil with the stencil
+// function and op already set, color writes off, under transform.
+func (p *painter) drawStencilRect(pos geo.Position, size geo.Size, radius float32, transform geo.Matrix) {
 	p.ctx.StencilMask(0xFF)
 	p.ctx.ColorMask(false, false, false, false)
-
-	// Draw a rounded rectangle to the stencil buffer
-	frame := p.targetFrame()
+	prev := p.currentTransform
+	p.currentTransform = transform
 	r := canvas.NewRectangle(color.Transparent)
 	r.Resize(size)
 	r.Move(pos)
-	r.CornerRadius = cornerRadius
+	r.CornerRadius = radius
 	r.FillColor = color.White // doesn't matter, color writes are off
-	p.drawRectangle(r, pos, frame)
-
-	// Now set stencil to only allow drawing where stencil == 1
+	p.drawRectangle(r, pos, p.targetFrame())
+	p.currentTransform = prev
 	p.ctx.ColorMask(true, true, true, true)
-	p.ctx.StencilFunc(glEqual, 1, 0xFF)
+	p.logError()
+}
+
+// topRoundClip returns the innermost rounded clip active in the bound target,
+// or nil.
+func (p *painter) topRoundClip() *glRoundClip {
+	base := 0
+	if n := len(p.clipBases); n > 0 {
+		base = p.clipBases[n-1]
+	}
+	if n := len(p.roundClips); n > base {
+		return &p.roundClips[n-1]
+	}
+	return nil
+}
+
+// applyRoundClip sets the stencil test for the innermost active rounded clip
+// in the bound target, or disables it when there is none.
+func (p *painter) applyRoundClip() {
+	top := p.topRoundClip()
+	if top == nil {
+		p.ctx.Disable(stencilTest)
+		p.logError()
+		return
+	}
+	p.ctx.Enable(stencilTest)
+	p.ctx.StencilFunc(glEqual, int32(top.depth), 0xFF)
 	p.ctx.StencilMask(0x00) // don't write to stencil anymore
 	p.logError()
 }
 
-// StopRoundedClipping disables stencil-based clipping.
+// restampRoundClips clears the stencil and stamps the active rounded clips of
+// the bound target again, outermost first. A path fill or path clip uses the
+// whole stencil, so the clips around it are put back once it is done (#1012).
+func (p *painter) restampRoundClips() {
+	if p.topRoundClip() == nil {
+		p.ctx.Disable(stencilTest)
+		p.logError()
+		return
+	}
+	p.ctx.Enable(stencilTest)
+	p.ctx.StencilMask(0xFF)
+	p.ctx.ClearStencil(0)
+	p.ctx.Clear(bitStencilBuffer)
+	base := 0
+	if n := len(p.clipBases); n > 0 {
+		base = p.clipBases[n-1]
+	}
+	for i := base; i < len(p.roundClips); i++ {
+		p.stampRoundClip(&p.roundClips[i])
+	}
+	p.applyRoundClip()
+}
+
+// StopRoundedClipping ends the innermost rounded clip: it erases its stamp
+// back to the enclosing clip's depth and restores that clip's test, or
+// disables the test when no clip encloses it.
 func (p *painter) StopRoundedClipping() {
-	p.ctx.Disable(stencilTest)
-	p.logError()
+	top := p.topRoundClip()
+	if top == nil {
+		p.ctx.Disable(stencilTest)
+		p.logError()
+		return
+	}
+	clip := *top
+	p.roundClips = p.roundClips[:len(p.roundClips)-1]
+	p.ctx.StencilFunc(glEqual, int32(clip.depth), 0xFF)
+	p.ctx.StencilOp(glKeep, glKeep, glDecrWrap)
+	p.drawStencilRect(clip.pos, clip.size, 0, clip.transform)
+	p.applyRoundClip()
 }
 
 // StartPathClipping enables stencil-based clipping to an arbitrary path shape.
@@ -509,10 +611,11 @@ func (p *painter) StartPathClipping(path *canvas.Path, pos geo.Position, size ge
 	p.logError()
 }
 
-// StopPathClipping disables stencil-based path clipping.
+// StopPathClipping ends a path clip. The winding pass used the whole stencil,
+// so the rounded clips around it are stamped again (#1012). A path clip's own
+// content is confined to the path, not to the rounded clips around it.
 func (p *painter) StopPathClipping() {
-	p.ctx.Disable(stencilTest)
-	p.logError()
+	p.restampRoundClips()
 }
 
 func (p *painter) SetGroupOpacity(opacity float32) {

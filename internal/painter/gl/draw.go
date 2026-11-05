@@ -987,7 +987,12 @@ func (p *painter) drawPathFillStencil(path *canvas.Path, fanTris []float32, subp
 	p.ctx.DrawArrays(triangles, 0, len(bbVerts)/3)
 	p.logError()
 
-	p.ctx.Disable(stencilTest)
+	// The rounded clips around the path are stamped again over the winding
+	// counts (#1012), so the fringe and what follows stay inside them. The
+	// bounding-box pass above is confined to the path only.
+	p.restampRoundClips()
+	p.ctx.UseProgram(program.ref)
+	p.ctx.BindBuffer(arrayBuffer, program.buff)
 
 	// Pass 3: Draw anti-aliased fringe along fill boundary.
 	fringeVerts := paint.ExpandFillFringe(subpaths, fringeWidth)
