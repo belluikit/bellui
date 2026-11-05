@@ -14,6 +14,7 @@ import (
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/cache"
 	"github.com/belluikit/bellui/internal/dirhook"
+	"github.com/belluikit/bellui/internal/layoutgen"
 	"github.com/belluikit/bellui/internal/paintgen"
 	internalWidget "github.com/belluikit/bellui/internal/widget"
 	"github.com/belluikit/bellui/theme"
@@ -211,6 +212,10 @@ func (w *BaseWidget) Show() {
 	}
 
 	w.Hidden = false
+	// A widget hidden before any walk has no node, so its refresh below marks
+	// nothing: the next min-size pass must walk everything to lay it out, as
+	// for a container or a canvas object shown (#973, player#278).
+	layoutgen.Changed()
 	paintgen.Changed() // a hidden widget has no node to refresh (#599)
 
 	impl := w.super()
@@ -218,6 +223,24 @@ func (w *BaseWidget) Show() {
 		return
 	}
 	impl.Refresh()
+	frameEverywhereIfUnplaced(impl)
+}
+
+// frameEverywhereIfUnplaced asks every window for a frame when no canvas knows
+// obj, just shown. One hidden since before its window's first frame was never
+// placed, so its refresh reached no window, and without a frame the min-size
+// pass that lays it out never ran (#973, player#278). Showing is rare enough that a
+// frame of every window costs nothing that matters.
+func frameEverywhereIfUnplaced(obj core.CanvasObject) {
+	app := bellui.CurrentApp()
+	if app == nil || app.Driver() == nil || app.Driver().CanvasForObject(obj) != nil {
+		return
+	}
+	for _, win := range app.Driver().AllWindows() {
+		if c, ok := win.Canvas().(interface{ SetDirty() }); ok {
+			c.SetDirty()
+		}
+	}
 }
 
 // Hide this widget so it is no longer visible
@@ -227,6 +250,10 @@ func (w *BaseWidget) Hide() {
 	}
 
 	w.Hidden = true
+	// The walk drops a hidden widget's node without telling its parent, so
+	// the parent must be laid out again for its other children to take the
+	// space, as for a container or a canvas object hidden (#973, player#278).
+	layoutgen.Changed()
 
 	impl := w.super()
 	if impl == nil {

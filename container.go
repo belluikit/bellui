@@ -222,6 +222,17 @@ func repaint(obj *Container) {
 	}
 
 	c := app.Driver().CanvasForObject(obj)
+	if c == nil && obj.Visible() {
+		// Shown, and never placed: hidden since before its window's first
+		// frame, so no canvas knows it. Every window gets a frame, or none
+		// would run to lay it out (#973, player#278).
+		for _, win := range app.Driver().AllWindows() {
+			if paint, ok := win.Canvas().(interface{ SetDirty() }); ok {
+				paint.SetDirty()
+			}
+		}
+		return
+	}
 	if c != nil {
 		// Showing or hiding changes the layout around obj: let the min-size
 		// pass know, as a refresh would (#487).
