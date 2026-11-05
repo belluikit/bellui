@@ -1,3 +1,7 @@
+//go:build !gl && !wasm
+
+// (!wasm: these acquire a real WebGPU device; see canvas_fbo_test.go.)
+
 package webgpu
 
 import (
