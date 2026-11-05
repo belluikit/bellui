@@ -861,7 +861,11 @@ func (s *Scroll) updateOffset(deltaX, deltaY float32) bool {
 // reporting it. It returns whether the offset changed.
 func (s *Scroll) clampOffset(deltaX, deltaY float32) bool {
 	size := s.Size()
-	contentSize := s.Content.Size()
+	// The size the layout gives the content, as the limits below use its
+	// MinSize: content that grew since its last layout still has its old
+	// Size, and judging by that snapped a scroll into the new part back to 0
+	// (#1005).
+	contentSize := s.Content.MinSize().Max(size)
 	if contentSize.Width <= size.Width && contentSize.Height <= size.Height {
 		if s.Offset.X != 0 || s.Offset.Y != 0 {
 			s.Offset.X = 0
