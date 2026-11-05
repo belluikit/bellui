@@ -378,6 +378,18 @@ const (
 	// Since: 1.3
 	IconNameFavoriteBorder bellui.ThemeIconName = "favoriteBorder"
 
+	// IconNameBookmark is the name of theme lookup for the filled bookmark
+	// icon, for a Save that is on.
+	//
+	// Since: 1.3
+	IconNameBookmark bellui.ThemeIconName = "bookmark"
+
+	// IconNameBookmarkBorder is the name of theme lookup for the outlined
+	// bookmark icon, for a Save that is off.
+	//
+	// Since: 1.3
+	IconNameBookmarkBorder bellui.ThemeIconName = "bookmarkBorder"
+
 	// IconNameHistory is the name of theme lookup for history icon.
 	//
 	// Since: 1.0
@@ -604,6 +616,8 @@ var icons = map[bellui.ThemeIconName]bellui.Resource{
 	IconNameHelp:            NewThemedResource(helpIconRes),
 	IconNameFavorite:        NewThemedResource(favoriteIconRes),
 	IconNameFavoriteBorder:  NewThemedResource(favoriteborderIconRes),
+	IconNameBookmark:        NewThemedResource(bookmarkIconRes),
+	IconNameBookmarkBorder:  NewThemedResource(bookmarkborderIconRes),
 	IconNameHistory:         NewThemedResource(historyIconRes),
 	IconNameHome:            NewThemedResource(homeIconRes),
 	IconNameSettings:        NewThemedResource(settingsIconRes),
@@ -1154,6 +1168,22 @@ func FavoriteIcon() bellui.Resource {
 // Since: 1.3
 func FavoriteBorderIcon() bellui.Resource {
 	return safeIconLookup(IconNameFavoriteBorder)
+}
+
+// BookmarkIcon returns a resource containing the standard filled bookmark
+// icon for the current theme
+//
+// Since: 1.3
+func BookmarkIcon() bellui.Resource {
+	return safeIconLookup(IconNameBookmark)
+}
+
+// BookmarkBorderIcon returns a resource containing the standard outlined
+// bookmark icon for the current theme
+//
+// Since: 1.3
+func BookmarkBorderIcon() bellui.Resource {
+	return safeIconLookup(IconNameBookmarkBorder)
 }
 
 // HistoryIcon returns a resource containing the standard history icon for the current theme

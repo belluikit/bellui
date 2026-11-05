@@ -438,6 +438,22 @@ var favoriteborderIconRes = &bellui.StaticResource{
 	StaticContent: favoriteborderIcon,
 }
 
+//go:embed icons/bookmark.svg
+var bookmarkIcon []byte
+
+var bookmarkIconRes = &bellui.StaticResource{
+	StaticName:    "bookmark.svg",
+	StaticContent: bookmarkIcon,
+}
+
+//go:embed icons/bookmark-border.svg
+var bookmarkborderIcon []byte
+
+var bookmarkborderIconRes = &bellui.StaticResource{
+	StaticName:    "bookmark-border.svg",
+	StaticContent: bookmarkborderIcon,
+}
+
 //go:embed icons/history.svg
 var historyIcon []byte
 
