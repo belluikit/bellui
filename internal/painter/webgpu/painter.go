@@ -338,10 +338,16 @@ func (p *painter) StartClipping(pos geo.Position, size geo.Size) {
 	}
 	// WebGPU framebuffer origin is top-left (y-down), so no Y flip is needed
 	// (unlike the GL painter's bottom-left scissor).
+	//
+	// The edges are scaled, not the origin and the size: two clips sharing an
+	// edge in dp then share it in pixels. Scaling y and h separately rounds
+	// them separately, so a partial repaint's clear could end a row below the
+	// clip it then redraws a ClipToBounds container under, leaving that row
+	// cleared (#975).
 	x := int(p.textureScale(pos.X))
 	y := int(p.textureScale(pos.Y))
-	w := int(p.textureScale(size.Width))
-	h := int(p.textureScale(size.Height))
+	w := int(p.textureScale(pos.X+size.Width)) - x
+	h := int(p.textureScale(pos.Y+size.Height)) - y
 	p.dev.SetScissor(x, y, w, h)
 }
 
