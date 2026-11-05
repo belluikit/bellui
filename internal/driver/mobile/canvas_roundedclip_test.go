@@ -123,3 +123,46 @@ func Test_mobileTreeWalker_RoundedClip(t *testing.T) {
 	assert.Less(t, start, paint, "content paints inside the rounded clip")
 	assert.Greater(t, stop, paint, "clip is dropped only after the subtree painted")
 }
+
+// A ClipToBounds container with ClipCornerRadius clips its children to rounded
+// corners in the mobile walk, as a widget's RoundedClipCornerRadius does (#992).
+func Test_mobileTreeWalker_ContainerCornerClip(t *testing.T) {
+	cont := &bellui.Container{
+		Objects:      []core.CanvasObject{belluicanvas.NewRectangle(color.Black)},
+		ClipToBounds: true, ClipCornerRadius: 12,
+	}
+	c := newCanvas(bellui.CurrentDevice()).(*canvas)
+	c.SetContent(cont)
+	c.Resize(geo.NewSize(100, 100))
+	cont.Objects[0].Resize(geo.NewSize(100, 100))
+
+	painter := &clipRecordingPainter{}
+	c.SetPainter(painter)
+	walk := &mobileTreeWalker{c: c, clips: &internal.ClipStack{}, size: geo.NewSize(100, 100)}
+	c.WalkTrees(walk.draw, walk.afterDraw)
+
+	start, paint, stop := -1, -1, -1
+	for i, call := range painter.calls {
+		switch call {
+		case "startRounded 12":
+			start = i
+		case "paint *canvas.Rectangle":
+			paint = i
+		case "stopRounded":
+			stop = i
+		}
+	}
+	require.GreaterOrEqual(t, start, 0, "rounded clip established for the container: %v", painter.calls)
+	require.GreaterOrEqual(t, paint, 0, "child painted: %v", painter.calls)
+	require.GreaterOrEqual(t, stop, 0, "rounded clip torn down: %v", painter.calls)
+	assert.Less(t, start, paint, "the child paints inside the rounded clip")
+	assert.Greater(t, stop, paint, "the clip drops only after the child painted")
+
+	// without ClipToBounds the radius means nothing
+	cont.ClipToBounds = false
+	painter.calls = nil
+	c.WalkTrees(walk.draw, walk.afterDraw)
+	for _, call := range painter.calls {
+		assert.NotEqual(t, "startRounded 12", call, "no rounded clip without ClipToBounds")
+	}
+}
