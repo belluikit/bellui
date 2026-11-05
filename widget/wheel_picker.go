@@ -78,7 +78,7 @@ type WheelPicker struct {
 	axisLock wheelAxis
 	dragFrom float32 // pos when the gesture's axis locked
 	drag     float32 // finger travel along the axis, points
-	samples  []wheelSample
+	speed    dragSpeed
 	settling *bellui.Animation
 }
 
@@ -89,11 +89,6 @@ const (
 	wheelAxisAlong
 	wheelAxisAcross
 )
-
-type wheelSample struct {
-	at time.Time
-	d  float32
-}
 
 const (
 	wheelDefaultVisible = 5
@@ -225,7 +220,7 @@ func (w *WheelPicker) Dragged(e *event.DragEvent) {
 		w.dragging = true
 		w.axisLock = wheelAxisNone
 		w.drag = 0
-		w.samples = w.samples[:0]
+		w.speed.reset()
 	}
 	along, across := abs32(w.along(e.Dragged)), abs32(w.across(e.Dragged))
 	if w.axisLock == wheelAxisNone {
@@ -243,11 +238,7 @@ func (w *WheelPicker) Dragged(e *event.DragEvent) {
 	}
 	w.drag += w.along(e.Dragged)
 
-	now := wheelNow()
-	w.samples = append(w.samples, wheelSample{at: now, d: w.drag})
-	for len(w.samples) > 2 && now.Sub(w.samples[0].at) > carouselVelocityWindow {
-		w.samples = w.samples[1:]
-	}
+	w.speed.add(wheelNow(), w.drag)
 
 	if p := w.pitch(); p > 0 {
 		// Moving the items towards the start reveals later items.
@@ -280,10 +271,10 @@ func (w *WheelPicker) DragEnd() {
 		return
 	}
 	along := w.axisLock == wheelAxisAlong
-	v := w.releaseVelocity()
+	v := w.speed.at(wheelNow())
 	w.dragging = false
 	w.axisLock = wheelAxisNone
-	w.samples = w.samples[:0]
+	w.speed.reset()
 	if !along {
 		return
 	}
@@ -292,33 +283,6 @@ func (w *WheelPicker) DragEnd() {
 		target -= v * float32(wheelCoast.Seconds()) / p
 	}
 	w.settleTo(int(math.Round(float64(target))))
-}
-
-// releaseVelocity is the drag speed along the axis, in points per second,
-// over the last carouselVelocityWindow; zero when the finger had stopped.
-// It measures as Carousel.releaseVelocity does.
-func (w *WheelPicker) releaseVelocity() float32 {
-	n := len(w.samples)
-	if n < 2 {
-		return 0
-	}
-	now := wheelNow()
-	last := w.samples[n-1]
-	if now.Sub(last.at) > carouselStoppedAfter {
-		return 0
-	}
-	first := w.samples[0]
-	for _, s := range w.samples[:n-1] {
-		if now.Sub(s.at) <= carouselVelocityWindow {
-			first = s
-			break
-		}
-	}
-	dt := last.at.Sub(first.at).Seconds()
-	if dt <= 0 {
-		return 0
-	}
-	return (last.d - first.d) / float32(dt)
 }
 
 // Tapped spins the tapped item to the centre.
