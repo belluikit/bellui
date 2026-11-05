@@ -2,11 +2,13 @@
 
 package gl
 
+import "github.com/belluikit/bellui/geo"
+
 // pushRenderTarget binds an FBO as the current render target and records it
 // on the target stack so temporary offscreen work can restore it.
-// logicalH is the target's height in canvas units, 0 for the full canvas.
-func (p *painter) pushRenderTarget(fbo Framebuffer, w, h int, logicalH float32) {
-	p.targetStack = append(p.targetStack, renderTarget{fbo: fbo, w: w, h: h, logical: logicalH})
+// logical is the target's size in canvas units, zero for the full canvas.
+func (p *painter) pushRenderTarget(fbo Framebuffer, w, h int, logical geo.Size) {
+	p.targetStack = append(p.targetStack, renderTarget{fbo: fbo, w: w, h: h, logical: logical})
 	p.ctx.BindFramebuffer(glFramebuffer, fbo)
 	p.ctx.Viewport(0, 0, w, h)
 }

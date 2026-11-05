@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/belluikit/bellui/geo"
 )
 
 // recordingContext records framebuffer binds and viewport calls. All other
@@ -36,12 +38,12 @@ func TestRenderTargetStack(t *testing.T) {
 
 	canvasFBO, boundaryFBO := Framebuffer(7), Framebuffer(9)
 
-	p.pushRenderTarget(canvasFBO, 100, 200, 0)
+	p.pushRenderTarget(canvasFBO, 100, 200, geo.Size{})
 	assert.Equal(t, []Framebuffer{canvasFBO}, ctx.binds)
 	assert.Equal(t, [][2]int{{100, 200}}, ctx.viewports)
 
 	// Nested boundary FBO.
-	p.pushRenderTarget(boundaryFBO, 30, 40, 40)
+	p.pushRenderTarget(boundaryFBO, 30, 40, geo.NewSize(30, 40))
 	assert.Equal(t, boundaryFBO, ctx.binds[len(ctx.binds)-1])
 
 	// Offscreen work (shadow blur) restores the boundary, not framebuffer 0.

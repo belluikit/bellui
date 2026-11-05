@@ -73,7 +73,7 @@ func (p *painter) BindCanvasFBO() {
 	p.targetStack = p.targetStack[:0]
 	p.beginFrame()
 	p.frameOpen = true
-	p.pushRenderTarget(p.canvasFBO.fbo, p.canvasFBO.width, p.canvasFBO.height, 0)
+	p.pushRenderTarget(p.canvasFBO.fbo, p.canvasFBO.width, p.canvasFBO.height, geo.Size{})
 	p.logError()
 }
 

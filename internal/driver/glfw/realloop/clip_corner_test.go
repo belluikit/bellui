@@ -26,7 +26,8 @@ import (
 // It runs under -tags gl too: the GL painter draws into an offscreen canvas
 // FBO, which had no stencil buffer, so no rounded clip clipped (#990). The
 // widget path (a renderer's RoundedClipCornerRadius, as Card and Entry use)
-// is checked the same way.
+// and a clip inside a RepaintBoundary, which has an FBO of its own, are
+// checked the same way.
 func TestContainerClipCornerRadiusDraws(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -41,6 +42,10 @@ func TestContainerClipCornerRadiusDraws(t *testing.T) {
 		{"widget", func(radius float32, fill core.CanvasObject) (core.CanvasObject, core.CanvasObject) {
 			w := newRoundClipWidget(radius, fill)
 			return w, w
+		}},
+		{"container in a RepaintBoundary", func(radius float32, fill core.CanvasObject) (core.CanvasObject, core.CanvasObject) {
+			c := &bellui.Container{ClipToBounds: true, ClipCornerRadius: radius, Objects: []core.CanvasObject{fill}}
+			return c, container.NewRepaintBoundary(c)
 		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
