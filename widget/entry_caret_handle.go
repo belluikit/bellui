@@ -187,9 +187,6 @@ func (h *entryCaretHandle) sync() {
 
 	rect := e.caretRect(e.CursorRow, e.CursorColumn, true)
 
-	// The entry's origin in overlay coordinates (canvas-absolute, so the
-	// display inset is accounted for — see hostAbsolutePosition).
-	entryOrigin := hostAbsolutePosition(e.super()).Subtract(h.Position())
 	entrySize := e.Size()
 
 	anchor := rect.Pos.Subtract(e.scroll.Offset) // entry-relative caret top
@@ -199,9 +196,12 @@ func (h *entryCaretHandle) sync() {
 		return
 	}
 
+	// Centered below the caret, where the entry draws the caret's foot
+	// (canvas-absolute, so through its transforms and the display inset —
+	// see hostPointAbsolute), in overlay coordinates.
 	size := h.grab.desiredSize()
-	pos := entryOrigin.Add(anchor).
-		AddXY(-size.Width/2, rect.Size.Height) // centered below the caret
+	foot := hostPointAbsolute(e.super(), anchor.AddXY(0, rect.Size.Height)).Subtract(h.Position())
+	pos := foot.AddXY(-size.Width/2, 0)
 	if h.grab.Size() != size {
 		h.grab.Resize(size)
 	}
@@ -255,22 +255,21 @@ func (h *entryCaretHandle) drag(d *event.DragEvent) {
 	// Drivers set AbsolutePosition on drag events; the handle-relative
 	// fallback (off by up to the tap slop) covers synthetic events without it.
 	finger := d.AbsolutePosition
-	entryAbs := hostAbsolutePosition(e.super())
 	if finger == (geo.Position{}) {
 		finger = h.Position().Add(h.grab.Position()).Add(d.Position)
 	}
-	content := finger.Subtract(entryAbs).Add(e.scroll.Offset)
 
-	// The dot hangs below the line it controls: lift the lookup point from
-	// the finger back up into that line, measured from where the finger
-	// actually grabbed the dot when known.
+	// The dot hangs below the line it controls, upright on the canvas: take
+	// the point it hangs from, where the finger actually grabbed it when
+	// known, into the entry's coordinates (#1008), then lift it into that line.
 	th := e.Theme()
 	lineHeight := e.text.charMinSize(false, e.TextStyle, th.Size(theme.SizeNameText)).Height
 	grab := h.grab.Size().Height / 2
 	if h.grab.grabY >= 0 {
 		grab = h.grab.grabY
 	}
-	content.Y -= grab + lineHeight/2
+	content := hostPointAt(e.super(), finger.AddXY(0, -grab)).Add(e.scroll.Offset)
+	content.Y -= lineHeight / 2
 
 	prevRow, prevCol := e.CursorRow, e.CursorColumn
 	e.updateMousePointer(content, false)

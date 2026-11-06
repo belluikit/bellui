@@ -187,9 +187,6 @@ func (h *richEntryCaretHandle) sync() {
 	row, col := e.doc.offsetToRowCol(e.caret)
 	pos, csize := e.caretRectAt(row, col, e.doc.rowIsImage(row))
 
-	// The editor's origin in overlay coordinates (canvas-absolute, so the
-	// display inset is accounted for — see hostAbsolutePosition).
-	entryOrigin := hostAbsolutePosition(e.super()).Subtract(h.Position())
 	entrySize := e.super().Size()
 
 	if pos.Y+csize.Height <= 0 || pos.Y >= entrySize.Height ||
@@ -198,9 +195,12 @@ func (h *richEntryCaretHandle) sync() {
 		return
 	}
 
+	// Centered below the caret, where the editor draws the caret's foot
+	// (canvas-absolute, so through its transforms and the display inset —
+	// see hostPointAbsolute), in overlay coordinates.
 	size := h.grab.desiredSize()
-	gpos := entryOrigin.Add(pos).
-		AddXY(-size.Width/2, csize.Height) // centered below the caret
+	foot := hostPointAbsolute(e.super(), pos.AddXY(0, csize.Height)).Subtract(h.Position())
+	gpos := foot.AddXY(-size.Width/2, 0)
 	if h.grab.Size() != size {
 		h.grab.Resize(size)
 	}
@@ -254,21 +254,21 @@ func (h *richEntryCaretHandle) drag(d *event.DragEvent) {
 	// Drivers set AbsolutePosition on drag events; the handle-relative fallback
 	// (off by up to the tap slop) covers synthetic events without it.
 	finger := d.AbsolutePosition
-	entryAbs := hostAbsolutePosition(e.super())
 	if finger == (geo.Position{}) {
 		finger = h.Position().Add(h.grab.Position()).Add(d.Position)
 	}
-	content := finger.Subtract(entryAbs) // RichEntry does not self-scroll
 
-	// The dot hangs below the line it controls: lift the lookup point from the
-	// finger back up into that line, measured from where the finger actually
-	// grabbed the dot when known.
+	// The dot hangs below the line it controls, upright on the canvas: take
+	// the point it hangs from, where the finger actually grabbed it when
+	// known, into the editor's coordinates (#1008), then lift it into that
+	// line. RichEntry does not self-scroll.
 	lineHeight := e.selectionHandleLineHeight()
 	grab := h.grab.Size().Height / 2
 	if h.grab.grabY >= 0 {
 		grab = h.grab.grabY
 	}
-	content.Y -= grab + lineHeight/2
+	content := hostPointAt(e.super(), finger.AddXY(0, -grab))
+	content.Y -= lineHeight / 2
 
 	row, col, _ := e.sel.getRowCol(content)
 	off := clampInt(e.doc.rowColToOffset(row, col), 0, e.doc.len())

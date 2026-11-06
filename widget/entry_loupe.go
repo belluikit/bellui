@@ -177,8 +177,9 @@ func (l *entryLoupe) sync() {
 		return
 	}
 
-	hostOrigin := hostAbsolutePosition(hostObj).Subtract(l.owner.Position())
-	l.place(row, col, rect.Size.Height, hostOrigin.Add(anchor))
+	// Where the host draws the caret's top, through its transforms (#1008).
+	caretTop := hostPointAbsolute(hostObj, anchor).Subtract(l.owner.Position())
+	l.place(row, col, rect.Size.Height, caretTop)
 }
 
 // place positions the bubble above (or, near the canvas top, below) the

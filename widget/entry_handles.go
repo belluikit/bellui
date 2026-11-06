@@ -140,10 +140,7 @@ func (h *entrySelectionHandles) sync() {
 	// independent (the selection() convention).
 	rowA, colA, rowB, colB := h.host.selectionHandleEdges()
 
-	// The host's origin in overlay coordinates (canvas-absolute, so the
-	// display inset is accounted for — see hostAbsolutePosition).
 	hostObj := h.host.selectionHandleObject()
-	hostOrigin := hostAbsolutePosition(hostObj).Subtract(h.Position())
 	hostSize := hostObj.Size()
 	scroll := h.host.selectionHandleScroll()
 
@@ -156,9 +153,12 @@ func (h *entrySelectionHandles) sync() {
 			return
 		}
 
+		// Centered below the caret, where the host draws the caret's foot
+		// (canvas-absolute, so through its transforms and the display inset
+		// — see hostPointAbsolute), in overlay coordinates.
 		size := hd.desiredSize()
-		pos := hostOrigin.Add(anchor).
-			AddXY(-size.Width/2, rect.Size.Height) // centered below the caret
+		foot := hostPointAbsolute(hostObj, anchor.AddXY(0, rect.Size.Height)).Subtract(h.Position())
+		pos := foot.AddXY(-size.Width/2, 0)
 		if hd.Size() != size {
 			hd.Resize(size)
 		}
@@ -214,20 +214,20 @@ func (h *entrySelectionHandles) dragHandle(hd *entrySelectionHandle, d *event.Dr
 	// Drivers set AbsolutePosition on drag events; the handle-relative
 	// fallback (off by up to the tap slop) covers synthetic events without it.
 	finger := d.AbsolutePosition
-	hostAbs := hostAbsolutePosition(h.host.selectionHandleObject())
 	if finger == (geo.Position{}) {
 		finger = h.Position().Add(hd.Position()).Add(d.Position)
 	}
-	content := finger.Subtract(hostAbs).Add(h.host.selectionHandleScroll())
 
-	// The handle hangs below the line it controls: lift the lookup point from
-	// the finger back up into that line, measured from where the finger
-	// actually grabbed the handle when known.
+	// The handle hangs below the line it controls, upright on the canvas:
+	// take the point the handle hangs from, where the finger actually grabbed
+	// it when known, into the host's coordinates, then lift it into that line.
 	grab := hd.Size().Height / 2
 	if hd.grabY >= 0 {
 		grab = hd.grabY
 	}
-	content.Y -= grab + h.host.selectionHandleLineHeight()/2
+	content := hostPointAt(h.host.selectionHandleObject(), finger.AddXY(0, -grab)).
+		Add(h.host.selectionHandleScroll())
+	content.Y -= h.host.selectionHandleLineHeight() / 2
 
 	h.host.dragSelectionHandle(hd.isStart, content)
 }
