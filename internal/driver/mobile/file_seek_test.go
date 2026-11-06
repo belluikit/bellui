@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/belluikit/bellui/storage"
@@ -42,12 +43,35 @@ func TestPickedFileSeeksWhenItsReaderCan(t *testing.T) {
 	if r.URI().String() != uri.String() {
 		t.Errorf("URI %v; want %v", r.URI(), uri)
 	}
+	// A picked file is read through its file on iOS, which reads at an
+	// offset too (#1020).
+	ra, ok := r.(io.ReaderAt)
+	if !ok {
+		t.Fatal("a reader over a file is not an io.ReaderAt")
+	}
+	if n, err := ra.ReadAt(b, 1); err != nil || string(b[:n]) != "123" {
+		t.Errorf("read %q, %v at 1; want \"123\"", b[:n], err)
+	}
 
 	fw := withSeek(&fileOpen{uri: uri}, io.NopCloser(io.MultiReader()))
 	if _, ok := fw.(io.Seeker); ok {
 		t.Error("a forward-only reader is offered as an io.Seeker")
 	}
+	if _, ok := fw.(io.ReaderAt); ok {
+		t.Error("a forward-only reader is offered as an io.ReaderAt")
+	}
+	fs := withSeek(&fileOpen{uri: uri}, seekOnly{strings.NewReader("x")})
+	if _, ok := fs.(io.ReaderAt); ok {
+		t.Error("a reader that only seeks is offered as an io.ReaderAt")
+	}
 }
+
+// seekOnly is a reader that seeks but does not read at an offset.
+type seekOnly struct{ r *strings.Reader }
+
+func (s seekOnly) Read(p []byte) (int, error)                { return s.r.Read(p) }
+func (s seekOnly) Seek(off int64, whence int) (int64, error) { return s.r.Seek(off, whence) }
+func (seekOnly) Close() error                                { return nil }
 
 // TestSeekWithin covers the in-memory seek the iOS picker's reader uses.
 func TestSeekWithin(t *testing.T) {

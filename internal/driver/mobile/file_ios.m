@@ -42,6 +42,20 @@ const void* iosReadFromURL(void* urlPtr, int* len)  {
     return data.bytes;
 }
 
+// iosURLPath returns a malloc'd copy of the file system path of a file URL,
+// which the caller must free, or NULL when it has none.
+char* iosURLPath(void* urlPtr) {
+    NSURL* url = (NSURL*)urlPtr;
+    if (url == nil || !url.isFileURL) {
+        return NULL;
+    }
+    const char* path = url.fileSystemRepresentation;
+    if (path == NULL) {
+        return NULL;
+    }
+    return strdup(path);
+}
+
 // iosOpenFileWriter returns a retained NSFileHandle, or NULL on failure. On
 // failure *errMsg (when non-NULL) is set to a malloc'd copy of the OS error
 // text, which the caller must free.
