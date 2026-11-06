@@ -161,8 +161,12 @@ func readAll(r bellui.URIReadCloser, size int64, verify bool) error {
 		return fmt.Errorf("the reader cannot read at an offset")
 	}
 	at := (total / block / 3) * block
-	if n, err := ra.ReadAt(b, at); err != nil || n != block || (verify && !check(b, at/block, 0)) {
-		return fmt.Errorf("read at %d: %d, %v", at, n, err)
+	// A read that reaches the end is short and may say io.EOF, as io.ReaderAt
+	// allows: a file under one block reads that way.
+	want := min(int64(block), total-at)
+	n, err := ra.ReadAt(b, at)
+	if int64(n) != want || (err != nil && (err != io.EOF || at+want != total)) || (verify && !check(b[:n], at/block, 0)) {
+		return fmt.Errorf("read at %d: %d, %v; want %d", at, n, err, want)
 	}
 	logf("read at ok, rss %d MiB", maxRSS())
 	return nil
