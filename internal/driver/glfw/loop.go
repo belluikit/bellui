@@ -2,6 +2,7 @@ package glfw
 
 import (
 	"runtime"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -34,6 +35,10 @@ var (
 	// goroutine runs late, the loop used to wake, find nothing, and sleep a
 	// whole idle tick with the work queued (#981, player#287).
 	pendingFuncs atomic.Int64
+
+	// postMu makes a post's check of drained and its send to funcQueue one
+	// step against shutdownLoop setting drained and closing the queue (#1021).
+	postMu sync.RWMutex
 )
 
 // Arrange that main.main runs on main thread.
@@ -51,7 +56,11 @@ func runOnMain(f func()) {
 func runOnMainWithWait(f func(), wait bool) {
 	// If we are on main before app run just execute - otherwise add it to the main queue and wait.
 	// We also need to run it as-is if the app is in the process of shutting down as the queue will be stopped.
+	// The check and the send are one step against shutdownLoop, which closes
+	// the queue: a send after that panics (#1021).
+	postMu.RLock()
 	if (!running.Load() && async.IsMainGoroutine()) || drained.Load() {
+		postMu.RUnlock()
 		f()
 		return
 	}
@@ -62,11 +71,13 @@ func runOnMainWithWait(f func(), wait bool) {
 
 		pendingFuncs.Add(1)
 		funcQueue.In() <- funcData{f: f, done: done}
+		postMu.RUnlock()
 		wakeMainLoop()
 		<-done
 	} else {
 		pendingFuncs.Add(1)
 		funcQueue.In() <- funcData{f: f}
+		postMu.RUnlock()
 		wakeMainLoop()
 	}
 }
@@ -176,16 +187,24 @@ func (d *gLDriver) shutdownLoop() {
 		l.QueueEvent(f)
 	}
 
-	// as we are shutting down make sure we drain the pending funcQueue and close it out.
-	for len(funcQueue.Out()) > 0 {
-		f := <-funcQueue.Out()
+	closeFuncQueue()
+}
+
+// closeFuncQueue stops posting to funcQueue, closes it and releases
+// everything still in it. Work posted from then on runs where it is posted.
+// Reading only what had reached Out() missed work still on its way, whose
+// waiters then never returned, and a post after the close panicked (#1021).
+func closeFuncQueue() {
+	postMu.Lock()
+	drained.Store(true)
+	postMu.Unlock()
+	funcQueue.Close()
+	for f := range funcQueue.Out() {
 		pendingFuncs.Add(-1)
 		if f.done != nil {
 			f.done <- struct{}{}
 		}
 	}
-	drained.Store(true)
-	funcQueue.Close()
 }
 
 // processEventTick runs one frame's worth of work: window lifecycle,
