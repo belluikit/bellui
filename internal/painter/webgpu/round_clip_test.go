@@ -16,6 +16,7 @@ import (
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	paint "github.com/belluikit/bellui/internal/painter"
 )
 
 const clipDim = 64
@@ -178,8 +179,9 @@ func TestRoundedClipLeavesNoStampBehind(t *testing.T) {
 	assert.Equal(t, clipRed, pixel(img, 48, 32), "inside the second clip")
 }
 
-// TestRoundedClipAfterPathFill checks the fallback: a path fill leaves winding
-// counts in the stencil, so the next clip must clear the whole target.
+// TestRoundedClipAfterPathFill checks that a path fill's winding counts do not
+// reach a clip after it: they are in the winding bits, which a clip does not
+// read, so the depth bits stay zero and the clip clears nothing (#1015).
 func TestRoundedClipAfterPathFill(t *testing.T) {
 	o := newOffscreenPainter(t)
 	green := color.NRGBA{G: 255, A: 255}
@@ -193,12 +195,12 @@ func TestRoundedClipAfterPathFill(t *testing.T) {
 		})
 		path.FillColor = green
 		o.drawPath(path, geo.Position{}, geo.NewSquareSize(clipDim))
-		assert.False(t, o.dev.StencilZero(), "a path fill must mark the stencil not zero")
+		assert.True(t, o.dev.StencilZero(), "a path fill wrote the depth bits")
 
 		o.StartRoundedClipping(geo.NewPos(32, 0), geo.NewSize(32, clipDim), 0)
 		o.fill()
 		o.StopRoundedClipping()
-		assert.True(t, o.dev.StencilZero(), "a clip that cleared the whole target leaves it zero")
+		assert.True(t, o.dev.StencilZero(), "the clip left the depth bits not zero")
 	})
 	assert.Equal(t, green, pixel(img, 16, 32), "content leaked through the path fill's winding counts")
 	assert.Equal(t, clipRed, pixel(img, 48, 32), "inside the clip")
@@ -323,6 +325,144 @@ func TestRoundedClipSurvivesPathOps(t *testing.T) {
 			assert.Equal(t, clipRed, pixel(img, 12, 12), "inside the clip")
 			assert.Equal(t, clipBlue, pixel(img, 4, 4), "outside the clip, after the path op")
 			assert.True(t, zeroAfter, "the clip left the stencil not zero")
+		})
+	}
+}
+
+// TestPathInsideRoundedClipIsCut pins #1015: a path fill, and a path clip's
+// content, larger than the rounded clip around them are cut by its corners.
+// Both used to count winding in the whole stencil, which held the clip's depth,
+// so they were confined to the path only.
+func TestPathInsideRoundedClipIsCut(t *testing.T) {
+	square := func() *canvas.Path {
+		return canvas.NewPath(func(p *canvas.Path) {
+			p.MoveTo(0, 0)
+			p.LineTo(clipDim, 0)
+			p.LineTo(clipDim, clipDim)
+			p.LineTo(0, clipDim)
+			p.Close()
+		})
+	}
+	green := color.NRGBA{G: 255, A: 255}
+	for name, op := range map[string]func(o *offscreenPainter) color.NRGBA{
+		"path fill": func(o *offscreenPainter) color.NRGBA {
+			path := square()
+			path.FillColor = green
+			o.drawPath(path, geo.Position{}, geo.NewSquareSize(clipDim))
+			return green
+		},
+		"path fill, even-odd": func(o *offscreenPainter) color.NRGBA {
+			path := square()
+			path.FillColor = green
+			path.FillRule = canvas.FillRuleEvenOdd
+			o.drawPath(path, geo.Position{}, geo.NewSquareSize(clipDim))
+			return green
+		},
+		"path clip's content": func(o *offscreenPainter) color.NRGBA {
+			o.StartPathClipping(square(), geo.Position{}, geo.NewSquareSize(clipDim))
+			o.fill()
+			o.StopPathClipping()
+			return clipRed
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			o := newOffscreenPainter(t)
+			var want color.NRGBA
+			var zeroAfter bool
+			img := o.frame(t, func() {
+				o.StartRoundedClipping(geo.NewPos(8, 8), geo.NewSquareSize(48), 20)
+				want = op(o)
+				o.StopRoundedClipping()
+				zeroAfter = o.dev.StencilZero()
+			})
+			assert.Equal(t, want, pixel(img, 32, 32), "inside the clip")
+			assert.Equal(t, clipBlue, pixel(img, 10, 10), "the clip's rounded corner")
+			assert.Equal(t, clipBlue, pixel(img, 4, 32), "left of the clip")
+			assert.True(t, zeroAfter, "the clip left the stencil not zero")
+		})
+	}
+}
+
+// TestRoundedClipsNestToMaxDepth pins the depth bits' limit (#1015): clips
+// nested paint.MaxClipDepth deep each narrow the one around them, and a deeper
+// clip is cut by the deepest one that fits, not lost.
+func TestRoundedClipsNestToMaxDepth(t *testing.T) {
+	for _, n := range []int{paint.MaxClipDepth, paint.MaxClipDepth + 2} {
+		o := newOffscreenPainter(t)
+		var zeroAfter bool
+		img := o.frame(t, func() {
+			for i := range n {
+				o.StartRoundedClipping(geo.NewPos(float32(i*4), 0), geo.NewSize(float32(clipDim-i*4), clipDim), 0)
+			}
+			o.fill()
+			for range n {
+				o.StopRoundedClipping()
+			}
+			zeroAfter = o.dev.StencilZero()
+		})
+		// Each clip starts 4 px right of the one around it; the stamps are
+		// inset by their anti-aliasing, so the pixels read clear of the edges.
+		deepest := (min(n, paint.MaxClipDepth) - 1) * 4
+		assert.Equal(t, clipRed, pixel(img, deepest+3, 32), "%d clips: inside the deepest that fits", n)
+		assert.Equal(t, clipBlue, pixel(img, deepest-2, 32), "%d clips: outside it, inside the one around it", n)
+		assert.True(t, zeroAfter, "%d clips left the depth bits not zero", n)
+	}
+}
+
+// TestDrawsInsidePathClipAreCut pins the other nesting of #1015: what is drawn
+// inside a path clip, a rounded clip or a path included, stays inside the path.
+// A path clip is a clip level of its own in the depth bits. Before, a rounded
+// clip or a path fill inside it reset the stencil, and the path clip was gone.
+func TestDrawsInsidePathClipAreCut(t *testing.T) {
+	rect := func(x0, x1 float32) *canvas.Path {
+		return canvas.NewPath(func(p *canvas.Path) {
+			p.MoveTo(x0, 0)
+			p.LineTo(x1, 0)
+			p.LineTo(x1, clipDim)
+			p.LineTo(x0, clipDim)
+			p.Close()
+		})
+	}
+	green := color.NRGBA{G: 255, A: 255}
+	for name, op := range map[string]func(o *offscreenPainter) color.NRGBA{
+		"rounded clip, then a fill": func(o *offscreenPainter) color.NRGBA {
+			o.StartRoundedClipping(geo.Position{}, geo.NewSquareSize(clipDim), 0)
+			o.fill()
+			o.StopRoundedClipping()
+			return clipRed
+		},
+		"a fill after a rounded clip ended": func(o *offscreenPainter) color.NRGBA {
+			o.StartRoundedClipping(geo.Position{}, geo.NewSquareSize(clipDim), 0)
+			o.StopRoundedClipping()
+			o.fill()
+			return clipRed
+		},
+		"path fill": func(o *offscreenPainter) color.NRGBA {
+			p := rect(0, clipDim)
+			p.FillColor = green
+			o.drawPath(p, geo.Position{}, geo.NewSquareSize(clipDim))
+			return green
+		},
+		"path clip, then a fill": func(o *offscreenPainter) color.NRGBA {
+			o.StartPathClipping(rect(0, clipDim), geo.Position{}, geo.NewSquareSize(clipDim))
+			o.fill()
+			o.StopPathClipping()
+			return clipRed
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			o := newOffscreenPainter(t)
+			var want color.NRGBA
+			var zeroAfter bool
+			img := o.frame(t, func() {
+				o.StartPathClipping(rect(0, 32), geo.Position{}, geo.NewSquareSize(clipDim))
+				want = op(o)
+				o.StopPathClipping()
+				zeroAfter = o.dev.StencilZero()
+			})
+			assert.Equal(t, want, pixel(img, 16, 32), "inside the path clip")
+			assert.Equal(t, clipBlue, pixel(img, 48, 32), "outside the path clip")
+			assert.True(t, zeroAfter, "the path clip left the depth bits not zero")
 		})
 	}
 }
