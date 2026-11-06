@@ -35,6 +35,7 @@ type Snackbar struct {
 
 	mu          sync.Mutex
 	popUp       *PopUp
+	slide       *bellui.Animation // the slide-up; Hide stops it
 	timer       *time.Timer
 	actionTimer *time.Timer
 }
@@ -116,11 +117,18 @@ func (s *Snackbar) Show(c core.Canvas) {
 	if bellui.CurrentApp().Settings().ShowAnimations() {
 		startY := canvasSize.Height
 		s.popUp.ShowAtPosition(geo.NewPos(x, startY))
+		// The tick moves this popup, not s.popUp: Hide drops s.popUp, and a
+		// tick that lands after it moved a nil popup and crashed the app
+		// (belluikit/player#342). Hide also stops the slide.
+		p := s.popUp
 		anim := bellui.NewAnimation(canvas.DurationShort4, func(done float32) {
 			cy := startY + (y-startY)*done
-			s.popUp.Move(geo.NewPos(x, cy))
+			p.Move(geo.NewPos(x, cy))
 		})
 		anim.Curve = bellui.AnimationEaseStandardDecelerate
+		s.mu.Lock()
+		s.slide = anim
+		s.mu.Unlock()
 		anim.Start()
 	} else {
 		s.popUp.ShowAtPosition(geo.NewPos(x, y))
@@ -158,10 +166,15 @@ func (s *Snackbar) Hide() {
 		s.actionTimer.Stop()
 		s.actionTimer = nil
 	}
+	slide := s.slide
+	s.slide = nil
 	p := s.popUp
 	s.popUp = nil
 	s.mu.Unlock()
 
+	if slide != nil {
+		slide.Stop()
+	}
 	if p != nil {
 		p.Hide()
 	}

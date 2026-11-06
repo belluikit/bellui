@@ -97,3 +97,28 @@ func TestSnackbar_BottomInset(t *testing.T) {
 	raised := restingY(72)
 	assert.InDelta(t, 72, base-raised, 0.01, "inset 72 should raise the snackbar by 72dp (base %v, raised %v)", base, raised)
 }
+
+// TestSnackbar_HideWhileSlidingIn: hiding a snackbar before its slide-up
+// animation ends must not leave the animation moving a popup that Hide
+// already dropped. It did (a nil PopUp.Move on the animation tick), which
+// crashed an app that replaced or dismissed a message right after showing
+// it (belluikit/player#342).
+func TestSnackbar_HideWhileSlidingIn(t *testing.T) {
+	app := test.NewTempApp(t)
+	w := app.NewWindow("Test")
+	defer w.Close()
+	w.Resize(geo.NewSize(400, 300))
+	require.True(t, bellui.CurrentApp().Settings().ShowAnimations(), "the slide-up only runs with animations on")
+
+	s := NewSnackbar("Asking…", "", nil)
+	s.Duration = time.Minute
+	s.Show(w.Canvas())
+	s.mu.Lock()
+	slide := s.slide
+	s.mu.Unlock()
+	require.NotNil(t, slide, "Show keeps its slide-up animation")
+	s.Hide()
+	// The test driver ticks an animation once, at its start, so tick the
+	// slide by hand as a real driver would after Hide: it must not panic.
+	assert.NotPanics(t, func() { slide.Tick(0.5) })
+}
