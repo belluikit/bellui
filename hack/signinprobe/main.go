@@ -35,6 +35,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"runtime"
 	"strings"
 	"time"
@@ -82,9 +83,12 @@ func main() {
 	}
 	w.SetContent(container.NewVBox(buttons, status))
 
+	// App.Quit does nothing on a phone, whose guidelines forbid an app
+	// quitting itself, so the self-stop exits the process.
 	go func() {
 		time.Sleep(15 * time.Minute)
-		bellui.Do(a.Quit)
+		fmt.Println("signinprobe done")
+		os.Exit(0)
 	}()
 	fmt.Println("signinprobe ready os=" + runtime.GOOS)
 	bellui.ShowAndRun(w)
