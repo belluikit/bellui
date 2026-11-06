@@ -8,12 +8,14 @@
 // Launched, it runs by itself: it writes a fixture of fixtureSize bytes into
 // its own storage, opens it with storage.Reader (the same reader a picked file
 // gets, minus the security scope), checks every block, then deletes the
-// fixture and quits. Lines starting "PROBE" go to the console:
+// fixture. Lines starting "PROBE" go to the console. With PROBE_AUTO set it
+// then quits, for a scripted run:
 //
-//	xcrun devicectl device process launch --console --device <udid> com.trendvidia.pickedreadprobe
+//	xcrun devicectl device process launch --console --environment-variables '{"PROBE_AUTO":"1"}' --device <udid> com.trendvidia.pickedreadprobe
 //
 // The "Pick a file" button runs the same read on a file picked from Files,
-// with its security scope, for a check by hand.
+// with its security scope, for a check by hand. Without PROBE_AUTO the probe
+// stays open for that, as it does when opened from the home screen.
 package main
 
 import (
@@ -221,7 +223,7 @@ func main() {
 	a.Lifecycle().SetOnStarted(func() {
 		go func() {
 			runFixture(a)
-			if os.Getenv("PROBE_STAY") == "" {
+			if os.Getenv("PROBE_AUTO") != "" {
 				// A mobile app is not ended by Quit, so the probe ends itself:
 				// nothing it started keeps running.
 				logf("quitting")
