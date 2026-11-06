@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"slices"
 	"sync"
 
 	"github.com/belluikit/bellui/core"
@@ -73,13 +74,7 @@ func (s *OverlayStack) ListFocusManagers() []*app.FocusManager {
 func (s *OverlayStack) Remove(overlay core.CanvasObject) {
 	s.mu.Lock()
 
-	overlayIdx := -1
-	for i, o := range s.overlays {
-		if o == overlay {
-			overlayIdx = i
-			break
-		}
-	}
+	overlayIdx := s.indexLocked(overlay)
 	if overlayIdx == -1 {
 		s.mu.Unlock()
 		return
@@ -95,6 +90,44 @@ func (s *OverlayStack) Remove(overlay core.CanvasObject) {
 	s.focusManagers = s.focusManagers[:overlayIdx]
 
 	s.mu.Unlock()
+	s.removed(removed)
+}
+
+// RemoveOnly deletes one overlay from the stack and keeps the overlays above
+// it. A pop-up whose fade-out ends uses it, so that an overlay added during
+// the fade, which the pop-up did not open, is not removed with it (#1038).
+func (s *OverlayStack) RemoveOnly(overlay core.CanvasObject) {
+	s.mu.Lock()
+	i := s.indexLocked(overlay)
+	if i == -1 {
+		s.mu.Unlock()
+		return
+	}
+	s.overlays = slices.Delete(s.overlays, i, i+1)
+	s.focusManagers = slices.Delete(s.focusManagers, i, i+1)
+	s.mu.Unlock()
+	s.removed([]core.CanvasObject{overlay})
+}
+
+// Index returns where overlay sits in the stack, counted from the bottom, or
+// -1 when it is not on the stack.
+func (s *OverlayStack) Index(overlay core.CanvasObject) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.indexLocked(overlay)
+}
+
+func (s *OverlayStack) indexLocked(overlay core.CanvasObject) int {
+	for i, o := range s.overlays {
+		if o == overlay {
+			return i
+		}
+	}
+	return -1
+}
+
+// removed finishes a removal once the lock is released.
+func (s *OverlayStack) removed(removed []core.CanvasObject) {
 	// A removed overlay no longer takes its opener's direction (#749).
 	for _, o := range removed {
 		uidir.ForgetInherited(o)
