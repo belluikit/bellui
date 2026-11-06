@@ -15,6 +15,7 @@ import (
 	"unsafe"
 
 	"github.com/belluikit/bellui"
+	paint "github.com/belluikit/bellui/internal/painter"
 	"github.com/belluikit/webgpu/wgpu"
 )
 
@@ -856,35 +857,58 @@ func depthStencilState(mode StencilMode, depth bool) *wgpu.DepthStencilState {
 	}
 	front, back := keep, keep
 	var writeMask uint32
+	readMask := uint32(paint.StencilDepthMask)
 	switch mode {
 	case StencilWriteReplace:
 		front.PassOp = wgpu.StencilOperationReplace
 		back = front
 		writeMask = 0xFF
-	case StencilWriteIncrDecr:
+	case StencilClearWinding:
+		front.PassOp = wgpu.StencilOperationReplace
+		back = front
+		writeMask = paint.StencilWindingMask
+	case StencilClearDepth:
+		front.PassOp = wgpu.StencilOperationReplace
+		back = front
+		writeMask = paint.StencilDepthMask
+	case StencilWriteIncrDecr, StencilWriteIncrDecrInClip:
+		// The ops act on the whole value and the write mask keeps the depth
+		// bits, so the count wraps within the winding bits.
 		front.PassOp = wgpu.StencilOperationIncrementWrap
 		back.PassOp = wgpu.StencilOperationDecrementWrap
-		writeMask = 0xFF
-	case StencilWriteInvert:
+		writeMask = paint.StencilWindingMask
+		if mode == StencilWriteIncrDecrInClip {
+			front.Compare = wgpu.CompareFunctionEqual
+			back.Compare = wgpu.CompareFunctionEqual
+		}
+	case StencilWriteInvert, StencilWriteInvertInClip:
 		front.PassOp = wgpu.StencilOperationInvert
+		if mode == StencilWriteInvertInClip {
+			front.Compare = wgpu.CompareFunctionEqual
+		}
 		back = front
-		writeMask = 0xFF
+		writeMask = paint.StencilWindingMask
 	case StencilTestEqual:
 		front.Compare = wgpu.CompareFunctionEqual
 		back = front
 	case StencilTestNotEqual:
 		front.Compare = wgpu.CompareFunctionNotEqual
 		back = front
-	case StencilTestEqualIncr:
+		readMask = paint.StencilWindingMask
+	case StencilStampBit0, StencilStampBit1, StencilStampBit2, StencilStampBit3:
 		front.Compare = wgpu.CompareFunctionEqual
-		front.PassOp = wgpu.StencilOperationIncrementClamp
+		front.PassOp = wgpu.StencilOperationReplace
 		back = front
-		writeMask = 0xFF
-	case StencilTestEqualDecr:
-		front.Compare = wgpu.CompareFunctionEqual
-		front.PassOp = wgpu.StencilOperationDecrementClamp
+		readMask = paint.StencilDepthMask &^ (0x10 << (mode - StencilStampBit0))
+		writeMask = paint.StencilDepthMask
+	case StencilStampWinding:
+		// The reference's winding bits are zero, so this passes where the
+		// winding count is not.
+		front.Compare = wgpu.CompareFunctionNotEqual
+		front.PassOp = wgpu.StencilOperationReplace
 		back = front
-		writeMask = 0xFF
+		readMask = paint.StencilWindingMask
+		writeMask = paint.StencilDepthMask
 	}
 	depthCompare := wgpu.CompareFunctionAlways
 	if depth {
@@ -898,7 +922,7 @@ func depthStencilState(mode StencilMode, depth bool) *wgpu.DepthStencilState {
 		DepthCompare:      depthCompare,
 		StencilFront:      front,
 		StencilBack:       back,
-		StencilReadMask:   0xFF,
+		StencilReadMask:   readMask,
 		StencilWriteMask:  writeMask,
 	}
 }
@@ -917,7 +941,9 @@ func optionalBool(b bool) wgpu.OptionalBool {
 // the stencil) and writes all channels otherwise.
 func colorWriteMask(mode StencilMode) wgpu.ColorWriteMask {
 	switch mode {
-	case StencilWriteReplace, StencilWriteIncrDecr, StencilWriteInvert, StencilTestEqualIncr, StencilTestEqualDecr:
+	case StencilWriteReplace, StencilClearWinding, StencilClearDepth,
+		StencilWriteIncrDecr, StencilWriteIncrDecrInClip, StencilWriteInvert, StencilWriteInvertInClip,
+		StencilStampBit0, StencilStampBit1, StencilStampBit2, StencilStampBit3, StencilStampWinding:
 		return wgpu.ColorWriteMaskNone
 	}
 	return wgpu.ColorWriteMaskAll

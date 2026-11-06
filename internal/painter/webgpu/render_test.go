@@ -16,6 +16,7 @@ import (
 
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/geo"
+	paint "github.com/belluikit/bellui/internal/painter"
 )
 
 // TestOffscreenRenderReadback is a headless, permission-independent proof that
@@ -815,7 +816,7 @@ func runSceneStencilIsolation(t *testing.T, dedicated bool) (center, corner [4]b
 	}
 	maskPipe := buildPipe(StencilWriteReplace, false) // A: stamp mask, color off
 	scenePipe := buildPipe(StencilNone, true)         // B: depth-tested scene draw
-	fillPipe := buildPipe(StencilTestEqual, false)    // C: fill where stencil == 1
+	fillPipe := buildPipe(StencilTestEqual, false)    // C: fill where the depth bits hold depth 1
 	defer maskPipe.Release()
 	defer scenePipe.Release()
 	defer fillPipe.Release()
@@ -886,7 +887,7 @@ func runSceneStencilIsolation(t *testing.T, dedicated bool) (center, corner [4]b
 
 	// Pass A — canvas: stamp the clip mask into the shared depth-stencil.
 	passA := enc.BeginRenderPass(&wgpu.RenderPassDescriptor{ColorAttachments: colorAtt(wgpu.LoadOpClear), DepthStencilAttachment: depthAtt(sharedView, wgpu.LoadOpClear)})
-	passA.SetStencilReference(1)
+	passA.SetStencilReference(paint.ClipDepthCode(1))
 	passA.SetPipeline(maskPipe)
 	passA.SetBindGroup(0, maskBG, nil)
 	passA.SetVertexBuffer(0, maskVB, 0, wgpu.WholeSize)
@@ -905,7 +906,7 @@ func runSceneStencilIsolation(t *testing.T, dedicated bool) (center, corner [4]b
 
 	// Pass C — canvas: reopen the shared depth-stencil and fill red where masked.
 	passC := enc.BeginRenderPass(&wgpu.RenderPassDescriptor{ColorAttachments: colorAtt(wgpu.LoadOpLoad), DepthStencilAttachment: depthAtt(sharedView, wgpu.LoadOpLoad)})
-	passC.SetStencilReference(1)
+	passC.SetStencilReference(paint.ClipDepthCode(1))
 	passC.SetPipeline(fillPipe)
 	passC.SetBindGroup(0, fillBG, nil)
 	passC.SetVertexBuffer(0, fullVB, 0, wgpu.WholeSize)
@@ -964,10 +965,11 @@ func TestSceneDedicatedDepthPreservesStencilClip(t *testing.T) {
 }
 
 // TestStencilClipReplaceReadback validates the rounded-clip stencil family
-// (StencilWriteReplace mask + StencilTestEqual fill, ref=1): only the masked
-// center region receives the red fill; the corner stays clear.
+// (StencilWriteReplace mask + StencilTestEqual fill, ref the code of depth 1,
+// as StencilTestEqual reads only the depth bits, #1015): only the masked center
+// region receives the red fill; the corner stays clear.
 func TestStencilClipReplaceReadback(t *testing.T) {
-	center, corner := runStencilReadback(t, StencilWriteReplace, StencilTestEqual, 1)
+	center, corner := runStencilReadback(t, StencilWriteReplace, StencilTestEqual, paint.ClipDepthCode(1))
 	if center[0] < 250 || center[1] > 5 || center[2] > 5 || center[3] < 250 {
 		t.Fatalf("center = %v, want opaque red inside stencil mask", center)
 	}

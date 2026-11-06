@@ -12,31 +12,52 @@ const (
 	// StencilNone disables the stencil test and writes color (the default for
 	// every normal draw): stencil compare Always, no stencil write.
 	StencilNone StencilMode = iota
-	// StencilWriteReplace writes the stencil reference where fragments pass and
-	// masks color off — used to stamp a rounded-rect clip mask (ref=1) and to
-	// zero the stencil (ref=0) emulating a mid-pass clear.
+	// StencilWriteReplace writes the stencil reference to every bit where
+	// fragments pass and masks color off: with ref 0 it zeroes the stencil,
+	// emulating a mid-pass clear.
 	StencilWriteReplace
-	// StencilWriteIncrDecr increments the stencil on front faces and decrements
-	// on back faces (non-zero winding), color masked off — the path clip / fill
-	// winding pass.
+	// StencilClearWinding zeroes the winding bits (paint.StencilWindingMask)
+	// and keeps the clip depth, color masked off: a path op's fresh start
+	// inside the rounded clips around it (#1015).
+	StencilClearWinding
+	// StencilClearDepth zeroes the depth bits and keeps the winding bits,
+	// color masked off: a first rounded clip on a stencil not known to be
+	// zero, inside a path clip as well.
+	StencilClearDepth
+	// StencilWriteIncrDecr increments the winding bits on front faces and
+	// decrements them on back faces (non-zero winding), color masked off: the
+	// path clip / fill winding pass outside every rounded clip.
 	StencilWriteIncrDecr
-	// StencilWriteInvert inverts the stencil bits, color masked off — the
+	// StencilWriteIncrDecrInClip is StencilWriteIncrDecr only where the depth
+	// bits equal the reference: the winding pass inside a rounded clip, which
+	// so cuts the path (#1015).
+	StencilWriteIncrDecrInClip
+	// StencilWriteInvert inverts the winding bits, color masked off: the
 	// even-odd fill winding pass.
 	StencilWriteInvert
-	// StencilTestEqual draws color only where stencil == reference (rounded-rect
-	// clip content).
+	// StencilWriteInvertInClip is StencilWriteInvert inside a rounded clip.
+	StencilWriteInvertInClip
+	// StencilTestEqual draws color only where the depth bits equal the
+	// reference (rounded-rect clip content).
 	StencilTestEqual
-	// StencilTestNotEqual draws color only where stencil != reference (path clip
-	// content and the path-fill bounding-box quad; reference is 0).
+	// StencilTestNotEqual draws color only where the winding bits are not the
+	// reference, 0 (path clip content and the path-fill bounding-box quad).
 	StencilTestNotEqual
-	// StencilTestEqualIncr increments the stencil where it equals the reference,
-	// color masked off: a rounded clip nested at depth d stamps where the
-	// enclosing clip left d-1, so it can only narrow it (#1012).
-	StencilTestEqualIncr
-	// StencilTestEqualDecr decrements the stencil where it equals the reference,
-	// color masked off: a rounded clip's Stop returns its area to the enclosing
-	// clip's depth (#1012).
-	StencilTestEqualDecr
+	// StencilStampBit0 to StencilStampBit3 stamp and erase a rounded clip's
+	// depth: where the depth bits, all but bit n, equal the reference, they
+	// are replaced with it, color masked off. Depth d stamps with bit
+	// paint.ClipStampBit(d) and reference paint.ClipDepthCode(d), and erases
+	// with paint.ClipDepthCode(d-1), so a nested clip only narrows the clip
+	// around it (#1012, #1015).
+	StencilStampBit0
+	StencilStampBit1
+	StencilStampBit2
+	StencilStampBit3
+	// StencilStampWinding replaces the depth bits with the reference where the
+	// winding bits are non-zero, color masked off: a path clip becomes a
+	// clip level, so what is drawn inside it, rounded clips included, is cut
+	// by it (#1015).
+	StencilStampWinding
 )
 
 // PipelineKey identifies a unique render pipeline (PSO). A pipeline is keyed by

@@ -10,6 +10,7 @@ import (
 	"log"
 	"runtime"
 	"strings"
+	"sync"
 
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/canvas"
@@ -433,49 +434,74 @@ func (p *painter) blurPass(program ProgramState, fbo Framebuffer, width, height 
 	p.logError()
 }
 
-// glRoundClip is an active rounded clip, kept so its Stop can erase it and a
-// path op can stamp it again.
+// glRoundClip is an active rounded clip, kept so its Stop can erase it.
 //
-// Clips nest by depth (#1012): a clip at depth d stamps d into the stencil
-// only where its enclosing clip left d-1, and draws test for d. So an inner
-// clip narrows the outer one, and Stop returns its area to d-1, which is the
-// outer clip again.
+// Clips nest by depth (#1012), kept in the stencil's depth bits (#1015, see
+// paint.StencilDepthMask): a clip at depth d stamps d only where its enclosing
+// clip left d-1, and draws test for d. So an inner clip narrows the outer one,
+// and Stop returns its area to d-1, which is the outer clip again.
 type glRoundClip struct {
 	pos       geo.Position
 	size      geo.Size
 	radius    float32
 	transform geo.Matrix
 	depth     int
+	// shared is a clip deeper than paint.MaxClipDepth: it stamps nothing and
+	// its content is cut by the clip around it only.
+	shared bool
+	// path is a path clip's level: its stamp is where the path's winding was
+	// counted, and it is erased over the whole target (#1015).
+	path bool
 }
 
 // StartRoundedClipping enables stencil-based rounded-corner clipping, inside
 // any rounded clip already active.
 func (p *painter) StartRoundedClipping(pos geo.Position, size geo.Size, cornerRadius float32) {
 	clip := glRoundClip{pos: pos, size: size, radius: cornerRadius, transform: p.currentTransform, depth: 1}
-	if top := p.topRoundClip(); top != nil {
+	top := p.topRoundClip()
+	if top != nil {
 		clip.depth = top.depth + 1
-	} else {
-		p.ctx.Enable(stencilTest)
-		p.ctx.ClearStencil(0)
-		p.ctx.Clear(bitStencilBuffer)
+	}
+	if clip.depth > paint.MaxClipDepth {
+		warnClipDepth()
+		clip.depth = top.depth
+		clip.shared = true
+		p.roundClips = append(p.roundClips, clip)
+		return
+	}
+	if top == nil {
+		p.clearDepthBits()
 	}
 	p.roundClips = append(p.roundClips, clip)
 	p.stampRoundClip(&clip)
 	p.applyRoundClip()
 }
 
+// warnClipDepth reports, once, a clip nested deeper than the stencil holds.
+var warnClipDepth = sync.OnceFunc(func() {
+	bellui.LogError(fmt.Sprintf("gl: clips nest deeper than %d; deeper ones are cut by the clip around them only", paint.MaxClipDepth), nil)
+})
+
+// clearDepthBits zeroes the stencil's depth bits, keeping the winding bits.
+func (p *painter) clearDepthBits() {
+	p.ctx.Enable(stencilTest)
+	p.ctx.StencilMask(paint.StencilDepthMask)
+	p.ctx.ClearStencil(0)
+	p.ctx.Clear(bitStencilBuffer)
+}
+
 // stampRoundClip draws clip's rounded rect into the stencil, raising it from
 // the enclosing clip's depth to clip's, color writes off.
 func (p *painter) stampRoundClip(clip *glRoundClip) {
-	p.ctx.StencilFunc(glEqual, int32(clip.depth-1), 0xFF)
-	p.ctx.StencilOp(glKeep, glKeep, glIncrWrap)
+	p.ctx.StencilFunc(glEqual, int32(paint.ClipDepthCode(clip.depth)), paint.ClipStampMask(clip.depth))
+	p.ctx.StencilOp(glKeep, glKeep, glReplace)
 	p.drawStencilRect(clip.pos, clip.size, clip.radius, clip.transform)
 }
 
-// drawStencilRect draws a rounded rect into the stencil with the stencil
-// function and op already set, color writes off, under transform.
+// drawStencilRect draws a rounded rect into the stencil's depth bits with the
+// stencil function and op already set, color writes off, under transform.
 func (p *painter) drawStencilRect(pos geo.Position, size geo.Size, radius float32, transform geo.Matrix) {
-	p.ctx.StencilMask(0xFF)
+	p.ctx.StencilMask(paint.StencilDepthMask)
 	p.ctx.ColorMask(false, false, false, false)
 	prev := p.currentTransform
 	p.currentTransform = transform
@@ -513,32 +539,25 @@ func (p *painter) applyRoundClip() {
 		return
 	}
 	p.ctx.Enable(stencilTest)
-	p.ctx.StencilFunc(glEqual, int32(top.depth), 0xFF)
+	p.ctx.StencilFunc(glEqual, int32(paint.ClipDepthCode(top.depth)), paint.StencilDepthMask)
 	p.ctx.StencilMask(0x00) // don't write to stencil anymore
 	p.logError()
 }
 
-// restampRoundClips clears the stencil and stamps the active rounded clips of
-// the bound target again, outermost first. A path fill or path clip uses the
-// whole stencil, so the clips around it are put back once it is done (#1012).
-func (p *painter) restampRoundClips() {
-	if p.topRoundClip() == nil {
-		p.ctx.Disable(stencilTest)
-		p.logError()
-		return
-	}
+// startWinding prepares a path op's winding pass: the winding bits zeroed, and
+// the count kept to the innermost rounded clip of the bound target, so the path
+// is cut by it (#1015). Color writes are off; the caller sets the stencil ops.
+func (p *painter) startWinding() {
 	p.ctx.Enable(stencilTest)
-	p.ctx.StencilMask(0xFF)
+	p.ctx.StencilMask(paint.StencilWindingMask)
 	p.ctx.ClearStencil(0)
 	p.ctx.Clear(bitStencilBuffer)
-	base := 0
-	if n := len(p.clipBases); n > 0 {
-		base = p.clipBases[n-1]
+	p.ctx.ColorMask(false, false, false, false)
+	if top := p.topRoundClip(); top != nil {
+		p.ctx.StencilFunc(glEqual, int32(paint.ClipDepthCode(top.depth)), paint.StencilDepthMask)
+	} else {
+		p.ctx.StencilFunc(glAlways, 0, 0xFF)
 	}
-	for i := base; i < len(p.roundClips); i++ {
-		p.stampRoundClip(&p.roundClips[i])
-	}
-	p.applyRoundClip()
 }
 
 // StopRoundedClipping ends the innermost rounded clip: it erases its stamp
@@ -553,31 +572,47 @@ func (p *painter) StopRoundedClipping() {
 	}
 	clip := *top
 	p.roundClips = p.roundClips[:len(p.roundClips)-1]
-	p.ctx.StencilFunc(glEqual, int32(clip.depth), 0xFF)
-	p.ctx.StencilOp(glKeep, glKeep, glDecrWrap)
-	p.drawStencilRect(clip.pos, clip.size, 0, clip.transform)
+	p.popClip(clip)
+}
+
+// popClip erases the stamp of clip, just taken off roundClips, and restores
+// the enclosing clip's test.
+func (p *painter) popClip(clip glRoundClip) {
+	if !clip.shared {
+		p.ctx.StencilFunc(glEqual, int32(paint.ClipDepthCode(clip.depth-1)), paint.ClipStampMask(clip.depth))
+		p.ctx.StencilOp(glKeep, glKeep, glReplace)
+		if clip.path {
+			// The stamp's area is wherever the depth bits hold the clip's depth.
+			p.drawStencilRect(geo.Position{}, p.targetFrame(), 0, geo.Identity())
+		} else {
+			p.drawStencilRect(clip.pos, clip.size, 0, clip.transform)
+		}
+	}
 	p.applyRoundClip()
 }
 
 // StartPathClipping enables stencil-based clipping to an arbitrary path shape.
-// Content drawn after this call will only appear inside the path's filled region.
+// Content drawn after this call will only appear inside the path's filled
+// region, and inside the clips around it. The path's area becomes a clip level
+// of its own in the depth bits, so what is drawn inside it, rounded clips and
+// paths included, is cut by it (#1015).
 func (p *painter) StartPathClipping(path *canvas.Path, pos geo.Position, size geo.Size) {
-	if path == nil {
-		return
+	// Every Start pushes a level, so its Stop pops its own.
+	clip := glRoundClip{path: true}
+	top := p.topRoundClip()
+	if top != nil {
+		clip.depth = top.depth
 	}
-
-	elements := path.Elements()
-	if len(elements) == 0 {
-		return
+	var fanTris []float32
+	if path != nil {
+		if subpaths := paint.FlattenPath(path.Elements(), p.pixScale); len(subpaths) > 0 {
+			fanTris = paint.FanTriangulate(subpaths)
+		}
 	}
-
-	subpaths := paint.FlattenPath(elements, p.pixScale)
-	if len(subpaths) == 0 {
-		return
-	}
-
-	fanTris := paint.FanTriangulate(subpaths)
 	if len(fanTris) < 6 {
+		// Nothing to clip to: the content is drawn as without the clip.
+		clip.shared = true
+		p.roundClips = append(p.roundClips, clip)
 		return
 	}
 
@@ -585,13 +620,8 @@ func (p *painter) StartPathClipping(path *canvas.Path, pos geo.Position, size ge
 	program := p.pathProgram
 	p.ctx.UseProgram(program.ref)
 
-	// Render path fill to stencil buffer using winding rule.
-	p.ctx.Enable(stencilTest)
-	p.ctx.ClearStencil(0)
-	p.ctx.Clear(bitStencilBuffer)
-	p.ctx.StencilMask(0xFF)
-	p.ctx.ColorMask(false, false, false, false)
-	p.ctx.StencilFunc(glAlways, 0, 0xFF)
+	// Render path fill to the stencil's winding bits using winding rule.
+	p.startWinding()
 	p.ctx.StencilOpSeparate(glFront, glKeep, glKeep, glIncrWrap)
 	p.ctx.StencilOpSeparate(glBack, glKeep, glKeep, glDecrWrap)
 
@@ -602,20 +632,45 @@ func (p *painter) StartPathClipping(path *canvas.Path, pos geo.Position, size ge
 	p.ctx.VertexAttribPointerWithOffset(program.attributes["alpha"], 1, float, false, 0, 0)
 	p.SetUniform4f(program, "fill_color", 0, 0, 0, 0)
 	p.ctx.DrawArrays(triangles, 0, len(ndcVerts)/2)
+	p.ctx.ColorMask(true, true, true, true)
 	p.logError()
 
-	// Set stencil to only allow drawing where path is filled.
-	p.ctx.ColorMask(true, true, true, true)
-	p.ctx.StencilFunc(glNotEqual, 0, 0xFF)
-	p.ctx.StencilMask(0x00)
-	p.logError()
+	clip.depth++
+	if clip.depth > paint.MaxClipDepth {
+		// Too deep for a level: the content is tested against the winding,
+		// so it is cut by the path and the clips around it, but what is
+		// nested inside it is not.
+		warnClipDepth()
+		clip.depth--
+		clip.shared = true
+		p.roundClips = append(p.roundClips, clip)
+		p.ctx.StencilFunc(glNotEqual, 0, paint.StencilWindingMask)
+		p.ctx.StencilMask(0x00)
+		p.logError()
+		return
+	}
+	if top == nil {
+		p.clearDepthBits()
+	}
+	// The depth bits take the level's code where the winding is not zero: the
+	// reference's winding bits are zero.
+	p.ctx.StencilFunc(glNotEqual, int32(paint.ClipDepthCode(clip.depth)), paint.StencilWindingMask)
+	p.ctx.StencilOp(glKeep, glKeep, glReplace)
+	p.drawStencilRect(geo.Position{}, frame, 0, geo.Identity())
+	p.roundClips = append(p.roundClips, clip)
+	p.applyRoundClip()
 }
 
-// StopPathClipping ends a path clip. The winding pass used the whole stencil,
-// so the rounded clips around it are stamped again (#1012). A path clip's own
-// content is confined to the path, not to the rounded clips around it.
+// StopPathClipping ends a path clip: its level is erased, and the clips
+// around it apply again.
 func (p *painter) StopPathClipping() {
-	p.restampRoundClips()
+	if p.topRoundClip() == nil {
+		p.applyRoundClip()
+		return
+	}
+	clip := p.roundClips[len(p.roundClips)-1]
+	p.roundClips = p.roundClips[:len(p.roundClips)-1]
+	p.popClip(clip)
 }
 
 func (p *painter) SetGroupOpacity(opacity float32) {

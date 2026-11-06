@@ -540,25 +540,24 @@ func (p *painter) drawPath(path *canvas.Path, pos geo.Position, frame geo.Size) 
 }
 
 // drawPathFillStencil renders a path fill via the stencil buffer, mirroring
-// gl.drawPathFillStencil. Pass 1 stamps the fill rule's winding into the stencil
-// (color off); pass 2 draws a bounding-box quad where the stencil marks the
-// interior; pass 3 draws an anti-aliased fringe along the boundary (no stencil).
-// The stencil is zeroed first (clearStencil) since WebGPU can't clear mid-pass.
+// gl.drawPathFillStencil. Pass 1 counts the fill rule's winding into the
+// stencil's winding bits (color off), inside the innermost rounded clip; pass 2
+// draws a bounding-box quad where the winding is non-zero; pass 3 draws an
+// anti-aliased fringe along the boundary, inside the rounded clips. So the
+// whole fill is cut by the rounded clips around it (#1015). The winding bits
+// are zeroed first (clearStencilBits) since WebGPU can't clear mid-pass.
 func (p *painter) drawPathFillStencil(path *canvas.Path, fanTris []float32, subpaths [][]geo.Position, fringeWidth float32, pos geo.Position, frame geo.Size) {
-	// Pass 1: winding / even-odd into the stencil, color masked off.
-	p.clearStencil()
-	p.markStencilDirty()
-	p.dev.SetStencilRef(0)
-	if path.FillRule == canvas.FillRuleEvenOdd {
-		p.stencilMode = StencilWriteInvert
-	} else {
-		p.stencilMode = StencilWriteIncrDecr
-	}
+	// Pass 1: winding / even-odd into the winding bits, color masked off.
+	p.clearStencilBits(StencilClearWinding)
+	ref, mode := p.clipRef(path.FillRule != canvas.FillRuleEvenOdd)
+	p.dev.SetStencilRef(ref)
+	p.stencilMode = mode
 	fan := p.pathFanToNDC(fanTris, pos, frame)
 	su := PathUniforms{}
 	p.record("path", fan, len(fan)/3, uniformBytes(&su), nil)
 
-	// Pass 2: bounding-box quad where the stencil interior is non-zero, color on.
+	// Pass 2: bounding-box quad where the winding is non-zero, color on.
+	p.dev.SetStencilRef(0)
 	p.stencilMode = StencilTestNotEqual
 	c := p.fragColor(path.FillColor)
 	fu := PathUniforms{FillColor: c}
@@ -571,9 +570,8 @@ func (p *painter) drawPathFillStencil(path *canvas.Path, fanTris []float32, subp
 	p.record("path", bb, len(bb)/3, uniformBytes(&fu), nil)
 
 	// Pass 3: anti-aliased fringe along the fill boundary, inside the rounded
-	// clips around the path, stamped again over the winding counts (#1012).
-	// The bounding-box pass above is confined to the path only.
-	p.restampRoundClips()
+	// clips around the path.
+	p.applyRoundClip()
 	fringe := paint.ExpandFillFringe(subpaths, fringeWidth)
 	if len(fringe) >= 9 {
 		fr := p.pathVertsToNDCWithAlpha(fringe, pos, frame)
