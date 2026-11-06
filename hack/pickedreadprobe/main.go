@@ -1,3 +1,5 @@
+//go:build unix
+
 // Command pickedreadprobe checks, on a device, that a document opened through
 // the mobile driver's reader is read through its file rather than into memory
 // (#1020): a file larger than the device's memory is read end to end, seeked
