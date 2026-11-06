@@ -3,7 +3,7 @@
 package glfw
 
 import (
-	"sync/atomic"
+	"sync"
 	"time"
 
 	"github.com/belluikit/bellui"
@@ -19,10 +19,16 @@ const (
 	platformWayland = "wayland"
 )
 
-// glfwInitDone gates wakeMainLoop: glfw.PostEmptyEvent may only be called
-// once GLFW is initialised. Work queued before that is picked up by the
-// event loop's first drain anyway.
-var glfwInitDone atomic.Bool
+// glfwLive gates wakeMainLoop: glfw.PostEmptyEvent may only be called while
+// GLFW is initialised, and panics after glfw.Terminate. Work queued before
+// init is picked up by the event loop's first drain, and work queued after
+// Terminate by shutdownLoop's drain, so neither needs a wake. glfwMu makes the
+// check and the call one step against a concurrent Terminate: a Do from
+// another goroutine during shutdown crashed the process (#1021).
+var (
+	glfwMu   sync.RWMutex
+	glfwLive bool
+)
 
 func (d *gLDriver) initGLFW() {
 	// On linux the default build compiles both the X11 and Wayland backends and
@@ -71,7 +77,9 @@ func (d *gLDriver) initGLFW() {
 	}
 
 	initCursors()
-	glfwInitDone.Store(true)
+	glfwMu.Lock()
+	glfwLive = true
+	glfwMu.Unlock()
 }
 
 func (d *gLDriver) pollEvents() {
@@ -81,7 +89,9 @@ func (d *gLDriver) pollEvents() {
 // wakeMainLoop interrupts the event loop's native wait so freshly queued
 // main-thread work runs promptly.
 func wakeMainLoop() {
-	if glfwInitDone.Load() {
+	glfwMu.RLock()
+	defer glfwMu.RUnlock()
+	if glfwLive {
 		glfw.PostEmptyEvent()
 	}
 }
@@ -266,6 +276,11 @@ func withPaintRetry(nextTick, retry time.Time) time.Time {
 	return nextTick
 }
 
+// Terminate ends GLFW. wakeMainLoop stops posting first, as it would panic
+// after it (#1021).
 func (d *gLDriver) Terminate() {
+	glfwMu.Lock()
+	defer glfwMu.Unlock()
+	glfwLive = false
 	glfw.Terminate()
 }
