@@ -122,3 +122,43 @@ func TestSnackbar_HideWhileSlidingIn(t *testing.T) {
 	// slide by hand as a real driver would after Hide: it must not panic.
 	assert.NotPanics(t, func() { slide.Tick(0.5) })
 }
+
+// TestSnackbar_ShowAgainWhileFading: a snackbar shown again while its
+// previous popup is still fading out keeps the new popup on the canvas.
+// OverlayStack.Remove drops every overlay above the one removed, so the old
+// popup's fade ending after the new popup was added took the new one with
+// it: a replaced message showed nothing in a real window
+// (belluikit/player#342). The test driver ends every animation as it starts,
+// so the fade is held open by hand: the old popup is put back on the canvas
+// as a real driver still has it, and its fade is ended after Show.
+func TestSnackbar_ShowAgainWhileFading(t *testing.T) {
+	app := test.NewTempApp(t)
+	w := app.NewWindow("Test")
+	defer w.Close()
+	w.Resize(geo.NewSize(400, 300))
+	c := w.Canvas()
+
+	s := NewSnackbar("Asking…", "", nil)
+	s.Duration = time.Minute
+	s.Show(c)
+	s.mu.Lock()
+	old := s.popUp
+	s.mu.Unlock()
+	s.Hide()
+
+	// A real driver: the fade has not ended, so the old popup is still on
+	// the canvas when the next message shows.
+	c.Overlays().Add(old)
+	old.overlayShown = true
+
+	s.Text = "Loading the song…"
+	s.Show(c)
+	s.mu.Lock()
+	current := s.popUp
+	s.mu.Unlock()
+
+	old.finishHide() // the old fade ends now
+	assert.Same(t, current, c.Overlays().Top(), "the new message must still be on the canvas after the old one's fade ends")
+	assert.Len(t, c.Overlays().List(), 1)
+	s.Hide()
+}

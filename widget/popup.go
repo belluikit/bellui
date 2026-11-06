@@ -88,6 +88,18 @@ func (p *PopUp) PassesInputThrough() bool {
 	return p.passThrough
 }
 
+// removeNow takes the pop-up off its canvas at once, ending any show or hide
+// animation in progress, so it cannot later remove overlays added above it.
+func (p *PopUp) removeNow() {
+	if p.showAnim != nil {
+		p.showAnim.Stop()
+	}
+	if p.hideAnim != nil {
+		p.hideAnim.Stop()
+	}
+	p.finishHide()
+}
+
 func (p *PopUp) finishHide() {
 	if p.overlayShown {
 		p.Canvas.Overlays().Remove(p)

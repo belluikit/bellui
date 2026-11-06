@@ -36,6 +36,7 @@ type Snackbar struct {
 	mu          sync.Mutex
 	popUp       *PopUp
 	slide       *bellui.Animation // the slide-up; Hide stops it
+	fading      *PopUp            // the popup Hide is fading out; Show removes it at once
 	timer       *time.Timer
 	actionTimer *time.Timer
 }
@@ -54,6 +55,17 @@ func NewSnackbar(text, actionText string, action func()) *Snackbar {
 func (s *Snackbar) Show(c core.Canvas) {
 	s.canvas = c
 	s.Hide() // dismiss any previous
+	// Take the previous popup off the canvas now instead of letting it fade:
+	// OverlayStack.Remove drops every overlay above the one removed, so a
+	// popup whose fade ended after the new one was added took the new one
+	// with it, and a replaced message showed nothing (belluikit/player#342).
+	s.mu.Lock()
+	f := s.fading
+	s.fading = nil
+	s.mu.Unlock()
+	if f != nil {
+		f.removeNow()
+	}
 
 	th := theme.Current()
 	v := bellui.CurrentApp().Settings().ThemeVariant()
@@ -170,6 +182,9 @@ func (s *Snackbar) Hide() {
 	s.slide = nil
 	p := s.popUp
 	s.popUp = nil
+	if p != nil {
+		s.fading = p
+	}
 	s.mu.Unlock()
 
 	if slide != nil {
