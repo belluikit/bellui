@@ -1,9 +1,21 @@
-// Package auth provides OIDC and OAuth 2.0 authentication for desktop apps.
+// Package auth provides OIDC and OAuth 2.0 authentication.
 //
-// The package implements the Authorization Code flow with PKCE, which is the
-// recommended flow for native/desktop applications. It opens the user's system
-// browser for authentication and receives the callback on a temporary localhost
-// HTTP server.
+// On a desktop the package implements the Authorization Code flow with PKCE,
+// which is the recommended flow for native/desktop applications. It opens the
+// user's system browser for authentication and receives the callback on a
+// temporary localhost HTTP server.
+//
+// On phones the same [Authenticate] call uses the platform's own sign-in:
+//
+//   - "apple" on iOS shows the Sign in with Apple sheet. The app needs the
+//     com.apple.developer.applesignin entitlement in ios/Entitlements.plist.
+//   - "google" on Android uses Credential Manager. The app ships the
+//     androidx.credentials and googleid libraries in android/libs, and
+//     ClientID is the Web client ID: the audience of the token Google returns.
+//   - "google" on iOS runs the PKCE flow in ASWebAuthenticationSession, with
+//     ClientID the iOS client ID and the redirect on its reversed-ID scheme.
+//
+// Other providers return an error on phones.
 //
 // Supported providers: Google, Microsoft (Entra ID), Apple, GitHub, Okta,
 // Keycloak, and any custom OIDC-compliant provider.
@@ -14,6 +26,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -62,11 +75,32 @@ type OIDCResult struct {
 	AccessToken  string `json:"-"`
 	RefreshToken string `json:"-"`
 	IDToken      string `json:"-"`
+
+	// AuthorizationCode is the one-time code a native sign-in sheet returns
+	// beside the ID token. Sign in with Apple on iOS gives one: the app's
+	// server redeems it with Apple for the user's refresh token. The sheet
+	// gives no access or refresh token itself. Empty for the other flows,
+	// which redeem their code themselves.
+	//
+	// Since: 1.3
+	AuthorizationCode string `json:"-"`
 }
+
+// ErrCancelled is the error Authenticate returns when the user closes the
+// sign-in sheet or browser session without signing in. It is told apart with
+// errors.Is. The desktop flow, which cannot see the browser tab close, never
+// returns it.
+//
+// Since: 1.3
+var ErrCancelled = errors.New("auth: sign-in cancelled")
 
 // Authenticate runs the full OIDC Authorization Code + PKCE flow.
 // It opens the system browser, waits for the callback, exchanges the
 // code for tokens, and returns the user's claims.
+//
+// On iOS and Android it uses the platform's own sign-in where the package has
+// one (see the package documentation), and returns the same verified claims.
+// A user who closes the sheet gets [ErrCancelled].
 func Authenticate(cfg OIDCConfig) (*OIDCResult, error) {
 	// Apply defaults. Scopes are defaulted after the GitHub branch below:
 	// GitHub is OAuth 2.0, not OpenID Connect, and has its own defaults.
@@ -80,8 +114,12 @@ func Authenticate(cfg OIDCConfig) (*OIDCResult, error) {
 		cfg.Issuer = preset.Issuer
 	}
 
-	// GitHub uses a custom OAuth flow, not OIDC.
+	// GitHub uses a custom OAuth flow, not OIDC, and only over the loopback
+	// listener.
 	if cfg.Provider == "github" {
+		if !loopbackFlows {
+			return nil, fmt.Errorf("auth: provider %q has no sign-in flow on this platform", cfg.Provider)
+		}
 		return authenticateGitHub(cfg)
 	}
 
@@ -91,6 +129,18 @@ func Authenticate(cfg OIDCConfig) (*OIDCResult, error) {
 
 	if cfg.Issuer == "" {
 		return nil, fmt.Errorf("auth: issuer is required for provider %q", cfg.Provider)
+	}
+
+	nonce := cfg.Nonce
+	if nonce == "" {
+		var err error
+		if nonce, err = randomString(32); err != nil {
+			return nil, err
+		}
+	}
+
+	if sheet, ok := nativeSheets[cfg.Provider]; ok {
+		return authenticateNative(cfg, sheet, nonce)
 	}
 
 	// Step 1: OIDC Discovery.
@@ -105,39 +155,31 @@ func Authenticate(cfg OIDCConfig) (*OIDCResult, error) {
 		return nil, fmt.Errorf("auth: PKCE generation failed: %w", err)
 	}
 
-	// Step 3: Start callback server.
-	cb, err := newCallbackServer()
+	// Step 3: Prepare the redirect: the loopback listener on a desktop.
+	flow, err := newRedirectFlow(cfg)
 	if err != nil {
-		return nil, fmt.Errorf("auth: callback server failed: %w", err)
+		return nil, fmt.Errorf("auth: %w", err)
 	}
-	defer cb.Close()
+	defer flow.Close()
 
-	redirectURI := cb.RedirectURI()
+	redirectURI := flow.RedirectURI()
 
 	// Step 4: Build authorization URL.
 	state, err := randomString(32)
 	if err != nil {
 		return nil, err
 	}
-	nonce := cfg.Nonce
-	if nonce == "" {
-		if nonce, err = randomString(32); err != nil {
-			return nil, err
-		}
-	}
 
 	authURL := buildAuthURL(disc.AuthorizationEndpoint, cfg.ClientID, redirectURI,
 		cfg.Scopes, state, nonce, challenge)
 
-	// Step 5: Open browser.
-	if err := openBrowser(authURL); err != nil {
-		return nil, fmt.Errorf("auth: failed to open browser: %w", err)
-	}
-
-	// Step 6: Wait for callback.
-	code, callbackState, err := cb.WaitForCode(cfg.Timeout)
+	// Steps 5 and 6: Show the user the URL and wait for the redirect.
+	code, callbackState, err := flow.Authorize(authURL, cfg.Timeout)
 	if err != nil {
-		return nil, fmt.Errorf("auth: callback failed: %w", err)
+		if errors.Is(err, ErrCancelled) {
+			return nil, err
+		}
+		return nil, fmt.Errorf("auth: %w", err)
 	}
 	if callbackState != state {
 		return nil, fmt.Errorf("auth: state mismatch (CSRF protection)")

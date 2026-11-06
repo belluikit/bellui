@@ -4875,4 +4875,146 @@ public class GoNativeActivity extends NativeActivity {
         });
         return true;
     }
+
+    // Sign in with Google through Credential Manager, for the auth package
+    // (#1042). Credential Manager is androidx code that only an app signing in
+    // ships, in its android/libs, so it is reached by reflection: an app
+    // without the libraries carries none of it, and asking for it reports
+    // which libraries are missing. The callback interface is implemented with
+    // java.lang.reflect.Proxy for the same reason.
+    //
+    // Statuses, matching auth/signin_android.go.
+    private static final int AUTH_OK = 0;
+    private static final int AUTH_CANCELLED = 1;
+    private static final int AUTH_FAILED = 2;
+    private static final int AUTH_MISSING_LIBRARIES = 3;
+
+    private static final String AUTH_GOOGLE_ID_TOKEN_TYPE =
+            "com.google.android.libraries.identity.googleid.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL";
+    private static final String AUTH_GOOGLE_SIWG_TOKEN_TYPE =
+            "com.google.android.libraries.identity.googleid.TYPE_GOOGLE_ID_TOKEN_SIWG_CREDENTIAL";
+
+    private static native void authGoogleDone(long token, int status, String idToken,
+            String email, String name, String err);
+
+    static void authGoogleSignIn(final long token, final String serverClientId, final String nonce) {
+        final GoNativeActivity activity = goNativeActivity;
+        if (activity == null) {
+            authGoogleDone(token, AUTH_FAILED, "", "", "", "no activity to show the sign-in sheet");
+            return;
+        }
+        activity.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                activity.doAuthGoogleSignIn(token, serverClientId, nonce);
+            }
+        });
+    }
+
+    void doAuthGoogleSignIn(final long token, String serverClientId, String nonce) {
+        try {
+            final ClassLoader cl = getClassLoader();
+            Class<?> managerClass = Class.forName("androidx.credentials.CredentialManager", true, cl);
+            // CredentialManager.create is a static method of an interface,
+            // which d8 moves to a generated class when it dexes for an API
+            // level below 24, as the packager does: reflection does not find
+            // it there. The Kotlin companion object carries the same create as
+            // an ordinary method.
+            Object companion = managerClass.getField("Companion").get(null);
+            Object manager = companion.getClass().getMethod("create", Context.class).invoke(companion, this);
+
+            // The "Sign in with Google" button flow, not GetGoogleIdOption's
+            // bottom sheet: the sheet is Google's automatic prompt, and after
+            // a user dismisses it a few times it stops showing for a while and
+            // reports NoCredentialException instead (measured on #1042). An app
+            // calls Authenticate when its user asked to sign in, so the dialog
+            // always shows, with every account on the device.
+            Class<?> optionBuilder = Class.forName(
+                    "com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption$Builder", true, cl);
+            Object ob = optionBuilder.getConstructor(String.class).newInstance(serverClientId);
+            optionBuilder.getMethod("setNonce", String.class).invoke(ob, nonce);
+            Object option = optionBuilder.getMethod("build").invoke(ob);
+
+            Class<?> optionClass = Class.forName("androidx.credentials.CredentialOption", true, cl);
+            Class<?> requestBuilder = Class.forName("androidx.credentials.GetCredentialRequest$Builder", true, cl);
+            Object rb = requestBuilder.getConstructor().newInstance();
+            requestBuilder.getMethod("addCredentialOption", optionClass).invoke(rb, option);
+            Object request = requestBuilder.getMethod("build").invoke(rb);
+
+            Class<?> requestClass = Class.forName("androidx.credentials.GetCredentialRequest", true, cl);
+            Class<?> callbackClass = Class.forName("androidx.credentials.CredentialManagerCallback", true, cl);
+            Object callback = java.lang.reflect.Proxy.newProxyInstance(cl, new Class<?>[] {callbackClass},
+                    new java.lang.reflect.InvocationHandler() {
+                        @Override
+                        public Object invoke(Object proxy, java.lang.reflect.Method m, Object[] args) {
+                            switch (m.getName()) {
+                                case "onResult":
+                                    authGoogleResult(token, args[0], cl);
+                                    return null;
+                                case "onError":
+                                    authGoogleError(token, args[0]);
+                                    return null;
+                                case "hashCode":
+                                    return System.identityHashCode(proxy);
+                                case "equals":
+                                    return proxy == args[0];
+                                case "toString":
+                                    return "BelluiAuthGoogleCallback";
+                                default:
+                                    return null;
+                            }
+                        }
+                    });
+
+            // The callback only hands its result to Go, so it runs on whichever
+            // thread Credential Manager completes on.
+            java.util.concurrent.Executor direct = new java.util.concurrent.Executor() {
+                @Override
+                public void execute(Runnable r) {
+                    r.run();
+                }
+            };
+            managerClass.getMethod("getCredentialAsync", Context.class, requestClass,
+                    android.os.CancellationSignal.class, java.util.concurrent.Executor.class, callbackClass)
+                    .invoke(manager, this, request, new android.os.CancellationSignal(), direct, callback);
+        } catch (ClassNotFoundException e) {
+            authGoogleDone(token, AUTH_MISSING_LIBRARIES, "", "", "", e.getMessage());
+        } catch (Throwable e) {
+            Throwable cause = e instanceof java.lang.reflect.InvocationTargetException && e.getCause() != null
+                    ? e.getCause() : e;
+            authGoogleDone(token, AUTH_FAILED, "", "", "", cause.toString());
+        }
+    }
+
+    private static void authGoogleResult(long token, Object response, ClassLoader cl) {
+        try {
+            Object cred = response.getClass().getMethod("getCredential").invoke(response);
+            String type = (String) cred.getClass().getMethod("getType").invoke(cred);
+            if (!AUTH_GOOGLE_ID_TOKEN_TYPE.equals(type) && !AUTH_GOOGLE_SIWG_TOKEN_TYPE.equals(type)) {
+                authGoogleDone(token, AUTH_FAILED, "", "", "", "unexpected credential type " + type);
+                return;
+            }
+            Bundle data = (Bundle) cred.getClass().getMethod("getData").invoke(cred);
+            Class<?> googleCred = Class.forName(
+                    "com.google.android.libraries.identity.googleid.GoogleIdTokenCredential", true, cl);
+            Object g = googleCred.getMethod("createFrom", Bundle.class).invoke(null, data);
+            String idToken = (String) googleCred.getMethod("getIdToken").invoke(g);
+            String email = (String) googleCred.getMethod("getId").invoke(g);
+            String name = (String) googleCred.getMethod("getDisplayName").invoke(g);
+            authGoogleDone(token, AUTH_OK, idToken, email != null ? email : "", name != null ? name : "", "");
+        } catch (Throwable e) {
+            Throwable cause = e instanceof java.lang.reflect.InvocationTargetException && e.getCause() != null
+                    ? e.getCause() : e;
+            authGoogleDone(token, AUTH_FAILED, "", "", "", cause.toString());
+        }
+    }
+
+    private static void authGoogleError(long token, Object err) {
+        String name = err.getClass().getName();
+        if (name.equals("androidx.credentials.exceptions.GetCredentialCancellationException")) {
+            authGoogleDone(token, AUTH_CANCELLED, "", "", "", "");
+            return;
+        }
+        authGoogleDone(token, AUTH_FAILED, "", "", "", err.toString());
+    }
 }
