@@ -162,3 +162,39 @@ func TestSnackbar_ShowAgainWhileFading(t *testing.T) {
 	assert.Len(t, c.Overlays().List(), 1)
 	s.Hide()
 }
+
+// TestShowSnackbar_OneAtATime: MD3 shows one snackbar at a time. Each
+// ShowSnackbar call builds its own Snackbar, and two of them stacked their
+// bars (#1038).
+func TestShowSnackbar_OneAtATime(t *testing.T) {
+	w := test.NewTempWindow(t, NewLabel("Content"))
+	w.Resize(geo.NewSize(400, 300))
+	c := w.Canvas()
+
+	ShowSnackbar("First", "", nil, c)
+	ShowSnackbar("Second", "", nil, c)
+	overlays := c.Overlays().List()
+	require.Len(t, overlays, 1, "two ShowSnackbar calls leave one snackbar")
+	s, ok := canvasSnackbars.Load(c)
+	require.True(t, ok)
+	snack := s.(*Snackbar)
+	assert.Equal(t, "Second", snack.Text)
+	assert.Same(t, snack.popUp, overlays[0])
+	snack.Hide()
+	_, ok = canvasSnackbars.Load(c)
+	assert.False(t, ok, "a hidden snackbar is no longer the canvas's")
+}
+
+// TestShowSnackbar_OneAtATimeWhileFading: a snackbar from another value,
+// shown while the canvas's current one fades in, takes that one off at once.
+func TestShowSnackbar_OneAtATimeWhileFading(t *testing.T) {
+	c := holdAnimations(t)
+	first := NewSnackbar("First", "", nil)
+	first.Duration = time.Minute
+	first.Show(c)
+	second := NewSnackbar("Second", "", nil)
+	second.Duration = time.Minute
+	second.Show(c)
+	t.Cleanup(second.Hide)
+	assert.Equal(t, []core.CanvasObject{second.popUp}, c.Overlays().List())
+}
