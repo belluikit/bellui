@@ -42,9 +42,7 @@ type secureReadCloser struct {
 	closer func()
 
 	file *os.File
-
-	data   []byte
-	offset int
+	mem  memReader
 }
 
 // Declare conformity to ReadCloser interface
@@ -69,42 +67,27 @@ func (s *secureReadCloser) openFile() error {
 	return nil
 }
 
-// load reads the whole document on first use, when it could not be opened as
-// a file; Read and Seek then serve from memory.
-func (s *secureReadCloser) load() {
-	if s.data == nil {
-		var length C.int
-		s.data = C.GoBytes(C.iosReadFromURL(s.url, &length), length)
-	}
+// readAll reads the whole document, for the fallback when it could not be
+// opened as a file.
+func (s *secureReadCloser) readAll() []byte {
+	var length C.int
+	return C.GoBytes(C.iosReadFromURL(s.url, &length), length)
 }
 
 func (s *secureReadCloser) Read(p []byte) (int, error) {
 	if s.file != nil {
 		return s.file.Read(p)
 	}
-	s.load()
-	n, err := s.ReadAt(p, int64(s.offset))
-	s.offset += n
-	return n, err
+	return s.mem.Read(p)
 }
 
 // ReadAt reads len(p) bytes at off, without moving the offset Read reads from.
+// It is safe for concurrent use, the fallback's first read included (#1031).
 func (s *secureReadCloser) ReadAt(p []byte, off int64) (int, error) {
 	if s.file != nil {
 		return s.file.ReadAt(p, off)
 	}
-	s.load()
-	if off < 0 {
-		return 0, errors.New("read at a negative offset")
-	}
-	if off >= int64(len(s.data)) {
-		return 0, io.EOF
-	}
-	n := copy(p, s.data[off:])
-	if n < len(p) {
-		return n, io.EOF
-	}
-	return n, nil
+	return s.mem.ReadAt(p, off)
 }
 
 // Seek moves within the document, so a picked file seeks as it does on the
@@ -114,13 +97,7 @@ func (s *secureReadCloser) Seek(offset int64, whence int) (int64, error) {
 	if s.file != nil {
 		return s.file.Seek(offset, whence)
 	}
-	s.load()
-	pos, err := seekWithin(int64(s.offset), int64(len(s.data)), offset, whence)
-	if err != nil {
-		return int64(s.offset), err
-	}
-	s.offset = int(pos)
-	return pos, nil
+	return s.mem.Seek(offset, whence)
 }
 
 // Close closes the document's file, then ends its security scope.
@@ -209,6 +186,7 @@ func nativeFileOpen(f *fileOpen) (io.ReadCloser, error) {
 	url := C.iosParseUrl(cStr)
 
 	fileStruct := &secureReadCloser{url: url, closer: f.done}
+	fileStruct.mem.load = fileStruct.readAll
 	if err := fileStruct.openFile(); err != nil {
 		bellui.LogError("iOS: reading the picked file into memory, as it cannot be opened by its path", err)
 	}
