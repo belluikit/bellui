@@ -49,12 +49,6 @@ type selectionHandleHost interface {
 	updateSelectionHandles()
 }
 
-// hostAbsolutePosition returns a host object's canvas-absolute origin: its
-// point (0, 0) through hostPointAbsolute.
-func hostAbsolutePosition(obj core.CanvasObject) geo.Position {
-	return hostPointAbsolute(obj, geo.Position{})
-}
-
 // hostPointAbsolute returns where p, in a host object's own coordinates, is
 // drawn, in canvas-absolute coordinates. Driver.AbsolutePositionForObject
 // reports positions relative to the canvas interactive area (the mobile driver
