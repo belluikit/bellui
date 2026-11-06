@@ -39,19 +39,29 @@ func fileReaderForURI(u bellui.URI, done func()) (bellui.URIReadCloser, error) {
 }
 
 // withSeek finishes file around read, and lets it seek when read can, as a
-// picked file on the desktop does (#848). Callers discover seeking by type
-// assertion, so a reader that cannot seek must not offer it.
+// picked file on the desktop does (#848), and read at an offset when read can
+// as well (#1020). Callers discover both by type assertion, so a reader that
+// cannot must not offer them.
 func withSeek(file *fileOpen, read io.ReadCloser) bellui.URIReadCloser {
 	file.ReadCloser = read
-	if s, ok := read.(io.Seeker); ok {
-		return &seekableFileOpen{fileOpen: file, Seeker: s}
+	s, ok := read.(io.Seeker)
+	if !ok {
+		return file
 	}
-	return file
+	if ra, ok := read.(io.ReaderAt); ok {
+		return &readerAtFileOpen{seekableFileOpen: seekableFileOpen{fileOpen: file, Seeker: s}, ReaderAt: ra}
+	}
+	return &seekableFileOpen{fileOpen: file, Seeker: s}
 }
 
 type seekableFileOpen struct {
 	*fileOpen
 	io.Seeker
+}
+
+type readerAtFileOpen struct {
+	seekableFileOpen
+	io.ReaderAt
 }
 
 // seekWithin answers where a seek lands in a document of size bytes held in
