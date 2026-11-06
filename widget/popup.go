@@ -48,7 +48,8 @@ type PopUp struct {
 	isHiding          bool        // true during hide animation — absorb taps, don't act
 	showAnim          *bellui.Animation
 	hideAnim          *bellui.Animation
-	opacity           float32 // 0.0–1.0 for animation; 1.0 when fully visible
+	hidingAbove       []core.CanvasObject // overlays above this one when Hide began; its fade's end removes them too
+	opacity           float32             // 0.0–1.0 for animation; 1.0 when fully visible
 }
 
 // Hide this widget, if it was previously visible
@@ -63,6 +64,7 @@ func (p *PopUp) Hide() {
 		if p.hideAnim != nil {
 			p.hideAnim.Stop()
 		}
+		p.hidingAbove = p.overlaysAbove()
 		p.hideAnim = bellui.NewAnimation(canvas.DurationShort2, func(done float32) {
 			p.opacity = 1 - done
 			p.Refresh()
@@ -75,6 +77,7 @@ func (p *PopUp) Hide() {
 		return
 	}
 
+	p.hidingAbove = p.overlaysAbove()
 	p.finishHide()
 }
 
@@ -97,17 +100,60 @@ func (p *PopUp) removeNow() {
 	if p.hideAnim != nil {
 		p.hideAnim.Stop()
 	}
+	p.hidingAbove = p.overlaysAbove()
 	p.finishHide()
 }
 
 func (p *PopUp) finishHide() {
 	if p.overlayShown {
-		p.Canvas.Overlays().Remove(p)
+		p.removeOverlay()
 		p.overlayShown = false
 	}
+	p.hidingAbove = nil
 	p.isHiding = false
 	p.opacity = 0
 	p.BaseWidget.Hide()
+}
+
+// overlaySubset is the part of an overlay stack that removes one overlay and
+// keeps those above it. The drivers' stacks have it (#1038).
+type overlaySubset interface {
+	RemoveOnly(core.CanvasObject)
+}
+
+// overlaysAbove lists the overlays above this pop-up on its canvas: the ones
+// it may have opened, which go when it goes.
+func (p *PopUp) overlaysAbove() []core.CanvasObject {
+	if p.passThrough {
+		return nil
+	}
+	list := p.Canvas.Overlays().List()
+	for i, o := range list {
+		if o == p {
+			return list[i+1:]
+		}
+	}
+	return nil
+}
+
+// removeOverlay takes the pop-up off its canvas. Overlays that were above it
+// when Hide began go with it, like the submenu of a menu or a dialog's open
+// Select. Overlays added during its fade-out stay: a pop-up shown meanwhile, a
+// replacing snackbar or a dialog, is not the hiding one's to remove (#1038). A
+// pass-through pop-up (a toast or a snackbar) opens nothing, so it removes only
+// itself. A stack without RemoveOnly drops everything above the pop-up, as
+// core.OverlayStack.Remove does.
+func (p *PopUp) removeOverlay() {
+	stack := p.Canvas.Overlays()
+	only, ok := stack.(overlaySubset)
+	if !ok {
+		stack.Remove(p)
+		return
+	}
+	for i := len(p.hidingAbove) - 1; i >= 0; i-- {
+		only.RemoveOnly(p.hidingAbove[i])
+	}
+	only.RemoveOnly(p)
 }
 
 // Move the widget to a new position. A PopUp position is absolute to the top, left of its canvas.
