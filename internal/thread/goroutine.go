@@ -27,9 +27,9 @@ func MainGoroutineRegistered() bool {
 
 // GoroutineID returns the current goroutine's ID.
 //
-// Where the runtime's goroutine record can be read (gc on amd64 and arm64), the
-// ID is read from it in a few nanoseconds. Elsewhere it is parsed out of a stack
-// trace, which takes microseconds. Every widget setter checks its goroutine, so
+// Where the runtime's goroutine record can be read (gc on amd64, arm64 and
+// wasm), the ID is read from it in a few nanoseconds. Elsewhere it is parsed out
+// of a stack trace, which takes microseconds. Every widget setter checks its goroutine, so
 // the stack trace cost most of a busy frame's CPU (#457).
 func GoroutineID() uint64 {
 	if goidOffset >= 0 {
