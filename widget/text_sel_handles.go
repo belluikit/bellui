@@ -49,27 +49,43 @@ type selectionHandleHost interface {
 	updateSelectionHandles()
 }
 
-// hostAbsolutePosition returns a host object's canvas-absolute origin.
-// Driver.AbsolutePositionForObject reports positions relative to the canvas
-// interactive area (the mobile driver subtracts the display inset), while
-// overlay children and touch events use canvas-absolute coordinates — a
-// mismatch the pre-rebrand tracker #945 device pass exposed (handles drawn one status-bar too
-// high, handle drags landing one status-bar too low). Adding the
-// interactive-area origin back restores canvas-absolute; a no-op on
-// inset-free drivers. The test driver's deliberate non-zero inset keeps
-// this honest in the host tests.
-//
-// The origin is where a transform draws it (#1003), so a translated host
-// gets its handles in place. The offsets added to it are not rotated or
-// scaled with the host (#1008).
+// hostAbsolutePosition returns a host object's canvas-absolute origin: its
+// point (0, 0) through hostPointAbsolute.
 func hostAbsolutePosition(obj core.CanvasObject) geo.Position {
-	driver := bellui.CurrentApp().Driver()
-	pos := bellui.AbsolutePositionForPoint(obj, geo.Position{})
-	if cnv := driver.CanvasForObject(obj); cnv != nil {
+	return hostPointAbsolute(obj, geo.Position{})
+}
+
+// hostPointAbsolute returns where p, in a host object's own coordinates, is
+// drawn, in canvas-absolute coordinates. Driver.AbsolutePositionForObject
+// reports positions relative to the canvas interactive area (the mobile driver
+// subtracts the display inset), while overlay children and touch events use
+// canvas-absolute coordinates — a mismatch the pre-rebrand tracker #945 device
+// pass exposed (handles drawn one status-bar too high, handle drags landing one
+// status-bar too low). Adding the interactive-area origin back restores
+// canvas-absolute; a no-op on inset-free drivers. The test driver's deliberate
+// non-zero inset keeps this honest in the host tests.
+//
+// The point goes through the transforms on the host and its ancestors, so the
+// handles of a rotated or scaled host sit on its text (#1003, #1008).
+func hostPointAbsolute(obj core.CanvasObject, p geo.Position) geo.Position {
+	return bellui.AbsolutePositionForPoint(obj, p).Add(interactiveOrigin(obj))
+}
+
+// hostPointAt maps abs, in canvas-absolute coordinates, into a host object's
+// own coordinates: the inverse of hostPointAbsolute, so a handle drag moves
+// along the host's text however it is turned (#1008).
+func hostPointAt(obj core.CanvasObject, abs geo.Position) geo.Position {
+	return bellui.PositionForAbsolutePoint(obj, abs.Subtract(interactiveOrigin(obj)))
+}
+
+// interactiveOrigin is the canvas-absolute origin of the interactive area of
+// obj's canvas, or zero when obj is on no canvas.
+func interactiveOrigin(obj core.CanvasObject) geo.Position {
+	if cnv := bellui.CurrentApp().Driver().CanvasForObject(obj); cnv != nil {
 		origin, _ := cnv.InteractiveArea()
-		pos = pos.Add(origin)
+		return origin
 	}
-	return pos
+	return geo.Position{}
 }
 
 // syncSelectionHandles is the shared show/hide seam behind each host's
