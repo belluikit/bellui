@@ -1,6 +1,7 @@
 package common
 
 import (
+	"slices"
 	"sync"
 	"sync/atomic"
 
@@ -277,6 +278,20 @@ func (o *overlayStack) Remove(overlay core.CanvasObject) {
 	}
 
 	o.renderCaches = o.renderCaches[:overlayCount]
+}
+
+// RemoveOnly deletes one overlay and keeps the overlays above it, with their
+// render caches (#1038).
+func (o *overlayStack) RemoveOnly(overlay core.CanvasObject) {
+	i := o.Index(overlay)
+	if i == -1 {
+		return
+	}
+	o.OverlayStack.RemoveOnly(overlay)
+	if o.forget != nil && o.renderCaches[i] != nil {
+		o.forget(o.renderCaches[i].root)
+	}
+	o.renderCaches = slices.Delete(o.renderCaches, i, i+1)
 }
 
 // nodeQueue holds nodes queued from any goroutine for the main thread to

@@ -123,3 +123,26 @@ func TestOverlayStack_FocusTransparent(t *testing.T) {
 	assert.Equal(t, mgrs[0], s.TopFocusManager(),
 		"a transparent overlay on top yields to the opaque overlay beneath")
 }
+
+// RemoveOnly takes one overlay out of the middle and keeps those above it,
+// with their focus managers in step (#1038).
+func TestOverlayStack_RemoveOnly(t *testing.T) {
+	s := &internal.OverlayStack{Canvas: test.NewCanvas()}
+	a, b, c := widget.NewLabel("A"), widget.NewLabel("B"), widget.NewLabel("C")
+	s.Add(a)
+	s.Add(b)
+	s.Add(c)
+	fms := s.ListFocusManagers()
+
+	s.RemoveOnly(widget.NewLabel("not on the stack"))
+	assert.Equal(t, []core.CanvasObject{a, b, c}, s.List())
+
+	s.RemoveOnly(b)
+	assert.Equal(t, []core.CanvasObject{a, c}, s.List())
+	assert.Equal(t, []*app.FocusManager{fms[0], fms[2]}, s.ListFocusManagers())
+	assert.Equal(t, 1, s.Index(c))
+	assert.Equal(t, -1, s.Index(b))
+
+	s.RemoveOnly(c)
+	assert.Equal(t, []core.CanvasObject{a}, s.List())
+}

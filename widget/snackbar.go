@@ -15,6 +15,11 @@ import (
 
 const snackbarDefaultDuration = 4 * time.Second
 
+// canvasSnackbars holds the Snackbar showing on each canvas (core.Canvas →
+// *Snackbar). MD3 shows one snackbar at a time, so Show takes the canvas's
+// current one off first, whichever Snackbar value showed it (#1038).
+var canvasSnackbars sync.Map
+
 // Snackbar shows a brief message at the bottom of the screen with an optional action button.
 // It auto-dismisses after Duration.
 type Snackbar struct {
@@ -52,20 +57,17 @@ func NewSnackbar(text, actionText string, action func()) *Snackbar {
 }
 
 // Show displays the snackbar at the bottom of the given canvas.
+//
+// A snackbar already showing on the canvas, from this Snackbar or another, is
+// taken off at once: MD3 shows one at a time.
 func (s *Snackbar) Show(c core.Canvas) {
-	s.canvas = c
-	s.Hide() // dismiss any previous
-	// Take the previous popup off the canvas now instead of letting it fade:
-	// OverlayStack.Remove drops every overlay above the one removed, so a
-	// popup whose fade ended after the new one was added took the new one
-	// with it, and a replaced message showed nothing (belluikit/player#342).
-	s.mu.Lock()
-	f := s.fading
-	s.fading = nil
-	s.mu.Unlock()
-	if f != nil {
-		f.removeNow()
+	s.removeNow() // dismiss any previous
+	if prev, ok := canvasSnackbars.Swap(c, s); ok && prev != s {
+		prev.(*Snackbar).removeNow()
 	}
+	s.mu.Lock()
+	s.canvas = c
+	s.mu.Unlock()
 
 	th := theme.Current()
 	v := bellui.CurrentApp().Settings().ThemeVariant()
@@ -167,9 +169,25 @@ func (s *Snackbar) Show(c core.Canvas) {
 	s.mu.Unlock()
 }
 
+// removeNow hides the snackbar and takes its popup off the canvas at once
+// instead of letting it fade, so a snackbar replacing it shows alone.
+func (s *Snackbar) removeNow() {
+	s.Hide()
+	s.mu.Lock()
+	f := s.fading
+	s.fading = nil
+	s.mu.Unlock()
+	if f != nil {
+		f.removeNow()
+	}
+}
+
 // Hide dismisses the snackbar. It is safe to call from any goroutine.
 func (s *Snackbar) Hide() {
 	s.mu.Lock()
+	if s.canvas != nil {
+		canvasSnackbars.CompareAndDelete(s.canvas, s)
+	}
 	if s.timer != nil {
 		s.timer.Stop()
 		s.timer = nil
