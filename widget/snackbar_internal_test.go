@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/belluikit/bellui"
+	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
 	intdriver "github.com/belluikit/bellui/internal/driver"
@@ -68,4 +69,31 @@ func TestSnackbar_DoesNotBlockContentBeneath(t *testing.T) {
 	assert.Eventually(t, func() bool { return action.Load() == 1 }, 2*time.Second, 10*time.Millisecond,
 		"the snackbar action still works")
 	assert.Equal(t, 1, tapped, "the action tap did not leak through")
+}
+
+// TestSnackbar_BottomInset: the inset raises the snackbar by exactly that
+// many dp, so an app can keep it clear of controls pinned to the bottom.
+func TestSnackbar_BottomInset(t *testing.T) {
+	app := test.NewTempApp(t)
+	w := app.NewWindow("Test")
+	defer w.Close()
+	w.Resize(geo.NewSize(400, 300))
+
+	restingY := func(inset float32) float32 {
+		s := NewSnackbar("Message", "", nil)
+		s.Duration = time.Minute
+		s.BottomInset = inset
+		s.Show(w.Canvas())
+		defer s.Hide()
+		// Let the slide-up animation (if animations are on) come to rest.
+		time.Sleep(canvas.DurationShort4 + 100*time.Millisecond)
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		require.NotNil(t, s.popUp)
+		return s.popUp.innerPos.Y
+	}
+
+	base := restingY(0)
+	raised := restingY(72)
+	assert.InDelta(t, 72, base-raised, 0.01, "inset 72 should raise the snackbar by 72dp (base %v, raised %v)", base, raised)
 }

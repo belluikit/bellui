@@ -23,6 +23,14 @@ type Snackbar struct {
 	OnAction   func() `json:"-"`
 	Duration   time.Duration
 
+	// BottomInset raises the snackbar this many dp above where it would
+	// otherwise sit, so it clears controls pinned to the bottom of the
+	// canvas, such as a player's transport bar. Zero keeps the default
+	// place at the bottom edge.
+	//
+	// Since: 1.3
+	BottomInset float32
+
 	canvas core.Canvas
 
 	mu          sync.Mutex
@@ -98,6 +106,9 @@ func (s *Snackbar) Show(c core.Canvas) {
 	margin := th.Size(theme.SizeNamePadding) * 2
 	x := (canvasSize.Width - popSize.Width) / 2
 	y := canvasSize.Height - popSize.Height - margin
+	if s.BottomInset > 0 {
+		y -= s.BottomInset
+	}
 	if x < margin {
 		x = margin
 	}
