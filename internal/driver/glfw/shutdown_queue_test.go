@@ -4,7 +4,6 @@ package glfw
 
 import (
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -30,18 +29,20 @@ func TestCloseFuncQueue_WhilePosting(t *testing.T) {
 		drained.Store(false)
 		pendingFuncs.Store(0)
 
-		var stop atomic.Bool
+		// Each poster stops once it sees the queue drained: the posts that
+		// race the close are the ones before that. Spinning on past it, eight
+		// posters running their work in place starved the drain of the queue's
+		// backlog on a CI runner under -race, for ten minutes.
 		var wg sync.WaitGroup
 		for i := range 8 {
 			wg.Go(func() {
-				for !stop.Load() {
+				for !drained.Load() {
 					runOnMainWithWait(func() {}, i%2 == 0)
 				}
 			})
 		}
 		time.Sleep(200 * time.Microsecond)
 		closeFuncQueue()
-		stop.Store(true)
 
 		returned := make(chan struct{})
 		go func() {
