@@ -1,0 +1,30 @@
+name: wake probe 1033 (throwaway)
+on:
+  push:
+    branches: [probe/macos-wake-1033]
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, macos-15, macos-26]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+      - name: system
+        run: sw_vers; sysctl -n machdep.cpu.brand_string; go version
+      - name: build
+        run: go build -o wakeprobe ./hack/wakeprobe1033
+      - name: probe
+        run: |
+          for i in 1 2 3; do
+            echo "no-window run $i: $(./wakeprobe)"
+            echo "window run $i: $(RAW_WINDOW=1 ./wakeprobe)"
+          done
