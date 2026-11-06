@@ -100,3 +100,34 @@ func TestWithPaintRetry(t *testing.T) {
 	assert.Equal(t, frame, withPaintRetry(frame, retry), "a frame due before the retry")
 	assert.Less(t, paintRetry, idleTick, "a retry must not wait for the idle tick")
 }
+
+// framePainter is a surfacePainter that reports whether its frame is open, as
+// the WebGPU painter does, and counts the draws the walk makes.
+type framePainter struct {
+	surfacePainter
+	draws int
+}
+
+func (p *framePainter) FrameOpen() bool { return p.surface }
+
+func (p *framePainter) Paint(core.CanvasObject, geo.Position, geo.Size) { p.draws++ }
+
+// TestRepaintWindow_DoesNotWalkWithoutFrame pins #1019: the paint walked a
+// window whose frame had not begun, and every draw in it was refused and
+// logged as dropped.
+func TestRepaintWindow_DoesNotWalkWithoutFrame(t *testing.T) {
+	p := &framePainter{}
+	w := &window{canvas: newCanvas(), visible: true}
+	w.canvas.SetPainter(p)
+	w.canvas.SetContent(canvas.NewRectangle(nil))
+	w.canvas.Resize(geo.NewSize(100, 100))
+	d := &gLDriver{windows: []bellui.Window{w}}
+
+	d.repaintWindow(w)
+	assert.Equal(t, 1, p.paints, "the frame's setup ran")
+	assert.Zero(t, p.draws, "no draw is made without a frame")
+
+	p.surface = true
+	d.repaintWindow(w)
+	assert.NotZero(t, p.draws, "the walk draws once the frame is open")
+}

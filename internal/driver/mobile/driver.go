@@ -1239,6 +1239,12 @@ func (d *driver) paintWindow(win bellui.Window, size geo.Size) {
 		d.glctx.ClearColor(float32(r)/max16bit, float32(g)/max16bit, float32(b)/max16bit, float32(a)/max16bit)
 		d.glctx.Clear(gl.ColorBufferBit)
 	}
+	// Without a frame every draw is refused, as on desktop (#1019); hit-testing
+	// still follows the content.
+	if !gpu.FrameOpen(c.Painter()) {
+		c.RebuildSpatialIndex()
+		return
+	}
 
 	// Check if the painter supports boundary FBO caching.
 	bp, hasBoundary := c.Painter().(gpu.BoundaryPainter)

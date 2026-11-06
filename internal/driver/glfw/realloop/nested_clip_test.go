@@ -103,14 +103,7 @@ func shootClip(t *testing.T, content core.CanvasObject) (image.Image, float32, g
 	})
 	defer bellui.DoAndWait(w.Hide) // closing the last window quits the app
 	time.Sleep(500 * time.Millisecond)
-	var img image.Image
-	var scale float32
-	var origin geo.Position
-	bellui.DoAndWait(func() {
-		img = w.Canvas().Capture()
-		scale = float32(img.Bounds().Dx()) / w.Canvas().Size().Width
-		origin = testApp.Driver().AbsolutePositionForObject(content)
-	})
+	img, scale, origin := capture(t, w, content)
 	return img, scale, origin
 }
 

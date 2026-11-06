@@ -662,3 +662,7 @@ func (p *painter) effectiveAlpha(alpha float32) float32 {
 // the system reports occluded never begins on WebGPU, so Canvas.Capture can
 // tell a frame it painted from one it could not (#631).
 func (p *painter) FramesBegun() uint64 { return p.frame }
+
+// FrameOpen reports whether a frame is open to draw into: begun, and not yet
+// presented or abandoned. The drivers do not walk a window without one (#1019).
+func (p *painter) FrameOpen() bool { return p.dev != nil && p.framing }

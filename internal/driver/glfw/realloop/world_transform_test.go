@@ -3,7 +3,6 @@
 package realloop_test
 
 import (
-	"image"
 	"image/color"
 	"math"
 	"testing"
@@ -165,14 +164,7 @@ func TestWorldTransformDraws(t *testing.T) {
 			})
 			defer bellui.DoAndWait(w.Hide) // closing the last window quits the app
 			time.Sleep(500 * time.Millisecond)
-			var img image.Image
-			var scale float32
-			var origin geo.Position
-			bellui.DoAndWait(func() {
-				img = w.Canvas().Capture()
-				scale = float32(img.Bounds().Dx()) / w.Canvas().Size().Width
-				origin = testApp.Driver().AbsolutePositionForObject(root)
-			})
+			img, scale, origin := capture(t, w, root)
 			at := func(p geo.Position) color.Color {
 				b := img.Bounds()
 				return img.At(b.Min.X+int((origin.X+p.X)*scale), b.Min.Y+int((origin.Y+p.Y)*scale))

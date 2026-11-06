@@ -77,14 +77,7 @@ func testClipCornerRadiusDraws(t *testing.T, build func(float32, core.CanvasObje
 		})
 		defer bellui.DoAndWait(w.Hide) // closing the last window quits the app
 		time.Sleep(500 * time.Millisecond)
-		var img image.Image
-		var scale float32
-		var origin geo.Position
-		bellui.DoAndWait(func() {
-			img = w.Canvas().Capture()
-			scale = float32(img.Bounds().Dx()) / w.Canvas().Size().Width
-			origin = testApp.Driver().AbsolutePositionForObject(clip)
-		})
+		img, scale, origin := capture(t, w, clip)
 		return img, scale, origin
 	}
 	// at reads the pixel at (x, y) in the clip's own coordinates.
