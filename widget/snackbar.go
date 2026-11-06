@@ -23,10 +23,20 @@ type Snackbar struct {
 	OnAction   func() `json:"-"`
 	Duration   time.Duration
 
+	// BottomInset raises the snackbar this many dp above where it would
+	// otherwise sit, so it clears controls pinned to the bottom of the
+	// canvas, such as a player's transport bar. Zero keeps the default
+	// place at the bottom edge.
+	//
+	// Since: 1.3
+	BottomInset float32
+
 	canvas core.Canvas
 
 	mu          sync.Mutex
 	popUp       *PopUp
+	slide       *bellui.Animation // the slide-up; Hide stops it
+	fading      *PopUp            // the popup Hide is fading out; Show removes it at once
 	timer       *time.Timer
 	actionTimer *time.Timer
 }
@@ -45,6 +55,17 @@ func NewSnackbar(text, actionText string, action func()) *Snackbar {
 func (s *Snackbar) Show(c core.Canvas) {
 	s.canvas = c
 	s.Hide() // dismiss any previous
+	// Take the previous popup off the canvas now instead of letting it fade:
+	// OverlayStack.Remove drops every overlay above the one removed, so a
+	// popup whose fade ended after the new one was added took the new one
+	// with it, and a replaced message showed nothing (belluikit/player#342).
+	s.mu.Lock()
+	f := s.fading
+	s.fading = nil
+	s.mu.Unlock()
+	if f != nil {
+		f.removeNow()
+	}
 
 	th := theme.Current()
 	v := bellui.CurrentApp().Settings().ThemeVariant()
@@ -98,6 +119,9 @@ func (s *Snackbar) Show(c core.Canvas) {
 	margin := th.Size(theme.SizeNamePadding) * 2
 	x := (canvasSize.Width - popSize.Width) / 2
 	y := canvasSize.Height - popSize.Height - margin
+	if s.BottomInset > 0 {
+		y -= s.BottomInset
+	}
 	if x < margin {
 		x = margin
 	}
@@ -105,11 +129,18 @@ func (s *Snackbar) Show(c core.Canvas) {
 	if bellui.CurrentApp().Settings().ShowAnimations() {
 		startY := canvasSize.Height
 		s.popUp.ShowAtPosition(geo.NewPos(x, startY))
+		// The tick moves this popup, not s.popUp: Hide drops s.popUp, and a
+		// tick that lands after it moved a nil popup and crashed the app
+		// (belluikit/player#342). Hide also stops the slide.
+		p := s.popUp
 		anim := bellui.NewAnimation(canvas.DurationShort4, func(done float32) {
 			cy := startY + (y-startY)*done
-			s.popUp.Move(geo.NewPos(x, cy))
+			p.Move(geo.NewPos(x, cy))
 		})
 		anim.Curve = bellui.AnimationEaseStandardDecelerate
+		s.mu.Lock()
+		s.slide = anim
+		s.mu.Unlock()
 		anim.Start()
 	} else {
 		s.popUp.ShowAtPosition(geo.NewPos(x, y))
@@ -147,10 +178,18 @@ func (s *Snackbar) Hide() {
 		s.actionTimer.Stop()
 		s.actionTimer = nil
 	}
+	slide := s.slide
+	s.slide = nil
 	p := s.popUp
 	s.popUp = nil
+	if p != nil {
+		s.fading = p
+	}
 	s.mu.Unlock()
 
+	if slide != nil {
+		slide.Stop()
+	}
 	if p != nil {
 		p.Hide()
 	}

@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/belluikit/bellui"
+	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
 	intdriver "github.com/belluikit/bellui/internal/driver"
@@ -68,4 +69,96 @@ func TestSnackbar_DoesNotBlockContentBeneath(t *testing.T) {
 	assert.Eventually(t, func() bool { return action.Load() == 1 }, 2*time.Second, 10*time.Millisecond,
 		"the snackbar action still works")
 	assert.Equal(t, 1, tapped, "the action tap did not leak through")
+}
+
+// TestSnackbar_BottomInset: the inset raises the snackbar by exactly that
+// many dp, so an app can keep it clear of controls pinned to the bottom.
+func TestSnackbar_BottomInset(t *testing.T) {
+	app := test.NewTempApp(t)
+	w := app.NewWindow("Test")
+	defer w.Close()
+	w.Resize(geo.NewSize(400, 300))
+
+	restingY := func(inset float32) float32 {
+		s := NewSnackbar("Message", "", nil)
+		s.Duration = time.Minute
+		s.BottomInset = inset
+		s.Show(w.Canvas())
+		defer s.Hide()
+		// Let the slide-up animation (if animations are on) come to rest.
+		time.Sleep(canvas.DurationShort4 + 100*time.Millisecond)
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		require.NotNil(t, s.popUp)
+		return s.popUp.innerPos.Y
+	}
+
+	base := restingY(0)
+	raised := restingY(72)
+	assert.InDelta(t, 72, base-raised, 0.01, "inset 72 should raise the snackbar by 72dp (base %v, raised %v)", base, raised)
+}
+
+// TestSnackbar_HideWhileSlidingIn: hiding a snackbar before its slide-up
+// animation ends must not leave the animation moving a popup that Hide
+// already dropped. It did (a nil PopUp.Move on the animation tick), which
+// crashed an app that replaced or dismissed a message right after showing
+// it (belluikit/player#342).
+func TestSnackbar_HideWhileSlidingIn(t *testing.T) {
+	app := test.NewTempApp(t)
+	w := app.NewWindow("Test")
+	defer w.Close()
+	w.Resize(geo.NewSize(400, 300))
+	require.True(t, bellui.CurrentApp().Settings().ShowAnimations(), "the slide-up only runs with animations on")
+
+	s := NewSnackbar("Asking…", "", nil)
+	s.Duration = time.Minute
+	s.Show(w.Canvas())
+	s.mu.Lock()
+	slide := s.slide
+	s.mu.Unlock()
+	require.NotNil(t, slide, "Show keeps its slide-up animation")
+	s.Hide()
+	// The test driver ticks an animation once, at its start, so tick the
+	// slide by hand as a real driver would after Hide: it must not panic.
+	assert.NotPanics(t, func() { slide.Tick(0.5) })
+}
+
+// TestSnackbar_ShowAgainWhileFading: a snackbar shown again while its
+// previous popup is still fading out keeps the new popup on the canvas.
+// OverlayStack.Remove drops every overlay above the one removed, so the old
+// popup's fade ending after the new popup was added took the new one with
+// it: a replaced message showed nothing in a real window
+// (belluikit/player#342). The test driver ends every animation as it starts,
+// so the fade is held open by hand: the old popup is put back on the canvas
+// as a real driver still has it, and its fade is ended after Show.
+func TestSnackbar_ShowAgainWhileFading(t *testing.T) {
+	app := test.NewTempApp(t)
+	w := app.NewWindow("Test")
+	defer w.Close()
+	w.Resize(geo.NewSize(400, 300))
+	c := w.Canvas()
+
+	s := NewSnackbar("Asking…", "", nil)
+	s.Duration = time.Minute
+	s.Show(c)
+	s.mu.Lock()
+	old := s.popUp
+	s.mu.Unlock()
+	s.Hide()
+
+	// A real driver: the fade has not ended, so the old popup is still on
+	// the canvas when the next message shows.
+	c.Overlays().Add(old)
+	old.overlayShown = true
+
+	s.Text = "Loading the song…"
+	s.Show(c)
+	s.mu.Lock()
+	current := s.popUp
+	s.mu.Unlock()
+
+	old.finishHide() // the old fade ends now
+	assert.Same(t, current, c.Overlays().Top(), "the new message must still be on the canvas after the old one's fade ends")
+	assert.Len(t, c.Overlays().List(), 1)
+	s.Hide()
 }
