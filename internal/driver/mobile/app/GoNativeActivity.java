@@ -4891,6 +4891,8 @@ public class GoNativeActivity extends NativeActivity {
 
     private static final String AUTH_GOOGLE_ID_TOKEN_TYPE =
             "com.google.android.libraries.identity.googleid.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL";
+    private static final String AUTH_GOOGLE_SIWG_TOKEN_TYPE =
+            "com.google.android.libraries.identity.googleid.TYPE_GOOGLE_ID_TOKEN_SIWG_CREDENTIAL";
 
     private static native void authGoogleDone(long token, int status, String idToken,
             String email, String name, String err);
@@ -4921,14 +4923,16 @@ public class GoNativeActivity extends NativeActivity {
             Object companion = managerClass.getField("Companion").get(null);
             Object manager = companion.getClass().getMethod("create", Context.class).invoke(companion, this);
 
+            // The "Sign in with Google" button flow, not GetGoogleIdOption's
+            // bottom sheet: the sheet is Google's automatic prompt, and after
+            // a user dismisses it a few times it stops showing for a while and
+            // reports NoCredentialException instead (measured on #1042). An app
+            // calls Authenticate when its user asked to sign in, so the dialog
+            // always shows, with every account on the device.
             Class<?> optionBuilder = Class.forName(
-                    "com.google.android.libraries.identity.googleid.GetGoogleIdOption$Builder", true, cl);
-            Object ob = optionBuilder.getConstructor().newInstance();
-            optionBuilder.getMethod("setServerClientId", String.class).invoke(ob, serverClientId);
+                    "com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption$Builder", true, cl);
+            Object ob = optionBuilder.getConstructor(String.class).newInstance(serverClientId);
             optionBuilder.getMethod("setNonce", String.class).invoke(ob, nonce);
-            // Every account on the device, not only ones that signed in
-            // before: this is sign-in and sign-up both.
-            optionBuilder.getMethod("setFilterByAuthorizedAccounts", boolean.class).invoke(ob, false);
             Object option = optionBuilder.getMethod("build").invoke(ob);
 
             Class<?> optionClass = Class.forName("androidx.credentials.CredentialOption", true, cl);
@@ -4986,7 +4990,7 @@ public class GoNativeActivity extends NativeActivity {
         try {
             Object cred = response.getClass().getMethod("getCredential").invoke(response);
             String type = (String) cred.getClass().getMethod("getType").invoke(cred);
-            if (!AUTH_GOOGLE_ID_TOKEN_TYPE.equals(type)) {
+            if (!AUTH_GOOGLE_ID_TOKEN_TYPE.equals(type) && !AUTH_GOOGLE_SIWG_TOKEN_TYPE.equals(type)) {
                 authGoogleDone(token, AUTH_FAILED, "", "", "", "unexpected credential type " + type);
                 return;
             }
