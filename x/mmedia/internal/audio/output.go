@@ -165,16 +165,10 @@ func newOutput(ctx otoContext, channels int) *Output {
 }
 
 // WriteSamples writes PCM audio data, at SampleRate and Channels, to the
-// buffer for playback.
+// buffer for playback. It is written as decoded: the volume is applied as it
+// plays (SetVolume).
 func (o *Output) WriteSamples(data []byte) {
-	if o.volume < 1.0 {
-		scaled := make([]byte, len(data))
-		copy(scaled, data)
-		o.applyVolume(scaled)
-		o.buffer.Write(scaled)
-	} else {
-		o.buffer.Write(data)
-	}
+	o.buffer.Write(data)
 	if o.flushPending.Load() {
 		o.flushPlayer()
 	}
@@ -209,6 +203,7 @@ func (o *Output) Start() {
 	}
 	o.player = o.ctx.NewPlayer(o.pull)
 	o.player.SetBufferSize(playerBufferBytes(o.sampleRate, o.channels))
+	o.player.SetVolume(o.volume)
 	o.pull.setPlayer(o.player)
 	o.player.Play()
 	o.started = true
@@ -282,11 +277,18 @@ func (o *Output) Stop() {
 	o.started = false
 }
 
-// SetVolume sets the playback volume (0.0 to 1.0).
+// SetVolume sets the playback volume (0.0 to 1.0). It is the player's volume,
+// which oto applies as it mixes, so a change is heard within the device's own
+// buffer. It used to scale samples as they were written to the ring, so the
+// decoder's lead, a second or more, played at the old volume first: a mute
+// took 1.2 s to be heard (#1032).
 func (o *Output) SetVolume(v float64) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	o.volume = math.Max(0, math.Min(1, v))
+	if o.player != nil {
+		o.player.SetVolume(o.volume)
+	}
 }
 
 // Volume returns the current volume.
@@ -334,15 +336,6 @@ func (o *Output) Channels() int {
 	return o.channels
 }
 
-func (o *Output) applyVolume(data []byte) {
-	for i := 0; i < len(data)-1; i += 2 {
-		sample := int16(data[i]) | int16(data[i+1])<<8
-		sample = int16(float64(sample) * o.volume)
-		data[i] = byte(sample)
-		data[i+1] = byte(sample >> 8)
-	}
-}
-
 // Buffered returns the number of PCM bytes currently waiting in the
 // output buffer (decoded but not yet consumed by the audio device).
 func (o *Output) Buffered() int {
@@ -368,10 +361,12 @@ func (o *Output) Rebase(pos time.Duration) {
 
 // Level is the RMS, 0 to 1, of the audio playing now: the 20 ms window at the
 // playback position, with the volume applied. It is what is heard, not what
-// was last handed to the device, which runs a pull ahead.
+// was last handed to the device, which runs a pull ahead. The volume is the
+// current one, as oto applies it to what the player holds as well (SetVolume).
 func (o *Output) Level() float32 {
+	volume := float32(o.Volume())
 	played, _ := o.pull.played()
 	o.pull.mu.Lock()
 	defer o.pull.mu.Unlock()
-	return o.pull.level.at(played)
+	return o.pull.level.at(played) * volume
 }
