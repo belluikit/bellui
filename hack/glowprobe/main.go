@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"image/color"
 	"math"
+	"os"
 	"strings"
 	"time"
 
@@ -190,9 +191,12 @@ func main() {
 			})
 		}
 	}()
+	// App.Quit does nothing on a phone, whose guidelines forbid an app
+	// quitting itself, so the self-stop exits the process (#1045).
 	go func() {
 		time.Sleep(30 * time.Minute)
-		bellui.Do(a.Quit)
+		fmt.Println("glowprobe done")
+		os.Exit(0)
 	}()
 
 	bellui.ShowAndRun(w)

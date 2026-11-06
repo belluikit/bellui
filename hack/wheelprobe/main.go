@@ -28,6 +28,7 @@ package main
 import (
 	"fmt"
 	"image/color"
+	"os"
 	"time"
 
 	"github.com/belluikit/bellui"
@@ -68,9 +69,12 @@ func main() {
 				w.Canvas().Scale(), p.X, p.Y, s.Width, s.Height, wheel.Selected)
 		})
 	}()
+	// App.Quit does nothing on a phone, whose guidelines forbid an app
+	// quitting itself, so the self-stop exits the process (#1045).
 	go func() {
 		time.Sleep(10 * time.Minute)
-		bellui.Do(a.Quit)
+		fmt.Println("wheelprobe done")
+		os.Exit(0)
 	}()
 
 	bellui.ShowAndRun(w)
