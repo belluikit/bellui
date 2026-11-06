@@ -40,6 +40,15 @@ type OIDCConfig struct {
 	// ["user:email", "read:user"] for GitHub.
 	Scopes []string
 
+	// Nonce, when set, is the nonce sent in the authorization request; the
+	// flow then requires the ID token to carry it. A server that issued it
+	// can check the token against it, so a captured token cannot be replayed
+	// against another request. Empty means a random nonce, checked the same
+	// way but known only to this flow.
+	//
+	// Since: 1.3
+	Nonce string
+
 	// Timeout for the entire flow. Defaults to 5 minutes.
 	Timeout time.Duration
 }
@@ -110,9 +119,11 @@ func Authenticate(cfg OIDCConfig) (*OIDCResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	nonce, err := randomString(32)
-	if err != nil {
-		return nil, err
+	nonce := cfg.Nonce
+	if nonce == "" {
+		if nonce, err = randomString(32); err != nil {
+			return nil, err
+		}
 	}
 
 	authURL := buildAuthURL(disc.AuthorizationEndpoint, cfg.ClientID, redirectURI,
