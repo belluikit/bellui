@@ -83,11 +83,22 @@ func TestSeekWhilePausedShowsTheTarget(t *testing.T) {
 	mu.Unlock()
 
 	p.Seek(5 * time.Second) // frame 150
-	time.Sleep(300 * time.Millisecond)
 
-	mu.Lock()
-	after := append([]int(nil), shown[before:]...)
-	mu.Unlock()
+	// Wait for the target rather than for a fixed time: a fixed 300 ms was a
+	// deadline a loaded CI runner missed, with nothing shown yet (#1028).
+	// Then wait a little more, so a frame shown after the target is seen.
+	afterSeek := func() []int {
+		mu.Lock()
+		defer mu.Unlock()
+		return append([]int(nil), shown[before:]...)
+	}
+	for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); time.Sleep(10 * time.Millisecond) {
+		if a := afterSeek(); len(a) > 0 && a[len(a)-1] == 150 {
+			break
+		}
+	}
+	time.Sleep(200 * time.Millisecond)
+	after := afterSeek()
 	if len(after) == 0 || after[len(after)-1] != 150 {
 		t.Errorf("frames shown after a paused seek to frame 150: %v; want it to end on 150", after)
 	}
