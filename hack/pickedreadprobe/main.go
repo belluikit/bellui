@@ -8,12 +8,14 @@
 // Launched, it runs by itself: it writes a fixture of fixtureSize bytes into
 // its own storage, opens it with storage.Reader (the same reader a picked file
 // gets, minus the security scope), checks every block, then deletes the
-// fixture and quits. Lines starting "PROBE" go to the console:
+// fixture. Lines starting "PROBE" go to the console. With PROBE_AUTO set it
+// then quits, for a scripted run:
 //
-//	xcrun devicectl device process launch --console --device <udid> com.trendvidia.pickedreadprobe
+//	xcrun devicectl device process launch --console --environment-variables '{"PROBE_AUTO":"1"}' --device <udid> com.trendvidia.pickedreadprobe
 //
 // The "Pick a file" button runs the same read on a file picked from Files,
-// with its security scope, for a check by hand.
+// with its security scope, for a check by hand. Without PROBE_AUTO the probe
+// stays open for that, as it does when opened from the home screen.
 package main
 
 import (
@@ -161,8 +163,12 @@ func readAll(r bellui.URIReadCloser, size int64, verify bool) error {
 		return fmt.Errorf("the reader cannot read at an offset")
 	}
 	at := (total / block / 3) * block
-	if n, err := ra.ReadAt(b, at); err != nil || n != block || (verify && !check(b, at/block, 0)) {
-		return fmt.Errorf("read at %d: %d, %v", at, n, err)
+	// A read that reaches the end is short and may say io.EOF, as io.ReaderAt
+	// allows: a file under one block reads that way.
+	want := min(int64(block), total-at)
+	n, err := ra.ReadAt(b, at)
+	if int64(n) != want || (err != nil && (err != io.EOF || at+want != total)) || (verify && !check(b[:n], at/block, 0)) {
+		return fmt.Errorf("read at %d: %d, %v; want %d", at, n, err, want)
 	}
 	logf("read at ok, rss %d MiB", maxRSS())
 	return nil
@@ -217,7 +223,7 @@ func main() {
 	a.Lifecycle().SetOnStarted(func() {
 		go func() {
 			runFixture(a)
-			if os.Getenv("PROBE_STAY") == "" {
+			if os.Getenv("PROBE_AUTO") != "" {
 				// A mobile app is not ended by Quit, so the probe ends itself:
 				// nothing it started keeps running.
 				logf("quitting")
