@@ -3,7 +3,9 @@
 package glfw
 
 import (
+	"runtime"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/belluikit/bellui"
@@ -29,6 +31,14 @@ var (
 	glfwMu   sync.RWMutex
 	glfwLive bool
 )
+
+// wakePending is set while an empty event posted by wakeMainLoop has not yet
+// been seen by the loop, which clears it before each drain of funcQueue. One
+// pending wake is enough for all work queued behind it, so further posts skip
+// theirs: an event per post let goroutines posting back to back add events
+// faster than GLFW's native pump cleared them, and the pump never returned
+// (#1023).
+var wakePending atomic.Bool
 
 func (d *gLDriver) initGLFW() {
 	// On linux the default build compiles both the X11 and Wayland backends and
@@ -89,6 +99,9 @@ func (d *gLDriver) pollEvents() {
 // wakeMainLoop interrupts the event loop's native wait so freshly queued
 // main-thread work runs promptly.
 func wakeMainLoop() {
+	if !wakePending.CompareAndSwap(false, true) {
+		return
+	}
 	glfwMu.RLock()
 	defer glfwMu.RUnlock()
 	if glfwLive {
@@ -115,7 +128,16 @@ func (d *gLDriver) runEventLoop() {
 	now := time.Now()
 	nextFrame, lastTick := now, now
 	for {
-		// Drain control channels without blocking.
+		// Clear before the drain, so work queued after it posts a fresh wake.
+		wakePending.Store(false)
+
+		// Drain control channels without blocking. Work posted but not yet
+		// on funcQueue.Out() is waited for here, briefly, by yielding to the
+		// goroutine that moves it: a native wait for it lasts pendingWait, so
+		// each round ran one Out() buffer of work, and four goroutines posting
+		// back to back queued work faster than that (#1023). drainBudget keeps
+		// such a flood from holding off native events.
+		var drainEnd time.Time
 		for {
 			select {
 			case <-d.done:
@@ -128,7 +150,15 @@ func (d *gLDriver) runEventLoop() {
 					f.done <- struct{}{}
 				}
 			default:
-				goto drained
+				if pendingFuncs.Load() == 0 {
+					goto drained
+				}
+				if drainEnd.IsZero() {
+					drainEnd = time.Now().Add(drainBudget)
+				} else if time.Now().After(drainEnd) {
+					goto drained
+				}
+				runtime.Gosched()
 			}
 		}
 	drained:
@@ -207,6 +237,11 @@ func frameForRates(rates []int) time.Duration {
 // funcQueue.Out(): the goroutine moving it there runs within this, unless the
 // machine is very busy, and the loop then looks again.
 const pendingWait = time.Millisecond
+
+// drainBudget bounds how long one drain of funcQueue waits for work still on
+// its way to funcQueue.Out(), so a steady stream of posts still lets the loop
+// pump native events every round.
+const drainBudget = 2 * time.Millisecond
 
 // idleTick is how far apart ticks are while the app is idle. Ticks then only
 // do housekeeping (cache expiry, keeping cached renderers alive), whose
