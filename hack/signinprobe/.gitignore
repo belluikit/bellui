@@ -1,0 +1,4 @@
+# fetch-libs.sh downloads these; android-libs.txt pins them.
+/android/libs/
+*.apk
+*.app/

@@ -1,0 +1,45 @@
+# The dependency closure of Credential Manager with Sign in with Google, as
+# group:artifact:version:extension, highest version of each. fetch-libs.sh
+# downloads it into android/libs. Resolved 2026-11-06 from:
+#   androidx.credentials:credentials:1.3.0
+#   androidx.credentials:credentials-play-services-auth:1.3.0
+#   com.google.android.libraries.identity.googleid:googleid:1.1.1
+androidx.activity:activity:1.5.1:aar
+androidx.annotation:annotation:1.5.0:jar
+androidx.annotation:annotation-experimental:1.1.0:aar
+androidx.arch.core:core-common:2.1.0:jar
+androidx.arch.core:core-runtime:2.1.0:aar
+androidx.collection:collection:1.1.0:jar
+androidx.concurrent:concurrent-futures:1.0.0:jar
+androidx.core:core:1.8.0:aar
+androidx.core:core-ktx:1.2.0:aar
+androidx.credentials:credentials:1.3.0:aar
+androidx.credentials:credentials-play-services-auth:1.3.0:aar
+androidx.customview:customview:1.0.0:aar
+androidx.fragment:fragment:1.5.7:aar
+androidx.lifecycle:lifecycle-common:2.5.1:jar
+androidx.lifecycle:lifecycle-livedata-core:2.5.1:aar
+androidx.lifecycle:lifecycle-runtime:2.5.1:aar
+androidx.lifecycle:lifecycle-viewmodel:2.5.1:aar
+androidx.lifecycle:lifecycle-viewmodel-savedstate:2.5.1:aar
+androidx.loader:loader:1.1.0:aar
+androidx.savedstate:savedstate:1.2.0:aar
+androidx.tracing:tracing:1.0.0:aar
+androidx.versionedparcelable:versionedparcelable:1.1.1:aar
+androidx.viewpager:viewpager:1.0.0:aar
+com.google.android.gms:play-services-auth:21.1.1:aar
+com.google.android.gms:play-services-auth-api-phone:18.0.2:aar
+com.google.android.gms:play-services-auth-base:18.0.10:aar
+com.google.android.gms:play-services-base:18.3.0:aar
+com.google.android.gms:play-services-basement:18.3.0:aar
+com.google.android.gms:play-services-fido:21.0.0:aar
+com.google.android.gms:play-services-tasks:18.1.0:aar
+com.google.android.libraries.identity.googleid:googleid:1.1.1:aar
+com.google.guava:listenablefuture:1.0:jar
+org.jetbrains:annotations:23.0.0:jar
+org.jetbrains.kotlin:kotlin-stdlib:1.9.0:jar
+org.jetbrains.kotlin:kotlin-stdlib-common:1.9.0:jar
+org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.9.0:jar
+org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.20:jar
+org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3:jar
+org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.7.3:jar
