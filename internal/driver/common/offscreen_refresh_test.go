@@ -190,3 +190,38 @@ func TestOffscreenLetsGoOfWhatLeftForGood(t *testing.T) {
 	_, ok = c.offscreen.Load(glow)
 	assert.False(t, ok, "nothing found the glow for offscreenKeep, and it is still held")
 }
+
+// TestInSight is what bellui.IsOnScreen asks the drivers' canvases (#1061):
+// placed by the last walk, and nothing above it hidden since. A tab switch or
+// an ancestor's Hide answers false at once, before the next walk; showing
+// answers true from the walk that places the object again.
+func TestInSight(t *testing.T) {
+	test.NewTempApp(t)
+	glow := canvas.NewRectangle(color.White)
+	inner := container.NewStack(glow)
+	tabs := container.NewAppTabs(
+		container.NewTabItem("Player", container.NewVBox(inner)),
+		container.NewTabItem("Library", widget.NewLabel("songs")),
+	)
+	c := walkedCanvas(tabs)
+	assert.True(t, c.InSight(glow))
+	assert.False(t, c.InSight(canvas.NewRectangle(color.White)), "an object no walk placed")
+
+	tabs.SelectIndex(1)
+	assert.False(t, c.InSight(glow), "out of sight on a tab not selected, before the next walk")
+	c.Refresh(tabs)
+	c.EnsureMinSize()
+	assert.False(t, c.InSight(glow), "out of sight on a tab not selected")
+
+	tabs.SelectIndex(0)
+	c.Refresh(tabs)
+	c.EnsureMinSize()
+	assert.True(t, c.InSight(glow), "in sight on the tab selected again")
+
+	inner.Hide()
+	assert.False(t, c.InSight(glow), "out of sight under a container hidden, before the next walk")
+	inner.Show()
+	c.Refresh(inner)
+	c.EnsureMinSize()
+	assert.True(t, c.InSight(glow), "in sight under the container shown again")
+}

@@ -241,6 +241,21 @@ func (d *gLDriver) windowList() []bellui.Window {
 	return d.windows
 }
 
+// IsOnScreen implements bellui.OnScreenDriver: obj is in sight on the canvas
+// of a window that is shown.
+func (d *gLDriver) IsOnScreen(obj core.CanvasObject) bool {
+	c, ok := d.CanvasForObject(obj).(*glCanvas)
+	if !ok {
+		return false
+	}
+	for _, win := range d.windowList() {
+		if w := win.(*window); w.canvas == c {
+			return w.visible && c.InSight(obj)
+		}
+	}
+	return false
+}
+
 func (d *gLDriver) initFailed(msg string, err error) {
 	bellui.LogError(msg, err)
 

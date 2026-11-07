@@ -89,3 +89,20 @@ func (c *Canvas) sweepOffscreen(gen uint64) {
 		return true
 	})
 }
+
+// InSight reports whether the last walk placed obj in this canvas' trees, and
+// it and every object above it are still visible: one hidden since, by Hide or
+// a tab switch, is out of sight at once, without waiting for the next walk
+// (bellui.IsOnScreen). Call it on the main goroutine, which walks the trees.
+func (c *Canvas) InSight(obj core.CanvasObject) bool {
+	node, ok := c.nodeMap.Load(obj)
+	if !ok {
+		return false
+	}
+	for n := node; n != nil; n = n.parent {
+		if !n.obj.Visible() {
+			return false
+		}
+	}
+	return true
+}
