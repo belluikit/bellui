@@ -306,6 +306,8 @@ func testClearAll() {
 	textTextures.Clear()
 	objectTextures.Clear()
 	renderers.Clear()
+	ownedScopes.Clear()
+	overrides.Clear()
 	timeNow = time.Now
 	cachedNow.Store(time.Now().UnixNano())
 }

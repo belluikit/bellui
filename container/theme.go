@@ -37,13 +37,13 @@ func NewThemeOverride(obj core.CanvasObject, th bellui.Theme) *ThemeOverride {
 	t := &ThemeOverride{Content: obj, Theme: th, holder: NewStack(obj)}
 	t.ExtendBaseWidget(t)
 
-	cache.OverrideTheme(obj, addFeatures(th, t))
+	cache.OverrideThemeFor(obj, addFeatures(th, t), t)
 	obj.Refresh() // required as the widgets passed in could have been initially rendered with default theme
 	return t
 }
 
 func (t *ThemeOverride) CreateRenderer() core.WidgetRenderer {
-	cache.OverrideTheme(t.Content, addFeatures(t.Theme, t))
+	cache.OverrideThemeFor(t.Content, addFeatures(t.Theme, t), t)
 
 	return &overrideRenderer{parent: t, objs: []core.CanvasObject{t.holder}}
 }
@@ -54,7 +54,7 @@ func (t *ThemeOverride) Refresh() {
 		t.holder.Refresh()
 	}
 
-	cache.OverrideTheme(t.Content, addFeatures(t.Theme, t))
+	cache.OverrideThemeFor(t.Content, addFeatures(t.Theme, t), t)
 	t.Content.Refresh()
 	t.BaseWidget.Refresh()
 }

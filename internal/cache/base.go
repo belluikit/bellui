@@ -161,6 +161,7 @@ func destroyExpiredRenderers(now time.Time) {
 		}
 		return true
 	})
+	destroyExpiredScopes(now)
 }
 
 type expiringCache struct {
