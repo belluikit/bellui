@@ -38,6 +38,11 @@ type Output struct {
 	volume     float64
 	started    bool
 
+	// idle is the device's count of playing Outputs (nil for a detached
+	// Output), and active whether this one is counted in it.
+	idle   *idleSuspend
+	active bool
+
 	// Seek rebase: PlaybackPosition = posBase + time(played - playedBase),
 	// where played counts the audio the player has played (puller).
 	posBase    time.Duration
@@ -56,6 +61,7 @@ var device struct {
 	ctx      otoContext
 	channels int   // channel count the device was opened with
 	err      error // why it could not be opened, for every later NewOutput
+	idle     idleSuspend
 }
 
 // otoContext is what an Output uses of *oto.Context. It is an interface so a
@@ -64,6 +70,8 @@ var device struct {
 type otoContext interface {
 	NewPlayer(r io.Reader) *oto.Player
 	Err() error
+	Suspend() error
+	Resume() error
 }
 
 // newOtoContext is oto.NewContext, a variable so a test can make the device
@@ -81,7 +89,7 @@ var newOtoContext = func(op *oto.NewContextOptions) (otoContext, chan struct{}, 
 //
 // A failure is remembered, not retried. oto marks its one context as created
 // before the platform backend runs and never clears the mark (context.go in
-// v3.4.0: contextCreated = true precedes newContext), so a second
+// v3.5.1: contextCreated = true precedes newContext), so a second
 // oto.NewContext can only fail with "context is already created", which would
 // hide the real cause. Returning the first error to every later caller is the
 // only answer that is both true and does not block. It used to discard the
@@ -111,6 +119,7 @@ func openDevice(channels int) (otoContext, int, error) {
 			return
 		}
 		device.ctx, device.channels = ctx, channels
+		device.idle.dev = ctx
 	})
 	return device.ctx, device.channels, device.err
 }
@@ -133,7 +142,9 @@ func NewOutput(channels int) (*Output, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newOutput(ctx, got), nil
+	o := newOutput(ctx, got)
+	o.idle = &device.idle
+	return o, nil
 }
 
 // NewDetachedOutput is an Output on no device, for tests above this package
@@ -205,8 +216,33 @@ func (o *Output) Start() {
 	o.player.SetBufferSize(playerBufferBytes(o.sampleRate, o.channels))
 	o.player.SetVolume(o.volume)
 	o.pull.setPlayer(o.player)
+	o.setActive(true)
 	o.player.Play()
 	o.started = true
+}
+
+// setActive counts the Output in the device's playing Outputs, or takes it
+// out, so the device is suspended while none plays (idleSuspend). It is
+// called under o.mu, before a player plays and after it pauses.
+func (o *Output) setActive(on bool) {
+	if o.idle == nil || o.active == on {
+		return
+	}
+	o.active = on
+	if on {
+		o.idle.play()
+	} else {
+		o.idle.idle()
+	}
+}
+
+// Playing reports whether the Output counts as playing, which keeps the
+// device from being suspended (idleSuspend): started, and neither paused nor
+// stopped since. A detached Output never counts.
+func (o *Output) Playing() bool {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return o.active
 }
 
 // Pause pauses audio playback.
@@ -246,6 +282,7 @@ func (o *Output) Pause() {
 	defer o.mu.Unlock()
 	if o.player != nil {
 		o.player.Pause()
+		o.setActive(false)
 	}
 }
 
@@ -254,6 +291,7 @@ func (o *Output) Resume() {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	if o.player != nil {
+		o.setActive(true)
 		o.player.Play()
 	}
 }
@@ -268,6 +306,7 @@ func (o *Output) Stop() {
 		o.player.Close()
 		o.player = nil
 	}
+	o.setActive(false)
 	o.buffer.Reset()
 	o.pull.reset()
 	// The resets zero the byte counts, so the last seek's base goes with

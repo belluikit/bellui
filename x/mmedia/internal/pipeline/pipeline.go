@@ -994,6 +994,13 @@ var ErrCaptureStopped = errors.New("mmedia: capture device stopped producing med
 // playback stopped, so the app can show it, retry, or resume from there.
 func (p *Pipeline) reportEnd() {
 	p.state.Set(StateStopped)
+	// Nothing is left to hear, so the device may rest until the next Play,
+	// which brings the pipeline to rest first (restAfterEnd). A device kept
+	// playing silence after the end was reopened in a phone call's audio
+	// mode on Android (#1052).
+	if p.hasAudio {
+		p.audioOutput.Pause()
+	}
 	if p.live {
 		if p.onError != nil {
 			p.onError(p.captureError())

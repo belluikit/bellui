@@ -161,3 +161,26 @@ func TestVideoEndsWhenItsSoundHasPlayed(t *testing.T) {
 		t.Errorf("%d bytes (%v) of its sound still to play when the end was reported", left, p.audioOutput.PlaybackPosition())
 	}
 }
+
+// TestAudioEndLetsTheDeviceRest pins #1052's end of a track: the Output went
+// on playing silence after the end, so on Android the device was never
+// suspended, and a call then reopened its stream in call mode. The end now
+// pauses it, and the next Play counts it again.
+func TestAudioEndLetsTheDeviceRest(t *testing.T) {
+	p, ended := playCoverMP3(t)
+	if !p.audioOutput.Playing() {
+		t.Fatal("precondition: the Output does not count as playing while the track plays")
+	}
+	select {
+	case <-ended:
+	case <-time.After(6 * time.Second):
+		t.Fatal("a 3s track did not end")
+	}
+	if p.audioOutput.Playing() {
+		t.Error("the Output still counts as playing after the end")
+	}
+	p.Play()
+	if !p.audioOutput.Playing() {
+		t.Error("the Output does not count as playing after Play from the end")
+	}
+}
