@@ -12,6 +12,7 @@ type options struct {
 	onEnd    func()
 	onError  func(error)
 	onTime   func(current, total time.Duration)
+	onSeek   func(from, to time.Duration)
 	// captureOptions is forwarded to libavdevice when opening a capture device;
 	// it has no meaning for file or url playback.
 	captureOptions string
@@ -132,6 +133,22 @@ func WithOnError(f func(error)) Option {
 func WithOnTimeUpdate(f func(current, total time.Duration)) Option {
 	return func(o *options) {
 		o.onTime = f
+	}
+}
+
+// WithOnSeek sets a callback for seeks, with the position before the seek and
+// the one it went to, clamped to the media. It is called once for every Seek,
+// whoever made it: a drag or tap on the seek bar (once, on release) or the
+// app's own call. It runs on the goroutine that called Seek, the main one for
+// the seek bar, and before the WithOnTimeUpdate call that reports the new
+// position, so an app can tell that update from playback.
+//
+// A seek is reported when it is asked for. One that then fails goes to the
+// WithOnError callback, and playback stays where it was. Neither Stop's
+// rewind nor a loop's restart is a seek, and a live source cannot seek.
+func WithOnSeek(f func(from, to time.Duration)) Option {
+	return func(o *options) {
+		o.onSeek = f
 	}
 }
 

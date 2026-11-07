@@ -2,6 +2,7 @@ package mmedia
 
 import (
 	"image"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -141,5 +142,99 @@ func TestAudioPlayerClosesItsOwnPlayback(t *testing.T) {
 	closeWithin(t, ap.Close)
 	if pb.IsPlaying() {
 		t.Error("the widget's own playback still plays after Close")
+	}
+}
+
+// TestAudioPlayerSeekBarReportsTheSeek is #1051: a drag on the widget's seek
+// bar reaches WithOnSeek once, with where playback was and where it went, and
+// before the time update that reports the new position.
+func TestAudioPlayerSeekBarReportsTheSeek(t *testing.T) {
+	test.NewTempApp(t)
+	var mu sync.Mutex
+	var events []string
+	type seek struct{ from, to time.Duration }
+	var seeks []seek
+	pb := newAudioPlaybackFromPipeline(clipPipeline(t, 300), buildOptions([]Option{
+		WithOnSeek(func(from, to time.Duration) {
+			mu.Lock()
+			defer mu.Unlock()
+			events = append(events, "seek")
+			seeks = append(seeks, seek{from, to})
+		}),
+		WithOnTimeUpdate(func(time.Duration, time.Duration) {
+			mu.Lock()
+			defer mu.Unlock()
+			events = append(events, "time")
+		}),
+	}))
+	defer closeWithin(t, pb.Close)
+	recorded := func() ([]string, []seek) {
+		mu.Lock()
+		defer mu.Unlock()
+		return slices.Clone(events), slices.Clone(seeks)
+	}
+
+	// Paused, so the only time update is the one the seek reports.
+	pb.Play()
+	if !playingWithin(pb.IsPlaying, 500*time.Millisecond) {
+		t.Fatal("not playing after Play")
+	}
+	time.Sleep(200 * time.Millisecond)
+	pb.Pause()
+	from := pb.CurrentTime()
+	if from <= 0 {
+		t.Fatalf("precondition: paused at %v, want past the start", from)
+	}
+	ap := NewAudioPlayerFor(pb)
+	mu.Lock()
+	events, seeks = nil, nil
+	mu.Unlock()
+
+	dragSeekBarToEnd(ap.controls)
+	if ev, _ := recorded(); slices.Contains(ev, "seek") {
+		t.Fatalf("a drag still in flight reported a seek: %v", ev)
+	}
+	ap.controls.seekBar.DragEnd()
+
+	ev, got := recorded()
+	if want := []seek{{from, pb.Duration()}}; !slices.Equal(got, want) {
+		t.Errorf("seeks reported %v, want %v", got, want)
+	}
+	if want := []string{"seek", "time"}; !slices.Equal(ev, want) {
+		t.Errorf("callbacks ran %v, want %v", ev, want)
+	}
+}
+
+// TestAudioPlaybackReportsEverySeek: WithOnSeek hears the app's own seeks as
+// well as the widget's, with the target clamped to the media, and not Stop's
+// rewind to the start.
+func TestAudioPlaybackReportsEverySeek(t *testing.T) {
+	type seek struct{ from, to time.Duration }
+	var mu sync.Mutex
+	var seeks []seek
+	pb := newAudioPlaybackFromPipeline(clipPipeline(t, 300), buildOptions([]Option{
+		WithOnSeek(func(from, to time.Duration) {
+			mu.Lock()
+			defer mu.Unlock()
+			seeks = append(seeks, seek{from, to})
+		}),
+	}))
+	defer closeWithin(t, pb.Close)
+
+	total := pb.Duration()
+	pb.Seek(2 * time.Second)
+	pb.Seek(time.Hour)
+	pb.Seek(-time.Second)
+	pb.Play()
+	if !playingWithin(pb.IsPlaying, 500*time.Millisecond) {
+		t.Fatal("not playing after Play")
+	}
+	pb.Stop()
+
+	mu.Lock()
+	defer mu.Unlock()
+	want := []seek{{0, 2 * time.Second}, {2 * time.Second, total}, {total, 0}}
+	if !slices.Equal(seeks, want) {
+		t.Errorf("seeks reported %v, want %v", seeks, want)
 	}
 }
