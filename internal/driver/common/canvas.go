@@ -109,10 +109,13 @@ type Canvas struct {
 	// WalkTrees and read during mouse/touch event processing.
 	spatialIdx spatialIndexHolder
 	// spatialBufs are the two indexes RebuildSpatialIndex alternates between,
-	// reusing their slices (#435): each rebuild fills the one not published,
-	// so the index a reader just loaded is not touched until the rebuild
-	// after next. Every reader runs on the goroutine that paints (the event
-	// loop, or bellui.Do), so none holds an index across two rebuilds.
+	// reusing their slices (#435): each rebuild fills the one not published.
+	// The one it stops publishing keeps its layout but lets go of its
+	// objects (#1074): it held the previous frame's, which after the content
+	// is replaced is the replaced content, for as long as no frame follows.
+	// Every reader runs on the goroutine that paints (the event loop, or
+	// bellui.Do), so none is inside a query when a rebuild runs; one that
+	// were would find nothing in the index it loaded, not another tree.
 	spatialBufs [2]*SpatialIndex
 	spatialNext int
 
@@ -1076,6 +1079,7 @@ func (c *Canvas) SpatialIndex() *SpatialIndex {
 func (c *Canvas) RebuildSpatialIndex() {
 	size := c.impl.Size()
 	if size.Width <= 0 || size.Height <= 0 {
+		c.spatialIdx.Load().release()
 		c.spatialIdx.Store(nil)
 		return
 	}
@@ -1103,6 +1107,7 @@ func (c *Canvas) RebuildSpatialIndex() {
 	}
 
 	b.finish()
+	c.spatialIdx.Load().release()
 	c.spatialIdx.Store(b)
 }
 

@@ -95,6 +95,16 @@ func (idx *SpatialIndex) reset(canvasW, canvasH float32) {
 	idx.cellStart = idx.cellStart[:0]
 }
 
+// release lets go of the objects idx holds, keeping the rest, so that a
+// query of it finds nothing rather than an index out of range. Each index is
+// released before it is reset, so the capacity past a shorter rebuild holds
+// no object either. A nil idx is a no-op.
+func (idx *SpatialIndex) release() {
+	if idx != nil {
+		clear(idx.entries)
+	}
+}
+
 // add inserts an object into the grid. The world transform, local size, and
 // effective clip bounds are used to compute the screen-space AABB and
 // determine which cells the object overlaps.
@@ -227,7 +237,7 @@ func (idx *SpatialIndex) FindObjectAtPositionMatching(
 	for _, i := range cell {
 		e := &idx.entries[i]
 
-		if !e.obj.Visible() {
+		if e.obj == nil || !e.obj.Visible() { // nil: released
 			continue
 		}
 
@@ -278,7 +288,7 @@ func (idx *SpatialIndex) FindAllObjectsAtPositionMatching(
 	for _, i := range cell {
 		e := &idx.entries[i]
 
-		if !e.obj.Visible() {
+		if e.obj == nil || !e.obj.Visible() { // nil: released
 			continue
 		}
 

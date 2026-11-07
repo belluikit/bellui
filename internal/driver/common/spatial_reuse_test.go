@@ -28,8 +28,10 @@ func noWalk(*RenderCacheNode, geo.Position) {}
 // TestRebuildSpatialIndexReusesBuffers guards #435: rebuilding the hit-test
 // index every paint must not allocate once the buffers have grown, must
 // alternate between two indexes (so the one a reader just loaded is not
-// rewritten by the next rebuild), and must not keep entries from the previous
-// build when it reuses a buffer.
+// rewritten with another tree by the next rebuild), and must not keep entries
+// from the previous build when it reuses a buffer. The one a rebuild stops
+// publishing holds no object, as it would otherwise keep the previous frame's
+// until the next frame (#1074).
 func TestRebuildSpatialIndexReusesBuffers(t *testing.T) {
 	test.NewTempApp(t)
 
@@ -56,8 +58,12 @@ func TestRebuildSpatialIndexReusesBuffers(t *testing.T) {
 	c.WalkTrees(noWalk, noWalk)
 	second := c.SpatialIndex()
 	assert.NotSame(t, first, second, "a rebuild must not rewrite the index just published")
-	hit, _, _ = first.FindObjectAtPositionMatching(geo.NewPos(110, 110), matchAll)
-	assert.Same(t, moved, hit, "the previous index stays intact through one rebuild")
+	_, _, ok = first.FindObjectAtPositionMatching(geo.NewPos(110, 110), matchAll)
+	assert.False(t, ok, "the previous index finds nothing once a rebuild replaced it")
+	assert.Empty(t, first.FindAllObjectsAtPositionMatching(geo.NewPos(110, 110), matchAll))
+	for _, e := range first.entries[:cap(first.entries)] {
+		assert.Nil(t, e.obj, "the previous index still holds an object")
+	}
 
 	c.WalkTrees(noWalk, noWalk)
 	third := c.SpatialIndex()
