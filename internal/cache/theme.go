@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/core"
@@ -13,6 +14,10 @@ import (
 var (
 	overrides     async.Map[core.CanvasObject, *overrideScope]
 	overrideCount atomic.Uint32
+
+	// ownedScopes holds the current scope of each owner OverrideThemeFor was
+	// given, so the expiry sweep can release it once the owner is gone.
+	ownedScopes async.Map[core.Widget, *overrideScope]
 )
 
 // anchorMark marks where one anchor's own entries begin: an anchor owns the
@@ -24,6 +29,8 @@ type anchorMark struct {
 }
 
 type overrideScope struct {
+	expiringCache // owned scopes only: alive while the owner has a renderer
+
 	th      bellui.Theme
 	cacheID string
 
@@ -38,9 +45,54 @@ type overrideScope struct {
 //
 // Since: 1.0
 func OverrideTheme(o core.CanvasObject, th bellui.Theme) {
-	id := overrideCount.Add(1)
-	s := &overrideScope{th: th, cacheID: strconv.Itoa(int(id))}
+	overrideTheme(o, newScope(th))
+}
+
+// OverrideThemeFor is OverrideTheme for a scope that owner keeps, replacing
+// the scope owner kept before. The scope lives while owner has a renderer;
+// when it has none, from the start or once its renderer is destroyed, the
+// expiry sweep releases the scope after ValidDuration. Without an owner, a
+// container's part of the scope would stay until its window closed, since a
+// container has no renderer whose destruction releases it (#1065).
+func OverrideThemeFor(o core.CanvasObject, th bellui.Theme, owner core.Widget) {
+	s := newScope(th)
+	s.setAlive()
 	overrideTheme(o, s)
+	if old, ok := ownedScopes.Swap(owner, s); ok && old != s {
+		old.release()
+	}
+}
+
+func newScope(th bellui.Theme) *overrideScope {
+	id := overrideCount.Add(1)
+	return &overrideScope{th: th, cacheID: strconv.Itoa(int(id))}
+}
+
+// destroyExpiredScopes releases the owned scopes whose owner has had no
+// renderer for ValidDuration.
+func destroyExpiredScopes(now time.Time) {
+	ownedScopes.Range(func(owner core.Widget, s *overrideScope) bool {
+		if IsRendered(owner) {
+			s.setAlive()
+			return true
+		}
+		if s.isExpired(now) && ownedScopes.CompareAndDelete(owner, s) {
+			s.release()
+		}
+		return true
+	})
+}
+
+// release removes every entry the map still holds for s.
+func (s *overrideScope) release() {
+	s.mu.Lock()
+	objs := s.objects
+	s.objects, s.markers = nil, nil
+	s.mu.Unlock()
+
+	for _, obj := range objs {
+		deleteIfScope(obj, s)
+	}
 }
 
 func OverrideThemeMatchingScope(o, parent core.CanvasObject) bool {
@@ -152,8 +204,10 @@ func (s *overrideScope) store(o core.CanvasObject, anchor bool) {
 }
 
 func overrideContainer(c *bellui.Container, s *overrideScope) {
-	// A container has no renderer of its own, so it anchors its scope here and
-	// CleanCanvas releases its part when the window it belongs to closes.
+	// A container has no renderer of its own, so it anchors its scope here.
+	// Its part goes with the whole scope when the scope's owner is gone
+	// (OverrideThemeFor, #1065), or else when CleanCanvas runs for the window
+	// it belongs to.
 	s.store(c, true)
 	for _, o := range c.Objects {
 		overrideTheme(o, s)
