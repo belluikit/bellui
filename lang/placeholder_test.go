@@ -2,6 +2,7 @@ package lang
 
 import (
 	"bytes"
+	"fmt"
 	"log"
 	"os"
 	"testing"
@@ -12,6 +13,29 @@ import (
 func fill(src string, data any) string {
 	s, _ := parsePlaceholders(src).Execute(data)
 	return s
+}
+
+// Fill gives what LocalizeKey gives for a key no catalog has (#1041). The
+// cases are TestPlaceholders' own, so the two cannot drift apart.
+func TestFill_MatchesLocalizeKey(t *testing.T) {
+	SetLocaleForTests(t, "en")
+	for i, tt := range placeholderCases {
+		key := fmt.Sprintf("probe.fill.%d", i)
+		assert.Equal(t, tt.want, Fill(tt.src, tt.data), tt.name)
+		assert.Equal(t, LocalizeKey(key, tt.src, tt.data), Fill(tt.src, tt.data), tt.name)
+	}
+}
+
+// Fill takes several data values as the other lang calls do, never reads a
+// filled value again, and has no escape.
+func TestFill(t *testing.T) {
+	ana := struct{ Name string }{"Ana"}
+	extra := map[string]any{"Count": 3, "Name": "not used"}
+	assert.Equal(t, "Ana sent 3", Fill("{Name} sent {Count}", ana, extra))
+	assert.Equal(t, "Ana sent 3", Fill("{Name} sent {Count}", nil, ana, extra), "a nil value is skipped")
+	assert.Equal(t, "Hi {Name}", Fill("Hi {Name}"), "no data")
+	assert.Equal(t, "{b}B", Fill("{a}{b}", map[string]string{"a": "{b}", "b": "B"}), "one pass")
+	assert.Equal(t, `\x {{a}}`, Fill(`\{a} {{a}}`, map[string]string{"a": "x"}), "no escape")
 }
 
 type inner struct{ Name string }
@@ -31,51 +55,56 @@ var (
 	pfive = &five
 )
 
-func TestPlaceholders(t *testing.T) {
-	type person struct {
-		Name    string
-		Age     int
-		private string
-	}
-	m := map[string]any{"Name": "Ada", "Count": 3, "Value": 2.5}
+type person struct {
+	Name    string
+	Age     int
+	private string
+}
 
-	for _, tt := range []struct {
-		name, src string
-		data      any
-		want      string
-	}{
-		{"named", "Hello {Name}", m, "Hello Ada"},
-		{"several", "{Name} has {Count} items, {Value} each", m, "Ada has 3 items, 2.5 each"},
-		{"Go template field", "Hello {{.Name}}", m, "Hello Ada"},
-		{"Go template field with spaces", "Hello {{ .Name }}", m, "Hello Ada"},
-		{"both forms", "{Name} / {{.Name}}", m, "Ada / Ada"},
-		{"struct", "{Name} is {Age}", person{Name: "Ada", Age: 36}, "Ada is 36"},
-		{"struct pointer", "{Name}", &person{Name: "Ada"}, "Ada"},
-		{"unexported field", "{private}", person{private: "x"}, "{private}"},
-		{"map[string]string", "{Name}", map[string]string{"Name": "Ada"}, "Ada"},
-		{"map[string]int", "{Count}", map[string]int{"Count": 4}, "4"},
-		{"named map type", "{K}", map[string]float64{"K": 1.5}, "1.5"},
-		{"plural count", "{PluralCount} files", map[string]any{"PluralCount": 2}, "2 files"},
-		{"unknown name", "Hello {Who}", m, "Hello {Who}"},
-		{"unknown Go template field", "Hello {{.Who}}", m, "Hello {{.Who}}"},
-		{"nil data", "Hello {Name}", nil, "Hello {Name}"},
-		{"no placeholders", "Plain text", m, "Plain text"},
-		{"empty", "", m, ""},
-		{"not a name", "{} { Name } {1x} {a-b}", m, "{} { Name } {1x} {a-b}"},
-		{"unclosed", "Hello {Name", m, "Hello {Name"},
-		{"unicode around", "Grüße, {Name}! 👋", m, "Grüße, Ada! 👋"},
-		{"other data", "{Name}", 42, "{Name}"},
-		{"field through a nil embedded pointer", "Hi {Name}", outer{}, "Hi {Name}"},
-		{"field through an embedded pointer", "Hi {Name}", outer{&inner{Name: "Ada"}}, "Hi Ada"},
-		{"pointer value", "{N} items", map[string]any{"N": &five}, "5 items"},
-		{"pointer to pointer", "{N} items", map[string]any{"N": &pfive}, "5 items"},
-		{"nil pointer value", "{N}", map[string]any{"N": (*int)(nil)}, "<nil>"},
-		{"String method on the pointer", "{S}", map[string]any{"S": &ptrStringer{"x"}}, "stringer x"},
-		{"pointer field", "{P}", struct{ P *int }{&five}, "5"},
-		{"map[any]any", "{Name}", map[any]any{"Name": "Ada"}, "Ada"},
-		{"map with int keys", "{Name}", map[int]string{1: "Ada"}, "{Name}"},
-		{"method is not called", "{Count} items", stats{}, "{Count} items"},
-	} {
+var m = map[string]any{"Name": "Ada", "Count": 3, "Value": 2.5}
+
+// placeholderCases are the placeholder rules, shared by the parser's test and
+// Fill's.
+var placeholderCases = []struct {
+	name, src string
+	data      any
+	want      string
+}{
+	{"named", "Hello {Name}", m, "Hello Ada"},
+	{"several", "{Name} has {Count} items, {Value} each", m, "Ada has 3 items, 2.5 each"},
+	{"Go template field", "Hello {{.Name}}", m, "Hello Ada"},
+	{"Go template field with spaces", "Hello {{ .Name }}", m, "Hello Ada"},
+	{"both forms", "{Name} / {{.Name}}", m, "Ada / Ada"},
+	{"struct", "{Name} is {Age}", person{Name: "Ada", Age: 36}, "Ada is 36"},
+	{"struct pointer", "{Name}", &person{Name: "Ada"}, "Ada"},
+	{"unexported field", "{private}", person{private: "x"}, "{private}"},
+	{"map[string]string", "{Name}", map[string]string{"Name": "Ada"}, "Ada"},
+	{"map[string]int", "{Count}", map[string]int{"Count": 4}, "4"},
+	{"named map type", "{K}", map[string]float64{"K": 1.5}, "1.5"},
+	{"plural count", "{PluralCount} files", map[string]any{"PluralCount": 2}, "2 files"},
+	{"unknown name", "Hello {Who}", m, "Hello {Who}"},
+	{"unknown Go template field", "Hello {{.Who}}", m, "Hello {{.Who}}"},
+	{"nil data", "Hello {Name}", nil, "Hello {Name}"},
+	{"no placeholders", "Plain text", m, "Plain text"},
+	{"empty", "", m, ""},
+	{"not a name", "{} { Name } {1x} {a-b}", m, "{} { Name } {1x} {a-b}"},
+	{"unclosed", "Hello {Name", m, "Hello {Name"},
+	{"unicode around", "Grüße, {Name}! 👋", m, "Grüße, Ada! 👋"},
+	{"other data", "{Name}", 42, "{Name}"},
+	{"field through a nil embedded pointer", "Hi {Name}", outer{}, "Hi {Name}"},
+	{"field through an embedded pointer", "Hi {Name}", outer{&inner{Name: "Ada"}}, "Hi Ada"},
+	{"pointer value", "{N} items", map[string]any{"N": &five}, "5 items"},
+	{"pointer to pointer", "{N} items", map[string]any{"N": &pfive}, "5 items"},
+	{"nil pointer value", "{N}", map[string]any{"N": (*int)(nil)}, "<nil>"},
+	{"String method on the pointer", "{S}", map[string]any{"S": &ptrStringer{"x"}}, "stringer x"},
+	{"pointer field", "{P}", struct{ P *int }{&five}, "5"},
+	{"map[any]any", "{Name}", map[any]any{"Name": "Ada"}, "Ada"},
+	{"map with int keys", "{Name}", map[int]string{1: "Ada"}, "{Name}"},
+	{"method is not called", "{Count} items", stats{}, "{Count} items"},
+}
+
+func TestPlaceholders(t *testing.T) {
+	for _, tt := range placeholderCases {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equal(t, tt.want, fill(tt.src, tt.data))
 		})

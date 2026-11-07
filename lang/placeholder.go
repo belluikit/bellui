@@ -26,6 +26,17 @@ import (
 // to a map.
 var placeholders template.Parser = placeholderParser{}
 
+// Fill fills src's {Name} placeholders from data by the rules LocalizeKey
+// uses, without a catalog lookup: data is a struct with exported fields or a
+// map of string keys, and with several values the first that has a name
+// fills it. It is one pass, so text that came from a value is never read
+// again. A name the data does not have, and braces that hold no name, are
+// left as written. There is no escape (#1041).
+func Fill(src string, data ...any) string {
+	s, _ := parsePlaceholders(src).Execute(templateData(data))
+	return s
+}
+
 type placeholderParser struct{}
 
 // Cacheable reports that a parsed message can be kept: it holds no state from
