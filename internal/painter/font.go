@@ -8,12 +8,12 @@ import (
 	"image/draw"
 	"math"
 	"os"
-	"slices"
 	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+	"weak"
 
 	"github.com/belluikit/bellui/internal/render"
 	"github.com/belluikit/typesetting/di"
@@ -259,24 +259,12 @@ func SweepFontCache(expiry time.Duration) {
 		return true
 	})
 
-	// Keep the parsed fonts the remaining chains were built from, and no others.
-	inUse := make(map[*font.Face]bool)
-	markBuiltFrom := func(val *FontCacheItem) {
-		for _, f := range val.builtFrom {
-			inUse[f] = true
-		}
-	}
-	fontCache.Range(func(_ cacheID, val *FontCacheItem) bool {
-		markBuiltFrom(val)
-		return true
-	})
-	fontCustomCache.Range(func(_ bellui.Resource, val *FontCacheItem) bool {
-		markBuiltFrom(val)
-		return true
-	})
-	parsedFonts.Range(func(key parsedFontKey, f *font.Face) bool {
-		if !inUse[f] {
-			parsedFonts.Delete(key)
+	// A parsed font lives while anything holds its face, which is more than
+	// the chains above: a cached text layout or a glyph atlas keeps the faces
+	// it was shaped with (#1066). Forget only the fonts nothing holds any more.
+	parsedFonts.Range(func(key parsedFontKey, f weak.Pointer[font.Face]) bool {
+		if f.Value() == nil {
+			parsedFonts.CompareAndDelete(key, f)
 		}
 		return true
 	})
@@ -365,8 +353,11 @@ func drawDecorationLine(dst draw.Image, clr color.Color, y, x0, x1 int, scale fl
 }
 
 // loadMeasureFont returns the face parsed from a font resource. A font file is
-// parsed once while a cached chain uses it: every text style's chain includes
+// parsed once while anything holds its face: every text style's chain includes
 // the bundled text and emoji fonts, and the emoji font alone is 4.2 MB (#446).
+// The faces are held weakly here, so a font nothing uses is still released,
+// and one a swept chain left behind in use is found again, not parsed again
+// (#1066).
 func loadMeasureFont(data bellui.Resource) *font.Face {
 	content := data.Content()
 	if len(content) == 0 {
@@ -374,14 +365,24 @@ func loadMeasureFont(data bellui.Resource) *font.Face {
 	}
 	key := parsedFontKey{data: &content[0], size: len(content)}
 	if f, ok := parsedFonts.Load(key); ok {
-		return f
+		if face := f.Value(); face != nil {
+			return face
+		}
 	}
-	f := parseMeasureFont(content)
-	if f == nil {
+	face := parseMeasureFont(content)
+	if face == nil {
 		return nil
 	}
-	f, _ = parsedFonts.LoadOrStore(key, f)
-	return f
+	for {
+		f, loaded := parsedFonts.LoadOrStore(key, weak.Make(face))
+		if !loaded {
+			return face
+		}
+		if other := f.Value(); other != nil {
+			return other // parsed at the same time by another goroutine
+		}
+		parsedFonts.CompareAndDelete(key, f)
+	}
 }
 
 // FontParses reports how many font files have been parsed.
@@ -1653,14 +1654,10 @@ func assignCluster(carets, caretsBwd []float32, extents [][2]float32, cluster, r
 type FontCacheItem struct {
 	Fonts      shaping.Fontmap
 	lastAccess atomic.Int64 // unix timestamp (seconds) of last access
-
-	// builtFrom holds the faces Fonts started with, which keep their parsed
-	// fonts from being swept. Fonts itself grows as runes resolve.
-	builtFrom []*font.Face
 }
 
 func newFontCacheItem(faces *dynamicFontMap) *FontCacheItem {
-	return &FontCacheItem{Fonts: faces, builtFrom: slices.Clone(faces.faces)}
+	return &FontCacheItem{Fonts: faces}
 }
 
 // parsedFontKey identifies a font file by its content, which resources of the
@@ -1685,7 +1682,7 @@ var (
 	fontCache       async.Map[cacheID, *FontCacheItem]
 	fontCustomCache async.Map[bellui.Resource, *FontCacheItem] // for custom resources
 	fontCacheGen    atomic.Uint64
-	parsedFonts     async.Map[parsedFontKey, *font.Face]
+	parsedFonts     async.Map[parsedFontKey, weak.Pointer[font.Face]]
 	fontParses      atomic.Uint64
 )
 

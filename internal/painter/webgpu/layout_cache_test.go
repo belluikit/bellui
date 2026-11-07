@@ -3,8 +3,11 @@
 package webgpu
 
 import (
+	"fmt"
 	"image/color"
+	"runtime"
 	"testing"
+	"time"
 
 	"github.com/belluikit/typesetting/font"
 	"github.com/stretchr/testify/assert"
@@ -98,4 +101,41 @@ func TestLayoutTextFollowsFontChanges(t *testing.T) {
 		after := p.layoutText(text)
 		assert.NotSame(t, firstFace(t, before), firstFace(t, after), "the font source was not used")
 	})
+}
+
+// A text drawn from its cached layout does not look its fonts up, so after a
+// minute the cache sweep forgets its font chain while the layout still holds
+// the faces. The next text shaped then must get those same faces, not parse
+// the font files again: a phone app playing a song grew from 1.6k to 43k live
+// parsed-font objects in an hour, each play/pause icon change parsing a copy
+// that the layouts and the glyph atlas kept (#1066). The static text carries
+// an emoji so that its layout holds the emoji font too; a font nothing holds
+// is released by the sweep and parsed again on its next use (#446).
+func TestLayoutTextKeepsFacesAcrossSweeps(t *testing.T) {
+	test.NewTempApp(t)
+	p := layoutPainter()
+	static := canvas.NewText("Now playing \U0001F3B5", color.White)
+	static.TextSize = 16
+	cache.OverrideTheme(static, theme.DefaultTheme())
+	first := p.layoutText(static)
+	held := map[*font.Face]bool{}
+	for _, g := range first.glyphs {
+		held[g.key.face] = true
+	}
+	require.Len(t, held, 2, "the static text should be shaped with the text and the emoji font")
+
+	parses := paint.FontParses()
+	for i := range 20 {
+		paint.SweepFontCache(-time.Hour) // every chain is a minute old: only cache hits used them
+		runtime.GC()
+		require.True(t, first == p.layoutText(static), "the cached layout was dropped")
+
+		changed := canvas.NewText(fmt.Sprintf("00:%02d \U0001F3B5", i), color.White)
+		changed.TextSize = 16
+		cache.OverrideTheme(changed, theme.DefaultTheme()) // a new theme scope, as each renderer under a ThemeOverride gets
+		for _, g := range p.layoutText(changed).glyphs {
+			assert.True(t, held[g.key.face], "round %d shaped with a second copy of a font still in use", i)
+		}
+	}
+	assert.Equal(t, parses, paint.FontParses(), "fonts still in use were parsed again")
 }
