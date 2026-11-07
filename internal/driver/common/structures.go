@@ -314,10 +314,13 @@ func (q *nodeQueue) add(node *RenderCacheNode, queued *atomic.Bool) {
 }
 
 // take returns the nodes queued since it was last called. The next take hands
-// the slice back to add, so the caller is done with it by then.
+// the slice back to add, so the caller is done with it by then, and clears it
+// first: its nodes, and through them their trees, would otherwise stay until
+// add wrote over them, which an idle app does not (#1075).
 func (q *nodeQueue) take() []*RenderCacheNode {
 	q.mu.Lock()
 	taken := q.nodes
+	clear(q.taken[:cap(q.taken)])
 	q.nodes = q.taken[:0]
 	q.taken = taken
 	q.mu.Unlock()
