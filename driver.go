@@ -58,6 +58,12 @@ type DoubleTapDriver interface {
 	DoubleTapDelay() time.Duration
 }
 
+// OnScreenDriver is an optional interface that a [Driver] can implement to
+// report whether an object is on screen. See [IsOnScreen].
+type OnScreenDriver interface {
+	IsOnScreen(core.CanvasObject) bool
+}
+
 // PositionMappingDriver is an optional interface that a [Driver] can implement
 // to map positions between an object's own coordinates and its canvas through
 // the object's world transform, the one it is drawn and hit with
@@ -148,4 +154,27 @@ func DoubleTapDelay() time.Duration {
 		}
 	}
 	return defaultDoubleTapDelay
+}
+
+// IsOnScreen reports whether obj is drawn: the last frame of a window that is
+// shown placed it, and it and everything above it are still visible. So it is
+// false on a tab that is not selected, under a hidden container, in a window
+// that is not shown, and before the first frame that draws it; and it turns
+// false as soon as an ancestor is hidden, without waiting for the next frame.
+// An object scrolled out of a scroll's view is still on screen.
+//
+// It reports visibility, not what to do about it: an animation can skip its
+// values, a video keep its sound but decode no frames, a chart keep its data
+// but not redraw. Code that runs on its own clock asks once per tick. Call it
+// on the main goroutine. A refresh of an object out of sight already draws no
+// frame; this is for the work done before refreshing (#1061).
+//
+// Falls back to obj.Visible() if the driver doesn't implement [OnScreenDriver].
+func IsOnScreen(obj core.CanvasObject) bool {
+	if a := CurrentApp(); a != nil {
+		if osd, ok := a.Driver().(OnScreenDriver); ok {
+			return osd.IsOnScreen(obj)
+		}
+	}
+	return obj.Visible()
 }

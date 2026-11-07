@@ -39,6 +39,11 @@ func (p *infProgressRenderer) MinSize() geo.Size {
 }
 
 func (p *infProgressRenderer) updateBar(done float32) {
+	if !bellui.IsOnScreen(p.progress) {
+		// On a tab not selected or under a hidden container: the animation
+		// keeps its place in time and draws it once seen again (#1061).
+		return
+	}
 	size := p.progress.Size()
 	progressWidth := size.Width
 	spanWidth := progressWidth + (progressWidth * (maxProgressBarInfiniteWidthRatio / 2))

@@ -9,6 +9,7 @@ import (
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/async"
+	"github.com/belluikit/bellui/internal/cache"
 	intdriver "github.com/belluikit/bellui/internal/driver"
 	"github.com/belluikit/bellui/internal/memcanvas"
 	"github.com/belluikit/bellui/internal/painter"
@@ -18,7 +19,10 @@ import (
 	"github.com/belluikit/bellui/storage/repository"
 )
 
-var _ bellui.PositionMappingDriver = (*driver)(nil)
+var (
+	_ bellui.PositionMappingDriver = (*driver)(nil)
+	_ bellui.OnScreenDriver        = (*driver)(nil)
+)
 
 // SoftwarePainter describes a simple type that can render canvases
 type SoftwarePainter = memcanvas.Painter
@@ -152,6 +156,51 @@ func (d *driver) CanvasForObject(core.CanvasObject) core.Canvas {
 	}
 	// cheating: probably the last created window is meant
 	return d.windows[len(d.windows)-1].Canvas()
+}
+
+// IsOnScreen implements bellui.OnScreenDriver: obj is reached from a
+// window's content or overlays through visible objects and the renderers that
+// exist. The test canvas keeps no render tree to answer from, as the real
+// drivers do, so it walks. It builds no renderer: one that starts an animation
+// would ask again from inside the walk.
+func (d *driver) IsOnScreen(obj core.CanvasObject) bool {
+	d.windowsMutex.RLock()
+	windows := append([]bellui.Window(nil), d.windows...)
+	d.windowsMutex.RUnlock()
+	for _, w := range windows {
+		c := w.Canvas()
+		for _, root := range append([]core.CanvasObject{c.Content()}, c.Overlays().List()...) {
+			if reachesVisible(root, obj) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// reachesVisible reports whether obj is o, or under it through visible objects.
+func reachesVisible(o, obj core.CanvasObject) bool {
+	if o == nil || !o.Visible() {
+		return false
+	}
+	if o == obj {
+		return true
+	}
+	var children []core.CanvasObject
+	switch t := o.(type) {
+	case *bellui.Container:
+		children = t.Objects
+	case core.Widget:
+		if r, _ := cache.CachedRenderer(t); r != nil {
+			children = r.Objects()
+		}
+	}
+	for _, child := range children {
+		if reachesVisible(child, obj) {
+			return true
+		}
+	}
+	return false
 }
 
 func (d *driver) CreateWindow(title string) bellui.Window {

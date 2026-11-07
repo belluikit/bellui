@@ -124,6 +124,9 @@ func (a *activityRenderer) Refresh() {
 }
 
 func (a *activityRenderer) animate(done float32) {
+	if !bellui.IsOnScreen(a.parent) {
+		return // out of sight, as for ProgressBarInfinite (#1061)
+	}
 	off := done * 2
 	if off > 1 {
 		off = 2 - off

@@ -167,6 +167,12 @@ type Canvas struct {
 	// to the node it was skipped under, so that showing it by its Hidden
 	// field, which reports nothing, has a node to report from (#619).
 	hiddenUnder async.Map[core.CanvasObject, hiddenAt]
+	// offscreenTops maps each hidden object a walk found out of sight to the
+	// full-walk generation that recorded its subtree, and offscreen maps every
+	// object under one, it included, to it: a refresh of those asks for no
+	// frame (#1061).
+	offscreenTops async.Map[core.CanvasObject, uint64]
+	offscreen     async.Map[core.CanvasObject, *offscreenAt]
 	// regionVisits counts the nodes the last PartialDirtyRegion visited.
 	regionVisits int
 }
@@ -388,7 +394,9 @@ func (c *Canvas) FocusPrevious() {
 	}
 }
 
-// FreeDirtyTextures frees dirty textures and returns the number of freed textures.
+// FreeDirtyTextures frees the textures of the objects refreshed since it last
+// ran, and returns how many of them are in sight: those under a hidden object
+// need no frame (#1061).
 func (c *Canvas) FreeDirtyTextures() uint64 {
 	if c.painter == nil {
 		return 0
@@ -397,9 +405,12 @@ func (c *Canvas) FreeDirtyTextures() uint64 {
 	bp, hasBP := c.painter.(gpu.BoundaryPainter)
 
 	c.dirtyRegion.Reset()
-	objectsToFree := c.refreshQueue.Len()
+	var inSight uint64
 	for object := c.refreshQueue.Out(); object != nil; object = c.refreshQueue.Out() {
 		c.freeObject(object)
+		if !c.isOffscreen(object) {
+			inSight++
+		}
 
 		// Track dirty region for scissor culling. The node is looked up once,
 		// for this, the partial-repaint region and the boundary below (#543).
@@ -415,7 +426,7 @@ func (c *Canvas) FreeDirtyTextures() uint64 {
 	}
 
 	cache.RangeExpiredTexturesFor(c.impl, c.painter.Free)
-	return objectsToFree
+	return inSight
 }
 
 // markBoundaryDirtyFrom walks up the render cache tree from node to find the
@@ -751,6 +762,11 @@ func (c *Canvas) Painter() gpu.Painter {
 func (c *Canvas) Refresh(obj core.CanvasObject) {
 	c.MarkMinSizeDirty(obj)
 	c.refreshQueue.In(obj)
+	if c.isOffscreen(obj) {
+		// Queued all the same: the frame that shows it again frees what the
+		// refresh made stale.
+		return
+	}
 	async.EnsureMain(c.SetDirty)
 }
 
@@ -996,6 +1012,7 @@ func (c *Canvas) WalkTrees(
 		}
 		return true
 	})
+	c.sweepOffscreen(gen)
 }
 
 // WalkContentTrees walks content, window head, and menu trees (not overlays).
@@ -1241,16 +1258,7 @@ func (c *Canvas) walkTreeFrom(
 		}
 	}
 	region := c.regionWalk == regionContent
-	var hidden func(obj, _ core.CanvasObject)
-	if region {
-		// A hidden child that does not report placement would not report
-		// being shown either: its parent is walked every region (#599).
-		hidden = func(obj, _ core.CanvasObject) { noteHiddenChild(parent, obj) }
-	} else if build.PartialRepaint {
-		// Nor does one shown by its Hidden field: the other walks, the paint
-		// walk among them, record where it is (#619).
-		hidden = func(obj, _ core.CanvasObject) { c.noteHidden(parent, obj) }
-	}
+	hidden := c.walkHidden(region, &parent)
 
 	bc := func(obj core.CanvasObject, pos geo.Position, clipPos geo.Position, clipSize geo.Size) bool {
 		if node != nil && node.obj != obj {
@@ -1318,6 +1326,29 @@ func (c *Canvas) walkTreeFrom(
 		node = node.nextSibling
 	}
 	driver.WalkVisibleSubtreeCulled(start.obj, parentObj, offset, clipPos, clipSize, start.walkXf(), cull, hidden, bc, ac)
+}
+
+// walkHidden is what a walk does with a hidden child it skips under *parent,
+// the node it is visiting: it records the child as out of sight (#1061), and
+// where it is for the partial-repaint region.
+func (c *Canvas) walkHidden(region bool, parent **RenderCacheNode) func(obj, _ core.CanvasObject) {
+	switch {
+	case region:
+		// A hidden child that does not report placement would not report
+		// being shown either: its parent is walked every region (#599).
+		return func(obj, _ core.CanvasObject) {
+			noteHiddenChild(*parent, obj)
+			c.noteOffscreen(obj)
+		}
+	case build.PartialRepaint:
+		// Nor does one shown by its Hidden field: the other walks, the paint
+		// walk among them, record where it is (#619).
+		return func(obj, _ core.CanvasObject) {
+			c.noteHidden(*parent, obj)
+			c.noteOffscreen(obj)
+		}
+	}
+	return func(obj, _ core.CanvasObject) { c.noteOffscreen(obj) }
 }
 
 // addChild adds a node for obj to parent, after prev or first.
@@ -1423,6 +1454,9 @@ func (c *Canvas) forgetNodes(n *RenderCacheNode) {
 	for ; n != nil; n = n.nextSibling {
 		if cur, ok := c.nodeMap.Load(n.obj); ok && cur == n {
 			c.nodeMap.Delete(n.obj)
+		}
+		if !n.obj.Visible() {
+			c.noteOffscreen(n.obj) // as an unselected tab's content leaves
 		}
 		if build.PartialRepaint && n.lastPaintSet {
 			c.leftRegion.Union(padRect(n.lastPaintPos, n.lastPaintSize))

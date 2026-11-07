@@ -237,6 +237,17 @@ func (d *driver) removeWindow(w *window) {
 	}
 }
 
+// IsOnScreen implements bellui.OnScreenDriver: obj is in sight on the canvas
+// of the window shown, the only one a phone shows.
+func (d *driver) IsOnScreen(obj core.CanvasObject) bool {
+	w := d.currentWindow()
+	if w == nil {
+		return false
+	}
+	c, ok := w.Canvas().(*canvas)
+	return ok && c.InSight(obj)
+}
+
 // currentWindow returns the most recently opened window - we can only show one at a time.
 func (d *driver) currentWindow() *window {
 	windows := d.AllWindows()
