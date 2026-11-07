@@ -161,7 +161,10 @@ func DoubleTapDelay() time.Duration {
 // false on a tab that is not selected, under a hidden container, in a window
 // that is not shown, and before the first frame that draws it; and it turns
 // false as soon as an ancestor is hidden, without waiting for the next frame.
-// An object scrolled out of a scroll's view is still on screen.
+// It turns true as soon as that ancestor is shown or that tab selected again,
+// before the frame that draws obj, so work done on a tick in between is in
+// that frame (#1069). An object scrolled out of a scroll's view is still on
+// screen.
 //
 // It reports visibility, not what to do about it: an animation can skip its
 // values, a video keep its sound but decode no frames, a chart keep its data

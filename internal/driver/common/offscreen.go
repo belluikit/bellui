@@ -1,11 +1,14 @@
 package common
 
 import (
+	"slices"
 	"sync/atomic"
 	"time"
 
+	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/cache"
 	"github.com/belluikit/bellui/internal/driver"
 )
 
@@ -18,21 +21,24 @@ import (
 const offscreenKeep = time.Minute
 
 // offscreenAt is the hidden object that obj sits under, obj itself if it is
-// that object, and when a walk or a refresh last found it there.
+// that object, the object that hidden one was a child of when a walk found it
+// (nil for a tree's root), and when a walk or a refresh last found it there.
 type offscreenAt struct {
-	top  core.CanvasObject
-	seen atomic.Int64 // UnixNano
+	top, parent core.CanvasObject
+	seen        atomic.Int64 // UnixNano
 }
 
-// noteOffscreen records that top is hidden and out of sight, and so every
-// object under it: their refreshes then ask for no frame (isOffscreen). A walk
-// calls it for a hidden object it skips, and for a hidden object whose node
-// leaves the tree, which is how an unselected tab's content goes: AppTabs
-// hides it and stops listing it. The subtree is recorded at most once per
-// full-walk generation, which also records objects added under top since.
-// Only renderers that exist are read: an object under a widget never rendered
-// is not recorded, and its refreshes still ask for a frame.
-func (c *Canvas) noteOffscreen(top core.CanvasObject) {
+// noteOffscreen records that top, a child of parent, is hidden and out of
+// sight, and so every object under it: their refreshes then ask for no frame
+// (isOffscreen), and once top is shown again they are in sight before a walk
+// places them (InSight). A walk calls it for a hidden object it skips, and for
+// a hidden object whose node leaves the tree, which is how an unselected tab's
+// content goes: AppTabs hides it and stops listing it. The subtree is recorded
+// at most once per full-walk generation, which also records objects added
+// under top since. Only renderers that exist are read: an object under a
+// widget never rendered is not recorded, and its refreshes still ask for a
+// frame.
+func (c *Canvas) noteOffscreen(top, parent core.CanvasObject) {
 	if gen, ok := c.offscreenTops.Load(top); ok && gen == c.walkGen {
 		return // storing over a key allocates (mapNode)
 	}
@@ -40,12 +46,12 @@ func (c *Canvas) noteOffscreen(top core.CanvasObject) {
 	now := time.Now().UnixNano()
 	var under *offscreenAt
 	driver.WalkCompleteObjectTree(top, func(obj core.CanvasObject, _, _ geo.Position, _ geo.Size) bool {
-		if at, ok := c.offscreen.Load(obj); ok && at.top == top {
+		if at, ok := c.offscreen.Load(obj); ok && at.top == top && at.parent == parent {
 			at.seen.Store(now)
 			return false
 		}
 		if under == nil {
-			under = &offscreenAt{top: top}
+			under = &offscreenAt{top: top, parent: parent}
 			under.seen.Store(now)
 		}
 		c.offscreen.Store(obj, under)
@@ -90,14 +96,16 @@ func (c *Canvas) sweepOffscreen(gen uint64) {
 	})
 }
 
-// InSight reports whether the last walk placed obj in this canvas' trees, and
-// it and every object above it are still visible: one hidden since, by Hide or
-// a tab switch, is out of sight at once, without waiting for the next walk
-// (bellui.IsOnScreen). Call it on the main goroutine, which walks the trees.
+// InSight reports whether obj is in sight in this canvas' trees: the last walk
+// placed it, and it and every object above it are still visible. One hidden
+// since, by Hide or a tab switch, is out of sight at once, without waiting for
+// the next walk (bellui.IsOnScreen). So is one shown again at once, before the
+// walk that places it (#1069): see shownAgain. Call it on the main goroutine,
+// which walks the trees.
 func (c *Canvas) InSight(obj core.CanvasObject) bool {
 	node, ok := c.nodeMap.Load(obj)
 	if !ok {
-		return false
+		return c.shownAgain(obj)
 	}
 	for n := node; n != nil; n = n.parent {
 		if !n.obj.Visible() {
@@ -105,4 +113,56 @@ func (c *Canvas) InSight(obj core.CanvasObject) bool {
 		}
 	}
 	return true
+}
+
+// shownAgain reports whether obj, which no walk has placed since it went out
+// of sight under a hidden object, is in sight again although the walk that
+// places it is still to come: that hidden object is shown, it is still a
+// child of the object it was a child of, which is in sight, and obj is still
+// under it with nothing between them hidden. That walk is the paint of the
+// next frame, so without this a consumer asking on each tick skips its work
+// for that frame, which then draws what it showed when it went out of sight
+// (#1069). Only an object recorded out of sight is found: one added under the
+// hidden object since the last walk that recorded it is in sight from the walk
+// that places it. The cost is a walk of the hidden object's subtree, through
+// the renderers that exist, for each question until that walk: one frame.
+func (c *Canvas) shownAgain(obj core.CanvasObject) bool {
+	at, ok := c.offscreen.Load(obj)
+	if !ok || at.parent == nil || !at.top.Visible() || !c.InSight(at.parent) {
+		return false
+	}
+	if !slices.Contains(childrenOf(at.parent), at.top) {
+		return false // moved while hidden, or its parent stopped listing it
+	}
+	var path []core.CanvasObject
+	found := false
+	driver.WalkCompleteObjectTree(at.top, func(o core.CanvasObject, _, _ geo.Position, _ geo.Size) bool {
+		path = append(path, o)
+		if o != obj {
+			return false
+		}
+		found = true
+		for _, above := range path {
+			if !above.Visible() {
+				found = false
+			}
+		}
+		return true
+	}, func(core.CanvasObject, geo.Position, core.CanvasObject) {
+		path = path[:len(path)-1]
+	})
+	return found
+}
+
+// childrenOf is what a walk visits below obj, from the renderers that exist.
+func childrenOf(obj core.CanvasObject) []core.CanvasObject {
+	switch o := obj.(type) {
+	case *bellui.Container:
+		return o.Objects
+	case core.Widget:
+		if r, _ := cache.CachedRenderer(o); r != nil {
+			return r.Objects()
+		}
+	}
+	return nil
 }

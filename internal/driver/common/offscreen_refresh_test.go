@@ -1,6 +1,7 @@
 package common
 
 import (
+	"fmt"
 	"image/color"
 	"testing"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/driver"
 	"github.com/belluikit/bellui/test"
 	"github.com/belluikit/bellui/widget"
 )
@@ -224,4 +226,128 @@ func TestInSight(t *testing.T) {
 	c.Refresh(inner)
 	c.EnsureMinSize()
 	assert.True(t, c.InSight(glow), "in sight under the container shown again")
+}
+
+// TestInSightOnReturnBeforeWalk is #1069: a tab selected again is in sight at
+// once, before the walk of the frame that draws it. A consumer asks on its
+// tick, which runs before that frame's walk, so if it read false there that
+// frame drew what the tab showed when it was hidden.
+func TestInSightOnReturnBeforeWalk(t *testing.T) {
+	test.NewTempApp(t)
+	glow := canvas.NewRectangle(color.White)
+	inner := container.NewStack(glow)
+	content := container.NewVBox(inner)
+	tabs := container.NewAppTabs(
+		container.NewTabItem("Player", content),
+		container.NewTabItem("Library", widget.NewLabel("songs")),
+	)
+	outer := container.NewStack(tabs)
+	c := walkedCanvas(outer)
+	hideTab := func() {
+		tabs.SelectIndex(1)
+		c.Refresh(tabs)
+		c.EnsureMinSize()
+		_, placed := c.nodeMap.Load(glow)
+		require.False(t, placed, "the walk did not take the tab out of the tree")
+	}
+	// tick is a consumer on its own clock: it applies its value only in sight.
+	tick := func(value color.Color) {
+		if c.InSight(glow) {
+			glow.FillColor = value
+		}
+	}
+
+	hideTab()
+	tick(color.Black)
+	require.Equal(t, color.White, glow.FillColor, "applied out of sight")
+	tabs.SelectIndex(0)
+	tick(color.Black) // the tick before the frame that draws the tab
+	assert.Equal(t, color.Black, glow.FillColor, "the first frame back draws the value from when the tab was hidden")
+	c.Refresh(tabs)
+	c.EnsureMinSize()
+	assert.True(t, c.InSight(glow), "in sight after the walk")
+
+	hideTab()
+	inner.Hide()
+	tabs.SelectIndex(0)
+	assert.False(t, c.InSight(glow), "under a container hidden while the tab was")
+	inner.Show()
+	assert.True(t, c.InSight(glow), "under that container shown again")
+
+	hideTab()
+	outer.Hide()
+	tabs.SelectIndex(0)
+	assert.False(t, c.InSight(glow), "selected again under tabs hidden")
+	outer.Show()
+	c.Refresh(outer)
+	c.EnsureMinSize()
+
+	hideTab()
+	inner.Objects = nil // moved away while hidden
+	tabs.SelectIndex(0)
+	assert.False(t, c.InSight(glow), "taken out from under the tab while it was hidden")
+	inner.Objects = []core.CanvasObject{glow}
+	c.Refresh(tabs)
+	c.EnsureMinSize()
+
+	hideTab()
+	tabs.Items[0].Content = widget.NewLabel("other")
+	content.Show() // shown, but no longer what the tab lists
+	assert.False(t, c.InSight(glow), "shown, but no longer listed by the tabs")
+}
+
+// TestInSightShownBeforeWalk: the same for an ancestor's Hide and Show, which
+// a walk skips rather than taking out of the tree.
+func TestInSightShownBeforeWalk(t *testing.T) {
+	test.NewTempApp(t)
+	glow := canvas.NewRectangle(color.White)
+	inner := container.NewStack(glow)
+	c := walkedCanvas(container.NewVBox(container.NewPadded(inner)))
+
+	inner.Hide()
+	c.Refresh(inner)
+	c.EnsureMinSize()
+	require.False(t, c.InSight(glow))
+	inner.Show()
+	assert.True(t, c.InSight(glow), "shown, before the walk that places it")
+}
+
+// BenchmarkInSightOnReturn is what #1069 adds to each IsOnScreen question
+// between a tab's selection and the walk that places its content: a walk of
+// the content's subtree, to the object asked about. The object is last, so
+// the walk goes through the whole content.
+func BenchmarkInSightOnReturn(b *testing.B) {
+	for _, rows := range []int{10, 100, 1000} {
+		b.Run(fmt.Sprintf("rows=%d", rows), func(b *testing.B) {
+			test.NewTempApp(b)
+			box := container.NewVBox()
+			for i := range rows {
+				box.Add(widget.NewLabel(fmt.Sprintf("row %d", i)))
+			}
+			glow := canvas.NewRectangle(color.White)
+			box.Add(glow)
+			tabs := container.NewAppTabs(
+				container.NewTabItem("Player", box),
+				container.NewTabItem("Library", widget.NewLabel("songs")),
+			)
+			c := walkedCanvas(tabs)
+			tabs.SelectIndex(1)
+			c.Refresh(tabs)
+			c.EnsureMinSize()
+			tabs.SelectIndex(0)
+			objects := 0
+			driver.WalkCompleteObjectTree(box, func(core.CanvasObject, geo.Position, geo.Position, geo.Size) bool {
+				objects++
+				return false
+			}, nil)
+			b.ReportMetric(float64(objects), "objects")
+			b.ReportAllocs()
+			b.ResetTimer()
+			for b.Loop() {
+				if !c.InSight(glow) {
+					b.Fatal("not in sight")
+				}
+			}
+		})
+	}
 }
