@@ -676,8 +676,17 @@ func (c *Canvas) MarkDirtyRect(pos geo.Position, size geo.Size) {
 // MarkFullRepaint tells PartialDirtyRegion that the frame being painted is a
 // full repaint that did not ask it for a region, so the bounds it recorded are
 // no longer those on screen.
+//
+// It also takes the nodes queued for a region walk, since this frame repaints
+// everything they could have reported. Only PartialDirtyRegion took them, and
+// after a mobile background→resume no frame asks it for a region again (the
+// mobile driver's surfaceShown, pre-rebrand tracker #342), so every node added
+// from then on stayed queued, with its object, for the life of the canvas: an
+// app rebuilding a tab bar ten times a second kept 26 MB of nodes in 26
+// minutes (daysong#365).
 func (c *Canvas) MarkFullRepaint() {
 	c.paintBoundsStale = true
+	clear(c.takePlaced())
 }
 
 // clampRect returns the size of the part of r inside a canvas of size canvas.
