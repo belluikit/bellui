@@ -1336,19 +1336,19 @@ func (c *Canvas) walkHidden(region bool, parent **RenderCacheNode) func(obj, _ c
 	case region:
 		// A hidden child that does not report placement would not report
 		// being shown either: its parent is walked every region (#599).
-		return func(obj, _ core.CanvasObject) {
+		return func(obj, parentObj core.CanvasObject) {
 			noteHiddenChild(*parent, obj)
-			c.noteOffscreen(obj)
+			c.noteOffscreen(obj, parentObj)
 		}
 	case build.PartialRepaint:
 		// Nor does one shown by its Hidden field: the other walks, the paint
 		// walk among them, record where it is (#619).
-		return func(obj, _ core.CanvasObject) {
+		return func(obj, parentObj core.CanvasObject) {
 			c.noteHidden(*parent, obj)
-			c.noteOffscreen(obj)
+			c.noteOffscreen(obj, parentObj)
 		}
 	}
-	return func(obj, _ core.CanvasObject) { c.noteOffscreen(obj) }
+	return func(obj, parentObj core.CanvasObject) { c.noteOffscreen(obj, parentObj) }
 }
 
 // addChild adds a node for obj to parent, after prev or first.
@@ -1456,7 +1456,11 @@ func (c *Canvas) forgetNodes(n *RenderCacheNode) {
 			c.nodeMap.Delete(n.obj)
 		}
 		if !n.obj.Visible() {
-			c.noteOffscreen(n.obj) // as an unselected tab's content leaves
+			var parent core.CanvasObject
+			if n.parent != nil {
+				parent = n.parent.obj
+			}
+			c.noteOffscreen(n.obj, parent) // as an unselected tab's content leaves
 		}
 		if build.PartialRepaint && n.lastPaintSet {
 			c.leftRegion.Union(padRect(n.lastPaintPos, n.lastPaintSize))
