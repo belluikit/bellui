@@ -5,7 +5,7 @@ go 1.26.2
 require (
 	github.com/belluikit/bellui v1.3.0-rc.1
 	github.com/belluikit/goffmpeg v0.7.1
-	github.com/ebitengine/oto/v3 v3.4.0
+	github.com/ebitengine/oto/v3 v3.5.1
 )
 
 require (
@@ -23,12 +23,13 @@ require (
 	github.com/belluikit/goffmpeg-libs/windows_amd64 v0.3.5 // indirect
 	github.com/belluikit/goffmpeg-libs/windows_arm64 v0.3.5 // indirect
 	github.com/belluikit/typesetting v0.3.6 // indirect
-	github.com/ebitengine/purego v0.10.0 // indirect
+	github.com/ebitengine/purego v0.11.0 // indirect
 	github.com/fredbi/uri v1.1.1 // indirect
 	github.com/go-gl/gl v0.0.0-20231021071112-07e5d0ea2e71 // indirect
 	github.com/hack-pad/go-indexeddb v0.3.2 // indirect
 	github.com/hack-pad/safejs v0.1.0 // indirect
 	github.com/jeandeaual/go-locale v0.0.0-20250612000132-0ef82f21eade // indirect
+	github.com/jfreymuth/pulse v0.1.3 // indirect
 	github.com/nicksnyder/go-i18n/v2 v2.5.1 // indirect
 	github.com/stretchr/testify v1.12.1 // indirect
 	github.com/trendvidia/protowire-go v1.16.0 // indirect
