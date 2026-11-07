@@ -1258,24 +1258,7 @@ func (c *Canvas) walkTreeFrom(
 		}
 	}
 	region := c.regionWalk == regionContent
-	var hidden func(obj, _ core.CanvasObject)
-	if region {
-		// A hidden child that does not report placement would not report
-		// being shown either: its parent is walked every region (#599).
-		hidden = func(obj, _ core.CanvasObject) { noteHiddenChild(parent, obj) }
-	} else if build.PartialRepaint {
-		// Nor does one shown by its Hidden field: the other walks, the paint
-		// walk among them, record where it is (#619).
-		hidden = func(obj, _ core.CanvasObject) { c.noteHidden(parent, obj) }
-	}
-	if note := hidden; note != nil {
-		hidden = func(obj, p core.CanvasObject) {
-			note(obj, p)
-			c.noteOffscreen(obj)
-		}
-	} else {
-		hidden = func(obj, _ core.CanvasObject) { c.noteOffscreen(obj) }
-	}
+	hidden := c.walkHidden(region, &parent)
 
 	bc := func(obj core.CanvasObject, pos geo.Position, clipPos geo.Position, clipSize geo.Size) bool {
 		if node != nil && node.obj != obj {
@@ -1343,6 +1326,29 @@ func (c *Canvas) walkTreeFrom(
 		node = node.nextSibling
 	}
 	driver.WalkVisibleSubtreeCulled(start.obj, parentObj, offset, clipPos, clipSize, start.walkXf(), cull, hidden, bc, ac)
+}
+
+// walkHidden is what a walk does with a hidden child it skips under *parent,
+// the node it is visiting: it records the child as out of sight (#1061), and
+// where it is for the partial-repaint region.
+func (c *Canvas) walkHidden(region bool, parent **RenderCacheNode) func(obj, _ core.CanvasObject) {
+	switch {
+	case region:
+		// A hidden child that does not report placement would not report
+		// being shown either: its parent is walked every region (#599).
+		return func(obj, _ core.CanvasObject) {
+			noteHiddenChild(*parent, obj)
+			c.noteOffscreen(obj)
+		}
+	case build.PartialRepaint:
+		// Nor does one shown by its Hidden field: the other walks, the paint
+		// walk among them, record where it is (#619).
+		return func(obj, _ core.CanvasObject) {
+			c.noteHidden(*parent, obj)
+			c.noteOffscreen(obj)
+		}
+	}
+	return func(obj, _ core.CanvasObject) { c.noteOffscreen(obj) }
 }
 
 // addChild adds a node for obj to parent, after prev or first.
