@@ -35,6 +35,14 @@ type AppTabs struct {
 	OnSelected   func(*TabItem) `json:"-"`
 	OnUnselected func(*TabItem) `json:"-"`
 
+	// DragToSelect lets the user drag along the tab titles to move the
+	// selection indicator. The indicator follows the pointer, and on release
+	// the nearest enabled tab is selected. Tapping a title still selects it.
+	// Call Refresh after changing it.
+	//
+	// Since: 1.3
+	DragToSelect bool
+
 	current         int
 	location        TabLocation
 	isTransitioning bool
@@ -66,6 +74,7 @@ func (t *AppTabs) CreateRenderer() core.WidgetRenderer {
 		appTabs: t,
 	}
 	r.action = r.buildOverflowTabsButton()
+	r.dragSurface = newTabDragSurface(r)
 	r.tabs = t
 
 	// Initially setup the tab bar to only show one tab, all others will be in overflow.
@@ -223,6 +232,9 @@ var _ core.WidgetRenderer = (*appTabsRenderer)(nil)
 type appTabsRenderer struct {
 	baseTabsRenderer
 	appTabs *AppTabs
+
+	dragSurface *tabDragSurface
+	drag        tabDrag
 }
 
 func (r *appTabsRenderer) Layout(size geo.Size) {
@@ -248,7 +260,12 @@ func (r *appTabsRenderer) Layout(size geo.Size) {
 	}
 
 	r.layout(r.appTabs, size)
-	r.updateIndicator(r.appTabs.transitioning())
+	r.layoutDragSurface()
+	if r.drag.active {
+		r.placeDragIndicator()
+	} else {
+		r.updateIndicator(r.appTabs.transitioning())
+	}
 	if r.appTabs.transitioning() {
 		r.appTabs.setTransitioning(false)
 	}
@@ -259,7 +276,12 @@ func (r *appTabsRenderer) MinSize() geo.Size {
 }
 
 func (r *appTabsRenderer) Objects() []core.CanvasObject {
-	return r.objects(r.appTabs)
+	objects := r.objects(r.appTabs)
+	if r.appTabs.DragToSelect {
+		// First, so it is under the tab buttons: a tap passes it to the button.
+		objects = append([]core.CanvasObject{r.dragSurface}, objects...)
+	}
+	return objects
 }
 
 func (r *appTabsRenderer) Refresh() {
@@ -365,39 +387,46 @@ func (r *appTabsRenderer) updateIndicator(animate bool) {
 	var selectedPos geo.Position
 	var selectedSize geo.Size
 
-	buttons := r.bar.Objects[0].(*bellui.Container).Objects
-	if r.appTabs.current >= len(buttons) {
+	// Positions are taken through the bar and the buttons' container: in a
+	// right-to-left layout the overflow button comes before the tab buttons.
+	buttons := r.bar.Objects[0].(*bellui.Container)
+	if r.appTabs.current >= len(buttons.Objects) {
 		if a := r.action; a != nil {
-			selectedPos = a.Position()
+			selectedPos = r.bar.Position().Add(a.Position())
 			selectedSize = a.Size()
 		}
 	} else {
-		selected := buttons[r.appTabs.current]
-		selectedPos = selected.Position()
+		selected := buttons.Objects[r.appTabs.current]
+		selectedPos = r.bar.Position().Add(buttons.Position()).Add(selected.Position())
 		selectedSize = selected.Size()
 	}
 
-	var indicatorPos geo.Position
-	var indicatorSize geo.Size
-	th := r.appTabs.Theme()
-	pad := th.Size(theme.SizeNamePadding)
-
-	switch r.appTabs.location {
-	case TabLocationTop:
-		indicatorPos = geo.NewPos(selectedPos.X, r.bar.MinSize().Height)
-		indicatorSize = geo.NewSize(selectedSize.Width, pad)
-	case TabLocationLeading:
-		indicatorPos = geo.NewPos(r.bar.MinSize().Width, selectedPos.Y)
-		indicatorSize = geo.NewSize(pad, selectedSize.Height)
-	case TabLocationBottom:
-		indicatorPos = geo.NewPos(selectedPos.X, r.bar.Position().Y-pad)
-		indicatorSize = geo.NewSize(selectedSize.Width, pad)
-	case TabLocationTrailing:
-		indicatorPos = geo.NewPos(r.bar.Position().X-pad, selectedPos.Y)
-		indicatorSize = geo.NewSize(pad, selectedSize.Height)
+	start, length := selectedPos.X, selectedSize.Width
+	if r.verticalBar() {
+		start, length = selectedPos.Y, selectedSize.Height
 	}
+	indicatorPos, indicatorSize := r.indicatorRect(start, length)
+	r.moveIndicator(indicatorPos, indicatorSize, r.appTabs.Theme(), animate)
+}
 
-	r.moveIndicator(indicatorPos, indicatorSize, th, animate)
+// indicatorRect places the indicator along the tab bar: start and length are
+// measured along the bar's axis, and the indicator sits on the content side.
+func (r *appTabsRenderer) indicatorRect(start, length float32) (geo.Position, geo.Size) {
+	pad := r.appTabs.Theme().Size(theme.SizeNamePadding)
+	switch r.appTabs.location {
+	case TabLocationLeading:
+		return geo.NewPos(r.bar.MinSize().Width, start), geo.NewSize(pad, length)
+	case TabLocationBottom:
+		return geo.NewPos(start, r.bar.Position().Y-pad), geo.NewSize(length, pad)
+	case TabLocationTrailing:
+		return geo.NewPos(r.bar.Position().X-pad, start), geo.NewSize(pad, length)
+	default: // TabLocationTop
+		return geo.NewPos(start, r.bar.MinSize().Height), geo.NewSize(length, pad)
+	}
+}
+
+func (r *appTabsRenderer) verticalBar() bool {
+	return r.appTabs.location == TabLocationLeading || r.appTabs.location == TabLocationTrailing
 }
 
 func (r *appTabsRenderer) updateTabs(max int) {
