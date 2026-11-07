@@ -427,3 +427,11 @@ func (t *tracker) startSession() {
 	t.mu.Unlock()
 	t.Track("session_start", nil)
 }
+
+// reset forgets the app's identity and rotates the session id (see [Reset]).
+func (t *tracker) reset() {
+	t.mu.Lock()
+	t.userID = ""
+	t.sessionID = t.newSessionID()
+	t.mu.Unlock()
+}

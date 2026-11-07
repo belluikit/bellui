@@ -505,3 +505,49 @@ func TestSpoolCacheStaysInStep(t *testing.T) {
 		check(step)
 	}
 }
+
+// TestResetForgetsIdentity pins Reset (#1076): after it, events carry no user
+// id and a new session id, so they are not linked to the identified ones;
+// events queued before it keep the identity; Reset itself queues nothing.
+func TestResetForgetsIdentity(t *testing.T) {
+	sink := newFakeSink()
+	tr, _, _, flushCh := newTestTracker(t, sink, WithBatchSize(1000))
+	tr.SetEnabled(true)
+
+	tr.Identify("p-1", nil)
+	tr.Track("before", nil)
+	before := tr.sessionID
+	tr.mu.Lock()
+	queued := len(tr.queue)
+	tr.mu.Unlock()
+
+	Reset(tr)
+	tr.mu.Lock()
+	assert.Len(t, tr.queue, queued, "Reset queues nothing")
+	tr.mu.Unlock()
+	tr.Track("after", nil)
+	require.NoError(t, tr.Flush())
+	drain(flushCh)
+
+	byName := map[string]Event{}
+	for _, e := range sink.allEvents() {
+		byName[e.Name] = e
+	}
+	require.Contains(t, byName, "before")
+	require.Contains(t, byName, "after")
+	assert.Equal(t, "p-1", byName["before"].UserID, "an event queued before Reset keeps its identity")
+	assert.Empty(t, byName["after"].UserID, "no identity after Reset")
+	assert.NotEqual(t, before, byName["after"].SessionID, "a new session id after Reset")
+	assert.NotEmpty(t, byName["after"].SessionID)
+
+	// Disabled: Reset still forgets, and still queues nothing.
+	tr.Identify("p-2", nil)
+	tr.SetEnabled(false)
+	Reset(tr)
+	tr.mu.Lock()
+	assert.Empty(t, tr.userID, "Reset forgets while disabled")
+	assert.Empty(t, tr.queue)
+	tr.mu.Unlock()
+
+	Reset(nopTracker{}) // a tracker not from New is ignored
+}
