@@ -35,6 +35,14 @@ type AppTabs struct {
 	OnSelected   func(*TabItem) `json:"-"`
 	OnUnselected func(*TabItem) `json:"-"`
 
+	// DragToSelect lets the user drag along the tab titles to move the
+	// selection indicator. The indicator follows the pointer, and on release
+	// the nearest enabled tab is selected. Tapping a title still selects it.
+	// Call Refresh after changing it.
+	//
+	// Since: 1.3
+	DragToSelect bool
+
 	current         int
 	location        TabLocation
 	isTransitioning bool
@@ -66,6 +74,7 @@ func (t *AppTabs) CreateRenderer() core.WidgetRenderer {
 		appTabs: t,
 	}
 	r.action = r.buildOverflowTabsButton()
+	r.dragSurface = newTabDragSurface(r)
 	r.tabs = t
 
 	// Initially setup the tab bar to only show one tab, all others will be in overflow.
@@ -223,6 +232,9 @@ var _ core.WidgetRenderer = (*appTabsRenderer)(nil)
 type appTabsRenderer struct {
 	baseTabsRenderer
 	appTabs *AppTabs
+
+	dragSurface *tabDragSurface
+	drag        tabDrag
 }
 
 func (r *appTabsRenderer) Layout(size geo.Size) {
@@ -248,7 +260,12 @@ func (r *appTabsRenderer) Layout(size geo.Size) {
 	}
 
 	r.layout(r.appTabs, size)
-	r.updateIndicator(r.appTabs.transitioning())
+	r.layoutDragSurface()
+	if r.drag.active {
+		r.placeDragIndicator()
+	} else {
+		r.updateIndicator(r.appTabs.transitioning())
+	}
 	if r.appTabs.transitioning() {
 		r.appTabs.setTransitioning(false)
 	}
@@ -259,7 +276,12 @@ func (r *appTabsRenderer) MinSize() geo.Size {
 }
 
 func (r *appTabsRenderer) Objects() []core.CanvasObject {
-	return r.objects(r.appTabs)
+	objects := r.objects(r.appTabs)
+	if r.appTabs.DragToSelect {
+		// First, so it is under the tab buttons: a tap passes it to the button.
+		objects = append([]core.CanvasObject{r.dragSurface}, objects...)
+	}
+	return objects
 }
 
 func (r *appTabsRenderer) Refresh() {
