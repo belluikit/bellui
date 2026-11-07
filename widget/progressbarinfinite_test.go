@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/cache"
@@ -79,6 +80,7 @@ func TestProgressBarInfinite_Reshown(t *testing.T) {
 func TestInfiniteProgressRenderer_Layout(t *testing.T) {
 	bar := NewProgressBarInfinite()
 	width := float32(100.0)
+	test.NewTempWindow(t, &bellui.Container{Objects: []core.CanvasObject{bar}}) // drawn: on screen
 	bar.Resize(geo.NewSize(width, 10))
 
 	render := test.TempWidgetRenderer(t, bar).(*infProgressRenderer)
@@ -119,4 +121,33 @@ func TestProgressBarInfinite_Animates(t *testing.T) {
 
 	bar.Show()
 	assert.True(t, r.wasRunning, "a re-shown bar animates again")
+}
+
+// TestInfiniteProgressRenderer_OutOfSightDrawsNothing is #1061: under a hidden
+// container, or in no window at all, the animation's ticks move nothing, and
+// once shown the next tick puts the bar where the animation is.
+func TestInfiniteProgressRenderer_OutOfSightDrawsNothing(t *testing.T) {
+	bar := NewProgressBarInfinite()
+	width := float32(100.0)
+	box := &bellui.Container{Objects: []core.CanvasObject{bar}}
+	test.NewTempWindow(t, box)
+	bar.Resize(geo.NewSize(width, 10))
+	render := test.TempWidgetRenderer(t, bar).(*infProgressRenderer)
+	render.updateBar(0.0)
+	start := render.bar.Size()
+
+	box.Hide()
+	assert.True(t, bar.Visible(), "the bar itself is not hidden, only its container")
+	render.updateBar(0.5)
+	assert.Equal(t, start, render.bar.Size(), "a tick out of sight moved the bar")
+
+	box.Show()
+	render.updateBar(0.5)
+	assert.Equal(t, width*maxProgressBarInfiniteWidthRatio, render.bar.Size().Width, "the first tick seen again did not draw")
+
+	loose := NewProgressBarInfinite()
+	loose.Resize(geo.NewSize(width, 10))
+	lr := test.TempWidgetRenderer(t, loose).(*infProgressRenderer)
+	lr.updateBar(0.5)
+	assert.Zero(t, lr.bar.Size().Width, "a bar in no window was drawn")
 }
