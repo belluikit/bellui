@@ -33,9 +33,10 @@ type CanvasRegistration struct{ info *canvasInfo }
 // Current reports whether the entry still maps its object to c and has not
 // expired. Such an entry cannot have been deleted: Clean deletes only entries
 // that expired before the clock sample it cuts off at, which is never later
-// than the one read here, and CleanCanvas only the entries of a canvas being
-// closed, whose walks end with it. Nor replaced: moving an object to another
-// canvas expires the entry it replaces.
+// than the one read here, CleanCanvas only the entries of a canvas being
+// closed, whose walks end with it, and ReleaseObject expires the entry it
+// deletes. Nor replaced: moving an object to another canvas expires the entry
+// it replaces.
 func (r CanvasRegistration) Current(c core.Canvas) bool {
 	return r.info != nil && r.info.canvas == c && r.info.expires.Load() >= cachedNow.Load()
 }
@@ -75,6 +76,60 @@ func setCanvasForObject(obj core.CanvasObject, c core.Canvas, setup func()) *can
 		setup()
 	}
 	return cinfo
+}
+
+// ReleaseObject drops what the caches hold for obj on canvas c, as CleanCanvas
+// does for every object of a closing canvas: its canvas-map entry and, for a
+// widget, its renderer. A canvas calls it for content it replaced and no
+// longer shows, which would otherwise stay until a Clean after a paint a
+// minute later, and an idle app makes no such paint (#1075). An object the map
+// gives to another canvas is shown there, and is left alone.
+func ReleaseObject(obj core.CanvasObject, c core.Canvas) {
+	if cinfo, ok := canvases.Load(obj); ok {
+		if cinfo.canvas != c {
+			return
+		}
+		canvases.Delete(obj)
+		cinfo.expires.Store(0) // see CanvasRegistration.Current
+	}
+	if wid, ok := obj.(core.Widget); ok {
+		DestroyRenderer(wid)
+		return
+	}
+	DeleteOverride(obj)
+}
+
+// ReleaseUnkept releases, as ReleaseObject does, what the caches hold for
+// every object keep does not report, except what the canvas map gives to a
+// canvas other than c (#1075). c calls it when it has replaced content, with
+// keep reporting what its trees still hold: the objects of the replaced
+// content are then let go of at once, where a Clean waits for a paint a
+// minute later. That includes what a widget holds outside its renderer's
+// objects, which no walk from the replaced root reaches, such as the rows a
+// list keeps for reuse or the buttons tabs measure.
+//
+// A renderer whose widget no canvas has registered goes too: a widget the app
+// keeps off screen, such as a pop-up it shows again, then gets a new renderer
+// when it is next shown, as it does today after ValidDuration unshown.
+func ReleaseUnkept(c core.Canvas, keep func(core.CanvasObject) bool) {
+	var gone []core.CanvasObject
+	canvases.Range(func(obj core.CanvasObject, cinfo *canvasInfo) bool {
+		if cinfo.canvas == c && !keep(obj) {
+			gone = append(gone, obj)
+		}
+		return true
+	})
+	renderers.Range(func(wid core.Widget, _ *rendererInfo) bool {
+		if _, registered := canvases.Load(wid); !registered && !keep(wid) {
+			gone = append(gone, wid)
+		}
+		return true
+	})
+	// Release only after both ranges, as a renderer's Destroy may change the
+	// maps.
+	for _, obj := range gone {
+		ReleaseObject(obj, c)
+	}
 }
 
 type canvasInfo struct {

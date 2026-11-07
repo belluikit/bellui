@@ -5,6 +5,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/belluikit/bellui/core"
 )
 
 func TestSetCanvasForObject(t *testing.T) {
@@ -93,4 +95,37 @@ func TestCanvasRegistrationCurrent(t *testing.T) {
 	reg = RegisterCanvasForObject(obj, c, nil)
 	assert.True(t, reg.Current(c))
 	assert.Equal(t, c, GetCanvasForObject(obj))
+}
+
+// TestReleaseUnkept is #1075: what keep does not report is released, from the
+// canvas map and the renderers, unless the map gives it to another canvas.
+func TestReleaseUnkept(t *testing.T) {
+	testClearAll()
+	t.Cleanup(testClearAll)
+	c, other := &dummyCanvas{}, &dummyCanvas{}
+	destroyed := map[string]bool{}
+	widget := func(name string) *dummyWidget {
+		return &dummyWidget{onDestroy: func() { destroyed[name] = true }}
+	}
+	kept, gone, elsewhere, unregistered := widget("kept"), widget("gone"), widget("elsewhere"), widget("unregistered")
+	for _, w := range []*dummyWidget{kept, gone, elsewhere, unregistered} {
+		Renderer(w)
+	}
+	SetCanvasForObject(kept, c, nil)
+	SetCanvasForObject(gone, c, nil)
+	SetCanvasForObject(elsewhere, other, nil)
+	reg := RegisterCanvasForObject(gone, c, nil)
+	require.True(t, reg.Current(c))
+
+	ReleaseUnkept(c, func(o core.CanvasObject) bool { return o == kept })
+
+	assert.Equal(t, map[string]bool{"gone": true, "unregistered": true}, destroyed)
+	assert.Equal(t, core.Canvas(c), GetCanvasForObject(kept))
+	assert.Nil(t, GetCanvasForObject(gone))
+	assert.Equal(t, core.Canvas(other), GetCanvasForObject(elsewhere))
+	assert.True(t, IsRendered(kept))
+	assert.True(t, IsRendered(elsewhere))
+	assert.False(t, IsRendered(gone))
+	assert.False(t, IsRendered(unregistered))
+	assert.False(t, reg.Current(c), "a walk holding the released entry takes it as current")
 }

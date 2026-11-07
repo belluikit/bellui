@@ -12,7 +12,6 @@ import (
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/core"
-	"github.com/belluikit/bellui/internal/cache"
 	"github.com/belluikit/bellui/test"
 	"github.com/belluikit/bellui/widget"
 )
@@ -55,12 +54,6 @@ func TestOffscreenLetsGoOfReplacedContent(t *testing.T) {
 	assert.Zero(t, held, "the replaced content's entries are still in the offscreen map")
 	w := weak.Make(glow)
 	glow, inner = nil, nil
-	runtime.GC()
-	runtime.GC()
-	// Pinned: the cache's canvas map still holds the replaced content, until
-	// a Clean after a paint a minute on (#1075). Nothing else may.
-	assert.NotNil(t, w.Value(), "the canvas map no longer holds the replaced content: update #1075")
-	cache.CleanCanvas(c.impl)
 	runtime.GC()
 	runtime.GC()
 	assert.Nil(t, w.Value(), "the hidden object of the replaced content is still reachable")
