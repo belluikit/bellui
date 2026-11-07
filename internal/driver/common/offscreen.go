@@ -23,9 +23,14 @@ const offscreenKeep = time.Minute
 // offscreenAt is the hidden object that obj sits under, obj itself if it is
 // that object, the object that hidden one was a child of when a walk found it
 // (nil for a tree's root), and when a walk or a refresh last found it there.
+// sweptGen and inTree are what the sweep after the full walk numbered
+// sweptGen found of parent (inTree), kept so that it asks once per hidden
+// object rather than once per object under it.
 type offscreenAt struct {
 	top, parent core.CanvasObject
 	seen        atomic.Int64 // UnixNano
+	sweptGen    uint64
+	inTree      bool
 }
 
 // noteOffscreen records that top, a child of parent, is hidden and out of
@@ -78,8 +83,13 @@ func (c *Canvas) isOffscreen(obj core.CanvasObject) bool {
 
 // sweepOffscreen runs after the full walk numbered gen. It forgets the hidden
 // objects that walk did not skip, so the next walk to find one records its
-// subtree again, and drops the objects whose hidden object is shown or that
-// nothing found for offscreenKeep.
+// subtree again, and drops the objects whose hidden object is shown, that
+// nothing found for offscreenKeep, or whose hidden object's parent left the
+// trees (#1074). That last is how replaced content goes: the walk of the
+// frame that shows the new content drops it, where waiting out offscreenKeep
+// needs a walk a minute later, which an idle app does not make. All are asked
+// before any is dropped, as whether one is in the trees can go through
+// another's entry.
 func (c *Canvas) sweepOffscreen(gen uint64) {
 	c.offscreenTops.Range(func(top core.CanvasObject, at uint64) bool {
 		if at != gen {
@@ -87,13 +97,39 @@ func (c *Canvas) sweepOffscreen(gen uint64) {
 		}
 		return true
 	})
+	c.offscreen.Range(func(_ core.CanvasObject, at *offscreenAt) bool {
+		c.offscreenInTree(at, gen, 0)
+		return true
+	})
 	stale := time.Now().Add(-offscreenKeep).UnixNano()
 	c.offscreen.Range(func(obj core.CanvasObject, at *offscreenAt) bool {
-		if at.seen.Load() < stale || at.top.Visible() {
+		if !at.inTree || at.seen.Load() < stale || at.top.Visible() {
 			c.offscreen.Delete(obj)
 		}
 		return true
 	})
+}
+
+// offscreenInTree reports whether at's hidden object is still a child of an
+// object in this canvas' trees, as the full walk numbered gen left them: its
+// parent is placed, or is itself recorded under a hidden object that is, as
+// a hidden object inside an unselected tab's content is. A tree's root has no
+// parent to ask, and is kept until offscreenKeep. depth stops a cycle, which
+// only entries recorded at different times could make.
+func (c *Canvas) offscreenInTree(at *offscreenAt, gen uint64, depth int) bool {
+	if at.sweptGen == gen {
+		return at.inTree
+	}
+	in := at.parent == nil
+	if !in {
+		if _, placed := c.nodeMap.Load(at.parent); placed {
+			in = true
+		} else if up, ok := c.offscreen.Load(at.parent); ok && up != at && depth < 64 {
+			in = c.offscreenInTree(up, gen, depth+1)
+		}
+	}
+	at.sweptGen, at.inTree = gen, in
+	return in
 }
 
 // InSight reports whether obj is in sight in this canvas' trees: the last walk

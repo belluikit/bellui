@@ -12,6 +12,7 @@ import (
 	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/cache"
 	"github.com/belluikit/bellui/test"
 )
 
@@ -32,6 +33,7 @@ func TestCanvas_nodeMapForgetsRemovedContent(t *testing.T) {
 
 	c.SetContentTreeAndFocusMgr(container.NewVBox(canvas.NewRectangle(color.Gray16{Y: 2})))
 	c.WalkTrees(nil, nil)
+	c.MarkFullRepaint() // as the frame's paint takes the nodes queued for a region
 
 	stale := 0
 	c.nodeMap.Range(func(obj core.CanvasObject, _ *RenderCacheNode) bool {
@@ -44,9 +46,11 @@ func TestCanvas_nodeMapForgetsRemovedContent(t *testing.T) {
 
 	w := weak.Make(old)
 	old = nil
+	cache.CleanCanvas(c.impl) // the cache's canvas map holds it apart from c (#1075)
 	runtime.GC()
 	runtime.GC()
 	assert.Nil(t, w.Value(), "removed object is still reachable after GC")
+	runtime.KeepAlive(c) // or the canvas, and all it holds, is collected with it
 }
 
 // sizedCanvas gives Canvas the SizeableCanvas it needs for the spatial index.
