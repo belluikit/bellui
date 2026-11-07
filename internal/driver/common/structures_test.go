@@ -2,7 +2,9 @@ package common
 
 import (
 	"runtime"
+	"sync/atomic"
 	"testing"
+	"weak"
 
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/core"
@@ -127,4 +129,23 @@ func TestOverlayStack(t *testing.T) {
 	stack.Remove(nil)
 	assert.Zero(t, len(stack.List()))
 	assert.Zero(t, len(stack.renderCaches))
+}
+
+// TestNodeQueueLetsGoOfTakenNodes is #1075: the nodes take returned are not
+// held once the next take has handed their slice back, though nothing is
+// queued after it. An idle app queues nothing.
+func TestNodeQueueLetsGoOfTakenNodes(t *testing.T) {
+	var q nodeQueue
+	var queued atomic.Bool
+	obj := &bellui.Container{}
+	q.add(&RenderCacheNode{obj: obj}, &queued)
+	assert.Len(t, q.take(), 1)
+	assert.Empty(t, q.take())
+
+	w := weak.Make(obj)
+	obj = nil
+	runtime.GC()
+	runtime.GC()
+	assert.Nil(t, w.Value(), "a taken node is still held by the queue")
+	runtime.KeepAlive(&q)
 }

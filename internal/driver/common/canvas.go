@@ -176,6 +176,10 @@ type Canvas struct {
 	// frame (#1061).
 	offscreenTops async.Map[core.CanvasObject, uint64]
 	offscreen     async.Map[core.CanvasObject, *offscreenAt]
+	// replaced says a tree was replaced since the last full walk, for it to
+	// release what the replaced one held (releaseReplaced, #1075). Like the
+	// trees, it is set and read on the main goroutine.
+	replaced bool
 	// regionVisits counts the nodes the last PartialDirtyRegion visited.
 	regionVisits int
 }
@@ -915,6 +919,7 @@ func (c *Canvas) SetDirection(d bellui.Direction) {
 // This function does not use the canvas lock.
 func (c *Canvas) SetContentTreeAndFocusMgr(content core.CanvasObject) {
 	dirhook.Changed() // the content may enter or leave a scope (#749)
+	c.noteReplaced(c.contentTree, content)
 	c.contentTree = &renderCacheTree{root: &RenderCacheNode{obj: content}}
 	c.minSizeFull.Store(true)
 	c.placeAll.Store(true)
@@ -955,6 +960,7 @@ func (c *Canvas) IsDirty() bool {
 //
 // This function does not use the canvas lock.
 func (c *Canvas) SetMenuTreeAndFocusMgr(menu core.CanvasObject) {
+	c.noteReplaced(c.menuTree, menu)
 	c.menuTree = &renderCacheTree{root: &RenderCacheNode{obj: menu}}
 	c.placeAll.Store(true)
 	if menu != nil {
@@ -968,6 +974,7 @@ func (c *Canvas) SetMenuTreeAndFocusMgr(menu core.CanvasObject) {
 //
 // This function does not use the canvas lock.
 func (c *Canvas) SetMobileWindowHeadTree(head core.CanvasObject) {
+	c.noteReplaced(c.mWindowHeadTree, head)
 	c.mWindowHeadTree = &renderCacheTree{root: &RenderCacheNode{obj: head}}
 	c.placeAll.Store(true)
 }
@@ -1016,6 +1023,7 @@ func (c *Canvas) WalkTrees(
 		return true
 	})
 	c.sweepOffscreen(gen)
+	c.releaseReplaced()
 }
 
 // WalkContentTrees walks content, window head, and menu trees (not overlays).

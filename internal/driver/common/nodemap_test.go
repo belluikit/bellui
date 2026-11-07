@@ -12,7 +12,6 @@ import (
 	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
-	"github.com/belluikit/bellui/internal/cache"
 	"github.com/belluikit/bellui/test"
 )
 
@@ -46,7 +45,6 @@ func TestCanvas_nodeMapForgetsRemovedContent(t *testing.T) {
 
 	w := weak.Make(old)
 	old = nil
-	cache.CleanCanvas(c.impl) // the cache's canvas map holds it apart from c (#1075)
 	runtime.GC()
 	runtime.GC()
 	assert.Nil(t, w.Value(), "removed object is still reachable after GC")

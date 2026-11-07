@@ -2,7 +2,9 @@ package async_test
 
 import (
 	"image/color"
+	"runtime"
 	"testing"
+	"weak"
 
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
@@ -63,5 +65,26 @@ func TestQueue(t *testing.T) {
 				t.Fatalf("input does not match output, want %+v, got %+v", want[i], x[i])
 			}
 		}
+	})
+
+	// #1075: a value Out returned is not held by the queue, though nothing is
+	// queued after it. The head used to keep the last, and an idle app
+	// refreshes nothing more.
+	t.Run("lets go of what it returned", func(t *testing.T) {
+		q := async.NewCanvasObjectQueue()
+		a, b := canvas.NewRectangle(color.Black), canvas.NewRectangle(color.White)
+		q.In(a)
+		q.In(b)
+		q.Out()
+		q.Out()
+
+		wa, wb := weak.Make(a), weak.Make(b)
+		a, b = nil, nil
+		runtime.GC()
+		runtime.GC()
+		if wa.Value() != nil || wb.Value() != nil {
+			t.Fatalf("a returned value is still held: first %v, last %v", wa.Value() != nil, wb.Value() != nil)
+		}
+		runtime.KeepAlive(q)
 	})
 }

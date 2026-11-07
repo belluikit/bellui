@@ -58,7 +58,12 @@ func (q *CanvasObjectQueue) In(v core.CanvasObject) {
 }
 
 // Out removes and returns the value at the head of the queue.
-// It returns nil if the queue is empty.
+// It returns nil if the queue is empty. It may be called from one goroutine at
+// a time: In from any number.
+//
+// The item it takes the value from becomes the queue's head, and it lets go of
+// the value: a head that kept it held the last object refreshed, so the last
+// screen an idle app showed, until the next refresh (#1075).
 func (q *CanvasObjectQueue) Out() core.CanvasObject {
 	var first, last, firstnext *itemCanvasObject
 	for {
@@ -75,6 +80,7 @@ func (q *CanvasObjectQueue) Out() core.CanvasObject {
 			} else {
 				v := firstnext.v
 				if q.head.CompareAndSwap(first, firstnext) {
+					firstnext.v = nil // only Out reads it, and In wrote it before linking
 					q.len.Add(^uint64(0))
 					itemCanvasObjectPool.Put(first)
 					return v
