@@ -365,39 +365,46 @@ func (r *appTabsRenderer) updateIndicator(animate bool) {
 	var selectedPos geo.Position
 	var selectedSize geo.Size
 
-	buttons := r.bar.Objects[0].(*bellui.Container).Objects
-	if r.appTabs.current >= len(buttons) {
+	// Positions are taken through the bar and the buttons' container: in a
+	// right-to-left layout the overflow button comes before the tab buttons.
+	buttons := r.bar.Objects[0].(*bellui.Container)
+	if r.appTabs.current >= len(buttons.Objects) {
 		if a := r.action; a != nil {
-			selectedPos = a.Position()
+			selectedPos = r.bar.Position().Add(a.Position())
 			selectedSize = a.Size()
 		}
 	} else {
-		selected := buttons[r.appTabs.current]
-		selectedPos = selected.Position()
+		selected := buttons.Objects[r.appTabs.current]
+		selectedPos = r.bar.Position().Add(buttons.Position()).Add(selected.Position())
 		selectedSize = selected.Size()
 	}
 
-	var indicatorPos geo.Position
-	var indicatorSize geo.Size
-	th := r.appTabs.Theme()
-	pad := th.Size(theme.SizeNamePadding)
-
-	switch r.appTabs.location {
-	case TabLocationTop:
-		indicatorPos = geo.NewPos(selectedPos.X, r.bar.MinSize().Height)
-		indicatorSize = geo.NewSize(selectedSize.Width, pad)
-	case TabLocationLeading:
-		indicatorPos = geo.NewPos(r.bar.MinSize().Width, selectedPos.Y)
-		indicatorSize = geo.NewSize(pad, selectedSize.Height)
-	case TabLocationBottom:
-		indicatorPos = geo.NewPos(selectedPos.X, r.bar.Position().Y-pad)
-		indicatorSize = geo.NewSize(selectedSize.Width, pad)
-	case TabLocationTrailing:
-		indicatorPos = geo.NewPos(r.bar.Position().X-pad, selectedPos.Y)
-		indicatorSize = geo.NewSize(pad, selectedSize.Height)
+	start, length := selectedPos.X, selectedSize.Width
+	if r.verticalBar() {
+		start, length = selectedPos.Y, selectedSize.Height
 	}
+	indicatorPos, indicatorSize := r.indicatorRect(start, length)
+	r.moveIndicator(indicatorPos, indicatorSize, r.appTabs.Theme(), animate)
+}
 
-	r.moveIndicator(indicatorPos, indicatorSize, th, animate)
+// indicatorRect places the indicator along the tab bar: start and length are
+// measured along the bar's axis, and the indicator sits on the content side.
+func (r *appTabsRenderer) indicatorRect(start, length float32) (geo.Position, geo.Size) {
+	pad := r.appTabs.Theme().Size(theme.SizeNamePadding)
+	switch r.appTabs.location {
+	case TabLocationLeading:
+		return geo.NewPos(r.bar.MinSize().Width, start), geo.NewSize(pad, length)
+	case TabLocationBottom:
+		return geo.NewPos(start, r.bar.Position().Y-pad), geo.NewSize(length, pad)
+	case TabLocationTrailing:
+		return geo.NewPos(r.bar.Position().X-pad, start), geo.NewSize(pad, length)
+	default: // TabLocationTop
+		return geo.NewPos(start, r.bar.MinSize().Height), geo.NewSize(length, pad)
+	}
+}
+
+func (r *appTabsRenderer) verticalBar() bool {
+	return r.appTabs.location == TabLocationLeading || r.appTabs.location == TabLocationTrailing
 }
 
 func (r *appTabsRenderer) updateTabs(max int) {
