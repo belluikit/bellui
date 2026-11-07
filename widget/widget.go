@@ -270,6 +270,10 @@ func (w *BaseWidget) Hide() {
 //     method is called to sync public fields to internal rendering state
 //  3. Renderer.Refresh — the renderer updates canvas objects from state
 //
+// A widget that implements [core.Transformable] is redrawn under the
+// transform it reports now, so a widget that changes its transform calls
+// Refresh.
+//
 // Widgets should implement [StateSyncer] instead of overriding Refresh()
 // to ensure state is always synced before rendering.
 func (w *BaseWidget) Refresh() {
@@ -305,6 +309,14 @@ func (w *BaseWidget) Refresh() {
 	// widget's own min size may have changed too (#464).
 	if m, ok := cache.GetCanvasForObject(impl).(interface{ MarkMinSizeDirty(core.CanvasObject) }); ok {
 		m.MarkMinSizeDirty(impl)
+	}
+
+	// 5. Nor does the renderer report the widget's own transform, which only
+	// a walk from the widget reads again: without this a widget outside
+	// Bellui, which cannot count in paintgen as a canvas object's
+	// SetTransform does, never had a new transform drawn (#1072).
+	if _, ok := impl.(core.Transformable); ok {
+		internalWidget.Repaint(impl)
 	}
 }
 
