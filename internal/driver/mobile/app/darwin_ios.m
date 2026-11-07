@@ -157,12 +157,8 @@ void belluiKeyboardExpectRaise(void) {
 
 @implementation GoAppAppDelegate
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
-    int scale = 1;
-    if ([[UIScreen mainScreen] respondsToSelector:@selector(displayLinkWithTarget:selector:)]) {
-		scale = (int)[UIScreen mainScreen].scale; // either 1.0, 2.0, or 3.0.
-	}
     CGSize size = [UIScreen mainScreen].nativeBounds.size;
-    setDisplayMetrics((int)size.width, (int)size.height, scale);
+    setDisplayMetrics((int)size.width, (int)size.height, (int)[UIScreen mainScreen].nativeScale);
 
 	lifecycleAlive();
 	self.window = [[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
@@ -372,11 +368,10 @@ continueUserActivity:(NSUserActivity *)userActivity
 	//self.resumeOnDidBecomeActive = NO;
 	//self.preferredFramesPerSecond = 0;
 
-	int scale = 1;
-	if ([[UIScreen mainScreen] respondsToSelector:@selector(displayLinkWithTarget:selector:)]) {
-		scale = (int)[UIScreen mainScreen].scale; // either 1.0, 2.0, or 3.0.
-	}
-	setScreen(scale);
+	// nativeScale, not scale: with Display Zoom on, a point covers more
+	// physical pixels than scale says, and the layout must use the zoomed
+	// points the screen really has (#1016).
+	setScreen([UIScreen mainScreen].nativeScale);
 
 	CGSize size = [UIScreen mainScreen].nativeBounds.size;
 	UIInterfaceOrientation orientation = [[UIApplication sharedApplication] statusBarOrientation];
