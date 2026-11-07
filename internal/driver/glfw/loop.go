@@ -23,22 +23,37 @@ type funcData struct {
 	done chan struct{} // Zero allocation signalling channel
 }
 
-// channel for queuing functions on the main thread
-var (
-	funcQueue        = async.NewUnboundedChan[funcData]()
-	running, drained atomic.Bool
+// mainQueue is a queue of work for the main thread, with the state a post and
+// the shutdown share. The driver has one, funcQueue; a test owns its own, so
+// closing it cannot close the queue a live loop reads (#1063).
+type mainQueue struct {
+	*async.UnboundedChan[funcData]
 
-	// pendingFuncs counts work posted to funcQueue and not yet run. It goes up
+	// drained is set once close has run: work posted from then on runs where
+	// it is posted.
+	drained atomic.Bool
+
+	// pending counts work posted to the queue and not yet run. It goes up
 	// before the work is queued and the loop is woken, and down once the work
 	// has run, so the loop can tell work is on its way even before it reaches
-	// funcQueue.Out(). A goroutine moves it there from In(), and when that
-	// goroutine runs late, the loop used to wake, find nothing, and sleep a
-	// whole idle tick with the work queued (#981, player#287).
-	pendingFuncs atomic.Int64
+	// Out(). A goroutine moves it there from In(), and when that goroutine
+	// runs late, the loop used to wake, find nothing, and sleep a whole idle
+	// tick with the work queued (#981, player#287).
+	pending atomic.Int64
 
-	// postMu makes a post's check of drained and its send to funcQueue one
-	// step against shutdownLoop setting drained and closing the queue (#1021).
+	// postMu makes a post's check of drained and its send to the queue one
+	// step against close setting drained and closing the queue (#1021).
 	postMu sync.RWMutex
+}
+
+func newMainQueue() *mainQueue {
+	return &mainQueue{UnboundedChan: async.NewUnboundedChan[funcData]()}
+}
+
+// channel for queuing functions on the main thread
+var (
+	funcQueue = newMainQueue()
+	running   atomic.Bool
 )
 
 // Arrange that main.main runs on main thread.
@@ -54,13 +69,19 @@ func runOnMain(f func()) {
 
 // force a function f to run on the main thread and specify if we should wait for it to return
 func runOnMainWithWait(f func(), wait bool) {
+	funcQueue.post(f, wait)
+}
+
+// post runs f on the thread reading q, waiting for it to return when wait is
+// set.
+func (q *mainQueue) post(f func(), wait bool) {
 	// If we are on main before app run just execute - otherwise add it to the main queue and wait.
 	// We also need to run it as-is if the app is in the process of shutting down as the queue will be stopped.
-	// The check and the send are one step against shutdownLoop, which closes
-	// the queue: a send after that panics (#1021).
-	postMu.RLock()
-	if (!running.Load() && async.IsMainGoroutine()) || drained.Load() {
-		postMu.RUnlock()
+	// The check and the send are one step against close, which closes the
+	// queue: a send after that panics (#1021).
+	q.postMu.RLock()
+	if (!running.Load() && async.IsMainGoroutine()) || q.drained.Load() {
+		q.postMu.RUnlock()
 		f()
 		return
 	}
@@ -69,15 +90,15 @@ func runOnMainWithWait(f func(), wait bool) {
 		done := common.DonePool.Get()
 		defer common.DonePool.Put(done)
 
-		pendingFuncs.Add(1)
-		funcQueue.In() <- funcData{f: f, done: done}
-		postMu.RUnlock()
+		q.pending.Add(1)
+		q.In() <- funcData{f: f, done: done}
+		q.postMu.RUnlock()
 		wakeMainLoop()
 		<-done
 	} else {
-		pendingFuncs.Add(1)
-		funcQueue.In() <- funcData{f: f}
-		postMu.RUnlock()
+		q.pending.Add(1)
+		q.In() <- funcData{f: f}
+		q.postMu.RUnlock()
 		wakeMainLoop()
 	}
 }
@@ -187,20 +208,20 @@ func (d *gLDriver) shutdownLoop() {
 		l.QueueEvent(f)
 	}
 
-	closeFuncQueue()
+	funcQueue.close()
 }
 
-// closeFuncQueue stops posting to funcQueue, closes it and releases
-// everything still in it. Work posted from then on runs where it is posted.
-// Reading only what had reached Out() missed work still on its way, whose
-// waiters then never returned, and a post after the close panicked (#1021).
-func closeFuncQueue() {
-	postMu.Lock()
-	drained.Store(true)
-	postMu.Unlock()
-	funcQueue.Close()
-	for f := range funcQueue.Out() {
-		pendingFuncs.Add(-1)
+// close stops posting to q, closes it and releases everything still in it.
+// Work posted from then on runs where it is posted. Reading only what had
+// reached Out() missed work still on its way, whose waiters then never
+// returned, and a post after the close panicked (#1021).
+func (q *mainQueue) close() {
+	q.postMu.Lock()
+	q.drained.Store(true)
+	q.postMu.Unlock()
+	q.Close()
+	for f := range q.Out() {
+		q.pending.Add(-1)
 		if f.done != nil {
 			f.done <- struct{}{}
 		}

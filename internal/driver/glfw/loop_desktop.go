@@ -145,12 +145,12 @@ func (d *gLDriver) runEventLoop() {
 				return
 			case f := <-funcQueue.Out():
 				f.f()
-				pendingFuncs.Add(-1)
+				funcQueue.pending.Add(-1)
 				if f.done != nil {
 					f.done <- struct{}{}
 				}
 			default:
-				if pendingFuncs.Load() == 0 {
+				if funcQueue.pending.Load() == 0 {
 					goto drained
 				}
 				if drainEnd.IsZero() {
@@ -181,7 +181,7 @@ func (d *gLDriver) runEventLoop() {
 		if wait := time.Until(nextTick); wait > 0 {
 			// Work posted but not yet on funcQueue.Out() has already spent
 			// its wake-up, so wait only briefly for it (#981, player#287).
-			if pendingFuncs.Load() > 0 {
+			if funcQueue.pending.Load() > 0 {
 				wait = min(wait, pendingWait)
 			}
 			glfw.WaitEventsTimeout(wait.Seconds())

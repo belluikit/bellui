@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/container"
@@ -44,17 +43,34 @@ func TestRepaintBoundaryRemovedIsFreed(t *testing.T) {
 		})
 		return n
 	}
+	begun := func() uint64 {
+		var n uint64
+		runOnMain(func() {
+			n = w.canvas.Painter().(interface{ FramesBegun() uint64 }).FramesBegun()
+		})
+		return n
+	}
 	paint := func() { repaintWindow(w) } // paints whether or not the canvas is dirty
-	paint()
-	require.Equal(t, 2, cached(), "both boundaries are cached once painted")
 
-	runOnMain(func() { box.Remove(gone) })
 	// Eviction counts the frames a painter began, and a window macOS reports
 	// occluded, as it does for a moment after showing one, begins none: so
-	// paint until the boundary goes, not a fixed number of times (#615).
-	start, paints := time.Now(), 0
+	// paint until a frame begins, not a fixed number of times (#615). A window
+	// that stays occluded tells nothing about eviction, and the test skips, as
+	// captureOrSkip does (#1063).
+	for deadline := time.Now().Add(2 * time.Second); cached() != 2; {
+		if time.Now().After(deadline) {
+			t.Skip("the window began no frame for 2s (occluded, or no GPU surface)")
+		}
+		paint()
+	}
+
+	runOnMain(func() { box.Remove(gone) })
+	start, paints, began := time.Now(), 0, begun()
 	for deadline := start.Add(5 * time.Second); cached() != 1 && time.Now().Before(deadline); paints++ {
 		paint()
+	}
+	if cached() != 1 && begun()-began <= keepFrames {
+		t.Skipf("the window began %d frames in %d paints, too few to evict (occluded)", begun()-began, paints)
 	}
 
 	if !assert.Equal(t, 1, cached(), "the removed boundary is freed, the one on screen kept") {
@@ -69,3 +85,7 @@ func TestRepaintBoundaryRemovedIsFreed(t *testing.T) {
 		})
 	}
 }
+
+// keepFrames mirrors boundaryKeepFrames, which both painters keep: a boundary
+// no walk reaches is evicted only once more frames than this have begun.
+const keepFrames = 3
