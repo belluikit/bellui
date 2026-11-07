@@ -18,6 +18,7 @@ import (
 // Like AudioPlayer, it plays only a file's audio. The options are the players'
 // own; WithOnEnd, WithOnError and WithOnTimeUpdate run on the pipeline's
 // goroutines, so a callback that waits for Stop or Close deadlocks.
+// WithOnSeek runs on the goroutine that called Seek.
 type AudioPlayback struct {
 	pipe *pipeline.Pipeline
 	opts *options
@@ -89,6 +90,7 @@ func newAudioPlaybackFromPipeline(pipe *pipeline.Pipeline, o *options) *AudioPla
 		}
 	})
 
+	pipe.SetOnSeek(o.onSeek)
 	pipe.SetVolume(o.volume)
 
 	if o.autoPlay {

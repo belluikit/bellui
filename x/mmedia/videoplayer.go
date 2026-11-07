@@ -116,6 +116,7 @@ func newVideoPlayerFromPipeline(pipe *pipeline.Pipeline, o *options) (*VideoPlay
 		}
 	})
 
+	pipe.SetOnSeek(o.onSeek)
 	pipe.SetVolume(o.volume)
 
 	vp.ExtendBaseWidget(vp)

@@ -212,6 +212,7 @@ func newMediaPlayerFromPipeline(pipe *pipeline.Pipeline, o *options, previewURL 
 		}
 	})
 
+	pipe.SetOnSeek(o.onSeek)
 	pipe.SetVolume(o.volume)
 
 	mp.ExtendBaseWidget(mp)

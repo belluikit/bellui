@@ -26,6 +26,10 @@ type OnEndFunc func()
 // OnErrorFunc is called when an error occurs during playback.
 type OnErrorFunc func(err error)
 
+// OnSeekFunc is called for each seek, with the position before it and the
+// target, clamped to the media.
+type OnSeekFunc func(from, to time.Duration)
+
 // Pipeline orchestrates media demuxing, decoding, and presentation.
 // PlaybackStats holds real-time playback metrics.
 type PlaybackStats struct {
@@ -66,6 +70,7 @@ type Pipeline struct {
 	onTime  OnTimeFunc
 	onEnd   OnEndFunc
 	onError OnErrorFunc
+	onSeek  OnSeekFunc
 
 	stopCh chan struct{}
 	wg     sync.WaitGroup // tracks decode goroutine lifecycle
@@ -568,6 +573,9 @@ func (p *Pipeline) SetOnEnd(f OnEndFunc) { p.onEnd = f }
 // SetOnError sets the callback for errors.
 func (p *Pipeline) SetOnError(f OnErrorFunc) { p.onError = f }
 
+// SetOnSeek sets the callback for seeks.
+func (p *Pipeline) SetOnSeek(f OnSeekFunc) { p.onSeek = f }
+
 // HasVideo returns true if the media contains a video stream.
 func (p *Pipeline) HasVideo() bool { return p.hasVideo }
 
@@ -1046,11 +1054,17 @@ func (p *Pipeline) sourceError() error {
 // (landSeek), and until it is there the clock holds at the target and nothing
 // from before it is shown or heard. A seek that fails is reported through
 // OnError, as the end of the stream.
+//
+// OnSeek runs on the caller's goroutine before the time update the seek
+// reports, so an app hears of the seek before the position it moved to.
 func (p *Pipeline) Seek(pos time.Duration) {
 	if p.live {
 		return
 	}
-	p.seek(pos, false)
+	from, to := p.seek(pos, false)
+	if p.onSeek != nil {
+		p.onSeek(from, to)
+	}
 	// Reported here because nothing else would: the tick runs only while
 	// playing, and a seek while paused or stopped is still a new position.
 	p.reportTime()
@@ -1058,8 +1072,9 @@ func (p *Pipeline) Seek(pos time.Duration) {
 
 // seek posts a seek, or with rewind a Rewind, for the decoder to make, and
 // does at once everything that does not touch the source: it discards what
-// was decoded before it, and moves the clock to pos and holds it there.
-func (p *Pipeline) seek(pos time.Duration, rewind bool) {
+// was decoded before it, and moves the clock to pos and holds it there. It
+// returns the clock's time before the seek and pos clamped to the media.
+func (p *Pipeline) seek(pos time.Duration, rewind bool) (from, to time.Duration) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -1077,8 +1092,9 @@ func (p *Pipeline) seek(pos time.Duration, rewind bool) {
 	// was due (#513).
 	p.seekMu.Lock()
 	defer p.seekMu.Unlock()
+	from = p.clock.Time()
 	if !p.seeking {
-		p.seekFrom = p.clock.Time()
+		p.seekFrom = from
 	}
 
 	// Under presentMu, no frame checked before the seek is shown after it;
@@ -1122,6 +1138,7 @@ func (p *Pipeline) seek(pos time.Duration, rewind bool) {
 	case p.seekWake <- struct{}{}:
 	default: // a wake is already pending
 	}
+	return from, pos
 }
 
 // landSeek moves the source to the latest seek posted, on the decode
