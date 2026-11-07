@@ -167,6 +167,12 @@ type Canvas struct {
 	// to the node it was skipped under, so that showing it by its Hidden
 	// field, which reports nothing, has a node to report from (#619).
 	hiddenUnder async.Map[core.CanvasObject, hiddenAt]
+	// offscreenTops maps each hidden object a walk found out of sight to the
+	// full-walk generation that recorded its subtree, and offscreen maps every
+	// object under one, it included, to it: a refresh of those asks for no
+	// frame (#1061).
+	offscreenTops async.Map[core.CanvasObject, uint64]
+	offscreen     async.Map[core.CanvasObject, *offscreenAt]
 	// regionVisits counts the nodes the last PartialDirtyRegion visited.
 	regionVisits int
 }
@@ -388,7 +394,9 @@ func (c *Canvas) FocusPrevious() {
 	}
 }
 
-// FreeDirtyTextures frees dirty textures and returns the number of freed textures.
+// FreeDirtyTextures frees the textures of the objects refreshed since it last
+// ran, and returns how many of them are in sight: those under a hidden object
+// need no frame (#1061).
 func (c *Canvas) FreeDirtyTextures() uint64 {
 	if c.painter == nil {
 		return 0
@@ -397,9 +405,12 @@ func (c *Canvas) FreeDirtyTextures() uint64 {
 	bp, hasBP := c.painter.(gpu.BoundaryPainter)
 
 	c.dirtyRegion.Reset()
-	objectsToFree := c.refreshQueue.Len()
+	var inSight uint64
 	for object := c.refreshQueue.Out(); object != nil; object = c.refreshQueue.Out() {
 		c.freeObject(object)
+		if !c.isOffscreen(object) {
+			inSight++
+		}
 
 		// Track dirty region for scissor culling. The node is looked up once,
 		// for this, the partial-repaint region and the boundary below (#543).
@@ -415,7 +426,7 @@ func (c *Canvas) FreeDirtyTextures() uint64 {
 	}
 
 	cache.RangeExpiredTexturesFor(c.impl, c.painter.Free)
-	return objectsToFree
+	return inSight
 }
 
 // markBoundaryDirtyFrom walks up the render cache tree from node to find the
@@ -751,6 +762,11 @@ func (c *Canvas) Painter() gpu.Painter {
 func (c *Canvas) Refresh(obj core.CanvasObject) {
 	c.MarkMinSizeDirty(obj)
 	c.refreshQueue.In(obj)
+	if c.isOffscreen(obj) {
+		// Queued all the same: the frame that shows it again frees what the
+		// refresh made stale.
+		return
+	}
 	async.EnsureMain(c.SetDirty)
 }
 
@@ -996,6 +1012,7 @@ func (c *Canvas) WalkTrees(
 		}
 		return true
 	})
+	c.sweepOffscreen(gen)
 }
 
 // WalkContentTrees walks content, window head, and menu trees (not overlays).
@@ -1251,6 +1268,14 @@ func (c *Canvas) walkTreeFrom(
 		// walk among them, record where it is (#619).
 		hidden = func(obj, _ core.CanvasObject) { c.noteHidden(parent, obj) }
 	}
+	if note := hidden; note != nil {
+		hidden = func(obj, p core.CanvasObject) {
+			note(obj, p)
+			c.noteOffscreen(obj)
+		}
+	} else {
+		hidden = func(obj, _ core.CanvasObject) { c.noteOffscreen(obj) }
+	}
 
 	bc := func(obj core.CanvasObject, pos geo.Position, clipPos geo.Position, clipSize geo.Size) bool {
 		if node != nil && node.obj != obj {
@@ -1423,6 +1448,9 @@ func (c *Canvas) forgetNodes(n *RenderCacheNode) {
 	for ; n != nil; n = n.nextSibling {
 		if cur, ok := c.nodeMap.Load(n.obj); ok && cur == n {
 			c.nodeMap.Delete(n.obj)
+		}
+		if !n.obj.Visible() {
+			c.noteOffscreen(n.obj) // as an unselected tab's content leaves
 		}
 		if build.PartialRepaint && n.lastPaintSet {
 			c.leftRegion.Union(padRect(n.lastPaintPos, n.lastPaintSize))
