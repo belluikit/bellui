@@ -622,6 +622,51 @@ func TestPartialDirtyRegion_OverlayIsNotARoot(t *testing.T) {
 	assert.Equal(t, 2, c.RegionVisits(), "a move after it visits the object and the overlay (of %d)", full)
 }
 
+// scaleWidget is a widget an app builds on BaseWidget that draws its content
+// scaled about its centre, as Player's Scale does: a change of scale is a
+// change of its transform, and its renderer refreshes nothing.
+type scaleWidget struct {
+	widget.BaseWidget
+	content core.CanvasObject
+	factor  float32
+}
+
+func (s *scaleWidget) Transform() geo.Matrix {
+	size := s.Size()
+	cx, cy := size.Width/2, size.Height/2
+	return geo.NewTranslation(cx, cy).Multiply(geo.NewScale(s.factor, s.factor)).Multiply(geo.NewTranslation(-cx, -cy))
+}
+
+func (s *scaleWidget) SetTransform(geo.Matrix) {}
+
+func (s *scaleWidget) CreateRenderer() core.WidgetRenderer {
+	return widget.NewSimpleRenderer(s.content)
+}
+
+// TestPartialDirtyRegion_WidgetTransform pins that a widget outside Bellui
+// that changes its transform and refreshes is drawn under the new one: its
+// refresh reached only its renderer, so no walk read the transform again,
+// and the region and the bounds it recorded stayed where it was first drawn
+// (#1072).
+func TestPartialDirtyRegion_WidgetTransform(t *testing.T) {
+	test.NewTempApp(t)
+
+	s := &scaleWidget{content: canvas.NewRectangle(color.White), factor: 0.6}
+	s.ExtendBaseWidget(s)
+	s.Move(geo.NewPos(100, 100))
+	s.Resize(geo.NewSize(50, 50))
+	content := container.NewWithoutLayout(s, canvas.NewRectangle(color.Black))
+	content.Resize(geo.NewSize(400, 400))
+	c, ref := newTwinCanvases(content, geo.NewSize(400, 400))
+	frame(t, c, ref, "first frame")
+
+	for _, f := range []float32{0.8, 1, 1.5, 0.5} {
+		s.factor = f
+		s.Refresh()
+		frame(t, c, ref, fmt.Sprintf("scale %v", f))
+	}
+}
+
 // TestReportsPlacement_ListedTypesReport pins that every type reportsPlacement
 // names tells its canvas when it is moved, resized or hidden: one that did not
 // would have its changes missed by the region, which walks only from what
