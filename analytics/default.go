@@ -64,6 +64,18 @@ func Close(t Tracker) error {
 	return nil
 }
 
+// Reset forgets the identity an app gave [Tracker.Identify] and starts a new
+// ephemeral session id, so the events that follow are anonymous and not linked
+// to the ones before: the sign-out counterpart of Identify (PostHog's reset).
+// It queues and sends nothing, and works while disabled. Events already queued
+// keep the identity they were recorded under. Trackers not created by [New]
+// are ignored (#1076).
+func Reset(t Tracker) {
+	if r, ok := t.(interface{ reset() }); ok {
+		r.reset()
+	}
+}
+
 // nopTracker is the safe no-op default. Every method drops its input.
 type nopTracker struct{}
 
