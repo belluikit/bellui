@@ -3,6 +3,7 @@ package common
 import (
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/internal/cache"
+	"github.com/belluikit/bellui/internal/gpu"
 )
 
 // noteReplaced records that a Set*Tree call is replacing old with a tree
@@ -29,7 +30,53 @@ func (c *Canvas) releaseReplaced() {
 		return
 	}
 	c.replaced = false
-	cache.ReleaseUnkept(c.impl, c.inTrees)
+	gone := cache.ReleaseUnkept(c.impl, c.inTrees)
+	if c.painter == nil {
+		return
+	}
+	if p, ok := c.painter.(gpu.BetweenFramesPainter); !ok || !p.CanFreeNow() {
+		c.freeUnkept = true
+		return
+	}
+	c.freeGPU(gone)
+}
+
+// freeGPU frees the textures and RepaintBoundary targets of the objects that
+// left the canvas: gone, which the caches just let go of, and every object
+// with a texture the last full walk left out of the trees, which is the leaf
+// it draws, such as an image. The texture cache otherwise frees a texture at
+// the first frame a minute after it was last drawn, and keeps the object, an
+// image's decoded pixels with it, until then; an idle app draws no such frame
+// (#1082).
+//
+// A painter that can free outside a frame, as WebGPU can, is asked in the
+// walk. Otherwise the next FreeDirtyTextures, at the start of a frame, where
+// GL has its context, frees the textures, which hold their objects until
+// then anyway. The canvas keeps no list of them for it, as that list would
+// hold the widgets the caches just let go of.
+func (c *Canvas) freeGPU(gone []core.CanvasObject) {
+	cache.RangeTexturesFor(c.impl, func(obj core.CanvasObject) {
+		if !c.inTrees(obj) {
+			c.painter.Free(obj)
+		}
+	})
+	bp, ok := c.painter.(gpu.BoundaryPainter)
+	if !ok {
+		return
+	}
+	for _, obj := range gone {
+		bp.FreeBoundaryFBO(obj)
+	}
+}
+
+// freeUnkeptTextures frees, at the start of a frame, the textures replaced
+// content left to a painter that could not free them in the walk (freeGPU).
+func (c *Canvas) freeUnkeptTextures() {
+	if !c.freeUnkept {
+		return
+	}
+	c.freeUnkept = false
+	c.freeGPU(nil)
 }
 
 // inTrees reports whether the last full walk found obj in the trees: it placed
