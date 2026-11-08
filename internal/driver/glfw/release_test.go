@@ -21,7 +21,10 @@ import (
 func TestReleaseDroppedPage(t *testing.T) {
 	w := createWindow("Release")
 	defer w.Close()
-	state := &struct{ taps int }{}
+	state := &struct {
+		taps int
+		_    *int // out of the tiny allocator, which a weak pointer cannot see freed
+	}{}
 	page := widget.NewButton("page", func() { state.taps++ })
 	slot := container.NewStack(page)
 	w.SetContent(container.NewBorder(widget.NewLabel("nav"), nil, nil, nil, slot))
