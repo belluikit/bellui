@@ -6,8 +6,11 @@ import (
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
+	"github.com/belluikit/bellui/driver/desktop"
+	"github.com/belluikit/bellui/driver/mobile"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/cache"
 	internalWidget "github.com/belluikit/bellui/internal/widget"
 	"github.com/belluikit/bellui/theme"
 )
@@ -69,6 +72,8 @@ func (s IconButtonSize) dims(th bellui.Theme) (container, icon float32) {
 var (
 	_ event.Tappable          = (*IconButton)(nil)
 	_ event.Hoverable         = (*IconButton)(nil)
+	_ mobile.Touchable        = (*IconButton)(nil)
+	_ desktop.Mouseable       = (*IconButton)(nil)
 	_ core.Accessible         = (*IconButton)(nil)
 	_ core.AccessibleActioner = (*IconButton)(nil)
 )
@@ -112,9 +117,17 @@ func NewIconButton(icon bellui.Resource, tapped func()) *IconButton {
 	return b
 }
 
-func (b *IconButton) Tapped(*event.PointEvent) {
+func (b *IconButton) Tapped(ev *event.PointEvent) {
 	if b.Disabled() {
 		return
+	}
+	// A pointer tap's press showed already; Tap shows one for a tap from code.
+	if r := b.renderer(); r != nil {
+		at := geo.NewPos(b.Size().Width/2, b.Size().Height/2)
+		if ev != nil {
+			at = ev.Position
+		}
+		r.press.Tap(at, b.Size(), r.bg.CornerRadius, r.contentColor())
 	}
 	if b.OnTapped != nil {
 		b.OnTapped()
@@ -123,7 +136,67 @@ func (b *IconButton) Tapped(*event.PointEvent) {
 
 func (b *IconButton) HoverIn(*event.HoverEvent)    { b.hovered = true; b.Refresh() }
 func (b *IconButton) HoverMoved(*event.HoverEvent) {}
-func (b *IconButton) HoverOut()                    { b.hovered = false; b.Refresh() }
+
+// HoverOut ends a press the pointer took with it: the button gets no MouseUp
+// for a release elsewhere.
+func (b *IconButton) HoverOut() {
+	b.hovered = false
+	if r := b.renderer(); r != nil {
+		r.press.Cancel()
+	}
+	b.Refresh()
+}
+
+// MouseDown shows the pressed state from where the primary button went down
+// (#1085).
+func (b *IconButton) MouseDown(ev *desktop.MouseEvent) {
+	if ev.Button == desktop.MouseButtonPrimary {
+		b.press(ev.Position)
+	}
+}
+
+// MouseUp ends the pressed state.
+func (b *IconButton) MouseUp(*desktop.MouseEvent) {
+	if r := b.renderer(); r != nil {
+		r.press.Release()
+	}
+}
+
+// TouchDown shows the pressed state from where the finger went down (#1085).
+// The icon button had no tap feedback at all, and touch screens have no
+// hover.
+func (b *IconButton) TouchDown(ev *mobile.TouchEvent) {
+	b.press(ev.Position)
+}
+
+// TouchUp ends the pressed state.
+func (b *IconButton) TouchUp(*mobile.TouchEvent) {
+	if r := b.renderer(); r != nil {
+		r.press.Release()
+	}
+}
+
+// TouchCancel ends the pressed state with no feedback left: the finger left
+// the button, or the touch became a scroll.
+func (b *IconButton) TouchCancel(*mobile.TouchEvent) {
+	if r := b.renderer(); r != nil {
+		r.press.Cancel()
+	}
+}
+
+func (b *IconButton) press(at geo.Position) {
+	if b.Disabled() {
+		return
+	}
+	if r := b.renderer(); r != nil {
+		r.press.Press(at, b.Size(), r.bg.CornerRadius, r.contentColor())
+	}
+}
+
+func (b *IconButton) renderer() *iconButtonRenderer {
+	r, _ := cache.Renderer(b.super()).(*iconButtonRenderer)
+	return r
+}
 
 func (b *IconButton) MinSize() geo.Size {
 	b.ExtendBaseWidget(b)
@@ -135,10 +208,12 @@ func (b *IconButton) CreateRenderer() core.WidgetRenderer {
 	bg := canvas.NewRectangle(color.Transparent)
 	icon := canvas.NewImageFromResource(b.Icon)
 	icon.FillMode = canvas.ImageFillContain
+	press := internalWidget.NewPressFeedback()
 
 	r := &iconButtonRenderer{
-		BaseRenderer: internalWidget.NewBaseRenderer([]core.CanvasObject{bg, icon}),
+		BaseRenderer: internalWidget.NewBaseRenderer([]core.CanvasObject{bg, press.Ripple, icon}),
 		bg:           bg,
+		press:        press,
 		icon:         icon,
 		btn:          b,
 	}
@@ -148,9 +223,18 @@ func (b *IconButton) CreateRenderer() core.WidgetRenderer {
 
 type iconButtonRenderer struct {
 	internalWidget.BaseRenderer
-	bg   *canvas.Rectangle
-	icon *canvas.Image
-	btn  *IconButton
+	bg    *canvas.Rectangle
+	press *internalWidget.PressFeedback
+	icon  *canvas.Image
+	btn   *IconButton
+	// fg is the icon's colour, which the pressed state is made of.
+	fg bellui.ThemeColorName
+}
+
+// contentColor is the colour of the icon: OnPrimary on a filled button,
+// OnSurfaceVariant on a standard one, and so on.
+func (r *iconButtonRenderer) contentColor() color.Color {
+	return r.btn.Theme().Color(r.fg, bellui.CurrentApp().Settings().ThemeVariant())
 }
 
 func (r *iconButtonRenderer) MinSize() geo.Size {
@@ -160,6 +244,7 @@ func (r *iconButtonRenderer) MinSize() geo.Size {
 
 func (r *iconButtonRenderer) Layout(size geo.Size) {
 	r.bg.Resize(size)
+	r.press.Resize(size)
 	_, iconSize := r.btn.ButtonSize.dims(r.btn.Theme())
 	r.icon.Resize(geo.NewSize(iconSize, iconSize))
 	r.icon.Move(geo.NewPos((size.Width-iconSize)/2, (size.Height-iconSize)/2))
@@ -206,6 +291,7 @@ func (r *iconButtonRenderer) Refresh() {
 	}
 
 	r.bg.Refresh()
+	r.fg = fgColorName
 
 	if r.btn.Icon != nil {
 		r.icon.Resource = theme.NewColoredResource(r.btn.Icon, fgColorName)
