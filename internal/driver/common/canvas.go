@@ -849,7 +849,8 @@ func needsMeasure(node *RenderCacheNode, obj core.CanvasObject, size geo.Size, m
 // otherwise only the paths to what was refreshed (#487).
 func (c *Canvas) walkForMinSize(measureAll bool, setup, ensureMinSize func(*RenderCacheNode, geo.Position)) {
 	now := time.Now()
-	full := measureAll || c.minSizeFull.Swap(false) ||
+	asked := c.minSizeFull.Swap(false) // cleared by any full walk, measureAll's too
+	full := measureAll || asked ||
 		len(c.overlays.renderCaches) != c.measuredOverlays || now.Sub(c.lastFullMinSize) >= fullMinSizeEvery
 	c.measuredOverlays = len(c.overlays.renderCaches)
 	c.markDirtyPaths()
