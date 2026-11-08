@@ -45,7 +45,8 @@ func main() {
 	}
 
 	top := container.NewVBox(
-		container.NewGridWithColumns(2,
+		container.NewGridWithColumns(
+			2,
 			button("High", widget.HighImportance),
 			button("Medium", widget.MediumImportance),
 			button("Low", widget.LowImportance),
