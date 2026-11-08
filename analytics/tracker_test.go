@@ -516,21 +516,22 @@ func TestResetForgetsIdentity(t *testing.T) {
 
 	tr.Identify("p-1", nil)
 	tr.Track("before", nil)
-	before := tr.sessionID
 	tr.mu.Lock()
-	queued := len(tr.queue)
+	before := tr.sessionID
 	tr.mu.Unlock()
 
 	Reset(tr)
-	tr.mu.Lock()
-	assert.Len(t, tr.queue, queued, "Reset queues nothing")
-	tr.mu.Unlock()
 	tr.Track("after", nil)
 	require.NoError(t, tr.Flush())
 	drain(flushCh)
 
+	// Reset queues nothing: the sink holds the identify event, "before" and
+	// "after". It is read there, not from the queue, which the worker may
+	// flush at any point after SetEnabled (#1093).
+	events := sink.allEvents()
+	assert.Len(t, events, 3, "Reset queued an event")
 	byName := map[string]Event{}
-	for _, e := range sink.allEvents() {
+	for _, e := range events {
 		byName[e.Name] = e
 	}
 	require.Contains(t, byName, "before")
