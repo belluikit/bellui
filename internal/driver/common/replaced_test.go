@@ -28,7 +28,14 @@ func idleFrame(c *Canvas) {
 }
 
 // screenState stands for what an app's screen closes over in its handlers.
-type screenState struct{ events int }
+// The pointer keeps it out of the tiny allocator, which packs small objects
+// without pointers into one block: a weak pointer to one of them is not
+// cleared while another in its block lives, so whether it was depended on
+// what the tests before had allocated.
+type screenState struct {
+	events int
+	_      *int
+}
 
 // replacedScreen builds a screen whose every handler closes over s: a list
 // scrolled so that rows wait in its pool, a focused entry, a hidden button, and
