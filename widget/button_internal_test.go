@@ -8,6 +8,9 @@ import (
 
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/canvas"
+	"github.com/belluikit/bellui/core"
+	"github.com/belluikit/bellui/driver/desktop"
+	"github.com/belluikit/bellui/driver/mobile"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/cache"
@@ -226,31 +229,101 @@ func TestButtonRenderer_ApplyTheme(t *testing.T) {
 	assert.NotEqual(t, textSize, customTextSize)
 }
 
-func TestButtonRenderer_TapAnimation(t *testing.T) {
+// TestButton_PressFeedback is #1085: a button shows its pressed state from
+// the press, not only after the release, and ends it on the release, a
+// cancel, or the pointer leaving it.
+func TestButton_PressFeedback(t *testing.T) {
 	test.NewTempApp(t)
-	test.ApplyTheme(t, test.NewTheme())
-
 	button := NewButton("Hi", func() {})
-	w := test.NewWindow(button)
-	defer w.Close()
-	w.Resize(geo.NewSize(50, 50).Add(geo.NewSize(20, 20)))
-	button.Resize(geo.NewSize(50, 50))
+	button.Resize(geo.NewSize(80, 40))
+	press := cache.Renderer(button).(*buttonRenderer).press
 
-	render1 := test.TempWidgetRenderer(t, button).(*buttonRenderer)
-	test.Tap(button)
-	button.tapAnim.Tick(0.5)
-	test.AssertImageMatches(t, "button/tap_animation.png", w.Canvas().Capture())
+	button.TouchDown(&mobile.TouchEvent{PointEvent: event.PointEvent{Position: geo.NewPos(10, 20)}})
+	assert.True(t, press.Pressed(), "no pressed state while the finger is down")
+	assert.True(t, press.Ripple.Visible())
+	assert.Equal(t, geo.NewPos(10, 20), press.Ripple.Center, "the ripple does not start at the press")
+	button.TouchUp(&mobile.TouchEvent{})
+	assert.False(t, press.Pressed())
 
-	cache.DestroyRenderer(button)
-	button.Refresh()
+	button.TouchDown(&mobile.TouchEvent{})
+	button.TouchCancel(&mobile.TouchEvent{})
+	assert.False(t, press.Pressed())
+	assert.False(t, press.Ripple.Visible(), "a touch that became a scroll left the button pressed")
 
-	render2 := test.TempWidgetRenderer(t, button).(*buttonRenderer)
+	button.MouseDown(&desktop.MouseEvent{Button: desktop.MouseButtonPrimary})
+	assert.True(t, press.Pressed())
+	button.MouseUp(&desktop.MouseEvent{Button: desktop.MouseButtonPrimary})
+	assert.False(t, press.Pressed())
 
-	assert.NotEqual(t, render1, render2)
+	button.MouseDown(&desktop.MouseEvent{Button: desktop.MouseButtonPrimary})
+	button.HoverOut()
+	assert.False(t, press.Pressed(), "a press dragged off the button stayed")
+	assert.False(t, press.Ripple.Visible())
 
-	// Verify the animation still works after renderer recreation.
-	test.Tap(button)
-	assert.NotNil(t, button.tapAnim)
+	button.MouseDown(&desktop.MouseEvent{Button: desktop.MouseButtonSecondary})
+	assert.False(t, press.Pressed(), "a secondary click pressed the button")
+
+	button.Disable()
+	button.TouchDown(&mobile.TouchEvent{})
+	assert.False(t, press.Pressed(), "a disabled button showed a press")
+}
+
+// TestButton_KeyPressFeedback: Space, which has no press before it, still
+// shows one, from the button's centre.
+func TestButton_KeyPressFeedback(t *testing.T) {
+	test.NewTempApp(t)
+	button := NewButton("Hi", func() {})
+	button.Resize(geo.NewSize(80, 40))
+	press := cache.Renderer(button).(*buttonRenderer).press
+
+	button.TypedKey(&event.KeyEvent{Name: event.KeySpace})
+	assert.Equal(t, geo.NewPos(40, 20), press.Ripple.Center, "Space showed no press")
+	assert.NotZero(t, press.Ripple.Radius)
+}
+
+// TestButton_PressColor: the pressed state is the colour of the button's
+// content, per MD3: OnPrimary on a filled button, Primary on a text,
+// outlined or elevated one. It was OnSurface on every variant.
+func TestButton_PressColor(t *testing.T) {
+	test.NewTempApp(t)
+	th := test.Theme()
+	v := bellui.CurrentApp().Settings().ThemeVariant()
+	for _, tc := range []struct {
+		name  string
+		build func(*Button)
+		want  bellui.ThemeColorName
+	}{
+		{"filled", func(b *Button) { b.Style = ButtonStyleFilled }, theme.ColorNameForegroundOnPrimary},
+		{"high importance", func(b *Button) { b.Importance = HighImportance }, theme.ColorNameForegroundOnPrimary},
+		{"tonal", func(b *Button) { b.Style = ButtonStyleFilledTonal }, theme.ColorNameOnSecondaryContainer},
+		{"elevated", func(b *Button) { b.Style = ButtonStyleElevated }, theme.ColorNamePrimary},
+		{"outlined", func(b *Button) { b.Style = ButtonStyleOutlined }, theme.ColorNamePrimary},
+		{"text", func(b *Button) { b.Style = ButtonStyleText }, theme.ColorNamePrimary},
+		{"danger", func(b *Button) { b.Importance = DangerImportance }, theme.ColorNameForegroundOnError},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			button := NewButton("Hi", nil)
+			tc.build(button)
+			button.Resize(geo.NewSize(80, 40))
+			press := cache.Renderer(button).(*buttonRenderer).press
+			button.TouchDown(&mobile.TouchEvent{})
+			want := th.Color(tc.want, v)
+			wr, wg, wb, _ := want.RGBA()
+			r, g, b, _ := press.Ripple.Color.RGBA()
+			assert.Equal(t, [3]uint32{wr >> 8, wg >> 8, wb >> 8}, [3]uint32{r >> 8, g >> 8, b >> 8})
+		})
+	}
+}
+
+// TestButton_IconKeepsShadow: giving a button an icon rebuilt its objects
+// without the shadow, so an Elevated button with an icon lost it.
+func TestButton_IconKeepsShadow(t *testing.T) {
+	test.NewTempApp(t)
+	button := NewButtonWithIcon("Hi", theme.HomeIcon(), nil)
+	button.Style = ButtonStyleElevated
+	button.Resize(button.MinSize())
+	r := cache.Renderer(button).(*buttonRenderer)
+	assert.Contains(t, r.Objects(), core.CanvasObject(r.shadow))
 }
 
 // An Elevated button casts a shadow, MD3 level 1 at rest and 2 under the

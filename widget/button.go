@@ -2,12 +2,12 @@ package widget
 
 import (
 	"image/color"
-	"math"
 
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/driver/desktop"
+	"github.com/belluikit/bellui/driver/mobile"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/cache"
@@ -59,6 +59,8 @@ const (
 
 var (
 	_ event.Focusable         = (*Button)(nil)
+	_ mobile.Touchable        = (*Button)(nil)
+	_ desktop.Mouseable       = (*Button)(nil)
 	_ event.Activatable       = (*Button)(nil)
 	_ core.Accessible         = (*Button)(nil)
 	_ core.AccessibleActioner = (*Button)(nil)
@@ -86,8 +88,6 @@ type Button struct {
 	OnTapped func() `json:"-"`
 
 	hovered, focused bool
-	tapAnim          *bellui.Animation
-	isAnimating      bool
 }
 
 // NewButton creates a new button widget with the set label and tap handler
@@ -127,8 +127,7 @@ func (b *Button) CreateRenderer() core.WidgetRenderer {
 	background := canvas.NewRectangle(th.Color(theme.ColorNameButton, v))
 	background.CornerRadius = buttonRadius(th)
 
-	ripple := canvas.NewRipple(th.Color(theme.ColorNamePressed, v))
-	ripple.Hide()
+	press := widget.NewPressFeedback()
 
 	// Always create the gradient overlay; show/hide based on render style.
 	grad := canvas.NewLinearGradient(color.Transparent, color.Transparent, 90)
@@ -139,11 +138,11 @@ func (b *Button) CreateRenderer() core.WidgetRenderer {
 	shadow.Hide()
 
 	r := &buttonRenderer{
-		BaseRenderer: widget.NewBaseRenderer([]core.CanvasObject{shadow, background, grad, ripple, text}),
+		BaseRenderer: widget.NewBaseRenderer([]core.CanvasObject{shadow, background, grad, press.Ripple, text}),
 		shadow:       shadow,
 		background:   background,
 		gradientBG:   grad,
-		ripple:       ripple,
+		press:        press,
 		button:       b,
 		label:        text,
 		layout:       layout.NewHBoxLayout(),
@@ -204,10 +203,50 @@ func (b *Button) HoverIn(*event.HoverEvent) {
 func (b *Button) HoverMoved(*event.HoverEvent) {
 }
 
-// HoverOut is called when a desktop pointer exits the widget
+// HoverOut is called when a desktop pointer exits the widget. A press the
+// pointer took with it ends: the button gets no MouseUp for a release
+// elsewhere.
 func (b *Button) HoverOut() {
 	b.hovered = false
+	if r := b.renderer(); r != nil {
+		r.press.Cancel()
+	}
 	b.Refresh()
+}
+
+// MouseDown shows the pressed state from where the primary button went down
+// (#1085).
+func (b *Button) MouseDown(ev *desktop.MouseEvent) {
+	if ev.Button == desktop.MouseButtonPrimary {
+		b.press(ev.Position)
+	}
+}
+
+// MouseUp ends the pressed state.
+func (b *Button) MouseUp(*desktop.MouseEvent) {
+	if r := b.renderer(); r != nil {
+		r.press.Release()
+	}
+}
+
+// TouchDown shows the pressed state from where the finger went down (#1085).
+func (b *Button) TouchDown(ev *mobile.TouchEvent) {
+	b.press(ev.Position)
+}
+
+// TouchUp ends the pressed state.
+func (b *Button) TouchUp(*mobile.TouchEvent) {
+	if r := b.renderer(); r != nil {
+		r.press.Release()
+	}
+}
+
+// TouchCancel ends the pressed state with no feedback left: the finger left
+// the button, or the touch became a scroll.
+func (b *Button) TouchCancel(*mobile.TouchEvent) {
+	if r := b.renderer(); r != nil {
+		r.press.Cancel()
+	}
 }
 
 // SetIcon updates the icon on a label - pass nil to hide an icon.
@@ -239,7 +278,7 @@ func (b *Button) Tapped(ev *event.PointEvent) {
 		return
 	}
 
-	b.tapAnimation(ev)
+	b.tapFeedback(ev)
 
 	if onTapped := b.OnTapped; onTapped != nil {
 		onTapped()
@@ -263,55 +302,34 @@ func (b *Button) ActivatedByKey(ev *event.KeyEvent) bool {
 	return ev.Name == event.KeySpace
 }
 
-func (b *Button) tapAnimation(ev *event.PointEvent) {
-	if b.tapAnim != nil {
-		b.tapAnim.Stop()
-	}
-	b.isAnimating = false
-
-	if !bellui.CurrentApp().Settings().ShowAnimations() {
+// press shows the pressed state from at, unless the button is disabled.
+func (b *Button) press(at geo.Position) {
+	if b.Disabled() {
 		return
 	}
+	if r := b.renderer(); r != nil {
+		r.press.Press(at, b.Size(), r.background.CornerRadius, r.contentColor())
+	}
+}
 
-	r := cache.Renderer(b.super())
+// tapFeedback shows a press and its release for a tap the button saw no press
+// of: Space, or a tap from code or a test. A pointer tap's press showed
+// already.
+func (b *Button) tapFeedback(ev *event.PointEvent) {
+	r := b.renderer()
 	if r == nil {
 		return
 	}
-	br, ok := r.(*buttonRenderer)
-	if !ok || br.ripple == nil {
-		return
-	}
-
-	// Set ripple center to touch point (or center if no event).
+	at := geo.NewPos(b.Size().Width/2, b.Size().Height/2)
 	if ev != nil {
-		br.ripple.Center = ev.Position
-	} else {
-		br.ripple.Center = geo.NewPos(b.Size().Width/2, b.Size().Height/2)
+		at = ev.Position
 	}
-	br.ripple.CornerRadius = buttonRadius(b.Theme())
+	r.press.Tap(at, b.Size(), r.background.CornerRadius, r.contentColor())
+}
 
-	// Calculate max radius (distance from center to farthest corner).
-	size := b.Size()
-	cx, cy := br.ripple.Center.X, br.ripple.Center.Y
-	dx := geo.Max(cx, size.Width-cx)
-	dy := geo.Max(cy, size.Height-cy)
-	maxRadius := float32(math.Sqrt(float64(dx*dx + dy*dy)))
-
-	br.ripple.Resize(size)
-	br.ripple.Show()
-
-	b.isAnimating = true
-	b.tapAnim = bellui.NewAnimation(canvas.DurationStandard, func(done float32) {
-		br.ripple.Radius = maxRadius * done
-		br.ripple.Opacity = 0.12 * (1 - done)
-		br.ripple.Refresh()
-		if done >= 1.0 {
-			br.ripple.Hide()
-			b.isAnimating = false
-		}
-	})
-	b.tapAnim.Curve = bellui.AnimationEaseOut
-	b.tapAnim.Start()
+func (b *Button) renderer() *buttonRenderer {
+	r, _ := cache.Renderer(b.super()).(*buttonRenderer)
+	return r
 }
 
 type buttonRenderer struct {
@@ -322,7 +340,7 @@ type buttonRenderer struct {
 	shadow     *canvas.BoxShadow // shown for ButtonStyleElevated
 	background *canvas.Rectangle
 	gradientBG *canvas.LinearGradient // non-nil for modern render style
-	ripple     *canvas.Ripple
+	press      *widget.PressFeedback
 	button     *Button
 	layout     core.Layout
 }
@@ -334,9 +352,7 @@ func (r *buttonRenderer) Layout(size geo.Size) {
 	if r.gradientBG != nil {
 		r.gradientBG.Resize(size)
 	}
-	if r.ripple != nil && !r.button.isAnimating {
-		r.ripple.Resize(size)
-	}
+	r.press.Resize(size)
 
 	th := r.button.Theme()
 	padding := r.padding(th)
@@ -576,6 +592,14 @@ func (r *buttonRenderer) buttonColorNames() (foreground, background, backgroundB
 	return foreground, background, backgroundBlend
 }
 
+// contentColor is the colour of the button's text and icon, which its state
+// layers are made of: OnPrimary on a filled button, Primary on a text or
+// outlined one, and so on.
+func (r *buttonRenderer) contentColor() color.Color {
+	fg, _, _ := r.buttonColorNames()
+	return r.button.Theme().Color(fg, bellui.CurrentApp().Settings().ThemeVariant())
+}
+
 func (r *buttonRenderer) padding(th bellui.Theme) geo.Size {
 	return geo.NewSquareSize(th.Size(theme.SizeNameInnerPadding) * 2)
 }
@@ -587,7 +611,7 @@ func (r *buttonRenderer) updateIconAndText() {
 		if r.icon == nil {
 			r.icon = canvas.NewImageFromResource(icon)
 			r.icon.FillMode = canvas.ImageFillContain
-			r.SetObjects([]core.CanvasObject{r.background, r.gradientBG, r.ripple, r.label, r.icon})
+			r.SetObjects([]core.CanvasObject{r.shadow, r.background, r.gradientBG, r.press.Ripple, r.label, r.icon})
 		}
 		if r.button.Disabled() {
 			icon = theme.NewDisabledResource(icon)
@@ -673,10 +697,5 @@ func newButtonTapAnimation(bg *canvas.Rectangle, w core.Widget, th bellui.Theme)
 			bg.FillColor = color.Transparent
 		}
 		canvas.Refresh(bg)
-		if done == 1.0 {
-			if btn, ok := w.(*Button); ok {
-				btn.isAnimating = false
-			}
-		}
 	})
 }
