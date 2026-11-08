@@ -185,6 +185,10 @@ type Canvas struct {
 	// replaced content, which the painter could not free in the walk that let
 	// go of it (freeGPU, #1082).
 	freeUnkept bool
+	// focusLeft says a walk dropped the node of the content's focused object,
+	// for the end of the min-size pass to unfocus it if it left the trees
+	// (#1089). Main goroutine only.
+	focusLeft bool
 	// regionVisits counts the nodes the last PartialDirtyRegion visited.
 	regionVisits int
 }
@@ -860,6 +864,10 @@ func (c *Canvas) walkForMinSize(measureAll bool, setup, ensureMinSize func(*Rend
 		return
 	}
 	c.walkChangedTrees(setup, ensureMinSize)
+	if c.focusLeft {
+		c.focusLeft = false
+		c.unfocusLeft()
+	}
 }
 
 // walkChangedTrees walks the content and overlay trees as WalkTrees does,
@@ -1031,6 +1039,8 @@ func (c *Canvas) WalkTrees(
 		return true
 	})
 	c.sweepOffscreen(gen)
+	c.focusLeft = false
+	c.unfocusLeft() // a full walk placed everything the trees hold (#1089)
 	c.releaseReplaced()
 }
 
@@ -1471,8 +1481,24 @@ func (c *Canvas) mapNode(node *RenderCacheNode, obj core.CanvasObject) {
 //
 // Under partial repaint, what the nodes were painted as joins the next dirty
 // region (leftRegion): a hidden or removed object's pixels must be cleared.
+//
+// Dropping the focused object's node marks it for unfocusLeft at the end of
+// the pass (focusLeft, #1089). That is the only case a walk of changed paths
+// unfocuses: an object focused before any walk placed it is not in the node
+// map either, and keeps the focus.
 func (c *Canvas) forgetNodes(n *RenderCacheNode) {
+	var focused core.CanvasObject
+	if mgr := c.contentFocusMgr; mgr != nil {
+		focused, _ = mgr.Focused().(core.CanvasObject)
+	}
+	c.forget(n, focused)
+}
+
+func (c *Canvas) forget(n *RenderCacheNode, focused core.CanvasObject) {
 	for ; n != nil; n = n.nextSibling {
+		if focused != nil && n.obj == focused {
+			c.focusLeft = true
+		}
 		if cur, ok := c.nodeMap.Load(n.obj); ok && cur == n {
 			c.nodeMap.Delete(n.obj)
 		}
@@ -1486,7 +1512,7 @@ func (c *Canvas) forgetNodes(n *RenderCacheNode) {
 		if build.PartialRepaint && n.lastPaintSet {
 			c.leftRegion.Union(padRect(n.lastPaintPos, n.lastPaintSize))
 		}
-		c.forgetNodes(n.firstChild)
+		c.forget(n.firstChild, focused)
 	}
 }
 
