@@ -217,7 +217,10 @@ type ltoken struct {
 
 // UnmarshalXML decodes an AndroidManifest.xml document returning type XML
 // containing decoded resources.
-func UnmarshalXML(r io.Reader, withIcon bool, targetSDK int) (*XML, error) {
+func UnmarshalXML(r io.Reader, withIcon bool, minSDK, targetSDK int) (*XML, error) {
+	if minSDK < MinSDK {
+		return nil, fmt.Errorf("minSdkVersion %d is below %d, the lowest bellui builds for", minSDK, MinSDK)
+	}
 	lr := &lineReader{r: r}
 	dec := xml.NewDecoder(lr)
 
@@ -288,7 +291,7 @@ func UnmarshalXML(r io.Reader, withIcon bool, targetSDK int) (*XML, error) {
 									Space: androidSchema,
 									Local: "minSdkVersion",
 								},
-								Value: fmt.Sprintf("%v", MinSDK),
+								Value: strconv.Itoa(minSDK),
 							},
 							{
 								Name: xml.Name{

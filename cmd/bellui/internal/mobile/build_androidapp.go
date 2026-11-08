@@ -417,7 +417,7 @@ func addAssets(apkw *Writer, manifestData []byte, dir, iconPath string, target i
 
 func legacyAddAssets(apkw *Writer, manifestData []byte, iconPath string, target int) error {
 	// Legacy single icon mode using binres
-	bxml, err := binres.UnmarshalXML(bytes.NewReader(manifestData), iconPath != "", target)
+	bxml, err := binres.UnmarshalXML(bytes.NewReader(manifestData), iconPath != "", buildAndroidMinSDK, target)
 	if err != nil {
 		return err
 	}
@@ -704,7 +704,7 @@ func mergeAppJavaDex(dir string, jars, extraJava []string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	d8Args := []string{"--min-api", "21", "--lib", androidJar, "--output", outDir, baseDex}
+	d8Args := []string{"--min-api", fmt.Sprint(buildAndroidMinSDK), "--lib", androidJar, "--output", outDir, baseDex}
 	d8Args = append(d8Args, classFiles...)
 	d8Args = append(d8Args, jars...)
 	if out, err := runD8(d8, d8Args); err != nil {

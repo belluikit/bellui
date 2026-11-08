@@ -22,8 +22,20 @@ func (p *Packager) packageAndroid(arch string, tags []string) error {
 
 	p.warnOwnManifestDropsCredit()
 	p.warnOwnManifestExtractsLibs()
+	if err := mobile.SetAndroidMinSDK(p.androidMinSDKOrDefault()); err != nil {
+		return err
+	}
 	return mobile.RunNewBuild(arch, p.AppID, p.icon, p.Name, p.AppVersion, p.AppBuild, p.release, p.distribution,
 		"", "", tags, iconFG, iconBG, iconMono, p.URLSchemes, p.fileMimeTypes(), nil, p.AssociatedDomains, p.iconCredit())
+}
+
+// androidMinSDKOrDefault is --android-min-sdk, or the default when the
+// Packager was built without the flag (0).
+func (p *Packager) androidMinSDKOrDefault() int {
+	if p.androidMinSDK == 0 {
+		return mobile.DefaultAndroidMinSDK
+	}
+	return p.androidMinSDK
 }
 
 // warnOwnManifestDropsCredit says when the default icon's credit cannot reach

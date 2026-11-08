@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"github.com/urfave/cli/v2"
+
+	"github.com/belluikit/bellui/cmd/bellui/internal/mobile"
 )
 
 type keyValueFlag struct {
@@ -228,6 +230,14 @@ var boolFlags = map[string]func(*bool) cli.Flag{
 }
 
 var intFlags = map[string]func(*int) cli.Flag{
+	"android-min-sdk": func(dst *int) cli.Flag {
+		return &cli.IntFlag{
+			Name:        "android-min-sdk",
+			Usage:       "android: the lowest Android API level the app installs on (at least 21)",
+			Value:       mobile.DefaultAndroidMinSDK,
+			Destination: dst,
+		}
+	},
 	"app-build": func(dst *int) cli.Flag {
 		return &cli.IntFlag{
 			Name:        "app-build",

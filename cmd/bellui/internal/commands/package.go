@@ -48,6 +48,7 @@ func Package() *cli.Command {
 			stringFlags["tags"](&p.tags),
 			stringFlags["app-version"](&p.AppVersion),
 			intFlags["app-build"](&p.AppBuild),
+			intFlags["android-min-sdk"](&p.androidMinSDK),
 			stringFlags["src"](&p.srcDir),
 			stringFlags["icon"](&p.icon),
 			boolFlags["use-raw-icon"](&p.rawIcon),
@@ -73,6 +74,7 @@ type Packager struct {
 	srcDir, dir, exe, os           string
 	install, release, distribution bool
 	certificate, profile           string // optional flags for releasing
+	androidMinSDK                  int    // --android-min-sdk; 0 is mobile.DefaultAndroidMinSDK
 	tags, category                 string
 	tempDir                        string
 	defaultIcon                    bool // the bundled gopher icon is in use (#362)

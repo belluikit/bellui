@@ -17,6 +17,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/belluikit/bellui/cmd/bellui/internal/mobile/binres"
 	"github.com/belluikit/bellui/cmd/bellui/internal/util"
 
 	"golang.org/x/tools/go/packages"
@@ -43,6 +44,26 @@ const (
 	// install on Android 11 and later.
 	androidTargetSDK = 36
 )
+
+// DefaultAndroidMinSDK is the Android API level a package needs unless
+// --android-min-sdk says otherwise: Android 6 (#1086). Google Play Billing 9,
+// among others, needs it.
+const DefaultAndroidMinSDK = 23
+
+// buildAndroidMinSDK is the package's minSdkVersion, --android-min-sdk. The
+// manifest, aapt2's link, d8's dex and the NDK build all use it, so the
+// native code can't need a newer Android than the manifest promises.
+var buildAndroidMinSDK = DefaultAndroidMinSDK
+
+// SetAndroidMinSDK sets the Android API level the package needs. Below
+// binres.MinSDK (21) is refused.
+func SetAndroidMinSDK(api int) error {
+	if api < binres.MinSDK {
+		return fmt.Errorf("--android-min-sdk %d is below %d, the lowest bellui builds for", api, binres.MinSDK)
+	}
+	buildAndroidMinSDK = api
+	return nil
+}
 
 func runBuild(cmd *command) error {
 	_, err := runBuildImpl(cmd)
@@ -292,6 +313,9 @@ func RunNewBuild(target, appID, icon, name, version string, build int, release, 
 	buildIOSUsageDescriptions = iosUsageDescriptions
 	buildAssociatedDomains = associatedDomains
 	buildIconCredit = iconCredit
+	if buildAndroidAPI < buildAndroidMinSDK {
+		buildAndroidAPI = buildAndroidMinSDK
+	}
 	if release {
 		buildLdflags = "-w"
 		buildTrimpath = true
