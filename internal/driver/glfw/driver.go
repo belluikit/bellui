@@ -256,6 +256,14 @@ func (d *gLDriver) IsOnScreen(obj core.CanvasObject) bool {
 	return false
 }
 
+// Release implements bellui.ReleasingDriver: the next frame of the canvas obj
+// was last drawn on lets go of what it no longer shows.
+func (d *gLDriver) Release(obj core.CanvasObject) {
+	if c, ok := d.CanvasForObject(obj).(*glCanvas); ok {
+		c.ReleaseDropped()
+	}
+}
+
 func (d *gLDriver) initFailed(msg string, err error) {
 	bellui.LogError(msg, err)
 

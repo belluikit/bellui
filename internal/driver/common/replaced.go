@@ -8,10 +8,21 @@ import (
 
 // noteReplaced records that a Set*Tree call is replacing old with a tree
 // rooted at next, for the next full walk to release what old held (#1075).
+// ReleaseDropped records the same for content the app dropped (#1083).
 func (c *Canvas) noteReplaced(old *renderCacheTree, next core.CanvasObject) {
 	if old != nil && old.root != nil && old.root.obj != nil && old.root.obj != next {
 		c.replaced = true
 	}
+}
+
+// ReleaseDropped asks the next frame's walk to release what the caches and
+// the painter hold for content the app took out of the canvas, as it does for
+// replaced content (bellui.Release, #1083). It marks the canvas dirty so that
+// frame comes. Call it on the main goroutine.
+func (c *Canvas) ReleaseDropped() {
+	c.replaced = true
+	c.minSizeFull.Store(true)
+	c.SetDirty()
 }
 
 // releaseReplaced runs after a full walk, once the offscreen sweep has run.
@@ -30,6 +41,7 @@ func (c *Canvas) releaseReplaced() {
 		return
 	}
 	c.replaced = false
+	c.unfocusLeft()
 	gone := cache.ReleaseUnkept(c.impl, c.inTrees)
 	if c.painter == nil {
 		return
@@ -39,6 +51,24 @@ func (c *Canvas) releaseReplaced() {
 		return
 	}
 	c.freeGPU(gone)
+}
+
+// unfocusLeft unfocuses the content's focused object if the walk left it out
+// of the trees. The focus manager kept it, and with it the content it was
+// dropped with, and sent it the keys typed after (#1083). A replaced tree
+// gets a new focus manager, but content dropped from a container does not.
+func (c *Canvas) unfocusLeft() {
+	mgr := c.contentFocusMgr
+	if mgr == nil {
+		return
+	}
+	obj, ok := mgr.Focused().(core.CanvasObject)
+	if !ok || c.inTrees(obj) {
+		return
+	}
+	if mgr.Focus(nil) && mgr == c.focusManager() && c.OnUnfocus != nil {
+		c.OnUnfocus()
+	}
 }
 
 // freeGPU frees the textures and RepaintBoundary targets of the objects that
