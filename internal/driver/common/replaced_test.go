@@ -211,8 +211,10 @@ func texturedScreen(c *Canvas, kept *canvas.Image) (*canvas.Image, *container.Re
 	c.impl.(*markingCanvas).SetContent(content)
 	c.SetContentTreeAndFocusMgr(content)
 	idleFrame(c)
-	cache.SetTexture(img, 1, c.impl)
-	cache.SetTexture(kept, 2, c.impl)
+	// The handle's value does not matter: the cache holds an entry for each,
+	// and TextureType is a struct on GL mobile and wasm builds.
+	cache.SetTexture(img, cache.NoTexture, c.impl)
+	cache.SetTexture(kept, cache.NoTexture, c.impl)
 	return img, b
 }
 
