@@ -647,7 +647,7 @@ func linkResourcesWithLibs(work string, manifest []byte, libs *androidLibs, ownR
 	args := []string{
 		"link", "-o", apk,
 		"--manifest", manifestPath,
-		"--min-sdk-version", fmt.Sprint(binres.MinSDK),
+		"--min-sdk-version", fmt.Sprint(buildAndroidMinSDK),
 		"--target-sdk-version", fmt.Sprint(target),
 		"--version-code", fmt.Sprint(versionCode),
 		"--version-name", versionName,

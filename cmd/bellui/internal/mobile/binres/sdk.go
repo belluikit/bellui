@@ -13,7 +13,8 @@ import (
 	"strings"
 )
 
-// MinSDK is the targeted sdk version for support by package binres.
+// MinSDK is the lowest Android API level package binres builds for. A
+// package's own minimum is UnmarshalXML's minSDK, at least this.
 const MinSDK = 21
 
 // SDKPlatform is the SDK platform directory name the embedded resource table

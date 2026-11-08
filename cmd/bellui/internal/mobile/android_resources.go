@@ -164,7 +164,7 @@ func compileAndroidResources(tempDir string, manifestData []byte, legacyPath, fo
 		"link",
 		"-o", outputAPK,
 		"--manifest", tempManifestPath,
-		"--min-sdk-version", "21", // Android 5.0, minimum for adaptive icons (v26) with backward compat
+		"--min-sdk-version", fmt.Sprint(buildAndroidMinSDK),
 		"--target-sdk-version", fmt.Sprintf("%d", targetSDK),
 		"--version-code", fmt.Sprintf("%d", versionCode),
 		"--version-name", versionName,

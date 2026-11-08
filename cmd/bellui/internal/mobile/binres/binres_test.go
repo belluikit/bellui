@@ -157,7 +157,7 @@ func TestEncode(t *testing.T) {
 	f, err := os.Open("testdata/bootstrap.xml")
 	r.NoError(err)
 
-	bx, err := UnmarshalXML(f, false, 30)
+	bx, err := UnmarshalXML(f, false, MinSDK, 30)
 	r.NoError(err)
 
 	bin, err := os.ReadFile("testdata/bootstrap.bin")
@@ -214,7 +214,7 @@ func TestEncodeAttrsInResourceIDOrder(t *testing.T) {
 	skipSynthesize = false // the build-platform and uses-sdk attributes a real build adds
 	t.Cleanup(func() { skipSynthesize = restore })
 
-	bx, err := UnmarshalXML(strings.NewReader(manifest), true, 34)
+	bx, err := UnmarshalXML(strings.NewReader(manifest), true, MinSDK, 34)
 	r.NoError(err)
 	bin, err := bx.MarshalBinary()
 	r.NoError(err)
@@ -268,7 +268,7 @@ func configChangesValue(t *testing.T, flags string) uint32 {
 	t.Helper()
 	r := require.New(t)
 
-	bx, err := UnmarshalXML(strings.NewReader(configChangesManifest(flags)), false, 30)
+	bx, err := UnmarshalXML(strings.NewReader(configChangesManifest(flags)), false, MinSDK, 30)
 	r.NoError(err)
 
 	elref, err := bx.Pool.RefByName("activity")
@@ -323,7 +323,7 @@ func TestEncodeConfigChanges(t *testing.T) {
 // hard error naming the flag, not a silently dropped bit (#287).
 func TestEncodeConfigChangesUnknownFlag(t *testing.T) {
 	r := require.New(t)
-	_, err := UnmarshalXML(strings.NewReader(configChangesManifest("orientation|notAConfigChange")), false, 30)
+	_, err := UnmarshalXML(strings.NewReader(configChangesManifest("orientation|notAConfigChange")), false, MinSDK, 30)
 	r.Error(err)
 	r.Contains(err.Error(), "notAConfigChange")
 	r.Contains(err.Error(), "configChanges")
@@ -395,7 +395,7 @@ func TestEncodeScreenOrientation(t *testing.T) {
 		t.Run(tt.value, func(t *testing.T) {
 			r := require.New(t)
 
-			bx, err := UnmarshalXML(strings.NewReader(screenOrientationManifest(tt.value)), false, 30)
+			bx, err := UnmarshalXML(strings.NewReader(screenOrientationManifest(tt.value)), false, MinSDK, 30)
 			r.NoError(err)
 
 			nref, err := bx.Pool.RefByName("screenOrientation")
@@ -420,7 +420,7 @@ func TestEncodeScreenOrientation(t *testing.T) {
 // compiles to a valid-but-wrong manifest (#295).
 func TestEncodeScreenOrientationUnknownValue(t *testing.T) {
 	r := require.New(t)
-	_, err := UnmarshalXML(strings.NewReader(screenOrientationManifest("typo")), false, 30)
+	_, err := UnmarshalXML(strings.NewReader(screenOrientationManifest("typo")), false, MinSDK, 30)
 	r.Error(err)
 	r.Contains(err.Error(), `"typo"`)
 	r.Contains(err.Error(), "screenOrientation")
@@ -432,7 +432,7 @@ func TestRawValueByName(t *testing.T) {
 	f, err := os.Open("testdata/bootstrap.xml")
 	r.NoError(err)
 
-	bx, err := UnmarshalXML(f, false, 30)
+	bx, err := UnmarshalXML(f, false, MinSDK, 30)
 	r.NoError(err)
 
 	pkgname, err := bx.RawValueByName("manifest", xml.Name{Local: "package"})
@@ -734,5 +734,41 @@ func BenchmarkTableRefByName(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
+	}
+}
+
+// The manifest's minSdkVersion is the package's own (#1086), and below
+// MinSDK is refused.
+func TestUnmarshalXMLMinSDK(t *testing.T) {
+	const manifest = `<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.example.min">
+	<application android:label="Min"/>
+</manifest>`
+	restore := skipSynthesize
+	skipSynthesize = false // uses-sdk is synthesized
+	t.Cleanup(func() { skipSynthesize = restore })
+	for _, min := range []int{MinSDK, 23} {
+		bx, err := UnmarshalXML(strings.NewReader(manifest), false, min, 36)
+		if err != nil {
+			t.Fatal(err)
+		}
+		name, err := bx.Pool.RefByName("minSdkVersion")
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := -1
+		for el := range bx.iterElements() {
+			for _, a := range el.attrs {
+				if a.Name == name {
+					got = int(a.TypedValue.Value)
+				}
+			}
+		}
+		if got != min {
+			t.Errorf("minSdkVersion %d, want %d", got, min)
+		}
+	}
+	if _, err := UnmarshalXML(strings.NewReader(manifest), false, MinSDK-1, 36); err == nil {
+		t.Errorf("minSdkVersion %d was accepted", MinSDK-1)
 	}
 }

@@ -108,7 +108,7 @@ func TestAaptDumpTemplateManifest(t *testing.T) {
 	skipSynthesize = false
 	t.Cleanup(func() { skipSynthesize = restore })
 
-	bx, err := UnmarshalXML(bytes.NewReader(manifest.Bytes()), true, 30)
+	bx, err := UnmarshalXML(bytes.NewReader(manifest.Bytes()), true, MinSDK, 30)
 	r.NoError(err)
 	bin, err := bx.MarshalBinary()
 	r.NoError(err)
