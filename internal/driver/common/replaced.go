@@ -41,7 +41,6 @@ func (c *Canvas) releaseReplaced() {
 		return
 	}
 	c.replaced = false
-	c.unfocusLeft()
 	gone := cache.ReleaseUnkept(c.impl, c.inTrees)
 	if c.painter == nil {
 		return
@@ -55,8 +54,11 @@ func (c *Canvas) releaseReplaced() {
 
 // unfocusLeft unfocuses the content's focused object if the walk left it out
 // of the trees. The focus manager kept it, and with it the content it was
-// dropped with, and sent it the keys typed after (#1083). A replaced tree
-// gets a new focus manager, but content dropped from a container does not.
+// dropped with, and sent it the keys typed after (#1083, #1089). A replaced
+// tree gets a new focus manager, but content dropped from a container does
+// not. Every full walk runs it, and a walk of changed paths that dropped the
+// focused object's node (forgetNodes). An object moved elsewhere in the trees
+// has a node again by then, and keeps the focus.
 func (c *Canvas) unfocusLeft() {
 	mgr := c.contentFocusMgr
 	if mgr == nil {
