@@ -28,6 +28,11 @@ const liveLabel = "live"
 
 // TransportControls provides play/pause, seek, mute, volume, and time display
 // controls.
+//
+// The volume slider and mute are the playback's own volume, 0 to 1, reported
+// through OnVolume. The device's volume applies on top and is separate: on a
+// phone the hardware buttons do not move the slider, and the slider does not
+// move the device volume. That is deliberate (#1095).
 type TransportControls struct {
 	widget.BaseWidget
 
