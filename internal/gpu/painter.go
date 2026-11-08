@@ -90,6 +90,18 @@ func FrameOpen(p Painter) bool {
 	return !ok || f.FrameOpen()
 }
 
+// BetweenFramesPainter is an optional interface for painters that can free an
+// object's GPU memory outside a frame, as the walk that lets go of replaced
+// content asks (#1082). WebGPU can whenever no frame is open: no unsubmitted
+// command then uses a texture. GL cannot, as freeing needs its context
+// current, which a walk does not make, so the canvas keeps those objects for
+// the next frame's FreeDirtyTextures.
+type BetweenFramesPainter interface {
+	// CanFreeNow reports whether Free and FreeBoundaryFBO may free GPU memory
+	// now, rather than with a frame.
+	CanFreeNow() bool
+}
+
 // DirtyRegionPainter is an optional interface for painters that support
 // a persistent canvas FBO for dirty-region culling. The paint walk
 // type-asserts to this interface.

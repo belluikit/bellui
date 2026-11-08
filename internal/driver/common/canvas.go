@@ -180,6 +180,10 @@ type Canvas struct {
 	// release what the replaced one held (releaseReplaced, #1075). Like the
 	// trees, it is set and read on the main goroutine.
 	replaced bool
+	// freeUnkept asks the next FreeDirtyTextures to free the textures of
+	// replaced content, which the painter could not free in the walk that let
+	// go of it (freeGPU, #1082).
+	freeUnkept bool
 	// regionVisits counts the nodes the last PartialDirtyRegion visited.
 	regionVisits int
 }
@@ -408,6 +412,8 @@ func (c *Canvas) FreeDirtyTextures() uint64 {
 	if c.painter == nil {
 		return 0
 	}
+
+	c.freeUnkeptTextures()
 
 	bp, hasBP := c.painter.(gpu.BoundaryPainter)
 

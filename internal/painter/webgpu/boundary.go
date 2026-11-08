@@ -156,7 +156,7 @@ func (p *painter) releaseBoundary(s *boundaryState) {
 	if s.tex == nil {
 		return
 	}
-	if p.dev != nil {
+	if p.dev != nil && !p.CanFreeNow() {
 		p.dev.ReleaseTextureAfterFrame(s.tex)
 	} else {
 		s.tex.Release()

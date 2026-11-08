@@ -1,6 +1,7 @@
 package common
 
 import (
+	"image"
 	"runtime"
 	"testing"
 	"weak"
@@ -8,9 +9,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/core"
+	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/cache"
+	"github.com/belluikit/bellui/internal/gpu"
 	"github.com/belluikit/bellui/test"
 	"github.com/belluikit/bellui/widget"
 )
@@ -24,7 +28,14 @@ func idleFrame(c *Canvas) {
 }
 
 // screenState stands for what an app's screen closes over in its handlers.
-type screenState struct{ events int }
+// The pointer keeps it out of the tiny allocator, which packs small objects
+// without pointers into one block: a weak pointer to one of them is not
+// cleared while another in its block lives, so whether it was depended on
+// what the tests before had allocated.
+type screenState struct {
+	events int
+	_      *int
+}
 
 // replacedScreen builds a screen whose every handler closes over s: a list
 // scrolled so that rows wait in its pool, a focused entry, a hidden button, and
@@ -135,4 +146,160 @@ func TestReplacedContentPutBackBeforeAWalk(t *testing.T) {
 
 	_, ok := cache.CachedRenderer(entry)
 	assert.True(t, ok, "content put back lost its renderer")
+}
+
+// gpuPainter frees as a GPU painter does, recording what it freed: Free drops
+// an object's texture from the cache. canFree is what it answers CanFreeNow;
+// glPainter wraps one to answer nothing, as GL does not implement it.
+type gpuPainter struct {
+	stubPainter
+	canFree    bool
+	freed      []core.CanvasObject
+	boundaries []core.CanvasObject
+}
+
+func (p *gpuPainter) Free(obj core.CanvasObject) {
+	if _, ok := cache.GetTexture(obj); ok {
+		p.freed = append(p.freed, obj)
+		cache.DeleteTexture(obj)
+	}
+}
+
+func (p *gpuPainter) CanFreeNow() bool { return p.canFree }
+
+func (*gpuPainter) EnsureBoundaryFBO(core.CanvasObject, int, int, geo.Size) gpu.BoundaryFBO {
+	return nil
+}
+func (*gpuPainter) BindBoundaryFBO(gpu.BoundaryFBO)                             {}
+func (*gpuPainter) UnbindBoundaryFBO(int, int)                                  {}
+func (*gpuPainter) BlitBoundaryTexture(gpu.BoundaryFBO, geo.Position, geo.Size) {}
+func (*gpuPainter) MarkBoundaryDirty(core.CanvasObject)                         {}
+func (*gpuPainter) IsBoundaryClean(core.CanvasObject) bool                      { return false }
+func (*gpuPainter) InvalidateAllBoundaries()                                    {}
+
+func (p *gpuPainter) FreeBoundaryFBO(obj core.CanvasObject) {
+	if _, ok := obj.(*container.RepaintBoundary); ok {
+		p.boundaries = append(p.boundaries, obj)
+	}
+}
+
+var (
+	_ gpu.BetweenFramesPainter = (*gpuPainter)(nil)
+	_ gpu.BoundaryPainter      = (*gpuPainter)(nil)
+)
+
+// glPainter is a gpuPainter that cannot free outside a frame, as GL cannot.
+type glPainter struct{ p *gpuPainter }
+
+func (g glPainter) Init()                                                  {}
+func (g glPainter) Capture(core.Canvas) image.Image                        { return nil }
+func (g glPainter) Clear()                                                 {}
+func (g glPainter) Free(obj core.CanvasObject)                             { g.p.Free(obj) }
+func (g glPainter) Paint(core.CanvasObject, geo.Position, geo.Size)        {}
+func (g glPainter) SetFrameBufferScale(float32)                            {}
+func (g glPainter) SetOutputSize(int, int)                                 {}
+func (g glPainter) StartClipping(geo.Position, geo.Size)                   {}
+func (g glPainter) StopClipping()                                          {}
+func (g glPainter) StartRoundedClipping(geo.Position, geo.Size, float32)   {}
+func (g glPainter) StopRoundedClipping()                                   {}
+func (g glPainter) StartPathClipping(*canvas.Path, geo.Position, geo.Size) {}
+func (g glPainter) StopPathClipping()                                      {}
+func (g glPainter) SetGroupOpacity(float32)                                {}
+func (g glPainter) ClearGroupOpacity()                                     {}
+func (g glPainter) SetTransform(geo.Matrix)                                {}
+
+// texturedScreen is a screen with an image the painter holds a texture for,
+// under a RepaintBoundary, and an image the next screen takes over.
+func texturedScreen(c *Canvas, kept *canvas.Image) (*canvas.Image, *container.RepaintBoundary) {
+	img := canvas.NewImageFromImage(image.NewNRGBA(image.Rect(0, 0, 512, 512)))
+	img.SetMinSize(geo.NewSize(50, 50))
+	b := container.NewRepaintBoundary(container.NewVBox(img, kept))
+	content := container.NewVBox(b)
+	c.impl.(*markingCanvas).SetContent(content)
+	c.SetContentTreeAndFocusMgr(content)
+	idleFrame(c)
+	// The handle's value does not matter: the cache holds an entry for each,
+	// and TextureType is a struct on GL mobile and wasm builds.
+	cache.SetTexture(img, cache.NoTexture, c.impl)
+	cache.SetTexture(kept, cache.NoTexture, c.impl)
+	return img, b
+}
+
+// TestReplacedContentFreesTextures is #1082: the walk that lets go of
+// replaced content frees its textures and RepaintBoundary targets too, when
+// the painter can free outside a frame, so no frame has to follow. The
+// texture cache held each until a frame a minute after it was last drawn,
+// and the image it was keyed by with it.
+func TestReplacedContentFreesTextures(t *testing.T) {
+	test.NewTempApp(t)
+	c := walkedCanvas(container.NewVBox())
+	p := &gpuPainter{canFree: true}
+	c.SetPainter(p)
+	kept := canvas.NewImageFromImage(image.NewNRGBA(image.Rect(0, 0, 8, 8)))
+	img, b := texturedScreen(c, kept)
+
+	next := container.NewVBox(kept)
+	c.impl.(*markingCanvas).SetContent(next)
+	c.SetContentTreeAndFocusMgr(next)
+	c.EnsureMinSize() // the walk of the frame that shows next, before its FreeDirtyTextures
+
+	assert.Contains(t, p.freed, core.CanvasObject(img), "the replaced image's texture was not freed in the walk")
+	assert.NotContains(t, p.freed, core.CanvasObject(kept), "the texture of an image still shown was freed")
+	assert.Contains(t, p.boundaries, core.CanvasObject(b), "the replaced boundary's target was not freed in the walk")
+	_, ok := cache.GetTexture(kept)
+	assert.True(t, ok, "the image still shown lost its texture")
+
+	p.freed, p.boundaries = nil, nil
+	w := weak.Make(img)
+	img, b = nil, nil
+	runtime.GC()
+	runtime.GC()
+	assert.Nil(t, w.Value(), "the replaced image is still reachable")
+	runtime.KeepAlive(c)
+}
+
+// TestReplacedContentTexturesWaitForAFrame: a painter that cannot free outside
+// a frame, as GL cannot, frees the replaced content's textures at the start
+// of the next frame, not in the walk.
+func TestReplacedContentTexturesWaitForAFrame(t *testing.T) {
+	test.NewTempApp(t)
+	c := walkedCanvas(container.NewVBox())
+	p := &gpuPainter{}
+	c.SetPainter(glPainter{p})
+	kept := canvas.NewImageFromImage(image.NewNRGBA(image.Rect(0, 0, 8, 8)))
+	img, _ := texturedScreen(c, kept)
+
+	next := container.NewVBox(kept)
+	c.impl.(*markingCanvas).SetContent(next)
+	c.SetContentTreeAndFocusMgr(next)
+	c.EnsureMinSize()
+	assert.Empty(t, p.freed, "a painter that cannot free outside a frame was asked to")
+
+	c.FreeDirtyTextures()
+	assert.Equal(t, []core.CanvasObject{img}, p.freed)
+	p.freed = nil
+	c.FreeDirtyTextures()
+	assert.Empty(t, p.freed, "a second frame freed again")
+}
+
+// TestReplacedContentTexturesWaitForAnOpenFrame: a painter that can free
+// outside a frame but has one open is asked at the next frame instead.
+func TestReplacedContentTexturesWaitForAnOpenFrame(t *testing.T) {
+	test.NewTempApp(t)
+	c := walkedCanvas(container.NewVBox())
+	p := &gpuPainter{canFree: true}
+	c.SetPainter(p)
+	kept := canvas.NewImageFromImage(image.NewNRGBA(image.Rect(0, 0, 8, 8)))
+	img, _ := texturedScreen(c, kept)
+
+	p.canFree = false // a frame is open
+	next := container.NewVBox(kept)
+	c.impl.(*markingCanvas).SetContent(next)
+	c.SetContentTreeAndFocusMgr(next)
+	c.EnsureMinSize()
+	assert.Empty(t, p.freed)
+
+	p.canFree = true
+	c.FreeDirtyTextures()
+	assert.Equal(t, []core.CanvasObject{img}, p.freed)
 }

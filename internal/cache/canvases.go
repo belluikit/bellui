@@ -111,7 +111,9 @@ func ReleaseObject(obj core.CanvasObject, c core.Canvas) {
 // A renderer whose widget no canvas has registered goes too: a widget the app
 // keeps off screen, such as a pop-up it shows again, then gets a new renderer
 // when it is next shown, as it does today after ValidDuration unshown.
-func ReleaseUnkept(c core.Canvas, keep func(core.CanvasObject) bool) {
+//
+// It returns the objects it released, for c to free their GPU memory (#1082).
+func ReleaseUnkept(c core.Canvas, keep func(core.CanvasObject) bool) []core.CanvasObject {
 	var gone []core.CanvasObject
 	canvases.Range(func(obj core.CanvasObject, cinfo *canvasInfo) bool {
 		if cinfo.canvas == c && !keep(obj) {
@@ -130,6 +132,7 @@ func ReleaseUnkept(c core.Canvas, keep func(core.CanvasObject) bool) {
 	for _, obj := range gone {
 		ReleaseObject(obj, c)
 	}
+	return gone
 }
 
 type canvasInfo struct {

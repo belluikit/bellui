@@ -126,9 +126,29 @@ func TestBoundaryEvictedWhenUnused(t *testing.T) {
 
 	o.painter.frame += boundaryKeepFrames + 1
 	o.boundaries[kept].usedFrame = o.painter.frame // drawn in the latest frame
+	// BeginFrame evicts once it has begun the frame.
+	o.framing = true
 	o.evictBoundaries()
+	o.framing = false
 
 	assert.Equal(t, 1, o.CachedBoundaries())
 	assert.Contains(t, o.boundaries, core.CanvasObject(kept))
 	assert.True(t, slices.Contains(o.dev.frameTextures, goneTex), "the texture waits for the frame's submit")
+}
+
+// TestBoundaryFreedBetweenFrames is #1082: a boundary freed with no frame
+// open, as the walk that lets go of replaced content frees it, releases its
+// texture at once, as no unsubmitted command can sample it. It used to wait
+// for the next frame's submit, which an idle app does not make.
+func TestBoundaryFreedBetweenFrames(t *testing.T) {
+	o := newOffscreenPainter(t)
+	obj := canvas.NewRectangle(nil)
+	tex := o.EnsureBoundaryFBO(obj, 16, 16, geo.NewSquareSize(16)).(*boundaryState).tex
+	require.True(t, o.CanFreeNow(), "precondition: no frame is open")
+
+	o.FreeBoundaryFBO(obj)
+
+	assert.Zero(t, o.CachedBoundaries())
+	assert.False(t, slices.Contains(o.dev.frameTextures, tex), "the texture waits for a frame")
+	assert.Nil(t, tex.tex, "the texture was not released")
 }

@@ -31,9 +31,10 @@ import (
 
 // Verify painter implements the backend-neutral painter interfaces.
 var (
-	_ gpu.Painter            = (*painter)(nil)
-	_ gpu.BoundaryPainter    = (*painter)(nil)
-	_ gpu.DirtyRegionPainter = (*painter)(nil)
+	_ gpu.Painter              = (*painter)(nil)
+	_ gpu.BoundaryPainter      = (*painter)(nil)
+	_ gpu.DirtyRegionPainter   = (*painter)(nil)
+	_ gpu.BetweenFramesPainter = (*painter)(nil)
 )
 
 // painter is the WebGPU renderer for a single canvas. It mirrors the GL
@@ -303,6 +304,14 @@ func (p *painter) Free(obj core.CanvasObject) {
 	if _, ok := obj.(*canvas.Scene3D); ok {
 		delete(p.scenes, obj)
 	}
+}
+
+// CanFreeNow implements gpu.BetweenFramesPainter: with no frame open, no
+// unsubmitted command samples a texture, so Free may destroy it at once
+// (#1082). A frame begun and not presented or discarded still holds its
+// encoder.
+func (p *painter) CanFreeNow() bool {
+	return !p.framing && (p.dev == nil || !p.dev.HasOpenFrame())
 }
 
 // EnableCapture arms the device's per-frame capture copy without reading a
