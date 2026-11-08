@@ -291,6 +291,26 @@ func (h *TouchHandler) tapDownSingle(pos geo.Position, tapID int) {
 	}
 }
 
+// cancelTouched sends TouchCancel to the Touchable contact tapID went down
+// on, unless it is keep, when the contact latches a scroll, or a drag of
+// another object. The content then moves with the finger, so the finger stays
+// over a button it scrolls a list by, and the button kept showing a press it
+// will never be tapped by (#1085). A drag of the Touchable itself, such as an
+// entry's, is its own gesture and goes on.
+func (h *TouchHandler) cancelTouched(tapID int, keep core.CanvasObject) {
+	t := h.Touched[tapID]
+	if t == nil {
+		return
+	}
+	if obj, ok := t.(core.CanvasObject); ok && obj == keep {
+		return
+	}
+	touchEv := &mobile.TouchEvent{}
+	touchEv.AbsolutePosition = h.LastTapDownPos[tapID]
+	t.TouchCancel(touchEv)
+	h.Touched[tapID] = nil
+}
+
 // markUnfocusOnTap records that the contact went down away from the focused
 // widget (see unfocusOnTap).
 func (h *TouchHandler) markUnfocusOnTap(tapID int) {
@@ -445,8 +465,12 @@ func (h *TouchHandler) TapMove(pos geo.Position, tapID int,
 			h.draggingID = tapID
 			h.DragOffset = previousPos.Subtract(dragPos)
 			h.DragStart = dragCo.Position()
+			h.cancelTouched(tapID, dragCo)
 		} else {
 			h.tryLatchScroll(previousPos, offset, tapID)
+			if h.scrolling && h.scrollingID == tapID {
+				h.cancelTouched(tapID, nil)
+			}
 			return
 		}
 	}
