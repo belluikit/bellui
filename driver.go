@@ -64,6 +64,12 @@ type OnScreenDriver interface {
 	IsOnScreen(core.CanvasObject) bool
 }
 
+// ReleasingDriver is an optional interface that a [Driver] can implement to
+// let go at once of content the app dropped. See [Release].
+type ReleasingDriver interface {
+	Release(core.CanvasObject)
+}
+
 // PositionMappingDriver is an optional interface that a [Driver] can implement
 // to map positions between an object's own coordinates and its canvas through
 // the object's world transform, the one it is drawn and hit with
@@ -180,4 +186,32 @@ func IsOnScreen(obj core.CanvasObject) bool {
 		}
 	}
 	return obj.Visible()
+}
+
+// Release tells the toolkit that obj, which the app has taken out of a window,
+// will not be shown again, so what the toolkit keeps for it can go: the
+// renderers of the widgets in it, what the canvas records about them, and the
+// textures it drew them with (#1083). Call it on the main goroutine when
+// dropping a subtree for good, such as a page a navigation container replaced
+// by assigning its Objects or calling RemoveAll. Window.SetContent needs no
+// call: it releases the content it replaces.
+//
+// It takes effect at the next frame, the one that shows what replaced obj,
+// and needs no frame after it. That frame lets go of everything on obj's
+// canvas that is no longer in the window, not only obj: rows a list keeps for
+// reuse elsewhere on the canvas, say, get new renderers when they are next
+// shown. Anything still in the window keeps its renderers, obj included if it
+// was not removed. An object released and shown again later gets new
+// renderers, as after SetContent.
+//
+// Without it, the toolkit lets go of dropped content at the first frame at
+// least a minute after it was last drawn, which an idle app does not make.
+// Release does nothing on a driver that does not implement [ReleasingDriver],
+// which then frees it that way.
+func Release(obj core.CanvasObject) {
+	if a := CurrentApp(); a != nil {
+		if rd, ok := a.Driver().(ReleasingDriver); ok {
+			rd.Release(obj)
+		}
+	}
 }

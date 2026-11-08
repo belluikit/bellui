@@ -248,6 +248,14 @@ func (d *driver) IsOnScreen(obj core.CanvasObject) bool {
 	return ok && c.InSight(obj)
 }
 
+// Release implements bellui.ReleasingDriver: the next frame of the canvas obj
+// was last drawn on lets go of what it no longer shows.
+func (d *driver) Release(obj core.CanvasObject) {
+	if c, ok := d.CanvasForObject(obj).(*canvas); ok {
+		c.ReleaseDropped()
+	}
+}
+
 // currentWindow returns the most recently opened window - we can only show one at a time.
 func (d *driver) currentWindow() *window {
 	windows := d.AllWindows()

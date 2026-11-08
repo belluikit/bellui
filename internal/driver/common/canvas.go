@@ -176,9 +176,10 @@ type Canvas struct {
 	// frame (#1061).
 	offscreenTops async.Map[core.CanvasObject, uint64]
 	offscreen     async.Map[core.CanvasObject, *offscreenAt]
-	// replaced says a tree was replaced since the last full walk, for it to
-	// release what the replaced one held (releaseReplaced, #1075). Like the
-	// trees, it is set and read on the main goroutine.
+	// replaced says a tree was replaced, or the app dropped content
+	// (ReleaseDropped, #1083), since the last full walk, for it to release
+	// what the replaced one held (releaseReplaced, #1075). Like the trees, it
+	// is set and read on the main goroutine.
 	replaced bool
 	// freeUnkept asks the next FreeDirtyTextures to free the textures of
 	// replaced content, which the painter could not free in the walk that let
