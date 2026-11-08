@@ -131,3 +131,45 @@ func TestHiddenFocusedObjectKeepsFocus(t *testing.T) {
 
 	assert.Equal(t, entry, c.Focused(), "hiding the entry took its focus")
 }
+
+// TestListRowScrolledAwayLosesFocus pins the owner's decision on #1089: a
+// focused row a List scrolls fully out of view leaves the trees, so it loses
+// the focus, and does not get it back when it scrolls in again. The list
+// recycles the row's widget for another item, which a kept focus would type
+// into. Keeping it would need the List to hold its focused row out of the
+// pool. Selecting another tab still keeps it, as the row stays in the trees.
+func TestListRowScrolledAwayLosesFocus(t *testing.T) {
+	test.NewTempApp(t)
+	var made []*widget.Entry
+	list := widget.NewList(func() int { return 200 },
+		func() core.CanvasObject { e := widget.NewEntry(); made = append(made, e); return e },
+		func(widget.ListItemID, core.CanvasObject) {})
+	tabs := container.NewAppTabs(container.NewTabItem("L", list), container.NewTabItem("O", widget.NewLabel("o")))
+	c := walkedCanvas(tabs)
+	idleFrame(c)
+	var row *widget.Entry
+	for _, e := range made {
+		if _, ok := c.nodeMap.Load(core.CanvasObject(e)); ok {
+			row = e // not the template entry List measures with
+			break
+		}
+	}
+	require.NotNil(t, row, "precondition: a placed row")
+	c.Focus(row)
+	idleFrame(c)
+
+	tabs.SelectIndex(1)
+	c.Refresh(tabs)
+	idleFrame(c)
+	assert.Equal(t, row, c.Focused(), "selecting another tab took the row's focus")
+	tabs.SelectIndex(0)
+	c.Refresh(tabs)
+	idleFrame(c)
+
+	list.ScrollToBottom()
+	idleFrame(c)
+	assert.Nil(t, c.Focused(), "the row scrolled away kept the focus")
+	list.ScrollToTop()
+	idleFrame(c)
+	assert.Nil(t, c.Focused(), "the row got the focus back")
+}
