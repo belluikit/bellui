@@ -382,15 +382,21 @@ func (w *window) findObjectAtPositionMatching(canvas *glCanvas, mouse geo.Positi
 	return canvas.FindObjectAtPositionMatching(mouse, matches)
 }
 
+// stampDrag records user activity for a mouse moved with a button held. A
+// bare move does not count, since a mouse at rest can jitter (#1108).
+func (w *window) stampDrag() {
+	if w.mouseButton != 0 {
+		activity.Stamp()
+	}
+}
+
 func (w *window) processMouseMoved(xpos float64, ypos float64) {
 	previousPos := w.mousePos
 	w.mousePos = geo.NewPos(scale.ToBelluiCoordinate(w.canvas, int(xpos)), scale.ToBelluiCoordinate(w.canvas, int(ypos)))
 	mousePos := w.mousePos
 	mouseDragPos := w.mouseDragPos
 	mouseOver := w.mouseOver
-	if w.mouseButton != 0 {
-		activity.Stamp() // a drag; a bare move does not count (#1108)
-	}
+	w.stampDrag()
 
 	w.cancelLongPressOnMove(mousePos)
 
