@@ -15,6 +15,7 @@ import (
 	"github.com/belluikit/bellui/driver/desktop"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/activity"
 	"github.com/belluikit/bellui/internal/app"
 	"github.com/belluikit/bellui/internal/async"
 	"github.com/belluikit/bellui/internal/build"
@@ -387,6 +388,9 @@ func (w *window) processMouseMoved(xpos float64, ypos float64) {
 	mousePos := w.mousePos
 	mouseDragPos := w.mouseDragPos
 	mouseOver := w.mouseOver
+	if w.mouseButton != 0 {
+		activity.Stamp() // a drag; a bare move does not count (#1108)
+	}
 
 	w.cancelLongPressOnMove(mousePos)
 
@@ -692,6 +696,7 @@ func (w *window) finishDragTarget(pos geo.Position) {
 var refreshCursorOnClick = true
 
 func (w *window) processMouseClicked(button desktop.MouseButton, action action, modifiers event.KeyModifier) {
+	activity.Stamp()
 	if view := w.view(); refreshCursorOnClick && view != nil {
 		xpos, ypos := view.GetCursorPos()
 		w.mousePos = geo.NewPos(scale.ToBelluiCoordinate(w.canvas, int(xpos)), scale.ToBelluiCoordinate(w.canvas, int(ypos)))
@@ -983,6 +988,7 @@ func (w *window) waitForDoubleTapEnded(co core.CanvasObject, ev *event.PointEven
 }
 
 func (w *window) processMouseScrolled(xoff float64, yoff float64) {
+	activity.Stamp()
 	if math.Abs(xoff) >= scrollAccelerateCutoff {
 		xoff *= scrollAccelerateRate
 	}
@@ -1097,6 +1103,7 @@ func (w *window) processKeyReleased(keyEvent *event.KeyEvent, pendingMenuToggle,
 }
 
 func (w *window) processKeyPressed(keyName event.KeyName, keyASCII event.KeyName, scancode int, action action, keyDesktopModifier event.KeyModifier) {
+	activity.Stamp()
 	keyEvent := &event.KeyEvent{Name: keyName, Physical: event.HardwareKey{ScanCode: scancode}, Modifier: keyDesktopModifier}
 	// Set when KeyDown moved focus, as the Linux web view's Ctrl+Tab escape
 	// does: the Tab handling below then treats the press as handled.
@@ -1184,6 +1191,7 @@ func (w *window) processKeyPressed(keyName event.KeyName, keyASCII event.KeyName
 //
 // Characters do not map 1:1 to physical keys, as a key may produce zero, one or more characters.
 func (w *window) processCharInput(char rune) {
+	activity.Stamp()
 	w.tabEscape.Disarm()
 	if focused := w.canvas.Focused(); focused != nil {
 		focused.TypedRune(char)
@@ -1198,6 +1206,7 @@ func (w *window) processCharInput(char rune) {
 // (device_wasm.go). The commit and cancel companions live in the platform files
 // where each is used (window_wasm.go / window_desktop.go).
 func (w *window) processCompose(ev *event.PreeditEvent) {
+	activity.Stamp()
 	w.tabEscape.Disarm()
 	if c, ok := w.canvas.Focused().(event.Composable); ok {
 		c.Compose(ev)

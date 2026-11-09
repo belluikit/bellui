@@ -7,6 +7,7 @@ import (
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/activity"
 	"github.com/belluikit/bellui/internal/driver"
 	"github.com/belluikit/bellui/internal/driver/common"
 )
@@ -31,6 +32,9 @@ const (
 // callback set or removed while contacts are down truncates their sequences,
 // and a rare system cancel may carry an unknown id too.
 func (w *window) handleTouch(id int, phase touchPhase, pos geo.Position) {
+	if phase != touchCancel {
+		activity.Stamp() // the system cancelling a touch is not the user (#1108)
+	}
 	switch phase {
 	case touchBegin:
 		w.ensureTouchHandler()

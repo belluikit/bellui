@@ -9,6 +9,7 @@ import (
 	"github.com/belluikit/bellui/driver/embedded"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/activity"
 	"github.com/belluikit/bellui/internal/async"
 	"github.com/belluikit/bellui/internal/cache"
 	intdriver "github.com/belluikit/bellui/internal/driver"
@@ -112,6 +113,7 @@ func (n *noosDriver) doRun() {
 				n.Quit()
 				continue
 			}
+			activity.Stamp() // every embedded event is a touch or a key (#1108)
 
 			w := n.wins[n.current].(*noosWindow)
 

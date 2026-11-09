@@ -19,6 +19,7 @@ import (
 	"github.com/belluikit/bellui/driver/desktop"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/activity"
 	"github.com/belluikit/bellui/internal/async"
 	"github.com/belluikit/bellui/internal/build"
 	"github.com/belluikit/bellui/internal/cache"
@@ -446,6 +447,7 @@ func (w *window) SetOnDropped(dropped func(pos geo.Position, items []bellui.URI)
 // deepest bellui.Droppable under the pointer, falling back to the window-wide
 // SetOnDropped callback when no widget claims the drop.
 func (w *window) processDropped(_ *glfw.Window, names []string) {
+	activity.Stamp()
 	uris := make([]bellui.URI, len(names))
 	for i, name := range names {
 		uris[i] = storage.NewFileURI(name)
@@ -1118,6 +1120,7 @@ func (w *window) preeditInput(_ *glfw.Window, preedit []rune, _ []int, _ int, ca
 // processComposeCancel discards any in-progress IME composition on the focused
 // object when it supports composition. A no-op otherwise.
 func (w *window) processComposeCancel() {
+	activity.Stamp()
 	if c, ok := w.canvas.Focused().(event.Composable); ok {
 		c.ComposeCancel()
 	}
