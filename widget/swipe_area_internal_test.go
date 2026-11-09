@@ -298,3 +298,90 @@ func TestSwipeArea_CardTiltsAboutItsCentre(t *testing.T) {
 	// 240 points apart at 5 degrees: tan(5°)·240 ≈ 21.
 	assert.InDelta(t, 21, top-bottom, 2, "its top leans right")
 }
+
+// A stay direction lets the card follow and report progress, but a swipe
+// that way springs it back, with OnSwiped run at the release; the other
+// directions still throw (#1103).
+func TestSwipeArea_CardStayDirection(t *testing.T) {
+	b := newSwipeCardBench(t, canvas.NewRectangle(nil), false)
+	b.area.Directions = map[SwipeDirection]SwipeCardMode{SwipeUp: SwipeStay, SwipeDown: SwipeStay}
+
+	b.area.Dragged(dragBy(0, -40))
+	assert.Equal(t, geo.NewPos(0, -40), b.area.card.Position(), "it follows the finger")
+	assert.Equal(t, swipeProgress{SwipeUp, 40.0 / 60}, b.lastProgress(t))
+	for range 6 {
+		*b.clock += 50 * time.Millisecond
+		b.area.Dragged(dragBy(0, -10))
+	}
+	assert.Equal(t, swipeProgress{SwipeUp, 1}, b.lastProgress(t))
+	b.area.DragEnd()
+	assert.Equal(t, []SwipeDirection{SwipeUp}, b.swiped, "reported at the release")
+	require.Len(t, b.drv.started, 1)
+	spring := b.drv.started[0]
+	spring.Tick(0.5)
+	_, y := b.at(150, 150)
+	assert.Greater(t, y, float32(150-100), "on its way back, not off")
+	assert.Less(t, y, float32(150))
+	spring.Tick(1)
+	assert.True(t, b.atRest())
+	assert.Equal(t, []SwipeDirection{SwipeUp}, b.swiped, "reported once")
+
+	b.swiped = nil
+	b.drag(-90, 0)
+	b.drv.started[len(b.drv.started)-1].Tick(0.5)
+	assert.Empty(t, b.swiped, "left still throws, reported once off")
+	b.drv.started[len(b.drv.started)-1].Tick(1)
+	assert.Equal(t, []SwipeDirection{SwipeLeft}, b.swiped)
+
+	// Short of a swipe, a stay direction reports nothing, as a throw would.
+	b.swiped = nil
+	b.drag(0, 30)
+	b.drv.started[len(b.drv.started)-1].Tick(1)
+	assert.Empty(t, b.swiped)
+	assert.True(t, b.atRest())
+}
+
+// With animations off a stay swipe reports and the card is at rest at once.
+func TestSwipeArea_CardStayWithoutAnimations(t *testing.T) {
+	b := newSwipeCardBench(t, canvas.NewRectangle(nil), true)
+	b.area.Directions = map[SwipeDirection]SwipeCardMode{SwipeDown: SwipeStay}
+	b.drag(0, 100)
+	assert.Equal(t, []SwipeDirection{SwipeDown}, b.swiped)
+	assert.True(t, b.atRest())
+	assert.Empty(t, b.drv.started)
+}
+
+// An ignored direction keeps the card at rest: it does not move that way, no
+// progress above 0 is reported, and a swipe that way runs nothing. Dragged
+// back across rest from a direction it may go, it stops at rest (#1103).
+func TestSwipeArea_CardIgnoreDirection(t *testing.T) {
+	b := newSwipeCardBench(t, canvas.NewRectangle(nil), false)
+	b.area.Directions = map[SwipeDirection]SwipeCardMode{SwipeUp: SwipeIgnore, SwipeDown: SwipeIgnore, SwipeLeft: SwipeIgnore}
+
+	b.drag(0, -120)
+	if n := len(b.drv.started); n > 0 {
+		b.drv.started[n-1].Tick(1)
+	}
+	assert.Empty(t, b.swiped)
+	assert.True(t, b.atRest())
+	for _, p := range b.progress {
+		assert.Equal(t, float32(0), p.p, "never off rest")
+	}
+
+	b.area.Dragged(dragBy(40, 0))
+	assert.Equal(t, geo.NewPos(40, 0), b.area.card.Position(), "right is not ignored")
+	b.area.Dragged(dragBy(-100, 0))
+	assert.True(t, b.atRest(), "it stops at rest rather than go left")
+	assert.Equal(t, float32(0), b.lastProgress(t).p)
+	b.area.DragEnd()
+	assert.Empty(t, b.swiped, "a release at rest is no swipe")
+}
+
+// A direction a non-nil map leaves out still throws.
+func TestSwipeArea_CardDirectionsDefaultToThrow(t *testing.T) {
+	b := newSwipeCardBench(t, canvas.NewRectangle(nil), true)
+	b.area.Directions = map[SwipeDirection]SwipeCardMode{SwipeUp: SwipeIgnore}
+	b.drag(100, 0)
+	assert.Equal(t, []SwipeDirection{SwipeRight}, b.swiped)
+	assert.Equal(t, SwipeThrow, SwipeCardMode(0), "the zero value throws")
+}

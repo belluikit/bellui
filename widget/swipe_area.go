@@ -30,6 +30,31 @@ const (
 	SwipeDown  SwipeDirection = "down"
 )
 
+// SwipeCardMode is what a card SwipeArea does with a swipe one way (#1103).
+// The zero value, SwipeThrow, is what it does with a direction it is not
+// told about.
+//
+// Since: 1.3
+type SwipeCardMode uint8
+
+// The ways a card SwipeArea can treat a direction.
+//
+// Since: 1.3
+const (
+	// SwipeThrow throws the card off that way on a swipe, and OnSwiped runs
+	// once it is off.
+	SwipeThrow SwipeCardMode = iota
+
+	// SwipeStay lets the card follow the finger that way, with progress
+	// reported as for a throw, but a swipe springs it back instead: OnSwiped
+	// runs at the release, as it starts back.
+	SwipeStay
+
+	// SwipeIgnore keeps the card at rest that way: it does not move, its
+	// progress stays 0, and OnSwiped does not run.
+	SwipeIgnore
+)
+
 // swipeDominance is how much longer a swipe must be along its axis than
 // across it, so a diagonal drag reports nothing rather than a guess.
 const swipeDominance = 2
@@ -73,6 +98,8 @@ var (
 // swipe must go a fifth of the card's width (or height), or be a flick of at
 // least 400 points per second, as on a Carousel, so a short drag can be
 // taken back. With animations off in the app settings it moves at once.
+// Directions can make a swipe some way spring the card back and only report
+// it, or keep the card from moving that way at all (#1103).
 //
 // Since: 1.3
 type SwipeArea struct {
@@ -94,6 +121,13 @@ type SwipeArea struct {
 	//
 	// Since: 1.3
 	OnSwipeProgress func(SwipeDirection, float32) `json:"-"`
+
+	// Directions, when Follow is set, says what a swipe each way does: a
+	// direction missing from it, and every direction of a nil map, throws
+	// the card (SwipeThrow). Without Follow every swipe is reported.
+	//
+	// Since: 1.3
+	Directions map[SwipeDirection]SwipeCardMode
 
 	dx, dy float32
 
@@ -158,7 +192,15 @@ func (s *SwipeArea) Dragged(e *event.DragEvent) {
 	}
 	along := s.along(s.dx, s.dy)
 	s.speed.add(swipeNow(), along)
-	s.place(s.base + along)
+	to := s.base + along
+	if s.Directions[s.directionAt(to)] == SwipeIgnore {
+		// Held at rest: once there, nothing more to place or report.
+		if s.offset == 0 {
+			return
+		}
+		to = 0
+	}
+	s.place(to)
 }
 
 // startDrag begins a gesture on the card. One caught springing back goes on
@@ -194,11 +236,15 @@ func (s *SwipeArea) DragEnd() {
 	s.dragging = false
 	v := s.speed.at(swipeNow())
 	s.speed.reset()
-	if d, ok := s.cardSwipe(dx, dy, v); ok {
+	d, ok := s.cardSwipe(dx, dy, v)
+	if ok && s.Directions[d] != SwipeStay {
 		s.flyOff(d)
 		return
 	}
 	s.springBack()
+	if ok && s.OnSwiped != nil {
+		s.OnSwiped(d)
+	}
 }
 
 // cardSwipe is the direction a card released after a gesture that moved
@@ -241,12 +287,17 @@ func (s *SwipeArea) along(dx, dy float32) float32 {
 
 // direction is the way the card sits from rest.
 func (s *SwipeArea) direction() SwipeDirection {
+	return s.directionAt(s.offset)
+}
+
+// directionAt is the way a card offset along the axis sits from rest.
+func (s *SwipeArea) directionAt(offset float32) SwipeDirection {
 	switch {
-	case s.axis == swipeAxisVertical && s.offset < 0:
+	case s.axis == swipeAxisVertical && offset < 0:
 		return SwipeUp
 	case s.axis == swipeAxisVertical:
 		return SwipeDown
-	case s.offset < 0:
+	case offset < 0:
 		return SwipeLeft
 	}
 	return SwipeRight
