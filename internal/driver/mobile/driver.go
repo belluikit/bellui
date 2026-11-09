@@ -20,6 +20,7 @@ import (
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal"
 	"github.com/belluikit/bellui/internal/accessibility"
+	"github.com/belluikit/bellui/internal/activity"
 	"github.com/belluikit/bellui/internal/animation"
 	intapp "github.com/belluikit/bellui/internal/app"
 	"github.com/belluikit/bellui/internal/async"
@@ -491,6 +492,7 @@ func (d *driver) Run() {
 // one-writer IME reroute (pre-rebrand tracker #1061), then dispatches and syncs the native
 // keyboard state.
 func (d *driver) dispatchKeyEvent(c *canvas, e key.Event) {
+	activity.Stamp()
 	if d.suppressNativeTextKey(e) {
 		return
 	}
@@ -580,6 +582,7 @@ func (d *driver) handleKeyEvent(c *canvas, e key.Event) {
 // genuine composition (CJK, or an IME that composes inline) arrives as the
 // preedit/commit pair below — no dual-writer reconciliation is needed.
 func (d *driver) handleComposition(e composition.Event) {
+	activity.Stamp()
 	if d.textInput == nil {
 		return
 	}
@@ -611,6 +614,7 @@ func (d *driver) handleComposition(e composition.Event) {
 // a range replaced by nothing; a non-editor gets it as Backspace presses, one
 // per deleted rune (#666).
 func (d *driver) handleTextEdit(c *canvas, e textedit.Event) {
+	activity.Stamp()
 	if d.textInput == nil || !d.textInput.Bound() {
 		if !e.Selection && c != nil {
 			if e.Text == "" {
@@ -712,6 +716,7 @@ func undoActionsState(obj any) (canUndo, canRedo bool) {
 // the input view's NSUndoManager, pre-rebrand tracker #1134) to the focused editor via its
 // accessible undo/redo action — the same gated path assistive tech uses.
 func (d *driver) handleUndoRedo(e undoredo.Event) {
+	activity.Stamp()
 	cur := d.currentWindow()
 	if cur == nil {
 		return
@@ -1527,6 +1532,9 @@ func (d *driver) tbPastSlop(w *window, x, y float32) bool {
 // never saw it go down, which ignores it, and leave the touch latched as down
 // (a drag, a scroll or a pending long press) in the path that did.
 func (d *driver) routeTouch(current *window, e touch.Event, exploring bool) {
+	if e.Type != touch.TypeCancel {
+		activity.Stamp() // the system cancelling a touch is not the user (#1108)
+	}
 	if e.Type != touch.TypeBegin {
 		if _, ok := d.touchWindows[e.Sequence]; ok {
 			d.handleTouch(current, e)

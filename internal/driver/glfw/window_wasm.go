@@ -17,6 +17,7 @@ import (
 	"github.com/belluikit/bellui/driver/desktop"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/activity"
 	"github.com/belluikit/bellui/internal/cache"
 	intdriver "github.com/belluikit/bellui/internal/driver"
 	"github.com/belluikit/bellui/internal/scale"
@@ -603,6 +604,7 @@ func (w *window) charInput(viewport *glfw.Window, char rune) {
 // compositionend with empty data commits "", which acts as a cancel — so no
 // separate cancel is wired on this path.)
 func (w *window) processComposeCommit(text string) {
+	activity.Stamp()
 	if c, ok := w.canvas.Focused().(event.Composable); ok {
 		c.ComposeCommit(text)
 	}
