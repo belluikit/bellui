@@ -8,6 +8,7 @@ import (
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/activity"
 	"github.com/belluikit/bellui/internal/cache"
 	intdriver "github.com/belluikit/bellui/internal/driver"
 	"github.com/belluikit/bellui/internal/memcanvas"
@@ -41,7 +42,12 @@ func RenderToMarkup(c core.Canvas) string {
 // cursor via AbsolutePosition − driver.AbsolutePositionForObject can be driven
 // headlessly. Drag sends a single Dragged event followed immediately by DragEnd;
 // use [DragSteps] to observe intermediate drag state.
+//
+// Like every helper here that simulates the user's input, it moves
+// [github.com/belluikit/bellui.LastUserActivity] forward, whether or not
+// anything is there to receive it, as the real drivers do.
 func Drag(c core.Canvas, pos geo.Position, deltaX, deltaY float32) {
+	activity.Stamp()
 	matches := func(object core.CanvasObject) bool {
 		_, ok := object.(event.Draggable)
 		return ok
@@ -73,6 +79,7 @@ func Drag(c core.Canvas, pos geo.Position, deltaX, deltaY float32) {
 //
 // Since: 1.0
 func DragSteps(c core.Canvas, pos geo.Position, deltaX, deltaY float32, steps int, onStep func(step int)) {
+	activity.Stamp()
 	if steps < 1 {
 		steps = 1
 	}
@@ -134,7 +141,9 @@ func LaidOutObjects(o core.CanvasObject) (objects []core.CanvasObject) {
 	return objects
 }
 
-// MoveMouse simulates a mouse movement to the given position.
+// MoveMouse simulates a mouse movement to the given position. Like the real
+// drivers' mouse moved with no button held, it does not count as user
+// activity.
 func MoveMouse(c core.Canvas, pos geo.Position) {
 	if bellui.CurrentDevice().IsMobile() {
 		return
@@ -177,6 +186,7 @@ func MoveMouse(c core.Canvas, pos geo.Position) {
 // Scroll scrolls at an absolute position on the canvas.
 // deltaX/Y is the scrolling distance: <0 for scrolling up/left, >0 for scrolling down/right.
 func Scroll(c core.Canvas, pos geo.Position, deltaX, deltaY float32) {
+	activity.Stamp()
 	matches := func(object core.CanvasObject) bool {
 		_, ok := object.(event.Scrollable)
 		return ok
@@ -192,6 +202,7 @@ func Scroll(c core.Canvas, pos geo.Position, deltaX, deltaY float32) {
 
 // DoubleTap simulates a double left mouse click on the specified object.
 func DoubleTap(obj event.DoubleTappable) {
+	activity.Stamp()
 	ev, c := prepareTap(obj, geo.NewPos(1, 1))
 	handleFocusOnTap(c, obj)
 	obj.DoubleTapped(ev)
@@ -204,12 +215,14 @@ func Tap(obj event.Tappable) {
 
 // TapAt simulates a left mouse click on the passed object at a specified place within it.
 func TapAt(obj event.Tappable, pos geo.Position) {
+	activity.Stamp()
 	ev, c := prepareTap(obj, pos)
 	tap(c, obj, ev)
 }
 
 // TapCanvas taps at an absolute position on the canvas.
 func TapCanvas(c core.Canvas, pos geo.Position) {
+	activity.Stamp()
 	if o, p := findTappable(c, pos); o != nil {
 		tap(c, o.(event.Tappable), &event.PointEvent{AbsolutePosition: pos, Position: p})
 	}
@@ -222,6 +235,7 @@ func TapSecondary(obj event.SecondaryTappable) {
 
 // TapSecondaryAt simulates a right mouse click on the passed object at a specified place within it.
 func TapSecondaryAt(obj event.SecondaryTappable, pos geo.Position) {
+	activity.Stamp()
 	ev, c := prepareTap(obj, pos)
 	handleFocusOnTap(c, obj)
 	obj.TappedSecondary(ev)
@@ -234,6 +248,7 @@ func LongPress(obj event.LongPressable) {
 
 // LongPressAt simulates a long-press gesture on the passed object at a specified place within it.
 func LongPressAt(obj event.LongPressable, pos geo.Position) {
+	activity.Stamp()
 	ev, c := prepareTap(obj, pos)
 	handleFocusOnTap(c, obj)
 	obj.LongPressed(ev)
@@ -243,6 +258,7 @@ func LongPressAt(obj event.LongPressable, pos geo.Position) {
 // The focusable object will be focused before typing begins.
 // The chars parameter will be input one rune at a time to the focused object.
 func Type(obj event.Focusable, chars string) {
+	activity.Stamp()
 	obj.FocusGained()
 
 	typeChars([]rune(chars), obj.TypedRune)
@@ -251,6 +267,7 @@ func Type(obj event.Focusable, chars string) {
 // TypeOnCanvas is like the Type function but it passes the key events to the canvas object
 // rather than a focusable widget.
 func TypeOnCanvas(c core.Canvas, chars string) {
+	activity.Stamp()
 	typeChars([]rune(chars), c.OnTypedRune())
 }
 
@@ -260,6 +277,7 @@ func TypeOnCanvas(c core.Canvas, chars string) {
 //
 // Since: 1.0
 func Compose(c core.Canvas, text string, cursorPos int) {
+	activity.Stamp()
 	if comp, ok := c.Focused().(event.Composable); ok {
 		comp.Compose(&event.PreeditEvent{Text: text, CursorPos: cursorPos})
 	}
@@ -271,6 +289,7 @@ func Compose(c core.Canvas, text string, cursorPos int) {
 //
 // Since: 1.0
 func ComposeCommit(c core.Canvas, text string) {
+	activity.Stamp()
 	if comp, ok := c.Focused().(event.Composable); ok {
 		comp.ComposeCommit(text)
 	}
@@ -282,6 +301,7 @@ func ComposeCommit(c core.Canvas, text string) {
 //
 // Since: 1.0
 func ComposeCancel(c core.Canvas) {
+	activity.Stamp()
 	if comp, ok := c.Focused().(event.Composable); ok {
 		comp.ComposeCancel()
 	}

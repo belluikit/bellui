@@ -19,6 +19,7 @@ import (
 
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/internal"
+	"github.com/belluikit/bellui/internal/activity"
 	intapp "github.com/belluikit/bellui/internal/app"
 	"github.com/belluikit/bellui/internal/async"
 	"github.com/belluikit/bellui/internal/cache"
@@ -183,7 +184,10 @@ func (a *app) transitionCloud(p bellui.CloudProvider) {
 
 // NewApp returns a new dummy app used for testing.
 // It loads a test driver which creates a virtual window in memory for testing.
+// It sets [github.com/belluikit/bellui.LastUserActivity] back to the zero time,
+// so one test's input does not show in the next.
 func NewApp() bellui.App {
+	activity.Reset()
 	settings := &testSettings{scale: 1.0, theme: Theme()}
 	prefs := internal.NewInMemoryPreferences()
 	store := &testStorage{}

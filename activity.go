@@ -31,6 +31,9 @@ import (
 // delivers it as scroll events, as macOS does. Actions a screen reader performs through the accessibility API, such
 // as VoiceOver activating a button, are not counted yet (#1109).
 //
+// In tests, the helpers in bellui/test that simulate input count as the
+// drivers would, and test.NewApp starts the time back at zero.
+//
 // The time carries a monotonic reading, so time.Since is not fooled by the
 // wall clock being changed. It may be called from any goroutine.
 //
