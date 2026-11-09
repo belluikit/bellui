@@ -3409,11 +3409,11 @@ func ellipsisPriorBound(bounds []rowBoundary, trunc bellui.TextTruncation, width
 }
 
 // findSpaceIndex accepts a slice of runes and a fallback index
-// findSpaceIndex returns the index of the last space in the text, or fallback if there are no spaces
+// findSpaceIndex returns the index of the last breakable space in the text, or fallback if there are none
 func findSpaceIndex(text []rune, fallback int) int {
 	curIndex := fallback
 	for ; curIndex >= 0; curIndex-- {
-		if unicode.IsSpace(text[curIndex]) {
+		if breakableSpace(text[curIndex]) {
 			break
 		}
 	}
@@ -3421,6 +3421,14 @@ func findSpaceIndex(text []rune, fallback int) int {
 		return fallback
 	}
 	return curIndex
+}
+
+// breakableSpace reports whether a word-wrapped line may break at r: a space,
+// but not a no-break one (U+00A0, U+2007, U+202F). Those are White_Space in
+// Unicode, yet they exist to keep their neighbours on one line, as French does
+// with the space before ":" or inside "« »" (#1099).
+func breakableSpace(r rune) bool {
+	return unicode.IsSpace(r) && r != '\u00A0' && r != '\u2007' && r != '\u202F'
 }
 
 func float32ToFixed266(f float32) fixed.Int26_6 {
@@ -3559,7 +3567,7 @@ func lineBoundsWord(seg *TextSegment, text []rune, low, high, lineEnd int, trunc
 			st.reuse++
 			low = high
 			high = lineEnd
-			if low < high && unicode.IsSpace(text[low]) {
+			if low < high && breakableSpace(text[low]) {
 				low++
 			}
 			st.measureWidth = max.Width

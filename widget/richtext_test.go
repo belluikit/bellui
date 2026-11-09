@@ -1,6 +1,7 @@
 package widget
 
 import (
+	"fmt"
 	"net/url"
 	"testing"
 	"unicode"
@@ -1519,4 +1520,68 @@ func TestRichText_MixedHeightRowKeepsSegmentHeight(t *testing.T) {
 	want, _ := bellui.CurrentApp().Driver().RenderedTextSize(normal.Text, normal.TextSize, normal.TextStyle, normal.FontSource)
 	assert.InDelta(t, want.Height, normal.Size().Height, 0.01,
 		"a grown-to-fill run must keep its own height, not the taller row height")
+}
+
+// #1099: a no-break space (U+00A0, U+2007, U+202F) is White_Space, but a word
+// wrap must not break there. French writes one before ":" so the colon never
+// starts a line.
+func TestLineBounds_WrapWordKeepsNoBreakSpace(t *testing.T) {
+	measurer := func(text []rune) geo.Size { return geo.NewSize(float32(len(text))*10, 10) }
+	maxSize := geo.NewSize(130, 10000) // fits "votre moment" (120) but not "votre moment :" (140)
+
+	for _, nbsp := range []rune{'\u00A0', '\u2007', '\u202F'} {
+		t.Run(fmt.Sprintf("U+%04X", nbsp), func(t *testing.T) {
+			seg := &TextSegment{Text: "votre moment" + string(nbsp) + ": une note"}
+			bounds, _ := lineBounds(seg, bellui.TextWrapWord, bellui.TextTruncateOff, maxSize.Width, maxSize, measurer)
+
+			text := []rune(seg.Text)
+			var rows []string
+			for _, b := range bounds {
+				rows = append(rows, string(text[b.begin:b.end]))
+			}
+			assert.Equal(t, []string{"votre", "moment" + string(nbsp) + ": une", "note"}, rows)
+		})
+	}
+}
+
+// A no-break run wider than the line has nowhere to break, so it falls back to
+// a character break rather than overflowing (#1099), and a no-break space at
+// the start of a row is content, not a separator to drop.
+func TestLineBounds_WrapWordNoBreakRunWiderThanLine(t *testing.T) {
+	measurer := func(text []rune) geo.Size { return geo.NewSize(float32(len(text))*10, 10) }
+	maxSize := geo.NewSize(50, 10000)
+
+	seg := &TextSegment{Text: "aaaaa\u00A0bbbb"}
+	bounds, _ := lineBounds(seg, bellui.TextWrapWord, bellui.TextTruncateOff, maxSize.Width, maxSize, measurer)
+
+	text := []rune(seg.Text)
+	var rows []string
+	for _, b := range bounds {
+		rows = append(rows, string(text[b.begin:b.end]))
+	}
+	assert.Equal(t, []string{"aaaaa", "\u00A0bbbb"}, rows)
+}
+
+// Widget-level #1099, with the sentence DaySong's French help page showed it
+// on: at no width may a row start or end at a no-break space. The widths are
+// swept so the check does not hang on the test font's metrics.
+func TestRichText_WrapWordKeepsNoBreakSpace(t *testing.T) {
+	test.NewTempApp(t)
+
+	seg := &TextSegment{Style: RichTextStyleInline, Text: "Glissez à droite quand une chanson va avec votre moment\u00A0: une note soleil apparaît, «\u202Fpasser\u202F» et «\u202Fça colle\u202F», en bas de la pochette."}
+	rt := NewRichText(seg)
+	rt.Wrapping = bellui.TextWrapWord
+	r := test.TempWidgetRenderer(t, rt)
+
+	text := []rune(seg.Text)
+	for w := float32(150); w <= 600; w += 5 {
+		rt.Resize(geo.NewSize(w, 1000))
+		r.Refresh()
+		require.Greater(t, len(rt.rowBounds), 1, "test needs the text to wrap at width %v", w)
+		for _, b := range rt.rowBounds {
+			row := string(text[b.begin:b.end])
+			assert.NotRegexp(t, `^[\x{00A0}\x{202F}]?[:»]`, row, "width %v: a row starts at a no-break space", w)
+			assert.NotRegexp(t, `[\x{00A0}\x{202F}«]$`, row, "width %v: a row ends at a no-break space", w)
+		}
+	}
 }
