@@ -7,9 +7,11 @@ package mobile
 import (
 	"bytes"
 	"crypto/x509"
+	"debug/macho"
 	"encoding/pem"
 	"fmt"
 	"io/fs"
+	"log"
 	"os"
 	"os/exec"
 	"path"
@@ -54,8 +56,8 @@ func goIOSBuild(pkg *packages.Package, bundleID string, archs []string,
 		return nil, err
 	}
 
-	infoplistBytes, err := iosInfoPlist(appDir,
-		iosInfoPlistData(bundleID, appName, version, build, len(allArchs["ios"]) > 2, usageDescriptions))
+	infoData := iosInfoPlistData(bundleID, appName, version, build, len(allArchs["ios"]) > 2, usageDescriptions)
+	infoplistBytes, err := iosInfoPlist(appDir, infoData)
 	if err != nil {
 		return nil, err
 	}
@@ -111,6 +113,10 @@ func goIOSBuild(pkg *packages.Package, bundleID string, archs []string,
 			}
 		}
 		cmd.Args = append(cmd.Args, path)
+	}
+
+	if err := dropUnlinkedSceneManifest(appDir, infoData, filepath.Join(tmpdir, archs[0])); err != nil {
+		return nil, err
 	}
 
 	if err := runCmd(cmd); err != nil {
@@ -177,6 +183,50 @@ func goIOSBuild(pkg *packages.Package, bundleID string, archs []string,
 	}
 
 	return nmpkgs, nil
+}
+
+// dropUnlinkedSceneManifest rewrites the Info.plist without the scene manifest
+// when the app binary bin does not define iosSceneDelegateClass. A manifest
+// naming a class the app does not link makes UIKit create no window, so the
+// app is black on every iOS; an app on a bellui older than the scene delegate
+// keeps the app-delegate life cycle instead (#1117).
+func dropUnlinkedSceneManifest(appDir string, data infoplistTmplData, bin string) error {
+	if buildN {
+		return nil
+	}
+	linked, err := objcClassLinked(bin, iosSceneDelegateClass)
+	if err != nil || linked {
+		return err
+	}
+	log.Printf("The app's bellui has no %s, so the Info.plist declares no scene life cycle; "+
+		"apps built with the iOS 27 SDK then do not launch on iOS 27. Update github.com/belluikit/bellui.",
+		iosSceneDelegateClass)
+	data.SceneDelegate = false
+	info, err := iosInfoPlist(appDir, data)
+	if err != nil {
+		return err
+	}
+	return writeProjectFiles([]projectFile{{tmpdir + "/main/Info.plist", info}})
+}
+
+// objcClassLinked reports whether the Mach-O binary bin defines the
+// Objective-C class name, rather than only referring to it.
+func objcClassLinked(bin, name string) (bool, error) {
+	f, err := macho.Open(bin)
+	if err != nil {
+		return false, err
+	}
+	defer f.Close()
+	if f.Symtab == nil {
+		return false, nil
+	}
+	want := "_OBJC_CLASS_$_" + name
+	for _, s := range f.Symtab.Syms {
+		if s.Name == want && s.Sect != 0 {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // iosInfoPlist renders the generated Info.plist and merges the app's
@@ -356,6 +406,7 @@ func iosInfoPlistData(bundleID, appName, version string, build int, legacy bool,
 		URLSchemes:        buildURLSchemes,
 		MimeTypes:         buildFileMimeTypes,
 		ContentTypes:      mimeTypesToUTIs(buildFileMimeTypes),
+		SceneDelegate:     true,
 	}
 }
 
@@ -381,6 +432,10 @@ type infoplistTmplData struct {
 	// targets by UTI, not the legacy CFBundleTypeMIMETypes, so without these the
 	// app never surfaces as a file handler (pre-rebrand tracker #622).
 	ContentTypes []string
+	// SceneDelegate writes the UIApplicationSceneManifest naming
+	// iosSceneDelegateClass. It is false only for an app linked against a
+	// bellui that predates the class (#1117).
+	SceneDelegate bool
 }
 
 // mimeTypesToUTIs maps document MIME types to the iOS Uniform Type Identifiers
@@ -467,6 +522,12 @@ func sortedPlistEntries(m map[string]string) []plistEntry {
 	return entries
 }
 
+// iosSceneDelegateClass is the UIWindowSceneDelegate in the toolkit's iOS
+// runtime (internal/driver/mobile/app/darwin_ios.m) that the Info.plist's
+// UIApplicationSceneManifest names. Apps built with the iOS 27 SDK do not
+// launch without a scene manifest (#1117).
+const iosSceneDelegateClass = "GoAppSceneDelegate"
+
 var infoplistTmpl = template.Must(template.New("infoplist").Funcs(templates.XMLFuncs).Parse(`<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -522,6 +583,25 @@ var infoplistTmpl = template.Must(template.New("infoplist").Funcs(templates.XMLF
   <string>AppIcon</string>
   <key>LSRequiresIPhoneOS</key>
   <true/>
+  {{- if .SceneDelegate}}
+  <key>UIApplicationSceneManifest</key>
+  <dict>
+    <key>UIApplicationSupportsMultipleScenes</key>
+    <false/>
+    <key>UISceneConfigurations</key>
+    <dict>
+      <key>UIWindowSceneSessionRoleApplication</key>
+      <array>
+        <dict>
+          <key>UISceneConfigurationName</key>
+          <string>Default Configuration</string>
+          <key>UISceneDelegateClassName</key>
+          <string>` + iosSceneDelegateClass + `</string>
+        </dict>
+      </array>
+    </dict>
+  </dict>
+  {{- end}}
   <key>UILaunchStoryboardName</key>
   <string>LaunchScreen</string>
   <key>UIRequiredDeviceCapabilities</key>

@@ -20,6 +20,9 @@ struct utsname sysInfo;
 static CGFloat keyboardHeight;
 
 @interface GoAppAppController : GLKViewController<UIContentContainer, GLKViewDelegate>
+// hostInputViewIn puts the hidden text-input view into window, which a scene
+// that reconnects replaces (#1117).
+- (void)hostInputViewIn:(UIWindow *)window;
 @end
 
 // BelluiTextInputProxy is the interface the app controller and the C entry points
@@ -150,10 +153,32 @@ void belluiKeyboardExpectRaise(void) {
     belluiKeyboardRaisePending = YES;
 }
 
+// GoAppAppDelegate owns the app's one window and its controller. With the
+// scene life cycle, which apps built with the iOS 27 SDK must use (#1117),
+// GoAppSceneDelegate creates the window and hands it over with showWindow:,
+// and the scene delegate gets the foreground, background and URL callbacks.
+// An app whose Info.plist has no UIApplicationSceneManifest (packaged by an
+// older bellui) still runs on the app-delegate life cycle: the window is made
+// here and the application* callbacks below fire instead.
 @interface GoAppAppDelegate : UIResponder<UIApplicationDelegate>
 @property (strong, nonatomic) UIWindow *window;
 @property (strong, nonatomic) GoAppAppController *controller;
+- (void)showWindow:(UIWindow *)window;
 @end
+
+static void forwardOpenURL(NSURL *url);
+static BOOL forwardUserActivity(NSUserActivity *userActivity);
+
+// currentOrientation is the interface orientation of the app's window. The
+// window scene knows it; statusBarOrientation is the fallback for a window
+// that has no scene yet.
+static UIInterfaceOrientation currentOrientation(void) {
+	UIWindow *win = ((GoAppAppDelegate *)[UIApplication sharedApplication].delegate).window;
+	if (win.windowScene != nil) {
+		return win.windowScene.interfaceOrientation;
+	}
+	return [[UIApplication sharedApplication] statusBarOrientation];
+}
 
 @implementation GoAppAppDelegate
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
@@ -165,19 +190,34 @@ void belluiKeyboardExpectRaise(void) {
     setDisplayMetrics((int)size.width, (int)size.height, scale);
 
 	lifecycleAlive();
-	self.window = [[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
-	self.controller = [[GoAppAppController alloc] initWithNibName:nil bundle:nil];
-	self.window.rootViewController = self.controller;
-	[self.window makeKeyAndVisible];
-
-    // update insets once key window is set
-	UIInterfaceOrientation orientation = [[UIApplication sharedApplication] statusBarOrientation];
-	updateConfig((int)size.width, (int)size.height, orientation);
+	if ([[NSBundle mainBundle] objectForInfoDictionaryKey:@"UIApplicationSceneManifest"] == nil) {
+		[self showWindow:[[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]]];
+	}
 
 	UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
 	center.delegate = (id) self;
 
 	return YES;
+}
+
+// showWindow makes window the app's window, showing the controller in it. A
+// scene that is disconnected and connected again brings a new window; the
+// controller, its GL context and its display link carry over to it.
+- (void)showWindow:(UIWindow *)window {
+	self.window = window;
+	BOOL reattach = self.controller != nil;
+	if (!reattach) {
+		self.controller = [[GoAppAppController alloc] initWithNibName:nil bundle:nil];
+	}
+	window.rootViewController = self.controller;
+	if (reattach) {
+		[self.controller hostInputViewIn:window];
+	}
+	[window makeKeyAndVisible];
+
+    // update insets once key window is set
+	CGSize size = [UIScreen mainScreen].nativeBounds.size;
+	updateConfig((int)size.width, (int)size.height, currentOrientation());
 }
 
 - (void)applicationDidBecomeActive:(UIApplication * )application {
@@ -290,10 +330,22 @@ static void forwardOpenURL(NSURL *url) {
 	onOpenIntent((char*)[[(copied ? dest : url) absoluteString] UTF8String]);
 }
 
+// forwardUserActivity hands a Universal Link (a web URL routed to the app via
+// an associated domain) to Go the same way (pre-rebrand tracker #622).
+static BOOL forwardUserActivity(NSUserActivity *userActivity) {
+	if ([userActivity.activityType isEqualToString:NSUserActivityTypeBrowsingWeb] &&
+	    userActivity.webpageURL != nil) {
+		onOpenIntent((char*)[[userActivity.webpageURL absoluteString] UTF8String]);
+		return YES;
+	}
+	return NO;
+}
+
 // application:openURL: delivers an "open with" launch or deep-link — a custom
 // URL scheme (myapp://…) or a file:// URL handed over by another app (pre-rebrand tracker #622).
 // The URL is forwarded to Go via onOpenIntent, which buffers it until the app
 // registers a handler; also fires on cold launch (after didFinishLaunching).
+// Without a scene manifest only; a scene app gets scene:openURLContexts:.
 - (BOOL)application:(UIApplication *)application
             openURL:(NSURL *)url
             options:(NSDictionary<UIApplicationOpenURLOptionsKey, id> *)options {
@@ -304,17 +356,60 @@ static void forwardOpenURL(NSURL *url) {
 	return YES;
 }
 
-// application:continueUserActivity: delivers a Universal Link (a web URL routed
-// to the app via an associated domain), forwarded the same way (pre-rebrand tracker #622).
+// application:continueUserActivity: delivers a Universal Link, without a scene
+// manifest only; a scene app gets scene:continueUserActivity:.
 - (BOOL)application:(UIApplication *)application
 continueUserActivity:(NSUserActivity *)userActivity
   restorationHandler:(void (^)(NSArray<id<UIUserActivityRestoring>> *restorableObjects))restorationHandler {
-	if ([userActivity.activityType isEqualToString:NSUserActivityTypeBrowsingWeb] &&
-	    userActivity.webpageURL != nil) {
-		onOpenIntent((char*)[[userActivity.webpageURL absoluteString] UTF8String]);
-		return YES;
+	return forwardUserActivity(userActivity);
+}
+@end
+
+// GoAppSceneDelegate is the window scene delegate the generated Info.plist
+// names in its UIApplicationSceneManifest (#1117). The app has one scene: it
+// creates the window, reports foreground and background, and forwards the URLs
+// that open the app, including the ones a cold launch arrives with.
+// applicationWillTerminate and the memory warning stay on the app delegate.
+@interface GoAppSceneDelegate : UIResponder<UIWindowSceneDelegate>
+@property (strong, nonatomic) UIWindow *window;
+@end
+
+@implementation GoAppSceneDelegate
+- (void)scene:(UIScene *)scene willConnectToSession:(UISceneSession *)session options:(UISceneConnectionOptions *)connectionOptions {
+	if (![scene isKindOfClass:[UIWindowScene class]]) {
+		return;
 	}
-	return NO;
+	self.window = [[UIWindow alloc] initWithWindowScene:(UIWindowScene *)scene];
+	[(GoAppAppDelegate *)[UIApplication sharedApplication].delegate showWindow:self.window];
+
+	for (UIOpenURLContext *ctx in connectionOptions.URLContexts) {
+		forwardOpenURL(ctx.URL);
+	}
+	for (NSUserActivity *activity in connectionOptions.userActivities) {
+		forwardUserActivity(activity);
+	}
+}
+
+- (void)sceneDidBecomeActive:(UIScene *)scene {
+	lifecycleFocused();
+}
+
+- (void)sceneWillResignActive:(UIScene *)scene {
+	lifecycleVisible();
+}
+
+- (void)sceneDidEnterBackground:(UIScene *)scene {
+	lifecycleAlive();
+}
+
+- (void)scene:(UIScene *)scene openURLContexts:(NSSet<UIOpenURLContext *> *)URLContexts {
+	for (UIOpenURLContext *ctx in URLContexts) {
+		forwardOpenURL(ctx.URL);
+	}
+}
+
+- (void)scene:(UIScene *)scene continueUserActivity:(NSUserActivity *)userActivity {
+	forwardUserActivity(userActivity);
 }
 @end
 
@@ -358,8 +453,7 @@ continueUserActivity:(NSUserActivity *)userActivity
 	// rootViewController.view.layer). Flutter's separate inputHider model: as a
 	// GLKView subview, the bare view's keyboard presentation stalled the render
 	// surface — the pre-rebrand tracker #1124 real-tap freeze.
-	UIWindow *win = ((GoAppAppDelegate *)[UIApplication sharedApplication].delegate).window;
-	[win addSubview:self.inputView];
+	[self hostInputViewIn:((GoAppAppDelegate *)[UIApplication sharedApplication].delegate).window];
 	self.glview = (GLKView*)self.view;
 	self.glview.drawableDepthFormat = GLKViewDrawableDepthFormat24;
 	self.glview.multipleTouchEnabled = true; // TODO expose setting to user.
@@ -379,7 +473,7 @@ continueUserActivity:(NSUserActivity *)userActivity
 	setScreen(scale);
 
 	CGSize size = [UIScreen mainScreen].nativeBounds.size;
-	UIInterfaceOrientation orientation = [[UIApplication sharedApplication] statusBarOrientation];
+	UIInterfaceOrientation orientation = currentOrientation();
 	updateConfig((int)size.width, (int)size.height, orientation);
 
     self.glview.enableSetNeedsDisplay = NO;
@@ -393,11 +487,15 @@ continueUserActivity:(NSUserActivity *)userActivity
     [displayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSRunLoopCommonModes];
 }
 
+- (void)hostInputViewIn:(UIWindow *)window {
+	[window addSubview:self.inputView];
+}
+
 - (void)viewWillTransitionToSize:(CGSize)ptSize withTransitionCoordinator:(id<UIViewControllerTransitionCoordinator>)coordinator {
 	[coordinator animateAlongsideTransition:^(id<UIViewControllerTransitionCoordinatorContext> context) {
 		// TODO(crawshaw): come up with a plan to handle animations.
 	} completion:^(id<UIViewControllerTransitionCoordinatorContext> context) {
-		UIInterfaceOrientation orientation = [[UIApplication sharedApplication] statusBarOrientation];
+		UIInterfaceOrientation orientation = currentOrientation();
 		CGSize size = [UIScreen mainScreen].nativeBounds.size;
 		updateConfig((int)size.width, (int)size.height, orientation);
 	}];
@@ -476,7 +574,7 @@ static void sendTouches(int change, NSSet* touches, UIEvent* event) {
 - (void) traitCollectionDidChange: (UITraitCollection *) previousTraitCollection {
     [super traitCollectionDidChange: previousTraitCollection];
 
-	UIInterfaceOrientation orientation = [[UIApplication sharedApplication] statusBarOrientation];
+	UIInterfaceOrientation orientation = currentOrientation();
 	CGSize size = [UIScreen mainScreen].nativeBounds.size;
 	updateConfig((int)size.width, (int)size.height, orientation);
 }
@@ -486,7 +584,7 @@ static void sendTouches(int change, NSSet* touches, UIEvent* event) {
     keyboardHeight = keyboardSize.height;
 
     CGSize size = [UIScreen mainScreen].nativeBounds.size;
-	UIInterfaceOrientation orientation = [[UIApplication sharedApplication] statusBarOrientation];
+	UIInterfaceOrientation orientation = currentOrientation();
 	updateConfig((int)size.width, (int)size.height, orientation);
 }
 
@@ -494,7 +592,7 @@ static void sendTouches(int change, NSSet* touches, UIEvent* event) {
     keyboardHeight = 0;
 
     CGSize size = [UIScreen mainScreen].nativeBounds.size;
-	UIInterfaceOrientation orientation = [[UIApplication sharedApplication] statusBarOrientation];
+	UIInterfaceOrientation orientation = currentOrientation();
 	updateConfig((int)size.width, (int)size.height, orientation);
 }
 

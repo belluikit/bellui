@@ -172,6 +172,7 @@ func TestMergeInfoPlistConflicts(t *testing.T) {
 		"CFBundleURLTypes":           "URLSchemes",
 		"CFBundleDocumentTypes":      "file associations",
 		"NSHumanReadableCopyright":   "credit",
+		"UIApplicationSceneManifest": "scene delegate",
 	} {
 		frag := &plistValue{Kind: "dict"}
 		frag.set(key, plistString("x"))

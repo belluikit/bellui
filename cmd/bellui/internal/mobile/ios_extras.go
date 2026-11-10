@@ -49,14 +49,16 @@ func readIOSFragment(appDir, name string) (*plistValue, error) {
 }
 
 // manifestOwnedInfoKeys are the Info.plist keys the packager derives from the
-// manifest or the command line. A fragment may not set them: two sources for
-// one value would let the fragment silently disagree with the manifest.
+// manifest or the command line, or that the toolkit's runtime depends on. A
+// fragment may not set them: two sources for one value would let the fragment
+// silently disagree with the manifest or the runtime.
 var manifestOwnedInfoKeys = map[string]string{
 	"CFBundleIdentifier":         "set the app ID (Details.ID in manifest.pxf, or --app-id)",
 	"CFBundleExecutable":         "the packager names the executable",
 	"CFBundleName":               "set Details.Name in manifest.pxf",
 	"CFBundleShortVersionString": "set Details.Version in manifest.pxf",
 	"CFBundleVersion":            "set Details.Build in manifest.pxf",
+	"UIApplicationSceneManifest": "it names the toolkit's scene delegate, without which the app does not launch",
 }
 
 // mergeInfoPlist merges the app's ios/Info.plist fragment into the generated

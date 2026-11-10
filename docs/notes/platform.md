@@ -276,6 +276,17 @@ next to the app's main package, the way `android/*.java` works on Android:
   `NSUserDefaults` are not declared: a one-label bellui app does not import
   them, and a reason for them is the app's to state. Tracking and collected
   data are never defaulted, for the same reason.
+- **Scene life cycle** (#1117). iOS 27 traps at launch in an app built with
+  its SDK that lacks `UIApplicationSceneManifest`, so the generated Info.plist
+  names the runtime's `GoAppSceneDelegate` (one scene) and a fragment may not
+  set the key. The scene delegate makes the window and hands it to the app
+  delegate, which still owns it for every other reader. The manifest and the
+  runtime must agree both ways: without the manifest the runtime falls back to
+  the app-delegate life cycle (fine before iOS 27), but a manifest naming a
+  class the binary lacks leaves UIKit with no window, black on every iOS. So
+  the packager looks for `_OBJC_CLASS_$_GoAppSceneDelegate` in the linked
+  binary and writes no manifest, with a warning, when the app's bellui
+  predates it. Live-verify with `hack/sceneprobe`.
 - **One source of truth per key.** A fragment key the packager owns or derives
   from the manifest is an error, never a silent override. Generated defaults
   (orientations, `UIRequiresFullScreen`, …) are the fragment's to replace.
