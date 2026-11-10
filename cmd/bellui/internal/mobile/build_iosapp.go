@@ -115,26 +115,8 @@ func goIOSBuild(pkg *packages.Package, bundleID string, archs []string,
 		cmd.Args = append(cmd.Args, path)
 	}
 
-	// A scene manifest naming a class the app does not link makes UIKit
-	// create no window, so the app is black on every iOS. An app on a bellui
-	// older than the scene delegate keeps the app-delegate life cycle (#1117).
-	if !buildN {
-		linked, err := objcClassLinked(filepath.Join(tmpdir, archs[0]), iosSceneDelegateClass)
-		if err != nil {
-			return nil, err
-		}
-		if !linked {
-			log.Printf("The app's bellui has no %s, so the Info.plist declares no scene life cycle; "+
-				"apps built with the iOS 27 SDK then do not launch on iOS 27. Update github.com/belluikit/bellui.",
-				iosSceneDelegateClass)
-			infoData.SceneDelegate = false
-			if infoplistBytes, err = iosInfoPlist(appDir, infoData); err != nil {
-				return nil, err
-			}
-			if err := writeProjectFiles([]projectFile{{tmpdir + "/main/Info.plist", infoplistBytes}}); err != nil {
-				return nil, err
-			}
-		}
+	if err := dropUnlinkedSceneManifest(appDir, infoData, filepath.Join(tmpdir, archs[0])); err != nil {
+		return nil, err
 	}
 
 	if err := runCmd(cmd); err != nil {
@@ -201,6 +183,30 @@ func goIOSBuild(pkg *packages.Package, bundleID string, archs []string,
 	}
 
 	return nmpkgs, nil
+}
+
+// dropUnlinkedSceneManifest rewrites the Info.plist without the scene manifest
+// when the app binary bin does not define iosSceneDelegateClass. A manifest
+// naming a class the app does not link makes UIKit create no window, so the
+// app is black on every iOS; an app on a bellui older than the scene delegate
+// keeps the app-delegate life cycle instead (#1117).
+func dropUnlinkedSceneManifest(appDir string, data infoplistTmplData, bin string) error {
+	if buildN {
+		return nil
+	}
+	linked, err := objcClassLinked(bin, iosSceneDelegateClass)
+	if err != nil || linked {
+		return err
+	}
+	log.Printf("The app's bellui has no %s, so the Info.plist declares no scene life cycle; "+
+		"apps built with the iOS 27 SDK then do not launch on iOS 27. Update github.com/belluikit/bellui.",
+		iosSceneDelegateClass)
+	data.SceneDelegate = false
+	info, err := iosInfoPlist(appDir, data)
+	if err != nil {
+		return err
+	}
+	return writeProjectFiles([]projectFile{{tmpdir + "/main/Info.plist", info}})
 }
 
 // objcClassLinked reports whether the Mach-O binary bin defines the
