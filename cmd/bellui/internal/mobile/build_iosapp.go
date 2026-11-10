@@ -7,9 +7,11 @@ package mobile
 import (
 	"bytes"
 	"crypto/x509"
+	"debug/macho"
 	"encoding/pem"
 	"fmt"
 	"io/fs"
+	"log"
 	"os"
 	"os/exec"
 	"path"
@@ -54,8 +56,8 @@ func goIOSBuild(pkg *packages.Package, bundleID string, archs []string,
 		return nil, err
 	}
 
-	infoplistBytes, err := iosInfoPlist(appDir,
-		iosInfoPlistData(bundleID, appName, version, build, len(allArchs["ios"]) > 2, usageDescriptions))
+	infoData := iosInfoPlistData(bundleID, appName, version, build, len(allArchs["ios"]) > 2, usageDescriptions)
+	infoplistBytes, err := iosInfoPlist(appDir, infoData)
 	if err != nil {
 		return nil, err
 	}
@@ -111,6 +113,28 @@ func goIOSBuild(pkg *packages.Package, bundleID string, archs []string,
 			}
 		}
 		cmd.Args = append(cmd.Args, path)
+	}
+
+	// A scene manifest naming a class the app does not link makes UIKit
+	// create no window, so the app is black on every iOS. An app on a bellui
+	// older than the scene delegate keeps the app-delegate life cycle (#1117).
+	if !buildN {
+		linked, err := objcClassLinked(filepath.Join(tmpdir, archs[0]), iosSceneDelegateClass)
+		if err != nil {
+			return nil, err
+		}
+		if !linked {
+			log.Printf("The app's bellui has no %s, so the Info.plist declares no scene life cycle; "+
+				"apps built with the iOS 27 SDK then do not launch on iOS 27. Update github.com/belluikit/bellui.",
+				iosSceneDelegateClass)
+			infoData.SceneDelegate = false
+			if infoplistBytes, err = iosInfoPlist(appDir, infoData); err != nil {
+				return nil, err
+			}
+			if err := writeProjectFiles([]projectFile{{tmpdir + "/main/Info.plist", infoplistBytes}}); err != nil {
+				return nil, err
+			}
+		}
 	}
 
 	if err := runCmd(cmd); err != nil {
@@ -177,6 +201,26 @@ func goIOSBuild(pkg *packages.Package, bundleID string, archs []string,
 	}
 
 	return nmpkgs, nil
+}
+
+// objcClassLinked reports whether the Mach-O binary bin defines the
+// Objective-C class name, rather than only referring to it.
+func objcClassLinked(bin, name string) (bool, error) {
+	f, err := macho.Open(bin)
+	if err != nil {
+		return false, err
+	}
+	defer f.Close()
+	if f.Symtab == nil {
+		return false, nil
+	}
+	want := "_OBJC_CLASS_$_" + name
+	for _, s := range f.Symtab.Syms {
+		if s.Name == want && s.Sect != 0 {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // iosInfoPlist renders the generated Info.plist and merges the app's
@@ -356,6 +400,7 @@ func iosInfoPlistData(bundleID, appName, version string, build int, legacy bool,
 		URLSchemes:        buildURLSchemes,
 		MimeTypes:         buildFileMimeTypes,
 		ContentTypes:      mimeTypesToUTIs(buildFileMimeTypes),
+		SceneDelegate:     true,
 	}
 }
 
@@ -381,6 +426,10 @@ type infoplistTmplData struct {
 	// targets by UTI, not the legacy CFBundleTypeMIMETypes, so without these the
 	// app never surfaces as a file handler (pre-rebrand tracker #622).
 	ContentTypes []string
+	// SceneDelegate writes the UIApplicationSceneManifest naming
+	// iosSceneDelegateClass. It is false only for an app linked against a
+	// bellui that predates the class (#1117).
+	SceneDelegate bool
 }
 
 // mimeTypesToUTIs maps document MIME types to the iOS Uniform Type Identifiers
@@ -528,6 +577,7 @@ var infoplistTmpl = template.Must(template.New("infoplist").Funcs(templates.XMLF
   <string>AppIcon</string>
   <key>LSRequiresIPhoneOS</key>
   <true/>
+  {{- if .SceneDelegate}}
   <key>UIApplicationSceneManifest</key>
   <dict>
     <key>UIApplicationSupportsMultipleScenes</key>
@@ -545,6 +595,7 @@ var infoplistTmpl = template.Must(template.New("infoplist").Funcs(templates.XMLF
       </array>
     </dict>
   </dict>
+  {{- end}}
   <key>UILaunchStoryboardName</key>
   <string>LaunchScreen</string>
   <key>UIRequiredDeviceCapabilities</key>

@@ -14,7 +14,7 @@ import (
 // Info.plist declares the scene life cycle (#1117), so the generated plist
 // must carry a UIApplicationSceneManifest naming the runtime's scene delegate.
 func TestInfoPlistSceneManifest(t *testing.T) {
-	gen := generatedInfoPlist(t, infoplistTmplData{BundleID: "com.example.t", Name: "T", Version: "1.0", Build: 1})
+	gen := generatedInfoPlist(t, iosInfoPlistData("com.example.t", "T", "1.0", 1, false, nil))
 	plutilLint(t, gen)
 	info, err := parsePlist(gen)
 	require.NoError(t, err)
@@ -31,6 +31,18 @@ func TestInfoPlistSceneManifest(t *testing.T) {
 	require.Equal(t, "array", roles.Kind)
 	require.Len(t, roles.Items, 1)
 	assert.Equal(t, iosSceneDelegateClass, roles.Items[0].get("UISceneDelegateClassName").Text)
+}
+
+// An app linked against a bellui without the scene delegate gets no manifest:
+// one naming a missing class leaves UIKit with no window to show.
+func TestInfoPlistNoSceneManifestWithoutDelegate(t *testing.T) {
+	d := iosInfoPlistData("com.example.t", "T", "1.0", 1, false, nil)
+	d.SceneDelegate = false
+	gen := generatedInfoPlist(t, d)
+	plutilLint(t, gen)
+	info, err := parsePlist(gen)
+	require.NoError(t, err)
+	assert.Nil(t, info.get("UIApplicationSceneManifest"))
 }
 
 // The class the plist names must exist in the iOS runtime, or UIKit has no
