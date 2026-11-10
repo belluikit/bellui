@@ -901,9 +901,13 @@ func convertAPKToAAB(aabPath string) error {
 	if err != nil {
 		return err
 	}
-	defer os.Remove(filepath.Join(filepath.Dir(aabPath), "base.zip"))
+	// The module zip is written next to the bundle, and bundletool resolves a
+	// relative --modules against the working directory, so a bundle written
+	// to another directory needs the full path.
+	basePath := filepath.Join(filepath.Dir(aabPath), "base.zip")
+	defer os.Remove(basePath)
 
-	cmd = exec.Command("bundletool", "build-bundle", "--output", aabPath, "--modules", "base.zip")
+	cmd = exec.Command("bundletool", "build-bundle", "--output", aabPath, "--modules", basePath)
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
 	return cmd.Run()
