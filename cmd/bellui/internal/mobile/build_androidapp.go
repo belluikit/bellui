@@ -857,6 +857,14 @@ func androidPkgName(name string) string {
 	return s
 }
 
+// bundleConfig is the BundleConfig every store bundle states (bundletool's
+// JSON format, so not PXF). The native libraries go in uncompressed
+// (extractNativeLibs="false"), and the store aligns them in the APKs it
+// generates by this setting; left unset, the alignment is whatever the
+// store's bundletool defaults to. Android 15+ devices with 16 KB pages need
+// 16 KB (#1115).
+const bundleConfig = `{"optimizations": {"uncompressNativeLibraries": {"enabled": true, "alignment": "PAGE_ALIGNMENT_16K"}}}`
+
 func convertAPKToAAB(aabPath string) error {
 	apkPath := buildO[:len(aabPath)-3] + "apk"
 	apkProtoPath := buildO[:len(aabPath)-3] + "apk-proto"
@@ -907,7 +915,13 @@ func convertAPKToAAB(aabPath string) error {
 	basePath := filepath.Join(filepath.Dir(aabPath), "base.zip")
 	defer os.Remove(basePath)
 
-	cmd = exec.Command("bundletool", "build-bundle", "--output", aabPath, "--modules", basePath)
+	configPath := filepath.Join(filepath.Dir(aabPath), "BundleConfig.json")
+	if err := os.WriteFile(configPath, []byte(bundleConfig), 0o644); err != nil {
+		return err
+	}
+	defer os.Remove(configPath)
+
+	cmd = exec.Command("bundletool", "build-bundle", "--output", aabPath, "--modules", basePath, "--config", configPath)
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
 	return cmd.Run()
