@@ -1,0 +1,9 @@
+details {
+  name = "sceneprobe"
+  id = "com.trendvidia.sceneprobe"
+  version = "1.0.0"
+  build = 1
+  url_schemes = [
+    "sceneprobe"
+  ]
+}
