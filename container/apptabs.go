@@ -16,8 +16,14 @@ var (
 	_ core.Accessible = (*AppTabs)(nil)
 )
 
-// AccessibleRole returns [core.RoleTabList].
-func (t *AppTabs) AccessibleRole() core.AccessibleRole { return core.RoleTabList }
+// AccessibleRole returns [core.RoleTabList], or [core.RoleNone] while
+// HideTabBar is set: with no tabs shown, the widget is only its page.
+func (t *AppTabs) AccessibleRole() core.AccessibleRole {
+	if t.HideTabBar {
+		return core.RoleNone
+	}
+	return core.RoleTabList
+}
 
 // AccessibleLabel returns an empty string; tab containers have no intrinsic label.
 func (t *AppTabs) AccessibleLabel() string { return "" }
@@ -42,6 +48,14 @@ type AppTabs struct {
 	//
 	// Since: 1.3
 	DragToSelect bool
+
+	// HideTabBar hides the tab bar, its divider and the selection
+	// indicator, so the selected item's content fills the whole widget.
+	// The items and the selection stay as they are; turning it off puts
+	// the bar back. Call Refresh after changing it.
+	//
+	// Since: 1.3
+	HideTabBar bool
 
 	current         int
 	location        TabLocation
@@ -238,6 +252,10 @@ type appTabsRenderer struct {
 }
 
 func (r *appTabsRenderer) Layout(size geo.Size) {
+	if r.appTabs.HideTabBar {
+		r.layoutBarless(size)
+		return
+	}
 	// Try render as many tabs as will fit, others will appear in the overflow
 	if len(r.appTabs.Items) == 0 {
 		r.updateTabs(0)
@@ -272,10 +290,43 @@ func (r *appTabsRenderer) Layout(size geo.Size) {
 }
 
 func (r *appTabsRenderer) MinSize() geo.Size {
+	if r.appTabs.HideTabBar {
+		min := geo.NewSize(0, 0)
+		for _, ti := range r.appTabs.Items {
+			min = min.Max(ti.Content.MinSize())
+		}
+		return min
+	}
 	return r.minSize(r.appTabs)
 }
 
+// layoutBarless lays out the tabs while HideTabBar is set: the selected
+// content fills the widget and the others are hidden, as in layout.
+func (r *appTabsRenderer) layoutBarless(size geo.Size) {
+	selected := r.appTabs.selected()
+	for i, ti := range r.appTabs.Items {
+		if i == selected {
+			ti.Content.Move(geo.NewPos(0, 0))
+			ti.Content.Resize(size)
+			ti.Content.Show()
+		} else {
+			ti.Content.Hide()
+		}
+	}
+	if r.appTabs.transitioning() {
+		r.appTabs.setTransitioning(false)
+	}
+}
+
 func (r *appTabsRenderer) Objects() []core.CanvasObject {
+	if r.appTabs.HideTabBar {
+		// Only the selected content: the bar, divider and indicator are
+		// neither drawn nor tappable.
+		if i, is := r.appTabs.selected(), r.appTabs.Items; i >= 0 && i < len(is) {
+			return []core.CanvasObject{is[i].Content}
+		}
+		return nil
+	}
 	objects := r.objects(r.appTabs)
 	if r.appTabs.DragToSelect {
 		// First, so it is under the tab buttons: a tap passes it to the button.
