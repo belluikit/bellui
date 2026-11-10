@@ -7,6 +7,8 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/belluikit/bellui/x/mmedia/internal/codecset"
 )
 
 const coverMedia = "testdata/cover.mp3" // 3 s of tone with cover art; see mkcover.sh
@@ -90,6 +92,7 @@ func TestCoverArtIsNotVideo(t *testing.T) {
 // IgnoreVideo makes a file with a real video stream audio-only, so no video
 // frame paces its audio, from a path and from a forward-only reader.
 func TestIgnoreVideoPlaysAVideoAsAudio(t *testing.T) {
+	codecset.NeedsMedia(t)
 	const media = "testdata/sample_stream.mp4" // 4 s of video and audio, index at the front
 	data, err := os.ReadFile(media)
 	if err != nil {

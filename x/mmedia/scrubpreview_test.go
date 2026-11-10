@@ -15,6 +15,7 @@ import (
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/test"
+	"github.com/belluikit/bellui/x/mmedia/internal/codecset"
 	"github.com/belluikit/bellui/x/mmedia/internal/source"
 )
 
@@ -187,6 +188,7 @@ func TestScrubPreviewLayoutKeepsThePreviewOnScreen(t *testing.T) {
 // old [controls, video] order — leaves the preview invisible, and no positional
 // assertion would notice.
 func TestScrubPreviewPaintsOverTheVideo(t *testing.T) {
+	codecset.NeedsMedia(t)
 	p, err := NewMediaPlayerURL(urlTestMedia, WithScrubPreview())
 	if err != nil {
 		t.Fatalf("NewMediaPlayerURL: %v", err)
@@ -270,6 +272,7 @@ func containsColor(img image.Image, wantR, wantG, wantB uint8) bool {
 // Scrubbing a file that has not been started is precisely what a preview is for,
 // so the player now tells the transport the duration at construction.
 func TestControlsKnowTheDurationBeforePlayback(t *testing.T) {
+	codecset.NeedsMedia(t)
 	p, err := NewMediaPlayerURL(urlTestMedia)
 	if err != nil {
 		t.Fatalf("NewMediaPlayerURL: %v", err)
@@ -340,6 +343,7 @@ func TestScrubPreviewDropsRequestsAfterClose(t *testing.T) {
 
 // TestWithScrubPreviewOnAURLPlayer is the supported path.
 func TestWithScrubPreviewOnAURLPlayer(t *testing.T) {
+	codecset.NeedsMedia(t)
 	p, err := NewMediaPlayerURL(urlTestMedia, WithScrubPreview())
 	if err != nil {
 		t.Fatalf("NewMediaPlayerURL with a scrub preview: %v", err)
@@ -357,6 +361,7 @@ func TestWithScrubPreviewOnAURLPlayer(t *testing.T) {
 // TestWithScrubPreviewOnAFile covers the *os.File case, where the name is what
 // the second decoder reopens.
 func TestWithScrubPreviewOnAFile(t *testing.T) {
+	codecset.NeedsMedia(t)
 	f, err := os.Open(urlTestMedia)
 	if err != nil {
 		t.Fatalf("open: %v", err)
@@ -378,6 +383,7 @@ func TestWithScrubPreviewOnAFile(t *testing.T) {
 // decoder, and silently giving no preview would leave the caller to discover it
 // by hovering.
 func TestWithScrubPreviewRejectsAPlainReader(t *testing.T) {
+	codecset.NeedsMedia(t)
 	data, err := os.ReadFile(urlTestMedia)
 	if err != nil {
 		t.Fatalf("read: %v", err)

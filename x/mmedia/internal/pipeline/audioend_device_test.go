@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/belluikit/bellui/x/mmedia/internal/audio"
+	"github.com/belluikit/bellui/x/mmedia/internal/codecset"
 )
 
 // coverMP3 is 3 s of tone with cover art; see mkcover.sh beside it.
@@ -110,6 +111,7 @@ func openSampleMP4(t *testing.T) *Pipeline {
 // those writes. The picture froze at the target and the end never came, for
 // a seek made before Play and, depending on timing, one made just after it.
 func TestVideoSeekIntoTheLastSecond(t *testing.T) {
+	codecset.NeedsMedia(t)
 	for _, tc := range []struct {
 		name  string
 		after time.Duration // after Play; negative is before it
@@ -144,6 +146,7 @@ func TestVideoSeekIntoTheLastSecond(t *testing.T) {
 // 54 ms of sample.mp4's sound still to play, cut off by whatever the app did
 // on the end.
 func TestVideoEndsWhenItsSoundHasPlayed(t *testing.T) {
+	codecset.NeedsMedia(t)
 	p := openSampleMP4(t)
 	var left int
 	ended := make(chan struct{})

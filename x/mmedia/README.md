@@ -135,6 +135,31 @@ target. Eleven platforms are published (darwin, linux, windows, android, iOS
 and the iOS Simulator, amd64/arm64/arm as applicable); the module graph resolves
 only the matching one.
 
+### Formats
+
+goffmpeg builds FFmpeg in two codec sets, chosen by a build tag
+([goffmpeg#41](https://github.com/belluikit/goffmpeg/issues/41)):
+
+| Set | Plays | Build |
+|---|---|---|
+| media | MP3, WAV, MP4 (`.mp4`, `.m4a`, `.mov`) with H.264 and AAC, HLS; webcams on desktop | default |
+| audio | MP3 and WAV, no video and no capture | `-tags goffmpeg_novideo` |
+
+Anything else (FLAC, Ogg, Opus, HEVC, VP9, …) fails to open with
+`goffmpeg.ErrUnrecognizedInput`, or `goffmpeg.ErrNoDecoder` when the container
+opens but none of its streams decodes. An audio-only app ships less with the
+audio set: 1.8 MB of FFmpeg against 4.9 MB on darwin/arm64.
+
+### Shipping FFmpeg
+
+FFmpeg is a set of shared libraries, so a user can replace them (LGPL 2.1 §6b).
+An app has to carry the ones its binary loads. `go run` and `go test` find them
+in the module cache. On desktop, `bellui package` copies them into the package
+and points the binary at them ([#1101](https://github.com/belluikit/bellui/issues/1101)):
+`Contents/Frameworks` in a macOS app, `lib/<app id>/` in a Linux package, beside
+the `.exe` on Windows. `bellui package` for Android and iOS doesn't carry them
+yet ([#1122](https://github.com/belluikit/bellui/issues/1122)).
+
 ### Background playback
 
 On **iOS**, x/mmedia sets the app's audio session to the Playback category when

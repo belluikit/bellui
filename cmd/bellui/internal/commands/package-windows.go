@@ -115,6 +115,10 @@ func (p *Packager) packageWindows(tags []string) error {
 		}
 		os.Rename(filepath.Base(p.exe), appName)
 	}
+	libs, err := bundleWindowsLibs(appName)
+	if err != nil {
+		return fmt.Errorf("failed to bundle the DLLs the executable needs: %w", err)
+	}
 
 	if p.install {
 		wd, err := os.Getwd()
@@ -126,6 +130,11 @@ func (p *Packager) packageWindows(tags []string) error {
 		err = runAsAdminWindows("copy", appPath, filepath.Join(p.dir, appName))
 		if err != nil {
 			return fmt.Errorf("failed to run as administrator: %w", err)
+		}
+		for _, lib := range libs {
+			if err := runAsAdminWindows("copy", filepath.Join(wd, lib), filepath.Join(p.dir, lib)); err != nil {
+				return fmt.Errorf("failed to run as administrator: %w", err)
+			}
 		}
 	}
 	return nil

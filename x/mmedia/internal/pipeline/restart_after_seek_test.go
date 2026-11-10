@@ -3,6 +3,8 @@ package pipeline
 import (
 	"testing"
 	"time"
+
+	"github.com/belluikit/bellui/x/mmedia/internal/codecset"
 )
 
 // A restart plays from the start, whatever was seeked to before it. The audio
@@ -15,6 +17,7 @@ import (
 // not move either way. internal/audio's TestStopForgetsTheSeekBase pins the
 // same fix without one.
 func TestRestartAfterSeekStartsFromZero(t *testing.T) {
+	codecset.NeedsMedia(t)
 	if _, err := newAudioOutput(2); err != nil { // the device opens once per process
 		t.Skipf("no audio device: %v", err)
 	}

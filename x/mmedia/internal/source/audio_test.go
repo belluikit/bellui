@@ -4,6 +4,8 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/belluikit/bellui/x/mmedia/internal/codecset"
 )
 
 // multichannelMedia is a 2s 5.1 AAC clip.
@@ -36,6 +38,7 @@ func collectPCM(s *FFmpegSource, limit int) (chunks, bytes int) {
 // TestMultichannelPassthrough is the regression test for the downmix bug: the
 // bridge hardcoded stereo, so a 5.1 source could not reach the output intact.
 func TestMultichannelPassthrough(t *testing.T) {
+	codecset.NeedsMedia(t)
 	s := openMultichannel(t)
 
 	if got := s.Channels(); got != 6 {
@@ -54,6 +57,7 @@ func TestMultichannelPassthrough(t *testing.T) {
 // TestSetAudioChannelsDownmix covers the explicit stereo request that
 // WithDownmix drives.
 func TestSetAudioChannelsDownmix(t *testing.T) {
+	codecset.NeedsMedia(t)
 	s := openMultichannel(t)
 
 	if err := s.SetAudioChannels(2); err != nil {

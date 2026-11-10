@@ -31,6 +31,11 @@ type unixData struct {
 	// the Makefile installs it and sets up the sandbox helper (#107).
 	BundleCEF bool
 
+	// BundleLibs marks a package carrying lib/<AppID>: the shared libraries
+	// the binary loads through its $ORIGIN/../lib/<AppID> rpath, such as
+	// FFmpeg's (#1101).
+	BundleLibs bool
+
 	// Credits marks a package carrying share/doc/<AppID>/CREDITS: the
 	// attribution the default gopher icon needs (#362).
 	Credits bool
@@ -57,11 +62,20 @@ func (p *Packager) packageUNIX() error {
 
 	shareDir := util.EnsureSubDir(prefixDir, "share")
 
+	appIDOrName := p.AppID
+	if appIDOrName == "" {
+		appIDOrName = p.Name
+	}
+
 	binDir := util.EnsureSubDir(prefixDir, "bin")
 	binName := filepath.Join(binDir, filepath.Base(p.exe))
 	err := util.CopyExeFile(p.exe, binName)
 	if err != nil {
 		return fmt.Errorf("failed to copy application binary file: %w", err)
+	}
+	bundledLibs, err := bundleUnixLibs(p.exe, binName, filepath.Join(prefixDir, "lib", appIDOrName), "$ORIGIN/../lib/"+appIDOrName)
+	if err != nil {
+		return fmt.Errorf("failed to bundle the shared libraries the executable needs: %w", err)
 	}
 
 	// A binary that links the CEF binding needs the engine beside it — on
@@ -78,11 +92,6 @@ func (p *Packager) packageUNIX() error {
 			bundledCEF = true
 			log.Printf("bundled CEF %s under bin/cef — the sandbox helper needs setuid root, which `make install` sets up; without it the app runs sandbox-disabled with a notice", version)
 		}
-	}
-
-	appIDOrName := p.AppID
-	if appIDOrName == "" {
-		appIDOrName = p.Name
 	}
 
 	iconDir := util.EnsureSubDir(shareDir, "pixmaps")
@@ -134,6 +143,7 @@ func (p *Packager) packageUNIX() error {
 		MimeTypes:      mimes,
 		StartupWMClass: p.Name,
 		BundleCEF:      bundledCEF,
+		BundleLibs:     bundledLibs,
 		Credits:        credit != "",
 	}
 	if err := writeUnixCredits(shareDir, appIDOrName, credit); err != nil {

@@ -107,7 +107,23 @@ func darwinLangs(langs []string) []string {
 	return r
 }
 
-func (p *Packager) packageDarwin() (err error) {
+func (p *Packager) packageDarwin() error {
+	if err := p.writeDarwinApp(); err != nil {
+		return err
+	}
+	// Last, once the bundle is complete: relinking signs the executable
+	// again, which seals the bundle's resources as they are then (#1101).
+	contentsDir := filepath.Join(p.dir, p.Name+".app", "Contents")
+	bin := filepath.Join(contentsDir, "MacOS", filepath.Base(p.exe))
+	if err := bundleDarwinLibs(p.exe, bin, contentsDir); err != nil {
+		return fmt.Errorf("failed to bundle the shared libraries the executable needs: %w", err)
+	}
+	return nil
+}
+
+// writeDarwinApp writes the .app bundle: Info.plist, the executable and the
+// icon.
+func (p *Packager) writeDarwinApp() (err error) {
 	appDir := util.EnsureSubDir(p.dir, p.Name+".app")
 	exeName := filepath.Base(p.exe)
 

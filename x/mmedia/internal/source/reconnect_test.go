@@ -12,6 +12,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/belluikit/bellui/x/mmedia/internal/codecset"
 )
 
 const reconnectMedia = "testdata/sample_stream.mp4" // index at the front
@@ -65,6 +67,7 @@ func failFirst(t *testing.T, data []byte, fail func(http.ResponseWriter, *http.R
 // from where it stopped, and the whole file decodes. Without them a drop ended
 // the stream partway and a stall blocked the read forever.
 func TestURLSourceRidesOutANetworkFailure(t *testing.T) {
+	codecset.NeedsMedia(t)
 	data, err := os.ReadFile(reconnectMedia)
 	if err != nil {
 		t.Fatal(err)
