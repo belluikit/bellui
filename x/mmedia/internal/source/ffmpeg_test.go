@@ -7,6 +7,8 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/belluikit/bellui/x/mmedia/internal/codecset"
 )
 
 // Small self-contained H.264/AAC fixtures (4s, 320x240, 1s GOP).
@@ -42,6 +44,7 @@ func drain(s *FFmpegSource, limit int) (frames, audioChunks int) {
 }
 
 func TestFFmpegSourceFromReader(t *testing.T) {
+	codecset.NeedsMedia(t)
 	s, err := NewFFmpegSource(openSample(t))
 	if err != nil {
 		t.Fatalf("NewFFmpegSource: %v", err)
@@ -76,6 +79,7 @@ func TestFFmpegSourceFromReader(t *testing.T) {
 // TestFFmpegSourceFromURL covers the *os.File fast path the pipeline prefers,
 // where FFmpeg opens the file itself instead of reading through Go.
 func TestFFmpegSourceFromURL(t *testing.T) {
+	codecset.NeedsMedia(t)
 	abs, err := os.Stat(sampleMedia)
 	if err != nil || abs.Size() == 0 {
 		t.Skipf("sample media unavailable: %v", err)
@@ -96,6 +100,7 @@ func TestFFmpegSourceFromURL(t *testing.T) {
 
 // TestFFmpegSourceSeek checks Seek lands at or after the requested position.
 func TestFFmpegSourceSeek(t *testing.T) {
+	codecset.NeedsMedia(t)
 	s, err := NewFFmpegSource(openSample(t))
 	if err != nil {
 		t.Fatalf("NewFFmpegSource: %v", err)
@@ -117,6 +122,7 @@ func TestFFmpegSourceSeek(t *testing.T) {
 // TestFFmpegSourceRewind verifies Rewind restores playback from the start,
 // which the pipeline relies on for Stop and looping.
 func TestFFmpegSourceRewind(t *testing.T) {
+	codecset.NeedsMedia(t)
 	s, err := NewFFmpegSource(openSample(t))
 	if err != nil {
 		t.Fatalf("NewFFmpegSource: %v", err)
@@ -145,6 +151,7 @@ func TestFFmpegSourceRejectsNonMedia(t *testing.T) {
 // TestFFmpegSourceNonSeekableStream covers playback from a pure stream, the
 // case that previously could not work at all because the decoder needed a path.
 func TestFFmpegSourceNonSeekableStream(t *testing.T) {
+	codecset.NeedsMedia(t)
 	data, err := os.ReadFile(streamMedia)
 	if err != nil {
 		t.Skipf("stream fixture unavailable: %v", err)

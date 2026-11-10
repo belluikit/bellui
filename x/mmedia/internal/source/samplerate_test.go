@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/belluikit/bellui/x/mmedia/internal/codecset"
 	"github.com/belluikit/goffmpeg"
 )
 
@@ -131,6 +132,7 @@ func TestSampleRateConversionIsClean(t *testing.T) {
 // swresample's unflushed tail: the linear resampler lost 0.05% (about 48
 // frames a second) at 1,024-frame boundaries (#582).
 func TestSampleRateConversionKeepsEveryFrame(t *testing.T) {
+	codecset.NeedsMedia(t)
 	frames := func(rate int) (n, chunks, largest int) {
 		s := openMultichannel(t)
 		if err := s.SetAudioChannels(2); err != nil {

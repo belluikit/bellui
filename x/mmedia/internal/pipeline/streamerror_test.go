@@ -14,6 +14,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/belluikit/bellui/x/mmedia/internal/codecset"
 )
 
 // failingSource is a clip that stops after frames of its total, with err as
@@ -111,6 +113,7 @@ func TestCleanEndWithAnErrorSourceIsStillAnEnd(t *testing.T) {
 // It needs a real audio device, since the detached one never plays out its
 // samples.
 func TestDroppedHTTPStreamIsAnError(t *testing.T) {
+	codecset.NeedsMedia(t)
 	if _, err := newAudioOutput(2); err != nil {
 		t.Skipf("no audio device: %v", err)
 	}
@@ -179,6 +182,7 @@ func TestDroppedHTTPStreamIsAnError(t *testing.T) {
 // ended reported the end again at once, and the display loop the first Play
 // started was never stopped, so the next Stop waited on it forever.
 func TestPlayAfterTheEndPlaysAgain(t *testing.T) {
+	codecset.NeedsMedia(t)
 	if _, err := newAudioOutput(2); err != nil {
 		t.Skipf("no audio device: %v", err)
 	}

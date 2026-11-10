@@ -126,6 +126,21 @@ jobs:
             echo "::endgroup::"
           done
 
+      # goffmpeg links one of two codec sets (goffmpeg#41): the media set by
+      # default, the audio set (MP3, WAV) under goffmpeg_novideo, which is
+      # what an audio-only app such as DaySong ships. Its tests run again
+      # against that set; a test whose fixture only the media set opens skips
+      # through internal/codecset. No coverage profile: the floor below is the
+      # default build's.
+      - name: Test x/mmedia with goffmpeg's audio codec set
+        run: |
+          set -e
+          runner=""
+          if [ -n "${{ matrix.runner }}" ]; then runner="$PWD/${{ matrix.runner }}"; fi
+          cd x/mmedia
+          go vet -tags goffmpeg_novideo ./...
+          $runner go test -race -tags "${{ matrix.tags }},goffmpeg_novideo" ./...
+
       # Per-module floors rather than the main module's 62%, which none of these
       # would have any reason to meet: they are five unrelated bodies of code
       # that happen to share a directory, and x/editor sits near 90% while

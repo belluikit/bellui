@@ -14,6 +14,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/belluikit/bellui/x/mmedia/internal/codecset"
 )
 
 const indexAtEnd = "testdata/sample.mp4" // moov after mdat: the open seeks to the end
@@ -85,6 +87,7 @@ func control(t *testing.T, path string) (frames, audio int) {
 // rather than by reading the whole file. A server that ignores Range still
 // plays, read through from the start (belluikit/player#148 suspected this).
 func TestHTTPSInGoPlaysAndSeeks(t *testing.T) {
+	codecset.NeedsMedia(t)
 	data, err := os.ReadFile(indexAtEnd)
 	if err != nil {
 		t.Fatal(err)
@@ -148,6 +151,7 @@ func TestHTTPSInGoPlaysAndSeeks(t *testing.T) {
 // for the Go reader: a drop and a stall are each resumed from where they
 // stopped, and the whole file decodes.
 func TestHTTPSInGoRidesOutANetworkFailure(t *testing.T) {
+	codecset.NeedsMedia(t)
 	data, err := os.ReadFile(reconnectMedia)
 	if err != nil {
 		t.Fatal(err)
@@ -200,6 +204,7 @@ func TestHTTPSInGoRidesOutANetworkFailure(t *testing.T) {
 // A failure no retry can fix is reported at once, and a link that never answers
 // is reported within httpOpenTimeout.
 func TestHTTPSInGoRetriesAnOpen(t *testing.T) {
+	codecset.NeedsMedia(t)
 	data, err := os.ReadFile(reconnectMedia)
 	if err != nil {
 		t.Fatal(err)
@@ -285,6 +290,7 @@ func TestHTTPSInGoRetriesAnOpen(t *testing.T) {
 // fails with a reason a person can act on, not goffmpeg's -1. The signature in
 // the query stays out of the message.
 func TestHTTPSInGoReportsAnExpiredLink(t *testing.T) {
+	codecset.NeedsMedia(t)
 	data, err := os.ReadFile(reconnectMedia)
 	if err != nil {
 		t.Fatal(err)
@@ -345,6 +351,7 @@ func TestHTTPSInGoRefusesHLS(t *testing.T) {
 // cannot play. FFmpeg's own http fails on it too; the error should say why.
 // filesamples.com answered this way on 2026-11-01.
 func TestHTTPSInGoNamesAnUnsizedServer(t *testing.T) {
+	codecset.NeedsMedia(t)
 	data, err := os.ReadFile(indexAtEnd)
 	if err != nil {
 		t.Fatal(err)
@@ -370,6 +377,7 @@ func TestHTTPSInGoNamesAnUnsizedServer(t *testing.T) {
 // TestHTTPSInGoThumbnailer: scrub preview opens the URL a second time, and gets
 // the Go reader too.
 func TestHTTPSInGoThumbnailer(t *testing.T) {
+	codecset.NeedsMedia(t)
 	data, err := os.ReadFile(indexAtEnd)
 	if err != nil {
 		t.Fatal(err)

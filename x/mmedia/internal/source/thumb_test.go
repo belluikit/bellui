@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/belluikit/bellui/x/mmedia/internal/codecset"
 	"github.com/belluikit/goffmpeg"
 )
 
@@ -13,6 +14,7 @@ const thumbTestMedia = "testdata/sample.mp4"
 // TestThumbnailerDecodesAFrame is the basic claim: a preview frame comes back,
 // at the video's own geometry.
 func TestThumbnailerDecodesAFrame(t *testing.T) {
+	codecset.NeedsMedia(t)
 	th := NewThumbnailer(thumbTestMedia)
 	defer th.Close()
 
@@ -39,6 +41,7 @@ func TestThumbnailerDecodesAFrame(t *testing.T) {
 // seek that failed silently, or a decoder that returned its buffered frame
 // regardless, would pass every other check here.
 func TestThumbnailerFramesDiffer(t *testing.T) {
+	codecset.NeedsMedia(t)
 	th := NewThumbnailer(thumbTestMedia)
 	defer th.Close()
 
@@ -133,6 +136,7 @@ func TestThumbnailerGivesUpOnAStreamWithNoVideo(t *testing.T) {
 }
 
 func TestThumbnailerClosedIsFinal(t *testing.T) {
+	codecset.NeedsMedia(t)
 	th := NewThumbnailer(thumbTestMedia)
 	if _, err := th.FrameAt(0); err != nil {
 		t.Fatalf("FrameAt: %v", err)
@@ -159,6 +163,7 @@ func TestThumbnailerReportsAnUnopenableSource(t *testing.T) {
 // upstream, but a preview asking a decoder to seek before zero should not
 // depend on that.
 func TestThumbnailerClampsNegativePositions(t *testing.T) {
+	codecset.NeedsMedia(t)
 	th := NewThumbnailer(thumbTestMedia)
 	defer th.Close()
 

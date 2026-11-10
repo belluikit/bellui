@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/belluikit/bellui/x/mmedia/internal/codecset"
 )
 
 const (
@@ -19,6 +21,7 @@ const (
 // TestNewMediaPlayerURLLocalPath covers the path form, where FFmpeg opens the
 // file itself rather than reading through a Go callback.
 func TestNewMediaPlayerURLLocalPath(t *testing.T) {
+	codecset.NeedsMedia(t)
 	p, err := NewMediaPlayerURL(urlTestMedia)
 	if err != nil {
 		t.Fatalf("NewMediaPlayerURL: %v", err)
@@ -37,6 +40,7 @@ func TestNewMediaPlayerURLLocalPath(t *testing.T) {
 // owns the transport, so it can issue its own requests rather than being handed
 // a byte stream. Serving from httptest keeps it hermetic.
 func TestNewMediaPlayerURLOverHTTP(t *testing.T) {
+	codecset.NeedsMedia(t)
 	srv := httptest.NewServer(http.FileServer(http.Dir("internal/source/testdata")))
 	defer srv.Close()
 
@@ -60,6 +64,7 @@ func TestNewMediaPlayerURLOverHTTP(t *testing.T) {
 // is a text file listing segment URLs; the demuxer has to fetch those itself,
 // which it can only do when it owns the protocol handler.
 func TestHLSOverURL(t *testing.T) {
+	codecset.NeedsMedia(t)
 	if _, err := os.Stat(hlsTestDir); err != nil {
 		t.Skipf("hls fixture unavailable: %v", err)
 	}
@@ -115,6 +120,7 @@ func TestHLSViaReaderFails(t *testing.T) {
 }
 
 func TestNewVideoPlayerURLAndAudioPlayerURL(t *testing.T) {
+	codecset.NeedsMedia(t)
 	v, err := NewVideoPlayerURL(urlTestMedia)
 	if err != nil {
 		t.Fatalf("NewVideoPlayerURL: %v", err)
@@ -146,6 +152,7 @@ func TestNewMediaPlayerURLRejectsMissing(t *testing.T) {
 // TestURLConstructorsHonourOptions checks the shared option handling did not
 // regress when the constructors were split into reader and URL forms.
 func TestURLConstructorsHonourOptions(t *testing.T) {
+	codecset.NeedsMedia(t)
 	p, err := NewMediaPlayerURL(urlTestMedia, WithVolume(0.25), WithLoop())
 	if err != nil {
 		t.Fatalf("NewMediaPlayerURL: %v", err)

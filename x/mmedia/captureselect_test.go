@@ -4,6 +4,8 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/belluikit/bellui/x/mmedia/internal/codecset"
 )
 
 // None of these open a device. That is the point: the picker's whole job is to
@@ -209,6 +211,7 @@ func TestVideoOnlyFilters(t *testing.T) {
 // TestSetCaptureDeviceRefusesANonCapturePlayer. Doing nothing would leave a
 // picker looking as though it had worked.
 func TestSetCaptureDeviceRefusesANonCapturePlayer(t *testing.T) {
+	codecset.NeedsMedia(t)
 	p, err := NewMediaPlayerURL(urlTestMedia)
 	if err != nil {
 		t.Fatalf("NewMediaPlayerURL: %v", err)
