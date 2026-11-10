@@ -21,6 +21,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -89,7 +90,55 @@ func androidManifestData(dir, bundleID, appName, libName, version string, build 
 	if err != nil {
 		return nil, libName, fmt.Errorf("error parsing %s: %v", manifestPath, err)
 	}
-	return manifestData, outLibName, nil
+	return withManifestVersion(manifestData, build, version), outLibName, nil
+}
+
+// withManifestVersion sets android:versionCode and android:versionName on an
+// app's own manifest to the build's -app-build and -app-version, when given
+// (SetAndroidVersionGiven), replacing values the manifest has, and says so on
+// stderr when they differ. aapt2's --version-code only fills a missing value,
+// and the binres path reads the manifest alone, so a manifest's own numbers
+// otherwise won silently, and Play refuses a version code it has seen
+// (#1114).
+func withManifestVersion(manifest []byte, build int, version string) []byte {
+	if buildVersionCodeGiven {
+		manifest = withManifestAttr(manifest, "android:versionCode", fmt.Sprint(build), "-app-build")
+	}
+	if buildVersionNameGiven {
+		manifest = withManifestAttr(manifest, "android:versionName", version, "-app-version")
+	}
+	return manifest
+}
+
+// manifestStartTag matches the <manifest> start tag.
+var manifestStartTag = regexp.MustCompile(`<manifest[\s>]`)
+
+// withManifestAttr sets attr on <manifest> to value, which flag supplied.
+func withManifestAttr(manifest []byte, attr, value, flag string) []byte {
+	s := string(manifest)
+	loc := manifestStartTag.FindStringIndex(s)
+	if loc == nil {
+		return manifest
+	}
+	start := loc[0]
+	end := strings.Index(s[start:], ">")
+	if end < 0 {
+		return manifest
+	}
+	end += start
+	var escaped strings.Builder
+	_ = xml.EscapeText(&escaped, []byte(value))
+	existing := regexp.MustCompile(`\s` + regexp.QuoteMeta(attr) + `\s*=\s*("[^"]*"|'[^']*')`)
+	if m := existing.FindStringSubmatchIndex(s[start:end]); m != nil {
+		old := s[start+m[2]+1 : start+m[3]-1]
+		if old == escaped.String() {
+			return manifest
+		}
+		fmt.Fprintf(os.Stderr, "bellui: warning: AndroidManifest.xml sets %s=%q; the package uses %q, from %s or manifest.pxf\n", attr, old, value, flag)
+		return []byte(s[:start+m[2]] + `"` + escaped.String() + `"` + s[start+m[3]:])
+	}
+	at := start + len("<manifest")
+	return []byte(s[:at] + " " + attr + `="` + escaped.String() + `"` + s[at:])
 }
 
 // androidPageSizeLDFLAG links native libraries with 16 KB page alignment.

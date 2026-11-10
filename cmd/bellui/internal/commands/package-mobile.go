@@ -25,6 +25,7 @@ func (p *Packager) packageAndroid(arch string, tags []string) error {
 	if err := mobile.SetAndroidMinSDK(p.androidMinSDKOrDefault()); err != nil {
 		return err
 	}
+	mobile.SetAndroidVersionGiven(p.versionGiven, p.buildGiven)
 	return mobile.RunNewBuild(arch, p.AppID, p.icon, p.Name, p.AppVersion, p.AppBuild, p.release, p.distribution,
 		"", "", tags, iconFG, iconBG, iconMono, p.URLSchemes, p.fileMimeTypes(), nil, p.AssociatedDomains, p.iconCredit())
 }

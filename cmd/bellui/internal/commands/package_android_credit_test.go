@@ -67,15 +67,12 @@ const ownAndroidManifest = `<?xml version="1.0" encoding="utf-8"?>
 </manifest>
 `
 
-// `bellui package -os android` of an app with its own AndroidManifest.xml and
-// no Icon.png says the default icon's credit is not in the package: the
-// credit goes into the manifest bellui generates, and this app's manifest is
-// used unchanged (#362, #714). TestOwnAndroidManifestWarnsTheCreditIsMissing
-// covers the helper's cases; this covers that packageAndroid calls it, which
-// takes a real Android build.
-func TestPackageAndroidOwnManifestWarnsTheCreditIsMissing(t *testing.T) {
-	androidNDKOrSkip(t)
-
+// ownManifestApp writes an app with its own AndroidManifest.xml (manifest)
+// that builds against the toolkit in this checkout, and makes it the working
+// directory with the environment an Android build needs. It returns the
+// app's directory.
+func ownManifestApp(t *testing.T, manifest string) string {
+	t.Helper()
 	// The app builds against the toolkit in this checkout, as the CLI does.
 	toolkit, err := filepath.Abs(filepath.Join("..", "..", "..", ".."))
 	require.NoError(t, err)
@@ -107,7 +104,7 @@ func main() {
 	write("go.mod", "module example.com/credit\n\ngo 1.25.0\n\nrequire github.com/belluikit/bellui v0.0.0\n\n"+
 		"replace github.com/belluikit/bellui => \""+filepath.ToSlash(toolkit)+"\"\n")
 	write("go.sum", string(goSum))
-	write("AndroidManifest.xml", ownAndroidManifest)
+	write("AndroidManifest.xml", manifest)
 
 	// The app's go.mod lists only the toolkit, so the build fills in the
 	// rest from the toolkit's go.sum. Host cgo flags (a Homebrew -L, a macOS
@@ -117,6 +114,20 @@ func main() {
 	t.Setenv("CGO_CFLAGS", "")
 	t.Setenv("CGO_LDFLAGS", "")
 	t.Chdir(dir)
+
+	return dir
+}
+
+// `bellui package -os android` of an app with its own AndroidManifest.xml and
+// no Icon.png says the default icon's credit is not in the package: the
+// credit goes into the manifest bellui generates, and this app's manifest is
+// used as it is, apart from its version (#362, #714, #1114). TestOwnAndroidManifestWarnsTheCreditIsMissing
+// covers the helper's cases; this covers that packageAndroid calls it, which
+// takes a real Android build.
+func TestPackageAndroidOwnManifestWarnsTheCreditIsMissing(t *testing.T) {
+	androidNDKOrSkip(t)
+
+	dir := ownManifestApp(t, ownAndroidManifest)
 
 	var out bytes.Buffer
 	log.SetOutput(io.MultiWriter(&out, os.Stderr))

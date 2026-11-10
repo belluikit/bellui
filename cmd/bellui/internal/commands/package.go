@@ -78,6 +78,7 @@ type Packager struct {
 	tags, category                 string
 	tempDir                        string
 	defaultIcon                    bool // the bundled gopher icon is in use (#362)
+	versionGiven, buildGiven       bool // AppVersion / AppBuild were set, not defaulted (#1114)
 	langs                          []string
 
 	customMetadata      keyValueFlag
@@ -138,6 +139,8 @@ func (p *Packager) combinedVersion() string {
 }
 
 func (p *Packager) doPackage(runner runner) error {
+	// Only a given version replaces an app's own Android manifest's (#1114).
+	p.versionGiven, p.buildGiven = p.AppVersion != "", p.AppBuild > 0
 	// sensible defaults - validation deemed them optional
 	if p.AppVersion == "" {
 		p.AppVersion = defaultAppVersion

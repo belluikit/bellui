@@ -65,6 +65,19 @@ func SetAndroidMinSDK(api int) error {
 	return nil
 }
 
+// buildVersionNameGiven and buildVersionCodeGiven say whether the version
+// and the build number came from -app-version / -app-build or manifest.pxf,
+// not from the packager's defaults. Only a given one replaces what an app's
+// own AndroidManifest.xml states (#1114), so an app that keeps its numbers
+// there alone still packages with them.
+var buildVersionNameGiven, buildVersionCodeGiven bool
+
+// SetAndroidVersionGiven says which of the version (name) and the build
+// number (code) the packager was given rather than defaulted.
+func SetAndroidVersionGiven(name, code bool) {
+	buildVersionNameGiven, buildVersionCodeGiven = name, code
+}
+
 func runBuild(cmd *command) error {
 	_, err := runBuildImpl(cmd)
 	return err
