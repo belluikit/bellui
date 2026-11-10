@@ -25,6 +25,11 @@ install:
 {{- if .Credits}}
 	install -Dm00644 usr/{{.Local}}share/doc/$(AppID)/CREDITS $(DESTDIR)$(PREFIX)/share/doc/$(AppID)/CREDITS
 {{- end}}
+{{- if .BundleLibs}}
+	# The shared libraries the application loads, such as FFmpeg's (bellui #1101).
+	mkdir -p $(DESTDIR)$(PREFIX)/lib/$(AppID)
+	cp -r usr/{{.Local}}lib/$(AppID)/. $(DESTDIR)$(PREFIX)/lib/$(AppID)/
+{{- end}}
 {{- if .BundleCEF}}
 	# The CEF payload: the web engine this application bundles (bellui #107).
 	mkdir -p $(DESTDIR)$(PREFIX)/bin/cef
@@ -41,6 +46,9 @@ uninstall:
 	-rm $(DESTDIR)$(PREFIX)/share/doc/$(AppID)/CREDITS
 	-rmdir $(DESTDIR)$(PREFIX)/share/doc/$(AppID)
 {{- end}}
+{{- if .BundleLibs}}
+	-rm -r $(DESTDIR)$(PREFIX)/lib/$(AppID)
+{{- end}}
 {{- if .BundleCEF}}
 	-rm -r $(DESTDIR)$(PREFIX)/bin/cef
 {{- end}}
@@ -52,6 +60,10 @@ user-install:
 	sed -i -e "s,Exec=$(Exec),Exec=$(DESTDIR)$(HOME)/.local/bin/$(Exec),g" $(DESTDIR)$(HOME)/.local/share/applications/$(AppID).desktop
 {{- if .Credits}}
 	install -Dm00644 usr/{{.Local}}share/doc/$(AppID)/CREDITS $(DESTDIR)$(HOME)/.local/share/doc/$(AppID)/CREDITS
+{{- end}}
+{{- if .BundleLibs}}
+	mkdir -p $(DESTDIR)$(HOME)/.local/lib/$(AppID)
+	cp -r usr/{{.Local}}lib/$(AppID)/. $(DESTDIR)$(HOME)/.local/lib/$(AppID)/
 {{- end}}
 {{- if .BundleCEF}}
 	# A user install cannot make the sandbox helper setuid root; the
@@ -67,6 +79,9 @@ user-uninstall:
 {{- if .Credits}}
 	-rm $(DESTDIR)$(HOME)/.local/share/doc/$(AppID)/CREDITS
 	-rmdir $(DESTDIR)$(HOME)/.local/share/doc/$(AppID)
+{{- end}}
+{{- if .BundleLibs}}
+	-rm -r $(DESTDIR)$(HOME)/.local/lib/$(AppID)
 {{- end}}
 {{- if .BundleCEF}}
 	-rm -r $(DESTDIR)$(HOME)/.local/bin/cef

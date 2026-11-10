@@ -219,6 +219,18 @@ func (r *Releaser) packageMacOSRelease() error {
 	}
 	defer cleanup()
 
+	// The shared libraries `bellui package` bundled (#1101) are signed with
+	// the app's certificate first: the bundle's signature covers nested code
+	// only once that code is signed, and the hardened runtime loads no
+	// library signed by another team.
+	dylibs, _ := filepath.Glob(filepath.Join(r.Name+".app", "Contents", "Frameworks", "*.dylib"))
+	for _, lib := range dylibs {
+		if out, err := exec.Command("codesign", "-f", "-vv", "-s", appCert, lib).CombinedOutput(); err != nil {
+			bellui.LogError("Codesign failed: "+string(out), err)
+			return errors.New("unable to codesign bundled library " + filepath.Base(lib))
+		}
+	}
+
 	cmd := exec.Command("codesign", "-vfs", appCert, "--entitlement", "entitlements.plist", r.Name+".app")
 	err = cmd.Run()
 	if err != nil {
@@ -265,6 +277,16 @@ func (r *Releaser) packageWindowsRelease(outFile string) error {
 
 	util.CopyFile(r.icon, filepath.Join(payload, "Icon.png"))
 	util.CopyFile(r.Name, filepath.Join(payload, r.Name))
+	// The DLLs `bellui package` put beside the executable (#1101).
+	libs, err := bundleWindowsLibs(r.Name)
+	if err != nil {
+		return err
+	}
+	for _, lib := range libs {
+		if err := util.CopyFile(lib, filepath.Join(payload, lib)); err != nil {
+			return err
+		}
+	}
 
 	binDir, err := findWindowsSDKBin()
 	if err != nil {
