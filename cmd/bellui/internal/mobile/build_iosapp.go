@@ -467,6 +467,12 @@ func sortedPlistEntries(m map[string]string) []plistEntry {
 	return entries
 }
 
+// iosSceneDelegateClass is the UIWindowSceneDelegate in the toolkit's iOS
+// runtime (internal/driver/mobile/app/darwin_ios.m) that the Info.plist's
+// UIApplicationSceneManifest names. Apps built with the iOS 27 SDK do not
+// launch without a scene manifest (#1117).
+const iosSceneDelegateClass = "GoAppSceneDelegate"
+
 var infoplistTmpl = template.Must(template.New("infoplist").Funcs(templates.XMLFuncs).Parse(`<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -522,6 +528,23 @@ var infoplistTmpl = template.Must(template.New("infoplist").Funcs(templates.XMLF
   <string>AppIcon</string>
   <key>LSRequiresIPhoneOS</key>
   <true/>
+  <key>UIApplicationSceneManifest</key>
+  <dict>
+    <key>UIApplicationSupportsMultipleScenes</key>
+    <false/>
+    <key>UISceneConfigurations</key>
+    <dict>
+      <key>UIWindowSceneSessionRoleApplication</key>
+      <array>
+        <dict>
+          <key>UISceneConfigurationName</key>
+          <string>Default Configuration</string>
+          <key>UISceneDelegateClassName</key>
+          <string>` + iosSceneDelegateClass + `</string>
+        </dict>
+      </array>
+    </dict>
+  </dict>
   <key>UILaunchStoryboardName</key>
   <string>LaunchScreen</string>
   <key>UIRequiredDeviceCapabilities</key>
