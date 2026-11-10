@@ -3,6 +3,7 @@ package container
 import (
 	"testing"
 
+	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/test"
 	"github.com/belluikit/bellui/widget"
@@ -27,8 +28,10 @@ func TestAppTabs_HideTabBar(t *testing.T) {
 	assert.Greater(t, c1.Position().Y, float32(0), "with the bar, the content sits below it")
 	assert.Contains(t, r.Objects(), r.bar)
 
+	assert.Equal(t, core.RoleTabList, tabs.AccessibleRole())
 	tabs.HideTabBar = true
 	tabs.Refresh()
+	assert.Equal(t, core.RoleNone, tabs.AccessibleRole(), "no tabs are shown, so no tab list")
 
 	assert.Equal(t, geo.NewPos(0, 0), c1.Position())
 	assert.Equal(t, size, c1.Size(), "the selected content fills the widget")

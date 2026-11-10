@@ -16,8 +16,14 @@ var (
 	_ core.Accessible = (*AppTabs)(nil)
 )
 
-// AccessibleRole returns [core.RoleTabList].
-func (t *AppTabs) AccessibleRole() core.AccessibleRole { return core.RoleTabList }
+// AccessibleRole returns [core.RoleTabList], or [core.RoleNone] while
+// HideTabBar is set: with no tabs shown, the widget is only its page.
+func (t *AppTabs) AccessibleRole() core.AccessibleRole {
+	if t.HideTabBar {
+		return core.RoleNone
+	}
+	return core.RoleTabList
+}
 
 // AccessibleLabel returns an empty string; tab containers have no intrinsic label.
 func (t *AppTabs) AccessibleLabel() string { return "" }
