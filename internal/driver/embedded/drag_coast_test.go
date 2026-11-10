@@ -50,7 +50,7 @@ func (r *coastRecorder) DragMomentum() bool { return !r.direct }
 // coastDriver runs a driver whose window is filled by a coastRecorder. Its
 // event channel is unbuffered, so a send returns once the loop has the event,
 // and the loop handles it before it runs anything queued after the send.
-func coastDriver(t *testing.T) (bellui.Driver, chan embedded.Event, *coastRecorder) {
+func coastDriver(t *testing.T) (bellui.Driver, chan embedded.Event, *coastRecorder, func(time.Duration)) {
 	t.Helper()
 	events := make(chan embedded.Event)
 	size := func() geo.Size { return geo.NewSquareSize(200) }
@@ -61,7 +61,7 @@ func coastDriver(t *testing.T) (bellui.Driver, chan embedded.Event, *coastRecord
 	// The driver stamps each touch with the time it handles it, so on a
 	// loaded machine a 40ms stall before the release made the flick count as
 	// held still, and it did not coast (#786).
-	intNoos.StepTouchClock(w)
+	hold := intNoos.StepTouchClock(w)
 	stopped := make(chan struct{})
 	go func() {
 		d.Run()
@@ -71,7 +71,7 @@ func coastDriver(t *testing.T) (bellui.Driver, chan embedded.Event, *coastRecord
 		close(events)
 		<-stopped
 	})
-	return d, events, rec
+	return d, events, rec, hold
 }
 
 func flickEvents(events chan embedded.Event) {
@@ -87,7 +87,7 @@ func flickEvents(events chan embedded.Event) {
 const coastFor = 1500 * time.Millisecond
 
 func TestNoOSDriver_TouchStopsDragCoast(t *testing.T) {
-	d, events, rec := coastDriver(t)
+	d, events, rec, _ := coastDriver(t)
 	onLoop := func(fn func()) { d.DoFromGoroutine(fn, true) }
 
 	flickEvents(events)
@@ -106,7 +106,7 @@ func TestNoOSDriver_TouchStopsDragCoast(t *testing.T) {
 }
 
 func TestNoOSDriver_DragCoastDoesNotEndALaterDrag(t *testing.T) {
-	d, events, rec := coastDriver(t)
+	d, events, rec, hold := coastDriver(t)
 	onLoop := func(fn func()) { d.DoFromGoroutine(fn, true) }
 
 	flickEvents(events)
@@ -121,19 +121,25 @@ func TestNoOSDriver_DragCoastDoesNotEndALaterDrag(t *testing.T) {
 		assert.Equal(t, []string{"drag"}, rec.log[started:],
 			"the second drag is still going: no coast step or DragEnd landed in it")
 	})
+	// Held still for coastFor on the touch clock too, its release does not
+	// coast (#751): it just ends the drag, at once. On the stepped clock alone
+	// the release came a few milliseconds after the move and coasted, and a
+	// slow runner's coast outlasted the wait for it (#830).
+	hold(coastFor)
 	events <- &embedded.TouchUpEvent{Position: geo.NewPos(140, 100), ID: 1}
+	var atRelease []string
+	onLoop(func() { atRelease = append([]string(nil), rec.log[started:]...) })
+	assert.Equal(t, []string{"drag", "end"}, atRelease, "its own release ends it, once")
 	time.Sleep(coastFor)
 	onLoop(func() {
-		second := rec.log[started:]
-		assert.Equal(t, "end", second[len(second)-1], "its own release ends it")
-		assert.NotContains(t, second[:len(second)-1], "end", "once")
+		assert.Equal(t, atRelease, rec.log[started:], "and nothing coasts after it")
 	})
 }
 
 // Only a Draggable that asks for momentum coasts (#751): any other gets
 // DragEnd where the finger lifted, however fast it was moving.
 func TestNoOSDriver_DirectDragDoesNotCoast(t *testing.T) {
-	d, events, rec := coastDriver(t)
+	d, events, rec, _ := coastDriver(t)
 	onLoop := func(fn func()) { d.DoFromGoroutine(fn, true) }
 	onLoop(func() { rec.direct = true })
 
