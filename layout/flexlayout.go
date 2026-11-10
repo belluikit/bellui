@@ -76,8 +76,15 @@ type FlexHBoxLayout struct {
 	MaxWidth   []float32  // maximum width per child (0 = no limit)
 	MinHeight  []float32  // cross-axis minimum height per child (0 = unset); Since: 1.0
 	MaxHeight  []float32  // cross-axis maximum height per child (0 = no limit, full stretch); Since: 1.0
-	Padding    float32    // spacing between children (0 = theme default)
+	Padding    float32    // spacing between children (0 = theme default, unless ExactPadding)
 	CrossAlign CrossAlign // cross-axis placement (default CrossStretch); Since: 1.3
+
+	// ExactPadding makes Padding the spacing as given, so 0 puts the children
+	// flush against each other. Without it, a Padding of 0 or less means the
+	// theme's padding.
+	//
+	// Since: 1.3
+	ExactPadding bool
 }
 
 // NewFlexHBoxLayout creates a horizontal flex layout with the given per-child
@@ -88,7 +95,7 @@ func NewFlexHBoxLayout(flex []float32) *FlexHBoxLayout {
 }
 
 func (l *FlexHBoxLayout) padding() float32 {
-	if l.Padding > 0 {
+	if l.ExactPadding || l.Padding > 0 {
 		return l.Padding
 	}
 	return theme.Padding()
@@ -202,8 +209,15 @@ type FlexVBoxLayout struct {
 	MaxHeight  []float32  // maximum height per child
 	MinWidth   []float32  // cross-axis minimum width per child (0 = unset); Since: 1.0
 	MaxWidth   []float32  // cross-axis maximum width per child (0 = no limit, full stretch); Since: 1.0
-	Padding    float32    // spacing between children (0 = theme default)
+	Padding    float32    // spacing between children (0 = theme default, unless ExactPadding)
 	CrossAlign CrossAlign // cross-axis placement (default CrossStretch); Since: 1.3
+
+	// ExactPadding makes Padding the spacing as given, so 0 puts the children
+	// flush against each other. Without it, a Padding of 0 or less means the
+	// theme's padding.
+	//
+	// Since: 1.3
+	ExactPadding bool
 }
 
 // NewFlexVBoxLayout creates a vertical flex layout with the given per-child
@@ -213,7 +227,7 @@ func NewFlexVBoxLayout(flex []float32) *FlexVBoxLayout {
 }
 
 func (l *FlexVBoxLayout) padding() float32 {
-	if l.Padding > 0 {
+	if l.ExactPadding || l.Padding > 0 {
 		return l.Padding
 	}
 	return theme.Padding()

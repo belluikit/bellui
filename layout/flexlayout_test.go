@@ -8,6 +8,7 @@ import (
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/layout"
+	"github.com/belluikit/bellui/theme"
 )
 
 // TestFlexHBoxLayout_CrossMaxHeight verifies that MaxHeight clamps a child's
@@ -195,5 +196,36 @@ func TestFlexVBoxLayout_CrossAlign(t *testing.T) {
 		assert.Equal(t, geo.NewSize(tt.wantW, 56), small.Size(), tt.reason)
 		assert.Equal(t, geo.NewPos(0, 60), big.Position(), tt.reason)
 		assert.Equal(t, geo.NewSize(96, 96), big.Size(), tt.reason)
+	}
+}
+
+// TestFlexLayout_ExactPadding verifies that ExactPadding makes a Padding of 0
+// mean no spacing (#1126), on both axes, while a Padding of 0 without it keeps
+// the theme's padding.
+func TestFlexLayout_ExactPadding(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		padding float32
+		exact   bool
+		wantGap float32
+	}{
+		{"zero is theme default", 0, false, theme.Padding()},
+		{"exact zero touches", 0, true, 0},
+		{"exact non-zero", 6, true, 6},
+	} {
+		a := NewMinSizeRect(geo.NewSize(10, 10))
+		b := NewMinSizeRect(geo.NewSize(10, 10))
+		objs := []core.CanvasObject{a, b}
+		hl := &layout.FlexHBoxLayout{Flex: []float32{0, 1}, Padding: tt.padding, ExactPadding: tt.exact}
+		assert.Equal(t, geo.NewSize(20+tt.wantGap, 10), hl.MinSize(objs), tt.name)
+		hl.Layout(objs, geo.NewSize(100, 10))
+		assert.Equal(t, float32(10+tt.wantGap), b.Position().X, tt.name)
+		assert.Equal(t, float32(90-tt.wantGap), b.Size().Width, tt.name)
+
+		vl := &layout.FlexVBoxLayout{Flex: []float32{0, 1}, Padding: tt.padding, ExactPadding: tt.exact}
+		assert.Equal(t, geo.NewSize(10, 20+tt.wantGap), vl.MinSize(objs), tt.name)
+		vl.Layout(objs, geo.NewSize(10, 100))
+		assert.Equal(t, float32(10+tt.wantGap), b.Position().Y, tt.name)
+		assert.Equal(t, float32(90-tt.wantGap), b.Size().Height, tt.name)
 	}
 }
