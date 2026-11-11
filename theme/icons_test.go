@@ -495,3 +495,17 @@ func TestBookmarkIcons(t *testing.T) {
 		t.Error("filled and outlined bookmarks are the same icon")
 	}
 }
+
+// The notifications icon is its own file, themed like the rest (#1104).
+func TestNotificationsIcon(t *testing.T) {
+	icon := theme.NotificationsIcon()
+	if icon == nil || !strings.HasSuffix(icon.Name(), "notifications.svg") {
+		t.Fatalf("icon %v, want one named for notifications.svg", icon)
+	}
+	if !strings.Contains(string(icon.Content()), "<path") {
+		t.Error("notifications.svg has no path")
+	}
+	if _, ok := icon.(*theme.ThemedResource); !ok {
+		t.Errorf("icon is %T, want a *theme.ThemedResource so it takes the theme's colour", icon)
+	}
+}
