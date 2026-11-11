@@ -46,3 +46,16 @@ the change below.
   limit (`readStyleAttr` 47, `addSeg` 44 in oksvg; `strokeEdge` 43 here). They
   are scoped out of the gocyclo gate pending a real refactor — tracked in #18,
   deliberately not attempted alongside a mechanical cleanup.
+* `ScannerGV` rasterizes each path within its own extent (#1137). Upstream
+  sized `vector.Rasterizer` to the whole image and drew every path over every
+  pixel, so a 2 px dot cost as much as the page: DaySong's 22 making layers
+  took 13.9 s at 720 px, 0.33 s after. The scanner now records a path's points
+  and, at `Draw`, sizes the rasterizer to their pixel extent (clipped to the
+  bounds) and replays them shifted to its origin — what upstream's
+  commented-out lines under `Draw` described. Below 512 px the masks are
+  identical to upstream's (`TestScannerGV_MatchesWholeImage`). Above it,
+  `vector` switches a whole-image raster to float math while a path's small
+  raster keeps fixed-point, so large images differ in anti-aliasing by
+  rounding: both are equally far from a 2× supersampled render. Pixels a path
+  does not reach are no longer written, so their colour no longer drifts
+  through a premultiplied round trip per path.

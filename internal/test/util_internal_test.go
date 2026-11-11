@@ -13,6 +13,11 @@ func TestPixCloseEnough(t *testing.T) {
 	br, bg, bb, ba := uint8color(color.Black)
 	assert.False(t, pixCloseEnough([]byte{wr, wg, wb, wa}, []byte{br, bg, bb, ba}))
 	assert.False(t, pixCloseEnough([]byte{wr, wg, wb, wa}, []byte{wr + 1, wg - 1, wb, wa}))
+
+	// Fully transparent pixels match whatever their colour bytes (#1137), but
+	// not a pixel that shows.
+	assert.True(t, pixCloseEnough([]byte{0xff, 0, 0, 0, wr, wg, wb, wa}, []byte{0, 0, 0, 0, wr, wg, wb, wa}))
+	assert.False(t, pixCloseEnough([]byte{0xff, 0, 0, 0}, []byte{0, 0, 0, 0x10}))
 }
 
 func uint8color(c color.Color) (r, g, b, a uint8) {

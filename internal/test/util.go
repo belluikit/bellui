@@ -9,7 +9,11 @@ import (
 	"path/filepath"
 )
 
-// pixCloseEnough reports whether a and b are mostly the same.
+// pixCloseEnough reports whether a and b, 4 bytes a pixel, are mostly the
+// same. Two pixels that are both fully transparent are the same whatever their
+// colour bytes hold: an NRGBA pixel's colour at alpha 0 shows nothing, and
+// whether a draw wrote one there can depend on the architecture's float
+// rounding (#1137).
 func pixCloseEnough(a, b []uint8) bool {
 	if len(a) != len(b) {
 		return false
@@ -19,6 +23,9 @@ func pixCloseEnough(a, b []uint8) bool {
 	for i, v := range a {
 		w := b[i]
 		if v == w {
+			continue
+		}
+		if p := i - i%4; p+3 < len(a) && a[p+3] == 0 && b[p+3] == 0 {
 			continue
 		}
 		// Allow a small delta for rendering variation.
