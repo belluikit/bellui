@@ -1,7 +1,7 @@
-<canvas size="84x76">
+<canvas size="84x88">
 	<content>
-		<widget size="84x76" type="*container.AppTabs">
-			<container pos="0,36" size="84x40">
+		<widget size="84x88" type="*container.AppTabs">
+			<container pos="0,48" size="84x40">
 				<container size="44x40">
 					<widget size="44x40" type="*container.tabButton">
 						<text alignment="center" bold color="primary" pos="4,8" size="36x16">Test1</text>
@@ -12,8 +12,8 @@
 					<image fillMode="contain" pos="8,10" rsc="more-horizontal.svg" size="iconInlineSize" themed="foreground"/>
 				</widget>
 			</container>
-			<rectangle fillColor="shadow" pos="0,32" size="84x4"/>
-			<rectangle fillColor="primary" pos="0,32" radius="4" size="44x4"/>
+			<rectangle fillColor="shadow" pos="0,44" size="84x4"/>
+			<rectangle fillColor="primary" pos="0,44" radius="4" size="44x4"/>
 			<widget size="84x32" type="*widget.Label">
 				<widget size="84x32" type="*widget.RichText">
 					<text pos="8,8" size="37x16">Text 1</text>

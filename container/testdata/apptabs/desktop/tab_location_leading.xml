@@ -1,6 +1,6 @@
-<canvas size="105x72">
+<canvas size="117x72">
 	<content>
-		<widget size="105x72" type="*container.AppTabs">
+		<widget size="117x72" type="*container.AppTabs">
 			<container size="48x72">
 				<container size="48x28">
 					<widget size="48x32" type="*container.tabButton">
@@ -14,7 +14,7 @@
 			</container>
 			<rectangle fillColor="shadow" pos="48,0" size="4x72"/>
 			<rectangle fillColor="primary" pos="48,0" radius="4" size="4x32"/>
-			<widget pos="52,0" size="53x72" type="*widget.Label">
+			<widget pos="64,0" size="53x72" type="*widget.Label">
 				<widget size="53x72" type="*widget.RichText">
 					<text pos="8,8" size="37x16">Text 1</text>
 				</widget>

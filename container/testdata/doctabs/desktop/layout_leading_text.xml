@@ -18,7 +18,7 @@
 			</container>
 			<rectangle fillColor="shadow" pos="72,0" size="4x150"/>
 			<rectangle fillColor="primary" pos="72,0" radius="4" size="4x36"/>
-			<circle fillColor="background" pos="76,0" size="74x150"/>
+			<circle fillColor="background" pos="88,0" size="62x150"/>
 		</widget>
 	</content>
 </canvas>

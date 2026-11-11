@@ -34,7 +34,8 @@ func TestAppTabs_Empty(t *testing.T) {
 	assert.Nil(t, tabs.Selected())
 	min := tabs.MinSize()
 	assert.Equal(t, float32(0), min.Width)
-	assert.Equal(t, theme.Padding(), min.Height)
+	// The divider strip and the gap between the bar and the content.
+	assert.Equal(t, theme.Padding()+theme.Size(theme.SizeNameTabContentMargin), min.Height)
 
 	tabs = &AppTabs{}
 	assert.Equal(t, 0, len(tabs.Items))
