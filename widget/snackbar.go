@@ -73,10 +73,17 @@ func (s *Snackbar) Show(c core.Canvas) {
 	v := bellui.CurrentApp().Settings().ThemeVariant()
 
 	bgColor := th.Color(theme.ColorNameInverseSurface, v)
-	textColor := th.Color(theme.ColorNameInverseOnSurface, v)
 
-	label := canvas.NewText(s.Text, textColor)
-	label.TextSize = th.Size(theme.SizeNameText)
+	label := NewRichText(&TextSegment{Text: s.Text, Style: RichTextStyle{
+		ColorName: theme.ColorNameInverseOnSurface,
+		Inline:    true,
+	}})
+	label.Wrapping = bellui.TextWrapWord
+	msg := &snackbarLayout{
+		text:   label,
+		outset: th.Size(theme.SizeNameInnerPadding),
+		pad:    th.Size(theme.SizeNamePadding),
+	}
 
 	objects := []core.CanvasObject{label}
 
@@ -99,13 +106,22 @@ func (s *Snackbar) Show(c core.Canvas) {
 		})
 		actionBtn.Importance = HighImportance
 
-		objects = append(objects, layout.NewSpacer(), actionBtn)
+		objects = append(objects, actionBtn)
+		msg.action = actionBtn
 	}
 
-	content := &bellui.Container{Layout: layout.NewHBoxLayout(), Objects: objects}
-	pad := th.Size(theme.SizeNameInnerPadding)
+	content := &bellui.Container{Layout: msg, Objects: objects}
 	padded := &bellui.Container{Layout: layout.NewPaddedLayout(), Objects: []core.CanvasObject{content}}
-	_ = pad
+
+	// The message keeps to one line while it fits, and otherwise wraps at
+	// the width the canvas leaves inside the snackbar's margins (#1106).
+	margin := th.Size(theme.SizeNamePadding) * 2
+	room := c.Size().Width - 2*margin - 2*msg.pad // the padded layout's insets
+	if msg.action != nil {
+		room -= msg.pad + msg.action.MinSize().Width
+	}
+	oneLine := bellui.MeasureText(s.Text, th.Size(theme.SizeNameText), bellui.TextStyle{}).Width
+	msg.textWidth = max(min(oneLine, room), 1)
 
 	s.mu.Lock()
 	s.popUp = newPopUpWithBgColor(padded, c, bgColor)
@@ -118,7 +134,6 @@ func (s *Snackbar) Show(c core.Canvas) {
 	// Position at bottom center.
 	canvasSize := c.Size()
 	popSize := padded.MinSize()
-	margin := th.Size(theme.SizeNamePadding) * 2
 	x := (canvasSize.Width - popSize.Width) / 2
 	y := canvasSize.Height - popSize.Height - margin
 	if s.BottomInset > 0 {
@@ -211,6 +226,48 @@ func (s *Snackbar) Hide() {
 	if p != nil {
 		p.Hide()
 	}
+}
+
+// snackbarLayout lays out a snackbar's message and its optional action: the
+// message wraps at textWidth, and the action sits at the end, centred. The
+// message's RichText draws its text outset in from its edges, so the layout
+// places it that far outside the text's area, putting the text where a
+// single canvas.Text line used to be (#1106).
+type snackbarLayout struct {
+	text      *RichText
+	action    core.CanvasObject
+	textWidth float32
+	outset    float32
+	pad       float32 // between the message and the action
+}
+
+// textSize is the size of the message's text, wrapped at textWidth.
+func (l *snackbarLayout) textSize() geo.Size {
+	if w := l.textWidth + 2*l.outset; l.text.Size().Width != w {
+		l.text.Resize(geo.NewSize(w, l.text.Size().Height))
+	}
+	return geo.NewSize(l.textWidth, l.text.MinSize().Height-2*l.outset)
+}
+
+func (l *snackbarLayout) MinSize([]core.CanvasObject) geo.Size {
+	size := l.textSize()
+	if l.action != nil {
+		a := l.action.MinSize()
+		size = geo.NewSize(size.Width+l.pad+a.Width, max(size.Height, a.Height))
+	}
+	return size
+}
+
+func (l *snackbarLayout) Layout(objects []core.CanvasObject, size geo.Size) {
+	text := l.textSize()
+	l.text.Move(geo.NewPos(-l.outset, (size.Height-text.Height)/2-l.outset))
+	l.text.Resize(text.AddWidthHeight(2*l.outset, 2*l.outset))
+	if l.action != nil {
+		a := l.action.MinSize()
+		l.action.Move(geo.NewPos(size.Width-a.Width, (size.Height-a.Height)/2))
+		l.action.Resize(a)
+	}
+	mirrorIfRTL(objects, size.Width) // the action leads in a right-to-left layout, as the box it replaced did
 }
 
 // ShowSnackbar is a convenience function to show a snackbar on the given canvas.
