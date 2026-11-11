@@ -114,14 +114,9 @@ func goIOSBuild(pkg *packages.Package, bundleID string, archs []string,
 	if err != nil {
 		return nil, err
 	}
-	projPbxproj := new(bytes.Buffer)
 	projData := iosProjectData(bundleID, cert, profile, teamID, release)
 	projData.Entitlements = entitlements != nil
-	projData.Embeds = pbxEmbeds(embed)
-	if err := projPbxprojTmpl.Execute(projPbxproj, projData); err != nil {
-		return nil, err
-	}
-	if err := writeProjectFiles([]projectFile{{tmpdir + "/main.xcodeproj/project.pbxproj", projPbxproj.Bytes()}}); err != nil {
+	if err := writeIOSProject(projData, embed); err != nil {
 		return nil, err
 	}
 
@@ -251,6 +246,16 @@ func iosInfoPlist(appDir string, data infoplistTmplData) ([]byte, error) {
 		return nil, err
 	}
 	return mergeInfoPlist(buf.Bytes(), fragment, data)
+}
+
+// writeIOSProject writes the Xcode project, which embeds embed.
+func writeIOSProject(data projPbxprojTmplData, embed []iosFramework) error {
+	data.Embeds = pbxEmbeds(embed)
+	var buf bytes.Buffer
+	if err := projPbxprojTmpl.Execute(&buf, data); err != nil {
+		return err
+	}
+	return writeProjectFiles([]projectFile{{tmpdir + "/main.xcodeproj/project.pbxproj", buf.Bytes()}})
 }
 
 // copyIOSEmbeds puts the dynamic frameworks next to the Xcode project, whose

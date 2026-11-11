@@ -188,48 +188,17 @@ func goAndroidBuild(pkg *packages.Package, bundleID string, androidArchs []strin
 	nmpkgs := make(map[string]map[string]bool) // map: arch -> extractPkgs' output
 
 	for _, arch := range androidArchs {
-		toolchain := ndk.Toolchain(arch)
-		libPath := "lib/" + toolchain.abi + "/lib" + libName + ".so"
-		libAbsPath := filepath.Join(tmpdir, libPath)
-		if err := mkdir(filepath.Dir(libAbsPath)); err != nil {
-			return nil, err
-		}
-		// If building release and no ldflags are set then remove the useless debug and DWARF build options
-		if release && buildLdflags == "" {
-			buildLdflags = "-w" // not -s: extractPkgs reads the symbols, and stripLibrary drops them after
-		}
-		err = goBuild(
-			pkg.PkgPath,
-			append(env, androidEnv[arch]...),
-			"-buildmode=c-shared",
-			"-o", libAbsPath,
-		)
+		files, pkgs, err := buildAndroidLib(pkg, arch, libName, env, ndkRoot, release)
 		if err != nil {
 			return nil, err
 		}
-		nmpkgs[arch], err = extractPkgs(toolchain.Path(ndkRoot, "nm"), libAbsPath)
-		if err != nil {
-			return nil, err
-		}
-		shared, err := bundleAndroidSharedLibs(libAbsPath, "lib/"+toolchain.abi)
-		if err != nil {
-			return nil, err
-		}
-		libFiles = append(libFiles, shared...)
-		if release {
-			if err := stripLibrary(toolchain.Path(ndkRoot, "strip"), libAbsPath); err != nil {
-				return nil, err
-			}
-		}
-		libFiles = append(libFiles, libPath)
+		nmpkgs[arch] = pkgs
+		libFiles = append(libFiles, files...)
 	}
-	for _, f := range libs.nativeFiles {
-		if slices.Contains(libFiles, f) {
-			// Two zip entries of one name install whichever the reader keeps.
-			return nil, fmt.Errorf("android/libs: an AAR ships %s, which the app's Go modules also bundle", f)
-		}
+	libFiles, err = withAARNativeFiles(libFiles, libs.nativeFiles)
+	if err != nil {
+		return nil, err
 	}
-	libFiles = append(libFiles, libs.nativeFiles...)
 
 	// Only a distribution build ("bellui release") produces the .aab store
 	// bundle; a --release package stays an installable .apk (#144).
@@ -517,6 +486,57 @@ func legacyAddAssets(apkw *Writer, manifestData []byte, iconPath string, target 
 		return err
 	}
 	return nil
+}
+
+// buildAndroidLib builds the app's library for one architecture, with the
+// shared libraries it loads from its Go modules beside it. It returns their
+// APK paths, the app's library last, and the packages extractPkgs found.
+func buildAndroidLib(pkg *packages.Package, arch, libName string, env []string, ndkRoot string, release bool) ([]string, map[string]bool, error) {
+	toolchain := ndk.Toolchain(arch)
+	libPath := "lib/" + toolchain.abi + "/lib" + libName + ".so"
+	libAbsPath := filepath.Join(tmpdir, libPath)
+	if err := mkdir(filepath.Dir(libAbsPath)); err != nil {
+		return nil, nil, err
+	}
+	// If building release and no ldflags are set then remove the useless debug and DWARF build options
+	if release && buildLdflags == "" {
+		buildLdflags = "-w" // not -s: extractPkgs reads the symbols, and stripLibrary drops them after
+	}
+	err := goBuild(
+		pkg.PkgPath,
+		append(env, androidEnv[arch]...),
+		"-buildmode=c-shared",
+		"-o", libAbsPath,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	pkgs, err := extractPkgs(toolchain.Path(ndkRoot, "nm"), libAbsPath)
+	if err != nil {
+		return nil, nil, err
+	}
+	files, err := bundleAndroidSharedLibs(libAbsPath, "lib/"+toolchain.abi)
+	if err != nil {
+		return nil, nil, err
+	}
+	if release {
+		if err := stripLibrary(toolchain.Path(ndkRoot, "strip"), libAbsPath); err != nil {
+			return nil, nil, err
+		}
+	}
+	return append(files, libPath), pkgs, nil
+}
+
+// withAARNativeFiles adds the native libraries of android/libs' AARs to the
+// APK's. Two zip entries of one name install whichever the reader keeps, so
+// one the app's Go modules also bundle is an error.
+func withAARNativeFiles(libFiles, native []string) ([]string, error) {
+	for _, f := range native {
+		if slices.Contains(libFiles, f) {
+			return nil, fmt.Errorf("android/libs: an AAR ships %s, which the app's Go modules also bundle", f)
+		}
+	}
+	return append(libFiles, native...), nil
 }
 
 // bundleAndroidSharedLibs copies the shared libraries the app's library lib
