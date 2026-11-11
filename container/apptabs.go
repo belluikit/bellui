@@ -249,6 +249,24 @@ type appTabsRenderer struct {
 
 	dragSurface *tabDragSurface
 	drag        tabDrag
+
+	// buttons holds the tab buttons shown in the bar. It is kept across
+	// updates, and the bar is refreshed only when barState changes, so a
+	// Layout or Refresh with the same tabs adds nothing to the render tree
+	// (#1059).
+	buttons  *bellui.Container
+	barState tabBarState
+	// buttonsChanged records that a button's text, icon or state changed
+	// since the bar was last laid out.
+	buttonsChanged bool
+}
+
+// tabBarState is what decides the tab bar's layouts and objects.
+type tabBarState struct {
+	shown    int // tab buttons in the bar; the rest are in the overflow menu
+	overflow bool
+	mobile   bool
+	location TabLocation
 }
 
 func (r *appTabsRenderer) Layout(size geo.Size) {
@@ -257,25 +275,7 @@ func (r *appTabsRenderer) Layout(size geo.Size) {
 		return
 	}
 	// Try render as many tabs as will fit, others will appear in the overflow
-	if len(r.appTabs.Items) == 0 {
-		r.updateTabs(0)
-	} else {
-		for i := len(r.appTabs.Items); i > 0; i-- {
-			r.updateTabs(i)
-			barMin := r.bar.MinSize()
-			if r.appTabs.location == TabLocationLeading || r.appTabs.location == TabLocationTrailing {
-				if barMin.Height <= size.Height {
-					// Tab bar is short enough to fit
-					break
-				}
-			} else {
-				if barMin.Width <= size.Width {
-					// Tab bar is thin enough to fit
-					break
-				}
-			}
-		}
-	}
+	r.updateTabs(r.fittingTabs(size))
 
 	r.layout(r.appTabs, size)
 	r.layoutDragSurface()
@@ -377,31 +377,44 @@ func (r *appTabsRenderer) buildOverflowTabsButton() (overflow *widget.Button) {
 	return overflow
 }
 
-func (r *appTabsRenderer) buildTabButtons(count int) *bellui.Container {
-	buttons := &bellui.Container{}
-
-	var iconPos buttonIconPosition
-	if isMobile(r.tabs) {
+// buttonsLayout lays out count tab buttons.
+func (r *appTabsRenderer) buttonsLayout(count int, mobile bool) core.Layout {
+	if mobile {
 		cells := count
 		if cells == 0 {
 			cells = 1
 		}
 		if r.appTabs.location == TabLocationTop || r.appTabs.location == TabLocationBottom {
-			buttons.Layout = layout.NewGridLayoutWithColumns(cells)
-		} else {
-			buttons.Layout = layout.NewGridLayoutWithRows(cells)
+			return layout.NewGridLayoutWithColumns(cells)
 		}
+		return layout.NewGridLayoutWithRows(cells)
+	} else if r.verticalBar() {
+		return layout.NewVBoxLayout()
+	}
+	return layout.NewHBoxLayout()
+}
+
+// barLayout lays out the bar: the tab buttons alone, or with the overflow
+// button after them.
+func (r *appTabsRenderer) barLayout(overflow bool, action core.CanvasObject) core.Layout {
+	if !overflow {
+		return layout.NewStackLayout()
+	} else if r.verticalBar() {
+		return layout.NewBorderLayout(nil, action, nil, nil)
+	}
+	return layout.NewBorderLayout(nil, nil, nil, action)
+}
+
+// updateTabButtons brings every tab's button up to date with its item, and
+// refreshes only the buttons that changed.
+func (r *appTabsRenderer) updateTabButtons(mobile bool) {
+	iconPos := buttonIconInline
+	if mobile || r.verticalBar() {
 		iconPos = buttonIconTop
-	} else if r.appTabs.location == TabLocationLeading || r.appTabs.location == TabLocationTrailing {
-		buttons.Layout = layout.NewVBoxLayout()
-		iconPos = buttonIconTop
-	} else {
-		buttons.Layout = layout.NewHBoxLayout()
-		iconPos = buttonIconInline
 	}
 
-	for i := 0; i < count; i++ {
-		item := r.appTabs.Items[i]
+	for i, item := range r.appTabs.Items {
+		changed := false
 		if item.button == nil {
 			item.button = &tabButton{
 				onTapped: func() { r.appTabs.Select(item) },
@@ -411,21 +424,75 @@ func (r *appTabsRenderer) buildTabButtons(count int) *bellui.Container {
 			if item.disabled {
 				item.button.Disable()
 			}
+			changed = true
 		}
 		button := item.button
-		button.icon = item.Icon
-		button.iconPosition = iconPos
+		importance := widget.MediumImportance
 		if i == r.appTabs.current {
-			button.importance = widget.HighImportance
-		} else {
-			button.importance = widget.MediumImportance
+			importance = widget.HighImportance
 		}
-		button.text = item.Text
-		button.textAlignment = bellui.TextAlignCenter
-		button.Refresh()
-		buttons.Objects = append(buttons.Objects, button)
+		if button.icon != item.Icon || button.iconPosition != iconPos || button.importance != importance ||
+			button.text != item.Text || button.textAlignment != bellui.TextAlignCenter {
+			button.icon = item.Icon
+			button.iconPosition = iconPos
+			button.importance = importance
+			button.text = item.Text
+			button.textAlignment = bellui.TextAlignCenter
+			changed = true
+		}
+		if changed {
+			button.Refresh()
+			r.buttonsChanged = true
+		}
 	}
-	return buttons
+}
+
+// minSizeStandIn measures as min in a layout. Unlike a rectangle's SetMinSize,
+// setting min does not count as a layout change.
+type minSizeStandIn struct {
+	core.CanvasObject
+	min geo.Size
+}
+
+func (s *minSizeStandIn) MinSize() geo.Size { return s.min }
+
+// fittingTabs returns how many tab buttons fit in the bar at size, the others
+// going to the overflow menu, and at least one when there are tabs. It
+// measures with the bar's own layouts and stand-ins, leaving the bar and the
+// overflow button as they are: showing or hiding a widget costs a full layout
+// walk (#1059).
+func (r *appTabsRenderer) fittingTabs(size geo.Size) int {
+	count := len(r.appTabs.Items)
+	if count == 0 {
+		return 0
+	}
+	mobile := isMobile(r.tabs)
+	r.updateTabButtons(mobile)
+
+	all := make([]core.CanvasObject, count)
+	for i, item := range r.appTabs.Items {
+		all[i] = item.button
+	}
+	tabs := &minSizeStandIn{CanvasObject: canvas.NewRectangle(nil)}
+	action := &minSizeStandIn{CanvasObject: canvas.NewRectangle(nil)}
+	if r.action != nil {
+		action.min = r.action.MinSize()
+	}
+	for i := count; i > 1; i-- {
+		tabs.min = r.buttonsLayout(i, mobile).MinSize(all[:i])
+		barMin := tabs.min
+		if i < count {
+			barMin = r.barLayout(true, action).MinSize([]core.CanvasObject{tabs, action})
+		}
+		if r.verticalBar() {
+			if barMin.Height <= size.Height {
+				return i // Tab bar is short enough to fit
+			}
+		} else if barMin.Width <= size.Width {
+			return i // Tab bar is thin enough to fit
+		}
+	}
+	return 1
 }
 
 func (r *appTabsRenderer) updateIndicator(animate bool) {
@@ -480,31 +547,58 @@ func (r *appTabsRenderer) verticalBar() bool {
 	return r.appTabs.location == TabLocationLeading || r.appTabs.location == TabLocationTrailing
 }
 
+// updateTabs shows the first max tab buttons in the bar and the others in the
+// overflow menu. The bar is refreshed only when what it holds changes, and
+// otherwise laid out again only when a button changed.
 func (r *appTabsRenderer) updateTabs(max int) {
-	tabCount := len(r.appTabs.Items)
+	mobile := isMobile(r.tabs)
+	r.updateTabButtons(mobile)
+
+	state := tabBarState{
+		shown:    min(max, len(r.appTabs.Items)),
+		overflow: max < len(r.appTabs.Items),
+		mobile:   mobile,
+		location: r.appTabs.location,
+	}
 
 	// Set overflow action
-	if tabCount <= max {
-		r.action.Hide()
-		r.bar.Layout = layout.NewStackLayout()
-	} else {
-		tabCount = max
+	if state.overflow {
 		r.action.Show()
+	} else {
+		r.action.Hide()
+	}
 
-		// Set layout of tab bar containing tab buttons and overflow action
-		if r.appTabs.location == TabLocationLeading || r.appTabs.location == TabLocationTrailing {
-			r.bar.Layout = layout.NewBorderLayout(nil, r.action, nil, nil)
-		} else {
-			r.bar.Layout = layout.NewBorderLayout(nil, nil, nil, r.action)
+	structural := r.buttons == nil || state != r.barState ||
+		len(r.buttons.Objects) != state.shown
+	if r.buttons == nil {
+		r.buttons = &bellui.Container{}
+		r.bar.Objects = []core.CanvasObject{r.buttons}
+		if a := r.action; a != nil {
+			r.bar.Objects = append(r.bar.Objects, a)
+		}
+	}
+	if !structural {
+		for i, o := range r.buttons.Objects {
+			if o != r.appTabs.Items[i].button {
+				structural = true
+				break
+			}
 		}
 	}
 
-	buttons := r.buildTabButtons(tabCount)
-
-	r.bar.Objects = []core.CanvasObject{buttons}
-	if a := r.action; a != nil {
-		r.bar.Objects = append(r.bar.Objects, a)
+	if structural {
+		r.barState = state
+		r.buttons.Layout = r.buttonsLayout(state.shown, mobile)
+		r.bar.Layout = r.barLayout(state.overflow, r.action)
+		r.buttons.Objects = make([]core.CanvasObject, 0, state.shown)
+		for _, item := range r.appTabs.Items[:state.shown] {
+			r.buttons.Objects = append(r.buttons.Objects, item.button)
+		}
+		r.buttonsChanged = false
+		r.bar.Refresh()
+	} else if r.buttonsChanged {
+		r.buttonsChanged = false
+		r.bar.Layout.Layout(r.bar.Objects, r.bar.Size())
+		r.buttons.Layout.Layout(r.buttons.Objects, r.buttons.Size())
 	}
-
-	r.bar.Refresh()
 }
