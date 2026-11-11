@@ -407,64 +407,72 @@ func (r *docTabsRenderer) updateIndicator(animate bool) {
 		return
 	}
 
-	var selectedPos geo.Position
-	var selectedSize geo.Size
-
-	buttons := r.scroller.Content.(*bellui.Container).Objects
-
-	if r.docTabs.current >= len(buttons) {
-		if a := r.action; a != nil {
-			selectedPos = a.Position()
-			selectedSize = a.Size()
-			minSize := a.MinSize()
-			if minSize.Width > selectedSize.Width {
-				selectedSize = minSize
-			}
+	vertical := r.docTabs.location == TabLocationLeading || r.docTabs.location == TabLocationTrailing
+	along := func(p geo.Position) float32 {
+		if vertical {
+			return p.Y
 		}
+		return p.X
+	}
+	alongSize := func(s geo.Size) float32 {
+		if vertical {
+			return s.Height
+		}
+		return s.Width
+	}
+
+	// Measured along the bar, in the renderer's coordinates. The tab buttons
+	// scroll in a viewport that starts where the scroller sits in the bar:
+	// in a right-to-left layout that is after the create and overflow
+	// buttons, which are mirrored to the leading edge (#1078).
+	var start, length float32
+	buttons := r.scroller.Content.(*bellui.Container).Objects
+	if r.docTabs.current >= len(buttons) {
+		a := r.action
+		if a == nil {
+			return
+		}
+		start = along(r.bar.Position().Add(r.box.Position()).Add(a.Position()))
+		size := a.Size()
+		if minSize := a.MinSize(); minSize.Width > size.Width {
+			size = minSize
+		}
+		length = alongSize(size)
 	} else {
 		selected := buttons[r.docTabs.current]
-		selectedPos = selected.Position()
-		selectedSize = selected.Size()
-		minSize := selected.MinSize()
-		if minSize.Width > selectedSize.Width {
-			selectedSize = minSize
+		viewStart := along(r.bar.Position().Add(r.scroller.Position()))
+		viewEnd := viewStart + alongSize(r.scroller.Size())
+		start = viewStart + along(selected.Position()) - along(r.scroller.Offset)
+		size := selected.Size()
+		if minSize := selected.MinSize(); minSize.Width > size.Width {
+			size = minSize
 		}
+		end := geo.Min(start+alongSize(size), viewEnd)
+		start = geo.Max(start, viewStart)
+		length = end - start
 	}
-
-	scrollOffset := r.scroller.Offset
-	scrollSize := r.scroller.Size()
-
-	var indicatorPos geo.Position
-	var indicatorSize geo.Size
-	pad := th.Size(theme.SizeNamePadding)
-
-	switch r.docTabs.location {
-	case TabLocationTop:
-		indicatorPos = geo.NewPos(selectedPos.X-scrollOffset.X, r.bar.MinSize().Height)
-		indicatorSize = geo.NewSize(geo.Min(selectedSize.Width, scrollSize.Width-indicatorPos.X), pad)
-	case TabLocationLeading:
-		indicatorPos = geo.NewPos(r.bar.MinSize().Width, selectedPos.Y-scrollOffset.Y)
-		indicatorSize = geo.NewSize(pad, geo.Min(selectedSize.Height, scrollSize.Height-indicatorPos.Y))
-	case TabLocationBottom:
-		indicatorPos = geo.NewPos(selectedPos.X-scrollOffset.X, r.bar.Position().Y-pad)
-		indicatorSize = geo.NewSize(geo.Min(selectedSize.Width, scrollSize.Width-indicatorPos.X), pad)
-	case TabLocationTrailing:
-		indicatorPos = geo.NewPos(r.bar.Position().X-pad, selectedPos.Y-scrollOffset.Y)
-		indicatorSize = geo.NewSize(pad, geo.Min(selectedSize.Height, scrollSize.Height-indicatorPos.Y))
-	}
-
-	if indicatorPos.X < 0 {
-		indicatorSize.Width = indicatorSize.Width + indicatorPos.X
-		indicatorPos.X = 0
-	}
-	if indicatorPos.Y < 0 {
-		indicatorSize.Height = indicatorSize.Height + indicatorPos.Y
-		indicatorPos.Y = 0
-	}
-	if indicatorSize.Width < 0 || indicatorSize.Height < 0 {
+	if length < 0 { // the selected tab is scrolled out of view
 		r.indicator.FillColor = color.Transparent
 		r.indicator.Refresh()
 		return
+	}
+
+	pad := th.Size(theme.SizeNamePadding)
+	var indicatorPos geo.Position
+	var indicatorSize geo.Size
+	switch r.docTabs.location {
+	case TabLocationLeading:
+		indicatorPos = geo.NewPos(r.bar.MinSize().Width, start)
+		indicatorSize = geo.NewSize(pad, length)
+	case TabLocationBottom:
+		indicatorPos = geo.NewPos(start, r.bar.Position().Y-pad)
+		indicatorSize = geo.NewSize(length, pad)
+	case TabLocationTrailing:
+		indicatorPos = geo.NewPos(r.bar.Position().X-pad, start)
+		indicatorSize = geo.NewSize(pad, length)
+	default: // TabLocationTop
+		indicatorPos = geo.NewPos(start, r.bar.MinSize().Height)
+		indicatorSize = geo.NewSize(length, pad)
 	}
 
 	r.moveIndicator(indicatorPos, indicatorSize, th, animate)
