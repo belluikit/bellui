@@ -96,6 +96,11 @@ func (n *noosDriver) Run() {
 }
 
 func (n *noosDriver) doRun() {
+	// The loop is the main goroutine, as the glfw and mobile drivers record
+	// theirs: unrecorded, a wait queued from the loop itself deadlocked it,
+	// and under -tags mobile every goroutine counted as main, so a wait from
+	// any of them returned before its function ran (#1132).
+	async.SetMainGoroutine()
 	for _, w := range n.wins {
 		n.renderWindow(w)
 	}
