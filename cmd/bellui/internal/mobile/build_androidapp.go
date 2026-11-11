@@ -211,12 +211,23 @@ func goAndroidBuild(pkg *packages.Package, bundleID string, androidArchs []strin
 		if err != nil {
 			return nil, err
 		}
+		shared, err := bundleAndroidSharedLibs(libAbsPath, "lib/"+toolchain.abi)
+		if err != nil {
+			return nil, err
+		}
+		libFiles = append(libFiles, shared...)
 		if release {
 			if err := stripLibrary(toolchain.Path(ndkRoot, "strip"), libAbsPath); err != nil {
 				return nil, err
 			}
 		}
 		libFiles = append(libFiles, libPath)
+	}
+	for _, f := range libs.nativeFiles {
+		if slices.Contains(libFiles, f) {
+			// Two zip entries of one name install whichever the reader keeps.
+			return nil, fmt.Errorf("android/libs: an AAR ships %s, which the app's Go modules also bundle", f)
+		}
 	}
 	libFiles = append(libFiles, libs.nativeFiles...)
 
@@ -506,6 +517,51 @@ func legacyAddAssets(apkw *Writer, manifestData []byte, iconPath string, target 
 		return err
 	}
 	return nil
+}
+
+// bundleAndroidSharedLibs copies the shared libraries the app's library lib
+// loads from its Go modules (goffmpeg's FFmpeg, #1122) into abiDir, the
+// lib/<abi> directory under tmpdir that lib sits in, and returns their APK
+// paths. Android loads an app library's dependencies from the same
+// directory, by the names it lists (DT_NEEDED). The libraries go in as they
+// are: they arrive linked for 16 KB pages, and the APK writer stores every
+// .so uncompressed on a 16 KB boundary like the app's own.
+func bundleAndroidSharedLibs(lib, abiDir string) ([]string, error) {
+	dirs, err := util.SharedLibDirs(lib)
+	if err != nil || len(dirs) == 0 {
+		return nil, err
+	}
+	return copyAndroidSharedLibs(lib, dirs, abiDir)
+}
+
+// copyAndroidSharedLibs copies what lib loads from dirs into abiDir under
+// tmpdir, for bundleAndroidSharedLibs.
+func copyAndroidSharedLibs(lib string, dirs []string, abiDir string) ([]string, error) {
+	found, err := util.SharedLibs(lib, dirs)
+	if err != nil {
+		return nil, err
+	}
+	if len(found) > 0 {
+		if err := mkdir(filepath.Join(tmpdir, abiDir)); err != nil {
+			return nil, err
+		}
+	}
+	var files, names []string
+	for _, l := range found {
+		dst := abiDir + "/" + l.Name
+		if buildX {
+			printcmd("cp %s %s", l.Path, filepath.Join("$WORK", dst))
+		}
+		if err := util.CopyExeFile(l.Path, filepath.Join(tmpdir, dst)); err != nil {
+			return nil, fmt.Errorf("copying %s: %w", l.Name, err)
+		}
+		files = append(files, dst)
+		names = append(names, l.Name)
+	}
+	if len(files) > 0 {
+		log.Printf("bundled %s in %s", strings.Join(names, ", "), abiDir)
+	}
+	return files, nil
 }
 
 // stripLibrary removes a built library's symbol tables, which are about an
