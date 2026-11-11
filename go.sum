@@ -18,6 +18,8 @@ github.com/belluikit/typesetting v0.3.6 h1:M27Rx+fhz1IV2n6Tei3fNhs/Oe9gGAnq3QMrB
 github.com/belluikit/typesetting v0.3.6/go.mod h1:vOvJAyUaoKpOpxqHeDglX6xNuG1zv2C3IOG3yEnHuLQ=
 github.com/belluikit/webgpu v1.2.4-0.20261111145738-f1242730476c h1:9gBci0zJiHadEawxnEuD0d3bAS3/Lcj+E7a9a7NJOFI=
 github.com/belluikit/webgpu v1.2.4-0.20261111145738-f1242730476c/go.mod h1:Z9urUnak04MsHA808QpcLQsIX+A2vkpwDaUc3Zn32c8=
+github.com/belluikit/webgpu v1.2.4 h1:lOCL1tBRFNCUyGn5JQYvTbRXMyk3ognepMeEXvqlqtQ=
+github.com/belluikit/webgpu v1.2.4/go.mod h1:Z9urUnak04MsHA808QpcLQsIX+A2vkpwDaUc3Zn32c8=
 github.com/belluikit/webgpu/libs-android v0.0.0-20261111082704-bbaa548a1d45 h1:zukD+VBfKJpZYGaVEEpSb4JEg0gIj/srV6SB3r5kBDk=
 github.com/belluikit/webgpu/libs-android v0.0.0-20261111082704-bbaa548a1d45/go.mod h1:7SKumYToQp8dWW7oHl0JNZ7fnGW6LR212OGLdvp84y8=
 github.com/belluikit/webgpu/libs-darwin v0.0.0-20261111082641-092cb90d718e h1:qdtV7PVAxAl2WuuyOdwXaA0R++uwab6qF+bigTspzwk=

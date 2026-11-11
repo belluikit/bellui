@@ -22,6 +22,8 @@ github.com/belluikit/webgpu v1.2.3 h1:+c6zJ1v5UE8nR7cpraI0v/M2+oqTyEAxCk1V2kHqTG
 github.com/belluikit/webgpu v1.2.3/go.mod h1:Z9urUnak04MsHA808QpcLQsIX+A2vkpwDaUc3Zn32c8=
 github.com/belluikit/webgpu v1.2.4-0.20261111145738-f1242730476c h1:9gBci0zJiHadEawxnEuD0d3bAS3/Lcj+E7a9a7NJOFI=
 github.com/belluikit/webgpu v1.2.4-0.20261111145738-f1242730476c/go.mod h1:Z9urUnak04MsHA808QpcLQsIX+A2vkpwDaUc3Zn32c8=
+github.com/belluikit/webgpu v1.2.4 h1:lOCL1tBRFNCUyGn5JQYvTbRXMyk3ognepMeEXvqlqtQ=
+github.com/belluikit/webgpu v1.2.4/go.mod h1:Z9urUnak04MsHA808QpcLQsIX+A2vkpwDaUc3Zn32c8=
 github.com/belluikit/webgpu/libs-android v0.0.0-20260731101013-82e3bdc8353b h1:VfSbjwooB/L8QxcHIuGtIDFWVuV5rwAvVIlZGWWU70k=
 github.com/belluikit/webgpu/libs-android v0.0.0-20260731101013-82e3bdc8353b/go.mod h1:7SKumYToQp8dWW7oHl0JNZ7fnGW6LR212OGLdvp84y8=
 github.com/belluikit/webgpu/libs-android v0.0.0-20261111082704-bbaa548a1d45 h1:zukD+VBfKJpZYGaVEEpSb4JEg0gIj/srV6SB3r5kBDk=
