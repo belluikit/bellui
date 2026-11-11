@@ -41,6 +41,17 @@ type (
 		Source                 image.Image
 		Offset                 image.Point
 		minX, minY, maxX, maxY fixed.Int26_6 // keep track of bounds
+		// width and height are the bounds SetBounds set, and path the points
+		// of the path since the last Clear: the rasterizer is sized to each
+		// path's extent only when it is drawn.
+		width, height int
+		path          []pathPoint
+	}
+
+	// pathPoint is a point of a path, and whether it starts a new subpath.
+	pathPoint struct {
+		p     fixed.Point26_6
+		start bool
 	}
 )
 
@@ -123,38 +134,48 @@ func (s *ScannerGV) set(a fixed.Point26_6) {
 // Start starts a new path at the given point.
 func (s *ScannerGV) Start(a fixed.Point26_6) {
 	s.set(a)
-	s.r.MoveTo(float32(a.X)/64, float32(a.Y)/64)
+	s.path = append(s.path, pathPoint{p: a, start: true})
 }
 
 // Line adds a linear segment to the current curve.
 func (s *ScannerGV) Line(b fixed.Point26_6) {
 	s.set(b)
-	s.r.LineTo(float32(b.X)/64, float32(b.Y)/64)
+	s.path = append(s.path, pathPoint{p: b})
 }
 
 // Draw renders the accumulate scan to the desination
+//
+// The rasterizer costs its whole area to reset, accumulate and draw, so it is
+// sized to the path's extent, within the bounds, and the path is replayed
+// into it shifted to its origin. Sized to the whole bounds, as upstream had
+// it, every path cost every pixel of the image, a 2 px dot as much as the
+// whole page (#1137).
 func (s *ScannerGV) Draw() {
-	// This draws the entire bounds of the image, because
-	// at this point the alpha mask does not shift with the
-	// placement of the target rectangle in the vector rasterizer
-	s.r.Draw(s.Dest, s.Dest.Bounds(), s.Source, s.Offset)
-
-	// Remove the line above and uncomment the lines below if you
-	// are using a version of the vector rasterizer that shifts the alpha
-	// mask with the placement of the target
-
-	//	s.Targ.Min.X = int(s.minX >> 6)
-	//	s.Targ.Min.Y = int(s.minY >> 6)
-	//	s.Targ.Max.X = int(s.maxX>>6) + 1
-	//	s.Targ.Max.Y = int(s.maxY>>6) + 1
-	//	s.Targ = s.Targ.Intersect(s.Dest.Bounds())  // This check should be done by the rasterizer?
-	//	s.r.Draw(s.Dest, s.Targ, s.Source, s.Offset)
+	if len(s.path) == 0 {
+		return
+	}
+	dest := s.Dest.Bounds()
+	area := image.Rect(int(s.minX>>6), int(s.minY>>6), int(s.maxX>>6)+1, int(s.maxY>>6)+1).
+		Intersect(image.Rect(0, 0, min(s.width, dest.Dx()), min(s.height, dest.Dy())))
+	if area.Empty() {
+		return
+	}
+	s.r.Reset(area.Dx(), area.Dy())
+	ox, oy := float32(area.Min.X), float32(area.Min.Y)
+	for _, pt := range s.path {
+		x, y := float32(pt.p.X)/64-ox, float32(pt.p.Y)/64-oy
+		if pt.start {
+			s.r.MoveTo(x, y)
+		} else {
+			s.r.LineTo(x, y)
+		}
+	}
+	s.r.Draw(s.Dest, area.Add(dest.Min), s.Source, s.Offset.Add(area.Min))
 }
 
 // Clear cancels any previous accumulated scans
 func (s *ScannerGV) Clear() {
-	p := s.r.Size()
-	s.r.Reset(p.X, p.Y)
+	s.path = s.path[:0]
 	const mxfi = fixed.Int26_6(math.MaxInt32)
 	s.minX, s.minY, s.maxX, s.maxY = mxfi, mxfi, -mxfi, -mxfi
 }
@@ -162,7 +183,8 @@ func (s *ScannerGV) Clear() {
 // SetBounds sets the maximum width and height of the rasterized image and
 // calls Clear. The width and height are in pixels, not fixed.Int26_6 units.
 func (s *ScannerGV) SetBounds(width, height int) {
-	s.r.Reset(width, height)
+	s.width, s.height = width, height
+	s.Clear()
 }
 
 // NewScannerGV creates a new Scanner with the given bounds.
