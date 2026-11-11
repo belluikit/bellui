@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/core"
@@ -96,6 +97,7 @@ func TestNoOSDriver_TouchStopsDragCoast(t *testing.T) {
 	events <- &embedded.TouchDownEvent{Position: geo.NewPos(100, 100), ID: 1}
 	var atTouch []string
 	onLoop(func() { atTouch = append([]string(nil), rec.log...) })
+	require.NotEmpty(t, atTouch, "the flick was recorded before the touch")
 	assert.Equal(t, "end", atTouch[len(atTouch)-1], "the touch ends the coast's drag at once")
 
 	time.Sleep(coastFor)
@@ -118,6 +120,9 @@ func TestNoOSDriver_DragCoastDoesNotEndALaterDrag(t *testing.T) {
 
 	time.Sleep(coastFor)
 	onLoop(func() {
+		if !assert.LessOrEqual(t, started, len(rec.log)) { // on the loop: no require
+			return
+		}
 		assert.Equal(t, []string{"drag"}, rec.log[started:],
 			"the second drag is still going: no coast step or DragEnd landed in it")
 	})
@@ -128,10 +133,18 @@ func TestNoOSDriver_DragCoastDoesNotEndALaterDrag(t *testing.T) {
 	hold(coastFor)
 	events <- &embedded.TouchUpEvent{Position: geo.NewPos(140, 100), ID: 1}
 	var atRelease []string
-	onLoop(func() { atRelease = append([]string(nil), rec.log[started:]...) })
+	onLoop(func() {
+		if !assert.LessOrEqual(t, started, len(rec.log)) { // on the loop: no require
+			return
+		}
+		atRelease = append([]string(nil), rec.log[started:]...)
+	})
 	assert.Equal(t, []string{"drag", "end"}, atRelease, "its own release ends it, once")
 	time.Sleep(coastFor)
 	onLoop(func() {
+		if !assert.LessOrEqual(t, started, len(rec.log)) { // on the loop: no require
+			return
+		}
 		assert.Equal(t, atRelease, rec.log[started:], "and nothing coasts after it")
 	})
 }
