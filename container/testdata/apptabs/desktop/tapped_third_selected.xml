@@ -16,8 +16,8 @@
 			</container>
 			<rectangle fillColor="shadow" pos="0,36" size="200x4"/>
 			<rectangle fillColor="primary" pos="111,36" radius="4" size="51x4"/>
-			<widget pos="0,40" size="200x60" type="*widget.Label">
-				<widget size="200x60" type="*widget.RichText">
+			<widget pos="0,52" size="200x48" type="*widget.Label">
+				<widget size="200x48" type="*widget.RichText">
 					<text pos="8,8" size="37x16">Text 3</text>
 				</widget>
 			</widget>

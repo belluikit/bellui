@@ -173,6 +173,12 @@ func NewTheme() bellui.Theme {
 			theme.SizeNameTopBarHeight:     float32(64),
 			theme.SizeNameBottomBarHeight:  float32(80),
 			theme.SizeNameSwitchTrackWidth: float32(52),
+			// Window chrome and tab containers
+			theme.SizeNameTabContentMargin:     float32(18),
+			theme.SizeNameWindowButtonHeight:   float32(20),
+			theme.SizeNameWindowButtonIcon:     float32(16),
+			theme.SizeNameWindowButtonRadius:   float32(10),
+			theme.SizeNameWindowTitleBarHeight: float32(30),
 		},
 	}
 }
@@ -272,6 +278,7 @@ func Theme() bellui.Theme {
 				theme.SizeNameWindowButtonHeight:   float32(10),
 				theme.SizeNameWindowButtonIcon:     float32(8),
 				theme.SizeNameWindowButtonRadius:   float32(5),
+				theme.SizeNameTabContentMargin:     float32(12),
 				theme.SizeNameShadowDepth:          float32(0),
 				theme.SizeNameButtonRadius:         float32(0),
 				theme.SizeNameCardRadius:           float32(0),

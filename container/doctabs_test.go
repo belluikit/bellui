@@ -35,7 +35,7 @@ func TestDocTabs_Empty(t *testing.T) {
 	assert.Nil(t, tabs.Selected())
 	min := tabs.MinSize()
 	assert.Equal(t, float32(0), min.Width)
-	assert.Equal(t, 4*theme.Padding()+theme.IconInlineSize(), min.Height)
+	assert.Equal(t, 4*theme.Padding()+theme.IconInlineSize()+theme.Size(theme.SizeNameTabContentMargin), min.Height)
 
 	tabs = &container.DocTabs{}
 	assert.Equal(t, 0, len(tabs.Items))
