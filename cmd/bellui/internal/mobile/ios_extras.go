@@ -5,12 +5,16 @@ import (
 	"debug/macho"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
+
+	"github.com/belluikit/bellui/cmd/bellui/internal/util"
 )
 
 // An iOS app can carry native requirements the manifest has no field for, as
@@ -506,4 +510,81 @@ func pbxEmbeds(fws []iosFramework) []iosEmbed {
 		}
 	}
 	return out
+}
+
+// goModuleFrameworks adds to embed the dynamic frameworks the app's
+// per-architecture binaries load from their Go modules: goffmpeg's FFmpeg
+// (#1122), which goffmpeg-libs links through -framework but cgo cannot give
+// an @rpath to find it by. Each binary gains that rpath
+// (@executable_path/Frameworks), and the frameworks are embedded and signed
+// like ios/Frameworks' own. All architectures must load the same ones, and
+// none may share a name with one ios/Frameworks embeds.
+func goModuleFrameworks(embed []iosFramework, bins []string) ([]iosFramework, error) {
+	var found []iosFramework
+	for _, bin := range bins {
+		fws, err := binModuleFrameworks(bin)
+		if err != nil {
+			return nil, err
+		}
+		if found != nil && !slices.Equal(found, fws) {
+			return nil, fmt.Errorf("the architectures' binaries load different frameworks from their Go modules (%v, %v)", found, fws)
+		}
+		found = fws
+		if len(fws) > 0 {
+			if err := addIOSRpath(bin); err != nil {
+				return nil, err
+			}
+		}
+	}
+	for _, f := range found {
+		for _, e := range embed {
+			if filepath.Base(e.Path) == filepath.Base(f.Path) {
+				return nil, fmt.Errorf("ios/Frameworks embeds %s, which the app's Go modules also bundle (%s)", filepath.Base(e.Path), f.Path)
+			}
+		}
+		log.Printf("bundled %s in %s", filepath.Base(f.Path), iosFrameworksDir)
+	}
+	return append(embed, found...), nil
+}
+
+// binModuleFrameworks lists the frameworks bin loads from its Go modules.
+func binModuleFrameworks(bin string) ([]iosFramework, error) {
+	dirs, err := util.SharedLibDirs(bin)
+	if err != nil || len(dirs) == 0 {
+		return nil, err
+	}
+	libs, err := util.SharedLibs(bin, dirs)
+	if err != nil {
+		return nil, err
+	}
+	var fws []iosFramework
+	for _, l := range libs {
+		fw := l.Framework()
+		if fw == "" {
+			return nil, fmt.Errorf("%s loads %s, which is not in a framework: an iOS app embeds only frameworks", filepath.Base(bin), l.Path)
+		}
+		fws = append(fws, iosFramework{
+			Name:    strings.TrimSuffix(fw, ".framework"),
+			Path:    filepath.Join(strings.TrimSuffix(l.Path, filepath.FromSlash(l.Name)), fw),
+			Dynamic: true,
+		})
+	}
+	return fws, nil
+}
+
+// addIOSRpath adds @executable_path/Frameworks to bin's rpaths unless it has
+// it. The binary's signature breaks, and xcodebuild signs the app after.
+func addIOSRpath(bin string) error {
+	f, err := macho.Open(bin)
+	if err != nil {
+		return err
+	}
+	for _, l := range f.Loads {
+		if r, ok := l.(*macho.Rpath); ok && r.Path == iosEmbeddedFrameworks {
+			f.Close()
+			return nil
+		}
+	}
+	f.Close()
+	return runCmd(exec.Command("xcrun", "install_name_tool", "-add_rpath", iosEmbeddedFrameworks, bin))
 }
