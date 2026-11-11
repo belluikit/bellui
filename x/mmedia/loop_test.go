@@ -202,3 +202,28 @@ func newTestPipeline(t *testing.T, src source.Source) *pipeline.Pipeline {
 	}
 	return p
 }
+
+// TestVideoPlayerPlaysOnAfterRendererDestroyed pins #1145: bellui destroys the
+// renderer of a widget it still shows, and the renderer's Destroy closed the
+// player, so the video stopped for good with no OnEnd or OnError.
+func TestVideoPlayerPlaysOnAfterRendererDestroyed(t *testing.T) {
+	test.NewTempApp(t)
+	clip := &shortClip{frames: 90} // three seconds
+	vp, err := newVideoPlayerFromPipeline(newTestPipeline(t, clip), buildOptions(nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer vp.Close()
+
+	vp.Play()
+	time.Sleep(200 * time.Millisecond)
+	test.WidgetRenderer(vp).Destroy()
+	before := vp.CurrentTime()
+	time.Sleep(400 * time.Millisecond)
+	if !vp.IsPlaying() {
+		t.Error("stopped when its renderer was destroyed")
+	}
+	if now := vp.CurrentTime(); now <= before {
+		t.Errorf("time stuck at %v after the renderer was destroyed (then %v)", before, now)
+	}
+}

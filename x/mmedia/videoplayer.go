@@ -34,6 +34,10 @@ type VideoPlayer struct {
 //
 // A stream with audio fails here when the audio device will not open or the
 // stream cannot be converted to its format; see the package documentation.
+//
+// Close the player when it is no longer needed; nothing else does. Taking it
+// out of a window, or bellui destroying its renderer, leaves it playing
+// (#1145).
 func NewVideoPlayer(r io.Reader, opts ...Option) (*VideoPlayer, error) {
 	o := buildOptions(opts)
 	pipe, err := pipeline.NewPipeline(r)
@@ -56,6 +60,10 @@ func NewVideoPlayer(r io.Reader, opts ...Option) (*VideoPlayer, error) {
 //
 // A stream with audio fails here when the audio device will not open or the
 // stream cannot be converted to its format; see the package documentation.
+//
+// Close the player when it is no longer needed; nothing else does. Taking it
+// out of a window, or bellui destroying its renderer, leaves it playing
+// (#1145).
 func NewVideoPlayerURL(url string, opts ...Option) (*VideoPlayer, error) {
 	o := buildOptions(opts)
 	pipe, err := pipeline.NewPipelineURL(url)
@@ -209,6 +217,7 @@ func (r *videoRenderer) Objects() []core.CanvasObject {
 	return []core.CanvasObject{r.player.surface.Object()}
 }
 
-func (r *videoRenderer) Destroy() {
-	r.player.Close()
-}
+// Destroy does not close the player: bellui destroys and rebuilds the renderer
+// of a widget it still shows, and a closed player stays stopped (#1145).
+// Closing is the owner's call, VideoPlayer.Close, as for every mmedia widget.
+func (r *videoRenderer) Destroy() {}
