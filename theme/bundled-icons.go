@@ -454,6 +454,14 @@ var bookmarkborderIconRes = &bellui.StaticResource{
 	StaticContent: bookmarkborderIcon,
 }
 
+//go:embed icons/notifications.svg
+var notificationsIcon []byte
+
+var notificationsIconRes = &bellui.StaticResource{
+	StaticName:    "notifications.svg",
+	StaticContent: notificationsIcon,
+}
+
 //go:embed icons/history.svg
 var historyIcon []byte
 

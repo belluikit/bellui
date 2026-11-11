@@ -390,6 +390,12 @@ const (
 	// Since: 1.3
 	IconNameBookmarkBorder bellui.ThemeIconName = "bookmarkBorder"
 
+	// IconNameNotifications is the name of theme lookup for the outlined
+	// notifications (bell) icon, for notices waiting to be read.
+	//
+	// Since: 1.3
+	IconNameNotifications bellui.ThemeIconName = "notifications"
+
 	// IconNameHistory is the name of theme lookup for history icon.
 	//
 	// Since: 1.0
@@ -618,6 +624,7 @@ var icons = map[bellui.ThemeIconName]bellui.Resource{
 	IconNameFavoriteBorder:  NewThemedResource(favoriteborderIconRes),
 	IconNameBookmark:        NewThemedResource(bookmarkIconRes),
 	IconNameBookmarkBorder:  NewThemedResource(bookmarkborderIconRes),
+	IconNameNotifications:   NewThemedResource(notificationsIconRes),
 	IconNameHistory:         NewThemedResource(historyIconRes),
 	IconNameHome:            NewThemedResource(homeIconRes),
 	IconNameSettings:        NewThemedResource(settingsIconRes),
@@ -1184,6 +1191,14 @@ func BookmarkIcon() bellui.Resource {
 // Since: 1.3
 func BookmarkBorderIcon() bellui.Resource {
 	return safeIconLookup(IconNameBookmarkBorder)
+}
+
+// NotificationsIcon returns a resource containing the standard outlined
+// notifications (bell) icon for the current theme
+//
+// Since: 1.3
+func NotificationsIcon() bellui.Resource {
+	return safeIconLookup(IconNameNotifications)
 }
 
 // HistoryIcon returns a resource containing the standard history icon for the current theme
