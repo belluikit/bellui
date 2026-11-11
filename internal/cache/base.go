@@ -27,8 +27,10 @@ var (
 	themeCacheGen atomic.Uint64
 
 	// cachedNow is the clock sample, in Unix nanoseconds, that setAlive stamps
-	// entries with. The paint walk keeps every widget alive every frame, so
-	// reading the clock there cost about 15% of a frame's CPU (#458). Clean
+	// entries with. What keeps a renderer alive is the paint walk looking it up
+	// (CachedRenderer) for every widget it visits, every frame, under the
+	// object in the tree: a renderer kept under any other key is not (#1146).
+	// Reading the clock there cost about 15% of a frame's CPU (#458). Clean
 	// takes a new sample, once per frame on desktop and the web.
 	cachedNow atomic.Int64
 

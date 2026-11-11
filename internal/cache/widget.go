@@ -1,15 +1,61 @@
 package cache
 
 import (
+	"fmt"
+	"log"
+	"sync"
+
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/internal/async"
 )
 
 var renderers async.Map[core.Widget, *rendererInfo]
 
-type isBaseWidget interface {
-	ExtendBaseWidget(core.Widget)
-	super() core.Widget
+// extendedBy are the base widgets' reports of the widget a base widget was
+// extended by: widget.BaseWidget's and internal/widget.Base's, registered by
+// their packages, as package cache cannot name their unexported fields.
+var extendedBy []func(core.Widget) core.Widget
+
+// RegisterExtendedBy adds f, which returns the widget wid's base widget was
+// extended by, or nil when wid has no base widget or it was never extended.
+func RegisterExtendedBy(f func(wid core.Widget) core.Widget) {
+	extendedBy = append(extendedBy, f)
+}
+
+var warnedWrappers sync.Map
+
+// warnIfWrapper logs, once per pair of types, a widget whose base widget was
+// extended by another object (#1146). Such a widget is a wrapper standing in
+// the tree for the widget it embeds: the walk looks its renderer up under the
+// wrapper, and the widget's own methods under the widget, so each gets a
+// renderer. The one the walk does not visit expires, and is released as
+// replaced, while the widget is still shown.
+func warnIfWrapper(wid core.Widget) {
+	for _, f := range extendedBy {
+		impl := f(wid)
+		if impl == nil {
+			continue
+		}
+		if impl == wid {
+			return
+		}
+		key := fmt.Sprintf("%T in place of %T", wid, impl)
+		if _, warned := warnedWrappers.LoadOrStore(key, true); !warned {
+			log.Printf("bellui: a %T is in the tree in place of the %T it embeds, whose ExtendBaseWidget was "+
+				"called with the %[2]T. The two get separate renderers, and the one the tree does not hold "+
+				"is destroyed while it is still shown. Put the %[2]T itself in the tree, or build it without "+
+				"its constructor and call ExtendBaseWidget with the %[1]T: ExtendBaseWidget keeps the first "+
+				"widget it is given.", wid, impl)
+		}
+		return
+	}
+}
+
+// ResetWrapperWarningsForTests clears the once-per-type set behind the
+// wrapper warning, and clears it again when the test ends.
+func ResetWrapperWarningsForTests(t interface{ Cleanup(func()) }) {
+	warnedWrappers.Clear()
+	t.Cleanup(func() { warnedWrappers.Clear() })
 }
 
 // Renderer looks up the render implementation for a widget.
@@ -19,6 +65,7 @@ type isBaseWidget interface {
 func Renderer(wid core.Widget) core.WidgetRenderer {
 	renderer, ok := CachedRenderer(wid)
 	if !ok && wid != nil {
+		warnIfWrapper(wid)
 		renderer = wid.CreateRenderer()
 		rinfo := &rendererInfo{renderer: renderer}
 		rinfo.setAlive()
@@ -40,12 +87,6 @@ func CachedRenderer(wid core.Widget) (core.WidgetRenderer, bool) {
 		return nil, false
 	}
 
-	if wd, ok := wid.(isBaseWidget); ok {
-		if wd.super() != nil {
-			wid = wd.super()
-		}
-	}
-
 	rinfo, ok := renderers.Load(wid)
 	if !ok {
 		return nil, false
@@ -61,12 +102,6 @@ func CachedRenderer(wid core.Widget) (core.WidgetRenderer, bool) {
 func PeekRenderer(wid core.Widget) (core.WidgetRenderer, bool) {
 	if wid == nil {
 		return nil, false
-	}
-
-	if wd, ok := wid.(isBaseWidget); ok {
-		if wd.super() != nil {
-			wid = wd.super()
-		}
 	}
 
 	rinfo, ok := renderers.Load(wid)

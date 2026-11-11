@@ -222,7 +222,9 @@ func Test_canvas_ResizeWithModalPopUpOverlay(t *testing.T) {
 }
 
 func Test_canvas_Tappable(t *testing.T) {
-	content := &touchableLabel{Label: widget.NewLabel("Hi\nHi\nHi")}
+	// Not NewLabel: it extends the label with itself, and ExtendBaseWidget
+	// keeps the first widget it is given (#1146).
+	content := &touchableLabel{Label: &widget.Label{Text: "Hi\nHi\nHi"}}
 	content.ExtendBaseWidget(content)
 	c := newCanvas(bellui.CurrentDevice()).(*canvas)
 	c.SetContent(content)
