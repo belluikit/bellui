@@ -157,6 +157,10 @@ type Device struct {
 	// no write) but the same attachment is the foundation for Scene3D depth.
 	depthStencils map[[2]int]*depthStencil
 
+	// acquires counts surface acquires, for the tests that prove a lost
+	// device never reaches one (#1150).
+	acquires int
+
 	// per-frame state, valid between BeginFrame and EndFrame
 	frameView *wgpu.TextureView
 	frameTex  *wgpu.Texture
@@ -1809,6 +1813,11 @@ const (
 // such as an offscreen one.
 var errNoSurface = errors.New("webgpu: no surface")
 
+// ErrDeviceLost is BeginFrame's error once the GPU device is lost: a driver
+// reset, or the device destroyed. Nothing more can be drawn with the Device;
+// the painter makes a new one (#1150).
+var ErrDeviceLost = errors.New("webgpu: the GPU device was lost")
+
 // SurfaceStatusError carries a non-success surface-acquire status as an error.
 // The bindings report the status in the returned SurfaceTexture rather than as an
 // error, so acquireSurfaceTexture converts it here — keeping the classification
@@ -1824,6 +1833,7 @@ func (e *SurfaceStatusError) Error() string {
 // acquireSurfaceTexture wraps TryGetCurrentTexture so a non-success status (and a
 // success status with no texture) surfaces as a *SurfaceStatusError.
 func (d *Device) acquireSurfaceTexture() (*wgpu.Texture, error) {
+	d.acquires++
 	if d.surface == nil {
 		return nil, errNoSurface
 	}
@@ -1859,6 +1869,14 @@ func classifyAcquire(err error) acquireAction {
 	return acquireSkip
 }
 
+// lostError is ErrDeviceLost with wgpu's reason, once the device is lost.
+func (d *Device) lostError() error {
+	if reason, msg, lost := d.device.Lost(); lost {
+		return fmt.Errorf("%w (%v: %s)", ErrDeviceLost, reason, msg)
+	}
+	return nil
+}
+
 func (d *Device) BeginFrame(clear wgpu.Color) error {
 	// Reset the per-frame arena staging and the textured bind-group position
 	// cursor, then pre-size the GPU arenas to the high-water mark so this frame's
@@ -1868,7 +1886,29 @@ func (d *Device) BeginFrame(clear wgpu.Color) error {
 	d.texBindInUse = 0
 	d.frameDemandVtx = 0
 	d.frameDemandUni = 0
+	// The command encoder comes before the surface texture, and the device's
+	// loss is checked between them. On a lost device wgpu-native aborts the
+	// process in wgpuSurfaceGetCurrentTexture ("Parent device is lost")
+	// instead of returning a status, and it reports a loss only from inside a
+	// later call on the device. Creating a command encoder reports it, and
+	// is the first call of a frame for that reason; a failed buffer creation
+	// does not (measured on Metal).
+	enc, err := d.device.TryCreateCommandEncoder(nil)
+	if lost := d.lostError(); lost != nil {
+		if enc != nil {
+			enc.Release()
+		}
+		return lost
+	}
+	if err != nil {
+		return err
+	}
+	d.encoder = enc
 	if err := d.ensureArenas(); err != nil {
+		d.DiscardFrame()
+		if lost := d.lostError(); lost != nil {
+			return lost
+		}
 		return err
 	}
 	st, err := d.acquireSurfaceTexture()
@@ -1885,12 +1925,15 @@ func (d *Device) BeginFrame(clear wgpu.Color) error {
 			d.releaseDepthStencils()
 			st, err = d.acquireSurfaceTexture()
 			if err != nil {
+				d.DiscardFrame()
 				return err // retry failed — skip this frame, try again next
 			}
 		case acquireFatal:
 			bellui.LogError("webgpu: unrecoverable surface acquire, skipping frame", err)
+			d.DiscardFrame()
 			return err
 		default: // acquireSkip: Timeout (transient) or a non-status error
+			d.DiscardFrame()
 			return err
 		}
 	}
@@ -1903,12 +1946,6 @@ func (d *Device) BeginFrame(clear wgpu.Color) error {
 		return err
 	}
 	d.frameView = view
-
-	d.encoder, err = d.device.TryCreateCommandEncoder(nil)
-	if err != nil {
-		d.DiscardFrame()
-		return err
-	}
 	d.targets = d.targets[:0]
 	// Size the root render target from the ACQUIRED surface texture, not the
 	// cached config size. On the web the surface's current texture follows the

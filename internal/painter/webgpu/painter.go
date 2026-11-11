@@ -11,6 +11,7 @@
 package webgpu
 
 import (
+	"errors"
 	"fmt"
 	"image"
 	"image/color"
@@ -210,6 +211,9 @@ func (p *painter) SetOutputSize(width, height int) {
 // background instead of beginning a new frame.
 func (p *painter) Clear() {
 	if p.dev == nil {
+		p.Init() // after a lost device (#1150); a no-op until the surface is known
+	}
+	if p.dev == nil {
 		return
 	}
 	if p.framing && p.canvasFBO != nil && p.canvasFBO.active {
@@ -227,6 +231,9 @@ func (p *painter) beginFrame() {
 	bg := backgroundColor()
 	clear := wgpu.Color{R: float64(bg[0]), G: float64(bg[1]), B: float64(bg[2]), A: float64(bg[3])}
 	if err := p.dev.BeginFrame(clear); err != nil {
+		if errors.Is(err, ErrDeviceLost) {
+			p.dropLostDevice(err)
+		}
 		return
 	}
 	p.framing = true
@@ -237,6 +244,47 @@ func (p *painter) beginFrame() {
 	p.evictLayouts()
 	p.evictBoundaries()
 	p.resetFullAtlas()
+}
+
+// dropLostDevice lets go of a lost device and of everything made with it, so
+// that the next frame's Clear makes a new device and the objects drawn get new
+// textures (getTexture makes one when its handle has none). It does not draw
+// the frame it was called in: the driver keeps painting, and a later frame
+// with the new device draws the whole canvas, as the canvas FBO starts empty.
+func (p *painter) dropLostDevice(err error) {
+	bellui.LogError("webgpu: making a new GPU device", err)
+	for id, tex := range p.textures {
+		tex.Release()
+		delete(p.textures, id)
+	}
+	for obj, b := range p.boundaries {
+		if b.tex != nil {
+			b.tex.Release()
+		}
+		delete(p.boundaries, obj)
+	}
+	clear(p.scenes) // their textures are in p.textures
+	for k, e := range p.shadows {
+		e.tex.Release()
+		delete(p.shadows, k)
+	}
+	if a := &p.batch.atlas; a.tex != nil {
+		a.tex.Release()
+		a.tex = nil
+		clear(a.entries)
+		a.shelfX, a.shelfY, a.shelfH, a.full = 0, 0, 0, false
+	}
+	clear(p.batch.layouts)
+	if p.canvasFBO != nil && p.canvasFBO.tex != nil {
+		p.canvasFBO.tex.Release()
+	}
+	p.canvasFBO = nil
+	p.boundaryFrames = p.boundaryFrames[:0]
+	p.roundClips = p.roundClips[:0]
+	p.clipBases = p.clipBases[:0]
+	p.framing = false
+	p.dev.Destroy()
+	p.dev = nil
 }
 
 // backgroundColor returns the theme background as straight RGBA in 0..1.
