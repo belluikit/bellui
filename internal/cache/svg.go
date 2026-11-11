@@ -10,6 +10,12 @@ import (
 
 var svgs async.Map[string, *svgInfo]
 
+// RenderDeferredSVG rasterizes the SVG of a canvas.Image that put it off while
+// the image was not on screen, at the image's size, and does nothing for any
+// other object. The painters call it before they read an image's pixels;
+// canvas sets it (#1137).
+var RenderDeferredSVG = func(core.CanvasObject) {}
+
 // GetSvg gets svg image from cache if it exists.
 func GetSvg(name string, o core.CanvasObject, w int, h int) *image.NRGBA {
 	svginfo, ok := svgs.Load(overriddenName(name, o))

@@ -15,6 +15,7 @@ import (
 	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/driver/software"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/painter"
 	"github.com/belluikit/bellui/storage"
 	"github.com/belluikit/bellui/test"
 	"github.com/belluikit/bellui/theme"
@@ -42,6 +43,8 @@ func TestImage_RefreshBlank(t *testing.T) {
 
 	img.Resource = theme.HomeIcon()
 	img.Refresh()
+	assert.Nil(t, img.Image, "an SVG in no window is rasterized when drawn (#1137)")
+	assert.NotNil(t, painter.PaintImage(img, nil, 64, 64))
 	assert.NotNil(t, img.Image)
 
 	img.Image = nil
@@ -189,4 +192,28 @@ func TestImage_FillOriginalFileDrawsAfterLayout(t *testing.T) {
 		}
 	}
 	assert.NotZero(t, coloured)
+}
+
+// TestImage_HiddenSVGRasterizedWhenShown pins #1137: an SVG under a hidden
+// container is laid out without being rasterized, and is rasterized when it
+// is first drawn after the container is shown. One on screen is rasterized
+// when it is refreshed, as before.
+func TestImage_HiddenSVGRasterizedWhenShown(t *testing.T) {
+	test.NewTempApp(t)
+	shown := canvas.NewImageFromResource(theme.HomeIcon())
+	hidden := canvas.NewImageFromResource(theme.SearchIcon())
+	box := container.NewStack(hidden)
+	box.Hide()
+	w := test.NewTempWindow(t, container.NewVBox(shown, box))
+	w.Resize(geo.NewSize(100, 100))
+	shown.Resize(geo.NewSize(40, 40))
+	hidden.Resize(geo.NewSize(40, 40))
+
+	assert.NotNil(t, shown.Image, "on screen: rasterized when refreshed")
+	assert.Nil(t, hidden.Image, "under a hidden container: not rasterized")
+
+	box.Show()
+	assert.Nil(t, hidden.Image, "shown, but not yet drawn")
+	w.Canvas().(test.WindowlessCanvas).Capture()
+	assert.NotNil(t, hidden.Image, "rasterized when drawn")
 }
