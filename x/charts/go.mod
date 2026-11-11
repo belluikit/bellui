@@ -12,7 +12,7 @@ require (
 	github.com/belluikit/glfw-js v1.0.4 // indirect
 	github.com/belluikit/systray v1.12.2 // indirect
 	github.com/belluikit/typesetting v0.3.6 // indirect
-	github.com/belluikit/webgpu v1.2.3 // indirect
+	github.com/belluikit/webgpu v1.2.4-0.20261111145738-f1242730476c // indirect
 	github.com/belluikit/webgpu/libs-android v0.0.0-20261111082704-bbaa548a1d45 // indirect
 	github.com/belluikit/webgpu/libs-darwin v0.0.0-20261111082641-092cb90d718e // indirect
 	github.com/belluikit/webgpu/libs-ios v0.0.0-20261111082643-f4adf07a4281 // indirect
