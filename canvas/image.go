@@ -80,7 +80,10 @@ type Image struct {
 	// one of the following sources will provide our image data
 	File     string          // Load the image from a file
 	Resource bellui.Resource // Load the image from an in-memory resource
-	Image    image.Image     // Specify a loaded image to use in this canvas object
+	// Image is the image to draw. Set it to draw a loaded image. For a File
+	// or Resource it holds the pixels drawn from them, filled by Refresh; an
+	// SVG out of sight is filled only once it is first drawn (#1137).
+	Image image.Image
 
 	Translucency float64    // Set a translucency value > 0.0 to fade the image
 	FillMode     ImageFill  // Specify how the image should expand to fill or fit the available space
