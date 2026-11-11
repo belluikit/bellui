@@ -154,11 +154,13 @@ audio set: 1.8 MB of FFmpeg against 4.9 MB on darwin/arm64.
 
 FFmpeg is a set of shared libraries, so a user can replace them (LGPL 2.1 §6b).
 An app has to carry the ones its binary loads. `go run` and `go test` find them
-in the module cache. On desktop, `bellui package` copies them into the package
-and points the binary at them ([#1101](https://github.com/belluikit/bellui/issues/1101)):
-`Contents/Frameworks` in a macOS app, `lib/<app id>/` in a Linux package, beside
-the `.exe` on Windows. `bellui package` for Android and iOS doesn't carry them
-yet ([#1122](https://github.com/belluikit/bellui/issues/1122)).
+in the module cache. `bellui package` copies them into the package and points
+the binary at them: `Contents/Frameworks` in a macOS app, `lib/<app id>/` in a
+Linux package, beside the `.exe` on Windows
+([#1101](https://github.com/belluikit/bellui/issues/1101)), each ABI's
+`lib/<abi>/` in an Android APK, and `Frameworks/` in an iOS app, signed with it
+([#1122](https://github.com/belluikit/bellui/issues/1122)). Built with
+`goffmpeg_novideo`, a package carries only the audio set.
 
 ### Background playback
 
