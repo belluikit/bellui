@@ -246,6 +246,15 @@ type docTabsRenderer struct {
 	box          *bellui.Container
 	create       *widget.Button
 	lastSelected int
+
+	// barLocation is the location the bar was last built for, and barBuilt
+	// whether it has been. The bar is refreshed only when it or the buttons
+	// shown change, so a Layout with the same tabs refreshes nothing (#1059).
+	barLocation TabLocation
+	barBuilt    bool
+	// buttonsChanged records that a button's text, icon or state changed
+	// since the bar was last laid out.
+	buttonsChanged bool
 }
 
 func (r *docTabsRenderer) Layout(size geo.Size) {
@@ -328,20 +337,28 @@ func (r *docTabsRenderer) buildCreateTabsButton() *widget.Button {
 	return create
 }
 
-func (r *docTabsRenderer) buildTabButtons(count int, buttons *bellui.Container) {
-	buttons.Objects = nil
-
-	var iconPos buttonIconPosition
-	if r.docTabs.location == TabLocationLeading || r.docTabs.location == TabLocationTrailing {
-		buttons.Layout = layout.NewVBoxLayout()
+// buildTabButtons brings the first count tab buttons up to date with their
+// items, refreshing only the buttons that changed. It reports whether the
+// buttons shown, or their layout, changed.
+func (r *docTabsRenderer) buildTabButtons(count int, buttons *bellui.Container) (structural bool) {
+	vertical := r.docTabs.location == TabLocationLeading || r.docTabs.location == TabLocationTrailing
+	iconPos := buttonIconInline
+	if vertical {
 		iconPos = buttonIconTop
-	} else {
-		buttons.Layout = layout.NewHBoxLayout()
-		iconPos = buttonIconInline
 	}
+	if !r.barBuilt || r.barLocation != r.docTabs.location {
+		if vertical {
+			buttons.Layout = layout.NewVBoxLayout()
+		} else {
+			buttons.Layout = layout.NewHBoxLayout()
+		}
+		structural = true
+	}
+	structural = structural || len(buttons.Objects) != count
 
 	for i := 0; i < count; i++ {
 		item := r.docTabs.Items[i]
+		changed := false
 		if item.button == nil {
 			item.button = &tabButton{
 				onTapped: func() { r.docTabs.Select(item) },
@@ -352,20 +369,36 @@ func (r *docTabsRenderer) buildTabButtons(count int, buttons *bellui.Container) 
 			if item.disabled {
 				item.button.Disable()
 			}
+			changed = true
 		}
 		button := item.button
-		button.icon = item.Icon
-		button.iconPosition = iconPos
+		importance := widget.MediumImportance
 		if i == r.docTabs.current {
-			button.importance = widget.HighImportance
-		} else {
-			button.importance = widget.MediumImportance
+			importance = widget.HighImportance
 		}
-		button.text = item.Text
-		button.textAlignment = bellui.TextAlignLeading
-		button.Refresh()
-		buttons.Objects = append(buttons.Objects, button)
+		if button.icon != item.Icon || button.iconPosition != iconPos || button.importance != importance ||
+			button.text != item.Text || button.textAlignment != bellui.TextAlignLeading {
+			button.icon = item.Icon
+			button.iconPosition = iconPos
+			button.importance = importance
+			button.text = item.Text
+			button.textAlignment = bellui.TextAlignLeading
+			changed = true
+		}
+		if changed {
+			button.Refresh()
+			r.buttonsChanged = true
+		}
+		structural = structural || buttons.Objects[i] != button
 	}
+
+	if structural {
+		buttons.Objects = make([]core.CanvasObject, 0, count)
+		for _, item := range r.docTabs.Items[:count] {
+			buttons.Objects = append(buttons.Objects, item.button)
+		}
+	}
+	return structural
 }
 
 func (r *docTabsRenderer) scrollToSelected() {
@@ -488,7 +521,9 @@ func (r *docTabsRenderer) updateAllTabs() {
 
 func (r *docTabsRenderer) updateCreateTab() {
 	if r.docTabs.CreateTab != nil {
-		r.create.SetIcon(theme.ContentAddIcon())
+		if icon := theme.ContentAddIcon(); r.create.Icon != icon {
+			r.create.SetIcon(icon) // SetIcon refreshes even when the icon is the same
+		}
 		r.create.Show()
 	} else {
 		r.create.Hide()
@@ -497,7 +532,19 @@ func (r *docTabsRenderer) updateCreateTab() {
 
 func (r *docTabsRenderer) updateTabs() {
 	tabCount := len(r.docTabs.Items)
-	r.buildTabButtons(tabCount, r.scroller.Content.(*bellui.Container))
+	structural := r.buildTabButtons(tabCount, r.scroller.Content.(*bellui.Container))
+	if !structural {
+		if r.buttonsChanged {
+			// The scroller re-measures and resizes the buttons without
+			// refreshing them.
+			r.buttonsChanged = false
+			r.scroller.Refresh()
+		}
+		return
+	}
+	r.barBuilt = true
+	r.barLocation = r.docTabs.location
+	r.buttonsChanged = false
 
 	// Set layout of tab bar containing tab buttons and overflow action
 	if r.docTabs.location == TabLocationLeading || r.docTabs.location == TabLocationTrailing {
