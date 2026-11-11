@@ -124,10 +124,11 @@ func (i *Image) MinSize() geo.Size {
 	i.propMu.RLock()
 	a := i.aspect
 	i.propMu.RUnlock()
-	if i.Image == nil || a == 0 {
-		if i.File != "" || i.Resource != nil {
-			i.Refresh()
-		}
+	// Only while the aspect is unknown: a file or resource image is decoded
+	// only once it has a size, so a hidden one keeps a nil Image, and
+	// refreshing it here would reopen its file on every call (#1062).
+	if a == 0 && (i.File != "" || i.Resource != nil) {
+		i.Refresh()
 	}
 	return i.baseObject.MinSize()
 }
@@ -233,7 +234,9 @@ func (i *Image) Resize(s geo.Size) {
 	// Refresh can return without telling the canvas, when there is nothing to
 	// draw or it fails to: tell it here, as Move and Hide do (#599).
 	defer repaint(i)
-	if i.FillMode == ImageFillOriginal && i.Size().Height > 2 { // we can just ask for a GPU redraw to align
+	// An undecoded image falls through to decode at its new size: MinSize
+	// no longer refreshes one once its aspect is known (#1062).
+	if i.FillMode == ImageFillOriginal && i.Size().Height > 2 && i.Image != nil { // we can just ask for a GPU redraw to align
 		Refresh(i)
 		return
 	}

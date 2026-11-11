@@ -10,7 +10,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/canvas"
+	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/driver/software"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/storage"
@@ -133,4 +135,58 @@ func TestImage_CornerRadius(t *testing.T) {
 	i.CornerRadius = 20
 	c.Resize(geo.NewSize(60, 100))
 	test.AssertRendersToImage(t, "image_cover_rounded_corners.png", c)
+}
+
+// countingResource counts how often the image reads its content.
+type countingResource struct {
+	bellui.Resource
+	reads int
+}
+
+func (r *countingResource) Content() []byte {
+	r.reads++
+	return r.Resource.Content()
+}
+
+// A hidden image keeps a zero size, so it is never decoded: MinSize must not
+// re-read its source every call once the aspect is known (#1062).
+func TestImage_MinSizeZeroSizeReadsOnce(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("testdata", "arc_80_100.png"))
+	assert.NoError(t, err)
+	res := &countingResource{Resource: bellui.NewStaticResource("arc.png", data)}
+	img := canvas.NewImageFromResource(res)
+
+	img.MinSize() // learns the aspect
+	first := res.reads
+	assert.NotZero(t, first)
+	for range 100 {
+		img.MinSize()
+	}
+	assert.Equal(t, first, res.reads)
+	assert.Nil(t, img.Image)
+	assert.NotZero(t, img.Aspect())
+}
+
+// MinSize used to decode an ImageFillOriginal file image on the call after
+// layout gave it a size; now Resize must, or it draws nothing (#1062).
+func TestImage_FillOriginalFileDrawsAfterLayout(t *testing.T) {
+	test.NewTempApp(t)
+	img := canvas.NewImageFromFile(filepath.Join("testdata", "arc_80_100.png"))
+	img.FillMode = canvas.ImageFillOriginal
+	w := test.NewTempWindow(t, container.NewStack(img))
+	w.Resize(img.MinSize().AddWidthHeight(40, 40))
+
+	out := w.Canvas().Capture()
+	assert.NotNil(t, img.Image)
+	coloured := 0
+	b := out.Bounds()
+	for y := b.Min.Y; y < b.Max.Y; y++ {
+		for x := b.Min.X; x < b.Max.X; x++ {
+			r, g, bl, _ := out.At(x, y).RGBA()
+			if r != g || g != bl { // the arc is coloured, the window grey
+				coloured++
+			}
+		}
+	}
+	assert.NotZero(t, coloured)
 }
