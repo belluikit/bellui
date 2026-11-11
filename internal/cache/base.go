@@ -54,6 +54,21 @@ func getLastClean() time.Time {
 	return time.Time{}
 }
 
+// SetClockForTests makes now the clock Clean reads, takes a sample from it,
+// and forgets when Clean last ran, so that the next Clean runs. The wall clock
+// comes back when the test ends. It lets a test paint past ValidDuration
+// without waiting for it.
+func SetClockForTests(t interface{ Cleanup(func()) }, now func() time.Time) {
+	timeNow = now
+	cachedNow.Store(now().UnixNano())
+	lastClean.Store(time.Time{})
+	t.Cleanup(func() {
+		timeNow = time.Now
+		cachedNow.Store(time.Now().UnixNano())
+		lastClean.Store(time.Time{})
+	})
+}
+
 // sampledNow returns the clock sample entries are currently stamped with.
 func sampledNow() time.Time {
 	return time.Unix(0, cachedNow.Load())
