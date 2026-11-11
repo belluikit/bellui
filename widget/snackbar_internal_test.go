@@ -12,8 +12,11 @@ import (
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/cache"
 	intdriver "github.com/belluikit/bellui/internal/driver"
+	"github.com/belluikit/bellui/lang"
 	"github.com/belluikit/bellui/test"
+	"github.com/belluikit/bellui/theme"
 )
 
 // findButtonIn walks a rendered tree for the first *Button.
@@ -29,7 +32,8 @@ func findButtonIn(obj core.CanvasObject) *Button {
 			}
 		}
 	case core.Widget:
-		for _, child := range test.TempWidgetRenderer(nil, o).Objects() {
+		// The cached renderer: TempWidgetRenderer needs a *testing.T.
+		for _, child := range cache.Renderer(o).Objects() {
 			if b := findButtonIn(child); b != nil {
 				return b
 			}
@@ -197,4 +201,51 @@ func TestShowSnackbar_OneAtATimeWhileFading(t *testing.T) {
 	second.Show(c)
 	t.Cleanup(second.Hide)
 	assert.Equal(t, []core.CanvasObject{second.popUp}, c.Overlays().List())
+}
+
+// A message wider than the canvas wraps inside the snackbar's margins
+// instead of running off both edges (#1106). The text is DaySong's, on a
+// phone-width canvas.
+func TestSnackbar_LongMessageWrapsInsideMargins(t *testing.T) {
+	const message = "Like not kept: DaySong can't be reached right now. Check your connection and try again."
+	for _, actionText := range []string{"", "Retry"} {
+		w := test.NewTempWindow(t, NewLabel(""))
+		w.Resize(geo.NewSize(360, 640))
+		c := w.Canvas()
+
+		s := NewSnackbar(message, actionText, func() {})
+		s.Duration = time.Minute
+		s.Show(c)
+		t.Cleanup(s.Hide)
+
+		margin := theme.Padding() * 2
+		pos, size := s.popUp.innerPos, s.popUp.MinSize()
+		assert.GreaterOrEqual(t, pos.X, margin, "action %q: left edge inside the margin", actionText)
+		assert.LessOrEqual(t, pos.X+size.Width, c.Size().Width-margin, "action %q: right edge inside the margin", actionText)
+
+		line := bellui.MeasureText("Hg", theme.TextSize(), bellui.TextStyle{}).Height
+		layout := s.popUp.Content.(*bellui.Container).Objects[0].(*bellui.Container).Layout.(*snackbarLayout)
+		lines := layout.textSize().Height / line
+		assert.True(t, lines > 1.5 && lines < 2.5, "action %q: two lines, got %.2f", actionText, lines)
+	}
+}
+
+// In a right-to-left canvas the action leads and the message follows, as
+// they did in the HBox the snackbar's own layout replaced (#1106).
+func TestSnackbar_RTLPutsActionFirst(t *testing.T) {
+	w := test.NewTempWindow(t, NewLabel(""))
+	w.Resize(geo.NewSize(360, 640))
+	lang.SetLocaleForTests(t, "en-US")
+	w.Canvas().(interface{ SetDirection(bellui.Direction) }).SetDirection(bellui.DirectionRTL)
+
+	s := NewSnackbar("Like not kept: DaySong can't be reached right now. Check your connection.", "Retry", func() {})
+	s.Duration = time.Minute
+	s.Show(w.Canvas())
+	t.Cleanup(s.Hide)
+
+	content := s.popUp.Content.(*bellui.Container).Objects[0].(*bellui.Container)
+	l := content.Layout.(*snackbarLayout)
+	assert.Less(t, l.action.Position().X, l.text.Position().X, "the action leads")
+	assert.Equal(t, content.Size().Width, l.text.Position().X+l.text.Size().Width-l.outset,
+		"the message ends at the content's right edge")
 }
