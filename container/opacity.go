@@ -1,6 +1,7 @@
 package container
 
 import (
+	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/widget"
@@ -22,7 +23,7 @@ type Opacity struct {
 	widget.BaseWidget
 	Content core.CanvasObject
 	// Opacity is the content's opacity. Change it with SetOpacity, or set it
-	// and Refresh.
+	// and Refresh, which also refreshes the content.
 	Opacity float32
 }
 
@@ -33,10 +34,13 @@ func NewOpacity(content core.CanvasObject, opacity float32) *Opacity {
 	return o
 }
 
-// SetOpacity changes the content's opacity and redraws it.
+// SetOpacity changes the content's opacity and redraws it. The content is not
+// refreshed: the painters apply the opacity per draw, so nothing in it changes,
+// and an animated opacity would otherwise refresh every object under it on
+// every frame, an image re-reading its file each time (#1138).
 func (o *Opacity) SetOpacity(opacity float32) {
 	o.Opacity = opacity
-	o.Refresh()
+	canvas.Refresh(o)
 }
 
 // GroupOpacity returns the Opacity clamped to [0, 1].
