@@ -73,6 +73,9 @@ type Image struct {
 	icon           *svg.Decoder
 	isSVG          bool
 	previousRender bool // did we successfully draw before? if so a nil content will need a reset
+	// svgDeferred is set when Refresh put off rasterizing the SVG because the
+	// image was not on screen: it is rasterized when first drawn (#1137).
+	svgDeferred bool
 
 	// one of the following sources will provide our image data
 	File     string          // Load the image from a file
@@ -198,6 +201,20 @@ func (i *Image) Refresh() {
 		isSVG := i.isSVG
 		i.propMu.RUnlock()
 		if isSVG {
+			// An SVG out of sight, under a hidden container or before the
+			// first frame that draws it, is rasterized when it is drawn
+			// instead: rasterizing costs every pixel of it, on the main
+			// goroutine, at every size it is laid out at (#1137).
+			if !bellui.IsOnScreen(i) {
+				i.propMu.Lock()
+				i.svgDeferred = true
+				i.propMu.Unlock()
+				Refresh(i)
+				return
+			}
+			i.propMu.Lock()
+			i.svgDeferred = false
+			i.propMu.Unlock()
 			tex, err := i.renderSVG(width, height)
 			if err != nil {
 				bellui.LogError("Failed to render SVG", err)
@@ -461,6 +478,36 @@ func (i *Image) renderSVG(width, height float32) (image.Image, error) {
 	}
 	cache.SetSvg(i.name(), i, tex, screenWidth, screenHeight)
 	return tex, nil
+}
+
+func init() {
+	cache.RenderDeferredSVG = renderDeferredSVG
+}
+
+// renderDeferredSVG rasterizes the SVG of an Image whose Refresh put it off
+// while it was not on screen, now that a painter draws it (#1137).
+func renderDeferredSVG(o core.CanvasObject) {
+	i, ok := o.(*Image)
+	if !ok {
+		return
+	}
+	i.propMu.Lock()
+	deferred := i.svgDeferred
+	i.svgDeferred = false
+	i.propMu.Unlock()
+	size := i.Size()
+	if !deferred || size.Width == 0 || size.Height == 0 {
+		return
+	}
+	tex, err := i.renderSVG(size.Width, size.Height)
+	if err != nil {
+		bellui.LogError("Failed to render SVG", err)
+		return
+	}
+	i.Image = tex
+	i.propMu.Lock()
+	i.previousRender = true
+	i.propMu.Unlock()
 }
 
 // decodeImage decodes an encoded image and converts it to sRGB from the colour

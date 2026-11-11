@@ -10,6 +10,7 @@ import (
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/cache"
 	"github.com/belluikit/bellui/internal/painter"
 	"github.com/belluikit/bellui/internal/scale"
 	"github.com/belluikit/bellui/lang"
@@ -84,6 +85,7 @@ func drawImage(c core.Canvas, img *canvas.Image, pos geo.Position, base *image.N
 	height := scale.ToScreenCoordinate(c, bounds.Height)
 	scaledX, scaledY := scale.ToScreenCoordinate(c, pos.X), scale.ToScreenCoordinate(c, pos.Y)
 
+	cache.RenderDeferredSVG(img)
 	origImg := img.Image
 	if img.FillMode != canvas.ImageFillCover {
 		origImg = painter.PaintImage(img, c, width, height)
