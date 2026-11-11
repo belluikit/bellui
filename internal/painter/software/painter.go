@@ -2,6 +2,7 @@ package software
 
 import (
 	"image"
+	"image/color"
 
 	"golang.org/x/image/draw"
 	"golang.org/x/image/math/f64"
@@ -33,12 +34,18 @@ func (*Painter) Paint(c core.Canvas) image.Image {
 	// Transform stack for composing parent + child transforms.
 	wtStack := []geo.Matrix{geo.Identity()}
 
+	// The group opacity of the subtree being drawn, from the core.OpacityGroup
+	// objects above it, as the GL walks keep it. Disabled widgets are not
+	// dimmed, as on mobile.
+	var opacity driver.OpacityStack
+
 	paint := func(obj core.CanvasObject, _, clipPos geo.Position, clipSize geo.Size) bool {
 		// Scope the subtree's paint to a container DirectionScope's direction so
 		// paint-time text base direction and leading/trailing alignment resolve
 		// against the scope. paint always returns false, so afterPaint (which
 		// pops) always runs and the push/pop pair balances.
 		driver.PushDirectionScope(obj)
+		opacity.Push(groupOpacity{}, obj)
 
 		w := geo.Min(clipPos.X+clipSize.Width, c.Size().Width)
 		h := geo.Min(clipPos.Y+clipSize.Height, c.Size().Height)
@@ -67,54 +74,36 @@ func (*Painter) Paint(c core.Canvas) image.Image {
 		// above it, a pure translation included (#997).
 		pos := geo.NewPos(wt.TX, wt.TY)
 
-		// Check if any non-trivial transform (rotation/scale/skew) is active.
-		hasNonTrivialTransform := !(wt.A == 1 && wt.B == 0 && wt.C == 0 && wt.D == 1)
-
-		if hasNonTrivialTransform {
-			// The worldTransform's linear part is the matrix.
-			linearOnly := geo.Matrix{A: wt.A, B: wt.B, C: wt.C, D: wt.D}
-			drawTransformed(c, obj, pos, linearOnly, base, clip)
+		if opacity.Transparent() {
 			return false
 		}
-
-		switch o := obj.(type) {
-		case *canvas.BoxShadow:
-			drawBoxShadow(c, o, pos, base, clip)
-		case *canvas.Image:
-			drawImage(c, o, pos, base, clip)
-		case *canvas.Text:
-			drawText(c, o, pos, base, clip)
-		case gradient:
-			drawGradient(c, o, pos, base, clip)
-		case *canvas.Circle:
-			drawCircle(c, o, pos, base, clip)
-		case *canvas.Line:
-			drawLine(c, o, pos, base, clip)
-		case *canvas.Polygon:
-			drawPolygon(c, o, pos, base, clip)
-		case *canvas.Raster:
-			drawRaster(c, o, pos, base, clip)
-		case *canvas.Rectangle:
-			drawRectangle(c, o, pos, base, clip)
-		case *canvas.Arc:
-			drawArc(c, o, pos, base, clip)
-		case *canvas.Scene3D:
-			drawScene3D(c, o, pos, base, clip)
-		case *canvas.Path:
-			drawPath(c, o, pos, base, clip)
-		case *canvas.StyledText:
-			drawStyledText(c, o, pos, base, clip)
-		case *canvas.TextOnPath:
-			drawTextOnPath(c, o, pos, base, clip)
-		case *canvas.GLView:
-			// GLView requires a GL context; no-op in software painter.
+		a := opacity.Current()
+		if a >= 1 {
+			drawObject(c, obj, pos, wt, base, clip)
+			return false
 		}
-
+		// Under a group opacity each draw is blended by it, as the GL painters
+		// multiply each draw: drawn alone into a layer the size of its clip,
+		// then composited through a uniform mask. Containers and widgets draw
+		// nothing themselves, so they need no layer.
+		switch obj.(type) {
+		case *bellui.Container, core.Widget:
+			return false
+		}
+		clip = clip.Intersect(base.Bounds())
+		if clip.Empty() {
+			return false
+		}
+		layer := image.NewNRGBA(clip)
+		drawObject(c, obj, pos, wt, layer, clip)
+		mask := image.NewUniform(color.Alpha{A: uint8(a*0xff + 0.5)})
+		draw.DrawMask(base, clip, layer, clip.Min, mask, image.Point{}, draw.Over)
 		return false
 	}
 
 	afterPaint := func(obj core.CanvasObject, _ geo.Position, _ core.CanvasObject) {
 		driver.PopDirectionScope(obj)
+		opacity.Pop(groupOpacity{})
 		if len(wtStack) > 1 {
 			wtStack = wtStack[:len(wtStack)-1]
 		}
@@ -142,6 +131,59 @@ func (*Painter) Paint(c core.Canvas) image.Image {
 	}
 
 	return base
+}
+
+// groupOpacity is the painter side of the walk's driver.OpacityStack. The walk
+// reads the stack's Current itself, so there is nothing to tell.
+type groupOpacity struct{}
+
+func (groupOpacity) SetGroupOpacity(float32) {}
+func (groupOpacity) ClearGroupOpacity()      {}
+
+// drawObject draws obj at pos, under the world transform wt, onto base.
+func drawObject(c core.Canvas, obj core.CanvasObject, pos geo.Position, wt geo.Matrix, base *image.NRGBA, clip image.Rectangle) {
+	// Check if any non-trivial transform (rotation/scale/skew) is active.
+	hasNonTrivialTransform := !(wt.A == 1 && wt.B == 0 && wt.C == 0 && wt.D == 1)
+
+	if hasNonTrivialTransform {
+		// The worldTransform's linear part is the matrix.
+		linearOnly := geo.Matrix{A: wt.A, B: wt.B, C: wt.C, D: wt.D}
+		drawTransformed(c, obj, pos, linearOnly, base, clip)
+		return
+	}
+
+	switch o := obj.(type) {
+	case *canvas.BoxShadow:
+		drawBoxShadow(c, o, pos, base, clip)
+	case *canvas.Image:
+		drawImage(c, o, pos, base, clip)
+	case *canvas.Text:
+		drawText(c, o, pos, base, clip)
+	case gradient:
+		drawGradient(c, o, pos, base, clip)
+	case *canvas.Circle:
+		drawCircle(c, o, pos, base, clip)
+	case *canvas.Line:
+		drawLine(c, o, pos, base, clip)
+	case *canvas.Polygon:
+		drawPolygon(c, o, pos, base, clip)
+	case *canvas.Raster:
+		drawRaster(c, o, pos, base, clip)
+	case *canvas.Rectangle:
+		drawRectangle(c, o, pos, base, clip)
+	case *canvas.Arc:
+		drawArc(c, o, pos, base, clip)
+	case *canvas.Scene3D:
+		drawScene3D(c, o, pos, base, clip)
+	case *canvas.Path:
+		drawPath(c, o, pos, base, clip)
+	case *canvas.StyledText:
+		drawStyledText(c, o, pos, base, clip)
+	case *canvas.TextOnPath:
+		drawTextOnPath(c, o, pos, base, clip)
+	case *canvas.GLView:
+		// GLView requires a GL context; no-op in software painter.
+	}
 }
 
 // drawTransformed renders an object at its local size to a temp image, then
