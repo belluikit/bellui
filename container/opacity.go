@@ -16,9 +16,8 @@ var (
 // Opacity containers nest, multiplying. Each draw is faded on its own, so
 // where two objects in the content overlap, the lower one shows through.
 //
-// It is a [core.OpacityGroup], which both the desktop and the mobile drivers
-// honour. The software painter behind test images does not, so a rendered
-// test image shows the content at full opacity.
+// It is a [core.OpacityGroup], which the desktop and mobile drivers and the
+// software painter behind test images all honour.
 type Opacity struct {
 	widget.BaseWidget
 	Content core.CanvasObject
