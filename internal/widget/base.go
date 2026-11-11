@@ -136,6 +136,18 @@ func (w *Base) Refresh() {
 	r.Refresh()
 }
 
+func init() {
+	cache.RegisterExtendedBy(func(wid core.Widget) core.Widget {
+		if b, ok := wid.(interface{ extendedBy() core.Widget }); ok {
+			return b.extendedBy()
+		}
+		return nil
+	})
+}
+
+// extendedBy is the widget ExtendBaseWidget was called with, or nil.
+func (w *Base) extendedBy() core.Widget { return w.impl }
+
 // super will return the actual object that this represents.
 // If extended then this is the extending widget, otherwise it is nil.
 func (w *Base) super() core.Widget {

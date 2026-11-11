@@ -370,6 +370,19 @@ func ResetExtendWarningsForTests(t interface{ Cleanup(func()) }) {
 	t.Cleanup(func() { warnedWidgets.Clear() })
 }
 
+func init() {
+	cache.RegisterExtendedBy(func(wid core.Widget) core.Widget {
+		if b, ok := wid.(interface{ extendedBy() core.Widget }); ok {
+			return b.extendedBy()
+		}
+		return nil
+	})
+}
+
+// extendedBy is the widget ExtendBaseWidget was called with, or nil, without
+// the warning super logs.
+func (w *BaseWidget) extendedBy() core.Widget { return w.impl }
+
 // super will return the actual object that this represents.
 // If extended then this is the extending widget, otherwise it is nil.
 // Logs a warning on first use if ExtendBaseWidget was not called.
