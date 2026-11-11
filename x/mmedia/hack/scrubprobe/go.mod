@@ -17,26 +17,26 @@ require (
 	github.com/belluikit/gl-js v0.2.1 // indirect
 	github.com/belluikit/glfw v1.10.1 // indirect
 	github.com/belluikit/glfw-js v1.0.4 // indirect
-	github.com/belluikit/goffmpeg v0.9.0 // indirect
-	github.com/belluikit/goffmpeg-libs/android_amd64 v0.6.0 // indirect
-	github.com/belluikit/goffmpeg-libs/android_arm v0.6.0 // indirect
-	github.com/belluikit/goffmpeg-libs/android_arm64 v0.6.0 // indirect
-	github.com/belluikit/goffmpeg-libs/darwin_amd64 v0.6.0 // indirect
-	github.com/belluikit/goffmpeg-libs/darwin_arm64 v0.6.0 // indirect
-	github.com/belluikit/goffmpeg-libs/ios_arm64 v0.6.0 // indirect
-	github.com/belluikit/goffmpeg-libs/iossimulator_arm64 v0.6.0 // indirect
-	github.com/belluikit/goffmpeg-libs/linux_amd64 v0.6.0 // indirect
-	github.com/belluikit/goffmpeg-libs/linux_arm64 v0.6.0 // indirect
-	github.com/belluikit/goffmpeg-libs/windows_amd64 v0.6.0 // indirect
-	github.com/belluikit/goffmpeg-libs/windows_arm64 v0.6.0 // indirect
+	github.com/belluikit/goffmpeg v0.10.0 // indirect
+	github.com/belluikit/goffmpeg-libs/android_amd64 v0.8.0 // indirect
+	github.com/belluikit/goffmpeg-libs/android_arm v0.8.0 // indirect
+	github.com/belluikit/goffmpeg-libs/android_arm64 v0.8.0 // indirect
+	github.com/belluikit/goffmpeg-libs/darwin_amd64 v0.8.0 // indirect
+	github.com/belluikit/goffmpeg-libs/darwin_arm64 v0.8.0 // indirect
+	github.com/belluikit/goffmpeg-libs/ios_arm64 v0.8.0 // indirect
+	github.com/belluikit/goffmpeg-libs/iossimulator_arm64 v0.8.0 // indirect
+	github.com/belluikit/goffmpeg-libs/linux_amd64 v0.8.0 // indirect
+	github.com/belluikit/goffmpeg-libs/linux_arm64 v0.8.0 // indirect
+	github.com/belluikit/goffmpeg-libs/windows_amd64 v0.8.0 // indirect
+	github.com/belluikit/goffmpeg-libs/windows_arm64 v0.8.0 // indirect
 	github.com/belluikit/systray v1.12.2 // indirect
 	github.com/belluikit/typesetting v0.3.6 // indirect
-	github.com/belluikit/webgpu v1.2.2 // indirect
-	github.com/belluikit/webgpu/libs-android v0.0.0-20260731101013-82e3bdc8353b // indirect
-	github.com/belluikit/webgpu/libs-darwin v0.0.0-20260731101014-ce4f86d4438c // indirect
-	github.com/belluikit/webgpu/libs-ios v0.0.0-20260727093643-fcde44a448a6 // indirect
-	github.com/belluikit/webgpu/libs-linux v0.0.0-20260731101015-884076933a5d // indirect
-	github.com/belluikit/webgpu/libs-windows v0.0.0-20260727093645-6b8e55d25f27 // indirect
+	github.com/belluikit/webgpu v1.2.3 // indirect
+	github.com/belluikit/webgpu/libs-android v0.0.0-20261111082704-bbaa548a1d45 // indirect
+	github.com/belluikit/webgpu/libs-darwin v0.0.0-20261111082641-092cb90d718e // indirect
+	github.com/belluikit/webgpu/libs-ios v0.0.0-20261111082643-f4adf07a4281 // indirect
+	github.com/belluikit/webgpu/libs-linux v0.0.0-20261111082701-57a52ab65675 // indirect
+	github.com/belluikit/webgpu/libs-windows v0.0.0-20261111091809-343dda80becd // indirect
 	github.com/ebitengine/oto/v3 v3.5.1 // indirect
 	github.com/ebitengine/purego v0.11.0 // indirect
 	github.com/fredbi/uri v1.1.1 // indirect
