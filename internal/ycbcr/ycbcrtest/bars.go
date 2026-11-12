@@ -100,3 +100,14 @@ func AssertBars(t *testing.T, bars []Bar, barW int, got image.Image, delta int) 
 		}
 	}
 }
+
+// Reversed returns bars in reverse order. Every set above encodes the same
+// colours, so a test that checks a second frame needs its bars in another
+// order: otherwise a painter still showing the first frame passes.
+func Reversed(bars []Bar) []Bar {
+	out := make([]Bar, len(bars))
+	for i, b := range bars {
+		out[len(bars)-1-i] = b
+	}
+	return out
+}

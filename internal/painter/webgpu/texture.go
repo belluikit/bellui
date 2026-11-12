@@ -37,7 +37,14 @@ func (p *painter) releaseTexture(id uint32) {
 }
 
 // createTexture rasterizes an object and uploads it to a persistent GPU texture.
+// A raster showing a Y'CbCr frame is converted on the GPU instead, when the
+// device can (#1107).
 func (p *painter) createTexture(o core.CanvasObject, raster func(core.CanvasObject) image.Image) *Texture {
+	if rast, ok := o.(*canvas.Raster); ok {
+		if tex := p.createYCbCrTexture(rast); tex != nil {
+			return tex
+		}
+	}
 	img := raster(o)
 	if img == nil {
 		return nil
@@ -64,6 +71,20 @@ func (p *painter) updateStreamingTexture(obj *canvas.Raster) {
 	if tex == nil {
 		return
 	}
+
+	// A Y'CbCr frame supplied by SetYCbCr: upload its planes and convert them
+	// on the GPU, under StreamMu for the same reason as below.
+	obj.StreamMu.Lock()
+	if yuv := obj.StreamYCbCr; yuv != nil {
+		if tex.FitsYCbCr(yuv) && p.dev.WriteYCbCr(tex, yuv, int(obj.StreamMatrix), obj.StreamFullRange) == nil {
+			obj.StreamMu.Unlock()
+			return
+		}
+		obj.StreamMu.Unlock()
+		p.dropTexture(obj, id, tex)
+		return
+	}
+	obj.StreamMu.Unlock()
 
 	// Pixels supplied by SetPixels: upload straight from the caller's buffer,
 	// under StreamMu so SetPixels cannot swap it out mid-write. This is the
@@ -94,6 +115,31 @@ func (p *painter) updateStreamingTexture(obj *canvas.Raster) {
 		return
 	}
 	_ = p.dev.WriteTexturePixels(tex, rgba.Pix, genW, genH)
+}
+
+// createYCbCrTexture creates the texture of a raster showing a Y'CbCr frame
+// and converts the frame into it, or returns nil when the raster shows none or
+// the device cannot convert it; the caller then converts on the processor,
+// through PixelImage.
+func (p *painter) createYCbCrTexture(rast *canvas.Raster) *Texture {
+	if p.dev == nil {
+		return nil
+	}
+	rast.StreamMu.Lock()
+	defer rast.StreamMu.Unlock()
+	yuv := rast.StreamYCbCr
+	if yuv == nil || yuv.Rect.Empty() {
+		return nil
+	}
+	tex, err := p.dev.CreateYCbCrTexture(yuv)
+	if err != nil {
+		return nil
+	}
+	if err := p.dev.WriteYCbCr(tex, yuv, int(rast.StreamMatrix), rast.StreamFullRange); err != nil {
+		tex.Release()
+		return nil
+	}
+	return tex
 }
 
 // streamingGeneratorPixels runs a streaming raster's Generator and returns its
