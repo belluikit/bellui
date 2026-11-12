@@ -201,20 +201,92 @@ func isTappable(obj core.CanvasObject) bool {
 	return ok
 }
 
-// CanvasNodes builds the semantic tree for a whole canvas: the content, then
-// the canvas-drawn menu (drivers that own one pass it, others pass nil), then
-// each overlay in stacking order. This mirrors what the user perceives as the
-// window's UI and is the entry point platform backends call.
+// CanvasNodes builds the semantic tree for a whole canvas from CanvasRoots,
+// with the canvas-drawn menu (drivers that own one pass it, others pass nil).
+// This mirrors what the user perceives as the window's UI and is the entry
+// point the desktop backends call.
 func CanvasNodes(c core.Canvas, menu core.CanvasObject) []*Node {
-	var roots []core.CanvasObject
-	if content := c.Content(); content != nil {
-		roots = append(roots, content)
+	return BuildRoots(CanvasRoots(c, menu))
+}
+
+// Root is one tree a canvas exposes to assistive technology.
+type Root struct {
+	Object core.CanvasObject
+	// Within, when not nil, keeps only the nodes whose centre it reports
+	// true for, with their ancestors: the content's share of a canvas whose
+	// top pop-up leaves it a band, as a drawer below a header does (#1172).
+	Within func(geo.Position) bool
+}
+
+// CanvasRoots returns the trees of c a screen reader reaches, in reading
+// order: the content, then each of extra (a window head, a canvas-drawn
+// menu), then the overlays in stacking order. An overlay that does not pass
+// input through is a barrier, as it is for a tap
+// (driver.FindObjectAtPositionMatching): what is beneath it is inert, and
+// the roots start at it (pre-rebrand tracker #807). Only the band such an
+// overlay leaves to the content stays reachable beneath it (#1172).
+func CanvasRoots(c core.Canvas, extra ...core.CanvasObject) []Root {
+	var content []core.CanvasObject
+	if root := c.Content(); root != nil {
+		content = append(content, root)
 	}
-	if menu != nil {
-		roots = append(roots, menu)
+	for _, o := range extra {
+		if o != nil {
+			content = append(content, o)
+		}
 	}
-	roots = append(roots, c.Overlays().List()...)
-	return BuildTree(roots...)
+	overlays := c.Overlays().List()
+	var roots []Root
+	from := 0
+	for i := len(overlays) - 1; i >= 0; i-- {
+		if pt, ok := overlays[i].(driver.InputPassThrough); ok && pt.PassesInputThrough() {
+			continue
+		}
+		from = i
+		band, ok := overlays[i].(driver.InputPassThroughAt)
+		if !ok || !band.PassesInputThroughAt(geo.Position{}) {
+			content = nil // the barrier covers the canvas from its top edge
+		}
+		for _, o := range content {
+			roots = append(roots, Root{Object: o, Within: band.PassesInputThroughAt})
+		}
+		content = nil
+		break
+	}
+	for _, o := range content {
+		roots = append(roots, Root{Object: o})
+	}
+	for _, o := range overlays[from:] {
+		roots = append(roots, Root{Object: o})
+	}
+	return roots
+}
+
+// BuildRoots builds the semantic forest of roots, keeping of a root with
+// Within only the nodes in it.
+func BuildRoots(roots []Root) []*Node {
+	var forest []*Node
+	for _, r := range roots {
+		nodes := BuildTree(r.Object)
+		if r.Within != nil {
+			nodes = keepWithin(nodes, r.Within)
+		}
+		forest = append(forest, nodes...)
+	}
+	return forest
+}
+
+// keepWithin drops the nodes whose centre within rejects and that hold no
+// node it accepts.
+func keepWithin(nodes []*Node, within func(geo.Position) bool) []*Node {
+	var kept []*Node
+	for _, n := range nodes {
+		n.Children = keepWithin(n.Children, within)
+		if len(n.Children) > 0 || within(n.Pos.AddXY(n.Size.Width/2, n.Size.Height/2)) {
+			kept = append(kept, n)
+		}
+	}
+	return kept
 }
 
 // Flatten returns the nodes of the given forest as a single list in tree

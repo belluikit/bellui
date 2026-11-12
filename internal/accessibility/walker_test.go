@@ -16,6 +16,7 @@ import (
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/accessibility"
+	"github.com/belluikit/bellui/layout"
 	"github.com/belluikit/bellui/test"
 	"github.com/belluikit/bellui/widget"
 )
@@ -350,7 +351,9 @@ func TestCanvasNodes_ContentMenuOverlayOrder(t *testing.T) {
 	c := w.Canvas()
 
 	menu := widget.NewMenu(bellui.NewMenu("", bellui.NewMenuItem("Item", nil)))
-	c.Overlays().Add(widget.NewButton("Overlay", nil))
+	// A pass-through overlay, as a toast is: one that is not would be a
+	// barrier hiding the content (TestCanvasNodes_ModalOverlayIsABarrier).
+	c.Overlays().Add(&passThroughButton{widget.NewButton("Overlay", nil)})
 
 	forest := accessibility.CanvasNodes(c, menu)
 	require.Len(t, forest, 3)
@@ -592,4 +595,69 @@ func TestBuildTree_CompletionPopupRows(t *testing.T) {
 	// The container's active descendant resolves to the selected row's NodeID.
 	assert.Equal(t, rows[0].NodeID, p.AccessibleActiveDescendant(),
 		"active descendant identity must match the selected row node")
+}
+
+// passThroughButton is an overlay that lets input through, as a toast does.
+type passThroughButton struct{ *widget.Button }
+
+func (*passThroughButton) PassesInputThrough() bool { return true }
+
+// bandOverlay covers the canvas below top, as a drawer opened below a header
+// does (#1171), with a button of its own.
+type bandOverlay struct {
+	widget.BaseWidget
+	content core.CanvasObject
+	top     float32
+}
+
+func newBandOverlay(content core.CanvasObject, top float32) *bandOverlay {
+	o := &bandOverlay{content: content, top: top}
+	o.ExtendBaseWidget(o)
+	return o
+}
+
+func (o *bandOverlay) CreateRenderer() core.WidgetRenderer {
+	return widget.NewSimpleRenderer(o.content)
+}
+
+func (o *bandOverlay) PassesInputThroughAt(pos geo.Position) bool { return pos.Y < o.top }
+
+// An overlay that does not pass input through is a barrier for a screen
+// reader as it is for a tap: the content and menu beneath it are inert
+// (pre-rebrand tracker #807, now on every backend).
+func TestCanvasNodes_ModalOverlayIsABarrier(t *testing.T) {
+	w := test.NewTempWindow(t, widget.NewButton("Content", nil))
+	c := w.Canvas()
+	menu := widget.NewMenu(bellui.NewMenu("", bellui.NewMenuItem("Item", nil)))
+	c.Overlays().Add(widget.NewButton("Dialog", nil))
+	c.Overlays().Add(&passThroughButton{widget.NewButton("Toast", nil)})
+
+	forest := accessibility.CanvasNodes(c, menu)
+	require.Len(t, forest, 2)
+	assert.Equal(t, "Dialog", forest[0].Label)
+	assert.Equal(t, "Toast", forest[1].Label, "a toast above the barrier stays reachable")
+}
+
+// A pop-up that leaves a band to the content keeps the content's controls in
+// that band reachable, and only those (#1172).
+func TestCanvasNodes_BandAboveADrawer(t *testing.T) {
+	header, covered := widget.NewButton("Header", nil), widget.NewButton("Covered", nil)
+	w := test.NewTempWindow(t, container.NewVBox(header, covered))
+	w.Resize(geo.NewSize(300, 300))
+	c := w.Canvas()
+	top := header.Position().Y + header.Size().Height + 1
+	require.Less(t, top, covered.Position().Y+covered.Size().Height/2, "precondition: the covered button lies below top")
+
+	inDrawer := widget.NewButton("In drawer", nil)
+	drawer := newBandOverlay(container.NewVBox(layout.NewSpacer(), inDrawer), top)
+	drawer.Resize(c.Size())
+	c.Overlays().Add(drawer)
+
+	var labels []string
+	for _, n := range accessibility.Flatten(accessibility.CanvasNodes(c, nil)) {
+		if n.Role == core.RoleButton {
+			labels = append(labels, n.Label)
+		}
+	}
+	assert.Equal(t, []string{"Header", "In drawer"}, labels)
 }
