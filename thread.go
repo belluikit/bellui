@@ -46,6 +46,12 @@ func RunOnMain(fn func()) {
 // This is required when a background process wishes to adjust graphical elements of a running app.
 // Developers should use this only from within goroutines they have created.
 //
+// On macOS 26 and later each call can wait several milliseconds for the main
+// loop to wake: AppKit delivers a wake posted from another thread late, on a
+// grid of about 7 ms (macOS 15 wakes in under half a millisecond). Back-to-back
+// calls from one goroutine then run at about 145 a second, so batch work into
+// one call rather than making many in a row. See #1033.
+//
 // Since: 1.0
 func DoAndWait(fn func()) {
 	CurrentApp().Driver().DoFromGoroutine(fn, true)
@@ -55,6 +61,9 @@ func DoAndWait(fn func()) {
 // This is required when a background process wishes to adjust graphical elements of a running app.
 // Developers should use this only from within goroutines they have created and when the result does not have to
 // be waited for.
+//
+// On macOS 26 and later the function can run several milliseconds after the
+// call; see [DoAndWait].
 //
 // Since: 1.0
 func Do(fn func()) {

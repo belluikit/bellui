@@ -349,3 +349,8 @@ description is in `cmd/bellui/README.md`, the code in
   android-35 `android.jar` given as `--lib`. It now takes the newest.
 - **Verify** with `hack/androidlibprobe` (androidx.core 1.3.2 closure; expects
   `androidlibprobe ok color=#ff9e9e9e overflow=999+ arrayset=2`).
+
+### macOS 26+: late wakes for `Do` / `DoAndWait` (#1033, accepted)
+On macOS 26 and later, a wake posted to the main thread from another thread reaches the main loop late, on a grid of about 7 ms: AppKit holds the event between accepting it and `nextEventMatchingMask:untilDate:` returning it. A `bellui.Do` lands anywhere from 0.35 to 7 ms after the call, and back-to-back `DoAndWait` calls from one goroutine run at about 145 a second. Plain GLFW with no bellui code shows the same delay, and four wake mechanisms all measured the same (GLFW's `PostEmptyEvent`, that plus `CFRunLoopWakeUp`, an NSEvent posted from `dispatch_async` on the main queue, and one from `CFRunLoopPerformBlock`). macOS 15 has no grid: post-to-wake p50 0.45 ms on a hosted M1 VM, against about 9 ms on macOS 26.6 on the same VM type and 3.3 ms on macOS 27 on an M3 Max.
+
+**Decision (owner, 2026-11-11): accept it and document it on `DoAndWait`.** Keeping the native wait short while posts arrive would cost idle CPU, which #470 removed. Apps batch work into one call instead of many in a row. Re-measure with the raw probe in #1033 when a macOS release might change it. If the grid is gone, the note on `DoAndWait` can go too.
