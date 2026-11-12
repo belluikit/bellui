@@ -1403,6 +1403,15 @@ func (p *Pipeline) awaitSeekAfterEnd(stop <-chan struct{}) bool {
 // display leaves that alone (#527), and the next decode after it is the frame
 // that follows the target, so resuming carries on from there.
 func (p *Pipeline) showPausedSeek(step time.Duration) {
+	// Seek posts its target after it asks for the frame, so the decoder can
+	// see the ask before the source has moved. Decoding then would take a
+	// frame from the old position, which the generation check below refuses,
+	// and the ask would be spent: nothing would show the target once it
+	// landed. Ask again, after the landing.
+	if p.srcGen.Load() != p.seekGen.Load() {
+		p.pausedSeek.Store(true)
+		return
+	}
 	p.framePending = false
 	// One video frame per Decode; a second try covers an empty frame pool.
 	for i := 0; i < 2 && !p.framePending && !p.src.HasEnded(); i++ {
