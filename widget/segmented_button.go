@@ -8,6 +8,7 @@ import (
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/cache"
 	internalWidget "github.com/belluikit/bellui/internal/widget"
 	"github.com/belluikit/bellui/theme"
 )
@@ -116,6 +117,7 @@ func (s *SegmentedButton) CreateRenderer() core.WidgetRenderer {
 
 type segmentWidget struct {
 	BaseWidget
+	pressTarget
 	text     string
 	selected bool
 	focused  bool
@@ -124,10 +126,40 @@ type segmentWidget struct {
 	onTap    func()
 }
 
-func (w *segmentWidget) Tapped(*event.PointEvent) {
+func (w *segmentWidget) Tapped(ev *event.PointEvent) {
 	if w.onTap != nil {
+		internalWidget.TapPress(&w.pressTarget, ev)
 		w.onTap()
 	}
+}
+
+// HoverIn does nothing: the segment is Hoverable for HoverOut.
+func (w *segmentWidget) HoverIn(*event.HoverEvent) {}
+
+// HoverMoved does nothing.
+func (w *segmentWidget) HoverMoved(*event.HoverEvent) {}
+
+// HoverOut ends a press the pointer took off the segment: it gets no MouseUp
+// for a release elsewhere.
+func (w *segmentWidget) HoverOut() {
+	internalWidget.CancelPress(&w.pressTarget)
+}
+
+// pressShape is the whole segment in the shape of its background, rounded on
+// the outer side only for an end segment (#1156), in its label's colour.
+func (w *segmentWidget) pressShape() (internalWidget.PressShape, bool) {
+	r, ok := cache.Renderer(w).(*segmentRenderer)
+	if w.onTap == nil || !ok {
+		return internalWidget.PressShape{}, false
+	}
+	return internalWidget.PressShape{
+		Size:                    w.Size(),
+		TopLeftCornerRadius:     r.bg.TopLeftCornerRadius,
+		TopRightCornerRadius:    r.bg.TopRightCornerRadius,
+		BottomRightCornerRadius: r.bg.BottomRightCornerRadius,
+		BottomLeftCornerRadius:  r.bg.BottomLeftCornerRadius,
+		Content:                 r.label.Color,
+	}, true
 }
 
 // AccessibleRole returns [core.RoleTab]; the parent SegmentedButton is the tab list.
@@ -169,7 +201,7 @@ func (w *segmentWidget) CreateRenderer() core.WidgetRenderer {
 	label.Alignment = bellui.TextAlignCenter
 
 	r := &segmentRenderer{
-		BaseRenderer: internalWidget.NewBaseRenderer([]core.CanvasObject{bg, label}),
+		BaseRenderer: internalWidget.NewBaseRenderer([]core.CanvasObject{bg, internalWidget.AttachPress(&w.pressTarget, w.pressShape), label}),
 		bg:           bg,
 		label:        label,
 		seg:          w,

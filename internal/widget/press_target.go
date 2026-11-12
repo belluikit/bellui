@@ -19,6 +19,12 @@ type PressShape struct {
 	Size geo.Size
 	// CornerRadius rounds the state layer; half the size makes a circle.
 	CornerRadius float32
+	// TopLeftCornerRadius and the three after it round one corner each in
+	// place of CornerRadius when not zero, for a part rounded on its outer
+	// side only: a segmented button's end segment, a half of a split button
+	// (#1156).
+	TopLeftCornerRadius, TopRightCornerRadius       float32
+	BottomRightCornerRadius, BottomLeftCornerRadius float32
 	// Content is the colour of the widget's text or icon. The state layer is
 	// that colour at the theme's pressed opacity.
 	Content color.Color
@@ -129,5 +135,8 @@ func (t *PressTarget) pressShape() (PressShape, bool) {
 }
 
 func (t *PressTarget) place(s PressShape) {
-	t.feedback.Ripple.Move(s.Pos)
+	r := t.feedback.Ripple
+	r.Move(s.Pos)
+	r.TopLeftCornerRadius, r.TopRightCornerRadius = s.TopLeftCornerRadius, s.TopRightCornerRadius
+	r.BottomRightCornerRadius, r.BottomLeftCornerRadius = s.BottomRightCornerRadius, s.BottomLeftCornerRadius
 }
