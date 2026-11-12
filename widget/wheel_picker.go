@@ -2,6 +2,7 @@ package widget
 
 import (
 	"math"
+	"sync"
 	"time"
 
 	"github.com/belluikit/bellui"
@@ -10,6 +11,7 @@ import (
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/cache"
+	"github.com/belluikit/bellui/internal/paintgen"
 	internalWidget "github.com/belluikit/bellui/internal/widget"
 	"github.com/belluikit/bellui/theme"
 )
@@ -64,7 +66,8 @@ type WheelPicker struct {
 	VisibleItems int
 	// ShrinkTo is the scale, between 0 and 1, of an item at the edge of the
 	// wheel; items between the centre and the edge scale in proportion. Zero
-	// means 0.7.
+	// means 0.7. An item keeps its size and is drawn scaled, so its texture
+	// is not rebuilt on every frame of a spin (#1183).
 	ShrinkTo float32
 	// FadeTo is the opacity, between 0 and 1, of an item at the edge of the
 	// wheel; items between the centre and the edge fade in proportion. Zero
@@ -475,15 +478,26 @@ func (r *wheelPickerRenderer) syncSlots() {
 	r.track.Objects = objs
 }
 
-// wheelSlot holds one item at an opacity. It covers the whole track and
-// leaves the item where layoutItems puts it.
+// wheelSlot holds one item at an opacity and a scale. It covers the whole
+// track and leaves the item where layoutItems puts it.
+//
+// The scale is a transform about the item's centre, not a smaller size: a
+// resized image is drawn again from its pixels, and an SVG rasterized again,
+// so shrinking the items by size rebuilt every visible item's texture on
+// every frame of a spin, about half a phone's CPU (#1183).
 type wheelSlot struct {
 	BaseWidget
 	item    core.CanvasObject
 	opacity float32
+
+	mu        sync.RWMutex // the transform is read by the painter
+	transform geo.Matrix
 }
 
-var _ core.OpacityGroup = (*wheelSlot)(nil)
+var (
+	_ core.OpacityGroup  = (*wheelSlot)(nil)
+	_ core.Transformable = (*wheelSlot)(nil)
+)
 
 func newWheelSlot(item core.CanvasObject) *wheelSlot {
 	s := &wheelSlot{item: item, opacity: 1}
@@ -492,6 +506,40 @@ func newWheelSlot(item core.CanvasObject) *wheelSlot {
 }
 
 func (s *wheelSlot) GroupOpacity() float32 { return s.opacity }
+
+// Transform returns the scale of the slot's item about its centre.
+func (s *wheelSlot) Transform() geo.Matrix {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.transform == (geo.Matrix{}) {
+		return geo.Identity()
+	}
+	return s.transform
+}
+
+// SetTransform sets the slot's transform; layoutItems sets it through scaleAbout.
+func (s *wheelSlot) SetTransform(m geo.Matrix) {
+	s.mu.Lock()
+	changed := s.transform != m
+	s.transform = m
+	s.mu.Unlock()
+	if changed {
+		paintgen.Changed()
+		internalWidget.Repaint(s)
+	}
+}
+
+// scaleAbout scales the slot's item by scale about the point (cx, cy) of the
+// track.
+func (s *wheelSlot) scaleAbout(scale, cx, cy float32) {
+	if scale == 1 {
+		s.SetTransform(geo.Identity())
+		return
+	}
+	s.SetTransform(geo.NewTranslation(cx, cy).
+		Multiply(geo.NewScale(scale, scale)).
+		Multiply(geo.NewTranslation(-cx, -cy)))
+}
 
 func (s *wheelSlot) CreateRenderer() core.WidgetRenderer {
 	return &wheelSlotRenderer{objects: []core.CanvasObject{s.item}}
@@ -569,15 +617,19 @@ func (r *wheelPickerRenderer) layoutItems() {
 		edge := geo.Min(1, abs32(d)/half)
 		holder.opacity = 1 - (1-fade)*edge
 		scale := 1 - (1-shrink)*edge
-		// The item keeps its own size, at most the slot's, scaled.
+		// The item keeps its own size, at most the slot's, and is drawn
+		// scaled about its centre.
 		ms := it.MinSize()
-		is := geo.NewSize(geo.Min(ms.Width, slot.Width)*scale, geo.Min(ms.Height, slot.Height)*scale)
+		is := geo.NewSize(geo.Min(ms.Width, slot.Width), geo.Min(ms.Height, slot.Height))
+		cx, cy := size.Width/2, size.Height/2
 		if w.vertical() {
-			it.Move(geo.NewPos((size.Width-is.Width)/2, size.Height/2+d*pitch-is.Height/2))
+			cy += d * pitch
 		} else {
-			it.Move(geo.NewPos(size.Width/2+d*pitch-is.Width/2, (size.Height-is.Height)/2))
+			cx += d * pitch
 		}
+		it.Move(geo.NewPos(cx-is.Width/2, cy-is.Height/2))
 		it.Resize(is)
+		holder.scaleAbout(scale, cx, cy)
 		it.Show()
 	}
 }

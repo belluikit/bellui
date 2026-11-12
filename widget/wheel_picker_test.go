@@ -1,6 +1,8 @@
 package widget
 
 import (
+	"image"
+	"image/color"
 	"strconv"
 	"testing"
 	"time"
@@ -8,10 +10,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/test"
+	"github.com/belluikit/bellui/theme"
 )
 
 // newWheelBench builds a wheel of n labelled items, five visible, in a
@@ -234,15 +238,50 @@ func TestWheelPicker_Shrinks(t *testing.T) {
 	wp.Refresh()
 
 	// A label is shorter than the 50 point pitch: it keeps its own height
-	// and is not stretched to the slot.
+	// and is not stretched to the slot. Every item keeps that size and is
+	// drawn scaled about its centre (#1183).
 	natural := wp.Items[2].MinSize()
 	require.Less(t, natural.Height, float32(50))
-	h := func(i int) float32 { return wp.Items[i].Size().Height }
-	assert.InDelta(t, natural.Height, h(2), 0.01, "the centred item at its own size")
-	assert.InDelta(t, natural.Height*0.8, h(1), 0.01, "one item out of 2.5: 0.8")
-	assert.InDelta(t, natural.Height*0.6, h(0), 0.01, "two out of 2.5: 0.6")
-	assert.InDelta(t, h(1), h(3), 0.01)
-	assert.InDelta(t, natural.Width*0.6, wp.Items[0].Size().Width, 0.01, "both sides scale alike")
+	r := test.TempWidgetRenderer(t, wp).(*wheelPickerRenderer)
+	scale := func(i int) float32 {
+		assert.Equal(t, natural, wp.Items[i].Size(), "item %d keeps its size", i)
+		m := r.slots[i].Transform()
+		mid := centre(wp.Items[i])
+		x, y := m.TransformPoint(mid.X, mid.Y)
+		assert.InDelta(t, mid.X, x, 0.01, "item %d scaled about its centre", i)
+		assert.InDelta(t, mid.Y, y, 0.01, "item %d scaled about its centre", i)
+		sx, sy := m.TransformVector(1, 1)
+		assert.InDelta(t, sx, sy, 1e-6, "both sides scale alike")
+		return sx
+	}
+	assert.InDelta(t, 1, scale(2), 1e-6, "the centred item at its own size")
+	assert.True(t, r.slots[2].Transform().IsIdentity())
+	assert.InDelta(t, 0.8, scale(1), 1e-6, "one item out of 2.5: 0.8")
+	assert.InDelta(t, 0.6, scale(0), 1e-6, "two out of 2.5: 0.6")
+	assert.InDelta(t, scale(1), scale(3), 1e-6)
+}
+
+// A spin moves the items and scales their slots, but never resizes them: a
+// resized image is drawn again from its pixels, and an SVG rasterized again,
+// on every frame of the spin (#1183).
+func TestWheelPicker_SpinKeepsItemSizes(t *testing.T) {
+	for _, o := range []Orientation{Vertical, Horizontal} {
+		wp, _, elapsed := newWheelBench(t, 7, o, false)
+		wp.SetSelectedSilently(3)
+		sizes := make([]geo.Size, len(wp.Items))
+		for i, it := range wp.Items {
+			sizes[i] = it.MinSize()
+		}
+		for range 6 {
+			drag(wp, elapsed, -13, 1)
+			for i, it := range wp.Items {
+				if it.Visible() {
+					assert.Equal(t, sizes[i], it.Size(), "item %d", i)
+				}
+			}
+		}
+		release(wp, elapsed)
+	}
 }
 
 // Items away from the centre fade, down to FadeTo at the edge; 1 turns the
@@ -311,4 +350,91 @@ func TestWheelPicker_SelectionBeforeItemsSurvivesARefresh(t *testing.T) {
 	wp.Items = wp.Items[:2]
 	wp.Refresh()
 	assert.Equal(t, 1, wp.Selected, "clamped to the items it has")
+}
+
+// The software painter, behind test images and headless capture, draws a
+// side item at its scale about its centre: the slot's transform reaches it as
+// it reaches the GPU painters (#1183).
+func TestWheelPicker_DrawsSideItemsScaled(t *testing.T) {
+	test.NewTempApp(t)
+	items := make([]core.CanvasObject, 5)
+	for i := range items {
+		r := canvas.NewRectangle(color.NRGBA{R: 255, A: 255})
+		r.SetMinSize(geo.NewSize(40, 40))
+		items[i] = r
+	}
+	wp := NewWheelPicker(items, nil)
+	wp.VisibleItems, wp.ShrinkTo, wp.FadeTo = 5, 0.5, 1
+	wp.SetSelectedSilently(2)
+	w := test.NewTempWindow(t, wp)
+	w.SetPadded(false)
+	w.Resize(geo.NewSize(100, 250))
+	img := w.Canvas().Capture()
+
+	// The red run along a row, and its middle.
+	red := func(y int) (width int, mid float32) {
+		first, last := -1, -1
+		for x := 0; x < img.Bounds().Dx(); x++ {
+			c := color.NRGBAModel.Convert(img.At(x, y)).(color.NRGBA)
+			if c.R > 200 && c.G < 80 && c.B < 80 {
+				if first < 0 {
+					first = x
+				}
+				last = x
+			}
+		}
+		if first < 0 {
+			return 0, 0
+		}
+		return last - first + 1, float32(first+last+1) / 2
+	}
+	width, mid := red(125)
+	assert.InDelta(t, 40, width, 1, "the centred item at its own size")
+	assert.InDelta(t, 50, mid, 1)
+	width, mid = red(25)
+	assert.InDelta(t, 24, width, 1, "two out of 2.5: 0.6 of 40")
+	assert.InDelta(t, 50, mid, 1, "scaled about its centre")
+	width, _ = red(25 - 13)
+	assert.Zero(t, width, "and 0.6 tall: nothing 13 points above its centre")
+	width, _ = red(25 - 11)
+	assert.NotZero(t, width, "but something 11 points above it")
+}
+
+// A spin of SVG items rasterizes none of them again: each keeps the raster
+// it was drawn with (#1183).
+func TestWheelPicker_SpinRasterizesNoSVG(t *testing.T) {
+	_, _, elapsed := newWheelBench(t, 1, Horizontal, false)
+	items := make([]core.CanvasObject, 7)
+	imgs := make([]*canvas.Image, 7)
+	for i := range items {
+		imgs[i] = canvas.NewImageFromResource(theme.HomeIcon())
+		imgs[i].SetMinSize(geo.NewSize(40, 40))
+		items[i] = imgs[i]
+	}
+	wp := NewWheelPicker(items, nil)
+	wp.Orientation, wp.VisibleItems = Horizontal, 5
+	wp.SetSelectedSilently(3)
+	w := test.NewTempWindow(t, wp)
+	w.SetPadded(false)
+	w.Resize(geo.NewSize(250, 100))
+	w.Canvas().(test.WindowlessCanvas).Capture()
+
+	rasters := make([]image.Image, len(imgs))
+	for i, img := range imgs {
+		rasters[i] = img.Image
+	}
+	redrawn := 0
+	for range 6 {
+		drag(wp, elapsed, -13, 1)
+		w.Canvas().(test.WindowlessCanvas).Capture()
+		for i, img := range imgs {
+			if rasters[i] != nil && img.Image != rasters[i] {
+				redrawn++
+				rasters[i] = img.Image
+			}
+		}
+	}
+	release(wp, elapsed)
+	assert.NotNil(t, rasters[3], "the centred item was rasterized")
+	assert.Zero(t, redrawn, "no SVG rasterized again during the spin")
 }
