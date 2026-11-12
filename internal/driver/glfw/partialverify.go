@@ -130,7 +130,7 @@ func (v *partialVerifier) afterFrame(w *window) {
 }
 
 // streamHashes appends to buf a hash of the pixels each streaming raster shown
-// on c draws. A video decoder writes them from its own goroutine, often more
+// on c draws, RGBA or Y'CbCr. A video decoder writes them from its own goroutine, often more
 // than once during a check, which takes three full captures: swapping between
 // two buffers can leave the same one in place with a new frame in it (#613).
 func streamHashes(c *glCanvas, buf []uint64) []uint64 {
@@ -141,6 +141,11 @@ func streamHashes(c *glCanvas, buf []uint64) []uint64 {
 				h.Reset()
 				r.StreamMu.Lock()
 				h.Write(r.StreamPix)
+				if yuv := r.StreamYCbCr; yuv != nil {
+					h.Write(yuv.Y)
+					h.Write(yuv.Cb)
+					h.Write(yuv.Cr)
+				}
 				r.StreamMu.Unlock()
 				buf = append(buf, h.Sum64())
 			}

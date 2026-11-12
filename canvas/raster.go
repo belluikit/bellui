@@ -8,6 +8,7 @@ import (
 
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/ycbcr"
 )
 
 // Declare conformity with CanvasObject interface
@@ -35,8 +36,9 @@ type Raster struct {
 	Streaming bool
 
 	// StreamMu protects the streaming pixel fields (StreamPix, StreamPixW,
-	// StreamPixH, StreamTexW, StreamTexH) from concurrent access between
-	// SetPixels (user goroutine) and the GL painter thread.
+	// StreamPixH, StreamTexW, StreamTexH, and the StreamYCbCr fields) from
+	// concurrent access between SetPixels or SetYCbCr (user goroutine) and the
+	// painter thread.
 	StreamMu sync.Mutex
 
 	// StreamPix holds raw premultiplied-RGBA pixel data set via SetPixels.
@@ -48,7 +50,33 @@ type Raster struct {
 	// StreamTexW and StreamTexH track the allocated GL texture dimensions.
 	// Managed by the painter to detect size changes.
 	StreamTexW, StreamTexH int
+
+	// StreamYCbCr holds a video frame set via SetYCbCr, with the colour
+	// matrix and range it was encoded with. Read by the painter; do not set
+	// directly — use SetYCbCr.
+	//
+	// Experimental: see SetYCbCr.
+	StreamYCbCr *image.YCbCr
+	// StreamMatrix is StreamYCbCr's colour matrix.
+	StreamMatrix YCbCrMatrix
+	// StreamFullRange is true when StreamYCbCr uses every byte value, and
+	// false for the limited ("TV") range most video uses.
+	StreamFullRange bool
 }
+
+// YCbCrMatrix is the colour matrix a Y'CbCr video frame was encoded with.
+//
+// Experimental: see [Raster.SetYCbCr].
+type YCbCrMatrix int
+
+const (
+	// YCbCrBT601 is the matrix of standard-definition video and of JPEG.
+	YCbCrBT601 YCbCrMatrix = ycbcr.BT601
+	// YCbCrBT709 is the matrix of high-definition video.
+	YCbCrBT709 YCbCrMatrix = ycbcr.BT709
+	// YCbCrBT2020 is the matrix of ultra-high-definition and HDR video.
+	YCbCrBT2020 YCbCrMatrix = ycbcr.BT2020
+)
 
 // Alpha is a convenience function that returns the alpha value for a raster
 // based on its Translucency value. The result is 1.0 - Translucency.
@@ -104,13 +132,41 @@ func (r *Raster) SetPixels(pix []byte, width, height int) {
 	r.StreamPix = pix
 	r.StreamPixW = width
 	r.StreamPixH = height
+	r.StreamYCbCr = nil
+	r.StreamMu.Unlock()
+	Refresh(r)
+}
+
+// SetYCbCr updates the raster's content with a video frame as it was decoded:
+// Y'CbCr planes, encoded with the given colour matrix and range. The GPU
+// painters upload the planes and convert them to RGB on the GPU: at 4:2:0 that
+// uploads 1.5 bytes a pixel instead of SetPixels' 4, and converts nothing on
+// the processor. The software painter converts in Go. Any subsample ratio
+// image.YCbCr has is drawn. It replaces anything set by SetPixels, and
+// automatically calls Refresh to trigger a repaint.
+//
+// The raster keeps img, not a copy: do not write to it until a later
+// SetYCbCr or SetPixels call has replaced it. A video surface alternates
+// between two frames for that reason.
+//
+// Experimental: added for x/mmedia's video playback (#1107), and its shape
+// follows what that needs; a dedicated video-frame type may replace it. The
+// stable alternative is SetPixels with RGBA converted on the processor.
+func (r *Raster) SetYCbCr(img *image.YCbCr, matrix YCbCrMatrix, fullRange bool) {
+	r.StreamMu.Lock()
+	r.StreamYCbCr = img
+	r.StreamMatrix = matrix
+	r.StreamFullRange = fullRange
+	r.StreamPix = nil
+	r.StreamPixW, r.StreamPixH = 0, 0
 	r.StreamMu.Unlock()
 	Refresh(r)
 }
 
 // PixelImage returns the raster's current content at the requested size: the
-// data supplied by [Raster.SetPixels] when there is any, otherwise the output
-// of Generator. It returns nil when the raster has neither, so painters can
+// data supplied by [Raster.SetPixels] or [Raster.SetYCbCr] when there is any
+// (a Y'CbCr frame converted to RGBA by its own colour matrix and range),
+// otherwise the output of Generator. It returns nil when the raster has neither, so painters can
 // skip an empty raster instead of dereferencing a nil Generator.
 //
 // The pixel data is copied, so the caller may keep the result after the next
@@ -124,6 +180,11 @@ func (r *Raster) PixelImage(w, h int) image.Image {
 	if pixW > 0 && pixH > 0 && len(pix) >= pixW*pixH*4 {
 		img := image.NewRGBA(image.Rect(0, 0, pixW, pixH))
 		copy(img.Pix, pix)
+		r.StreamMu.Unlock()
+		return img
+	}
+	if yuv := r.StreamYCbCr; yuv != nil && !yuv.Rect.Empty() {
+		img := ycbcr.ToRGBA(yuv, int(r.StreamMatrix), r.StreamFullRange)
 		r.StreamMu.Unlock()
 		return img
 	}

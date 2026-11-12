@@ -145,6 +145,9 @@ var descriptors = map[string]Descriptor{
 			{Location: 1, Format: Float32, Offset: 8},
 		},
 	}},
+	// yuv draws one triangle from the vertex index and binds three planes,
+	// not the texture+sampler pair: yuvPipeline builds it, not the cache.
+	"yuv": {Name: "yuv", DefaultBlend: BlendReplace, Topology: TriangleList},
 	"scene3d": {Name: "scene3d", DefaultBlend: BlendOver, Topology: TriangleList, Vertex: VertexLayout{
 		Stride: 40,
 		Attrs: []VertexAttr{

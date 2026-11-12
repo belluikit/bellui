@@ -222,6 +222,12 @@ type Device struct {
 	bglUniform, bglTextured *wgpu.BindGroupLayout
 	plUniform, plTextured   *wgpu.PipelineLayout
 
+	// The yuv shader's layouts and pipeline (yuv.go), built on the first
+	// Y'CbCr frame and released in Destroy.
+	bglYUV  *wgpu.BindGroupLayout
+	plYUV   *wgpu.PipelineLayout
+	yuvPipe *wgpu.RenderPipeline
+
 	// frameBuffers / frameBinds hold the transient per-draw GPU resources created
 	// by the overflow path (a frame larger than any before), released after the
 	// frame is submitted so the recorded draws keep using them until the GPU is done.
@@ -352,6 +358,9 @@ type Texture struct {
 	// in-place updates (streaming rasters, #34) can tell a same-size refresh
 	// from one that needs a fresh allocation.
 	w, h int
+	// yuv holds the planes a Y'CbCr frame is converted from, for a texture
+	// made by CreateYCbCrTexture (#1107); nil for every other texture.
+	yuv *yuvPlanes
 }
 
 // View returns the texture view for use as a DrawCall.TexView.
@@ -360,8 +369,13 @@ func (t *Texture) View() *wgpu.TextureView { return t.view }
 // Size reports the texture's allocated pixel dimensions.
 func (t *Texture) Size() (w, h int) { return t.w, t.h }
 
-// Release frees the texture and its view, including its GPU memory.
+// Release frees the texture and its view, including its GPU memory, and the
+// planes of a Y'CbCr texture.
 func (t *Texture) Release() {
+	if t.yuv != nil {
+		t.yuv.release()
+		t.yuv = nil
+	}
 	if t.view != nil {
 		t.view.Release()
 		t.view = nil
@@ -2411,6 +2425,7 @@ func (d *Device) Destroy() {
 		}
 	}
 	d.bglUniform, d.bglTextured = nil, nil
+	d.releaseYUVPipeline()
 	d.releaseDepthStencils()
 	if d.captureTex != nil {
 		destroyTexture(d.captureTex)
