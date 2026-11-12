@@ -158,6 +158,13 @@ func (s *OverlayStack) Top() core.CanvasObject {
 // layer beneath them keeps keyboard focus; nil is returned when no overlay
 // participates, letting the canvas fall back to its menu/content manager.
 func (s *OverlayStack) TopFocusManager() *app.FocusManager {
+	_, mgr := s.TopFocus()
+	return mgr
+}
+
+// TopFocus returns the overlay that owns the keyboard and its focus manager,
+// as TopFocusManager does, or nils when no overlay does.
+func (s *OverlayStack) TopFocus() (core.CanvasObject, *app.FocusManager) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for i := len(s.focusManagers) - 1; i >= 0; i-- {
@@ -169,7 +176,7 @@ func (s *OverlayStack) TopFocusManager() *app.FocusManager {
 		if oc, ok := s.overlays[i].(*widget.OverlayContainer); ok && oc.FocusTransparent {
 			continue
 		}
-		return s.focusManagers[i]
+		return s.overlays[i], s.focusManagers[i]
 	}
-	return nil
+	return nil, nil
 }
