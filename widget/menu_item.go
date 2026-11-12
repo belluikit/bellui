@@ -23,6 +23,7 @@ var (
 // menuItem is a widget for displaying a bellui.menuItem.
 type menuItem struct {
 	widget.Base
+	pressTarget
 	Item *bellui.MenuItem
 
 	alignment     bellui.TextAlign
@@ -93,7 +94,8 @@ func (i *menuItem) CreateRenderer() core.WidgetRenderer {
 	background.Hide()
 	text := canvas.NewText(i.Item.Label, th.Color(theme.ColorNameForeground, v))
 	text.Alignment = i.alignment
-	objects := []core.CanvasObject{background, text}
+	ripple := widget.AttachPress(&i.pressTarget, i.pressShape)
+	objects := []core.CanvasObject{background, ripple, text}
 	var expandIcon *canvas.Image
 	if i.Item.ChildMenu != nil {
 		expandIcon = canvas.NewImageFromResource(th.Icon(theme.IconNameMenuExpand))
@@ -143,6 +145,7 @@ func (i *menuItem) HoverMoved(*event.HoverEvent) {
 
 // HoverOut deactivates the item unless it has an open submenu.
 func (i *menuItem) HoverOut() {
+	widget.CancelPress(&i.pressTarget)
 	if !i.isSubmenuOpen() {
 		i.deactivate()
 	}
@@ -150,10 +153,11 @@ func (i *menuItem) HoverOut() {
 
 // Tapped performs the action of the item and dismisses the menu.
 // It does nothing if the item doesn’t have an action.
-func (i *menuItem) Tapped(*event.PointEvent) {
+func (i *menuItem) Tapped(ev *event.PointEvent) {
 	if i.Item.Disabled {
 		return
 	}
+	widget.TapPress(&i.pressTarget, ev)
 	if i.Item.Action == nil {
 		if bellui.CurrentDevice().IsMobile() {
 			i.activate()
@@ -169,6 +173,14 @@ func (i *menuItem) Tapped(*event.PointEvent) {
 	}
 
 	i.trigger()
+}
+
+// pressShape is the whole item, unless it is disabled.
+func (i *menuItem) pressShape() (widget.PressShape, bool) {
+	if i.Item.Disabled {
+		return widget.PressShape{}, false
+	}
+	return rowPressShape(i.parent.Theme(), i.Size()), true
 }
 
 func (i *menuItem) activate() {

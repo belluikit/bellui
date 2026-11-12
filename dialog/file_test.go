@@ -216,14 +216,14 @@ func TestShowFileOpen(t *testing.T) {
 	objects := test.TempWidgetRenderer(t, files).Objects()[0].(*container.Scroll).Content.(*bellui.Container).Objects
 	assert.NotEmpty(t, objects)
 
-	fileName := test.TempWidgetRenderer(t, objects[0].(core.Widget)).Objects()[1].(*fileDialogItem).name
+	fileName := test.TempWidgetRenderer(t, objects[0].(core.Widget)).Objects()[2].(*fileDialogItem).name
 	assert.Equal(t, lang.L("(Parent)"), fileName)
 	assert.True(t, open.Disabled())
 
 	var target *fileDialogItem
 	id := 0
 	for i, icon := range objects {
-		item := test.TempWidgetRenderer(t, icon.(core.Widget)).Objects()[1].(*fileDialogItem)
+		item := test.TempWidgetRenderer(t, icon.(core.Widget)).Objects()[2].(*fileDialogItem)
 		if item.dir == false {
 			target = item
 			id = i
@@ -272,7 +272,7 @@ func TestHiddenFiles(t *testing.T) {
 
 	var target *fileDialogItem
 	for _, icon := range objects {
-		item := test.TempWidgetRenderer(t, icon.(core.Widget)).Objects()[1].(*fileDialogItem)
+		item := test.TempWidgetRenderer(t, icon.(core.Widget)).Objects()[2].(*fileDialogItem)
 		if item.name == ".hidden" {
 			target = item
 		}
@@ -283,7 +283,7 @@ func TestHiddenFiles(t *testing.T) {
 	fd.refreshDir(fd.dir)
 
 	for _, icon := range objects {
-		item := test.TempWidgetRenderer(t, icon.(core.Widget)).Objects()[1].(*fileDialogItem)
+		item := test.TempWidgetRenderer(t, icon.(core.Widget)).Objects()[2].(*fileDialogItem)
 		if item.name == ".hidden" {
 			target = item
 		}
@@ -320,7 +320,7 @@ func TestSetShowHidden(t *testing.T) {
 
 		var target *fileDialogItem
 		for _, icon := range objects {
-			item := test.TempWidgetRenderer(t, icon.(core.Widget)).Objects()[1].(*fileDialogItem)
+			item := test.TempWidgetRenderer(t, icon.(core.Widget)).Objects()[2].(*fileDialogItem)
 			if item.name == ".hidden" {
 				target = item
 			}
@@ -345,7 +345,7 @@ func TestSetShowHidden(t *testing.T) {
 		// hidden files should not be visible initially
 		var target *fileDialogItem
 		for _, icon := range objects {
-			item := test.TempWidgetRenderer(t, icon.(core.Widget)).Objects()[1].(*fileDialogItem)
+			item := test.TempWidgetRenderer(t, icon.(core.Widget)).Objects()[2].(*fileDialogItem)
 			if item.name == ".hidden" {
 				target = item
 			}
@@ -357,7 +357,7 @@ func TestSetShowHidden(t *testing.T) {
 
 		target = nil
 		for _, icon := range objects {
-			item := test.TempWidgetRenderer(t, icon.(core.Widget)).Objects()[1].(*fileDialogItem)
+			item := test.TempWidgetRenderer(t, icon.(core.Widget)).Objects()[2].(*fileDialogItem)
 			if item.name == ".hidden" {
 				target = item
 			}
@@ -390,7 +390,7 @@ func TestShowFileSave(t *testing.T) {
 	objects := test.TempWidgetRenderer(t, files).Objects()[0].(*container.Scroll).Content.(*bellui.Container).Objects
 	assert.NotEmpty(t, objects)
 
-	item := test.TempWidgetRenderer(t, objects[0].(core.Widget)).Objects()[1].(*fileDialogItem)
+	item := test.TempWidgetRenderer(t, objects[0].(core.Widget)).Objects()[2].(*fileDialogItem)
 	assert.Equal(t, lang.L("(Parent)"), item.name)
 	assert.True(t, save.Disabled())
 
@@ -401,7 +401,7 @@ func TestShowFileSave(t *testing.T) {
 	var target *fileDialogItem
 	id := -1
 	for i, icon := range objects {
-		item := test.TempWidgetRenderer(t, icon.(core.Widget)).Objects()[1].(*fileDialogItem)
+		item := test.TempWidgetRenderer(t, icon.(core.Widget)).Objects()[2].(*fileDialogItem)
 		if item.dir == false {
 			target = item
 			id = i
@@ -528,7 +528,7 @@ func TestFileSort(t *testing.T) {
 	binPos := -1
 	capitalPos := -1
 	for i, icon := range objects {
-		item := test.TempWidgetRenderer(t, icon.(core.Widget)).Objects()[1].(*fileDialogItem)
+		item := test.TempWidgetRenderer(t, icon.(core.Widget)).Objects()[2].(*fileDialogItem)
 		switch item.name {
 		case "bin":
 			binPos = i
@@ -791,7 +791,7 @@ func TestTapParent_GoesUpOne(t *testing.T) {
 
 	items := test.WidgetRenderer(d.dialog.files)
 	item := items.Objects()[0].(*intWidget.Scroll).Content.(*bellui.Container).Objects[0]
-	parent := test.TempWidgetRenderer(t, item.(core.Widget)).Objects()[1].(*fileDialogItem)
+	parent := test.TempWidgetRenderer(t, item.(core.Widget)).Objects()[2].(*fileDialogItem)
 	test.Tap(parent)
 
 	assert.Equal(t, d.dialog.dir.String(), parentURI.String())

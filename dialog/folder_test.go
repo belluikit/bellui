@@ -52,7 +52,7 @@ func TestShowFolderOpen(t *testing.T) {
 	assert.NotEmpty(t, d.dialog.data)
 
 	item := test.TempWidgetRenderer(t, files).Objects()[0].(*container.Scroll).Content.(*bellui.Container).Objects[0]
-	fileName := test.TempWidgetRenderer(t, item.(core.Widget)).Objects()[1].(*fileDialogItem).name
+	fileName := test.TempWidgetRenderer(t, item.(core.Widget)).Objects()[2].(*fileDialogItem).name
 	assert.Equal(t, lang.L("(Parent)"), fileName)
 	assert.False(t, open.Disabled())
 

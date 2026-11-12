@@ -8,6 +8,8 @@ import (
 	"github.com/belluikit/bellui/data/model"
 	"github.com/belluikit/bellui/driver/desktop"
 	"github.com/belluikit/bellui/event"
+	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/widget"
 )
 
 // SortDirection is the order a column is sorted in by a [TableSorter].
@@ -234,6 +236,7 @@ func nextSortDirection(d SortDirection) SortDirection {
 // cell input, but nothing consumes header taps, so the arrow widget can).
 type tableSortHeader struct {
 	BaseWidget
+	pressTarget
 
 	label    *Label
 	onTapped func()
@@ -259,10 +262,33 @@ func (h *tableSortHeader) set(title string, dir SortDirection) {
 }
 
 // Tapped implements event.Tappable, forwarding to the column's sort handler.
-func (h *tableSortHeader) Tapped(*event.PointEvent) {
+func (h *tableSortHeader) Tapped(ev *event.PointEvent) {
 	if h.onTapped != nil {
+		widget.TapPress(&h.pressTarget, ev)
 		h.onTapped()
 	}
+}
+
+// HoverIn does nothing: the header is Hoverable for HoverOut.
+func (h *tableSortHeader) HoverIn(*event.HoverEvent) {}
+
+// HoverMoved does nothing.
+func (h *tableSortHeader) HoverMoved(*event.HoverEvent) {}
+
+// HoverOut ends a press the pointer took off the header: it gets no MouseUp
+// for a release elsewhere.
+func (h *tableSortHeader) HoverOut() {
+	widget.CancelPress(&h.pressTarget)
+}
+
+// pressShape is the whole header cell, square like it, while it sorts.
+func (h *tableSortHeader) pressShape() (widget.PressShape, bool) {
+	if h.onTapped == nil {
+		return widget.PressShape{}, false
+	}
+	s := rowPressShape(h.Theme(), h.Size())
+	s.CornerRadius = 0
+	return s, true
 }
 
 // Cursor shows a pointer over sortable headers as a click affordance.
@@ -275,5 +301,17 @@ func (h *tableSortHeader) Cursor() desktop.Cursor {
 
 func (h *tableSortHeader) CreateRenderer() core.WidgetRenderer {
 	h.ExtendBaseWidget(h)
-	return NewSimpleRenderer(h.label)
+	ripple := widget.AttachPress(&h.pressTarget, h.pressShape)
+	return &tableSortHeaderRenderer{BaseRenderer: widget.NewBaseRenderer([]core.CanvasObject{ripple, h.label}), h: h}
 }
+
+type tableSortHeaderRenderer struct {
+	widget.BaseRenderer
+	h *tableSortHeader
+}
+
+func (r *tableSortHeaderRenderer) Layout(size geo.Size) { r.h.label.Resize(size) }
+
+func (r *tableSortHeaderRenderer) MinSize() geo.Size { return r.h.label.MinSize() }
+
+func (r *tableSortHeaderRenderer) Refresh() { r.h.label.Refresh() }

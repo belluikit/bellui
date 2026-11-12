@@ -561,6 +561,7 @@ var (
 
 type listItem struct {
 	BaseWidget
+	pressTarget
 
 	onTapped          func()
 	background        *canvas.Rectangle
@@ -591,7 +592,8 @@ func (li *listItem) CreateRenderer() core.WidgetRenderer {
 	accent := canvas.NewRectangle(th.Color(theme.ColorNamePrimary, v))
 	accent.Hide()
 
-	objects := []core.CanvasObject{li.background, accent, li.child}
+	ripple := widget.AttachPress(&li.pressTarget, li.pressShape)
+	objects := []core.CanvasObject{li.background, accent, ripple, li.child}
 
 	return &listItemRenderer{BaseRenderer: widget.NewBaseRenderer(objects), item: li, accent: accent}
 }
@@ -615,16 +617,26 @@ func (li *listItem) HoverMoved(*event.HoverEvent) {
 // HoverOut is called when a desktop pointer exits the widget.
 func (li *listItem) HoverOut() {
 	li.hovered = false
+	widget.CancelPress(&li.pressTarget)
 	li.Refresh()
 }
 
 // Tapped is called when a pointer tapped event is captured and triggers any tap handler.
-func (li *listItem) Tapped(*event.PointEvent) {
+func (li *listItem) Tapped(ev *event.PointEvent) {
 	if li.onTapped != nil {
+		widget.TapPress(&li.pressTarget, ev)
 		li.selected = true
 		li.Refresh()
 		li.onTapped()
 	}
+}
+
+// pressShape is the whole row, while it has a tap handler.
+func (li *listItem) pressShape() (widget.PressShape, bool) {
+	if li.onTapped == nil {
+		return widget.PressShape{}, false
+	}
+	return rowPressShape(li.Theme(), li.Size()), true
 }
 
 // AccessibleRole returns [core.RoleListItem].
