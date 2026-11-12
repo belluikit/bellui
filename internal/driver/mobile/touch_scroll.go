@@ -67,17 +67,16 @@ func (c *canvas) dispatchTouchScroll(origin geo.Position, delta geo.Delta) bool 
 }
 
 // scrollablesAt returns every scrollable under pos, innermost first, from the
-// top overlay if it has one there and from the content otherwise, the way
-// FindObjectAtPositionMatching resolves taps.
+// overlays the way FindObjectAtPositionMatching resolves taps, and from the
+// content when no overlay holds one there and none stops the search: a modal
+// pop-up's scrim does not scroll what is beneath it (#1173).
 func (c *canvas) scrollablesAt(pos geo.Position) []intdriver.ObjectAtPosition {
 	isScrollable := func(object core.CanvasObject) bool {
 		_, ok := object.(event.Scrollable)
 		return ok
 	}
-	if overlay := c.Overlays().Top(); overlay != nil {
-		if found := intdriver.FindAllObjectsAtPositionMatching(pos, isScrollable, overlay); len(found) > 0 {
-			return found
-		}
+	if found, blocked := intdriver.FindAllInOverlaysAt(pos, isScrollable, c.Overlays().List()); len(found) > 0 || blocked {
+		return found
 	}
 	if c.menu != nil {
 		return intdriver.FindAllObjectsAtPositionMatching(pos, isScrollable, nil, c.menu)

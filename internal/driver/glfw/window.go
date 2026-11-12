@@ -1026,20 +1026,14 @@ func (w *window) scrollablesAt(pos geo.Position) []driver.ObjectAtPosition {
 		return ok
 	}
 
-	overlay := w.canvas.Overlays().Top()
+	// The overlays first, as taps are resolved: a modal one stops the scroll
+	// even where nothing in it scrolls, so its scrim does not scroll the
+	// content beneath (#1173).
+	if found, blocked := driver.FindAllInOverlaysAt(pos, isScrollable, w.canvas.Overlays().List()); len(found) > 0 || blocked {
+		return found
+	}
 	var scrollables []driver.ObjectAtPosition
-	if overlay != nil {
-		scrollables = driver.FindAllObjectsAtPositionMatching(pos, isScrollable, overlay)
-		// If no scrollable found in overlay, fall through to content beneath.
-		if len(scrollables) == 0 {
-			if idx := w.canvas.SpatialIndex(); idx != nil && !w.canvas.IsDirty() {
-				scrollables = idx.FindAllObjectsAtPositionMatching(pos, isScrollable)
-			} else {
-				scrollables = driver.FindAllObjectsAtPositionMatching(pos, isScrollable,
-					nil, w.canvas.menu, w.canvas.Content())
-			}
-		}
-	} else if idx := w.canvas.SpatialIndex(); idx != nil && !w.canvas.IsDirty() {
+	if idx := w.canvas.SpatialIndex(); idx != nil && !w.canvas.IsDirty() {
 		scrollables = idx.FindAllObjectsAtPositionMatching(pos, isScrollable)
 	} else {
 		scrollables = driver.FindAllObjectsAtPositionMatching(pos, isScrollable,
