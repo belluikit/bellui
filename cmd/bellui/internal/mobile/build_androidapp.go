@@ -188,37 +188,17 @@ func goAndroidBuild(pkg *packages.Package, bundleID string, androidArchs []strin
 	nmpkgs := make(map[string]map[string]bool) // map: arch -> extractPkgs' output
 
 	for _, arch := range androidArchs {
-		toolchain := ndk.Toolchain(arch)
-		libPath := "lib/" + toolchain.abi + "/lib" + libName + ".so"
-		libAbsPath := filepath.Join(tmpdir, libPath)
-		if err := mkdir(filepath.Dir(libAbsPath)); err != nil {
-			return nil, err
-		}
-		// If building release and no ldflags are set then remove the useless debug and DWARF build options
-		if release && buildLdflags == "" {
-			buildLdflags = "-w" // not -s: extractPkgs reads the symbols, and stripLibrary drops them after
-		}
-		err = goBuild(
-			pkg.PkgPath,
-			append(env, androidEnv[arch]...),
-			"-buildmode=c-shared",
-			"-o", libAbsPath,
-		)
+		files, pkgs, err := buildAndroidLib(pkg, arch, libName, env, ndkRoot, release)
 		if err != nil {
 			return nil, err
 		}
-		nmpkgs[arch], err = extractPkgs(toolchain.Path(ndkRoot, "nm"), libAbsPath)
-		if err != nil {
-			return nil, err
-		}
-		if release {
-			if err := stripLibrary(toolchain.Path(ndkRoot, "strip"), libAbsPath); err != nil {
-				return nil, err
-			}
-		}
-		libFiles = append(libFiles, libPath)
+		nmpkgs[arch] = pkgs
+		libFiles = append(libFiles, files...)
 	}
-	libFiles = append(libFiles, libs.nativeFiles...)
+	libFiles, err = withAARNativeFiles(libFiles, libs.nativeFiles)
+	if err != nil {
+		return nil, err
+	}
 
 	// Only a distribution build ("bellui release") produces the .aab store
 	// bundle; a --release package stays an installable .apk (#144).
@@ -506,6 +486,102 @@ func legacyAddAssets(apkw *Writer, manifestData []byte, iconPath string, target 
 		return err
 	}
 	return nil
+}
+
+// buildAndroidLib builds the app's library for one architecture, with the
+// shared libraries it loads from its Go modules beside it. It returns their
+// APK paths, the app's library last, and the packages extractPkgs found.
+func buildAndroidLib(pkg *packages.Package, arch, libName string, env []string, ndkRoot string, release bool) ([]string, map[string]bool, error) {
+	toolchain := ndk.Toolchain(arch)
+	libPath := "lib/" + toolchain.abi + "/lib" + libName + ".so"
+	libAbsPath := filepath.Join(tmpdir, libPath)
+	if err := mkdir(filepath.Dir(libAbsPath)); err != nil {
+		return nil, nil, err
+	}
+	// If building release and no ldflags are set then remove the useless debug and DWARF build options
+	if release && buildLdflags == "" {
+		buildLdflags = "-w" // not -s: extractPkgs reads the symbols, and stripLibrary drops them after
+	}
+	err := goBuild(
+		pkg.PkgPath,
+		append(env, androidEnv[arch]...),
+		"-buildmode=c-shared",
+		"-o", libAbsPath,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	pkgs, err := extractPkgs(toolchain.Path(ndkRoot, "nm"), libAbsPath)
+	if err != nil {
+		return nil, nil, err
+	}
+	files, err := bundleAndroidSharedLibs(libAbsPath, "lib/"+toolchain.abi)
+	if err != nil {
+		return nil, nil, err
+	}
+	if release {
+		if err := stripLibrary(toolchain.Path(ndkRoot, "strip"), libAbsPath); err != nil {
+			return nil, nil, err
+		}
+	}
+	return append(files, libPath), pkgs, nil
+}
+
+// withAARNativeFiles adds the native libraries of android/libs' AARs to the
+// APK's. Two zip entries of one name install whichever the reader keeps, so
+// one the app's Go modules also bundle is an error.
+func withAARNativeFiles(libFiles, native []string) ([]string, error) {
+	for _, f := range native {
+		if slices.Contains(libFiles, f) {
+			return nil, fmt.Errorf("android/libs: an AAR ships %s, which the app's Go modules also bundle", f)
+		}
+	}
+	return append(libFiles, native...), nil
+}
+
+// bundleAndroidSharedLibs copies the shared libraries the app's library lib
+// loads from its Go modules (goffmpeg's FFmpeg, #1122) into abiDir, the
+// lib/<abi> directory under tmpdir that lib sits in, and returns their APK
+// paths. Android loads an app library's dependencies from the same
+// directory, by the names it lists (DT_NEEDED). The libraries go in as they
+// are: they arrive linked for 16 KB pages, and the APK writer stores every
+// .so uncompressed on a 16 KB boundary like the app's own.
+func bundleAndroidSharedLibs(lib, abiDir string) ([]string, error) {
+	dirs, err := util.SharedLibDirs(lib)
+	if err != nil || len(dirs) == 0 {
+		return nil, err
+	}
+	return copyAndroidSharedLibs(lib, dirs, abiDir)
+}
+
+// copyAndroidSharedLibs copies what lib loads from dirs into abiDir under
+// tmpdir, for bundleAndroidSharedLibs.
+func copyAndroidSharedLibs(lib string, dirs []string, abiDir string) ([]string, error) {
+	found, err := util.SharedLibs(lib, dirs)
+	if err != nil {
+		return nil, err
+	}
+	if len(found) > 0 {
+		if err := mkdir(filepath.Join(tmpdir, abiDir)); err != nil {
+			return nil, err
+		}
+	}
+	var files, names []string
+	for _, l := range found {
+		dst := abiDir + "/" + l.Name
+		if buildX {
+			printcmd("cp %s %s", l.Path, filepath.Join("$WORK", dst))
+		}
+		if err := util.CopyExeFile(l.Path, filepath.Join(tmpdir, dst)); err != nil {
+			return nil, fmt.Errorf("copying %s: %w", l.Name, err)
+		}
+		files = append(files, dst)
+		names = append(names, l.Name)
+	}
+	if len(files) > 0 {
+		log.Printf("bundled %s in %s", strings.Join(names, ", "), abiDir)
+	}
+	return files, nil
 }
 
 // stripLibrary removes a built library's symbol tables, which are about an

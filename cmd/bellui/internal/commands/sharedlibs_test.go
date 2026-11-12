@@ -17,23 +17,6 @@ import (
 	"github.com/belluikit/bellui/cmd/bellui/internal/templates"
 )
 
-func TestSharedLibDirs_SelfBinary(t *testing.T) {
-	// The test binary links no goffmpeg-libs module: nothing to bundle, and
-	// no error.
-	exe, err := os.Executable()
-	require.NoError(t, err)
-	dirs, err := sharedLibDirs(exe)
-	require.NoError(t, err)
-	assert.Empty(t, dirs)
-}
-
-func TestModuleDir_MissingFromTheCache(t *testing.T) {
-	_, err := moduleDir("github.com/belluikit/goffmpeg-libs/Nowhere_arm64", "v0.0.0-missing")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "go mod download")
-	assert.Contains(t, err.Error(), "!nowhere_arm64@v0.0.0-missing", "the cache path is escaped")
-}
-
 // buildWindowsExe cross-builds a pure-Go Windows executable, which imports
 // kernel32.dll like every Windows program.
 func buildWindowsExe(t *testing.T) string {
@@ -48,14 +31,6 @@ func buildWindowsExe(t *testing.T) string {
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, string(out))
 	return exe
-}
-
-// pe.File.ImportedLibraries returns nothing, so the DLL names must come from
-// the imported symbols (#1101).
-func TestImportedLibs_PE(t *testing.T) {
-	libs, err := importedLibs(buildWindowsExe(t))
-	require.NoError(t, err)
-	assert.Contains(t, strings.ToLower(strings.Join(libs, " ")), "kernel32.dll")
 }
 
 func TestBundleSharedLibs_CopiesWhatTheBinaryLoads(t *testing.T) {

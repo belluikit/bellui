@@ -1,0 +1,6 @@
+details {
+  name = "mobileffmpegprobe"
+  id = "io.bellui.mobileffmpegprobe"
+  version = "1.0.0"
+  build = 1
+}

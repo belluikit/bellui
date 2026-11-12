@@ -48,14 +48,6 @@ func goIOSBuild(pkg *packages.Package, bundleID string, archs []string,
 		return nil, err
 	}
 
-	projPbxproj := new(bytes.Buffer)
-	projData := iosProjectData(bundleID, cert, profile, teamID, release)
-	projData.Entitlements = entitlements != nil
-	projData.Embeds = pbxEmbeds(embed)
-	if err := projPbxprojTmpl.Execute(projPbxproj, projData); err != nil {
-		return nil, err
-	}
-
 	infoData := iosInfoPlistData(bundleID, appName, version, build, len(allArchs["ios"]) > 2, usageDescriptions)
 	infoplistBytes, err := iosInfoPlist(appDir, infoData)
 	if err != nil {
@@ -68,7 +60,6 @@ func goIOSBuild(pkg *packages.Package, bundleID string, archs []string,
 	}
 
 	files := []projectFile{
-		{tmpdir + "/main.xcodeproj/project.pbxproj", projPbxproj.Bytes()},
 		{tmpdir + "/main/Info.plist", infoplistBytes},
 		{tmpdir + "/main/" + iosPrivacyManifest, privacyInfo},
 	}
@@ -94,6 +85,7 @@ func goIOSBuild(pkg *packages.Package, bundleID string, archs []string,
 		"-create",
 	)
 	var nmpkgs map[string]bool
+	var bins []string
 	for _, arch := range archs {
 		path := filepath.Join(tmpdir, arch)
 		cflags, ldflags := iosLinkFlags(perArch[arch])
@@ -113,6 +105,19 @@ func goIOSBuild(pkg *packages.Package, bundleID string, archs []string,
 			}
 		}
 		cmd.Args = append(cmd.Args, path)
+		bins = append(bins, path)
+	}
+
+	// The project is written after the build: what the binaries load from
+	// their Go modules is embedded too, and only the build tells.
+	embed, err = goModuleFrameworks(embed, bins)
+	if err != nil {
+		return nil, err
+	}
+	projData := iosProjectData(bundleID, cert, profile, teamID, release)
+	projData.Entitlements = entitlements != nil
+	if err := writeIOSProject(projData, embed); err != nil {
+		return nil, err
 	}
 
 	if err := dropUnlinkedSceneManifest(appDir, infoData, filepath.Join(tmpdir, archs[0])); err != nil {
@@ -243,9 +248,21 @@ func iosInfoPlist(appDir string, data infoplistTmplData) ([]byte, error) {
 	return mergeInfoPlist(buf.Bytes(), fragment, data)
 }
 
+// writeIOSProject writes the Xcode project, which embeds embed.
+func writeIOSProject(data projPbxprojTmplData, embed []iosFramework) error {
+	data.Embeds = pbxEmbeds(embed)
+	var buf bytes.Buffer
+	if err := projPbxprojTmpl.Execute(&buf, data); err != nil {
+		return err
+	}
+	return writeProjectFiles([]projectFile{{tmpdir + "/main.xcodeproj/project.pbxproj", buf.Bytes()}})
+}
+
 // copyIOSEmbeds puts the dynamic frameworks next to the Xcode project, whose
 // Embed Frameworks phase copies them into the app and signs them with the
-// app's identity.
+// app's identity. The copies are made writable: one from the module cache
+// (goffmpeg's) arrives read-only, and the work directory could not be removed
+// after.
 func copyIOSEmbeds(embed []iosFramework) error {
 	for _, f := range embed {
 		dst := filepath.Join(tmpdir, "main", iosFrameworksDir, filepath.Base(f.Path))
@@ -253,6 +270,9 @@ func copyIOSEmbeds(embed []iosFramework) error {
 			return err
 		}
 		if err := runCmd(exec.Command("cp", "-R", f.Path, dst)); err != nil {
+			return err
+		}
+		if err := runCmd(exec.Command("chmod", "-R", "u+w", dst)); err != nil {
 			return err
 		}
 	}
