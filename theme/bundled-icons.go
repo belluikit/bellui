@@ -462,6 +462,30 @@ var notificationsIconRes = &bellui.StaticResource{
 	StaticContent: notificationsIcon,
 }
 
+//go:embed icons/place.svg
+var placeIcon []byte
+
+var placeIconRes = &bellui.StaticResource{
+	StaticName:    "place.svg",
+	StaticContent: placeIcon,
+}
+
+//go:embed icons/people.svg
+var peopleIcon []byte
+
+var peopleIconRes = &bellui.StaticResource{
+	StaticName:    "people.svg",
+	StaticContent: peopleIcon,
+}
+
+//go:embed icons/child.svg
+var childIcon []byte
+
+var childIconRes = &bellui.StaticResource{
+	StaticName:    "child.svg",
+	StaticContent: childIcon,
+}
+
 //go:embed icons/history.svg
 var historyIcon []byte
 

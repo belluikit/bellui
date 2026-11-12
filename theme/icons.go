@@ -396,6 +396,21 @@ const (
 	// Since: 1.3
 	IconNameNotifications bellui.ThemeIconName = "notifications"
 
+	// IconNamePlace is the name of theme lookup for the icon of a place (map pin), for a destination about location.
+	//
+	// Since: 1.3
+	IconNamePlace bellui.ThemeIconName = "place"
+
+	// IconNamePeople is the name of theme lookup for the icon of people (a group), for a destination about friends or contacts.
+	//
+	// Since: 1.3
+	IconNamePeople bellui.ThemeIconName = "people"
+
+	// IconNameChild is the name of theme lookup for the icon of a child (a child's face), for a destination about children or kids.
+	//
+	// Since: 1.3
+	IconNameChild bellui.ThemeIconName = "child"
+
 	// IconNameHistory is the name of theme lookup for history icon.
 	//
 	// Since: 1.0
@@ -625,6 +640,9 @@ var icons = map[bellui.ThemeIconName]bellui.Resource{
 	IconNameBookmark:        NewThemedResource(bookmarkIconRes),
 	IconNameBookmarkBorder:  NewThemedResource(bookmarkborderIconRes),
 	IconNameNotifications:   NewThemedResource(notificationsIconRes),
+	IconNamePlace:           NewThemedResource(placeIconRes),
+	IconNamePeople:          NewThemedResource(peopleIconRes),
+	IconNameChild:           NewThemedResource(childIconRes),
 	IconNameHistory:         NewThemedResource(historyIconRes),
 	IconNameHome:            NewThemedResource(homeIconRes),
 	IconNameSettings:        NewThemedResource(settingsIconRes),
@@ -1199,6 +1217,27 @@ func BookmarkBorderIcon() bellui.Resource {
 // Since: 1.3
 func NotificationsIcon() bellui.Resource {
 	return safeIconLookup(IconNameNotifications)
+}
+
+// PlaceIcon returns a resource containing the standard icon of a place (map pin), for a destination about location, for the current theme
+//
+// Since: 1.3
+func PlaceIcon() bellui.Resource {
+	return safeIconLookup(IconNamePlace)
+}
+
+// PeopleIcon returns a resource containing the standard icon of people (a group), for a destination about friends or contacts, for the current theme
+//
+// Since: 1.3
+func PeopleIcon() bellui.Resource {
+	return safeIconLookup(IconNamePeople)
+}
+
+// ChildIcon returns a resource containing the standard icon of a child (a child's face), for a destination about children or kids, for the current theme
+//
+// Since: 1.3
+func ChildIcon() bellui.Resource {
+	return safeIconLookup(IconNameChild)
 }
 
 // HistoryIcon returns a resource containing the standard history icon for the current theme
