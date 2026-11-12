@@ -595,6 +595,7 @@ func ShowTimePicker(hour, minute int, use24h bool, changed func(hour, minute int
 // instead of picker-level coordinate math (pre-rebrand tracker #543).
 type timePickerButton struct {
 	BaseWidget
+	pressTarget
 	bg    *canvas.Rectangle
 	label *canvas.Text
 
@@ -619,15 +620,41 @@ func newTimePickerButton(role core.AccessibleRole, name string, onTap func()) *t
 func (b *timePickerButton) CreateRenderer() core.WidgetRenderer {
 	b.ExtendBaseWidget(b)
 	return &timePickerButtonRenderer{
-		BaseRenderer: internalWidget.NewBaseRenderer([]core.CanvasObject{b.bg, b.label}),
+		BaseRenderer: internalWidget.NewBaseRenderer([]core.CanvasObject{b.bg, internalWidget.AttachPress(&b.pressTarget, b.pressShape), b.label}),
 		btn:          b,
 	}
 }
 
-func (b *timePickerButton) Tapped(*event.PointEvent) {
+func (b *timePickerButton) Tapped(ev *event.PointEvent) {
 	if b.onTap != nil {
+		internalWidget.TapPress(&b.pressTarget, ev)
 		b.onTap()
 	}
+}
+
+// HoverIn does nothing: the button is Hoverable for HoverOut.
+func (b *timePickerButton) HoverIn(*event.HoverEvent) {}
+
+// HoverMoved does nothing.
+func (b *timePickerButton) HoverMoved(*event.HoverEvent) {}
+
+// HoverOut ends a press the pointer took off the button: it gets no MouseUp
+// for a release elsewhere.
+func (b *timePickerButton) HoverOut() {
+	internalWidget.CancelPress(&b.pressTarget)
+}
+
+// pressShape is the whole button, with its background's corners, in its
+// label's colour (#1091).
+func (b *timePickerButton) pressShape() (internalWidget.PressShape, bool) {
+	if b.onTap == nil {
+		return internalWidget.PressShape{}, false
+	}
+	return internalWidget.PressShape{
+		Size:         b.Size(),
+		CornerRadius: b.bg.CornerRadius,
+		Content:      b.label.Color,
+	}, true
 }
 
 // AccessibleRole returns the role given at construction: [core.RoleTab] for

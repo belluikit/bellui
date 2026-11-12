@@ -3,10 +3,13 @@ package widget
 import (
 	"testing"
 
-	"github.com/belluikit/bellui"
+	"github.com/belluikit/bellui/driver/mobile"
+	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/cache"
+	"github.com/belluikit/bellui/internal/widget"
 	"github.com/belluikit/bellui/test"
+	"github.com/belluikit/bellui/theme"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -36,37 +39,30 @@ func TestSelect_SetOptions(t *testing.T) {
 	assert.Equal(t, "20", sel.popUp.Items[0].(*menuItem).Item.Label)
 }
 
-func TestSelectRenderer_TapAnimation(t *testing.T) {
+// TestSelect_PressFeedback is #1091: a select shows its pressed state from the
+// press, over the whole field, where it used to run a ripple only after the
+// release. A renderer made again after the cache dropped the old one shows it
+// too.
+func TestSelect_PressFeedback(t *testing.T) {
 	test.NewTempApp(t)
-
-	test.ApplyTheme(t, test.NewTheme())
-	sel := NewSelect([]string{"one"}, func(s string) {})
-	w := test.NewWindow(sel)
-	defer w.Close()
-	w.Resize(sel.MinSize().Add(geo.NewSize(10, 10)))
-	sel.Resize(sel.MinSize())
-	sel.Refresh()
-
-	path := "select/desktop/tap_animation.png"
-	if bellui.CurrentDevice().IsMobile() {
-		path = "select/mobile/tap_animation.png"
+	sel := NewSelect([]string{"one"}, func(string) {})
+	sel.Resize(geo.NewSize(150, sel.MinSize().Height))
+	assertPressCycle(t, sel, &sel.pressTarget, sel.HoverOut)
+	assertRowShape(t, sel, &sel.pressTarget, test.Theme().Size(theme.SizeNameInputRadius))
+	assertTapFromCode(t, &sel.pressTarget, func() { sel.TypedKey(&event.KeyEvent{Name: event.KeySpace}) })
+	if sel.popUp != nil {
+		sel.popUp.Hide()
 	}
 
-	render1 := test.TempWidgetRenderer(t, sel).(*selectRenderer)
-	test.Tap(sel)
-	sel.popUp.Hide()
-	sel.tapAnim.Tick(0.5)
-	test.AssertImageMatches(t, path, w.Canvas().Capture())
-
+	render1 := cache.Renderer(sel)
 	cache.DestroyRenderer(sel)
 	sel.Refresh()
+	assert.NotSame(t, render1, cache.Renderer(sel))
+	sel.TouchDown(&mobile.TouchEvent{})
+	assert.True(t, widget.PressFeedbackOf(&sel.pressTarget).Pressed(), "the new renderer shows no press")
+	sel.TouchCancel(nil)
 
-	render2 := test.TempWidgetRenderer(t, sel).(*selectRenderer)
-
-	assert.NotEqual(t, render1, render2)
-
-	test.Tap(sel)
-	sel.popUp.Hide()
-	sel.tapAnim.Tick(0.5)
-	test.AssertImageMatches(t, path, w.Canvas().Capture())
+	sel.Disable()
+	sel.TouchDown(&mobile.TouchEvent{})
+	assert.False(t, widget.PressFeedbackOf(&sel.pressTarget).Pressed(), "a disabled select showed a press")
 }

@@ -679,23 +679,3 @@ func lightenColor(c color.Color, factor float64) color.Color {
 		A: uint8(a),
 	}
 }
-
-func newButtonTapAnimation(bg *canvas.Rectangle, w core.Widget, th bellui.Theme) *bellui.Animation {
-	v := bellui.CurrentApp().Settings().ThemeVariant()
-	return bellui.NewAnimation(canvas.DurationStandard, func(done float32) {
-		mid := w.Size().Width / 2
-		size := mid * done
-		bg.Resize(geo.NewSize(size*2, w.Size().Height))
-		bg.Move(geo.NewPos(mid-size, 0))
-
-		r, g, bb, a := col.ToNRGBA(th.Color(theme.ColorNamePressed, v))
-		aa := uint8(a)
-		fade := aa - uint8(float32(aa)*done)
-		if fade > 0 {
-			bg.FillColor = &color.NRGBA{R: uint8(r), G: uint8(g), B: uint8(bb), A: fade}
-		} else {
-			bg.FillColor = color.Transparent
-		}
-		canvas.Refresh(bg)
-	})
-}

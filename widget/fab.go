@@ -49,6 +49,7 @@ func (f *FAB) AccessibleActions() []core.AccessibleAction {
 // PerformAccessibleAction invokes the FAB's tap handler.
 func (f *FAB) PerformAccessibleAction(name string) {
 	if name == core.ActionPress && !f.Disabled() && f.OnTapped != nil {
+		internalWidget.TapPress(&f.pressTarget, nil)
 		f.OnTapped()
 	}
 }
@@ -57,6 +58,7 @@ func (f *FAB) PerformAccessibleAction(name string) {
 // Set Text for an Extended FAB (icon + label), leave empty for a standard FAB (icon only).
 type FAB struct {
 	DisableableWidget
+	pressTarget
 	Icon     bellui.Resource
 	Text     string // empty = regular FAB, non-empty = Extended FAB
 	Style    FABStyle
@@ -79,18 +81,51 @@ func NewExtendedFAB(text string, icon bellui.Resource, tapped func()) *FAB {
 	return f
 }
 
-func (f *FAB) Tapped(*event.PointEvent) {
+func (f *FAB) Tapped(ev *event.PointEvent) {
 	if f.Disabled() {
 		return
 	}
 	if f.OnTapped != nil {
+		internalWidget.TapPress(&f.pressTarget, ev)
 		f.OnTapped()
 	}
 }
 
 func (f *FAB) HoverIn(*event.HoverEvent)    { f.hovered = true; f.Refresh() }
 func (f *FAB) HoverMoved(*event.HoverEvent) {}
-func (f *FAB) HoverOut()                    { f.hovered = false; f.Refresh() }
+
+func (f *FAB) HoverOut() {
+	internalWidget.CancelPress(&f.pressTarget)
+	f.hovered = false
+	f.Refresh()
+}
+
+// pressShape is the whole FAB, in its icon's colour (#1091).
+func (f *FAB) pressShape() (internalWidget.PressShape, bool) {
+	if f.Disabled() || f.OnTapped == nil {
+		return internalWidget.PressShape{}, false
+	}
+	th := f.Theme()
+	return internalWidget.PressShape{
+		Size:         f.Size(),
+		CornerRadius: th.Size(theme.SizeNameShapeLarge),
+		Content:      th.Color(f.contentColorName(), bellui.CurrentApp().Settings().ThemeVariant()),
+	}, true
+}
+
+// contentColorName is the colour of the FAB's icon and label for its style.
+func (f *FAB) contentColorName() bellui.ThemeColorName {
+	switch f.Style {
+	case FABStyleSurface:
+		return theme.ColorNamePrimary
+	case FABStyleSecondary:
+		return theme.ColorNameOnSecondaryContainer
+	case FABStyleTertiary:
+		return theme.ColorNameOnTertiaryContainer
+	default:
+		return theme.ColorNameOnPrimaryContainer
+	}
+}
 
 func (f *FAB) MinSize() geo.Size {
 	f.ExtendBaseWidget(f)
@@ -103,7 +138,8 @@ func (f *FAB) CreateRenderer() core.WidgetRenderer {
 	icon := canvas.NewImageFromResource(f.Icon)
 	icon.FillMode = canvas.ImageFillContain
 
-	objects := []core.CanvasObject{bg, icon}
+	ripple := internalWidget.AttachPress(&f.pressTarget, f.pressShape)
+	objects := []core.CanvasObject{bg, ripple, icon}
 	var label *canvas.Text
 	if f.Text != "" {
 		th := f.Theme()
@@ -160,8 +196,13 @@ func (r *fabRenderer) Layout(size geo.Size) {
 			r.label.Resize(labelSize) // tight box so the RTL reflection lands correctly
 		}
 		// Under RTL the icon leads from the right and the label follows to its
-		// left; the full-width bg maps onto itself (#945).
-		mirrorIfRTL(r.Objects(), size.Width)
+		// left; the full-width bg maps onto itself (#945). The press ripple is
+		// left out: a press places it.
+		mirrored := []core.CanvasObject{r.bg, r.icon}
+		if r.label != nil {
+			mirrored = append(mirrored, r.label)
+		}
+		mirrorIfRTL(mirrored, size.Width)
 	} else {
 		// Standard: centered icon
 		r.icon.Resize(geo.NewSize(iconSize, iconSize))

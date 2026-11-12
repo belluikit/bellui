@@ -2,7 +2,6 @@
 	<content>
 		<widget pos="4,4" size="126x32" type="*widget.Select">
 			<rectangle fillColor="inputBackground" radius="4" size="126x32"/>
-			<rectangle size="126x32"/>
 			<widget pos="4,4" size="94x24" type="*widget.RichText">
 				<text pos="4,4" size="74x16">(Select one)</text>
 			</widget>

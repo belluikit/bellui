@@ -24,6 +24,7 @@ import (
 // "keycloak", and "custom".
 type AuthButton struct {
 	BaseWidget
+	pressTarget
 
 	// Provider is the provider key (e.g., "google", "microsoft").
 	Provider string
@@ -78,17 +79,46 @@ func NewAuthButton(provider, clientID string, onAuth func(auth.OIDCResult)) *Aut
 
 // Tapped triggers the authentication flow in a background goroutine.
 // If an authentication is already in progress, the tap is ignored.
-func (b *AuthButton) Tapped(_ *event.PointEvent) {
+func (b *AuthButton) Tapped(ev *event.PointEvent) {
 	b.mu.Lock()
 	if b.cancel != nil {
 		b.mu.Unlock()
 		return // already authenticating
 	}
+	internalWidget.TapPress(&b.pressTarget, ev)
 	ctx, cancel := context.WithCancel(context.Background())
 	b.cancel = cancel
 	b.mu.Unlock()
 
 	go b.authenticate(ctx)
+}
+
+// HoverIn does nothing: the button is Hoverable for HoverOut.
+func (b *AuthButton) HoverIn(*event.HoverEvent) {}
+
+// HoverMoved does nothing.
+func (b *AuthButton) HoverMoved(*event.HoverEvent) {}
+
+// HoverOut ends a press the pointer took off the button: it gets no MouseUp
+// for a release elsewhere.
+func (b *AuthButton) HoverOut() {
+	internalWidget.CancelPress(&b.pressTarget)
+}
+
+// pressShape is the whole button, in the provider's text colour, unless an
+// authentication is already running and a tap would do nothing (#1091).
+func (b *AuthButton) pressShape() (internalWidget.PressShape, bool) {
+	b.mu.Lock()
+	busy := b.cancel != nil
+	b.mu.Unlock()
+	if busy {
+		return internalWidget.PressShape{}, false
+	}
+	return internalWidget.PressShape{
+		Size:         b.Size(),
+		CornerRadius: 4, // the button's own corners
+		Content:      b.preset().TextColor,
+	}, true
 }
 
 // CancelAuth cancels any in-flight authentication flow.
@@ -208,7 +238,7 @@ func (b *AuthButton) CreateRenderer() core.WidgetRenderer {
 		logoImg.FillMode = canvas.ImageFillContain
 	}
 
-	objects := []core.CanvasObject{bg, label}
+	objects := []core.CanvasObject{bg, internalWidget.AttachPress(&b.pressTarget, b.pressShape), label}
 	if logoImg != nil {
 		objects = append(objects, logoImg)
 	}
@@ -258,8 +288,13 @@ func (r *authButtonRenderer) Layout(size geo.Size) {
 	r.label.Resize(labelSize) // tight box so the RTL reflection lands correctly
 
 	// Under RTL reflect the row so the logo sits on the right and the label on
-	// the left; the full-width bg maps onto itself.
-	mirrorIfRTL(r.Objects(), size.Width)
+	// the left; the full-width bg maps onto itself. The press ripple is left
+	// out: a press places it.
+	mirrored := []core.CanvasObject{r.bg, r.label}
+	if r.logoImg != nil {
+		mirrored = append(mirrored, r.logoImg)
+	}
+	mirrorIfRTL(mirrored, size.Width)
 }
 
 func (r *authButtonRenderer) Refresh() {
