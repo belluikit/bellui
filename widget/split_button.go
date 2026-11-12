@@ -6,8 +6,11 @@ import (
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
+	"github.com/belluikit/bellui/driver/desktop"
+	"github.com/belluikit/bellui/driver/mobile"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/cache"
 	internalWidget "github.com/belluikit/bellui/internal/widget"
 	"github.com/belluikit/bellui/theme"
 )
@@ -30,10 +33,11 @@ func (s *SplitButton) AccessibleActions() []core.AccessibleAction {
 	return []core.AccessibleAction{{Name: core.ActionPress, Description: "Activate the button"}}
 }
 
-// PerformAccessibleAction invokes the button's primary tap handler.
+// PerformAccessibleAction invokes the button's primary tap handler, as a tap
+// on its primary half does, pressed state included.
 func (s *SplitButton) PerformAccessibleAction(name string) {
-	if name == core.ActionPress && !s.Disabled() && s.OnTapped != nil {
-		s.OnTapped()
+	if name == core.ActionPress {
+		s.Tapped(nil)
 	}
 }
 
@@ -46,9 +50,14 @@ type SplitButton struct {
 	OnTapped  func() `json:"-"`
 	MenuItems []*bellui.MenuItem
 
-	hovered bool
-	popUp   *PopUpMenu
+	pressTarget
+	pressDrop bool // the press began on the dropdown half
+	hovered   bool
+	popUp     *PopUpMenu
 }
+
+// splitDropWidth is the width of the dropdown half, at the trailing end.
+const splitDropWidth = float32(36)
 
 // NewSplitButton creates a split button with a primary action and menu items.
 func NewSplitButton(text string, tapped func(), items []*bellui.MenuItem) *SplitButton {
@@ -61,13 +70,9 @@ func (s *SplitButton) Tapped(e *event.PointEvent) {
 	if s.Disabled() {
 		return
 	}
-	// Check if tap is on the dropdown area: the trailing end, which the
-	// layout mirrors to the left under RTL (#835).
-	dropWidth := float32(36)
-	onDrop := e != nil && e.Position.X > s.Size().Width-dropWidth
-	if e != nil && isRTLAt(s) {
-		onDrop = e.Position.X < dropWidth
-	}
+	onDrop := e != nil && s.onDropAt(e.Position)
+	s.pressDrop = onDrop
+	internalWidget.TapPress(&s.pressTarget, e)
 	if onDrop {
 		s.showMenu()
 		return
@@ -77,9 +82,63 @@ func (s *SplitButton) Tapped(e *event.PointEvent) {
 	}
 }
 
+// onDropAt reports whether pos is on the dropdown half: the trailing end,
+// which the layout mirrors to the left under RTL (#835).
+func (s *SplitButton) onDropAt(pos geo.Position) bool {
+	if isRTLAt(s) {
+		return pos.X < splitDropWidth
+	}
+	return pos.X > s.Size().Width-splitDropWidth
+}
+
+// MouseDown shows the pressed state on the half the button went down on.
+func (s *SplitButton) MouseDown(ev *desktop.MouseEvent) {
+	s.pressDrop = s.onDropAt(ev.Position)
+	s.pressTarget.MouseDown(ev)
+}
+
+// TouchDown shows the pressed state on the half the finger went down on.
+func (s *SplitButton) TouchDown(ev *mobile.TouchEvent) {
+	s.pressDrop = s.onDropAt(ev.Position)
+	s.pressTarget.TouchDown(ev)
+}
+
+// pressShape is the half the press began on, rounded on its outer side only
+// as MD3 gives each half its own state layer (#1156), in the label's colour.
+func (s *SplitButton) pressShape() (internalWidget.PressShape, bool) {
+	r, ok := cache.Renderer(s).(*splitButtonRenderer)
+	if s.Disabled() || !ok {
+		return internalWidget.PressShape{}, false
+	}
+	size, radius := s.Size(), r.bg.CornerRadius
+	shape := internalWidget.PressShape{
+		Size:    geo.NewSize(size.Width-splitDropWidth, size.Height),
+		Content: r.label.Color,
+	}
+	if s.pressDrop {
+		shape.Size.Width = splitDropWidth
+	}
+	// The half at the left edge is rounded on its left, the other on its right.
+	atLeft := s.pressDrop == isRTLAt(s)
+	if atLeft {
+		shape.TopLeftCornerRadius, shape.BottomLeftCornerRadius = radius, radius
+	} else {
+		shape.Pos.X = size.Width - shape.Size.Width
+		shape.TopRightCornerRadius, shape.BottomRightCornerRadius = radius, radius
+	}
+	return shape, true
+}
+
 func (s *SplitButton) HoverIn(*event.HoverEvent)    { s.hovered = true; s.Refresh() }
 func (s *SplitButton) HoverMoved(*event.HoverEvent) {}
-func (s *SplitButton) HoverOut()                    { s.hovered = false; s.Refresh() }
+
+// HoverOut also ends a press the pointer took off the button: it gets no
+// MouseUp for a release elsewhere.
+func (s *SplitButton) HoverOut() {
+	internalWidget.CancelPress(&s.pressTarget)
+	s.hovered = false
+	s.Refresh()
+}
 
 func (s *SplitButton) MinSize() geo.Size {
 	s.ExtendBaseWidget(s)
@@ -122,13 +181,17 @@ func (s *SplitButton) CreateRenderer() core.WidgetRenderer {
 	dropIcon := canvas.NewImageFromResource(theme.MenuDropDownIcon())
 	dropIcon.FillMode = canvas.ImageFillContain
 
-	objects := []core.CanvasObject{bg, label, divider, dropIcon}
+	// The ripple is not mirrored with the rest under RTL: pressShape places
+	// it on the half that was pressed, where it shows.
+	mirrored := []core.CanvasObject{bg, label, divider, dropIcon}
 	if icon != nil {
-		objects = append(objects, icon)
+		mirrored = append(mirrored, icon)
 	}
+	objects := append([]core.CanvasObject{bg, internalWidget.AttachPress(&s.pressTarget, s.pressShape)}, mirrored[1:]...)
 
 	r := &splitButtonRenderer{
 		BaseRenderer: internalWidget.NewBaseRenderer(objects),
+		mirrored:     mirrored,
 		bg:           bg,
 		divider:      divider,
 		label:        label,
@@ -148,6 +211,7 @@ type splitButtonRenderer struct {
 	icon     *canvas.Image
 	dropIcon *canvas.Image
 	btn      *SplitButton
+	mirrored []core.CanvasObject // the objects but the ripple
 }
 
 func (r *splitButtonRenderer) MinSize() geo.Size {
@@ -162,7 +226,7 @@ func (r *splitButtonRenderer) MinSize() geo.Size {
 func (r *splitButtonRenderer) Layout(size geo.Size) {
 	r.bg.Resize(size)
 
-	dropW := float32(36)
+	dropW := splitDropWidth
 	dividerX := size.Width - dropW
 	x := float32(16)
 
@@ -184,7 +248,7 @@ func (r *splitButtonRenderer) Layout(size geo.Size) {
 
 	// Under RTL reflect the row so the dropdown section moves to the leading
 	// (left) edge and the primary label/icon to the trailing (right) edge.
-	mirrorIfRTL(r.Objects(), size.Width)
+	mirrorIfRTL(r.mirrored, size.Width)
 }
 
 func (r *splitButtonRenderer) Refresh() {

@@ -426,9 +426,15 @@ func (p *painter) drawRipple(ripple *canvas.Ripple, pos geo.Position, frame geo.
 	col := p.fragColor(ripple.Color)
 	col[3] = p.effectiveAlpha(ripple.Opacity)
 
+	tr, br, tl, bl := paint.RippleCornerRadii(ripple, ripple.Size())
 	u := RippleUniforms{
-		FrameSize:    [2]float32{fw, fh},
-		Radius:       roundToPixel(ripple.CornerRadius*p.pixScale, 1.0),
+		FrameSize: [2]float32{fw, fh},
+		Radius: [4]float32{
+			roundToPixel(tr*p.pixScale, 1.0),
+			roundToPixel(br*p.pixScale, 1.0),
+			roundToPixel(tl*p.pixScale, 1.0),
+			roundToPixel(bl*p.pixScale, 1.0),
+		},
 		EdgeSoftness: roundToPixel(edgeSoftness*p.pixScale, 1.0),
 		RectCoords:   [4]float32{x1, x2, y1, y2},
 		RectSizeHalf: [2]float32{(x2 - x1) * 0.5, (y2 - y1) * 0.5},

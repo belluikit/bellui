@@ -181,13 +181,11 @@ func TestOffscreenRenderReadback(t *testing.T) {
 	}
 }
 
-// TestRippleRenderReadback drives the `ripple` shader + RippleUniforms +
-// premultiplied blend through an offscreen pass: a full-target rounded-rect clip
-// with the ripple centered and large enough to cover the center, so the center
-// pixel must be the (opaque red) ripple color while a far corner stays outside
-// the ripple radius and remains transparent. Proves the std140 RippleUniforms
-// layout, the SDF clip/ripple maths, and the Premul blend all agree end-to-end.
-func TestRippleRenderReadback(t *testing.T) {
+// rippleReadback draws u with the `ripple` shader, RippleUniforms and the
+// premultiplied blend into an offscreen 64×64 target, and returns its RGBA
+// bytes, top row first.
+func rippleReadback(t *testing.T, u RippleUniforms) []byte {
+	t.Helper()
 	const dim = 64
 	const bytesPerRow = dim * 4
 
@@ -265,19 +263,6 @@ func TestRippleRenderReadback(t *testing.T) {
 	}
 	defer vbuf.Release()
 
-	// Rect clip = whole target, ripple centered with radius covering the center
-	// but not the corners. Identity inv_transform.
-	u := RippleUniforms{
-		FrameSize:    [2]float32{dim, dim},
-		Radius:       0,
-		EdgeSoftness: 1,
-		RectCoords:   [4]float32{0, dim, 0, dim},
-		RectSizeHalf: [2]float32{dim / 2, dim / 2},
-		RippleCenter: [2]float32{dim / 2, dim / 2},
-		RippleRadius: dim / 2,
-		RippleColor:  [4]float32{1, 0, 0, 1},
-		InvTransform: Mat3ToStd140(geo.Identity().ToGL()),
-	}
 	ubuf, err := device.TryCreateBufferInit(&wgpu.BufferInitDescriptor{Contents: uniformBytes(&u), Usage: wgpu.BufferUsageUniform})
 	if err != nil {
 		t.Fatalf("uniform buffer: %v", err)
@@ -345,6 +330,31 @@ func TestRippleRenderReadback(t *testing.T) {
 	}
 	data := readBuf.GetMappedRange(0, uint(bytesPerRow*dim))
 	defer readBuf.Unmap()
+	return append([]byte(nil), data...)
+}
+
+// TestRippleRenderReadback drives the `ripple` shader + RippleUniforms +
+// premultiplied blend through an offscreen pass: a full-target rounded-rect clip
+// with the ripple centered and large enough to cover the center, so the center
+// pixel must be the (opaque red) ripple color while a far corner stays outside
+// the ripple radius and remains transparent. Proves the std140 RippleUniforms
+// layout, the SDF clip/ripple maths, and the Premul blend all agree end-to-end.
+func TestRippleRenderReadback(t *testing.T) {
+	const dim = 64
+	const bytesPerRow = dim * 4
+
+	// Rect clip = whole target, ripple centered with radius covering the center
+	// but not the corners. Identity inv_transform.
+	data := rippleReadback(t, RippleUniforms{
+		FrameSize:    [2]float32{dim, dim},
+		EdgeSoftness: 1,
+		RectCoords:   [4]float32{0, dim, 0, dim},
+		RectSizeHalf: [2]float32{dim / 2, dim / 2},
+		RippleCenter: [2]float32{dim / 2, dim / 2},
+		RippleRadius: dim / 2,
+		RippleColor:  [4]float32{1, 0, 0, 1},
+		InvTransform: Mat3ToStd140(geo.Identity().ToGL()),
+	})
 
 	// Center pixel is inside the ripple → opaque red.
 	cOff := (dim/2)*bytesPerRow + (dim/2)*4
@@ -354,6 +364,47 @@ func TestRippleRenderReadback(t *testing.T) {
 	// Top-left corner is outside the ripple radius → untouched (transparent).
 	if a := data[0+3]; a > 5 {
 		t.Fatalf("corner alpha = %d, want transparent (outside ripple radius)", a)
+	}
+}
+
+// TestRippleRenderReadbackPerCorner clips a ripple covering the whole target
+// to a shape rounded on its left side only, as a segmented button's first
+// segment is (#1156): the left corners stay clear, the right ones are filled.
+// The radii are in the shader's order, top-right, bottom-right, top-left,
+// bottom-left, so a swapped order fails here.
+func TestRippleRenderReadbackPerCorner(t *testing.T) {
+	const dim = 64
+	const bytesPerRow = dim * 4
+
+	data := rippleReadback(t, RippleUniforms{
+		FrameSize:    [2]float32{dim, dim},
+		EdgeSoftness: 1,
+		RectCoords:   [4]float32{0, dim, 0, dim},
+		RectSizeHalf: [2]float32{dim / 2, dim / 2},
+		Radius:       [4]float32{0, 0, dim / 2, dim / 2},
+		RippleCenter: [2]float32{dim / 2, dim / 2},
+		RippleRadius: dim * 2,
+		RippleColor:  [4]float32{1, 0, 0, 1},
+		InvTransform: Mat3ToStd140(geo.Identity().ToGL()),
+	})
+	alpha := func(x, y int) byte { return data[y*bytesPerRow+x*4+3] }
+	for _, c := range []struct {
+		name   string
+		x, y   int
+		filled bool
+	}{
+		{"top-left", 1, 1, false},
+		{"bottom-left", 1, dim - 2, false},
+		{"top-right", dim - 2, 1, true},
+		{"bottom-right", dim - 2, dim - 2, true},
+		{"left edge middle", 1, dim / 2, true},
+	} {
+		a := alpha(c.x, c.y)
+		if c.filled && a < 250 {
+			t.Errorf("%s alpha = %d, want the ripple there", c.name, a)
+		} else if !c.filled && a > 5 {
+			t.Errorf("%s alpha = %d, want it clipped away", c.name, a)
+		}
 	}
 }
 

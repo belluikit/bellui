@@ -92,13 +92,12 @@ type ArcUniforms struct {
 // RippleUniforms matches shaders/ripple.wgsl (size 128).
 type RippleUniforms struct {
 	FrameSize    [2]float32  // offset 0
-	Radius       float32     // offset 8
-	EdgeSoftness float32     // offset 12
+	EdgeSoftness float32     // offset 8
+	RippleRadius float32     // offset 12
 	RectCoords   [4]float32  // offset 16
 	RectSizeHalf [2]float32  // offset 32
 	RippleCenter [2]float32  // offset 40
-	RippleRadius float32     // offset 48
-	_            [3]float32  // pad before ripple_color (vec4 align 16)
+	Radius       [4]float32  // offset 48 (tr, br, tl, bl)
 	RippleColor  [4]float32  // offset 64
 	InvTransform [12]float32 // offset 80
 }
