@@ -322,6 +322,13 @@ description is in `cmd/bellui/README.md`, the code in
   and dexed with the app, which is why linking now runs before dexing.
 - **No AAR, no change.** Without an AAR the binres path is untouched; a test
   pins the manifest byte-identical with and without a jar.
+- **`tools:node="remove"` is the one merge directive read** (#1168). The app's
+  marked elements are cut out of its manifest text in `goAndroidBuild`, before
+  either resource path, because binres compiles the marker as an ordinary
+  element: before the fix an app that removed `AD_ID` declared it even with no
+  library. Their keys (element name + `android:name`, at the levels libraries
+  merge into) stop the library elements. A mark nested deeper is only cut, as
+  the app's own enclosing element already wins.
 - **App resources in `android/res/`** (#928) take the same aapt2 path as an
   AAR, as the last overlay (after the generated icon), so the app wins a
   clash. Whole `res/`, not only `res/xml/` (owner decision, 2026-11-03):

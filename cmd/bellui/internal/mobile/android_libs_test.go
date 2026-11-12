@@ -75,7 +75,7 @@ func TestMergeLibraryManifests(t *testing.T) {
 	require.Len(t, libs.aars, 1)
 	assert.Equal(t, "com.example.aar", libs.aars[0].pkg)
 
-	merged, err := mergeLibraryManifests([]byte(testAppManifest), libs)
+	merged, err := mergeLibraryManifests([]byte(testAppManifest), libs, nil)
 	require.NoError(t, err)
 	m := string(merged)
 
@@ -123,7 +123,7 @@ func TestMergeLibraryManifestsJoinsSharedComponents(t *testing.T) {
 	})
 	libs, err := collectAndroidLibs(dir, t.TempDir())
 	require.NoError(t, err)
-	merged, err := mergeLibraryManifests([]byte(testAppManifest), libs)
+	merged, err := mergeLibraryManifests([]byte(testAppManifest), libs, nil)
 	require.NoError(t, err)
 	m := string(merged)
 
@@ -159,7 +159,7 @@ func TestMergeLibraryManifestsQualifiesClassNames(t *testing.T) {
 	})
 	libs, err := collectAndroidLibs(dir, t.TempDir())
 	require.NoError(t, err)
-	merged, err := mergeLibraryManifests([]byte(testAppManifest), libs)
+	merged, err := mergeLibraryManifests([]byte(testAppManifest), libs, nil)
 	require.NoError(t, err)
 	m := string(merged)
 
@@ -173,7 +173,7 @@ func TestMergeLibraryManifestsQualifiesClassNames(t *testing.T) {
 }
 
 func TestMergeLibraryManifestsWithoutAARsIsIdentity(t *testing.T) {
-	merged, err := mergeLibraryManifests([]byte(testAppManifest), &androidLibs{jars: []string{"x.jar"}})
+	merged, err := mergeLibraryManifests([]byte(testAppManifest), &androidLibs{jars: []string{"x.jar"}}, nil)
 	require.NoError(t, err)
 	assert.Equal(t, testAppManifest, string(merged))
 }
@@ -358,7 +358,7 @@ func TestPackageAndroidLibs(t *testing.T) {
 	require.NoError(t, os.MkdirAll(filepath.Join(app, "assets"), 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(app, "assets", "shared.txt"), []byte("app version"), 0o644))
 
-	libs, err := prepareAndroidLibs(app, []byte(testAppManifest), []string{"arm64"}, "app", "", "", "", "", 35, 7, "1.2")
+	libs, err := prepareAndroidLibs(app, []byte(testAppManifest), nil, []string{"arm64"}, "app", "", "", "", "", 35, 7, "1.2")
 	require.NoError(t, err)
 	assert.Equal(t, []string{"lib/arm64-v8a/libgreet.so"}, libs.nativeFiles)
 	require.NotNil(t, libs.linked)
@@ -472,7 +472,7 @@ func TestPackageAndroidJarsOnlyKeepsBinresPath(t *testing.T) {
 	writeZip(t, filepath.Join(app, "android", "libs", "plain.jar"), javacJar(t, androidJar, nil, map[string]string{
 		"com/example/plain/Plain.java": `package com.example.plain; public class Plain {}`,
 	}, ""))
-	libs, err := prepareAndroidLibs(app, []byte(testAppManifest), []string{"arm64"}, "app", "", "", "", "", 35, 1, "1")
+	libs, err := prepareAndroidLibs(app, []byte(testAppManifest), nil, []string{"arm64"}, "app", "", "", "", "", 35, 1, "1")
 	require.NoError(t, err)
 	assert.Nil(t, libs.linked)
 	assert.Empty(t, libs.nativeFiles)
@@ -531,7 +531,7 @@ func TestDryRunSkipsLibraryTools(t *testing.T) {
 	})
 	require.NoError(t, os.WriteFile(filepath.Join(app, "android", "Shim.java"), []byte("class Shim {}"), 0o644))
 
-	libs, err := prepareAndroidLibs(app, []byte(testAppManifest), []string{"arm64"}, "app", "", "", "", "", 35, 7, "1.2")
+	libs, err := prepareAndroidLibs(app, []byte(testAppManifest), nil, []string{"arm64"}, "app", "", "", "", "", 35, 7, "1.2")
 	require.NoError(t, err)
 	assert.Empty(t, libs.nativeFiles)
 	assert.Nil(t, libs.linked)
@@ -640,7 +640,7 @@ func TestPackageAndroidAppRes(t *testing.T) {
 	aapt2 := filepath.Join(buildTools, util.BuildToolFile("aapt2"))
 	pkg := func() (string, string, map[string]*zip.File) {
 		tmpdir = spacedDir(t)
-		libs, err := prepareAndroidLibs(app, []byte(manifest), []string{"arm64"}, "app", "", "", "", "", 35, 1, "1")
+		libs, err := prepareAndroidLibs(app, []byte(manifest), nil, []string{"arm64"}, "app", "", "", "", "", 35, 1, "1")
 		require.NoError(t, err)
 		require.NotNil(t, libs.linked, "android/res switches resources to aapt2")
 

@@ -115,9 +115,16 @@ Limits:
   qualified with the library's package. An entry whose `android:name` the app
   already declares is left out (the app wins). One that two libraries declare
   (such as androidx.startup's `InitializationProvider`) is kept once, with the
-  children of both. `tools:*` attributes and merge directives are dropped, and a library's `<application>` attributes (such as
-  `appComponentFactory`) are not merged. Put anything else in your own
-  `AndroidManifest.xml`.
+  children of both. One merge directive is read: an element in your own
+  `AndroidManifest.xml` marked `tools:node="remove"` keeps every library's
+  element of that name and `android:name` out, and is itself left out of the
+  APK. For example, an app that bundles the ads SDK but does not ask for
+  tracking removes the advertising ID permission:
+  `<uses-permission android:name="com.google.android.gms.permission.AD_ID" tools:node="remove" />`
+  (with `xmlns:tools="http://schemas.android.com/tools"` on `<manifest>`).
+  Other `tools:*` attributes and directives are dropped, and a library's
+  `<application>` attributes (such as `appComponentFactory`) are not merged.
+  Put anything else in your own `AndroidManifest.xml`.
 - An AAR with native libraries for some ABIs but not for one being built
   fails the build. Build only the targets it supports (`-target
   android/arm64`).

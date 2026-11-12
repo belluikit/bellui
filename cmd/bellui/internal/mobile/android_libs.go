@@ -372,10 +372,12 @@ func (e *manifestElem) mergeChildren(other *manifestElem) {
 // declares is skipped, so the app's own entry wins; one that two libraries
 // declare is kept once, with the children of both (androidx.startup's
 // InitializationProvider carries one meta-data per initializer, from each
-// library that has one). tools:* attributes are dropped: there are no merge
+// library that has one). An element whose key is in removed, which the app
+// marked tools:node="remove" (see withoutRemovedElements), is not merged at
+// all. Other tools:* attributes are dropped: there are no other merge
 // directives, and <application> attributes from libraries (e.g.
 // appComponentFactory) are not merged.
-func mergeLibraryManifests(appManifest []byte, libs *androidLibs) ([]byte, error) {
+func mergeLibraryManifests(appManifest []byte, libs *androidLibs, removed map[string]bool) ([]byte, error) {
 	if !libs.hasAARs() {
 		return appManifest, nil
 	}
@@ -409,7 +411,7 @@ func mergeLibraryManifests(appManifest []byte, libs *androidLibs) ([]byte, error
 				k := e.key()
 				switch {
 				case k == "":
-				case fromApp[k]:
+				case fromApp[k], removed[k]:
 					continue
 				case fromLibs[k] != nil:
 					fromLibs[k].mergeChildren(e)
@@ -446,6 +448,95 @@ func mergeLibraryManifests(appManifest []byte, libs *androidLibs) ([]byte, error
 		out = out[:i] + join(top) + "\n" + out[i:]
 	}
 	return []byte(out), nil
+}
+
+// withoutRemovedElements returns the app manifest without the elements it
+// marks tools:node="remove", and the keys (manifestElem.key) of those that sit
+// where a library's elements are merged: under <manifest> or <application>.
+// Gradle's manifest merger reads the mark the same way: the library's element
+// of that name is left out, and the marker itself is not part of the app
+// (#1168). An app that removes a permission an SDK declares, such as the
+// advertising ID, needs it. A marked element nested deeper is only dropped,
+// since the app's own enclosing element already wins over a library's.
+//
+// The rest of the manifest is kept as written, byte for byte.
+func withoutRemovedElements(manifest []byte) ([]byte, map[string]bool, error) {
+	appPkg, err := manifestPackage(manifest)
+	if err != nil {
+		return nil, nil, err
+	}
+	dec := xml.NewDecoder(bytes.NewReader(manifest))
+	var path []string
+	var cuts [][2]int
+	var removed map[string]bool
+	for {
+		start := int(dec.InputOffset())
+		tok, err := dec.Token()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, nil, err
+		}
+		switch t := tok.(type) {
+		case xml.StartElement:
+			if !markedRemove(t) {
+				path = append(path, t.Name.Local)
+				continue
+			}
+			if depth := len(path); depth == 1 || (depth == 2 && path[1] == "application") {
+				if k := newManifestElem(t, appPkg, appPkg).key(); k != "" {
+					if removed == nil {
+						removed = map[string]bool{}
+					}
+					removed[k] = true
+				}
+			}
+			if err := dec.Skip(); err != nil {
+				return nil, nil, err
+			}
+			cuts = append(cuts, lineSpan(manifest, start, int(dec.InputOffset())))
+		case xml.EndElement:
+			path = path[:len(path)-1]
+		}
+	}
+	if len(cuts) == 0 {
+		return manifest, nil, nil
+	}
+	var out []byte
+	at := 0
+	for _, c := range cuts {
+		out = append(out, manifest[at:c[0]]...)
+		at = c[1]
+	}
+	return append(out, manifest[at:]...), removed, nil
+}
+
+// markedRemove reports whether se carries tools:node="remove".
+func markedRemove(se xml.StartElement) bool {
+	for _, a := range se.Attr {
+		if a.Name.Space == toolsNS && a.Name.Local == "node" {
+			return a.Value == "remove"
+		}
+	}
+	return false
+}
+
+// lineSpan widens the byte span [start, end) of an element to its whole line
+// when nothing else is on it, so removing it leaves no blank line.
+func lineSpan(b []byte, start, end int) [2]int {
+	s := start
+	for s > 0 && (b[s-1] == ' ' || b[s-1] == '\t') {
+		s--
+	}
+	e := end
+	for e < len(b) && (b[e] == ' ' || b[e] == '\t' || b[e] == '\r') {
+		e++
+	}
+	if (s == 0 || b[s-1] == '\n') && e < len(b) && b[e] == '\n' {
+		return [2]int{s, e + 1}
+	}
+	return [2]int{start, end}
 }
 
 var liftedTopLevel = map[string]bool{
@@ -826,7 +917,10 @@ func (p *preparedLibs) rJava() []string {
 // sources), and the native libraries' placement. Without an AAR or
 // android/res the resource path is left untouched, so an app with no
 // libraries (or only jars) packages exactly as before.
-func prepareAndroidLibs(dir string, manifest []byte, archs []string, libName, iconPath, iconFG, iconBG, iconMono string,
+//
+// removed holds the keys of the elements the app manifest marked
+// tools:node="remove" (withoutRemovedElements); no library brings them back.
+func prepareAndroidLibs(dir string, manifest []byte, removed map[string]bool, archs []string, libName, iconPath, iconFG, iconBG, iconMono string,
 	target, build int, version string,
 ) (*preparedLibs, error) {
 	if buildN {
@@ -869,7 +963,7 @@ func prepareAndroidLibs(dir string, manifest []byte, archs []string, libName, ic
 	}
 	sort.Strings(p.nativeFiles)
 
-	merged, err := mergeLibraryManifests(manifest, libs)
+	merged, err := mergeLibraryManifests(manifest, libs, removed)
 	if err != nil {
 		return nil, err
 	}
