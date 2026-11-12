@@ -99,7 +99,7 @@ func TestMobileCanvas_MenuChild(t *testing.T) {
 	rootOverlay := c.Overlays().Top()
 	parentItem := rootOverlay.(*internalWidget.OverlayContainer).Content.(*widget.PopUpMenu).Items[0]
 	parentDetails := test.WidgetRenderer(parentItem.(core.Widget))
-	text := parentDetails.Objects()[1].(*belluicanvas.Text)
+	text := parentDetails.Objects()[2].(*belluicanvas.Text)
 	assert.Equal(t, "Parent", text.Text)
 
 	test.Tap(parentItem.(event.Tappable))
@@ -111,7 +111,7 @@ func TestMobileCanvas_MenuChild(t *testing.T) {
 	assert.Equal(t, 1, len(childMenu.Items))
 
 	childDetails := test.WidgetRenderer(childMenu.Items[0].(core.Widget))
-	text = childDetails.Objects()[1].(*belluicanvas.Text)
+	text = childDetails.Objects()[2].(*belluicanvas.Text)
 	assert.Equal(t, "One", text.Text)
 }
 
