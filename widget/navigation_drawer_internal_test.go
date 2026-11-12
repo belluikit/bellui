@@ -8,10 +8,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/belluikit/bellui"
+	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/cache"
 	internalWidget "github.com/belluikit/bellui/internal/widget"
+	"github.com/belluikit/bellui/layout"
 	"github.com/belluikit/bellui/test"
 	"github.com/belluikit/bellui/theme"
 )
@@ -169,4 +172,178 @@ func TestNavigationDrawer_KeepsDestinationsInsideInsets(t *testing.T) {
 	assert.Equal(t, plainBottom-c.bottom, bottom, "last destination scrolls clear of the home indicator")
 	assert.Equal(t, plainSurfaceY, d.popUp.Content.Position().Y,
 		"the drawer surface still starts at the top edge")
+}
+
+// edgeCanvas reports a notch on either side, as a phone in landscape does.
+type edgeCanvas struct {
+	core.Canvas
+	left, right float32
+}
+
+func (c edgeCanvas) InteractiveArea() (geo.Position, geo.Size) {
+	return geo.NewPos(c.left, 0), c.Size().SubtractWidthHeight(c.left+c.right, 0)
+}
+
+// drawerSurface is the drawer's surface on the canvas: its background, which
+// runs to the edges the content's insets keep the destinations clear of.
+func drawerSurface(t *testing.T, d *NavigationDrawer) (pos geo.Position, size geo.Size) {
+	t.Helper()
+	switch r := cache.Renderer(d.popUp).(type) {
+	case *modalPopUpRenderer:
+		return r.background.Position(), r.background.Size()
+	case *popUpRenderer:
+		return r.background.Position(), r.background.Size()
+	}
+	t.Fatalf("unexpected drawer renderer %T", cache.Renderer(d.popUp))
+	return
+}
+
+func drawerScrim(t *testing.T, d *NavigationDrawer) *canvas.Rectangle {
+	t.Helper()
+	r, ok := cache.Renderer(d.popUp).(*modalPopUpRenderer)
+	require.True(t, ok, "a modal drawer has a scrim")
+	return r.underlay
+}
+
+// A drawer with neither Side nor Top set is the drawer from before #1171: at
+// the left edge, full height, its scrim over the whole canvas, and a tap on
+// the scrim anywhere closes it.
+func TestNavigationDrawer_DefaultsUnchanged(t *testing.T) {
+	test.NewTempApp(t)
+	items := []*NavigationDrawerItem{{Label: "Home", Icon: theme.HomeIcon()}}
+	header := NewButton("header", nil)
+	w := test.NewTempWindow(t, &bellui.Container{Layout: layout.NewVBoxLayout(), Objects: []core.CanvasObject{header}})
+	w.Resize(geo.NewSize(800, 600))
+	c := w.Canvas()
+
+	d := NewNavigationDrawer(items, nil)
+	d.Show(c)
+	pos, size := drawerSurface(t, d)
+	assert.Equal(t, geo.NewPos(0, 0), pos)
+	assert.Equal(t, c.Size().Height, size.Height)
+	scrim := drawerScrim(t, d)
+	assert.Equal(t, geo.NewPos(0, 0), scrim.Position())
+	assert.Equal(t, c.Size(), scrim.Size())
+
+	// Over the header, outside the drawer: the scrim takes the tap.
+	tapped := false
+	header.OnTapped = func() { tapped = true }
+	at := bellui.CurrentApp().Driver().AbsolutePositionForObject(header)
+	require.Greater(t, at.X+header.Size().Width, size.Width, "the header reaches past the drawer")
+	test.TapCanvas(c, geo.NewPos(at.X+header.Size().Width-2, at.Y+2))
+	assert.False(t, tapped, "the scrim covers the header")
+	assert.False(t, d.IsOpen(), "a tap on the scrim closes the drawer")
+}
+
+// An end drawer sits against the end edge: the right in a left-to-right
+// layout, the left in a right-to-left one, where a start drawer moves to the
+// right. The notch on its own side moves with it.
+func TestNavigationDrawer_Side(t *testing.T) {
+	test.NewTempApp(t)
+	items := []*NavigationDrawerItem{{Label: "Home", Icon: theme.HomeIcon()}}
+	w := test.NewTempWindow(t, NewLabel("content"))
+	w.Resize(geo.NewSize(800, 400))
+	c := edgeCanvas{Canvas: w.Canvas(), left: 30, right: 40}
+	width := c.Size().Width
+
+	for _, tc := range []struct {
+		name  string
+		dir   bellui.Direction
+		side  DrawerSide
+		right bool
+	}{
+		{"start ltr", bellui.DirectionLTR, DrawerSideStart, false},
+		{"end ltr", bellui.DirectionLTR, DrawerSideEnd, true},
+		{"start rtl", bellui.DirectionRTL, DrawerSideStart, true},
+		{"end rtl", bellui.DirectionRTL, DrawerSideEnd, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			bellui.SetLayoutDirection(tc.dir)
+			t.Cleanup(func() { bellui.SetLayoutDirection(bellui.DirectionAuto) })
+
+			d := NewNavigationDrawer(items, nil)
+			d.Side = tc.side
+			d.Show(c)
+			defer d.Hide()
+
+			pos, size := drawerSurface(t, d)
+			_, rowLeft, _ := drawerRowsAbs(t, d)
+			rowRight := rowLeft + drawerRows(t, d)[0].Size().Width
+			if tc.right {
+				assert.Equal(t, width, pos.X+size.Width, "against the right edge")
+				assert.Equal(t, 360+c.right, size.Width, "the surface spans the right notch")
+				assert.LessOrEqual(t, rowRight, width-c.right, "the destination clears the right notch")
+				assert.Less(t, rowLeft-pos.X, c.left, "and no left notch is kept clear")
+			} else {
+				assert.Equal(t, float32(0), pos.X, "against the left edge")
+				assert.Equal(t, 360+c.left, size.Width, "the surface spans the left notch")
+				assert.GreaterOrEqual(t, rowLeft, c.left, "the destination clears the left notch")
+			}
+		})
+	}
+}
+
+// With Top set, the drawer and its scrim start there. A tap above Top reaches
+// the header button and leaves the drawer open; a tap on the scrim below
+// closes it.
+func TestNavigationDrawer_Top(t *testing.T) {
+	test.NewTempApp(t)
+	items := []*NavigationDrawerItem{{Label: "Home", Icon: theme.HomeIcon()}}
+	tapped := 0
+	header := NewButton("header", func() { tapped++ })
+	w := test.NewTempWindow(t, &bellui.Container{Layout: layout.NewVBoxLayout(), Objects: []core.CanvasObject{header}})
+	w.Resize(geo.NewSize(800, 600))
+	c := w.Canvas()
+	at := bellui.CurrentApp().Driver().AbsolutePositionForObject(header)
+	top := at.Y + header.Size().Height
+
+	d := NewNavigationDrawer(items, nil)
+	d.Side = DrawerSideEnd
+	d.Top = top
+	d.Show(c)
+
+	pos, size := drawerSurface(t, d)
+	assert.Equal(t, top, pos.Y, "the drawer starts at Top")
+	assert.Equal(t, c.Size().Height-top, size.Height, "and runs to the bottom")
+	scrim := drawerScrim(t, d)
+	assert.Equal(t, geo.NewPos(0, top), scrim.Position(), "the scrim starts at Top")
+	assert.Equal(t, geo.NewSize(c.Size().Width, c.Size().Height-top), scrim.Size())
+
+	// Above Top, over the drawer's column too: the header gets the tap.
+	test.TapCanvas(c, geo.NewPos(c.Size().Width-20, at.Y+header.Size().Height/2))
+	test.TapCanvas(c, geo.NewPos(20, at.Y+header.Size().Height/2))
+	assert.Equal(t, 2, tapped, "taps above Top reach the header")
+	assert.True(t, d.IsOpen(), "and leave the drawer open")
+
+	// Below Top, outside the drawer: the scrim closes it.
+	test.TapCanvas(c, geo.NewPos(20, top+20))
+	assert.Equal(t, 2, tapped)
+	assert.False(t, d.IsOpen(), "a tap on the scrim closes the drawer")
+}
+
+// Top past the status bar leaves the status-bar inset out of the drawer: its
+// destinations start at Top, not a status bar's height below it.
+func TestNavigationDrawer_TopPastStatusBar(t *testing.T) {
+	test.NewTempApp(t)
+	items := []*NavigationDrawerItem{{Label: "Home", Icon: theme.HomeIcon()}}
+	w := test.NewTempWindow(t, NewLabel("content"))
+	w.Resize(geo.NewSize(400, 600))
+
+	plain := NewNavigationDrawer(items, nil)
+	plain.Show(insetCanvas{Canvas: w.Canvas()})
+	plainTop, _, _ := drawerRowsAbs(t, plain)
+	plain.Hide()
+
+	c := insetCanvas{Canvas: w.Canvas(), top: 48}
+	d := NewNavigationDrawer(items, nil)
+	d.Top = 100
+	d.Show(c)
+	defer d.Hide()
+	rowTop, _, _ := drawerRowsAbs(t, d)
+	assert.Equal(t, plainTop+100, rowTop)
+
+	d.Top = 20 // under the status bar: the rest of the bar still applies
+	d.Show(c)
+	rowTop, _, _ = drawerRowsAbs(t, d)
+	assert.Equal(t, plainTop+48, rowTop)
 }

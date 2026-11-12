@@ -145,7 +145,7 @@ Full Material Design 3 component coverage (36 components):
 **Navigation:**
 - `widget.NavigationBar` — Bottom nav (3-5 items). `NewNavigationBar(items, changed)`. 80dp height, SecondaryContainer indicator.
 - `widget.NavigationRail` — Side nav (3-7 items). `NewNavigationRail(items, changed)`. 80dp width, optional labels.
-- `widget.NavigationDrawer` — Slide-out side panel. `NewNavigationDrawer(items, changed)`. 360dp width, modal/standard, supports dividers.
+- `widget.NavigationDrawer` — Slide-out side panel. `NewNavigationDrawer(items, changed)`. 360dp width, modal/standard, supports dividers. `Side` opens it against the start edge (default) or the end edge, by layout direction. `Top` starts the drawer and its scrim at a canvas y and leaves the strip above to the app: there the pop-up reports `PassesInputThroughAt`, and the driver hit tests skip it, so a header button gets the tap and the drawer stays open (#1171). That strip is reachable by pointer and touch only: keyboard focus and the screen-reader walk still treat the drawer as the top modal (#1172).
 - `widget.TopAppBar` — Header bar. `NewTopAppBar(title, navIcon, navAction)`. 64dp, navigation icon + action icons.
 - `widget.BottomAppBar` — Bottom toolbar. `NewBottomAppBar(actions, fab)`. 80dp, action icons + optional FAB.
 

@@ -240,7 +240,7 @@ func FindObjectAtPositionMatching(mouse geo.Position, matches func(object core.C
 	// modal even with a toast stacked above it).
 	for i := len(overlays) - 1; i >= 0; i-- {
 		overlay := overlays[i]
-		if overlay == nil {
+		if overlay == nil || overlayAbsentAt(overlay, mouse) {
 			continue
 		}
 		wtStack = wtStack[:1] // reset stack between walks
@@ -319,6 +319,20 @@ func overlayPassesInput(overlay core.CanvasObject) bool {
 	return ok && pt.PassesInputThrough()
 }
 
+// InputPassThroughAt is implemented by overlay roots that leave part of the
+// canvas to the content beneath them: a drawer that opens below a header
+// (#1171). Where it reports true for a canvas position, hit-testing skips the
+// overlay as if it were not there; elsewhere the overlay is what it otherwise
+// is, a modal one a barrier.
+type InputPassThroughAt interface {
+	PassesInputThroughAt(pos geo.Position) bool
+}
+
+func overlayAbsentAt(overlay core.CanvasObject, pos geo.Position) bool {
+	pt, ok := overlay.(InputPassThroughAt)
+	return ok && pt.PassesInputThroughAt(pos)
+}
+
 // matchesHitTarget applies the caller's match predicate, excluding
 // input-pass-through surfaces themselves: a transient overlay root (Toast or
 // Snackbar's PopUp, a tooltip) may satisfy predicates like Tappable while
@@ -344,6 +358,9 @@ type ObjectAtPosition struct {
 // to handle the event, and if it doesn't consume it, the next parent scrollable tries.
 func FindAllObjectsAtPositionMatching(mouse geo.Position, matches func(object core.CanvasObject) bool, overlay core.CanvasObject, roots ...core.CanvasObject) []ObjectAtPosition {
 	var results []ObjectAtPosition
+	if overlay != nil && overlayAbsentAt(overlay, mouse) {
+		overlay = nil
+	}
 
 	wtStack := []geo.Matrix{geo.Identity()}
 	var cutStack []bool // as in FindObjectAtPositionMatching
