@@ -26,6 +26,7 @@ var (
 // Switch is an MD3-style toggle switch with a sliding thumb.
 type Switch struct {
 	DisableableWidget
+	pressTarget
 	On        bool
 	OnChanged func(bool) `json:"-"`
 
@@ -71,10 +72,11 @@ func (s *Switch) PerformAccessibleAction(name string) {
 }
 
 // Tapped toggles the switch state.
-func (s *Switch) Tapped(*event.PointEvent) {
+func (s *Switch) Tapped(ev *event.PointEvent) {
 	if s.Disabled() {
 		return
 	}
+	internalWidget.TapPress(&s.pressTarget, ev)
 	s.On = !s.On
 	if s.OnChanged != nil {
 		s.OnChanged(s.On)
@@ -96,7 +98,21 @@ func (s *Switch) Tapped(*event.PointEvent) {
 
 func (s *Switch) HoverIn(*event.HoverEvent)    { s.hovered = true; s.Refresh() }
 func (s *Switch) HoverMoved(*event.HoverEvent) {}
-func (s *Switch) HoverOut()                    { s.hovered = false; s.Refresh() }
+func (s *Switch) HoverOut() {
+	internalWidget.CancelPress(&s.pressTarget)
+	s.hovered = false
+	s.Refresh()
+}
+
+// pressShape is the circle around the thumb, where its focus halo shows,
+// unless the switch is disabled (#1091).
+func (s *Switch) pressShape() (internalWidget.PressShape, bool) {
+	r, ok := cache.Renderer(s.super()).(*switchRenderer)
+	if !ok || s.Disabled() {
+		return internalWidget.PressShape{}, false
+	}
+	return controlPressShape(s.Theme(), r.focusIndicator, s.On), true
+}
 
 // FocusGained is called when the Switch is given keyboard focus.
 func (s *Switch) FocusGained() { s.focused = true; s.Refresh() }
@@ -135,7 +151,7 @@ func (s *Switch) CreateRenderer() core.WidgetRenderer {
 
 	r := &switchRenderer{
 		// focus indicator sits behind the thumb so its halo reads as a ring.
-		BaseRenderer:   internalWidget.NewBaseRenderer([]core.CanvasObject{track, focus, thumb}),
+		BaseRenderer:   internalWidget.NewBaseRenderer([]core.CanvasObject{track, focus, internalWidget.AttachPress(&s.pressTarget, s.pressShape), thumb}),
 		track:          track,
 		focusIndicator: focus,
 		thumb:          thumb,

@@ -9,7 +9,9 @@ import (
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
 	internalapp "github.com/belluikit/bellui/internal/app"
+	"github.com/belluikit/bellui/internal/cache"
 	internaltheme "github.com/belluikit/bellui/internal/theme"
+	"github.com/belluikit/bellui/internal/widget"
 	"github.com/belluikit/bellui/lang"
 	"github.com/belluikit/bellui/layout"
 	"github.com/belluikit/bellui/theme"
@@ -263,6 +265,7 @@ func (r *themeSelectorRenderer) Destroy() {
 // themeSwatch is a single tappable primary color dot with a selected ring.
 type themeSwatch struct {
 	BaseWidget
+	pressTarget
 	name  string
 	owner *ThemeSelector
 }
@@ -279,8 +282,30 @@ func (s *themeSwatch) AccessibleRole() core.AccessibleRole { return core.RoleBut
 func (s *themeSwatch) AccessibleLabel() string { return s.name }
 
 // Tapped makes this swatch's color the selected primary color.
-func (s *themeSwatch) Tapped(_ *event.PointEvent) {
+func (s *themeSwatch) Tapped(ev *event.PointEvent) {
+	widget.TapPress(&s.pressTarget, ev)
 	s.owner.setPrimary(s.name)
+}
+
+// HoverIn does nothing: the swatch is Hoverable for HoverOut.
+func (s *themeSwatch) HoverIn(*event.HoverEvent) {}
+
+// HoverMoved does nothing.
+func (s *themeSwatch) HoverMoved(*event.HoverEvent) {}
+
+// HoverOut ends a press the pointer took off the swatch: it gets no MouseUp
+// for a release elsewhere.
+func (s *themeSwatch) HoverOut() {
+	widget.CancelPress(&s.pressTarget)
+}
+
+// pressShape is the circle of the swatch's selection ring (#1091).
+func (s *themeSwatch) pressShape() (widget.PressShape, bool) {
+	r, ok := cache.Renderer(s).(*themeSwatchRenderer)
+	if !ok {
+		return widget.PressShape{}, false
+	}
+	return controlPressShape(s.Theme(), r.ring, false), true
 }
 
 // CreateRenderer returns a new renderer for the swatch.
@@ -288,7 +313,7 @@ func (s *themeSwatch) CreateRenderer() core.WidgetRenderer {
 	dot := &canvas.Circle{}
 	ring := &canvas.Circle{FillColor: color.Transparent, StrokeWidth: 2}
 
-	r := &themeSwatchRenderer{swatch: s, dot: dot, ring: ring}
+	r := &themeSwatchRenderer{swatch: s, dot: dot, ring: ring, ripple: widget.AttachPress(&s.pressTarget, s.pressShape)}
 	r.Refresh()
 	return r
 }
@@ -296,6 +321,7 @@ func (s *themeSwatch) CreateRenderer() core.WidgetRenderer {
 type themeSwatchRenderer struct {
 	swatch    *themeSwatch
 	dot, ring *canvas.Circle
+	ripple    *canvas.Ripple
 }
 
 func (r *themeSwatchRenderer) MinSize() geo.Size {
@@ -320,7 +346,7 @@ func (r *themeSwatchRenderer) Layout(size geo.Size) {
 }
 
 func (r *themeSwatchRenderer) Objects() []core.CanvasObject {
-	return []core.CanvasObject{r.ring, r.dot}
+	return []core.CanvasObject{r.ripple, r.ring, r.dot}
 }
 
 func (r *themeSwatchRenderer) Refresh() {

@@ -9,6 +9,7 @@ import (
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/driver/desktop"
+	"github.com/belluikit/bellui/driver/mobile"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
 	intWidget "github.com/belluikit/bellui/internal/widget"
@@ -482,7 +483,57 @@ func (b *borderButton) CreateRenderer() core.WidgetRenderer {
 // inside the touch target but outside the visual land here (#254). Tapped is
 // a no-op for disabled buttons — widget.Button guards that itself.
 func (b *borderButton) Tapped(ev *event.PointEvent) {
+	if ev != nil {
+		inner := *ev
+		inner.Position = b.toButton(ev.Position)
+		ev = &inner
+	}
 	b.b.Tapped(ev)
+}
+
+// The ring passes presses on to the button too, so its pressed state shows
+// from the press like a press on the button itself (#1091).
+
+// TouchDown shows the button's pressed state for a touch on the ring.
+func (b *borderButton) TouchDown(ev *mobile.TouchEvent) {
+	inner := *ev
+	inner.Position = b.toButton(ev.Position)
+	b.b.TouchDown(&inner)
+}
+
+// TouchUp ends the button's pressed state.
+func (b *borderButton) TouchUp(ev *mobile.TouchEvent) { b.b.TouchUp(ev) }
+
+// TouchCancel ends the button's pressed state with no feedback left.
+func (b *borderButton) TouchCancel(ev *mobile.TouchEvent) { b.b.TouchCancel(ev) }
+
+// MouseDown shows the button's pressed state for a press on the ring.
+func (b *borderButton) MouseDown(ev *desktop.MouseEvent) {
+	inner := *ev
+	inner.Position = b.toButton(ev.Position)
+	b.b.MouseDown(&inner)
+}
+
+// MouseUp ends the button's pressed state.
+func (b *borderButton) MouseUp(ev *desktop.MouseEvent) { b.b.MouseUp(ev) }
+
+// HoverIn does nothing: the ring is Hoverable for HoverOut.
+func (b *borderButton) HoverIn(*event.HoverEvent) {}
+
+// HoverMoved does nothing.
+func (b *borderButton) HoverMoved(*event.HoverEvent) {}
+
+// HoverOut ends a press the pointer took off the ring.
+func (b *borderButton) HoverOut() { b.b.HoverOut() }
+
+// toButton maps pos, in the ring's coordinates, to the button's: the ring
+// is padding around it on mobile and nothing on desktop.
+func (b *borderButton) toButton(pos geo.Position) geo.Position {
+	if !bellui.CurrentDevice().IsMobile() {
+		return pos
+	}
+	pad := b.Theme().Size(theme.SizeNamePadding)
+	return pos.SubtractXY(pad, pad)
 }
 
 func (b *borderButton) Disable() {

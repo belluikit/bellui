@@ -3,6 +3,7 @@ package dialog
 import (
 	"image/color"
 
+	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/event"
@@ -20,6 +21,7 @@ var (
 // colorButton displays a color and triggers the callback when tapped.
 type colorButton struct {
 	widget.BaseWidget
+	internalwidget.PressTarget
 	color   color.Color
 	onTap   func(color.Color)
 	hovered bool
@@ -43,7 +45,7 @@ func (b *colorButton) CreateRenderer() core.WidgetRenderer {
 		FillColor: b.color,
 	}
 	return &colorButtonRenderer{
-		BaseRenderer: internalwidget.NewBaseRenderer([]core.CanvasObject{background, rectangle}),
+		BaseRenderer: internalwidget.NewBaseRenderer([]core.CanvasObject{background, rectangle, internalwidget.AttachPress(&b.PressTarget, b.pressShape)}),
 		button:       b,
 		background:   background,
 		rectangle:    rectangle,
@@ -58,6 +60,7 @@ func (b *colorButton) HoverIn(*event.HoverEvent) {
 
 // HoverOut is called when a pointer exits the widget
 func (b *colorButton) HoverOut() {
+	internalwidget.CancelPress(&b.PressTarget)
 	b.hovered = false
 	b.Refresh()
 }
@@ -81,10 +84,25 @@ func (b *colorButton) SetColor(color color.Color) {
 }
 
 // Tapped is called when a pointer tapped event is captured and triggers any change handler
-func (b *colorButton) Tapped(*event.PointEvent) {
+func (b *colorButton) Tapped(ev *event.PointEvent) {
 	if f := b.onTap; f != nil {
+		internalwidget.TapPress(&b.PressTarget, ev)
 		f(b.color)
 	}
+}
+
+// pressShape is the whole swatch, square like it, in OnSurface (#1091). The
+// state layer sits above the colour: a colour swatch has no content of its
+// own to draw it under.
+func (b *colorButton) pressShape() (internalwidget.PressShape, bool) {
+	if b.onTap == nil {
+		return internalwidget.PressShape{}, false
+	}
+	th := b.Theme()
+	return internalwidget.PressShape{
+		Size:    b.Size(),
+		Content: th.Color(theme.ColorNameOnSurface, bellui.CurrentApp().Settings().ThemeVariant()),
+	}, true
 }
 
 type colorButtonRenderer struct {
