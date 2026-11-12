@@ -18,6 +18,7 @@ import (
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/core"
+	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/cache"
 	"github.com/belluikit/bellui/internal/driver"
@@ -41,6 +42,10 @@ func (f *twinSizeable) MarkPlacementDirty(o core.CanvasObject) { f.c.MarkPlaceme
 func (f *twinSizeable) MarkMinSizeDirty(o core.CanvasObject) { f.c.MarkMinSizeDirty(o) }
 
 func (f *twinSizeable) SetDirty() {}
+
+// Focused reports no focus: a collection widget asks as it recycles a row
+// (#1175), and these tests focus nothing.
+func (f *twinSizeable) Focused() event.Focusable { return nil }
 
 func (f *twinSizeable) PixelCoordinateForPosition(p geo.Position) (int, int) {
 	return int(p.X), int(p.Y) // a scale of 1, for icons rendered at their size

@@ -214,6 +214,7 @@ func (r *treeViewContentRenderer) Layout(size geo.Size) {
 			// for the same id — the node deleted and re-added, or its row
 			// scrolled back into view — it would reopen the editor unasked.
 			item.renaming = false
+			unfocusRecycled(item)
 			r.itemPool.Put(item)
 		}
 	}

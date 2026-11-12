@@ -829,11 +829,13 @@ func (r *treeContentRenderer) Layout(size geo.Size) {
 	// Release any nodes that haven't been reused
 	for uid, b := range r.branches {
 		if _, ok := branches[uid]; !ok {
+			unfocusRecycled(b)
 			r.branchPool.Put(b)
 		}
 	}
 	for uid, l := range r.leaves {
 		if _, ok := leaves[uid]; !ok {
+			unfocusRecycled(l)
 			r.leafPool.Put(l)
 		}
 	}
