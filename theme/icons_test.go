@@ -509,3 +509,45 @@ func TestNotificationsIcon(t *testing.T) {
 		t.Errorf("icon is %T, want a *theme.ThemedResource so it takes the theme's colour", icon)
 	}
 }
+
+// The icons for navigation destinations about a place, people and a child
+// are their own files, themed like the rest (#1155).
+func TestNavigationDestinationIcons(t *testing.T) {
+	bellui.CurrentApp().Settings().SetTheme(theme.LightTheme())
+	r, g, b, _ := theme.LightTheme().Color(theme.ColorNameForeground, theme.VariantLight).RGBA()
+	want := fmt.Sprintf("#%02x%02x%02x", r>>8, g>>8, b>>8)
+	checked := map[string]int{}
+	for file, icon := range map[string]bellui.Resource{
+		"place.svg":  theme.PlaceIcon(),
+		"people.svg": theme.PeopleIcon(),
+		"child.svg":  theme.ChildIcon(),
+	} {
+		if icon == nil || !strings.HasSuffix(icon.Name(), file) {
+			t.Errorf("icon %v, want one named for %s", icon, file)
+			continue
+		}
+		if _, ok := icon.(*theme.ThemedResource); !ok {
+			t.Errorf("%s is %T, want a *theme.ThemedResource so it takes the theme's colour", file, icon)
+		}
+		content := string(icon.Content())
+		if !strings.Contains(content, "<path") {
+			t.Errorf("%s has no path", file)
+		}
+		// Every shape takes the theme's colour, the child's eyes (circles) too.
+		for _, shape := range []string{"<path", "<circle"} {
+			for _, part := range strings.Split(content, shape)[1:] {
+				el := part[:strings.Index(part, ">")]
+				if strings.Contains(el, `fill="none"`) {
+					continue
+				}
+				if !strings.Contains(strings.ToLower(el), want) {
+					t.Errorf("%s: a %s> is not in the theme's colour %s: %s", file, shape, want, el)
+				}
+				checked[file+shape]++
+			}
+		}
+	}
+	assert.Equal(t, 2, checked["child.svg<circle"], "the child's two eyes were not checked")
+	assert.Positive(t, checked["place.svg<path"])
+	assert.Positive(t, checked["people.svg<path"])
+}

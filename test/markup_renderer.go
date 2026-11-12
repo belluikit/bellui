@@ -782,6 +782,12 @@ func knownResource(rsc bellui.Resource) string {
 		return "bookmarkBorderIcon"
 	case theme.NotificationsIcon():
 		return "notificationsIcon"
+	case theme.PlaceIcon():
+		return "placeIcon"
+	case theme.PeopleIcon():
+		return "peopleIcon"
+	case theme.ChildIcon():
+		return "childIcon"
 	case theme.HistoryIcon():
 		return "historyIcon"
 	case theme.HomeIcon():
