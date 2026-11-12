@@ -88,7 +88,7 @@ func TestSwapSourceReplacesAndClosesTheOld(t *testing.T) {
 // against buffers sized for the old device.
 func TestSwapSourceResizesTheFramePool(t *testing.T) {
 	p := newTestPipeline(t, newShapedSource(16, 16))
-	before := <-p.frameRecycle
+	before := <-p.pool.Load().recycle
 	p.RecycleFrame(before)
 	if got := before.Bounds().Dx(); got != 16 {
 		t.Fatalf("precondition: pool frame width = %d, want 16", got)
@@ -102,7 +102,7 @@ func TestSwapSourceResizesTheFramePool(t *testing.T) {
 	if w, h := p.VideoSize(); w != 64 || h != 48 {
 		t.Errorf("VideoSize = %dx%d, want 64x48", w, h)
 	}
-	after := <-p.frameRecycle
+	after := <-p.pool.Load().recycle
 	if got := after.Bounds(); got.Dx() != 64 || got.Dy() != 48 {
 		t.Errorf("pool frame = %v, want 64x48 — a larger frame would be truncated", got)
 	}
@@ -113,14 +113,14 @@ func TestSwapSourceResizesTheFramePool(t *testing.T) {
 // whole pool.
 func TestSwapSourceKeepsThePoolWhenGeometryIsUnchanged(t *testing.T) {
 	p := newTestPipeline(t, newShapedSource(16, 16))
-	pool := p.frameRecycle
+	pool := p.pool.Load().recycle
 
 	if err := p.SwapSource(newShapedSource(16, 16)); err != nil {
 		t.Fatalf("SwapSource: %v", err)
 	}
 	defer p.Close()
 
-	if p.frameRecycle != pool {
+	if p.pool.Load().recycle != pool {
 		t.Error("the frame pool was rebuilt for a swap that did not change the geometry")
 	}
 }

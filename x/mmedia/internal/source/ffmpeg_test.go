@@ -2,7 +2,6 @@ package source
 
 import (
 	"bytes"
-	"image"
 	"io"
 	"os"
 	"testing"
@@ -31,7 +30,7 @@ func openSample(t *testing.T) *os.File {
 // drain runs Decode until it yields a video frame or the source ends.
 func drain(s *FFmpegSource, limit int) (frames, audioChunks int) {
 	var got int
-	s.SetVideoCallback(func(*image.RGBA, time.Duration) { got++ })
+	s.SetVideoCallback(func(VideoFrame) { got++ })
 	s.SetAudioCallback(func(b []byte) {
 		if len(b) > 0 {
 			audioChunks++

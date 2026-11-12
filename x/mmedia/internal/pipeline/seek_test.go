@@ -38,7 +38,7 @@ func (s *clipSource) Decode(time.Duration) {
 	}
 	img := image.NewRGBA(image.Rect(0, 0, 16, 16))
 	binary.LittleEndian.PutUint32(img.Pix, uint32(s.next))
-	s.vcb(img, time.Duration(s.next)*time.Second/30)
+	s.vcb(source.RGBAFrame(img, time.Duration(s.next)*time.Second/30))
 	s.next++
 }
 func (s *clipSource) Seek(pos time.Duration) { s.next = int(pos * 30 / time.Second) }

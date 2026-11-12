@@ -61,10 +61,11 @@ func TestSeekRebasesClock(t *testing.T) {
 // the nominal frame rate accumulated with no way back. Frames must carry the
 // stream's own timestamp instead.
 func TestTimedFrameCarriesPTS(t *testing.T) {
-	p := &Pipeline{frameQueue: make(chan timedFrame, 2)}
-	p.frameQueue <- timedFrame{img: nil, pts: 1234 * time.Millisecond}
+	p := &Pipeline{}
+	p.pool.Store(&framePool{queue: make(chan timedFrame, 2)})
+	p.pool.Load().queue <- timedFrame{img: nil, pts: 1234 * time.Millisecond}
 
-	got := <-p.frameQueue
+	got := <-p.pool.Load().queue
 	if got.pts != 1234*time.Millisecond {
 		t.Errorf("pts = %v, want it preserved through the queue", got.pts)
 	}

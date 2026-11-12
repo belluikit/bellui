@@ -32,7 +32,7 @@ func (s *shortClip) SetAudioChannels(int) error            { return nil }
 func (s *shortClip) SetAudioSampleRate(int) error          { return nil }
 func (s *shortClip) Decode(time.Duration) {
 	if s.next < s.frames && s.vcb != nil {
-		s.vcb(image.NewRGBA(image.Rect(0, 0, 16, 16)), time.Duration(s.next)*time.Second/30)
+		s.vcb(source.RGBAFrame(image.NewRGBA(image.Rect(0, 0, 16, 16)), time.Duration(s.next)*time.Second/30))
 		s.next++
 	}
 }

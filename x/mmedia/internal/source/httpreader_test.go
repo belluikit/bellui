@@ -3,7 +3,6 @@ package source
 import (
 	"bytes"
 	"errors"
-	"image"
 	"io"
 	"net"
 	"net/http"
@@ -136,7 +135,7 @@ func TestHTTPSInGoPlaysAndSeeks(t *testing.T) {
 			s.SetVideoCallback(nil)
 			s.Decode(0)
 			var got []time.Duration
-			s.SetVideoCallback(func(_ *image.RGBA, pts time.Duration) { got = append(got, pts) })
+			s.SetVideoCallback(func(f VideoFrame) { got = append(got, f.PTS) })
 			s.Seek(3 * time.Second)
 			s.Decode(0)
 			if err := s.Err(); err != nil || len(got) == 0 || got[0] < 2*time.Second {

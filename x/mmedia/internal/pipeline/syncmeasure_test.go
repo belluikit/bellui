@@ -39,7 +39,7 @@ func (s *vfrSource) SetAudioSampleRate(int) error            { return nil }
 
 func (s *vfrSource) Decode(time.Duration) {
 	if s.vcb != nil {
-		s.vcb(s.frame, s.pts)
+		s.vcb(source.RGBAFrame(s.frame, s.pts))
 		s.pts += time.Duration(float64(time.Second) / s.realRate)
 	}
 }

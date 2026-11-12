@@ -2,7 +2,6 @@ package source
 
 import (
 	"bytes"
-	"image"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -21,7 +20,7 @@ const reconnectMedia = "testdata/sample_stream.mp4" // index at the front
 // decodeAll decodes s to its end and counts what it delivered.
 func decodeAll(t *testing.T, s *FFmpegSource, within time.Duration) (frames, audioBytes int) {
 	t.Helper()
-	s.SetVideoCallback(func(*image.RGBA, time.Duration) { frames++ })
+	s.SetVideoCallback(func(VideoFrame) { frames++ })
 	s.SetAudioCallback(func(b []byte) { audioBytes += len(b) })
 	done := make(chan struct{})
 	go func() {

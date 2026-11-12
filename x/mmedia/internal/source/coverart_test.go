@@ -2,7 +2,6 @@ package source
 
 import (
 	"bytes"
-	"image"
 	"io"
 	"os"
 	"testing"
@@ -23,7 +22,7 @@ func (f forwardOnly) Read(p []byte) (int, error) { return f.r.Read(p) }
 func decodedSeconds(t *testing.T, s *FFmpegSource) (audio time.Duration, frames int) {
 	t.Helper()
 	var bytes int
-	s.SetVideoCallback(func(*image.RGBA, time.Duration) { frames++ })
+	s.SetVideoCallback(func(VideoFrame) { frames++ })
 	s.SetAudioCallback(func(b []byte) { bytes += len(b) })
 	for i := 0; !s.HasEnded(); i++ {
 		if i > 100000 {
