@@ -39,8 +39,9 @@ type PopUp struct {
 	innerPosMoved     bool // true if Move was called explicitly
 	innerSize         geo.Size
 	modal             bool
-	modalDismissOnTap bool // when true, modal popups dismiss on outside tap (for drawers)
-	passThrough       bool // when true, input outside the content passes to the UI beneath (pre-rebrand tracker #569)
+	modalDismissOnTap bool    // when true, modal popups dismiss on outside tap (for drawers)
+	passThrough       bool    // when true, input outside the content passes to the UI beneath (pre-rebrand tracker #569)
+	coverTop          float32 // canvas y where the scrim and input barrier begin; above it the UI beneath gets input (a drawer below a header, #1171)
 	overlayShown      bool
 	bgColor           color.Color // custom background color; nil = use overlay background
 	noPadding         bool        // when true, skip inner padding (used for tooltips)
@@ -89,6 +90,14 @@ func (p *PopUp) Hide() {
 // the content itself (a Snackbar's action button) still work.
 func (p *PopUp) PassesInputThrough() bool {
 	return p.passThrough
+}
+
+// PassesInputThroughAt reports whether the pop-up leaves the canvas position
+// pos to the UI beneath it: above the top it covers from, set for a drawer
+// that opens below a header (#1171). There the driver hit tests skip the
+// pop-up entirely, so a tap reaches the header and does not dismiss it.
+func (p *PopUp) PassesInputThroughAt(pos geo.Position) bool {
+	return pos.Y < p.coverTop
 }
 
 // removeNow takes the pop-up off its canvas at once, ending any show or hide
@@ -527,14 +536,19 @@ type modalPopUpRenderer struct {
 	areaSize geo.Size
 }
 
-// Layout covers the canvas with the scrim and places the content. Content
+// Layout covers the canvas with the scrim, from the cover top down, and
+// places the content. Content
 // with no explicit position is centred on the canvas and then kept inside the
 // canvas's interactive area, the part not under a notch, a system bar or an
 // on-screen keyboard: a dialog moves up above the keyboard its own field
 // opened, and shrinks to fit there (#654). Content placed with Move, such as
 // a navigation drawer that covers the whole edge, keeps its position.
 func (r *modalPopUpRenderer) Layout(canvasSize geo.Size) {
-	r.underlay.Resize(canvasSize)
+	// The scrim covers the canvas from the pop-up's cover top down: all of
+	// it, unless a drawer leaves a header above uncovered (#1171).
+	coverTop := min(r.popUp.coverTop, canvasSize.Height)
+	r.underlay.Move(geo.NewPos(0, coverTop))
+	r.underlay.Resize(canvasSize.SubtractWidthHeight(0, coverTop))
 	r.areaPos, r.areaSize = r.popUp.Canvas.InteractiveArea()
 
 	padding := r.padding()

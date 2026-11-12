@@ -9,6 +9,7 @@ import (
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
 	internalWidget "github.com/belluikit/bellui/internal/widget"
+	"github.com/belluikit/bellui/lang"
 	"github.com/belluikit/bellui/layout"
 	"github.com/belluikit/bellui/theme"
 )
@@ -20,6 +21,24 @@ type NavigationDrawerItem struct {
 	IsDivider bool // true = render as separator
 }
 
+// DrawerSide is the edge of the canvas a [NavigationDrawer] opens against.
+//
+// Since: 1.3
+type DrawerSide int
+
+const (
+	// DrawerSideStart opens the drawer against the start edge: the left in a
+	// left-to-right layout, the right in a right-to-left one.
+	//
+	// Since: 1.3
+	DrawerSideStart DrawerSide = iota
+	// DrawerSideEnd opens the drawer against the end edge: the right in a
+	// left-to-right layout, the left in a right-to-left one.
+	//
+	// Since: 1.3
+	DrawerSideEnd
+)
+
 // NavigationDrawer is an MD3 slide-out side panel with destinations.
 type NavigationDrawer struct {
 	Items     []*NavigationDrawerItem
@@ -28,9 +47,25 @@ type NavigationDrawer struct {
 	OnChanged func(int) `json:"-"`
 	Modal     bool
 
+	// Side is the edge the drawer opens against. The system insets on that
+	// side, such as a landscape notch, move with it. With animations on, the
+	// drawer slides in from its edge.
+	//
+	// Since: 1.3
+	Side DrawerSide
+	// Top is the canvas y where the drawer and its scrim begin. Zero covers
+	// the whole height. Above Top the drawer is not there for input: a tap
+	// reaches the widget underneath, such as a header button, and leaves the
+	// drawer open. The status-bar inset applies only to the part of it below
+	// Top.
+	//
+	// Since: 1.3
+	Top float32
+
 	canvas core.Canvas
 	popUp  *PopUp
 	open   bool
+	slide  *bellui.Animation // the slide in, while it runs
 }
 
 // NewNavigationDrawer creates a navigation drawer.
@@ -99,13 +134,23 @@ func (d *NavigationDrawer) Show(c core.Canvas) {
 	// the system insets (status bar, home indicator, a landscape notch).
 	insetPos, insetSize := c.InteractiveArea()
 	canvasSize := c.Size()
+	top := min(max(d.Top, 0), canvasSize.Height)
+	insetTop := max(insetPos.Y-top, 0)
 	insetBottom := max(canvasSize.Height-insetPos.Y-insetSize.Height, 0)
+	insetLeft := insetPos.X
+	insetRight := max(canvasSize.Width-insetPos.X-insetSize.Width, 0)
 
-	drawerWidth := float32(360) + insetPos.X
+	atRight := d.atRight(c)
+	if atRight {
+		insetLeft = 0
+	} else {
+		insetRight = 0
+	}
+	drawerWidth := float32(360) + insetLeft + insetRight
 	content := &bellui.Container{Layout: layout.NewVBoxLayout(), Objects: objects}
 	padded := &bellui.Container{Layout: layout.NewPaddedLayout(), Objects: []core.CanvasObject{content}}
 	inset := &bellui.Container{
-		Layout:  layout.NewCustomPaddedLayout(insetPos.Y, insetBottom, insetPos.X, 0),
+		Layout:  layout.NewCustomPaddedLayout(insetTop, insetBottom, insetLeft, insetRight),
 		Objects: []core.CanvasObject{padded},
 	}
 	// Scroll so destination lists taller than the canvas remain reachable.
@@ -117,15 +162,54 @@ func (d *NavigationDrawer) Show(c core.Canvas) {
 	} else {
 		d.popUp = NewPopUp(scroll, c)
 	}
+	d.popUp.coverTop = top
 
-	d.popUp.Resize(geo.NewSize(drawerWidth, canvasSize.Height))
+	x := float32(0)
+	if atRight {
+		x = canvasSize.Width - drawerWidth
+	}
+	d.popUp.Resize(geo.NewSize(drawerWidth, canvasSize.Height-top))
 	d.popUp.Show()
-	d.popUp.Move(geo.NewPos(0, 0))
+	if bellui.CurrentApp().Settings().ShowAnimations() {
+		d.slideIn(x, top, drawerWidth, canvasSize.Width, atRight)
+	} else {
+		d.popUp.Move(geo.NewPos(x, top))
+	}
 	d.open = true
+}
+
+// slideIn moves the drawer in from beyond its edge to x, as SideSheet does
+// (#1171).
+func (d *NavigationDrawer) slideIn(x, top, width, canvasWidth float32, atRight bool) {
+	from := -width
+	if atRight {
+		from = canvasWidth
+	}
+	p := d.popUp
+	p.Move(geo.NewPos(from, top))
+	d.slide = bellui.NewAnimation(canvas.DurationMedium2, func(done float32) {
+		p.Move(geo.NewPos(from+(x-from)*done, top))
+	})
+	d.slide.Curve = bellui.AnimationEaseStandardDecelerate
+	d.slide.Start()
+}
+
+// atRight reports whether the drawer opens against the right edge of c: the
+// end side in a left-to-right layout, the start side in a right-to-left one.
+func (d *NavigationDrawer) atRight(c core.Canvas) bool {
+	rtl := lang.IsRTLDirection()
+	if content := c.Content(); content != nil {
+		rtl = isRTLAt(content)
+	}
+	return (d.Side == DrawerSideEnd) != rtl
 }
 
 // Hide dismisses the drawer.
 func (d *NavigationDrawer) Hide() {
+	if d.slide != nil {
+		d.slide.Stop()
+		d.slide = nil
+	}
 	if d.popUp != nil {
 		d.popUp.Hide()
 		d.popUp = nil
