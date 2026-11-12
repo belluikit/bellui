@@ -42,7 +42,7 @@ func TestConvertAPKToAABAlignment(t *testing.T) {
 	t.Cleanup(func() { tmpdir, buildO = prevTmp, prevO })
 
 	app := spacedDir(t)
-	libs, err := prepareAndroidLibs(app, []byte(testAppManifest), []string{"arm64"}, "app", "", "", "", "", 35, 7, "1.2")
+	libs, err := prepareAndroidLibs(app, []byte(testAppManifest), nil, []string{"arm64"}, "app", "", "", "", "", 35, 7, "1.2")
 	require.NoError(t, err)
 	goLib := "lib/arm64-v8a/libapp.so"
 	require.NoError(t, os.MkdirAll(filepath.Join(tmpdir, "lib", "arm64-v8a"), 0o755))

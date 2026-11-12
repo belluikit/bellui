@@ -176,9 +176,16 @@ func goAndroidBuild(pkg *packages.Package, bundleID string, androidArchs []strin
 		return nil, err
 	}
 
+	// Elements the app marks tools:node="remove" leave the manifest here,
+	// whether or not a library brings them (#1168).
+	manifestData, removed, err := withoutRemovedElements(manifestData)
+	if err != nil {
+		return nil, fmt.Errorf("AndroidManifest.xml: %w", err)
+	}
+
 	// Library dependencies from android/libs (#672): merged into the
 	// manifest, linked with aapt2 and dexed below.
-	libs, err := prepareAndroidLibs(dir, manifestData, androidArchs, libName, iconPath, iconFG, iconBG, iconMono,
+	libs, err := prepareAndroidLibs(dir, manifestData, removed, androidArchs, libName, iconPath, iconFG, iconBG, iconMono,
 		target, build, version)
 	if err != nil {
 		return nil, err
