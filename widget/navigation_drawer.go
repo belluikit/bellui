@@ -98,21 +98,28 @@ func (d *NavigationDrawer) Show(c core.Canvas) {
 		bg := canvas.NewRectangle(color.Transparent)
 		bg.CornerRadius = 28
 
-		icon := canvas.NewImageFromResource(item.Icon)
+		icon := canvas.NewImageFromResource(nil)
 		icon.FillMode = canvas.ImageFillContain
 		icon.Resize(geo.NewSize(24, 24))
 
 		label := canvas.NewText(item.Label, th.Color(theme.ColorNameOnSurface, v))
 		label.TextSize = 14
 
+		iconColor := theme.ColorNameOnSurfaceVariant
 		if idx == d.Selected {
 			bg.FillColor = th.Color(theme.ColorNameSecondaryContainer, v)
-			icon.Resource = theme.NewColoredResource(item.Icon, theme.ColorNameOnSecondaryContainer)
+			iconColor = theme.ColorNameOnSecondaryContainer
 			label.Color = th.Color(theme.ColorNameOnSecondaryContainer, v)
 			label.TextStyle.Bold = true
 		} else {
-			icon.Resource = theme.NewColoredResource(item.Icon, theme.ColorNameOnSurfaceVariant)
 			label.Color = th.Color(theme.ColorNameOnSurfaceVariant, v)
+		}
+		// An item with no icon is a label alone, starting where the icon
+		// would (#1179).
+		if item.Icon != nil {
+			icon.Resource = theme.NewColoredResource(item.Icon, iconColor)
+		} else {
+			icon.Hide()
 		}
 
 		row := &drawerItemWidget{
@@ -328,7 +335,11 @@ func (r *drawerItemRenderer) Layout(size geo.Size) {
 	r.item.icon.Move(geo.NewPos(16, (size.Height-24)/2))
 	r.item.icon.Resize(geo.NewSize(24, 24))
 	labelSize := r.item.label.MinSize()
-	r.item.label.Move(geo.NewPos(52, (size.Height-labelSize.Height)/2))
+	labelX := float32(52)
+	if !r.item.icon.Visible() {
+		labelX = 16
+	}
+	r.item.label.Move(geo.NewPos(labelX, (size.Height-labelSize.Height)/2))
 	r.item.label.Resize(labelSize)
 }
 

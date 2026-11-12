@@ -62,6 +62,35 @@ func TestNavigationDrawer_CaptionsAreSized(t *testing.T) {
 	}
 }
 
+// An item may leave its Icon out: it draws its label alone, starting where
+// the icon would, rather than panicking on the first frame (#1179).
+func TestNavigationDrawer_ItemWithoutIcon(t *testing.T) {
+	test.NewTempApp(t)
+	items := []*NavigationDrawerItem{
+		{Label: "Home", Icon: theme.HomeIcon()},
+		{Label: "Settings"},
+		{Label: "Account"},
+	}
+	d := NewNavigationDrawer(items, nil)
+	d.Selected = 1
+	w := test.NewTempWindow(t, NewLabel("content"))
+	w.Resize(geo.NewSize(400, 600))
+	d.Show(w.Canvas())
+	w.Canvas().Capture()
+
+	rows := drawerRows(t, d)
+	require.Len(t, rows, 3)
+	for _, row := range rows {
+		row.Refresh()
+	}
+	assert.True(t, rows[0].icon.Visible())
+	assert.Equal(t, float32(52), rows[0].label.Position().X)
+	for _, row := range rows[1:] {
+		assert.False(t, row.icon.Visible(), row.label.Text)
+		assert.Equal(t, float32(16), row.label.Position().X, row.label.Text)
+	}
+}
+
 func TestNavigationDrawer_ItemTap(t *testing.T) {
 	test.NewTempApp(t)
 	var got, calls int
