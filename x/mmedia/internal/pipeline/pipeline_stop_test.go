@@ -31,7 +31,7 @@ func (s *stubSource) SetAudioChannels(int) error            { return nil }
 func (s *stubSource) SetAudioSampleRate(int) error          { return nil }
 func (s *stubSource) Decode(time.Duration) {
 	if s.vcb != nil {
-		s.vcb(s.frame, s.pts)
+		s.vcb(source.RGBAFrame(s.frame, s.pts))
 		s.pts += time.Second / 30
 	}
 }
@@ -78,19 +78,19 @@ func TestStopReturnsEveryFrameToThePool(t *testing.T) {
 	p := newTestPipeline(t, src)
 	p.SetOnFrame(func(*image.RGBA) {})
 	defer p.Close()
-	pool := cap(p.frameRecycle)
+	pool := cap(p.pool.Load().recycle)
 
 	for cycle := 0; cycle < 2; cycle++ {
 		p.Play()
 		deadline := time.Now().Add(2 * time.Second)
-		for len(p.frameQueue) < cap(p.frameQueue) && time.Now().Before(deadline) {
+		for len(p.pool.Load().queue) < cap(p.pool.Load().queue) && time.Now().Before(deadline) {
 			time.Sleep(5 * time.Millisecond)
 		}
-		if len(p.frameQueue) < cap(p.frameQueue) {
-			t.Fatalf("cycle %d: queue never filled (%d of %d)", cycle, len(p.frameQueue), cap(p.frameQueue))
+		if len(p.pool.Load().queue) < cap(p.pool.Load().queue) {
+			t.Fatalf("cycle %d: queue never filled (%d of %d)", cycle, len(p.pool.Load().queue), cap(p.pool.Load().queue))
 		}
 		p.Stop()
-		if got := len(p.frameRecycle) + len(p.frameQueue); got != pool {
+		if got := len(p.pool.Load().recycle) + len(p.pool.Load().queue); got != pool {
 			t.Errorf("cycle %d: %d of %d frames back in the pool after Stop", cycle, got, pool)
 		}
 	}

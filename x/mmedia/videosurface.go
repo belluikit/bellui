@@ -32,6 +32,11 @@ type videoSurface struct {
 	cur  int // buffer holding the most recently written frame
 
 	width, height int
+
+	// onResize, when set, is told the new size after a frame of another size
+	// resized the buffers (WriteFrame), so the letterboxing can follow. It is
+	// called on the frame's goroutine, with no lock held.
+	onResize func(width, height int)
 }
 
 func newVideoSurface(width, height int) *videoSurface {
@@ -108,6 +113,19 @@ func (s *videoSurface) resize(width, height int) {
 	s.publish(first)
 }
 
+// resized resizes the buffers to width x height and reports whether they were
+// another size.
+func (s *videoSurface) resized(width, height int) bool {
+	s.mu.Lock()
+	same := width == s.width && height == s.height
+	s.mu.Unlock()
+	if same || width <= 0 || height <= 0 {
+		return false
+	}
+	s.resize(width, height)
+	return true
+}
+
 // generate returns an image over the most recently written frame. It is called
 // on the paint thread; double buffering keeps it off whichever buffer
 // WriteFrame is filling. The requested size is ignored — the frame is returned
@@ -125,9 +143,16 @@ func (s *videoSurface) generate(_, _ int) image.Image {
 // WriteFrame copies frame into the next buffer and hands it to the raster.
 // Safe to call from the decode goroutine: SetPixels takes the raster's own
 // lock, and the copy targets a buffer the painter is not reading.
+//
+// A frame of another size than the buffers resizes them first, so it is never
+// truncated: a source that declared no size (0x0) at open gets its frames'
+// own size this way (#431).
 func (s *videoSurface) WriteFrame(frame *image.RGBA) {
 	if frame == nil {
 		return
+	}
+	if w, h := frame.Rect.Dx(), frame.Rect.Dy(); s.resized(w, h) && s.onResize != nil {
+		s.onResize(w, h)
 	}
 	s.mu.Lock()
 	idx := s.next

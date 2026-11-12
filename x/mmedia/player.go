@@ -137,6 +137,17 @@ func newMediaPlayerFromPipeline(pipe *pipeline.Pipeline, o *options, previewURL 
 	// switch can change the video geometry, and the letterboxing has to follow
 	// it without rebuilding the widget tree.
 	mp.aspect = &aspectLayout{width: vw, height: vh}
+	// Frames of another size than declared — a device that declared 0x0 —
+	// resize the surface as they arrive; the letterboxing follows here. Not
+	// applyVideoGeometry: that wants mp.mu, and this runs on the pipeline's
+	// display goroutine, which SetCaptureDevice waits for holding mp.mu.
+	mp.surface.onResize = func(w, h int) {
+		bellui.Do(func() {
+			mp.aspect.width, mp.aspect.height = w, h
+			mp.minSize = geo.NewSize(float32(w), float32(h)+48)
+			mp.Refresh()
+		})
+	}
 
 	// Create transport controls.
 	mp.controls = NewTransportControls()

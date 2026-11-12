@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"image"
 	"io"
 	"net/http"
 	"strings"
@@ -296,12 +295,17 @@ func (s *FFmpegSource) Decode(_ time.Duration) {
 				continue // IgnoreVideo
 			}
 			if s.videoCallback != nil {
-				rgba := image.NewRGBA(image.Rect(0, 0, s.vInfo.Width, s.vInfo.Height))
-				if err := s.dec.GetRGBA(rgba); err == nil {
-					// Position is the decoded frame's own PTS, set by the
-					// bridge from best_effort_timestamp.
-					s.videoCallback(rgba, s.presentationTime(s.dec.Position()))
-				}
+				// Converted into the callback's buffer, not one of ours: the
+				// pipeline reads it straight into a pool frame (#431). The
+				// bridge converts only at the size it opened with, so that is
+				// the frame's size. Position is the decoded frame's own PTS,
+				// set by the bridge from best_effort_timestamp.
+				s.videoCallback(VideoFrame{
+					Width:  s.vInfo.Width,
+					Height: s.vInfo.Height,
+					PTS:    s.presentationTime(s.dec.Position()),
+					Read:   s.dec.GetRGBA,
+				})
 			}
 			return // one video frame per call
 		case goffmpeg.MediaTypeAudio:

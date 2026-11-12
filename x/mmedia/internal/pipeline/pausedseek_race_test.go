@@ -45,7 +45,7 @@ func TestPausedSeekRacingTheDecoderShowsTheTarget(t *testing.T) {
 drain:
 	for {
 		select {
-		case tf := <-p.frameQueue:
+		case tf := <-p.pool.Load().queue:
 			p.RecycleFrame(tf.img)
 		default:
 			break drain

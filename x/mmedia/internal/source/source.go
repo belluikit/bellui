@@ -1,15 +1,53 @@
 package source
 
 import (
+	"fmt"
 	"image"
 	"time"
 )
 
-// VideoCallback is called when a decoded video frame is ready. pts is the
-// frame's presentation timestamp from the stream, which the pipeline paces
-// against the audio clock — deriving video time from a frame counter instead
-// lets the two drift apart with no way back.
-type VideoCallback func(frame *image.RGBA, pts time.Duration)
+// VideoFrame is a decoded video frame that has not been converted to RGBA yet.
+// The source does not choose where the pixels go: the callback reads the frame
+// into a buffer of its own, so playback converts each frame once, straight into
+// a frame of the pipeline's pool, and allocates nothing per frame (#431).
+//
+// A VideoFrame is valid only during the VideoCallback it is passed to. Read
+// must not be called after the callback returns.
+type VideoFrame struct {
+	// Width and Height are the frame's own size. They can differ from the
+	// size the source declared at open, which a device that declares 0x0
+	// does.
+	Width, Height int
+	// PTS is the frame's presentation timestamp from the stream, which the
+	// pipeline paces against the audio clock — deriving video time from a
+	// frame counter instead lets the two drift apart with no way back.
+	PTS time.Duration
+	// Read converts the frame into dst, which must be Width x Height. It
+	// writes every pixel of dst, or returns an error.
+	Read func(dst *image.RGBA) error
+}
+
+// VideoCallback is called when a decoded video frame is ready. A callback
+// that does not want the frame — the pool is exhausted, say — returns without
+// calling Read, and the conversion is never paid for.
+type VideoCallback func(frame VideoFrame)
+
+// RGBAFrame is a VideoFrame over pixels that are already RGBA: Read copies img.
+// For sources that produce RGBA themselves, which the test stubs do.
+func RGBAFrame(img *image.RGBA, pts time.Duration) VideoFrame {
+	return VideoFrame{
+		Width:  img.Rect.Dx(),
+		Height: img.Rect.Dy(),
+		PTS:    pts,
+		Read: func(dst *image.RGBA) error {
+			if dst.Rect.Size() != img.Rect.Size() {
+				return fmt.Errorf("frame is %v, destination %v", img.Rect.Size(), dst.Rect.Size())
+			}
+			copy(dst.Pix, img.Pix)
+			return nil
+		},
+	}
+}
 
 // AudioCallback is called when decoded PCM audio samples (S16LE) are ready.
 type AudioCallback func(data []byte)
