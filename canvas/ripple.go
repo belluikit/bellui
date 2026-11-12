@@ -25,7 +25,34 @@ type Ripple struct {
 	Opacity float32
 
 	// CornerRadius is the corner radius for SDF clipping to the parent shape.
+	// A per-corner radius below overrides it for its corner.
 	CornerRadius float32
+
+	// TopLeftCornerRadius, when not zero, is the radius of the top-left
+	// corner of the clip instead of CornerRadius. With the other three, it
+	// gives the ripple the shape of a part rounded on one side only, such as
+	// the end segment of a segmented button.
+	//
+	// Since: 1.3
+	TopLeftCornerRadius float32
+
+	// TopRightCornerRadius, when not zero, is the radius of the top-right
+	// corner of the clip instead of CornerRadius.
+	//
+	// Since: 1.3
+	TopRightCornerRadius float32
+
+	// BottomRightCornerRadius, when not zero, is the radius of the
+	// bottom-right corner of the clip instead of CornerRadius.
+	//
+	// Since: 1.3
+	BottomRightCornerRadius float32
+
+	// BottomLeftCornerRadius, when not zero, is the radius of the bottom-left
+	// corner of the clip instead of CornerRadius.
+	//
+	// Since: 1.3
+	BottomLeftCornerRadius float32
 }
 
 // NewRipple creates a new ripple canvas object.

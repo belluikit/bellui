@@ -299,8 +299,10 @@ func (p *painter) drawRipple(ripple *canvas.Ripple, pos geo.Position, frame geo.
 	rectSizeHeight := y2Scaled - y1Scaled
 	p.SetUniform2f(program, "rect_size_half", rectSizeWidth*0.5, rectSizeHeight*0.5)
 
-	cornerRadiusScaled := roundToPixel(ripple.CornerRadius*p.pixScale, 1.0)
-	p.SetUniform1f(program, "radius", cornerRadiusScaled)
+	tr, br, tl, bl := paint.RippleCornerRadii(ripple, ripple.Size())
+	p.SetUniform4f(program, "radius",
+		roundToPixel(tr*p.pixScale, 1.0), roundToPixel(br*p.pixScale, 1.0),
+		roundToPixel(tl*p.pixScale, 1.0), roundToPixel(bl*p.pixScale, 1.0))
 
 	edgeSoftnessScaled := roundToPixel(edgeSoftness*p.pixScale, 1.0)
 	p.SetUniform1f(program, "edge_softness", edgeSoftnessScaled)

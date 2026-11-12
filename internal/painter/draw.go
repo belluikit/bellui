@@ -621,6 +621,21 @@ func GetCornerRadius(perCornerRadius, baseCornerRadius float32) float32 {
 	return perCornerRadius
 }
 
+// RippleCornerRadii returns the radii a ripple of the given size clips its
+// corners to, in the order the ripple shaders take them: top-right,
+// bottom-right, top-left, bottom-left. Each corner falls back to CornerRadius
+// and is kept within the size as a rectangle's is.
+func RippleCornerRadii(ripple *canvas.Ripple, size geo.Size) (tr, br, tl, bl float32) {
+	tr = GetCornerRadius(ripple.TopRightCornerRadius, ripple.CornerRadius)
+	tl = GetCornerRadius(ripple.TopLeftCornerRadius, ripple.CornerRadius)
+	br = GetCornerRadius(ripple.BottomRightCornerRadius, ripple.CornerRadius)
+	bl = GetCornerRadius(ripple.BottomLeftCornerRadius, ripple.CornerRadius)
+	return GetMaximumCornerRadius(tr, tl, br, size),
+		GetMaximumCornerRadius(br, bl, tr, size),
+		GetMaximumCornerRadius(tl, tr, bl, size),
+		GetMaximumCornerRadius(bl, br, tl, size)
+}
+
 // GetMaximumRadius returns the maximum possible corner radius that fits within the given size.
 // It calculates half of the smaller dimension (width or height) of the provided geo.Size.
 //

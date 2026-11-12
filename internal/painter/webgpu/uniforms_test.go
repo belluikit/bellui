@@ -63,8 +63,8 @@ func TestUniformLayouts(t *testing.T) {
 		{
 			name: "RippleUniforms", typ: reflect.TypeOf(RippleUniforms{}), size: 128,
 			offsets: map[string]uintptr{
-				"FrameSize": 0, "Radius": 8, "EdgeSoftness": 12, "RectCoords": 16,
-				"RectSizeHalf": 32, "RippleCenter": 40, "RippleRadius": 48,
+				"FrameSize": 0, "EdgeSoftness": 8, "RippleRadius": 12, "RectCoords": 16,
+				"RectSizeHalf": 32, "RippleCenter": 40, "Radius": 48,
 				"RippleColor": 64, "InvTransform": 80,
 			},
 		},
