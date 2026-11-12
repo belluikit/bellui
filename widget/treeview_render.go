@@ -631,6 +631,7 @@ var (
 
 type treeViewItem struct {
 	BaseWidget
+	pressTarget
 	tree     *TreeView
 	uid      TreeViewNodeID
 	depth    int
@@ -666,11 +667,23 @@ func (ti *treeViewItem) update(uid TreeViewNodeID, depth int, isBranch bool) {
 	ti.Refresh()
 }
 
-func (ti *treeViewItem) Tapped(*event.PointEvent) {
+func (ti *treeViewItem) Tapped(ev *event.PointEvent) {
 	if ti.renaming {
 		return
 	}
+	widget.TapPress(&ti.pressTarget, ev)
 	ti.tree.Select(ti.uid)
+}
+
+// pressShape is the whole row, except while it is being renamed.
+func (ti *treeViewItem) pressShape() (widget.PressShape, bool) {
+	if ti.renaming {
+		return widget.PressShape{}, false
+	}
+	th := ti.Theme()
+	s := rowPressShape(th, ti.Size())
+	s.CornerRadius = th.Size(theme.SizeNameShapeSmall)
+	return s, true
 }
 
 func (ti *treeViewItem) DoubleTapped(*event.PointEvent) {
@@ -774,7 +787,10 @@ func (ti *treeViewItem) commitRename(newText string) {
 
 func (ti *treeViewItem) HoverIn(*event.HoverEvent)    { ti.setHovered(true) }
 func (ti *treeViewItem) HoverMoved(*event.HoverEvent) {}
-func (ti *treeViewItem) HoverOut()                    { ti.setHovered(false) }
+func (ti *treeViewItem) HoverOut() {
+	widget.CancelPress(&ti.pressTarget)
+	ti.setHovered(false)
+}
 
 // AccessibleRole returns [core.RoleTreeItem].
 func (ti *treeViewItem) AccessibleRole() core.AccessibleRole { return core.RoleTreeItem }
@@ -903,6 +919,7 @@ func (ti *treeViewItem) Dragged(e *event.DragEvent) {
 	if !ti.tree.AllowReorder && !ti.tree.AllowReparent {
 		return
 	}
+	widget.CancelPress(&ti.pressTarget) // a row being moved is not being tapped
 	ti.tree.handleDrag(ti.uid, e)
 }
 
@@ -963,6 +980,7 @@ func (ti *treeViewItem) CreateRenderer() core.WidgetRenderer {
 	return &treeViewItemRenderer{
 		item:        ti,
 		bg:          bg,
+		ripple:      widget.AttachPress(&ti.pressTarget, ti.pressShape),
 		chevron:     chevron,
 		icon:        icon,
 		content:     ti.content,
@@ -977,6 +995,7 @@ func (ti *treeViewItem) CreateRenderer() core.WidgetRenderer {
 type treeViewItemRenderer struct {
 	item        *treeViewItem
 	bg          *canvas.Rectangle
+	ripple      *canvas.Ripple
 	chevron     *rowHoverButton
 	icon        *canvas.Image
 	content     core.CanvasObject
@@ -1134,7 +1153,7 @@ func (r *treeViewItemRenderer) Refresh() {
 }
 
 func (r *treeViewItemRenderer) Objects() []core.CanvasObject {
-	objs := []core.CanvasObject{r.bg, r.chevron, r.content, r.renameEntry, r.renameBtn, r.deleteBtn}
+	objs := []core.CanvasObject{r.bg, r.ripple, r.chevron, r.content, r.renameEntry, r.renameBtn, r.deleteBtn}
 	if r.icon != nil {
 		objs = append(objs, r.icon)
 	}

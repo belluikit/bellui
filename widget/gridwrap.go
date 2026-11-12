@@ -484,6 +484,7 @@ var (
 
 type gridWrapItem struct {
 	BaseWidget
+	pressTarget
 
 	onTapped          func()
 	background        *canvas.Rectangle
@@ -511,7 +512,8 @@ func (gw *gridWrapItem) CreateRenderer() core.WidgetRenderer {
 	gw.background.CornerRadius = th.Size(theme.SizeNameSelectionRadius)
 	gw.background.Hide()
 
-	objects := []core.CanvasObject{gw.background, gw.child}
+	ripple := widget.AttachPress(&gw.pressTarget, gw.pressShape)
+	objects := []core.CanvasObject{gw.background, ripple, gw.child}
 
 	return &gridWrapItemRenderer{widget.NewBaseRenderer(objects), gw}
 }
@@ -535,16 +537,26 @@ func (gw *gridWrapItem) HoverMoved(*event.HoverEvent) {
 // HoverOut is called when a desktop pointer exits the widget.
 func (gw *gridWrapItem) HoverOut() {
 	gw.hovered = false
+	widget.CancelPress(&gw.pressTarget)
 	gw.Refresh()
 }
 
 // Tapped is called when a pointer tapped event is captured and triggers any tap handler.
-func (gw *gridWrapItem) Tapped(*event.PointEvent) {
+func (gw *gridWrapItem) Tapped(ev *event.PointEvent) {
 	if gw.onTapped != nil {
+		widget.TapPress(&gw.pressTarget, ev)
 		gw.selected = true
 		gw.Refresh()
 		gw.onTapped()
 	}
+}
+
+// pressShape is the whole cell, while it has a tap handler.
+func (gw *gridWrapItem) pressShape() (widget.PressShape, bool) {
+	if gw.onTapped == nil {
+		return widget.PressShape{}, false
+	}
+	return rowPressShape(gw.Theme(), gw.Size()), true
 }
 
 // AccessibleRole returns [core.RoleListItem].

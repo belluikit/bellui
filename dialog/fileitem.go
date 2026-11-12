@@ -11,6 +11,7 @@ import (
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
 	intdriver "github.com/belluikit/bellui/internal/driver"
+	internalwidget "github.com/belluikit/bellui/internal/widget"
 	"github.com/belluikit/bellui/lang"
 	"github.com/belluikit/bellui/theme"
 	"github.com/belluikit/bellui/widget"
@@ -29,6 +30,7 @@ var (
 
 type fileDialogItem struct {
 	widget.BaseWidget
+	internalwidget.PressTarget
 	picker *fileDialog
 
 	name     string
@@ -62,12 +64,13 @@ func (i *fileDialogItem) CreateRenderer() core.WidgetRenderer {
 	bg := canvas.NewRectangle(color.Transparent)
 	bg.CornerRadius = i.Theme().Size(theme.SizeNameShapeSmall)
 
+	ripple := internalwidget.AttachPress(&i.PressTarget, i.pressShape)
 	return &fileItemRenderer{
 		item:         i,
 		icon:         icon,
 		text:         text,
 		bg:           bg,
-		objects:      []core.CanvasObject{bg, icon, text},
+		objects:      []core.CanvasObject{bg, ripple, icon, text},
 		fileTextSize: measureLabel("M\nM").Height, // cache two-line label height,
 	}
 }
@@ -89,7 +92,19 @@ func (i *fileDialogItem) setLocation(l bellui.URI, dir, up bool) {
 	i.Refresh()
 }
 
-func (i *fileDialogItem) Tapped(*event.PointEvent) {
+// pressShape is the whole item, with the corners of its background.
+func (i *fileDialogItem) pressShape() (internalwidget.PressShape, bool) {
+	th := i.Theme()
+	v := bellui.CurrentApp().Settings().ThemeVariant()
+	return internalwidget.PressShape{
+		Size:         i.Size(),
+		CornerRadius: th.Size(theme.SizeNameShapeSmall),
+		Content:      th.Color(theme.ColorNameOnSurface, v),
+	}, true
+}
+
+func (i *fileDialogItem) Tapped(ev *event.PointEvent) {
+	internalwidget.TapPress(&i.PressTarget, ev)
 	// Read the mode before choose runs: the tap that deselects the last file
 	// ends the mode inside it, and that tap is still a selection-mode tap —
 	// it must not arm (or fire) the double-tap open below.
@@ -131,7 +146,11 @@ func (i *fileDialogItem) LongPressed(ev *event.PointEvent) {
 
 func (i *fileDialogItem) HoverIn(*event.HoverEvent)    { i.hovered = true; i.Refresh() }
 func (i *fileDialogItem) HoverMoved(*event.HoverEvent) {}
-func (i *fileDialogItem) HoverOut()                    { i.hovered = false; i.Refresh() }
+func (i *fileDialogItem) HoverOut() {
+	internalwidget.CancelPress(&i.PressTarget)
+	i.hovered = false
+	i.Refresh()
+}
 
 func (f *fileDialog) newFileItem(location bellui.URI, dir, up bool) *fileDialogItem {
 	item := &fileDialogItem{

@@ -7,6 +7,7 @@ import (
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/data/binding"
+	"github.com/belluikit/bellui/driver/desktop"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/async"
@@ -968,6 +969,7 @@ var (
 
 type treeNode struct {
 	BaseWidget
+	pressTarget
 	tree     *Tree
 	uid      string
 	depth    int
@@ -988,11 +990,34 @@ func (n *treeNode) CreateRenderer() core.WidgetRenderer {
 	background := canvas.NewRectangle(th.Color(theme.ColorNameHover, v))
 	background.CornerRadius = th.Size(theme.SizeNameSelectionRadius)
 	background.Hide()
-	return &treeNodeRenderer{
+	r := &treeNodeRenderer{
 		BaseRenderer: widget.BaseRenderer{},
 		treeNode:     n,
 		background:   background,
+		ripple:       widget.AttachPress(&n.pressTarget, n.pressShape),
 	}
+	if icon, ok := n.icon.(*branchIcon); ok {
+		r.iconRipple = widget.AttachPress(&icon.pressTarget, n.iconPressShape)
+	}
+	return r
+}
+
+// pressShape is the whole row.
+func (n *treeNode) pressShape() (widget.PressShape, bool) {
+	return rowPressShape(n.Theme(), n.Size()), true
+}
+
+// iconPressShape is a circle around a branch's expand icon, as for an icon
+// button: a press on it toggles the branch and does not select the row.
+func (n *treeNode) iconPressShape() (widget.PressShape, bool) {
+	th := n.Theme()
+	icon := n.icon.Size()
+	d := geo.Min(n.Size().Height, th.Size(theme.SizeNameInlineIcon)+2*th.Size(theme.SizeNamePadding))
+	s := rowPressShape(th, geo.NewSquareSize(d))
+	s.Pos = n.icon.Position().Add(geo.NewPos((icon.Width-d)/2, (icon.Height-d)/2))
+	s.CornerRadius = d / 2
+	s.FromCenter = true
+	return s, true
 }
 
 func (n *treeNode) Indent() float32 {
@@ -1013,10 +1038,27 @@ func (n *treeNode) HoverMoved(*event.HoverEvent) {
 // HoverOut is called when a pointer exits the widget.
 func (n *treeNode) HoverOut() {
 	n.hovered = false
+	n.cancelIconPress()
+	widget.CancelPress(&n.pressTarget)
 	n.partialRefresh()
 }
 
-func (n *treeNode) Tapped(*event.PointEvent) {
+// MouseUp ends the row's pressed state. A press on the expand icon that was
+// released off it, on the row, ends too: the icon is not Hoverable, so it is
+// told of neither.
+func (n *treeNode) MouseUp(ev *desktop.MouseEvent) {
+	n.cancelIconPress()
+	n.pressTarget.MouseUp(ev)
+}
+
+func (n *treeNode) cancelIconPress() {
+	if icon, ok := n.icon.(*branchIcon); ok {
+		widget.CancelPress(&icon.pressTarget)
+	}
+}
+
+func (n *treeNode) Tapped(ev *event.PointEvent) {
+	widget.TapPress(&n.pressTarget, ev)
 	n.tree.Select(n.uid)
 	canvas := bellui.CurrentApp().Driver().CanvasForObject(n.tree.super())
 	if canvas != nil && canvas.Focused() != n.tree {
@@ -1102,6 +1144,8 @@ type treeNodeRenderer struct {
 	widget.BaseRenderer
 	treeNode   *treeNode
 	background *canvas.Rectangle
+	ripple     *canvas.Ripple
+	iconRipple *canvas.Ripple // a branch's, for its expand icon
 }
 
 func (r *treeNodeRenderer) Layout(size geo.Size) {
@@ -1136,9 +1180,12 @@ func (r *treeNodeRenderer) MinSize() (min geo.Size) {
 }
 
 func (r *treeNodeRenderer) Objects() (objects []core.CanvasObject) {
-	objects = append(objects, r.background)
+	objects = append(objects, r.background, r.ripple)
 	if r.treeNode.content != nil {
 		objects = append(objects, r.treeNode.content)
+	}
+	if r.iconRipple != nil {
+		objects = append(objects, r.iconRipple)
 	}
 	if r.treeNode.icon != nil {
 		objects = append(objects, r.treeNode.icon)
@@ -1209,8 +1256,9 @@ var _ event.Tappable = (*branchIcon)(nil)
 
 type branchIcon struct {
 	Icon
-	tree *Tree
-	uid  string
+	pressTarget // its node attaches it, and draws the ripple
+	tree        *Tree
+	uid         string
 }
 
 func newBranchIcon(tree *Tree) (i *branchIcon) {
@@ -1230,7 +1278,8 @@ func (i *branchIcon) Refresh() {
 	i.Icon.Refresh()
 }
 
-func (i *branchIcon) Tapped(*event.PointEvent) {
+func (i *branchIcon) Tapped(ev *event.PointEvent) {
+	widget.TapPress(&i.pressTarget, nil)
 	i.tree.ToggleBranch(i.uid)
 }
 
