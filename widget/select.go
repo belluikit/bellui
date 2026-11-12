@@ -11,6 +11,7 @@ import (
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
 	internaltheme "github.com/belluikit/bellui/internal/theme"
+	internalWidget "github.com/belluikit/bellui/internal/widget"
 	"github.com/belluikit/bellui/theme"
 )
 
@@ -29,6 +30,7 @@ var (
 // Select widget has a list of options, with the current one shown, and triggers an event func when clicked
 type Select struct {
 	DisableableWidget
+	pressTarget
 
 	// Alignment sets the text alignment of the select and its list of options.
 	//
@@ -51,7 +53,6 @@ type Select struct {
 	focused bool
 	hovered bool
 	popUp   *PopUpMenu
-	tapAnim *bellui.Animation
 }
 
 // NewSelect creates a new select widget with the set list of options and changes handler
@@ -138,10 +139,8 @@ func (s *Select) CreateRenderer() core.WidgetRenderer {
 	}
 
 	background := &canvas.Rectangle{}
-	tapBG := canvas.NewRectangle(color.Transparent)
-	s.tapAnim = newButtonTapAnimation(tapBG, s, th)
-	s.tapAnim.Curve = bellui.AnimationEaseOut
-	objects := []core.CanvasObject{background, tapBG, txtProv, icon}
+	ripple := internalWidget.AttachPress(&s.pressTarget, s.pressShape)
+	objects := []core.CanvasObject{background, ripple, txtProv, icon}
 	r := &selectRenderer{icon, txtProv, background, objects, s}
 	background.FillColor = r.bgColor(th, v)
 	background.CornerRadius = th.Size(theme.SizeNameInputRadius)
@@ -189,6 +188,7 @@ func (s *Select) HoverMoved(*event.HoverEvent) {
 
 // HoverOut is called when a desktop pointer exits the widget
 func (s *Select) HoverOut() {
+	internalWidget.CancelPress(&s.pressTarget)
 	s.hovered = false
 	s.Refresh()
 }
@@ -257,7 +257,7 @@ func (s *Select) SetSelectedIndex(index int) {
 }
 
 // Tapped is called when a pointer tapped event is captured and triggers any tap handler
-func (s *Select) Tapped(*event.PointEvent) {
+func (s *Select) Tapped(ev *event.PointEvent) {
 	if s.Disabled() {
 		return
 	}
@@ -266,7 +266,7 @@ func (s *Select) Tapped(*event.PointEvent) {
 		focusIfNotMobile(s.super())
 	}
 
-	s.tapAnimation()
+	internalWidget.TapPress(&s.pressTarget, ev)
 	s.Refresh()
 
 	s.showPopUp()
@@ -276,6 +276,7 @@ func (s *Select) Tapped(*event.PointEvent) {
 func (s *Select) TypedKey(ev *event.KeyEvent) {
 	switch ev.Name {
 	case event.KeySpace, event.KeyUp, event.KeyDown:
+		internalWidget.TapPress(&s.pressTarget, nil)
 		s.showPopUp()
 	case event.KeyRight:
 		// Under a right-to-left layout the visual reading order is reversed, so
@@ -359,14 +360,22 @@ func (s *Select) showPopUp() {
 	s.popUp = pop
 }
 
-func (s *Select) tapAnimation() {
-	if s.tapAnim == nil {
-		return
+// pressShape is the whole field, in OnSurface, unless it is disabled. It
+// replaces a ripple that ran only after the release (#1091).
+func (s *Select) pressShape() (internalWidget.PressShape, bool) {
+	if s.Disabled() {
+		return internalWidget.PressShape{}, false
 	}
-	s.tapAnim.Stop()
+	return selectPressShape(s.Theme(), s.Size()), true
+}
 
-	if bellui.CurrentApp().Settings().ShowAnimations() {
-		s.tapAnim.Start()
+// selectPressShape is the pressed state of a select field: the whole field,
+// with the input's corners, in OnSurface.
+func selectPressShape(th bellui.Theme, size geo.Size) internalWidget.PressShape {
+	return internalWidget.PressShape{
+		Size:         size,
+		CornerRadius: th.Size(theme.SizeNameInputRadius),
+		Content:      th.Color(theme.ColorNameOnSurface, bellui.CurrentApp().Settings().ThemeVariant()),
 	}
 }
 
@@ -440,8 +449,8 @@ func (s *selectRenderer) Objects() []core.CanvasObject {
 
 // Destroy has nothing to release: the renderer's objects are torn down by the
 // framework's destroy walk, the dropdown popup is owned by the Select widget and
-// dismissed in Hide, and tapAnim is a one-shot ease-out that unregisters when it
-// completes (the same reason Button leaves its tap animation to BaseRenderer).
+// dismissed in Hide, and the press feedback's animations are one-shot ones
+// that unregister when they complete, as for Button.
 func (s *selectRenderer) Destroy() {}
 
 // Layout the components of the button widget

@@ -41,7 +41,7 @@ func TestRichText_HyperLink(t *testing.T) {
 	}})
 	texts := test.TempWidgetRenderer(t, text).Objects()
 	assert.Equal(t, "Text", texts[0].(*canvas.Text).Text)
-	richLink := test.TempWidgetRenderer(t, texts[1].(*bellui.Container).Objects[0].(*Hyperlink)).Objects()[0].(core.Widget)
+	richLink := test.TempWidgetRenderer(t, texts[1].(*bellui.Container).Objects[0].(*Hyperlink)).Objects()[1].(core.Widget)
 	linkText := test.TempWidgetRenderer(t, richLink).Objects()[0].(*canvas.Text)
 	assert.Equal(t, "Link", linkText.Text)
 

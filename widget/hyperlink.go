@@ -8,8 +8,10 @@ import (
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/driver/desktop"
+	"github.com/belluikit/bellui/driver/mobile"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/cache"
 	"github.com/belluikit/bellui/internal/widget"
 	"github.com/belluikit/bellui/lang"
 	"github.com/belluikit/bellui/theme"
@@ -27,6 +29,7 @@ var (
 // When clicked, the default web browser should open with a URL
 type Hyperlink struct {
 	BaseWidget
+	pressTarget
 	Text      string
 	URL       *url.URL
 	Alignment bellui.TextAlign // The alignment of the Text
@@ -99,6 +102,7 @@ func (hl *Hyperlink) AccessibleActions() []core.AccessibleAction {
 // PerformAccessibleAction opens the link URL.
 func (hl *Hyperlink) PerformAccessibleAction(name string) {
 	if name == core.ActionPress {
+		widget.TapPress(&hl.pressTarget, nil)
 		hl.openURL()
 	}
 }
@@ -117,7 +121,8 @@ func (hl *Hyperlink) CreateRenderer() core.WidgetRenderer {
 	focus.Hide()
 	under := canvas.NewRectangle(th.Color(theme.ColorNamePrimary, v))
 	under.Hide()
-	return &hyperlinkRenderer{hl: hl, objects: []core.CanvasObject{&hl.provider, focus, under}, focus: focus, under: under}
+	ripple := widget.AttachPress(&hl.pressTarget, hl.pressShape)
+	return &hyperlinkRenderer{hl: hl, objects: []core.CanvasObject{ripple, &hl.provider, focus, under}, focus: focus, under: under}
 }
 
 // Cursor returns the cursor type of this widget
@@ -156,6 +161,7 @@ func (hl *Hyperlink) HoverMoved(e *event.HoverEvent) {
 
 // HoverOut is a hook that is called if the pointer leaves the element.
 func (hl *Hyperlink) HoverOut() {
+	widget.CancelPress(&hl.pressTarget)
 	changed := hl.hovered
 	hl.hovered = false
 	if changed {
@@ -259,7 +265,38 @@ func (hl *Hyperlink) Tapped(e *event.PointEvent) {
 	if len(hl.provider.Segments) != 0 && !hl.isPosOverText(e.Position) {
 		return // tapped outside text area
 	}
+	widget.TapPress(&hl.pressTarget, e)
 	hl.invokeAction()
+}
+
+// TouchDown shows the pressed state for a touch on the link's text (#1091).
+func (hl *Hyperlink) TouchDown(ev *mobile.TouchEvent) {
+	if hl.isPosOverText(ev.Position) {
+		hl.pressTarget.TouchDown(ev)
+	}
+}
+
+// MouseDown shows the pressed state for a press on the link's text.
+func (hl *Hyperlink) MouseDown(ev *desktop.MouseEvent) {
+	if hl.isPosOverText(ev.Position) {
+		hl.pressTarget.MouseDown(ev)
+	}
+}
+
+// pressShape is the box the focus ring draws round the text, in the link's
+// colour.
+func (hl *Hyperlink) pressShape() (widget.PressShape, bool) {
+	r, ok := cache.Renderer(hl.super()).(*hyperlinkRenderer)
+	if !ok {
+		return widget.PressShape{}, false
+	}
+	th := hl.Theme()
+	return widget.PressShape{
+		Pos:          r.focus.Position(),
+		Size:         r.focus.Size(),
+		CornerRadius: th.Size(theme.SizeNameSelectionRadius),
+		Content:      th.Color(hl.colorName(), bellui.CurrentApp().Settings().ThemeVariant()),
+	}, true
 }
 
 func (hl *Hyperlink) invokeAction() {
@@ -279,6 +316,7 @@ func (hl *Hyperlink) TypedRune(rune) {
 // TypedKey is a hook called by the input handling logic on key events if this object is focused.
 func (hl *Hyperlink) TypedKey(ev *event.KeyEvent) {
 	if ev.Name == event.KeySpace {
+		widget.TapPress(&hl.pressTarget, nil)
 		hl.invokeAction()
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
+	internalWidget "github.com/belluikit/bellui/internal/widget"
 	"github.com/belluikit/bellui/layout"
 	"github.com/belluikit/bellui/theme"
 )
@@ -21,6 +22,7 @@ var (
 // preferred options shown at the top with a divider.
 type SearchSelect struct {
 	DisableableWidget
+	pressTarget
 
 	Options     []string     // All available options
 	Preferred   []string     // Options shown first, above a divider
@@ -68,11 +70,32 @@ func (s *SearchSelect) ClearSelected() {
 }
 
 // Tapped opens the search popup.
-func (s *SearchSelect) Tapped(*event.PointEvent) {
+func (s *SearchSelect) Tapped(ev *event.PointEvent) {
 	if s.Disabled() {
 		return
 	}
+	internalWidget.TapPress(&s.pressTarget, ev)
 	s.showPopUp()
+}
+
+// HoverIn does nothing: the field is Hoverable for HoverOut.
+func (s *SearchSelect) HoverIn(*event.HoverEvent) {}
+
+// HoverMoved does nothing.
+func (s *SearchSelect) HoverMoved(*event.HoverEvent) {}
+
+// HoverOut ends a press the pointer took off the field: it gets no MouseUp
+// for a release elsewhere.
+func (s *SearchSelect) HoverOut() {
+	internalWidget.CancelPress(&s.pressTarget)
+}
+
+// pressShape is the whole field, in OnSurface, unless it is disabled (#1091).
+func (s *SearchSelect) pressShape() (internalWidget.PressShape, bool) {
+	if s.Disabled() {
+		return internalWidget.PressShape{}, false
+	}
+	return selectPressShape(s.Theme(), s.Size()), true
 }
 
 // CreateRenderer returns the renderer for SearchSelect.
@@ -86,7 +109,7 @@ func (s *SearchSelect) CreateRenderer() core.WidgetRenderer {
 	icon := NewIcon(s.Theme().Icon(theme.IconNameArrowDropDown))
 	bg := newSelectBackground(s)
 
-	objects := []core.CanvasObject{bg, label, icon}
+	objects := []core.CanvasObject{bg, internalWidget.AttachPress(&s.pressTarget, s.pressShape), label, icon}
 	r := &searchSelectRenderer{
 		label:   label,
 		icon:    icon,

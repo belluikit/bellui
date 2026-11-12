@@ -6,8 +6,11 @@ import (
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
+	"github.com/belluikit/bellui/driver/desktop"
+	"github.com/belluikit/bellui/driver/mobile"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/cache"
 	internalWidget "github.com/belluikit/bellui/internal/widget"
 	"github.com/belluikit/bellui/theme"
 )
@@ -44,6 +47,9 @@ type Chip struct {
 	OnTapped  func() `json:"-"`
 	OnDeleted func() `json:"-"` // for Input chips (shows X)
 
+	pressTarget
+	deletePress internalWidget.PressTarget // the delete X's own, on an input chip
+
 	hovered bool
 }
 
@@ -71,13 +77,93 @@ func NewFilterChip(text string, changed func(bool)) *Chip {
 func (c *Chip) Tapped(e *event.PointEvent) {
 	// On an input chip a tap landing on the trailing delete (X) button fires
 	// OnDeleted rather than OnTapped; otherwise the X would be inert (pre-rebrand tracker #291).
-	if c.Style == ChipStyleInput && c.OnDeleted != nil && e != nil && c.inDeleteRegion(e.Position.X) {
+	if c.hasDelete() && e != nil && c.inDeleteRegion(e.Position.X) {
+		internalWidget.TapPress(&c.deletePress, nil)
 		c.OnDeleted()
 		return
 	}
 	if c.OnTapped != nil {
+		internalWidget.TapPress(&c.pressTarget, e)
 		c.OnTapped()
 	}
+}
+
+// hasDelete reports whether the chip shows a delete X.
+func (c *Chip) hasDelete() bool { return c.Style == ChipStyleInput && c.OnDeleted != nil }
+
+// TouchDown shows the pressed state of the chip, or of its delete X for a
+// touch on the X (#1091).
+func (c *Chip) TouchDown(ev *mobile.TouchEvent) {
+	if c.hasDelete() && c.inDeleteRegion(ev.Position.X) {
+		c.deletePress.TouchDown(ev)
+		return
+	}
+	c.pressTarget.TouchDown(ev)
+}
+
+// TouchUp ends the pressed state.
+func (c *Chip) TouchUp(ev *mobile.TouchEvent) {
+	c.deletePress.TouchUp(ev)
+	c.pressTarget.TouchUp(ev)
+}
+
+// TouchCancel ends the pressed state with no feedback left.
+func (c *Chip) TouchCancel(ev *mobile.TouchEvent) {
+	c.deletePress.TouchCancel(ev)
+	c.pressTarget.TouchCancel(ev)
+}
+
+// MouseDown shows the pressed state of the chip, or of its delete X for a
+// press on the X.
+func (c *Chip) MouseDown(ev *desktop.MouseEvent) {
+	if c.hasDelete() && c.inDeleteRegion(ev.Position.X) {
+		c.deletePress.MouseDown(ev)
+		return
+	}
+	c.pressTarget.MouseDown(ev)
+}
+
+// MouseUp ends the pressed state.
+func (c *Chip) MouseUp(ev *desktop.MouseEvent) {
+	c.deletePress.MouseUp(ev)
+	c.pressTarget.MouseUp(ev)
+}
+
+// pressShape is the whole chip, in its label's colour, while it has a tap
+// handler.
+func (c *Chip) pressShape() (internalWidget.PressShape, bool) {
+	if c.OnTapped == nil {
+		return internalWidget.PressShape{}, false
+	}
+	th := c.Theme()
+	content := theme.ColorNameOnSurface
+	if c.Style == ChipStyleFilter && c.Selected {
+		content = theme.ColorNameOnSecondaryContainer
+	}
+	return internalWidget.PressShape{
+		Size:         c.Size(),
+		CornerRadius: th.Size(theme.SizeNameShapeSmall),
+		Content:      th.Color(content, bellui.CurrentApp().Settings().ThemeVariant()),
+	}, true
+}
+
+// deletePressShape is a circle around the delete X, as for an icon button.
+func (c *Chip) deletePressShape() (internalWidget.PressShape, bool) {
+	r, ok := cache.Renderer(c.super()).(*chipRenderer)
+	if !ok || r.deleteBtn == nil {
+		return internalWidget.PressShape{}, false
+	}
+	th := c.Theme()
+	x := r.deleteBtn.Size()
+	d := geo.Min(c.Size().Height, x.Width+12)
+	centre := r.deleteBtn.Position().Add(geo.NewPos(x.Width/2, x.Height/2))
+	return internalWidget.PressShape{
+		Pos:          centre.SubtractXY(d/2, d/2),
+		Size:         geo.NewSquareSize(d),
+		CornerRadius: d / 2,
+		Content:      th.Color(theme.ColorNameOnSurfaceVariant, bellui.CurrentApp().Settings().ThemeVariant()),
+		FromCenter:   true,
+	}, true
 }
 
 // inDeleteRegion reports whether x falls on the delete button, which sits on
@@ -93,7 +179,12 @@ func (c *Chip) inDeleteRegion(x float32) bool {
 
 func (c *Chip) HoverIn(*event.HoverEvent)    { c.hovered = true; c.Refresh() }
 func (c *Chip) HoverMoved(*event.HoverEvent) {}
-func (c *Chip) HoverOut()                    { c.hovered = false; c.Refresh() }
+func (c *Chip) HoverOut() {
+	internalWidget.CancelPress(&c.deletePress)
+	internalWidget.CancelPress(&c.pressTarget)
+	c.hovered = false
+	c.Refresh()
+}
 
 func (c *Chip) MinSize() geo.Size {
 	c.ExtendBaseWidget(c)
@@ -108,7 +199,13 @@ func (c *Chip) CreateRenderer() core.WidgetRenderer {
 	label.TextSize = th.Size(theme.SizeNameLabelLarge)
 
 	var icon *canvas.Image
-	objects := []core.CanvasObject{bg, label}
+	objects := []core.CanvasObject{bg, internalWidget.AttachPress(&c.pressTarget, c.pressShape)}
+	var deleteRipple *canvas.Ripple
+	if c.hasDelete() {
+		deleteRipple = internalWidget.AttachPress(&c.deletePress, c.deletePressShape)
+		objects = append(objects, deleteRipple)
+	}
+	objects = append(objects, label)
 
 	if c.Icon != nil {
 		icon = canvas.NewImageFromResource(c.Icon)
@@ -188,8 +285,16 @@ func (r *chipRenderer) Layout(size geo.Size) {
 	}
 
 	// Under RTL the element row (icon | label | delete) reflects so the leading
-	// icon sits on the right; the full-width bg maps onto itself.
-	mirrorIfRTL(r.Objects(), size.Width)
+	// icon sits on the right; the full-width bg maps onto itself. The press
+	// ripples are left out: a press places them.
+	mirrored := []core.CanvasObject{r.bg, r.label}
+	if r.icon != nil {
+		mirrored = append(mirrored, r.icon)
+	}
+	if r.deleteBtn != nil {
+		mirrored = append(mirrored, r.deleteBtn)
+	}
+	mirrorIfRTL(mirrored, size.Width)
 }
 
 func (r *chipRenderer) Refresh() {
