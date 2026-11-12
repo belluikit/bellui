@@ -265,7 +265,9 @@ func (i *Image) Resize(s geo.Size) {
 	} else if isSVG || i.Image == nil {
 		i.Refresh() // we need to rasterise at the new size
 	} else {
-		Refresh(i) // just re-size using GPU scaling
+		// The decoded pixels stay, but this frees the texture: the painter
+		// builds a new one at the new size, scaling the pixels on the CPU.
+		Refresh(i)
 	}
 }
 
