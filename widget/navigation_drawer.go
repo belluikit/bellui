@@ -155,6 +155,7 @@ func (d *NavigationDrawer) Toggle(c core.Canvas) {
 
 type drawerItemWidget struct {
 	BaseWidget
+	pressTarget
 	bg       *canvas.Rectangle
 	icon     *canvas.Image
 	label    *canvas.Text
@@ -162,10 +163,36 @@ type drawerItemWidget struct {
 	onTap    func()
 }
 
-func (w *drawerItemWidget) Tapped(*event.PointEvent) {
+func (w *drawerItemWidget) Tapped(ev *event.PointEvent) {
 	if w.onTap != nil {
+		internalWidget.TapPress(&w.pressTarget, ev)
 		w.onTap()
 	}
+}
+
+// HoverIn does nothing: the item is Hoverable for HoverOut.
+func (w *drawerItemWidget) HoverIn(*event.HoverEvent) {}
+
+// HoverMoved does nothing.
+func (w *drawerItemWidget) HoverMoved(*event.HoverEvent) {}
+
+// HoverOut ends a press the pointer took off the item: it gets no MouseUp
+// for a release elsewhere.
+func (w *drawerItemWidget) HoverOut() {
+	internalWidget.CancelPress(&w.pressTarget)
+}
+
+// pressShape is the whole item, a pill like its selection, in its label's
+// colour.
+func (w *drawerItemWidget) pressShape() (internalWidget.PressShape, bool) {
+	if w.onTap == nil {
+		return internalWidget.PressShape{}, false
+	}
+	return internalWidget.PressShape{
+		Size:         w.Size(),
+		CornerRadius: w.bg.CornerRadius,
+		Content:      w.label.Color,
+	}, true
 }
 
 // AccessibleRole returns [core.RoleMenuItem]; the drawer is a menu-like
@@ -198,7 +225,7 @@ func (w *drawerItemWidget) PerformAccessibleAction(name string) {
 func (w *drawerItemWidget) CreateRenderer() core.WidgetRenderer {
 	w.ExtendBaseWidget(w)
 	return &drawerItemRenderer{
-		BaseRenderer: internalWidget.NewBaseRenderer([]core.CanvasObject{w.bg, w.icon, w.label}),
+		BaseRenderer: internalWidget.NewBaseRenderer([]core.CanvasObject{w.bg, internalWidget.AttachPress(&w.pressTarget, w.pressShape), w.icon, w.label}),
 		item:         w,
 	}
 }

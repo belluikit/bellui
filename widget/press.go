@@ -2,6 +2,7 @@ package widget
 
 import (
 	"github.com/belluikit/bellui"
+	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/widget"
 	"github.com/belluikit/bellui/theme"
@@ -19,5 +20,20 @@ func rowPressShape(th bellui.Theme, size geo.Size) widget.PressShape {
 		Size:         size,
 		CornerRadius: th.Size(theme.SizeNameSelectionRadius),
 		Content:      th.Color(theme.ColorNameOnSurface, v),
+	}
+}
+
+// navIndicatorPressShape is the pressed state of a navigation bar or rail
+// item: its indicator pill, in the colour of the icon in it.
+func navIndicatorPressShape(th bellui.Theme, indicator *canvas.Rectangle, selected bool) widget.PressShape {
+	content := theme.ColorNameOnSurfaceVariant
+	if selected {
+		content = theme.ColorNameOnSecondaryContainer
+	}
+	return widget.PressShape{
+		Pos:          indicator.Position(),
+		Size:         indicator.Size(),
+		CornerRadius: indicator.CornerRadius,
+		Content:      th.Color(content, bellui.CurrentApp().Settings().ThemeVariant()),
 	}
 }
