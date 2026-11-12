@@ -315,3 +315,36 @@ func TestVideoSurfaceResizeRejectsDegenerateSizes(t *testing.T) {
 		}
 	}
 }
+
+// A source that declared no size (0x0) gets the default surface; its frames
+// then arrive at their real size, and the first one resizes the buffers rather
+// than being truncated into them (#431, #712). The player is told, so the
+// letterboxing follows.
+func TestVideoSurfaceTakesTheFramesOwnSize(t *testing.T) {
+	s := newVideoSurface(0, 0)
+	var told [2]int
+	s.onResize = func(w, h int) { told = [2]int{w, h} }
+
+	frame := image.NewRGBA(image.Rect(0, 0, 1280, 720))
+	for i := range frame.Pix {
+		frame.Pix[i] = 0x5C
+	}
+	s.WriteFrame(frame)
+
+	rgba := s.raster.Generator(0, 0).(*image.RGBA)
+	if got := rgba.Bounds(); got.Dx() != 1280 || got.Dy() != 720 {
+		t.Fatalf("surface is %v, want the frame's 1280x720", got)
+	}
+	if last := rgba.Pix[len(rgba.Pix)-1]; last != 0x5C {
+		t.Errorf("last pixel = %#x, want the frame's: it was truncated", last)
+	}
+	if told != [2]int{1280, 720} {
+		t.Errorf("onResize told %v, want [1280 720]", told)
+	}
+
+	told = [2]int{}
+	s.WriteFrame(frame)
+	if told != [2]int{} {
+		t.Errorf("onResize told %v for a frame of the same size", told)
+	}
+}
