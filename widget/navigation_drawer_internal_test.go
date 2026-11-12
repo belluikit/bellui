@@ -205,9 +205,9 @@ func drawerScrim(t *testing.T, d *NavigationDrawer) *canvas.Rectangle {
 	return r.underlay
 }
 
-// A drawer with neither Side nor Top set is the drawer from before #1171: at
-// the left edge, full height, its scrim over the whole canvas, and a tap on
-// the scrim anywhere closes it.
+// A drawer with neither Side nor Top set comes to rest where the drawer from
+// before #1171 sat: at the left edge, full height, its scrim over the whole
+// canvas, and a tap on the scrim anywhere closes it.
 func TestNavigationDrawer_DefaultsUnchanged(t *testing.T) {
 	test.NewTempApp(t)
 	items := []*NavigationDrawerItem{{Label: "Home", Icon: theme.HomeIcon()}}
@@ -348,10 +348,9 @@ func TestNavigationDrawer_TopPastStatusBar(t *testing.T) {
 	assert.Equal(t, plainTop+48, rowTop)
 }
 
-// With animations on, an end drawer slides in from beyond the end edge to its
-// place; with them off, it appears there. A start drawer appears in place
-// either way, as it always has (#1171).
-func TestNavigationDrawer_EndSlidesIn(t *testing.T) {
+// With animations on, a drawer slides in from beyond its edge to its place;
+// with them off, it appears there (#1171).
+func TestNavigationDrawer_SlidesIn(t *testing.T) {
 	items := []*NavigationDrawerItem{{Label: "Home", Icon: theme.HomeIcon()}}
 	show := func(t *testing.T, noAnim bool, dir bellui.Direction, side DrawerSide) (*NavigationDrawer, *carouselAnimDriver, float32) {
 		t.Helper()
@@ -408,9 +407,28 @@ func TestNavigationDrawer_EndSlidesIn(t *testing.T) {
 		assert.Equal(t, width-360, surfaceX(t, d))
 	})
 
-	t.Run("start drawer: in place", func(t *testing.T) {
+	t.Run("start ltr slides from the left", func(t *testing.T) {
 		d, _, _ := show(t, false, bellui.DirectionLTR, DrawerSideStart)
+		require.NotNil(t, d.slide)
+		d.slide.Tick(0)
+		assert.Equal(t, float32(-360), surfaceX(t, d), "starts beyond the left edge")
+		d.slide.Tick(1)
+		assert.Equal(t, float32(0), surfaceX(t, d), "ends against the left edge")
+	})
+
+	t.Run("start rtl slides from the right", func(t *testing.T) {
+		d, _, width := show(t, false, bellui.DirectionRTL, DrawerSideStart)
+		require.NotNil(t, d.slide)
+		d.slide.Tick(0)
+		assert.Equal(t, width, surfaceX(t, d), "starts beyond the right edge")
+		d.slide.Tick(1)
+		assert.Equal(t, width-360, surfaceX(t, d), "ends against the right edge")
+	})
+
+	t.Run("animations off, start: in place", func(t *testing.T) {
+		d, drv, _ := show(t, true, bellui.DirectionLTR, DrawerSideStart)
 		assert.Nil(t, d.slide)
+		assert.Empty(t, drv.started)
 		assert.Equal(t, float32(0), surfaceX(t, d))
 	})
 

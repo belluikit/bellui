@@ -48,8 +48,8 @@ type NavigationDrawer struct {
 	Modal     bool
 
 	// Side is the edge the drawer opens against. The system insets on that
-	// side, such as a landscape notch, move with it. An end drawer slides in
-	// from its edge when animations are on; a start drawer appears in place.
+	// side, such as a landscape notch, move with it. With animations on, the
+	// drawer slides in from its edge.
 	//
 	// Since: 1.3
 	Side DrawerSide
@@ -65,7 +65,7 @@ type NavigationDrawer struct {
 	canvas core.Canvas
 	popUp  *PopUp
 	open   bool
-	slide  *bellui.Animation // an end drawer's slide in, while it runs
+	slide  *bellui.Animation // the slide in, while it runs
 }
 
 // NewNavigationDrawer creates a navigation drawer.
@@ -170,7 +170,7 @@ func (d *NavigationDrawer) Show(c core.Canvas) {
 	}
 	d.popUp.Resize(geo.NewSize(drawerWidth, canvasSize.Height-top))
 	d.popUp.Show()
-	if d.Side == DrawerSideEnd && bellui.CurrentApp().Settings().ShowAnimations() {
+	if bellui.CurrentApp().Settings().ShowAnimations() {
 		d.slideIn(x, top, drawerWidth, canvasSize.Width, atRight)
 	} else {
 		d.popUp.Move(geo.NewPos(x, top))
@@ -178,8 +178,8 @@ func (d *NavigationDrawer) Show(c core.Canvas) {
 	d.open = true
 }
 
-// slideIn moves an end drawer in from beyond its edge to x, as SideSheet
-// does (#1171). A start drawer appears in place, as it always has.
+// slideIn moves the drawer in from beyond its edge to x, as SideSheet does
+// (#1171).
 func (d *NavigationDrawer) slideIn(x, top, width, canvasWidth float32, atRight bool) {
 	from := -width
 	if atRight {
