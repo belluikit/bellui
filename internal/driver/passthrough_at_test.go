@@ -42,3 +42,48 @@ func TestFindObjectAtPosition_PassesInputThroughAt(t *testing.T) {
 	all = driver.FindAllObjectsAtPositionMatching(geo.NewPos(50, 60), func(o core.CanvasObject) bool { return o == scroller }, inside)
 	assert.Len(t, all, 1, "below top it is")
 }
+
+// passOverlay passes input through wherever nothing in it matches, as a
+// Toast or a tooltip does.
+type passOverlay struct{ objectTree }
+
+func (*passOverlay) PassesInputThrough() bool { return true }
+
+// The overlay stack is searched for scrollables the way taps are resolved
+// (#1173): a modal overlay stops the search even where nothing in it
+// scrolls, a pass-through one with nothing there lets it continue, and an
+// overlay's own scrollable is found wherever it is under the point.
+func TestFindAllInOverlaysAt(t *testing.T) {
+	size := geo.NewSize(100, 200)
+	isScrollable := func(o core.CanvasObject) bool { _, ok := o.(*scrollableTree); return ok }
+	at := geo.NewPos(50, 150)
+
+	modal := &objectTree{size: size}
+	pass := &passOverlay{objectTree{size: size}}
+	found, blocked := driver.FindAllInOverlaysAt(at, isScrollable, []core.CanvasObject{modal})
+	assert.Empty(t, found)
+	assert.True(t, blocked, "a modal scrim stops the scroll")
+
+	found, blocked = driver.FindAllInOverlaysAt(at, isScrollable, []core.CanvasObject{pass})
+	assert.Empty(t, found)
+	assert.False(t, blocked, "a pass-through overlay lets it reach the content")
+
+	found, blocked = driver.FindAllInOverlaysAt(at, isScrollable, []core.CanvasObject{modal, pass})
+	assert.Empty(t, found)
+	assert.True(t, blocked, "a toast above a modal leaves the modal a barrier")
+
+	list := &scrollableTree{objectTree{pos: geo.NewPos(0, 100), size: geo.NewSize(100, 100)}}
+	dialog := &objectTree{children: []core.CanvasObject{list}, size: size}
+	found, blocked = driver.FindAllInOverlaysAt(at, isScrollable, []core.CanvasObject{dialog, pass})
+	assert.False(t, blocked)
+	if assert.Len(t, found, 1, "the modal's own list beneath a toast scrolls") {
+		assert.Equal(t, list, found[0].Object)
+		assert.Equal(t, geo.NewPos(50, 50), found[0].Position)
+	}
+
+	band := &bandOverlay{objectTree: objectTree{size: size}, top: 40}
+	_, blocked = driver.FindAllInOverlaysAt(geo.NewPos(50, 20), isScrollable, []core.CanvasObject{band})
+	assert.False(t, blocked, "above a drawer's top the content scrolls")
+	_, blocked = driver.FindAllInOverlaysAt(geo.NewPos(50, 60), isScrollable, []core.CanvasObject{band})
+	assert.True(t, blocked, "below it the scrim stops the scroll")
+}

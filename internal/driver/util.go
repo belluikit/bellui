@@ -440,6 +440,32 @@ func FindAllObjectsAtPositionMatching(mouse geo.Position, matches func(object co
 	return results
 }
 
+// FindAllInOverlaysAt walks the overlay stack top-down the way
+// FindObjectAtPositionMatching does for taps, and returns every object
+// matching at mouse in the first overlay that has one, innermost first. An
+// input-pass-through overlay with no match there, or one that leaves mouse to
+// the content (InputPassThroughAt), lets the search continue downward. The
+// first other overlay is a barrier: blocked reports that it stopped the search
+// with nothing found, so the caller must not fall through to the content (a
+// scroll over a modal scrim, #1173).
+func FindAllInOverlaysAt(mouse geo.Position, matches func(object core.CanvasObject) bool, overlays []core.CanvasObject) (found []ObjectAtPosition, blocked bool) {
+	target := func(object core.CanvasObject) bool { return matchesHitTarget(object, matches) }
+	for i := len(overlays) - 1; i >= 0; i-- {
+		overlay := overlays[i]
+		if overlay == nil || overlayAbsentAt(overlay, mouse) {
+			continue
+		}
+		found = FindAllObjectsAtPositionMatching(mouse, target, nil, overlay)
+		if len(found) > 0 {
+			return found, false
+		}
+		if !overlayPassesInput(overlay) {
+			return nil, true
+		}
+	}
+	return nil, false
+}
+
 // ScrollConsumer is an optional interface for Scrollable objects that can report
 // whether a scroll event was consumed. If TryScrolled returns false, the scroll
 // event may propagate to a parent scrollable.
