@@ -193,6 +193,18 @@ func (p *painter) updateStreamingTexture(obj *canvas.Raster) {
 		width = obj.StreamPixW
 		height = obj.StreamPixH
 	}
+	if obj.StreamYCbCr != nil {
+		// A Y'CbCr frame (#1107) is converted on the processor here: the GL
+		// painter is being removed, so it gets no shader for it. PixelImage
+		// takes the lock itself and converts into a fresh image, so there is
+		// no race with SetYCbCr.
+		obj.StreamMu.Unlock()
+		if img, ok := obj.PixelImage(width, height).(*image.RGBA); ok {
+			pix = img.Pix
+			width, height = img.Rect.Dx(), img.Rect.Dy()
+		}
+		obj.StreamMu.Lock()
+	}
 
 	if pix == nil {
 		obj.StreamMu.Unlock()
