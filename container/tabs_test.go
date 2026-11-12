@@ -17,7 +17,7 @@ import (
 func TestTabButton_Icon_Change(t *testing.T) {
 	b := &tabButton{icon: theme.CancelIcon()}
 	r := cache.Renderer(b)
-	icon := r.Objects()[3].(*canvas.Image)
+	icon := r.Objects()[4].(*canvas.Image)
 	oldResource := icon.Resource
 
 	b.icon = theme.ConfirmIcon()

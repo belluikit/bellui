@@ -8,8 +8,10 @@ import (
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal"
 	"github.com/belluikit/bellui/internal/build"
+	"github.com/belluikit/bellui/internal/cache"
 	"github.com/belluikit/bellui/internal/driver"
 	intTheme "github.com/belluikit/bellui/internal/theme"
+	intwidget "github.com/belluikit/bellui/internal/widget"
 	"github.com/belluikit/bellui/theme"
 	"github.com/belluikit/bellui/widget"
 )
@@ -515,6 +517,7 @@ var (
 
 type tabButton struct {
 	widget.DisableableWidget
+	intwidget.PressTarget
 	hovered       bool
 	icon          bellui.Resource
 	iconPosition  buttonIconPosition
@@ -554,7 +557,8 @@ func (b *tabButton) CreateRenderer() core.WidgetRenderer {
 	close.ExtendBaseWidget(close)
 	close.Hide()
 
-	objects := []core.CanvasObject{background, label, close, icon}
+	ripple := intwidget.AttachPress(&b.PressTarget, b.pressShape)
+	objects := []core.CanvasObject{background, ripple, label, close, icon}
 	return &tabButtonRenderer{
 		button:     b,
 		background: background,
@@ -580,15 +584,31 @@ func (b *tabButton) HoverMoved(*event.HoverEvent) {
 
 func (b *tabButton) HoverOut() {
 	b.hovered = false
+	intwidget.CancelPress(&b.PressTarget)
 	b.Refresh()
 }
 
-func (b *tabButton) Tapped(*event.PointEvent) {
+func (b *tabButton) Tapped(ev *event.PointEvent) {
 	if b.Disabled() {
 		return
 	}
 
+	intwidget.TapPress(&b.PressTarget, ev)
 	b.onTapped()
+}
+
+// pressShape is the whole tab, in the colour of its label: Primary on the
+// current tab (#1091).
+func (b *tabButton) pressShape() (intwidget.PressShape, bool) {
+	r, ok := cache.Renderer(b).(*tabButtonRenderer)
+	if !ok || b.Disabled() {
+		return intwidget.PressShape{}, false
+	}
+	return intwidget.PressShape{
+		Size:         b.Size(),
+		CornerRadius: b.Theme().Size(theme.SizeNameSelectionRadius),
+		Content:      r.label.Color,
+	}, true
 }
 
 // AccessibleRole returns [core.RoleTab]; AppTabs/DocTabs are the tab list.
@@ -797,6 +817,7 @@ var (
 
 type tabCloseButton struct {
 	widget.BaseWidget
+	intwidget.PressTarget
 	parent   *tabButton
 	hovered  bool
 	onTapped func()
@@ -816,8 +837,25 @@ func (b *tabCloseButton) CreateRenderer() core.WidgetRenderer {
 		button:     b,
 		background: background,
 		icon:       icon,
-		objects:    []core.CanvasObject{background, icon},
+		objects:    []core.CanvasObject{background, intwidget.AttachPress(&b.PressTarget, b.pressShape), icon},
 	}
+}
+
+// pressShape is a circle around the icon, in its colour, wherever on the
+// button the press lands.
+func (b *tabCloseButton) pressShape() (intwidget.PressShape, bool) {
+	th := b.Theme()
+	content := th.Color(theme.ColorNameForeground, bellui.CurrentApp().Settings().ThemeVariant())
+	if b.parent.importance == widget.HighImportance {
+		content = th.Color(theme.ColorNamePrimary, bellui.CurrentApp().Settings().ThemeVariant())
+	}
+	size := b.Size()
+	return intwidget.PressShape{
+		Size:         size,
+		CornerRadius: geo.Min(size.Width, size.Height) / 2,
+		Content:      content,
+		FromCenter:   true,
+	}, true
 }
 
 func (b *tabCloseButton) MinSize() geo.Size {
@@ -835,10 +873,12 @@ func (b *tabCloseButton) HoverMoved(*event.HoverEvent) {
 
 func (b *tabCloseButton) HoverOut() {
 	b.hovered = false
+	intwidget.CancelPress(&b.PressTarget)
 	b.parent.Refresh()
 }
 
-func (b *tabCloseButton) Tapped(*event.PointEvent) {
+func (b *tabCloseButton) Tapped(ev *event.PointEvent) {
+	intwidget.TapPress(&b.PressTarget, ev)
 	b.onTapped()
 }
 

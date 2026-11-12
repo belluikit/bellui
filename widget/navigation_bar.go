@@ -8,6 +8,7 @@ import (
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/cache"
 	internalWidget "github.com/belluikit/bellui/internal/widget"
 	"github.com/belluikit/bellui/theme"
 )
@@ -63,6 +64,7 @@ func (n *NavigationBar) CreateRenderer() core.WidgetRenderer {
 
 type navBarItemWidget struct {
 	BaseWidget
+	pressTarget
 	item     *NavigationBarItem
 	selected bool
 	onTap    func()
@@ -74,10 +76,32 @@ func newNavBarItem(item *NavigationBarItem, selected bool, onTap func()) *navBar
 	return w
 }
 
-func (w *navBarItemWidget) Tapped(*event.PointEvent) {
+func (w *navBarItemWidget) Tapped(ev *event.PointEvent) {
 	if w.onTap != nil {
+		internalWidget.TapPress(&w.pressTarget, ev)
 		w.onTap()
 	}
+}
+
+// HoverIn does nothing: the item is Hoverable for HoverOut.
+func (w *navBarItemWidget) HoverIn(*event.HoverEvent) {}
+
+// HoverMoved does nothing.
+func (w *navBarItemWidget) HoverMoved(*event.HoverEvent) {}
+
+// HoverOut ends a press the pointer took off the item: it gets no MouseUp
+// for a release elsewhere.
+func (w *navBarItemWidget) HoverOut() {
+	internalWidget.CancelPress(&w.pressTarget)
+}
+
+// pressShape is the indicator pill, in the colour of the icon it holds.
+func (w *navBarItemWidget) pressShape() (internalWidget.PressShape, bool) {
+	r, ok := cache.Renderer(w).(*navBarItemRenderer)
+	if !ok || w.onTap == nil {
+		return internalWidget.PressShape{}, false
+	}
+	return navIndicatorPressShape(w.Theme(), r.indicator, w.selected), true
 }
 
 // AccessibleRole returns [core.RoleTab]; the bar hosts one selected destination of N.
@@ -115,7 +139,7 @@ func (w *navBarItemWidget) CreateRenderer() core.WidgetRenderer {
 	label.Alignment = bellui.TextAlignCenter
 
 	r := &navBarItemRenderer{
-		BaseRenderer: internalWidget.NewBaseRenderer([]core.CanvasObject{indicator, icon, label}),
+		BaseRenderer: internalWidget.NewBaseRenderer([]core.CanvasObject{indicator, internalWidget.AttachPress(&w.pressTarget, w.pressShape), icon, label}),
 		indicator:    indicator,
 		icon:         icon,
 		label:        label,
