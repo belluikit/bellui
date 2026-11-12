@@ -1493,6 +1493,7 @@ func (r *tableCellsRenderer) refreshForID(toDraw TableCellID) {
 
 	for id, old := range wasVisible {
 		if _, ok := r.visible[id]; !ok {
+			unfocusRecycled(old)
 			r.pool.Put(old)
 		}
 	}
@@ -1840,6 +1841,7 @@ func (r *tableCellsRenderer) refreshHeaders(visibleRowHeights, visibleColWidths 
 
 	for id, old := range wasVisible {
 		if _, ok := r.headers[id]; !ok {
+			unfocusRecycled(old)
 			r.headerPool.Put(old)
 		}
 	}

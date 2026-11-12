@@ -806,6 +806,7 @@ func (l *gridWrapLayout) updateGrid(newOnly bool) {
 
 	for _, old := range l.wasVisible {
 		if _, ok := l.searchVisible(l.visible, old.id); !ok {
+			unfocusRecycled(old.item)
 			l.itemPool.Put(old.item)
 		}
 	}
