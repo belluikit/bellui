@@ -8,6 +8,7 @@ import (
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/cache"
 	"github.com/belluikit/bellui/internal/widget"
 	"github.com/belluikit/bellui/theme"
 )
@@ -28,6 +29,7 @@ func newRadioItem(label string, onTap func(*radioItem)) *radioItem {
 // radioItem is a single radio item to be used by RadioGroup.
 type radioItem struct {
 	DisableableWidget
+	pressTarget
 
 	Label    string
 	Selected bool
@@ -75,7 +77,8 @@ func (i *radioItem) CreateRenderer() core.WidgetRenderer {
 	txt := canvas.Text{Alignment: bellui.TextAlignLeading}
 	txt.TextSize = i.Theme().Size(theme.SizeNameText)
 	r := &radioItemRenderer{item: i, label: &txt}
-	r.SetObjects([]core.CanvasObject{&r.focusIndicator, &r.icon, &r.over, &txt})
+	ripple := widget.AttachPress(&i.pressTarget, i.pressShape)
+	r.SetObjects([]core.CanvasObject{&r.focusIndicator, ripple, &r.icon, &r.over, &txt})
 	r.update()
 	return r
 }
@@ -108,6 +111,7 @@ func (i *radioItem) HoverMoved(_ *event.HoverEvent) {
 
 // HoverOut is called when a desktop pointer exits the widget
 func (i *radioItem) HoverOut() {
+	widget.CancelPress(&i.pressTarget)
 	if i.Disabled() {
 		return
 	}
@@ -127,7 +131,8 @@ func (i *radioItem) SetSelected(selected bool) {
 }
 
 // Tapped is called when a pointer tapped event is captured and triggers any change handler
-func (i *radioItem) Tapped(_ *event.PointEvent) {
+func (i *radioItem) Tapped(ev *event.PointEvent) {
+	widget.TapPress(&i.pressTarget, ev)
 	if !i.focused {
 		focusIfNotMobile(i.super())
 	}
@@ -141,8 +146,19 @@ func (i *radioItem) TypedKey(_ *event.KeyEvent) {
 // TypedRune is called when this item receives a char event.
 func (i *radioItem) TypedRune(r rune) {
 	if r == ' ' {
+		widget.TapPress(&i.pressTarget, nil)
 		i.toggle()
 	}
+}
+
+// pressShape is the circle around the radio button, unless the item is
+// disabled or does nothing on a tap (#1091).
+func (i *radioItem) pressShape() (widget.PressShape, bool) {
+	r, ok := cache.Renderer(i.super()).(*radioItemRenderer)
+	if !ok || i.Disabled() || i.onTap == nil {
+		return widget.PressShape{}, false
+	}
+	return controlPressShape(i.Theme(), &r.focusIndicator, i.Selected), true
 }
 
 func (i *radioItem) toggle() {

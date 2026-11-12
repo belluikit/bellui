@@ -8,8 +8,11 @@ import (
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/data/binding"
+	"github.com/belluikit/bellui/driver/desktop"
+	"github.com/belluikit/bellui/driver/mobile"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/cache"
 	"github.com/belluikit/bellui/internal/widget"
 	"github.com/belluikit/bellui/theme"
 )
@@ -23,6 +26,7 @@ var (
 // Check widget has a text label and a checked (or unchecked) icon and triggers an event func when toggled
 type Check struct {
 	DisableableWidget
+	pressTarget
 	Text    string
 	Checked bool
 
@@ -163,6 +167,7 @@ func (c *Check) HoverIn(me *event.HoverEvent) {
 
 // HoverOut is called when a desktop pointer exits the widget
 func (c *Check) HoverOut() {
+	widget.CancelPress(&c.pressTarget)
 	if c.hovered {
 		c.hovered = false
 		c.Refresh()
@@ -193,18 +198,50 @@ func (c *Check) Tapped(pe *event.PointEvent) {
 		return
 	}
 
-	minHeight := c.minSize.Height
-	minY := (c.Size().Height - minHeight) / 2
-	if !c.minSize.IsZero() &&
-		(pe.Position.X > c.minSize.Width || pe.Position.Y < minY || pe.Position.Y > minY+minHeight) {
+	if !c.inActiveArea(pe.Position) {
 		// tapped outside the active area of the widget
 		return
 	}
 
+	widget.TapPress(&c.pressTarget, pe)
 	if !c.focused {
 		focusIfNotMobile(c.super())
 	}
 	c.SetChecked(!c.Checked)
+}
+
+// inActiveArea reports whether pos, in the check's coordinates, is on its
+// box or label rather than in the space beyond them.
+func (c *Check) inActiveArea(pos geo.Position) bool {
+	minHeight := c.minSize.Height
+	minY := (c.Size().Height - minHeight) / 2
+	return c.minSize.IsZero() ||
+		(pos.X <= c.minSize.Width && pos.Y >= minY && pos.Y <= minY+minHeight)
+}
+
+// TouchDown shows the pressed state around the box, for a touch on the box
+// or its label (#1091).
+func (c *Check) TouchDown(ev *mobile.TouchEvent) {
+	if c.inActiveArea(ev.Position) {
+		c.pressTarget.TouchDown(ev)
+	}
+}
+
+// MouseDown shows the pressed state around the box, for a press on the box
+// or its label.
+func (c *Check) MouseDown(ev *desktop.MouseEvent) {
+	if c.inActiveArea(ev.Position) {
+		c.pressTarget.MouseDown(ev)
+	}
+}
+
+// pressShape is the circle around the box, unless the check is disabled.
+func (c *Check) pressShape() (widget.PressShape, bool) {
+	r, ok := cache.Renderer(c.super()).(*checkRenderer)
+	if !ok || c.Disabled() {
+		return widget.PressShape{}, false
+	}
+	return controlPressShape(c.Theme(), r.focusIndicator, c.Checked || c.Partial), true
 }
 
 // MinSize returns the size that this widget should not shrink below
@@ -227,8 +264,9 @@ func (c *Check) CreateRenderer() core.WidgetRenderer {
 	text.Alignment = bellui.TextAlignLeading
 
 	focusIndicator := canvas.NewCircle(th.Color(theme.ColorNameBackground, v))
+	ripple := widget.AttachPress(&c.pressTarget, c.pressShape)
 	r := &checkRenderer{
-		widget.NewBaseRenderer([]core.CanvasObject{focusIndicator, bg, icon, text}),
+		widget.NewBaseRenderer([]core.CanvasObject{focusIndicator, ripple, bg, icon, text}),
 		bg,
 		icon,
 		text,
@@ -265,6 +303,7 @@ func (c *Check) TypedRune(r rune) {
 		return
 	}
 	if r == ' ' {
+		widget.TapPress(&c.pressTarget, nil)
 		c.SetChecked(!c.Checked)
 		// Check activates via a rune (space), not TypedKey, so the driver's
 		// event.Activatable hook (on the key path) does not cover it — emit the
@@ -381,8 +420,9 @@ func (c *checkRenderer) Layout(size geo.Size) {
 
 	// Under RTL reflect so the check icon sits on the right and the label on the
 	// left; the label keeps its remaining-width box and the painter flips its
-	// leading alignment to trailing, so the text reads from the inner edge.
-	mirrorIfRTL(c.Objects(), size.Width)
+	// leading alignment to trailing, so the text reads from the inner edge. The
+	// press ripple is left out: a press places it on the mirrored indicator.
+	mirrorIfRTL([]core.CanvasObject{c.focusIndicator, c.bg, c.icon, c.label}, size.Width)
 }
 
 // applyTheme updates this Check to the current theme

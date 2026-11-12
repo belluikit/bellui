@@ -241,6 +241,7 @@ func ShowDatePicker(selected time.Time, changed func(time.Time), c core.Canvas) 
 // widget so screen readers can reach and activate individual days (pre-rebrand tracker #521).
 type dateDayCell struct {
 	BaseWidget
+	pressTarget
 	bg    *canvas.Circle
 	label *canvas.Text
 
@@ -262,16 +263,45 @@ func newDateDayCell(onTap func(*dateDayCell)) *dateDayCell {
 func (c *dateDayCell) CreateRenderer() core.WidgetRenderer {
 	c.ExtendBaseWidget(c)
 	return &dateDayCellRenderer{
-		BaseRenderer: internalWidget.NewBaseRenderer([]core.CanvasObject{c.bg, c.label}),
+		BaseRenderer: internalWidget.NewBaseRenderer([]core.CanvasObject{c.bg, internalWidget.AttachPress(&c.pressTarget, c.pressShape), c.label}),
 		cell:         c,
 	}
 }
 
-func (c *dateDayCell) Tapped(*event.PointEvent) {
+func (c *dateDayCell) Tapped(ev *event.PointEvent) {
 	if c.day == 0 || c.onTap == nil {
 		return
 	}
+	internalWidget.TapPress(&c.pressTarget, ev)
 	c.onTap(c)
+}
+
+// HoverIn does nothing: the day is Hoverable for HoverOut.
+func (c *dateDayCell) HoverIn(*event.HoverEvent) {}
+
+// HoverMoved does nothing.
+func (c *dateDayCell) HoverMoved(*event.HoverEvent) {}
+
+// HoverOut ends a press the pointer took off the day: it gets no MouseUp
+// for a release elsewhere.
+func (c *dateDayCell) HoverOut() {
+	internalWidget.CancelPress(&c.pressTarget)
+}
+
+// pressShape is the day's circle, in its number's colour, while the cell
+// holds a day (#1091).
+func (c *dateDayCell) pressShape() (internalWidget.PressShape, bool) {
+	if c.day == 0 || c.onTap == nil {
+		return internalWidget.PressShape{}, false
+	}
+	size := c.bg.Size()
+	return internalWidget.PressShape{
+		Pos:          c.bg.Position(),
+		Size:         size,
+		CornerRadius: size.Width / 2,
+		Content:      c.label.Color,
+		FromCenter:   true,
+	}, true
 }
 
 // date returns the cell's day as a time; only meaningful when day != 0.

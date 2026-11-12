@@ -7,6 +7,7 @@ import (
 	"github.com/belluikit/bellui/driver/desktop"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
+	internalwidget "github.com/belluikit/bellui/internal/widget"
 	"github.com/belluikit/bellui/lang"
 	"github.com/belluikit/bellui/theme"
 )
@@ -19,6 +20,7 @@ var (
 
 type passwordRevealer struct {
 	BaseWidget
+	pressTarget
 
 	icon  *canvas.Image
 	entry *Entry
@@ -35,10 +37,11 @@ func newPasswordRevealer(e *Entry) *passwordRevealer {
 }
 
 func (r *passwordRevealer) CreateRenderer() core.WidgetRenderer {
+	ripple := internalwidget.AttachPress(&r.pressTarget, r.pressShape)
 	return &passwordRevealerRenderer{
-		WidgetRenderer: NewSimpleRenderer(r.icon),
-		icon:           r.icon,
-		entry:          r.entry,
+		BaseRenderer: internalwidget.NewBaseRenderer([]core.CanvasObject{ripple, r.icon}),
+		icon:         r.icon,
+		entry:        r.entry,
 	}
 }
 
@@ -78,10 +81,11 @@ func (r *passwordRevealer) PerformAccessibleAction(name string) {
 	}
 }
 
-func (r *passwordRevealer) Tapped(*event.PointEvent) {
+func (r *passwordRevealer) Tapped(ev *event.PointEvent) {
 	if r.entry.Disabled() {
 		return
 	}
+	internalwidget.TapPress(&r.pressTarget, ev)
 
 	r.entry.setFieldsAndRefresh(func() {
 		r.entry.Password = !r.entry.Password
@@ -91,10 +95,40 @@ func (r *passwordRevealer) Tapped(*event.PointEvent) {
 	}
 }
 
+// HoverIn does nothing: the button is Hoverable for HoverOut.
+func (r *passwordRevealer) HoverIn(*event.HoverEvent) {}
+
+// HoverMoved does nothing.
+func (r *passwordRevealer) HoverMoved(*event.HoverEvent) {}
+
+// HoverOut ends a press the pointer took off the button: it gets no MouseUp
+// for a release elsewhere.
+func (r *passwordRevealer) HoverOut() {
+	internalwidget.CancelPress(&r.pressTarget)
+}
+
+// pressShape is a circle around the eye icon, in its colour, as for an icon
+// button (#1091).
+func (r *passwordRevealer) pressShape() (internalwidget.PressShape, bool) {
+	if r.entry.Disabled() {
+		return internalwidget.PressShape{}, false
+	}
+	size := r.Size()
+	d := geo.Min(size.Width, size.Height)
+	th := r.entry.Theme()
+	return internalwidget.PressShape{
+		Pos:          geo.NewPos((size.Width-d)/2, (size.Height-d)/2),
+		Size:         geo.NewSquareSize(d),
+		CornerRadius: d / 2,
+		Content:      th.Color(theme.ColorNameOnSurfaceVariant, bellui.CurrentApp().Settings().ThemeVariant()),
+		FromCenter:   true,
+	}, true
+}
+
 var _ core.WidgetRenderer = (*passwordRevealerRenderer)(nil)
 
 type passwordRevealerRenderer struct {
-	core.WidgetRenderer
+	internalwidget.BaseRenderer
 	entry *Entry
 	icon  *canvas.Image
 }
