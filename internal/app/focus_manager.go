@@ -142,6 +142,24 @@ func (f *FocusManager) focus(obj event.Focusable) {
 	}
 }
 
+// Chain returns the focusables Tab visits, in order, with where each is on
+// the canvas.
+func (f *FocusManager) Chain() []FocusEntry {
+	order := f.focusOrder()
+	out := make([]FocusEntry, len(order))
+	for i, o := range order {
+		out[i] = FocusEntry{Focusable: o.focusable, Pos: o.pos, Size: o.size}
+	}
+	return out
+}
+
+// FocusEntry is one focusable of a Chain and its absolute bounds.
+type FocusEntry struct {
+	Focusable event.Focusable
+	Pos       geo.Position
+	Size      geo.Size
+}
+
 func (f *FocusManager) nextInChain(current event.Focusable) event.Focusable {
 	return f.step(current, 1)
 }

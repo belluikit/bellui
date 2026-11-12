@@ -20,20 +20,35 @@
 //
 // Widget callbacks print PROBE-prefixed lines to stdout so an external
 // driver can confirm an action reached the widget, not just the bridge.
+//
+// With -drawer it shows one window instead, "Probe Drawer": a header with a
+// button and an entry, a button below it, and a navigation drawer open below
+// the header (#1172). A screen reader must reach the header's two controls
+// and the drawer's, and not the button the drawer's scrim covers; list them
+// with darwin/axlist.
 package main
 
 import (
+	"flag"
 	"fmt"
 
+	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/app"
 	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/theme"
 	"github.com/belluikit/bellui/widget"
 )
 
 func main() {
+	drawer := flag.Bool("drawer", false, "show the drawer-below-a-header window only")
+	flag.Parse()
 	a := app.New()
+	if *drawer {
+		drawerWindow(a)
+		return
+	}
 
 	wA := a.NewWindow("Probe A")
 	slider := widget.NewSlider(0, 100)
@@ -110,5 +125,32 @@ func main() {
 
 	wA.Show()
 	wB.Show()
+	a.Run()
+}
+
+// drawerWindow shows a navigation drawer open below a header (#1172).
+func drawerWindow(a bellui.App) {
+	w := a.NewWindow("Probe Drawer")
+	headerEntry := widget.NewEntry()
+	headerEntry.SetPlaceHolder("Header field")
+	header := container.NewHBox(
+		widget.NewButton("Header action", func() { fmt.Println("PROBE header action") }),
+		container.NewGridWrap(geo.NewSize(200, headerEntry.MinSize().Height), headerEntry),
+	)
+	covered := widget.NewButton("Covered action", func() { fmt.Println("PROBE covered action") })
+	w.SetContent(container.NewBorder(header, nil, nil, nil, container.NewVBox(covered)))
+	w.Resize(geo.NewSize(560, 500))
+
+	d := widget.NewNavigationDrawer([]*widget.NavigationDrawerItem{
+		{Label: "Drawer home", Icon: theme.HomeIcon()},
+		{Label: "Drawer settings", Icon: theme.SettingsIcon()},
+	}, func(i int) { fmt.Println("PROBE drawer item", i) })
+	d.Modal = true
+	w.Show()
+	bellui.Do(func() {
+		d.Top = header.Position().Y + header.Size().Height
+		d.Show(w.Canvas())
+		fmt.Println("PROBE drawer open, top", d.Top)
+	})
 	a.Run()
 }

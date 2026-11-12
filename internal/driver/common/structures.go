@@ -251,6 +251,8 @@ type overlayStack struct {
 	// painted is repainted. Without it the overlay stayed on screen wherever
 	// nothing beneath it repainted (#826).
 	forget func(*RenderCacheNode)
+	// removed is told of each overlay taken off the stack.
+	removed func(core.CanvasObject)
 }
 
 func (o *overlayStack) Add(overlay core.CanvasObject) {
@@ -274,6 +276,9 @@ func (o *overlayStack) Remove(overlay core.CanvasObject) {
 		if o.forget != nil && o.renderCaches[i] != nil {
 			o.forget(o.renderCaches[i].root)
 		}
+		if o.removed != nil && o.renderCaches[i] != nil {
+			o.removed(o.renderCaches[i].root.obj)
+		}
 		o.renderCaches[i] = nil // release memory reference to removed element
 	}
 
@@ -290,6 +295,9 @@ func (o *overlayStack) RemoveOnly(overlay core.CanvasObject) {
 	o.OverlayStack.RemoveOnly(overlay)
 	if o.forget != nil && o.renderCaches[i] != nil {
 		o.forget(o.renderCaches[i].root)
+	}
+	if o.removed != nil {
+		o.removed(overlay)
 	}
 	o.renderCaches = slices.Delete(o.renderCaches, i, i+1)
 }

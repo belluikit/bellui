@@ -15,7 +15,6 @@ import (
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/accessibility"
-	intdriver "github.com/belluikit/bellui/internal/driver"
 	"github.com/belluikit/bellui/internal/scale"
 	"github.com/belluikit/bellui/internal/textinput"
 )
@@ -230,7 +229,7 @@ type mobileA11yCustomAct struct {
 // Android rebuilds wholesale and only needs the registry pruned).
 func (w *window) mobileA11yGather() (nodes []mobileA11yNode, removed []uintptr) {
 	c := w.canvas
-	forest := accessibility.BuildTree(w.mobileA11yRoots()...)
+	forest := accessibility.BuildRoots(accessibility.CanvasRoots(w.canvas, w.canvas.windowHead, w.canvas.menu))
 
 	var focusedObj core.CanvasObject
 	if f := c.Focused(); f != nil {
@@ -272,44 +271,6 @@ func (w *window) mobileA11yGather() (nodes []mobileA11yNode, removed []uintptr) 
 		}
 	}
 	return nodes, removed
-}
-
-// mobileA11yRoots returns the object roots the flat sequence is built from,
-// honouring modal overlays: a modal (non-input-pass-through) overlay makes
-// everything beneath it inert, so the sequence contains only that overlay and
-// any transient (pass-through) overlays stacked above it — matching native
-// modal semantics and the input hit-test barrier
-// (internal/driver.FindObjectAtPositionMatching, pre-rebrand tracker #569). Without this the content
-// under a dialog stays focusable and activatable by a screen reader (pre-rebrand tracker #807).
-// Toast/Snackbar overlays pass input through, so they are not barriers and the
-// content below stays reachable.
-func (w *window) mobileA11yRoots() []core.CanvasObject {
-	c := w.canvas
-	overlays := c.Overlays().List()
-	for i := len(overlays) - 1; i >= 0; i-- {
-		if !overlayA11yPassesThrough(overlays[i]) {
-			return overlays[i:]
-		}
-	}
-	var roots []core.CanvasObject
-	if content := c.Content(); content != nil {
-		roots = append(roots, content)
-	}
-	if c.windowHead != nil {
-		roots = append(roots, c.windowHead)
-	}
-	if c.menu != nil {
-		roots = append(roots, c.menu)
-	}
-	return append(roots, overlays...)
-}
-
-// overlayA11yPassesThrough reports whether an overlay lets input (and thus a
-// screen reader) reach the layers beneath it — a tooltip/Toast/Snackbar — rather
-// than acting as a modal barrier. Mirrors internal/driver.overlayPassesInput.
-func overlayA11yPassesThrough(o core.CanvasObject) bool {
-	pt, ok := o.(intdriver.InputPassThrough)
-	return ok && pt.PassesInputThrough()
 }
 
 // flattenA11yNode appends the wire node for n (when it is exposable) and

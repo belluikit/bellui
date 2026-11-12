@@ -47,6 +47,11 @@ type Canvas struct {
 	contentFocusMgr *app.FocusManager
 	menuFocusMgr    *app.FocusManager
 	overlays        overlayStack
+	// bandFocus is the overlay that owns the keyboard while the focus is in
+	// the content, on an object in the band of the canvas that overlay leaves
+	// to the content: a field in a header above a drawer (#1172). Nil while
+	// the focus is where the top overlay's manager says.
+	bandFocus core.CanvasObject
 
 	shortcut bellui.ShortcutHandler
 
@@ -325,8 +330,15 @@ func (c *Canvas) EnsureMinSize() bool {
 
 // Focus makes the provided item focused.
 func (c *Canvas) Focus(obj event.Focusable) {
+	c.leaveBandFor(obj)
 	focusMgr := c.focusManager()
 	if focusMgr != nil && focusMgr.Focus(obj) { // fast path – probably >99.9% of all cases
+		if c.OnFocus != nil {
+			c.OnFocus(obj)
+		}
+		return
+	}
+	if c.focusAcrossBand(obj) {
 		if c.OnFocus != nil {
 			c.OnFocus(obj)
 		}
@@ -381,6 +393,9 @@ func (c *Canvas) FocusLost() {
 
 // FocusNext focuses the next focusable item.
 func (c *Canvas) FocusNext() {
+	if c.stepBand(1) {
+		return
+	}
 	mgr := c.focusManager()
 	if mgr == nil {
 		return
@@ -399,6 +414,9 @@ func (c *Canvas) FocusNext() {
 
 // FocusPrevious focuses the previous focusable item.
 func (c *Canvas) FocusPrevious() {
+	if c.stepBand(-1) {
+		return
+	}
 	mgr := c.focusManager()
 	if mgr == nil {
 		return
@@ -467,6 +485,11 @@ func (c *Canvas) Initialize(impl SizeableCanvas, onOverlayChanged func()) {
 		Canvas:   impl,
 	}
 	c.overlays.forget = c.forgetNodes
+	c.overlays.removed = func(o core.CanvasObject) {
+		if o == c.bandFocus {
+			c.bandFocus = nil // a reused pop-up does not start with the content's focus
+		}
+	}
 }
 
 // ObjectTrees return canvas object trees.
@@ -1179,7 +1202,10 @@ func (c *Canvas) addCacheNodes(node *RenderCacheNode, b *SpatialIndex, cut int32
 }
 
 func (c *Canvas) focusManager() *app.FocusManager {
-	if focusMgr := c.overlays.TopFocusManager(); focusMgr != nil {
+	if top, focusMgr := c.overlays.TopFocus(); focusMgr != nil {
+		if top == c.bandFocus {
+			return c.contentFocusMgr // a field above a drawer has the focus (#1172)
+		}
 		return focusMgr
 	}
 	if c.isMenuActive() {
