@@ -461,11 +461,189 @@ func TestNavigationDrawer_SlidesIn(t *testing.T) {
 		assert.Equal(t, float32(0), surfaceX(t, d))
 	})
 
-	t.Run("hide stops the slide", func(t *testing.T) {
+	t.Run("hide stops the slide in", func(t *testing.T) {
 		d, drv, _ := show(t, false, bellui.DirectionLTR, DrawerSideEnd)
 		slide := d.slide
 		d.Hide()
 		assert.Contains(t, drv.stopped, slide)
+		assert.NotSame(t, slide, d.slide, "the slide out replaces it")
+	})
+}
+
+// With animations on, a drawer closing by any path slides from where it is
+// out beyond the edge it opened against, then leaves the canvas; with them
+// off, it goes at once (#1186).
+func TestNavigationDrawer_SlidesOut(t *testing.T) {
+	items := []*NavigationDrawerItem{{Label: "Home", Icon: theme.HomeIcon()}}
+	show := func(t *testing.T, noAnim bool, dir bellui.Direction, side DrawerSide) (*NavigationDrawer, *carouselAnimDriver, core.Canvas) {
+		t.Helper()
+		a := test.NewTempApp(t)
+		drv := &carouselAnimDriver{Driver: a.Driver()}
+		bellui.SetCurrentApp(&carouselAnimApp{App: a, drv: drv, noAnim: noAnim})
+		t.Cleanup(func() { bellui.SetCurrentApp(a) })
+		bellui.SetLayoutDirection(dir)
+		t.Cleanup(func() { bellui.SetLayoutDirection(bellui.DirectionAuto) })
+
+		w := test.NewTempWindow(t, NewLabel("content"))
+		w.Resize(geo.NewSize(800, 400))
+		d := NewNavigationDrawer(items, nil)
+		d.Side = side
+		d.Top = 50
+		d.Show(insetCanvas{Canvas: w.Canvas()})
+		if d.slide != nil {
+			d.slide.Tick(1)
+		}
+		t.Cleanup(d.hideNow)
+		return d, drv, w.Canvas()
+	}
+	// closingX is where the sliding-out surface is.
+	closingX := func(t *testing.T, p *PopUp) float32 {
+		t.Helper()
+		assert.Equal(t, float32(50), p.innerPos.Y, "the slide keeps Top")
+		return p.innerPos.X
+	}
+	onCanvas := func(c core.Canvas, p *PopUp) bool {
+		for _, o := range c.Overlays().List() {
+			if o == p {
+				return true
+			}
+		}
+		return false
+	}
+
+	t.Run("end ltr slides to the right", func(t *testing.T) {
+		d, drv, c := show(t, false, bellui.DirectionLTR, DrawerSideEnd)
+		p := d.popUp
+		width := c.Size().Width
+		d.Hide()
+		assert.False(t, d.IsOpen(), "closed from the moment the slide begins")
+		require.NotNil(t, d.slide)
+		assert.Contains(t, drv.started, d.slide)
+		slide := d.slide
+		slide.Tick(0)
+		assert.Equal(t, width-360, closingX(t, p), "starts where it is")
+		slide.Tick(0.5)
+		mid := closingX(t, p)
+		assert.Greater(t, mid, width-360)
+		assert.Less(t, mid, width)
+		assert.True(t, onCanvas(c, p), "still drawn while it slides")
+		slide.Tick(1)
+		assert.Equal(t, width, closingX(t, p), "ends beyond the right edge")
 		assert.Nil(t, d.slide)
+		assert.Nil(t, d.closing)
+		assert.True(t, p.isHiding, "then its pop-up hides")
+	})
+
+	t.Run("start ltr slides to the left", func(t *testing.T) {
+		d, _, _ := show(t, false, bellui.DirectionLTR, DrawerSideStart)
+		p := d.popUp
+		d.Hide()
+		require.NotNil(t, d.slide)
+		d.slide.Tick(0)
+		assert.Equal(t, float32(0), closingX(t, p))
+		d.slide.Tick(1)
+		assert.Equal(t, float32(-360), closingX(t, p), "ends beyond the left edge")
+	})
+
+	t.Run("start rtl slides to the right", func(t *testing.T) {
+		d, _, c := show(t, false, bellui.DirectionRTL, DrawerSideStart)
+		p := d.popUp
+		d.Hide()
+		require.NotNil(t, d.slide)
+		d.slide.Tick(1)
+		assert.Equal(t, c.Size().Width, closingX(t, p), "ends beyond the right edge")
+	})
+
+	t.Run("end rtl slides to the left", func(t *testing.T) {
+		d, _, _ := show(t, false, bellui.DirectionRTL, DrawerSideEnd)
+		p := d.popUp
+		d.Hide()
+		require.NotNil(t, d.slide)
+		d.slide.Tick(1)
+		assert.Equal(t, float32(-360), closingX(t, p), "ends beyond the left edge")
+	})
+
+	t.Run("closing mid slide in starts from where it got to", func(t *testing.T) {
+		d, _, c := show(t, false, bellui.DirectionLTR, DrawerSideEnd)
+		d.hideNow()
+		d.Show(insetCanvas{Canvas: c})
+		p := d.popUp
+		d.slide.Tick(0.5)
+		at := p.innerPos.X
+		d.Hide()
+		d.slide.Tick(0)
+		assert.Equal(t, at, closingX(t, p))
+	})
+
+	dismissals := map[string]func(t *testing.T, p *PopUp){
+		"scrim tap":     func(_ *testing.T, p *PopUp) { p.Tapped(&event.PointEvent{Position: geo.NewPos(10, 200)}) },
+		"escape":        func(t *testing.T, p *PopUp) { assert.True(t, p.DismissOnEscape()) },
+		"a11y dismiss":  func(_ *testing.T, p *PopUp) { p.PerformAccessibleAction(core.ActionDismiss) },
+		"toggle":        nil,
+		"item selected": nil,
+	}
+	for name, dismiss := range dismissals {
+		t.Run(name+" slides out", func(t *testing.T) {
+			d, _, _ := show(t, false, bellui.DirectionLTR, DrawerSideEnd)
+			p := d.popUp
+			switch name {
+			case "toggle":
+				d.Toggle(p.Canvas)
+			case "item selected":
+				drawerRows(t, d)[0].Tapped(&event.PointEvent{})
+			default:
+				dismiss(t, p)
+			}
+			assert.False(t, d.IsOpen())
+			assert.Same(t, p, d.closing, "it slides rather than fading in place")
+			assert.True(t, p.isHiding, "a second dismissal is absorbed")
+			assert.False(t, p.DismissOnEscape(), "Escape goes to what is beneath")
+		})
+	}
+
+	t.Run("a destination tapped while sliding out is not chosen", func(t *testing.T) {
+		d, _, _ := show(t, false, bellui.DirectionLTR, DrawerSideEnd)
+		calls := 0
+		d.OnChanged = func(int) { calls++ }
+		row := drawerRows(t, d)[0]
+		d.Hide()
+		row.Tapped(&event.PointEvent{})
+		assert.Zero(t, calls)
+	})
+
+	t.Run("OnChanged hiding it too keeps the slide", func(t *testing.T) {
+		d, _, _ := show(t, false, bellui.DirectionLTR, DrawerSideEnd)
+		p := d.popUp
+		d.OnChanged = func(int) { d.Hide() }
+		drawerRows(t, d)[0].Tapped(&event.PointEvent{})
+		assert.Same(t, p, d.closing, "the second Hide does not cut it short")
+		require.NotNil(t, d.slide)
+		d.slide.Tick(1)
+		assert.Nil(t, d.closing)
+	})
+
+	t.Run("toggle while sliding out reopens", func(t *testing.T) {
+		d, _, c := show(t, false, bellui.DirectionLTR, DrawerSideEnd)
+		old := d.popUp
+		d.Hide()
+		closing := d.slide
+		d.Toggle(c)
+		assert.True(t, d.IsOpen())
+		assert.NotSame(t, old, d.popUp)
+		assert.Nil(t, d.closing)
+		assert.True(t, old.isHiding, "the closing pop-up goes")
+		closing.Tick(1)
+		assert.NotEqual(t, c.Size().Width, old.innerPos.X, "a stopped slide out no longer moves it")
+		assert.True(t, onCanvas(c, d.popUp))
+	})
+
+	t.Run("animations off: gone at once", func(t *testing.T) {
+		d, drv, c := show(t, true, bellui.DirectionLTR, DrawerSideEnd)
+		p := d.popUp
+		d.Hide()
+		assert.Nil(t, d.slide)
+		assert.Nil(t, d.closing)
+		assert.Empty(t, drv.started)
+		assert.False(t, onCanvas(c, p))
 	})
 }

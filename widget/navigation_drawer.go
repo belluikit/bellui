@@ -49,7 +49,7 @@ type NavigationDrawer struct {
 
 	// Side is the edge the drawer opens against. The system insets on that
 	// side, such as a landscape notch, move with it. With animations on, the
-	// drawer slides in from its edge.
+	// drawer slides in from its edge and back out to it.
 	//
 	// Since: 1.3
 	Side DrawerSide
@@ -62,10 +62,12 @@ type NavigationDrawer struct {
 	// Since: 1.3
 	Top float32
 
-	canvas core.Canvas
-	popUp  *PopUp
-	open   bool
-	slide  *bellui.Animation // the slide in, while it runs
+	canvas  core.Canvas
+	popUp   *PopUp
+	open    bool
+	atRight bool              // the edge the shown drawer opened against
+	slide   *bellui.Animation // the slide in or out, while it runs
+	closing *PopUp            // the pop-up sliding out, until it is gone
 }
 
 // NewNavigationDrawer creates a navigation drawer.
@@ -76,7 +78,7 @@ func NewNavigationDrawer(items []*NavigationDrawerItem, changed func(int)) *Navi
 // Show displays the drawer on the given canvas.
 func (d *NavigationDrawer) Show(c core.Canvas) {
 	d.canvas = c
-	d.Hide()
+	d.hideNow()
 
 	th := theme.Current()
 	v := bellui.CurrentApp().Settings().ThemeVariant()
@@ -126,6 +128,9 @@ func (d *NavigationDrawer) Show(c core.Canvas) {
 			bg: bg, icon: icon, label: label,
 			selected: idx == d.Selected,
 			onTap: func() {
+				if !d.open {
+					return // a drawer sliding out takes no choice
+				}
 				d.Selected = idx
 				if d.OnChanged != nil {
 					d.OnChanged(idx)
@@ -147,7 +152,8 @@ func (d *NavigationDrawer) Show(c core.Canvas) {
 	insetLeft := insetPos.X
 	insetRight := max(canvasSize.Width-insetPos.X-insetSize.Width, 0)
 
-	atRight := d.atRight(c)
+	atRight := d.opensAtRight(c)
+	d.atRight = atRight
 	if atRight {
 		insetLeft = 0
 	} else {
@@ -170,6 +176,9 @@ func (d *NavigationDrawer) Show(c core.Canvas) {
 		d.popUp = NewPopUp(scroll, c)
 	}
 	d.popUp.coverTop = top
+	// The scrim, Escape and the accessibility dismiss close the drawer as
+	// Hide does, so they slide it out too (#1186).
+	d.popUp.OnDismissed = d.Hide
 
 	x := float32(0)
 	if atRight {
@@ -201,9 +210,37 @@ func (d *NavigationDrawer) slideIn(x, top, width, canvasWidth float32, atRight b
 	d.slide.Start()
 }
 
-// atRight reports whether the drawer opens against the right edge of c: the
-// end side in a left-to-right layout, the start side in a right-to-left one.
-func (d *NavigationDrawer) atRight(c core.Canvas) bool {
+// slideOut moves the closing drawer from where it is to beyond the edge it
+// opened against, then hides its pop-up (#1186). The exit is shorter than the
+// entrance and accelerates, as MD3 motion has it. Until it is gone the pop-up
+// is hiding: it absorbs taps on its scrim and leaves Escape to what is beneath.
+func (d *NavigationDrawer) slideOut(p *PopUp) {
+	from, top := p.innerPos.X, p.innerPos.Y
+	to := -p.innerSize.Width
+	if d.atRight {
+		to = p.Canvas.Size().Width
+	}
+	p.isHiding = true
+	d.closing = p
+	d.slide = bellui.NewAnimation(canvas.DurationShort4, func(done float32) {
+		if d.closing != p {
+			return
+		}
+		p.Move(geo.NewPos(from+(to-from)*done, top))
+		if done >= 1 {
+			d.closing = nil
+			d.slide = nil
+			p.Hide()
+		}
+	})
+	d.slide.Curve = bellui.AnimationEaseStandardAccelerate
+	d.slide.Start()
+}
+
+// opensAtRight reports whether the drawer opens against the right edge of c:
+// the end side in a left-to-right layout, the start side in a right-to-left
+// one.
+func (d *NavigationDrawer) opensAtRight(c core.Canvas) bool {
 	rtl := lang.IsRTLDirection()
 	if content := c.Content(); content != nil {
 		rtl = isRTLAt(content)
@@ -211,17 +248,45 @@ func (d *NavigationDrawer) atRight(c core.Canvas) bool {
 	return (d.Side == DrawerSideEnd) != rtl
 }
 
-// Hide dismisses the drawer.
+// Hide dismisses the drawer. With animations on, it slides out to its edge;
+// it is no longer open from the moment the slide begins. Hiding a drawer
+// already sliding out lets the slide finish, as when OnChanged hides it before
+// the destination tap does.
 func (d *NavigationDrawer) Hide() {
-	if d.slide != nil {
-		d.slide.Stop()
-		d.slide = nil
+	p := d.popUp
+	if p == nil && d.closing != nil {
+		return
+	}
+	if p == nil || !p.Visible() || !bellui.CurrentApp().Settings().ShowAnimations() {
+		d.hideNow()
+		return
+	}
+	d.stopSlide()
+	d.popUp = nil
+	d.open = false
+	d.slideOut(p)
+}
+
+// hideNow dismisses the drawer without the slide out, and ends one in
+// progress: Show replaces a closing drawer at once.
+func (d *NavigationDrawer) hideNow() {
+	d.stopSlide()
+	if d.closing != nil {
+		d.closing.Hide()
+		d.closing = nil
 	}
 	if d.popUp != nil {
 		d.popUp.Hide()
 		d.popUp = nil
 	}
 	d.open = false
+}
+
+func (d *NavigationDrawer) stopSlide() {
+	if d.slide != nil {
+		d.slide.Stop()
+		d.slide = nil
+	}
 }
 
 // IsOpen returns whether the drawer is showing.
