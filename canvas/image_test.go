@@ -217,3 +217,57 @@ func TestImage_HiddenSVGRasterizedWhenShown(t *testing.T) {
 	w.Canvas().(test.WindowlessCanvas).Capture()
 	assert.NotNil(t, hidden.Image, "rasterized when drawn")
 }
+
+// TestImage_SVGResizeKeepsParsedSVG pins #1183: resizing an SVG on every
+// frame, as a WheelPicker scales its items, rasterizes it at each size from
+// the SVG parsed once, without reading the source again.
+func TestImage_SVGResizeKeepsParsedSVG(t *testing.T) {
+	test.NewTempApp(t)
+	res := &countingResource{Resource: bellui.NewStaticResource("home.svg", theme.HomeIcon().Content())}
+	img := canvas.NewImageFromResource(res)
+	w := test.NewTempWindow(t, container.NewWithoutLayout(img))
+	w.Resize(geo.NewSize(100, 100))
+	img.Resize(geo.NewSize(40, 40))
+	assert.NotNil(t, img.Image)
+	reads := res.reads
+	assert.NotZero(t, reads)
+
+	for s := float32(39); s >= 20; s-- {
+		img.Resize(geo.NewSize(s, s))
+		assert.Equal(t, int(s), img.Image.Bounds().Dx(), "rasterized at its new size")
+	}
+	assert.Equal(t, reads, res.reads, "the source is not read again")
+
+	img.Refresh()
+	assert.Greater(t, res.reads, reads, "Refresh still reads the source")
+}
+
+// A resize after the source changed reads the new source: the parsed SVG is
+// only kept for the source it came from (#1183).
+func TestImage_SVGResizeReadsChangedSource(t *testing.T) {
+	test.NewTempApp(t)
+	img := canvas.NewImageFromResource(bellui.NewStaticResource("home.svg", theme.HomeIcon().Content()))
+	w := test.NewTempWindow(t, container.NewWithoutLayout(img))
+	w.Resize(geo.NewSize(100, 100))
+	img.Resize(geo.NewSize(40, 40))
+
+	other := &countingResource{Resource: bellui.NewStaticResource("search.svg", theme.SearchIcon().Content())}
+	img.Resource = other
+	img.Resize(geo.NewSize(30, 30))
+	assert.NotZero(t, other.reads)
+
+	// A resource of a type that cannot be compared is read again, not matched.
+	img.Resource = sliceResource{name: "home.svg", data: theme.HomeIcon().Content()}
+	img.Resize(geo.NewSize(20, 20))
+	img.Resize(geo.NewSize(25, 25))
+	assert.Equal(t, 25, img.Image.Bounds().Dx())
+}
+
+// sliceResource is a resource whose type is not comparable.
+type sliceResource struct {
+	name string
+	data []byte
+}
+
+func (r sliceResource) Name() string    { return r.name }
+func (r sliceResource) Content() []byte { return r.data }

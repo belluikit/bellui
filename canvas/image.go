@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sync"
 
 	"github.com/belluikit/bellui"
@@ -68,9 +69,14 @@ var _ core.CanvasObject = (*Image)(nil)
 type Image struct {
 	baseObject
 
-	propMu         sync.RWMutex // protects aspect, icon, isSVG, previousRender, and snapshots of File/Resource/Image
-	aspect         float32
-	icon           *svg.Decoder
+	propMu sync.RWMutex // protects aspect, icon, isSVG, previousRender, and snapshots of File/Resource/Image
+	aspect float32
+	icon   *svg.Decoder
+	// iconFile and iconRes are the source icon was parsed from: while File
+	// and Resource still name it, a resize draws from icon without reading
+	// and parsing the source again (#1183).
+	iconFile       string
+	iconRes        bellui.Resource
 	isSVG          bool
 	previousRender bool // did we successfully draw before? if so a nil content will need a reset
 	// svgDeferred is set when Refresh put off rasterizing the SVG because the
@@ -176,6 +182,13 @@ func (i *Image) Refresh() {
 			return
 		}
 		rc = io.NopCloser(r)
+		i.propMu.Lock()
+		if i.isSVG {
+			i.iconFile, i.iconRes = file, res
+		} else {
+			i.icon, i.iconFile, i.iconRes = nil, "", nil
+		}
+		i.propMu.Unlock()
 	} else {
 		i.propMu.RLock()
 		prev := i.previousRender
@@ -204,26 +217,9 @@ func (i *Image) Refresh() {
 		isSVG := i.isSVG
 		i.propMu.RUnlock()
 		if isSVG {
-			// An SVG out of sight, under a hidden container or before the
-			// first frame that draws it, is rasterized when it is drawn
-			// instead: rasterizing costs every pixel of it, on the main
-			// goroutine, at every size it is laid out at (#1137).
-			if !bellui.IsOnScreen(i) {
-				i.propMu.Lock()
-				i.svgDeferred = true
-				i.propMu.Unlock()
-				Refresh(i)
+			if !i.drawSVG(width, height) {
 				return
 			}
-			i.propMu.Lock()
-			i.svgDeferred = false
-			i.propMu.Unlock()
-			tex, err := i.renderSVG(width, height)
-			if err != nil {
-				bellui.LogError("Failed to render SVG", err)
-				return
-			}
-			i.Image = tex
 		} else {
 			if rc == nil {
 				return
@@ -264,10 +260,14 @@ func (i *Image) Resize(s geo.Size) {
 	i.propMu.RLock()
 	isSVG := i.isSVG
 	i.propMu.RUnlock()
-	if isSVG || i.Image == nil {
+	if isSVG && i.parsedSVGCurrent() {
+		i.redrawSVG() // rasterise the parsed SVG at the new size (#1183)
+	} else if isSVG || i.Image == nil {
 		i.Refresh() // we need to rasterise at the new size
 	} else {
-		Refresh(i) // just re-size using GPU scaling
+		// The decoded pixels stay, but this frees the texture: the painter
+		// builds a new one at the new size, scaling the pixels on the CPU.
+		Refresh(i)
 	}
 }
 
@@ -453,6 +453,66 @@ func (i *Image) imageDetailsFromReader(source io.Reader) (reader io.Reader, widt
 		aspect = float32(width) / float32(height)
 	}
 	return reader, width, height, aspect, err
+}
+
+// drawSVG rasterizes the parsed SVG at width by height into Image, and
+// reports whether it did. An SVG out of sight, under a hidden container or
+// before the first frame that draws it, is rasterized when it is drawn
+// instead: rasterizing costs every pixel of it, on the main goroutine, at
+// every size it is laid out at (#1137).
+func (i *Image) drawSVG(width, height float32) bool {
+	if !bellui.IsOnScreen(i) {
+		i.propMu.Lock()
+		i.svgDeferred = true
+		i.propMu.Unlock()
+		Refresh(i)
+		return false
+	}
+	i.propMu.Lock()
+	i.svgDeferred = false
+	i.propMu.Unlock()
+	tex, err := i.renderSVG(width, height)
+	if err != nil {
+		bellui.LogError("Failed to render SVG", err)
+		return false
+	}
+	i.Image = tex
+	return true
+}
+
+// parsedSVGCurrent reports whether the parsed SVG was read from the source
+// File and Resource still name. Only a Resource of a comparable type can be
+// matched; any other is read again.
+func (i *Image) parsedSVGCurrent() bool {
+	i.propMu.RLock()
+	defer i.propMu.RUnlock()
+	if i.icon == nil || i.File != i.iconFile {
+		return false
+	}
+	if i.Resource == nil || i.iconRes == nil {
+		return i.Resource == nil && i.iconRes == nil
+	}
+	if !reflect.TypeOf(i.Resource).Comparable() || !reflect.TypeOf(i.iconRes).Comparable() {
+		return false
+	}
+	return i.Resource == i.iconRes
+}
+
+// redrawSVG rasterizes the parsed SVG at the image's size, as Refresh does
+// without reading and parsing the source again: an SVG resized on every
+// frame, as a WheelPicker scales its items, did both every frame (#1183).
+func (i *Image) redrawSVG() {
+	size := i.Size()
+	if size.Width == 0 || size.Height == 0 {
+		return
+	}
+	if !i.drawSVG(size.Width, size.Height) {
+		return
+	}
+	i.propMu.Lock()
+	i.previousRender = true
+	i.propMu.Unlock()
+	Refresh(i)
 }
 
 func (i *Image) renderSVG(width, height float32) (image.Image, error) {
