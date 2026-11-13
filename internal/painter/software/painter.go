@@ -244,8 +244,11 @@ func drawTransformed(c core.Canvas, obj core.CanvasObject, pos geo.Position, m g
 		float64(m.B), float64(m.D), py,
 	}
 
-	draw.BiLinear.Transform(base, aff, tmp, tmp.Bounds(), draw.Over, &draw.Options{
-		SrcMask: nil,
-		DstMask: nil,
-	})
+	// Composite into the clip only: a transform can carry the object past
+	// its clipping container's bounds (#1190).
+	dst, ok := base.SubImage(clip.Intersect(base.Bounds())).(*image.NRGBA)
+	if !ok || dst.Bounds().Empty() {
+		return
+	}
+	draw.BiLinear.Transform(dst, aff, tmp, tmp.Bounds(), draw.Over, nil)
 }
