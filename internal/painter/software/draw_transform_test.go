@@ -124,3 +124,30 @@ func TestPainter_drawTransformed_primitives(t *testing.T) {
 		})
 	}
 }
+
+// TestPainter_drawTransformed_clipped pins #1190: an object scaled past its
+// clipping container's bounds is cut at them, as an untransformed one is.
+func TestPainter_drawTransformed_clipped(t *testing.T) {
+	r := canvas.NewRectangle(color.NRGBA{R: 255, A: 255})
+	r.Resize(geo.NewSize(100, 100))
+	// 200×200, centred on the box.
+	r.SetTransform(geo.NewTranslation(50, 50).Multiply(geo.NewScale(2, 2)).Multiply(geo.NewTranslation(-50, -50)))
+	box := container.NewWithoutLayout(r)
+	box.ClipToBounds = true
+	box.Resize(geo.NewSize(100, 100))
+	box.Move(geo.NewPos(100, 100))
+
+	c := test.NewCanvas()
+	c.SetPadded(false)
+	c.SetContent(container.NewWithoutLayout(box))
+	c.Resize(geo.NewSize(300, 300))
+	img := software.NewPainter().Paint(c)
+
+	w, h := redExtent(img)
+	assert.Equal(t, 100, w, "the scaled rect is cut at the box's left and right")
+	assert.Equal(t, 100, h, "the scaled rect is cut at the box's top and bottom")
+	_, _, _, a := img.At(150, 150).RGBA()
+	assert.NotZero(t, a, "the box itself is drawn")
+	_, _, _, a = img.At(60, 150).RGBA()
+	assert.Zero(t, a, "nothing is drawn left of the box")
+}
