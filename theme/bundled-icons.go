@@ -462,6 +462,22 @@ var notificationsIconRes = &bellui.StaticResource{
 	StaticContent: notificationsIcon,
 }
 
+//go:embed icons/closed-caption.svg
+var closedcaptionIcon []byte
+
+var closedcaptionIconRes = &bellui.StaticResource{
+	StaticName:    "closed-caption.svg",
+	StaticContent: closedcaptionIcon,
+}
+
+//go:embed icons/closed-caption-off.svg
+var closedcaptionoffIcon []byte
+
+var closedcaptionoffIconRes = &bellui.StaticResource{
+	StaticName:    "closed-caption-off.svg",
+	StaticContent: closedcaptionoffIcon,
+}
+
 //go:embed icons/place.svg
 var placeIcon []byte
 
