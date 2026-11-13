@@ -510,6 +510,31 @@ func TestNotificationsIcon(t *testing.T) {
 	}
 }
 
+// The closed-captions icons are their own files, themed like the rest:
+// filled for captions on, outlined for off (#1191).
+func TestClosedCaptionIcons(t *testing.T) {
+	for _, c := range []struct {
+		icon bellui.Resource
+		file string
+	}{
+		{theme.ClosedCaptionIcon(), "closed-caption.svg"},
+		{theme.ClosedCaptionOffIcon(), "closed-caption-off.svg"},
+	} {
+		if c.icon == nil || !strings.HasSuffix(c.icon.Name(), c.file) {
+			t.Fatalf("icon %v, want one named for %s", c.icon, c.file)
+		}
+		if !strings.Contains(string(c.icon.Content()), "<path") {
+			t.Errorf("%s has no path", c.file)
+		}
+		if _, ok := c.icon.(*theme.ThemedResource); !ok {
+			t.Errorf("%s is %T, want a *theme.ThemedResource so it takes the theme's colour", c.file, c.icon)
+		}
+	}
+	if theme.ClosedCaptionIcon().Name() == theme.ClosedCaptionOffIcon().Name() {
+		t.Error("captions on and off are the same icon")
+	}
+}
+
 // The icons for navigation destinations about a place, people and a child
 // are their own files, themed like the rest (#1155).
 func TestNavigationDestinationIcons(t *testing.T) {

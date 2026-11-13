@@ -396,6 +396,18 @@ const (
 	// Since: 1.3
 	IconNameNotifications bellui.ThemeIconName = "notifications"
 
+	// IconNameClosedCaption is the name of theme lookup for the filled
+	// closed-captions icon, for captions that are on.
+	//
+	// Since: 1.3
+	IconNameClosedCaption bellui.ThemeIconName = "closedCaption"
+
+	// IconNameClosedCaptionOff is the name of theme lookup for the outlined
+	// closed-captions icon, for captions that are off.
+	//
+	// Since: 1.3
+	IconNameClosedCaptionOff bellui.ThemeIconName = "closedCaptionOff"
+
 	// IconNamePlace is the name of theme lookup for the icon of a place (map pin), for a destination about location.
 	//
 	// Since: 1.3
@@ -625,27 +637,29 @@ var icons = map[bellui.ThemeIconName]bellui.Resource{
 	IconNameArrowDropDown: NewThemedResource(arrowdropdownIconRes),
 	IconNameArrowDropUp:   NewThemedResource(arrowdropupIconRes),
 
-	IconNameFile:            NewThemedResource(fileIconRes),
-	IconNameFileApplication: NewThemedResource(fileapplicationIconRes),
-	IconNameFileAudio:       NewThemedResource(fileaudioIconRes),
-	IconNameFileImage:       NewThemedResource(fileimageIconRes),
-	IconNameFileText:        NewThemedResource(filetextIconRes),
-	IconNameFileVideo:       NewThemedResource(filevideoIconRes),
-	IconNameFolder:          NewThemedResource(folderIconRes),
-	IconNameFolderNew:       NewThemedResource(foldernewIconRes),
-	IconNameFolderOpen:      NewThemedResource(folderopenIconRes),
-	IconNameHelp:            NewThemedResource(helpIconRes),
-	IconNameFavorite:        NewThemedResource(favoriteIconRes),
-	IconNameFavoriteBorder:  NewThemedResource(favoriteborderIconRes),
-	IconNameBookmark:        NewThemedResource(bookmarkIconRes),
-	IconNameBookmarkBorder:  NewThemedResource(bookmarkborderIconRes),
-	IconNameNotifications:   NewThemedResource(notificationsIconRes),
-	IconNamePlace:           NewThemedResource(placeIconRes),
-	IconNamePeople:          NewThemedResource(peopleIconRes),
-	IconNameChild:           NewThemedResource(childIconRes),
-	IconNameHistory:         NewThemedResource(historyIconRes),
-	IconNameHome:            NewThemedResource(homeIconRes),
-	IconNameSettings:        NewThemedResource(settingsIconRes),
+	IconNameFile:             NewThemedResource(fileIconRes),
+	IconNameFileApplication:  NewThemedResource(fileapplicationIconRes),
+	IconNameFileAudio:        NewThemedResource(fileaudioIconRes),
+	IconNameFileImage:        NewThemedResource(fileimageIconRes),
+	IconNameFileText:         NewThemedResource(filetextIconRes),
+	IconNameFileVideo:        NewThemedResource(filevideoIconRes),
+	IconNameFolder:           NewThemedResource(folderIconRes),
+	IconNameFolderNew:        NewThemedResource(foldernewIconRes),
+	IconNameFolderOpen:       NewThemedResource(folderopenIconRes),
+	IconNameHelp:             NewThemedResource(helpIconRes),
+	IconNameFavorite:         NewThemedResource(favoriteIconRes),
+	IconNameFavoriteBorder:   NewThemedResource(favoriteborderIconRes),
+	IconNameBookmark:         NewThemedResource(bookmarkIconRes),
+	IconNameBookmarkBorder:   NewThemedResource(bookmarkborderIconRes),
+	IconNameNotifications:    NewThemedResource(notificationsIconRes),
+	IconNameClosedCaption:    NewThemedResource(closedcaptionIconRes),
+	IconNameClosedCaptionOff: NewThemedResource(closedcaptionoffIconRes),
+	IconNamePlace:            NewThemedResource(placeIconRes),
+	IconNamePeople:           NewThemedResource(peopleIconRes),
+	IconNameChild:            NewThemedResource(childIconRes),
+	IconNameHistory:          NewThemedResource(historyIconRes),
+	IconNameHome:             NewThemedResource(homeIconRes),
+	IconNameSettings:         NewThemedResource(settingsIconRes),
 
 	IconNameViewFullScreen: NewThemedResource(viewfullscreenIconRes),
 	IconNameViewRefresh:    NewThemedResource(viewrefreshIconRes),
@@ -1217,6 +1231,22 @@ func BookmarkBorderIcon() bellui.Resource {
 // Since: 1.3
 func NotificationsIcon() bellui.Resource {
 	return safeIconLookup(IconNameNotifications)
+}
+
+// ClosedCaptionIcon returns a resource containing the standard filled
+// closed-captions icon for the current theme, for captions that are on
+//
+// Since: 1.3
+func ClosedCaptionIcon() bellui.Resource {
+	return safeIconLookup(IconNameClosedCaption)
+}
+
+// ClosedCaptionOffIcon returns a resource containing the standard outlined
+// closed-captions icon for the current theme, for captions that are off
+//
+// Since: 1.3
+func ClosedCaptionOffIcon() bellui.Resource {
+	return safeIconLookup(IconNameClosedCaptionOff)
 }
 
 // PlaceIcon returns a resource containing the standard icon of a place (map pin), for a destination about location, for the current theme
