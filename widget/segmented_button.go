@@ -23,7 +23,7 @@ func (s *SegmentedButton) AccessibleLabel() string { return "" }
 
 // SegmentedButton is an MD3 group of 2-5 mutually exclusive toggle buttons.
 type SegmentedButton struct {
-	BaseWidget
+	DisableableWidget
 	Items     []string
 	Selected  int       // index of selected item; -1 or out of range selects none
 	OnChanged func(int) `json:"-"`
@@ -54,6 +54,9 @@ func (s *SegmentedButton) TypedRune(rune) {}
 // to the previous segment and the left arrow to the next, matching the mirrored
 // pixels.
 func (s *SegmentedButton) TypedKey(ev *event.KeyEvent) {
+	if s.Disabled() {
+		return
+	}
 	switch ev.Name {
 	case event.KeyRight:
 		if isRTLAt(s.super()) {
@@ -124,10 +127,17 @@ type segmentWidget struct {
 	first    bool
 	last     bool
 	onTap    func()
+	group    *SegmentedButton // the owner; a segment of a disabled group takes no tap
+}
+
+// active reports whether the segment takes a tap: it has a handler and its
+// group is not disabled.
+func (w *segmentWidget) active() bool {
+	return w.onTap != nil && (w.group == nil || !w.group.Disabled())
 }
 
 func (w *segmentWidget) Tapped(ev *event.PointEvent) {
-	if w.onTap != nil {
+	if w.active() {
 		internalWidget.TapPress(&w.pressTarget, ev)
 		w.onTap()
 	}
@@ -149,7 +159,7 @@ func (w *segmentWidget) HoverOut() {
 // the outer side only for an end segment (#1156), in its label's colour.
 func (w *segmentWidget) pressShape() (internalWidget.PressShape, bool) {
 	r, ok := cache.Renderer(w).(*segmentRenderer)
-	if w.onTap == nil || !ok {
+	if !w.active() || !ok {
 		return internalWidget.PressShape{}, false
 	}
 	return internalWidget.PressShape{
@@ -282,6 +292,18 @@ func (r *segmentRenderer) Refresh() {
 		r.label.Color = th.Color(theme.ColorNameOnSurface, v)
 	}
 
+	// A segment of a disabled group draws its text and outline in the
+	// disabled colour and its selection in the disabled container colour, as
+	// Button does (#1213).
+	if r.seg.group != nil && r.seg.group.Disabled() {
+		r.bg.StrokeWidth = 1
+		r.bg.StrokeColor = th.Color(theme.ColorNameDisabled, v)
+		r.label.Color = th.Color(theme.ColorNameDisabled, v)
+		if r.seg.selected {
+			r.bg.FillColor = th.Color(theme.ColorNameDisabledButton, v)
+		}
+	}
+
 	r.bg.Refresh()
 	r.label.Refresh()
 	r.Layout(r.seg.Size())
@@ -356,7 +378,8 @@ func (r *segButtonRenderer) updateSegments() {
 		if i == len(r.segments) {
 			btn, idx := r.btn, i
 			seg := &segmentWidget{
-				text: item,
+				text:  item,
+				group: btn,
 				onTap: func() {
 					btn.Selected = idx
 					// Move keyboard focus to the parent group so that
