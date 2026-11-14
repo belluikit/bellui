@@ -3,6 +3,7 @@ package software
 import (
 	"image"
 	"image/color"
+	"math"
 
 	"golang.org/x/image/draw"
 	"golang.org/x/image/math/f64"
@@ -12,6 +13,7 @@ import (
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/driver"
+	"github.com/belluikit/bellui/internal/painter"
 	"github.com/belluikit/bellui/internal/scale"
 	"github.com/belluikit/bellui/internal/uidir"
 )
@@ -186,22 +188,36 @@ func drawObject(c core.Canvas, obj core.CanvasObject, pos geo.Position, wt geo.M
 	}
 }
 
-// drawTransformed renders an object at its local size to a temp image, then
-// composites it onto base with the given affine transform (leaf only).
+// drawTransformed renders an object into a temp image covering its paint
+// extent, then composites it onto base with the given affine transform (leaf
+// only). The extent, not the object's size: a shadow's blur, a stroke or an
+// overflowing text draws past the object's bounds, and a layer the object's
+// size would cut it off (#1192).
 func drawTransformed(c core.Canvas, obj core.CanvasObject, pos geo.Position, m geo.Matrix, base *image.NRGBA, clip image.Rectangle) {
-	objSize := obj.Size()
-	localW := scale.ToScreenCoordinate(c, objSize.Width)
-	localH := scale.ToScreenCoordinate(c, objSize.Height)
-	if localW <= 0 || localH <= 0 {
+	off, ext := painter.PaintExtent(obj)
+	if ext.Width <= 0 || ext.Height <= 0 {
 		return
 	}
+	s := c.Scale()
+	// The layer's pixel bounds in the object's local pixels, a pixel wider on
+	// each side than the extent for the painters' rounding.
+	minX := int(math.Floor(float64(off.X*s))) - 1
+	minY := int(math.Floor(float64(off.Y*s))) - 1
+	maxX := int(math.Ceil(float64((off.X+ext.Width)*s))) + 1
+	maxY := int(math.Ceil(float64((off.Y+ext.Height)*s))) + 1
 
-	// Render the object at (0,0) into a temp image.
-	tmp := image.NewNRGBA(image.Rect(0, 0, localW, localH))
+	// Render the object into a temp image, with its origin moved to put the
+	// extent inside it.
+	tmp := image.NewNRGBA(image.Rect(0, 0, maxX-minX, maxY-minY))
 	localClip := tmp.Bounds()
-	localPos := geo.Position{}
+	localPos := geo.NewPos(-float32(minX)/s, -float32(minY)/s)
+	// Where the painters put that origin, in the temp image's pixels.
+	originX := scale.ToScreenCoordinate(c, localPos.X)
+	originY := scale.ToScreenCoordinate(c, localPos.Y)
 
 	switch o := obj.(type) {
+	case *canvas.BoxShadow:
+		drawBoxShadow(c, o, localPos, tmp, localClip)
 	case *canvas.Image:
 		drawImage(c, o, localPos, tmp, localClip)
 	case *canvas.Text:
@@ -220,6 +236,8 @@ func drawTransformed(c core.Canvas, obj core.CanvasObject, pos geo.Position, m g
 		drawRectangle(c, o, localPos, tmp, localClip)
 	case *canvas.Arc:
 		drawArc(c, o, localPos, tmp, localClip)
+	case *canvas.Scene3D:
+		drawScene3D(c, o, localPos, tmp, localClip)
 	case *canvas.Path:
 		drawPath(c, o, localPos, tmp, localClip)
 	case *canvas.StyledText:
@@ -232,11 +250,13 @@ func drawTransformed(c core.Canvas, obj core.CanvasObject, pos geo.Position, m g
 
 	// Build the affine transform in pixel coordinates.
 	// Source and dest are both in pixel space (same scale), so the linear
-	// part of the matrix (A,B,C,D) applies directly. The translation
-	// is the object's absolute position in pixels.
-	s := float64(c.Scale())
-	px := float64(pos.X) * s
-	py := float64(pos.Y) * s
+	// part of the matrix (A,B,C,D) applies directly. The translation is the
+	// object's absolute position in pixels, less the linear part applied to
+	// where the object's origin sits in the temp image.
+	sf := float64(s)
+	ox, oy := float64(originX), float64(originY)
+	px := float64(pos.X)*sf - float64(m.A)*ox - float64(m.C)*oy
+	py := float64(pos.Y)*sf - float64(m.B)*ox - float64(m.D)*oy
 
 	// f64.Aff3 is [a, b, tx, c, d, ty] (row-major).
 	aff := f64.Aff3{

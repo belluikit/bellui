@@ -1,4 +1,4 @@
-package common
+package painter_test
 
 import (
 	"fmt"
@@ -14,6 +14,7 @@ import (
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/painter"
 	"github.com/belluikit/bellui/internal/painter/software"
 	"github.com/belluikit/bellui/test"
 )
@@ -23,7 +24,7 @@ func TestPaintExtent(t *testing.T) {
 
 	rect := canvas.NewRectangle(color.White)
 	rect.Resize(geo.NewSize(30, 20))
-	off, size := PaintExtent(rect)
+	off, size := painter.PaintExtent(rect)
 	assert.Equal(t, geo.Position{}, off, "a plain shape draws in its bounds")
 	assert.Equal(t, geo.NewSize(30, 20), size)
 
@@ -33,7 +34,7 @@ func TestPaintExtent(t *testing.T) {
 	// position, or ending there in RTL.
 	text := canvas.NewText("File Transfer", color.White)
 	min := text.MinSize()
-	off, size = PaintExtent(text)
+	off, size = painter.PaintExtent(text)
 	assert.Equal(t, geo.NewPos(-min.Width, 0), off)
 	assert.Equal(t, geo.NewSize(2*min.Width, min.Height), size, "a text never resized draws at its MinSize")
 
@@ -42,31 +43,31 @@ func TestPaintExtent(t *testing.T) {
 	narrow := canvas.NewText("File Transfer", color.White)
 	narrow.Alignment = bellui.TextAlignCenter
 	narrow.Resize(geo.NewSize(10, min.Height))
-	off, size = PaintExtent(narrow)
+	off, size = painter.PaintExtent(narrow)
 	assert.Equal(t, geo.NewPos(-(min.Width-10)/2, 0), off, "a centred text overflows both sides evenly")
 	assert.Equal(t, min, size)
 
 	narrow.Alignment = bellui.TextAlignTrailing
-	off, size = PaintExtent(narrow)
+	off, size = painter.PaintExtent(narrow)
 	assert.Equal(t, geo.NewPos(-(min.Width-10), 0), off, "a trailing text overflows its leading side")
 	assert.Equal(t, geo.NewSize(10+2*(min.Width-10), min.Height), size)
 
 	text.Resize(geo.NewSize(min.Width+50, min.Height+10))
-	_, size = PaintExtent(text)
+	_, size = painter.PaintExtent(text)
 	assert.Equal(t, geo.NewSize(min.Width+50, min.Height+10), size, "a larger box contains the glyphs")
 
 	circle := canvas.NewCircle(color.White)
 	circle.StrokeColor = color.Black
 	circle.StrokeWidth = 4
 	circle.Resize(geo.NewSize(20, 20))
-	off, size = PaintExtent(circle)
+	off, size = painter.PaintExtent(circle)
 	assert.Equal(t, geo.NewPos(-6, -6), off, "a stroke overflows by the painters' VectorPad")
 	assert.Equal(t, geo.NewSize(32, 32), size)
 
 	shadow := canvas.NewBoxShadow(color.Black, 5)
 	shadow.OffsetY = 4
 	shadow.Resize(geo.NewSize(20, 20))
-	off, size = PaintExtent(shadow)
+	off, size = painter.PaintExtent(shadow)
 	assert.Equal(t, geo.NewPos(-10, -6), off, "a shadow's blur spreads around its offset box")
 	assert.Equal(t, geo.NewSize(40, 40), size)
 }
@@ -112,7 +113,7 @@ func TestPaintExtent_ContainsSoftwareInk(t *testing.T) {
 				// The painters snap the glyph texture to whole pixels, so the
 				// extent is compared rounded out to them; the dirty region's
 				// partialRepaintPad covers that rounding when painting.
-				off, size := PaintExtent(text)
+				off, size := painter.PaintExtent(text)
 				ext := image.Rect(
 					int(math.Floor(float64(pos.X+off.X))), int(math.Floor(float64(pos.Y+off.Y))),
 					int(math.Ceil(float64(pos.X+off.X+size.Width))), int(math.Ceil(float64(pos.Y+off.Y+size.Height))),

@@ -1,12 +1,14 @@
 package software_test
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/container"
@@ -150,4 +152,106 @@ func TestPainter_drawTransformed_clipped(t *testing.T) {
 	assert.NotZero(t, a, "the box itself is drawn")
 	_, _, _, a = img.At(60, 150).RGBA()
 	assert.Zero(t, a, "nothing is drawn left of the box")
+}
+
+// inkBox returns the bounding box and count of img's visibly drawn pixels.
+func inkBox(img image.Image) (image.Rectangle, int) {
+	b := img.Bounds()
+	box, n := image.Rectangle{}, 0
+	for y := b.Min.Y; y < b.Max.Y; y++ {
+		for x := b.Min.X; x < b.Max.X; x++ {
+			if _, _, _, a := img.At(x, y).RGBA(); a > 0x1000 {
+				box = box.Union(image.Rect(x, y, x+1, y+1))
+				n++
+			}
+		}
+	}
+	return box, n
+}
+
+// TestPainter_drawTransformed_paintExtent pins #1192: an object drawn through
+// drawTransformed was rendered into a layer its own size, so a shadow drew
+// nothing and a stroke, a thick line or an overflowing text was cut at the
+// object's bounds. A scale too small to move a pixel takes that path, and must
+// draw what the untransformed object draws, at every canvas scale.
+func TestPainter_drawTransformed_paintExtent(t *testing.T) {
+	red := color.NRGBA{R: 255, A: 255}
+	cases := map[string]func() core.CanvasObject{
+		"shadow": func() core.CanvasObject { return canvas.NewBoxShadow(color.Black, 8) },
+		"offset shadow": func() core.CanvasObject {
+			s := canvas.NewBoxShadow(color.Black, 4)
+			s.OffsetX, s.OffsetY = 6, -5
+			return s
+		},
+		"stroked rectangle": func() core.CanvasObject {
+			r := canvas.NewRectangle(red)
+			r.StrokeColor, r.StrokeWidth = red, 8
+			return r
+		},
+		"stroked circle": func() core.CanvasObject {
+			r := canvas.NewCircle(red)
+			r.StrokeColor, r.StrokeWidth = red, 8
+			return r
+		},
+		"line": func() core.CanvasObject { l := canvas.NewLine(red); l.StrokeWidth = 8; return l },
+		"overflowing text": func() core.CanvasObject {
+			return canvas.NewText("Wider than its box", red)
+		},
+		"scene3d": func() core.CanvasObject { s := canvas.NewScene3D(); s.Background = red; return s },
+	}
+	paint := func(obj core.CanvasObject, scale float32) image.Image {
+		c := test.NewTransparentCanvasWithPainter(software.NewPainter())
+		c.SetPadded(false)
+		c.SetScale(scale)
+		c.SetContent(container.NewWithoutLayout(obj))
+		c.Resize(geo.NewSize(200, 200))
+		return c.Capture()
+	}
+	for name, mk := range cases {
+		for _, scale := range []float32{1, 1.5, 2} {
+			t.Run(fmt.Sprintf("%s at %v", name, scale), func(t *testing.T) {
+				plainObj, transObj := mk(), mk()
+				for _, o := range []core.CanvasObject{plainObj, transObj} {
+					o.Resize(geo.NewSize(40, 40))
+					o.Move(geo.NewPos(80, 80))
+				}
+				transObj.(core.Transformable).SetTransform(geo.NewScale(1.0001, 1))
+
+				plain, plainN := inkBox(paint(plainObj, scale))
+				trans, transN := inkBox(paint(transObj, scale))
+				require.NotZero(t, plainN, "the untransformed object drew nothing, so the check would prove nothing")
+				assert.InDelta(t, plain.Min.X, trans.Min.X, 1, "left edge: plain %v, transformed %v", plain, trans)
+				assert.InDelta(t, plain.Min.Y, trans.Min.Y, 1, "top edge: plain %v, transformed %v", plain, trans)
+				assert.InDelta(t, plain.Max.X, trans.Max.X, 1, "right edge: plain %v, transformed %v", plain, trans)
+				assert.InDelta(t, plain.Max.Y, trans.Max.Y, 1, "bottom edge: plain %v, transformed %v", plain, trans)
+				assert.InEpsilon(t, plainN, transN, 0.05, "drawn pixels: plain %d, transformed %d", plainN, transN)
+			})
+		}
+	}
+}
+
+// TestPainter_drawTransformed_rotatedShadow: a shadow under a quarter turn is
+// drawn turned, its blur included (#1192).
+func TestPainter_drawTransformed_rotatedShadow(t *testing.T) {
+	s := canvas.NewBoxShadow(color.Black, 4) // pads by 8 on each side
+	s.Resize(geo.NewSize(80, 20))
+	s.Move(geo.NewPos(60, 90))
+	s.SetTransform(geo.NewRotationAround(math.Pi/2, 40, 10)) // about its centre: 20×80 at (90, 60)
+
+	c := test.NewTransparentCanvasWithPainter(software.NewPainter())
+	c.SetPadded(false)
+	c.SetContent(container.NewWithoutLayout(s))
+	c.Resize(geo.NewSize(200, 200))
+	img := c.Capture()
+
+	box, _ := inkBox(img)
+	assert.Greater(t, box.Dy(), box.Dx()+40, "the shadow is turned upright: %v", box)
+	assert.Less(t, box.Min.X, 90-2, "the blur spreads left of the turned box: %v", box)
+	assert.Greater(t, box.Max.X, 110+2, "the blur spreads right of the turned box: %v", box)
+	if a := alphaAt(img, 100, 100); a < 0.99 {
+		t.Errorf("alpha %.3f in the middle of the turned shadow; want it solid", a)
+	}
+	if a := alphaAt(img, 90, 100); a < 0.3 || a > 0.7 {
+		t.Errorf("alpha %.3f on the turned box's edge; want the blur's half", a)
+	}
 }
