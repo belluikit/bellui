@@ -80,12 +80,15 @@ func NewAuthButton(provider, clientID string, onAuth func(auth.OIDCResult)) *Aut
 // Tapped triggers the authentication flow in a background goroutine.
 // If an authentication is already in progress, the tap is ignored.
 func (b *AuthButton) Tapped(ev *event.PointEvent) {
+	// The press shows before the lock is taken: pressShape takes it too, and
+	// a sync.Mutex is not re-entrant, so showing it under the lock hung the
+	// main goroutine on the first tap of a drawn button.
+	internalWidget.TapPress(&b.pressTarget, ev)
 	b.mu.Lock()
 	if b.cancel != nil {
 		b.mu.Unlock()
 		return // already authenticating
 	}
-	internalWidget.TapPress(&b.pressTarget, ev)
 	ctx, cancel := context.WithCancel(context.Background())
 	b.cancel = cancel
 	b.mu.Unlock()
