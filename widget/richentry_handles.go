@@ -39,6 +39,9 @@ var (
 // TappedSecondary directly). The embedded selectable forwards the driver's
 // dispatch here (it is the deeper LongPressable in the object tree).
 func (e *RichEntry) LongPressed(ev *event.PointEvent) {
+	if e.Disabled() {
+		return
+	}
 	e.requestFocus()
 	e.syncSel()
 	row, col, _ := e.sel.getRowCol(ev.Position)
@@ -90,6 +93,9 @@ func (e *RichEntry) MouseUp(*desktop.MouseEvent) {
 // re-summoned after a long-press release or a handle adjustment — the native
 // "text toolbar reappears" behavior (pre-rebrand tracker #945).
 func (e *RichEntry) TappedSecondary(pe *event.PointEvent) {
+	if e.Disabled() {
+		return
+	}
 	e.requestFocus()
 	e.showContextMenu(bellui.AbsolutePositionForPoint(e.super(), pe.Position))
 }
@@ -169,7 +175,7 @@ func (e *RichEntry) updateSelectionHandles() {
 	if _, _, ok := e.selection(); !ok || e.composing {
 		e.touchSelection = false // the touch-initiated selection is gone
 	}
-	show := e.touchSelection && e.focused && e.Visible()
+	show := e.touchSelection && e.focused && e.Visible() && !e.Disabled()
 	syncSelectionHandles(e, &e.selHandles, show)
 }
 

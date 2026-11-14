@@ -56,6 +56,9 @@ func (e *RichEntry) AccessibleRange() (min, max, current float64) { return 0, 0,
 // actions menu, AT-SPI Action) now that the editor carries its semantic role.
 func (e *RichEntry) AccessibleActions() []core.AccessibleAction {
 	var acts []core.AccessibleAction
+	if e.Disabled() {
+		return acts // a disabled editor offers no edits (#1216)
+	}
 	if e.undo.canUndo() {
 		acts = append(acts, core.AccessibleAction{Name: core.ActionUndo, Description: lang.L("Undo")})
 	}
@@ -67,6 +70,9 @@ func (e *RichEntry) AccessibleActions() []core.AccessibleAction {
 
 // PerformAccessibleAction invokes the named accessible action.
 func (e *RichEntry) PerformAccessibleAction(name string) {
+	if e.Disabled() {
+		return
+	}
 	switch name {
 	case core.ActionUndo, core.ActionRedo:
 		// Cancel an in-flight IME composition before replaying history —
@@ -138,6 +144,9 @@ func (e *RichEntry) AccessibleCaret() int {
 // goroutine.
 func (e *RichEntry) SetAccessibleSelection(start, end int) {
 	onMain(func() {
+		if e.Disabled() {
+			return // a disabled editor's text cannot be selected (#1216)
+		}
 		n := e.doc.len()
 		start = clampInt(start, 0, n)
 		end = clampInt(end, 0, n)
@@ -157,6 +166,9 @@ func (e *RichEntry) SetAccessibleSelection(start, end int) {
 // text deletes the selection. Safe to call from any goroutine.
 func (e *RichEntry) ReplaceAccessibleSelection(text string) {
 	onMain(func() {
+		if e.Disabled() {
+			return
+		}
 		if text == "" {
 			e.deleteSelection()
 			return

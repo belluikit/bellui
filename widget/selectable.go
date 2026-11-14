@@ -192,6 +192,12 @@ func (s *selectable) MouseDown(m *desktop.MouseEvent) {
 		if h, ok := s.host.(desktop.Mouseable); ok {
 			h.MouseDown(m)
 		}
+		// A disabled host takes no focus by click (#1216). The focus manager
+		// would give it one: it lets a disabled widget with SelectedText be
+		// focused, for Entry's copyable disabled text.
+		if d, ok := s.host.(core.Disableable); ok && d.Disabled() {
+			return
+		}
 		s.grabFocus()
 		return
 	}

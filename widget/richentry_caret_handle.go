@@ -30,7 +30,7 @@ const richEntryCaretHandleTimeout = 4 * time.Second
 // showCaretHandle arms the caret handle after a touch placed the caret. A no-op
 // off mobile, for a non-touch pointer, and for unfocused or composing editors.
 func (e *RichEntry) showCaretHandle() {
-	if !bellui.CurrentDevice().IsMobile() || !e.focused || !e.touchPointer || e.composing {
+	if !bellui.CurrentDevice().IsMobile() || !e.focused || !e.touchPointer || e.composing || e.Disabled() {
 		return
 	}
 	if e.caretHandle == nil {
@@ -65,7 +65,7 @@ func (e *RichEntry) updateCaretHandle() {
 		return
 	}
 
-	if !h.active || !e.focused || !e.Visible() || e.composing ||
+	if !h.active || !e.focused || !e.Visible() || e.composing || e.Disabled() ||
 		time.Since(h.shownAt) >= richEntryCaretHandleTimeout {
 		h.active = false
 		h.hide()
