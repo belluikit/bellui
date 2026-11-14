@@ -355,6 +355,41 @@ func TestForm_Disable_Validation(t *testing.T) {
 	test.AssertImageMatches(t, "form/disable_validation_disabled_valid.png", w.Canvas().Capture())
 }
 
+// Disable and Enable before the form has a renderer must not panic, and the
+// renderer must apply the state they set (#1210).
+func TestForm_DisableBeforeRender(t *testing.T) {
+	test.NewTempApp(t)
+
+	for name, form := range map[string]*Form{
+		"literal": {},
+		"NewForm": NewForm(NewFormItem("test", NewEntry())),
+	} {
+		t.Run(name, func(t *testing.T) {
+			form.OnSubmit = func() {}
+			form.OnCancel = func() {}
+			form.Disable()
+			assert.True(t, form.Disabled())
+
+			test.TempWidgetRenderer(t, form)
+			assert.True(t, form.submitButton.Disabled())
+			assert.True(t, form.cancelButton.Disabled())
+
+			form.Enable()
+			assert.False(t, form.submitButton.Disabled())
+			assert.False(t, form.cancelButton.Disabled())
+		})
+	}
+
+	form := NewForm(NewFormItem("test", NewEntry()))
+	form.OnSubmit = func() {}
+	form.Disable()
+	form.Enable()
+	assert.False(t, form.Disabled())
+	test.TempWidgetRenderer(t, form)
+	assert.False(t, form.submitButton.Disabled())
+	assert.False(t, form.cancelButton.Disabled())
+}
+
 func TestForm_HintsRendered(t *testing.T) {
 	test.NewTempApp(t)
 	test.ApplyTheme(t, test.Theme())

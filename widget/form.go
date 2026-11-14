@@ -129,6 +129,9 @@ func (f *Form) Refresh() {
 // Since: 1.0
 func (f *Form) Enable() {
 	f.disabled = false
+	if f.cancelButton == nil {
+		return // not rendered yet: CreateRenderer applies the state
+	}
 	f.cancelButton.Enable()
 	f.checkValidation(nil) // as the form may be invalid
 }
@@ -138,6 +141,9 @@ func (f *Form) Enable() {
 // Since: 1.0
 func (f *Form) Disable() {
 	f.disabled = true
+	if f.cancelButton == nil {
+		return // not rendered yet: CreateRenderer applies the state
+	}
 	f.submitButton.Disable()
 	f.cancelButton.Disable()
 }
@@ -440,6 +446,10 @@ func (f *Form) CreateRenderer() core.WidgetRenderer {
 	f.cancelButton.ExtendBaseWidget(f.cancelButton)
 	f.submitButton = &Button{Icon: th.Icon(theme.IconNameConfirm), OnTapped: f.OnSubmit, Importance: HighImportance}
 	f.submitButton.ExtendBaseWidget(f.submitButton)
+	if f.disabled {
+		f.cancelButton.Disable()
+		f.submitButton.Disable()
+	}
 	buttons := &bellui.Container{Layout: layout.NewGridLayoutWithRows(1), Objects: []core.CanvasObject{f.cancelButton, f.submitButton}}
 	f.buttonBox = &bellui.Container{Layout: layout.NewBorderLayout(nil, nil, nil, buttons), Objects: []core.CanvasObject{buttons}}
 	f.validationError = errFormItemInitialState // set initial state error to guarantee next error (if triggers) is always different
