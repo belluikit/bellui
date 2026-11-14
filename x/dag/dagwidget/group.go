@@ -107,7 +107,7 @@ func (g *GroupWidget) effectiveSize() geo.Size {
 // affordance sync (see dagCanvasRenderer.Layout).
 func (g *GroupWidget) handlesVisible() bool {
 	return g.Selected && !g.collapsed() &&
-		(g.dagCanvas == nil || g.dagCanvas.Capabilities.MoveResize)
+		(g.dagCanvas == nil || g.dagCanvas.caps().MoveResize)
 }
 
 func (g *GroupWidget) MinSize() geo.Size {
@@ -187,6 +187,9 @@ var (
 
 // Cursor shows an open hand over the title bar: dragging it moves the group.
 func (t *groupTitleBar) Cursor() desktop.Cursor {
+	if t.gw.dagCanvas.inert() {
+		return desktop.DefaultCursor
+	}
 	return desktop.GrabCursor
 }
 
@@ -198,7 +201,7 @@ func (t *groupTitleBar) DragImage() core.CanvasObject { return nil }
 // Dragged moves the group and all member nodes in graph coordinates.
 func (t *groupTitleBar) Dragged(ev *event.DragEvent) {
 	c := t.gw.dagCanvas
-	if c == nil || !c.Capabilities.MoveResize {
+	if c == nil || !c.caps().MoveResize {
 		return
 	}
 	grp := t.gw.group()
@@ -264,7 +267,7 @@ func (t *groupTitleBar) DragEnd() {
 // DAGCanvas.Tapped and selects without activating.
 func (t *groupTitleBar) Tapped(ev *event.PointEvent) {
 	c := t.gw.dagCanvas
-	if c == nil {
+	if c == nil || c.inert() {
 		return
 	}
 	c.requestFocus() // so Enter/Delete act on this selection
@@ -282,7 +285,7 @@ func (t *groupTitleBar) Tapped(ev *event.PointEvent) {
 // card's body) resolve through DAGCanvas.TappedSecondary instead.
 func (t *groupTitleBar) TappedSecondary(ev *event.PointEvent) {
 	c := t.gw.dagCanvas
-	if c == nil {
+	if c == nil || c.inert() {
 		return
 	}
 	c.requestFocus() // so Enter/Delete act on this selection
@@ -312,7 +315,7 @@ var (
 func (b *groupCollapseButton) Tapped(*event.PointEvent) {
 	c := b.gw.dagCanvas
 	grp := b.gw.group()
-	if c == nil || grp == nil {
+	if c == nil || grp == nil || c.inert() {
 		return
 	}
 	c.do(&ToggleGroupCollapseCommand{Canvas: c, GroupID: b.gw.GroupID, Collapsed: !grp.Collapsed})
@@ -340,6 +343,9 @@ var (
 // Cursor shows a crosshair over the connector handle to hint that a
 // dependency edge can be drawn from here.
 func (h *groupConnectorHandle) Cursor() desktop.Cursor {
+	if h.gw.dagCanvas.inert() {
+		return desktop.DefaultCursor
+	}
 	return desktop.CrosshairCursor
 }
 
@@ -349,7 +355,7 @@ func (h *groupConnectorHandle) DragImage() core.CanvasObject { return nil }
 
 func (h *groupConnectorHandle) Dragged(ev *event.DragEvent) {
 	c := h.gw.dagCanvas
-	if c == nil || !c.Capabilities.GroupEdges {
+	if c == nil || !c.caps().GroupEdges {
 		return
 	}
 	if c.dragState != dragConnectingGroup {

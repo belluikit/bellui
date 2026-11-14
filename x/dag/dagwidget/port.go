@@ -41,6 +41,9 @@ var (
 // Cursor shows a crosshair over ports to hint that a connection can be drawn
 // from here.
 func (p *PortWidget) Cursor() desktop.Cursor {
+	if p.dagCanvas.inert() {
+		return desktop.DefaultCursor
+	}
 	return desktop.CrosshairCursor
 }
 
@@ -90,7 +93,7 @@ func (p *PortWidget) MinSize() geo.Size {
 // - Output port: starts a new connection drag.
 // - Connected input port: detaches the incoming edge and reroutes from the original source.
 func (p *PortWidget) Dragged(ev *event.DragEvent) {
-	if p.dagCanvas == nil || !p.dagCanvas.Capabilities.ConnectEdges {
+	if p.dagCanvas == nil || !p.dagCanvas.caps().ConnectEdges {
 		return
 	}
 
@@ -164,7 +167,7 @@ func (r *portRenderer) Objects() []core.CanvasObject {
 func (r *portRenderer) Destroy() {}
 
 func (r *portRenderer) applyTheme() {
-	th := r.port.Theme()
+	th := partTheme(r.port.Theme(), r.port.dagCanvas)
 	v := bellui.CurrentApp().Settings().ThemeVariant()
 
 	var strokeColor color.Color = th.Color(theme.ColorNameOutline, v)

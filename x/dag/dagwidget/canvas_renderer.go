@@ -63,7 +63,7 @@ func (r *dagCanvasRenderer) Layout(size geo.Size) {
 	// unchanged), so this loop is what makes a Capabilities change actually
 	// take effect.
 	for _, gw := range c.groups {
-		if c.Capabilities.GroupEdges {
+		if c.caps().GroupEdges {
 			gw.connector.Show()
 		} else {
 			gw.connector.Hide()
@@ -71,7 +71,7 @@ func (r *dagCanvasRenderer) Layout(size geo.Size) {
 		setHandlesVisible(gw.handles, gw.handlesVisible())
 	}
 	for _, nw := range c.nodes {
-		if c.Capabilities.LinkEdges {
+		if c.caps().LinkEdges {
 			nw.connector.Show()
 		} else {
 			nw.connector.Hide()

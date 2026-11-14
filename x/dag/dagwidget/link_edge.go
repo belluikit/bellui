@@ -209,7 +209,7 @@ func (r *linkEdgeRenderer) MinSize() geo.Size {
 func (r *linkEdgeRenderer) Refresh() {
 	e := r.edge
 	c := e.dagCanvas
-	th := e.Theme()
+	th := partTheme(e.Theme(), e.dagCanvas)
 	v := bellui.CurrentApp().Settings().ThemeVariant()
 	z := float32(1.0)
 	if c != nil {
@@ -266,7 +266,7 @@ func (r *linkEdgeRenderer) refreshLabel(zoom float32) {
 		r.labelBG = &canvas.Rectangle{}
 	}
 
-	th := r.edge.Theme()
+	th := partTheme(r.edge.Theme(), r.edge.dagCanvas)
 	v := bellui.CurrentApp().Settings().ThemeVariant()
 
 	e := r.edge

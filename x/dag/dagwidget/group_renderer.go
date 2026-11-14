@@ -102,7 +102,7 @@ func (r *groupRenderer) Refresh() {
 	r.group.titleBar.Refresh()
 	r.group.collapse.Refresh()
 	c := r.group.dagCanvas
-	if c == nil || c.Capabilities.GroupEdges {
+	if c == nil || c.caps().GroupEdges {
 		r.group.connector.Show()
 	} else {
 		r.group.connector.Hide()
@@ -127,12 +127,12 @@ func (r *groupRenderer) Destroy() {}
 
 func (r *groupRenderer) applyTheme() {
 	g := r.group
-	th := g.Theme()
+	th := partTheme(g.Theme(), g.dagCanvas)
 	v := bellui.CurrentApp().Settings().ThemeVariant()
 	z := g.zoom()
 
 	tint := th.Color(theme.ColorNamePrimary, v)
-	if grp := g.group(); grp != nil {
+	if grp := g.group(); grp != nil && !g.dagCanvas.inert() { // disabled: the disabled tint
 		if c, ok := parseHexColor(grp.Color); ok {
 			tint = c
 		}
@@ -215,7 +215,7 @@ func (r *groupTitleBarRenderer) Destroy() {}
 
 func (r *groupTitleBarRenderer) applyTheme() {
 	t := r.bar
-	th := t.gw.Theme()
+	th := partTheme(t.gw.Theme(), t.gw.dagCanvas)
 	v := bellui.CurrentApp().Settings().ThemeVariant()
 
 	tint := th.Color(theme.ColorNamePrimary, v)
@@ -307,7 +307,7 @@ func (r *groupConnectorRenderer) MinSize() geo.Size {
 
 func (r *groupConnectorRenderer) Refresh() {
 	h := r.handle
-	th := h.gw.Theme()
+	th := partTheme(h.gw.Theme(), h.gw.dagCanvas)
 	v := bellui.CurrentApp().Settings().ThemeVariant()
 	z := h.gw.zoom()
 	r.circle.FillColor = withAlpha(th.Color(theme.ColorNamePrimary, v), 60)

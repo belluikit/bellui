@@ -79,6 +79,9 @@ var (
 // Cursor hints the resize direction: horizontal/vertical arrows on the edge
 // midpoints, a crosshair on the corners (no diagonal standard cursor exists).
 func (h *HandleWidget) Cursor() desktop.Cursor {
+	if h.target.resizeCanvas().inert() {
+		return desktop.DefaultCursor
+	}
 	switch {
 	case h.dirY == 0:
 		return desktop.HResizeCursor
@@ -131,7 +134,7 @@ func (h *HandleWidget) zoom() float32 {
 func (h *HandleWidget) Dragged(ev *event.DragEvent) {
 	t := h.target
 	c := t.resizeCanvas()
-	if c == nil || !c.Capabilities.MoveResize {
+	if c == nil || !c.caps().MoveResize {
 		return
 	}
 	pos, stored, ok := t.storedGeometry()
@@ -225,7 +228,7 @@ func (r *handleRenderer) Objects() []core.CanvasObject {
 func (r *handleRenderer) Destroy() {}
 
 func (r *handleRenderer) applyTheme() {
-	th := r.handle.Theme()
+	th := partTheme(r.handle.Theme(), r.handle.target.resizeCanvas())
 	v := bellui.CurrentApp().Settings().ThemeVariant()
 	z := r.handle.zoom()
 	r.rect.FillColor = th.Color(theme.ColorNamePrimary, v)

@@ -131,7 +131,7 @@ var _ resizable = (*NodeWidget)(nil)
 // and the canvas allows move/resize. Shared by the renderer's Refresh and
 // the canvas-side affordance sync (see dagCanvasRenderer.Layout).
 func (n *NodeWidget) handlesVisible() bool {
-	return n.Selected && (n.dagCanvas == nil || n.dagCanvas.Capabilities.MoveResize)
+	return n.Selected && (n.dagCanvas == nil || n.dagCanvas.caps().MoveResize)
 }
 
 // effectiveSize returns the node's user-set size clamped to MinSize, or
@@ -205,7 +205,7 @@ func (n *NodeWidget) graphCenter(node *dag.Node) geo.Position {
 // Dragged moves the node in graph coordinates and highlights the group under
 // its center as the membership drop target.
 func (n *NodeWidget) Dragged(ev *event.DragEvent) {
-	if n.dagCanvas == nil || !n.dagCanvas.Capabilities.MoveResize {
+	if n.dagCanvas == nil || !n.dagCanvas.caps().MoveResize {
 		return
 	}
 	c := n.dagCanvas
@@ -222,7 +222,7 @@ func (n *NodeWidget) Dragged(ev *event.DragEvent) {
 	node.Position[0] += ev.Dragged.DX / zoom
 	node.Position[1] += ev.Dragged.DY / zoom
 
-	if c.Capabilities.GroupMembership {
+	if c.caps().GroupMembership {
 		over := c.groupAtGraphPos(n.graphCenter(node))
 		assignable := over != nil && c.Graph.CanAssignToGroup(n.NodeID, over.ID)
 		for id, gw := range c.groups {
@@ -257,7 +257,7 @@ func (n *NodeWidget) DragEnd() {
 	oldGroup := c.groupOfNode(n.NodeID)
 	newGroup := oldGroup
 	var resizeCmd *ResizeGroupCommand
-	if c.Capabilities.GroupMembership {
+	if c.caps().GroupMembership {
 		newGroup = ""
 		if g := c.groupAtGraphPos(n.graphCenter(node)); g != nil && c.Graph.CanAssignToGroup(n.NodeID, g.ID) {
 			newGroup = g.ID
@@ -335,6 +335,9 @@ func (n *NodeWidget) DragEnd() {
 // Tapped selects this node; a second tap within the double-tap window also
 // activates it (see tapTracker for why this is not event.DoubleTappable).
 func (n *NodeWidget) Tapped(ev *event.PointEvent) {
+	if n.dagCanvas.inert() {
+		return
+	}
 	if n.dagCanvas == nil {
 		n.Selected = true
 		n.Refresh()
@@ -353,6 +356,9 @@ func (n *NodeWidget) Tapped(ev *event.PointEvent) {
 // on the element under the pointer — then fires OnNodeSecondaryTapped. It
 // never activates.
 func (n *NodeWidget) TappedSecondary(ev *event.PointEvent) {
+	if n.dagCanvas.inert() {
+		return
+	}
 	if n.dagCanvas == nil {
 		n.Selected = true
 		n.Refresh()
@@ -400,6 +406,9 @@ var (
 // Cursor shows a crosshair over the connector handle to hint that a link
 // edge can be drawn from here.
 func (h *nodeConnectorHandle) Cursor() desktop.Cursor {
+	if h.nw.dagCanvas.inert() {
+		return desktop.DefaultCursor
+	}
 	return desktop.CrosshairCursor
 }
 
@@ -409,7 +418,7 @@ func (h *nodeConnectorHandle) DragImage() core.CanvasObject { return nil }
 
 func (h *nodeConnectorHandle) Dragged(ev *event.DragEvent) {
 	c := h.nw.dagCanvas
-	if c == nil || !c.Capabilities.LinkEdges {
+	if c == nil || !c.caps().LinkEdges {
 		return
 	}
 	if c.dragState != dragConnectingLink {
