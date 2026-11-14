@@ -27,17 +27,24 @@ const (
 
 // Declare conformity with interfaces
 var (
-	_ event.Focusable = (*Tree)(nil)
-	_ core.Accessible = (*Tree)(nil)
-	_ core.Widget     = (*Tree)(nil)
+	_ event.Focusable  = (*Tree)(nil)
+	_ core.Accessible  = (*Tree)(nil)
+	_ core.Widget      = (*Tree)(nil)
+	_ core.Disableable = (*Tree)(nil)
 )
 
 // Tree widget displays hierarchical data.
 // Each node of the tree must be identified by a Unique TreeNodeID.
 //
+// A disabled Tree takes no input: a tap selects no node and opens no branch,
+// the wheel and a touch drag do not scroll it, keys do nothing and Tab skips
+// it. The selected node and the expand icons show in the disabled colours. The
+// objects CreateNode returns are the app's and are left as they are. Select,
+// OpenBranch and the other calls from code still work.
+//
 // Since: 1.0
 type Tree struct {
-	BaseWidget
+	DisableableWidget
 	Root TreeNodeID
 
 	// HideSeparators hides the separators between tree nodes
@@ -159,6 +166,7 @@ func (t *Tree) CreateRenderer() core.WidgetRenderer {
 	c := newTreeContent(t)
 	s := widget.NewScroll(c)
 	t.scroller = s
+	s.Inert = t.Disabled // a disabled tree does not scroll (#1215)
 	r := &treeRenderer{
 		BaseRenderer: widget.NewBaseRenderer([]core.CanvasObject{s}),
 		tree:         t,
@@ -385,6 +393,9 @@ func (t *Tree) ToggleBranch(uid string) {
 
 // TypedKey is called if a key event happens while this Tree is focused.
 func (t *Tree) TypedKey(ev *event.KeyEvent) {
+	if t.Disabled() {
+		return
+	}
 	switch ev.Name {
 	case event.KeySpace:
 		t.Select(t.currentFocus)
@@ -1004,14 +1015,20 @@ func (n *treeNode) CreateRenderer() core.WidgetRenderer {
 	return r
 }
 
-// pressShape is the whole row.
+// pressShape is the whole row, while the tree is enabled.
 func (n *treeNode) pressShape() (widget.PressShape, bool) {
+	if n.tree.Disabled() {
+		return widget.PressShape{}, false
+	}
 	return rowPressShape(n.Theme(), n.Size()), true
 }
 
 // iconPressShape is a circle around a branch's expand icon, as for an icon
 // button: a press on it toggles the branch and does not select the row.
 func (n *treeNode) iconPressShape() (widget.PressShape, bool) {
+	if n.tree.Disabled() {
+		return widget.PressShape{}, false
+	}
 	th := n.Theme()
 	icon := n.icon.Size()
 	d := geo.Min(n.Size().Height, th.Size(theme.SizeNameInlineIcon)+2*th.Size(theme.SizeNamePadding))
@@ -1029,6 +1046,9 @@ func (n *treeNode) Indent() float32 {
 
 // HoverIn is called when a pointer enters the widget.
 func (n *treeNode) HoverIn(*event.HoverEvent) {
+	if n.tree.Disabled() {
+		return
+	}
 	n.hovered = true
 	n.partialRefresh()
 }
@@ -1060,6 +1080,9 @@ func (n *treeNode) cancelIconPress() {
 }
 
 func (n *treeNode) Tapped(ev *event.PointEvent) {
+	if n.tree.Disabled() {
+		return
+	}
 	widget.TapPress(&n.pressTarget, ev)
 	n.tree.Select(n.uid)
 	canvas := bellui.CurrentApp().Driver().CanvasForObject(n.tree.super())
@@ -1109,6 +1132,9 @@ func (n *treeNode) AccessibleActions() []core.AccessibleAction {
 
 // PerformAccessibleAction selects the node or toggles branch expansion.
 func (n *treeNode) PerformAccessibleAction(name string) {
+	if n.tree.Disabled() {
+		return
+	}
 	switch name {
 	case core.ActionSelect:
 		n.tree.Select(n.uid)
@@ -1211,11 +1237,18 @@ func (r *treeNodeRenderer) partialRefresh() {
 	if r.treeNode.icon != nil {
 		r.treeNode.icon.Refresh()
 	}
+	disabled := r.treeNode.tree.Disabled()
+	if disabled {
+		r.treeNode.hovered = false
+	}
 	r.background.CornerRadius = th.Size(theme.SizeNameSelectionRadius)
 	if len(r.treeNode.tree.selected) > 0 && r.treeNode.uid == r.treeNode.tree.selected[0] {
 		r.background.FillColor = th.Color(theme.ColorNameSelection, v)
+		if disabled {
+			r.background.FillColor = th.Color(theme.ColorNameDisabledButton, v)
+		}
 		r.background.Show()
-	} else if r.treeNode.hovered || (r.treeNode.tree.focused && r.treeNode.tree.currentFocus == r.treeNode.uid) {
+	} else if !disabled && (r.treeNode.hovered || (r.treeNode.tree.focused && r.treeNode.tree.currentFocus == r.treeNode.uid)) {
 		r.background.FillColor = th.Color(theme.ColorNameHover, v)
 		r.background.Show()
 	} else {
@@ -1277,10 +1310,16 @@ func (i *branchIcon) Refresh() {
 	} else {
 		i.Resource = theme.NavigateNextIcon()
 	}
+	if i.tree.Disabled() {
+		i.Resource = theme.NewDisabledResource(i.Resource)
+	}
 	i.Icon.Refresh()
 }
 
 func (i *branchIcon) Tapped(ev *event.PointEvent) {
+	if i.tree.Disabled() {
+		return
+	}
 	widget.TapPress(&i.pressTarget, nil)
 	i.tree.ToggleBranch(i.uid)
 }

@@ -15,7 +15,10 @@ import (
 	"github.com/belluikit/bellui/theme"
 )
 
-var _ event.Draggable = (*Carousel)(nil)
+var (
+	_ event.Draggable  = (*Carousel)(nil)
+	_ core.Disableable = (*Carousel)(nil)
+)
 
 // Carousel is a pager: it shows one item at a time, and the user moves to the
 // neighbouring item with its previous/next buttons or a horizontal swipe.
@@ -33,8 +36,13 @@ var _ event.Draggable = (*Carousel)(nil)
 //
 // It does not implement MD3's carousel layouts (multi-browse, hero,
 // uncontained, keylines); see #744.
+//
+// A disabled Carousel does not page: a swipe moves nothing and its
+// previous/next buttons are disabled. The buttons and the page dots show in
+// the disabled colours. The items are the app's and are left
+// as they are. Next and Previous, called from code, still page.
 type Carousel struct {
-	BaseWidget
+	DisableableWidget
 	Items       []core.CanvasObject
 	CurrentItem int
 	OnChanged   func(int) `json:"-"`
@@ -74,6 +82,23 @@ func (c *Carousel) AccessibleRole() core.AccessibleRole { return core.RoleGroup 
 // AccessibleLabel returns an empty string; use SetAccessibilityLabel to
 // name the pager.
 func (c *Carousel) AccessibleLabel() string { return "" }
+
+// Disable stops the carousel paging (see [Carousel]). A swipe in progress
+// ends, and the content settles back on the current item.
+func (c *Carousel) Disable() {
+	onMain(func() {
+		if c.Disabled() {
+			return
+		}
+		if c.dragging {
+			c.dragging = false
+			c.axis = carouselAxisNone
+			c.speed.reset()
+			c.settle()
+		}
+		c.DisableableWidget.Disable()
+	})
+}
 
 // Next advances to the next item.
 func (c *Carousel) Next() { c.page(1) }
@@ -150,14 +175,20 @@ func (c *Carousel) dirSign() float32 {
 // ClaimsDrag takes a touch drag that starts mostly sideways and leaves one that
 // starts mostly up or down to the scroll around the carousel
 // (event.DragClaimer, #662).
+//
+// A disabled carousel claims no drag, so a swipe on it reaches the scroll
+// around it, as a disabled slider's does.
 func (c *Carousel) ClaimsDrag(d geo.Delta) bool {
-	return abs32(d.DX) > abs32(d.DY)
+	return !c.Disabled() && abs32(d.DX) > abs32(d.DY)
 }
 
 // Dragged moves the content with the finger once the gesture has locked to the
 // horizontal axis; a gesture that starts vertical is ignored. On touch a
 // vertical one never arrives (ClaimsDrag); a mouse drag still can.
 func (c *Carousel) Dragged(e *event.DragEvent) {
+	if c.Disabled() {
+		return
+	}
 	if !c.dragging {
 		c.dragging = true
 		c.rtl = isRTLAt(c.super()) // once per gesture: a DirectionScope may hold it (#696)
@@ -501,13 +532,27 @@ func (r *carouselRenderer) Refresh() {
 	th := r.carousel.Theme()
 	v := bellui.CurrentApp().Settings().ThemeVariant()
 
+	disabled := r.carousel.Disabled()
+	current, other := theme.ColorNamePrimary, theme.ColorNameOutlineVariant
+	if disabled {
+		current, other = theme.ColorNameDisabled, theme.ColorNameDisabledButton
+	}
 	for i, dot := range r.dots {
 		if i == r.carousel.CurrentItem {
-			dot.FillColor = th.Color(theme.ColorNamePrimary, v)
+			dot.FillColor = th.Color(current, v)
 		} else {
-			dot.FillColor = th.Color(theme.ColorNameOutlineVariant, v)
+			dot.FillColor = th.Color(other, v)
 		}
 		dot.Refresh()
+	}
+
+	// The buttons are the carousel's own: they go with it.
+	for _, b := range []*IconButton{r.prevBtn, r.nextBtn} {
+		if disabled && !b.Disabled() {
+			b.Disable()
+		} else if !disabled && b.Disabled() {
+			b.Enable()
+		}
 	}
 
 	// Hide prev/next at boundaries.

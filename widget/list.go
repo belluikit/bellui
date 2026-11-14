@@ -24,9 +24,10 @@ type ListItemID = int
 
 // Declare conformity with interfaces.
 var (
-	_ core.Widget     = (*List)(nil)
-	_ event.Focusable = (*List)(nil)
-	_ core.Accessible = (*List)(nil)
+	_ core.Widget      = (*List)(nil)
+	_ event.Focusable  = (*List)(nil)
+	_ core.Accessible  = (*List)(nil)
+	_ core.Disableable = (*List)(nil)
 )
 
 // AccessibleRole returns [core.RoleList].
@@ -40,9 +41,15 @@ func (l *List) AccessibleLabel() string { return "" }
 // By default, List requires that all items are the same size, but specific
 // rows can have their heights set with SetItemHeight.
 //
+// A disabled List takes no input: a tap selects no row, the wheel and a touch
+// drag do not scroll it, keys do nothing and Tab skips it. The selected row
+// shows in the disabled colours. The widgets CreateItem returns are the app's
+// and are left as they are. Select, ScrollTo and the other calls from code
+// still work.
+//
 // Since: 1.0
 type List struct {
-	BaseWidget
+	DisableableWidget
 
 	// Length is a callback for returning the number of items in the list.
 	Length func() int `json:"-"`
@@ -122,6 +129,7 @@ func (l *List) CreateRenderer() core.WidgetRenderer {
 
 	layout := &bellui.Container{Layout: newListLayout(l)}
 	l.scroller = widget.NewVScroll(layout)
+	l.scroller.Inert = l.Disabled // a disabled list does not scroll (#1215)
 	layout.Resize(layout.MinSize())
 	objects := []core.CanvasObject{l.scroller}
 	return newListRenderer(objects, l, l.scroller, layout)
@@ -332,6 +340,9 @@ func (l *List) GetScrollOffset() float32 {
 
 // TypedKey is called if a key event happens while this List is focused.
 func (l *List) TypedKey(ev *event.KeyEvent) {
+	if l.Disabled() {
+		return
+	}
 	switch ev.Name {
 	case event.KeySpace:
 		l.Select(l.currentFocus)
@@ -567,6 +578,18 @@ type listItem struct {
 	background        *canvas.Rectangle
 	child             core.CanvasObject
 	hovered, selected bool
+
+	// list is the List the row belongs to, nil for a row made on its own. A
+	// row of a disabled list takes no tap, hover or press (#1215).
+	list *List
+	// disabledShown is whether the row was last drawn in the disabled look,
+	// so the list knows to redraw it when that changes.
+	disabledShown bool
+}
+
+// disabled reports whether the row's list is disabled.
+func (li *listItem) disabled() bool {
+	return li.list != nil && li.list.Disabled()
 }
 
 func newListItem(child core.CanvasObject, tapped func()) *listItem {
@@ -606,6 +629,9 @@ func (li *listItem) MinSize() geo.Size {
 
 // HoverIn is called when a desktop pointer enters the widget.
 func (li *listItem) HoverIn(*event.HoverEvent) {
+	if li.disabled() {
+		return
+	}
 	li.hovered = true
 	li.Refresh()
 }
@@ -623,7 +649,7 @@ func (li *listItem) HoverOut() {
 
 // Tapped is called when a pointer tapped event is captured and triggers any tap handler.
 func (li *listItem) Tapped(ev *event.PointEvent) {
-	if li.onTapped != nil {
+	if li.onTapped != nil && !li.disabled() {
 		widget.TapPress(&li.pressTarget, ev)
 		li.selected = true
 		li.Refresh()
@@ -633,7 +659,7 @@ func (li *listItem) Tapped(ev *event.PointEvent) {
 
 // pressShape is the whole row, while it has a tap handler.
 func (li *listItem) pressShape() (widget.PressShape, bool) {
-	if li.onTapped == nil {
+	if li.onTapped == nil || li.disabled() {
 		return widget.PressShape{}, false
 	}
 	return rowPressShape(li.Theme(), li.Size()), true
@@ -698,11 +724,16 @@ func (li *listItemRenderer) Refresh() {
 	v := bellui.CurrentApp().Settings().ThemeVariant()
 	style := internaltheme.RenderStyleForWidget(li.item)
 
+	disabled := li.item.disabled()
+	li.item.disabledShown = disabled
 	li.item.background.CornerRadius = th.Size(theme.SizeNameSelectionRadius)
-	if li.item.selected {
+	if li.item.selected && disabled {
+		li.item.background.FillColor = th.Color(theme.ColorNameDisabledButton, v)
+		li.item.background.Show()
+	} else if li.item.selected {
 		li.item.background.FillColor = th.Color(theme.ColorNameSelection, v)
 		li.item.background.Show()
-	} else if li.item.hovered {
+	} else if li.item.hovered && !disabled {
 		onSurface := th.Color(theme.ColorNameOnSurface, v)
 		li.item.background.FillColor = theme.StateLayerHover(onSurface)
 		li.item.background.Show()
@@ -715,6 +746,9 @@ func (li *listItemRenderer) Refresh() {
 	if li.accent != nil {
 		if li.item.selected && style == internaltheme.RenderStyleModern {
 			li.accent.FillColor = th.Color(theme.ColorNamePrimary, v)
+			if disabled {
+				li.accent.FillColor = th.Color(theme.ColorNameDisabled, v)
+			}
 			li.accent.CornerRadius = 1.5
 			li.accent.Show()
 			li.accent.Refresh()
@@ -768,7 +802,9 @@ func (l *listLayout) getItem() *listItem {
 			item = newListItem(item2, nil)
 		}
 	}
-	return matchThemeScope(item.(*listItem), l.list)
+	li := item.(*listItem)
+	li.list = l.list
+	return matchThemeScope(li, l.list)
 }
 
 func (l *listLayout) offsetUpdated(pos geo.Position) {
@@ -788,10 +824,11 @@ func (l *listLayout) setupListItem(li *listItem, id ListItemID, focus bool) {
 			break
 		}
 	}
-	if focus {
+	disabled := l.list.Disabled()
+	if focus && !disabled {
 		li.hovered = true
 		li.Refresh()
-	} else if previousIndicator != li.selected || li.hovered {
+	} else if previousIndicator != li.selected || li.hovered || li.disabledShown != disabled {
 		li.hovered = false
 		li.Refresh()
 	}

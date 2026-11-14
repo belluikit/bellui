@@ -10,6 +10,7 @@ import (
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/async"
 	"github.com/belluikit/bellui/internal/cache"
+	"github.com/belluikit/bellui/internal/svg"
 	"github.com/belluikit/bellui/internal/widget"
 	"github.com/belluikit/bellui/lang"
 	"github.com/belluikit/bellui/theme"
@@ -669,7 +670,7 @@ func (ti *treeViewItem) update(uid TreeViewNodeID, depth int, isBranch bool) {
 }
 
 func (ti *treeViewItem) Tapped(ev *event.PointEvent) {
-	if ti.renaming {
+	if ti.renaming || ti.tree.Disabled() {
 		return
 	}
 	widget.TapPress(&ti.pressTarget, ev)
@@ -678,7 +679,7 @@ func (ti *treeViewItem) Tapped(ev *event.PointEvent) {
 
 // pressShape is the whole row, except while it is being renamed.
 func (ti *treeViewItem) pressShape() (widget.PressShape, bool) {
-	if ti.renaming {
+	if ti.renaming || ti.tree.Disabled() {
 		return widget.PressShape{}, false
 	}
 	th := ti.Theme()
@@ -688,6 +689,9 @@ func (ti *treeViewItem) pressShape() (widget.PressShape, bool) {
 }
 
 func (ti *treeViewItem) DoubleTapped(*event.PointEvent) {
+	if ti.tree.Disabled() {
+		return
+	}
 	if ti.tree.AllowRename {
 		ti.startRename()
 		return
@@ -698,6 +702,9 @@ func (ti *treeViewItem) DoubleTapped(*event.PointEvent) {
 }
 
 func (ti *treeViewItem) TappedSecondary(e *event.PointEvent) {
+	if ti.tree.Disabled() {
+		return
+	}
 	items := ti.contextMenuItems()
 	if len(items) == 0 {
 		return
@@ -740,6 +747,9 @@ func (ti *treeViewItem) contextMenuItems() []*bellui.MenuItem {
 }
 
 func (ti *treeViewItem) startRename() {
+	if ti.tree.Disabled() {
+		return
+	}
 	ti.renaming = true
 
 	tir, _ := cache.Renderer(ti).(*treeViewItemRenderer)
@@ -852,6 +862,9 @@ func (ti *treeViewItem) AccessibleActions() []core.AccessibleAction {
 // PerformAccessibleAction selects the row, toggles branch expansion, or
 // starts rename / deletes the node when the tree allows it.
 func (ti *treeViewItem) PerformAccessibleAction(name string) {
+	if ti.tree.Disabled() {
+		return
+	}
 	switch name {
 	case core.ActionSelect:
 		if !ti.renaming {
@@ -880,7 +893,19 @@ func (ti *treeViewItem) PerformAccessibleAction(name string) {
 // lay rows out flat, so this carries the outline structure.
 func (ti *treeViewItem) AccessibleLevel() int { return ti.depth + 1 }
 
+// iconResource is the node's icon, in the disabled colour while the tree is
+// disabled. Only an SVG icon can be recoloured, as for a menu item's.
+func (ti *treeViewItem) iconResource() bellui.Resource {
+	if ti.nodeIcon != nil && ti.tree.Disabled() && svg.IsResourceSVG(ti.nodeIcon) {
+		return theme.NewDisabledResource(ti.nodeIcon)
+	}
+	return ti.nodeIcon
+}
+
 func (ti *treeViewItem) setHovered(hovered bool) {
+	if hovered && ti.tree.Disabled() {
+		return // no hover state, and no hover buttons, while disabled
+	}
 	if ti.hovered == hovered {
 		return
 	}
@@ -906,6 +931,18 @@ func newRowHoverButton(icon bellui.Resource, row *treeViewItem, tapped func()) *
 	return b
 }
 
+// setDisabled disables or enables the button, when that changes.
+func (b *rowHoverButton) setDisabled(disabled bool) {
+	if disabled == b.Disabled() {
+		return
+	}
+	if disabled {
+		b.Disable()
+	} else {
+		b.Enable()
+	}
+}
+
 func (b *rowHoverButton) HoverIn(e *event.HoverEvent) {
 	b.IconButton.HoverIn(e)
 	b.row.setHovered(true)
@@ -917,7 +954,7 @@ func (b *rowHoverButton) HoverOut() {
 }
 
 func (ti *treeViewItem) Dragged(e *event.DragEvent) {
-	if !ti.tree.AllowReorder && !ti.tree.AllowReparent {
+	if ti.tree.Disabled() || (!ti.tree.AllowReorder && !ti.tree.AllowReparent) {
 		return
 	}
 	widget.CancelPress(&ti.pressTarget) // a row being moved is not being tapped
@@ -925,7 +962,7 @@ func (ti *treeViewItem) Dragged(e *event.DragEvent) {
 }
 
 func (ti *treeViewItem) DragEnd() {
-	if !ti.tree.AllowReorder && !ti.tree.AllowReparent {
+	if ti.tree.Disabled() || (!ti.tree.AllowReorder && !ti.tree.AllowReparent) {
 		return
 	}
 	ti.tree.finalizeDrag()
@@ -944,7 +981,7 @@ func (ti *treeViewItem) CreateRenderer() core.WidgetRenderer {
 
 	var icon *canvas.Image
 	if ti.nodeIcon != nil {
-		icon = canvas.NewImageFromResource(ti.nodeIcon)
+		icon = canvas.NewImageFromResource(ti.iconResource())
 		icon.FillMode = canvas.ImageFillContain
 	}
 
@@ -1042,7 +1079,7 @@ func (r *treeViewItemRenderer) Layout(size geo.Size) {
 	// Node icon
 	if r.icon != nil && r.item.nodeIcon != nil {
 		r.icon.Show()
-		r.icon.Resource = r.item.nodeIcon
+		r.icon.Resource = r.item.iconResource()
 		r.icon.Move(geo.NewPos(x, (size.Height-iconSize)/2))
 		r.icon.Resize(geo.NewSize(iconSize, iconSize))
 		x += iconSize + pad
@@ -1102,10 +1139,16 @@ func (r *treeViewItemRenderer) Refresh() {
 	r.item.tree.mu.RLock()
 	selected := r.item.uid == r.item.tree.selected
 	r.item.tree.mu.RUnlock()
+	disabled := r.item.tree.Disabled()
+	if disabled {
+		r.item.hovered = false
+	}
 	focused := r.item.uid == r.item.tree.currentFocus && r.item.tree.focused
 	hovered := r.item.hovered
 
-	if selected && hovered {
+	if selected && disabled {
+		r.bg.FillColor = th.Color(theme.ColorNameDisabledButton, v)
+	} else if selected && hovered {
 		base := th.Color(theme.ColorNameSecondaryContainer, v)
 		overlay := theme.StateLayerHover(th.Color(theme.ColorNameOnSecondaryContainer, v))
 		r.bg.FillColor = blendColor(base, overlay)
@@ -1120,6 +1163,12 @@ func (r *treeViewItemRenderer) Refresh() {
 	}
 	r.bg.CornerRadius = th.Size(theme.SizeNameShapeSmall)
 	r.bg.Refresh()
+
+	// The row's own buttons go with the tree: a disabled one draws disabled,
+	// takes no tap, and Tab skips it.
+	for _, b := range []*rowHoverButton{r.chevron, r.renameBtn, r.deleteBtn} {
+		b.setDisabled(disabled)
+	}
 
 	// Chevron icon
 	if r.item.isBranch {
@@ -1136,10 +1185,10 @@ func (r *treeViewItemRenderer) Refresh() {
 	// Node icon
 	if r.item.nodeIcon != nil {
 		if r.icon == nil {
-			r.icon = canvas.NewImageFromResource(r.item.nodeIcon)
+			r.icon = canvas.NewImageFromResource(r.item.iconResource())
 			r.icon.FillMode = canvas.ImageFillContain
 		} else {
-			r.icon.Resource = r.item.nodeIcon
+			r.icon.Resource = r.item.iconResource()
 			r.icon.Refresh()
 		}
 	}
@@ -1147,6 +1196,13 @@ func (r *treeViewItemRenderer) Refresh() {
 	// Content
 	if r.content != r.item.content {
 		r.content = r.item.content
+	}
+	if lbl, ok := r.content.(*Label); ok && r.item.tree.CreateNode == nil {
+		// The default label is the tree's own; CreateNode's content is the app's.
+		lbl.Importance = MediumImportance
+		if disabled {
+			lbl.Importance = LowImportance
+		}
 	}
 	r.content.Refresh()
 

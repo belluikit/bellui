@@ -283,6 +283,30 @@ func (t *FileTree) noteChanged(id TreeNodeID) {
 	t.Tree.Refresh()
 }
 
+// Disable stops the tree taking input, as [Tree.Disable] does. It redraws the
+// tree without re-listing it, as Refresh would.
+func (t *FileTree) Disable() {
+	onMain(func() {
+		if t.disabled {
+			return
+		}
+		t.disabled = true
+		unfocusInside(t.super())
+		t.Tree.Refresh()
+	})
+}
+
+// Enable lets the tree take input again, redrawing it without re-listing it.
+func (t *FileTree) Enable() {
+	onMain(func() {
+		if !t.disabled {
+			return
+		}
+		t.disabled = false
+		t.Tree.Refresh()
+	})
+}
+
 // Refresh re-lists every known branch and redraws the tree. Current children
 // stay visible until each fresh listing lands, so an open tree does not
 // flash back to placeholders.

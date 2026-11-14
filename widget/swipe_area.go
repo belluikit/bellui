@@ -101,9 +101,14 @@ var (
 // Directions can make a swipe some way spring the card back and only report
 // it, or keep the card from moving that way at all (#1103).
 //
+// A disabled SwipeArea reports no swipe: a drag moves no card and calls
+// neither OnSwiped nor OnSwipeProgress, and it is left to the scroll around
+// the area. The content is the app's and is left as it is: a tap still
+// reaches it. The area draws nothing of its own, so it has no disabled look.
+//
 // Since: 1.3
 type SwipeArea struct {
-	BaseWidget
+	DisableableWidget
 
 	Content  core.CanvasObject
 	OnSwiped func(SwipeDirection) `json:"-"`
@@ -167,9 +172,36 @@ func (s *SwipeArea) CreateRenderer() core.WidgetRenderer {
 	return &swipeAreaRenderer{area: s}
 }
 
+// ClaimsDrag takes every touch drag while the area is enabled, as a Draggable
+// that is not an event.DragClaimer does, and none while it is disabled: that
+// drag reaches the scroll around the area, as a disabled slider's does.
+func (s *SwipeArea) ClaimsDrag(geo.Delta) bool {
+	return !s.Disabled()
+}
+
+// Disable stops the area reporting swipes (see [SwipeArea]). A drag in
+// progress ends unreported, and a card it moved springs back to rest.
+func (s *SwipeArea) Disable() {
+	onMain(func() {
+		if s.Disabled() {
+			return
+		}
+		s.dx, s.dy = 0, 0
+		if s.dragging {
+			s.dragging = false
+			s.speed.reset()
+			s.springBack()
+		}
+		s.DisableableWidget.Disable()
+	})
+}
+
 // Dragged adds the drag's movement to the swipe in progress, and moves the
 // card with it when Follow is set.
 func (s *SwipeArea) Dragged(e *event.DragEvent) {
+	if s.Disabled() {
+		return
+	}
 	if !s.Follow {
 		s.dx += e.Dragged.DX
 		s.dy += e.Dragged.DY
@@ -222,6 +254,9 @@ func (s *SwipeArea) startDrag() {
 // DragEnd reports the swipe, if the drag was one, and starts afresh. A card
 // flies off first, or springs back when the drag was not a swipe.
 func (s *SwipeArea) DragEnd() {
+	if s.Disabled() {
+		return
+	}
 	dx, dy := s.dx, s.dy
 	s.dx, s.dy = 0, 0
 	if !s.Follow {
