@@ -21,6 +21,7 @@ import (
 	"github.com/belluikit/bellui/internal/driver"
 	"github.com/belluikit/bellui/internal/gpu"
 	"github.com/belluikit/bellui/internal/layoutgen"
+	"github.com/belluikit/bellui/internal/painter"
 	"github.com/belluikit/bellui/internal/paintgen"
 	"github.com/belluikit/bellui/internal/theme"
 	"github.com/belluikit/bellui/internal/uidir"
@@ -763,7 +764,7 @@ func (c *Canvas) unionSubtreeBounds(node *RenderCacheNode, region *dirtyRect) {
 }
 
 // PaintBounds returns the world-space box node's object paints in: its
-// PaintExtent, through its world transform.
+// painter.PaintExtent, through its world transform.
 func PaintBounds(node *RenderCacheNode) (geo.Position, geo.Size) {
 	return PaintBoundsAt(node.obj, node.worldTransform)
 }
@@ -781,7 +782,7 @@ func WorldBox(m geo.Matrix, size geo.Size) (geo.Position, geo.Size) {
 
 // PaintBoundsAt is PaintBounds for obj with world transform m.
 func PaintBoundsAt(obj core.CanvasObject, m geo.Matrix) (geo.Position, geo.Size) {
-	off, s := PaintExtent(obj)
+	off, s := painter.PaintExtent(obj)
 	if !off.IsZero() {
 		m = m.Multiply(geo.NewTranslation(off.X, off.Y))
 	}
