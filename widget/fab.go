@@ -226,8 +226,14 @@ func (r *fabRenderer) Refresh() {
 		bgColor, fgColor = theme.ColorNamePrimaryContainer, theme.ColorNameOnPrimaryContainer
 	}
 
+	disabled := r.fab.Disabled()
+	if disabled {
+		// MD3's disabled look, as Button draws it: no hover state layer.
+		bgColor, fgColor = theme.ColorNameDisabledButton, theme.ColorNameDisabled
+	}
+
 	bg := th.Color(bgColor, v)
-	if r.fab.hovered {
+	if r.fab.hovered && !disabled {
 		bg = blendColor(bg, theme.StateLayerHover(th.Color(fgColor, v)))
 	}
 

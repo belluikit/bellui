@@ -28,8 +28,11 @@ func (n *NavigationRail) AccessibleRole() core.AccessibleRole { return core.Role
 func (n *NavigationRail) AccessibleLabel() string { return "" }
 
 // NavigationRail is an MD3 side navigation rail with 3-7 destinations.
+//
+// A disabled rail keeps showing the selected destination, in the disabled
+// colours, and refuses every tap and press on its destinations.
 type NavigationRail struct {
-	BaseWidget
+	DisableableWidget
 	Items      []*NavigationRailItem
 	Selected   int       // index of the selected destination; out of range selects nothing
 	ShowLabels bool      // show labels below icons
@@ -62,7 +65,7 @@ func (n *NavigationRail) CreateRenderer() core.WidgetRenderer {
 }
 
 type navRailItemWidget struct {
-	BaseWidget
+	DisableableWidget
 	pressTarget
 	item      *NavigationRailItem
 	selected  bool
@@ -71,7 +74,7 @@ type navRailItemWidget struct {
 }
 
 func (w *navRailItemWidget) Tapped(ev *event.PointEvent) {
-	if w.onTap != nil {
+	if w.onTap != nil && !w.Disabled() {
 		internalWidget.TapPress(&w.pressTarget, ev)
 		w.onTap()
 	}
@@ -92,7 +95,7 @@ func (w *navRailItemWidget) HoverOut() {
 // pressShape is the indicator pill, in the colour of the icon it holds.
 func (w *navRailItemWidget) pressShape() (internalWidget.PressShape, bool) {
 	r, ok := cache.Renderer(w).(*navRailItemRenderer)
-	if !ok || w.onTap == nil {
+	if !ok || w.onTap == nil || w.Disabled() {
 		return internalWidget.PressShape{}, false
 	}
 	return navIndicatorPressShape(w.Theme(), r.indicator, w.selected), true
@@ -205,6 +208,15 @@ func (r *navRailItemRenderer) Refresh() {
 		r.label.Color = th.Color(theme.ColorNameOnSurfaceVariant, v)
 		r.label.TextStyle.Bold = false
 	}
+	if r.item.Disabled() {
+		// A disabled rail keeps showing which destination is selected, in
+		// the disabled colours (#1214).
+		if r.item.selected {
+			r.indicator.FillColor = th.Color(theme.ColorNameDisabledButton, v)
+		}
+		r.icon.Resource = theme.NewColoredResource(r.item.item.Icon, theme.ColorNameDisabled)
+		r.label.Color = th.Color(theme.ColorNameDisabled, v)
+	}
 
 	r.indicator.Refresh()
 	r.icon.Refresh()
@@ -255,6 +267,9 @@ func (r *navRailRenderer) Refresh() {
 
 	for i, item := range r.items {
 		item.selected = i == r.rail.Selected
+		// The items are the rail's own parts: they are disabled with it, so a
+		// tap, a press and the accessible select action are refused (#1214).
+		item.disabled = r.rail.Disabled()
 		item.showLabel = r.rail.ShowLabels
 		item.Refresh()
 	}
@@ -278,6 +293,9 @@ func (r *navRailRenderer) updateItems() {
 			w := &navRailItemWidget{
 				item: item,
 				onTap: func() {
+					if rail.Disabled() {
+						return
+					}
 					rail.Selected = idx
 					if rail.OnChanged != nil {
 						rail.OnChanged(idx)

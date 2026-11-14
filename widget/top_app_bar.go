@@ -24,8 +24,12 @@ func (t *TopAppBar) AccessibleRole() core.AccessibleRole { return core.RoleToolb
 func (t *TopAppBar) AccessibleLabel() string { return t.Title }
 
 // TopAppBar is an MD3 top application bar with title, navigation icon, and action icons.
+//
+// A disabled bar draws its title and icons in the disabled colours, and its
+// navigation and action buttons refuse every press. Those buttons are the
+// bar's own, built from NavigationIcon and Actions.
 type TopAppBar struct {
-	BaseWidget
+	DisableableWidget
 	Title          string
 	NavigationIcon bellui.Resource
 	Actions        []TopAppBarAction
@@ -150,12 +154,16 @@ func (r *topAppBarRenderer) Refresh() {
 
 	r.title.Text = r.bar.Title
 	r.title.Color = th.Color(theme.ColorNameOnSurface, v)
+	if r.bar.Disabled() {
+		r.title.Color = th.Color(theme.ColorNameDisabled, v)
+	}
 	r.title.Refresh()
 
 	// Dynamically add/remove the navigation button.
 	changed := false
 	if r.bar.NavigationIcon != nil && r.navBtn == nil {
 		r.navBtn = NewIconButton(r.bar.NavigationIcon, r.bar.OnNavigation)
+		r.navBtn.disabled = r.bar.Disabled()
 		changed = true
 	} else if r.bar.NavigationIcon == nil && r.navBtn != nil {
 		r.navBtn = nil
@@ -163,6 +171,7 @@ func (r *topAppBarRenderer) Refresh() {
 	} else if r.navBtn != nil {
 		r.navBtn.Icon = r.bar.NavigationIcon
 		r.navBtn.OnTapped = r.bar.OnNavigation
+		r.navBtn.disabled = r.bar.Disabled()
 		r.navBtn.Refresh()
 	}
 
@@ -170,13 +179,16 @@ func (r *topAppBarRenderer) Refresh() {
 	if len(r.bar.Actions) != len(r.actionBtns) {
 		r.actionBtns = nil
 		for _, a := range r.bar.Actions {
-			r.actionBtns = append(r.actionBtns, NewIconButton(a.Icon, a.OnTapped))
+			btn := NewIconButton(a.Icon, a.OnTapped)
+			btn.disabled = r.bar.Disabled()
+			r.actionBtns = append(r.actionBtns, btn)
 		}
 		changed = true
 	} else {
 		for i, a := range r.bar.Actions {
 			r.actionBtns[i].Icon = a.Icon
 			r.actionBtns[i].OnTapped = a.OnTapped
+			r.actionBtns[i].disabled = r.bar.Disabled()
 			r.actionBtns[i].Refresh()
 		}
 	}
