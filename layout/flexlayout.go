@@ -60,7 +60,8 @@ func entry(s []float32, i int) float32 {
 
 // FlexHBoxLayout is a horizontal layout where children can have flex grow
 // factors and min/max width constraints. Children with flex=0 get their
-// natural MinSize. Remaining space is distributed proportionally among
+// natural MinSize, or the wider width a [core.FitWidther] asks for while the
+// row has room for it. Remaining space is distributed proportionally among
 // children with flex>0.
 //
 // The main axis is horizontal: Flex/MinWidth/MaxWidth constrain width. The
@@ -133,8 +134,12 @@ func (l *FlexHBoxLayout) MinSize(objects []core.CanvasObject) geo.Size {
 func (l *FlexHBoxLayout) Layout(objects []core.CanvasObject, size geo.Size) {
 	pad := l.padding()
 
-	// Pass 1: compute fixed widths and total flex.
-	var totalFixed, totalFlex float32
+	// Pass 1: compute fixed widths and total flex. A child with no flex gets
+	// its MinSize width plus what its FitWidth asks beyond that, given back as
+	// the row runs out of room (#1195).
+	var totalFixed, totalFlex, totalGive float32
+	fixed := make([]float32, len(objects))
+	give := make([]float32, len(objects))
 	visible := 0
 	for i, o := range objects {
 		if !o.Visible() {
@@ -147,12 +152,17 @@ func (l *FlexHBoxLayout) Layout(objects []core.CanvasObject, size geo.Size) {
 			if i < len(l.MinWidth) && l.MinWidth[i] > w {
 				w = l.MinWidth[i]
 			}
+			fixed[i] = w
+			give[i] = fitGive(o, w, entry(l.MaxWidth, i))
 			totalFixed += w
+			totalGive += give[i]
 		}
 		visible++
 	}
 
 	spacing := pad * float32(max(0, visible-1))
+	keep := fitKeep(totalFixed+totalGive+spacing-size.Width, totalGive)
+	totalFixed += totalGive * keep
 	available := size.Width - totalFixed - spacing
 	if available < 0 {
 		available = 0
@@ -173,7 +183,7 @@ func (l *FlexHBoxLayout) Layout(objects []core.CanvasObject, size geo.Size) {
 		if i < len(l.Flex) && l.Flex[i] > 0 && totalFlex > 0 {
 			w = available * (l.Flex[i] / totalFlex)
 		} else {
-			w = o.MinSize().Width
+			w = fixed[i] + give[i]*keep
 		}
 
 		if i < len(l.MinWidth) && l.MinWidth[i] > 0 && w < l.MinWidth[i] {

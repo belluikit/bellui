@@ -57,6 +57,11 @@ Nested scrollable containers now propagate scroll events to parent scrollables w
 ### ShrinkLayout
 `layout.NewShrinkLayout()` — a layout that reports MinSize (0, 0) while positioning all children at full container size. Useful when a resizable parent (Split, Scroll, AppTabs) must shrink below the natural minimum size of its content.
 
+### Fit Width (#1195)
+`core.FitWidther` (`FitWidth() float32`) is the width an object would like beside other widgets when its MinSize is far below it. Wrapping or truncating text has a MinSize one character or an ellipsis wide. `HBoxLayout` and `FlexHBoxLayout` start an unstretched child at its FitWidth. When the row overflows, they take width back toward MinSize, in proportion to what each child asked beyond its minimum. Flex children and spacers get what is left; `MaxWidth` caps the ask. MinSize reporting is unchanged, so a row can still shrink to its minimum.
+
+`Label` and `RichText` implement it, returning their `IntrinsicSize` width. `Entry` deliberately does not, because an unstretched entry would grow as it is typed in (measured: 36 → 162 px at 40 characters). Before this, an unstretched wrapping label collapsed to one character wide, its text running down the screen.
+
 ### Entry Alignment
 `Entry.Alignment` — sets horizontal text alignment (`bellui.TextAlignLeading`, `TextAlignCenter`, `TextAlignTrailing`). Applied to both text and placeholder. Default is leading (left).
 
