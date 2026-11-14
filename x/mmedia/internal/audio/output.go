@@ -30,13 +30,14 @@ const defaultChannels = 2
 type Output struct {
 	mu         sync.Mutex
 	ctx        otoContext // nil for a detached Output
-	player     *oto.Player
+	player     devicePlayer
 	buffer     *RingBuffer
 	pull       *puller // what the player reads the buffer through
 	sampleRate int
 	channels   int
 	volume     float64
 	started    bool
+	playing    bool // started, and not paused or stopped since
 
 	// idle is the device's count of playing Outputs (nil for a detached
 	// Output), and active whether this one is counted in it.
@@ -66,13 +67,32 @@ var device struct {
 
 // otoContext is what an Output uses of *oto.Context. It is an interface so a
 // test can stand in a context that opened and then failed, the way oto reports
-// a missing device on Linux, which a real *oto.Context cannot be made to do.
+// a missing device on Linux, which a real *oto.Context cannot be made to do,
+// and one whose players a test mixes itself.
 type otoContext interface {
-	NewPlayer(r io.Reader) *oto.Player
+	NewPlayer(r io.Reader) devicePlayer
 	Err() error
 	Suspend() error
 	Resume() error
 }
+
+// devicePlayer is what an Output uses of *oto.Player.
+type devicePlayer interface {
+	Play()
+	Pause()
+	Close() error
+	Seek(offset int64, whence int) (int64, error)
+	SetBufferSize(bytes int)
+	BufferedSize() int
+	SetVolume(v float64)
+	Volume() float64
+	IsPlaying() bool
+}
+
+// otoDevice is the real context, its players as devicePlayers.
+type otoDevice struct{ *oto.Context }
+
+func (d otoDevice) NewPlayer(r io.Reader) devicePlayer { return d.Context.NewPlayer(r) }
 
 // newOtoContext is oto.NewContext, a variable so a test can make the device
 // refuse to open.
@@ -81,7 +101,7 @@ var newOtoContext = func(op *oto.NewContextOptions) (otoContext, chan struct{}, 
 	if err != nil {
 		return nil, nil, err // not a nil *oto.Context in a non-nil interface
 	}
-	return ctx, ready, nil
+	return otoDevice{ctx}, ready, nil
 }
 
 // openDevice opens the audio device once per process and returns it, or the
@@ -186,7 +206,8 @@ func (o *Output) WriteSamples(data []byte) {
 }
 
 // flushPlayer empties oto's player after a seek once the ring holds a chunk
-// from the new position. oto's player holds up to playerChunk it pulled from
+// from the new position, and fades the new position in (Rebase faded the old
+// one out). oto's player holds up to playerChunk it pulled from
 // the ring before the seek, and a seek played that much of the old position
 // first: 162 ms on macOS (#855). Player.Seek drops it and refills from the
 // ring. Doing it at once, at Rebase, refilled the player from the cleared
@@ -202,6 +223,47 @@ func (o *Output) flushPlayer() {
 	defer o.mu.Unlock()
 	if o.flushPending.Swap(false) && o.player != nil {
 		_, _ = o.player.Seek(0, io.SeekCurrent)
+		if o.playing {
+			o.fade(o.volume)
+		}
+	}
+}
+
+// fadeTime is how long the sound takes to fade in or out at a start, stop,
+// pause, resume or seek. Cut at full level, the wave jumps to or from zero in
+// one sample, which is heard as a click; changing songs clicked (#1228). A
+// few milliseconds is too short to hear as a fade.
+const fadeTime = 8 * time.Millisecond
+
+// fadeWait bounds how long fadeOut waits for the device to play the faded
+// audio, for a device that has stopped asking for any.
+const fadeWait = 100 * time.Millisecond
+
+// fade moves the player's volume to v over fadeTime. oto applies a volume
+// change gradually, across the next block it mixes (readBufferAndAdd in
+// oto v3.5.1's internal/mux), so the steps here join into a ramp whose
+// length is fadeTime or one block, whichever is longer: a block is 32 ms on
+// macOS, and a few on Android. Called under o.mu.
+func (o *Output) fade(v float64) {
+	from := o.player.Volume()
+	for start := time.Now(); ; time.Sleep(time.Millisecond) {
+		f := float64(time.Since(start)) / float64(fadeTime)
+		if f >= 1 {
+			break
+		}
+		o.player.SetVolume(from + (v-from)*f)
+	}
+	o.player.SetVolume(v)
+}
+
+// fadeOut fades the player to silence and waits until the device has mixed a
+// block at that volume, so a pause or a close that follows cuts silence.
+// Called under o.mu, with the player playing.
+func (o *Output) fadeOut() {
+	o.fade(0)
+	mark := o.pull.consumed()
+	for end := time.Now().Add(fadeWait); o.pull.consumed() == mark && time.Now().Before(end); {
+		time.Sleep(time.Millisecond)
 	}
 }
 
@@ -214,11 +276,12 @@ func (o *Output) Start() {
 	}
 	o.player = o.ctx.NewPlayer(o.pull)
 	o.player.SetBufferSize(playerBufferBytes(o.sampleRate, o.channels))
-	o.player.SetVolume(o.volume)
+	o.player.SetVolume(0) // faded in once playing
 	o.pull.setPlayer(o.player)
 	o.setActive(true)
 	o.player.Play()
-	o.started = true
+	o.started, o.playing = true, true
+	o.fade(o.volume)
 }
 
 // setActive counts the Output in the device's playing Outputs, or takes it
@@ -277,35 +340,51 @@ func playerBufferBytes(rate, channels int) int {
 	return audioBytes(rate, channels, playerChunk)
 }
 
+// Pause pauses audio playback, fading it out first (fadeOut): it returns up to
+// fadeTime and a device block later.
 func (o *Output) Pause() {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	if o.player != nil {
+		if o.playing {
+			o.fadeOut()
+		}
 		o.player.Pause()
+		o.playing = false
 		o.setActive(false)
 	}
 }
 
-// Resume resumes audio playback.
+// Resume resumes audio playback, fading it in.
 func (o *Output) Resume() {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	if o.player != nil {
+	if o.player != nil && !o.playing {
+		o.player.SetVolume(0) // while paused, so oto starts from silence
 		o.setActive(true)
 		o.player.Play()
+		o.playing = true
+		if !o.flushPending.Load() { // a seek's flush fades in
+			o.fade(o.volume)
+		}
 	}
 }
 
-// Stop stops audio playback.
+// Stop stops audio playback, fading it out first (fadeOut): it returns up to
+// fadeTime and a device block later.
 func (o *Output) Stop() {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	o.flushPending.Store(false)
 	if o.player != nil {
+		if o.playing {
+			o.fadeOut()
+		}
 		o.player.Pause()
 		o.player.Close()
 		o.player = nil
 	}
+	o.playing = false
 	o.setActive(false)
 	o.buffer.Reset()
 	o.pull.reset()
@@ -325,7 +404,7 @@ func (o *Output) SetVolume(v float64) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	o.volume = math.Max(0, math.Min(1, v))
-	if o.player != nil {
+	if o.player != nil && !o.flushPending.Load() { // a seek's flush fades in to it
 		o.player.SetVolume(o.volume)
 	}
 }
@@ -389,9 +468,17 @@ func (o *Output) BufferCap() int {
 // Rebase clears any buffered (not yet played) samples and rebases the
 // playback position to pos. Used after seeks: PlaybackPosition is derived
 // from total bytes consumed, which keeps counting across the seek.
+//
+// A playing player is faded out first and stays silent until flushPlayer
+// fades the new position in. Cleared, the ring pads the player with silence
+// once it has played what it holds, and a network seek can take seconds, so
+// the old audio would otherwise stop dead there (#1228).
 func (o *Output) Rebase(pos time.Duration) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
+	if o.player != nil && o.playing && !o.flushPending.Load() {
+		o.fadeOut()
+	}
 	o.buffer.Clear()
 	o.flushPending.Store(o.player != nil) // see flushPlayer
 	o.posBase = pos
