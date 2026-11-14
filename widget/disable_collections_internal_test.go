@@ -103,7 +103,10 @@ func TestList_Disable(t *testing.T) {
 	test.Drag(c, pos, 0, -200)
 	assert.False(t, l.scroller.TryScrolled(&event.ScrollEvent{Scrolled: geo.Delta{DY: -200}}),
 		"a disabled list consumed a scroll: the scroll around it would not get it")
-	assert.False(t, l.scroller.ClaimsDrag(geo.Delta{DY: -20}), "a disabled list claimed a touch drag")
+	// ClaimsDrag is built only for touch (ci, android, ios, mobile), not wasm.
+	if claimer, ok := any(l.scroller).(interface{ ClaimsDrag(geo.Delta) bool }); ok {
+		assert.False(t, claimer.ClaimsDrag(geo.Delta{DY: -20}), "a disabled list claimed a touch drag")
+	}
 	l.TypedKey(&event.KeyEvent{Name: event.KeyDown})
 	l.TypedKey(&event.KeyEvent{Name: event.KeySpace})
 
