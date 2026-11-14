@@ -197,6 +197,12 @@ type Editor struct {
 	deferredLastLines   int
 
 	scrollX, scrollY float32 // last known Entry scroll offset
+
+	// disabled is the Disable state; shield takes the pointer while it is set,
+	// over layers, which stacks it on root. See disable.go.
+	disabled bool
+	shield   *disabledShield
+	layers   *bellui.Container
 }
 
 // NewEditor creates a new code editor with default settings.
@@ -485,6 +491,8 @@ func NewEditor() *Editor {
 	e.topBar = container.NewStack() // initially empty
 	e.hbox = container.NewBorder(nil, nil, nil, nil, e.entry)
 	e.root = container.NewBorder(nil, nil, nil, nil, e.hbox)
+	e.shield = newDisabledShield()
+	e.layers = container.NewStack(e.root, e.shield)
 
 	return e
 }
@@ -510,7 +518,7 @@ func (e *Editor) CreateRenderer() core.WidgetRenderer {
 	if e.linkModWatchStop == nil && e.link != nil {
 		e.linkModWatchStop = e.link.watchModifiers()
 	}
-	return &editorRenderer{WidgetRenderer: widget.NewSimpleRenderer(e.root), e: e}
+	return &editorRenderer{WidgetRenderer: widget.NewSimpleRenderer(e.layers), e: e}
 }
 
 // editorRenderer wraps the simple renderer to release canvas-lifetime
@@ -678,7 +686,8 @@ func (e *Editor) SetCursorPos(row, col int) {
 	e.entry.CursorColumn = col
 }
 
-// SelectedText returns the currently selected text, or empty string.
+// SelectedText returns the currently selected text, or empty string. A
+// disabled editor reports none: its text cannot be selected (#1216).
 func (e *Editor) SelectedText() string {
 	return e.entry.SelectedText()
 }
@@ -694,6 +703,9 @@ func (e *Editor) ShowFind() {
 		e.root.Refresh()
 	}
 	c := bellui.CurrentApp().Driver().CanvasForObject(e.entry)
+	if e.disabled {
+		c = nil // shown, but its disabled search field takes no focus (#1216)
+	}
 	e.find.Focus(c, e.entry.SelectedText())
 }
 
@@ -713,6 +725,9 @@ func (e *Editor) HideFind() {
 	e.searchSpans.Active = -1
 	e.RefreshDecorators()
 
+	if e.disabled {
+		return // no focus to give back to a disabled editor (#1216)
+	}
 	if c := bellui.CurrentApp().Driver().CanvasForObject(e.entry); c != nil {
 		c.Focus(e.entry)
 	}
@@ -736,21 +751,29 @@ func (e *Editor) FindPrev() {
 // Focus gives keyboard focus to the editor's text area.
 // Keyboard shortcuts (Cmd/Ctrl+F, Cmd/Ctrl+S, etc.) require focus to fire.
 func (e *Editor) Focus() {
+	if e.disabled {
+		return // a disabled editor takes no focus (#1216)
+	}
 	if c := bellui.CurrentApp().Driver().CanvasForObject(e.entry); c != nil {
 		c.Focus(e.entry)
 	}
 }
 
-// SetReadOnly sets the editor to read-only mode.
-// Uses Entry.ReadOnly instead of Disable() so text colors and background
-// remain normal — syntax highlighting stays visible.
+// SetReadOnly sets the editor to read-only mode: its text can be selected and
+// copied but not edited. It uses Entry.ReadOnly rather than disabling the
+// Entry, so text colours and background stay normal and syntax highlighting
+// stays visible. Read-only is independent of [Editor.Disable]: a disabled
+// editor refuses selection and copy too, and Enable returns to the read-only
+// state last set.
 func (e *Editor) SetReadOnly(ro bool) {
 	e.entry.ReadOnly = ro
 }
 
 // applyHighlighter wires the Highlighter to the Entry's LineHighlighter.
 func (e *Editor) applyHighlighter() {
-	if e.Highlighter == nil {
+	// A disabled editor draws its text in the disabled colour, which the
+	// highlighter's runs would paint over (see applyLook).
+	if e.Highlighter == nil || e.disabled {
 		e.entry.LineHighlighter = nil
 		return
 	}
@@ -964,6 +987,9 @@ func (e *Editor) ApplyDecorators() {
 // It reports false (showing nothing) when the anchor cell is not currently
 // visible — callers should treat that as "cannot anchor here".
 func (e *Editor) showPopoverAt(p *popover, row, col int) bool {
+	if e.disabled {
+		return false // a disabled editor opens no popover (#1216)
+	}
 	anchor := e.PositionAt(row, col)
 	if anchor.IsZero() {
 		return false
@@ -1377,7 +1403,15 @@ func newEditorEntry() *editorEntry {
 	return e
 }
 
+// The editorEntry's handlers refuse everything while it is disabled, before
+// the editor's hooks see it: those hooks open popovers, re-indent, follow
+// links and run OnRun/OnSave, and widget.Entry lets Copy through when disabled
+// (#1216).
+
 func (e *editorEntry) TypedKey(ev *event.KeyEvent) {
+	if e.Disabled() {
+		return
+	}
 	if e.onKey != nil && e.onKey(ev) {
 		return
 	}
@@ -1389,6 +1423,9 @@ func (e *editorEntry) TypedKey(ev *event.KeyEvent) {
 }
 
 func (e *editorEntry) TypedShortcut(s core.Shortcut) {
+	if e.Disabled() {
+		return
+	}
 	if e.onShortcut != nil && e.onShortcut(s) {
 		return
 	}
@@ -1400,6 +1437,9 @@ func (e *editorEntry) TypedShortcut(s core.Shortcut) {
 // an IME composition the Entry routes the rune to the commit path itself;
 // electric reindent still runs against the committed result.
 func (e *editorEntry) TypedRune(r rune) {
+	if e.Disabled() {
+		return
+	}
 	e.Entry.TypedRune(r)
 	if e.onRune != nil {
 		e.onRune(r)
@@ -1407,6 +1447,9 @@ func (e *editorEntry) TypedRune(r rune) {
 }
 
 func (e *editorEntry) MouseDown(m *desktop.MouseEvent) {
+	if e.Disabled() {
+		return
+	}
 	if e.onMouseDown != nil {
 		e.onMouseDown(m)
 	}
@@ -1414,6 +1457,9 @@ func (e *editorEntry) MouseDown(m *desktop.MouseEvent) {
 }
 
 func (e *editorEntry) KeyDown(k *event.KeyEvent) {
+	if e.Disabled() {
+		return
+	}
 	if e.onKeyDown != nil {
 		e.onKeyDown(k)
 	}
@@ -1425,6 +1471,24 @@ func (e *editorEntry) KeyUp(k *event.KeyEvent) {
 		e.onKeyUp(k)
 	}
 	e.Entry.KeyUp(k)
+}
+
+// SelectedText reports no selection while disabled: a disabled editor's text
+// cannot be selected or copied.
+func (e *editorEntry) SelectedText() string {
+	if e.Disabled() {
+		return ""
+	}
+	return e.Entry.SelectedText()
+}
+
+// SetAccessibleSelection refuses a selection from assistive technology while
+// disabled; widget.Entry allows one, as it allows selecting disabled text.
+func (e *editorEntry) SetAccessibleSelection(start, end int) {
+	if e.Disabled() {
+		return
+	}
+	e.Entry.SetAccessibleSelection(start, end)
 }
 
 func (e *editorEntry) FocusLost() {

@@ -28,6 +28,8 @@ type findBar struct {
 	caseSwitch *widget.Switch
 	matchLabel *widget.Label
 
+	prevBtn, nextBtn, closeBtn *widget.Button
+
 	// matches holds the current match set as a data/model source (pre-rebrand tracker #539);
 	// selection tracks the active match by identity (matchPos value) rather than
 	// by row index, so re-running the search — a re-typed query, a case toggle,
@@ -85,8 +87,26 @@ func newFindBar(getText func() string, onSelect func(int, int, int, int), onHide
 		closeBtn,
 	)
 	f.bar = container.NewBorder(nil, nil, left, right, f.entry)
+	f.prevBtn, f.nextBtn, f.closeBtn = prevBtn, nextBtn, closeBtn
 
 	return f
+}
+
+// parts lists the find bar's interactive widgets, each a core.Disableable.
+func (f *findBar) parts() []core.Disableable {
+	return []core.Disableable{f.entry, f.caseSwitch, f.prevBtn, f.nextBtn, f.closeBtn}
+}
+
+// setDisabled disables or enables the find bar's widgets with its editor, so
+// Tab skips them and they take no input (#1216).
+func (f *findBar) setDisabled(disabled bool) {
+	for _, p := range f.parts() {
+		if disabled {
+			p.Disable()
+		} else {
+			p.Enable()
+		}
+	}
 }
 
 func (f *findBar) hide() {

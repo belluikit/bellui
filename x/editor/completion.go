@@ -323,6 +323,9 @@ func (c *completionController) filterAndShow(prefix string) {
 // anchors at the session's identifier start; a session whose anchor is not
 // visible (scrolled away) dismisses instead.
 func (c *completionController) show() {
+	if c.e.disabled {
+		return // a disabled editor opens no popup (#1216)
+	}
 	if !c.ensureUI() {
 		return
 	}
