@@ -185,3 +185,36 @@ func TestRowWrap_RowHeights(t *testing.T) {
 	assert.Equal(t, geo.NewPos(0, 10+p+40+p), b.Position())
 	assert.Equal(t, geo.NewSize(50, 10+p+40+p+10), l.MinSize(objects))
 }
+
+// A FormLayout widens its label column toward a FitWidther label's FitWidth
+// while the fields keep their MinSize, to no more than half the width, and
+// MinSize still reports the narrowest the form can be (#1202). The label used
+// to get its MinSize, one character for wrapping text.
+func TestFormLayout_FitWidthLabel(t *testing.T) {
+	p := theme.Padding()
+	for _, c := range []struct {
+		name         string
+		width, field float32
+		labelW       float32
+	}{
+		{"room", 500, 36, 200},
+		{"capped at half", 300, 36, (300 - p) / 2},
+		// The field needs 200: the label gives back what the row is over by.
+		{"wide field", 300, 200, 10 + 190*(1-(10+190+p+200-300)/190)},
+		{"no room", 50, 36, 10},
+	} {
+		label := newFitRect(10, 200)
+		field := NewMinSizeRect(geo.NewSize(c.field, 10))
+		other := NewMinSizeRect(geo.NewSize(5, 10))
+		otherField := NewMinSizeRect(geo.NewSize(5, 10))
+		layout.NewFormLayout().Layout([]core.CanvasObject{label, field, other, otherField}, geo.NewSize(c.width, 100))
+		assert.InDelta(t, c.labelW, label.Size().Width, 0.01, c.name)
+		assert.InDelta(t, c.labelW+p, field.Position().X, 0.01, "%s: field after the label column", c.name)
+		assert.InDelta(t, max(c.field, c.width-c.labelW-p), field.Size().Width, 0.01, "%s: field takes the rest", c.name)
+		assert.InDelta(t, c.labelW, other.Size().Width, 0.01, "%s: one label column", c.name)
+	}
+
+	label := newFitRect(10, 200)
+	field := NewMinSizeRect(geo.NewSize(36, 10))
+	assert.InDelta(t, 10+p+36, layout.NewFormLayout().MinSize([]core.CanvasObject{label, field}).Width, 0.01)
+}

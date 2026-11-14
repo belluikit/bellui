@@ -140,6 +140,47 @@ func TestLabel_FitWidthInRowWrap(t *testing.T) {
 	assert.InDelta(t, lbl.Position().Y+lbl.Size().Height+theme.Padding(), after.Position().Y, 0.01, "the next chip below it")
 }
 
+// A wrapping or truncating label in a FormLayout's label column keeps its
+// text on one line while the field beside it keeps half the width, and wraps
+// or truncates at half the width when it does not (#1202). It used to collapse
+// to one character wide.
+func TestLabel_FitWidthInFormLabelColumn(t *testing.T) {
+	test.NewTempApp(t)
+	for _, truncate := range []bool{false, true} {
+		lbl := widget.NewLabel("Your code: K7Q-42X · Friends: 2")
+		msg := "wrapping"
+		if truncate {
+			lbl.Truncation = bellui.TextTruncateEllipsis
+			msg = "truncating"
+		} else {
+			lbl.Wrapping = bellui.TextWrapWord
+		}
+		field := widget.NewEntry()
+		form := &bellui.Container{Layout: layout.NewFormLayout(), Objects: []core.CanvasObject{lbl, field, widget.NewLabel("Name"), widget.NewEntry()}}
+		w := test.NewTempWindow(t, form)
+		w.SetPadded(false)
+
+		oneLine := lbl.IntrinsicSize()
+		pad := theme.Padding()
+		for _, width := range []float32{500, 200} {
+			w.Resize(geo.NewSize(width, 300))
+			w.Resize(geo.NewSize(width, 301))
+			half := (width - pad) / 2
+			if oneLine.Width <= half {
+				assert.InDelta(t, oneLine.Width, lbl.Size().Width, 0.01, "%s: one line at %v", msg, width)
+				assert.InDelta(t, oneLine.Height, lbl.MinSize().Height, 0.01, "%s: one line high at %v", msg, width)
+			} else {
+				assert.InDelta(t, half, lbl.Size().Width, 0.01, "%s: half the width at %v", msg, width)
+				if !truncate {
+					assert.Greater(t, lbl.MinSize().Height, oneLine.Height, "%s: wraps at %v", msg, width)
+				}
+			}
+			assert.InDelta(t, lbl.Size().Width+pad, field.Position().X, 0.01, "%s: field after the label at %v", msg, width)
+			assert.GreaterOrEqual(t, field.Size().Width, half-0.01, "%s: field keeps half at %v", msg, width)
+		}
+	}
+}
+
 // Editable text is not a FitWidther: an entry beside other widgets would grow
 // as it is typed in.
 func TestEntry_IsNotAFitWidther(t *testing.T) {
