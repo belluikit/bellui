@@ -11,6 +11,10 @@ import (
 
 // ShowFilterPopup shows a filter popup for the given column at the given position.
 func (g *DataGrid) ShowFilterPopup(col int, pos geo.Position) {
+	// A disabled grid opens no popup, from a gesture or from the app.
+	if g.disabled {
+		return
+	}
 	rc := g.visibleCol(col)
 	if rc == nil {
 		return

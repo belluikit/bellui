@@ -17,6 +17,7 @@ type CellsWidget struct {
 
 	viewport *Viewport
 	pool     *CellPool
+	renderer *CellsRenderer // the last one CreateRenderer built, for HoldsFocusable
 }
 
 // GroupAggregate is one aggregate shown on a group header row.
@@ -151,7 +152,24 @@ func NewCellsWidget(grid GridAccess, viewport *Viewport, pool *CellPool) *CellsW
 // CreateRenderer returns the CellsRenderer that manages visible cell objects.
 func (c *CellsWidget) CreateRenderer() core.WidgetRenderer {
 	c.ExtendBaseWidget(c)
-	return NewCellsRenderer(c)
+	r := NewCellsRenderer(c)
+	c.renderer = r
+	return r
+}
+
+// HoldsFocusable reports whether o is one of the focusable parts the cells
+// build themselves: the select checkboxes. Content a column's CellRenderer
+// supplies is not counted; it is the app's.
+func (c *CellsWidget) HoldsFocusable(o any) bool {
+	if c.renderer == nil || o == nil {
+		return false
+	}
+	for _, cb := range c.renderer.checkboxes {
+		if any(cb) == o {
+			return true
+		}
+	}
+	return false
 }
 
 // MinSize returns the total content size (all rows * all columns).

@@ -159,7 +159,7 @@ func (r *pinnedCellsRenderer) refresh(size geo.Size) {
 		lastRow = rowCount - 1
 	}
 
-	tc := ResolveThemeColors()
+	tc := resolveColors(grid)
 	altColor := tc.RowAlternate
 	selColor := tc.Selection
 

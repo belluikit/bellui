@@ -38,6 +38,16 @@ func NewFloatingFilterRow(grid FloatingFilterAccess, viewport *Viewport) *Floati
 	return f
 }
 
+// HoldsFocusable reports whether o is one of the row's filter entries.
+func (f *FloatingFilterRow) HoldsFocusable(o any) bool {
+	for _, e := range f.entries {
+		if any(e) == o {
+			return true
+		}
+	}
+	return false
+}
+
 func (f *FloatingFilterRow) CreateRenderer() core.WidgetRenderer {
 	f.ExtendBaseWidget(f)
 	return &floatingFilterRenderer{row: f}
@@ -92,6 +102,7 @@ func (r *floatingFilterRenderer) rebuild(size geo.Size) {
 	// pinned-right); the shared helper owns the geometry and the clip.
 	place := func(absCol int, x, w float32, dst []core.CanvasObject) []core.CanvasObject {
 		entry := r.row.entries[absCol]
+		syncDisabled(entry, gridDisabled(grid))
 		entry.Move(geo.NewPos(x, 0))
 		entry.Resize(geo.NewSize(w, size.Height))
 		return append(dst, entry)

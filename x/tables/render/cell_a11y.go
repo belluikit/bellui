@@ -118,7 +118,7 @@ func (h *cellHost) AccessibleActions() []core.AccessibleAction {
 
 // PerformAccessibleAction selects the cell like a pointer tap would.
 func (h *cellHost) PerformAccessibleAction(name string) {
-	if name == core.ActionSelect {
+	if name == core.ActionSelect && !gridDisabled(h.grid) {
 		h.grid.SelectCell(h.row, h.col)
 	}
 }
