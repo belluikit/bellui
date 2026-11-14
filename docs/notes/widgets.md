@@ -57,12 +57,14 @@ Nested scrollable containers now propagate scroll events to parent scrollables w
 ### ShrinkLayout
 `layout.NewShrinkLayout()` — a layout that reports MinSize (0, 0) while positioning all children at full container size. Useful when a resizable parent (Split, Scroll, AppTabs) must shrink below the natural minimum size of its content.
 
-### Fit Width (#1195, #1198)
+### Fit Width (#1195, #1198, #1199)
 `core.FitWidther` (`FitWidth() float32`) is the width an object would like beside other widgets when its MinSize is far below it. Wrapping or truncating text has a MinSize one character or an ellipsis wide. `HBoxLayout` and `FlexHBoxLayout` start an unstretched child at its FitWidth. When the row overflows, they take width back toward MinSize, in proportion to what each child asked beyond its minimum. Flex children and spacers get what is left; `MaxWidth` caps the ask. MinSize reporting is unchanged, so a row can still shrink to its minimum.
 
 `CenterLayout` and a `FlexVBoxLayout` with `CrossStart`, `CrossCenter` or `CrossEnd` give such a child its FitWidth up to their own width (#1198); `MaxWidth` still caps it in a column. Center then asks the child how tall it is at that width. A container with no size yet, or narrower than the child's MinSize, gives the MinSize as before.
 
-FitWidth is not passed up through containers: only `Label` and `RichText` implement it, so a label inside a `Center` inside a row still collapses, because the row sees the `Center`. `RowWrapLayout` (#1199) and `FormLayout`'s label column (#1202) still size children to their MinSize.
+`RowWrapLayout` does the same (#1199): a FitWidther gets its FitWidth up to the flow's width, starting a new row when it doesn't fit beside the objects before it. Each row is as tall as its own tallest object. Rows used to share one height, the tallest object's, so a label wrapped to a few lines would have made every chip row that tall. Measured on a chip flow 348 px wide: one row height for all is 170 px tall, a height per row 145 px. Before this, the collapsed label made the flow 2474 px tall.
+
+FitWidth is not passed up through containers: only `Label` and `RichText` implement it, so a label inside a `Center` inside a row still collapses, because the row sees the `Center`. `FormLayout`'s label column still sizes its labels to their MinSize (#1202, parked: `widget.Form` draws plain one-line labels, so nothing hits it).
 
 `Label` and `RichText` implement it, returning their `IntrinsicSize` width. `Entry` deliberately does not, because an unstretched entry would grow as it is typed in (measured: 36 → 162 px at 40 characters). Before this, an unstretched wrapping label collapsed to one character wide, its text running down the screen.
 

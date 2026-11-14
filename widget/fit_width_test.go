@@ -113,6 +113,33 @@ func TestLabel_FitWidthInCenterAndColumns(t *testing.T) {
 	}
 }
 
+// A wrapping label in a RowWrap flow of chips keeps its text on one line
+// beside them while it fits, and wraps at the flow's width on a row of its
+// own when it does not; the chip rows keep their own height (#1199).
+func TestLabel_FitWidthInRowWrap(t *testing.T) {
+	test.NewTempApp(t)
+	lbl := widget.NewLabel("Filters apply to every playlist you open")
+	lbl.Wrapping = bellui.TextWrapWord
+	before := widget.NewButton("Rock", nil)
+	after := widget.NewButton("Jazz", nil)
+	flow := &bellui.Container{Layout: layout.NewRowWrapLayout(), Objects: []core.CanvasObject{before, lbl, after}}
+	w := test.NewTempWindow(t, flow)
+	w.SetPadded(false)
+
+	oneLine := lbl.IntrinsicSize()
+	w.Resize(geo.NewSize(1000, 300))
+	w.Resize(geo.NewSize(1000, 301))
+	assert.InDelta(t, oneLine.Width, lbl.Size().Width, 0.01, "one line")
+	assert.InDelta(t, 0, lbl.Position().Y, 0.01, "beside the chip")
+
+	w.Resize(geo.NewSize(150, 300))
+	w.Resize(geo.NewSize(150, 301))
+	assert.InDelta(t, 150, lbl.Size().Width, 0.01, "the flow's width")
+	assert.Greater(t, lbl.Size().Height, oneLine.Height, "wraps")
+	assert.InDelta(t, before.MinSize().Height+theme.Padding(), lbl.Position().Y, 0.01, "on the row after the chip, which keeps its own height")
+	assert.InDelta(t, lbl.Position().Y+lbl.Size().Height+theme.Padding(), after.Position().Y, 0.01, "the next chip below it")
+}
+
 // Editable text is not a FitWidther: an entry beside other widgets would grow
 // as it is typed in.
 func TestEntry_IsNotAFitWidther(t *testing.T) {

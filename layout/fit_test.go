@@ -9,6 +9,7 @@ import (
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/layout"
+	"github.com/belluikit/bellui/theme"
 )
 
 // fitRect is a min-sized rectangle that asks for a wider FitWidth, as wrapping text
@@ -144,4 +145,43 @@ func TestCenterAndColumns_FitWidth(t *testing.T) {
 	// MinSize still reports the narrowest the container can be.
 	assert.Equal(t, float32(10), layout.NewCenterLayout().MinSize([]core.CanvasObject{text}).Width)
 	assert.Equal(t, float32(10), (&layout.FlexVBoxLayout{CrossAlign: layout.CrossStart}).MinSize([]core.CanvasObject{text}).Width)
+}
+
+// RowWrap gives a FitWidther its FitWidth up to its own width, where it used to
+// get its MinSize, and moves it to a new row when it does not fit beside the
+// objects before it (#1199).
+func TestRowWrap_FitWidth(t *testing.T) {
+	p := theme.Padding()
+	chip := NewMinSizeRect(geo.NewSize(50, 10))
+	text := newFitRect(10, 200)
+	l := layout.NewRowWrapLayout()
+	l.Layout([]core.CanvasObject{chip, text}, geo.NewSize(300, 100))
+	assert.InDelta(t, 200, text.Size().Width, 0.01, "one line beside the chip")
+	assert.Equal(t, geo.NewPos(50+p, 0), text.Position())
+
+	text = newFitRect(10, 200)
+	l.Layout([]core.CanvasObject{chip, text}, geo.NewSize(120, 100))
+	assert.InDelta(t, 120, text.Size().Width, 0.01, "the container's width, on its own row")
+	assert.Equal(t, geo.NewPos(0, 10+p), text.Position())
+
+	text = newFitRect(10, 200)
+	l.Layout([]core.CanvasObject{text}, geo.NewSize(0, 100))
+	assert.InDelta(t, 10, text.Size().Width, 0.01, "no size yet: the MinSize")
+}
+
+// Each RowWrap row is as tall as its own tallest object, so one tall object
+// does not make every row tall (#1199).
+func TestRowWrap_RowHeights(t *testing.T) {
+	p := theme.Padding()
+	a := NewMinSizeRect(geo.NewSize(50, 10))
+	tall := NewMinSizeRect(geo.NewSize(50, 40))
+	b := NewMinSizeRect(geo.NewSize(50, 10))
+	l := layout.NewRowWrapLayout()
+	objects := []core.CanvasObject{a, tall, b}
+	// 60 wide: one object per row.
+	l.Layout(objects, geo.NewSize(60, 200))
+	assert.Equal(t, geo.NewPos(0, 0), a.Position())
+	assert.Equal(t, geo.NewPos(0, 10+p), tall.Position())
+	assert.Equal(t, geo.NewPos(0, 10+p+40+p), b.Position())
+	assert.Equal(t, geo.NewSize(50, 10+p+40+p+10), l.MinSize(objects))
 }

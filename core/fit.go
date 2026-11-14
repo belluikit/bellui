@@ -8,8 +8,9 @@ package core
 // A horizontal box gives a child it does not stretch its FitWidth, and takes
 // width back toward the child's MinSize only when the row runs out of room
 // (#1195). CenterLayout and a FlexVBoxLayout that does not stretch its
-// children give it its FitWidth up to their own width (#1198). A FitWidth at or
-// below the MinSize width asks for nothing more.
+// children give it its FitWidth up to their own width (#1198), and so does
+// RowWrapLayout (#1199). A FitWidth at or below the MinSize width asks for
+// nothing more.
 // Editable text does not implement it: an entry would grow as it is typed in.
 //
 // Since: 1.3
