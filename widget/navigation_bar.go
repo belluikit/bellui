@@ -28,8 +28,11 @@ func (n *NavigationBar) AccessibleRole() core.AccessibleRole { return core.RoleN
 func (n *NavigationBar) AccessibleLabel() string { return "" }
 
 // NavigationBar is an MD3 bottom navigation bar with 3-5 destinations.
+//
+// A disabled bar keeps showing the selected destination, in the disabled
+// colours, and refuses every tap and press on its destinations.
 type NavigationBar struct {
-	BaseWidget
+	DisableableWidget
 	Items     []*NavigationBarItem
 	Selected  int       // index of the selected destination; out of range selects nothing
 	OnChanged func(int) `json:"-"`
@@ -63,7 +66,7 @@ func (n *NavigationBar) CreateRenderer() core.WidgetRenderer {
 // --- internal item widget ---
 
 type navBarItemWidget struct {
-	BaseWidget
+	DisableableWidget
 	pressTarget
 	item     *NavigationBarItem
 	selected bool
@@ -77,7 +80,7 @@ func newNavBarItem(item *NavigationBarItem, selected bool, onTap func()) *navBar
 }
 
 func (w *navBarItemWidget) Tapped(ev *event.PointEvent) {
-	if w.onTap != nil {
+	if w.onTap != nil && !w.Disabled() {
 		internalWidget.TapPress(&w.pressTarget, ev)
 		w.onTap()
 	}
@@ -98,7 +101,7 @@ func (w *navBarItemWidget) HoverOut() {
 // pressShape is the indicator pill, in the colour of the icon it holds.
 func (w *navBarItemWidget) pressShape() (internalWidget.PressShape, bool) {
 	r, ok := cache.Renderer(w).(*navBarItemRenderer)
-	if !ok || w.onTap == nil {
+	if !ok || w.onTap == nil || w.Disabled() {
 		return internalWidget.PressShape{}, false
 	}
 	return navIndicatorPressShape(w.Theme(), r.indicator, w.selected), true
@@ -204,6 +207,15 @@ func (r *navBarItemRenderer) Refresh() {
 		r.label.Color = th.Color(theme.ColorNameOnSurfaceVariant, v)
 		r.label.TextStyle.Bold = false
 	}
+	if r.item.Disabled() {
+		// A disabled bar keeps showing which destination is selected, in
+		// the disabled colours (#1214).
+		if r.item.selected {
+			r.indicator.FillColor = th.Color(theme.ColorNameDisabledButton, v)
+		}
+		r.icon.Resource = theme.NewColoredResource(r.item.item.Icon, theme.ColorNameDisabled)
+		r.label.Color = th.Color(theme.ColorNameDisabled, v)
+	}
 
 	r.indicator.Refresh()
 	r.icon.Refresh()
@@ -256,6 +268,9 @@ func (r *navBarRenderer) Refresh() {
 
 	for i, item := range r.items {
 		item.selected = i == r.bar.Selected
+		// The items are the bar's own parts: they are disabled with it, so a
+		// tap, a press and the accessible select action are refused (#1214).
+		item.disabled = r.bar.Disabled()
 		item.Refresh()
 	}
 	r.Layout(r.bar.Size())
@@ -276,6 +291,9 @@ func (r *navBarRenderer) updateItems() {
 		if i == len(r.items) {
 			bar, idx := r.bar, i
 			w := newNavBarItem(item, idx == bar.Selected, func() {
+				if bar.Disabled() {
+					return
+				}
 				bar.Selected = idx
 				if bar.OnChanged != nil {
 					bar.OnChanged(idx)

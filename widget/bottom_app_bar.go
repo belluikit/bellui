@@ -24,10 +24,19 @@ func (b *BottomAppBar) AccessibleRole() core.AccessibleRole { return core.RoleTo
 func (b *BottomAppBar) AccessibleLabel() string { return "" }
 
 // BottomAppBar is an MD3 bottom toolbar with action icons and an optional FAB.
+//
+// A disabled bar draws its action icons in the disabled colours and refuses
+// every press, its FAB's included: Disable disables the FAB too, and Enable
+// enables it again only if the bar was the one that disabled it, so a FAB the
+// app disabled itself stays disabled.
 type BottomAppBar struct {
-	BaseWidget
+	DisableableWidget
 	Actions []*BottomAppBarAction
 	FAB     *FAB // optional, positioned at right
+
+	// fabDisabled is the FAB this bar disabled, which it enables again when
+	// the bar is enabled or the FAB leaves it (#1214).
+	fabDisabled *FAB
 }
 
 // NewBottomAppBar creates a bottom app bar.
@@ -35,6 +44,35 @@ func NewBottomAppBar(actions []*BottomAppBarAction, fab *FAB) *BottomAppBar {
 	b := &BottomAppBar{Actions: actions, FAB: fab}
 	b.ExtendBaseWidget(b)
 	return b
+}
+
+// Disable disables the bar, its action buttons and its FAB.
+func (b *BottomAppBar) Disable() {
+	b.DisableableWidget.Disable()
+	onMain(b.syncFAB)
+}
+
+// Enable enables the bar and its action buttons, and the FAB if the bar
+// disabled it.
+func (b *BottomAppBar) Enable() {
+	b.DisableableWidget.Enable()
+	onMain(b.syncFAB)
+}
+
+// syncFAB gives the FAB the bar's disabled state. The FAB is the app's
+// widget, so the bar enables only a FAB it disabled itself: an app's own
+// FAB.Disable is not undone by the bar's Enable. A FAB replaced or removed
+// while the bar is disabled is enabled again as it leaves.
+func (b *BottomAppBar) syncFAB() {
+	if held := b.fabDisabled; held != nil && (held != b.FAB || !b.Disabled()) {
+		b.fabDisabled = nil
+		held.Enable()
+	}
+	if fab := b.FAB; fab != nil && b.Disabled() && b.fabDisabled != fab && !fab.Disabled() {
+		fab.ExtendBaseWidget(fab)
+		b.fabDisabled = fab
+		fab.Disable()
+	}
 }
 
 func (b *BottomAppBar) MinSize() geo.Size {
@@ -113,14 +151,18 @@ func (r *bottomAppBarRenderer) updateActions() {
 	}
 	for i, a := range r.bar.Actions {
 		if i == len(r.actionBtns) {
-			r.actionBtns = append(r.actionBtns, NewIconButton(a.Icon, a.OnTapped))
+			btn := NewIconButton(a.Icon, a.OnTapped)
+			btn.disabled = r.bar.Disabled() // the buttons are the bar's own parts (#1214)
+			r.actionBtns = append(r.actionBtns, btn)
 			continue
 		}
 		btn := r.actionBtns[i]
 		btn.Icon = a.Icon
 		btn.OnTapped = a.OnTapped
+		btn.disabled = r.bar.Disabled()
 		btn.Refresh()
 	}
+	r.bar.syncFAB()
 
 	objects := make([]core.CanvasObject, 0, len(r.actionBtns)+2)
 	objects = append(objects, r.bg)
