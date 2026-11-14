@@ -147,12 +147,27 @@ func (p *puller) played() (played, pulled int64) {
 	return p.playedLocked(p.heldAtPull + p.pendingLen), p.audio
 }
 
-func (p *puller) playedLocked(held int) int64 {
+// consumed is how many of the pulled bytes, padding included, the player has
+// played. It grows only as the device mixes, which is what fadeOut waits for.
+func (p *puller) consumed() int64 {
+	held, _ := p.heldNow()
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.doneLocked(held)
+}
+
+// doneLocked is where in the pulled bytes playing has got to, given what the
+// player holds.
+func (p *puller) doneLocked(held int) int64 {
 	added := p.pulled
 	if p.pending && held <= p.heldAtPull && p.now().Sub(p.pulledAt) < p.duration(p.pendingLen)/2 {
 		added -= int64(p.pendingLen) // returned to the player, not yet added
 	}
-	done := added - int64(held) // where in the pulled bytes playing has got to
+	return added - int64(held)
+}
+
+func (p *puller) playedLocked(held int) int64 {
+	done := p.doneLocked(held)
 
 	// Walk back from the newest pull, taking off its audio not yet played.
 	played := p.audio

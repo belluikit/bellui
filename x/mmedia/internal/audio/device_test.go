@@ -41,10 +41,10 @@ func fakeDevice(t *testing.T, open func() (otoContext, chan struct{}, error)) *i
 // CoreAudio a queue that will not start.
 type lateFailContext struct{ err error }
 
-func (c lateFailContext) NewPlayer(io.Reader) *oto.Player { panic("NewPlayer on a failed device") }
-func (c lateFailContext) Err() error                      { return c.err }
-func (c lateFailContext) Suspend() error                  { return nil }
-func (c lateFailContext) Resume() error                   { return nil }
+func (c lateFailContext) NewPlayer(io.Reader) devicePlayer { panic("NewPlayer on a failed device") }
+func (c lateFailContext) Err() error                       { return c.err }
+func (c lateFailContext) Suspend() error                   { return nil }
+func (c lateFailContext) Resume() error                    { return nil }
 
 // closedReady is a ready channel the backend has already closed.
 func closedReady() chan struct{} {
