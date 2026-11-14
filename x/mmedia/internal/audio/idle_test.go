@@ -114,8 +114,17 @@ func TestOutputCountsWhilePlaying(t *testing.T) {
 	}
 	suspendingWhenIdle(t, true)
 	dev := &recordSuspender{}
+	// An earlier test can leave the real device suspended, on Android, and
+	// the recorder would then be asked to resume it first. It is resumed here
+	// for real, so that the recorder sees only this test's calls.
 	device.idle.mu.Lock()
 	saved := device.idle.dev
+	if device.idle.suspended {
+		if err := saved.Resume(); err != nil {
+			t.Fatalf("resuming the device an earlier test suspended: %v", err)
+		}
+		device.idle.suspended = false
+	}
 	device.idle.dev = dev
 	device.idle.mu.Unlock()
 	t.Cleanup(func() {

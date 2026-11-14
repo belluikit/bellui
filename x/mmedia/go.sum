@@ -30,8 +30,8 @@ github.com/belluikit/goffmpeg-libs/windows_amd64 v0.8.0 h1:thcB8zhkVP2sHWNJIpRxS
 github.com/belluikit/goffmpeg-libs/windows_amd64 v0.8.0/go.mod h1:x+DbU4kyhbEvk4fr7080dbV7lzSiXMh9x5rmDEuuz1w=
 github.com/belluikit/goffmpeg-libs/windows_arm64 v0.8.0 h1:VaCJpFcGY7is/4mBkXHXUvRmvGIWDDy4Oo4RRy37ouk=
 github.com/belluikit/goffmpeg-libs/windows_arm64 v0.8.0/go.mod h1:R8fUvbRy4Z80X1S4gntJqzuKdldkrMSB78cEOXVRaTI=
-github.com/belluikit/oto/v3 v3.0.0-20261114214624-f52e49485be2 h1:ixuFwrldifGwBXVH5FAASIbUWqoPCHQp6v+wZvj7+T0=
-github.com/belluikit/oto/v3 v3.0.0-20261114214624-f52e49485be2/go.mod h1:8pEBo7BVDVd/Gz2Vn8HO1DsTiE7b3M2bXU693DdORN0=
+github.com/belluikit/oto/v3 v3.0.0-20261114220522-af91c57d6a86 h1:QBcVyhrZ0jMTT//W3KwTs6jItp6uJlrHIBJXSOS688g=
+github.com/belluikit/oto/v3 v3.0.0-20261114220522-af91c57d6a86/go.mod h1:8pEBo7BVDVd/Gz2Vn8HO1DsTiE7b3M2bXU693DdORN0=
 github.com/belluikit/typesetting v0.3.6 h1:M27Rx+fhz1IV2n6Tei3fNhs/Oe9gGAnq3QMrBpAqisY=
 github.com/belluikit/typesetting v0.3.6/go.mod h1:vOvJAyUaoKpOpxqHeDglX6xNuG1zv2C3IOG3yEnHuLQ=
 github.com/ebitengine/purego v0.11.0 h1:jhp/D+Nyv7UUW8HAcmcjt2N2rYrYi9m3SL21k0Ua/NI=

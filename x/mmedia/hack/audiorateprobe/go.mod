@@ -27,7 +27,7 @@ require (
 	github.com/belluikit/goffmpeg-libs/linux_arm64 v0.8.0 // indirect
 	github.com/belluikit/goffmpeg-libs/windows_amd64 v0.8.0 // indirect
 	github.com/belluikit/goffmpeg-libs/windows_arm64 v0.8.0 // indirect
-	github.com/belluikit/oto/v3 v3.0.0-20261114214624-f52e49485be2 // indirect
+	github.com/belluikit/oto/v3 v3.0.0-20261114220522-af91c57d6a86 // indirect
 	github.com/belluikit/systray v1.12.2 // indirect
 	github.com/belluikit/typesetting v0.3.6 // indirect
 	github.com/belluikit/webgpu v1.2.3 // indirect
