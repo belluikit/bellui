@@ -62,7 +62,7 @@ Nested scrollable containers now propagate scroll events to parent scrollables w
 
 `CenterLayout` and a `FlexVBoxLayout` with `CrossStart`, `CrossCenter` or `CrossEnd` give such a child its FitWidth up to their own width (#1198); `MaxWidth` still caps it in a column. Center then asks the child how tall it is at that width. A container with no size yet, or narrower than the child's MinSize, gives the MinSize as before.
 
-FitWidth is not passed up through containers: only `Label` and `RichText` implement it, so a label inside a `Center` inside a row still collapses, because the row sees the `Center`. `RowWrapLayout` and `FormLayout`'s label column still size children to their MinSize (#1199).
+FitWidth is not passed up through containers: only `Label` and `RichText` implement it, so a label inside a `Center` inside a row still collapses, because the row sees the `Center`. `RowWrapLayout` (#1199) and `FormLayout`'s label column (#1202) still size children to their MinSize.
 
 `Label` and `RichText` implement it, returning their `IntrinsicSize` width. `Entry` deliberately does not, because an unstretched entry would grow as it is typed in (measured: 36 → 162 px at 40 characters). Before this, an unstretched wrapping label collapsed to one character wide, its text running down the screen.
 
