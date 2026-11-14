@@ -18,9 +18,13 @@ import (
 
 // DatePicker is an MD3-compliant date picker with a calendar grid.
 //
+// A disabled picker keeps showing its month and selection in the disabled
+// colours and takes no input: no month navigation, no day selection, no keys,
+// no focus (#1213).
+//
 // Since: 1.0
 type DatePicker struct {
-	BaseWidget
+	DisableableWidget
 	Selected  time.Time
 	OnChanged func(time.Time) `json:"-"`
 
@@ -30,7 +34,10 @@ type DatePicker struct {
 	cursor  time.Time // keyboard focus within the day grid (pre-rebrand tracker #534)
 }
 
-var _ event.Focusable = (*DatePicker)(nil)
+var (
+	_ event.Focusable  = (*DatePicker)(nil)
+	_ core.Disableable = (*DatePicker)(nil)
+)
 
 // FocusGained is called when the picker gains keyboard focus; the day
 // cursor starts on the selected date (or today) in the viewing month.
@@ -61,6 +68,9 @@ func (d *DatePicker) TypedRune(rune) {}
 // cursor (crossing a month boundary flips the viewing month), Home/End jump
 // to the week edges, PageUp/PageDown move a month, Enter/Space select.
 func (d *DatePicker) TypedKey(ev *event.KeyEvent) {
+	if d.Disabled() {
+		return
+	}
 	switch ev.Name {
 	case event.KeyLeft:
 		d.moveCursor(d.cursor.AddDate(0, 0, -1))
@@ -145,11 +155,17 @@ func (d *DatePicker) CreateRenderer() core.WidgetRenderer {
 	monthLabel.TextStyle.Bold = true
 
 	prevBtn := NewIconButton(theme.NavigateBackIcon(), func() {
+		if d.Disabled() {
+			return
+		}
 		d.viewing = d.viewing.AddDate(0, -1, 0)
 		d.Refresh()
 	})
 	prevBtn.SetAccessibilityLabel(lang.L("Previous month"))
 	nextBtn := NewIconButton(theme.NavigateNextIcon(), func() {
+		if d.Disabled() {
+			return
+		}
 		d.viewing = d.viewing.AddDate(0, 1, 0)
 		d.Refresh()
 	})
@@ -168,6 +184,7 @@ func (d *DatePicker) CreateRenderer() core.WidgetRenderer {
 	dayCells := make([]*dateDayCell, 42)
 	for i := range dayCells {
 		dayCells[i] = newDateDayCell(d.selectDay)
+		dayCells[i].disabled = d.Disabled
 	}
 
 	r := &datePickerRenderer{
@@ -249,6 +266,7 @@ type dateDayCell struct {
 	selected         bool
 	focused          bool // the picker's keyboard day cursor is on this cell
 	onTap            func(*dateDayCell)
+	disabled         func() bool // the picker's Disabled: a day of a disabled picker takes no tap
 }
 
 func newDateDayCell(onTap func(*dateDayCell)) *dateDayCell {
@@ -269,7 +287,7 @@ func (c *dateDayCell) CreateRenderer() core.WidgetRenderer {
 }
 
 func (c *dateDayCell) Tapped(ev *event.PointEvent) {
-	if c.day == 0 || c.onTap == nil {
+	if !c.active() {
 		return
 	}
 	internalWidget.TapPress(&c.pressTarget, ev)
@@ -288,10 +306,16 @@ func (c *dateDayCell) HoverOut() {
 	internalWidget.CancelPress(&c.pressTarget)
 }
 
+// active reports whether the cell takes a tap: it holds a day, has a
+// handler, and its picker is not disabled.
+func (c *dateDayCell) active() bool {
+	return c.day != 0 && c.onTap != nil && (c.disabled == nil || !c.disabled())
+}
+
 // pressShape is the day's circle, in its number's colour, while the cell
-// holds a day (#1091).
+// holds a day of an enabled picker (#1091).
 func (c *dateDayCell) pressShape() (internalWidget.PressShape, bool) {
-	if c.day == 0 || c.onTap == nil {
+	if !c.active() {
 		return internalWidget.PressShape{}, false
 	}
 	size := c.bg.Size()
@@ -328,6 +352,9 @@ func (c *dateDayCell) AccessibleState() core.AccessibleState {
 	}
 	if c.focused {
 		state |= core.StateFocused
+	}
+	if c.disabled != nil && c.disabled() {
+		state |= core.StateDisabled
 	}
 	return state
 }
@@ -442,10 +469,27 @@ func (r *datePickerRenderer) Refresh() {
 	r.bg.CornerRadius = 28
 	r.bg.Refresh()
 
+	// A disabled picker draws its text in the disabled colour and its
+	// selection in the disabled container colour, as Button does (#1213).
+	disabled := r.picker.Disabled()
+	if disabled {
+		r.prevBtn.Disable()
+		r.nextBtn.Disable()
+	} else {
+		r.prevBtn.Enable()
+		r.nextBtn.Enable()
+	}
+	textColor := func(name bellui.ThemeColorName) color.Color {
+		if disabled {
+			name = theme.ColorNameDisabled
+		}
+		return th.Color(name, v)
+	}
+
 	viewing := r.picker.viewing
 	r.monthLabel.Text = lang.FormatMonthYear(viewing)
 	r.monthLabel.TextSize = th.Size(theme.SizeNameHeadlineSmall)
-	r.monthLabel.Color = th.Color(theme.ColorNameOnSurface, v)
+	r.monthLabel.Color = textColor(theme.ColorNameOnSurface)
 	r.monthLabel.Refresh()
 
 	// Day headers (refresh text in case locale changed).
@@ -454,7 +498,7 @@ func (r *datePickerRenderer) Refresh() {
 	for i, h := range r.dayHeaders {
 		h.Text = days[i]
 		h.TextSize = headerTextSize
-		h.Color = th.Color(theme.ColorNameOnSurfaceVariant, v)
+		h.Color = textColor(theme.ColorNameOnSurfaceVariant)
 		h.Refresh()
 	}
 
@@ -496,19 +540,24 @@ func (r *datePickerRenderer) Refresh() {
 			cell.selected = isSelected
 			cell.focused = isFocused
 
-			if isSelected {
+			switch {
+			case isSelected && disabled:
+				cell.bg.FillColor = th.Color(theme.ColorNameDisabledButton, v)
+				cell.bg.StrokeWidth = 0
+				cell.label.Color = th.Color(theme.ColorNameDisabled, v)
+			case isSelected:
 				cell.bg.FillColor = th.Color(theme.ColorNamePrimary, v)
 				cell.bg.StrokeWidth = 0
 				cell.label.Color = th.Color(theme.ColorNameForegroundOnPrimary, v)
-			} else if isToday {
+			case isToday:
 				cell.bg.FillColor = color.Transparent
 				cell.bg.StrokeWidth = 2
-				cell.bg.StrokeColor = th.Color(theme.ColorNamePrimary, v)
-				cell.label.Color = th.Color(theme.ColorNamePrimary, v)
-			} else {
+				cell.bg.StrokeColor = textColor(theme.ColorNamePrimary)
+				cell.label.Color = textColor(theme.ColorNamePrimary)
+			default:
 				cell.bg.FillColor = color.Transparent
 				cell.bg.StrokeWidth = 0
-				cell.label.Color = th.Color(theme.ColorNameOnSurface, v)
+				cell.label.Color = textColor(theme.ColorNameOnSurface)
 			}
 			// The keyboard cursor draws a focus ring on top of any of the
 			// three looks above (pre-rebrand tracker #534).
@@ -527,6 +576,9 @@ func (r *datePickerRenderer) Refresh() {
 
 // selectDay commits a tapped day cell as the picker's selection.
 func (d *DatePicker) selectDay(c *dateDayCell) {
+	if d.Disabled() {
+		return
+	}
 	d.Selected = time.Date(c.year, time.Month(c.month), c.day, 0, 0, 0, 0, d.viewing.Location())
 	if d.OnChanged != nil {
 		d.OnChanged(d.Selected)

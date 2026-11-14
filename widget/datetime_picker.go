@@ -14,15 +14,42 @@ import (
 
 // DateTimePicker combines DatePicker and TimePicker in a tabbed interface.
 //
+// A disabled picker disables its date and time pickers and its Date/Time
+// tabs: it keeps showing the page it was on and takes no input (#1213).
+//
 // Since: 1.0
 type DateTimePicker struct {
-	BaseWidget
+	DisableableWidget
 	Selected  time.Time
 	OnChanged func(time.Time) `json:"-"`
 	Use24Hour bool
 
 	datePicker *DatePicker
 	timePicker *TimePicker
+	tabs       *SegmentedButton // built by the renderer
+}
+
+var _ core.Disableable = (*DateTimePicker)(nil)
+
+// Enable lets the picker, its two pickers and its tabs take input again.
+func (dt *DateTimePicker) Enable() {
+	dt.DisableableWidget.Enable()
+	dt.datePicker.Enable()
+	dt.timePicker.Enable()
+	if dt.tabs != nil {
+		dt.tabs.Enable()
+	}
+}
+
+// Disable stops the picker, its two pickers and its tabs taking input. It is
+// safe before the picker is drawn: the renderer disables the tabs it builds.
+func (dt *DateTimePicker) Disable() {
+	dt.DisableableWidget.Disable()
+	dt.datePicker.Disable()
+	dt.timePicker.Disable()
+	if dt.tabs != nil {
+		dt.tabs.Disable()
+	}
 }
 
 // AccessibleRole returns [core.RoleGroup]; the embedded date and time
@@ -85,6 +112,9 @@ func (dt *DateTimePicker) CreateRenderer() core.WidgetRenderer {
 	dt.ExtendBaseWidget(dt)
 
 	tabs := NewSegmentedButton([]string{lang.L("Date"), lang.L("Time")}, func(idx int) {
+		if dt.Disabled() {
+			return
+		}
 		dt.datePicker.Visible()
 		dt.timePicker.Visible()
 		if idx == 0 {
@@ -97,6 +127,10 @@ func (dt *DateTimePicker) CreateRenderer() core.WidgetRenderer {
 		dt.Refresh()
 	})
 	tabs.Selected = 0
+	if dt.Disabled() {
+		tabs.Disable()
+	}
+	dt.tabs = tabs
 	dt.timePicker.Hide()
 
 	return &dateTimePickerRenderer{
