@@ -106,6 +106,13 @@ The mobile driver opens the on-screen keyboard for whatever has the focus (`hand
 - **The cost:** hardware-keyboard shortcuts on a phone or tablet don't reach these widgets. Measured on a Pixel 9a: Backspace deleted a selected DAG node on v1.2.0, and no longer does. Touch users reach every action through menus and buttons. Bringing the shortcuts back without a keyboard needs an opt-out keyboard type plus native iOS work, parked as #660.
 - **New code:** a widget that focuses itself on tap checks `bellui.CurrentDevice().IsMobile()` first, unless it takes text. One that takes text only in some states (like the chart's Text tool) takes the focus when it enters that state and calls `Unfocus` when it leaves it, so the keyboard closes.
 
+### Disabled Widgets (#1221, belluikit/player#641)
+A disabled widget is **visible but inert** (owner, belluikit/player#641): it keeps its place, shows MD3's disabled look, and takes no input: no tap, drag, scroll or key, and no focus by Tab or click. Read-only (select and copy, no edits) is a separate state.
+- **Focus.** The focus manager gives a disabled widget no focus and Tab skips it. `Disable()` also drops a focus already on the widget or on an object inside it (`unfocusInside`, #1221), so enabling it again does not bring the focus back. Before #1221 the focus stayed, as upstream Fyne keeps it.
+- **Input is refused by the widget.** The drivers do not route around a disabled widget: a tap goes to the deepest tappable under the pointer whatever its ancestors. So each handler checks `Disabled()`, a composite disables its own `Disableable` parts (in `Disable` and again when its renderer builds them, as `SpinBox` and `FontPicker` do), and its other interactive parts ask their owner.
+- **The look** is drawn by the widget (`theme.ColorNameDisabled`, `theme.NewDisabledResource`), as `Button` does. The desktop walk also dims a disabled subtree to 0.38 and the mobile walk does not (#1223).
+- **Content the app supplies** inside a disabled widget (a carousel's pages, a list row's widgets) is the containers rule, still open on belluikit/player#641.
+
 ### NumericEntry Widget
 `widget.NumericEntry` and `widget.NewNumericEntry()` — Entry that only accepts numeric input. Right-aligned by default. Rejects non-numeric keystrokes at input time and filters paste content. `NewIntegerEntry()` for integer-only input.
 - `AllowFloat` (default true) — permits decimal point

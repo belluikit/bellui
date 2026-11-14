@@ -244,8 +244,11 @@ func TestSelect_FocusRendering(t *testing.T) {
 		test.AssertRendersToMarkup(t, "select/focus_focused_none_selected.xml", c)
 		sel.Disable()
 		test.AssertRendersToMarkup(t, "select/disabled.xml", c)
+		// A disabled widget gives up its focus, so enabling it does not bring
+		// the focus back (#1221).
+		assert.Nil(t, c.Focused())
 		sel.Enable()
-		test.AssertRendersToMarkup(t, "select/focus_focused_none_selected.xml", c)
+		test.AssertRendersToMarkup(t, "select/focus_unfocused_none_selected.xml", c)
 	})
 }
 

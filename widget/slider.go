@@ -598,6 +598,7 @@ func (s *Slider) Disable() {
 		defer s.Refresh()
 	}
 	s.disabled = true
+	unfocusInside(s.super())
 }
 
 // Enable enables the slider
