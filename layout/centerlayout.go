@@ -17,11 +17,18 @@ func NewCenterLayout() core.Layout {
 
 // Layout is called to pack all child objects into a specified size.
 // For CenterLayout this sets all children to their minimum size, centered within the space.
+// A core.FitWidther, such as wrapping text, gets its FitWidth instead, up to the
+// container's width, and the height it needs at that width (#1198).
 func (c *centerLayout) Layout(objects []core.CanvasObject, size geo.Size) {
 	for _, child := range objects {
-		childMin := child.MinSize()
-		child.Resize(childMin)
-		child.Move(geo.NewPos((size.Width-childMin.Width)/2, (size.Height-childMin.Height)/2))
+		childSize := child.MinSize()
+		if give := fitGive(child, childSize.Width, size.Width); size.Width > 0 && give > 0 {
+			childSize.Width += give
+			child.Resize(childSize)
+			childSize.Height = child.MinSize().Height
+		}
+		child.Resize(childSize)
+		child.Move(geo.NewPos((size.Width-childSize.Width)/2, (size.Height-childSize.Height)/2))
 	}
 }
 
