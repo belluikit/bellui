@@ -24,12 +24,13 @@ import (
 // input once enabled too, so a refusal is not mistaken for an input that never
 // arrived.
 
-func themeColor(name bellui.ThemeColorName) any {
+// pickerColor is the current theme's colour name.
+func pickerColor(name bellui.ThemeColorName) any {
 	return theme.Current().Color(name, bellui.CurrentApp().Settings().ThemeVariant())
 }
 
-// absPos is obj's position on its canvas.
-func absPos(obj core.CanvasObject) geo.Position {
+// pickerAbsPos is obj's position on its canvas.
+func pickerAbsPos(obj core.CanvasObject) geo.Position {
 	return bellui.CurrentApp().Driver().AbsolutePositionForObject(obj)
 }
 
@@ -47,10 +48,10 @@ func TestDatePicker_Disable(t *testing.T) {
 	require.True(t, dp.Disabled())
 	assert.True(t, r.prevBtn.Disabled(), "the previous-month button stayed enabled")
 	assert.True(t, r.nextBtn.Disabled(), "the next-month button stayed enabled")
-	assert.Equal(t, themeColor(theme.ColorNameDisabled), r.monthLabel.Color, "month label is not drawn disabled")
+	assert.Equal(t, pickerColor(theme.ColorNameDisabled), r.monthLabel.Color, "month label is not drawn disabled")
 	day20 := dayCellFor(t, dp, 20)
-	assert.Equal(t, themeColor(theme.ColorNameDisabled), day20.label.Color, "a day is not drawn disabled")
-	assert.Equal(t, themeColor(theme.ColorNameDisabledButton), dayCellFor(t, dp, 15).bg.FillColor,
+	assert.Equal(t, pickerColor(theme.ColorNameDisabled), day20.label.Color, "a day is not drawn disabled")
+	assert.Equal(t, pickerColor(theme.ColorNameDisabledButton), dayCellFor(t, dp, 15).bg.FillColor,
 		"the selected day is not filled with the disabled container colour")
 	assert.True(t, day20.AccessibleState()&core.StateDisabled != 0, "a day does not report disabled")
 
@@ -64,8 +65,8 @@ func TestDatePicker_Disable(t *testing.T) {
 	assert.Equal(t, time.June, dp.viewing.Month(), "a month button of a disabled picker moved the month")
 	// Drag and scroll: the picker has neither gesture. Both are sent at a day
 	// to show nothing there takes them.
-	test.Drag(c, absPos(day20).Add(geo.NewPos(4, 4)), 30, 0)
-	test.Scroll(c, absPos(day20).Add(geo.NewPos(4, 4)), 0, -30)
+	test.Drag(c, pickerAbsPos(day20).Add(geo.NewPos(4, 4)), 30, 0)
+	test.Scroll(c, pickerAbsPos(day20).Add(geo.NewPos(4, 4)), 0, -30)
 	// Keys: move the day cursor and select.
 	dp.TypedKey(&event.KeyEvent{Name: event.KeyRight})
 	dp.TypedKey(&event.KeyEvent{Name: event.KeyPageDown})
@@ -80,8 +81,8 @@ func TestDatePicker_Disable(t *testing.T) {
 
 	dp.Enable()
 	assert.False(t, r.nextBtn.Disabled(), "Enable left the next-month button disabled")
-	assert.Equal(t, themeColor(theme.ColorNameOnSurface), r.monthLabel.Color, "Enable left the month label disabled")
-	assert.Equal(t, themeColor(theme.ColorNamePrimary), dayCellFor(t, dp, 15).bg.FillColor, "Enable left the selection disabled")
+	assert.Equal(t, pickerColor(theme.ColorNameOnSurface), r.monthLabel.Color, "Enable left the month label disabled")
+	assert.Equal(t, pickerColor(theme.ColorNamePrimary), dayCellFor(t, dp, 15).bg.FillColor, "Enable left the selection disabled")
 	test.Tap(dayCellFor(t, dp, 20))
 	assert.Equal(t, 1, changed, "a tap on a day of an enabled picker did not fire OnChanged")
 	test.Tap(r.nextBtn)
@@ -97,7 +98,7 @@ func TestDatePicker_Disable(t *testing.T) {
 	require.Equal(t, dp, c.Focused())
 	dp.Disable()
 	assert.Nil(t, c.Focused(), "the disabled picker kept the focus")
-	assert.Equal(t, themeColor(theme.ColorNameDisabled), r.monthLabel.Color)
+	assert.Equal(t, pickerColor(theme.ColorNameDisabled), r.monthLabel.Color)
 }
 
 func TestTimePicker_Disable(t *testing.T) {
@@ -111,11 +112,11 @@ func TestTimePicker_Disable(t *testing.T) {
 	r := test.TempWidgetRenderer(t, tp).(*timePickerRenderer)
 
 	require.True(t, tp.Disabled())
-	assert.Equal(t, themeColor(theme.ColorNameDisabled), r.hourBtn.label.Color, "hour is not drawn disabled")
-	assert.Equal(t, themeColor(theme.ColorNameDisabled), r.minuteBtn.label.Color, "minute is not drawn disabled")
-	assert.Equal(t, themeColor(theme.ColorNameDisabledButton), r.hourBtn.bg.FillColor, "the selected field is not filled disabled")
-	assert.Equal(t, themeColor(theme.ColorNameDisabledButton), r.selectedBg.FillColor, "the dial selection is not filled disabled")
-	assert.Equal(t, themeColor(theme.ColorNameDisabled), r.selectorArm.StrokeColor, "the dial arm is not drawn disabled")
+	assert.Equal(t, pickerColor(theme.ColorNameDisabled), r.hourBtn.label.Color, "hour is not drawn disabled")
+	assert.Equal(t, pickerColor(theme.ColorNameDisabled), r.minuteBtn.label.Color, "minute is not drawn disabled")
+	assert.Equal(t, pickerColor(theme.ColorNameDisabledButton), r.hourBtn.bg.FillColor, "the selected field is not filled disabled")
+	assert.Equal(t, pickerColor(theme.ColorNameDisabledButton), r.selectedBg.FillColor, "the dial selection is not filled disabled")
+	assert.Equal(t, pickerColor(theme.ColorNameDisabled), r.selectorArm.StrokeColor, "the dial arm is not drawn disabled")
 	assert.True(t, r.hourBtn.AccessibleState()&core.StateDisabled != 0, "the hour field does not report disabled")
 
 	// The dial at 3 o'clock, in the picker's and the canvas's coordinates.
@@ -129,11 +130,11 @@ func TestTimePicker_Disable(t *testing.T) {
 	}
 	test.TapAt(tp, dial3)
 	refuse("a dial tap")
-	test.Drag(c, absPos(tp).Add(dial3), 0, 5)
+	test.Drag(c, pickerAbsPos(tp).Add(dial3), 0, 5)
 	refuse("a dial drag")
 	// Scroll: the picker has no scroll gesture; one sent at the dial lands
 	// on nothing.
-	test.Scroll(c, absPos(tp).Add(dial3), 0, -30)
+	test.Scroll(c, pickerAbsPos(tp).Add(dial3), 0, -30)
 	refuse("a scroll")
 	test.Tap(r.minuteBtn)
 	test.Tap(r.pmBtn)
@@ -151,13 +152,13 @@ func TestTimePicker_Disable(t *testing.T) {
 	assert.Equal(t, other, c.Focused(), "Tab stopped on the disabled picker")
 
 	tp.Enable()
-	assert.Equal(t, themeColor(theme.ColorNameOnPrimaryContainer), r.hourBtn.label.Color, "Enable left the hour disabled")
-	assert.Equal(t, themeColor(theme.ColorNamePrimary), r.selectedBg.FillColor, "Enable left the dial selection disabled")
+	assert.Equal(t, pickerColor(theme.ColorNameOnPrimaryContainer), r.hourBtn.label.Color, "Enable left the hour disabled")
+	assert.Equal(t, pickerColor(theme.ColorNamePrimary), r.selectedBg.FillColor, "Enable left the dial selection disabled")
 	test.TapAt(tp, dial3)
 	assert.Equal(t, 1, changed, "a dial tap on an enabled picker did not fire OnChanged")
 	assert.Equal(t, 3, tp.Hour)
 	tp.selectingMinute = false
-	test.Drag(c, absPos(tp).Add(dial3), 0, 5)
+	test.Drag(c, pickerAbsPos(tp).Add(dial3), 0, 5)
 	assert.Equal(t, 2, changed, "a dial drag on an enabled picker did not fire OnChanged")
 	test.Tap(r.pmBtn)
 	assert.Equal(t, 15, tp.Hour, "the PM field of an enabled picker did nothing")
@@ -173,7 +174,7 @@ func TestTimePicker_Disable(t *testing.T) {
 	tp.Disable()
 	assert.Nil(t, c.Focused(), "the disabled picker kept the focus")
 	assert.False(t, tp.hasPartial, "Disable kept a half-typed digit")
-	assert.Equal(t, themeColor(theme.ColorNameDisabled), r.hourBtn.label.Color)
+	assert.Equal(t, pickerColor(theme.ColorNameDisabled), r.hourBtn.label.Color)
 }
 
 func TestDateTimePicker_Disable(t *testing.T) {
@@ -195,9 +196,9 @@ func TestDateTimePicker_Disable(t *testing.T) {
 	segs := test.TempWidgetRenderer(t, dt.tabs).(*segButtonRenderer).segments
 	require.Len(t, segs, 2)
 	segLabel := func(i int) any { return test.TempWidgetRenderer(t, segs[i]).(*segmentRenderer).label.Color }
-	assert.Equal(t, themeColor(theme.ColorNameDisabled), segLabel(1), "a tab is not drawn disabled")
+	assert.Equal(t, pickerColor(theme.ColorNameDisabled), segLabel(1), "a tab is not drawn disabled")
 	dr := test.TempWidgetRenderer(t, dt.datePicker).(*datePickerRenderer)
-	assert.Equal(t, themeColor(theme.ColorNameDisabled), dr.monthLabel.Color, "the date page is not drawn disabled")
+	assert.Equal(t, pickerColor(theme.ColorNameDisabled), dr.monthLabel.Color, "the date page is not drawn disabled")
 
 	// Tap: the Time tab, and a day on the date page.
 	test.Tap(segs[1])
@@ -209,8 +210,8 @@ func TestDateTimePicker_Disable(t *testing.T) {
 	assert.Equal(t, 0, changed, "a tap on a day of a disabled picker fired OnChanged")
 	// Drag and scroll: neither the tabs nor the date page has either
 	// gesture; the time page's drag is covered by TestTimePicker_Disable.
-	test.Drag(c, absPos(segs[1]).Add(geo.NewPos(4, 4)), 30, 0)
-	test.Scroll(c, absPos(segs[1]).Add(geo.NewPos(4, 4)), 0, -30)
+	test.Drag(c, pickerAbsPos(segs[1]).Add(geo.NewPos(4, 4)), 30, 0)
+	test.Scroll(c, pickerAbsPos(segs[1]).Add(geo.NewPos(4, 4)), 0, -30)
 	// Keys on each part.
 	dt.tabs.TypedKey(&event.KeyEvent{Name: event.KeyRight})
 	dt.datePicker.TypedKey(&event.KeyEvent{Name: event.KeyReturn})
@@ -224,7 +225,7 @@ func TestDateTimePicker_Disable(t *testing.T) {
 
 	dt.Enable()
 	assert.False(t, dt.tabs.Disabled() || dt.datePicker.Disabled() || dt.timePicker.Disabled(), "Enable left a part disabled")
-	assert.Equal(t, themeColor(theme.ColorNameOnSurface), segLabel(1), "Enable left a tab disabled")
+	assert.Equal(t, pickerColor(theme.ColorNameOnSurface), segLabel(1), "Enable left a tab disabled")
 	test.Tap(dayCellFor(t, dt.datePicker, 20))
 	assert.Equal(t, 1, changed, "a tap on a day of an enabled picker did not fire OnChanged")
 	test.Tap(segs[1])
