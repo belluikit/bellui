@@ -15,8 +15,9 @@ var _ core.Layout = (*formLayout)(nil)
 // formLayout is two column grid where each row has a label and a widget.
 type formLayout struct{}
 
-// calculateTableSizes calculates the izes of the table.
-// This includes the width of the label column (maximum width of all labels),
+// calculateTableSizes calculates the sizes of the table.
+// This includes the width of the label column (maximum width of all labels,
+// widened toward the widest label's FitWidth when the container has room),
 // the width of the content column (maximum width of all content cells and remaining space in container)
 // and the total minimum height of the form.
 func (f *formLayout) calculateTableSizes(objects []core.CanvasObject, containerWidth float32) (labelWidth float32, contentWidth float32, height float32) {
@@ -25,6 +26,7 @@ func (f *formLayout) calculateTableSizes(objects []core.CanvasObject, containerW
 	}
 
 	rows := 0
+	labelFit := float32(0)
 	innerPadding := theme.InnerPadding()
 	for i := 0; i < len(objects); i += formLayoutCols {
 		labelCell, contentCell := objects[i], objects[i+1]
@@ -39,6 +41,9 @@ func (f *formLayout) calculateTableSizes(objects []core.CanvasObject, containerW
 			labelSize.Height += innerPadding * 2
 		}
 		labelWidth = geo.Max(labelWidth, labelSize.Width)
+		if labelCell.Visible() {
+			labelFit = geo.Max(labelFit, fitGive(labelCell, 0, 0))
+		}
 
 		// Content column width is the maximum of all content items.
 		contentSize := contentCell.MinSize()
@@ -54,6 +59,15 @@ func (f *formLayout) calculateTableSizes(objects []core.CanvasObject, containerW
 	}
 
 	padding := theme.Padding()
+	if containerWidth > 0 && labelFit > labelWidth {
+		// A FitWidther label, such as wrapping text, widens the label column
+		// toward its FitWidth while the content column keeps its MinSize,
+		// as an unstretched child of a box does, but to no more than half
+		// the width, so a long label cannot squeeze its field (#1202).
+		give := labelFit - labelWidth
+		w := labelWidth + give*fitKeep(labelWidth+give+padding+contentWidth-containerWidth, give)
+		labelWidth = geo.Max(labelWidth, geo.Min(w, (containerWidth-padding)/2))
+	}
 	contentWidth = geo.Max(contentWidth, containerWidth-labelWidth-padding)
 	return labelWidth, contentWidth, height + float32(rows-1)*padding
 }
@@ -132,7 +146,10 @@ func (f *formLayout) MinSize(objects []core.CanvasObject) geo.Size {
 	}
 }
 
-// NewFormLayout returns a new FormLayout instance
+// NewFormLayout returns a new FormLayout instance. The label column is as wide
+// as its widest label's MinSize, widened toward a [core.FitWidther] label's
+// FitWidth, such as wrapping text on one line, to no more than half the width
+// and while each field keeps its MinSize.
 func NewFormLayout() core.Layout {
 	return &formLayout{}
 }
