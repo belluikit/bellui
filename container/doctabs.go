@@ -136,12 +136,16 @@ func (t *DocTabs) MinSize() geo.Size {
 }
 
 // Remove tab by value.
+// Removing the selected tab selects the tab after it, or the one before when
+// it was last, and reports both through OnUnselected and OnSelected.
 func (t *DocTabs) Remove(item *TabItem) {
 	removeItem(t, item)
 	t.Refresh()
 }
 
 // RemoveIndex removes tab by index.
+// Removing the selected tab selects the tab after it, or the one before when
+// it was last, and reports both through OnUnselected and OnSelected.
 func (t *DocTabs) RemoveIndex(index int) {
 	removeIndex(t, index)
 	t.Refresh()

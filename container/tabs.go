@@ -161,12 +161,34 @@ func removeIndex(t baseTabs, index int) {
 	if index < 0 || index >= len(items) {
 		return
 	}
-	// Follow the selected tab before setItems sees the shorter list, so that
-	// it clamps only when the selected tab itself went (#1201).
-	if s := t.selected(); index < s {
-		t.setSelected(s - 1)
+	removed := items[index]
+	selected := t.selected()
+	// Move the selection before setItems sees the shorter list, so that it
+	// never has to clamp it: a tab before the selected one shifts it down
+	// (#1201), and the selected tab itself hands over to the tab after it,
+	// or the one before when it was last.
+	switch {
+	case index < selected:
+		t.setSelected(selected - 1)
+	case index == selected:
+		t.setSelected(min(selected, len(items)-2))
 	}
 	setItems(t, append(items[:index], items[index+1:]...))
+	if index != selected {
+		return
+	}
+
+	// The selected tab went, so the selection changed: report it as
+	// selectIndex does, wherever the tab was (#1204).
+	if f := t.onUnselected(); f != nil {
+		f(removed)
+	}
+	if s := t.selected(); s >= 0 {
+		t.setTransitioning(true)
+		if f := t.onSelected(); f != nil {
+			f(t.items()[s])
+		}
+	}
 }
 
 func removeItem(t baseTabs, item *TabItem) {
