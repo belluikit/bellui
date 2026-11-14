@@ -243,6 +243,7 @@ func (s *RangeSlider) Disable() {
 		defer s.Refresh()
 	}
 	s.disabled = true
+	unfocusInside(s.super())
 }
 
 // Enable reverses [RangeSlider.Disable].

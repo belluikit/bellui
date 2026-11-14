@@ -4,17 +4,27 @@ import (
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/apphook"
 	intdriver "github.com/belluikit/bellui/internal/driver"
 )
 
-// unfocusRecycled drops the canvas focus if it is on item or on an object
-// inside it. A collection widget calls it as it puts a row or cell that left
-// the view back in its pool, which hands the same widget out for another item:
-// a focus kept on it would follow it there, and the keys typed next would edit
-// that item (#1175). The canvas also unfocuses an object its frame's walk no
-// longer finds (#1089), but a second layout pass before that frame can already
-// have reused it.
-func unfocusRecycled(item core.CanvasObject) {
+// unfocusInside drops the canvas focus if it is on item or on an object
+// inside it.
+//
+// A collection widget calls it as it puts a row or cell that left the view
+// back in its pool, which hands the same widget out for another item: a focus
+// kept on it would follow it there, and the keys typed next would edit that
+// item (#1175). The canvas also unfocuses an object its frame's walk no longer
+// finds (#1089), but a second layout pass before that frame can already have
+// reused it.
+//
+// Disable calls it too: the focus manager gives a disabled widget no focus,
+// and one disabled while focused must give its focus up (#1221). A widget can
+// be disabled before any app exists, with no canvas to hold a focus.
+func unfocusInside(item core.CanvasObject) {
+	if item == nil || !apphook.Started() {
+		return
+	}
 	c := bellui.CurrentApp().Driver().CanvasForObject(item)
 	if c == nil {
 		return

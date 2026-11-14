@@ -862,7 +862,7 @@ func (l *listLayout) updateList(newOnly bool) {
 
 	for _, wasVis := range l.wasVisible {
 		if _, ok := l.searchVisible(l.visible, wasVis.id); !ok {
-			unfocusRecycled(wasVis.item)
+			unfocusInside(wasVis.item)
 			l.itemPool.Put(wasVis.item)
 		}
 	}

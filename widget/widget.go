@@ -429,6 +429,7 @@ func (w *DisableableWidget) Enable() {
 }
 
 // Disable this widget so that it cannot be interacted with, updating any style appropriately.
+// A focus on the widget, or on an object inside it, is dropped.
 func (w *DisableableWidget) Disable() {
 	onMain(func() {
 		if w.Disabled() {
@@ -436,6 +437,7 @@ func (w *DisableableWidget) Disable() {
 		}
 		w.disabled = true
 		if impl := w.super(); impl != nil {
+			unfocusInside(impl)
 			impl.Refresh()
 		}
 	})

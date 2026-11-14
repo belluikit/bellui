@@ -49,8 +49,11 @@ func TestRadioGroup_FocusRendering(t *testing.T) {
 		canvas.FocusNext()
 		radio.Disable()
 		test.AssertRendersToMarkup(t, "radio_group/focus_disabled_none_selected.xml", canvas)
+		// A disabled widget gives up its focus, so enabling it does not bring
+		// the focus back (#1221).
+		assert.Nil(t, canvas.Focused())
 		radio.Enable()
-		test.AssertRendersToMarkup(t, "radio_group/focus_a_focused_none_selected.xml", canvas)
+		test.AssertRendersToMarkup(t, "radio_group/focus_none_focused_none_selected.xml", canvas)
 	})
 
 	t.Run("append disabled", func(t *testing.T) {

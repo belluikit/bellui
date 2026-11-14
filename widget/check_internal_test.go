@@ -151,12 +151,10 @@ func TestCheck_Focused(t *testing.T) {
 	assert.True(t, check.Disabled())
 	assert.Equal(t, color.Transparent, render.focusIndicator.FillColor)
 
+	// A disabled widget gives up its focus, so enabling it does not bring the
+	// focus back (#1221).
 	check.Enable()
-	if bellui.CurrentDevice().IsMobile() {
-		assert.False(t, check.focused)
-	} else {
-		assert.True(t, check.focused)
-	}
+	assert.False(t, check.focused)
 
 	check.Hide()
 	assert.False(t, check.focused)
@@ -190,23 +188,13 @@ func TestCheck_Hovered(t *testing.T) {
 	assert.True(t, check.hovered)
 	assert.Equal(t, color.Transparent, render.focusIndicator.FillColor)
 
+	// Disabling dropped the focus (#1221), so enabled again it shows only the
+	// hover.
 	check.Enable()
 	assert.True(t, check.hovered)
-	if bellui.CurrentDevice().IsMobile() {
-		assert.Equal(t, theme.StateLayerHover(theme.Color(theme.ColorNameOnSurface)), render.focusIndicator.FillColor)
-	} else {
-		assert.Equal(t, theme.StateLayerFocus(theme.Color(theme.ColorNamePrimary)), render.focusIndicator.FillColor)
-	}
+	assert.Equal(t, theme.StateLayerHover(theme.Color(theme.ColorNameOnSurface)), render.focusIndicator.FillColor)
 
 	check.HoverOut()
-	assert.False(t, check.hovered)
-	if bellui.CurrentDevice().IsMobile() {
-		assert.Equal(t, color.Transparent, render.focusIndicator.FillColor)
-	} else {
-		assert.Equal(t, theme.StateLayerFocus(theme.Color(theme.ColorNamePrimary)), render.focusIndicator.FillColor)
-	}
-
-	check.FocusLost()
 	assert.False(t, check.hovered)
 	assert.Equal(t, color.Transparent, render.focusIndicator.FillColor)
 }
