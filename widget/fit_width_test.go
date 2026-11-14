@@ -68,6 +68,51 @@ func TestLabel_FitWidthBesideAButton(t *testing.T) {
 	}
 }
 
+// A wrapping or truncating label in Center or in a column that does not
+// stretch it keeps its text on one line while it fits, and wraps or truncates
+// at the container's width when it does not (#1198). It used to collapse to one
+// character wide.
+func TestLabel_FitWidthInCenterAndColumns(t *testing.T) {
+	test.NewTempApp(t)
+	layouts := map[string]func() core.Layout{
+		"Center":      layout.NewCenterLayout,
+		"CrossStart":  func() core.Layout { return &layout.FlexVBoxLayout{CrossAlign: layout.CrossStart} },
+		"CrossCenter": func() core.Layout { return &layout.FlexVBoxLayout{CrossAlign: layout.CrossCenter} },
+		"CrossEnd":    func() core.Layout { return &layout.FlexVBoxLayout{CrossAlign: layout.CrossEnd} },
+	}
+	for name, newLayout := range layouts {
+		for _, truncate := range []bool{false, true} {
+			lbl := widget.NewLabel("Your code: K7Q-42X · Friends: 2")
+			msg := name
+			if truncate {
+				lbl.Truncation = bellui.TextTruncateEllipsis
+				msg += " truncating"
+			} else {
+				lbl.Wrapping = bellui.TextWrapWord
+			}
+			box := &bellui.Container{Layout: newLayout(), Objects: []core.CanvasObject{lbl}}
+			w := test.NewTempWindow(t, box)
+			w.SetPadded(false)
+
+			oneLine := lbl.IntrinsicSize()
+			for _, width := range []float32{400, 120} {
+				w.Resize(geo.NewSize(width, 300))
+				w.Resize(geo.NewSize(width, 301))
+				if width > oneLine.Width {
+					assert.InDelta(t, oneLine.Width, lbl.Size().Width, 0.01, "%s: one line at %v", msg, width)
+					assert.InDelta(t, oneLine.Height, lbl.Size().Height, 0.01, "%s: one line high at %v", msg, width)
+					continue
+				}
+				assert.InDelta(t, width, lbl.Size().Width, 0.01, "%s: the container's width at %v", msg, width)
+				assert.InDelta(t, lbl.MinSize().Height, lbl.Size().Height, 0.01, "%s: as high as its lines at %v", msg, width)
+				if !truncate {
+					assert.Greater(t, lbl.Size().Height, oneLine.Height, "%s: wraps at %v", msg, width)
+				}
+			}
+		}
+	}
+}
+
 // Editable text is not a FitWidther: an entry beside other widgets would grow
 // as it is typed in.
 func TestEntry_IsNotAFitWidther(t *testing.T) {

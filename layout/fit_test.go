@@ -100,3 +100,48 @@ func TestBoxes_FitWidthLeavesStretchAndMinSize(t *testing.T) {
 	assert.Equal(t, float32(46), l.MinSize([]core.CanvasObject{text, btn}).Width)
 	assert.Equal(t, float32(46), layout.NewCustomPaddedHBoxLayout(0).MinSize([]core.CanvasObject{text, btn}).Width)
 }
+
+// Center and a column that does not stretch its children give a FitWidther its
+// FitWidth up to their own width, where it used to get its MinSize (#1198).
+func TestCenterAndColumns_FitWidth(t *testing.T) {
+	type place struct{ x, w float32 }
+	layouts := []struct {
+		name      string
+		newLayout func() core.Layout
+		room      place // in 300 wide
+		tooNarrow place // in 120 wide
+	}{
+		{"Center", layout.NewCenterLayout, place{50, 200}, place{0, 120}},
+		{"CrossStart", func() core.Layout { return &layout.FlexVBoxLayout{CrossAlign: layout.CrossStart} }, place{0, 200}, place{0, 120}},
+		{"CrossCenter", func() core.Layout { return &layout.FlexVBoxLayout{CrossAlign: layout.CrossCenter} }, place{50, 200}, place{0, 120}},
+		{"CrossEnd", func() core.Layout { return &layout.FlexVBoxLayout{CrossAlign: layout.CrossEnd} }, place{100, 200}, place{0, 120}},
+		{"CrossStretch", func() core.Layout { return &layout.FlexVBoxLayout{} }, place{0, 300}, place{0, 120}},
+	}
+	for _, l := range layouts {
+		for width, want := range map[float32]place{300: l.room, 120: l.tooNarrow} {
+			text := newFitRect(10, 200)
+			l.newLayout().Layout([]core.CanvasObject{text}, geo.NewSize(width, 100))
+			assert.InDelta(t, want.w, text.Size().Width, 0.01, "%s in %v: width", l.name, width)
+			assert.InDelta(t, want.x, text.Position().X, 0.01, "%s in %v: x", l.name, width)
+		}
+
+		// Before it has a size, and when it is narrower than the MinSize, the
+		// container gives the MinSize as before.
+		for _, width := range []float32{0, 5} {
+			text := newFitRect(10, 200)
+			l.newLayout().Layout([]core.CanvasObject{text}, geo.NewSize(width, 100))
+			if l.name != "CrossStretch" {
+				assert.InDelta(t, 10, text.Size().Width, 0.01, "%s in %v", l.name, width)
+			}
+		}
+	}
+
+	// A column's MaxWidth still caps the child.
+	text := newFitRect(10, 200)
+	(&layout.FlexVBoxLayout{CrossAlign: layout.CrossStart, MaxWidth: []float32{80}}).Layout([]core.CanvasObject{text}, geo.NewSize(300, 100))
+	assert.InDelta(t, 80, text.Size().Width, 0.01)
+
+	// MinSize still reports the narrowest the container can be.
+	assert.Equal(t, float32(10), layout.NewCenterLayout().MinSize([]core.CanvasObject{text}).Width)
+	assert.Equal(t, float32(10), (&layout.FlexVBoxLayout{CrossAlign: layout.CrossStart}).MinSize([]core.CanvasObject{text}).Width)
+}

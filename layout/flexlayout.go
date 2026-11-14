@@ -19,7 +19,8 @@ const (
 	CrossStretch CrossAlign = iota
 	// CrossStart gives each child its MinSize on the cross axis (within the
 	// per-child cross Min/Max) and puts it at the start: the top of a row, the
-	// leading edge of a column.
+	// leading edge of a column. In a column, a core.FitWidther gets its
+	// FitWidth instead, up to the column's width.
 	CrossStart
 	// CrossCenter sizes a child as CrossStart does and centres it.
 	CrossCenter
@@ -210,7 +211,9 @@ func (l *FlexHBoxLayout) Layout(objects []core.CanvasObject, size geo.Size) {
 // cross axis is horizontal and children are stretched to the container width by
 // default; the optional MinWidth/MaxWidth arrays clamp a child's width instead
 // (start/left-aligned within the freed space). CrossAlign places children at
-// their natural width instead, at the left, centre or right.
+// their natural width instead, at the left, centre or right: their MinSize
+// width, or for a core.FitWidther such as wrapping text its FitWidth, up to the
+// column's width (#1198).
 //
 // Since: 1.0
 type FlexVBoxLayout struct {
@@ -324,7 +327,11 @@ func (l *FlexVBoxLayout) Layout(objects []core.CanvasObject, size geo.Size) {
 		}
 
 		// Cross axis (width): full stretch by default, clamped to [MinWidth, MaxWidth].
-		x, w := l.CrossAlign.place(size.Width, o.MinSize().Width, entry(l.MinWidth, i), entry(l.MaxWidth, i))
+		natural := o.MinSize().Width
+		if l.CrossAlign != CrossStretch && size.Width > 0 {
+			natural += fitGive(o, natural, size.Width) // #1198
+		}
+		x, w := l.CrossAlign.place(size.Width, natural, entry(l.MinWidth, i), entry(l.MaxWidth, i))
 
 		o.Move(geo.NewPos(x, y))
 		o.Resize(geo.NewSize(w, h))
