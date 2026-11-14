@@ -145,8 +145,14 @@ func (r *nodeRenderer) syncStyle() {
 		}
 	}
 
+	// A disabled canvas draws the styler's icon and accent in the disabled
+	// look, as widget.Button does an app-given icon.
+	inert := n.dagCanvas.inert()
 	if r.style.Icon != nil {
 		r.icon.Resource = r.style.Icon
+		if inert {
+			r.icon.Resource = theme.NewDisabledResource(r.style.Icon)
+		}
 		r.icon.Show()
 	} else {
 		r.icon.Resource = nil
@@ -160,6 +166,9 @@ func (r *nodeRenderer) syncStyle() {
 	}
 	if r.style.Accent != nil {
 		r.accent.FillColor = r.style.Accent
+		if inert {
+			r.accent.FillColor = theme.Color(theme.ColorNameDisabled)
+		}
 		r.accent.Show()
 	} else {
 		r.accent.Hide()
@@ -189,7 +198,7 @@ func (r *nodeRenderer) Refresh() {
 	for _, pw := range r.node.Outputs {
 		pw.Refresh()
 	}
-	if r.node.dagCanvas == nil || r.node.dagCanvas.Capabilities.LinkEdges {
+	if r.node.dagCanvas == nil || r.node.dagCanvas.caps().LinkEdges {
 		r.node.connector.Show()
 	} else {
 		r.node.connector.Hide()
@@ -223,7 +232,7 @@ func (r *nodeRenderer) Objects() []core.CanvasObject {
 func (r *nodeRenderer) Destroy() {}
 
 func (r *nodeRenderer) applyTheme() {
-	th := r.node.Theme()
+	th := partTheme(r.node.Theme(), r.node.dagCanvas)
 	v := bellui.CurrentApp().Settings().ThemeVariant()
 
 	z := r.node.zoom()
@@ -272,7 +281,7 @@ func (r *nodeConnectorRenderer) MinSize() geo.Size {
 
 func (r *nodeConnectorRenderer) Refresh() {
 	h := r.handle
-	th := h.nw.Theme()
+	th := partTheme(h.nw.Theme(), h.nw.dagCanvas)
 	v := bellui.CurrentApp().Settings().ThemeVariant()
 	z := h.nw.zoom()
 	r.circle.FillColor = withAlpha(th.Color(theme.ColorNamePrimary, v), 60)

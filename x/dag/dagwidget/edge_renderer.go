@@ -34,7 +34,7 @@ func (r *edgeRenderer) MinSize() geo.Size {
 
 func (r *edgeRenderer) Refresh() {
 	e := r.edge
-	th := e.Theme()
+	th := partTheme(e.Theme(), e.dagCanvas)
 	v := bellui.CurrentApp().Settings().ThemeVariant()
 
 	col := th.Color(theme.ColorNameOutline, v)
@@ -115,7 +115,7 @@ func (r *edgeRenderer) refreshLabel(points []geo.Position, zoom float32) {
 		r.labelBG = &canvas.Rectangle{}
 	}
 
-	th := r.edge.Theme()
+	th := partTheme(r.edge.Theme(), r.edge.dagCanvas)
 	v := bellui.CurrentApp().Settings().ThemeVariant()
 
 	mid := points[len(points)/2]

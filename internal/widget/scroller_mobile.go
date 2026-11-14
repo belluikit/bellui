@@ -20,8 +20,14 @@ func (s *Scroll) DragMomentum() bool {
 	return s.Direction != ScrollNone
 }
 
-// Dragged will scroll on any drag - bar or otherwise - for mobile
+// Dragged will scroll on any drag - bar or otherwise - for mobile. A Scroll
+// set to ScrollNone does not scroll, by a drag as by the wheel: a driver that
+// asks ClaimsDrag first never sends it one, but a caller that delivers the
+// drag directly (a test, a driver without the claim) did move its content.
 func (s *Scroll) Dragged(e *event.DragEvent) {
+	if s.Direction == ScrollNone {
+		return
+	}
 	if s.updateOffset(e.Dragged.DX, e.Dragged.DY) {
 		s.refreshWithoutOffsetUpdate()
 	}

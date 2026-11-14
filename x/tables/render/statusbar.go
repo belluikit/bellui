@@ -35,7 +35,7 @@ func NewStatusBar(grid StatusBarAccess) *StatusBar {
 
 func (sb *StatusBar) CreateRenderer() core.WidgetRenderer {
 	sb.ExtendBaseWidget(sb)
-	tc := ResolveThemeColors()
+	tc := resolveColors(sb.Grid)
 	return &statusBarRenderer{
 		bar:   sb,
 		label: canvas.NewText("", tc.Foreground),
@@ -61,7 +61,7 @@ func (r *statusBarRenderer) MinSize() geo.Size {
 }
 
 func (r *statusBarRenderer) Refresh() {
-	tc := ResolveThemeColors()
+	tc := resolveColors(r.bar.Grid)
 	r.bg.FillColor = tc.HeaderBg
 	r.label.Color = tc.Foreground
 

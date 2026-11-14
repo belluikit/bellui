@@ -94,6 +94,10 @@ func (h *HeaderWidget) Tapped(e *event.PointEvent) {
 }
 
 func (h *HeaderWidget) MouseDown(e *desktop.MouseEvent) {
+	// A disabled grid neither sorts nor resizes (see gridDisabled).
+	if gridDisabled(h.Grid) {
+		return
+	}
 	// Check for resize border first
 	borderCol := h.Grid.HeaderBorderCol(e.Position.X)
 	if borderCol >= 0 {
@@ -111,11 +115,11 @@ func (h *HeaderWidget) MouseDown(e *desktop.MouseEvent) {
 func (h *HeaderWidget) MouseUp(e *desktop.MouseEvent) {}
 
 func (h *HeaderWidget) HoverIn(e *event.HoverEvent) {
-	h.nearBorder = h.Grid.HeaderBorderCol(e.Position.X) >= 0
+	h.nearBorder = !gridDisabled(h.Grid) && h.Grid.HeaderBorderCol(e.Position.X) >= 0
 }
 
 func (h *HeaderWidget) HoverMoved(e *event.HoverEvent) {
-	h.nearBorder = h.Grid.HeaderBorderCol(e.Position.X) >= 0
+	h.nearBorder = !gridDisabled(h.Grid) && h.Grid.HeaderBorderCol(e.Position.X) >= 0
 }
 
 func (h *HeaderWidget) HoverOut() {
@@ -123,6 +127,9 @@ func (h *HeaderWidget) HoverOut() {
 }
 
 func (h *HeaderWidget) Cursor() desktop.Cursor {
+	if gridDisabled(h.Grid) {
+		return desktop.DefaultCursor
+	}
 	if h.nearBorder || h.resizing {
 		return desktop.HResizeCursor
 	}
@@ -130,7 +137,7 @@ func (h *HeaderWidget) Cursor() desktop.Cursor {
 }
 
 func (h *HeaderWidget) Dragged(e *event.DragEvent) {
-	if h.resizing {
+	if h.resizing && !gridDisabled(h.Grid) {
 		h.Grid.OnResizeDrag(e.Position.X)
 	}
 }
@@ -180,7 +187,7 @@ func (r *headerRenderer) Destroy() {}
 
 func (r *headerRenderer) rebuild(size geo.Size) {
 	grid := r.header.Grid
-	tc := ResolveThemeColors()
+	tc := resolveColors(grid)
 	colCount := grid.HeaderColumnCount()
 	headerH := grid.HeaderHeight()
 	padding := grid.CellPadding()

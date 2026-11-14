@@ -21,6 +21,10 @@ import (
 // The edit is refused — no editor appears — when the column is not editable
 // or the column's per-cell CanEdit gate rejects the row.
 func (g *DataGrid) StartEditing(id CellID) {
+	// A disabled grid opens no editor, from a gesture or from the app.
+	if g.disabled {
+		return
+	}
 	// id.Col is an absolute display-column index; visibleCol maps it to the
 	// resolved column (honouring pinned reordering), unlike raw resolvedCols[].
 	rc := g.visibleCol(id.Col)

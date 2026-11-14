@@ -122,7 +122,7 @@ func (m *masterRowA11y) AccessibleActions() []core.AccessibleAction {
 // matches its current state, routing through the same ToggleDetail path a click
 // on the disclosure chevron uses.
 func (m *masterRowA11y) PerformAccessibleAction(name string) {
-	if m.grid == nil {
+	if m.grid == nil || gridDisabled(m.grid) {
 		return
 	}
 	switch name {
@@ -209,7 +209,7 @@ func (t *treeRowA11y) AccessibleActions() []core.AccessibleAction {
 // current state, routing through the same ToggleTreeNode path a chevron click and
 // the keyboard handler use.
 func (t *treeRowA11y) PerformAccessibleAction(name string) {
-	if t.grid == nil {
+	if t.grid == nil || gridDisabled(t.grid) {
 		return
 	}
 	switch name {
@@ -272,7 +272,7 @@ func (r *CellsRenderer) releaseHost(typeName string, h *cellHost) {
 func (r *CellsRenderer) refreshCells() {
 	grid := r.cells.Grid
 	vp := r.cells.viewport
-	tc := ResolveThemeColors()
+	tc := resolveColors(grid)
 
 	visRows := vp.VisibleRows
 	visCols := vp.VisibleCols
@@ -375,6 +375,7 @@ func (r *CellsRenderer) refreshCells() {
 			host := r.checkboxHosts[cbIdx]
 			cbIdx++
 			cb.SetChecked(grid.IsSelected(row, 0))
+			syncDisabled(cb, gridDisabled(grid))
 			host.row = row
 			host.Move(geo.NewPos(0, y))
 			host.Resize(geo.NewSize(checkboxCellWidth, cellH))

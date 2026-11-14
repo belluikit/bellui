@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"github.com/belluikit/bellui"
+	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/driver/desktop"
 	"github.com/belluikit/bellui/event"
@@ -171,6 +172,14 @@ type DataGrid struct {
 	// come from touch, where the mouse gestures (resize, reorder, row drag)
 	// cannot start, and scroll the grid instead.
 	mousePressed bool
+
+	// disabled makes the grid visible but inert (Disable). scrollDir is the
+	// body scroller's direction, kept while disabled sets it to ScrollNone.
+	disabled  bool
+	scrollDir container.ScrollDirection
+	// rendered is set once CreateRenderer has run: before that nothing in
+	// the grid can hold a focus, and no app need exist.
+	rendered bool
 }
 
 // filterState holds the active filter for a column.
@@ -193,6 +202,10 @@ type resolvedColumn struct {
 	width        float32
 	renderer     cell.RendererFactory
 	typeName     string
+	// builtin marks a renderer the grid picked from the column type. A
+	// column's CellRenderer is the app's, and its cells are app content: the
+	// disabled look leaves them alone.
+	builtin bool
 }
 
 // NewDataGrid creates a new DataGrid with the given column definitions and data callbacks.
@@ -332,6 +345,7 @@ func (g *DataGrid) resolveColumn(def *ColumnDef, index int) *resolvedColumn {
 	if def.CellRenderer != nil {
 		col.renderer = def.CellRenderer
 	} else {
+		col.builtin = true
 		switch def.Type {
 		case ColumnNumber:
 			col.renderer = cell.NewNumberRenderer()
@@ -472,6 +486,7 @@ func (g *DataGrid) noteVisibleRows() {
 // CreateRenderer returns the DataGrid's renderer.
 func (g *DataGrid) CreateRenderer() core.WidgetRenderer {
 	g.ExtendBaseWidget(g)
+	g.rendered = true
 	return newDataGridRenderer(g)
 }
 
@@ -573,6 +588,7 @@ func (g *DataGrid) UpdateCell(row, col int, obj core.CanvasObject) {
 		IsSelected: g.isCellSelected(row, col),
 		IsHovered:  g.isCellHovered(row, col),
 	})
+	g.dimBuiltinCell(rc, obj)
 }
 
 func (g *DataGrid) RowHeight() float32 {
@@ -800,6 +816,7 @@ func (g *DataGrid) PinnedUpdateCell(row, displayCol int, obj core.CanvasObject) 
 		RowData:   rowData,
 		CellWidth: rc.width,
 	})
+	g.dimBuiltinCell(rc, obj)
 }
 
 // --- HeaderAccess interface implementation (for render.HeaderWidget) ---
@@ -1405,6 +1422,9 @@ func (g *DataGrid) AccessibleRealizeCell(row, col int) (core.AccessibleVirtualNo
 // on-screen the cell exists as a real host, so its "select" action then routes
 // normally. Out-of-range coordinates are ignored. Called on the main goroutine.
 func (g *DataGrid) AccessibleScrollCellIntoView(row, col int) {
+	if g.disabled {
+		return // a disabled grid does not scroll (Disable)
+	}
 	rows, cols := g.AccessibleGridDimensions()
 	if row < 0 || row >= rows || col < 0 || col >= cols {
 		return
@@ -1499,6 +1519,9 @@ func colSpanIn(cols []*resolvedColumn, i int, pad float32) (x, width float32) {
 }
 
 func (g *DataGrid) Tapped(e *event.PointEvent) {
+	if g.disabled {
+		return
+	}
 	if row := g.detailToggleAt(e.Position); row >= 0 {
 		g.ToggleDetail(row)
 		return
@@ -1519,6 +1542,9 @@ func (g *DataGrid) Tapped(e *event.PointEvent) {
 }
 
 func (g *DataGrid) DoubleTapped(e *event.PointEvent) {
+	if g.disabled {
+		return
+	}
 	id := g.cellAtPosition(e.Position)
 	if id.Row < 0 || id.Col < 0 {
 		return
@@ -1531,6 +1557,9 @@ func (g *DataGrid) DoubleTapped(e *event.PointEvent) {
 }
 
 func (g *DataGrid) TappedSecondary(e *event.PointEvent) {
+	if g.disabled {
+		return
+	}
 	id := g.cellAtPosition(e.Position)
 
 	// Check if we're in the header area
@@ -1720,6 +1749,9 @@ func (g *DataGrid) contextMenuFocusedCell() {
 }
 
 func (g *DataGrid) TypedKey(e *event.KeyEvent) {
+	if g.disabled {
+		return
+	}
 	rows := g.RowCount()
 	// The keyboard cursor lives in absolute display-column space (matching mouse
 	// clicks, selection, and columnAtX), so bound and move it by the total
@@ -1849,6 +1881,9 @@ func (g *DataGrid) TypedKey(e *event.KeyEvent) {
 }
 
 func (g *DataGrid) Dragged(e *event.DragEvent) {
+	if g.disabled {
+		return
+	}
 	// Column resize drag — use absolute position delta (not incremental DX)
 	if g.resizeCol >= 0 {
 		rc := g.visibleCol(g.resizeCol)
@@ -1935,10 +1970,16 @@ func (g *DataGrid) DragEnd() {
 // forwarded delta lands on the same path as a wheel event, so the offset,
 // viewport, header, and pinned bands all stay in sync via onScrolled.
 func (g *DataGrid) Scrolled(ev *event.ScrollEvent) {
+	if g.disabled {
+		return
+	}
 	g.scrollContent.Scroll.Scrolled(ev)
 }
 
 func (g *DataGrid) MouseDown(e *desktop.MouseEvent) {
+	if g.disabled {
+		return
+	}
 	g.lastModifier = e.Modifier
 	g.mousePressed = true
 
@@ -2000,6 +2041,9 @@ func (g *DataGrid) MouseUp(e *desktop.MouseEvent) { g.mousePressed = false }
 func (g *DataGrid) HoverIn(e *event.HoverEvent) {}
 
 func (g *DataGrid) HoverMoved(e *event.HoverEvent) {
+	if g.disabled {
+		return
+	}
 	g.lastMousePos = e.Position
 
 	// Check for header border proximity (for resize cursor). Header is static;
@@ -2056,6 +2100,9 @@ func (g *DataGrid) dismissTooltip() {
 }
 
 func (g *DataGrid) Cursor() desktop.Cursor {
+	if g.disabled {
+		return desktop.DefaultCursor
+	}
 	if g.nearResizeBorder || g.resizeCol >= 0 {
 		return desktop.HResizeCursor
 	}
@@ -2102,6 +2149,9 @@ func (g *DataGrid) headerBorderCol(x float32) int {
 }
 
 func (g *DataGrid) TypedShortcut(s core.Shortcut) {
+	if g.disabled {
+		return
+	}
 	switch s.(type) {
 	case *bellui.ShortcutCopy:
 		g.copySelection()

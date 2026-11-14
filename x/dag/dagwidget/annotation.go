@@ -157,7 +157,7 @@ func (a *AnnotationWidget) updateLeader() {
 // Dragged moves the annotation in graph coordinates.
 func (a *AnnotationWidget) Dragged(ev *event.DragEvent) {
 	ann := a.annotation()
-	if ann == nil || a.dagCanvas == nil || !a.dagCanvas.Capabilities.MoveResize {
+	if ann == nil || a.dagCanvas == nil || !a.dagCanvas.caps().MoveResize {
 		return
 	}
 	if !a.dragging {
@@ -190,7 +190,7 @@ func (a *AnnotationWidget) DragEnd() {
 
 // Tapped selects this annotation.
 func (a *AnnotationWidget) Tapped(*event.PointEvent) {
-	if a.dagCanvas != nil {
+	if a.dagCanvas != nil && !a.dagCanvas.inert() {
 		a.dagCanvas.SelectAnnotation(a.AnnotationID)
 	}
 }
@@ -199,7 +199,7 @@ func (a *AnnotationWidget) Tapped(*event.PointEvent) {
 // acts on the element under the pointer — then fires
 // OnAnnotationSecondaryTapped.
 func (a *AnnotationWidget) TappedSecondary(ev *event.PointEvent) {
-	if a.dagCanvas == nil {
+	if a.dagCanvas == nil || a.dagCanvas.inert() {
 		return
 	}
 	a.dagCanvas.SelectAnnotation(a.AnnotationID)
@@ -237,7 +237,7 @@ func (a *AnnotationWidget) effectiveGraphSize() geo.Size { return a.effectiveSiz
 // and the canvas allows move/resize. Shared by the renderer's Refresh and
 // the canvas-side affordance sync (see dagCanvasRenderer.Layout).
 func (a *AnnotationWidget) handlesVisible() bool {
-	return a.Selected && (a.dagCanvas == nil || a.dagCanvas.Capabilities.MoveResize)
+	return a.Selected && (a.dagCanvas == nil || a.dagCanvas.caps().MoveResize)
 }
 
 // minGraphSize includes the text extent so resize handles cannot shrink the
@@ -309,7 +309,7 @@ func (r *annotationRenderer) MinSize() geo.Size {
 
 func (r *annotationRenderer) Refresh() {
 	a := r.ann
-	th := a.Theme()
+	th := partTheme(a.Theme(), a.dagCanvas)
 	v := bellui.CurrentApp().Settings().ThemeVariant()
 	z := a.zoom()
 

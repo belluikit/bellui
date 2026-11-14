@@ -99,7 +99,7 @@ func (r *groupRowOverlayRenderer) refresh(size geo.Size) {
 		return
 	}
 
-	tc := ResolveThemeColors()
+	tc := resolveColors(grid)
 
 	// Same visible range as the body; positions go through vp.RowY (variable
 	// row heights) translated by the shared vertical scroll offset.
@@ -434,7 +434,7 @@ func (g *groupRowA11y) AccessibleActions() []core.AccessibleAction {
 // the group header uses. It is a no-op when the group is already in the target
 // state (expand while expanded, collapse while collapsed).
 func (g *groupRowA11y) PerformAccessibleAction(name string) {
-	if g.grid == nil {
+	if g.grid == nil || gridDisabled(g.grid) {
 		return
 	}
 	switch name {

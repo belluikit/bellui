@@ -92,7 +92,7 @@ func (r *groupEdgeRenderer) MinSize() geo.Size {
 func (r *groupEdgeRenderer) Refresh() {
 	e := r.edge
 	c := e.dagCanvas
-	th := e.Theme()
+	th := partTheme(e.Theme(), e.dagCanvas)
 	v := bellui.CurrentApp().Settings().ThemeVariant()
 	z := float32(1.0)
 	if c != nil {

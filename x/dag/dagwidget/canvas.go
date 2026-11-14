@@ -137,6 +137,12 @@ type DAGCanvas struct {
 
 	focused    bool
 	nextEdgeID int
+
+	// disabled makes the canvas visible but inert (Disable). rendered is
+	// set once CreateRenderer has run: before that the canvas cannot hold
+	// a focus, and no app need exist.
+	disabled bool
+	rendered bool
 }
 
 var (
@@ -883,7 +889,7 @@ func (c *DAGCanvas) linkEdgeAtPosition(screenPos geo.Position) *LinkEdgeWidget {
 // then starts a connection drag from the original source so the user can
 // reconnect it to a different input.
 func (c *DAGCanvas) detachAndReroute(inputPort dag.PortID) {
-	if !c.Capabilities.ConnectEdges {
+	if !c.caps().ConnectEdges {
 		return
 	}
 	// Find the edge connected to this input
@@ -920,7 +926,7 @@ func (c *DAGCanvas) detachAndReroute(inputPort dag.PortID) {
 
 // startConnection begins a new connection drag from a port.
 func (c *DAGCanvas) startConnection(sourcePort dag.PortID, screenPos geo.Position) {
-	if !c.Capabilities.ConnectEdges {
+	if !c.caps().ConnectEdges {
 		return
 	}
 	c.dragState = dragConnecting
@@ -1037,7 +1043,7 @@ func (c *DAGCanvas) finishConnection() {
 // startGroupEdgeConnection begins a dependency drag from a group's connector
 // handle.
 func (c *DAGCanvas) startGroupEdgeConnection(groupID string, screenPos geo.Position) {
-	if !c.Capabilities.GroupEdges {
+	if !c.caps().GroupEdges {
 		return
 	}
 	c.dragState = dragConnectingGroup
@@ -1109,7 +1115,7 @@ func (c *DAGCanvas) finishGroupEdgeConnection() {
 // startLinkEdgeConnection begins a link edge drag from a node's connector
 // handle.
 func (c *DAGCanvas) startLinkEdgeConnection(nodeID string, screenPos geo.Position) {
-	if !c.Capabilities.LinkEdges {
+	if !c.caps().LinkEdges {
 		return
 	}
 	c.dragState = dragConnectingLink
@@ -1411,6 +1417,9 @@ func (c *DAGCanvas) deselectAll() {
 // works across it) — routing hits through the public Select* methods, and
 // clears the selection when nothing is hit.
 func (c *DAGCanvas) Tapped(ev *event.PointEvent) {
+	if c.inert() {
+		return
+	}
 	c.requestFocus()
 
 	if hit := c.edgeAtPosition(ev.Position); hit != nil {
@@ -1443,6 +1452,9 @@ func (c *DAGCanvas) Tapped(ev *event.PointEvent) {
 // matching On*SecondaryTapped hook. Unlike Tapped, a secondary tap on empty
 // canvas is ignored: selection and focus stay untouched.
 func (c *DAGCanvas) TappedSecondary(ev *event.PointEvent) {
+	if c.inert() {
+		return
+	}
 	if hit := c.edgeAtPosition(ev.Position); hit != nil {
 		c.requestFocus()
 		c.SelectEdge(hit.EdgeID)
@@ -1524,6 +1536,9 @@ func (c *DAGCanvas) TypedRune(rune) {}
 // "unhandled" can mean here: TypedKey has no consumed/propagate signal to
 // hand a key back to the driver.
 func (c *DAGCanvas) TypedKey(ev *event.KeyEvent) {
+	if c.inert() {
+		return
+	}
 	switch ev.Name {
 	case event.KeyTab:
 		if ev.Modifier&event.KeyModifierShift != 0 {
@@ -1661,6 +1676,9 @@ func (c *DAGCanvas) keyboardPointEvent(anchor, origin geo.Position) *event.Point
 
 // TypedShortcut handles Ctrl+Z (undo) and Ctrl+Shift+Z / Ctrl+Y (redo).
 func (c *DAGCanvas) TypedShortcut(s core.Shortcut) {
+	if c.inert() {
+		return
+	}
 	if c.Commands == nil {
 		return
 	}
@@ -1781,6 +1799,9 @@ func (c *DAGCanvas) AddAnnotationAtCenter() {
 
 // Dragged handles panning the canvas.
 func (c *DAGCanvas) Dragged(ev *event.DragEvent) {
+	if c.inert() {
+		return
+	}
 	if c.dragState == dragConnecting {
 		return // handled by PortWidget
 	}
@@ -1810,7 +1831,7 @@ func (c *DAGCanvas) DragEnd() {
 // other drag — connecting ports, links or groups — stops where the finger
 // lifts. It is the event.MomentumDraggable opt-in, matched structurally.
 func (c *DAGCanvas) DragMomentum() bool {
-	return c.dragState == dragPanning
+	return c.dragState == dragPanning && !c.inert()
 }
 
 // Scrolled handles zoom.
@@ -1822,6 +1843,9 @@ func (c *DAGCanvas) Scrolled(ev *event.ScrollEvent) {
 // two-finger pan (#398) — pans the graph with the fingers instead, the way a
 // one-finger drag does; on touch the canvas zooms by pinch.
 func (c *DAGCanvas) TryScrolled(ev *event.ScrollEvent) bool {
+	if c.inert() {
+		return false // not consumed: an enclosing scroller may take it
+	}
 	if ev.Source == event.ScrollSourceTouch {
 		c.panBy(ev.Scrolled)
 		return true
@@ -1834,6 +1858,9 @@ func (c *DAGCanvas) TryScrolled(ev *event.ScrollEvent) bool {
 // and pans with them: the graph point that was between the fingers at the
 // previous step is moved to where they are now.
 func (c *DAGCanvas) Pinched(ev *event.PinchEvent) {
+	if c.inert() {
+		return
+	}
 	from := ev.Position
 	if c.pinching {
 		from = c.pinchFocus
@@ -1876,6 +1903,7 @@ func (c *DAGCanvas) screenToGraphWithZoom(p geo.Position, zoom float32) geo.Posi
 
 func (c *DAGCanvas) CreateRenderer() core.WidgetRenderer {
 	c.ExtendBaseWidget(c)
+	c.rendered = true
 	bg := canvas.NewRectangle(color.Transparent)
 	r := &dagCanvasRenderer{
 		dc: c,

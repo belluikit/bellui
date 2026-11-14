@@ -92,7 +92,7 @@ func (h *headerCellA11y) AccessibleActions() []core.AccessibleAction {
 // PerformAccessibleAction routes the press through the same header-tap path a
 // pointer tap uses (plain tap, no modifier: cycle this column's sort).
 func (h *headerCellA11y) PerformAccessibleAction(name string) {
-	if h.grid == nil || !h.sortable {
+	if h.grid == nil || !h.sortable || gridDisabled(h.grid) {
 		return
 	}
 	if name == core.ActionPress {
