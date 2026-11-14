@@ -19,9 +19,13 @@ import (
 
 // TimePicker is an MD3-compliant time picker with a clock dial.
 //
+// A disabled picker keeps showing its time in the disabled colours and takes
+// no input: no dial tap or drag, no hour, minute or AM/PM field, no keys or
+// typed digits, no focus (#1213).
+//
 // Since: 1.0
 type TimePicker struct {
-	BaseWidget
+	DisableableWidget
 	Hour, Minute    int
 	Use24Hour       bool
 	OnChanged       func(hour, minute int) `json:"-"`
@@ -45,7 +49,18 @@ const (
 	tpFieldPM
 )
 
-var _ event.Focusable = (*TimePicker)(nil)
+var (
+	_ event.Focusable  = (*TimePicker)(nil)
+	_ core.Disableable = (*TimePicker)(nil)
+)
+
+// Disable stops the picker taking input and draws it in the disabled colours.
+// A half-typed hour or minute is discarded, so enabling it again starts
+// clean.
+func (t *TimePicker) Disable() {
+	onMain(t.clearPartial)
+	t.DisableableWidget.Disable()
+}
 
 // FocusGained is called when the picker gains keyboard focus; the field
 // cursor starts on whichever of hour/minute the dial is selecting.
@@ -74,6 +89,9 @@ func (t *TimePicker) FocusLost() {
 // (case-insensitive) set the meridiem. The advance and commit are deterministic
 // (no wall-clock timeout), so behaviour is fully reproducible.
 func (t *TimePicker) TypedRune(r rune) {
+	if t.Disabled() {
+		return
+	}
 	if !t.Use24Hour {
 		switch r {
 		case 'a', 'A':
@@ -187,7 +205,7 @@ func (t *TimePicker) typeMinuteDigit(d int) {
 //
 // Since: 1.0
 func (t *TimePicker) HandlesEscape() bool {
-	return t.hasPartial
+	return t.hasPartial && !t.Disabled()
 }
 
 // clearPartial discards any pending tens digit.
@@ -201,6 +219,9 @@ func (t *TimePicker) clearPartial() {
 // focused field — hour and minute wrap, AM/PM toggles — and Enter/Space
 // activates it like a tap (switching the dial or setting the meridiem).
 func (t *TimePicker) TypedKey(ev *event.KeyEvent) {
+	if t.Disabled() {
+		return
+	}
 	switch ev.Name {
 	case event.KeyLeft:
 		t.moveFocusField(-1)
@@ -333,6 +354,9 @@ func (t *TimePicker) CreateRenderer() core.WidgetRenderer {
 	// field, mirroring the keyboard Up/Down path (pre-rebrand tracker #796). The hour wraps through
 	// the full 0–23 range in both 12h and 24h modes, matching adjustFocusField.
 	hourBtn.onAdjust = func(delta int) {
+		if t.Disabled() {
+			return
+		}
 		t.Hour = (t.Hour + delta + 24) % 24
 		t.Refresh()
 		t.fireChanged()
@@ -343,6 +367,9 @@ func (t *TimePicker) CreateRenderer() core.WidgetRenderer {
 		t.Refresh()
 	})
 	minuteBtn.onAdjust = func(delta int) {
+		if t.Disabled() {
+			return
+		}
 		t.Minute = (t.Minute + delta + 60) % 60
 		t.Refresh()
 		t.fireChanged()
@@ -362,6 +389,9 @@ func (t *TimePicker) CreateRenderer() core.WidgetRenderer {
 		t.setMeridiem(true)
 	})
 	pmBtn.label.Text = lang.L("PM")
+	for _, b := range [...]*timePickerButton{hourBtn, minuteBtn, amBtn, pmBtn} {
+		b.disabled = t.Disabled
+	}
 	ampmBorder := canvas.NewRectangle(color.Transparent)
 
 	// Clock dial.
@@ -417,7 +447,7 @@ func (t *TimePicker) CreateRenderer() core.WidgetRenderer {
 // Tapped handles taps on the clock face; the header fields (hour, minute,
 // AM/PM) are widgets that receive their own taps (pre-rebrand tracker #543).
 func (t *TimePicker) Tapped(e *event.PointEvent) {
-	if e == nil {
+	if e == nil || t.Disabled() {
 		return
 	}
 
@@ -431,7 +461,7 @@ func (t *TimePicker) Tapped(e *event.PointEvent) {
 
 // Dragged handles drag events on the clock dial.
 func (t *TimePicker) Dragged(e *event.DragEvent) {
-	if e == nil {
+	if e == nil || t.Disabled() {
 		return
 	}
 	tr := t.getRenderer()
@@ -605,6 +635,13 @@ type timePickerButton struct {
 	focused  bool // the picker's keyboard field cursor is on this button
 	onTap    func()
 	onAdjust func(delta int) // set for value fields (hour/minute); enables a11y increment/decrement
+	disabled func() bool     // the picker's Disabled: a field of a disabled picker takes no tap
+}
+
+// active reports whether the button takes a tap: it has a handler and its
+// picker is not disabled.
+func (b *timePickerButton) active() bool {
+	return b.onTap != nil && (b.disabled == nil || !b.disabled())
 }
 
 func newTimePickerButton(role core.AccessibleRole, name string, onTap func()) *timePickerButton {
@@ -626,7 +663,7 @@ func (b *timePickerButton) CreateRenderer() core.WidgetRenderer {
 }
 
 func (b *timePickerButton) Tapped(ev *event.PointEvent) {
-	if b.onTap != nil {
+	if b.active() {
 		internalWidget.TapPress(&b.pressTarget, ev)
 		b.onTap()
 	}
@@ -647,7 +684,7 @@ func (b *timePickerButton) HoverOut() {
 // pressShape is the whole button, with its background's corners, in its
 // label's colour (#1091).
 func (b *timePickerButton) pressShape() (internalWidget.PressShape, bool) {
-	if b.onTap == nil {
+	if !b.active() {
 		return internalWidget.PressShape{}, false
 	}
 	return internalWidget.PressShape{
@@ -683,6 +720,9 @@ func (b *timePickerButton) AccessibleState() core.AccessibleState {
 	}
 	if b.focused {
 		state |= core.StateFocused
+	}
+	if b.disabled != nil && b.disabled() {
+		state |= core.StateDisabled
 	}
 	return state
 }
@@ -967,7 +1007,15 @@ func (r *timePickerRenderer) Refresh() {
 
 	r.titleLabel.Text = lang.L("Select time")
 	r.titleLabel.TextSize = bodySmall
+	// A disabled picker draws its text and selector in the disabled colour
+	// and its selected fills in the disabled container colour, as Button does
+	// (#1213).
+	disabled := r.picker.Disabled()
+	disabledText := th.Color(theme.ColorNameDisabled, v)
 	r.titleLabel.Color = th.Color(theme.ColorNameOnSurfaceVariant, v)
+	if disabled {
+		r.titleLabel.Color = disabledText
+	}
 	r.titleLabel.Refresh()
 
 	r.hourBtn.label.TextSize = displaySmall
@@ -982,6 +1030,9 @@ func (r *timePickerRenderer) Refresh() {
 	}
 
 	r.colonText.Color = th.Color(theme.ColorNameOnSurface, v)
+	if disabled {
+		r.colonText.Color = disabledText
+	}
 	r.colonText.Refresh()
 
 	primary := th.Color(theme.ColorNamePrimary, v)
@@ -990,6 +1041,19 @@ func (r *timePickerRenderer) Refresh() {
 	surfContHigh := th.Color(theme.ColorNameSurfaceContainerHighest, v)
 	tertiaryContainer := th.Color(theme.ColorNamePrimaryContainer, v)
 	onTertiary := th.Color(theme.ColorNameOnPrimaryContainer, v)
+	outline := th.Color(theme.ColorNameOutline, v)
+	if disabled {
+		primary = disabledText
+		onPrimary = disabledText
+		onSurface = disabledText
+		tertiaryContainer = th.Color(theme.ColorNameDisabledButton, v)
+		onTertiary = disabledText
+		outline = disabledText
+	}
+	selectedFill := primary
+	if disabled {
+		selectedFill = tertiaryContainer
+	}
 
 	// Hour/minute buttons.
 	if r.picker.selectingMinute {
@@ -1021,7 +1085,6 @@ func (r *timePickerRenderer) Refresh() {
 
 	// AM/PM.
 	if !r.picker.Use24Hour {
-		outline := th.Color(theme.ColorNameOutline, v)
 		r.ampmBorder.StrokeColor = outline
 		r.ampmBorder.StrokeWidth = 1
 		r.ampmBorder.FillColor = color.Transparent
@@ -1074,7 +1137,7 @@ func (r *timePickerRenderer) Refresh() {
 	r.centerDot.Refresh()
 	r.selectorDot.FillColor = color.Transparent
 	r.selectorDot.Refresh()
-	r.selectedBg.FillColor = primary
+	r.selectedBg.FillColor = selectedFill
 	r.selectedBg.Refresh()
 
 	// Clock labels.
