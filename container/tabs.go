@@ -161,10 +161,12 @@ func removeIndex(t baseTabs, index int) {
 	if index < 0 || index >= len(items) {
 		return
 	}
-	setItems(t, append(items[:index], items[index+1:]...))
+	// Follow the selected tab before setItems sees the shorter list, so that
+	// it clamps only when the selected tab itself went (#1201).
 	if s := t.selected(); index < s {
 		t.setSelected(s - 1)
 	}
+	setItems(t, append(items[:index], items[index+1:]...))
 }
 
 func removeItem(t baseTabs, item *TabItem) {
