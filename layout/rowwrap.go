@@ -13,7 +13,7 @@ type rowWrapLayout struct {
 }
 
 // NewRowWrapLayout returns a layout that dynamically arranges objects of similar height
-// in rows and wraps them dynamically.
+// in rows and wraps them dynamically. Each row is as tall as its tallest object.
 // Objects are separated with horizontal and vertical padding.
 //
 // Since: 1.0
@@ -69,39 +69,68 @@ func (l *rowWrapLayout) minHeight(rowHeight float32, rowCount int) float32 {
 }
 
 // Layout is called to pack all child objects into a specified size.
-// For RowWrapLayout this will arrange all objects into rows of equal size
-// and wrap objects into additional rows as needed.
+// For RowWrapLayout this will arrange all objects into rows, each as tall as
+// its tallest object, and wrap objects into additional rows as needed.
+// A core.FitWidther, such as wrapping text, gets its FitWidth, up to the
+// container's width, and the height it needs at that width (#1199).
 func (l *rowWrapLayout) Layout(objects []core.CanvasObject, containerSize geo.Size) {
 	if len(objects) == 0 {
 		return
 	}
-	var maxH float32
-	for _, o := range objects {
-		if !o.Visible() {
-			continue
-		}
-		maxH = geo.Max(maxH, o.MinSize().Height)
-	}
-	var minSize geo.Size
-	pos := geo.NewPos(0, 0)
-	rows := 1
-	isFirst := true
-	for _, o := range objects {
+	sizes := make([]geo.Size, len(objects))
+	for i, o := range objects {
 		if !o.Visible() {
 			continue
 		}
 		size := o.MinSize()
-		o.Resize(size)
-		if !isFirst && pos.X+size.Width+l.horizontalPadding >= containerSize.Width {
-			y := float32(rows) * (maxH + l.verticalPadding)
-			pos = geo.NewPos(0, y)
-			rows++
+		if give := fitGive(o, size.Width, containerSize.Width); containerSize.Width > 0 && give > 0 {
+			size.Width += give
+			o.Resize(size)
+			size.Height = o.MinSize().Height
 		}
-		isFirst = false
-		minSize.Width = geo.Max(minSize.Width, pos.X+size.Width)
-		minSize.Height = l.minHeight(maxH, rows)
-		o.Move(pos)
-		pos = pos.Add(geo.NewPos(size.Width+l.horizontalPadding, 0))
+		sizes[i] = size
+	}
+
+	// Break the objects into rows, then stack the rows.
+	row := make([]int, len(objects))
+	var rowHeights []float32
+	x := float32(0)
+	for i, o := range objects {
+		if !o.Visible() {
+			continue
+		}
+		if len(rowHeights) == 0 {
+			rowHeights = append(rowHeights, 0)
+		} else if x+sizes[i].Width+l.horizontalPadding >= containerSize.Width {
+			rowHeights = append(rowHeights, 0)
+			x = 0
+		}
+		r := len(rowHeights) - 1
+		row[i] = r
+		rowHeights[r] = geo.Max(rowHeights[r], sizes[i].Height)
+		x += sizes[i].Width + l.horizontalPadding
+	}
+
+	var minSize geo.Size
+	y := float32(0)
+	x = 0
+	current := 0
+	for i, o := range objects {
+		if !o.Visible() {
+			continue
+		}
+		if row[i] != current {
+			y += rowHeights[current] + l.verticalPadding
+			current = row[i]
+			x = 0
+		}
+		o.Resize(sizes[i])
+		o.Move(geo.NewPos(x, y))
+		minSize.Width = geo.Max(minSize.Width, x+sizes[i].Width)
+		x += sizes[i].Width + l.horizontalPadding
+	}
+	if len(rowHeights) > 0 {
+		minSize.Height = y + rowHeights[current]
 	}
 	l.minSize = minSize
 }
