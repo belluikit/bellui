@@ -590,6 +590,16 @@ func (t *RichText) IntrinsicSize() geo.Size {
 	return t.intrinsicSizeViaRefresh()
 }
 
+// FitWidth reports the width the text would like beside other widgets: its
+// content on one line, the width of [RichText.IntrinsicSize]. A horizontal box
+// gives unstretched wrapping or truncating text this width while the row has
+// room, and wraps or truncates it only when the row runs out (#1195).
+//
+// Since: 1.3
+func (t *RichText) FitWidth() float32 {
+	return t.IntrinsicSize().Width
+}
+
 // naturalSize measures the unwrapped extent of single text-segment content
 // (the only shape Label and Entry ever produce, and the common RichText case)
 // without touching the live render state — no row-bounds mutation, no repaint,

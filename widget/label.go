@@ -208,6 +208,17 @@ func (l *Label) IntrinsicSize() geo.Size {
 	return l.provider.IntrinsicSize()
 }
 
+// FitWidth reports the width the label would like beside other widgets: its
+// text on one line, the width of [Label.IntrinsicSize]. A wrapping or
+// truncating label's MinSize is one character or an ellipsis wide, so a
+// horizontal box gives an unstretched label this width while the row has room,
+// and wraps or truncates it only when the row runs out (#1195).
+//
+// Since: 1.3
+func (l *Label) FitWidth() float32 {
+	return l.IntrinsicSize().Width
+}
+
 // SyncState syncs Label's public fields to internal rendering state.
 // Called automatically by BaseWidget.Refresh() before the renderer refreshes.
 func (l *Label) SyncState() {

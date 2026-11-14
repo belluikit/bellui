@@ -17,9 +17,10 @@ func NewVBoxLayout() core.Layout {
 }
 
 // NewHBoxLayout returns a horizontal box layout for stacking a number of child
-// canvas objects or widgets left to right. The objects are always displayed
-// at their horizontal MinSize. Use a different layout if the objects are intended
-// to be larger than their horizontal MinSize.
+// canvas objects or widgets left to right. The objects are displayed at their
+// horizontal MinSize, except that a [core.FitWidther], such as wrapping text,
+// gets the wider width it asks for while the row has room for it. Use a
+// different layout if the objects are intended to be larger than that.
 func NewHBoxLayout() core.Layout {
 	return hBoxLayout{
 		paddingFunc: theme.Padding,
@@ -147,8 +148,11 @@ func (g hBoxLayout) Layout(objects []core.CanvasObject, size geo.Size) {
 	visibleObjects := 0
 	// Size taken up by visible objects
 	total := float32(0)
+	// Width the children's FitWidths ask beyond their MinSizes (#1195)
+	give := make([]float32, len(objects))
+	totalGive := float32(0)
 
-	for _, child := range objects {
+	for i, child := range objects {
 		if !child.Visible() {
 			continue
 		}
@@ -159,13 +163,19 @@ func (g hBoxLayout) Layout(objects []core.CanvasObject, size geo.Size) {
 		}
 
 		visibleObjects++
-		total += child.MinSize().Width
+		w := child.MinSize().Width
+		total += w
+		give[i] = fitGive(child, w, 0)
+		totalGive += give[i]
 	}
 
 	padding := g.paddingFunc()
+	spacing := padding * float32(visibleObjects-1)
+	keep := fitKeep(total+totalGive+spacing-size.Width, totalGive)
+	total += totalGive * keep
 
 	// Amount of space not taken up by visible objects and inter-object padding
-	extra := size.Width - total - (padding * float32(visibleObjects-1))
+	extra := size.Width - total - spacing
 
 	// Spacers split extra space equally
 	spacerSize := float32(0)
@@ -174,7 +184,7 @@ func (g hBoxLayout) Layout(objects []core.CanvasObject, size geo.Size) {
 	}
 
 	x, y := float32(0), float32(0)
-	for _, child := range objects {
+	for i, child := range objects {
 		if !child.Visible() {
 			continue
 		}
@@ -188,7 +198,7 @@ func (g hBoxLayout) Layout(objects []core.CanvasObject, size geo.Size) {
 		}
 		child.Move(geo.NewPos(x, y))
 
-		width := child.MinSize().Width
+		width := child.MinSize().Width + give[i]*keep
 		x += padding + width
 		child.Resize(geo.NewSize(width, size.Height))
 	}
