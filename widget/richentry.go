@@ -33,7 +33,7 @@ import (
 //
 // Since: 1.0
 type RichEntry struct {
-	BaseWidget
+	DisableableWidget
 
 	// OnChanged is called, on the main goroutine, after any edit that changes the
 	// content.
@@ -117,6 +117,10 @@ type RichEntry struct {
 	// Main-goroutine-owned, like the rest of the widget's state.
 	axText      string
 	axTextValid bool
+
+	// dimmed holds the recoloured copy of each text segment that a disabled
+	// editor draws (disabledSegments); nil while enabled.
+	dimmed map[*TextSegment]*TextSegment
 }
 
 // NewRichEntry creates a new empty rich-text editor.
@@ -159,10 +163,14 @@ func (e *RichEntry) String() string {
 }
 
 // SelectedText returns the currently selected text, or the empty string when
-// nothing is selected.
+// nothing is selected. A disabled editor reports no selection (#1216): its
+// text can be neither selected nor copied.
 //
 // Since: 1.0
 func (e *RichEntry) SelectedText() string {
+	if e.Disabled() {
+		return ""
+	}
 	from, to, ok := e.selection()
 	if !ok {
 		return ""
@@ -410,6 +418,9 @@ func (e *RichEntry) FocusLost() {
 // an IME composition is active, a typed rune commits it (the desktop char
 // callback path).
 func (e *RichEntry) TypedRune(r rune) {
+	if e.Disabled() {
+		return
+	}
 	// Typing dismisses the mobile caret drag-handle (pre-rebrand tracker #999).
 	e.hideCaretHandle()
 	if e.composing {
@@ -421,6 +432,9 @@ func (e *RichEntry) TypedRune(r rune) {
 
 // TypedKey receives key input events for editing and navigation.
 func (e *RichEntry) TypedKey(key *event.KeyEvent) {
+	if e.Disabled() {
+		return
+	}
 	// Keyboard interaction dismisses the mobile caret drag-handle (pre-rebrand tracker #999).
 	e.hideCaretHandle()
 	if e.composing {
@@ -497,6 +511,9 @@ func (e *RichEntry) TypedKey(key *event.KeyEvent) {
 
 // KeyDown records shift-key presses so cursor navigation extends the selection.
 func (e *RichEntry) KeyDown(key *event.KeyEvent) {
+	if e.Disabled() {
+		return
+	}
 	if key.Name == desktop.KeyShiftLeft || key.Name == desktop.KeyShiftRight {
 		if !e.selecting {
 			e.anchor = e.caret
@@ -516,6 +533,9 @@ func (e *RichEntry) KeyUp(key *event.KeyEvent) {
 
 // Tapped focuses the editor and places the caret at the tapped position.
 func (e *RichEntry) Tapped(ev *event.PointEvent) {
+	if e.Disabled() {
+		return
+	}
 	e.requestFocus()
 	e.syncSel()
 	row, col, _ := e.sel.getRowCol(ev.Position)
@@ -545,6 +565,9 @@ func (e *RichEntry) Cursor() desktop.Cursor {
 // DoubleTapped selects the word under the pointer, mirroring Entry. On mobile,
 // where there is no Shift key, double-tap is a primary way to begin a selection.
 func (e *RichEntry) DoubleTapped(ev *event.PointEvent) {
+	if e.Disabled() {
+		return
+	}
 	e.requestFocus()
 	e.syncSel()
 	row, col, _ := e.sel.getRowCol(ev.Position)
@@ -575,6 +598,9 @@ func (e *RichEntry) ClaimsDrag(geo.Delta) bool { return false }
 // events move the caret end. This is the only selection path on mobile, which
 // has no Shift key (pre-rebrand tracker #750).
 func (e *RichEntry) Dragged(d *event.DragEvent) {
+	if e.Disabled() {
+		return
+	}
 	e.requestFocus()
 	e.syncSel()
 	if !e.selecting {
@@ -595,6 +621,9 @@ func (e *RichEntry) Dragged(d *event.DragEvent) {
 // DragEnd finalizes a drag selection, collapsing it when the drag selected
 // nothing (a press-drag that returned to its origin).
 func (e *RichEntry) DragEnd() {
+	if e.Disabled() {
+		return
+	}
 	if e.anchor == e.caret {
 		e.selecting = false
 		e.Refresh()
@@ -619,7 +648,13 @@ func (e *RichEntry) DragEnd() {
 // --- clipboard shortcuts ---
 
 // TypedShortcut handles registered keyboard shortcuts (copy/cut/paste/select-all).
+// A disabled editor takes none of them, Copy included: the drivers let Copy
+// through to a disabled text widget (Entry keeps its text copyable), but a
+// disabled RichEntry's text cannot be copied (#1216).
 func (e *RichEntry) TypedShortcut(s core.Shortcut) {
+	if e.Disabled() {
+		return
+	}
 	e.shortcut.TypedShortcut(s)
 }
 
@@ -734,11 +769,32 @@ func (e *RichEntry) Keyboard() mobile.KeyboardType {
 
 // Hide hides the editor, dismissing its mobile selection handles with it.
 func (e *RichEntry) Hide() {
+	e.dismissTouchOverlays()
+	e.BaseWidget.Hide()
+}
+
+// dismissTouchOverlays takes down the mobile selection and caret handles.
+func (e *RichEntry) dismissTouchOverlays() {
 	if e.selHandles != nil {
 		e.selHandles.hide()
 	}
 	e.hideCaretHandle()
-	e.BaseWidget.Hide()
+}
+
+// Disable makes the editor visible but inert (#1216): its text is drawn
+// dimmed, and it takes no keys, no composition, no pointer input and no focus.
+// Its text can be neither selected nor copied; the selection it had is kept,
+// undrawn, and shows again on Enable. A composition in progress is cancelled
+// and a focus on the editor is dropped. It is safe before the editor is drawn.
+func (e *RichEntry) Disable() {
+	onMain(func() {
+		if e.Disabled() {
+			return
+		}
+		e.ComposeCancel()
+		e.dismissTouchOverlays()
+		e.DisableableWidget.Disable()
+	})
 }
 
 // --- IME composition (event.Composable / PreeditPositioner, pre-rebrand tracker #658) ---
@@ -746,6 +802,9 @@ func (e *RichEntry) Hide() {
 // Compose sets or replaces the inline preedit text shown at the caret. It does
 // not change the document, undo history or change callbacks.
 func (e *RichEntry) Compose(ev *event.PreeditEvent) {
+	if e.Disabled() {
+		return
+	}
 	if !e.composing {
 		e.deleteSelection() // replace any selection when composition starts
 		e.composing = true
@@ -762,6 +821,9 @@ func (e *RichEntry) Compose(ev *event.PreeditEvent) {
 
 // ComposeCommit finalizes composition, inserting the committed text as one edit.
 func (e *RichEntry) ComposeCommit(text string) {
+	if e.Disabled() {
+		return
+	}
 	e.clearPreedit()
 	if text == "" {
 		e.syncProvider()
@@ -872,7 +934,21 @@ func (e *RichEntry) caretDoc() (*richEntryDoc, int) {
 func (e *RichEntry) syncProvider() {
 	e.provider.ExtendBaseWidget(&e.provider)
 	e.provider.Scroll = widget.ScrollNone
-	e.provider.Segments = e.displaySegments()
+	segs := e.displaySegments()
+	swapped := false // the provider is handed other segments of the same length
+	if e.Disabled() {
+		segs, swapped = e.disabledSegments(segs)
+	} else if e.dimmed != nil {
+		e.dimmed, swapped = nil, true
+	}
+	if swapped {
+		// The provider rebuilds its rows only when the text lengths change, and
+		// its rows point at the segments it laid out, which it then draws: rows
+		// kept from the other state would draw the text undimmed, or dimmed
+		// after Enable.
+		e.provider.rowBoundsVersion++
+	}
+	e.provider.Segments = segs
 	e.provider.Wrapping = e.Wrapping
 	e.provider.Refresh()
 	e.rebuildWrapRows()
@@ -889,7 +965,47 @@ func (e *RichEntry) rebuildWrapRows() {
 		e.doc.setWrapRows(nil)
 		return
 	}
+	if e.Disabled() {
+		// The provider lays out dimmed copies of the segments (disabledSegments),
+		// and buildWrapRows keys rows to segments by identity. The copies hold the
+		// same positions, so a document over them yields the same rows.
+		e.doc.setWrapRows((&richEntryDoc{segs: e.provider.Segments}).buildWrapRows(&e.provider))
+		return
+	}
 	e.doc.setWrapRows(e.doc.buildWrapRows(&e.provider))
+}
+
+// disabledSegments returns copies of the text segments recoloured with
+// theme.ColorNameDisabled, the disabled look Entry gives its text (#1216). The
+// document's own segments are left as they are, so Enable restores each run's
+// colour. Images are passed through: the widget does not dim them.
+//
+// Each segment keeps its copy from one sync to the next. The provider reuses
+// its row bounds while the content looks unchanged, and those bounds point at
+// the copies it laid out; a fresh copy per sync would match none of them in
+// buildWrapRows.
+//
+// It reports whether it made any new copy, which the provider has not laid out.
+func (e *RichEntry) disabledSegments(segs []RichTextSegment) (out []RichTextSegment, fresh bool) {
+	out = make([]RichTextSegment, len(segs))
+	kept := make(map[*TextSegment]*TextSegment, len(segs))
+	for i, seg := range segs {
+		ts, ok := seg.(*TextSegment)
+		if !ok {
+			out[i] = seg
+			continue
+		}
+		dim := e.dimmed[ts]
+		if dim == nil {
+			dim, fresh = &TextSegment{}, true
+		}
+		*dim = *ts
+		dim.Style.ColorName = theme.ColorNameDisabled
+		kept[ts] = dim
+		out[i] = dim
+	}
+	e.dimmed = kept
+	return out, fresh
 }
 
 func (e *RichEntry) syncSel() {
@@ -903,7 +1019,8 @@ func (e *RichEntry) syncSel() {
 	}
 	e.sel.theme = e.Theme()
 	e.sel.focussed = e.focused
-	e.sel.selecting = e.selecting && !e.composing // selection is suppressed while composing
+	// Selection is suppressed while composing, and undrawn while disabled.
+	e.sel.selecting = e.selecting && !e.composing && !e.Disabled()
 	e.sel.cursorRow, e.sel.cursorColumn = e.doc.offsetToRowCol(e.caret)
 	e.sel.selectRow, e.sel.selectColumn = e.doc.offsetToRowCol(e.anchor)
 }
@@ -1068,9 +1185,9 @@ func (r *richEntryRenderer) Objects() []core.CanvasObject {
 	return r.objects
 }
 
-// refreshChrome updates the background box and border to reflect the style and
-// focus state, mirroring Entry's refreshBoxAndBorder (minus validation/disabled,
-// which RichEntry does not model yet).
+// refreshChrome updates the background box and border to reflect the style,
+// focus and disabled state, mirroring Entry's refreshBoxAndBorder (minus
+// validation, which RichEntry does not model).
 func (r *richEntryRenderer) refreshChrome() {
 	e := r.entry
 	th := e.Theme()
@@ -1086,17 +1203,21 @@ func (r *richEntryRenderer) refreshChrome() {
 	}
 	r.border.StrokeWidth = borderSize
 
-	if e.focused {
+	focused := e.focused && !e.Disabled()
+	switch {
+	case e.Disabled():
+		r.border.StrokeColor = th.Color(theme.ColorNameDisabled, v)
+	case focused:
 		r.border.StrokeColor = th.Color(theme.ColorNamePrimary, v)
 		if isOutlined || style == internaltheme.RenderStyleModern {
 			r.border.StrokeWidth = borderSize * 2
 		}
-	} else if isOutlined {
+	case isOutlined:
 		r.border.StrokeColor = th.Color(theme.ColorNameOutline, v)
-	} else {
+	default:
 		r.border.StrokeColor = th.Color(theme.ColorNameInputBorder, v)
 	}
-	r.indicator = shapeEntryChrome(r.box, r.border, !isOutlined, e.focused,
+	r.indicator = shapeEntryChrome(r.box, r.border, !isOutlined, focused,
 		th.Size(theme.SizeNameInputRadius), borderSize)
 	layoutEntryChrome(r.box, r.border, e.Size(), borderSize, r.indicator)
 	r.box.Refresh()
@@ -1110,7 +1231,7 @@ func (r *richEntryRenderer) Refresh() {
 	e.sel.Refresh()
 	r.refreshChrome()
 
-	if e.focused {
+	if e.focused && !e.Disabled() {
 		if bellui.CurrentApp().Settings().ShowAnimations() {
 			e.cursorAnim.start()
 		} else {

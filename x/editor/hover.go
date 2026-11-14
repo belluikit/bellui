@@ -236,6 +236,9 @@ func (h *hoverController) withinShown(row, col int) bool {
 // active reports whether the hover path should respond to pointer dwell: either
 // a host provider is installed, or there are diagnostics to surface.
 func (h *hoverController) active() bool {
+	if h.e.disabled {
+		return false
+	}
 	return h.provider != nil || h.e.hasDiagnostics()
 }
 
