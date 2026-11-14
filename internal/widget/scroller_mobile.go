@@ -17,7 +17,7 @@ func (s *Scroll) DragEnd() {
 // the finger's speed at release (event.MomentumDraggable, #751). A Scroll that
 // scrolls in no direction has nothing to coast.
 func (s *Scroll) DragMomentum() bool {
-	return s.Direction != ScrollNone
+	return s.Direction != ScrollNone && !s.inert()
 }
 
 // Dragged will scroll on any drag - bar or otherwise - for mobile. A Scroll
@@ -25,7 +25,7 @@ func (s *Scroll) DragMomentum() bool {
 // asks ClaimsDrag first never sends it one, but a caller that delivers the
 // drag directly (a test, a driver without the claim) did move its content.
 func (s *Scroll) Dragged(e *event.DragEvent) {
-	if s.Direction == ScrollNone {
+	if s.Direction == ScrollNone || s.inert() {
 		return
 	}
 	if s.updateOffset(e.Dragged.DX, e.Dragged.DY) {
@@ -39,7 +39,7 @@ func (s *Scroll) Dragged(e *event.DragEvent) {
 // already reached, is left to the Draggable around it: a scroll nested in a
 // page hands the page a drag it cannot follow.
 func (s *Scroll) ClaimsDrag(d geo.Delta) bool {
-	if s.Content == nil || s.Direction == ScrollNone {
+	if s.Content == nil || s.Direction == ScrollNone || s.inert() {
 		return false
 	}
 	if math.Abs(float64(d.DX)) > math.Abs(float64(d.DY)) {

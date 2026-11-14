@@ -129,6 +129,9 @@ func (b *scrollBar) DragEnd() {
 }
 
 func (b *scrollBar) Dragged(e *event.DragEvent) {
+	if b.area.scroll.inert() {
+		return
+	}
 	if !b.area.isDragging {
 		b.area.isDragging = true
 		b.area.HoverIn(nil)
@@ -152,6 +155,9 @@ func (b *scrollBar) Dragged(e *event.DragEvent) {
 }
 
 func (b *scrollBar) HoverIn(e *event.HoverEvent) {
+	if b.area.scroll.inert() {
+		return
+	}
 	b.area.HoverIn(e)
 }
 
@@ -303,6 +309,9 @@ func (a *scrollBarArea) CreateRenderer() core.WidgetRenderer {
 // a barely visible thumb movement, and paging to a distant position takes
 // dozens of clicks.
 func (a *scrollBarArea) Tapped(e *event.PointEvent) {
+	if a.scroll.inert() {
+		return
+	}
 	barSize := a.bar.Size()
 	switch a.orientation {
 	case scrollBarOrientationHorizontal:
@@ -321,6 +330,9 @@ func (a *scrollBarArea) Tapped(e *event.PointEvent) {
 // drag-through companion of the jump in Tapped. Drags that start on the bar
 // are delivered to the bar widget instead and move it relatively.
 func (a *scrollBarArea) Dragged(e *event.DragEvent) {
+	if a.scroll.inert() {
+		return
+	}
 	if !a.isDragging {
 		a.isDragging = true
 		a.scroll.refreshBars()
@@ -346,6 +358,9 @@ func (a *scrollBarArea) DragEnd() {
 }
 
 func (a *scrollBarArea) HoverIn(*event.HoverEvent) {
+	if a.scroll.inert() {
+		return
+	}
 	a.isMouseIn = true
 	a.scroll.refreshBars()
 }
@@ -573,6 +588,16 @@ type Scroll struct {
 	// scrolled edge — see pre-rebrand tracker #353 / pre-rebrand tracker #357.
 	HideShadows bool
 
+	// Inert, when set and returning true, makes the scroll refuse the user's
+	// input: a wheel or touchpad scroll, a touch drag of the content, and a
+	// drag or tap on its bars. A widget that owns the scroll sets it to its
+	// Disabled method, so that a disabled collection does not scroll (#1215).
+	// A refused wheel scroll is not consumed (TryScrolled reports false) and a
+	// refused touch drag is not claimed, so both reach the scroll around it, as
+	// they would over content that cannot move. Scrolls from code
+	// (ScrollToOffset and the others) still move it.
+	Inert func() bool `json:"-"`
+
 	// rtlPinned records that the initial right-edge position has been applied (or
 	// superseded by an explicit scroll) under a right-to-left layout, so it is
 	// done at most once and never fights a later user scroll.
@@ -727,9 +752,14 @@ func (s *Scroll) refreshWithoutOffsetUpdate() {
 	s.Base.Refresh()
 }
 
+// inert reports whether the scroll refuses user input now (see Inert).
+func (s *Scroll) inert() bool {
+	return s.Inert != nil && s.Inert()
+}
+
 // Scrolled is called when an input device triggers a scroll event
 func (s *Scroll) Scrolled(ev *event.ScrollEvent) {
-	if s.Direction != ScrollNone {
+	if s.Direction != ScrollNone && !s.inert() {
 		s.applyScroll(s.eventScrollDelta(ev))
 	}
 }
@@ -752,7 +782,7 @@ func (s *Scroll) eventScrollDelta(ev *event.ScrollEvent) (float32, float32) {
 // is at its boundary in the scroll direction or if the content fits entirely,
 // allowing the event to propagate to a parent scrollable.
 func (s *Scroll) TryScrolled(ev *event.ScrollEvent) bool {
-	if s.Direction == ScrollNone {
+	if s.Direction == ScrollNone || s.inert() {
 		return false
 	}
 	if s.Content == nil {

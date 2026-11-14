@@ -23,9 +23,10 @@ const (
 
 // Declare conformity with interfaces
 var (
-	_ event.Focusable = (*TreeView)(nil)
-	_ core.Widget     = (*TreeView)(nil)
-	_ core.Accessible = (*TreeView)(nil)
+	_ event.Focusable  = (*TreeView)(nil)
+	_ core.Widget      = (*TreeView)(nil)
+	_ core.Accessible  = (*TreeView)(nil)
+	_ core.Disableable = (*TreeView)(nil)
 )
 
 // AccessibleRole returns [core.RoleTree].
@@ -51,8 +52,18 @@ type internalNode struct {
 
 // TreeView displays hierarchical data with MD3 styling.
 // It supports drag-to-reorder, inline rename, delete, icons, and chunked loading.
+//
+// A disabled TreeView takes no input: a tap selects no node, a double tap or
+// the expand button opens no branch, a drag moves no node, no context menu,
+// rename or delete is offered, the wheel and a touch drag do not scroll it,
+// keys do nothing and Tab skips it. The row buttons are disabled, and the
+// selected row, the node icons and the default label show in the disabled
+// colours. The objects CreateNode returns are the app's and are left as they
+// are. Select,
+// OpenBranch, MoveNode and the other calls from code still work, except
+// BeginRename, which opens an editor for the user to type in.
 type TreeView struct {
-	BaseWidget
+	DisableableWidget
 	Root TreeViewNodeID // hidden root ID, default ""
 
 	// Feature toggles
@@ -589,6 +600,9 @@ func (tv *TreeView) TypedRune(_ rune) {}
 
 // TypedKey handles keyboard navigation.
 func (tv *TreeView) TypedKey(ev *event.KeyEvent) {
+	if tv.Disabled() {
+		return
+	}
 	switch ev.Name {
 	case event.KeyDown:
 		tv.focusNext()
@@ -648,6 +662,7 @@ func (tv *TreeView) CreateRenderer() core.WidgetRenderer {
 	c := newTreeViewContent(tv)
 	s := widget.NewScroll(c)
 	tv.scroller = s
+	s.Inert = tv.Disabled // a disabled tree does not scroll (#1215)
 	r := &treeViewRenderer{
 		BaseRenderer: widget.NewBaseRenderer([]core.CanvasObject{s}),
 		tree:         tv,
@@ -887,10 +902,13 @@ func (tv *TreeView) RenameNode(id TreeViewNodeID, newName string) {
 // moment earlier has no row yet, so the rename is held until the row exists and
 // applied then; it is dropped if the row never appears. AllowRename gates the
 // user's own rename gestures and does not apply here: calling this is the
-// application asking for the editor.
+// application asking for the editor. A disabled tree opens no editor.
 //
 // Since: 1.0
 func (tv *TreeView) BeginRename(id TreeViewNodeID) {
+	if tv.Disabled() {
+		return // an editor the user cannot type in is no rename (#1215)
+	}
 	tv.mu.RLock()
 	_, known := tv.nodeMap[id]
 	tv.mu.RUnlock()
@@ -922,15 +940,7 @@ func (tv *TreeView) BeginRename(id TreeViewNodeID) {
 // itemForID returns the row currently rendering a node, or nil when the node
 // is scrolled out of view, inside a closed branch, or not laid out yet.
 func (tv *TreeView) itemForID(id TreeViewNodeID) *treeViewItem {
-	r, ok := cache.Renderer(tv).(*treeViewRenderer)
-	if !ok {
-		return nil
-	}
-	cr, ok := cache.Renderer(r.content).(*treeViewContentRenderer)
-	if !ok {
-		return nil
-	}
-	return cr.items[id]
+	return tv.items()[id]
 }
 
 // armPendingRename records a rename to start as soon as the node has a row.
@@ -960,7 +970,55 @@ func (tv *TreeView) DeleteNode(id TreeViewNodeID) {
 	tv.Refresh()
 }
 
+// Disable stops the tree taking input (see [TreeView]). A node drag in
+// progress ends where it started, and an open rename editor closes without
+// writing anything back.
+func (tv *TreeView) Disable() {
+	onMain(func() {
+		if tv.Disabled() {
+			return
+		}
+		tv.cancelDrag()
+		tv.armPendingRename("")
+		for _, item := range tv.items() {
+			item.cancelRename()
+		}
+		tv.DisableableWidget.Disable()
+	})
+}
+
+// items returns the rows the tree is showing, or nil before it is drawn. It
+// builds no renderer: Disable runs before the first draw too.
+func (tv *TreeView) items() map[TreeViewNodeID]*treeViewItem {
+	r, ok := cache.CachedRenderer(tv)
+	if !ok {
+		return nil
+	}
+	tvr, ok := r.(*treeViewRenderer)
+	if !ok {
+		return nil
+	}
+	cr, ok := cache.CachedRenderer(tvr.content)
+	if !ok {
+		return nil
+	}
+	tcr, ok := cr.(*treeViewContentRenderer)
+	if !ok {
+		return nil
+	}
+	return tcr.items
+}
+
 // === Drag handling ===
+
+// cancelDrag ends a node drag in progress without moving the node.
+func (tv *TreeView) cancelDrag() {
+	if !tv.dragActive {
+		return
+	}
+	tv.dropTarget = dropPosition{}
+	tv.finalizeDrag()
+}
 
 func (tv *TreeView) handleDrag(sourceID TreeViewNodeID, e *event.DragEvent) {
 	if !tv.dragActive {
