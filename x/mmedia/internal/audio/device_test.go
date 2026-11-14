@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ebitengine/oto/v3"
+	"github.com/belluikit/oto/v3"
 )
 
 // failDevice makes the device refuse to open the way oto v3.4.0 does when it
@@ -45,6 +45,7 @@ func (c lateFailContext) NewPlayer(io.Reader) devicePlayer { panic("NewPlayer on
 func (c lateFailContext) Err() error                       { return c.err }
 func (c lateFailContext) Suspend() error                   { return nil }
 func (c lateFailContext) Resume() error                    { return nil }
+func (c lateFailContext) Flush() error                     { return nil }
 
 // closedReady is a ready channel the backend has already closed.
 func closedReady() chan struct{} {

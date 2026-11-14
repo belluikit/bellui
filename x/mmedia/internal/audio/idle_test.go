@@ -3,6 +3,7 @@ package audio
 import (
 	"errors"
 	"slices"
+	"sync"
 	"testing"
 	"time"
 )
@@ -10,17 +11,36 @@ import (
 // recordSuspender records what idleSuspend asks of the device, and can refuse
 // a suspend.
 type recordSuspender struct {
+	mu         sync.Mutex
 	calls      []string
 	suspendErr error
 }
 
+func (r *recordSuspender) record(call string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.calls = append(r.calls, call)
+}
+
+// recorded is the calls so far.
+func (r *recordSuspender) recorded() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return slices.Clone(r.calls)
+}
+
 func (r *recordSuspender) Suspend() error {
-	r.calls = append(r.calls, "suspend")
+	r.record("suspend")
 	return r.suspendErr
 }
 
 func (r *recordSuspender) Resume() error {
-	r.calls = append(r.calls, "resume")
+	r.record("resume")
+	return nil
+}
+
+func (r *recordSuspender) Flush() error {
+	r.record("flush")
 	return nil
 }
 
@@ -50,7 +70,8 @@ func TestIdleSuspendWaitsForTheLastOutput(t *testing.T) {
 	s.play()
 	s.idle()
 	s.idle()
-	if want := []string{"suspend", "resume", "suspend"}; !slices.Equal(dev.calls, want) {
+	// Each suspend discards what the device still had queued (#1228).
+	if want := []string{"suspend", "flush", "resume", "suspend", "flush"}; !slices.Equal(dev.calls, want) {
 		t.Errorf("device calls %v, want %v", dev.calls, want)
 	}
 }
@@ -83,8 +104,9 @@ func TestIdleSuspendResumesOnlyWhatItSuspended(t *testing.T) {
 }
 
 // TestOutputCountsWhilePlaying wires idleSuspend to Outputs on the real
-// device: Start and Resume count an Output, Pause and Stop take it out, each
-// once however often it is called.
+// device: Start and Resume count an Output, Pause and Stop take it out once
+// the device has played what it mixed (settle), each once however often it is
+// called.
 func TestOutputCountsWhilePlaying(t *testing.T) {
 	o, err := NewOutput(2)
 	if err != nil {
@@ -102,23 +124,26 @@ func TestOutputCountsWhilePlaying(t *testing.T) {
 		device.idle.mu.Unlock()
 	})
 	defer o.Stop()
+	calls := func(n int) func() bool { return func() bool { return len(dev.recorded()) >= n } }
 
 	o.WriteSamples(tone(500*time.Millisecond, 8000))
 	o.Start()
 	if !o.Playing() {
-		t.Error("not counted as playing after Start")
+		t.Error("not playing after Start")
 	}
 	o.Pause()
 	o.Pause()
 	if o.Playing() {
-		t.Error("counted as playing after Pause")
+		t.Error("playing after Pause")
 	}
+	waitFor(t, "the device to be suspended after the pause", 2*settleWait, calls(2))
 	o.Resume()
 	o.Resume()
 	o.Stop()
 	o.Stop()
-	if want := []string{"suspend", "resume", "suspend"}; !slices.Equal(dev.calls, want) {
-		t.Errorf("device calls %v, want %v", dev.calls, want)
+	waitFor(t, "the device to be suspended after the stop", 2*settleWait, calls(5))
+	if want := []string{"suspend", "flush", "resume", "suspend", "flush"}; !slices.Equal(dev.recorded(), want) {
+		t.Errorf("device calls %v, want %v", dev.recorded(), want)
 	}
 	if NewDetachedOutput(2).Playing() {
 		t.Error("a detached Output counts as playing")

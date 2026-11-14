@@ -34,6 +34,8 @@ github.com/belluikit/goffmpeg-libs/windows_amd64 v0.8.0 h1:thcB8zhkVP2sHWNJIpRxS
 github.com/belluikit/goffmpeg-libs/windows_amd64 v0.8.0/go.mod h1:x+DbU4kyhbEvk4fr7080dbV7lzSiXMh9x5rmDEuuz1w=
 github.com/belluikit/goffmpeg-libs/windows_arm64 v0.8.0 h1:VaCJpFcGY7is/4mBkXHXUvRmvGIWDDy4Oo4RRy37ouk=
 github.com/belluikit/goffmpeg-libs/windows_arm64 v0.8.0/go.mod h1:R8fUvbRy4Z80X1S4gntJqzuKdldkrMSB78cEOXVRaTI=
+github.com/belluikit/oto/v3 v3.0.0-20261114214624-f52e49485be2 h1:ixuFwrldifGwBXVH5FAASIbUWqoPCHQp6v+wZvj7+T0=
+github.com/belluikit/oto/v3 v3.0.0-20261114214624-f52e49485be2/go.mod h1:8pEBo7BVDVd/Gz2Vn8HO1DsTiE7b3M2bXU693DdORN0=
 github.com/belluikit/systray v1.12.2 h1:bWDRI+uX3DntAvul2DxdMC1wPD/sa31vtBnxEvYo0sw=
 github.com/belluikit/systray v1.12.2/go.mod h1:peb+/O80A/aXu5fUel0gSgeAsAVYz5x01SZF5mnyErU=
 github.com/belluikit/typesetting v0.3.6 h1:M27Rx+fhz1IV2n6Tei3fNhs/Oe9gGAnq3QMrBpAqisY=
@@ -50,8 +52,6 @@ github.com/belluikit/webgpu/libs-linux v0.0.0-20261111082701-57a52ab65675 h1:9JD
 github.com/belluikit/webgpu/libs-linux v0.0.0-20261111082701-57a52ab65675/go.mod h1:fmLJk6PUM+aXFxsYsZdyx/JSeCLMxtqPvLeRYNldFFY=
 github.com/belluikit/webgpu/libs-windows v0.0.0-20261111091809-343dda80becd h1:w07+m+HdA/BpRZBEOqq7yiFz/lr90VjvBXy2WRls/1U=
 github.com/belluikit/webgpu/libs-windows v0.0.0-20261111091809-343dda80becd/go.mod h1:wnqokPIT0O/r2eXZcG1uG17ou3REkcdLLxeFVGtO/8U=
-github.com/ebitengine/oto/v3 v3.5.1 h1:7gL5DxxSQp8S1Me2jDSp+gSAyondYxpjM5RPBBqLT0c=
-github.com/ebitengine/oto/v3 v3.5.1/go.mod h1:Elkm7yzTRns3w2efvibzVOoQ65YOwmec9a76dCiK10o=
 github.com/ebitengine/purego v0.11.0 h1:jhp/D+Nyv7UUW8HAcmcjt2N2rYrYi9m3SL21k0Ua/NI=
 github.com/ebitengine/purego v0.11.0/go.mod h1:DCHPP08djqhNSoTfImcnHYQRZmd0qhakvrozqaEYhGQ=
 github.com/felixge/fgprof v0.9.3 h1:VvyZxILNuCiUCSXtPtYmmtGvb65nqXh2QFWc0Wpf2/g=

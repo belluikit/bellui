@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ebitengine/oto/v3"
+	"github.com/belluikit/oto/v3"
 )
 
 // DeviceSampleRate is the rate the audio device is opened at, whatever the
@@ -38,6 +38,11 @@ type Output struct {
 	volume     float64
 	started    bool
 	playing    bool // started, and not paused or stopped since
+
+	// settling counts the pauses and stops whose sound the device is still
+	// playing (settle): a Start or Resume moves it on, so a settle that
+	// finishes after one does not count the Output as idle.
+	settling uint64
 
 	// idle is the device's count of playing Outputs (nil for a detached
 	// Output), and active whether this one is counted in it.
@@ -74,6 +79,7 @@ type otoContext interface {
 	Err() error
 	Suspend() error
 	Resume() error
+	Flush() error
 }
 
 // devicePlayer is what an Output uses of *oto.Player.
@@ -84,6 +90,7 @@ type devicePlayer interface {
 	Seek(offset int64, whence int) (int64, error)
 	SetBufferSize(bytes int)
 	BufferedSize() int
+	UnplayedSize() int
 	SetVolume(v float64)
 	Volume() float64
 	IsPlaying() bool
@@ -278,6 +285,7 @@ func (o *Output) Start() {
 	o.player.SetBufferSize(playerBufferBytes(o.sampleRate, o.channels))
 	o.player.SetVolume(0) // faded in once playing
 	o.pull.setPlayer(o.player)
+	o.settling++ // a stop still being played out no longer makes this idle
 	o.setActive(true)
 	o.player.Play()
 	o.started, o.playing = true, true
@@ -286,7 +294,8 @@ func (o *Output) Start() {
 
 // setActive counts the Output in the device's playing Outputs, or takes it
 // out, so the device is suspended while none plays (idleSuspend). It is
-// called under o.mu, before a player plays and after it pauses.
+// called under o.mu, before a player plays, and once the device has played
+// what a paused or stopped one mixed (settle).
 func (o *Output) setActive(on bool) {
 	if o.idle == nil || o.active == on {
 		return
@@ -299,13 +308,45 @@ func (o *Output) setActive(on bool) {
 	}
 }
 
-// Playing reports whether the Output counts as playing, which keeps the
-// device from being suspended (idleSuspend): started, and neither paused nor
-// stopped since. A detached Output never counts.
+// Playing reports whether the Output is playing: started, and neither paused
+// nor stopped since. A detached Output never plays. The device counts it as
+// playing a little longer, until it has played what was mixed (settle).
 func (o *Output) Playing() bool {
 	o.mu.Lock()
 	defer o.mu.Unlock()
-	return o.active
+	return o.playing && o.ctx != nil
+}
+
+// settleWait bounds how long settle waits for the device to play what a
+// paused or stopped player mixed. Its queue is tens of milliseconds on a
+// phone's speaker and can be hundreds over Bluetooth.
+const settleWait = time.Second
+
+// settle counts the Output as idle once the device has played what p mixed,
+// the faded end of it, and closes p then when close is set. Until then the
+// device keeps running and the fade is heard. Counted idle at once, the last
+// Output let Android suspend the device with that sound still queued: the
+// fade was cut off, which clicked, and Resume played the rest at the start of
+// the next song (#1228). oto counts the sound queued for the device in
+// UnplayedSize; where the platform does not report it, UnplayedSize is what
+// the player holds, and the Output is idle at once, as before. Called under
+// o.mu, after p.Pause.
+func (o *Output) settle(p devicePlayer, close bool) {
+	o.settling++
+	gen := o.settling
+	go func() {
+		for end := time.Now().Add(settleWait); p.UnplayedSize() > p.BufferedSize() && time.Now().Before(end); {
+			time.Sleep(5 * time.Millisecond)
+		}
+		o.mu.Lock()
+		defer o.mu.Unlock()
+		if close {
+			_ = p.Close()
+		}
+		if o.settling == gen {
+			o.setActive(false)
+		}
+	}()
 }
 
 // Pause pauses audio playback.
@@ -341,7 +382,8 @@ func playerBufferBytes(rate, channels int) int {
 }
 
 // Pause pauses audio playback, fading it out first (fadeOut): it returns up to
-// fadeTime and a device block later.
+// fadeTime and a device block later. The device plays the fade out after it
+// returns (settle).
 func (o *Output) Pause() {
 	o.mu.Lock()
 	defer o.mu.Unlock()
@@ -351,7 +393,7 @@ func (o *Output) Pause() {
 		}
 		o.player.Pause()
 		o.playing = false
-		o.setActive(false)
+		o.settle(o.player, false)
 	}
 }
 
@@ -361,6 +403,7 @@ func (o *Output) Resume() {
 	defer o.mu.Unlock()
 	if o.player != nil && !o.playing {
 		o.player.SetVolume(0) // while paused, so oto starts from silence
+		o.settling++          // the pause's sound no longer makes this idle
 		o.setActive(true)
 		o.player.Play()
 		o.playing = true
@@ -371,7 +414,8 @@ func (o *Output) Resume() {
 }
 
 // Stop stops audio playback, fading it out first (fadeOut): it returns up to
-// fadeTime and a device block later.
+// fadeTime and a device block later. The device plays the fade out after it
+// returns, and the player is closed then (settle).
 func (o *Output) Stop() {
 	o.mu.Lock()
 	defer o.mu.Unlock()
@@ -381,11 +425,12 @@ func (o *Output) Stop() {
 			o.fadeOut()
 		}
 		o.player.Pause()
-		o.player.Close()
+		o.settle(o.player, true)
 		o.player = nil
+	} else {
+		o.setActive(false)
 	}
 	o.playing = false
-	o.setActive(false)
 	o.buffer.Reset()
 	o.pull.reset()
 	// The resets zero the byte counts, so the last seek's base goes with
