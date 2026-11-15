@@ -1026,11 +1026,13 @@ func (tv *TreeView) handleDrag(sourceID TreeViewNodeID, e *event.DragEvent) {
 		tv.dragActive = true
 	}
 
-	// Calculate which node the cursor is over
-	// e.Position is relative to the dragged item; we need absolute Y in the tree content
+	// Calculate which node the cursor is over. e.AbsolutePosition is in
+	// canvas coordinates and the rows in the tree's content, so take off where
+	// the tree sits on the canvas, then add the scroll (#1229).
 	th := tv.Theme()
 	pad := th.Size(theme.SizeNamePadding)
-	mouseY := tv.offset.Y + e.AbsolutePosition.Y
+	treeY := bellui.CurrentApp().Driver().AbsolutePositionForObject(tv.super()).Y
+	mouseY := tv.offset.Y + e.AbsolutePosition.Y - treeY
 
 	// Walk visible nodes to find drop target
 	y := float32(0)
