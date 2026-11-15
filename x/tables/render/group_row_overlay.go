@@ -37,6 +37,13 @@ type GroupRowOverlay struct {
 	Grid     GridAccess
 	viewport *Viewport
 	offsetY  float32 // vertical scroll offset, synced from the main scroll
+
+	// Strips at the right and bottom edges the overlay leaves uncovered, where
+	// the main scroll draws its bars. The overlay sits above the scroll, so
+	// without them every group row painted over the bar and cut it into
+	// segments. The cell bands paint group rows in the group colour, so the
+	// row still reads as one band under the bar, as a data row does.
+	barRight, barBottom float32
 }
 
 // NewGroupRowOverlay creates the grid-level group-header overlay.
@@ -50,6 +57,13 @@ func NewGroupRowOverlay(grid GridAccess, viewport *Viewport) *GroupRowOverlay {
 func (w *GroupRowOverlay) SetOffsetY(y float32) {
 	w.offsetY = y
 	w.Refresh()
+}
+
+// SetScrollBarInsets sets the widths of the right (vertical bar) and bottom
+// (horizontal bar) strips the overlay must not draw over; 0 where no bar shows.
+// It takes effect on the next Refresh.
+func (w *GroupRowOverlay) SetScrollBarInsets(right, bottom float32) {
+	w.barRight, w.barBottom = right, bottom
 }
 
 func (w *GroupRowOverlay) CreateRenderer() core.WidgetRenderer {
@@ -196,7 +210,7 @@ func (r *groupRowOverlayRenderer) refresh(size geo.Size) {
 		r.clip = container.NewClip(r.band)
 	}
 	r.clip.Move(geo.NewPos(0, 0))
-	r.clip.Resize(size)
+	r.clip.Resize(geo.NewSize(geo.Max(size.Width-r.widget.barRight, 0), geo.Max(size.Height-r.widget.barBottom, 0)))
 	r.clip.Refresh()
 
 	r.objects = []core.CanvasObject{r.clip}

@@ -206,6 +206,10 @@ func (r *pinnedCellsRenderer) refresh(size geo.Size) {
 		if grid.IsSelected(row, colStart) {
 			rowBg.FillColor = selColor
 		}
+		if grid.IsGroupRow(row) {
+			// Shows in the strip the GroupRowOverlay leaves for the scroll bars.
+			rowBg.FillColor = tc.GroupRowBg
+		}
 		rowBg.Move(geo.NewPos(0, visY))
 		rowBg.Resize(geo.NewSize(size.Width, visH))
 		objects = append(objects, rowBg)
