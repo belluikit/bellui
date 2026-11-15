@@ -28,7 +28,7 @@ community in the hope of better software.
 
 # Prerequisites
 
-To develop apps using Bellui you will need Go version 1.25 or later, a C compiler and your system's development tools.
+To develop apps using Bellui you will need Go version 1.26.2 or later, a C compiler and your system's development tools.
 If you're not sure if that's all installed or you don't know how then check out our
 [Getting Started](https://bellui.com/develop/) document.
 
@@ -152,6 +152,19 @@ Specify "-os" to "iossimulator" allows the application be able to run in an iOS 
 
     bellui package -os ios -appID my.domain.appname
     bellui package -os iossimulator -appID my.domain.appname
+
+> **Go 1.27.4 and Swift code on iOS.** Since Go 1.27.4, the go command refuses
+> a library in a directory that a `#cgo LDFLAGS: -L<dir>` line names if any of
+> its objects has an `__LLVM` segment, which it takes for LTO bitcode. The
+> Swift compiler in Xcode 27.2 and later writes a small `__LLVM,__swift_modhash`
+> section into every object it builds, so an app that links Swift code this way
+> fails to build with `disallowed LTO section __LLVM,__swift_modhash in #cgo
+> LDFLAGS`. Put the library in the app's `ios/Frameworks/` folder instead, as a
+> plain static library (`.a`) or an `.xcframework`: `bellui package` links it
+> without going through a `#cgo` line, where the check does not run. Needs the
+> bellui CLI v1.3.0-rc.2 or later for a plain `.a`. Details are in
+> [cmd/bellui/README.md](cmd/bellui/README.md) under *ios/Frameworks*
+> ([#1240](https://github.com/belluikit/bellui/issues/1240)).
 
 # Preparing a release
 
