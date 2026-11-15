@@ -18,6 +18,11 @@ type CellsWidget struct {
 	viewport *Viewport
 	pool     *CellPool
 	renderer *CellsRenderer // the last one CreateRenderer built, for HoldsFocusable
+
+	// trailingW is room past the last main column, under the pinned-right
+	// band and the scroll bar gutter, so the last column can scroll clear of
+	// them (#1257).
+	trailingW float32
 }
 
 // GroupAggregate is one aggregate shown on a group header row.
@@ -172,7 +177,21 @@ func (c *CellsWidget) HoldsFocusable(o any) bool {
 	return false
 }
 
-// MinSize returns the total content size (all rows * all columns).
+// MinSize returns the total content size (all rows * all columns), plus the
+// trailing room.
 func (c *CellsWidget) MinSize() geo.Size {
-	return c.viewport.ContentSize()
+	s := c.viewport.ContentSize()
+	s.Width += c.trailingW
+	return s
+}
+
+// SetTrailingWidth sets the room past the last main column and reports whether
+// it changed. The DataGrid sets it to the width the pinned-right band and the
+// scroll bar gutter cover at the right of the main scroll.
+func (c *CellsWidget) SetTrailingWidth(w float32) bool {
+	if w == c.trailingW {
+		return false
+	}
+	c.trailingW = w
+	return true
 }

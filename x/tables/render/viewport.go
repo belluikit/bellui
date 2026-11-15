@@ -35,12 +35,16 @@ type Viewport struct {
 	// Pixel offset of the first visible row/col within the viewport.
 	RowPixelOffset float32
 	ColPixelOffset float32
+	// ViewRight is the content X of the visible area's right edge: the
+	// horizontal offset plus the width Update was given.
+	ViewRight float32
 }
 
 // Update recalculates visible ranges from the scroll offset and viewport size.
 func (v *Viewport) Update(offset geo.Position, viewSize geo.Size) {
 	v.updateVisibleRows(offset.Y, viewSize.Height)
 	v.updateVisibleCols(offset.X, viewSize.Width)
+	v.ViewRight = offset.X + viewSize.Width
 }
 
 func (v *Viewport) updateVisibleRows(offsetY, height float32) {

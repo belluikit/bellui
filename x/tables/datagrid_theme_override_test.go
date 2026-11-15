@@ -68,6 +68,14 @@ func TestDataGrid_ThemeOverrideReachesEverythingItRenders(t *testing.T) {
 			g.SelectionMode = SelectionMultiRow
 		}},
 		{"grouped rows", func(g *DataGrid) { g.API().SetRowGroupColumn("dept") }},
+		// Collapsed, the group headers are adjacent, so growing the grid
+		// realizes new header rows after the first layout.
+		{"collapsed groups", func(g *DataGrid) {
+			g.API().SetRowGroupColumn("dept")
+			for i := range 7 {
+				g.API().ToggleGroup(fmt.Sprintf("d%d", i))
+			}
+		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			g := newTestGrid(t, rows(1000), []*ColumnDef{

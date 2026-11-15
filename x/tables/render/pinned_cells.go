@@ -1,7 +1,9 @@
 package render
 
 import (
+	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/canvas"
+	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/theme"
@@ -72,6 +74,13 @@ type pinnedCellsRenderer struct {
 	// owns) instead of allocating. Mirrors CellsRenderer's host pool.
 	hostPool map[string][]*cellHost
 	objects  []core.CanvasObject
+
+	// The rows are drawn at full height inside a real clip, so a row cut by
+	// the band's edge is clipped rather than squeezed: its text stays level
+	// with the same row in the main band. The band's bottom edge can sit above
+	// the main scroll's horizontal bar (#1257), not only at the body's edge.
+	band *bellui.Container
+	clip *container.Clip
 
 	// Disclosure decorations for the first pinned-left column, pooled so the
 	// invisible a11y node keeps a stable identity across refreshes (unlike the
@@ -183,20 +192,12 @@ func (r *pinnedCellsRenderer) refresh(size geo.Size) {
 		rh -= grid.DetailBandHeight(row)
 		y -= offsetY // adjust for scroll
 
-		// Clip: skip rows entirely outside the widget bounds.
+		// Skip rows entirely outside the widget bounds; the clip cuts the
+		// rest at the edges.
 		if y+rh <= 0 || y >= size.Height {
 			continue
 		}
-		// Clamp: if row is partially above top, adjust position and height.
-		visY := y
-		visH := rh
-		if visY < 0 {
-			visH += visY // reduce height by the clipped amount
-			visY = 0
-		}
-		if visY+visH > size.Height {
-			visH = size.Height - visY
-		}
+		visY, visH := y, rh
 
 		// Row background
 		rowBg := canvas.NewRectangle(tc.Background)
@@ -330,6 +331,18 @@ func (r *pinnedCellsRenderer) refresh(size geo.Size) {
 		r.releasePinnedHost(typeName, host)
 	}
 	r.visible = newVisible
-	r.objects = objects
-	theme.MatchScope(r.widget, objects...) // see CellsRenderer.refreshCells (#758)
+	if r.band == nil {
+		r.band = container.NewWithoutLayout()
+		r.clip = container.NewClip(r.band)
+	}
+	r.band.Objects = objects
+	r.clip.Move(geo.NewPos(0, 0))
+	r.clip.Resize(size)
+	r.clip.Refresh()
+	r.objects = []core.CanvasObject{r.clip}
+	// See CellsRenderer.refreshCells (#758). MatchScope does not descend into
+	// containers, and skips the clip once it carries the scope, so the rows
+	// inside it are matched themselves.
+	theme.MatchScope(r.widget, r.clip)
+	theme.MatchScope(r.widget, objects...)
 }

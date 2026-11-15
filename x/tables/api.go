@@ -105,7 +105,8 @@ func (a *GridAPI) SizeColumnsToFit() {
 		available -= pinnedLeftW + padding
 	}
 	if pinnedRightW > 0 {
-		available -= pinnedRightW + padding
+		// Pinned-right keeps clear of the vertical bar's gutter (#1257).
+		available -= pinnedRightW + padding + g.vScrollGutter(g.Size())
 	}
 	// Subtract padding between main columns
 	available -= padding * float32(len(mainCols)-1)

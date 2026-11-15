@@ -262,7 +262,7 @@ func (g *DataGrid) editingCellRect(id CellID, size geo.Size) (pos geo.Position, 
 		return geo.Position{}, geo.Size{}, false
 	}
 	pad := g.cellPadding()
-	mainX, pinnedRightX, pinnedRightW := g.bandAnchors(size.Width)
+	mainX, pinnedRightX, pinnedRightW := g.bandAnchors(size)
 
 	var x, w float32
 	nL, nM := len(layout.pinnedLeft), len(layout.main)

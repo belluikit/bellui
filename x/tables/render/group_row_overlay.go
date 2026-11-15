@@ -214,7 +214,12 @@ func (r *groupRowOverlayRenderer) refresh(size geo.Size) {
 	r.clip.Refresh()
 
 	r.objects = []core.CanvasObject{r.clip}
-	theme.MatchScope(r.widget, r.clip) // see CellsRenderer.refreshCells (#758)
+	// See CellsRenderer.refreshCells (#758). MatchScope does not descend into
+	// containers, and skips a clip once it carries the scope, so the rows and
+	// aggregates inside the clips are matched themselves.
+	theme.MatchScope(r.widget, r.clip)
+	theme.MatchScope(r.widget, content...)
+	theme.MatchScope(r.widget, mainAggs...)
 }
 
 // aggGeometry places a group row's aggregates in their columns using the same
