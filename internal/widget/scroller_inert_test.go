@@ -15,8 +15,9 @@ import (
 
 // An inert Scroll, the one inside a disabled List or tree (#1215), refuses
 // the user's scrolling: the wheel, a touch drag of the content, and a tap or
-// drag on its bar. It leaves a wheel scroll and a touch drag to the scroll
-// around it, and a scroll from code still moves it.
+// drag on its bar. It swallows a wheel scroll and claims a touch drag, so the
+// scroll around it does not move either (#1251). A scroll from code still
+// moves it.
 func TestScroll_Inert(t *testing.T) {
 	content := canvas.NewRectangle(nil)
 	content.SetMinSize(geo.NewSize(100, 1000))
@@ -31,9 +32,9 @@ func TestScroll_Inert(t *testing.T) {
 	bar := r.vertArea
 
 	s.Scrolled(&event.ScrollEvent{Scrolled: geo.Delta{DY: -50}})
-	assert.False(t, s.TryScrolled(&event.ScrollEvent{Scrolled: geo.Delta{DY: -50}}), "an inert scroll consumed a scroll")
+	assert.True(t, s.TryScrolled(&event.ScrollEvent{Scrolled: geo.Delta{DY: -50}}), "an inert scroll left a scroll to the scroll around it")
 	s.Dragged(&event.DragEvent{Dragged: geo.Delta{DY: -50}})
-	assert.False(t, s.ClaimsDrag(geo.Delta{DY: -50}), "an inert scroll claimed a touch drag")
+	assert.True(t, s.ClaimsDrag(geo.Delta{DY: -50}), "an inert scroll left a touch drag to the scroll around it")
 	assert.False(t, s.DragMomentum())
 	bar.Tapped(&event.PointEvent{Position: geo.NewPos(5, 90)})
 	bar.Dragged(&event.DragEvent{PointEvent: event.PointEvent{Position: geo.NewPos(5, 90)}})

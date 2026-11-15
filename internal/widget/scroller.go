@@ -592,9 +592,9 @@ type Scroll struct {
 	// input: a wheel or touchpad scroll, a touch drag of the content, and a
 	// drag or tap on its bars. A widget that owns the scroll sets it to its
 	// Disabled method, so that a disabled collection does not scroll (#1215).
-	// A refused wheel scroll is not consumed (TryScrolled reports false) and a
-	// refused touch drag is not claimed, so both reach the scroll around it, as
-	// they would over content that cannot move. Scrolls from code
+	// A refused wheel scroll is consumed (TryScrolled reports true) and a
+	// refused touch drag is claimed, so neither reaches the scroll around it:
+	// over a disabled collection nothing scrolls (#1251). Scrolls from code
 	// (ScrollToOffset and the others) still move it.
 	Inert func() bool `json:"-"`
 
@@ -782,7 +782,10 @@ func (s *Scroll) eventScrollDelta(ev *event.ScrollEvent) (float32, float32) {
 // is at its boundary in the scroll direction or if the content fits entirely,
 // allowing the event to propagate to a parent scrollable.
 func (s *Scroll) TryScrolled(ev *event.ScrollEvent) bool {
-	if s.Direction == ScrollNone || s.inert() {
+	if s.inert() {
+		return true // swallowed: nothing scrolls over a disabled collection (#1251)
+	}
+	if s.Direction == ScrollNone {
 		return false
 	}
 	if s.Content == nil {
