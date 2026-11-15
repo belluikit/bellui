@@ -142,13 +142,18 @@ goffmpeg builds FFmpeg in two codec sets, chosen by a build tag
 
 | Set | Plays | Build |
 |---|---|---|
-| media | MP3, WAV, MP4 (`.mp4`, `.m4a`, `.mov`) with H.264 and AAC, HLS; webcams on desktop | default |
-| audio | MP3 and WAV, no video and no capture | `-tags goffmpeg_novideo` |
+| media, desktop | every format and codec FFmpeg decodes; webcams | default |
+| media, phones | MP3, WAV, MP4 (`.mp4`, `.m4a`, `.mov`), MPEG-TS, HLS, WebM/Matroska and Ogg, with H.264, VP9, AV1, AAC or Opus | default |
+| audio | MP3, WAV, AAC (`.m4a`, `.mp4`, ADTS) and Opus (`.ogg`); no video and no capture | `-tags goffmpeg_novideo` |
 
-Anything else (FLAC, Ogg, Opus, HEVC, VP9, …) fails to open with
+On Android and iOS, H.264 and AAC decode only through the platform's own
+decoders (MediaCodec; VideoToolbox and AudioToolbox), so a stream they refuse,
+such as 10-bit or High 4:4:4 H.264, does not play on a phone (goffmpeg
+v0.13.0). Outside its set a file fails to open with
 `goffmpeg.ErrUnrecognizedInput`, or `goffmpeg.ErrNoDecoder` when the container
 opens but none of its streams decodes. An audio-only app ships less with the
-audio set: 1.8 MB of FFmpeg against 4.9 MB on darwin/arm64.
+audio set: 2.4 MB of FFmpeg against 15.9 MB on darwin/arm64 (goffmpeg-libs
+v0.10.0). Each module's `NOTICE` records the configure line of both sets.
 
 ### Shipping FFmpeg
 
