@@ -37,8 +37,8 @@ func (*Painter) Paint(c core.Canvas) image.Image {
 	wtStack := []geo.Matrix{geo.Identity()}
 
 	// The group opacity of the subtree being drawn, from the core.OpacityGroup
-	// objects above it, as the GL walks keep it. Disabled widgets are not
-	// dimmed, as on mobile.
+	// objects and the disabled widgets above it, as the GL walks keep it, so a
+	// test capture shows a disabled widget as the platforms do (#1223).
 	var opacity driver.OpacityStack
 
 	paint := func(obj core.CanvasObject, _, clipPos geo.Position, clipSize geo.Size) bool {

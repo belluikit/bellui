@@ -63,19 +63,47 @@ func TestOpacityStack(t *testing.T) {
 	assert.Equal(t, float32(1), s.Current())
 }
 
-func TestOpacityStack_DimsDisabledWhereAsked(t *testing.T) {
+// ownLookObject is a disabled widget that draws its own disabled look.
+type ownLookObject struct{ disabledObject }
+
+func (ownLookObject) DrawsDisabledLook() bool { return true }
+
+// notOwnLookObject implements DisabledLook but reports no look of its own.
+type notOwnLookObject struct{ disabledObject }
+
+func (notOwnLookObject) DrawsDisabledLook() bool { return false }
+
+// enabledObject is an enabled widget.
+type enabledObject struct{ disabledObject }
+
+func (enabledObject) Disabled() bool { return false }
+
+// Every walk dims a disabled widget, unless it draws its own disabled look
+// (#1223). The desktop used to dim every disabled widget, so a Button, which
+// draws MD3's disabled colours itself, was dimmed twice: its label at
+// 0.38 x 0.38 of the text colour, measured on the GL driver.
+func TestOpacityStack_DimsDisabledWithoutALookOfItsOwn(t *testing.T) {
 	p := &recordedOpacity{v: 1}
-	b := disabledObject{}
+	var s OpacityStack
 
-	var mobile OpacityStack
-	mobile.Push(p, b)
-	assert.Equal(t, float32(1), p.v, "not unless DimDisabled")
+	s.Push(p, enabledObject{})
+	assert.Equal(t, float32(1), p.v, "an enabled widget")
+	s.Pop(p)
 
-	desktop := OpacityStack{DimDisabled: true}
-	desktop.Push(p, b)
-	assert.InDelta(t, 0.38, p.v, 1e-6)
-	desktop.Push(p, b)
+	s.Push(p, ownLookObject{})
+	assert.Equal(t, float32(1), p.v, "a widget with its own disabled look is not dimmed again")
+	s.Pop(p)
+
+	s.Push(p, notOwnLookObject{})
+	assert.InDelta(t, 0.38, p.v, 1e-6, "DrawsDisabledLook false is dimmed")
+	s.Pop(p)
+
+	s.Push(p, disabledObject{})
+	assert.InDelta(t, 0.38, p.v, 1e-6, "a disabled widget with no look of its own")
+	s.Push(p, disabledObject{})
 	assert.InDelta(t, 0.38*0.38, p.v, 1e-6, "a disabled widget inside another")
+	s.Push(p, ownLookObject{})
+	assert.InDelta(t, 0.38*0.38, p.v, 1e-6, "an ancestor's dim still covers a widget with its own look")
 }
 
 // countingOpacity counts the painter calls the stack makes.

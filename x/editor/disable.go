@@ -47,6 +47,10 @@ var (
 // Disable makes the editor visible but inert (see the note above). Open
 // popovers close, a focus inside the editor is dropped, and the find bar, if
 // shown, stays shown and disabled. It is safe before the editor is drawn.
+// DrawsDisabledLook reports that the paint walk must not dim a disabled
+// Editor (bellui's core.DisabledLook, belluikit/bellui#1223): its Entry and find bar are disabled and draw their own disabled look.
+func (*Editor) DrawsDisabledLook() bool { return true }
+
 func (e *Editor) Disable() {
 	if e.disabled {
 		return

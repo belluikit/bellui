@@ -974,8 +974,8 @@ type mobileTreeWalker struct {
 	drSize         geo.Size
 
 	// opacity is the group opacity of the subtree being drawn, from the
-	// core.OpacityGroup objects above it. The mobile walk does not dim
-	// disabled widgets.
+	// core.OpacityGroup objects and the disabled widgets above it, as on
+	// desktop (#1223).
 	opacity intdriver.OpacityStack
 }
 

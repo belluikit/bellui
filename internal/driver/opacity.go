@@ -12,18 +12,22 @@ type opacityPainter interface {
 }
 
 // OpacityStack is a paint walk's group opacity: the product of the
-// core.OpacityGroup objects (and, where the driver dims them, the disabled
-// widgets) the walk is inside. Push it for every node on the way down and Pop
-// it for every node on the way up, both unconditionally, so the pairs survive
-// every early return a walk takes for culling and boundaries.
+// core.OpacityGroup objects and the disabled widgets the walk is inside. Push
+// it for every node on the way down and Pop it for every node on the way up,
+// both unconditionally, so the pairs survive every early return a walk takes
+// for culling and boundaries.
+//
+// A disabled widget is dimmed unless it draws its own disabled look
+// (core.DisabledLook). Every walk, desktop, mobile and software, dims the same
+// way, so a widget looks the same on every platform and in test captures
+// (#1223).
 //
 // A RepaintBoundary's subtree is cached in a texture and blitted. EnterBoundary
 // starts the cached content at full opacity, and ExitBoundary returns to the
 // ancestors' opacity before the blit, so the ancestors' opacity is applied
 // once, when the texture is drawn, and changing it does not stale the cache.
 type OpacityStack struct {
-	DimDisabled bool
-	values      []float32
+	values []float32
 	// set is the opacity last handed to the painter, as 1 - set so that the
 	// zero value means full opacity. The painter is told only of changes:
 	// most of a tree has no opacity of its own.
@@ -45,15 +49,24 @@ func (s *OpacityStack) Transparent() bool { return s.Current() <= 0 }
 // Push enters obj, multiplying in its own opacity.
 func (s *OpacityStack) Push(p opacityPainter, obj core.CanvasObject) {
 	f := float32(1)
-	if s.DimDisabled {
-		if d, ok := obj.(core.Disableable); ok && d.Disabled() {
-			f = disabledOpacity
-		}
+	if dimsDisabled(obj) {
+		f = disabledOpacity
 	}
 	if g, ok := obj.(core.OpacityGroup); ok {
 		f *= max(0, min(1, g.GroupOpacity()))
 	}
 	s.push(p, s.Current()*f)
+}
+
+// dimsDisabled reports whether obj is a disabled widget the walk dims: one
+// that does not draw its own disabled look.
+func dimsDisabled(obj core.CanvasObject) bool {
+	d, ok := obj.(core.Disableable)
+	if !ok || !d.Disabled() {
+		return false
+	}
+	own, ok := obj.(core.DisabledLook)
+	return !ok || !own.DrawsDisabledLook()
 }
 
 // EnterBoundary starts a boundary's cached content at full opacity.

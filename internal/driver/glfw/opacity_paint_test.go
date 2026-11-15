@@ -45,14 +45,25 @@ func newRect() *canvas.Rectangle {
 	return r
 }
 
+// plainDisabled is a disabled widget with no disabled look of its own.
+type plainDisabled struct{ widget.DisableableWidget }
+
+func (w *plainDisabled) CreateRenderer() core.WidgetRenderer {
+	return widget.NewSimpleRenderer(newRect())
+}
+
 // The desktop walk applies core.OpacityGroup as the mobile one does, nested
 // with the dimming of disabled widgets, and restores the parent's opacity on
 // the way out instead of full opacity. A boundary in a group caches its
-// content opaque and is blitted at the group's opacity.
+// content opaque and is blitted at the group's opacity. A disabled Button
+// draws its own disabled look and is not dimmed again (#1223).
 func TestPaint_GroupOpacity(t *testing.T) {
 	a, b, c, d := newRect(), newRect(), newRect(), newRect()
-	disabled := widget.NewButton("", nil)
+	disabled := &plainDisabled{}
+	disabled.ExtendBaseWidget(disabled)
 	disabled.Disable()
+	button := widget.NewButton("", nil)
+	button.Disable()
 	tree := container.NewVBox(
 		container.NewOpacity(container.NewVBox(
 			a,
@@ -64,13 +75,13 @@ func TestPaint_GroupOpacity(t *testing.T) {
 
 	cv := newCanvas()
 	cv.SetPadded(false)
-	cv.SetContent(container.NewVBox(tree, disabled))
+	cv.SetContent(container.NewVBox(tree, disabled, button))
 	cv.Resize(geo.NewSize(300, 300))
-	p := &opacityPaintRecorder{names: map[core.CanvasObject]string{a: "a", b: "b", c: "c", d: "d", disabled: "disabled"}, opacity: 1}
+	p := &opacityPaintRecorder{names: map[core.CanvasObject]string{a: "a", b: "b", c: "c", d: "d", disabled: "disabled", button: "button"}, opacity: 1}
 	cv.SetPainter(p)
 
 	cv.paint(cv.Size())
 
-	assert.Equal(t, []string{"a@0.5", "b@0.25", "bind", "c@1", "unbind", "blit@0.5", "d@1", "disabled@0.38"}, p.calls)
+	assert.Equal(t, []string{"a@0.5", "b@0.25", "bind", "c@1", "unbind", "blit@0.5", "d@1", "disabled@0.38", "button@1"}, p.calls)
 	assert.Equal(t, float32(1), p.opacity, "the paint ends at full opacity")
 }
