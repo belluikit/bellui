@@ -111,8 +111,15 @@ func main(f func(App)) {
 
 var (
 	pixelsPerPt float32
-	screenScale int // [UIScreen mainScreen].scale, either 1, 2, or 3.
+	// screenScale is [UIScreen mainScreen].nativeScale: physical pixels per
+	// point. It is 1, 2 or 3 unless Display Zoom is on (or the screen is
+	// downsampled, as on the Plus models), when it is fractional (#1016).
+	screenScale float32
 )
+
+// ScreenScale is the screen's physical pixels per point, 0 before the screen
+// is set up.
+func ScreenScale() float32 { return screenScale }
 
 var DisplayMetrics struct {
 	WidthPx  int
@@ -130,7 +137,7 @@ func setDisplayMetrics(width, height int, scale int) {
 }
 
 //export setScreen
-func setScreen(scale int) {
+func setScreen(scale float32) {
 	C.uname(&C.sysInfo)
 	name := C.GoString(&C.sysInfo.machine[0])
 
@@ -156,7 +163,7 @@ func setScreen(scale int) {
 		v = 163 // emergency fallback
 	}
 
-	pixelsPerPt = v * float32(scale) / 72
+	pixelsPerPt = v * scale / 72
 	screenScale = scale
 }
 
@@ -177,10 +184,10 @@ func updateConfig(width, height, orientation int32) {
 		HeightPx:      int(height),
 		WidthPt:       float32(width) / pixelsPerPt,
 		HeightPt:      float32(height) / pixelsPerPt,
-		InsetTopPx:    int(float32(insets.top) * float32(screenScale)),
-		InsetBottomPx: int(float32(insets.bottom) * float32(screenScale)),
-		InsetLeftPx:   int(float32(insets.left) * float32(screenScale)),
-		InsetRightPx:  int(float32(insets.right) * float32(screenScale)),
+		InsetTopPx:    int(float32(insets.top) * screenScale),
+		InsetBottomPx: int(float32(insets.bottom) * screenScale),
+		InsetLeftPx:   int(float32(insets.left) * screenScale),
+		InsetRightPx:  int(float32(insets.right) * screenScale),
 		PixelsPerPt:   pixelsPerPt,
 		Orientation:   o,
 		DarkMode:      bool(C.isDark()),

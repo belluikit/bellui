@@ -28,7 +28,9 @@ static void *metalLayerForKeyWindowMain() {
 	if (v == nil) { return NULL; }
 	if (v.bounds.size.width <= 0 || v.bounds.size.height <= 0) { return NULL; } // not laid out yet
 
-	CGFloat scale = [UIScreen mainScreen].scale;
+	// nativeScale, as the layout uses: under Display Zoom scale would size
+	// the layer larger than the view, and its right side would be cut (#1016).
+	CGFloat scale = [UIScreen mainScreen].nativeScale;
 	CAMetalLayer *layer = [CAMetalLayer layer];
 	layer.frame = v.bounds;
 	layer.contentsScale = scale;
@@ -60,7 +62,7 @@ static void resizeMetalLayerMain(void *layerPtr, int wPx, int hPx) {
 	if (layerPtr == NULL) { return; }
 	CAMetalLayer *layer = (__bridge CAMetalLayer *)layerPtr;
 	CGFloat scale = layer.contentsScale;
-	if (scale <= 0) { scale = [UIScreen mainScreen].scale; }
+	if (scale <= 0) { scale = [UIScreen mainScreen].nativeScale; }
 	// CATransaction without implicit animations: a plain frame/drawableSize set
 	// would otherwise animate the resize on rotation.
 	[CATransaction begin];
