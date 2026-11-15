@@ -531,18 +531,16 @@ func (tv *TreeView) ScrollTo(id TreeViewNodeID) {
 
 	viewport := tv.scroller.Size()
 	if y < tv.offset.Y {
-		tv.scroller.Offset.Y = y
+		tv.scrollToY(y)
 	} else if y+tv.leafMinSize.Height > tv.offset.Y+viewport.Height {
-		tv.scroller.Offset.Y = y + tv.leafMinSize.Height - viewport.Height
+		tv.scrollToY(y + tv.leafMinSize.Height - viewport.Height)
 	}
-	tv.scroller.Refresh()
 }
 
 // ScrollToTop scrolls to the top.
 func (tv *TreeView) ScrollToTop() {
 	if tv.scroller != nil {
-		tv.scroller.Offset.Y = 0
-		tv.scroller.Refresh()
+		tv.scrollToY(0)
 	}
 }
 
@@ -556,9 +554,15 @@ func (tv *TreeView) ScrollToBottom() {
 // ScrollToOffset scrolls to the given Y offset.
 func (tv *TreeView) ScrollToOffset(offset float32) {
 	if tv.scroller != nil {
-		tv.scroller.Offset.Y = offset
-		tv.scroller.Refresh()
+		tv.scrollToY(offset)
 	}
+}
+
+// scrollToY scrolls through the scroller, which clamps y and reports the move
+// to offsetUpdated. Setting Offset.Y and refreshing did neither, so tv.offset,
+// which the drop row and GetScrollOffset read, kept the old value (#1229).
+func (tv *TreeView) scrollToY(y float32) {
+	tv.scroller.ScrollToOffset(geo.NewPos(tv.scroller.Offset.X, y))
 }
 
 // GetScrollOffset returns the current Y scroll offset.
@@ -1026,11 +1030,13 @@ func (tv *TreeView) handleDrag(sourceID TreeViewNodeID, e *event.DragEvent) {
 		tv.dragActive = true
 	}
 
-	// Calculate which node the cursor is over
-	// e.Position is relative to the dragged item; we need absolute Y in the tree content
+	// Calculate which node the cursor is over. e.AbsolutePosition is in
+	// canvas coordinates and the rows in the tree's content, so take off where
+	// the tree sits on the canvas, then add the scroll (#1229).
 	th := tv.Theme()
 	pad := th.Size(theme.SizeNamePadding)
-	mouseY := tv.offset.Y + e.AbsolutePosition.Y
+	treeY := bellui.CurrentApp().Driver().AbsolutePositionForObject(tv.super()).Y
+	mouseY := tv.offset.Y + e.AbsolutePosition.Y - treeY
 
 	// Walk visible nodes to find drop target
 	y := float32(0)
