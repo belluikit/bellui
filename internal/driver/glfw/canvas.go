@@ -455,7 +455,6 @@ func (c *glCanvas) paint(size geo.Size) {
 		drSize:         drSize,
 		canvasPixW:     canvasPixW,
 		canvasPixH:     canvasPixH,
-		opacity:        driver.OpacityStack{DimDisabled: true},
 	}
 
 	// Scope the whole paint pass to this canvas' direction so paint-time

@@ -74,6 +74,21 @@ type Disableable interface {
 	Disabled() bool
 }
 
+// DisabledLook is implemented by a Disableable that draws its own disabled
+// look, such as MD3's disabled colours, itself or through the children it
+// disables. Every paint walk draws the subtree of a disabled widget at 38%
+// opacity, as a fallback for a widget that would otherwise look no different;
+// it leaves alone a widget whose DrawsDisabledLook reports true, so that its
+// own look is not dimmed a second time (#1223).
+//
+// The fallback dims a whole subtree, so a widget inside a disabled widget
+// without its own look is dimmed by that ancestor, whatever it reports.
+//
+// Since: 1.3
+type DisabledLook interface {
+	DrawsDisabledLook() bool
+}
+
 // Transformable describes a CanvasObject that supports a 2D affine transform.
 // The transform is applied in addition to the object's position and size.
 // When objects in a tree implement Transformable, their transforms compose:
