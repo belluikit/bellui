@@ -11,6 +11,12 @@ import (
 	"github.com/belluikit/bellui/x/tables/render"
 )
 
+// Heights of the optional rows around the body.
+const (
+	floatingFilterHeight = 30
+	statusBarHeight      = 24
+)
+
 // dataGridRenderer implements core.WidgetRenderer for the DataGrid.
 type dataGridRenderer struct {
 	grid *DataGrid
@@ -79,7 +85,7 @@ func (r *dataGridRenderer) doLayout(size geo.Size) {
 	// Band anchors come from the single shared source (also used by hitRegions /
 	// the header + floating-filter rows) so the body is drawn exactly where
 	// hit-testing and the region rows place the columns.
-	mainX, pinnedRightX, pinnedRightW := g.bandAnchors(size.Width)
+	mainX, pinnedRightX, pinnedRightW := g.bandAnchors(size)
 
 	// Background
 	r.bg.Resize(size)
@@ -98,37 +104,48 @@ func (r *dataGridRenderer) doLayout(size geo.Size) {
 
 	// Floating filter row
 	if r.floatingFilterRow != nil {
-		filterH := float32(30)
 		r.floatingFilterRow.Move(geo.NewPos(0, yOffset))
-		r.floatingFilterRow.Resize(geo.NewSize(size.Width, filterH))
-		yOffset += filterH
+		r.floatingFilterRow.Resize(geo.NewSize(size.Width, floatingFilterHeight))
+		yOffset += floatingFilterHeight
 	}
 
 	// Status bar height
 	statusBarH := float32(0)
 	if r.statusBar != nil {
-		statusBarH = 24
+		statusBarH = statusBarHeight
 	}
 
-	contentH := size.Height - yOffset - statusBarH
+	// The same body height bandAnchors judges vertical overflow by.
+	contentH := g.bodyHeight(size.Height)
 
-	// Layout: [pinned-left | main-scroll [pinned-right-overlay] scrollbar |]
+	// Layout: [pinned-left | main-scroll [pinned-right-overlay] gutter |]
 	// The scroll area extends to the full remaining width so the scrollbar
 	// is at the far right edge. The pinned-right is overlaid on top of the
-	// scroll, after the main columns. The viewport's effective width is
-	// reduced so cells don't render behind the overlay.
+	// scroll, after the main columns, and keeps clear of the vertical bar's
+	// gutter when that bar shows (#1257). The viewport's effective width ends
+	// where pinned-right begins, so cells don't render behind the overlay.
 	scrollW := size.Width - mainX
 	if scrollW < 0 {
 		scrollW = 0
 	}
-	g.scrollContent.Scroll.Move(geo.NewPos(mainX, yOffset))
-	g.scrollContent.Scroll.Resize(geo.NewSize(scrollW, contentH))
-
-	// Reduce the viewport's effective visible width so the CellsRenderer
-	// doesn't render cells that would be hidden behind the pinned-right overlay.
-	effectiveViewW := scrollW - pinnedRightW
+	// The scroll content gets trailing room as wide as the overlaid zone, so
+	// the last main column can scroll fully clear of pinned-right rather than
+	// ending under it.
+	trailing := float32(0)
 	if pinnedRightW > 0 {
-		effectiveViewW -= padding
+		trailing = pinnedRightW + padding + g.vScrollGutter(size)
+	}
+	trailingChanged := g.cellsWidget.SetTrailingWidth(trailing)
+	scrollSize := geo.NewSize(scrollW, contentH)
+	g.scrollContent.Scroll.Move(geo.NewPos(mainX, yOffset))
+	if trailingChanged && g.scrollContent.Scroll.Size() == scrollSize {
+		g.scrollContent.Scroll.Refresh() // a same-size Resize would not relayout
+	}
+	g.scrollContent.Scroll.Resize(scrollSize)
+
+	effectiveViewW := scrollW
+	if pinnedRightW > 0 {
+		effectiveViewW = pinnedRightX - mainX - padding
 	}
 	if effectiveViewW < 0 {
 		effectiveViewW = 0
@@ -146,10 +163,12 @@ func (r *dataGridRenderer) doLayout(size geo.Size) {
 	}
 
 	// Pinned right cells — overlaid on the scroll area at the shared anchor,
-	// after the main columns.
+	// after the main columns, and ending above the horizontal bar when it
+	// shows so the bar is not drawn under them (#1257).
 	if pinnedRightW > 0 {
+		_, barBottom := g.scrollBarInsets(scrollSize)
 		r.pinnedRightCells.Move(geo.NewPos(pinnedRightX, yOffset))
-		r.pinnedRightCells.Resize(geo.NewSize(pinnedRightW, contentH))
+		r.pinnedRightCells.Resize(geo.NewSize(pinnedRightW, geo.Max(contentH-barBottom, 0)))
 		r.pinnedRightCells.Show()
 	} else {
 		r.pinnedRightCells.Hide()
@@ -160,7 +179,7 @@ func (r *dataGridRenderer) doLayout(size geo.Size) {
 	// pinned-right in one place (#110, #111).
 	g.groupRowOverlay.Move(geo.NewPos(0, yOffset))
 	g.groupRowOverlay.Resize(geo.NewSize(size.Width, contentH))
-	g.groupRowOverlay.SetScrollBarInsets(g.scrollBarInsets(geo.NewSize(scrollW, contentH)))
+	g.groupRowOverlay.SetScrollBarInsets(g.scrollBarInsets(scrollSize))
 
 	// Status bar
 	if r.statusBar != nil {
@@ -220,7 +239,7 @@ func (r *dataGridRenderer) MinSize() geo.Size {
 	}
 
 	if r.statusBar != nil {
-		minH += 24
+		minH += statusBarHeight
 	}
 
 	return geo.NewSize(minW, minH)

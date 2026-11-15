@@ -978,13 +978,10 @@ func (g *DataGrid) OnResizeDrag(posX float32) {
 	padding := g.cellPadding()
 	pinnedLeftW := layout.pinnedLeftWidth(padding)
 
-	// Reserve scrollbar width only when there's a pinned-right overlay,
-	// because the overlay can extend into the scrollbar zone (no clipping).
-	// Regular tabs don't need it — the scroll clips content internally.
-	scrollBarReserve := float32(0)
-	if len(layout.pinnedRight) > 0 {
-		scrollBarReserve = g.Theme().Size(bellui.ThemeSizeName("scrollBar"))
-	}
+	// Reserve the vertical bar's gutter, which pinned-right keeps clear when
+	// the bar shows (#1257). Without pinned-right there is none: the scroll
+	// clips its content internally.
+	scrollBarReserve := g.vScrollGutter(g.Size())
 
 	// Compute space used by everything EXCEPT the column being resized.
 	usedW := scrollBarReserve
@@ -2806,10 +2803,15 @@ func (g *DataGrid) IsAlternateRow(row int) bool {
 // draw path (dataGridRenderer.doLayout) and the hit-test/region path (hitRegions
 // -> columnAtX, and HeaderRegions for the header/floating-filter rows).
 //
-// The width is passed explicitly rather than read from g.Size() because during a
+// When the main scroll shows its vertical bar, pinned-right also keeps clear of
+// the bar's gutter at the right edge (vScrollGutter), so the bar is not drawn
+// under it (#1257).
+//
+// The size is passed explicitly rather than read from g.Size() because during a
 // layout pass doLayout must use its incoming size, which may not yet equal
-// g.Size(); hitRegions passes g.Size().Width.
-func (g *DataGrid) bandAnchors(width float32) (mainX, pinnedRightX, pinnedRightW float32) {
+// g.Size(); hitRegions passes g.Size().
+func (g *DataGrid) bandAnchors(size geo.Size) (mainX, pinnedRightX, pinnedRightW float32) {
+	width := size.Width
 	layout := g.visibleLayout()
 	pad := g.cellPadding()
 	pinnedLeftW := layout.pinnedLeftWidth(pad)
@@ -2823,10 +2825,39 @@ func (g *DataGrid) bandAnchors(width float32) (mainX, pinnedRightX, pinnedRightW
 		mainColsW += col.width + pad
 	}
 	pinnedRightX = mainX + mainColsW
-	if maxX := width - pinnedRightW; pinnedRightW > 0 && pinnedRightX > maxX {
+	if maxX := width - pinnedRightW - g.vScrollGutter(size); pinnedRightW > 0 && pinnedRightX > maxX {
 		pinnedRightX = maxX
 	}
 	return
+}
+
+// vScrollGutter is the width pinned-right keeps clear at the grid's right edge
+// for the main scroll's vertical bar (#1257): the bar width when there is a
+// pinned-right band and the body overflows vertically, else 0. The scroll's
+// direction is not consulted: Disable turns scrolling off, and the gutter
+// staying put keeps the columns from jumping sideways.
+func (g *DataGrid) vScrollGutter(size geo.Size) float32 {
+	if len(g.visibleLayout().pinnedRight) == 0 {
+		return 0
+	}
+	if g.viewport.ContentSize().Height <= g.bodyHeight(size.Height) {
+		return 0
+	}
+	return g.Theme().Size(bellui.ThemeSizeName("scrollBar"))
+}
+
+// bodyHeight is the height of the body (the main scroll and the bands beside
+// it) in a grid of height h: below the header and floating-filter row, above
+// the status bar.
+func (g *DataGrid) bodyHeight(h float32) float32 {
+	h -= g.HeaderHeight()
+	if g.floatingFilterRow != nil {
+		h -= floatingFilterHeight
+	}
+	if g.Options.ShowStatusBar {
+		h -= statusBarHeight
+	}
+	return h
 }
 
 // hitRegions returns the widget-X geometry of the three cell-body column bands,
@@ -2835,7 +2866,7 @@ func (g *DataGrid) bandAnchors(width float32) (mainX, pinnedRightX, pinnedRightW
 // [mainX, pinnedRightX) and scrolls by offset.X; pinned-right is a fixed overlay
 // at [pinnedRightX, pinnedRightX+pinnedRightW).
 func (g *DataGrid) hitRegions() (mainX, pinnedRightX, pinnedRightW float32) {
-	return g.bandAnchors(g.Size().Width)
+	return g.bandAnchors(g.Size())
 }
 
 // colIndexIn returns base+i for the column in cols whose fixed-origin span

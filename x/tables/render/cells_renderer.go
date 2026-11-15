@@ -42,6 +42,7 @@ type CellsRenderer struct {
 	hostPool map[string][]*cellHost
 
 	rowBgs     []*canvas.Rectangle
+	trailBgs   []*canvas.Rectangle // covers past the visible right edge (#1257)
 	checkboxes []*widget.Check
 	// checkboxHosts wraps each pooled select checkbox in a cellHost so assistive
 	// tech sees a RoleTableCell (at absolute column 0) carrying the row's
@@ -318,19 +319,12 @@ func (r *CellsRenderer) refreshCells() {
 		rowBg := r.rowBgs[bgIdx]
 		bgIdx++
 
-		rowBg.FillColor = tc.Background
-		if grid.IsAlternateRow(row) {
-			rowBg.FillColor = tc.RowAlternate
-		}
-		if grid.IsSelected(row, 0) {
-			rowBg.FillColor = tc.Selection
-		}
+		rowBg.FillColor = rowBgColor(grid, row, tc)
 		rowBgW := totalW
 		if grid.IsGroupRow(row) {
 			// The GroupRowOverlay leaves the scroll bar strip uncovered, so the
 			// group colour under the bar comes from here, across the whole
 			// band even where the columns end short of it.
-			rowBg.FillColor = tc.GroupRowBg
 			rowBgW = geo.Max(totalW, r.cells.Size().Width)
 		}
 		rowBg.Move(geo.NewPos(0, y))
@@ -517,6 +511,8 @@ func (r *CellsRenderer) refreshCells() {
 		}
 	}
 
+	objects = r.coverTrailing(objects, tc)
+
 	for key, obj := range r.visible {
 		typeName := grid.ColumnTypeName(key.col)
 		r.releaseHost(typeName, obj.(*cellHost))
@@ -560,4 +556,47 @@ func (r *CellsRenderer) firstColIndent(row int) float32 {
 		return g.TreeFirstColIndent(row)
 	}
 	return g.DetailToggleWidth()
+}
+
+// coverTrailing appends, above the cells, a cover per visible row over the band
+// past its visible right edge: under pinned-right and the scroll bar gutter
+// beside it. A main column passing under pinned-right then cannot show its text
+// in the gutter, and the cover's row colour carries the row on under the bar
+// (#1257).
+func (r *CellsRenderer) coverTrailing(objects []core.CanvasObject, tc ThemeColors) []core.CanvasObject {
+	grid, vp := r.cells.Grid, r.cells.viewport
+	idx := 0
+	if contentW := r.cells.Size().Width; grid.PinnedRightCount() > 0 && vp.ViewRight < contentW {
+		for row := vp.VisibleRows.Min; row <= vp.VisibleRows.Max; row++ {
+			y, rowH := vp.RowY(row)
+			if idx >= len(r.trailBgs) {
+				r.trailBgs = append(r.trailBgs, canvas.NewRectangle(color.Transparent))
+			}
+			c := r.trailBgs[idx]
+			idx++
+			c.FillColor = rowBgColor(grid, row, tc)
+			c.Move(geo.NewPos(vp.ViewRight, y))
+			c.Resize(geo.NewSize(contentW-vp.ViewRight, rowH))
+			c.Show()
+			objects = append(objects, c)
+		}
+	}
+	for i := idx; i < len(r.trailBgs); i++ {
+		r.trailBgs[i].Hide()
+	}
+	return objects
+}
+
+// rowBgColor is the background of a display row's cell band: the group colour
+// on a group header, else selection over alternation over the plain background.
+func rowBgColor(grid GridAccess, row int, tc ThemeColors) color.Color {
+	switch {
+	case grid.IsGroupRow(row):
+		return tc.GroupRowBg
+	case grid.IsSelected(row, 0):
+		return tc.Selection
+	case grid.IsAlternateRow(row):
+		return tc.RowAlternate
+	}
+	return tc.Background
 }
