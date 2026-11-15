@@ -166,7 +166,7 @@ func TestCellsAndPinnedRenderers_SkipGroupRows(t *testing.T) {
 	pw.Resize(geo.NewSize(100, 300))
 	pr := test.WidgetRenderer(pw).(*pinnedCellsRenderer)
 	pr.Refresh()
-	for _, o := range pr.objects {
+	for _, o := range pinnedContent(pr) {
 		if txt, ok := o.(*canvas.Text); ok && strings.Contains(txt.Text, "West") {
 			t.Errorf("pinned renderer drew group label %q; overlay owns it", txt.Text)
 		}

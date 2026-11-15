@@ -36,7 +36,7 @@ func TestPinnedCells_WrappedAsAccessibleHosts(t *testing.T) {
 	r := w.CreateRenderer().(*pinnedCellsRenderer)
 	r.Refresh()
 
-	hosts := collectHosts(r.objects)
+	hosts := collectHosts(pinnedContent(r))
 	if len(hosts) == 0 {
 		t.Fatal("no pinned cell hosts realized")
 	}
@@ -75,7 +75,7 @@ func TestPinnedCells_TreeDisclosure(t *testing.T) {
 
 	// Overlays: rows 0 and 2 are parents; row 1 (leaf) gets none.
 	byRow := map[int]*treeRowA11y{}
-	for _, o := range r.objects {
+	for _, o := range pinnedContent(r) {
 		if n, ok := o.(*treeRowA11y); ok {
 			byRow[n.row] = n
 		}
@@ -95,7 +95,7 @@ func TestPinnedCells_TreeDisclosure(t *testing.T) {
 
 	// One chevron per parent.
 	var chevrons int
-	for _, o := range r.objects {
+	for _, o := range pinnedContent(r) {
 		if txt, ok := o.(*canvas.Text); ok && (txt.Text == "▼" || txt.Text == "▶") {
 			chevrons++
 		}
@@ -106,7 +106,7 @@ func TestPinnedCells_TreeDisclosure(t *testing.T) {
 
 	// The leaf row's pinned cell content is indented by its tree indent (depth 1).
 	wantIndent := g.TreeFirstColIndent(1) // 1*TreeIndentPerLevel + TreeToggleWidth
-	for _, h := range collectHosts(r.objects) {
+	for _, h := range collectHosts(pinnedContent(r)) {
 		if h.row == 1 && h.col == 0 {
 			if got := h.Position().X; got != wantIndent {
 				t.Errorf("leaf pinned cell x = %v, want indent %v", got, wantIndent)
@@ -157,7 +157,7 @@ func TestPinnedCells_MasterDetailDisclosure(t *testing.T) {
 	r.Layout(geo.NewSize(120, 200))
 
 	byRow := map[int]*masterRowA11y{}
-	for _, o := range r.objects {
+	for _, o := range pinnedContent(r) {
 		if m, ok := o.(*masterRowA11y); ok {
 			byRow[m.row] = m
 		}
@@ -177,7 +177,7 @@ func TestPinnedCells_MasterDetailDisclosure(t *testing.T) {
 
 	// Every pinned-left cell is indented by the toggle width (column alignment).
 	wantIndent := g.DetailToggleWidth()
-	for _, h := range collectHosts(r.objects) {
+	for _, h := range collectHosts(pinnedContent(r)) {
 		if h.col == 0 && h.Position().X != wantIndent {
 			t.Errorf("row %d pinned cell x = %v, want indent %v", h.row, h.Position().X, wantIndent)
 		}
@@ -404,4 +404,13 @@ func TestTreeRowA11y_ExpandCollapseAction(t *testing.T) {
 	if len(fg.toggledTree) != 2 {
 		t.Fatalf("expected a second toggle, got %v", fg.toggledTree)
 	}
+}
+
+// pinnedContent returns the pinned renderer's row objects (the content inside
+// its clip).
+func pinnedContent(r *pinnedCellsRenderer) []core.CanvasObject {
+	if r.band == nil {
+		return nil
+	}
+	return r.band.Objects
 }
