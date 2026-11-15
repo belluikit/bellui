@@ -2,6 +2,7 @@ package audio
 
 import (
 	"errors"
+	"runtime"
 	"slices"
 	"sync"
 	"testing"
@@ -156,5 +157,21 @@ func TestOutputCountsWhilePlaying(t *testing.T) {
 	}
 	if NewDetachedOutput(2).Playing() {
 		t.Error("a detached Output counts as playing")
+	}
+}
+
+// The device is suspended while idle on Android and iOS, and nowhere else
+// (#1052, #1242), and this build's setting is its platform's.
+func TestSuspendsWhenIdlePlatforms(t *testing.T) {
+	for goos, want := range map[string]bool{
+		"android": true, "ios": true,
+		"darwin": false, "linux": false, "windows": false, "js": false,
+	} {
+		if got := suspendsWhenIdle(goos); got != want {
+			t.Errorf("suspendsWhenIdle(%q) = %v, want %v", goos, got, want)
+		}
+	}
+	if suspendWhenIdle != suspendsWhenIdle(runtime.GOOS) {
+		t.Errorf("suspendWhenIdle = %v on %s", suspendWhenIdle, runtime.GOOS)
 	}
 }
