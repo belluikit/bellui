@@ -4,7 +4,7 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"testing"
@@ -25,16 +25,27 @@ var fallbackDimmed = map[string]bool{
 // is added to one, so it is never dimmed twice, or not at all, by accident.
 func TestDisabledLook_EveryDisableableWidgetChose(t *testing.T) {
 	fset := token.NewFileSet()
-	pkgs, err := parser.ParseDir(fset, ".", func(fi os.FileInfo) bool {
-		return !strings.HasSuffix(fi.Name(), "_test.go")
-	}, 0)
+	paths, err := filepath.Glob("*.go")
 	if err != nil {
 		t.Fatal(err)
+	}
+	var files []*ast.File
+	for _, p := range paths {
+		if strings.HasSuffix(p, "_test.go") {
+			continue
+		}
+		f, err := parser.ParseFile(fset, p, nil, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if f.Name.Name == "widget" {
+			files = append(files, f)
+		}
 	}
 	disableable := map[string]bool{} // has its own Disable method or embeds DisableableWidget
 	ownLook := map[string]bool{}
 	embeds := map[string][]string{}
-	for _, f := range pkgs["widget"].Files {
+	for _, f := range files {
 		for _, d := range f.Decls {
 			switch d := d.(type) {
 			case *ast.FuncDecl:
@@ -67,8 +78,7 @@ func TestDisabledLook_EveryDisableableWidgetChose(t *testing.T) {
 			}
 		}
 	}
-	var chose func(string) bool
-	chose = func(name string) bool {
+	chose := func(name string) bool {
 		if ownLook[name] || fallbackDimmed[name] {
 			return true
 		}
