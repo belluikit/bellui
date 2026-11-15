@@ -3,6 +3,7 @@ package commands
 import (
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -429,6 +430,16 @@ func (r *Releaser) validate() error {
 		if r.profile == "" {
 			return errors.New("missing required --profile parameter for iOS release")
 		}
+		// Sign with one identity, not a name two certificates can share
+		// (#1249): the SHA-1 given, or the one the profile allows.
+		id, err := mobile.ResolveIOSIdentity(r.certificate, r.profile)
+		if err != nil {
+			return err
+		}
+		if id != r.certificate {
+			log.Printf("signing with %s, the %q identity profile %q allows", id, r.certificate, r.profile)
+		}
+		r.certificate = id
 	}
 	return nil
 }

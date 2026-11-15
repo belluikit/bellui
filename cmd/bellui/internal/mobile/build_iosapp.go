@@ -376,6 +376,9 @@ func iosCopyAssets(pkg *packages.Package, xcodeProjDir string) error {
 }
 
 func lookupCert(optName string) ([]byte, error) {
+	if IsCertSHA1(optName) {
+		return lookupCertSHA1(optName)
+	}
 	if optName != "" {
 		return lookupCertNamed(optName)
 	}
