@@ -259,7 +259,7 @@ Two defects in the Windows `ReadDirectoryChangesW` backend, **both still present
 next to the app's main package, the way `android/*.java` works on Android:
 `ios/Info.plist`, `ios/Entitlements.plist` and `ios/PrivacyInfo.xcprivacy`
 (plist dict fragments) and
-`ios/Frameworks/` (`.xcframework` / `.framework`). The user-facing rules are in
+`ios/Frameworks/` (`.xcframework` / `.framework` / `.a`). The user-facing rules are in
 `cmd/bellui/README.md`; the design points:
 
 - **Files, not manifest fields** (owner decision, 2026-10-22). A plist fragment
@@ -300,7 +300,18 @@ next to the app's main package, the way `android/*.java` works on Android:
   with `CodeSignOnCopy` signs them with the app's identity; copying into the
   .app after xcodebuild would break the seal. `bellui release` re-signs each
   with the release certificate before the app.
-- **Swift is not compiled** by the packager; it ships as an xcframework.
+- **Swift is not compiled** by the packager; it ships as an xcframework, or
+  as a plain `ios/Frameworks/*.a` (#1240). Either way the library reaches the
+  link through `CGO_LDFLAGS`, which the go command does not scan. A `#cgo
+  LDFLAGS: -L` naming it is refused since Go 1.27.4 (`disallowed LTO section
+  __LLVM,__swift_modhash`): the check refuses any `__LLVM` segment, and
+  swiftc in Xcode 27.2 writes a 16-byte module hash there, not bitcode
+  (belluikit/player#654). An unrecognised entry in `ios/Frameworks/` is an
+  error, because a skipped library only surfaces later as undefined symbols.
+- **The shell's `CGO_LDFLAGS` is not kept** for iOS builds, unlike Android,
+  so that a Homebrew Mac's `-L/opt/homebrew/lib` (macOS libraries) stays out
+  of an iOS link. That is why app libraries come in through `ios/Frameworks/`
+  rather than through the environment (#1240).
 - Verified with `hack/iosframeworkprobe` (bundle inspection; see its doc
   comment for the device run).
 
