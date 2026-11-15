@@ -17,6 +17,179 @@ one per change, so that open pull requests do not conflict here. Run
 `go run ./hack/changelog preview -C cmd/bellui` to see them assembled; the release folds them
 into a section below.
 
+## v1.3.0-rc.2 — 2026-11-14
+
+Cut with toolkit v1.3.0-rc.2. Android and iOS packages now carry the FFmpeg
+libraries an x/mmedia app loads, and desktop packages their shared libraries.
+On iOS, a plain static library in `ios/Frameworks/` is linked, which is how to
+link Swift code with Go 1.27.4 (whose check refuses swiftc's objects in a
+`#cgo LDFLAGS` directory), and every app ships a privacy manifest. On Android,
+apps can ship their own resources and remove an element a library's manifest
+brings, Google Play accepts the uploads again with Back working on Android 16,
+and packages need Android 6 unless `--android-min-sdk` says otherwise. The
+command needs Go 1.26.2 or newer to build. Built against bellui v1.3.0-rc.2.
+
+### Added
+
+* **`bellui package -os ios` links a plain static library from
+  `ios/Frameworks/`** ([#1240](https://github.com/belluikit/bellui/issues/1240)).
+  A `*.a` there, such as Swift built with `swiftc -emit-library -static`, is
+  linked into each architecture it holds, with no xcframework needed. It is
+  the way to link Swift code with Go 1.27.4 and Xcode 27.2, where a `#cgo
+  LDFLAGS: -L` naming the library fails with `disallowed LTO section
+  __LLVM,__swift_modhash`. Anything else in `ios/Frameworks/` other than dot
+  files is now an error; before, it was skipped without a word.
+* **Android: an app can remove an element a library's manifest brings, with
+  `tools:node="remove"`** ([#1168](https://github.com/belluikit/bellui/issues/1168)).
+  An element in the app's own `AndroidManifest.xml` marked that way keeps
+  every `android/libs` library's element of the same name and
+  `android:name` out of the package, as Gradle's manifest merger does, and
+  is left out itself. For example, an app with the ads SDK that does not ask
+  for tracking removes `com.google.android.gms.permission.AD_ID`. Before,
+  the mark was dropped and the line declared the very permission it meant
+  to remove, with or without a library. Other `tools:` attributes are still
+  dropped.
+* **Android and iOS packages carry the FFmpeg libraries their app loads**
+  ([#1122](https://github.com/belluikit/bellui/issues/1122)). Built against
+  x/mmedia with goffmpeg v0.8.0 or later, an app packaged by `bellui package
+  -os android` stopped at launch (`dlopen failed: library
+  "libavformat-goffmpeg.so" not found`), and one for `-os ios` stopped in dyld.
+  An APK now carries the libraries in each ABI's `lib/<abi>/`, stored and
+  16 KB-aligned like the app's own library, and so do the APKs bundletool
+  generates from a `bellui release` bundle. An iOS app embeds them in
+  `Frameworks/`, signed with the app, and its binary finds them through
+  `@executable_path/Frameworks`. With `-tags goffmpeg_novideo` only the audio
+  set goes in. An AAR in `android/libs` or a framework in `ios/Frameworks` of
+  the same name is an error.
+* **Desktop packages carry the shared libraries their app loads, such as FFmpeg's**
+  ([#1101](https://github.com/belluikit/bellui/issues/1101)). With goffmpeg
+  v0.8.0 and later, an app links FFmpeg as shared libraries and wouldn't start
+  without them. `bellui package` now copies the ones the executable imports
+  from goffmpeg-libs into the package: `Contents/Frameworks` in a macOS app,
+  `lib/<app id>/` in a Linux package (which its Makefile installs), and beside
+  the `.exe` on Windows. The executable is pointed at them, and the rpath into
+  the build machine's module cache is removed. `bellui release` signs the
+  macOS libraries with the app's certificate and puts the Windows DLLs in the
+  MSIX. Android and iOS packages carry them too, from
+  [#1122](https://github.com/belluikit/bellui/issues/1122).
+* **Android: an app can ship its own resources in `android/res/`**
+  ([#928](https://github.com/belluikit/bellui/issues/928)). `bellui package`
+  compiled only the resources of the libraries in `android/libs/` and the icon
+  it writes itself, so an app's manifest could not point at a resource of its
+  own. Android 12's `android:dataExtractionRules="@xml/…"`, which blocks a
+  device-to-device transfer of app data, is one that needs it. `android/res/`
+  is laid out like a Gradle module's `res/`. It is linked after the libraries'
+  resources and the generated icon, so the app's resource wins a name clash.
+  An app with `android/res/` now goes through aapt2 like an app with an AAR;
+  without one, packaging is unchanged.
+
+### Changed
+
+* **Android packages now need Android 6 (API 23) unless `--android-min-sdk` says otherwise**
+  ([#1086](https://github.com/belluikit/bellui/issues/1086)). Packages used to
+  say Android 5 (API 21) from a fixed constant, and nothing could raise it, so
+  apps shipping libraries that need Android 6, such as Google Play Billing 9,
+  installed on phones those libraries don't support. `bellui package` and
+  `bellui release` take `--android-min-sdk N` (21 or more); the manifest,
+  `aapt2 link`, `d8` and the NDK build all use it, so the native code never
+  needs a newer Android than the manifest promises.
+* **The `bellui` command now needs Go 1.26.2 or newer to build**
+  ([#948](https://github.com/belluikit/bellui/pull/948)), because its PXF
+  library, `trendvidia/protowire-go`, moves to v1.16.0.
+
+### Fixed
+
+* **iOS apps built with the iOS 27 SDK launch on iOS 27**
+  ([#1117](https://github.com/belluikit/bellui/issues/1117)). The generated
+  Info.plist now declares the scene life cycle (`UIApplicationSceneManifest`),
+  which iOS 27 requires of apps built with its SDK. It needs the app to use a
+  bellui with the scene delegate; for an app on an older bellui, `bellui
+  package` writes no scene manifest and warns, because one naming a missing
+  delegate leaves the app black on every iOS. An `ios/Info.plist` fragment can
+  no longer set `UIApplicationSceneManifest`.
+* **The Android store bundle asks for 16 KB alignment of its native libraries**
+  ([#1115](https://github.com/belluikit/bellui/issues/1115)). The `.aab`
+  that `bellui release -os android` writes had an empty bundle config, so the
+  alignment of the uncompressed libraries in the APKs the store generates was
+  left to the store's bundletool default. Devices with 16 KB memory pages
+  need 16 KB. The bundle now sets `PAGE_ALIGNMENT_16K`, which
+  `bundletool dump config` shows.
+* **`--app-build` and `--app-version` now reach an Android app that ships its own `AndroidManifest.xml`**
+  ([#1114](https://github.com/belluikit/bellui/issues/1114)). When that
+  manifest set `android:versionCode` or `android:versionName`, the package
+  kept those numbers and ignored the flags (and `manifest.pxf`) without a
+  word, so every Google Play upload after the first was refused for reusing a
+  version code. The given numbers now replace the manifest's, with a warning
+  when they differ. A version that was not given anywhere still leaves the
+  manifest's own value in place.
+* **Android apps can be uploaded to Google Play again, and Back still works on Android 16**
+  ([#935](https://github.com/belluikit/bellui/issues/935)). Play refuses an
+  app or update that targets less than API 36, and `bellui package` targeted
+  35 for release builds and 34 for debug builds. Both now target 36, and the
+  manifest is built against the android-36 resource table. At 36, Android 16
+  stops sending Back the way bellui received it, so Back would have left the
+  app instead of closing a dialog, a pop-up or the keyboard. The app's
+  activity now receives Back through `OnBackInvokedCallback` as well, and
+  older Android keeps the old path.
+* **iOS: every app now ships a privacy manifest, so App Store Connect accepts
+  the upload** ([#932](https://github.com/belluikit/bellui/issues/932)). Since
+  May 2024 App Store Connect refuses an app that calls a "required reason" API
+  without saying why in a `PrivacyInfo.xcprivacy` (ITMS-91053). Every Go
+  program calls two of them, file timestamps (`stat`) and system boot time
+  (`mach_absolute_time`), and `bellui package` wrote no manifest, so no bellui
+  app could be uploaded. The packaged app now carries one declaring those two,
+  for files in the app's own container (`C617.1`) and for measuring elapsed
+  time (`35F9.1`). An app adds its own declarations in
+  `ios/PrivacyInfo.xcprivacy`: its API reasons are merged with the toolkit's
+  per category, and tracking and collected data, which the toolkit never
+  declares, are taken from it as written.
+* **Android: manifest attributes are no longer silently ignored because of
+  their order** ([#930](https://github.com/belluikit/bellui/issues/930)).
+  Android reads an element's attributes in ascending resource-ID order and
+  misses any that come after one with a higher ID. `bellui package` sorted
+  them by value type instead, so an `activity-alias` with `exported`,
+  `targetActivity` and `permission` failed to install on Android 12+ with
+  "requires that an explicit value for android:exported be defined", although
+  the attribute was in the APK. Attributes are now written in resource-ID
+  order, as aapt writes them. The fix applies to every element, the generated
+  manifest's own included.
+* **Android: an app with its own AndroidManifest.xml and adaptive icon layers shows its icon**
+  ([#920](https://github.com/belluikit/bellui/issues/920)). `bellui package`
+  wrote the adaptive icon (`Icon-foreground.png` and the other layers) but did
+  not name it in an app's own manifest, so the launcher showed Android's
+  default icon unless the app added `android:icon` itself. It now adds
+  `android:icon="@mipmap/ic_launcher"` and
+  `android:roundIcon="@mipmap/ic_launcher_round"`, keeping either one the
+  manifest already sets, as it already did for a plain `Icon.png`. The adaptive
+  icon also gets a plain PNG for Android 5.0 to 7.1 (API 21–25), which cannot
+  read the adaptive form: `Icon.png` when the app has one, else the foreground
+  layer.
+* **Android: an app with an adaptive icon packaged on Windows finds its icon**
+  ([#920](https://github.com/belluikit/bellui/issues/920)). On Windows,
+  `bellui package` stored the adaptive icon's files in the APK under names
+  with backslashes (`res/mipmap-anydpi-v26\ic_launcher.xml`), which Android
+  does not read as folders, so the icon the manifest named was missing. They
+  now use forward slashes, as the build with Android libraries already did.
+* **`bellui package --release` strips the Android library**
+  ([#895](https://github.com/belluikit/bellui/issues/895)). Release builds kept
+  their symbol tables, which were over a tenth of the library: a real app's went
+  from 94.3 MB to 81.6 MB. Stack traces from a panic still name their functions.
+* **Android apps no longer keep a second copy of their native library**
+  ([#889](https://github.com/belluikit/bellui/issues/889)). The generated
+  manifest now sets `android:extractNativeLibs="false"`. The library was
+  already stored uncompressed and 16 KB aligned, so Android runs it from the
+  APK, but without the attribute it also unpacked a copy at install. On a
+  Pixel 9a a probe app went from 90,299 KiB installed to 53,247 KiB. An app
+  with its own `AndroidManifest.xml` that leaves the attribute out gets a
+  warning. A bundled library that needs its `.so` as a file on disk needs the
+  attribute set to `"true"` (see the README).
+* **Android: plugging in a hardware keyboard no longer restarts the app's activity**
+  ([#793](https://github.com/belluikit/bellui/issues/793)). The manifest
+  `bellui package` writes declared `keyboardHidden` but not `keyboard` in
+  `configChanges`, and attaching a USB or Bluetooth keyboard changes both, so
+  Android relaunched the activity. Both are declared now, and the change
+  reaches the app in place, like a rotation.
+
 ## v1.3.0-rc.1 — 2026-10-27
 
 A release candidate of the command, cut with toolkit v1.3.0-rc.1 so that apps

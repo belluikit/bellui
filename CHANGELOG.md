@@ -19,6 +19,1221 @@ one per change, so that open pull requests do not conflict here. Run
 `go run ./hack/changelog preview` to see them assembled; the release folds them
 into a section below.
 
+## v1.3.0-rc.2 — 2026-11-14
+
+The second release candidate for v1.3.0, cut so that Player and the apps on
+it can move to what landed since rc.1 while the release is validated by hand;
+the final v1.3.0 follows that check. It holds 160 entries, most of them fixes
+(97), many from device sessions on phones and tablets: audio that clicked or
+replayed a piece of the last song when songs changed, the lock screen's play
+and pause on iOS, a drawer on a narrow iPhone, touch scrolling over text, and
+memory that grew while an app ran. New: 22 more widgets can be disabled, most
+tappable widgets show MD3's pressed state, phones sign in with the platform's
+own sign-in (`auth.Authenticate`), `bellui.IsOnScreen`, the time of the user's
+last input, `widget.WheelPicker`, `widget.SwipeArea`, `container.Opacity`, and
+audio playback with no widget in x/mmedia. Things that may need a look (see
+*Changed*): bellui now needs Go 1.26.2 or newer, x/mmedia requires goffmpeg
+v0.13.0 and links FFmpeg as shared libraries, a finger dragged over text on a
+phone scrolls instead of selecting, and `NavigationDrawer` opens on the right
+in a right-to-left layout. The `x/*` modules and the `bellui` command are
+released at v1.3.0-rc.2 with it.
+
+### Added
+
+* **`x/tables` `DataGrid` and `x/dag` `DAGCanvas` can be disabled**
+  ([#1217](https://github.com/belluikit/bellui/issues/1217)). Both implement
+  `core.Disableable`. A disabled one stays in place and shows its content in
+  the disabled colours, and takes no input: no tap, drag, scroll, pinch, key
+  or shortcut, and Tab skips it. The grid neither selects, sorts, filters,
+  resizes, reorders nor edits, and closes an open editor without committing;
+  the canvas neither selects, moves, connects, pans nor zooms. Cells a
+  column's `CellRenderer` draws, master-detail content and a node's `Content`
+  are the app's, and are left alone. `Disable()` is safe before the widget is
+  drawn.
+* **`widget.RichEntry` and `x/editor`'s `Editor` can be disabled**
+  ([#1216](https://github.com/belluikit/bellui/issues/1216)). Both now have
+  `Disable`, `Enable` and `Disabled`. A disabled editor keeps its place and
+  draws its text dimmed, and takes no key, composition, tap, drag, scroll or
+  focus. Its text can be neither selected nor copied, which is stricter than a
+  disabled `Entry`. `Disable` cancels a composition in progress and drops a
+  focus on the editor, and both work before the editor is drawn. The
+  `Editor`'s find bar, if shown, is disabled with it, and it opens no
+  completion, hover or signature popover. `Editor.SetReadOnly` stays a
+  separate state: select and copy, no edits. Enable returns to it.
+* **`List`, `Tree`, `FileTree`, `TreeView`, `Carousel` and `SwipeArea` can be
+  disabled** ([#1215](https://github.com/belluikit/bellui/issues/1215)). They
+  gain `Disable`, `Enable` and `Disabled` (`core.Disableable`), safe to call
+  before the widget is drawn. A disabled one stays visible and takes no input:
+  no selection, expand or collapse, node drag, rename, delete or context menu,
+  no paging or swipe, no scrolling by wheel, touch or scroll bar, no keys, and
+  Tab skips it. The parts the widget draws itself (the selected row, expand
+  icons, a carousel's buttons and dots) switch to the disabled colours. The
+  content the app supplies (row templates, carousel pages, a swipe area's
+  content) is left as it is. Calls from code, such as `Select` or `Next`,
+  still work.
+* **`NavigationBar`, `NavigationRail`, `TopAppBar` and `BottomAppBar` can be
+  disabled** ([#1214](https://github.com/belluikit/bellui/issues/1214)). Each
+  is now `core.Disableable`. A disabled bar keeps its place and keeps showing
+  the selected destination, in the disabled colours, and refuses every press:
+  its destinations, its navigation and action buttons, and a `BottomAppBar`'s
+  FAB. `Disable()` works before the bar is first drawn. `BottomAppBar.Enable`
+  enables the FAB again only if the bar disabled it, so a FAB the app disabled
+  itself stays disabled.
+* **`DatePicker`, `DateTimePicker` and `TimePicker` can be disabled**
+  ([#1213](https://github.com/belluikit/bellui/issues/1213)). Each is now a
+  `core.Disableable`. A disabled picker keeps showing its value in the
+  disabled colours and takes no input: no month change or day pick, no dial
+  tap or drag, no hour, minute or AM/PM field, no keys or typed digits, and
+  Tab skips it. `Disable()` is safe before the picker is drawn. A
+  `DateTimePicker` disables its date and time pages and its Date/Time tabs,
+  and stays on the page it was showing. `SegmentedButton` gained
+  `Disable`/`Enable` for this: its segments and arrow keys do nothing and it
+  draws disabled while disabled.
+* **`Chip`, `ButtonGroup`, `SegmentedButton`, `ThemeSelector` and
+  `AuthButton` can be disabled**
+  ([#1212](https://github.com/belluikit/bellui/issues/1212)). Each is now a
+  `core.Disableable`. A disabled one keeps its place in MD3's disabled look
+  and takes no tap, key, hover or pressed state, and Tab skips it. A chip's
+  delete X does not fire `OnDeleted`. A `ButtonGroup` disables its buttons and
+  enables again only the ones it disabled, and a `ThemeSelector` disables its
+  variant selector and swatches. `Disable()` works before the widget is
+  drawn. A disabled `AuthButton` does not cancel a sign-in already running.
+* **`theme.ClosedCaptionIcon` and `theme.ClosedCaptionOffIcon`**
+  ([#1191](https://github.com/belluikit/bellui/issues/1191)): Material's
+  `closed_caption` (filled, captions on) and `closed_caption_off` (outlined,
+  captions off), themed like the rest of the set, for a player's CC toggle.
+* **`NavigationDrawer` can open from the end edge, and below a header**
+  ([#1171](https://github.com/belluikit/bellui/issues/1171)). `Side` places it
+  against the start edge (the default) or the end edge: the right in a
+  left-to-right layout, the left in a right-to-left one. The notch on that
+  side moves with it. `Top` starts the drawer and its scrim at a canvas y:
+  above it, taps reach the widgets there, such as a header's buttons, and
+  leave the drawer open, while a tap on the scrim below still closes it.
+* **`canvas.Ripple` rounds each corner on its own, and segmented and split
+  buttons show a pressed state** ([#1156](https://github.com/belluikit/bellui/issues/1156),
+  [#1091](https://github.com/belluikit/bellui/issues/1091)). `Ripple` gains
+  `TopLeftCornerRadius`, `TopRightCornerRadius`, `BottomRightCornerRadius` and
+  `BottomLeftCornerRadius`, as `Rectangle` has, with `CornerRadius` the
+  fallback. A ripple's radii are now kept within its size as a rectangle's
+  are, so an oversized radius draws the pill it meant. A `SegmentedButton`
+  segment's ripple takes the segment's shape: the end segments are rounded on
+  their outer side only, with nothing spilling past the outline and no gap at
+  a seam. Each half of a `SplitButton` shows its own ripple, in its own shape.
+  A `SplitButton`'s accessibility press now shows it too.
+* **`theme.PlaceIcon`, `theme.PeopleIcon` and `theme.ChildIcon`**
+  ([#1155](https://github.com/belluikit/bellui/issues/1155)): Material's map
+  pin, group of people and child's face, themed like the rest of the set, for
+  navigation destinations about a place, friends or contacts, and children.
+* **A flex box can put its children flush against each other**
+  ([#1126](https://github.com/belluikit/bellui/issues/1126)). `FlexHBoxLayout`
+  and `FlexVBoxLayout` read a `Padding` of 0 as the theme's padding, so there
+  was no way to ask for no spacing. Their new `ExactPadding` field makes
+  `Padding` the spacing as given, 0 included. Layouts that leave it unset
+  keep the theme's padding as before.
+* **`AppTabs` can hide its tab bar**
+  ([#1124](https://github.com/belluikit/bellui/issues/1124)). With
+  `HideTabBar` set, the bar, its divider and the selection indicator are
+  gone, and the selected item's content fills the whole widget. Selection and
+  the items are untouched, and turning it off puts the bar back. Player uses it
+  to keep one page of a tab set on a short window, such as a phone in
+  landscape.
+* **An app's idle timer can be tested headlessly**
+  ([#1111](https://github.com/belluikit/bellui/issues/1111)). The `bellui/test`
+  helpers that simulate the user's input (`Tap`, `Drag`, `Scroll`, `Type`,
+  `Compose` and the rest) now move `bellui.LastUserActivity()` forward, as the
+  real drivers do. `MoveMouse` and calling a widget's method directly do not,
+  and `test.NewApp` starts it back at the zero time.
+* **An app can tell when the user last touched, scrolled or typed**
+  ([#1108](https://github.com/belluikit/bellui/issues/1108)).
+  `bellui.LastUserActivity()` returns the time of the last user input in any
+  window, for idle timers: go back to a home screen, dim or lock after a
+  while untouched. Every driver records it as input arrives, before any
+  widget sees it, so a scroll inside a list counts though the list reports
+  nothing. Moving the mouse without a button held does not count, nor do
+  animations or a scroll coasting after the finger lifts. Actions a screen
+  reader performs through the accessibility API are not counted yet
+  ([#1109](https://github.com/belluikit/bellui/issues/1109)).
+* **`canvas.Raster` can show a video frame as it was decoded**
+  ([#1107](https://github.com/belluikit/bellui/issues/1107)). `SetYCbCr` takes
+  Y'CbCr planes (`image.YCbCr`) with their colour matrix (BT.601, BT.709,
+  BT.2020) and range. The WebGPU painter uploads the planes, 1.5 bytes a pixel
+  at 4:2:0 instead of 4, and converts them on the GPU; the GL and software
+  painters convert on the processor, by the same matrix and range.
+  Experimental: the shape follows x/mmedia's needs and may change.
+* **`theme.NotificationsIcon`**
+  ([#1104](https://github.com/belluikit/bellui/issues/1104)): Material's
+  outlined notifications bell, themed like the rest of the set, for a header
+  that shows notices waiting.
+* **List and grid rows, tree rows, menu items, sortable table headers and file dialog items show a pressed state**
+  ([#1091](https://github.com/belluikit/bellui/issues/1091)). A tap on one of
+  them used to register with no sign that it did. Each now shows the MD3
+  pressed state from the press to the release, like `Button`: a ripple that
+  fills the row and fades after the release. A touch that turns into a scroll
+  ends it, so a fling over a list leaves no row pressed. A tree branch's
+  expand icon shows a circle of its own.
+* **Navigation bar, rail and drawer items and tabs show a pressed state**
+  ([#1091](https://github.com/belluikit/bellui/issues/1091)). A navigation
+  item shows it on its indicator pill, in its icon's colour; a tab fills the
+  tab in its label's colour, and a tab's close button shows a circle of its
+  own.
+* **Checkboxes, radio buttons, switches and other small round controls show a pressed state**
+  ([#1091](https://github.com/belluikit/bellui/issues/1091)). A check box,
+  radio button or switch shows it as a circle around the box or the thumb,
+  in Primary when it is selected, wherever on the control the press lands.
+  Date picker days, the password field's reveal button, theme swatches,
+  colour picker swatches and an inner window's frame buttons show it too.
+* **Chips, FABs, sign-in buttons, links, selects and the time picker's fields show a pressed state**
+  ([#1091](https://github.com/belluikit/bellui/issues/1091)). Each shows the
+  MD3 pressed state from the press to the release. An input chip's delete X
+  shows a circle of its own, and a link shows it around its text only.
+  `Select` used to run a ripple only after the release; it now uses the same
+  pressed state as the rest.
+* **`bellui.Release(obj)`**
+  ([#1083](https://github.com/belluikit/bellui/issues/1083)): an app that
+  switches pages by replacing a container's children, instead of calling
+  `SetContent`, calls it with the page it dropped. The next frame then lets go
+  of the page's renderers, canvas records and textures, as `SetContent` does
+  for the content it replaces; they used to stay until a paint at least a
+  minute later, which an idle app does not draw. It also takes the focus from
+  a focused widget on the dropped page, which would otherwise keep it and
+  receive the keys typed after. A driver provides it through the optional
+  `ReleasingDriver`.
+* **`AppTabs.DragToSelect` lets users drag along the tab titles to move the selection indicator**
+  ([#1080](https://github.com/belluikit/bellui/pull/1080)). The indicator
+  follows the pointer, fitting each tab as it passes over it, and the release
+  selects the nearest enabled tab. Tapping a title still selects it. It is off
+  by default.
+* **`analytics.Reset` forgets the app's identity at sign-out**
+  ([#1076](https://github.com/belluikit/bellui/issues/1076)). It clears what
+  `Tracker.Identify` set and starts a new session ID, so later events are
+  anonymous and not on the same PostHog person as the ones before sign-in.
+  It sends nothing, works without consent, and leaves events already queued
+  under the identity they were recorded with. Before, `Identify("")` was the
+  only way back: it sent a `$identify` with the session ID and kept that ID.
+* **`bellui.IsOnScreen(obj)`**
+  ([#1061](https://github.com/belluikit/bellui/issues/1061)): reports whether
+  an object is drawn, so that work done on its own clock can be skipped while
+  it is not: on a tab that is not selected, under a hidden container, or in a
+  window that is not shown. It turns false as soon as an ancestor is hidden,
+  and true as soon as it is shown or the tab selected again, before the frame
+  that draws it, so that frame shows the work done on the tick in between
+  ([#1069](https://github.com/belluikit/bellui/issues/1069)); an object
+  scrolled out of view still counts as on screen. A driver provides
+  it through the optional `OnScreenDriver`. `ProgressBarInfinite` and
+  `Activity` use it to skip their animation ticks while out of sight.
+* **x/mmedia: `WithOnSeek` tells an app about every seek, with the position before and after**
+  ([#1051](https://github.com/belluikit/bellui/issues/1051)). A drag on an
+  `AudioPlayer`'s seek bar went straight to its `AudioPlayback`, and nothing
+  told the app. The callback runs once per seek, whoever asked for it: the
+  seek bar (on release) or the app's own `Seek`. It runs before the time
+  update for the new position, so an app can tell that update from playback.
+  It works on `AudioPlayback`, `MediaPlayer` and `VideoPlayer`. Stop's
+  rewind and a loop's restart are not seeks, and a live source cannot seek.
+* **`auth.Authenticate` signs in on phones, with the platform's own sign-in**
+  ([#1042](https://github.com/belluikit/bellui/issues/1042)). It used to fail
+  on iOS and Android, where there is no browser to open and no loopback
+  redirect the providers accept.
+  * `"apple"` on iOS shows the Sign in with Apple sheet. The app needs the
+    `com.apple.developer.applesignin` entitlement in
+    `ios/Entitlements.plist`. Without a `ClientID`, the audience checked is
+    the app's bundle ID.
+  * `"google"` on Android uses Credential Manager. The app ships its libraries
+    in `android/libs`; `hack/signinprobe/android-libs.txt` lists the set.
+    `ClientID` is the Web client ID.
+  * `"google"` on iOS runs the PKCE flow in `ASWebAuthenticationSession`.
+    `ClientID` is the iOS client ID, and the redirect is its reversed-ID
+    scheme.
+
+  Each verifies the ID token as the desktop flow does: the signature against
+  the provider's published keys, then the issuer, audience, expiry and nonce.
+  Other providers return an error on phones. `OIDCResult.AuthorizationCode`
+  carries the code Apple's sheet returns for the app's server.
+  `auth.ErrCancelled` reports a user who closed the sheet. `widget.AuthButton`
+  needs no change and passes it to `OnError`.
+* **`lang.Fill`** ([#1041](https://github.com/belluikit/bellui/issues/1041)):
+  fills a string's `{Name}` placeholders by the rules `LocalizeKey` uses, without
+  a catalog lookup, so code that formats outside the catalog can follow the same
+  rules instead of keeping its own copy.
+* **`bellui.AbsolutePositionForPoint` and `bellui.PositionForAbsolutePoint` map a point of an object to where it is drawn, and back**
+  ([#1003](https://github.com/belluikit/bellui/issues/1003)). They follow the
+  object's transform and its ancestors' (`core.Transformable`), so a popup
+  anchored to a widget inside a moved or tilted SwipeArea card opens next to
+  where the widget is drawn. The toolkit's own popups, menus, tooltips and
+  touch scrolling now use them. `Driver.AbsolutePositionForObject` is
+  unchanged: it still returns the position from layout and ignores
+  transforms. A driver provides the mapping through the optional
+  `PositionMappingDriver` interface; without it the functions fall back to the
+  layout position.
+* **`layout.NewAspectStackLayout`**
+  ([#993](https://github.com/belluikit/bellui/issues/993)): stacks its objects in
+  the largest box of a given width/height ratio that fits, centred; 1 is a square.
+* **Container.ClipCornerRadius clips a container's children to rounded
+  corners** ([#991](https://github.com/belluikit/bellui/issues/991)). With
+  ClipToBounds set, children are cut to a rounded rectangle of that radius, as
+  a Card cuts its content; without ClipToBounds it does nothing. The GL
+  painter's rounded clips do not clip on macOS yet, for containers and widgets
+  alike (#990); the default WebGPU painter does.
+* **`SwipeArea` can be a card that follows the finger**
+  ([#989](https://github.com/belluikit/bellui/issues/989)). With
+  `Follow` set, the content moves with a drag and tilts a few degrees the way
+  it goes. A release a fifth of the way across, or a flick, carries it off
+  that side; `OnSwiped` runs and the content is back in place for the next
+  item. Anything shorter springs back. `OnSwipeProgress` reports how close
+  the card is to a swipe, for a hint as it leaves. Taps still reach the
+  content. Without `Follow`, `SwipeArea` behaves as before.
+* **x/tables: DataGrid.OnVisibleRowsChanged reports the display rows in
+  view** ([#983](https://github.com/belluikit/bellui/issues/983)), whenever
+  scrolling, a resize or new data changes them, so an app that loads rows in
+  pages can fetch the next page as the listener nears the end. An empty grid
+  reports 0, -1.
+* **`widget.WheelPicker`: a wheel of items to spin through**
+  ([#977](https://github.com/belluikit/bellui/issues/977)), as iOS picker
+  wheels and Android's NumberPicker do. A drag or fling spins it, it settles
+  with one item centred, and a tap centres an item. Items away from the centre
+  shrink and fade. It is vertical or horizontal, and `Wrap` makes it a ring
+  instead of stopping at the ends. `OnChanged` fires once per settled change.
+  Screen readers adjust it by one item and read the selected item's label.
+* **`container.Opacity`: draw any content translucent** ([#977](https://github.com/belluikit/bellui/issues/977)).
+  Everything in it is drawn at the given opacity, nested containers
+  multiplying, on desktop and mobile alike. A widget can do the same by
+  implementing `core.OpacityGroup`.
+* **`widget.SwipeArea`**
+  ([#970](https://github.com/belluikit/bellui/issues/970)): holds one object
+  and reports a swipe across it, left, right, up or down.
+* **`theme.BookmarkIcon` and `theme.BookmarkBorderIcon`**
+  ([#968](https://github.com/belluikit/bellui/issues/968)): a filled and an
+  outlined bookmark, for a Save button.
+* **An icon can be tinted with a colour field**
+  ([#952](https://github.com/belluikit/bellui/issues/952)). `widget.Icon`
+  has a `Color` field. Set it and the icon is drawn in that colour whatever
+  the theme, and it stays tinted when its resource changes. nil, the default,
+  draws the resource as given. An icon that is not an SVG draws unchanged.
+* **An icon can be tinted with any colour**
+  ([#939](https://github.com/belluikit/bellui/issues/939)).
+  `theme.NewColoredResource` only took a theme colour name, so an app could
+  not draw an icon in a colour of its own, such as one that stands out
+  against artwork behind it. `theme.NewColorizedResource(src, color)` tints
+  an SVG icon with a fixed colour that stays the same when the theme
+  changes. A themed icon is tinted from its original SVG, and a resource
+  that is not an SVG is returned unchanged.
+* **`widget.Icon` can be drawn larger than the theme's icon size**
+  ([#937](https://github.com/belluikit/bellui/issues/937)). An icon always
+  took the theme's inline icon size, so it couldn't be the centrepiece of an
+  area. The new `IconSize` field sets its width and height in dp. Zero, the
+  default, keeps the theme's size, so existing icons are unchanged.
+* **layout: flex boxes can centre a shorter child across the row or column**
+  ([#921](https://github.com/belluikit/bellui/issues/921)). A child shorter
+  than its `FlexHBoxLayout` row was always stretched to the full height, or
+  pinned to the top when `MaxHeight` capped it, so a 56 dp button next to a
+  96 dp one could only sit at the top. The new `CrossAlign` field keeps each
+  child at its natural height and puts it at the top (`CrossStart`), centre
+  (`CrossCenter`) or bottom (`CrossEnd`); `FlexVBoxLayout` does the same
+  across a column. The default, `CrossStretch`, is the behaviour so far.
+* **x/tables: a column can have a blank header**
+  ([#918](https://github.com/belluikit/bellui/issues/918)). Set
+  `ColumnDef.HideHeaderText` for a column whose cells say what it is, such as
+  a column of play icons; before, an empty `HeaderName` always fell back to
+  `Field`, and it still does. Only the painted text goes: screen readers,
+  export, the filter popup and group-aggregate labels still use the column's
+  name, and the header still sorts and resizes.
+* **widget: IconButton sizes**
+  ([#915](https://github.com/belluikit/bellui/issues/915)). `IconButton`
+  gains `ButtonSize`, with the Material 3 Expressive icon button sizes
+  (container / icon, dp): `IconButtonSizeExtraSmall` 32 / 20,
+  `IconButtonSizeSmall` 40 / 24, `IconButtonSizeMedium` 56 / 24,
+  `IconButtonSizeLarge` 96 / 32 and `IconButtonSizeExtraLarge` 136 / 40. A
+  media player can now make its play button larger than the controls
+  around it. The zero value, `IconButtonSizeDefault`, still takes both
+  sizes from the theme, so existing buttons and dense themes look as
+  before. The corners stay fully round at every size.
+* **theme: heart icons for a Like button**
+  ([#912](https://github.com/belluikit/bellui/issues/912)). `FavoriteIcon` is
+  a filled heart and `FavoriteBorderIcon` an outlined one, themed like the
+  other icons.
+* **x/mmedia: audio playback with no widget**
+  ([#881](https://github.com/belluikit/bellui/issues/881)). `AudioPlayback`
+  (`NewAudioPlayback`, `NewAudioPlaybackURL`) plays, pauses, seeks, stops
+  and loops audio with no widget, window or app. A song can now keep
+  playing while screens are rebuilt or left. `NewAudioPlayerFor` shows an
+  `AudioPlayback` with transport controls, and `AudioPlayer.Detach` lets
+  go of it. Neither, nor closing such a widget, interrupts playback.
+  `NewAudioPlayer` and `NewAudioPlayerURL` work as before: the widget owns
+  its playback, and `Close` closes it. `AudioPlayer.Playback` returns the
+  playback a widget shows.
+* **`event.DragClaimer`: a draggable widget can take a touch drag in some directions only**
+  ([#662](https://github.com/belluikit/bellui/issues/662)). `ClaimsDrag(delta)`
+  is asked when a touch drag starts, innermost widget first, and the first one
+  that claims it gets the drag; the rest go on to the widgets around it. A
+  `Draggable` that does not implement it takes every drag, as before. A drag
+  that follows a long-press is not offered, and neither is a mouse drag.
+
+### Changed
+
+* **x/mmedia requires goffmpeg v0.13.0 and goffmpeg-libs v0.10.0**
+  ([#1237](https://github.com/belluikit/bellui/pull/1237)), from v0.10.0 and
+  v0.8.0. VP9, AV1 and Opus now play in every codec set, and the audio-only
+  set (`goffmpeg_novideo`) plays AAC. On Android and iOS, H.264 and AAC decode
+  only through the platform's decoders, so a stream they refuse (10-bit or
+  High 4:4:4 H.264) no longer plays on a phone. The README's codec-set table
+  now says what each set opens: the desktop media set opens everything FFmpeg
+  decodes.
+* **Removing the selected tab reports the new selection**
+  ([#1204](https://github.com/belluikit/bellui/issues/1204)). When `Remove` or
+  `RemoveIndex` removed the selected tab of an `AppTabs` or `DocTabs`, the tab
+  that took its place was reported through `OnSelected` only when the removed
+  tab was the last one; removing any other tab changed the selection silently.
+  Now every such removal calls `OnUnselected` with the removed tab and then
+  `OnSelected` with the new one (only `OnUnselected` when it was the only tab),
+  as selecting a tab does. This includes closing a `DocTabs` tab.
+* **In a right-to-left layout, `NavigationDrawer` opens on the right**
+  ([#1171](https://github.com/belluikit/bellui/issues/1171)). It used to open
+  on the left whatever the direction. The default side is now the start edge,
+  which is the right in a right-to-left layout. Left-to-right apps see no
+  change.
+* **`NavigationDrawer` slides in from its edge when animations are on**
+  ([#1171](https://github.com/belluikit/bellui/issues/1171)), as `SideSheet`
+  does. It used to appear in place. With animations off it still does.
+* **x/mmedia: a `VideoPlayer` keeps playing when bellui rebuilds its
+  renderer** ([#1145](https://github.com/belluikit/bellui/issues/1145)).
+  bellui destroys and recreates the renderer of a widget it still shows, and
+  the video player's renderer closed the player when destroyed, so a playing
+  video froze on its last frame after about a minute (on Android sooner)
+  with no `OnEnd` or `OnError`. The renderer no longer closes it. Call
+  `VideoPlayer.Close` when you are done with a player, as for every other
+  mmedia widget: nothing else closes it, and one left unclosed keeps its
+  decoder.
+* **An SVG image out of sight is rasterized when it is first drawn, not when
+  it is laid out** ([#1137](https://github.com/belluikit/bellui/issues/1137)).
+  A `canvas.Image` from an SVG file or resource rasterized itself at every
+  size it was laid out at, on the main goroutine, even under a hidden
+  container: an app with 22 hidden SVG layers spent 4.5 s of CPU in its first
+  10 s on a phone. While `bellui.IsOnScreen` reports it out of sight, its
+  pixels are now made when a painter first draws it. Its `Image` field stays
+  as it was until then, so code that reads `Image` after laying out a hidden
+  SVG image gets the old pixels, or nil.
+* **x/mmedia requires goffmpeg v0.9.0, which links FFmpeg as shared libraries in two codec sets**
+  ([#1101](https://github.com/belluikit/bellui/issues/1101)). The default
+  build plays MP3, WAV, MP4 with H.264 and AAC, and HLS; `-tags
+  goffmpeg_novideo` plays MP3 and WAV only, with less to ship. FLAC, Ogg,
+  Opus, HEVC, VP9 and other formats no longer open. An app now has to ship
+  FFmpeg's libraries, which `bellui package` does on desktop and, from
+  [#1122](https://github.com/belluikit/bellui/issues/1122), on Android and
+  iOS.
+  It brings goffmpeg-libs v0.6.0.
+* **`test.Theme` and `test.NewTheme` define every theme size**
+  ([#1079](https://github.com/belluikit/bellui/issues/1079)). Both lacked
+  `SizeNameTabContentMargin`, and `test.NewTheme` also lacked the four window
+  button and title bar sizes. A widget asking for one logged an error and laid
+  out with 0. Tab containers now leave the content margin (12 in `test.Theme`,
+  18 in `test.NewTheme`), and dialogs drawn with `test.NewTheme` show their
+  title bar buttons. Golden images of either move, in your tests as in
+  bellui's.
+* **`bellui.DoAndWait` documents its macOS 26+ latency**
+  ([#1033](https://github.com/belluikit/bellui/issues/1033)). On macOS 26 and
+  later AppKit delivers a wake from another thread late, on a grid of about
+  7 ms, so back-to-back `DoAndWait` calls from one goroutine run at about 145
+  a second. This is an accepted platform limit: batch work into one call.
+* **On a phone or tablet, dragging a finger over selectable text scrolls the page instead of selecting**
+  ([#986](https://github.com/belluikit/bellui/issues/986)). This is what
+  native selectable text views do, and matches text fields
+  ([#801](https://github.com/belluikit/bellui/issues/801)). It applies to a
+  `Label` or `RichText` with `Selectable` set. To select by touch, long-press
+  (a drag that follows extends the selection) or move the selection handles.
+  Mouse drags still select.
+* **Android: an animating app uses less CPU per frame**
+  ([#967](https://github.com/belluikit/bellui/issues/967)). Under the default
+  WebGPU painter, every frame was handed to the platform main loop and back
+  before the next one, parking and waking two threads 60 times a second. The
+  frame is already on screen by then, so it now skips that round trip. A 4×4
+  rectangle animating at 60 fps went from ~37% to ~31% of a core on a Pixel 9a,
+  still at 60 presented frames a second.
+* **x/mmedia requires goffmpeg v0.7.1**
+  ([#955](https://github.com/belluikit/bellui/pull/955)). After an
+  interrupt, every seek and read now fails, where v0.7.0 could rarely let an
+  interrupted seek report success. It brings goffmpeg-libs v0.3.5.
+* **Bellui now needs Go 1.26.2 or newer**
+  ([#948](https://github.com/belluikit/bellui/pull/948)). The PXF library
+  bellui reads and writes its files with, `trendvidia/protowire-go`, moves to
+  v1.16.0, which requires Go 1.26.2, so every bellui module now declares it.
+* **x/mmedia: time updates stop while nothing is playing**
+  ([#879](https://github.com/belluikit/bellui/issues/879)). `WithOnTimeUpdate`
+  fired every 100 ms while paused or after the end, for as long as the player
+  stayed open, reporting the same position each time. It now fires every
+  100 ms only while playing, plus once on Pause, once on each Seek (paused or
+  not) and once at the end. An app that used the idle updates as a heartbeat
+  needs a timer of its own.
+* **x/mmedia: requires goffmpeg v0.6.1**
+  ([#857](https://github.com/belluikit/bellui/pull/857)). MediaPlayer now
+  plays songs with embedded cover art as audio, as AudioPlayer already did;
+  before, it took the cover for a one-frame video and ended almost at once.
+  The last frames of a video are no longer dropped, resampled audio keeps
+  its last samples and no longer lets a few samples from before a seek
+  through, and the Windows library loads without MinGW. purego builds pick
+  up goffmpeg-libs v0.3.3 automatically.
+* **x/mmedia on iOS: audio keeps playing in the background**
+  ([#845](https://github.com/belluikit/bellui/issues/845)). x/mmedia now sets
+  the audio session to the Playback category, so audio continues when the app
+  is in the background or the screen locks, as long as the app declares
+  `UIBackgroundModes` `audio` in its `ios/Info.plist`. It also plays through
+  the silent switch now; before, iOS's default category stopped it in both
+  cases.
+* **x/mmedia: FFmpeg's warnings no longer print on stderr**
+  ([#844](https://github.com/belluikit/bellui/pull/844)). Players printed
+  lines such as `[aac @ 0x…] Could not update timestamps for discarded
+  samples` while playing ordinary files. x/mmedia now requires goffmpeg
+  v0.6.0, which sets FFmpeg's log to errors only; errors still print, and
+  `goffmpeg.SetLogLevel(goffmpeg.LogWarning)` brings the warnings back.
+* **On a phone or tablet, dragging a finger over a text field's text scrolls it instead of selecting**
+  ([#801](https://github.com/belluikit/bellui/issues/801)). This is what native
+  text fields do. A multi-line `Entry` scrolls its own text, and once the text
+  cannot move that way the drag scrolls the page around it; a `RichEntry`
+  leaves the drag to the page. To select by touch, long-press (a drag that
+  follows extends the selection) or move the selection handles. Mouse drags
+  still select.
+* **x/mmedia: video playback allocates nothing per frame**
+  ([#431](https://github.com/belluikit/bellui/issues/431)). Each decoded frame
+  used to be converted into a new full-size image and then copied into the
+  player's frame pool: about 250 MB/s of garbage at 1080p30. The decoder now
+  converts straight into a pool frame. Playing 1080p for 8 s peaked at 291 MB
+  instead of 458 MB, and a frame the pool has no room for is now dropped before
+  it is converted, not after. Inside the module, the internal `Source`
+  interface changed with it: the video callback receives a `VideoFrame` to
+  read into a buffer of its own, valid only during the call.
+* **x/mmedia: a live capture queues 3 frames ahead, not a memory-sized
+  queue** ([#431](https://github.com/belluikit/bellui/issues/431)). A camera
+  produces frames only in real time and skips the pre-roll, so the 16 queued
+  frames it got at 1080p (149 MB) bought nothing but memory and, once backed
+  up, latency. A file or stream keeps the queue sized by memory.
+
+### Fixed
+
+* **x/mmedia: after a pause on iOS, the lock screen shows ▶**
+  ([#1242](https://github.com/belluikit/bellui/issues/1242)). A paused
+  Output left the iOS audio device running, and iOS shows ⏸ for as long as
+  it runs, so the next lock-screen press paused again and resuming took two
+  presses. The device is now suspended while nothing plays, as it already was
+  on Android, and the next Play resumes it, also from the background.
+* **A NavigationDrawer on a screen narrower than 360 pt reaches its edge**
+  ([#1238](https://github.com/belluikit/bellui/issues/1238)). On such a
+  screen, for example an iPhone with Display Zoom on Larger (320 pt), an
+  end-side drawer stopped about 40 pt short of the right edge, and a
+  start-side drawer ran off its own. The drawer is now at most the screen
+  width less 56 pt, so it sits against its edge and leaves a strip of scrim
+  to tap. Wider screens keep the 360-pt drawer.
+* **TreeView drag-to-reorder drops on the row under the pointer**
+  ([#1229](https://github.com/belluikit/bellui/issues/1229)). The drop row
+  was read from the pointer's position in the window, as if the tree started
+  at the window's top, so a tree under a toolbar or an entry dropped rows
+  that far away from the pointer. After `ScrollTo`, `ScrollToTop` or
+  `ScrollToOffset`, the tree also kept the old scroll offset for the drop
+  row and for `GetScrollOffset`, until the user scrolled.
+* **x/mmedia: changing songs, pausing and seeking no longer click**
+  ([#1228](https://github.com/belluikit/bellui/issues/1228)). Playback
+  stopped, started and jumped at full level, so the wave jumped to or from
+  zero in a single sample, which is heard as a click. Each of these now fades
+  over about 8 ms. Because the fade has to be heard first, `Pause` and `Stop`
+  return a little later: about 33 ms and 23 ms on a Mac.
+* **x/mmedia: on Android, the next song no longer starts with the end of the
+  last** ([#1228](https://github.com/belluikit/bellui/issues/1228)). Android's
+  audio device is suspended while nothing plays (#1052), and a suspended device
+  kept the sound it had been sent and not yet played. It played that sound at
+  the start of the next song, after cutting the fade off with a click. Pause
+  and Stop now let the device play the fade out first, and a suspend discards
+  anything left. x/mmedia now uses `belluikit/oto`, Bellui's fork of oto,
+  which adds that discard (`Context.Flush`) and tells it what the device has
+  played.
+* **An extended FAB whose text is cleared keeps its pressed state**
+  ([#1225](https://github.com/belluikit/bellui/issues/1225)). Setting `Text`
+  to `""` on a drawn extended FAB left out the press ripple when the renderer
+  rebuilt its objects, so the standard FAB it became showed no pressed state.
+* **A widget disabled while it has the keyboard focus gives the focus up**
+  ([#1221](https://github.com/belluikit/bellui/issues/1221)). The focus
+  manager already refused focus to a disabled widget and Tab skipped it, but
+  `Disable()` on the focused widget, or on a widget holding the focused one
+  (a `FontPicker`'s select, say), left the focus there. Every widget built on
+  `DisableableWidget`, and `Slider` and `RangeSlider`, now drop it.
+* **A `container.Scroll` set to `ScrollNone` ignores a drag delivered to it**
+  ([#1217](https://github.com/belluikit/bellui/issues/1217)), as it already
+  ignored the wheel. On mobile builds `Scroll.Dragged` moved the content
+  whatever the direction; a driver that asks `ClaimsDrag` first never sent it
+  such a drag, but a test or a caller delivering one directly did. A disabled
+  `DataGrid` turns its body scroller off this way.
+* **A disabled `FAB` looks disabled**
+  ([#1214](https://github.com/belluikit/bellui/issues/1214)). It refused taps
+  but kept its colours and its hover layer; it now draws MD3's disabled
+  container and content colours, as `Button` does.
+* **A tap on an `AuthButton` no longer hangs the app.** Since the press
+  feedback of #1091, `AuthButton.Tapped` took its own lock twice, so the first
+  tap on a drawn button blocked the main goroutine.
+* **Wrapping text in a form's label column keeps its width**
+  ([#1202](https://github.com/belluikit/bellui/issues/1202)). A word-wrapping
+  or truncating label in a `FormLayout`'s label column collapsed to one
+  character wide. The label column now widens to the label's text on one line,
+  up to half the form's width, and wraps or truncates the label beyond that, so
+  a long label never squeezes the field beside it. `widget.Form` is unchanged.
+* **Removing a tab before the selected last tab keeps the selection**
+  ([#1201](https://github.com/belluikit/bellui/issues/1201)). In `AppTabs` and
+  `DocTabs`, `RemoveIndex` or `Remove` of a tab before the selected one moved
+  the selection to the previous tab when the selected tab was the last, and
+  fired `OnSelected` for a tab the user had not changed to. The same tab now
+  stays selected and nothing fires.
+* **Wrapping text in `RowWrapLayout` keeps its width**
+  ([#1199](https://github.com/belluikit/bellui/issues/1199)). A word-wrapping or
+  truncating label in a row-wrap flow collapsed to one character wide, and made
+  every row as tall as its column of letters. It now gets its text on one line
+  when that fits beside the objects before it, and otherwise a row of its own,
+  wrapping at the flow's width. Each row is now as tall as its own tallest
+  object, rather than every row as tall as the tallest object in the flow.
+* **Wrapping text in `Center` or an aligned column keeps its width**
+  ([#1198](https://github.com/belluikit/bellui/issues/1198)). A word-wrapping
+  or truncating label in `CenterLayout`, or in a `FlexVBoxLayout` whose
+  `CrossAlign` is start, centre or end, collapsed to one character wide, its
+  text running down the screen. It now gets its text on one line when that
+  fits, and wraps or truncates at the container's width when it does not, as
+  it does in a horizontal box since #1195.
+* **Wrapping text beside another widget keeps its width**
+  ([#1195](https://github.com/belluikit/bellui/issues/1195)). In a horizontal
+  box, an unstretched word-wrapping or truncating label collapsed to one
+  character wide, its text running down the screen. `HBoxLayout` and
+  `FlexHBoxLayout` now give it its text on one line while the row has room,
+  and wrap or truncate it only when the row runs out, with the widgets after
+  it still beside it. The new optional interface `core.FitWidther` says what
+  width an object would like; `Label` and `RichText` implement it, `Entry`
+  does not.
+* **The software painter draws a rotated or scaled object whole**
+  ([#1192](https://github.com/belluikit/bellui/issues/1192)). Under a scale,
+  rotation or skew it drew no `BoxShadow` and no `Scene3D` at all, and cut a
+  stroke, a thick line or a text wider than its box at the object's bounds.
+  This painter draws `test` captures and headless renders. It now draws each
+  object into a layer covering everything the object paints, the same box
+  partial repaint uses.
+* **A clipping container cuts a transformed child in the software painter**
+  ([#1190](https://github.com/belluikit/bellui/issues/1190)). An object scaled
+  or rotated past its clipping container's bounds was drawn whole, outside
+  them; it is now cut at them, as the WebGPU painter already did.
+* **Resizing an SVG `canvas.Image` no longer reads and parses its source
+  again** ([#1183](https://github.com/belluikit/bellui/issues/1183)). It is
+  rasterized at the new size from the SVG it already parsed, as long as `File`
+  and `Resource` still name the same source; `Refresh` still reads it afresh.
+  A `WheelPicker` of SVG items resizes them on every frame of a drag, and the
+  re-reading cost about 4% of a phone's CPU there.
+* **A spinning `WheelPicker` no longer redraws its items' pixels on every
+  frame** ([#1183](https://github.com/belluikit/bellui/issues/1183)). It
+  shrank its side items by resizing them, and a resized image is drawn again
+  from its pixels (an SVG rasterized again) and uploaded as a new texture.
+  Items now keep their size and are drawn scaled about their centres, so a
+  spin moves textures the GPU already has. On a mid-range phone, dragging a
+  wheel of image items took half the CPU it did. An item's `Size()` is now its
+  unscaled size; `ShrinkTo` still sets how small it is drawn.
+* **A row a List, GridWrap, Table, Tree or TreeView recycles gives up the
+  focus at once** ([#1175](https://github.com/belluikit/bellui/issues/1175)).
+  A focused field in a row that scrolled out of view kept the focus until the
+  next frame. If the widget laid itself out again before that frame, it could
+  hand the same row widget out for another item, and the keys typed next
+  edited that item. A row now loses the focus when it goes back to its pool.
+  This is the #1089 rule (a row scrolled fully out of view loses the focus),
+  applied without waiting for a frame.
+* **A scroll over a pop-up's scrim no longer scrolls the content beneath it**
+  ([#1173](https://github.com/belluikit/bellui/issues/1173)). A tap there was
+  already stopped, but a mouse wheel (desktop) or a two-finger pan (touch)
+  fell through to the window's content whenever nothing in the pop-up could
+  scroll at that point. Scrolls now follow the rule taps do: the topmost
+  pop-up that does not pass input through stops them, modal or not. A Toast or
+  Snackbar still lets them through, and so does the strip above a
+  `NavigationDrawer`'s `Top`.
+* **A header above a drawer opened below it takes the keyboard and is read by
+  screen readers** ([#1172](https://github.com/belluikit/bellui/issues/1172)).
+  With a `NavigationDrawer` open below `Top`, a field in the header now takes
+  the focus and the keys typed after it, and Tab visits the header's controls,
+  then the drawer's. Screen readers reach the header's controls too. Nothing the
+  drawer's scrim covers is reached by either. On desktop, screen readers no
+  longer reach the content beneath any modal pop-up (a dialog, a sheet), which
+  matches mobile and how taps already behaved; a Toast or Snackbar above it
+  stays reachable.
+* **x/mmedia: a seek while paused shows the frame it lands on**
+  ([#1162](https://github.com/belluikit/bellui/issues/1162)). Rarely, a seek
+  made while a video was paused moved the time and the seek bar but left the
+  picture on the old frame until Play: the decoder could look in the middle
+  of the seek, take the request for the paused frame, and decode it before
+  the source had moved. It now waits for the seek to land first.
+* **A lost GPU device no longer aborts the app**
+  ([#1150](https://github.com/belluikit/bellui/issues/1150)). When the GPU
+  device was lost (a driver reset, seen on an Android phone),
+  wgpu-native aborted the process inside the next frame's surface acquire,
+  before bellui could see an error. The WebGPU painter now checks for the loss
+  at the start of each frame, skips that frame, and makes a new device for the
+  next one, redrawing everything with it. Requires belluikit/webgpu with
+  `Device.Lost`.
+* **A widget wrapper standing in the tree for the widget it embeds is
+  reported** ([#1146](https://github.com/belluikit/bellui/issues/1146)). A
+  type that embeds a widget built by its constructor (`struct{ *mmedia.VideoPlayer }`,
+  `struct{ *widget.Label }` with `NewLabel`) and is put in the tree in the
+  widget's place got two renderers: one under the wrapper, which drawing
+  kept, and one under the widget, which its own methods used and which was
+  destroyed while it was still shown. A playing video stopped for good that
+  way. bellui now logs the case once per pair of types, saying how to fix it:
+  put the widget itself in the tree, or build it without its constructor and
+  call `ExtendBaseWidget` with the wrapper. bellui's lookup that was meant to
+  fold such a wrapper onto its widget never ran, and is removed.
+* **bellui builds on Go 1.27.4**
+  ([#1140](https://github.com/belluikit/bellui/issues/1140)). Go 1.27.4 refuses
+  cgo libraries that carry LLVM bitcode, or that are linked with
+  `-l:filename`, so the GPU packages stopped building on macOS and x/mmedia
+  stopped building on Linux. bellui now requires webgpu v1.2.3, and x/mmedia
+  goffmpeg v0.10.0, whose libraries Go 1.27.4 links. goffmpeg v0.10.0 also
+  keeps every FFmpeg codec in desktop builds, so its desktop libraries are
+  larger. webgpu v1.2.3 drops windows/386, which cgo could never link.
+* **Headless captures fade what an `Opacity` holds**
+  ([#1139](https://github.com/belluikit/bellui/issues/1139)). The software
+  painter behind test images, `RenderHeadless` and Player's `--render` drew a
+  `container.Opacity`'s children at full strength, so a red rectangle at
+  opacity 0 was captured red. It now blends each draw by the group opacity as
+  the GPU painters do. It does not dim disabled widgets, as the mobile driver
+  does not.
+* **Animating an `Opacity` no longer reloads the images under it every frame**
+  ([#1138](https://github.com/belluikit/bellui/issues/1138)).
+  `Opacity.SetOpacity` refreshed everything under it, so each `canvas.Image`
+  reopened and re-read its file, re-parsed an SVG and had its texture rebuilt
+  on every value an animation applied: on a phone, an animation of 38 fading
+  SVG layers ran at about 100 % CPU. It now only redraws. `Opacity.Refresh()`
+  still refreshes the content.
+* **An SVG shape costs its own pixels, not the whole image's**
+  ([#1137](https://github.com/belluikit/bellui/issues/1137)). The rasterizer
+  under SVG images and vector shapes drew every path over the whole image, so
+  a 2 px dot cost as much as a full page: 22 SVG layers took 13.9 s at 720 px
+  and froze a phone at launch. Each path is now rasterized within its own
+  bounds (0.33 s for the same layers). Images over 512 px may differ from
+  before in anti-aliasing by rounding; smaller ones are unchanged.
+* **The embedded (no-OS) driver records its loop as the main goroutine**
+  ([#1132](https://github.com/belluikit/bellui/issues/1132)). It was the one
+  driver that did not. A `bellui.DoAndWait` from code already running on the
+  loop deadlocked it; it is now logged and run off the loop, as on the other
+  drivers. `bellui.IsMainGoroutine` reports true on the loop. Built with
+  `-tags mobile`, a wait from any goroutine no longer returns before its
+  function ran.
+* **iOS apps built with the iOS 27 SDK launch on iOS 27**
+  ([#1117](https://github.com/belluikit/bellui/issues/1117)). iOS 27 stops an
+  app built with its SDK at launch unless the app uses the scene life cycle;
+  the user saw a black screen and the app closed. bellui's iOS runtime now has
+  a window scene delegate, which creates the window, reports foreground and
+  background, and receives opened URLs and Universal Links. It needs an
+  Info.plist that declares the scene, which `bellui package` and `bellui
+  release` now write, so repackage with an updated CLI. An app packaged by an
+  older CLI keeps working as before on iOS 26 and earlier.
+* **A snackbar's message wraps instead of running off the screen**
+  ([#1106](https://github.com/belluikit/bellui/issues/1106)). A message wider
+  than the window showed on one line, cut off at both edges. It now wraps at
+  the width the window leaves inside the snackbar's margins, with the action
+  button, if any, at the end. A message that fits on one line looks as
+  before.
+* **Word-wrapped text no longer breaks at a no-break space**
+  ([#1099](https://github.com/belluikit/bellui/issues/1099)). A Label or
+  RichText wrapped at U+00A0, U+2007 and U+202F like at any other space, so
+  French text started a line with `:` or `»`, and a no-break space at the
+  start of a line was dropped. Now a line breaks only at a breakable space;
+  a run joined by no-break spaces that is wider than the line still breaks
+  between characters, as an unbroken word does.
+* **A focused widget removed from a container no longer keeps the focus**
+  ([#1089](https://github.com/belluikit/bellui/issues/1089)). An app that swaps
+  a page by changing a container (assigning `Objects`, `Remove`) instead of
+  `SetContent` left the dropped widget focused, so keys typed after went to a
+  widget no longer shown, and the page stayed in memory. It now loses the focus
+  by the frame that shows the new content, without `bellui.Release`. A focused
+  row a `List` scrolls fully out of view loses the focus the same way, since
+  the list reuses that row for another item. Moving or hiding the focused
+  widget, or selecting another tab, still keeps it. Each new screen also costs
+  one full layout pass instead of two.
+* **Buttons show that they were pressed**
+  ([#1085](https://github.com/belluikit/bellui/issues/1085)). A tap on a
+  `Button` showed a ripple only after the finger lifted. It started at 12%
+  and faded as it grew, so a fingertip hid it until it was a few percent,
+  and it was OnSurface on every variant. An `IconButton` showed nothing.
+  Both now show the MD3 pressed state from the moment of the press: the
+  button's content colour (OnPrimary on a filled button, Primary on a text
+  or outlined one) at the theme's pressed opacity, spreading from the press
+  point. After the release it covers the button and then fades, so a quick
+  tap is seen. A touch that scrolls the list a button is in, or a pointer
+  dragged off it, leaves no pressed state behind. With animations off, the
+  state layer shows from press to release.
+* **A replaced screen's images and their GPU textures are freed with the frame
+  that shows the new screen**
+  ([#1082](https://github.com/belluikit/bellui/issues/1082)). After
+  `SetContent`, the texture cache kept each image of the old screen, its
+  decoded pixels and its texture until the first frame at least a minute after
+  it was last drawn, which an idle app does not draw. WebGPU's RepaintBoundary
+  targets waited for frames the same way. They now go with the frame that
+  shows the new screen, and no frame after it is needed; with the GL painter
+  they go at the start of the next frame.
+* **AppTabs draws its selection indicator under the selected tab in a right-to-left layout with overflowing tabs**
+  ([#1080](https://github.com/belluikit/bellui/pull/1080)). It was drawn one
+  overflow-button width before the tab.
+* **DocTabs draws its selection indicator under the selected tab in a right-to-left layout**
+  ([#1078](https://github.com/belluikit/bellui/issues/1078)). It was drawn one
+  create-and-overflow-buttons width before the tab, and clipped as if the tab
+  strip started at the edge of the bar.
+* **Fonts are no longer parsed again, and kept, while an app runs**
+  ([#1066](https://github.com/belluikit/bellui/issues/1066)). Under the
+  default WebGPU painter, a text drawn from its cached layout does not look
+  its fonts up, so the minute-long cache sweep forgot the parsed fonts while
+  those layouts and the glyph atlas still used them. The next text shaped
+  parsed a second copy, and both stayed: a phone app playing music grew from
+  1.6k to 43k live parsed-font objects in an hour. A font now stays parsed
+  once while anything holds it; one nothing holds is still released.
+* **A dropped `ThemeOverride` frees its content without its window closing**
+  ([#1065](https://github.com/belluikit/bellui/issues/1065)). A container
+  under an override stayed in memory, with everything inside it, until its
+  window closed. A phone app keeps one window, so it kept every screen it
+  rebuilt with an override in it. The `ThemeOverride` now owns its scope: the
+  scope lives while the override has a renderer, and a minute after it has
+  none, or a minute after it is made if it is never shown.
+* **A hidden file or resource `canvas.Image` no longer re-reads its source on
+  every size query** ([#1062](https://github.com/belluikit/bellui/issues/1062)).
+  An image with no size is never decoded, and `MinSize` used to reopen and
+  re-read its file each time it was asked, which inside a `WheelPicker` was
+  every frame (23% of a phone's CPU in one app). It now reads the source once
+  to learn the aspect. An `ImageFillOriginal` image is decoded when layout
+  gives it a size, instead of on the next `MinSize` call.
+* **Something refreshing out of sight no longer redraws the window**
+  ([#1061](https://github.com/belluikit/bellui/issues/1061)). An animation,
+  video or live chart on a tab that is not selected, or under a hidden
+  container, made the window draw a frame each time it refreshed: about 10 a
+  second for an app's two animated glows, against 1 now. Its refreshes are
+  still kept, so it is not shown stale when it comes back into view.
+* **`AppTabs` and `DocTabs` stop rebuilding their tab bar on every layout**
+  ([#1059](https://github.com/belluikit/bellui/issues/1059)). `AppTabs` made a
+  new container for its tab buttons, and both refreshed every button, each
+  time they were laid out or refreshed. In an app whose tabs were laid out on
+  every 10 Hz tick, that added about 70 render-tree nodes a second. The bar
+  now keeps its buttons and refreshes one only when its tab changed. With tabs
+  in the overflow menu, `AppTabs` no longer hides and shows the overflow
+  button while it measures, which cost a full layout pass on the next frame.
+  An explicit `Refresh` still restyles every button.
+* **A phone app no longer grows in memory for the rest of the session after it has been in the background once**
+  ([#1058](https://github.com/belluikit/bellui/issues/1058)). After a
+  background→resume the driver repaints every frame in full, and from then
+  on every object added to the screen was kept, with its render-tree node,
+  for the life of the window: DaySong on a Pixel 9a grew by about 8 MB
+  every five minutes while a song played. A full-repaint frame now takes
+  the nodes queued for a partial-repaint region, as a region frame does.
+* **x/mmedia (Android): music no longer sounds like a phone call after one**
+  ([#1052](https://github.com/belluikit/bellui/issues/1052)). When a call was
+  answered, the audio stream was dropped and opened again at once, while the
+  phone was still in call mode. The new stream kept a thin sound after the
+  call. The audio device now rests while nothing plays, so the paused stream
+  waits out the call and plays on as before. This also covers the end of a
+  track. x/mmedia now requires oto v3.5.1, the version apps already got
+  through player.
+* **One snackbar at a time, and a fading pop-up no longer removes what was opened after it**
+  ([#1038](https://github.com/belluikit/bellui/issues/1038)). Two
+  `widget.ShowSnackbar` calls stacked two bars. Material 3 shows one, and
+  `Snackbar.Show` now takes the canvas's current snackbar off first, whichever
+  `Snackbar` showed it. Separately, when a pop-up's fade-out ended, everything
+  added above it during the fade went with it: a dialog, toast or snackbar
+  shown in those ~100 ms vanished. A fading pop-up now removes itself and only
+  the overlays that were above it when it began to hide. A toast or snackbar
+  removes only itself, so a dialog opened while one shows also survives it.
+* **x/mmedia: mute and volume changes are heard at once**
+  ([#1032](https://github.com/belluikit/bellui/issues/1032)). The volume was
+  applied to audio as it was decoded, and the decoder runs up to a second
+  ahead of playback, so a mute took about 1.2 s to be heard. It is now the
+  audio player's own volume, applied as the audio is played.
+* **Concurrent reads of a picked iOS file no longer race when it is read from
+  memory** ([#1031](https://github.com/belluikit/bellui/issues/1031)). When a
+  picked document cannot be opened by its path, it is read whole into memory
+  on first use. Two `ReadAt` calls arriving first at the same moment each read
+  it and wrote it without synchronisation. It is now read once.
+* **Goroutines posting `bellui.Do` back to back no longer freeze the desktop
+  loop** ([#1023](https://github.com/belluikit/bellui/issues/1023)). Each post
+  woke the loop with its own native event, and four goroutines posting without
+  pause added them faster than the native pump cleared them, so the pump never
+  returned and work queued behind them, a `Quit` included, never ran. A wake
+  is now posted only when none is already pending, and the loop runs work
+  that is on its way to its queue instead of waiting for it natively.
+* **Quitting no longer crashes when other goroutines are posting work**
+  ([#1021](https://github.com/belluikit/bellui/issues/1021)). A `bellui.Do`
+  from another goroutine during shutdown (the app's own `OnStopped` is one)
+  could panic with `NotInitialized: The GLFW library is not initialized`, or
+  with `send on closed channel`, and a `DoAndWait` posted then could never
+  return. Shutdown now stops wakes before it ends GLFW, and stops posts
+  before it closes the main queue.
+* **A file picked on iOS is read from storage, not loaded into memory**
+  ([#1020](https://github.com/belluikit/bellui/issues/1020)). The reader for a
+  picked document loaded the whole file on its first read, so a video of a
+  few GB needed that much memory and the app was killed. It now reads through
+  the file while its security scope is held. Memory stays flat, seeking works
+  as before (#848), and the reader is also an `io.ReaderAt`. If the file
+  cannot be opened by its path, the reader logs that and loads it into memory
+  as before.
+* **No more "draw was refused" errors from a covered window on WebGPU**
+  ([#1019](https://github.com/belluikit/bellui/issues/1019)). When macOS gave
+  a window no surface (covered, or just shown), the desktop and mobile drivers
+  still walked its content, and each rounded clip logged
+  `Record called outside a frame`. Now a window with no open frame is not
+  walked; it is painted on the existing retry once a frame begins.
+* **An iOS app fills the screen with Display Zoom on**
+  ([#1016](https://github.com/belluikit/bellui/issues/1016)). With Display
+  Zoom set to Larger, an app was drawn about 1.26 times too large and its
+  right side was cut off. Layout and drawing now use the screen's own pixels
+  per point (`UIScreen.nativeScale`), as touches already did. This also fixes
+  the iPhone 12 mini and 13 mini, whose downsampled screens left an unpainted
+  strip along the right and bottom edges even without zoom. Other screens are
+  unchanged with Display Zoom off.
+* **Paths and rounded clips cut each other however they nest**
+  ([#1015](https://github.com/belluikit/bellui/issues/1015)). A filled
+  `canvas.Path`, or a path clip's content, inside a rounded clip (a `Card`, or
+  a container with `ClipCornerRadius`) drew past the clip's corners and edges
+  on WebGPU, and was not drawn at all on GL. A rounded clip or a path inside a
+  path clip drew outside the path. Now each is cut by the clips around it, on
+  both painters. Clips nest 14 deep; a deeper clip is cut by the one around it
+  only, and is logged once.
+* **A rounded clip inside another no longer turns off the outer one's rounded corners**
+  ([#1012](https://github.com/belluikit/bellui/issues/1012)). Once the
+  inner clip ended, anything drawn after it inside the outer clip showed in
+  the outer's corners: for example content after an `Entry` in a `Card`, or
+  in a `Container` with `ClipCornerRadius`. The same happened after a path
+  fill or a path clip inside a rounded clip. Fixed for the WebGPU and GL
+  painters. An inner clip that sticks out past the outer one is now cut by
+  it too.
+* **Selection handles follow a rotated or scaled text field on mobile**
+  ([#1008](https://github.com/belluikit/bellui/issues/1008)). The selection
+  handles, caret handle and loupe of an `Entry`, `RichEntry` or selectable
+  `Label`/`RichText` under a rotation or scale (on the widget or a parent)
+  sat off the text, and dragging a handle moved the selection along the
+  wrong axis. Each point now goes through the widget's transforms, both
+  ways. The handles and the loupe stay upright.
+* **A scroll into content that just grew lands where it was asked**
+  ([#1005](https://github.com/belluikit/bellui/issues/1005)). Scrolling a
+  Scroll into content that had grown since its last layout, such as a data
+  grid that was just given more rows, went back to the top when the content
+  used to fit the view; only a second scroll moved it. The scroll now judges
+  the offset by the content's new size.
+* **A `RepaintBoundary` inside a rotated or scaled widget turns and scales with it**
+  ([#1003](https://github.com/belluikit/bellui/issues/1003)). It used to draw
+  its cached image unrotated and unscaled, for example inside a SwipeArea
+  card while it tilts. While the transform does more than move it, the
+  boundary now draws its content directly; it uses its cache again once the
+  transform is back to a plain move.
+* **A clip inside a rotated widget clips to its turned shape**
+  ([#1003](https://github.com/belluikit/bellui/issues/1003)). A `ClipToBounds`
+  container or a scroll inside a rotated or skewed widget clipped its content
+  to the upright box around it, so the content showed in that box's corners,
+  and could be tapped there. It now clips exactly to the turned rectangle,
+  on the GPU painters, and taps there no longer reach the hidden content.
+* **A transform moves, pivots and turns objects the same way on every painter**
+  ([#997](https://github.com/belluikit/bellui/issues/997)). The WebGPU and GL
+  painters turned each object about its own top-left and dropped any
+  translation, so a `NewTranslation` did nothing, a `NewRotationAround` pivot
+  was ignored, and the children of a transformed widget did not turn with it
+  as one piece; the software painter dropped a transform that only translates.
+  An object moved by a transform that only translates or scales was hit where
+  it used to be, and a clipping container moved by a transform clipped where
+  it used to be. Now
+  drawing, hit-testing, clips and partial repaint all follow the documented
+  `core.Transformable` product. `Driver.AbsolutePositionForObject`, a
+  `RepaintBoundary` under a rotation and exact rectangle clips under a rotation
+  still do not ([#1003](https://github.com/belluikit/bellui/issues/1003)).
+* **Rounded clips clip under the GL painter (`-tags gl`)**
+  ([#990](https://github.com/belluikit/bellui/issues/990)). Card, Entry and a
+  `Container` with `ClipCornerRadius` drew their corners square: the GL
+  painter draws into offscreen framebuffers that had no stencil buffer, so
+  the stencil clip passed everything. The canvas and `RepaintBoundary`
+  framebuffers now have one, and a rounded clip inside a `RepaintBoundary` is
+  placed in the boundary's own space, as the default WebGPU painter does.
+* **`WheelPicker` no longer panics when its items are set after it is shown**
+  ([#984](https://github.com/belluikit/bellui/issues/984)). Adding items to a
+  wheel that was already drawn and then selecting one without a `Refresh`
+  crashed with "index out of range". The new items are now laid out at once.
+  A wheel with no items also keeps a selection made before its items arrive,
+  instead of resetting it to the first item on the next `Refresh`; it is
+  clamped to the items once they are there.
+* **bellui.Do and DoAndWait no longer stall for up to a second on a busy
+  machine** ([#981](https://github.com/belluikit/bellui/issues/981)). The
+  desktop loop could wake for posted work before the work reached the queue it
+  drains, find nothing, and sleep a whole idle tick with the work waiting. It
+  now counts posted work until it has run, and while any is outstanding waits
+  at most a millisecond.
+* **A clipped container that animates no longer leaves thin dark lines on
+  phones** ([#975](https://github.com/belluikit/bellui/issues/975)). At a
+  fractional scale (2.625 on a Pixel 9a), a partial repaint cleared its dirty
+  region and then redrew a `ClipToBounds` container under a clip that could end
+  one pixel row short of the cleared area, even where both ended at the same
+  place. That row kept the background colour. Clips are now rounded edge by
+  edge, so rects that share an edge share it in pixels too, in both the WebGPU
+  and GL painters.
+* **A widget or container shown after its window's first frame is laid out
+  at once, and a widget hidden later gives up its space**
+  ([#973](https://github.com/belluikit/bellui/issues/973)). One hidden since
+  before the first frame was never placed, so showing it asked no window for a
+  frame: it sat at size 0, a button's label hanging off the row's left edge,
+  until something else redrew. Showing such an object now asks every window
+  for a frame. A widget hidden later now has its parent laid out again, as a
+  container or canvas object already did.
+* **The WebGPU painter logs a draw it refuses**
+  ([#958](https://github.com/belluikit/bellui/issues/958)). A draw the
+  painter could not record vanished with nothing in the log. The causes
+  were a uniform block too large for its slot, a pipeline that failed to
+  build (a shader error), a draw outside a frame, or an unknown shader. Each
+  refusal is now logged once per pipeline and reason, naming the shader and
+  the cause, and is not repeated every frame.
+* **The GL painter draws gradients with a shader too**
+  ([#957](https://github.com/belluikit/bellui/issues/957)). The GL painter
+  (the default on Linux and Windows desktops, and in any `-tags gl` build)
+  now draws `LinearGradient` and `RadialGradient` with a fragment shader,
+  as the WebGPU painter does since #956. An animated gradient no longer
+  regenerates a CPU image and uploads it on every change. The result matches
+  the CPU image to within 3/255 per channel. A gradient with more than six
+  stops still takes the CPU path. So does every gradient on a driver that
+  cannot build the shader, which logs why and keeps rendering everything
+  else.
+* **An animated gradient no longer costs a CPU image every frame**
+  ([#956](https://github.com/belluikit/bellui/issues/956)). The WebGPU
+  painter, the default on phones and macOS, draws `LinearGradient` and
+  `RadialGradient` with a shader, computing each pixel's colour on the GPU.
+  Before, every change regenerated the whole image on the CPU and uploaded
+  it: two animated halos ran at about 11 fps on a Pixel 9a. The result
+  matches the CPU image to within 3/255 per channel. A gradient with more
+  than six stops still takes the CPU path, and the GL painter is unchanged.
+* **Right-to-left: the extended FAB no longer draws its icon over its label**
+  ([#945](https://github.com/belluikit/bellui/issues/945)). Under RTL the
+  icon now sits on the right of the label with the same gap as in LTR. The
+  label was laid out in a zero-width box, so its right-aligned text spilled
+  onto the icon, and the row was never mirrored. Under `DenseTheme` the icon's
+  leading padding is now 16, the width the FAB's minimum size already
+  reserved, instead of 12.
+* **iOS: clock times show in the device's time zone, not UTC**
+  ([#944](https://github.com/belluikit/bellui/issues/944)). Go's time package
+  leaves `time.Local` at UTC on iOS, so every time an app formatted with it,
+  including the date pickers', was off by the device's UTC offset. The driver
+  now sets `time.Local` at startup from the zone iOS reports, with its
+  daylight-saving rules. As on Android, a zone change while the app runs is
+  picked up on the next launch.
+* **macOS binaries no longer call the undeclared `setAppleMenu:`**
+  ([#934](https://github.com/belluikit/bellui/issues/934)). The native menu
+  bar called a method the macOS SDK does not declare, which Mac App Store
+  review can reject as private API. Only Mac OS X before 10.6 needed it; the
+  first item of the main menu is the application menu without it. The GLFW
+  fork still links its own copy of the call until its pin moves
+  (belluikit/glfw#6), so the selector stays in binaries until then.
+* **iOS: what an app writes to stdout, stderr and package `log` reaches the device log**
+  ([#914](https://github.com/belluikit/bellui/issues/914)). An app started
+  without Xcode attached has its stdout and stderr on `/dev/null`, so
+  `fmt.Println` output and diagnostics written to `os.Stderr` were lost; on an
+  iPad, package `log` output did not reach the device log either. All three
+  now go to the unified log line by line, prefixed `Bellui:` (stderr at the
+  error level), as Android already sends them to logcat. Under Xcode or
+  `devicectl --console`, stdout and stderr are left alone, since those
+  already show them.
+* **Android: a second launch while the app is starting no longer leaves it
+  not responding** ([#896](https://github.com/belluikit/bellui/issues/896)).
+  Opening an app again while it starts (SystemUI does this when an app is
+  opened as its install finishes) creates a new activity before the old one
+  is torn down. The old activity's teardown then detached the new one's input
+  queue, so the first touch timed out and Android showed "isn't responding".
+  Teardown and lifecycle callbacks from a replaced activity no longer touch
+  the new one's input, window or lifecycle.
+* **Android: the page grows back when a keyboard leaves**
+  ([#894](https://github.com/belluikit/bellui/issues/894)). An app opened
+  while another app's keyboard was up, such as from the launcher's search,
+  kept its page sized for that keyboard, with the lower part of the screen
+  black until a restart. The page now follows the window's insets as they
+  change, not only when the window is laid out again.
+* **Android: no "Failed to load user locales" error at every launch**
+  ([#892](https://github.com/belluikit/bellui/issues/892)). The locale was
+  asked for during package init, before Android hands over the JVM, so the
+  lookup always failed and logged an error. The app still ended up in the
+  right language, because the toolkit asks again once the JVM is there. The
+  early lookup is skipped now.
+* **Mobile: `Do`, `DoAndWait` and `RunOnMain` run on the main goroutine when
+  called before the app starts** ([#890](https://github.com/belluikit/bellui/issues/890)).
+  A goroutine that made one of these calls before the run loop started ran the
+  function itself, racing the UI that main was still building, and logged
+  `Error in GUI call thread`. The call now waits for the loop, as it does on
+  desktop. The same warning also names the calling code now, not its own line.
+* **x/mmedia: Close, Stop and swapping the source no longer wait for a
+  network seek to finish**
+  ([#884](https://github.com/belluikit/bellui/issues/884)). A far seek in a
+  network MP3 with no seek table makes FFmpeg read through to the target,
+  and closing or stopping the player during it waited for that: 0.6 to 10.5 s
+  on an https MP3 in our measurements. The player now interrupts the read and
+  returns in tens of milliseconds, and the download stops. After a Stop that
+  cut a seek short, the next Play opens the stream again from its start. A
+  Stop during ordinary playback is unchanged. Needs goffmpeg's new
+  `IDecoder.Interrupt`, so anything implementing that interface needs the
+  method too.
+* **x/mmedia: a track is reported finished when it has finished playing, and
+  a seek near the end plays to it**
+  ([#882](https://github.com/belluikit/bellui/issues/882)). The end of an
+  audio-only track came 0.2 to 0.3 s before its sound did, with the position
+  at about 2.7 s of a 3 s track, and a video's about 50 ms before; moving on
+  to the next track at the end cut that much off. A seek into about the last
+  second of a video with sound froze the picture at the target, and the end
+  never came. A seek made after the decoder had read to the end of the file
+  also ended a song at once or froze a video; that part was fixed with #872
+  and now has its tests.
+* **x/mmedia: the playback position no longer jumps a chunk ahead**
+  ([#878](https://github.com/belluikit/bellui/issues/878)). The position
+  counted audio the device's player had pulled but not yet taken in as
+  played, so a reading at the wrong moment was 120 to 150 ms ahead, and the
+  next one fell back. On a loaded Mac that happened 30 times in 8 s of
+  playback. When the player
+  ran short of audio, the silence it filled in was also counted as audio
+  still to play, which held the position back. Both now count what has been
+  played.
+* **Headless renders draw box shadows**
+  ([#876](https://github.com/belluikit/bellui/issues/876)). The software
+  painter, which draws `Canvas.Capture` without a window, test images and
+  `--render` output, dropped every `canvas.BoxShadow`. An elevated `Card`,
+  menu, pop-up or dialog had no shadow there, so a card the colour of the page
+  had no visible edge. It now draws the shadow as the GPU painters do: the
+  same rounded rect, padding and offset, blurred by the exact Gaussian their
+  9-tap blur approximates. Measured against the window's own WebGPU and GL
+  painters at scales 1 and 2, no pixel differs by more than 9 of 255. Test
+  images with shadows changed to match: 18 desktop and 11 mobile.
+* **x/mmedia: an https link on Android rides out a moment without network
+  when it opens** ([#873](https://github.com/belluikit/bellui/issues/873)).
+  An open that failed on the network, a timeout or a server error was not
+  retried, so a short drop meant no player. It now retries after 0.25, 0.5
+  and 1 s, inside 10 s for the whole open; a 404, an expired link or an
+  untrusted certificate still fails at once. An open whose server sent
+  headers and then went silent no longer waits forever.
+* **x/mmedia: Seek, Stop and Close on a network player no longer freeze the
+  caller** ([#872](https://github.com/belluikit/bellui/issues/872)). A seek
+  moved the stream on the goroutine that called it, usually the UI's, and on
+  a network stream FFmpeg may read everything up to the target first: a seek
+  to 75% of a 9 MB MP3 held the UI for 0.8 to 9.7 s, depending on the
+  server's speed. Seek now returns at once and the player's decoder moves the
+  stream. The position reads the target straight away and holds there until
+  playback resumes from it; a seek that fails is still reported through
+  `WithOnError`. Stop no longer rewinds the stream itself: the next Play
+  does. Close makes no request at all, where it used to rewind the stream
+  first.
+* **x/mmedia: `https` URLs play on Android**
+  ([#871](https://github.com/belluikit/bellui/issues/871)). FFmpeg's Android
+  libraries have no TLS, so `NewAudioPlayerURL`, `NewMediaPlayerURL` and
+  `NewVideoPlayerURL` failed on any `https` link with `failed to open decoder:
+  -1`. On Android an `https` URL is now read through Go's `net/http` with range
+  requests: it starts playing before the file has arrived, seeks, resumes a
+  dropped or stalled connection, and uses the system's certificates. A server
+  that ignores `Range` still works, read from the start. A signed link that
+  expires fails on the next request with an error that says so. An `https` HLS
+  playlist still cannot play on Android, and now fails with an error that says
+  why. Other platforms and plain `http` are unchanged.
+* **x/mmedia: a seek that fails is reported through `OnError`**
+  ([#869](https://github.com/belluikit/bellui/issues/869)). A seek the decoder
+  refused, such as one back into a stream whose server cannot rewind it, was
+  dropped: playback went on from where it was, so an app could not tell the
+  seek had not happened. Now playback stops and `OnError` gets the reason,
+  with the position left where playback was, playing or paused. Seeking a
+  stopped player that then fails reports it on the next `Play`.
+* **x/mmedia: a dropped connection to a server that ignores `Range` no longer replays the start of the file**
+  ([#868](https://github.com/belluikit/bellui/issues/868)). FFmpeg reconnected
+  and took the server's answer, the file again from byte 0, as the rest of the
+  stream. The start of a song played in the middle of it, the position ran on
+  past the end, and no error was reported. Such a drop now ends in `OnError`.
+  A live stream (no length) still reconnects, since without that a dropped one
+  ended as if the station had finished. x/mmedia tells the two apart by
+  duration, and opens a live stream a second time to do so.
+* **Desktop: a change made while a window is covered shows once it is not**
+  ([#864](https://github.com/belluikit/bellui/issues/864)). On macOS a window
+  that was fully covered, or whose app was hidden, drew nothing, and once it
+  was back on screen it kept its old content until something else changed.
+  A label set as an app started behind the terminal stayed as first drawn.
+  The window now paints the change within about 100 ms of coming back.
+* **A software-painted rectangle without a fill is now transparent instead of crashing** ([#862](https://github.com/belluikit/bellui/issues/862)).
+* **A theme looked up before the app starts says so, and a colour no longer
+  crashes** ([#861](https://github.com/belluikit/bellui/issues/861)). Asking
+  for a theme icon before `app.New`, as an app's metadata can, logged
+  "Attempt to access current Bellui app when none is started" on every
+  lookup. It now logs once that the built-in theme was used, not the app's.
+  `theme.Color` asked that early dereferenced a nil app and panicked; it now
+  gets the built-in theme's colour.
+* **x/mmedia: a seek no longer plays a fraction of a second of the old position first**
+  ([#855](https://github.com/belluikit/bellui/issues/855)). After moving the
+  position, players played up to about 160 ms from where they had been: the
+  audio library's own buffer still held it. That buffer is now emptied once
+  the new position's audio is ready, so the seek lands cleanly. A seek near
+  the very end, with less than 150 ms left to play, still plays the old
+  audio briefly.
+* **Android: picking a file no longer crashes the app now and then**
+  ([#852](https://github.com/belluikit/bellui/issues/852)). Each time the app
+  resumed, as it does when the file picker closes, the toolkit replaced its
+  reference to the activity and deleted the old one, even while code was
+  still using it, such as the picked file's name lookup. Android then aborted
+  the process with "jobject is an invalid global reference". The old
+  reference is now kept until the last code using it finishes.
+* **x/mmedia: songs with cover art play in `AudioPlayer`**
+  ([#850](https://github.com/belluikit/bellui/issues/850)). An MP3 with an
+  embedded album picture, as most songs from a music library have, reported
+  its end at once from a file, and after about a second from a file picked on
+  Android. FFmpeg presents the picture as a one-frame video stream, and the
+  player waited for video frames that never came. `AudioPlayer` now ignores
+  video streams, and goffmpeg v0.6.1 skips the picture for every player
+  (see #857).
+* **Android: a document that won't open says why**
+  ([#849](https://github.com/belluikit/bellui/issues/849)). Opening or saving
+  through the file dialog failed with "document does not exist" whatever the
+  cause, such as a Drive file that isn't stored offline while the device is
+  offline. The error is now the Java exception's own text, for example
+  `java.io.FileNotFoundException: tfe: Cello error 2.`. A
+  FileNotFoundException still matches `storage.ErrNotExists` with `errors.Is`.
+* **x/mmedia: the position no longer jumps past the end after an iOS app returns from the background**
+  ([#846](https://github.com/belluikit/bellui/issues/846)). iOS stops a
+  backgrounded app's audio, and the player's clock went on counting wall time,
+  so the first time updates back read the time spent away: 21 s of a 12 s
+  song, then back to 7 s. Each update now asks the audio device where it is,
+  so playback reports the position where the audio stopped, and no update
+  reads past the duration.
+* **x/mmedia: playing an audio track again after it ended works, and no longer freezes the app**
+  ([#842](https://github.com/belluikit/bellui/issues/842)). Tapping play on
+  an audio-only player whose track had ended played nothing, and the next
+  Stop or Close (leaving the page, opening another clip) hung forever. Play
+  after an end now plays from the start, or from a position sought since.
+* **x/mmedia: network streams ride out a dropped or stalled connection, and a lost one is reported as an error, not as the end of the track**
+  ([#839](https://github.com/belluikit/bellui/issues/839)). When the
+  connection dropped partway through a file or stream, the player called
+  `OnEnd` and jumped the position to the full duration, so an app could not
+  tell a finished track from a lost one; a server that went silent without
+  closing hung playback for good. `http(s)` URLs now reconnect and carry on
+  from where they stopped, and a read that gets nothing for 5 s counts as a
+  drop. A server that stays unreachable ends in `OnError` within a few
+  seconds, with the position left where playback stopped and the play button
+  back on "play". A clean end is still `OnEnd`. A live stream with no length
+  (internet radio) still ends in `OnError` after a drop: the reconnected
+  stream does not splice onto the old one.
+* **Android: a hardware key acts when it is pressed, and a held key repeats**
+  ([#793](https://github.com/belluikit/bellui/issues/793)). Bellui read every
+  key-down from a USB or Bluetooth keyboard as a release and every key-up as
+  a press, so a key acted when it was let go, and holding it typed it once.
+  Keys now act on the press. Holding one repeats it, the same way the desktop
+  driver does, except Escape: holding it closes one pop-up, not each in turn.
+  Text typed into an `Entry` was not affected, because the keyboard app
+  delivers it. A held vowel still types once, because Gboard opens its accent
+  picker for it, as it does in every app.
+* **On the web, checking which goroutine is running no longer takes a stack trace**
+  ([#776](https://github.com/belluikit/bellui/issues/776)). Every widget setter
+  and every text-direction push and pop asks for the current goroutine's ID.
+  The js/wasm build now reads the ID from the runtime's goroutine record, as
+  amd64 and arm64 already did, in about 5 ns with no allocation instead of
+  about 6 µs and one allocation.
+* **On a phone or tablet, a swipe that starts on a carousel, a slider or a scroll nested in the page now scrolls the page**
+  ([#662](https://github.com/belluikit/bellui/issues/662)). A one-finger drag
+  used to go to whatever draggable widget it started on, which kept it even
+  when it could do nothing with it: an upward swipe over a carousel or a
+  horizontal slider left the page where it was, and a scroll inside a page
+  swallowed swipes once it reached its end. The drag now goes to the innermost
+  widget that takes a drag that way, so a sideways swipe still pages a
+  carousel and moves a slider, and a nested scroll hands the page a swipe it
+  cannot follow. A disabled slider or wheel picker leaves every drag to the
+  page. Mouse drags are unchanged.
+* **x/mmedia: frames of another size than the source declared are no longer
+  truncated** ([#431](https://github.com/belluikit/bellui/issues/431)). A
+  source that declared no size (0x0) at open got a 640x360 frame pool, and its
+  real frames were cut into it. The first frame of another size now rebuilds
+  the pool at that size before anything is decoded into it, the video surface
+  follows, and `MediaPlayer` letterboxes to the new shape. FFmpeg devices that
+  declare 0x0 still open with no video at all; that is
+  [#1165](https://github.com/belluikit/bellui/issues/1165).
+
 ## v1.3.0-rc.1 — 2026-10-27
 
 The first release candidate for v1.3.0, cut while the release is still being
