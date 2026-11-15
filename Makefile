@@ -197,6 +197,9 @@ release-tag-commands: ## Steps 3 and 5: print the tag commands (does not run the
 	@echo "git tag -a $(VERSION) -m \"$(VERSION)\" && git push origin $(VERSION)"
 	@echo "# 5. x/ modules, after release-pins is committed and pushed:"
 	@for m in $(X); do echo "git tag -a \"x/$$m/$(VERSION)\" -m \"x/$$m $(VERSION)\" && git push origin \"x/$$m/$(VERSION)\""; done
+	@git fetch -q origin --tags; for t in $(addprefix x/,$(addsuffix /$(VERSION),$(X))) cmd/bellui/$(VERSION); do \
+		if git rev-parse -q --verify "refs/tags/$$t" >/dev/null; then echo "# WARNING: $$t already exists; give that module the next free version"; fi; \
+	done
 
 .PHONY: release-pins
 release-pins: ## Step 4: move the x/ pins to the tagged $(VERSION) and verify each

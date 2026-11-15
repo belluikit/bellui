@@ -36,7 +36,9 @@ audio playback with no widget in x/mmedia. Things that may need a look (see
 v0.13.0 and links FFmpeg as shared libraries, a finger dragged over text on a
 phone scrolls instead of selecting, and `NavigationDrawer` opens on the right
 in a right-to-left layout. The `x/*` modules and the `bellui` command are
-released at v1.3.0-rc.2 with it.
+released at v1.3.0-rc.2 with it, apart from x/mmedia, which is v1.3.0-rc.3:
+its rc.2 had already gone out on its own on 2026-11-02, and a published version
+cannot be moved.
 
 ### Added
 
