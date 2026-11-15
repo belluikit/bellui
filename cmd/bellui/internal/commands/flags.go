@@ -69,7 +69,7 @@ var stringFlags = map[string]func(*string) cli.Flag{
 		return &cli.StringFlag{
 			Name:        "certificate",
 			Aliases:     []string{"cert"},
-			Usage:       "ios/macos/windows: name of the certificate to sign the build",
+			Usage:       "ios/macos/windows: name of the certificate to sign the build. ios also takes the certificate's SHA-1, and an ios release with -profile picks the identity the profile allows",
 			Destination: dst,
 		}
 	},
