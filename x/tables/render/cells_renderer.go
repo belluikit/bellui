@@ -325,8 +325,16 @@ func (r *CellsRenderer) refreshCells() {
 		if grid.IsSelected(row, 0) {
 			rowBg.FillColor = tc.Selection
 		}
+		rowBgW := totalW
+		if grid.IsGroupRow(row) {
+			// The GroupRowOverlay leaves the scroll bar strip uncovered, so the
+			// group colour under the bar comes from here, across the whole
+			// band even where the columns end short of it.
+			rowBg.FillColor = tc.GroupRowBg
+			rowBgW = geo.Max(totalW, r.cells.Size().Width)
+		}
 		rowBg.Move(geo.NewPos(0, y))
-		rowBg.Resize(geo.NewSize(totalW, cellH))
+		rowBg.Resize(geo.NewSize(rowBgW, cellH))
 		rowBg.Show()
 		objects = append(objects, rowBg)
 

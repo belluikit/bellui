@@ -1,7 +1,9 @@
 package tables
 
 import (
+	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/canvas"
+	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/widget"
@@ -158,6 +160,7 @@ func (r *dataGridRenderer) doLayout(size geo.Size) {
 	// pinned-right in one place (#110, #111).
 	g.groupRowOverlay.Move(geo.NewPos(0, yOffset))
 	g.groupRowOverlay.Resize(geo.NewSize(size.Width, contentH))
+	g.groupRowOverlay.SetScrollBarInsets(g.scrollBarInsets(geo.NewSize(scrollW, contentH)))
 
 	// Status bar
 	if r.statusBar != nil {
@@ -181,6 +184,23 @@ func (r *dataGridRenderer) doLayout(size geo.Size) {
 	g.pinnedLeftCells.Refresh()
 	g.pinnedRightCells.Refresh()
 	g.groupRowOverlay.Refresh()
+}
+
+// scrollBarInsets returns the width of the vertical and the height of the
+// horizontal scroll bar the main scroll of size scrollSize draws, each 0 when
+// that bar is not shown. It follows the scroll's own rule: a bar shows when its
+// direction scrolls and the content is larger than the scroll that way.
+func (g *DataGrid) scrollBarInsets(scrollSize geo.Size) (right, bottom float32) {
+	dir := g.scrollContent.Scroll.Direction
+	content := g.cellsWidget.MinSize()
+	barW := g.Theme().Size(bellui.ThemeSizeName("scrollBar"))
+	if (dir == container.ScrollBoth || dir == container.ScrollVerticalOnly) && content.Height > scrollSize.Height {
+		right = barW
+	}
+	if (dir == container.ScrollBoth || dir == container.ScrollHorizontalOnly) && content.Width > scrollSize.Width {
+		bottom = barW
+	}
+	return right, bottom
 }
 
 func (r *dataGridRenderer) MinSize() geo.Size {
