@@ -21,7 +21,7 @@ func TestTreeView_DragDropsAtPointerBelowOtherWidget(t *testing.T) {
 	test.NewTempApp(t)
 	nodes := []TreeViewNode{{ID: "a", Text: "a"}, {ID: "b", Text: "b"}, {ID: "c", Text: "c"}, {ID: "d", Text: "d"}}
 
-	for _, scrolled := range []bool{false} {
+	for _, scrolled := range []bool{false, true} {
 		tv := NewTreeViewWithNodes(nodes)
 		tv.AllowReorder = true
 		// The tree sits 50 below the window's top, under an entry.
@@ -71,4 +71,27 @@ func TestTreeView_DragDropsAtPointerBelowOtherWidget(t *testing.T) {
 		}
 		assert.Equal(t, want, tv.ChildIDs(""), "scrolled=%v", scrolled)
 	}
+}
+
+// Scrolling from code reports the new offset, which GetScrollOffset and the
+// drop row read, and clamps it to the content (#1229).
+func TestTreeView_ScrollFromCodeUpdatesOffset(t *testing.T) {
+	test.NewTempApp(t)
+	var nodes []TreeViewNode
+	for _, id := range []TreeViewNodeID{"a", "b", "c", "d", "e", "f", "g", "h"} {
+		nodes = append(nodes, TreeViewNode{ID: id, Text: id})
+	}
+	tv := NewTreeViewWithNodes(nodes)
+	w := test.NewTempWindow(t, tv)
+	w.SetPadded(false)
+	w.Resize(geo.NewSize(300, 100))
+
+	tv.ScrollToOffset(50)
+	assert.Equal(t, float32(50), tv.GetScrollOffset(), "ScrollToOffset")
+	tv.ScrollToTop()
+	assert.Zero(t, tv.GetScrollOffset(), "ScrollToTop")
+	tv.ScrollTo("h")
+	assert.Greater(t, tv.GetScrollOffset(), float32(0), "ScrollTo")
+	tv.ScrollToOffset(1e6)
+	assert.Less(t, tv.GetScrollOffset(), float32(1e6), "ScrollToOffset is not clamped")
 }
