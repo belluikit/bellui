@@ -553,10 +553,15 @@ type focusSelectable struct {
 
 // Disabled returns true so that the focus manager skips this widget during
 // tab traversal, while still allowing direct focus via mouse click for
-// text selection (the focus manager has a special case for disabled+SelectedText).
+// text selection (SelectableWhenDisabled lets it take the focus).
 func (f *focusSelectable) Disabled() bool {
 	return true
 }
+
+// SelectableWhenDisabled lets a Label's or RichText's selection layer take the
+// focus a selection needs, though it reports itself disabled to skip Tab
+// (core.SelectableWhenDisabled, #1251).
+func (f *focusSelectable) SelectableWhenDisabled() bool { return true }
 
 func (f *focusSelectable) Disable() {
 }

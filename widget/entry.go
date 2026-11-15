@@ -1357,6 +1357,11 @@ func (e *Entry) RefreshGutter() {
 	e.text.Refresh()
 }
 
+// SelectableWhenDisabled reports that a disabled Entry keeps its text
+// selectable and copyable, so it may still take the focus a selection needs
+// (core.SelectableWhenDisabled, #1251). Tab skips it while it is disabled.
+func (e *Entry) SelectableWhenDisabled() bool { return true }
+
 // SelectedText returns the text currently selected in this Entry.
 // If there is no selection it will return the empty string.
 func (e *Entry) SelectedText() string {

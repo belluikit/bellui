@@ -37,9 +37,14 @@ func (s *Scroll) Dragged(e *event.DragEvent) {
 // drag mostly follows (event.DragClaimer, #662). A drag along an axis this
 // Scroll does not scroll, or one that pushes against the end its content
 // already reached, is left to the Draggable around it: a scroll nested in a
-// page hands the page a drag it cannot follow.
+// page hands the page a drag it cannot follow. An inert scroll claims every
+// drag and then ignores it, so nothing scrolls over a disabled collection
+// (#1251).
 func (s *Scroll) ClaimsDrag(d geo.Delta) bool {
-	if s.Content == nil || s.Direction == ScrollNone || s.inert() {
+	if s.inert() {
+		return true
+	}
+	if s.Content == nil || s.Direction == ScrollNone {
 		return false
 	}
 	if math.Abs(float64(d.DX)) > math.Abs(float64(d.DY)) {

@@ -15,6 +15,8 @@ import (
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/cache"
+	intdriver "github.com/belluikit/bellui/internal/driver"
+	internalWidget "github.com/belluikit/bellui/internal/widget"
 	"github.com/belluikit/bellui/layout"
 	"github.com/belluikit/bellui/storage"
 	"github.com/belluikit/bellui/test"
@@ -101,11 +103,13 @@ func TestList_Disable(t *testing.T) {
 	// The wheel, a touch drag and keys.
 	test.Scroll(c, pos, 0, -200)
 	test.Drag(c, pos, 0, -200)
-	assert.False(t, l.scroller.TryScrolled(&event.ScrollEvent{Scrolled: geo.Delta{DY: -200}}),
-		"a disabled list consumed a scroll: the scroll around it would not get it")
+	// Swallowed, not left to the scroll around it: over a disabled list
+	// nothing scrolls (#1251, TestList_DisabledSwallowsScrolls).
+	assert.True(t, l.scroller.TryScrolled(&event.ScrollEvent{Scrolled: geo.Delta{DY: -200}}),
+		"a disabled list left a scroll to the scroll around it")
 	// ClaimsDrag is built only for touch (ci, android, ios, mobile), not wasm.
 	if claimer, ok := any(l.scroller).(interface{ ClaimsDrag(geo.Delta) bool }); ok {
-		assert.False(t, claimer.ClaimsDrag(geo.Delta{DY: -20}), "a disabled list claimed a touch drag")
+		assert.True(t, claimer.ClaimsDrag(geo.Delta{DY: -20}), "a disabled list left a touch drag to the scroll around it")
 	}
 	l.TypedKey(&event.KeyEvent{Name: event.KeyDown})
 	l.TypedKey(&event.KeyEvent{Name: event.KeySpace})
@@ -193,7 +197,7 @@ func checkTreeDisable(t *testing.T, d core.Disableable, tr *Tree, a, b string) {
 
 	test.Scroll(c, pos, 0, -200)
 	test.Drag(c, pos, 0, -200)
-	assert.False(t, tr.scroller.TryScrolled(&event.ScrollEvent{Scrolled: geo.Delta{DY: -200}}))
+	assert.True(t, tr.scroller.TryScrolled(&event.ScrollEvent{Scrolled: geo.Delta{DY: -200}}), "swallowed (#1251)")
 	tr.currentFocus = a
 	tr.TypedKey(&event.KeyEvent{Name: event.KeyRight})
 	tr.TypedKey(&event.KeyEvent{Name: event.KeySpace})
@@ -319,7 +323,7 @@ func TestTreeView_Disable(t *testing.T) {
 	dragC()
 	test.Scroll(c, pos, 0, -200)
 	test.Drag(c, pos, 0, -200)
-	assert.False(t, tv.scroller.TryScrolled(&event.ScrollEvent{Scrolled: geo.Delta{DY: -200}}))
+	assert.True(t, tv.scroller.TryScrolled(&event.ScrollEvent{Scrolled: geo.Delta{DY: -200}}), "swallowed (#1251)")
 	tv.currentFocus = "a"
 	tv.TypedKey(&event.KeyEvent{Name: event.KeyRight})
 	tv.TypedKey(&event.KeyEvent{Name: event.KeySpace})
@@ -481,4 +485,65 @@ func TestSwipeArea_Disable(t *testing.T) {
 			assert.Zero(t, area.offset, "the card did not spring back") // animations are off in the test app
 		})
 	}
+}
+
+// scrollChain offers a wheel scroll at pos to the scrollables there, innermost
+// first, until one consumes it, as the desktop and mobile drivers do
+// (dispatchScrollChain): a scrollable that reports a scroll unconsumed
+// (driver.ScrollConsumer) passes it outward.
+func scrollChain(t *testing.T, root core.CanvasObject, pos geo.Position, dy float32) {
+	t.Helper()
+	isScrollable := func(o core.CanvasObject) bool { _, ok := o.(event.Scrollable); return ok }
+	found := intdriver.FindAllObjectsAtPositionMatching(pos, isScrollable, nil, nil, root)
+	require.NotEmpty(t, found, "nothing scrollable at %v", pos)
+	ev := &event.ScrollEvent{Scrolled: geo.Delta{DY: dy}}
+	for _, oap := range found {
+		ev.Position = oap.Position
+		if c, ok := oap.Object.(intdriver.ScrollConsumer); ok {
+			if c.TryScrolled(ev) {
+				return
+			}
+			continue
+		}
+		oap.Object.(event.Scrollable).Scrolled(ev)
+		return
+	}
+}
+
+// A wheel scroll over a disabled List moves neither it nor the scroll around
+// it (#1251, the owner's decision on belluikit/player#641). It used to pass to
+// the enclosing scroll, as a disabled Slider's does. Tree and TreeView share
+// the Scroll that does it (see TestScroll_Inert).
+func TestList_DisabledSwallowsScrolls(t *testing.T) {
+	test.NewTempApp(t)
+	l := NewList(
+		func() int { return 100 },
+		func() core.CanvasObject { return NewLabel("row") },
+		func(id ListItemID, o core.CanvasObject) { o.(*Label).SetText(fmt.Sprint(id)) },
+	)
+	filler := NewLabel("below")
+	page := &bellui.Container{Layout: layout.NewVBoxLayout(), Objects: []core.CanvasObject{
+		&bellui.Container{Layout: layout.NewGridWrapLayout(geo.NewSize(200, 200)), Objects: []core.CanvasObject{l}},
+		&bellui.Container{Layout: layout.NewGridWrapLayout(geo.NewSize(200, 600)), Objects: []core.CanvasObject{filler}},
+	}}
+	outer := internalWidget.NewVScroll(page)
+	w := test.NewTempWindow(t, outer)
+	w.SetPadded(false)
+	w.Resize(geo.NewSize(200, 300))
+	over := geo.NewPos(50, 100) // over the list
+
+	l.Disable()
+	scrollChain(t, w.Canvas().Content(), over, -60)
+	assert.Zero(t, l.scroller.Offset.Y, "the disabled list scrolled")
+	assert.Zero(t, outer.Offset.Y, "the scroll around the disabled list scrolled")
+
+	l.Enable()
+	scrollChain(t, w.Canvas().Content(), over, -60)
+	assert.Equal(t, float32(60), l.scroller.Offset.Y, "an enabled list did not take the scroll")
+	assert.Zero(t, outer.Offset.Y)
+
+	// Scrolled to its end, an enabled list hands the rest outward, as before.
+	l.scroller.ScrollToOffset(geo.NewPos(0, 1e6))
+	scrollChain(t, w.Canvas().Content(), over, -60)
+	assert.Equal(t, float32(60), outer.Offset.Y, "an enabled list at its end kept the scroll from the page")
 }

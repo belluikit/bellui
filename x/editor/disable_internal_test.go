@@ -192,6 +192,10 @@ func TestEditor_Disable(t *testing.T) {
 		assert.Equal(t, after, c.Focused(), "Tab did not skip the disabled editor and its find bar")
 		ed.Focus()
 		assert.Equal(t, after, c.Focused(), "Focus focused the disabled editor")
+		// Directly, as code or assistive tech would: the Entry inside the
+		// editor answers SelectableWhenDisabled false (belluikit/bellui#1251).
+		c.Focus(ed.entry)
+		assert.Equal(t, after, c.Focused(), "the disabled editor's entry took the focus from code")
 
 		ed.Enable()
 		c.Focus(ed.find.entry)

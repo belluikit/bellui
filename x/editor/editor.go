@@ -1475,6 +1475,11 @@ func (e *editorEntry) KeyUp(k *event.KeyEvent) {
 
 // SelectedText reports no selection while disabled: a disabled editor's text
 // cannot be selected or copied.
+// SelectableWhenDisabled overrides the embedded Entry's: a disabled Editor's
+// text can be neither selected nor copied, so its Entry takes no focus, from
+// code or assistive tech either (belluikit/bellui#1251).
+func (e *editorEntry) SelectableWhenDisabled() bool { return false }
+
 func (e *editorEntry) SelectedText() string {
 	if e.Disabled() {
 		return ""

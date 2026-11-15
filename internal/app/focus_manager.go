@@ -55,10 +55,11 @@ func (f *FocusManager) Focus(obj event.Focusable) bool {
 			return true
 		}
 		if dis, ok := obj.(core.Disableable); ok && dis.Disabled() {
-			type selectableText interface {
-				SelectedText() string
-			}
-			if _, isSelectableText := obj.(selectableText); !isSelectableText {
+			// A disabled widget takes no focus, from a click, code or assistive
+			// tech, unless its text stays selectable while disabled (#1251).
+			// It used to be enough to have SelectedText, which let a disabled
+			// RichEntry or code editor be focused from code.
+			if s, ok := obj.(core.SelectableWhenDisabled); !ok || !s.SelectableWhenDisabled() {
 				return true
 			}
 			// On mobile a disabled text *input* must not take focus (it would
