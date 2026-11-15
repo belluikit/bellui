@@ -152,6 +152,7 @@ func (f *FAB) CreateRenderer() core.WidgetRenderer {
 	r := &fabRenderer{
 		BaseRenderer: internalWidget.NewBaseRenderer(objects),
 		bg:           bg,
+		ripple:       ripple,
 		icon:         icon,
 		label:        label,
 		fab:          f,
@@ -162,10 +163,11 @@ func (f *FAB) CreateRenderer() core.WidgetRenderer {
 
 type fabRenderer struct {
 	internalWidget.BaseRenderer
-	bg    *canvas.Rectangle
-	icon  *canvas.Image
-	label *canvas.Text
-	fab   *FAB
+	bg     *canvas.Rectangle
+	ripple *canvas.Ripple
+	icon   *canvas.Image
+	label  *canvas.Text
+	fab    *FAB
 }
 
 func (r *fabRenderer) MinSize() geo.Size {
@@ -253,9 +255,9 @@ func (r *fabRenderer) Refresh() {
 		r.label.TextStyle.Bold = true
 		r.SetObjects(append(r.Objects(), r.label))
 	} else if r.fab.Text == "" && r.label != nil {
-		// Text was cleared; remove the label.
+		// Text was cleared; remove the label, keeping the press ripple (#1225).
 		r.label = nil
-		r.SetObjects([]core.CanvasObject{r.bg, r.icon})
+		r.SetObjects([]core.CanvasObject{r.bg, r.ripple, r.icon})
 	}
 	if r.label != nil {
 		r.label.Text = r.fab.Text

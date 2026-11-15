@@ -174,3 +174,27 @@ func TestTimePickerButton_PressFeedback(t *testing.T) {
 	b.TouchCancel(nil)
 	assertTapFromCode(t, &b.pressTarget, func() { b.PerformAccessibleAction(core.ActionSelect) })
 }
+
+// An extended FAB whose Text is cleared keeps drawing its pressed state: the
+// renderer's rebuilt object list still holds the ripple (#1225).
+func TestFAB_PressFeedbackAfterTextCleared(t *testing.T) {
+	test.NewTempApp(t)
+	f := NewExtendedFAB("Compose", theme.ContentAddIcon(), func() {})
+	f.Resize(f.MinSize())
+	r := cache.Renderer(f)
+	press := widget.PressFeedbackOf(&f.pressTarget)
+	assert.Contains(t, r.Objects(), core.CanvasObject(press.Ripple))
+
+	f.Text = ""
+	f.Refresh()
+	assert.Contains(t, r.Objects(), core.CanvasObject(press.Ripple), "clearing Text dropped the ripple")
+
+	f.TouchDown(&mobile.TouchEvent{})
+	assert.True(t, press.Pressed())
+	assert.True(t, press.Ripple.Visible(), "a press after the clear shows nothing")
+	f.TouchUp(&mobile.TouchEvent{})
+
+	f.Text = "Compose"
+	f.Refresh()
+	assert.Contains(t, r.Objects(), core.CanvasObject(press.Ripple), "setting Text again dropped the ripple")
+}
