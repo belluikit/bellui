@@ -8,9 +8,50 @@ import (
 )
 
 // ButtonGroup is an MD3 connected group of buttons sharing borders.
+//
+// Disabling the group disables each of its buttons, including one added to
+// Buttons while it is disabled, and enabling it enables again only the
+// buttons the group disabled: a button the app disabled on its own stays
+// disabled (#1212).
 type ButtonGroup struct {
-	BaseWidget
+	DisableableWidget
 	Buttons []*Button
+
+	// disabledByGroup holds the buttons Disable switched off, for Enable to
+	// switch back on.
+	disabledByGroup []*Button
+}
+
+var _ core.Disableable = (*ButtonGroup)(nil)
+
+// Disable disables the group and each of its buttons.
+func (g *ButtonGroup) Disable() {
+	g.DisableableWidget.Disable()
+	g.disableButtons()
+}
+
+// Enable enables the group and the buttons its Disable switched off.
+func (g *ButtonGroup) Enable() {
+	g.DisableableWidget.Enable()
+	for _, btn := range g.disabledByGroup {
+		btn.Enable()
+	}
+	g.disabledByGroup = nil
+}
+
+// disableButtons disables each enabled button of a disabled group and
+// records it, so that Enable switches on only what the group switched off.
+func (g *ButtonGroup) disableButtons() {
+	if !g.Disabled() {
+		return
+	}
+	for _, btn := range g.Buttons {
+		if btn == nil || btn.Disabled() {
+			continue
+		}
+		btn.Disable()
+		g.disabledByGroup = append(g.disabledByGroup, btn)
+	}
 }
 
 // NewButtonGroup creates a connected button group.
@@ -73,6 +114,7 @@ func (r *buttonGroupRenderer) Layout(size geo.Size) {
 
 func (r *buttonGroupRenderer) Refresh() {
 	r.updateButtons()
+	r.group.disableButtons() // a button added while the group is disabled
 	for _, btn := range r.group.Buttons {
 		btn.Refresh()
 	}

@@ -137,9 +137,13 @@ func LoadThemeSelection(p bellui.Preferences) (ThemeSelection, bool) {
 // OnChanged, but nothing is applied or persisted by the widget itself.
 // Use [ThemeSelection.Apply] and [SaveThemeSelection] for that.
 //
+// A disabled ThemeSelector keeps its place in the disabled look: its variant
+// selector and swatches take no input, and Tab skips it (#1212).
+// [ThemeSelector.SetSelection] still works: it is the app's call.
+//
 // Since: 1.0
 type ThemeSelector struct {
-	BaseWidget
+	DisableableWidget
 
 	// Selection is the current choice shown by the widget.
 	Selection ThemeSelection
@@ -190,6 +194,9 @@ func (t *ThemeSelector) CreateRenderer() core.WidgetRenderer {
 		func(index int) { t.setVariant(ThemeVariantSelection(index)) },
 	)
 	variants.Selected = int(t.Selection.Variant)
+	if t.Disabled() {
+		variants.Disable()
+	}
 
 	names := theme.PrimaryColorNames()
 	swatches := make([]*themeSwatch, len(names))
@@ -210,7 +217,7 @@ func (t *ThemeSelector) CreateRenderer() core.WidgetRenderer {
 }
 
 func (t *ThemeSelector) setVariant(v ThemeVariantSelection) {
-	if t.Selection.Variant == v {
+	if t.Selection.Variant == v || t.Disabled() {
 		return
 	}
 	t.Selection.Variant = v
@@ -220,7 +227,7 @@ func (t *ThemeSelector) setVariant(v ThemeVariantSelection) {
 }
 
 func (t *ThemeSelector) setPrimary(name string) {
-	if t.Selection.Primary == name {
+	if t.Selection.Primary == name || t.Disabled() {
 		return
 	}
 	t.Selection.Primary = name
@@ -250,6 +257,13 @@ func (r *themeSelectorRenderer) Objects() []core.CanvasObject {
 }
 
 func (r *themeSelectorRenderer) Refresh() {
+	// The variant selector is a SegmentedButton of the selector's own, so it
+	// follows the selector's disabled state: Tab then skips it (#1212).
+	if r.selector.Disabled() {
+		r.variants.Disable()
+	} else {
+		r.variants.Enable()
+	}
 	if v := int(r.selector.Selection.Variant); v != r.variants.Selected {
 		r.variants.Selected = v
 		r.variants.Refresh()
@@ -271,8 +285,9 @@ type themeSwatch struct {
 }
 
 var (
-	_ event.Tappable  = (*themeSwatch)(nil)
-	_ core.Accessible = (*themeSwatch)(nil)
+	_ event.Tappable          = (*themeSwatch)(nil)
+	_ core.Accessible         = (*themeSwatch)(nil)
+	_ core.AccessibleStateful = (*themeSwatch)(nil)
 )
 
 // AccessibleRole returns [core.RoleButton].
@@ -281,8 +296,21 @@ func (s *themeSwatch) AccessibleRole() core.AccessibleRole { return core.RoleBut
 // AccessibleLabel returns the primary color name this swatch selects.
 func (s *themeSwatch) AccessibleLabel() string { return s.name }
 
-// Tapped makes this swatch's color the selected primary color.
+// AccessibleState reports the swatch disabled while its selector is: the
+// swatch is not itself Disableable (#1212).
+func (s *themeSwatch) AccessibleState() core.AccessibleState {
+	if s.owner.Disabled() {
+		return core.StateDisabled
+	}
+	return 0
+}
+
+// Tapped makes this swatch's color the selected primary color, unless the
+// selector is disabled.
 func (s *themeSwatch) Tapped(ev *event.PointEvent) {
+	if s.owner.Disabled() {
+		return
+	}
 	widget.TapPress(&s.pressTarget, ev)
 	s.owner.setPrimary(s.name)
 }
@@ -302,7 +330,7 @@ func (s *themeSwatch) HoverOut() {
 // pressShape is the circle of the swatch's selection ring (#1091).
 func (s *themeSwatch) pressShape() (widget.PressShape, bool) {
 	r, ok := cache.Renderer(s).(*themeSwatchRenderer)
-	if !ok {
+	if !ok || s.owner.Disabled() {
 		return widget.PressShape{}, false
 	}
 	return controlPressShape(s.Theme(), r.ring, false), true
@@ -351,6 +379,12 @@ func (r *themeSwatchRenderer) Objects() []core.CanvasObject {
 
 func (r *themeSwatchRenderer) Refresh() {
 	c := internaltheme.PrimaryColorNamed(r.swatch.name)
+	if r.swatch.owner.Disabled() {
+		// The swatch is its colour, so the disabled look keeps the hue at
+		// MD3's disabled content opacity, 38%, rather than greying every
+		// swatch alike (#1212).
+		c = disabledSwatchColor(c)
+	}
 	r.dot.FillColor = c
 	if r.swatch.owner.Selection.Primary == r.swatch.name {
 		r.ring.StrokeColor = c
@@ -362,4 +396,11 @@ func (r *themeSwatchRenderer) Refresh() {
 }
 
 func (r *themeSwatchRenderer) Destroy() {
+}
+
+// disabledSwatchColor is c at the 38% opacity of MD3's disabled content.
+func disabledSwatchColor(c color.Color) color.Color {
+	n := color.NRGBAModel.Convert(c).(color.NRGBA)
+	n.A = uint8(float32(n.A)*0.38 + 0.5)
+	return n
 }

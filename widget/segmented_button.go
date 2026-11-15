@@ -178,9 +178,14 @@ func (w *segmentWidget) AccessibleRole() core.AccessibleRole { return core.RoleT
 // AccessibleLabel returns the segment's text.
 func (w *segmentWidget) AccessibleLabel() string { return w.text }
 
-// AccessibleState reports the selected and focused states.
+// AccessibleState reports the selected and focused states, and the disabled
+// state of its group: the segment is not itself Disableable, so the bit is
+// not derived for it (#1212).
 func (w *segmentWidget) AccessibleState() core.AccessibleState {
 	var state core.AccessibleState
+	if w.group != nil && w.group.Disabled() {
+		state |= core.StateDisabled
+	}
 	if w.selected {
 		state |= core.StateSelected
 	}

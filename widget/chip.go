@@ -26,9 +26,10 @@ const (
 )
 
 var (
-	_ event.Tappable  = (*Chip)(nil)
-	_ event.Hoverable = (*Chip)(nil)
-	_ core.Accessible = (*Chip)(nil)
+	_ event.Tappable   = (*Chip)(nil)
+	_ event.Hoverable  = (*Chip)(nil)
+	_ core.Accessible  = (*Chip)(nil)
+	_ core.Disableable = (*Chip)(nil)
 )
 
 // AccessibleRole returns [core.RoleButton].
@@ -38,8 +39,11 @@ func (c *Chip) AccessibleRole() core.AccessibleRole { return core.RoleButton }
 func (c *Chip) AccessibleLabel() string { return c.Text }
 
 // Chip is a compact MD3 element for selections, filters, or actions.
+//
+// A disabled chip keeps its place in the disabled look and takes no tap, on
+// the chip or on its delete X, and shows no hover or pressed state (#1212).
 type Chip struct {
-	BaseWidget
+	DisableableWidget
 	Text      string
 	Icon      bellui.Resource // optional leading icon
 	Style     ChipStyle
@@ -74,7 +78,12 @@ func NewFilterChip(text string, changed func(bool)) *Chip {
 	return c
 }
 
+// Tapped fires OnTapped, or OnDeleted for a tap on an input chip's delete X.
+// It does nothing while the chip is disabled.
 func (c *Chip) Tapped(e *event.PointEvent) {
+	if c.Disabled() {
+		return
+	}
 	// On an input chip a tap landing on the trailing delete (X) button fires
 	// OnDeleted rather than OnTapped; otherwise the X would be inert (pre-rebrand tracker #291).
 	if c.hasDelete() && e != nil && c.inDeleteRegion(e.Position.X) {
@@ -130,9 +139,9 @@ func (c *Chip) MouseUp(ev *desktop.MouseEvent) {
 }
 
 // pressShape is the whole chip, in its label's colour, while it has a tap
-// handler.
+// handler and is enabled.
 func (c *Chip) pressShape() (internalWidget.PressShape, bool) {
-	if c.OnTapped == nil {
+	if c.OnTapped == nil || c.Disabled() {
 		return internalWidget.PressShape{}, false
 	}
 	th := c.Theme()
@@ -149,6 +158,9 @@ func (c *Chip) pressShape() (internalWidget.PressShape, bool) {
 
 // deletePressShape is a circle around the delete X, as for an icon button.
 func (c *Chip) deletePressShape() (internalWidget.PressShape, bool) {
+	if c.Disabled() {
+		return internalWidget.PressShape{}, false
+	}
 	r, ok := cache.Renderer(c.super()).(*chipRenderer)
 	if !ok || r.deleteBtn == nil {
 		return internalWidget.PressShape{}, false
@@ -177,13 +189,35 @@ func (c *Chip) inDeleteRegion(x float32) bool {
 	return x > c.Size().Width-region
 }
 
-func (c *Chip) HoverIn(*event.HoverEvent)    { c.hovered = true; c.Refresh() }
+// HoverIn shows the hover state layer, unless the chip is disabled.
+func (c *Chip) HoverIn(*event.HoverEvent) {
+	if c.Disabled() {
+		return
+	}
+	c.hovered = true
+	c.Refresh()
+}
+
+// HoverMoved does nothing.
 func (c *Chip) HoverMoved(*event.HoverEvent) {}
+
+// HoverOut ends the hover state and any press the pointer took off the chip.
+// It runs while disabled too, so a chip disabled under the pointer does not
+// show a hover when it is enabled again.
 func (c *Chip) HoverOut() {
 	internalWidget.CancelPress(&c.deletePress)
 	internalWidget.CancelPress(&c.pressTarget)
 	c.hovered = false
 	c.Refresh()
+}
+
+// Disable makes the chip inert: no tap on it or on its delete X, no hover or
+// pressed state, and the disabled look (#1212).
+func (c *Chip) Disable() {
+	internalWidget.CancelPress(&c.deletePress)
+	internalWidget.CancelPress(&c.pressTarget)
+	c.hovered = false
+	c.DisableableWidget.Disable()
 }
 
 func (c *Chip) MinSize() geo.Size {
@@ -305,6 +339,11 @@ func (r *chipRenderer) Refresh() {
 	r.label.Text = r.chip.Text
 	r.label.TextSize = th.Size(theme.SizeNameLabelLarge)
 
+	if r.chip.Disabled() {
+		r.refreshDisabled(th, v)
+		return
+	}
+
 	if r.chip.Style == ChipStyleFilter && r.chip.Selected {
 		bgColor := th.Color(theme.ColorNameSecondaryContainer, v)
 		if r.chip.hovered {
@@ -335,6 +374,38 @@ func (r *chipRenderer) Refresh() {
 		r.deleteBtn.Refresh()
 	}
 
+	r.relayout()
+}
+
+// refreshDisabled draws the MD3 disabled chip: label and icons in the
+// disabled content colour, a selected filter chip's fill and the others'
+// outline in the disabled container colour, and no state layer (#1212).
+func (r *chipRenderer) refreshDisabled(th bellui.Theme, v bellui.ThemeVariant) {
+	container := th.Color(theme.ColorNameDisabledButton, v)
+	if r.chip.Style == ChipStyleFilter && r.chip.Selected {
+		r.bg.FillColor = container
+		r.bg.StrokeWidth = 0
+	} else {
+		r.bg.FillColor = color.Transparent
+		r.bg.StrokeWidth = 1
+		r.bg.StrokeColor = container
+	}
+	r.label.Color = th.Color(theme.ColorNameDisabled, v)
+	r.bg.Refresh()
+	r.label.Refresh()
+
+	if r.icon != nil && r.chip.Icon != nil {
+		r.icon.Resource = theme.NewDisabledResource(r.chip.Icon)
+		r.icon.Refresh()
+	}
+	if r.deleteBtn != nil {
+		r.deleteBtn.Resource = theme.NewDisabledResource(theme.CancelIcon())
+		r.deleteBtn.Refresh()
+	}
+	r.relayout()
+}
+
+func (r *chipRenderer) relayout() {
 	// Outside a layout walk (hover, SetText), so lay out in the chip's own
 	// direction (#696).
 	inDirectionOf(r.chip.super(), func() { r.Layout(r.chip.Size()) })

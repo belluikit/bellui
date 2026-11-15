@@ -22,8 +22,12 @@ import (
 //
 // Supported providers: "google", "microsoft", "apple", "github", "okta",
 // "keycloak", and "custom".
+//
+// A disabled AuthButton keeps its place in the disabled look and takes no tap
+// (#1212). Disabling it does not cancel a sign-in already running; call
+// CancelAuth for that.
 type AuthButton struct {
-	BaseWidget
+	DisableableWidget
 	pressTarget
 
 	// Provider is the provider key (e.g., "google", "microsoft").
@@ -78,14 +82,21 @@ func NewAuthButton(provider, clientID string, onAuth func(auth.OIDCResult)) *Aut
 }
 
 // Tapped triggers the authentication flow in a background goroutine.
-// If an authentication is already in progress, the tap is ignored.
+// If an authentication is already in progress, or the button is disabled, the
+// tap is ignored.
 func (b *AuthButton) Tapped(ev *event.PointEvent) {
+	if b.Disabled() {
+		return
+	}
+	// The press shows before the lock is taken: pressShape takes it too, and
+	// a sync.Mutex is not re-entrant, so showing it under the lock hung the
+	// main goroutine on the first tap of a drawn button.
+	internalWidget.TapPress(&b.pressTarget, ev)
 	b.mu.Lock()
 	if b.cancel != nil {
 		b.mu.Unlock()
 		return // already authenticating
 	}
-	internalWidget.TapPress(&b.pressTarget, ev)
 	ctx, cancel := context.WithCancel(context.Background())
 	b.cancel = cancel
 	b.mu.Unlock()
@@ -106,8 +117,12 @@ func (b *AuthButton) HoverOut() {
 }
 
 // pressShape is the whole button, in the provider's text colour, unless an
-// authentication is already running and a tap would do nothing (#1091).
+// authentication is already running or the button is disabled, and a tap
+// would do nothing (#1091, #1212).
 func (b *AuthButton) pressShape() (internalWidget.PressShape, bool) {
+	if b.Disabled() {
+		return internalWidget.PressShape{}, false
+	}
 	b.mu.Lock()
 	busy := b.cancel != nil
 	b.mu.Unlock()
@@ -243,13 +258,16 @@ func (b *AuthButton) CreateRenderer() core.WidgetRenderer {
 		objects = append(objects, logoImg)
 	}
 
-	return &authButtonRenderer{
+	r := &authButtonRenderer{
 		BaseRenderer: internalWidget.NewBaseRenderer(objects),
 		bg:           bg,
 		label:        label,
 		logoImg:      logoImg,
+		logo:         logo,
 		btn:          b,
 	}
+	r.applyColors()
+	return r
 }
 
 type authButtonRenderer struct {
@@ -257,7 +275,30 @@ type authButtonRenderer struct {
 	bg      *canvas.Rectangle
 	label   *canvas.Text
 	logoImg *canvas.Image
+	logo    bellui.Resource // the logo as given, before a disabled tint
 	btn     *AuthButton
+}
+
+// applyColors paints the provider's brand colours, or the disabled look: the
+// background in the disabled button colour, the label and logo in the
+// disabled content colour, as for a disabled Button (#1212).
+func (r *authButtonRenderer) applyColors() {
+	preset := r.btn.preset()
+	if !r.btn.Disabled() {
+		r.bg.FillColor = preset.BgColor
+		r.label.Color = preset.TextColor
+		if r.logoImg != nil {
+			r.logoImg.Resource = r.logo
+		}
+		return
+	}
+	th := r.btn.Theme()
+	v := bellui.CurrentApp().Settings().ThemeVariant()
+	r.bg.FillColor = th.Color(theme.ColorNameDisabledButton, v)
+	r.label.Color = th.Color(theme.ColorNameDisabled, v)
+	if r.logoImg != nil {
+		r.logoImg.Resource = theme.NewDisabledResource(r.logo)
+	}
 }
 
 func (r *authButtonRenderer) MinSize() geo.Size {
@@ -299,7 +340,7 @@ func (r *authButtonRenderer) Layout(size geo.Size) {
 
 func (r *authButtonRenderer) Refresh() {
 	preset := r.btn.preset()
-	r.bg.FillColor = preset.BgColor
+	r.applyColors()
 	r.bg.Refresh()
 
 	buttonText := preset.ButtonText
@@ -307,8 +348,10 @@ func (r *authButtonRenderer) Refresh() {
 		buttonText = r.btn.Text
 	}
 	r.label.Text = buttonText
-	r.label.Color = preset.TextColor
 	r.label.Refresh()
+	if r.logoImg != nil {
+		r.logoImg.Refresh()
+	}
 
 	r.Layout(r.btn.Size())
 	canvas.Refresh(r.btn.super())
