@@ -222,11 +222,10 @@ func TestTopAppBar_Disable(t *testing.T) {
 	require.Len(t, buttons(), 3)
 	look := func(disabled bool) {
 		t.Helper()
-		name := theme.ColorNameOnSurface
-		if disabled {
-			name = theme.ColorNameDisabled
-		}
-		assert.Equal(t, test.Theme().Color(name, bellui.CurrentApp().Settings().ThemeVariant()), r.title.Color, "title colour")
+		// The title takes no input and keeps its colour while the bar is
+		// disabled; only the controls look disabled (#1251).
+		assert.Equal(t, test.Theme().Color(theme.ColorNameOnSurface, bellui.CurrentApp().Settings().ThemeVariant()), r.title.Color,
+			"title colour (disabled %v)", disabled)
 		for _, btn := range buttons() {
 			iconButtonLook(t, btn, disabled)
 		}

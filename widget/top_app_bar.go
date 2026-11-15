@@ -25,9 +25,10 @@ func (t *TopAppBar) AccessibleLabel() string { return t.Title }
 
 // TopAppBar is an MD3 top application bar with title, navigation icon, and action icons.
 //
-// A disabled bar draws its title and icons in the disabled colours, and its
-// navigation and action buttons refuse every press. Those buttons are the
-// bar's own, built from NavigationIcon and Actions.
+// A disabled bar draws its navigation and action icons in the disabled
+// colours, and those buttons refuse every press. They are the bar's own, built
+// from NavigationIcon and Actions. The title keeps its colour: it takes no
+// input, so only the controls look disabled (#1251).
 type TopAppBar struct {
 	DisableableWidget
 	Title          string
@@ -153,10 +154,7 @@ func (r *topAppBarRenderer) Refresh() {
 	r.divider.Refresh()
 
 	r.title.Text = r.bar.Title
-	r.title.Color = th.Color(theme.ColorNameOnSurface, v)
-	if r.bar.Disabled() {
-		r.title.Color = th.Color(theme.ColorNameDisabled, v)
-	}
+	r.title.Color = th.Color(theme.ColorNameOnSurface, v) // also while disabled (#1251)
 	r.title.Refresh()
 
 	// Dynamically add/remove the navigation button.
