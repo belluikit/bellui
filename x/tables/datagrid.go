@@ -502,8 +502,20 @@ func (g *DataGrid) RefreshData() {
 	g.updateViewportGeometry()
 	g.viewport.Update(g.offset, g.scrollContent.Scroll.Size())
 	g.noteVisibleRows()
+	g.refreshRowBands()
+}
+
+// refreshRowBands redraws every band that draws rows: the cells, the column
+// header, the pinned cells and the group-header overlay. RefreshData and
+// rebuildPipeline change which rows show without a layout pass, and layout is
+// otherwise the only place the pinned bands and the overlay are refreshed, so
+// a grouped grid's headers kept the rows they last laid out (#1254).
+func (g *DataGrid) refreshRowBands() {
 	g.cellsWidget.Refresh()
 	g.headerWidget.Refresh()
+	g.pinnedLeftCells.Refresh()
+	g.pinnedRightCells.Refresh()
+	g.groupRowOverlay.Refresh()
 }
 
 // --- GridAccess interface implementation (for render.CellsWidget) ---
@@ -1188,8 +1200,7 @@ func (g *DataGrid) rebuildPipeline() {
 	g.updateViewportGeometry()
 	g.viewport.Update(g.offset, g.scrollContent.Scroll.Size())
 	g.noteVisibleRows()
-	g.cellsWidget.Refresh()
-	g.headerWidget.Refresh()
+	g.refreshRowBands()
 }
 
 // buildQuickFilter creates a cross-column filter that passes a row if any column
