@@ -24,7 +24,12 @@ type suspender interface {
 // A suspended stream is paused, and oto opens a new one only at Resume, which
 // is the next Play: after the call, when the player resumes.
 //
-// Only Android needs it (suspendWhenIdle). Elsewhere a suspend has no such
+// On iOS the lock screen shows ⏸ while the app's audio queue runs, even when
+// it plays only silence, so after a pause the next lock-screen press is
+// another pause (#1242). A suspended queue is paused, which iOS reads as not
+// playing, and it starts again from the background.
+//
+// Only those two need it (suspendWhenIdle). Elsewhere a suspend has no such
 // reason, and costs a restart of the device on every Play.
 type idleSuspend struct {
 	mu        sync.Mutex
