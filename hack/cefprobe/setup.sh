@@ -14,9 +14,9 @@
 
 set -euo pipefail
 
-CEF_VERSION="154.0.34+g14c5a08+chromium-154.0.8037.98"
+CEF_VERSION="156.0.30+g6028375+chromium-156.0.8078.96"
 CEF_PLATFORM="${CEF_PLATFORM:-linux64}"
-CEF_SHA1_linux64="15c91ad767097217b2e82ba8b933fe30b134be69"
+CEF_SHA1_linux64="0b4c2189e3b93033bbef13add1a86f66849c1e62"
 
 cd "$(dirname "$0")"
 ROOT="$PWD/cefroot"

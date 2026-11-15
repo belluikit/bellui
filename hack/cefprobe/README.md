@@ -40,7 +40,7 @@ go run -tags cef ./hack/cefprobe -accel-only \
 invocations. Without `-accel-only` the default flow runs the CPU phase and
 prints a note pointing at the second command.
 
-`setup.sh` pins CEF **154.0.34 / Chromium 154.0.8037.98** and verifies the
+`setup.sh` pins CEF **156.0.30 / Chromium 156.0.8078.96** and verifies the
 archive's SHA-1 before using it. It strips `libcef.so` from about **1.4 GB to
 260 MiB** — that 81% is what makes the payload shippable at all, and it is the
 same step `belluikit/gocef-libs`' mirror workflow performs (belluikit/bellui#104).
