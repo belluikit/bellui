@@ -4,30 +4,50 @@ import (
 	"encoding/binary"
 	"io"
 	"math"
+	"slices"
 	"sync"
 	"testing"
 	"time"
 )
 
-// mixContext is a device whose one player the test mixes itself, the way
-// oto v3.5.1's internal/mux does: the player pulls its source until it holds
-// a buffer's worth, unlocked while it reads, and every block mixed takes its
-// samples times a volume that moves from the last block's to the current one
-// across the block (readBufferAndAdd). A paused player adds nothing to the
-// mix. What the device would play is recorded, one value per frame, from the
-// first channel.
+// mixContext is a device whose players the test mixes itself, the way oto's
+// internal/mux does: a player pulls its source until it holds a buffer's
+// worth, unlocked while it reads, and every block mixed takes its samples
+// times a volume that moves from the last block's to the current one across
+// the block (readBufferAndAdd). A paused player adds nothing to the mix.
+//
+// Mixed blocks wait in a queue, latency blocks long, before they are played,
+// as in oto's fifo and the platform's buffer on Android. A suspended device
+// plays nothing and keeps its queue, which it plays first on Resume, and Flush
+// empties the queue. Each player counts what of its mix is still queued, which
+// is what oto's UnplayedSize adds to what it holds.
+//
+// What the device plays is recorded, one value per frame, from the first
+// channel; a suspended device plays silence.
 type mixContext struct {
-	frames int // per block
+	frames  int // per block
+	latency int // blocks queued before one is played
 
-	mu     sync.Mutex
-	player *mixPlayer
-	out    []float32
-	stop   chan struct{}
-	done   chan struct{}
+	mu        sync.Mutex
+	players   []*mixPlayer
+	queue     []mixedBlock
+	suspended bool
+	out       []float32
+	// suspends counts the suspends, and loudSuspends those that found sound
+	// still queued, which would be cut off and played at the next Resume.
+	suspends, loudSuspends, flushes int
+	stop, done                      chan struct{}
 }
 
-func newMixContext(blockFrames int, period time.Duration) *mixContext {
-	c := &mixContext{frames: blockFrames, stop: make(chan struct{}), done: make(chan struct{})}
+// mixedBlock is a block mixed and not yet played, and how many of its frames
+// came from each player.
+type mixedBlock struct {
+	samples []float32
+	from    map[*mixPlayer]int
+}
+
+func newMixContext(blockFrames, latency int, period time.Duration) *mixContext {
+	c := &mixContext{frames: blockFrames, latency: latency, stop: make(chan struct{}), done: make(chan struct{})}
 	go func() {
 		defer close(c.done)
 		for {
@@ -47,27 +67,86 @@ func (c *mixContext) close() { close(c.stop); <-c.done }
 func (c *mixContext) NewPlayer(r io.Reader) devicePlayer {
 	p := &mixPlayer{src: r}
 	c.mu.Lock()
-	c.player = p
+	c.players = append(c.players, p)
 	c.mu.Unlock()
 	return p
 }
-func (c *mixContext) Err() error     { return nil }
-func (c *mixContext) Suspend() error { return nil }
-func (c *mixContext) Resume() error  { return nil }
+func (c *mixContext) Err() error { return nil }
 
-// mix plays one block.
+func (c *mixContext) Suspend() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.suspended = true
+	c.suspends++
+	for _, b := range c.queue {
+		for _, v := range b.samples {
+			if abs32(v) > 0.01 {
+				c.loudSuspends++
+				return nil
+			}
+		}
+	}
+	return nil
+}
+
+func (c *mixContext) Resume() error {
+	c.mu.Lock()
+	c.suspended = false
+	c.mu.Unlock()
+	return nil
+}
+
+func (c *mixContext) Flush() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.flushes++
+	for _, b := range c.queue {
+		b.played()
+	}
+	c.queue = nil
+	return nil
+}
+
+// played tells b's players that its frames are played or discarded.
+func (b mixedBlock) played() {
+	for p, n := range b.from {
+		p.mu.Lock()
+		p.queued -= n
+		p.mu.Unlock()
+	}
+}
+
+// mix plays one block's time: it mixes a block into the queue and plays the
+// oldest once the queue is full, or plays silence while suspended.
 func (c *mixContext) mix() {
 	c.mu.Lock()
-	p := c.player
-	c.mu.Unlock()
-	block := make([]float32, c.frames)
-	if p != nil {
-		p.fill()
-		p.mixInto(block)
+	if c.suspended {
+		c.out = append(c.out, make([]float32, c.frames)...)
+		c.mu.Unlock()
+		return
 	}
-	c.mu.Lock()
-	c.out = append(c.out, block...)
+	players := slices.Clone(c.players)
 	c.mu.Unlock()
+
+	b := mixedBlock{samples: make([]float32, c.frames), from: map[*mixPlayer]int{}}
+	for _, p := range players {
+		p.fill()
+		if n := p.mixInto(b.samples); n > 0 {
+			b.from[p] = n
+		}
+	}
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.queue = append(c.queue, b)
+	if len(c.queue) <= c.latency {
+		c.out = append(c.out, make([]float32, c.frames)...)
+		return
+	}
+	first := c.queue[0]
+	c.queue = c.queue[1:]
+	first.played()
+	c.out = append(c.out, first.samples...)
 }
 
 func (c *mixContext) played() []float32 {
@@ -82,6 +161,7 @@ type mixPlayer struct {
 	mu               sync.Mutex
 	buf              []byte
 	size             int
+	queued           int // frames mixed and still queued in the device
 	volume, prev     float64
 	playing, closed  bool
 	reading, discard bool
@@ -108,11 +188,13 @@ func (p *mixPlayer) fill() {
 	p.mu.Unlock()
 }
 
-func (p *mixPlayer) mixInto(block []float32) {
+// mixInto adds the player's next block to block, and reports how many frames
+// it added.
+func (p *mixPlayer) mixInto(block []float32) int {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if !p.playing || p.closed {
-		return
+		return 0
 	}
 	n := min(len(p.buf)/4, len(block)) // 16-bit stereo frames
 	for i := range n {
@@ -122,10 +204,12 @@ func (p *mixPlayer) mixInto(block []float32) {
 			r := float64(i) / float64(n)
 			g = p.volume*r + p.prev*(1-r)
 		}
-		block[i] = float32(v * g)
+		block[i] += float32(v * g)
 	}
 	p.prev = p.volume
 	p.buf = p.buf[4*n:]
+	p.queued += n
+	return n
 }
 
 func (p *mixPlayer) Play()  { p.mu.Lock(); p.playing = true; p.mu.Unlock() }
@@ -145,8 +229,13 @@ func (p *mixPlayer) Seek(offset int64, whence int) (int64, error) {
 }
 func (p *mixPlayer) SetBufferSize(n int) { p.mu.Lock(); p.size = n; p.mu.Unlock() }
 func (p *mixPlayer) BufferedSize() int   { p.mu.Lock(); defer p.mu.Unlock(); return len(p.buf) }
-func (p *mixPlayer) Volume() float64     { p.mu.Lock(); defer p.mu.Unlock(); return p.volume }
-func (p *mixPlayer) IsPlaying() bool     { p.mu.Lock(); defer p.mu.Unlock(); return p.playing }
+func (p *mixPlayer) UnplayedSize() int {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return len(p.buf) + 4*p.queued
+}
+func (p *mixPlayer) Volume() float64 { p.mu.Lock(); defer p.mu.Unlock(); return p.volume }
+func (p *mixPlayer) IsPlaying() bool { p.mu.Lock(); defer p.mu.Unlock(); return p.playing }
 func (p *mixPlayer) SetVolume(v float64) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -191,10 +280,13 @@ func abs32(v float32) float32 { return float32(math.Abs(float64(v))) }
 
 // TestEdgesFade pins #1228: a stop, pause, resume, seek or start cut the
 // sound at full level, and changing songs clicked on a Pixel 9a. Each edge
-// now fades over fadeTime or a device block, whichever is longer. It plays a
-// constant level, so the edges are the only steps, through a device with
-// Android's small blocks and with macOS's 32 ms ones.
+// now fades over fadeTime or a device block, whichever is longer, and the
+// device plays the fade before it is suspended. It plays a constant level, so
+// the edges are the only steps, through a device with Android's small blocks
+// and with macOS's 32 ms ones, each with a queue of three blocks that a
+// suspend keeps, as Android's does.
 func TestEdgesFade(t *testing.T) {
+	suspendingWhenIdle(t, true)
 	const level = 16000
 	full := float32(level) / (1 << 15)
 	for _, dev := range []struct {
@@ -206,25 +298,27 @@ func TestEdgesFade(t *testing.T) {
 		{"macOS blocks", 1536, 32 * time.Millisecond},
 	} {
 		t.Run(dev.name, func(t *testing.T) {
-			c := newMixContext(dev.frames, dev.period)
+			c := newMixContext(dev.frames, 3, dev.period)
 			o := newOutput(c, 2)
+			o.idle = &idleSuspend{dev: c}
 			pause := func() { time.Sleep(10 * dev.period) }
 
 			o.WriteSamples(tone(time.Second, level))
 			o.Start() // up
 			pause()
-			o.Pause() // down
+			o.Pause() // down, then the device is suspended
 			pause()
 			o.Resume() // up
 			pause()
 			o.Rebase(time.Second)                     // down
 			o.WriteSamples(tone(time.Second, -level)) // up, at the new position
 			pause()
-			o.Stop() // down
+			o.Stop() // down, then the device is suspended
+			pause()
 			o.WriteSamples(tone(time.Second, level))
 			o.Start() // up: the next song
 			pause()
-			o.Stop() // down
+			o.Stop() // down, then the device is suspended
 			pause()
 			c.close()
 
@@ -236,11 +330,24 @@ func TestEdgesFade(t *testing.T) {
 					t.Errorf("edge %d steps by %.4f in one frame (%.0f%% of the level); want a fade", i, s, 100*s/full)
 				}
 			}
-			// The positive marker: every edge played was found and checked.
+			// The positive markers: every edge played was found and checked,
+			// and the device was suspended after the pause and both stops.
 			if len(steps) != 8 {
 				t.Errorf("found %d edges in what was played; want 8 (start, pause, resume, seek out, seek in, stop, start, stop)", len(steps))
 			}
-			t.Logf("%d edges, largest steps %v", len(steps), steps)
+			c.mu.Lock()
+			suspends, loud, flushes := c.suspends, c.loudSuspends, c.flushes
+			c.mu.Unlock()
+			if suspends != 3 {
+				t.Errorf("the device was suspended %d times; want 3 (pause, stop, stop)", suspends)
+			}
+			if loud != 0 {
+				t.Errorf("%d of %d suspends found sound still queued, to be cut off and played at the next Resume", loud, suspends)
+			}
+			if flushes != suspends {
+				t.Errorf("%d flushes for %d suspends; want one after each", flushes, suspends)
+			}
+			t.Logf("%d edges, largest steps %v; %d suspends", len(steps), steps, suspends)
 		})
 	}
 }

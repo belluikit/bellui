@@ -27,6 +27,7 @@ require (
 	github.com/belluikit/goffmpeg-libs/linux_arm64 v0.8.0 // indirect
 	github.com/belluikit/goffmpeg-libs/windows_amd64 v0.8.0 // indirect
 	github.com/belluikit/goffmpeg-libs/windows_arm64 v0.8.0 // indirect
+	github.com/belluikit/oto/v3 v3.0.0-20261114221446-b2db31a36c2f // indirect
 	github.com/belluikit/systray v1.12.2 // indirect
 	github.com/belluikit/typesetting v0.3.6 // indirect
 	github.com/belluikit/webgpu v1.2.3 // indirect
@@ -35,7 +36,6 @@ require (
 	github.com/belluikit/webgpu/libs-ios v0.0.0-20261111082643-f4adf07a4281 // indirect
 	github.com/belluikit/webgpu/libs-linux v0.0.0-20261111082701-57a52ab65675 // indirect
 	github.com/belluikit/webgpu/libs-windows v0.0.0-20261111091809-343dda80becd // indirect
-	github.com/ebitengine/oto/v3 v3.5.1 // indirect
 	github.com/ebitengine/purego v0.11.0 // indirect
 	github.com/fredbi/uri v1.1.1 // indirect
 	github.com/go-gl/gl v0.0.0-20231021071112-07e5d0ea2e71 // indirect

@@ -6,11 +6,12 @@ import (
 	"github.com/belluikit/bellui"
 )
 
-// suspender is what idleSuspend needs of the device: *oto.Context's Suspend
-// and Resume.
+// suspender is what idleSuspend needs of the device: *oto.Context's Suspend,
+// Resume and Flush.
 type suspender interface {
 	Suspend() error
 	Resume() error
+	Flush() error
 }
 
 // idleSuspend suspends the device while no Output in the process is playing,
@@ -60,4 +61,12 @@ func (s *idleSuspend) idle() {
 		return
 	}
 	s.suspended = true
+	// A suspended device keeps the sound it was sent and has not played, and
+	// plays it at the next Resume, before what plays next. The Outputs let the
+	// device play their own out first (Output.settle), so it is silence, unless
+	// the device did not say what it had played; it is discarded either way
+	// (#1228).
+	if err := s.dev.Flush(); err != nil {
+		bellui.LogError("x/mmedia: discarding the audio device's queued sound", err)
+	}
 }
