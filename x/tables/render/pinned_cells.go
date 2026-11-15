@@ -10,13 +10,45 @@ import (
 	"github.com/belluikit/bellui/widget"
 )
 
-// disclosureGlyph returns the chevron for an expanded (▼) or collapsed (▶)
-// disclosure control (tree node / master-detail row).
-func disclosureGlyph(expanded bool) string {
+// disclosureIcon returns the arrow for an expanded (pointing down) or
+// collapsed (pointing right) disclosure control: a group header, tree node or
+// master-detail row. It is the theme's own icon, so it has the same style and
+// colour as every other icon an app shows: the foreground colour, or the
+// disabled colour while the grid is disabled. A text arrow went through font
+// fallback instead, where bellui's bundled colour emoji font drew ▶ as a blue
+// play button (#1256).
+func disclosureIcon(expanded, disabled bool) bellui.Resource {
+	res := theme.MenuExpandIcon()
 	if expanded {
-		return "▼"
+		res = theme.MenuDropDownIcon()
 	}
-	return "▶"
+	if disabled {
+		return theme.NewDisabledResource(res)
+	}
+	return res
+}
+
+// disclosureSize is the height of a disclosure arrow's box. The theme's
+// triangles fill only the middle of their square, so the box is larger than
+// the text arrow it replaced, to draw an arrow of about the same size.
+const disclosureSize float32 = 18
+
+// newDisclosureImage makes an image for disclosureIcon, scaled to fit its box.
+func newDisclosureImage() *canvas.Image {
+	img := &canvas.Image{FillMode: canvas.ImageFillContain}
+	return img
+}
+
+// setDisclosure shows the arrow for a state, changing the image's resource
+// only when the state changed: a new resource makes the painter rasterize the
+// icon again.
+func setDisclosure(img *canvas.Image, expanded, disabled bool) {
+	res := disclosureIcon(expanded, disabled)
+	if img.Resource != nil && img.Resource.Name() == res.Name() {
+		return
+	}
+	img.Resource = res
+	img.Refresh()
 }
 
 // PinnedSide indicates which side this pinned region is on.
@@ -87,9 +119,9 @@ type pinnedCellsRenderer struct {
 	// row backgrounds / group labels, which are cheap and recreated each pass).
 	// Tree and master-detail are mutually exclusive, but keep independent pools
 	// for clarity.
-	treeChevrons   []*canvas.Text
+	treeChevrons   []*canvas.Image
 	treeA11y       []*treeRowA11y
-	masterChevrons []*canvas.Text
+	masterChevrons []*canvas.Image
 	masterA11y     []*masterRowA11y
 }
 
@@ -258,16 +290,13 @@ func (r *pinnedCellsRenderer) refresh(size geo.Size) {
 						depthX := x + float32(depth)*TreeIndentPerLevel
 
 						if treeChevIdx >= len(r.treeChevrons) {
-							t := canvas.NewText("", tc.GroupRowFg)
-							t.TextSize = 11
-							r.treeChevrons = append(r.treeChevrons, t)
+							r.treeChevrons = append(r.treeChevrons, newDisclosureImage())
 						}
 						chev := r.treeChevrons[treeChevIdx]
 						treeChevIdx++
-						chev.Text = disclosureGlyph(expanded)
-						chev.Color = tc.GroupRowFg
-						chev.Move(geo.NewPos(depthX+2, visY+(visH-14)/2))
-						chev.Resize(geo.NewSize(TreeToggleWidth, 14))
+						setDisclosure(chev, expanded, gridDisabled(grid))
+						chev.Move(geo.NewPos(depthX+2, visY+(visH-disclosureSize)/2))
+						chev.Resize(geo.NewSize(TreeToggleWidth, disclosureSize))
 						objects = append(objects, chev)
 
 						if treeA11yIdx >= len(r.treeA11y) {
@@ -289,16 +318,13 @@ func (r *pinnedCellsRenderer) refresh(size geo.Size) {
 						expanded := grid.DetailBandHeight(row) > 0
 
 						if masterChevIdx >= len(r.masterChevrons) {
-							t := canvas.NewText("", tc.GroupRowFg)
-							t.TextSize = 11
-							r.masterChevrons = append(r.masterChevrons, t)
+							r.masterChevrons = append(r.masterChevrons, newDisclosureImage())
 						}
 						chev := r.masterChevrons[masterChevIdx]
 						masterChevIdx++
-						chev.Text = disclosureGlyph(expanded)
-						chev.Color = tc.GroupRowFg
-						chev.Move(geo.NewPos(x+4, visY+(visH-14)/2))
-						chev.Resize(geo.NewSize(discIndent, 14))
+						setDisclosure(chev, expanded, gridDisabled(grid))
+						chev.Move(geo.NewPos(x+4, visY+(visH-disclosureSize)/2))
+						chev.Resize(geo.NewSize(discIndent, disclosureSize))
 						objects = append(objects, chev)
 
 						if masterA11yIdx >= len(r.masterA11y) {
