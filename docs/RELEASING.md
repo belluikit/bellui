@@ -153,7 +153,22 @@ Commit all of these `go.mod`/`go.sum` changes together, push.
 
 ### 5. Tag the `x/*` modules
 
-On the commit from step 4:
+First check that no module already has the version. An `x/*` module can be
+released on its own between toolkit releases, and a version the Go proxy has
+served can never be moved:
+
+```sh
+git fetch origin --tags
+for m in charts dag editor mmedia tables; do git tag -l "x/$m/v1.0.0-rc.7"; done
+git tag -l "cmd/bellui/v1.0.0-rc.7"
+```
+
+Any output names a version that is taken. Give that module the next free
+version and say so in the changelog entry. `make release-tag-commands` prints a
+warning for each one. v1.3.0-rc.2 hit this: x/mmedia had shipped its own rc.2
+on 2026-11-02, so with toolkit rc.2 it went out as rc.3.
+
+Then, on the commit from step 4:
 
 ```sh
 for m in charts dag editor mmedia tables; do
