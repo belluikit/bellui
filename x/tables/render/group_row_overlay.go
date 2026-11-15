@@ -178,7 +178,7 @@ func (r *groupRowOverlayRenderer) refresh(size geo.Size) {
 				pinnedAggs = append(pinnedAggs, t)
 			}
 		}
-		gw.update(key, childCount, expanded, depth, geo.NewPos(0, y), geo.NewSize(size.Width, rowH), labelEnd, tc)
+		gw.update(key, childCount, expanded, gridDisabled(grid), depth, geo.NewPos(0, y), geo.NewSize(size.Width, rowH), labelEnd, tc)
 		content = append(content, gw.objects...)
 		content = append(content, pinnedAggs...)
 
@@ -334,15 +334,14 @@ func placeAggText(t *canvas.Text, text string, x, y, w, h float32, tc ThemeColor
 // the grid level by the GroupRowOverlay.
 type groupRowWidget struct {
 	bg      *canvas.Rectangle
-	icon    *canvas.Text
+	icon    *canvas.Image
 	label   *canvas.Text
 	objects []core.CanvasObject
 }
 
 func newGroupRowWidget(tc ThemeColors) *groupRowWidget {
 	bg := canvas.NewRectangle(tc.GroupRowBg)
-	icon := canvas.NewText("▼", tc.GroupRowFg)
-	icon.TextSize = 11
+	icon := newDisclosureImage()
 	label := canvas.NewText("", tc.GroupRowFg)
 	label.TextStyle = bellui.TextStyle{Bold: true}
 	label.TextSize = 13
@@ -356,16 +355,15 @@ func groupLabelX(depth int) float32 { return float32(depth)*20 + 20 }
 // update lays the row out. The label is truncated with an ellipsis to end a
 // small gap before labelEnd, the left edge of the first aggregate it would
 // otherwise run into (#748); with no room at all it is left out.
-func (g *groupRowWidget) update(key string, childCount int, expanded bool, depth int, pos geo.Position, size geo.Size, labelEnd float32, tc ThemeColors) {
+func (g *groupRowWidget) update(key string, childCount int, expanded, disabled bool, depth int, pos geo.Position, size geo.Size, labelEnd float32, tc ThemeColors) {
 	const gap = 8
 	indent := float32(depth) * 20
 	g.bg.FillColor = tc.GroupRowBg
 	g.bg.Move(pos)
 	g.bg.Resize(size)
-	g.icon.Text = disclosureGlyph(expanded)
-	g.icon.Color = tc.GroupRowFg
-	g.icon.Move(geo.NewPos(pos.X+indent+4, pos.Y+2))
-	g.icon.Resize(geo.NewSize(14, size.Height-4))
+	setDisclosure(g.icon, expanded, disabled)
+	g.icon.Move(geo.NewPos(pos.X+indent+1, pos.Y+(size.Height-disclosureSize)/2))
+	g.icon.Resize(geo.NewSize(disclosureSize, disclosureSize))
 	labelX := pos.X + groupLabelX(depth)
 	text := fmt.Sprintf("%s (%d)", key, childCount)
 	if room := pos.X + labelEnd - gap - labelX; labelEnd < pos.X+size.Width {

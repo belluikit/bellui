@@ -441,11 +441,26 @@ func TestCellsRenderer_TreeRowDisclosure(t *testing.T) {
 	// A chevron is drawn per parent (two total).
 	var chevrons int
 	for _, o := range r.objects {
-		if txt, ok := o.(*canvas.Text); ok && (txt.Text == "▼" || txt.Text == "▶") {
+		if isDisclosureImage(o) {
 			chevrons++
 		}
 	}
 	if chevrons != 2 {
 		t.Errorf("drew %d chevrons, want 2 (one per parent)", chevrons)
 	}
+}
+
+// isDisclosureImage reports whether o is a disclosure arrow: an image showing
+// either state of disclosureIcon.
+func isDisclosureImage(o core.CanvasObject) bool {
+	img, ok := o.(*canvas.Image)
+	if !ok || img.Resource == nil {
+		return false
+	}
+	for _, expanded := range []bool{true, false} {
+		if img.Resource.Name() == disclosureIcon(expanded, false).Name() {
+			return true
+		}
+	}
+	return false
 }

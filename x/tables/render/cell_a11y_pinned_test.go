@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/test"
@@ -96,7 +95,7 @@ func TestPinnedCells_TreeDisclosure(t *testing.T) {
 	// One chevron per parent.
 	var chevrons int
 	for _, o := range pinnedContent(r) {
-		if txt, ok := o.(*canvas.Text); ok && (txt.Text == "▼" || txt.Text == "▶") {
+		if isDisclosureImage(o) {
 			chevrons++
 		}
 	}

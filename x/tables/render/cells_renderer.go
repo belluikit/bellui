@@ -49,9 +49,9 @@ type CellsRenderer struct {
 	// selection state, with the interactive widget.Check reachable inside it.
 	checkboxHosts []*cellHost
 	detailBgs     []*canvas.Rectangle
-	chevrons      []*canvas.Text
+	chevrons      []*canvas.Image
 	masterA11y    []*masterRowA11y
-	treeChevrons  []*canvas.Text
+	treeChevrons  []*canvas.Image
 	treeA11y      []*treeRowA11y
 }
 
@@ -391,20 +391,13 @@ func (r *CellsRenderer) refreshCells() {
 		// pinned_cells.go), mirroring the tree disclosure.
 		if toggleW > 0 && grid.IsMasterRow(row) && pinnedLeftCount == 0 {
 			if chevIdx >= len(r.chevrons) {
-				t := canvas.NewText("", tc.GroupRowFg)
-				t.TextSize = 11
-				r.chevrons = append(r.chevrons, t)
+				r.chevrons = append(r.chevrons, newDisclosureImage())
 			}
 			chev := r.chevrons[chevIdx]
 			chevIdx++
-			if bandH > 0 {
-				chev.Text = "▼"
-			} else {
-				chev.Text = "▶"
-			}
-			chev.Color = tc.GroupRowFg
-			chev.Move(geo.NewPos(checkboxW+4, y+(cellH-14)/2))
-			chev.Resize(geo.NewSize(toggleW, 14))
+			setDisclosure(chev, bandH > 0, gridDisabled(grid))
+			chev.Move(geo.NewPos(checkboxW+4, y+(cellH-disclosureSize)/2))
+			chev.Resize(geo.NewSize(toggleW, disclosureSize))
 			objects = append(objects, chev)
 
 			// Accessible disclosure control (semantics only, invisible), read
@@ -429,21 +422,14 @@ func (r *CellsRenderer) refreshCells() {
 			depth, hasChildren, expanded := grid.TreeRowInfo(row)
 			if hasChildren {
 				if treeChevIdx >= len(r.treeChevrons) {
-					t := canvas.NewText("", tc.GroupRowFg)
-					t.TextSize = 11
-					r.treeChevrons = append(r.treeChevrons, t)
+					r.treeChevrons = append(r.treeChevrons, newDisclosureImage())
 				}
 				chev := r.treeChevrons[treeChevIdx]
 				treeChevIdx++
-				if expanded {
-					chev.Text = "▼"
-				} else {
-					chev.Text = "▶"
-				}
-				chev.Color = tc.GroupRowFg
+				setDisclosure(chev, expanded, gridDisabled(grid))
 				depthIndent := checkboxW + float32(depth)*TreeIndentPerLevel
-				chev.Move(geo.NewPos(depthIndent+2, y+(cellH-14)/2))
-				chev.Resize(geo.NewSize(TreeToggleWidth, 14))
+				chev.Move(geo.NewPos(depthIndent+2, y+(cellH-disclosureSize)/2))
+				chev.Resize(geo.NewSize(TreeToggleWidth, disclosureSize))
 				objects = append(objects, chev)
 
 				// Accessible RoleTreeItem disclosure node (semantics only,
