@@ -696,7 +696,8 @@ func (g *DataGrid) ShowCheckboxColumn() bool {
 
 // ToggleGroup expands or collapses the row group with the given key and rebuilds
 // the pipeline so the change is reflected. It is the single group-toggle entry
-// point shared by the public GridAPI and the group-header row's accessible
+// point shared by the public GridAPI, a pointer tap on the group-header row
+// (Tapped), Enter/Space on a focused header, and the header row's accessible
 // expand/collapse action (see render.groupRowA11y).
 func (g *DataGrid) ToggleGroup(groupKey string) {
 	if g.groupTransform == nil {
@@ -1528,6 +1529,11 @@ func (g *DataGrid) Tapped(e *event.PointEvent) {
 	}
 	if row := g.treeToggleAt(e.Position); row >= 0 {
 		g.ToggleTreeNode(row)
+		return
+	}
+	if row := g.groupRowAt(e.Position); row >= 0 {
+		key, _, _, _ := g.GroupRowInfo(row)
+		g.ToggleGroup(key)
 		return
 	}
 	id := g.cellAtPosition(e.Position)
@@ -2494,6 +2500,24 @@ func (g *DataGrid) detailToggleAt(pos geo.Position) int {
 // after the row's depth indent, at the left of the first VISIBLE column (the
 // first pinned-left column when any are pinned, else the first main column), on
 // tree parent rows (HasChildren) only.
+// groupRowAt returns the display row of the group-header row under pos, or -1.
+// The whole header row is the toggle target, so a tap anywhere on it —
+// including past the last column — expands or collapses the group (#1252).
+func (g *DataGrid) groupRowAt(pos geo.Position) int {
+	if g.groupTransform == nil {
+		return -1
+	}
+	headerH := g.HeaderHeight()
+	if pos.Y < headerH {
+		return -1
+	}
+	row := g.viewport.RowAtY(pos.Y - headerH + g.offset.Y)
+	if row < 0 || row >= g.RowCount() || !g.IsGroupRow(row) {
+		return -1
+	}
+	return row
+}
+
 func (g *DataGrid) treeToggleAt(pos geo.Position) int {
 	if !g.treeActive() {
 		return -1
