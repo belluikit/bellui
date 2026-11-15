@@ -7,7 +7,7 @@ module github.com/belluikit/bellui/x/editor/examples/wasm
 go 1.26.2
 
 require (
-	github.com/belluikit/bellui v1.3.0-rc.1
+	github.com/belluikit/bellui v1.3.0-rc.2
 	github.com/belluikit/bellui/x/editor v0.0.0
 )
 
@@ -19,13 +19,12 @@ require (
 	github.com/belluikit/glfw-js v1.0.4 // indirect
 	github.com/belluikit/systray v1.12.2 // indirect
 	github.com/belluikit/typesetting v0.3.6 // indirect
-	github.com/belluikit/webgpu v1.2.2 // indirect
-	github.com/belluikit/webgpu/libs-android v0.0.0-20260731101013-82e3bdc8353b // indirect
-	github.com/belluikit/webgpu/libs-darwin v0.0.0-20260731101014-ce4f86d4438c // indirect
-	github.com/belluikit/webgpu/libs-ios v0.0.0-20260727093643-fcde44a448a6 // indirect
-	github.com/belluikit/webgpu/libs-linux v0.0.0-20260731101015-884076933a5d // indirect
-	github.com/belluikit/webgpu/libs-windows v0.0.0-20260727093645-6b8e55d25f27 // indirect
-	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/belluikit/webgpu v1.2.4 // indirect
+	github.com/belluikit/webgpu/libs-android v0.0.0-20261111082704-bbaa548a1d45 // indirect
+	github.com/belluikit/webgpu/libs-darwin v0.0.0-20261111082641-092cb90d718e // indirect
+	github.com/belluikit/webgpu/libs-ios v0.0.0-20261111082643-f4adf07a4281 // indirect
+	github.com/belluikit/webgpu/libs-linux v0.0.0-20261111082701-57a52ab65675 // indirect
+	github.com/belluikit/webgpu/libs-windows v0.0.0-20261111091809-343dda80becd // indirect
 	github.com/fredbi/uri v1.1.1 // indirect
 	github.com/go-gl/gl v0.0.0-20231021071112-07e5d0ea2e71 // indirect
 	github.com/go-gl/glfw/v3.4/glfw v0.1.0-pre.1.0.20260628091122-0bd588dc30cf // indirect
@@ -36,7 +35,6 @@ require (
 	github.com/jsummers/gobmp v0.0.0-20230614200233-a9de23ed2e25 // indirect
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646 // indirect
 	github.com/nicksnyder/go-i18n/v2 v2.5.1 // indirect
-	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rymdport/portal v0.4.2 // indirect
 	github.com/stretchr/testify v1.12.1 // indirect
 	github.com/trendvidia/protowire-go v1.16.0 // indirect
@@ -47,7 +45,6 @@ require (
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.40.0 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
 replace github.com/belluikit/bellui/x/editor => ../..
