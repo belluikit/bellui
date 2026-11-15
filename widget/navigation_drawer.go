@@ -21,6 +21,11 @@ type NavigationDrawerItem struct {
 	IsDivider bool // true = render as separator
 }
 
+// drawerScrimStrip is the scrim a drawer leaves uncovered on a canvas too
+// narrow for its full width, so a tap beside it can close it: the screen width
+// less one app bar, as Material sizes a modal drawer on a phone (#1238).
+const drawerScrimStrip = 56
+
 // DrawerSide is the edge of the canvas a [NavigationDrawer] opens against.
 //
 // Since: 1.3
@@ -159,7 +164,10 @@ func (d *NavigationDrawer) Show(c core.Canvas) {
 	} else {
 		insetRight = 0
 	}
-	drawerWidth := float32(360) + insetLeft + insetRight
+	// No wider than the canvas less a strip of scrim: the pop-up would cut a
+	// wider drawer to the canvas but keep its x, so an end drawer stopped
+	// short of its edge (#1238).
+	drawerWidth := min(float32(360)+insetLeft+insetRight, max(canvasSize.Width-drawerScrimStrip, 0))
 	content := &bellui.Container{Layout: layout.NewVBoxLayout(), Objects: objects}
 	padded := &bellui.Container{Layout: layout.NewPaddedLayout(), Objects: []core.CanvasObject{content}}
 	inset := &bellui.Container{

@@ -312,6 +312,44 @@ func TestNavigationDrawer_Side(t *testing.T) {
 	}
 }
 
+// On a canvas narrower than the drawer, as an iPhone with Display Zoom on
+// Larger is (320 pt), the drawer still sits against its edge and leaves a
+// strip of scrim on the other side (#1238). It was drawn 360 pt wide at
+// 320-360 = -40, cut to the canvas width, so an end drawer stopped 40 pt short
+// of the right edge.
+func TestNavigationDrawer_NarrowCanvas(t *testing.T) {
+	test.NewTempApp(t)
+	items := []*NavigationDrawerItem{{Label: "Home", Icon: theme.HomeIcon()}}
+	w := test.NewTempWindow(t, NewLabel("content"))
+	w.Resize(geo.NewSize(320, 600))
+	width := w.Canvas().Size().Width
+	require.Equal(t, float32(320), width)
+
+	for _, tc := range []struct {
+		name  string
+		side  DrawerSide
+		right bool
+	}{
+		{"start", DrawerSideStart, false},
+		{"end", DrawerSideEnd, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			d := NewNavigationDrawer(items, nil)
+			d.Side = tc.side
+			d.Show(w.Canvas())
+			defer d.Hide()
+
+			pos, size := drawerSurface(t, d)
+			assert.Equal(t, width-drawerScrimStrip, size.Width, "the drawer leaves a strip of scrim")
+			if tc.right {
+				assert.Equal(t, width, pos.X+size.Width, "against the right edge")
+			} else {
+				assert.Equal(t, float32(0), pos.X, "against the left edge")
+			}
+		})
+	}
+}
+
 // With Top set, the drawer and its scrim start there. A tap above Top reaches
 // the header button and leaves the drawer open; a tap on the scrim below
 // closes it.
