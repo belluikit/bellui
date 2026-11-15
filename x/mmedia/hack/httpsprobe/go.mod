@@ -5,7 +5,7 @@ module github.com/belluikit/bellui/x/mmedia/hack/httpsprobe
 go 1.26.2
 
 require (
-	github.com/belluikit/bellui v1.3.0-rc.1
+	github.com/belluikit/bellui v1.3.0-rc.2
 	github.com/belluikit/bellui/x/mmedia v0.0.0
 )
 
@@ -30,7 +30,7 @@ require (
 	github.com/belluikit/oto/v3 v3.0.0-20261114221446-b2db31a36c2f // indirect
 	github.com/belluikit/systray v1.12.2 // indirect
 	github.com/belluikit/typesetting v0.3.6 // indirect
-	github.com/belluikit/webgpu v1.2.3 // indirect
+	github.com/belluikit/webgpu v1.2.4 // indirect
 	github.com/belluikit/webgpu/libs-android v0.0.0-20261111082704-bbaa548a1d45 // indirect
 	github.com/belluikit/webgpu/libs-darwin v0.0.0-20261111082641-092cb90d718e // indirect
 	github.com/belluikit/webgpu/libs-ios v0.0.0-20261111082643-f4adf07a4281 // indirect
