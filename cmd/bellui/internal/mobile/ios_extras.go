@@ -234,8 +234,9 @@ type iosFramework struct {
 	Dynamic bool
 }
 
-// iosFrameworkSources lists ios/Frameworks/*.xcframework and *.framework,
-// sorted.
+// iosFrameworkSources lists ios/Frameworks/*.xcframework, *.framework and *.a,
+// sorted. Anything else there is an error rather than left out unseen; dot
+// files (.DS_Store) are ignored.
 func iosFrameworkSources(appDir string) ([]string, error) {
 	dir := filepath.Join(appDir, iosExtrasDir, iosFrameworksDir)
 	entries, err := os.ReadDir(dir)
@@ -247,9 +248,14 @@ func iosFrameworkSources(appDir string) ([]string, error) {
 	}
 	var out []string
 	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), ".") {
+			continue
+		}
 		switch filepath.Ext(e.Name()) {
-		case ".xcframework", ".framework":
+		case ".xcframework", ".framework", ".a":
 			out = append(out, filepath.Join(dir, e.Name()))
+		default:
+			return nil, fmt.Errorf("%s: not an .xcframework, .framework or static library (.a)", filepath.Join(dir, e.Name()))
 		}
 	}
 	sort.Strings(out)
@@ -272,8 +278,11 @@ func xcframeworkArch(goarch string) string {
 // resolveIOSFramework picks src's slice for one architecture. simulator is
 // true for an iossimulator build. A plain .framework is used as it is.
 func resolveIOSFramework(src, goarch string, simulator bool) (iosFramework, error) {
-	if filepath.Ext(src) == ".framework" {
+	switch filepath.Ext(src) {
+	case ".framework":
 		return frameworkSlice(src)
+	case ".a":
+		return staticLibrarySlice(src, goarch)
 	}
 	info, err := readPlistFile(filepath.Join(src, "Info.plist"))
 	if err != nil {
@@ -347,6 +356,30 @@ func frameworkSlice(dir string) (iosFramework, error) {
 		return iosFramework{}, fmt.Errorf("%s: %w", dir, err)
 	}
 	return iosFramework{Name: name, Path: dir, Dynamic: dynamic}, nil
+}
+
+// staticLibrarySlice describes a plain static archive, as swiftc -emit-library
+// -static or ar writes one (#1240). It is linked by path through CGO_LDFLAGS,
+// which go does not scan: a #cgo LDFLAGS -L naming its directory is refused
+// since Go 1.27.4, whose check takes swiftc's __LLVM,__swift_modhash section
+// for LTO bitcode. An archive holds one slice per architecture and no
+// platform, so the linker, not this, tells a device archive from a simulator
+// one; an app that needs both ships an xcframework.
+func staticLibrarySlice(src, goarch string) (iosFramework, error) {
+	// machODynamic cannot read a universal archive (lipo -create of two
+	// static ones) and errs; lipo below refuses what is not an archive.
+	if dynamic, err := machODynamic(src); err == nil && dynamic {
+		return iosFramework{}, fmt.Errorf("%s is a dynamic library; ship it as a .framework or .xcframework", src)
+	}
+	out, err := exec.Command("xcrun", "lipo", "-archs", src).Output()
+	if err != nil {
+		return iosFramework{}, fmt.Errorf("%s: lipo -archs: %w", src, err)
+	}
+	archs := strings.Fields(string(out))
+	if !slices.Contains(archs, xcframeworkArch(goarch)) {
+		return iosFramework{}, fmt.Errorf("%s has no slice for %s (has %s)", src, xcframeworkArch(goarch), strings.Join(archs, ", "))
+	}
+	return iosFramework{Name: filepath.Base(src), Path: src}, nil
 }
 
 // machODynamic reports whether bin is a dynamic library (thin or fat), as

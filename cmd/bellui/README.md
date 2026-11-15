@@ -79,6 +79,19 @@ next to the app's main package, for what `manifest.pxf` has no field for
   project, with `@executable_path/Frameworks` on the binary's rpath; static
   ones are linked only. Swift is not compiled by the packager: build Swift
   code into an xcframework in Xcode, exposing a C or `@objc` API.
+- **`ios/Frameworks/*.a`** — a plain static library, linked into every
+  architecture it holds; a build for one it lacks is an error. This is how
+  to link Swift built with `swiftc -emit-library -static`, or anything from
+  `ar`, without an xcframework. Don't link such a library from a `#cgo
+  LDFLAGS: -L<dir>` line: since Go 1.27.4 the go command refuses an object
+  with an `__LLVM` segment in a directory a `#cgo` line names, and swiftc
+  (Xcode 27.2 and later) writes `__LLVM,__swift_modhash` into every object
+  (`disallowed LTO section`). The packager passes these libraries outside
+  `#cgo` lines, where that check does not run. An archive does not say
+  whether it was built for a device or the simulator, so the linker reports
+  a mismatch; an app built for both ships an xcframework instead.
+
+Anything else in `ios/Frameworks/` is an error, apart from dot files.
 
 `hack/iosframeworkprobe` exercises all three on a device.
 

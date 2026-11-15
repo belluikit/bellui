@@ -476,3 +476,81 @@ func TestXCFrameworkSlices(t *testing.T) {
 	assert.Contains(t, string(out), "@rpath/Probe.framework/Probe")
 	t.Log("linked a simulator binary against both slices")
 }
+
+// TestStaticLibraryInFrameworks builds real archives with Xcode and checks a
+// plain .a in ios/Frameworks (#1240): it is linked for an architecture it
+// holds, refused for one it lacks, and a universal archive works; a dylib
+// named .a and any other entry are errors, dot files are ignored.
+func TestStaticLibraryInFrameworks(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("needs Xcode")
+	}
+	if err := exec.Command("xcrun", "--sdk", "iphoneos", "--show-sdk-path").Run(); err != nil {
+		t.Skip("needs Xcode with the iOS SDK")
+	}
+	dir := t.TempDir()
+	run := func(args ...string) {
+		t.Helper()
+		out, err := exec.Command(args[0], args[1:]...).CombinedOutput()
+		require.NoError(t, err, "%v\n%s", args, out)
+	}
+	src := filepath.Join(dir, "probe.c")
+	require.NoError(t, os.WriteFile(src, []byte("int probe_answer(void) { return 42; }\n"), 0o644))
+	archive := func(sdk, target, out string) {
+		obj := filepath.Join(dir, filepath.Base(out)+"-"+target+".o")
+		run("xcrun", "--sdk", sdk, "clang", "-target", target, "-c", "-o", obj, src)
+		run("xcrun", "ar", "rcs", out, obj)
+	}
+
+	app := t.TempDir()
+	fwDir := filepath.Join(app, iosExtrasDir, iosFrameworksDir)
+	require.NoError(t, os.MkdirAll(fwDir, 0o755))
+	archive("iphoneos", "arm64-apple-ios15.0", filepath.Join(fwDir, "libprobe.a"))
+	require.NoError(t, os.WriteFile(filepath.Join(fwDir, ".DS_Store"), []byte("x"), 0o644))
+
+	perArch, embed, err := resolveIOSFrameworks(app, []string{"arm64"}, false)
+	require.NoError(t, err)
+	require.Len(t, perArch["arm64"], 1)
+	lib := perArch["arm64"][0]
+	assert.Equal(t, iosFramework{Name: "libprobe.a", Path: filepath.Join(fwDir, "libprobe.a")}, lib)
+	assert.Empty(t, embed, "a static library is linked, not embedded")
+
+	_, _, err = resolveIOSFrameworks(app, []string{"arm"}, false)
+	assert.ErrorContains(t, err, "has no slice for armv7 (has arm64)")
+
+	// The archive links by path in a real device link.
+	main := filepath.Join(dir, "main.c")
+	require.NoError(t, os.WriteFile(main, []byte("int probe_answer(void);\nint main(void) { return probe_answer(); }\n"), 0o644))
+	_, ldflags := iosLinkFlags(perArch["arm64"])
+	args := append([]string{"xcrun", "--sdk", "iphoneos", "clang", "-target", "arm64-apple-ios15.0", "-o", filepath.Join(dir, "a.out"), main}, ldflags...)
+	run(args...)
+	out, err := exec.Command("nm", filepath.Join(dir, "a.out")).Output()
+	require.NoError(t, err)
+	assert.Contains(t, string(out), "_probe_answer")
+
+	// A universal simulator archive serves both simulator architectures.
+	sim := t.TempDir()
+	simFw := filepath.Join(sim, iosExtrasDir, iosFrameworksDir)
+	require.NoError(t, os.MkdirAll(simFw, 0o755))
+	archive("iphonesimulator", "arm64-apple-ios15.0-simulator", filepath.Join(dir, "libsim-arm64.a"))
+	archive("iphonesimulator", "x86_64-apple-ios15.0-simulator", filepath.Join(dir, "libsim-x86_64.a"))
+	run("xcrun", "lipo", "-create", "-output", filepath.Join(simFw, "libprobe.a"),
+		filepath.Join(dir, "libsim-arm64.a"), filepath.Join(dir, "libsim-x86_64.a"))
+	perArch, _, err = resolveIOSFrameworks(sim, []string{"arm64", "amd64"}, true)
+	require.NoError(t, err)
+	assert.Len(t, perArch["arm64"], 1)
+	assert.Len(t, perArch["amd64"], 1)
+
+	// A dynamic library is not a static one, whatever its name.
+	dyn := t.TempDir()
+	dynFw := filepath.Join(dyn, iosExtrasDir, iosFrameworksDir)
+	require.NoError(t, os.MkdirAll(dynFw, 0o755))
+	run("xcrun", "--sdk", "iphoneos", "clang", "-target", "arm64-apple-ios15.0", "-dynamiclib", "-o", filepath.Join(dynFw, "libprobe.a"), src)
+	_, _, err = resolveIOSFrameworks(dyn, []string{"arm64"}, false)
+	assert.ErrorContains(t, err, "is a dynamic library")
+
+	// Anything else is an error, not a library quietly left out.
+	require.NoError(t, os.WriteFile(filepath.Join(fwDir, "libprobe.dylib"), []byte("x"), 0o644))
+	_, _, err = resolveIOSFrameworks(app, []string{"arm64"}, false)
+	assert.ErrorContains(t, err, "libprobe.dylib: not an .xcframework, .framework or static library (.a)")
+}
