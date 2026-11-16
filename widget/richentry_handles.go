@@ -55,6 +55,7 @@ func (e *RichEntry) LongPressed(ev *event.PointEvent) {
 		e.anchor = e.doc.rowColToOffset(row, start)
 		e.caret = e.doc.rowColToOffset(row, end)
 		e.selecting = e.anchor != e.caret
+		e.pressedWord.set(row, start, end)
 	}
 	e.interruptCursor()
 	if e.selecting {
@@ -68,6 +69,7 @@ func (e *RichEntry) LongPressed(ev *event.PointEvent) {
 // forwards its TouchDown here (like the other pointer gestures).
 func (e *RichEntry) TouchDown(*mobile.TouchEvent) {
 	e.touchPointer = true
+	e.pressedWord.clear()
 }
 
 // TouchUp implements [mobile.Touchable].
@@ -82,6 +84,7 @@ func (e *RichEntry) TouchCancel(*mobile.TouchEvent) {
 // embedded selectable, which grabs focus itself).
 func (e *RichEntry) MouseDown(*desktop.MouseEvent) {
 	e.touchPointer = false
+	e.pressedWord.clear()
 }
 
 // MouseUp implements [desktop.Mouseable].

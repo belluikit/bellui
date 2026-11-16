@@ -103,6 +103,9 @@ type RichEntry struct {
 	// See richentry_handles.go.
 	selHandles                   *entrySelectionHandles
 	touchPointer, touchSelection bool
+	// pressedWord is the word a long-press selected, which a drag extends a
+	// word at a time (#1267).
+	pressedWord pressedWord
 
 	// caretHandle is the mobile caret drag-handle overlay (pre-rebrand tracker #999, parity with
 	// Entry's pre-rebrand tracker #943): a single draggable dot summoned after a plain touch tap so
@@ -603,14 +606,22 @@ func (e *RichEntry) Dragged(d *event.DragEvent) {
 	}
 	e.requestFocus()
 	e.syncSel()
-	if !e.selecting {
-		start := d.Position.Subtract(d.Dragged)
-		sr, sc, _ := e.sel.getRowCol(start)
-		e.anchor = clampInt(e.doc.rowColToOffset(sr, sc), 0, e.doc.len())
+	if e.pressedWord.active {
+		row, col, _ := e.sel.getRowCol(d.Position)
+		aRow, aCol, cRow, cCol := e.pressedWord.extend(row, col, e.provider.row)
+		e.anchor = clampInt(e.doc.rowColToOffset(aRow, aCol), 0, e.doc.len())
+		e.caret = clampInt(e.doc.rowColToOffset(cRow, cCol), 0, e.doc.len())
 		e.selecting = true
+	} else {
+		if !e.selecting {
+			start := d.Position.Subtract(d.Dragged)
+			sr, sc, _ := e.sel.getRowCol(start)
+			e.anchor = clampInt(e.doc.rowColToOffset(sr, sc), 0, e.doc.len())
+			e.selecting = true
+		}
+		row, col, _ := e.sel.getRowCol(d.Position)
+		e.caret = clampInt(e.doc.rowColToOffset(row, col), 0, e.doc.len())
 	}
-	row, col, _ := e.sel.getRowCol(d.Position)
-	e.caret = clampInt(e.doc.rowColToOffset(row, col), 0, e.doc.len())
 	e.interruptCursor()
 	if e.touchPointer && e.selecting {
 		e.markTouchSelection() // a touch drag-select gets handles (pre-rebrand tracker #888)
@@ -621,6 +632,7 @@ func (e *RichEntry) Dragged(d *event.DragEvent) {
 // DragEnd finalizes a drag selection, collapsing it when the drag selected
 // nothing (a press-drag that returned to its origin).
 func (e *RichEntry) DragEnd() {
+	e.pressedWord.clear()
 	if e.Disabled() {
 		return
 	}

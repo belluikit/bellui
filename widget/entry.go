@@ -345,6 +345,9 @@ type Entry struct {
 	// what summons the mobile selection handles (a hardware-keyboard or
 	// programmatic selection shows none, matching native platforms).
 	touchPointer, touchSelection bool
+	// pressedWord is the word a long-press selected, which a drag extends a
+	// word at a time (#1267).
+	pressedWord pressedWord
 
 	// OnSelectChanged is called whenever the text selection changes.
 	// The callback receives the currently selected text (empty string when
@@ -1049,6 +1052,7 @@ func (e *Entry) selectNearestWordAtCursor() {
 		e.CursorColumn = end
 		e.syncSelectable()
 		e.sel.selecting = true
+		e.pressedWord.set(e.CursorRow, start, end)
 	})
 }
 
@@ -1061,6 +1065,7 @@ func (e *Entry) markTouchSelection() {
 
 // DragEnd is called at end of a drag event.
 func (e *Entry) DragEnd() {
+	e.pressedWord.clear()
 	e.syncSelectable()
 
 	if e.CursorColumn == e.sel.selectColumn && e.CursorRow == e.sel.selectRow {
@@ -1093,11 +1098,31 @@ func (e *Entry) ClaimsDrag(geo.Delta) bool { return false }
 // It updates the selection accordingly.
 func (e *Entry) Dragged(d *event.DragEvent) {
 	d.Position = d.Position.Add(geo.NewPos(0, e.Theme().Size(theme.SizeNameInputBorder)))
+	if e.pressedWord.active {
+		e.dragPressedWord(d.Position)
+		return
+	}
 	e.sel.dragged(d)
 	e.updateMousePointer(d.Position, false)
 	if e.touchPointer && e.sel.selecting {
 		e.markTouchSelection()
 	}
+}
+
+// dragPressedWord extends the long-pressed word's selection to the word at p.
+func (e *Entry) dragPressedWord(p geo.Position) {
+	row, col, _ := e.sel.getRowCol(p)
+	aRow, aCol, cRow, cCol := e.pressedWord.extend(row, col, e.textProvider().row)
+	e.setFieldsAndRefresh(func() {
+		e.sel.selectRow, e.sel.selectColumn = aRow, aCol
+		e.CursorRow, e.CursorColumn = cRow, cCol
+		e.syncSelectable()
+		e.sel.selecting = true
+	})
+	if r := cache.Renderer(e.content); r != nil {
+		r.(*entryContentRenderer).moveCursor()
+	}
+	e.markTouchSelection()
 }
 
 // ExtendBaseWidget is used by an extending widget to make use of BaseWidget functionality.
@@ -1240,6 +1265,7 @@ func (e *Entry) IntrinsicSize() geo.Size {
 // update the existing selection (if shift is held), or start a selection dragging operation.
 func (e *Entry) MouseDown(m *desktop.MouseEvent) {
 	e.touchPointer = false
+	e.pressedWord.clear()
 
 	// Detect clicks in the gutter area BEFORE focus/selection to avoid side effects.
 	if e.OnGutterTap != nil && e.text.GutterWidth > 0 {
@@ -1730,6 +1756,7 @@ func (e *Entry) showContextMenu(pos geo.Position) {
 func (e *Entry) TouchDown(ev *mobile.TouchEvent) {
 	now := time.Now().UnixMilli()
 	e.touchPointer = true
+	e.pressedWord.clear()
 	e.syncSegments()
 	if !e.Disabled() {
 		e.requestFocus()
