@@ -60,6 +60,13 @@ type ColumnDef struct {
 
 	// Sortable controls whether this column can be sorted. Nil inherits from DefaultColumnDef.
 	Sortable *bool
+	// SortingOrder is the directions a header tap moves this column through,
+	// in order, as AG Grid's sortingOrder: the first tap gives the first, each
+	// later tap the next, round again. SortNone in it is the tap that clears
+	// the sort; without it, the column never goes back to unsorted, as a
+	// list that always comes in this column's order wants. Nil inherits from
+	// DefaultColumnDef, and there nil is ascending, descending, none.
+	SortingOrder []SortDirection
 	// Resizable controls whether this column can be resized by dragging. Nil inherits.
 	Resizable *bool
 	// Filterable controls whether this column can be filtered. Nil inherits.
@@ -147,14 +154,17 @@ type ColumnDef struct {
 
 // DefaultColumnDef provides shared defaults applied to all columns.
 type DefaultColumnDef struct {
-	Sortable   bool
-	Resizable  bool
-	Filterable bool
-	Editable   bool
-	MinWidth   float32
-	MaxWidth   float32
-	Width      float32
-	Flex       float32
+	Sortable bool
+	// SortingOrder is every column's ColumnDef.SortingOrder unless it sets
+	// its own; nil is ascending, descending, none.
+	SortingOrder []SortDirection
+	Resizable    bool
+	Filterable   bool
+	Editable     bool
+	MinWidth     float32
+	MaxWidth     float32
+	Width        float32
+	Flex         float32
 }
 
 // ID returns the effective column ID, falling back to Field.
@@ -187,6 +197,39 @@ func (c *ColumnDef) isSortable(def *DefaultColumnDef) bool {
 		return def.Sortable
 	}
 	return true
+}
+
+// defaultSortingOrder is a header tap's cycle when no column says otherwise.
+var defaultSortingOrder = []SortDirection{SortAscending, SortDescending, SortNone}
+
+// sortingOrder returns the effective sorting order, using the default if nil.
+func (c *ColumnDef) sortingOrder(def *DefaultColumnDef) []SortDirection {
+	switch {
+	case len(c.SortingOrder) > 0:
+		return c.SortingOrder
+	case def != nil && len(def.SortingOrder) > 0:
+		return def.SortingOrder
+	}
+	return defaultSortingOrder
+}
+
+// nextDirection is the direction a tap moves a column to from cur, along
+// order: the first for a column not sorted (or one whose direction order
+// doesn't hold), else the one after cur, round again.
+func nextDirection(order []SortDirection, cur SortDirection) SortDirection {
+	if cur != SortNone {
+		for i, d := range order {
+			if d == cur {
+				return order[(i+1)%len(order)]
+			}
+		}
+	}
+	for _, d := range order {
+		if d != SortNone {
+			return d
+		}
+	}
+	return SortNone
 }
 
 // isResizable returns the effective resizable setting, using the default if nil.

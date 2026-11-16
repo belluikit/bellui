@@ -901,10 +901,11 @@ func (g *DataGrid) OnHeaderTapped(col int, modifier event.KeyModifier) {
 	if !rc.def.isSortable(g.DefaultColDef) {
 		return
 	}
+	order := rc.def.sortingOrder(g.DefaultColDef)
 	if modifier&event.KeyModifierShift != 0 {
-		g.multiSortColumn(rc.def.ID())
+		g.multiSortColumn(rc.def.ID(), order)
 	} else {
-		g.cycleSortColumn(rc.def.ID())
+		g.cycleSortColumn(rc.def.ID(), order)
 	}
 }
 
@@ -1037,20 +1038,18 @@ func (g *DataGrid) IsFilterActive(col int) bool {
 
 // cycleSortColumn cycles the sort direction for the given column ID: None → Asc → Desc → None.
 // In single-sort mode (no shift held), clears other sorts. Multi-sort preserves them.
-func (g *DataGrid) cycleSortColumn(colID string) {
+func (g *DataGrid) cycleSortColumn(colID string, order []SortDirection) {
 	// Single-sort mode: if the model has other columns, replace entirely.
-	// If this column is already the sole sort, cycle its direction.
+	// If this column is already the sole sort, it moves along its order
+	// (by default Asc → Desc → None; ColumnDef.SortingOrder).
+	cur := SortNone
 	if len(g.sortModel) == 1 && g.sortModel[0].ColID == colID {
-		// Cycle: Asc → Desc → None
-		switch g.sortModel[0].Direction {
-		case SortAscending:
-			g.sortModel[0].Direction = SortDescending
-		case SortDescending:
-			g.sortModel = nil
-		}
+		cur = g.sortModel[0].Direction
+	}
+	if next := nextDirection(order, cur); next == SortNone {
+		g.sortModel = nil
 	} else {
-		// Replace entire model with this single column ascending
-		g.sortModel = []SortItem{{ColID: colID, Direction: SortAscending}}
+		g.sortModel = []SortItem{{ColID: colID, Direction: next}}
 	}
 
 	g.rebuildPipeline()
@@ -1061,7 +1060,7 @@ func (g *DataGrid) cycleSortColumn(colID string) {
 }
 
 // multiSortColumn adds or cycles a column in the multi-sort model (shift+click).
-func (g *DataGrid) multiSortColumn(colID string) {
+func (g *DataGrid) multiSortColumn(colID string, order []SortDirection) {
 	idx := -1
 	for i, s := range g.sortModel {
 		if s.ColID == colID {
@@ -1070,15 +1069,17 @@ func (g *DataGrid) multiSortColumn(colID string) {
 		}
 	}
 
+	cur := SortNone
 	if idx >= 0 {
-		switch g.sortModel[idx].Direction {
-		case SortAscending:
-			g.sortModel[idx].Direction = SortDescending
-		case SortDescending:
-			g.sortModel = append(g.sortModel[:idx], g.sortModel[idx+1:]...)
-		}
-	} else {
-		g.sortModel = append(g.sortModel, SortItem{ColID: colID, Direction: SortAscending})
+		cur = g.sortModel[idx].Direction
+	}
+	switch next := nextDirection(order, cur); {
+	case idx >= 0 && next == SortNone:
+		g.sortModel = append(g.sortModel[:idx], g.sortModel[idx+1:]...)
+	case idx >= 0:
+		g.sortModel[idx].Direction = next
+	case next != SortNone:
+		g.sortModel = append(g.sortModel, SortItem{ColID: colID, Direction: next})
 	}
 
 	g.rebuildPipeline()
