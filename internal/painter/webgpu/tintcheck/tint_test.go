@@ -150,7 +150,7 @@ func findChrome() string {
 // unavailable skips the test, or fails it when BELLUI_REQUIRE_TINT=1 says the
 // environment promised a browser with WebGPU. A CI job must never read a skip
 // as a pass.
-func unavailable(t *testing.T, format string, args ...any) {
+func unavailable(t testing.TB, format string, args ...any) {
 	t.Helper()
 	msg := fmt.Sprintf(format, args...)
 	if os.Getenv("BELLUI_REQUIRE_TINT") == "1" {
@@ -180,9 +180,12 @@ func loadShaders(t *testing.T) []shaderIn {
 	return out
 }
 
+// chromeTimeout is how long runChrome waits for the page's report.
+var chromeTimeout = 90 * time.Second
+
 // runChrome serves the page, runs headless Chrome on it, and returns the
 // report the page posts back.
-func runChrome(t *testing.T, chrome string, shaders []shaderIn) report {
+func runChrome(t testing.TB, chrome string, shaders []shaderIn) report {
 	t.Helper()
 	got := make(chan report, 1)
 	mux := http.NewServeMux()
@@ -207,7 +210,7 @@ func runChrome(t *testing.T, chrome string, shaders []shaderIn) report {
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), chromeTimeout)
 	defer cancel()
 	// http://127.0.0.1 is a secure context, so navigator.gpu is exposed.
 	// --no-sandbox: Ubuntu 24.04's AppArmor policy blocks the user namespaces
@@ -232,8 +235,15 @@ func runChrome(t *testing.T, chrome string, shaders []shaderIn) report {
 	if err := cmd.Start(); err != nil {
 		unavailable(t, "starting %s: %v", chrome, err)
 	}
-	exited := make(chan error, 1)
-	go func() { exited <- cmd.Wait() }()
+	// os/exec copies Chrome's output into stderr from its own goroutine
+	// until Wait returns, so stderr is read only after exited is closed
+	// (#1271).
+	var waitErr error
+	exited := make(chan struct{})
+	go func() {
+		waitErr = cmd.Wait()
+		close(exited)
+	}()
 	defer func() {
 		cancel()
 		<-exited
@@ -242,9 +252,10 @@ func runChrome(t *testing.T, chrome string, shaders []shaderIn) report {
 	select {
 	case rep := <-got:
 		return rep
-	case err := <-exited:
-		t.Fatalf("%s exited before the page reported (%v); its output:\n%s", chrome, err, stderr.String())
+	case <-exited:
+		t.Fatalf("%s exited before the page reported (%v); its output:\n%s", chrome, waitErr, stderr.String())
 	case <-ctx.Done():
+		<-exited // the context kills Chrome
 		t.Fatalf("no report from %s within the timeout; its output:\n%s", chrome, stderr.String())
 	}
 	return report{}
