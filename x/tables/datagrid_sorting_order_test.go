@@ -49,21 +49,35 @@ func TestSortingOrderIsTheTapsCycle(t *testing.T) {
 		shift bool
 		want  []string // after each tap on column a
 	}{
-		{name: "the default: ascending, descending, none", cols: []*ColumnDef{{Field: "a", Width: 100}},
-			want: []string{a(SortAscending), a(SortDescending), none, a(SortAscending)}},
-		{name: "ascending and descending only: never none", cols: []*ColumnDef{{Field: "a", Width: 100, SortingOrder: twoWay}},
-			want: []string{a(SortAscending), a(SortDescending), a(SortAscending), a(SortDescending)}},
-		{name: "descending first", cols: []*ColumnDef{{Field: "a", Width: 100, SortingOrder: []SortDirection{SortDescending, SortAscending}}},
-			want: []string{a(SortDescending), a(SortAscending), a(SortDescending)}},
-		{name: "DefaultColumnDef's order", def: &DefaultColumnDef{Sortable: true, SortingOrder: twoWay}, cols: []*ColumnDef{{Field: "a", Width: 100}},
-			want: []string{a(SortAscending), a(SortDescending), a(SortAscending)}},
-		{name: "the column's own before DefaultColumnDef's", def: &DefaultColumnDef{Sortable: true, SortingOrder: twoWay},
+		{
+			name: "the default: ascending, descending, none", cols: []*ColumnDef{{Field: "a", Width: 100}},
+			want: []string{a(SortAscending), a(SortDescending), none, a(SortAscending)},
+		},
+		{
+			name: "ascending and descending only: never none", cols: []*ColumnDef{{Field: "a", Width: 100, SortingOrder: twoWay}},
+			want: []string{a(SortAscending), a(SortDescending), a(SortAscending), a(SortDescending)},
+		},
+		{
+			name: "descending first", cols: []*ColumnDef{{Field: "a", Width: 100, SortingOrder: []SortDirection{SortDescending, SortAscending}}},
+			want: []string{a(SortDescending), a(SortAscending), a(SortDescending)},
+		},
+		{
+			name: "DefaultColumnDef's order", def: &DefaultColumnDef{Sortable: true, SortingOrder: twoWay}, cols: []*ColumnDef{{Field: "a", Width: 100}},
+			want: []string{a(SortAscending), a(SortDescending), a(SortAscending)},
+		},
+		{
+			name: "the column's own before DefaultColumnDef's", def: &DefaultColumnDef{Sortable: true, SortingOrder: twoWay},
 			cols: []*ColumnDef{{Field: "a", Width: 100, SortingOrder: []SortDirection{SortDescending, SortNone}}},
-			want: []string{a(SortDescending), none, a(SortDescending)}},
-		{name: "sorted from the start: the first tap moves on", cols: []*ColumnDef{{Field: "a", Width: 100, SortingOrder: twoWay}},
-			start: []SortItem{{ColID: "a", Direction: SortAscending}}, want: []string{a(SortDescending), a(SortAscending)}},
-		{name: "Shift follows the order too", cols: []*ColumnDef{{Field: "a", Width: 100, SortingOrder: twoWay}}, shift: true,
-			want: []string{a(SortAscending), a(SortDescending), a(SortAscending)}},
+			want: []string{a(SortDescending), none, a(SortDescending)},
+		},
+		{
+			name: "sorted from the start: the first tap moves on", cols: []*ColumnDef{{Field: "a", Width: 100, SortingOrder: twoWay}},
+			start: []SortItem{{ColID: "a", Direction: SortAscending}}, want: []string{a(SortDescending), a(SortAscending)},
+		},
+		{
+			name: "Shift follows the order too", cols: []*ColumnDef{{Field: "a", Width: 100, SortingOrder: twoWay}}, shift: true,
+			want: []string{a(SortAscending), a(SortDescending), a(SortAscending)},
+		},
 	}
 	ran, taps := 0, 0
 	for _, c := range cases {
