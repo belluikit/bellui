@@ -46,6 +46,10 @@ type selectable struct {
 	// nil and handle pointer input directly.
 	host selectableHost
 
+	// pressedWord is the word a long-press selected, which a drag extends a
+	// word at a time (#1267).
+	pressedWord pressedWord
+
 	// Mobile touch-selection state (pre-rebrand tracker #944, the pre-rebrand tracker #758 follow-up): selHandles is
 	// the draggable-handle overlay shown while a standalone selectable has a
 	// live touch-initiated selection; touchPointer notes whether the most
@@ -97,6 +101,7 @@ func (s *selectable) DragEnd() {
 		s.host.DragEnd()
 		return
 	}
+	s.pressedWord.clear()
 	if s.cursorColumn == s.selectColumn && s.cursorRow == s.selectRow {
 		s.selecting = false
 	}
@@ -157,6 +162,15 @@ func (s *selectable) dragged(d *event.DragEvent) {
 		}
 	}
 
+	if s.pressedWord.active {
+		row, col, _ := s.getRowCol(d.Position)
+		s.selectRow, s.selectColumn, s.cursorRow, s.cursorColumn = s.pressedWord.extend(row, col, s.provider.row)
+		s.selecting, s.selectEnded = true, false
+		s.markTouchSelection()
+		s.Refresh()
+		return
+	}
+
 	if !s.selecting || s.selectEnded {
 		s.selectEnded = false
 		s.updateMousePointer(d.Position)
@@ -184,6 +198,7 @@ func (s *selectable) dragged(d *event.DragEvent) {
 
 func (s *selectable) MouseDown(m *desktop.MouseEvent) {
 	s.touchPointer = false
+	s.pressedWord.clear()
 	if s.host != nil {
 		// The host owns caret/selection and handles focus in its Tapped/Dragged.
 		// Grab focus on press for responsiveness; do nothing else so the host's
@@ -379,6 +394,7 @@ func (s *selectable) TouchCancel(m *mobile.TouchEvent) {
 
 func (s *selectable) TouchDown(m *mobile.TouchEvent) {
 	s.touchPointer = true
+	s.pressedWord.clear()
 	if s.host != nil {
 		// The embedding editor gates its own selection handles on the pointer
 		// type, so it must see the touch too (mirrors Tapped/Dragged, pre-rebrand tracker #888).

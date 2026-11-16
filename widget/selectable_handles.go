@@ -66,6 +66,7 @@ func (s *selectable) selectWordAtCursor() {
 	s.selectColumn = start
 	s.cursorColumn = end
 	s.selecting = true
+	s.pressedWord.set(s.cursorRow, start, end)
 	s.Refresh()
 	s.notifySelectChanged()
 }
