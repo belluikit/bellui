@@ -72,6 +72,11 @@ type HeaderWidget struct {
 
 	nearBorder bool // true when hovering near a column border
 	resizing   bool // true during a resize drag
+	// pressedMod is the modifiers of the mouse press the next tap ends, and
+	// pressed whether there is one: a tap sorts, and a touch screen sends a
+	// tap with no press, so it has none.
+	pressed    bool
+	pressedMod event.KeyModifier
 }
 
 // NewHeaderWidget creates a new header widget.
@@ -89,8 +94,25 @@ func (h *HeaderWidget) CreateRenderer() core.WidgetRenderer {
 	return &headerRenderer{header: h}
 }
 
+// Tapped sorts by the column tapped. The sort is on the tap, not the mouse
+// press: a touch screen sends a tap and no press, so a header that sorted on
+// the press never sorted on a phone. A mouse click sends a press, then a
+// tap, so it sorts once, with the press's modifiers (Shift adds a column).
+// A drag, which is no tap, doesn't sort, and a tap on a column border is the
+// border's, for resizing.
 func (h *HeaderWidget) Tapped(e *event.PointEvent) {
-	// Selection handled in MouseDown for modifier capture
+	mod := event.KeyModifier(0)
+	if h.pressed {
+		mod = h.pressedMod
+	}
+	h.pressed, h.pressedMod = false, 0
+	if gridDisabled(h.Grid) || h.Grid.HeaderBorderCol(e.Position.X) >= 0 {
+		return
+	}
+	// region-aware column mapping, shared with the body
+	if col := h.Grid.ColumnAtX(e.Position.X); col >= 0 {
+		h.Grid.OnHeaderTapped(col, mod)
+	}
 }
 
 func (h *HeaderWidget) MouseDown(e *desktop.MouseEvent) {
@@ -105,11 +127,8 @@ func (h *HeaderWidget) MouseDown(e *desktop.MouseEvent) {
 		h.Grid.OnResizeDragStart(borderCol, e.Position.X)
 		return
 	}
-	// Normal header tap (sort) — region-aware column mapping, shared with the body.
-	col := h.Grid.ColumnAtX(e.Position.X)
-	if col >= 0 {
-		h.Grid.OnHeaderTapped(col, e.Modifier)
-	}
+	// a press that ends in a tap sorts there, with these modifiers
+	h.pressed, h.pressedMod = true, e.Modifier
 }
 
 func (h *HeaderWidget) MouseUp(e *desktop.MouseEvent) {}
