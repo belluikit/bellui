@@ -38,6 +38,8 @@ github.com/belluikit/goffmpeg-libs/windows_arm64 v0.10.0 h1:VyYh+VAeDePTfryDS5z0
 github.com/belluikit/goffmpeg-libs/windows_arm64 v0.10.0/go.mod h1:R8fUvbRy4Z80X1S4gntJqzuKdldkrMSB78cEOXVRaTI=
 github.com/belluikit/oto/v3 v3.0.0-20261114221446-b2db31a36c2f h1:QaER48wcSVnZMe9hD1Wvj/EtKYaCskJ8atm8PZttPJ8=
 github.com/belluikit/oto/v3 v3.0.0-20261114221446-b2db31a36c2f/go.mod h1:8pEBo7BVDVd/Gz2Vn8HO1DsTiE7b3M2bXU693DdORN0=
+github.com/belluikit/oto/v3 v3.0.0-20261116195744-f6c5812686aa h1:NIxfSveQT+SwN+iA1WM7s/XJR8FsD5BQTAAVtyXkzow=
+github.com/belluikit/oto/v3 v3.0.0-20261116195744-f6c5812686aa/go.mod h1:8pEBo7BVDVd/Gz2Vn8HO1DsTiE7b3M2bXU693DdORN0=
 github.com/belluikit/systray v1.12.2 h1:bWDRI+uX3DntAvul2DxdMC1wPD/sa31vtBnxEvYo0sw=
 github.com/belluikit/systray v1.12.2/go.mod h1:peb+/O80A/aXu5fUel0gSgeAsAVYz5x01SZF5mnyErU=
 github.com/belluikit/typesetting v0.3.6 h1:M27Rx+fhz1IV2n6Tei3fNhs/Oe9gGAnq3QMrBpAqisY=

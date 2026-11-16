@@ -250,7 +250,10 @@ const fadeWait = 100 * time.Millisecond
 // change gradually, across the next block it mixes (readBufferAndAdd in
 // oto v3.5.1's internal/mux), so the steps here join into a ramp whose
 // length is fadeTime or one block, whichever is longer: a block is 32 ms on
-// macOS, and a few on Android. Called under o.mu.
+// macOS, and a few on Android. A block that mixes nothing, as while the
+// player is empty after a Seek or a Play, leaves the ramp for the samples
+// that come next (belluikit/oto#2): it used to be spent on silence, and the
+// new position started at full level (#1273). Called under o.mu.
 func (o *Output) fade(v float64) {
 	from := o.player.Volume()
 	for start := time.Now(); ; time.Sleep(time.Millisecond) {
