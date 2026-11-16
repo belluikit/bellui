@@ -66,6 +66,15 @@ type NavigationDrawer struct {
 	//
 	// Since: 1.3
 	Top float32
+	// OnOpenChanged, when set, is told each time the drawer opens or closes,
+	// whatever did it: Show, Hide, Toggle, a destination tap, or the user
+	// dismissing it (a tap on the scrim, Escape, the accessibility action).
+	// An app can then show what the drawer's button would do, such as an X
+	// while it's open. It fires on a change only: showing an open drawer
+	// again doesn't.
+	//
+	// Since: 1.3
+	OnOpenChanged func(open bool) `json:"-"`
 
 	canvas  core.Canvas
 	popUp   *PopUp
@@ -199,7 +208,19 @@ func (d *NavigationDrawer) Show(c core.Canvas) {
 	} else {
 		d.popUp.Move(geo.NewPos(x, top))
 	}
-	d.open = true
+	d.setOpen(true)
+}
+
+// setOpen records whether the drawer is open, and tells OnOpenChanged when
+// that changes.
+func (d *NavigationDrawer) setOpen(open bool) {
+	if d.open == open {
+		return
+	}
+	d.open = open
+	if d.OnOpenChanged != nil {
+		d.OnOpenChanged(open)
+	}
 }
 
 // slideIn moves the drawer in from beyond its edge to x, as SideSheet does
@@ -265,18 +286,23 @@ func (d *NavigationDrawer) Hide() {
 	if p == nil && d.closing != nil {
 		return
 	}
-	if p == nil || !p.Visible() || !bellui.CurrentApp().Settings().ShowAnimations() {
+	slide := p != nil && p.Visible() && bellui.CurrentApp().Settings().ShowAnimations()
+	if slide {
+		d.stopSlide()
+		d.popUp = nil
+	} else {
 		d.hideNow()
-		return
 	}
-	d.stopSlide()
-	d.popUp = nil
-	d.open = false
-	d.slideOut(p)
+	// closed from here, slid out or not: one place tells OnOpenChanged
+	d.setOpen(false)
+	if slide {
+		d.slideOut(p)
+	}
 }
 
 // hideNow dismisses the drawer without the slide out, and ends one in
-// progress: Show replaces a closing drawer at once.
+// progress: Show replaces a closing drawer at once. It leaves open to its
+// caller: Show, putting the drawer back at once, keeps it open.
 func (d *NavigationDrawer) hideNow() {
 	d.stopSlide()
 	if d.closing != nil {
@@ -287,7 +313,6 @@ func (d *NavigationDrawer) hideNow() {
 		d.popUp.Hide()
 		d.popUp = nil
 	}
-	d.open = false
 }
 
 func (d *NavigationDrawer) stopSlide() {
@@ -300,8 +325,8 @@ func (d *NavigationDrawer) stopSlide() {
 // IsOpen returns whether the drawer is showing.
 func (d *NavigationDrawer) IsOpen() bool {
 	if d.open && d.popUp != nil && !d.popUp.Visible() {
-		d.open = false
 		d.popUp = nil
+		d.setOpen(false)
 	}
 	return d.open
 }
