@@ -685,3 +685,39 @@ func TestNavigationDrawer_SlidesOut(t *testing.T) {
 		assert.False(t, onCanvas(c, p))
 	})
 }
+
+// TestNavigationDrawer_OnOpenChanged: the drawer says each time it opens or
+// closes, whatever did it, so an app can show what its button would do (an X
+// while open; DaySong, 2026-11-16). Showing it again while open says nothing.
+func TestNavigationDrawer_OnOpenChanged(t *testing.T) {
+	test.NewTempApp(t)
+	items := []*NavigationDrawerItem{{Label: "Home", Icon: theme.HomeIcon()}, {Label: "Account", Icon: theme.AccountIcon()}}
+	d := NewNavigationDrawer(items, func(int) {})
+	var got []bool
+	d.OnOpenChanged = func(open bool) { got = append(got, open) }
+	w := test.NewTempWindow(t, NewLabel("content"))
+	w.Resize(geo.NewSize(400, 600))
+	c := w.Canvas()
+
+	steps := []struct {
+		what string
+		do   func()
+		want []bool
+	}{
+		{"Show", func() { d.Show(c) }, []bool{true}},
+		{"Show again, open", func() { d.Show(c) }, []bool{true}},
+		{"Hide", d.Hide, []bool{true, false}},
+		{"Hide again, closed", d.Hide, []bool{true, false}},
+		{"Toggle open", func() { d.Toggle(c) }, []bool{true, false, true}},
+		{"the scrim tapped", func() { d.popUp.dismiss() }, []bool{true, false, true, false}},
+		{"Toggle open again", func() { d.Toggle(c) }, []bool{true, false, true, false, true}},
+		{"Toggle closed", func() { d.Toggle(c) }, []bool{true, false, true, false, true, false}},
+		{"Show, then a destination tapped", func() { d.Show(c); drawerRows(t, d)[1].Tapped(&event.PointEvent{}) }, []bool{true, false, true, false, true, false, true, false}},
+	}
+	for _, s := range steps {
+		s.do()
+		require.Equal(t, s.want, got, "after %s", s.what)
+		require.Equal(t, got[len(got)-1], d.IsOpen(), "after %s: IsOpen disagrees with the last change", s.what)
+	}
+	require.Len(t, steps, 9)
+}
