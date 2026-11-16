@@ -73,7 +73,7 @@ func TestDataGrid_SortCycle(t *testing.T) {
 	})
 
 	// First click: ascending
-	g.cycleSortColumn("v")
+	g.cycleSortColumn("v", defaultSortingOrder)
 	if len(g.sortModel) != 1 || g.sortModel[0].Direction != SortAscending {
 		t.Fatalf("expected ascending, got %v", g.sortModel)
 	}
@@ -83,7 +83,7 @@ func TestDataGrid_SortCycle(t *testing.T) {
 	}
 
 	// Second click: descending
-	g.cycleSortColumn("v")
+	g.cycleSortColumn("v", defaultSortingOrder)
 	if g.sortModel[0].Direction != SortDescending {
 		t.Fatalf("expected descending, got %v", g.sortModel)
 	}
@@ -93,7 +93,7 @@ func TestDataGrid_SortCycle(t *testing.T) {
 	}
 
 	// Third click: no sort
-	g.cycleSortColumn("v")
+	g.cycleSortColumn("v", defaultSortingOrder)
 	if len(g.sortModel) != 0 {
 		t.Fatalf("expected no sort, got %v", g.sortModel)
 	}
