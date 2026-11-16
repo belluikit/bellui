@@ -301,25 +301,52 @@ func TestEdgesFade(t *testing.T) {
 			c := newMixContext(dev.frames, 3, dev.period)
 			o := newOutput(c, 2)
 			o.idle = &idleSuspend{dev: c}
-			pause := func() { time.Sleep(10 * dev.period) }
+			// Each step waits for what the next one needs, not for a fixed
+			// time, which a loaded machine overran (#1273): an up waits for
+			// the full level to be played, so the down after it fades from
+			// there; a pause or a stop waits for the device to be suspended,
+			// which is after it has played the fade out; and the seek waits
+			// for silence before the new position, as a network seek has.
+			last := func() float32 {
+				c.mu.Lock()
+				defer c.mu.Unlock()
+				if len(c.out) == 0 {
+					return 0
+				}
+				return c.out[len(c.out)-1]
+			}
+			heard := func(what string, sign float32) {
+				waitFor(t, what, 5*time.Second, func() bool { return last()*sign > full/2 })
+			}
+			quiet := func(what string) {
+				waitFor(t, what, 5*time.Second, func() bool { return abs32(last()) < 0.01 })
+			}
+			suspended := func(what string, n int) {
+				waitFor(t, what, 5*time.Second, func() bool {
+					c.mu.Lock()
+					defer c.mu.Unlock()
+					return c.suspends >= n
+				})
+			}
 
 			o.WriteSamples(tone(time.Second, level))
 			o.Start() // up
-			pause()
+			heard("the start", 1)
 			o.Pause() // down, then the device is suspended
-			pause()
+			suspended("the pause to suspend the device", 1)
 			o.Resume() // up
-			pause()
-			o.Rebase(time.Second)                     // down
+			heard("the resume", 1)
+			o.Rebase(time.Second) // down
+			quiet("the seek's fade out")
 			o.WriteSamples(tone(time.Second, -level)) // up, at the new position
-			pause()
+			heard("the new position", -1)
 			o.Stop() // down, then the device is suspended
-			pause()
+			suspended("the stop to suspend the device", 2)
 			o.WriteSamples(tone(time.Second, level))
 			o.Start() // up: the next song
-			pause()
+			heard("the next song", 1)
 			o.Stop() // down, then the device is suspended
-			pause()
+			suspended("the last stop to suspend the device", 3)
 			c.close()
 
 			steps := edges(c.played(), full)
