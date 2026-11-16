@@ -5,7 +5,7 @@ go 1.26.2
 require (
 	github.com/belluikit/bellui v1.3.0-rc.2
 	github.com/belluikit/goffmpeg v0.13.0
-	github.com/belluikit/oto/v3 v3.0.0-20261114221446-b2db31a36c2f
+	github.com/belluikit/oto/v3 v3.0.0-20261116195744-f6c5812686aa
 )
 
 require (

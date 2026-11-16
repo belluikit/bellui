@@ -14,7 +14,8 @@ import (
 // internal/mux does: a player pulls its source until it holds a buffer's
 // worth, unlocked while it reads, and every block mixed takes its samples
 // times a volume that moves from the last block's to the current one across
-// the block (readBufferAndAdd). A paused player adds nothing to the mix.
+// the block (readBufferAndAdd); a block that mixed nothing does not move it.
+// A paused player adds nothing to the mix.
 //
 // Mixed blocks wait in a queue, latency blocks long, before they are played,
 // as in oto's fifo and the platform's buffer on Android. A suspended device
@@ -25,8 +26,9 @@ import (
 // What the device plays is recorded, one value per frame, from the first
 // channel; a suspended device plays silence.
 type mixContext struct {
-	frames  int // per block
-	latency int // blocks queued before one is played
+	frames   int  // per block
+	latency  int  // blocks queued before one is played
+	stallNew bool // new players start stalled (mixPlayer.stall)
 
 	mu        sync.Mutex
 	players   []*mixPlayer
@@ -65,8 +67,8 @@ func newMixContext(blockFrames, latency int, period time.Duration) *mixContext {
 func (c *mixContext) close() { close(c.stop); <-c.done }
 
 func (c *mixContext) NewPlayer(r io.Reader) devicePlayer {
-	p := &mixPlayer{src: r}
 	c.mu.Lock()
+	p := &mixPlayer{src: r, stalled: c.stallNew}
 	c.players = append(c.players, p)
 	c.mu.Unlock()
 	return p
@@ -165,11 +167,12 @@ type mixPlayer struct {
 	volume, prev     float64
 	playing, closed  bool
 	reading, discard bool
+	stalled          bool // the source is not read: oto's reader held off
 }
 
 func (p *mixPlayer) fill() {
 	p.mu.Lock()
-	if p.closed || p.reading || len(p.buf) >= p.size {
+	if p.closed || p.reading || p.stalled || len(p.buf) >= p.size {
 		p.mu.Unlock()
 		return
 	}
@@ -206,7 +209,11 @@ func (p *mixPlayer) mixInto(block []float32) int {
 		}
 		block[i] += float32(v * g)
 	}
-	p.prev = p.volume
+	// A block that mixed nothing leaves the ramp for the next, as oto has
+	// since belluikit/oto#2 (#1273).
+	if n > 0 {
+		p.prev = p.volume
+	}
 	p.buf = p.buf[4*n:]
 	p.queued += n
 	return n
@@ -227,6 +234,12 @@ func (p *mixPlayer) Seek(offset int64, whence int) (int64, error) {
 	p.mu.Unlock()
 	return p.src.(io.Seeker).Seek(offset, whence)
 }
+
+// stall stops the player reading its source, or lets it read again: oto's
+// reader goroutine held off while the device goes on mixing what the player
+// holds.
+func (p *mixPlayer) stall(on bool) { p.mu.Lock(); p.stalled = on; p.mu.Unlock() }
+
 func (p *mixPlayer) SetBufferSize(n int) { p.mu.Lock(); p.size = n; p.mu.Unlock() }
 func (p *mixPlayer) BufferedSize() int   { p.mu.Lock(); defer p.mu.Unlock(); return len(p.buf) }
 func (p *mixPlayer) UnplayedSize() int {
@@ -349,5 +362,59 @@ func TestEdgesFade(t *testing.T) {
 			}
 			t.Logf("%d edges, largest steps %v; %d suspends", len(steps), steps, suspends)
 		})
+	}
+}
+
+// TestSeekFadesInAfterAStalledRefill pins #1273: after a seek empties the
+// player, the device can mix blocks before oto's reader refills it. A block
+// mixed from nothing still moved the player's volume on, so the fade-in was
+// spent on silence and the new position started at full level.
+func TestSeekFadesInAfterAStalledRefill(t *testing.T) {
+	const level = 16000
+	full := float32(level) / (1 << 15)
+	c := newMixContext(96, 3, 2*time.Millisecond)
+	defer c.close()
+	o := newOutput(c, 2)
+	o.WriteSamples(tone(time.Second, level))
+	o.Start()
+	time.Sleep(20 * time.Millisecond)
+	o.Rebase(time.Second)
+	p := o.player.(*mixPlayer)
+	p.stall(true)
+	o.WriteSamples(tone(time.Second, -level)) // the seek and its fade-in
+	time.Sleep(10 * time.Millisecond)         // blocks mixed from an empty player
+	p.stall(false)
+	time.Sleep(40 * time.Millisecond)
+
+	steps := edges(c.played(), full)
+	if len(steps) != 3 {
+		t.Fatalf("found %d edges, want 3 (start, seek out, seek in): %v", len(steps), steps)
+	}
+	if s := steps[2]; s > full/50 {
+		t.Errorf("the seek in steps by %.4f in one frame (%.0f%% of the level); want a fade", s, 100*s/full)
+	}
+}
+
+// TestStartFadesInAfterAStalledFill is the same for a new player: the device
+// can mix it before oto's reader has filled it at all.
+func TestStartFadesInAfterAStalledFill(t *testing.T) {
+	const level = 16000
+	full := float32(level) / (1 << 15)
+	c := newMixContext(96, 3, 2*time.Millisecond)
+	defer c.close()
+	c.stallNew = true
+	o := newOutput(c, 2)
+	o.WriteSamples(tone(time.Second, level))
+	o.Start()
+	time.Sleep(10 * time.Millisecond)
+	o.player.(*mixPlayer).stall(false)
+	time.Sleep(40 * time.Millisecond)
+
+	steps := edges(c.played(), full)
+	if len(steps) != 1 {
+		t.Fatalf("found %d edges, want 1 (start): %v", len(steps), steps)
+	}
+	if s := steps[0]; s > full/50 {
+		t.Errorf("the start steps by %.4f in one frame (%.0f%% of the level); want a fade", s, 100*s/full)
 	}
 }

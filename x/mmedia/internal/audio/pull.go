@@ -77,8 +77,9 @@ func newPuller(ring *RingBuffer, bytesPerSec int) *puller {
 	return &puller{ring: ring, bytesPerSec: bytesPerSec, now: time.Now, level: newLevels(bytesPerSec)}
 }
 
-// Read is the player's pull. It must not take the Output's lock: oto calls it
-// from inside Player.Seek, which flushPlayer makes holding that lock.
+// Read is the player's pull, made from oto's reader goroutine. It must not
+// take the Output's lock: Player.Seek, which flushPlayer makes holding that
+// lock, waits for a pull in flight to finish.
 func (p *puller) Read(b []byte) (int, error) {
 	held, holding := p.heldNow()
 
