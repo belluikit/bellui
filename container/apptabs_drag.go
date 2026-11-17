@@ -34,8 +34,12 @@ func (s *tabDragSurface) CreateRenderer() core.WidgetRenderer {
 }
 
 // ClaimsDrag takes a touch drag that starts along the tab bar and leaves one
-// that starts across it to a scroll around the tabs.
+// that starts across it to a scroll around the tabs. Disabled tabs take
+// none, as a disabled Carousel leaves its drags to the scroll around it.
 func (s *tabDragSurface) ClaimsDrag(d geo.Delta) bool {
+	if s.r.appTabs.Disabled() {
+		return false
+	}
 	if s.r.verticalBar() {
 		return abs32(d.DY) > abs32(d.DX)
 	}
@@ -43,6 +47,9 @@ func (s *tabDragSurface) ClaimsDrag(d geo.Delta) bool {
 }
 
 func (s *tabDragSurface) Dragged(e *event.DragEvent) {
+	if s.r.appTabs.Disabled() {
+		return
+	}
 	along := e.Position.X
 	if s.r.verticalBar() {
 		along = e.Position.Y
@@ -53,7 +60,7 @@ func (s *tabDragSurface) Dragged(e *event.DragEvent) {
 }
 
 func (s *tabDragSurface) DragEnd() {
-	if !s.r.drag.active {
+	if !s.r.drag.active || s.r.appTabs.Disabled() {
 		return
 	}
 	s.r.drag.active = false

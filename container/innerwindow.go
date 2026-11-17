@@ -32,9 +32,15 @@ var _ core.Widget = (*InnerWindow)(nil)
 // InnerWindow defines a container that wraps content in a window border - that can then be placed inside
 // a regular container/canvas.
 //
+// Disabling it disables the window chrome (no close, minimise, maximise,
+// icon or title-bar tap, no drag and no resize) and, like HTML's
+// <fieldset disabled>, every widget inside its content that can be disabled.
+// Enabling it enables again only the widgets it disabled. Calls from code
+// (Close, SetContent, SetMaximized) keep working while it is disabled.
+//
 // Since: 1.0
 type InnerWindow struct {
-	widget.BaseWidget
+	widget.DisableableWidget
 
 	CloseIntercept                                      func()                 `json:"-"`
 	OnDragged, OnResized                                func(*event.DragEvent) `json:"-"`
@@ -50,6 +56,7 @@ type InnerWindow struct {
 	title     string
 	content   *bellui.Container
 	maximized bool
+	cascade   disableCascade
 }
 
 // NewInnerWindow creates a new window border around the given `content`, displaying the `title` along the top.
@@ -66,15 +73,38 @@ func (w *InnerWindow) Close() {
 	w.Hide()
 }
 
+// Disable disables the window: its chrome takes no tap, drag or resize, and
+// every widget inside its content that can be disabled is disabled too,
+// including content set while the window is disabled.
+//
+// Since: 1.3
+func (w *InnerWindow) Disable() {
+	w.DisableableWidget.Disable()
+	w.syncDisabled()
+}
+
+// Enable enables the window and the widgets its Disable switched off. A
+// widget the app disabled itself stays disabled.
+//
+// Since: 1.3
+func (w *InnerWindow) Enable() {
+	w.DisableableWidget.Enable()
+	w.syncDisabled()
+}
+
+// syncDisabled brings the widgets inside the content to the window's state
+// (disableCascade).
+func (w *InnerWindow) syncDisabled() {
+	w.cascade.sync(w.Disabled(), w.content)
+}
+
 func (w *InnerWindow) CreateRenderer() core.WidgetRenderer {
 	w.ExtendBaseWidget(w)
 	th := w.Theme()
 	v := bellui.CurrentApp().Settings().ThemeVariant()
 
 	min := newBorderButton(theme.WindowMinimizeIcon(), modeMinimize, th, w.OnMinimized)
-	setFrameButtonAction(min, w.OnMinimized)
 	max := newBorderButton(theme.WindowMaximizeIcon(), modeMaximize, th, w.OnMaximized)
-	setFrameButtonAction(max, w.OnMaximized)
 
 	close := newBorderButton(theme.WindowCloseIcon(), modeClose, th, func() {
 		if f := w.CloseIntercept; f != nil {
@@ -90,10 +120,6 @@ func (w *InnerWindow) CreateRenderer() core.WidgetRenderer {
 			f()
 		}
 	})
-	if w.OnTappedIcon == nil {
-		borderIcon.Disable()
-	}
-
 	if w.Icon == nil {
 		borderIcon.Hide()
 	}
@@ -124,6 +150,8 @@ func (w *InnerWindow) CreateRenderer() core.WidgetRenderer {
 		win:               w, bar: bar, buttonBox: buttons, buttons: []*borderButton{close, min, max}, bg: bg,
 		corner: corner, contentBG: contentBG, icon: borderIcon,
 	}
+	r.syncChrome()
+	w.syncDisabled()
 	r.Layout(w.Size())
 	return r
 }
@@ -131,11 +159,12 @@ func (w *InnerWindow) CreateRenderer() core.WidgetRenderer {
 // setFrameButtonAction gives a minimise or maximise button its action. One
 // without an action is disabled on desktop, and hidden on a phone or tablet,
 // where there is nothing to minimise to and an inner window already fills
-// most of the screen: a dialog there shows only its close button (#654).
-func setFrameButtonAction(b *borderButton, action func()) {
+// most of the screen: a dialog there shows only its close button (#654). One
+// with an action is disabled while the window is (off).
+func setFrameButtonAction(b *borderButton, action func(), off bool) {
 	if action != nil {
 		b.SetOnTapped(action)
-		b.Enable()
+		b.setDisabled(off)
 		b.Show()
 		return
 	}
@@ -155,11 +184,14 @@ func (w *InnerWindow) Content() core.CanvasObject {
 	return w.content.Objects[0]
 }
 
-// SetContent sets the content of this inner window.
+// SetContent sets the content of this inner window. While the window is
+// disabled, the widgets inside the new content are disabled and those inside
+// the old one are released.
 func (w *InnerWindow) SetContent(obj core.CanvasObject) {
 	w.content.Objects[0] = obj
 
 	w.content.Refresh()
+	w.syncDisabled()
 }
 
 // SetMaximized tells the window if the maximized state should be set or not.
@@ -292,9 +324,8 @@ func (i *innerWindowRenderer) Refresh() {
 	}
 	i.bar.Refresh()
 
-	setFrameButtonAction(i.buttons[1], i.win.OnMinimized)
+	i.syncChrome()
 	max := i.buttons[2]
-	setFrameButtonAction(max, i.win.OnMaximized)
 	if i.win.maximized {
 		max.b.SetIcon(theme.ViewRestoreIcon())
 	} else {
@@ -304,11 +335,6 @@ func (i *innerWindowRenderer) Refresh() {
 	title := i.bar.Objects[2].(*bellui.Container).Objects[0].(*draggableLabel)
 	title.SetText(i.win.title)
 	i.ShadowingRenderer.RefreshShadow()
-	if i.win.OnTappedIcon == nil {
-		i.icon.Disable()
-	} else {
-		i.icon.Enable()
-	}
 	if i.win.Icon != nil {
 		i.icon.b.SetIcon(i.win.Icon)
 		i.icon.Show()
@@ -320,6 +346,19 @@ func (i *innerWindowRenderer) Refresh() {
 	// otherwise theme changes applied while the window is hidden never
 	// reach the content widgets.
 	i.win.content.Refresh()
+	i.win.syncDisabled()
+	i.corner.Refresh()
+}
+
+// syncChrome brings the frame buttons and the resize corner to the window's
+// state: each is disabled while the window is, and a minimise, maximise or
+// icon button without an action is disabled anyway.
+func (i *innerWindowRenderer) syncChrome() {
+	off := i.win.Disabled()
+	i.buttons[0].setDisabled(off)
+	setFrameButtonAction(i.buttons[1], i.win.OnMinimized, off)
+	setFrameButtonAction(i.buttons[2], i.win.OnMaximized, off)
+	i.icon.setDisabled(off || i.win.OnTappedIcon == nil)
 }
 
 type draggableLabel struct {
@@ -335,6 +374,9 @@ func newDraggableLabel(title string, win *InnerWindow) *draggableLabel {
 }
 
 func (d *draggableLabel) Dragged(ev *event.DragEvent) {
+	if d.win.Disabled() {
+		return
+	}
 	if f := d.win.OnDragged; f != nil {
 		f(ev)
 	}
@@ -350,6 +392,9 @@ func (d *draggableLabel) MinSize() geo.Size {
 }
 
 func (d *draggableLabel) Tapped(_ *event.PointEvent) {
+	if d.win.Disabled() {
+		return
+	}
 	if f := d.win.OnTappedBar; f != nil {
 		f()
 	}
@@ -366,19 +411,40 @@ const dragCornerIndicatorSize = 16
 type draggableCorner struct {
 	widget.BaseWidget
 	win *InnerWindow
+
+	// prop is the resize indicator, drawn in the disabled colour while the
+	// window is disabled.
+	prop *canvas.Image
 }
 
 var _ desktop.Cursorable = (*draggableCorner)(nil)
 
 func newDraggableCorner(w *InnerWindow) *draggableCorner {
 	d := &draggableCorner{win: w}
+	d.prop = canvas.NewImageFromResource(nil)
+	d.prop.SetMinSize(geo.NewSquareSize(dragCornerIndicatorSize))
 	d.ExtendBaseWidget(d)
+	d.updateIndicator()
 	return d
 }
 
+// Refresh redraws the indicator for the window's state.
+func (c *draggableCorner) Refresh() {
+	c.updateIndicator()
+	c.BaseWidget.Refresh()
+}
+
+func (c *draggableCorner) updateIndicator() {
+	var res bellui.Resource = bellui.CurrentApp().Settings().Theme().Icon(theme.IconNameDragCornerIndicator)
+	if _, svg := res.(*theme.ThemedResource); svg && c.win.Disabled() {
+		res = theme.NewDisabledResource(res)
+	}
+	c.prop.Resource = res
+}
+
 func (c *draggableCorner) CreateRenderer() core.WidgetRenderer {
-	prop := canvas.NewImageFromResource(bellui.CurrentApp().Settings().Theme().Icon(theme.IconNameDragCornerIndicator))
-	prop.SetMinSize(geo.NewSquareSize(dragCornerIndicatorSize))
+	c.updateIndicator()
+	prop := c.prop
 	if bellui.CurrentDevice().IsMobile() {
 		// Touch-sized drag target (#263), the #254 geometry: the visual
 		// indicator keeps its desktop size, pinned to the bottom-right of a
@@ -438,6 +504,9 @@ func (c *draggableCorner) Cursor() desktop.Cursor {
 }
 
 func (c *draggableCorner) Dragged(ev *event.DragEvent) {
+	if c.win.Disabled() {
+		return
+	}
 	if f := c.win.OnResized; f != nil {
 		c.win.OnResized(ev)
 	}
@@ -542,6 +611,19 @@ func (b *borderButton) Disable() {
 
 func (b *borderButton) Enable() {
 	b.b.Enable()
+}
+
+// setDisabled disables or enables the button, refreshing it only on a
+// change.
+func (b *borderButton) setDisabled(off bool) {
+	if b.b.Disabled() == off {
+		return
+	}
+	if off {
+		b.Disable()
+	} else {
+		b.Enable()
+	}
 }
 
 func (b *borderButton) SetOnTapped(fn func()) {
