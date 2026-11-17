@@ -7,6 +7,7 @@ package mobile
 
 import (
 	"image/color"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -248,4 +249,100 @@ func entryScroll(t *testing.T, e *widget.Entry) *container.Scroll {
 	walk(e)
 	require.NotNil(t, found, "the entry has a scroll")
 	return found
+}
+
+// A TreeView in a page (#1266): a row took every touch drag, so a swipe that
+// started on a row scrolled neither the tree nor the page. A row now claims a
+// drag only when the tree lets rows move; otherwise the tree scrolls, and the
+// page once the tree cannot.
+func Test_canvas_SwipeOnTreeViewRows(t *testing.T) {
+	tree := widget.NewTreeView()
+	for i := range 40 {
+		require.NoError(t, tree.AddNode("", widget.TreeViewNode{ID: widget.TreeViewNodeID(strconv.Itoa(i)), Text: "row"}))
+	}
+	box := container.NewGridWrap(geo.NewSize(200, 200), tree)
+	page := container.NewVScroll(container.NewVBox(box, filler(100, 600)))
+	c := claimCanvas(page, geo.NewSize(200, 300))
+	on := geo.NewPos(60, 150)
+
+	swipe(c, 1, on, on.SubtractXY(0, 60))
+	assert.Equal(t, float32(60), tree.GetScrollOffset(), "the tree scrolled under a swipe that started on a row")
+	assert.Zero(t, page.Offset.Y)
+
+	tree.ScrollToOffset(1e6)
+	bottom := tree.GetScrollOffset()
+	swipe(c, 2, on, on.SubtractXY(0, 60))
+	assert.Equal(t, bottom, tree.GetScrollOffset())
+	assert.Equal(t, float32(60), page.Offset.Y, "the page took the swipe the tree could not follow")
+}
+
+// A Table in a page (#1266): the table resizes a header only once a pointer
+// has found its divider, which a touch never does, so on touch it leaves a
+// swipe its content cannot follow to the page. Before, a touch began resizing
+// row 0 on TouchDown, and such a swipe made row 0 taller instead.
+func Test_canvas_SwipeOnTableAtItsEnd(t *testing.T) {
+	var lastRowHeight float32
+	table := widget.NewTable(
+		func() (int, int) { return 50, 2 },
+		func() core.CanvasObject { return filler(60, 30) },
+		func(widget.TableCellID, core.CanvasObject) {},
+	)
+	box := container.NewGridWrap(geo.NewSize(200, 200), table)
+	page := container.NewVScroll(container.NewVBox(box, filler(100, 600)))
+	c := claimCanvas(page, geo.NewSize(200, 300))
+	on := geo.NewPos(60, 150)
+
+	table.ScrollToBottom()
+	table.SetRowHeight(0, 30)
+	swipe(c, 1, on, on.SubtractXY(0, 60))
+	assert.Equal(t, float32(60), page.Offset.Y, "the page took the swipe the table could not follow")
+
+	// A downward swipe the page cannot follow either: nothing moves, and no
+	// row is resized by it.
+	page.ScrollToTop()
+	table.ScrollToTop()
+	table.UpdateCell = func(id widget.TableCellID, o core.CanvasObject) {
+		if id.Row == 0 {
+			lastRowHeight = o.Size().Height
+		}
+	}
+	swipe(c, 2, on, on.AddXY(0, 60))
+	table.RefreshItem(widget.TableCellID{Row: 0, Col: 0})
+	assert.Zero(t, page.Offset.Y)
+	assert.Equal(t, float32(30), lastRowHeight, "the swipe resized row 0")
+}
+
+// An Interactive in a page (#1266) keeps a drag only when it has a drag
+// callback to give it to.
+func Test_canvas_SwipeOnInteractiveInAPage(t *testing.T) {
+	target := widget.NewInteractive(filler(200, 100))
+	page := container.NewVScroll(container.NewVBox(target, filler(100, 600)))
+	c := claimCanvas(page, geo.NewSize(200, 300))
+	on := geo.NewPos(100, 50)
+
+	swipe(c, 1, on, on.SubtractXY(0, 40))
+	assert.Equal(t, float32(40), page.Offset.Y, "an Interactive with no drag callback left the swipe to the page")
+
+	page.ScrollToTop()
+	drags := 0
+	target.OnDragged = func(*event.DragEvent) { drags++ }
+	swipe(c, 2, on, on.SubtractXY(0, 40))
+	assert.Zero(t, page.Offset.Y)
+	assert.Positive(t, drags, "the Interactive took the swipe")
+}
+
+// A TimePicker in a page (#1266): the dial takes a drag in any direction, and
+// a disabled picker leaves every drag to the page, as a disabled Slider does.
+func Test_canvas_SwipeOnTimePickerInAPage(t *testing.T) {
+	picker := widget.NewTimePicker(10, 30, true, nil)
+	page := container.NewVScroll(container.NewVBox(picker, filler(100, 900)))
+	c := claimCanvas(page, geo.NewSize(400, 400))
+	on := geo.NewPos(picker.Size().Width/2, picker.Size().Height-60)
+
+	swipe(c, 1, on, on.SubtractXY(0, 40))
+	assert.Zero(t, page.Offset.Y, "the dial kept the swipe")
+
+	picker.Disable()
+	swipe(c, 2, on, on.SubtractXY(0, 40))
+	assert.Equal(t, float32(40), page.Offset.Y, "a disabled picker left the swipe to the page")
 }

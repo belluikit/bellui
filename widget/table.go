@@ -185,6 +185,11 @@ func (t *Table) CreateRenderer() core.WidgetRenderer {
 	t.dividerLayer = newClip(t, &bellui.Container{})
 	t.dragCol = noCellMatch
 	t.dragRow = noCellMatch
+	// No header divider is under the pointer until hoverAt finds one. Left at
+	// zero, these named row 0 and column 0, so a touch, which never hovers,
+	// began resizing row 0 on TouchDown and a later drag resized it (#1266).
+	t.hoverHeaderRow = noCellMatch
+	t.hoverHeaderCol = noCellMatch
 
 	r := &tableRenderer{t: t}
 	r.SetObjects([]core.CanvasObject{t.top, t.left, t.corner, t.dividerLayer, t.content})
@@ -228,6 +233,16 @@ func (t *Table) Dragged(e *event.DragEvent) {
 		}
 		t.SetRowHeight(t.dragRow, newSize)
 	}
+}
+
+// ClaimsDrag takes a touch drag only while a header resize is under way, and
+// leaves every other drag to the scrolls inside and around the table
+// (event.DragClaimer, #1266). A resize starts from a mouse press over a header
+// divider, and a touch sends no mouse press, so on touch the table itself
+// claims nothing: its content scroll takes the drags it can follow, and the
+// page the rest.
+func (t *Table) ClaimsDrag(geo.Delta) bool {
+	return t.dragCol != noCellMatch || t.dragRow != noCellMatch
 }
 
 func (t *Table) DragEnd() {
@@ -1870,6 +1885,14 @@ func (c *clip) DragEnd() {
 
 func (c *clip) Dragged(e *event.DragEvent) {
 	c.t.Dragged(e)
+}
+
+// ClaimsDrag is the table's: a clip's drag resizes a header (#1266). On
+// touch builds it would otherwise be the embedded Scroll's, which never
+// claims a drag for a ScrollNone clip, and on the desktop, where Scroll has
+// no ClaimsDrag, the clip took every touchscreen drag.
+func (c *clip) ClaimsDrag(d geo.Delta) bool {
+	return c.t.ClaimsDrag(d)
 }
 
 // DragMomentum turns off the coast the embedded Scroll would give a touch
