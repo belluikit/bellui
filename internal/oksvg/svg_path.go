@@ -7,6 +7,7 @@ package oksvg
 
 import (
 	"image/color"
+	"math"
 
 	"github.com/belluikit/bellui/internal/rasterx"
 	"golang.org/x/image/math/fixed"
@@ -67,9 +68,24 @@ func (svgp *SvgPath) DrawTransformed(r *rasterx.Dasher, opacity float64, t raste
 		if svgp.LeadLineCap != nil {
 			leadLineCap = svgp.LeadLineCap
 		}
-		r.SetStroke(fixed.Int26_6(svgp.LineWidth*64),
+		// The path's points reach the dasher already transformed, so its
+		// stroke width, dashes and dash offset must be in that space too.
+		// Upstream passed them in user units, so a stroke kept its width in
+		// pixels whatever the scale: a 7-unit stroke on a 120-unit viewBox
+		// was 7 px at 40 px (a filled disc) and at 240 px alike (#1292).
+		// A non-uniform transform is approximated by its area scale
+		// (srwiley/oksvg#53 has the elliptical pen it would need).
+		scale := strokeScale(svgp.mAdder.M)
+		dash := svgp.Dash
+		if scale != 1 && len(dash) > 0 {
+			dash = make([]float64, len(svgp.Dash))
+			for i, v := range svgp.Dash {
+				dash[i] = v * scale
+			}
+		}
+		r.SetStroke(fixed.Int26_6(svgp.LineWidth*scale*64),
 			fixed.Int26_6(svgp.MiterLimit*64), leadLineCap, lineCap,
-			lineGap, svgp.LineJoin, svgp.Dash, svgp.DashOffset)
+			lineGap, svgp.LineJoin, dash, svgp.DashOffset*scale)
 		svgp.Path.AddTo(&svgp.mAdder)
 		switch linerColor := svgp.linerColor.(type) {
 		case color.Color:
@@ -86,6 +102,13 @@ func (svgp *SvgPath) DrawTransformed(r *rasterx.Dasher, opacity float64, t raste
 		}
 		r.Draw()
 	}
+}
+
+// strokeScale is how much m scales a length: the square root of its
+// determinant, exact for a uniform scale and rotation, and the geometric mean
+// of the two axis scales otherwise (#1292).
+func strokeScale(m rasterx.Matrix2D) float64 {
+	return math.Sqrt(math.Abs(m.A*m.D - m.B*m.C))
 }
 
 // GetFillColor returns the fill color of the SvgPath if one is defined and otherwise returns colornames.Black
