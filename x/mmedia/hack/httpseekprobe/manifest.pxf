@@ -1,0 +1,6 @@
+details {
+  name = "httpseekprobe"
+  id = "io.bellui.httpseekprobe"
+  version = "1.0.0"
+  build = 2
+}
