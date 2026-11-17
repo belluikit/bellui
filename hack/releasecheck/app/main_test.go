@@ -21,6 +21,7 @@ func TestTabsBuild(t *testing.T) {
 		for name, tab := range map[string]core.CanvasObject{
 			"Locale": localeTab(w), "Direction": directionTab(w), "Theme override": overrideTab(),
 			"Menus": menusTab(w), "Touch & keys": touchTab(),
+			"Disabled": disabledTab(), "Drawer": drawerTab(w), "Swipes": swipesTab(), "Text": textTab(w),
 		} {
 			w.SetContent(tab)
 			w.Resize(geo.NewSize(700, 560))

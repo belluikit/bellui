@@ -50,6 +50,10 @@ func main() {
 		container.NewTabItem("Theme override", overrideTab()),
 		container.NewTabItem("Menus", menusTab(w)),
 		container.NewTabItem("Touch & keys", touchTab()),
+		container.NewTabItem("Disabled", disabledTab()),
+		container.NewTabItem("Drawer", drawerTab(w)),
+		container.NewTabItem("Swipes", swipesTab()),
+		container.NewTabItem("Text", textTab(w)),
 	)
 	w.SetMainMenu(bellui.NewMainMenu(demoMenu("Check")))
 	w.SetContent(tabs)
@@ -66,11 +70,12 @@ func localeTab(w bellui.Window) core.CanvasObject {
 	refresh := func() {
 		info.SetText(fmt.Sprintf(
 			"Locale: %s\nRight-to-left: %v\nApp greeting: %s\nBuilt-in string \"Cancel\": %s\n"+
-				"Date: %s\nNumber: %s\nCurrency: %s\nList: %s",
+				"Date: %s\nTime now: %s (time zone %s)\nNumber: %s\nCurrency: %s\nList: %s",
 			lang.CurrentLocale(), lang.IsRTL(),
 			lang.X("release.greeting", "Hello {Name}", map[string]any{"Name": "Ada"}),
 			lang.L("Cancel"),
 			lang.FormatDate(time.Date(2026, 3, 9, 0, 0, 0, 0, time.UTC)),
+			lang.FormatTime(time.Now().Hour(), time.Now().Minute()), time.Now().Format("MST"),
 			lang.FormatDecimal(1234567.891, 2),
 			lang.FormatCurrency(1234.5, "EUR"),
 			lang.FormatList([]string{"red", "green", "blue"}),
