@@ -10,6 +10,7 @@ import (
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/async"
 	"github.com/belluikit/bellui/internal/cache"
+	intdriver "github.com/belluikit/bellui/internal/driver"
 	"github.com/belluikit/bellui/internal/svg"
 	"github.com/belluikit/bellui/internal/widget"
 	"github.com/belluikit/bellui/lang"
@@ -628,6 +629,8 @@ var (
 	_ event.DoubleTappable    = (*treeViewItem)(nil)
 	_ event.SecondaryTappable = (*treeViewItem)(nil)
 	_ event.Draggable         = (*treeViewItem)(nil)
+	_ event.DragClaimer       = (*treeViewItem)(nil)
+	_ event.LongPressable     = (*treeViewItem)(nil)
 	_ event.Hoverable         = (*treeViewItem)(nil)
 )
 
@@ -961,12 +964,39 @@ func (ti *treeViewItem) Dragged(e *event.DragEvent) {
 	ti.tree.handleDrag(ti.uid, e)
 }
 
-// ClaimsDrag takes a touch drag, in any direction, only when the tree lets a
-// row be moved (AllowReorder or AllowReparent) and is enabled
-// (event.DragClaimer, #1266). Otherwise the row leaves the drag to the tree's
-// scroll, which before took no touch drag that started on a row.
+// ClaimsDrag claims no plain touch drag (event.DragClaimer, #1266, #1296): a
+// swipe that starts on a row scrolls the tree. On touch a row is moved by a
+// long-press then a drag. The touch handler does not ask the claim after a
+// long-press (see LongPressed), and does not ask it for a mouse drag, which
+// moves the row at once as before.
 func (ti *treeViewItem) ClaimsDrag(geo.Delta) bool {
-	return !ti.tree.Disabled() && (ti.tree.AllowReorder || ti.tree.AllowReparent)
+	return false
+}
+
+// LongPressed picks the row up for a touch drag (#1296). The long-press is
+// what lets the drag that follows reach the row: after a hold-fired
+// long-press the touch handler gives the drag to the Draggable under the
+// finger without asking ClaimsDrag, so the row moves when AllowReorder or
+// AllowReparent is set.
+//
+// The hold also answers as the tap it would otherwise have been. The drivers
+// send no tap for the release of a hold-fired press, and the desktop fires a
+// long-press for a mouse held still too, so without this a slow click would
+// select nothing. The tap goes to the Tappable under the press inside the row,
+// such as the chevron or a hover button, or to the row itself when there is
+// none, as dialog's file items fall back to their tap.
+func (ti *treeViewItem) LongPressed(ev *event.PointEvent) {
+	if r, ok := cache.Renderer(ti).(*treeViewItemRenderer); ok {
+		co, pos, _ := intdriver.FindObjectAtPositionMatching(ev.Position, func(o core.CanvasObject) bool {
+			_, ok := o.(event.Tappable)
+			return ok
+		}, nil, r.Objects()...)
+		if tap, ok := co.(event.Tappable); ok {
+			tap.Tapped(&event.PointEvent{Position: pos, AbsolutePosition: ev.AbsolutePosition})
+			return
+		}
+	}
+	ti.Tapped(ev)
 }
 
 func (ti *treeViewItem) DragEnd() {

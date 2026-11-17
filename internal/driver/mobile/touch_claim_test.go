@@ -346,3 +346,41 @@ func Test_canvas_SwipeOnTimePickerInAPage(t *testing.T) {
 	swipe(c, 2, on, on.SubtractXY(0, 40))
 	assert.Equal(t, float32(40), page.Offset.Y, "a disabled picker left the swipe to the page")
 }
+
+// A reorderable TreeView in a page (#1296): a plain swipe that starts on a row
+// scrolls the tree and moves no row, while a long-press then a drag moves the
+// row, as Entry's long-press then drag selects (#801).
+func Test_canvas_LongPressThenDragMovesTreeViewRow(t *testing.T) {
+	tree := widget.NewTreeView()
+	for i := range 40 {
+		require.NoError(t, tree.AddNode("", widget.TreeViewNode{ID: widget.TreeViewNodeID(strconv.Itoa(i)), Text: "row " + strconv.Itoa(i)}))
+	}
+	tree.AllowReorder = true
+	box := container.NewGridWrap(geo.NewSize(200, 200), tree)
+	page := container.NewVScroll(container.NewVBox(box, filler(100, 600)))
+	c := claimCanvas(page, geo.NewSize(200, 300))
+	order := append([]widget.TreeViewNodeID(nil), tree.ChildIDs("")...)
+
+	on := geo.NewPos(60, 150)
+	swipe(c, 1, on, on.SubtractXY(0, 60))
+	assert.Equal(t, float32(60), tree.GetScrollOffset(), "the tree scrolled under a plain swipe that started on a row")
+	assert.Equal(t, order, tree.ChildIDs(""), "a plain swipe moved no row")
+	assert.Zero(t, page.Offset.Y)
+
+	// Contact 0, the one lprTapUp lifts. The press is on the first row on
+	// screen once the tree is back at its top.
+	tree.ScrollToOffset(0)
+	press := geo.NewPos(60, 10)
+	c.TapDown(press, 0)
+	waitAndCheck(400, func() {
+		assert.Equal(t, widget.TreeViewNodeID("0"), tree.Selected(), "the long-press selected the row it picked up")
+	})
+	for i := 1; i <= 10; i++ {
+		c.TapMove(press.AddXY(0, float32(i)*10), 0, claimDrag)
+	}
+	lprTapUp(c, press.AddXY(0, 100))
+	assert.Zero(t, tree.GetScrollOffset(), "the drag after the long-press did not scroll the tree")
+	assert.Zero(t, page.Offset.Y)
+	assert.NotEqual(t, widget.TreeViewNodeID("0"), tree.ChildIDs("")[0], "the long-press then drag moved the first row")
+	assert.Contains(t, tree.ChildIDs("")[1:4], widget.TreeViewNodeID("0"), "to where the finger let go")
+}
