@@ -25,3 +25,11 @@ Treat as owned code; patch here.
 * Import path, and `github.com/srwiley/rasterx` retargeted to
   `github.com/belluikit/bellui/internal/rasterx`.
 * Reformatted with `gofumpt`/`goimports` to match this repo's enforced house style.
+* `SvgPath.DrawTransformed` scales the stroke width, dash lengths and dash
+  offset by the path's transform (#1292). Upstream passes them to the dasher in
+  user units while the path's points arrive already transformed, so a stroke
+  kept its width in pixels at every size: a 7-unit stroke on a 120-unit viewBox
+  was 7 px at 40 px and at 240 px. Both srwiley/oksvg and fyne-io/oksvg still
+  have this. The scale is the square root of the transform's determinant,
+  exact for uniform scaling and rotation; a non-uniform transform would need
+  an elliptical pen, srwiley/oksvg#53, not done here.
