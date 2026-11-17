@@ -3,11 +3,13 @@ package widget
 import (
 	"image/color"
 	"math"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
 	"unicode"
 	"unicode/utf8"
+	"unsafe"
 
 	"github.com/belluikit/typesetting/di"
 	"github.com/belluikit/typesetting/shaping"
@@ -1988,15 +1990,26 @@ func (t *RichText) rows() int {
 	return len(t.rowBounds)
 }
 
-// contentFingerprint computes a cheap fingerprint from segment count and total text length.
-// Used by SyncState to detect external modifications to segment content.
+// contentFingerprint computes a cheap fingerprint from segment count, each
+// segment's identity and each text segment's length. Used by SyncState to detect
+// external modifications to segment content.
+//
+// Identity matters because the row bounds hold the segments they were built
+// from and the renderer draws those: assigning new Segments of the same count
+// and lengths, then Refresh(), kept drawing the old text (#1302). An address
+// cannot be reused by a replacement while the cached row bounds still reference
+// the old segment, so it is a sound identity here.
 func (t *RichText) contentFingerprint() uint64 {
 	fp := uint64(len(t.Segments))
 	for _, seg := range t.Segments {
 		if ts, ok := seg.(*TextSegment); ok {
 			fp = fp*31 + uint64(len(ts.Text))
+			fp = fp*31 + uint64(uintptr(unsafe.Pointer(ts)))
 		} else {
 			fp = fp*31 + 1 // non-text segment contributes a fixed value
+			if v := reflect.ValueOf(seg); v.Kind() == reflect.Pointer {
+				fp = fp*31 + uint64(v.Pointer())
+			}
 		}
 	}
 	return fp
