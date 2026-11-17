@@ -1429,6 +1429,54 @@ func TestRichText_RowBounds_NoSpuriousInvalidation(t *testing.T) {
 		"rowBoundsVersion should not change on redundant Refresh")
 }
 
+// Replacing Segments with new ones of the same count and byte lengths, then
+// Refresh(), must draw the new text: the row bounds hold the segments they were
+// built from, so a fingerprint blind to identity kept drawing the old ones (#1302).
+func TestRichText_ReplacedSegmentsSameLength_DrawsNewText(t *testing.T) {
+	test.NewTempApp(t)
+
+	rt := NewRichText(&TextSegment{Style: RichTextStyleInline, Text: "Morning Light"})
+	w := test.NewTempWindow(t, rt)
+	w.Resize(geo.NewSize(300, 100))
+	require.Equal(t, "Morning Light", richTextRenderTexts(rt)[0].Text)
+	// Settle the model first: the very first Refresh after construction always
+	// rebuilds, which hid the bug in a single-step test.
+	rt.Refresh()
+
+	rt.Segments = []RichTextSegment{&TextSegment{Style: RichTextStyleInline, Text: "Evening Rain!"}}
+	rt.Refresh()
+
+	texts := richTextRenderTexts(rt)
+	require.Len(t, texts, 1)
+	assert.Equal(t, "Evening Rain!", texts[0].Text)
+}
+
+// The same holds for non-text segments, which the fingerprint keys by identity
+// alone: a replaced hyperlink segment must be drawn as the new link (#1302).
+func TestRichText_ReplacedHyperlinkSegment_DrawsNewLink(t *testing.T) {
+	test.NewTempApp(t)
+
+	rt := NewRichText(&HyperlinkSegment{Text: "Morning Light"})
+	w := test.NewTempWindow(t, rt)
+	w.Resize(geo.NewSize(300, 100))
+	rt.Refresh()
+
+	rt.Segments = []RichTextSegment{&HyperlinkSegment{Text: "Evening Rain!"}}
+	rt.Refresh()
+
+	var drawn []string
+	for _, obj := range cache.Renderer(rt).Objects() {
+		if c, ok := obj.(*bellui.Container); ok {
+			for _, o := range c.Objects {
+				if link, ok := o.(*Hyperlink); ok {
+					drawn = append(drawn, link.Text)
+				}
+			}
+		}
+	}
+	assert.Equal(t, []string{"Evening Rain!"}, drawn)
+}
+
 func TestRichText_CleanVisualCache_SameCount(t *testing.T) {
 	test.NewTempApp(t)
 
