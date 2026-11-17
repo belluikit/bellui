@@ -215,3 +215,71 @@ func TestRichEntry_DisableKeepsWrapRows(t *testing.T) {
 	e.Enable()
 	assert.Equal(t, enabled, e.doc.activeRowModel())
 }
+
+// A disabled RichEntry draws its images, block and inline, at the disabled
+// look's 38% opacity, and Enable draws them opaque again (#1232). The paint walk
+// leaves a RichEntry alone (core.DisabledLook), so nothing else dims them.
+func TestRichEntry_DisableDimsImages(t *testing.T) {
+	test.NewTempApp(t)
+
+	e := NewRichEntry()
+	e.SetSegments([]RichTextSegment{
+		&TextSegment{Style: RichTextStyleInline, Text: "before "},
+		&ImageSegment{Resource: theme.HomeIcon(), InlineImage: true},
+		&TextSegment{Style: RichTextStyleParagraph, Text: " after"},
+		&ImageSegment{Resource: theme.InfoIcon()},
+		&TextSegment{Style: RichTextStyleInline, Text: "last line"},
+	})
+	// Disable before the first draw, so the visuals are built dimmed.
+	e.Disable()
+	w := test.NewTempWindow(t, e)
+	w.Resize(geo.NewSize(400, 300))
+
+	assertImages := func(want float64) {
+		t.Helper()
+		// Read the images off the provider's cached renderers: the visuals it
+		// draws, not the segments it is handed.
+		imgs := renderedImages(&e.provider)
+		require.Len(t, imgs, 2, "the provider did not draw both images, so the check would prove nothing")
+		for _, img := range imgs {
+			assert.InDelta(t, want, img.Translucency, 1e-9, "translucency of %v", img.Resource)
+		}
+	}
+	dimmed := 1 - disabledImageOpacity
+	assertImages(dimmed)
+
+	e.Enable()
+	assertImages(0)
+
+	// Disable after the first draw updates the visuals already built.
+	e.Disable()
+	assertImages(dimmed)
+
+	e.Enable()
+	assertImages(0)
+}
+
+// renderedImages walks a widget's cached renderers and returns the image
+// objects they draw.
+func renderedImages(o core.CanvasObject) []*canvas.Image {
+	var out []*canvas.Image
+	var walk func(core.CanvasObject)
+	walk = func(o core.CanvasObject) {
+		switch x := o.(type) {
+		case *canvas.Image:
+			if x.Visible() {
+				out = append(out, x)
+			}
+		case *bellui.Container:
+			for _, c := range x.Objects {
+				walk(c)
+			}
+		case core.Widget:
+			for _, c := range cache.Renderer(x).Objects() {
+				walk(c)
+			}
+		}
+	}
+	walk(o)
+	return out
+}
