@@ -100,14 +100,15 @@ type drilldownEntry struct {
 }
 
 var (
-	_ core.Widget      = (*Chart)(nil)
-	_ event.Tappable   = (*Chart)(nil)
-	_ event.Scrollable = (*Chart)(nil)
-	_ event.Pinchable  = (*Chart)(nil)
-	_ event.Draggable  = (*Chart)(nil)
-	_ event.Focusable  = (*Chart)(nil)
-	_ event.Hoverable  = (*Chart)(nil)
-	_ desktop.Keyable  = (*Chart)(nil)
+	_ core.Widget       = (*Chart)(nil)
+	_ event.Tappable    = (*Chart)(nil)
+	_ event.Scrollable  = (*Chart)(nil)
+	_ event.Pinchable   = (*Chart)(nil)
+	_ event.Draggable   = (*Chart)(nil)
+	_ event.DragClaimer = (*Chart)(nil)
+	_ event.Focusable   = (*Chart)(nil)
+	_ event.Hoverable   = (*Chart)(nil)
+	_ desktop.Keyable   = (*Chart)(nil)
 )
 
 // New creates a new Chart widget with the given option.
@@ -1158,6 +1159,37 @@ type dragResult struct {
 	scene  *fynecanvas.Scene3D
 	window interact.DataWindow
 	onZoom func(interact.DataWindow)
+}
+
+// ClaimsDrag takes a touch drag only when the chart will act on it, and leaves
+// the rest to the scroll around the chart (event.DragClaimer, #1266). It
+// claims what resolveDrag acts on, in the same order:
+//   - the Measure tool, or a selected drawing (which a drag can move): any
+//     direction. The selected drawing moves only when the drag starts on it,
+//     and the claim cannot see where the drag starts, so it claims any drag
+//     while a drawing is selected, as the chart did before;
+//   - a geo map or a 3D scene (pan, orbit): any direction;
+//   - brush mode: any direction;
+//   - zoomed: a mostly sideways drag, since the pan follows DX only.
+//
+// A plain chart claims nothing, so a swipe that starts on it scrolls the page.
+// The other drawing tools place their points by taps, not drags.
+func (c *Chart) ClaimsDrag(d geo.Delta) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	switch {
+	case c.drawingTool == interact.DrawingToolMeasure, c.selectedID != "":
+		return true
+	case c.isGeo && c.geoCoord != nil:
+		return true
+	case c.is3D && c.orbitCam != nil && c.scene3D != nil:
+		return true
+	case c.option.Brush != nil && c.option.Brush.Enabled:
+		return true
+	case c.zoomState != nil && c.zoomState.IsZoomed():
+		return math.Abs(float64(d.DX)) > math.Abs(float64(d.DY))
+	}
+	return false
 }
 
 // Dragged handles drag events for 3D orbit, panning (when zoomed), or brush selection.
