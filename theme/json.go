@@ -191,9 +191,15 @@ func (t *dataTheme) Font(style bellui.TextStyle) bellui.Resource {
 }
 
 func (t *dataTheme) Icon(name bellui.ThemeIconName) bellui.Resource {
-	if val, ok := t.data.Icons[string(name)]; ok {
-		r := val.resource()
-		if r != nil {
+	val, ok := t.data.Icons[string(name)]
+	if !ok {
+		// A theme file written before #1307 names the icon its old way.
+		if old, renamed := legacyIconNames[name]; renamed {
+			val, ok = t.data.Icons[old]
+		}
+	}
+	if ok {
+		if r := val.resource(); r != nil {
 			return r
 		}
 	}
