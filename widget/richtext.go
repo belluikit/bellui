@@ -401,6 +401,12 @@ type RichText struct {
 	// loading from content, allowlist-only); an unknown family falls through
 	// to the default behaviour with a nil FontSource.
 	namedFonts map[string]bellui.Resource
+
+	// dimImages draws the image segments at the disabled look's 38% opacity. A
+	// disabled RichEntry sets it on the RichText it lays its content out in
+	// (#1232); like AllowRemoteContent it reaches each ImageSegment in
+	// cachedSegmentVisual.
+	dimImages bool
 }
 
 // virtualRowBuffer is the number of extra rows materialised above and below the
@@ -1016,6 +1022,7 @@ func (t *RichText) cachedSegmentVisual(seg RichTextSegment, offset int) core.Can
 	// fetched when the embedding RichText opted in (pre-rebrand tracker #285).
 	if img, ok := seg.(*ImageSegment); ok {
 		img.allowRemote = t.AllowRemoteContent
+		img.dimmed = t.dimImages
 	}
 
 	if t.visualCache == nil {

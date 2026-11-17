@@ -961,6 +961,9 @@ func (e *RichEntry) syncProvider() {
 		e.provider.rowBoundsVersion++
 	}
 	e.provider.Segments = segs
+	// Images are drawn translucent rather than copied: an image keeps its
+	// identity, so its rows and its cached visual stay valid across the swap.
+	e.provider.dimImages = e.Disabled()
 	e.provider.Wrapping = e.Wrapping
 	e.provider.Refresh()
 	e.rebuildWrapRows()
@@ -990,7 +993,8 @@ func (e *RichEntry) rebuildWrapRows() {
 // disabledSegments returns copies of the text segments recoloured with
 // theme.ColorNameDisabled, the disabled look Entry gives its text (#1216). The
 // document's own segments are left as they are, so Enable restores each run's
-// colour. Images are passed through: the widget does not dim them.
+// colour. Images are passed through as they are, and the provider draws them
+// at 38% opacity instead (RichText.dimImages, #1232).
 //
 // Each segment keeps its copy from one sync to the next. The provider reuses
 // its row bounds while the content looks unchanged, and those bounds point at

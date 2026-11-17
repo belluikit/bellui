@@ -256,6 +256,10 @@ type ImageSegment struct {
 	// broken-image placeholder is rendered instead, so rendering untrusted
 	// markup cannot trigger network requests or local-file reads (pre-rebrand tracker #285).
 	allowRemote bool
+
+	// dimmed draws the image at the disabled look's 38% opacity. It is set by
+	// the embedding RichText, from a disabled RichEntry (#1232).
+	dimmed bool
 }
 
 // Inline reports whether this image flows within a text row (see InlineImage).
@@ -271,8 +275,24 @@ func (i *ImageSegment) Textual() string {
 
 // Visual returns a new instance of an image widget required to render this segment.
 func (i *ImageSegment) Visual() core.CanvasObject {
-	return newRichImage(i.Source, i.Image, i.Resource, i.Alignment, i.allowRemote)
+	img := newRichImage(i.Source, i.Image, i.Resource, i.Alignment, i.allowRemote)
+	img.img.Translucency = i.translucency()
+	return img
 }
+
+// translucency is the image's Translucency: the disabled look's 38% opacity
+// while dimmed, as the paint walk dims a disabled widget without a look of its
+// own (#1223, #1232), and opaque otherwise.
+func (i *ImageSegment) translucency() float64 {
+	if i.dimmed {
+		return 1 - disabledImageOpacity
+	}
+	return 0
+}
+
+// disabledImageOpacity is the opacity a disabled editor draws its images at:
+// MD3's disabled content opacity, the 0.38 of internal/driver's fallback dim.
+const disabledImageOpacity = 0.38
 
 // Update applies the current state of this image segment to an existing visual.
 func (i *ImageSegment) Update(o core.CanvasObject) {
@@ -287,6 +307,7 @@ func (i *ImageSegment) Update(o core.CanvasObject) {
 	img.img.File = newer.File
 	img.img.Resource = newer.Resource
 	img.img.Image = newer.Image
+	img.img.Translucency = i.translucency()
 	img.setAlign(i.Alignment)
 
 	img.Refresh()

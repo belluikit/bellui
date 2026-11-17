@@ -5,6 +5,7 @@ import (
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/theme"
 	"github.com/belluikit/bellui/widget"
 )
 
@@ -16,9 +17,16 @@ type decoratorOverlay struct {
 
 	decorators     []RowDecorator
 	spanDecorators []SpanDecorator
-	scrollY        float32 // vertical scroll offset, synced from editor
-	topOffset      float32 // Y of first row, from Entry.RowMetrics()
-	stride         float32 // row-to-row Y distance, from Entry.RowMetrics()
+	// ownSpansFrom is the index in spanDecorators where the editor's own span
+	// decorators (search matches, diagnostics, hover, links, redaction) start;
+	// those before it are the app's.
+	ownSpansFrom int
+	// disabled draws the editor's own decorations in the disabled look (#1232).
+	disabled bool
+
+	scrollY   float32 // vertical scroll offset, synced from editor
+	topOffset float32 // Y of first row, from Entry.RowMetrics()
+	stride    float32 // row-to-row Y distance, from Entry.RowMetrics()
 
 	// getLineCount returns the document's live logical-line count (the fork's
 	// O(1) Entry.LineCount, pre-rebrand tracker #149) — replaces counting a pushed text copy,
@@ -134,6 +142,9 @@ func (r *decoratorOverlayRenderer) renderFoldPlaceholders() {
 		return
 	}
 	col := themeColor(ColorNameFoldPlaceholder)
+	if d.disabled {
+		col = theme.Color(theme.ColorNameDisabled)
+	}
 	for _, p := range d.foldPlaceholders() {
 		rect := d.getCaretRect(p.row, p.col)
 		if rect.IsZero() {
@@ -240,8 +251,12 @@ func (r *decoratorOverlayRenderer) renderSpans() {
 	if len(d.spanDecorators) == 0 || d.getRangeRects == nil {
 		return
 	}
-	for _, sd := range d.spanDecorators {
+	for i, sd := range d.spanDecorators {
+		dim := d.disabled && i >= d.ownSpansFrom
 		for _, span := range sd.Spans() {
+			if dim {
+				span = dimSpan(span)
+			}
 			for _, rect := range d.getRangeRects(span.Range) {
 				r.objects = append(r.objects, spanObjects(span, rect)...)
 			}
