@@ -786,6 +786,28 @@ func knownResource(rsc bellui.Resource) string {
 		return "closedCaptionIcon"
 	case theme.ClosedCaptionOffIcon():
 		return "closedCaptionOffIcon"
+	case theme.ShoppingCartIcon():
+		return "shoppingCartIcon"
+	case theme.AddShoppingCartIcon():
+		return "addShoppingCartIcon"
+	case theme.StorefrontIcon():
+		return "storefrontIcon"
+	case theme.ShoppingBagIcon():
+		return "shoppingBagIcon"
+	case theme.WorkspacePremiumIcon():
+		return "workspacePremiumIcon"
+	case theme.DiamondIcon():
+		return "diamondIcon"
+	case theme.AutorenewIcon():
+		return "autorenewIcon"
+	case theme.CardMembershipIcon():
+		return "cardMembershipIcon"
+	case theme.CreditCardIcon():
+		return "creditCardIcon"
+	case theme.ReceiptLongIcon():
+		return "receiptLongIcon"
+	case theme.LockIcon():
+		return "lockIcon"
 	case theme.PlaceIcon():
 		return "placeIcon"
 	case theme.PeopleIcon():

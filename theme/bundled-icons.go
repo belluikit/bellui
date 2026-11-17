@@ -478,6 +478,94 @@ var closedcaptionoffIconRes = &bellui.StaticResource{
 	StaticContent: closedcaptionoffIcon,
 }
 
+//go:embed icons/shopping-cart.svg
+var shoppingcartIcon []byte
+
+var shoppingcartIconRes = &bellui.StaticResource{
+	StaticName:    "shopping-cart.svg",
+	StaticContent: shoppingcartIcon,
+}
+
+//go:embed icons/add-shopping-cart.svg
+var addshoppingcartIcon []byte
+
+var addshoppingcartIconRes = &bellui.StaticResource{
+	StaticName:    "add-shopping-cart.svg",
+	StaticContent: addshoppingcartIcon,
+}
+
+//go:embed icons/storefront.svg
+var storefrontIcon []byte
+
+var storefrontIconRes = &bellui.StaticResource{
+	StaticName:    "storefront.svg",
+	StaticContent: storefrontIcon,
+}
+
+//go:embed icons/shopping-bag.svg
+var shoppingbagIcon []byte
+
+var shoppingbagIconRes = &bellui.StaticResource{
+	StaticName:    "shopping-bag.svg",
+	StaticContent: shoppingbagIcon,
+}
+
+//go:embed icons/workspace-premium.svg
+var workspacepremiumIcon []byte
+
+var workspacepremiumIconRes = &bellui.StaticResource{
+	StaticName:    "workspace-premium.svg",
+	StaticContent: workspacepremiumIcon,
+}
+
+//go:embed icons/diamond.svg
+var diamondIcon []byte
+
+var diamondIconRes = &bellui.StaticResource{
+	StaticName:    "diamond.svg",
+	StaticContent: diamondIcon,
+}
+
+//go:embed icons/autorenew.svg
+var autorenewIcon []byte
+
+var autorenewIconRes = &bellui.StaticResource{
+	StaticName:    "autorenew.svg",
+	StaticContent: autorenewIcon,
+}
+
+//go:embed icons/card-membership.svg
+var cardmembershipIcon []byte
+
+var cardmembershipIconRes = &bellui.StaticResource{
+	StaticName:    "card-membership.svg",
+	StaticContent: cardmembershipIcon,
+}
+
+//go:embed icons/credit-card.svg
+var creditcardIcon []byte
+
+var creditcardIconRes = &bellui.StaticResource{
+	StaticName:    "credit-card.svg",
+	StaticContent: creditcardIcon,
+}
+
+//go:embed icons/receipt-long.svg
+var receiptlongIcon []byte
+
+var receiptlongIconRes = &bellui.StaticResource{
+	StaticName:    "receipt-long.svg",
+	StaticContent: receiptlongIcon,
+}
+
+//go:embed icons/lock.svg
+var lockIcon []byte
+
+var lockIconRes = &bellui.StaticResource{
+	StaticName:    "lock.svg",
+	StaticContent: lockIcon,
+}
+
 //go:embed icons/place.svg
 var placeIcon []byte
 
