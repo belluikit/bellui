@@ -32,7 +32,7 @@ func TestChecksAreComplete(t *testing.T) {
 			t.Errorf("%s: needs Where, Steps and Expect", c.ID)
 		}
 		if !strings.HasPrefix(c.ID, map[string]string{
-			"smoke": "SM-", "touch": "TK-", "i18n": "I18N-", "rtl": "RTL-", "a11y": "A11Y-", "charts": "CH-",
+			"smoke": "SM-", "widgets": "WG-", "touch": "TK-", "i18n": "I18N-", "rtl": "RTL-", "a11y": "A11Y-", "charts": "CH-",
 			"tables": "TB-", "dag": "DG-", "media": "MD-", "cli": "CLI-", "edge": "ED-",
 		}[c.Area]) {
 			t.Errorf("%s: ID prefix does not match area %q", c.ID, c.Area)
