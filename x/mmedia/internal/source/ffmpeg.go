@@ -71,6 +71,14 @@ type FFmpegSource struct {
 	interrupts uint64
 	// interrupted is set by Interrupt and cleared by the reopen it calls for.
 	interrupted atomic.Bool
+
+	// fastOpen opens an http(s) URL again with fast seek, for a CBR MP3; nil
+	// for anything else. fastChecked is set once the first seek has asked
+	// whether to use it (preferFastSeek, #1098). stopSniff ends that check's
+	// requests, for Interrupt; it is guarded by decMu.
+	fastOpen    func() (goffmpeg.IDecoder, error)
+	fastChecked bool
+	stopSniff   context.CancelFunc
 }
 
 // NewFFmpegSource decodes from r. Container and codec are probed by
@@ -97,7 +105,15 @@ func NewFFmpegSourceURL(url string) (*FFmpegSource, error) {
 	s := newFFmpegSource(dec)
 	s.url = url
 	s.open = func() (goffmpeg.IDecoder, error) { return openURL(url) }
+	if isHTTP(url) {
+		s.fastOpen = func() (goffmpeg.IDecoder, error) { return openURLWith(url, fastSeekOptions) }
+	}
 	return s, nil
+}
+
+func isHTTP(url string) bool {
+	lower := strings.ToLower(url)
+	return strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://")
 }
 
 // httpOptions make FFmpeg ride out a network that drops or stalls (#839).
@@ -131,14 +147,24 @@ const liveHTTPOptions = httpOptions + ",reconnect_streamed=1"
 // can still read (a VBR MP3's Xing header) is taken for a file, and a drop
 // there ends cleanly, as every live stream's did without reconnect_streamed.
 func openURL(url string) (goffmpeg.IDecoder, error) {
+	return openURLWith(url, "")
+}
+
+// openURLWith is openURL with extra options for an http(s) URL, such as
+// fastSeekOptions.
+func openURLWith(url, extra string) (goffmpeg.IDecoder, error) {
 	lower := strings.ToLower(url)
 	if httpsInGo && strings.HasPrefix(lower, "https://") {
-		return openHTTPSInGo(url)
+		return openHTTPSInGo(url, extra)
 	}
-	if !strings.HasPrefix(lower, "http://") && !strings.HasPrefix(lower, "https://") {
+	if !isHTTP(url) {
 		return goffmpeg.Open(url)
 	}
-	dec, err := goffmpeg.OpenWithOptions(url, httpOptions)
+	opts := httpOptions
+	if extra != "" {
+		opts += "," + extra
+	}
+	dec, err := goffmpeg.OpenWithOptions(url, opts)
 	if errors.Is(err, goffmpeg.ErrOpenOptionsUnavailable) {
 		return goffmpeg.Open(url)
 	}
@@ -476,6 +502,9 @@ func (s *FFmpegSource) Seek(pos time.Duration) {
 	if s.dec == nil {
 		return
 	}
+	if !s.preferFastSeek() {
+		return
+	}
 	if err := s.dec.Seek(pos.Seconds()); err != nil {
 		if s.interrupted.Load() {
 			return // asked to stop, not a failure; the next Seek reopens
@@ -483,7 +512,7 @@ func (s *FFmpegSource) Seek(pos time.Duration) {
 		// Playing on from where it was let the caller believe the seek had
 		// landed (#869). The source stops instead, and the pipeline reports
 		// why through OnError.
-		s.err = fmt.Errorf("mmedia: seek to %v failed: %w", pos, err)
+		s.err = seekError(pos, s.url, s.readErr(err))
 		s.ended = true
 		return
 	}
@@ -524,6 +553,89 @@ func (s *FFmpegSource) Seek(pos time.Duration) {
 	}
 }
 
+// preferFastSeek opens an http(s) MP3 again with fast seek, once, at its first
+// seek, if it is CBR; see sniffCBR. Asking costs a request or two of a few KB,
+// and the reopen a connection; a far seek without it can cost the whole file.
+// A file that is not known to be CBR keeps its decoder. It reports whether
+// there is a decoder to seek with: false only when Interrupt came meanwhile.
+func (s *FFmpegSource) preferFastSeek() bool {
+	if s.fastChecked || s.fastOpen == nil || s.live {
+		return true
+	}
+	s.fastChecked = true
+	if s.dec.Duration() <= 0 {
+		return true // a live stream has nothing to seek in
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), httpOpenTimeout)
+	defer cancel()
+	s.decMu.Lock()
+	if s.interrupted.Load() {
+		s.decMu.Unlock()
+		return false
+	}
+	s.stopSniff = cancel
+	gen := s.interrupts
+	s.decMu.Unlock()
+
+	cbr := sniffCBR(ctx, httpClient, s.url)
+	var dec goffmpeg.IDecoder
+	if cbr {
+		var err error
+		if dec, err = s.fastOpen(); err == nil {
+			if err = applyAudioFormat(dec, s.wantChannels, s.wantRate); err != nil {
+				dec.Close()
+				dec = nil
+			}
+		}
+	}
+
+	s.decMu.Lock()
+	s.stopSniff = nil
+	again := s.interrupts != gen
+	var old goffmpeg.IDecoder
+	if dec != nil {
+		old, s.dec = s.dec, dec
+		s.open = s.fastOpen
+		if again {
+			dec.Interrupt() // interrupted while this one was opening
+		}
+	}
+	s.decMu.Unlock()
+	if old != nil {
+		old.Close()
+		if s.hasVideo {
+			s.vInfo = dec.VideoInfo()
+		}
+		s.aInfo = dec.AudioInfo()
+	}
+	return !again
+}
+
+// seekError says why a seek failed. A stream that cannot seek there fails with
+// ENOSYS, which FFmpeg returns for a server that ignores Range, and that is
+// said in words rather than as FFmpeg's number (#1098).
+func seekError(pos time.Duration, url string, err error) error {
+	var averr goffmpeg.AVError
+	if !errors.As(err, &averr) || int(averr) != -errnoENOSYS {
+		return fmt.Errorf("mmedia: seek to %v failed: %w", pos, err)
+	}
+	why := "this stream cannot be seeked in"
+	if isHTTP(url) {
+		why = "the server does not let this stream be seeked in (it ignores requests for part of the file)"
+	}
+	return &unseekableError{msg: fmt.Sprintf("mmedia: cannot seek to %v: %s", pos, why), err: err}
+}
+
+// unseekableError is a seek the stream cannot make. Its message leaves out
+// FFmpeg's number, which a listener cannot act on; Unwrap keeps it.
+type unseekableError struct {
+	msg string
+	err error
+}
+
+func (e *unseekableError) Error() string { return e.msg }
+func (e *unseekableError) Unwrap() error { return e.err }
+
 // Rewind returns a finite source to its start.
 //
 // A capture device has no start to return to, so it is released instead. The
@@ -557,6 +669,9 @@ func (s *FFmpegSource) Interrupt() {
 	defer s.decMu.Unlock()
 	s.interrupts++
 	s.interrupted.Store(true)
+	if s.stopSniff != nil {
+		s.stopSniff()
+	}
 	if s.dec != nil {
 		s.dec.Interrupt()
 	}

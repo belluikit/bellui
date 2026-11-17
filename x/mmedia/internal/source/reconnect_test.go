@@ -2,6 +2,7 @@ package source
 
 import (
 	"bytes"
+	"errors"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +12,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/belluikit/goffmpeg"
 
 	"github.com/belluikit/bellui/x/mmedia/internal/codecset"
 )
@@ -164,6 +167,9 @@ func TestURLSourceFailsADropFromAServerWithoutRange(t *testing.T) {
 		t.Fatalf("NewFFmpegSourceURL: %v", err)
 	}
 	defer s.Close()
+	// The plain seek, as a VBR file makes it. A CBR file's first seek opens
+	// it again with fast seek (#1098), leaving the dropped connection unread.
+	s.fastChecked = true
 	dur := s.Duration()
 	s.Seek(dur - 500*time.Millisecond)
 	last := 0.0
@@ -245,14 +251,23 @@ func TestURLSourceReportsASeekTheServerCannotDo(t *testing.T) {
 		t.Fatalf("NewFFmpegSourceURL: %v", err)
 	}
 	defer s.Close()
+	// The plain seek, as a VBR file makes it. A CBR file's first seek opens
+	// it again with fast seek (#1098), leaving the dropped connection unread.
+	s.fastChecked = true
 	decodeAll(t, s, 20*time.Second)
 	if s.Err() == nil {
 		t.Fatal("the drop ended with no error; the seek below needs a dropped stream")
 	}
 	s.Seek(time.Second)
 	t.Logf("ended %v, Err %v", s.HasEnded(), s.Err())
-	if !s.HasEnded() || s.Err() == nil || !strings.Contains(s.Err().Error(), "seek to 1s failed") {
+	if !s.HasEnded() || s.Err() == nil || !strings.Contains(s.Err().Error(), "cannot seek to 1s") {
 		t.Fatalf("after a seek back the server cannot serve: ended %v, Err %v; want the seek's error",
 			s.HasEnded(), s.Err())
+	}
+	// #1098: said in words, without FFmpeg's number, which stays reachable.
+	var averr goffmpeg.AVError
+	if strings.Contains(s.Err().Error(), strconv.Itoa(errnoENOSYS)) ||
+		!errors.As(s.Err(), &averr) || int(averr) != -errnoENOSYS {
+		t.Errorf("Err %q: want ENOSYS inside and not in the message", s.Err())
 	}
 }

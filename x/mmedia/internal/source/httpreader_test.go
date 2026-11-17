@@ -173,7 +173,7 @@ func TestHTTPSInGoRidesOutANetworkFailure(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			srv, requests := failFirst(t, data, tc.fail)
-			dec, err := openHTTPSInGo(srv.URL + "/s.mp4") // the reader does not mind http
+			dec, err := openHTTPSInGo(srv.URL+"/s.mp4", "") // the reader does not mind http
 			if err != nil {
 				t.Fatalf("openHTTPSInGo: %v", err)
 			}
@@ -262,7 +262,7 @@ func TestHTTPSInGoRetriesAnOpen(t *testing.T) {
 			requests := func() int { mu.Lock(); defer mu.Unlock(); return n }
 
 			start := time.Now()
-			dec, err := openHTTPSInGo(srv.URL + "/s.mp4")
+			dec, err := openHTTPSInGo(srv.URL+"/s.mp4", "")
 			took := time.Since(start)
 			if dec != nil {
 				dec.Close()

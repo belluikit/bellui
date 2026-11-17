@@ -9,7 +9,7 @@ go 1.26.2
 require (
 	github.com/belluikit/bellui v1.3.0-rc.2
 	github.com/belluikit/bellui/x/mmedia v0.0.0
-	github.com/belluikit/goffmpeg v0.13.0
+	github.com/belluikit/goffmpeg v0.13.1
 )
 
 require (
