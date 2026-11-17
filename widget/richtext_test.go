@@ -1451,6 +1451,41 @@ func TestRichText_ReplacedSegmentsSameLength_DrawsNewText(t *testing.T) {
 	assert.Equal(t, "Evening Rain!", texts[0].Text)
 }
 
+// With several segments the change can hide in their order or in all of them at
+// once, with every length unchanged; each must still be drawn as the new
+// segments (#1302).
+func TestRichText_ReplacedSegmentsMulti_DrawsNewText(t *testing.T) {
+	inline := func(s string) *TextSegment { return &TextSegment{Style: RichTextStyleInline, Text: s} }
+	for name, next := range map[string]func(a, b RichTextSegment) []RichTextSegment{
+		"swapped": func(a, b RichTextSegment) []RichTextSegment { return []RichTextSegment{b, a} },
+		"both replaced": func(_, _ RichTextSegment) []RichTextSegment {
+			return []RichTextSegment{inline("Quiet "), inline("Harbor")}
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			test.NewTempApp(t)
+
+			a, b := inline("Moon  "), inline("Light!")
+			rt := NewRichText(a, b)
+			w := test.NewTempWindow(t, rt)
+			w.Resize(geo.NewSize(300, 100))
+			rt.Refresh()
+
+			rt.Segments = next(a, b)
+			rt.Refresh()
+
+			var want, drawn string
+			for _, seg := range rt.Segments {
+				want += seg.Textual()
+			}
+			for _, txt := range richTextRenderTexts(rt) {
+				drawn += txt.Text
+			}
+			assert.Equal(t, want, drawn)
+		})
+	}
+}
+
 // The same holds for non-text segments, which the fingerprint keys by identity
 // alone: a replaced hyperlink segment must be drawn as the new link (#1302).
 func TestRichText_ReplacedHyperlinkSegment_DrawsNewLink(t *testing.T) {

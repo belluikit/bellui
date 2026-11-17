@@ -3,13 +3,11 @@ package widget
 import (
 	"image/color"
 	"math"
-	"reflect"
 	"strconv"
 	"strings"
 	"sync"
 	"unicode"
 	"unicode/utf8"
-	"unsafe"
 
 	"github.com/belluikit/typesetting/di"
 	"github.com/belluikit/typesetting/shaping"
@@ -225,6 +223,7 @@ type RichText struct {
 	rowBoundsTruncation bellui.TextTruncation // truncation when rowBounds was last computed
 	rowBoundsWrapping   bellui.TextWrap       // wrapping when rowBounds was last computed
 	lastContentFP       uint64                // content fingerprint at last SyncState — detects external changes
+	lastSegments        []RichTextSegment     // segments at last SyncState — detects replaced segments (#1302)
 
 	// Memoized multi-segment String() result (pre-rebrand tracker #560): the returned object
 	// keeps its identity while the content version is unchanged, so
@@ -678,13 +677,12 @@ func (t *RichText) intrinsicSizeViaRefresh() geo.Size {
 // SyncState syncs RichText's segments to internal rendering state.
 // Called automatically by BaseWidget.Refresh() before the renderer refreshes.
 func (t *RichText) SyncState() {
-	// Only invalidate row bounds when content has actually changed.
-	// Compute a lightweight fingerprint from segment count + total text length.
+	// Only invalidate row bounds when content has actually changed: segment
+	// count, text lengths or segment identity.
 	// Mutation methods also bump rowBoundsVersion explicitly for immediate detection.
-	fp := t.contentFingerprint()
-	if fp != t.lastContentFP {
+	if t.contentChanged() {
 		t.rowBoundsVersion++
-		t.lastContentFP = fp
+		t.stampContent()
 	}
 	t.updateRowBounds()
 
@@ -1990,29 +1988,43 @@ func (t *RichText) rows() int {
 	return len(t.rowBounds)
 }
 
-// contentFingerprint computes a cheap fingerprint from segment count, each
-// segment's identity and each text segment's length. Used by SyncState to detect
-// external modifications to segment content.
-//
-// Identity matters because the row bounds hold the segments they were built
-// from and the renderer draws those: assigning new Segments of the same count
-// and lengths, then Refresh(), kept drawing the old text (#1302). An address
-// cannot be reused by a replacement while the cached row bounds still reference
-// the old segment, so it is a sound identity here.
+// contentFingerprint computes a cheap fingerprint from segment count and total text length.
+// Used by SyncState to detect external modifications to segment content.
 func (t *RichText) contentFingerprint() uint64 {
 	fp := uint64(len(t.Segments))
 	for _, seg := range t.Segments {
 		if ts, ok := seg.(*TextSegment); ok {
 			fp = fp*31 + uint64(len(ts.Text))
-			fp = fp*31 + uint64(uintptr(unsafe.Pointer(ts)))
 		} else {
 			fp = fp*31 + 1 // non-text segment contributes a fixed value
-			if v := reflect.ValueOf(seg); v.Kind() == reflect.Pointer {
-				fp = fp*31 + uint64(v.Pointer())
-			}
 		}
 	}
 	return fp
+}
+
+// stampContent records the content the row model now reflects: the fingerprint
+// and the segments themselves. The backing array is reused, so a steady state
+// does not allocate.
+func (t *RichText) stampContent() {
+	t.lastContentFP = t.contentFingerprint()
+	t.lastSegments = append(t.lastSegments[:0], t.Segments...)
+}
+
+// contentChanged reports whether the content moved since the last stampContent.
+// The fingerprint alone misses Segments replaced by new ones of the same count and
+// lengths, while the row bounds still hold, and draw, the old ones (#1302); so the
+// segments are compared by identity too. Segments are already required to be
+// comparable (visualCache keys on them).
+func (t *RichText) contentChanged() bool {
+	if t.contentFingerprint() != t.lastContentFP || len(t.Segments) != len(t.lastSegments) {
+		return true
+	}
+	for i, seg := range t.Segments {
+		if seg != t.lastSegments[i] {
+			return true
+		}
+	}
+	return false
 }
 
 // updateRowBounds updates the row bounds used to render properly the text widget.
@@ -2058,7 +2070,7 @@ func (t *RichText) updateRowBounds() {
 		// direct segment mutation that bumps no rowBoundsVersion (e.g. SetPlaceHolder)
 		// leaves the cache "valid" but stale, and stamping would swallow the signal
 		// SyncState relies on to trigger the real rebuild.
-		t.lastContentFP = t.contentFingerprint()
+		t.stampContent()
 	}
 }
 
