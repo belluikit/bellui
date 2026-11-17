@@ -13,6 +13,10 @@ import (
 // editor width (including the gutter area).
 //
 // Multiple decorators can be stacked; the editor renders them in order.
+//
+// A disabled [Editor] leaves what a RowDecorator or [SpanDecorator] of the
+// app's draws as the app drew it, and dims only the decorations it adds itself
+// (find matches, diagnostics, links, the hover outline, redaction bars).
 type RowDecorator interface {
 	// Decorate returns canvas objects to render for the given line.
 	// line is 1-based. pos is the top-left corner of the row area and

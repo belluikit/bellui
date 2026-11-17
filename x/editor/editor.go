@@ -820,6 +820,7 @@ func (e *Editor) applyGutter() {
 
 	e.entry.SuppressGutter = true
 	e.gutterW = newGutterWidget(e.Gutter)
+	e.gutterW.disabled = e.disabled
 	// Seed the fresh widget with the editor's last known scroll offset: a
 	// re-apply (#281) can rebuild it while the document is scrolled, and
 	// OnScrolled only fires on a move, so a gutter left at 0 would draw its
@@ -857,6 +858,8 @@ func (e *Editor) applyDecorators() {
 	}
 
 	e.decOverlay = newDecoratorOverlay(e.Decorators, spanDecs)
+	e.decOverlay.ownSpansFrom = len(e.SpanDecorators)
+	e.decOverlay.disabled = e.disabled
 	// Same as the gutter above: a re-applied overlay inherits the current
 	// scroll offset so its row decorations stay on their rows.
 	e.decOverlay.scrollY = e.scrollY

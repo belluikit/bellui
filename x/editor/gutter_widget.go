@@ -17,6 +17,7 @@ type gutterWidget struct {
 	widget.BaseWidget
 
 	provider  GutterProvider
+	disabled  bool    // the editor is disabled: draw its own marks dimmed (#1232)
 	scrollY   float32 // vertical scroll offset, synced from editor
 	topOffset float32 // Y of first row, from Entry.RowMetrics()
 	stride    float32 // row-to-row Y distance, from Entry.RowMetrics()
@@ -290,7 +291,7 @@ func (r *gutterWidgetRenderer) Refresh() {
 // top y and height rh, offsetting each object by y. row is the 0-based logical row.
 func (r *gutterWidgetRenderer) emitRow(g *gutterWidget, row int, y, rh, gutterW, textSize float32) {
 	cellSize := geo.NewSize(gutterW, rh)
-	objs := g.provider.Render(row+1, cellSize, textSize)
+	objs := renderGutterCell(g.provider, row+1, cellSize, textSize, g.disabled)
 	for _, obj := range objs {
 		pos := obj.Position()
 		obj.Move(geo.NewPos(pos.X, pos.Y+y))

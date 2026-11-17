@@ -10,6 +10,10 @@ import (
 // text, matching the behavior of production code editors.
 //
 // Multiple providers can be composed side by side via [NewCompositeGutter].
+//
+// A disabled [Editor] draws this package's providers in the disabled look, and
+// leaves what a provider of the app's draws as the app drew it: an app that
+// wants its gutter content dimmed checks [Editor.Disabled] itself.
 type GutterProvider interface {
 	// Width returns the desired gutter width in device-independent pixels.
 	// totalRows is the line count of the document (useful for sizing based
@@ -155,12 +159,18 @@ func (c *CompositeGutter) Width(totalRows int, textSize float32) float32 {
 // Render returns canvas objects from all providers, offset horizontally
 // so each provider occupies its own column.
 func (c *CompositeGutter) Render(row int, size geo.Size, textSize float32) []core.CanvasObject {
+	return c.render(row, size, textSize, false)
+}
+
+// render is Render, with each of the editor's own providers in the disabled
+// look when disabled (renderGutterCell, #1232).
+func (c *CompositeGutter) render(row int, size geo.Size, textSize float32, disabled bool) []core.CanvasObject {
 	var objects []core.CanvasObject
 	var xOffset float32
 	for _, p := range c.columns {
 		pw := p.Width(c.totalRows, textSize)
 		cellSize := geo.NewSize(pw, size.Height)
-		objs := p.Render(row, cellSize, textSize)
+		objs := renderGutterCell(p, row, cellSize, textSize, disabled)
 		for _, obj := range objs {
 			pos := obj.Position()
 			obj.Move(geo.NewPos(pos.X+xOffset, pos.Y))

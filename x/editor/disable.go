@@ -9,6 +9,8 @@ import (
 	"github.com/belluikit/bellui/driver/desktop"
 	"github.com/belluikit/bellui/driver/mobile"
 	"github.com/belluikit/bellui/event"
+	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/theme"
 	"github.com/belluikit/bellui/widget"
 )
 
@@ -44,13 +46,16 @@ var (
 	_ mobile.Touchable        = (*disabledShield)(nil)
 )
 
+// DrawsDisabledLook reports that the paint walk must not dim a disabled
+// Editor (bellui's core.DisabledLook, belluikit/bellui#1223): its Entry and
+// find bar are disabled and draw their own disabled look, and the editor dims
+// its own gutter and decorations (#1232). The app's gutter providers and
+// decorators are left as the app draws them.
+func (*Editor) DrawsDisabledLook() bool { return true }
+
 // Disable makes the editor visible but inert (see the note above). Open
 // popovers close, a focus inside the editor is dropped, and the find bar, if
 // shown, stays shown and disabled. It is safe before the editor is drawn.
-// DrawsDisabledLook reports that the paint walk must not dim a disabled
-// Editor (bellui's core.DisabledLook, belluikit/bellui#1223): its Entry and find bar are disabled and draw their own disabled look.
-func (*Editor) DrawsDisabledLook() bool { return true }
-
 func (e *Editor) Disable() {
 	if e.disabled {
 		return
@@ -96,6 +101,9 @@ func (e *Editor) Disabled() bool {
 // and restores the syntax colours on Enable. The Entry dims its text itself,
 // but the highlighter's runs carry their own colours and the semantic overlay
 // paints over them, so both are taken off while disabled.
+//
+// The gutter and the decorator overlay draw the rest of what the editor itself
+// draws in the disabled look too (#1232); see dimObjects for which parts.
 func (e *Editor) applyLook() {
 	if e.disabled {
 		e.entry.StyleOverlayForRow = nil
@@ -104,6 +112,118 @@ func (e *Editor) applyLook() {
 	}
 	e.applyHighlighter()
 	e.entry.Refresh()
+	if e.gutterW != nil {
+		e.gutterW.disabled = e.disabled
+		e.gutterW.Refresh()
+	}
+	if e.decOverlay != nil {
+		e.decOverlay.disabled = e.disabled
+		e.decOverlay.Refresh()
+	}
+}
+
+// disabledMarkOpacity is the opacity a disabled editor draws its own marks at:
+// MD3's disabled content opacity, which bellui's paint walk also dims a
+// disabled widget without a look of its own to.
+const disabledMarkOpacity = 0.38
+
+// The disabled look of what the editor draws besides its text (#1232). The
+// Editor tells the paint walk not to dim it (DrawsDisabledLook), so these parts
+// are dimmed here or not at all:
+//
+//   - text (line numbers, fold placeholders) takes the disabled text colour,
+//     the colour the Entry gives the code beside it;
+//   - every other mark (fold chevrons, breakpoint dots, diagnostic markers and
+//     squiggles, find-match washes, link underlines, the hover outline) keeps
+//     its hue at 38% opacity, as the paint walk's fallback would draw it;
+//   - a redaction bar stays opaque, since a translucent one would show the
+//     secret under it, in its colour mixed 38% over the theme background.
+//
+// Only the editor's own parts are dimmed: the gutter providers of this package
+// (LineNumberGutter, FoldGutter, BreakpointGutter, and a DiagnosticGutter
+// without a MarkerFunc) and the span decorators the editor adds itself. A
+// GutterProvider, MarkerFunc, RowDecorator or SpanDecorator the app supplies
+// draws the app's content, which a disabled container leaves as the app drew
+// it (belluikit/player#641).
+
+// dimObjects redraws objs, built by one of the editor's own gutter providers,
+// in the disabled look.
+func dimObjects(objs []core.CanvasObject) {
+	for _, o := range objs {
+		switch o := o.(type) {
+		case *canvas.Text:
+			o.Color = theme.Color(theme.ColorNameDisabled)
+		case *canvas.Rectangle:
+			o.FillColor, o.StrokeColor = dimColor(o.FillColor), dimColor(o.StrokeColor)
+		case *canvas.Circle:
+			o.FillColor, o.StrokeColor = dimColor(o.FillColor), dimColor(o.StrokeColor)
+		case *canvas.Polygon:
+			o.FillColor, o.StrokeColor = dimColor(o.FillColor), dimColor(o.StrokeColor)
+		case *canvas.Line:
+			o.StrokeColor = dimColor(o.StrokeColor)
+		}
+	}
+}
+
+// dimColor returns c at 38% of its opacity, keeping its hue. nil stays nil.
+func dimColor(c color.Color) color.Color {
+	if c == nil {
+		return nil
+	}
+	n := color.NRGBAModel.Convert(c).(color.NRGBA)
+	n.A = uint8(float32(n.A)*disabledMarkOpacity + 0.5)
+	return n
+}
+
+// dimOpaque returns the opaque colour c drawn at 38% over the theme background
+// looks like: the disabled look of a redaction bar, which must stay opaque.
+func dimOpaque(c color.Color) color.Color {
+	fg := color.NRGBAModel.Convert(toOpaque(c)).(color.NRGBA)
+	bg := color.NRGBAModel.Convert(toOpaque(theme.Color(theme.ColorNameBackground))).(color.NRGBA)
+	mix := func(f, b uint8) uint8 {
+		return uint8(float32(b) + (float32(f)-float32(b))*disabledMarkOpacity + 0.5)
+	}
+	return color.NRGBA{R: mix(fg.R, bg.R), G: mix(fg.G, bg.G), B: mix(fg.B, bg.B), A: 255}
+}
+
+// dimSpan returns span as a disabled editor draws it.
+func dimSpan(span DecoratedSpan) DecoratedSpan {
+	col := span.Color
+	if col == nil {
+		col = defaultSpanColor
+	}
+	if span.Kind == SpanBackground && span.Opaque {
+		span.Color = dimOpaque(col)
+	} else {
+		span.Color = dimColor(col)
+	}
+	return span
+}
+
+// ownsGutterLook reports whether p is one of this package's gutter providers,
+// whose marks a disabled editor dims. A CompositeGutter is not asked: its
+// providers are, one by one.
+func ownsGutterLook(p GutterProvider) bool {
+	switch g := p.(type) {
+	case *LineNumberGutter, *FoldGutter, *BreakpointGutter:
+		return true
+	case *DiagnosticGutter:
+		return g.MarkerFunc == nil // a MarkerFunc draws the app's marker
+	}
+	return false
+}
+
+// renderGutterCell renders p's cell for line (1-based), in the disabled look
+// when disabled and p is the editor's own.
+func renderGutterCell(p GutterProvider, line int, size geo.Size, textSize float32, disabled bool) []core.CanvasObject {
+	if c, ok := p.(*CompositeGutter); ok {
+		return c.render(line, size, textSize, disabled)
+	}
+	objs := p.Render(line, size, textSize)
+	if disabled && ownsGutterLook(p) {
+		dimObjects(objs)
+	}
+	return objs
 }
 
 // dropFocus unfocuses the canvas when the focus is on one of the editor's own
