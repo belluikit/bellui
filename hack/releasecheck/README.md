@@ -3,8 +3,9 @@
 A guided manual validation of a release on desktop, Android, iOS and the web.
 It builds the [gallery](https://github.com/belluikit/gallery) from this checkout,
 plus a small companion app (`app/`) for the behaviours the gallery does not show:
-locale switching, right-to-left scopes and windows, theme overrides, menus, and
-touch and keys.
+locale switching, right-to-left scopes and windows, theme overrides, menus,
+touch and keys, disabled widgets and containers, the navigation drawer, swipes
+that start on nested widgets, and wrapping and long-pressed text.
 
 ```sh
 go run ./hack/releasecheck setup -platform desktop -run   # build everything the checks open
@@ -13,7 +14,8 @@ go run ./hack/releasecheck list > checklist.md            # the whole checklist,
 ```
 
 Platforms: `desktop`, `android`, `ios`, `web`. `-area` narrows a run or list to
-some of `smoke, touch, i18n, rtl, a11y, charts, tables, dag, media, cli, edge`.
+some of `smoke, widgets, touch, i18n, rtl, a11y, charts, tables, dag, media, cli,
+edge`.
 Checks marked SPECIAL are edge cases or the release's riskiest changes.
 
 `run` appends every verdict to the report as it is given (a fail or a blocked

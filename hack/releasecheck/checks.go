@@ -38,17 +38,18 @@ func (c check) on(platform string) bool {
 }
 
 var areaTitle = map[string]string{
-	"smoke":  "Smoke: every page, theme and window",
-	"touch":  "Touch and keys",
-	"i18n":   "Internationalisation",
-	"rtl":    "Right-to-left",
-	"a11y":   "Accessibility",
-	"charts": "x/charts",
-	"tables": "x/tables",
-	"dag":    "x/dag",
-	"media":  "x/mmedia",
-	"cli":    "Packaging and the bellui command",
-	"edge":   "Edge cases",
+	"smoke":   "Smoke: every page, theme and window",
+	"widgets": "Widgets: disabled, pressed, drawer, wrapping",
+	"touch":   "Touch and keys",
+	"i18n":    "Internationalisation",
+	"rtl":     "Right-to-left",
+	"a11y":    "Accessibility",
+	"charts":  "x/charts",
+	"tables":  "x/tables",
+	"dag":     "x/dag",
+	"media":   "x/mmedia",
+	"cli":     "Packaging and the bellui command",
+	"edge":    "Edge cases",
 }
 
 // text is the check as the runner shows it on one platform.
@@ -178,7 +179,7 @@ var checks = []check{
 	},
 	{
 		ID: "SM-04", Area: "smoke", Title: "Partial repaint leaves no stale pixels on phones", Platforms: mobile, Special: true,
-		Refs:  []string{"#593", "#619"},
+		Refs:  []string{"#593", "#619", "#975"},
 		Where: gallery + ", Communication page (progress, snackbar), Scrolling page",
 		Steps: []string{
 			"Watch the progress indicators animate for ten seconds.",
@@ -187,7 +188,7 @@ var checks = []check{
 			"If anything looks wrong, rebuild the gallery with -tags nopartialrepaint and repeat, to tell a partial-repaint fault from any other.",
 		},
 		Expect: []string{
-			"No ghost of a snackbar, toast, ripple or old scroll position stays on screen.",
+			"No ghost of a snackbar, toast, ripple or old scroll position stays on screen, and no thin dark line is left along an animating card or clipped container (#975).",
 			"Partial repaint is on by default on phones in this release; any difference from the nopartialrepaint build is a failure.",
 		},
 	},
@@ -217,6 +218,115 @@ var checks = []check{
 			"Every row's text stays yellow and every separator and header line orange — also rows that scrolled into view and after the resize and theme change.",
 			"Hover and selection use teal.",
 			"No row, separator or header ever shows the app theme's colours.",
+		},
+	},
+
+	// ---- widgets ----
+	{
+		ID: "WG-01", Area: "widgets", Title: "Disabled widgets are visible but inert, with one look", Special: true,
+		Refs:  []string{"#1212", "#1213", "#1214", "#1215", "#1216", "#1223", "#1232", "#1251"},
+		Where: companion + " → Disabled",
+		Steps: []string{
+			"Tick \"Disable everything below\".",
+			"Tap or click every control on the page: the buttons, FAB, entry, select, slider, switch, check, radio, segments, chips, the date and time pickers, the rich entry, the app bar's menu and search icons, the navigation bar's items, the carousel's arrow, and the rows of the list, tree and tree view. Try typing into the entry.",
+			"Drag the slider, the carousel and the time picker's dial.",
+			"Over the list, tree and tree view, turn the mouse wheel (desktop, web) or swipe up (phone).",
+			"In the entry, select a word, copy it and paste it somewhere else.",
+			"Untick the box.",
+		},
+		Expect: []string{
+			"Every control keeps its place and shows MD3's disabled look: labels and icons at about 38% of the text colour. A disabled Button's label is as readable as the disabled entry's text; in rc.1 the desktop dimmed it twice, to about 14% (#1223).",
+			"The look is the same on desktop, phone and web. In rc.1 a phone dimmed nothing for a widget with no disabled look of its own.",
+			"The rich entry's orange image is dimmed with its text (#1232). The app bar's title stays at full colour; only its icons look disabled (#1251).",
+			"Nothing responds: the status line reports no tap, no value, page, selection, date or time changes, nothing opens, and no pressed or hover state shows.",
+			"The wheel or swipe over the disabled list, tree and tree view moves neither them nor the page around them (#1251).",
+			"The disabled entry's text can still be selected and copied, but not edited.",
+			"After unticking, everything works again.",
+		},
+	},
+	{
+		ID: "WG-02", Area: "widgets", Title: "A disabled container disables what it holds", Refs: []string{"#1218"}, Special: true,
+		Where: companion + " → Disabled → Containers (tabs, document tabs, an inner window)",
+		Steps: []string{
+			"Tick \"Disable everything below\".",
+			"Tap \"Second tab\" and \"Doc two\"; drag the inner window by its title bar and by its corner; press its close, minimise and maximise buttons.",
+			"Tap the buttons and entries inside the three containers.",
+			"Untick the box, then look at the \"Disabled by the app\" check in the first tab.",
+		},
+		Expect: []string{
+			"While disabled, no tab switches, no document tab closes, and the inner window neither moves, resizes nor closes.",
+			"Every button and entry inside them, in every tab, looks disabled and does nothing.",
+			"The tab labels are dimmed once, not twice.",
+			"After unticking, everything inside works again, except \"Disabled by the app\", which stays disabled because the app disabled it itself.",
+		},
+	},
+	{
+		ID: "WG-03", Area: "widgets", Title: "A disabled widget takes no focus", Platforms: keyed, Refs: []string{"#1221", "#1251"},
+		Where: companion + " → Disabled",
+		Steps: []string{
+			"Press \"Disable everything in 3 seconds\", then at once click into the entry under \"Actions and choices\" so its caret shows.",
+			"When everything is disabled, type a letter.",
+			"Click an empty spot, then press Tab repeatedly through the page.",
+			"Untick \"Disable everything below\".",
+		},
+		Expect: []string{
+			"When the page disables itself, the entry loses its caret and focus ring at once, and the letter goes nowhere (#1221).",
+			"Tab skips every disabled control: only the box at the top and the \"Disable everything in 3 seconds\" button take the focus.",
+			"After unticking, the entry does not take the focus back by itself.",
+		},
+	},
+	{
+		ID: "WG-04", Area: "widgets", Title: "Controls show a pressed state", Refs: []string{"#1085", "#1091", "#1156"},
+		Where: gallery + " → Actions, Inputs, Navigation and Auth",
+		Steps: []string{
+			"Press and hold, then release, each kind of control: filled, outlined and text buttons, icon buttons, FABs, segmented and split buttons, chips, check boxes, radio buttons, switches, list rows, menu items, tabs, and navigation bar, rail and drawer items.",
+			"On a phone, start a press on a list row and turn it into a scroll.",
+			"On Auth, tap a sign-in button.",
+		},
+		Expect: []string{
+			"Each shows a pressed state from the moment of the press, in the control's own content colour, and it fades after the release, so a quick tap is seen too.",
+			"A segmented button's pressed state follows the rounded ends of its first and last segment (#1156).",
+			"A press that turns into a scroll leaves no pressed state behind.",
+			"The sign-in tap does not hang the app; the page keeps responding.",
+		},
+	},
+	{
+		ID: "WG-05", Area: "widgets", Title: "Navigation drawer: either edge, below a header, open and closed", Special: true,
+		Refs:  []string{"#1171", "#1172", "#1173", "#1186", "#1238", "#1280"},
+		Where: companion + " → Drawer",
+		Steps: []string{
+			"Press the app bar's menu icon, then close the drawer with a tap on the dimmed area beside it.",
+			"Press Show, then close it with Escape (desktop, web) or Back (Android).",
+			"Choose End edge, press Show and pick Documents.",
+			"Tick \"Open below the app bar\", press the menu icon, then press the app bar's X icon.",
+			"Press \"Show twice, then Hide after 2 seconds\" and wait.",
+			"Open the drawer again and turn the mouse wheel, or swipe, over the dimmed area.",
+			"Direction tab → \"Toggle the app's direction\"; come back and open the drawer at Start edge, then at End edge. Toggle the direction back.",
+		},
+		Expect: []string{
+			"With animations on, the drawer slides in from its edge and back out to it (#1186).",
+			"Start edge opens on the left, End edge on the right; in right-to-left, the other way round (#1171).",
+			"On a phone narrower than 360 pt, the drawer reaches its edge and leaves a strip of dimmed area to tap (#1238).",
+			"Below the app bar, the drawer and the dimmed area start under the bar, and the bar's X icon can be tapped and closes the drawer (#1171, #1172).",
+			"The app bar shows an X while the drawer is open and the menu icon while it is closed, whatever opened or closed it. The status line counts one change per open and one per close: \"Show twice\" adds two in all, not three (#1280).",
+			"Picking Documents closes the drawer and shows \"Destination: Documents\".",
+			"The wheel or swipe over the dimmed area does not scroll the page under it (#1173).",
+		},
+	},
+	{
+		ID: "WG-06", Area: "widgets", Title: "Wrapping text keeps its width, and long snackbars wrap",
+		Refs:  []string{"#1038", "#1099", "#1106", "#1195", "#1198", "#1199", "#1202"},
+		Where: companion + " → Text → \"Wrapping text keeps its width\" and Snackbars",
+		Steps: []string{
+			"Read each example, then make the window narrower and wider (desktop, web) or rotate (phone).",
+			"Press \"Show a long snackbar\", then \"Show two snackbars at once\".",
+		},
+		Expect: []string{
+			"Beside the button, centred, in the row-wrap flow and in the form's label column, the label is as wide as its text or its room allows and wraps between words. None collapses to one letter per line with its text running down the screen.",
+			"In the form, the label column takes at most half the width, and the field beside it keeps its room (#1202).",
+			"The French text never starts a line with \":\", \";\", \"!\" or \"»\", and \"10 km\" stays on one line (#1099).",
+			"The long snackbar wraps inside the window with its Undo button at the end, cut off at neither edge (#1106).",
+			"Two snackbars at once show as one: only \"Second snackbar\" (#1038).",
 		},
 	},
 
@@ -286,7 +396,7 @@ var checks = []check{
 		},
 	},
 	{
-		ID: "TK-06", Area: "touch", Title: "A hardware Return reaches a widget that takes keys but no text", Platforms: native, Refs: []string{"#666"},
+		ID: "TK-06", Area: "touch", Title: "A hardware Return reaches a widget that takes keys but no text", Platforms: native, Refs: []string{"#666", "#793"},
 		Where: companion + " → Touch & keys → Key target",
 		Per: map[string]string{
 			"android": "With no keyboard attached, send the keys with: adb shell input keyevent 66 (Return), then adb shell input keyevent 21 (Left).",
@@ -295,10 +405,12 @@ var checks = []check{
 		Steps: []string{
 			"Tap or click the Key target card.",
 			"Press Return, then the left arrow, then type the letter a.",
+			"Hold the left arrow down for two seconds.",
 		},
 		Expect: []string{
 			"The card says \"focused\" after the tap.",
 			"It then shows \"key Return\", \"key Left\" and \"rune 'a'\" in turn.",
+			"Each key shows when it goes down, not when it is released, and the held arrow repeats (#793). On Android, adb cannot hold a key: use a real keyboard or hack/keyprobe/keyboard.sh.",
 		},
 	},
 	{
@@ -334,10 +446,75 @@ var checks = []check{
 			"Ctrl+S sets the status to \"Saved (demo — no actual file written)\". On macOS the same works with Cmd.",
 		},
 	},
+	{
+		ID: "TK-10", Area: "touch", Title: "A swipe on a nested widget scrolls the page", Platforms: mobile, Special: true,
+		Refs:  []string{"#662", "#801", "#986", "#987", "#1229", "#1266"},
+		Where: companion + " → Swipes",
+		Steps: []string{
+			"Swipe up and down, starting each swipe on: the slider, the disabled slider, the carousel, the sideways row of chips and the selectable text.",
+			"Swipe sideways on the slider, the carousel and the row of chips.",
+			"On the inner list, the table, the tree, the fixed tree view and the multi-line entry, swipe up until each reaches its end, then keep swiping up.",
+			"On the tree view whose rows can be dragged, drag \"Inbox 1\" below \"Inbox 3\".",
+		},
+		Expect: []string{
+			"Every vertical swipe in the first step scrolls the page, as it would starting on plain text. In rc.1 a swipe that started on a slider, a carousel or the chip row left the page where it was.",
+			"Sideways, the slider moves, the carousel pages and the chip row scrolls; the page does not move.",
+			"The inner list, table, tree, fixed tree view and entry scroll their own content first; once one is at its end, the swipe scrolls the page (#662, #801, #1266).",
+			"A swipe at the table's end never stretches its first row (#1266).",
+			"A swipe over the selectable text and the entry selects nothing (#986, #801).",
+			"In the movable tree view, the drag moves the row and the drop lands on the row under the finger; the line below reads \"Moved: Inbox 1 …\" (#1229). Its rows keep the drag, so this tree view does not scroll the page.",
+		},
+	},
+	{
+		ID: "TK-11", Area: "touch", Title: "Charts and the data grid hand a swipe to the page", Platforms: mobile, Refs: []string{"#1266"}, Special: true,
+		Where: gallery + " → Charts (Basic, Trading) and Data Grid (Sort & Filter)",
+		Steps: []string{
+			"On Charts → Basic, swipe up and down starting on a chart's plot.",
+			"Pinch to zoom into a chart, then swipe sideways on it, then swipe up on it.",
+			"On Trading → Drawing Tools, pick the trend line tool and draw a line with one finger.",
+			"On Data Grid → Sort & Filter, swipe up on the grid body until its last row shows, then keep swiping; swipe up on the column header row.",
+		},
+		Expect: []string{
+			"A vertical swipe on an unzoomed chart scrolls the page. In rc.1 the chart kept every swipe, which is why the gallery leaves gaps between the charts on a phone.",
+			"Zoomed in, a sideways swipe pans the chart and an upward one still scrolls the page.",
+			"With a drawing tool on, the drag draws the line; the page does not move.",
+			"The grid scrolls its rows until its end, then the swipe scrolls the page; a swipe on its header scrolls the page.",
+		},
+	},
+	{
+		ID: "TK-12", Area: "touch", Title: "A long-press keeps its word, and a drag extends it a word at a time", Platforms: mobile, Refs: []string{"#1267", "#894"}, Special: true,
+		Where: companion + " → Text → \"Long-press a word\"",
+		Steps: []string{
+			"Long-press the word \"unwrapped\" in the sentence and keep the finger still for a second after the selection appears, then lift.",
+			"Long-press \"unwrapped\" again and, without lifting, drag right across the next three words, then back left past the start of \"unwrapped\".",
+			"Do the same two steps in the text field below it.",
+			"Android: with the on-screen keyboard open for the text field, close it (Back or the keyboard's hide key).",
+		},
+		Expect: []string{
+			"After the long-press, the selection is the whole of \"unwrapped\", also once the finger has been held still; in rc.2 it shrank to \"unw\" as the finger crept (#1267).",
+			"Dragged right, the selection grows a whole word at a time; dragged back left past it, it runs from the end of \"unwrapped\" back over whole words.",
+			"The text field behaves the same.",
+			"Android: when the keyboard goes, the page grows back to the full height of the screen (#894).",
+		},
+	},
+	{
+		ID: "TK-13", Area: "touch", Title: "Wheel picker and swipe card", Refs: []string{"#977", "#984", "#989"},
+		Where: companion + " → Swipes, near the end of the page",
+		Per:   map[string]string{"desktop": "Use the mouse: press, drag, release.", "web": "Use the mouse: press, drag, release."},
+		Steps: []string{
+			"Spin the wheel up with a short flick, then drag it down slowly past its first item.",
+			"Drag the swipe card a little sideways and let go; then drag it most of the way off and let go; then flick it.",
+		},
+		Expect: []string{
+			"The wheel coasts and settles with one item centred, and \"Wheel: Item N\" names that item. Past the first item it resists and springs back.",
+			"Items away from the centre are smaller and fainter.",
+			"The card follows the finger and tilts a little; a short drag springs back, a long drag or a flick throws it off, \"Card: swiped left\" (or right) shows and a new card takes its place.",
+		},
+	},
 
 	// ---- i18n ----
 	{
-		ID: "I18N-01", Area: "i18n", Title: "Switching the locale at run time", Refs: []string{"#87"},
+		ID: "I18N-01", Area: "i18n", Title: "Switching the locale at run time", Refs: []string{"#87", "#944"},
 		Where: companion + " → Locale",
 		Steps: []string{
 			"Press en-US, then de-DE, then ja-JP, then System.",
@@ -347,6 +524,7 @@ var checks = []check{
 			"de-DE: Abbrechen; date 09.03.2026; number 1.234.567,89; currency 1.234,50 €; list \"red, green und blue\".",
 			"ja-JP: キャンセル; date 2026/03/09; list \"red、green、blue\".",
 			"Each press updates the text at once, with no restart. System returns to the OS language.",
+			"\"Time now\" is the device clock's time, in the device's time zone; on iOS it is not UTC (#944).",
 		},
 	},
 	{
@@ -400,7 +578,7 @@ var checks = []check{
 
 	// ---- rtl ----
 	{
-		ID: "RTL-01", Area: "rtl", Title: "The gallery in right-to-left", Refs: []string{"#749"},
+		ID: "RTL-01", Area: "rtl", Title: "The gallery in right-to-left", Refs: []string{"#749", "#945", "#1078", "#1080"},
 		Where: gallery + ", app bar RTL toggle (⋯ icon)",
 		Steps: []string{
 			"Toggle RTL on. Visit Navigation, Inputs, Containment, Data Grid and Charts.",
@@ -409,6 +587,8 @@ var checks = []check{
 		Expect: []string{
 			"The navigation moves to the right; rows, forms and app bars mirror; text aligns to the right.",
 			"Directional icons (back, forward, navigate) point the other way.",
+			"On Actions, the extended FAB's icon sits beside its label, not over it (#945).",
+			"On Charts, with the window narrow enough that the tabs overflow, the tab indicator sits under the selected tab (#1078, #1080).",
 			"Known, not a failure in this release (#779): Slider, ProgressBar, Split, Tree and Table column order keep their left-to-right shape.",
 			"Toggling off restores the left-to-right layout exactly.",
 		},
@@ -542,6 +722,19 @@ var checks = []check{
 			"The zoom slider has no dark slab; annotation and text-drawing chips are light.",
 		},
 	},
+	{
+		ID: "A11Y-07", Area: "a11y", Title: "Disabled widgets are read as unavailable", Platforms: native, Refs: []string{"#1214", "#1251"},
+		Where: companion + " (a11y build) → Disabled",
+		Steps: []string{
+			"With the screen reader on, move through the controls, then tick \"Disable everything below\" and move through them again.",
+			"While disabled, try to activate a button and the entry with the screen reader's gesture or key.",
+		},
+		Expect: []string{
+			"Disabled controls are read with \"dimmed\", \"unavailable\" or \"disabled\" (the platform's word).",
+			"Activating one does nothing, and the entry takes no focus for typing.",
+			"The app bar's title is read as before; its icons are read as unavailable.",
+		},
+	},
 
 	// ---- charts ----
 	{
@@ -621,6 +814,50 @@ var checks = []check{
 		Steps:  []string{"Scroll fast to the end and back; resize the window; toggle dark mode; select rows with the checkboxes."},
 		Expect: []string{"Scrolling stays smooth; after the resize and theme change every visible row, checkbox and header uses the current theme."},
 	},
+	{
+		ID: "TB-03", Area: "tables", Title: "Group headers: tap, arrows, redraw and scroll bars", Special: true,
+		Refs:  []string{"#1252", "#1254", "#1256", "#1258"},
+		Where: gallery + " → Data Grid → Grouping",
+		Steps: []string{
+			"Press \"Group by Sector\".",
+			"Tap (or click) anywhere on a group's header row, then again.",
+			"Collapse several groups, scroll, then expand them again; press \"Collapse All\" and \"Expand All\".",
+			"Make the window small enough that both scroll bars show, and scroll down and sideways.",
+		},
+		Expect: []string{
+			"Each tap on a header row collapses or expands its group, also on a phone (#1252).",
+			"The arrows are the theme's grey chevrons, pointing down when open and sideways when closed; never a blue play-button emoji (#1256).",
+			"After every collapse, expand and scroll, each header sits on its own group's first row; no header is missing or drawn over the wrong rows (#1254).",
+			"The scroll bars are whole bars, not pieces between the group headers (#1258).",
+		},
+	},
+	{
+		ID: "TB-04", Area: "tables", Title: "A pinned-right column leaves the scroll bars and last column reachable", Refs: []string{"#1257"},
+		Where: gallery + " → Data Grid → Columns (Volume is pinned to the right)",
+		Steps: []string{
+			"Make the window small enough that both scroll bars show.",
+			"Scroll down, then scroll right to the end.",
+		},
+		Expect: []string{
+			"The vertical scroll bar is drawn whole beside the pinned Volume column, not hidden under it or showing as dashes between rows.",
+			"The pinned column stops above the horizontal scroll bar.",
+			"Scrolled to the end, the last unpinned column shows in full, clear of the pinned one.",
+		},
+	},
+	{
+		ID: "TB-05", Area: "tables", Title: "A tap on a column header sorts, also on a phone", Refs: []string{"#1268"},
+		Where: gallery + " → Data Grid → Sort & Filter",
+		Steps: []string{
+			"Tap (or click) the Price header three times.",
+			"Desktop: Shift-click the Change % header.",
+			"Drag the border between two headers to resize a column.",
+		},
+		Expect: []string{
+			"Each tap sorts once: ascending, descending, then unsorted, with the header's arrow showing which. In rc.2 a tap on a phone did nothing.",
+			"Shift-click adds Change % as a second sort column.",
+			"Resizing a column, or a drag starting on a header, does not sort.",
+		},
+	},
 
 	// ---- dag ----
 	{
@@ -638,12 +875,16 @@ var checks = []check{
 
 	// ---- media ----
 	{
-		ID: "MD-01", Area: "media", Title: "Picture and sound start together", Platforms: desktop, Refs: []string{"#787", "#504"}, Special: true,
+		ID: "MD-01", Area: "media", Title: "Picture and sound start together", Platforms: desktop, Refs: []string{"#787", "#504", "#1162"}, Special: true,
 		Where: gallery + " → Media Player (the bundled sample, or Open file… with a video that has speech)",
-		Steps: []string{"Open the page with speakers on; watch the first two seconds closely. Seek forward and back."},
+		Steps: []string{
+			"Open the page with speakers on; watch the first two seconds closely. Seek forward and back.",
+			"Pause, then seek a few times while paused.",
+		},
 		Expect: []string{
 			"The first frames do not run ahead of the sound; lips and voice line up from the start (#787).",
 			"After a seek, picture and sound resume together within a moment.",
+			"Each seek while paused shows the frame it landed on (#1162).",
 		},
 	},
 	{
@@ -654,19 +895,21 @@ var checks = []check{
 		Expect: []string{"The page shows \"Cannot play …\" with the audio error at once; the app does not hang or play silently."},
 	},
 	{
-		ID: "MD-03", Area: "media", Title: "Every bundled audio format plays", Platforms: native, Refs: []string{"gallery#28"},
+		ID: "MD-03", Area: "media", Title: "Every bundled audio format plays", Platforms: native, Refs: []string{"gallery#28", "#842", "#852", "#1020"},
 		Where: gallery + " → Audio Player",
 		Steps: []string{
 			"With sound on, pick each entry of Bundled clip in turn: MP3, AAC (m4a), Ogg Vorbis, Opus, FLAC, WAV.",
-			"Let one of them play to its end.",
+			"Let one of them play to its end, then press play again.",
+			"Phone: press \"Open file…\" and pick an audio file from the device's storage; do it five times in a row.",
 		},
 		Expect: []string{
 			"Each plays the same rising scale from its first note, twelve notes one second apart, and shows 0:12 as its length.",
-			"At the end the event log shows \"ended\" and the position reads 0:12 / 0:12.",
+			"At the end the event log shows \"ended\" and the position reads 0:12 / 0:12. Play then starts it again from the first note, and the app does not freeze (#842).",
+			"Every picked file plays, and the app never crashes while picking (#852, #1020).",
 		},
 	},
 	{
-		ID: "MD-04", Area: "media", Title: "Audio transport: seek, pause, stop, volume", Platforms: native, Refs: []string{"#831", "#833"},
+		ID: "MD-04", Area: "media", Title: "Audio transport: seek, pause, stop, volume", Platforms: native, Refs: []string{"#831", "#833", "#855", "#1032"},
 		Where: gallery + " → Audio Player, any bundled clip",
 		Steps: []string{
 			"While it plays, seek to about 0:05.",
@@ -675,10 +918,10 @@ var checks = []check{
 			"Move the volume control down and back up.",
 		},
 		Expect: []string{
-			"After the first seek the sixth note plays (the scale has one note a second).",
+			"After the first seek the sixth note plays (the scale has one note a second), with no snippet of the old position first (#855).",
 			"After the paused seek, play resumes at the ninth note, not where it was paused.",
 			"Stop returns to 0:00, and play starts again from the first note at once, without holding at an earlier position (#833).",
-			"The volume follows the control.",
+			"The volume follows the control at once (#1032).",
 		},
 	},
 	{
@@ -708,7 +951,7 @@ var checks = []check{
 		},
 	},
 	{
-		ID: "MD-07", Area: "media", Title: "Audio keeps playing in the background", Platforms: mobile, Refs: []string{"#672", "#673"}, Special: true,
+		ID: "MD-07", Area: "media", Title: "Audio keeps playing in the background", Platforms: mobile, Refs: []string{"#672", "#673", "#846", "#1052"}, Special: true,
 		Where: gallery + " → Audio Player",
 		Steps: []string{
 			"Turn Loop on and play a clip.",
@@ -717,9 +960,43 @@ var checks = []check{
 		},
 		Expect: []string{
 			"The scale is heard the whole time, with the app in the background and with the screen locked.",
-			"Back in the app, the position has moved on and the controls respond.",
+			"Back in the app, the position has moved on, never past the clip's end, and the controls respond (#846).",
 		},
-		Per: map[string]string{"ios": "Also with the silent switch on (or the Control Centre silent mode): a player keeps sounding, as music apps do."},
+		Per: map[string]string{
+			"ios":     "Also with the silent switch on (or the Control Centre silent mode): a player keeps sounding, as music apps do.",
+			"android": "If you can, take a phone call while it plays; after the call the music sounds as before, not like a call (#1052).",
+		},
+	},
+	{
+		ID: "MD-08", Area: "media", Title: "Seeking an MP3 over http, also where the server ignores ranges", Platforms: native, Refs: []string{"#1098", "#872"}, Special: true,
+		Where: gallery + " → Audio Player, URL field",
+		Setup: "Serve the gallery's clips as in MD-06 (python3 -m http.server answers every request with the whole file, as a server that ignores Range does). For the https leg, any https URL of a CBR MP3 will do, for example https://raw.githubusercontent.com/belluikit/gallery/main/pages/media/audio/scale.mp3.",
+		Steps: []string{
+			"Enter http://<computer>:8000/scale.mp3 and press Play URL.",
+			"While it plays, seek to about 0:08, then to about 0:02, then to about 0:11.",
+			"Pause, seek to about 0:05, play.",
+			"Repeat with the https URL.",
+			"Optional, if a long CBR MP3 is at hand (several minutes, on a server that honours ranges): play it over http and seek near its end.",
+		},
+		Expect: []string{
+			"Each seek lands on the note it was asked for (the ninth, third and twelfth note; after the paused seek, the sixth), and the shown position matches it.",
+			"No seek fails; in rc.2 some seeks on such a server failed with \"seek failed: -38\".",
+			"The app keeps responding during every seek (#872).",
+			"The long file's seek near the end starts playing within a moment, without first downloading the whole file (#1098).",
+		},
+	},
+	{
+		ID: "MD-09", Area: "media", Title: "Seeking, pausing and changing songs do not click", Platforms: native, Refs: []string{"#1228", "#1273"}, Special: true,
+		Where: gallery + " → Audio Player, any bundled clip, with headphones",
+		Steps: []string{
+			"Seek back and forth a dozen times while it plays, including right at the start of the clip.",
+			"Pause and play several times in mid-note.",
+			"While it plays, pick a different clip in Bundled clip; do it several times.",
+		},
+		Expect: []string{
+			"Each seek, pause, resume and change of clip is clean: the sound fades out and in over a few milliseconds, with no click or pop.",
+			"Android: the next clip does not start with a fragment of the end of the last one (#1228).",
+		},
 	},
 
 	// ---- cli ----
@@ -750,6 +1027,64 @@ var checks = []check{
 		Where:  "The terminal running bellui serve",
 		Steps:  []string{"Read the line bellui serve prints when it starts, for the gallery and for the companion app."},
 		Expect: []string{"It names the app it serves and the URL; the companion (whose manifest has an id) and the gallery both serve."},
+	},
+	{
+		ID: "CLI-05", Area: "cli", Title: "Packages carry the FFmpeg libraries", Platforms: native, Refs: []string{"#1101", "#1122"}, Special: true,
+		Where: "The gallery packaged by bellui package for the platform",
+		Per: map[string]string{
+			"desktop": "macOS: bellui package -os darwin, then otool -L <App>.app/Contents/MacOS/<binary> | grep av. Linux: bellui package -os linux, then look in the package's lib/<app id>/. Windows: the FFmpeg DLLs lie beside the .exe.",
+			"android": "unzip -l <gallery>.apk | grep goffmpeg",
+			"ios":     "ls <App>.app/Frameworks",
+		},
+		Steps: []string{
+			"Package the gallery and list the libraries as described for this platform.",
+			"Copy the package to another folder (desktop) or install it (phone), start it, and open Media Player or Audio Player.",
+		},
+		Expect: []string{
+			"The FFmpeg libraries (libavformat, libavcodec and the rest) are inside the package. On macOS otool lists them under @executable_path or @rpath into Contents/Frameworks, never a path into the Go module cache.",
+			"Android: each lib/<abi>/ holds the libraries next to the app's own library.",
+			"The app starts and plays; in rc.1, an Android app stopped at launch with \"dlopen failed: library libavformat-goffmpeg.so not found\".",
+		},
+	},
+	{
+		ID: "CLI-06", Area: "cli", Title: "Android store build", Platforms: []string{"android"}, Refs: []string{"#793", "#889", "#935", "#1115"}, Special: true,
+		Where: "The companion app, packaged by setup, and bellui release -os android",
+		Steps: []string{
+			"unzip -l Release_Check.apk | grep '\\.so' and zipalign -c -P 16 -v 4 Release_Check.apk.",
+			"Install it, open it and look at the size under Settings → Apps → Release Check → Storage.",
+			"Run bellui release -os android for the companion with a test keystore, then bundletool dump config --bundle=<app>.aab.",
+			"On Android 16 if available: open the Locale tab's confirm dialog and press Back; press Back again.",
+			"Plug in a hardware keyboard (or run hack/keyprobe/keyboard.sh) while the companion shows a non-default locale chosen on the Locale tab.",
+		},
+		Expect: []string{
+			"zipalign reports \"Verification successful\". The app's size is about the size of its library once, not twice (#889).",
+			"The bundle config shows PAGE_ALIGNMENT_16K (#1115).",
+			"The first Back closes the dialog, the second leaves the app (#935).",
+			"Plugging in the keyboard does not restart the app: the chosen locale is still shown (#793).",
+		},
+	},
+	{
+		ID: "CLI-07", Area: "cli", Title: "iOS packages for the App Store", Platforms: []string{"ios"}, Refs: []string{"#932", "#1117", "#1249"},
+		Where: "The gallery packaged by setup",
+		Steps: []string{
+			"ls <App>.app/PrivacyInfo.xcprivacy and plutil -p <App>.app/Info.plist | grep -A3 UIApplicationSceneManifest.",
+			"Install and start it on a device with the newest iOS available (iOS 27 if possible).",
+			"If the keychain holds two \"Apple Distribution\" certificates: bellui release -os ios -profile <profile> for the companion.",
+		},
+		Expect: []string{
+			"The privacy manifest is there, and the Info.plist declares a scene manifest (#932, #1117).",
+			"The app starts and draws; it is not black (#1117).",
+			"The release signs and names the identity it used, instead of codesign's \"ambiguous\" error (#1249).",
+		},
+	},
+	{
+		ID: "CLI-08", Area: "cli", Title: "Linux web views bundle Chromium 156", Platforms: desktop, Refs: []string{"#1112"},
+		Where: "Linux only: hack/webviewprobe",
+		Steps: []string{"In hack/webviewprobe run: bellui package -os linux. Then start the packaged probe."},
+		Expect: []string{
+			"The command prints \"bundled CEF 156.0.30…\" (Chromium 156), with no checksum error.",
+			"The probe's web view draws its page.",
+		},
 	},
 
 	// ---- edge ----
@@ -789,5 +1124,27 @@ var checks = []check{
 		Where:  companion + " → Locale and Direction",
 		Steps:  []string{"Press the locale buttons and the direction toggles as fast as you can for ten seconds."},
 		Expect: []string{"The app keeps up and ends in the state of the last press; no crash, no stuck layout."},
+	},
+	{
+		ID: "ED-06", Area: "edge", Title: "A covered window catches up", Platforms: desktop, Refs: []string{"#864", "#1019"},
+		Where: companion + " → Disabled",
+		Steps: []string{
+			"Press \"Disable everything in 3 seconds\" and at once cover the window completely with another window (or minimise it).",
+			"After five seconds, uncover it.",
+		},
+		Expect: []string{
+			"As soon as it shows, the window shows everything disabled; it does not wait for a mouse move.",
+			"No \"draw was refused\" error appears in the terminal (#1019).",
+		},
+	},
+	{
+		ID: "ED-07", Area: "edge", Title: "iOS Display Zoom", Platforms: []string{"ios"}, Refs: []string{"#1016", "#1238"},
+		Where: gallery,
+		Setup: "Settings → Display & Brightness → Display Zoom → Larger Text, then restart the gallery.",
+		Steps: []string{"Open the gallery; open its navigation drawer; rotate the phone."},
+		Expect: []string{
+			"The app fills the whole screen, with no black bands (#1016).",
+			"The drawer reaches the screen's edge and leaves a strip to tap beside it (#1238).",
+		},
 	},
 }
