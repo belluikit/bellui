@@ -350,6 +350,7 @@ func (r *searchSelectRenderer) Refresh() {
 
 func (r *searchSelectRenderer) updateLabel() {
 	seg := r.label.Segments[0].(*TextSegment)
+	oldText, oldStyle := seg.Text, seg.Style
 	if r.combo.Disabled() {
 		seg.Style.ColorName = theme.ColorNameDisabled
 	} else {
@@ -363,6 +364,7 @@ func (r *searchSelectRenderer) updateLabel() {
 	} else {
 		seg.Text = r.combo.Selected
 	}
+	r.label.segmentEdited(seg, oldText, oldStyle)
 	r.label.Refresh()
 }
 
