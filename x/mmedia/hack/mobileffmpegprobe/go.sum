@@ -10,8 +10,8 @@ github.com/belluikit/glfw v1.10.1 h1:51EoPG9bWO8qVLaqCtbV3RbN1t7xP4xtoB8nPl9LOac
 github.com/belluikit/glfw v1.10.1/go.mod h1:mEc2Kpmxh42yey5lCRmU6AkCSMwvKbPW1QAro97VvYY=
 github.com/belluikit/glfw-js v1.0.4 h1:E+339oJ3SjI0noviExqKj5GOfTQ5/fKGOi6VeNkSrN4=
 github.com/belluikit/glfw-js v1.0.4/go.mod h1:JYXSw+veF7drhhMre99XhEIGdUHLiyF9JWXEwzd8cZ4=
-github.com/belluikit/goffmpeg v0.13.0 h1:fIMdbXPZMwi98FgNYs+Sx2tYR2pY0Oa3w+xqSSZ2yiw=
-github.com/belluikit/goffmpeg v0.13.0/go.mod h1:GZW4uZudUmhNkpv6V90Bza/G+UUb0KkIZ5RVJcNngJc=
+github.com/belluikit/goffmpeg v0.13.1 h1:b02eGf/no0+qB2wItAN1lnW34q/wKdUZ3loc5giLtpo=
+github.com/belluikit/goffmpeg v0.13.1/go.mod h1:GZW4uZudUmhNkpv6V90Bza/G+UUb0KkIZ5RVJcNngJc=
 github.com/belluikit/goffmpeg-libs/android_amd64 v0.10.0 h1:8gcB+7q30uM33ddpkamddFm4q3mbTLZUTHfZWXQxJCk=
 github.com/belluikit/goffmpeg-libs/android_amd64 v0.10.0/go.mod h1:7ixvLucbYVV9YE+1zYmoB7UWsehbEGuwtgWjTqiIwqA=
 github.com/belluikit/goffmpeg-libs/android_arm v0.10.0 h1:NDQUPdLtSRbruw89cJqH+11Bw1ZFDvMZkuyl/j/Nqco=
@@ -34,8 +34,6 @@ github.com/belluikit/goffmpeg-libs/windows_amd64 v0.10.0 h1:KQUVcJ9HY9v6JreGb5a6
 github.com/belluikit/goffmpeg-libs/windows_amd64 v0.10.0/go.mod h1:x+DbU4kyhbEvk4fr7080dbV7lzSiXMh9x5rmDEuuz1w=
 github.com/belluikit/goffmpeg-libs/windows_arm64 v0.10.0 h1:VyYh+VAeDePTfryDS5z0QhlQIZhTXZIAxsxlbw7kRgM=
 github.com/belluikit/goffmpeg-libs/windows_arm64 v0.10.0/go.mod h1:R8fUvbRy4Z80X1S4gntJqzuKdldkrMSB78cEOXVRaTI=
-github.com/belluikit/oto/v3 v3.0.0-20261114221446-b2db31a36c2f h1:QaER48wcSVnZMe9hD1Wvj/EtKYaCskJ8atm8PZttPJ8=
-github.com/belluikit/oto/v3 v3.0.0-20261114221446-b2db31a36c2f/go.mod h1:8pEBo7BVDVd/Gz2Vn8HO1DsTiE7b3M2bXU693DdORN0=
 github.com/belluikit/oto/v3 v3.0.0-20261116195744-f6c5812686aa h1:NIxfSveQT+SwN+iA1WM7s/XJR8FsD5BQTAAVtyXkzow=
 github.com/belluikit/oto/v3 v3.0.0-20261116195744-f6c5812686aa/go.mod h1:8pEBo7BVDVd/Gz2Vn8HO1DsTiE7b3M2bXU693DdORN0=
 github.com/belluikit/systray v1.12.2 h1:bWDRI+uX3DntAvul2DxdMC1wPD/sa31vtBnxEvYo0sw=

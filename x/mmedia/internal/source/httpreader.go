@@ -463,13 +463,14 @@ func (d *readerDecoder) readErr(err error) error {
 	return err
 }
 
-// openHTTPSInGo opens url through httpReader; see httpsInGo.
-func openHTTPSInGo(url string) (goffmpeg.IDecoder, error) {
+// openHTTPSInGo opens url through httpReader, with options for the demuxer;
+// see httpsInGo.
+func openHTTPSInGo(url, options string) (goffmpeg.IDecoder, error) {
 	r, err := newHTTPReader(url)
 	if err != nil {
 		return nil, err
 	}
-	dec, err := goffmpeg.OpenReader(r)
+	dec, err := goffmpeg.OpenReaderWithOptions(r, options)
 	if err != nil {
 		r.Close()
 		if rerr := r.Err(); rerr != nil {
