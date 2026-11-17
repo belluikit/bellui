@@ -544,7 +544,7 @@ func (t *RichText) lazySpliceText(low, high int, ins []rune) []rune {
 	// content fingerprint so a following SyncState does not force a rebuild.
 	t.rowBoundsVersion++
 	t.rowBoundsComputed = t.rowBoundsVersion
-	t.lastContentFP = t.contentFingerprint()
+	t.stampContent()
 
 	return removed
 }
@@ -566,7 +566,7 @@ func (t *RichText) lazyMaterialize() {
 	newText := t.buf.String()
 	t.Segments[0].(*TextSegment).Text = newText
 	t.lazyStr = newText
-	t.lastContentFP = t.contentFingerprint()
+	t.stampContent()
 }
 
 // repairLazyLineCaches splices/invalidates the per-line measurement slices after
