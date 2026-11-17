@@ -172,8 +172,7 @@ func drawerTab(w bellui.Window) core.CanvasObject {
 		{Label: "Settings", Icon: theme.SettingsIcon()},
 	}, nil)
 	drawer.Header = widget.NewLabelWithStyle("Release check", bellui.TextAlignLeading, bellui.TextStyle{Bold: true})
-	var bar *widget.TopAppBar
-	bar = widget.NewTopAppBar("Drawer", theme.MenuIcon(), func() {
+	bar := widget.NewTopAppBar("Drawer", theme.MenuIcon(), func() {
 		if drawer.IsOpen() {
 			drawer.Hide()
 		} else {
