@@ -82,12 +82,11 @@ func (a *AnnotationWidget) ClaimsDrag(geo.Delta) bool {
 	return a.dagCanvas != nil && a.dagCanvas.caps().MoveResize && a.annotation() != nil
 }
 
-// ClaimsDrag takes a touch drag while the palette's canvas accepts new nodes,
-// the condition its DragEnd drops one under. The palette scrolls vertically
-// and its entries take a drag in any direction, so a swipe that starts on an
-// entry drags it rather than scrolling the palette; which way a touch drag
-// out of a palette should go is an open question on bellui#1266.
+// ClaimsDrag claims no plain touch drag, so a swipe that starts on an entry
+// scrolls the palette (bellui#1296). On touch an entry is dragged out by a
+// long-press then a drag: the touch handler does not ask the claim after a
+// long-press (see LongPressed), nor for a mouse drag, which drags the entry
+// out at once as before.
 func (item *paletteItem) ClaimsDrag(geo.Delta) bool {
-	dc := item.palette.DAGCanvas
-	return dc != nil && dc.Capabilities.AddNodes
+	return false
 }

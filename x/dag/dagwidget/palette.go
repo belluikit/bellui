@@ -72,6 +72,8 @@ func (p *Palette) CreateRenderer() core.WidgetRenderer {
 
 // paletteItem is a single component entry in the palette.
 // It supports both click (adds at center) and drag-and-drop (adds at drop position).
+// On touch the drag needs a long-press first (bellui#1296), so that a plain
+// swipe on an entry scrolls the palette.
 type paletteItem struct {
 	widget.BaseWidget
 
@@ -79,6 +81,9 @@ type paletteItem struct {
 	palette    *Palette
 	lastAbsPos geo.Position // updated during drag
 	dragging   bool
+	// held is set by a hold-fired long-press and cleared when the press ends
+	// in a drag or a mouse release, or a new mouse press starts.
+	held bool
 }
 
 func newPaletteItem(comp *dag.Component, p *Palette) *paletteItem {
@@ -93,9 +98,42 @@ func newPaletteItem(comp *dag.Component, p *Palette) *paletteItem {
 var (
 	_ event.Tappable         = (*paletteItem)(nil)
 	_ event.Draggable        = (*paletteItem)(nil)
+	_ event.LongPressable    = (*paletteItem)(nil)
+	_ desktop.Mouseable      = (*paletteItem)(nil)
 	_ desktop.Cursorable     = (*paletteItem)(nil)
 	_ core.DragImageProvider = (*paletteItem)(nil)
 )
+
+// LongPressed picks the entry up for a touch drag (bellui#1296). After a
+// hold-fired long-press the touch handler gives the drag that follows to the
+// Draggable under the finger without asking ClaimsDrag, so the entry is
+// dragged out, while a plain swipe scrolls the palette.
+//
+// It adds no node: a drag may follow, and that drag drops one. A mouse held
+// still fires it too on the desktop, where the driver then withholds the
+// release's Tapped, so MouseUp answers a slow click with the tap instead. On
+// touch a long-press lifted without a drag adds nothing, as a slow touch on an
+// entry did before.
+func (item *paletteItem) LongPressed(*event.PointEvent) {
+	item.held = true
+}
+
+// MouseDown starts a mouse press afresh.
+func (item *paletteItem) MouseDown(*desktop.MouseEvent) {
+	item.held = false
+}
+
+// MouseUp gives a slow click the tap the driver withheld for its hold-fired
+// long-press: a primary press held still and released without a drag adds the
+// component, as a quick click does. The release of a drag reaches MouseUp
+// before DragEnd, while dragging is still set, and adds nothing here.
+func (item *paletteItem) MouseUp(ev *desktop.MouseEvent) {
+	held := item.held
+	item.held = false
+	if held && !item.dragging && ev.Button == desktop.MouseButtonPrimary {
+		item.Tapped(&ev.PointEvent)
+	}
+}
 
 // Cursor shows an open hand over palette entries to hint they can be dragged
 // onto the canvas.
@@ -141,6 +179,7 @@ func (item *paletteItem) Dragged(ev *event.DragEvent) {
 
 // DragEnd creates a node at the drop position if released over the DAG canvas.
 func (item *paletteItem) DragEnd() {
+	item.held = false
 	if !item.dragging {
 		return
 	}
