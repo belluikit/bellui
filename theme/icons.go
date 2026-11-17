@@ -408,6 +408,72 @@ const (
 	// Since: 1.3
 	IconNameClosedCaptionOff bellui.ThemeIconName = "closedCaptionOff"
 
+	// IconNameShoppingCart is the name of theme lookup for Material's shopping_cart icon:
+	// a shopping cart, for buying or a basket of items to buy (#1303).
+	//
+	// Since: 1.3
+	IconNameShoppingCart bellui.ThemeIconName = "shoppingCart"
+
+	// IconNameAddShoppingCart is the name of theme lookup for Material's add_shopping_cart icon:
+	// a shopping cart with a plus, for adding an item to the cart (#1303).
+	//
+	// Since: 1.3
+	IconNameAddShoppingCart bellui.ThemeIconName = "addShoppingCart"
+
+	// IconNameStorefront is the name of theme lookup for Material's storefront icon:
+	// a shop front, for a store or the place to buy (#1303).
+	//
+	// Since: 1.3
+	IconNameStorefront bellui.ThemeIconName = "storefront"
+
+	// IconNameShoppingBag is the name of theme lookup for Material's shopping_bag icon:
+	// a shopping bag, for purchases or a store (#1303).
+	//
+	// Since: 1.3
+	IconNameShoppingBag bellui.ThemeIconName = "shoppingBag"
+
+	// IconNameWorkspacePremium is the name of theme lookup for Material's workspace_premium icon:
+	// a medal, for a premium or paid feature (#1303).
+	//
+	// Since: 1.3
+	IconNameWorkspacePremium bellui.ThemeIconName = "workspacePremium"
+
+	// IconNameDiamond is the name of theme lookup for Material's diamond icon:
+	// a diamond, for a premium tier (#1303).
+	//
+	// Since: 1.3
+	IconNameDiamond bellui.ThemeIconName = "diamond"
+
+	// IconNameAutorenew is the name of theme lookup for Material's autorenew icon:
+	// two arrows in a circle, for something that renews, such as a subscription (#1303).
+	//
+	// Since: 1.3
+	IconNameAutorenew bellui.ThemeIconName = "autorenew"
+
+	// IconNameCardMembership is the name of theme lookup for Material's card_membership icon:
+	// a membership card, for a subscription or plan (#1303).
+	//
+	// Since: 1.3
+	IconNameCardMembership bellui.ThemeIconName = "cardMembership"
+
+	// IconNameCreditCard is the name of theme lookup for Material's credit_card icon:
+	// a credit card, for a payment method (#1303).
+	//
+	// Since: 1.3
+	IconNameCreditCard bellui.ThemeIconName = "creditCard"
+
+	// IconNameReceiptLong is the name of theme lookup for Material's receipt_long icon:
+	// a long receipt, for a purchase history or an invoice (#1303).
+	//
+	// Since: 1.3
+	IconNameReceiptLong bellui.ThemeIconName = "receiptLong"
+
+	// IconNameLock is the name of theme lookup for Material's lock icon:
+	// a closed padlock, for something locked, such as a paid feature (#1303).
+	//
+	// Since: 1.3
+	IconNameLock bellui.ThemeIconName = "lock"
+
 	// IconNamePlace is the name of theme lookup for the icon of a place (map pin), for a destination about location.
 	//
 	// Since: 1.3
@@ -654,6 +720,17 @@ var icons = map[bellui.ThemeIconName]bellui.Resource{
 	IconNameNotifications:    NewThemedResource(notificationsIconRes),
 	IconNameClosedCaption:    NewThemedResource(closedcaptionIconRes),
 	IconNameClosedCaptionOff: NewThemedResource(closedcaptionoffIconRes),
+	IconNameShoppingCart:     NewThemedResource(shoppingcartIconRes),
+	IconNameAddShoppingCart:  NewThemedResource(addshoppingcartIconRes),
+	IconNameStorefront:       NewThemedResource(storefrontIconRes),
+	IconNameShoppingBag:      NewThemedResource(shoppingbagIconRes),
+	IconNameWorkspacePremium: NewThemedResource(workspacepremiumIconRes),
+	IconNameDiamond:          NewThemedResource(diamondIconRes),
+	IconNameAutorenew:        NewThemedResource(autorenewIconRes),
+	IconNameCardMembership:   NewThemedResource(cardmembershipIconRes),
+	IconNameCreditCard:       NewThemedResource(creditcardIconRes),
+	IconNameReceiptLong:      NewThemedResource(receiptlongIconRes),
+	IconNameLock:             NewThemedResource(lockIconRes),
 	IconNamePlace:            NewThemedResource(placeIconRes),
 	IconNamePeople:           NewThemedResource(peopleIconRes),
 	IconNameChild:            NewThemedResource(childIconRes),
@@ -1247,6 +1324,94 @@ func ClosedCaptionIcon() bellui.Resource {
 // Since: 1.3
 func ClosedCaptionOffIcon() bellui.Resource {
 	return safeIconLookup(IconNameClosedCaptionOff)
+}
+
+// ShoppingCartIcon returns a resource containing Material's shopping_cart icon for the
+// current theme: a shopping cart, for buying or a basket of items to buy
+//
+// Since: 1.3
+func ShoppingCartIcon() bellui.Resource {
+	return safeIconLookup(IconNameShoppingCart)
+}
+
+// AddShoppingCartIcon returns a resource containing Material's add_shopping_cart icon for the
+// current theme: a shopping cart with a plus, for adding an item to the cart
+//
+// Since: 1.3
+func AddShoppingCartIcon() bellui.Resource {
+	return safeIconLookup(IconNameAddShoppingCart)
+}
+
+// StorefrontIcon returns a resource containing Material's storefront icon for the
+// current theme: a shop front, for a store or the place to buy
+//
+// Since: 1.3
+func StorefrontIcon() bellui.Resource {
+	return safeIconLookup(IconNameStorefront)
+}
+
+// ShoppingBagIcon returns a resource containing Material's shopping_bag icon for the
+// current theme: a shopping bag, for purchases or a store
+//
+// Since: 1.3
+func ShoppingBagIcon() bellui.Resource {
+	return safeIconLookup(IconNameShoppingBag)
+}
+
+// WorkspacePremiumIcon returns a resource containing Material's workspace_premium icon for the
+// current theme: a medal, for a premium or paid feature
+//
+// Since: 1.3
+func WorkspacePremiumIcon() bellui.Resource {
+	return safeIconLookup(IconNameWorkspacePremium)
+}
+
+// DiamondIcon returns a resource containing Material's diamond icon for the
+// current theme: a diamond, for a premium tier
+//
+// Since: 1.3
+func DiamondIcon() bellui.Resource {
+	return safeIconLookup(IconNameDiamond)
+}
+
+// AutorenewIcon returns a resource containing Material's autorenew icon for the
+// current theme: two arrows in a circle, for something that renews, such as a subscription
+//
+// Since: 1.3
+func AutorenewIcon() bellui.Resource {
+	return safeIconLookup(IconNameAutorenew)
+}
+
+// CardMembershipIcon returns a resource containing Material's card_membership icon for the
+// current theme: a membership card, for a subscription or plan
+//
+// Since: 1.3
+func CardMembershipIcon() bellui.Resource {
+	return safeIconLookup(IconNameCardMembership)
+}
+
+// CreditCardIcon returns a resource containing Material's credit_card icon for the
+// current theme: a credit card, for a payment method
+//
+// Since: 1.3
+func CreditCardIcon() bellui.Resource {
+	return safeIconLookup(IconNameCreditCard)
+}
+
+// ReceiptLongIcon returns a resource containing Material's receipt_long icon for the
+// current theme: a long receipt, for a purchase history or an invoice
+//
+// Since: 1.3
+func ReceiptLongIcon() bellui.Resource {
+	return safeIconLookup(IconNameReceiptLong)
+}
+
+// LockIcon returns a resource containing Material's lock icon for the
+// current theme: a closed padlock, for something locked, such as a paid feature
+//
+// Since: 1.3
+func LockIcon() bellui.Resource {
+	return safeIconLookup(IconNameLock)
 }
 
 // PlaceIcon returns a resource containing the standard icon of a place (map pin), for a destination about location, for the current theme

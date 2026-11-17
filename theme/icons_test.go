@@ -535,6 +535,43 @@ func TestClosedCaptionIcons(t *testing.T) {
 	}
 }
 
+// The icons for an in-app purchase flow (subscriptions and paid features)
+// are their own files, themed like the rest (#1303).
+func TestPurchaseIcons(t *testing.T) {
+	seen := map[string]bool{}
+	for _, c := range []struct {
+		icon bellui.Resource
+		file string
+	}{
+		{theme.ShoppingCartIcon(), "shopping-cart.svg"},
+		{theme.AddShoppingCartIcon(), "add-shopping-cart.svg"},
+		{theme.StorefrontIcon(), "storefront.svg"},
+		{theme.ShoppingBagIcon(), "shopping-bag.svg"},
+		{theme.WorkspacePremiumIcon(), "workspace-premium.svg"},
+		{theme.DiamondIcon(), "diamond.svg"},
+		{theme.AutorenewIcon(), "autorenew.svg"},
+		{theme.CardMembershipIcon(), "card-membership.svg"},
+		{theme.CreditCardIcon(), "credit-card.svg"},
+		{theme.ReceiptLongIcon(), "receipt-long.svg"},
+		{theme.LockIcon(), "lock.svg"},
+	} {
+		if c.icon == nil || !strings.HasSuffix(c.icon.Name(), c.file) {
+			t.Fatalf("icon %v, want one named for %s", c.icon, c.file)
+		}
+		// The diamond is drawn with polygons, the rest with paths.
+		if content := string(c.icon.Content()); !strings.Contains(content, "<path") && !strings.Contains(content, "<polygon") {
+			t.Errorf("%s has no shape", c.file)
+		}
+		if _, ok := c.icon.(*theme.ThemedResource); !ok {
+			t.Errorf("%s is %T, want a *theme.ThemedResource so it takes the theme's colour", c.file, c.icon)
+		}
+		if seen[c.icon.Name()] {
+			t.Errorf("%s is listed twice", c.file)
+		}
+		seen[c.icon.Name()] = true
+	}
+}
+
 // The icons for navigation destinations about a place, people and a child
 // are their own files, themed like the rest (#1155).
 func TestNavigationDestinationIcons(t *testing.T) {
