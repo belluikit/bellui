@@ -961,6 +961,14 @@ func (ti *treeViewItem) Dragged(e *event.DragEvent) {
 	ti.tree.handleDrag(ti.uid, e)
 }
 
+// ClaimsDrag takes a touch drag, in any direction, only when the tree lets a
+// row be moved (AllowReorder or AllowReparent) and is enabled
+// (event.DragClaimer, #1266). Otherwise the row leaves the drag to the tree's
+// scroll, which before took no touch drag that started on a row.
+func (ti *treeViewItem) ClaimsDrag(geo.Delta) bool {
+	return !ti.tree.Disabled() && (ti.tree.AllowReorder || ti.tree.AllowReparent)
+}
+
 func (ti *treeViewItem) DragEnd() {
 	if ti.tree.Disabled() || (!ti.tree.AllowReorder && !ti.tree.AllowReparent) {
 		return

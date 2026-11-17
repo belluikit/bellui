@@ -4,6 +4,7 @@ import (
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/driver/desktop"
 	"github.com/belluikit/bellui/event"
+	"github.com/belluikit/bellui/geo"
 )
 
 // Interactive wraps any CanvasObject and adds event handling via callbacks.
@@ -21,7 +22,8 @@ import (
 //
 // Interactive implements Tappable, DoubleTappable, SecondaryTappable,
 // Draggable, Scrollable, event.Hoverable, and desktop.Cursorable
-// — but only dispatches events when the corresponding callback is set.
+// — but only dispatches events when the corresponding callback is set. As an
+// event.DragClaimer it takes a touch drag only while a drag callback is set.
 type Interactive struct {
 	BaseWidget
 
@@ -99,6 +101,13 @@ func (i *Interactive) DragEnd() {
 	}
 }
 
+// ClaimsDrag takes every touch drag while OnDragged or OnDragEnd is set, and
+// none otherwise, so a swipe that starts on an Interactive with no drag
+// callback scrolls the page around it (event.DragClaimer, #1266).
+func (i *Interactive) ClaimsDrag(geo.Delta) bool {
+	return i.OnDragged != nil || i.OnDragEnd != nil
+}
+
 // --- Scrollable ---
 
 func (i *Interactive) Scrolled(ev *event.ScrollEvent) {
@@ -142,6 +151,7 @@ var (
 	_ event.DoubleTappable    = (*Interactive)(nil)
 	_ event.SecondaryTappable = (*Interactive)(nil)
 	_ event.Draggable         = (*Interactive)(nil)
+	_ event.DragClaimer       = (*Interactive)(nil)
 	_ event.Scrollable        = (*Interactive)(nil)
 	_ event.Hoverable         = (*Interactive)(nil)
 	_ desktop.Cursorable      = (*Interactive)(nil)

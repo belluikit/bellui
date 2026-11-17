@@ -1947,6 +1947,54 @@ func (g *DataGrid) Dragged(e *event.DragEvent) {
 	}
 }
 
+// ClaimsDrag takes a touch drag the grid will use and leaves the rest to the
+// scroll around it (event.DragClaimer, #1266). A touch drag only scrolls the
+// body (resize and reorder start from a mouse press), so the grid claims a
+// drag whose main axis the body can still move along, and leaves one at the
+// body's end, or along an axis it does not scroll, to the page. A gesture a
+// mouse press began keeps every drag. A disabled grid claims every drag and
+// ignores it, so nothing scrolls over it, as over a disabled List (#1251).
+func (g *DataGrid) ClaimsDrag(d geo.Delta) bool {
+	if g.disabled || g.resizeCol >= 0 || g.reorderFromCol >= 0 || g.dragRow >= 0 {
+		return true
+	}
+	return scrollCanMove(g.scrollContent.Scroll, d)
+}
+
+// scrollCanMove reports whether a touch drag starting with d would move s's
+// content along the axis d mostly follows, as bellui's Scroll.ClaimsDrag
+// decides it. The grid cannot ask its Scroll: that method is built only for
+// touch platforms and CI, not on the desktop, where a touchscreen still asks
+// the grid.
+func scrollCanMove(s *container.Scroll, d geo.Delta) bool {
+	if s == nil || s.Content == nil || s.Direction == container.ScrollNone {
+		return false
+	}
+	size, content := s.Size(), s.Content.MinSize()
+	if abs32(d.DX) > abs32(d.DY) {
+		return s.Direction != container.ScrollVerticalOnly && offsetMoves(s.Offset.X, d.DX, size.Width, content.Width)
+	}
+	return s.Direction != container.ScrollHorizontalOnly && offsetMoves(s.Offset.Y, d.DY, size.Height, content.Height)
+}
+
+// offsetMoves reports whether a finger moving by delta moves a scroll offset
+// of a viewport over content of the given lengths.
+func offsetMoves(offset, delta, viewport, content float32) bool {
+	limit := content - viewport
+	if limit <= 0 {
+		return false
+	}
+	next := min(max(offset-delta, 0), limit)
+	return next != offset
+}
+
+func abs32(f float32) float32 {
+	if f < 0 {
+		return -f
+	}
+	return f
+}
+
 func (g *DataGrid) DragEnd() {
 	// Finalize column reorder
 	if g.reorderFromCol >= 0 {

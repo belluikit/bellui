@@ -471,6 +471,14 @@ func (t *TimePicker) Dragged(e *event.DragEvent) {
 	t.handleClockInteraction(e.Position, tr, false)
 }
 
+// ClaimsDrag takes every touch drag while the picker is enabled: the dial
+// follows the finger around it, in both directions. A disabled picker leaves
+// every drag to the scroll around it, as a disabled Slider does
+// (event.DragClaimer, #1266).
+func (t *TimePicker) ClaimsDrag(geo.Delta) bool {
+	return !t.Disabled()
+}
+
 // DragEnd is called when the drag finishes.
 func (t *TimePicker) DragEnd() {}
 

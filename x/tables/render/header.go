@@ -16,6 +16,7 @@ var (
 	_ event.Hoverable    = (*HeaderWidget)(nil)
 	_ desktop.Cursorable = (*HeaderWidget)(nil)
 	_ event.Draggable    = (*HeaderWidget)(nil)
+	_ event.DragClaimer  = (*HeaderWidget)(nil)
 )
 
 // HeaderAccess is the interface the HeaderWidget needs from the DataGrid.
@@ -159,6 +160,15 @@ func (h *HeaderWidget) Dragged(e *event.DragEvent) {
 	if h.resizing && !gridDisabled(h.Grid) {
 		h.Grid.OnResizeDrag(e.Position.X)
 	}
+}
+
+// ClaimsDrag takes a touch drag only while a column resize is under way
+// (event.DragClaimer, #1266). A resize starts from a mouse press on a column
+// border, and a touch sends no mouse press, so on touch the header claims
+// nothing: the grid around it scrolls its body, or leaves the drag to the
+// page.
+func (h *HeaderWidget) ClaimsDrag(geo.Delta) bool {
+	return h.resizing && !gridDisabled(h.Grid)
 }
 
 func (h *HeaderWidget) DragEnd() {

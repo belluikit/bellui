@@ -37,10 +37,11 @@ const (
 )
 
 var (
-	_ core.Widget     = (*DataZoomSlider)(nil)
-	_ event.Tappable  = (*DataZoomSlider)(nil)
-	_ event.Draggable = (*DataZoomSlider)(nil)
-	_ event.Hoverable = (*DataZoomSlider)(nil)
+	_ core.Widget       = (*DataZoomSlider)(nil)
+	_ event.Tappable    = (*DataZoomSlider)(nil)
+	_ event.Draggable   = (*DataZoomSlider)(nil)
+	_ event.DragClaimer = (*DataZoomSlider)(nil)
+	_ event.Hoverable   = (*DataZoomSlider)(nil)
 )
 
 // NewDataZoomSlider creates a DataZoomSlider with a callback fired when the window changes.
@@ -80,6 +81,20 @@ const handleWidth = float32(6)
 
 // Tapped is a no-op; the slider only responds to drag events.
 func (s *DataZoomSlider) Tapped(_ *event.PointEvent) {}
+
+// ClaimsDrag takes a touch drag along the slider and leaves one across it to
+// the scroll around it, as widget.Slider does (event.DragClaimer, #1266): the
+// handles and the window move with DX only.
+func (s *DataZoomSlider) ClaimsDrag(d geo.Delta) bool {
+	return abs32(d.DX) > abs32(d.DY)
+}
+
+func abs32(f float32) float32 {
+	if f < 0 {
+		return -f
+	}
+	return f
+}
 
 // Dragged handles drag events on the left handle, right handle, or body of the selection.
 func (s *DataZoomSlider) Dragged(e *event.DragEvent) {
