@@ -95,3 +95,37 @@ func TestTreeView_ScrollFromCodeUpdatesOffset(t *testing.T) {
 	tv.ScrollToOffset(1e6)
 	assert.Less(t, tv.GetScrollOffset(), float32(1e6), "ScrollToOffset is not clamped")
 }
+
+// A long-press on a row answers as the tap it would have been (#1296). The
+// row is LongPressable so that a touch can pick it up for a drag, and the
+// drivers send no tap for the release of a hold-fired press, mouse included on
+// the desktop: without this a slow click selected nothing, and one on the
+// chevron did not open the branch.
+func TestTreeView_LongPressFallsBackToTheTap(t *testing.T) {
+	test.NewTempApp(t)
+	tv := NewTreeViewWithNodes([]TreeViewNode{{ID: "a", Text: "a"}, {ID: "b", Text: "b"}})
+	require.NoError(t, tv.AddNode("b", TreeViewNode{ID: "c", Text: "c"}))
+	tv.AllowReorder = true
+	w := test.NewTempWindow(t, tv)
+	w.SetPadded(false)
+	w.Resize(geo.NewSize(300, 300))
+
+	var row *treeViewItem
+	driver.WalkVisibleObjectTree(tv, func(o core.CanvasObject, _, _ geo.Position, _ geo.Size) bool {
+		if ti, ok := o.(*treeViewItem); ok && ti.uid == "b" {
+			row = ti
+			return true
+		}
+		return false
+	}, nil)
+	require.NotNil(t, row)
+	chevron := test.TempWidgetRenderer(t, row).(*treeViewItemRenderer).chevron
+	require.True(t, chevron.Visible(), "a branch row shows its chevron")
+
+	test.LongPressAt(row, geo.NewPos(row.Size().Width-10, row.Size().Height/2))
+	assert.Equal(t, TreeViewNodeID("b"), tv.Selected(), "a long-press away from the row's buttons selects the row")
+	assert.False(t, tv.IsBranchOpen("b"))
+
+	test.LongPressAt(row, chevron.Position().Add(geo.NewPos(chevron.Size().Width/2, chevron.Size().Height/2)))
+	assert.True(t, tv.IsBranchOpen("b"), "a long-press on the chevron opens the branch, as its tap does")
+}

@@ -4,6 +4,7 @@ package glfw
 
 import (
 	"image/color"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/driver/common"
+	"github.com/belluikit/bellui/widget"
 
 	"github.com/belluikit/glfw"
 )
@@ -429,5 +431,47 @@ func TestWindow_TouchScrollPositionUnderTransform(t *testing.T) {
 		if assert.NotEmpty(t, taker.got, "the drawn object took the scroll") {
 			assert.Equal(t, geo.NewPos(50, 50), taker.got[0], "offered at the gesture's origin, in its own coordinates")
 		}
+	})
+}
+
+// A reorderable TreeView on the desktop (#1296): a mouse drag on a row moves
+// the row at once, as before, while a touch swipe that starts on a row scrolls
+// the tree. On touch a row moves only after a long-press, which the mobile
+// driver's tests pin.
+func TestWindow_TreeViewRowMouseDragMovesTouchSwipeScrolls(t *testing.T) {
+	w := createWindow("Test")
+	tree := widget.NewTreeView()
+	for i := range 40 {
+		assert.NoError(t, tree.AddNode("", widget.TreeViewNode{ID: widget.TreeViewNodeID(strconv.Itoa(i)), Text: "row " + strconv.Itoa(i)}))
+	}
+	tree.AllowReorder = true
+	w.SetPadded(false)
+	w.SetContent(tree)
+	w.Resize(geo.NewSize(200, 300))
+	repaintWindow(w)
+
+	runOnMain(func() {
+		w.mouseMoved(w.viewport, 60, 10)
+		w.mouseClicked(w.viewport, glfw.MouseButton1, glfw.Press, 0)
+		for y := 20; y <= 100; y += 10 {
+			w.mouseMoved(w.viewport, 60, float64(y))
+		}
+		w.mouseClicked(w.viewport, glfw.MouseButton1, glfw.Release, 0)
+		assert.NotEqual(t, widget.TreeViewNodeID("0"), tree.ChildIDs("")[0], "the mouse drag moved the first row")
+		assert.Contains(t, tree.ChildIDs("")[1:4], widget.TreeViewNodeID("0"), "to where the pointer let go")
+		assert.Zero(t, tree.GetScrollOffset(), "the mouse drag did not scroll the tree")
+	})
+
+	order := append([]widget.TreeViewNodeID(nil), tree.ChildIDs("")...)
+	runOnMain(func() {
+		w.touchEvent(w.viewport, 1, glfw.TouchBegin, 60, 150)
+		for dy := 10; dy <= 60; dy += 10 {
+			w.touchEvent(w.viewport, 1, glfw.TouchMove, 60, 150-float64(dy))
+		}
+		w.touchEvent(w.viewport, 1, glfw.TouchEnd, 60, 90)
+		assert.Positive(t, tree.GetScrollOffset(), "the touch swipe on a row scrolled the tree")
+		assert.Equal(t, order, tree.ChildIDs(""), "the touch swipe moved no row")
+		w.touchEvent(w.viewport, 2, glfw.TouchBegin, 60, 150) // stop the momentum
+		w.touchEvent(w.viewport, 2, glfw.TouchEnd, 60, 150)
 	})
 }

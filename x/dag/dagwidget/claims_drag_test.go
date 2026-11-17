@@ -21,7 +21,6 @@ func TestDAGCanvas_ClaimsDragFollowsCapabilities(t *testing.T) {
 	require.NotEmpty(t, nw.handles)
 	gw := c.groups["g1"]
 	require.NotNil(t, gw)
-	item := newPaletteItem(nil, &Palette{DAGCanvas: c})
 
 	parts := map[string]event.DragClaimer{
 		"node":            nw,
@@ -31,7 +30,6 @@ func TestDAGCanvas_ClaimsDragFollowsCapabilities(t *testing.T) {
 		"group title":     gw.titleBar,
 		"group connector": gw.connector,
 		"annotation":      c.annotations["an1"],
-		"palette item":    item,
 	}
 	up := geo.Delta{DY: -20}
 
@@ -51,10 +49,19 @@ func TestDAGCanvas_ClaimsDragFollowsCapabilities(t *testing.T) {
 	c.Disable()
 	assert.False(t, c.ClaimsDrag(up), "a disabled canvas should leave the drag to the scroll around it")
 	for name, p := range parts {
-		if name == "palette item" {
-			continue // the palette is a separate widget, left alone by Disable
-		}
 		assert.False(t, p.ClaimsDrag(up), "%s, canvas disabled", name)
+	}
+}
+
+// A palette entry claims no plain touch drag (bellui#1296): a swipe on it
+// scrolls the palette, and a long-press, after which the claim is not asked,
+// picks it up. palette_touch_test.go runs both through the touch handler.
+func TestPaletteItem_ClaimsNoPlainDrag(t *testing.T) {
+	c := fullCanvas(t)
+	c.Capabilities = AllCapabilities()
+	item := newPaletteItem(nil, &Palette{DAGCanvas: c})
+	for _, d := range []geo.Delta{{DY: -20}, {DY: 20}, {DX: 20}, {DX: -20}} {
+		assert.False(t, item.ClaimsDrag(d), "%v", d)
 	}
 }
 
