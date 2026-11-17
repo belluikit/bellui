@@ -28,9 +28,15 @@ func (t *DocTabs) AccessibleLabel() string { return "" }
 // The tabs contain text and/or an icon and allow the user to switch between the content specified in each TabItem.
 // Each item is represented by a button at the edge of the container.
 //
+// Disabling it disables the tab bar (no tab is selected, closed or created
+// by the user, and the bar does not scroll) and, like HTML's
+// <fieldset disabled>, every widget inside the tabs' content that can be
+// disabled. Enabling it enables again only the widgets it disabled. Calls
+// from code (Select, SetItems, Remove) keep working while it is disabled.
+//
 // Since: 1.0
 type DocTabs struct {
-	widget.BaseWidget
+	widget.DisableableWidget
 
 	Items []*TabItem
 
@@ -45,6 +51,7 @@ type DocTabs struct {
 	isTransitioning bool
 
 	popUpMenu *widget.PopUpMenu
+	cascade   disableCascade
 }
 
 // NewDocTabs creates a new tab container that allows the user to choose between various pieces of content.
@@ -76,6 +83,7 @@ func (t *DocTabs) CreateRenderer() core.WidgetRenderer {
 		docTabs:  t,
 		scroller: NewScroll(&bellui.Container{}),
 	}
+	r.scroller.Inert = t.Disabled
 	r.action = r.buildAllTabsButton()
 	r.create = r.buildCreateTabsButton()
 	r.tabs = t
@@ -89,7 +97,32 @@ func (t *DocTabs) CreateRenderer() core.WidgetRenderer {
 	r.updateTabs()
 	r.updateIndicator(false)
 	r.applyTheme(t)
+	r.syncDisabled()
 	return r
+}
+
+// Disable disables the tabs: no tab can be selected, closed or created by
+// the user, the all-tabs menu closes and the bar does not scroll. Every
+// widget inside the tabs' content that can be disabled is disabled too,
+// including one added while the tabs are disabled.
+//
+// Since: 1.3
+func (t *DocTabs) Disable() {
+	t.DisableableWidget.Disable()
+	if t.popUpMenu != nil {
+		t.popUpMenu.Hide()
+		t.popUpMenu = nil
+	}
+	t.syncDisabled()
+}
+
+// Enable enables the tabs and the widgets their Disable switched off. A
+// widget the app disabled itself stays disabled.
+//
+// Since: 1.3
+func (t *DocTabs) Enable() {
+	t.DisableableWidget.Enable()
+	t.syncDisabled()
 }
 
 // DisableIndex disables the TabItem at the specified index.
@@ -141,6 +174,7 @@ func (t *DocTabs) MinSize() geo.Size {
 func (t *DocTabs) Remove(item *TabItem) {
 	removeItem(t, item)
 	t.Refresh()
+	t.syncDisabled()
 }
 
 // RemoveIndex removes tab by index.
@@ -149,6 +183,7 @@ func (t *DocTabs) Remove(item *TabItem) {
 func (t *DocTabs) RemoveIndex(index int) {
 	removeIndex(t, index)
 	t.Refresh()
+	t.syncDisabled()
 }
 
 // Select sets the specified TabItem to be selected and its content visible.
@@ -176,6 +211,7 @@ func (t *DocTabs) SelectedIndex() int {
 func (t *DocTabs) SetItems(items []*TabItem) {
 	setItems(t, items)
 	t.Refresh()
+	t.syncDisabled()
 }
 
 // SetTabLocation sets the location of the tab bar
@@ -191,6 +227,9 @@ func (t *DocTabs) Show() {
 }
 
 func (t *DocTabs) close(item *TabItem) {
+	if t.Disabled() {
+		return
+	}
 	if f := t.CloseIntercept; f != nil {
 		f(item)
 	} else {
@@ -199,6 +238,12 @@ func (t *DocTabs) close(item *TabItem) {
 			f(item)
 		}
 	}
+}
+
+// syncDisabled brings the widgets inside the tabs' content to the tabs'
+// state (disableCascade).
+func (t *DocTabs) syncDisabled() {
+	t.cascade.sync(t.Disabled(), tabsContent(t)...)
 }
 
 func (t *DocTabs) onUnselected() func(*TabItem) {
@@ -286,6 +331,7 @@ func (r *docTabsRenderer) Objects() []core.CanvasObject {
 }
 
 func (r *docTabsRenderer) Refresh() {
+	r.syncDisabled()
 	r.Layout(r.docTabs.Size())
 
 	if c := r.docTabs.current; c != r.lastSelected {
@@ -298,6 +344,15 @@ func (r *docTabsRenderer) Refresh() {
 	r.refresh(r.docTabs)
 
 	canvas.Refresh(r.docTabs)
+}
+
+// syncDisabled brings the bar's own buttons (all tabs, new tab) and the
+// content to the tabs' state.
+func (r *docTabsRenderer) syncDisabled() {
+	off := r.docTabs.Disabled()
+	setDisabled(r.action, off)
+	setDisabled(r.create, off)
+	r.docTabs.syncDisabled()
 }
 
 func (r *docTabsRenderer) buildAllTabsButton() (all *widget.Button) {
@@ -330,6 +385,9 @@ func (r *docTabsRenderer) buildAllTabsButton() (all *widget.Button) {
 
 func (r *docTabsRenderer) buildCreateTabsButton() *widget.Button {
 	create := widget.NewButton("", func() {
+		if r.docTabs.Disabled() {
+			return
+		}
 		if f := r.docTabs.CreateTab; f != nil {
 			if tab := f(); tab != nil {
 				r.docTabs.Append(tab)

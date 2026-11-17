@@ -80,6 +80,7 @@ func NewTabItemWithIcon(text string, icon bellui.Resource, content core.CanvasOb
 
 type baseTabs interface {
 	core.Widget
+	Disabled() bool
 
 	onUnselected() func(*TabItem)
 	onSelected() func(*TabItem)
@@ -346,7 +347,7 @@ func (r *baseTabsRenderer) applyTheme(t baseTabs) {
 	v := bellui.CurrentApp().Settings().ThemeVariant()
 
 	r.divider.FillColor = th.Color(theme.ColorNameShadow, v)
-	r.indicator.FillColor = th.Color(theme.ColorNamePrimary, v)
+	r.indicator.FillColor = th.Color(r.indicatorColor(), v)
 	r.indicator.CornerRadius = th.Size(theme.SizeNameSelectionRadius)
 
 	for _, tab := range r.tabs.items() {
@@ -471,7 +472,7 @@ func (r *baseTabsRenderer) moveIndicator(pos geo.Position, siz geo.Size, th bell
 	}
 
 	v := bellui.CurrentApp().Settings().ThemeVariant()
-	r.indicator.FillColor = th.Color(theme.ColorNamePrimary, v)
+	r.indicator.FillColor = th.Color(r.indicatorColor(), v)
 	if r.indicator.Position().IsZero() {
 		r.indicator.Move(pos)
 		r.indicator.Resize(siz)
@@ -507,6 +508,28 @@ func (r *baseTabsRenderer) moveIndicator(pos geo.Position, siz geo.Size, th bell
 		r.indicator.Move(pos)
 		r.indicator.Resize(siz)
 		r.indicator.Refresh()
+	}
+}
+
+// indicatorColor is the selection indicator's colour: Primary, or the
+// disabled colour, as the selected tab's label, while the tabs are disabled.
+func (r *baseTabsRenderer) indicatorColor() bellui.ThemeColorName {
+	if r.tabs != nil && r.tabs.Disabled() {
+		return theme.ColorNameDisabled
+	}
+	return theme.ColorNamePrimary
+}
+
+// setDisabled disables or enables one of the bar's own buttons, which are
+// the tabs' and so follow their state alone.
+func setDisabled(b *widget.Button, off bool) {
+	if b == nil || b.Disabled() == off {
+		return
+	}
+	if off {
+		b.Disable()
+	} else {
+		b.Enable()
 	}
 }
 
@@ -598,6 +621,12 @@ func (b *tabButton) MinSize() geo.Size {
 	return b.BaseWidget.MinSize()
 }
 
+// inert reports whether the tab takes no input: it is disabled, or the tabs
+// are.
+func (b *tabButton) inert() bool {
+	return b.Disabled() || (b.tabs != nil && b.tabs.Disabled())
+}
+
 func (b *tabButton) HoverIn(*event.HoverEvent) {
 	b.hovered = true
 	b.Refresh()
@@ -613,7 +642,7 @@ func (b *tabButton) HoverOut() {
 }
 
 func (b *tabButton) Tapped(ev *event.PointEvent) {
-	if b.Disabled() {
+	if b.inert() {
 		return
 	}
 
@@ -625,7 +654,7 @@ func (b *tabButton) Tapped(ev *event.PointEvent) {
 // current tab (#1091).
 func (b *tabButton) pressShape() (intwidget.PressShape, bool) {
 	r, ok := cache.Renderer(b).(*tabButtonRenderer)
-	if !ok || b.Disabled() {
+	if !ok || b.inert() {
 		return intwidget.PressShape{}, false
 	}
 	return intwidget.PressShape{
@@ -648,7 +677,7 @@ func (b *tabButton) AccessibleState() core.AccessibleState {
 	if b.importance == widget.HighImportance {
 		state |= core.StateSelected
 	}
-	if b.Disabled() {
+	if b.inert() {
 		state |= core.StateDisabled
 	}
 	return state
@@ -761,7 +790,8 @@ func (r *tabButtonRenderer) Refresh() {
 	th := r.button.Theme()
 	v := bellui.CurrentApp().Settings().ThemeVariant()
 
-	if r.button.hovered && !r.button.Disabled() {
+	inert := r.button.inert()
+	if r.button.hovered && !inert {
 		r.background.FillColor = th.Color(theme.ColorNameHover, v)
 		r.background.CornerRadius = th.Size(theme.SizeNameSelectionRadius)
 		r.background.Show()
@@ -772,7 +802,7 @@ func (r *tabButtonRenderer) Refresh() {
 
 	r.label.Text = r.button.text
 	r.label.Alignment = r.button.textAlignment
-	if !r.button.Disabled() {
+	if !inert {
 		if r.button.importance == widget.HighImportance {
 			r.label.Color = th.Color(theme.ColorNamePrimary, v)
 		} else {
@@ -801,12 +831,22 @@ func (r *tabButtonRenderer) Refresh() {
 				r.icon.Resource = res.Original()
 			}
 		}
+		if inert {
+			switch res := r.icon.Resource.(type) {
+			case *theme.ThemedResource:
+				r.icon.Resource = theme.NewDisabledResource(res)
+			case *theme.PrimaryThemedResource:
+				r.icon.Resource = theme.NewDisabledResource(res.Original())
+			}
+		}
 		r.icon.Refresh()
 	} else {
 		r.icon.Hide()
 	}
 
-	if r.button.onClosed != nil && (isMobile(r.button.tabs) || r.button.hovered || r.close.hovered) {
+	// A disabled tab shows no close button on hover: it cannot be closed.
+	// On mobile, where it always shows, it stays, drawn disabled.
+	if r.button.onClosed != nil && (isMobile(r.button.tabs) || (!inert && (r.button.hovered || r.close.hovered))) {
 		r.close.Show()
 	} else {
 		r.close.Hide()
@@ -868,6 +908,9 @@ func (b *tabCloseButton) CreateRenderer() core.WidgetRenderer {
 // pressShape is a circle around the icon, in its colour, wherever on the
 // button the press lands.
 func (b *tabCloseButton) pressShape() (intwidget.PressShape, bool) {
+	if b.parent.inert() {
+		return intwidget.PressShape{}, false
+	}
 	th := b.Theme()
 	content := th.Color(theme.ColorNameForeground, bellui.CurrentApp().Settings().ThemeVariant())
 	if b.parent.importance == widget.HighImportance {
@@ -902,6 +945,9 @@ func (b *tabCloseButton) HoverOut() {
 }
 
 func (b *tabCloseButton) Tapped(ev *event.PointEvent) {
+	if b.parent.inert() {
+		return
+	}
 	intwidget.TapPress(&b.PressTarget, ev)
 	b.onTapped()
 }
@@ -933,7 +979,8 @@ func (r *tabCloseButtonRenderer) Refresh() {
 	th := r.button.Theme()
 	v := bellui.CurrentApp().Settings().ThemeVariant()
 
-	if r.button.hovered {
+	inert := r.button.parent.inert()
+	if r.button.hovered && !inert {
 		r.background.FillColor = th.Color(theme.ColorNameHover, v)
 		r.background.CornerRadius = th.Size(theme.SizeNameSelectionRadius)
 		r.background.Show()
@@ -941,13 +988,20 @@ func (r *tabCloseButtonRenderer) Refresh() {
 		r.background.Hide()
 	}
 	r.background.Refresh()
+	if _, ok := r.icon.Resource.(*theme.DisabledResource); ok {
+		r.icon.Resource = theme.CancelIcon()
+	}
 	switch res := r.icon.Resource.(type) {
 	case *theme.ThemedResource:
-		if r.button.parent.importance == widget.HighImportance {
+		if inert {
+			r.icon.Resource = theme.NewDisabledResource(res)
+		} else if r.button.parent.importance == widget.HighImportance {
 			r.icon.Resource = theme.NewPrimaryThemedResource(res)
 		}
 	case *theme.PrimaryThemedResource:
-		if r.button.parent.importance != widget.HighImportance {
+		if inert {
+			r.icon.Resource = theme.NewDisabledResource(res.Original())
+		} else if r.button.parent.importance != widget.HighImportance {
 			r.icon.Resource = res.Original()
 		}
 	}

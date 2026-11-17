@@ -32,9 +32,14 @@ func (t *AppTabs) AccessibleLabel() string { return "" }
 // The tabs contain text and/or an icon and allow the user to switch between the content specified in each TabItem.
 // Each item is represented by a button at the edge of the container.
 //
+// Disabling it disables the tab bar and, like HTML's <fieldset disabled>,
+// every widget inside the tabs' content that can be disabled. Enabling it
+// enables again only the widgets it disabled. Calls from code (Select,
+// SetItems, Remove) keep working while it is disabled.
+//
 // Since: 1.0
 type AppTabs struct {
-	widget.BaseWidget
+	widget.DisableableWidget
 
 	Items []*TabItem
 
@@ -62,6 +67,7 @@ type AppTabs struct {
 	isTransitioning bool
 
 	popUpMenu *widget.PopUpMenu
+	cascade   disableCascade
 }
 
 // NewAppTabs creates a new tab container that allows the user to choose between different areas of an app.
@@ -96,12 +102,37 @@ func (t *AppTabs) CreateRenderer() core.WidgetRenderer {
 	r.updateTabs(1)
 	r.updateIndicator(false)
 	r.applyTheme(t)
+	r.syncDisabled()
 	return r
 }
 
 // Append adds a new TabItem to the end of the tab bar.
 func (t *AppTabs) Append(item *TabItem) {
 	t.SetItems(append(t.Items, item))
+}
+
+// Disable disables the tabs: no tab can be selected, dragged to or picked
+// from the overflow menu, which closes. Every widget inside the tabs'
+// content that can be disabled is disabled too, including one added while
+// the tabs are disabled.
+//
+// Since: 1.3
+func (t *AppTabs) Disable() {
+	t.DisableableWidget.Disable()
+	if t.popUpMenu != nil {
+		t.popUpMenu.Hide()
+		t.popUpMenu = nil
+	}
+	t.syncDisabled()
+}
+
+// Enable enables the tabs and the widgets their Disable switched off. A
+// widget the app disabled itself stays disabled.
+//
+// Since: 1.3
+func (t *AppTabs) Enable() {
+	t.DisableableWidget.Enable()
+	t.syncDisabled()
 }
 
 // DisableIndex disables the TabItem at the specified index.
@@ -153,6 +184,7 @@ func (t *AppTabs) MinSize() geo.Size {
 func (t *AppTabs) Remove(item *TabItem) {
 	removeItem(t, item)
 	t.Refresh()
+	t.syncDisabled()
 }
 
 // RemoveIndex removes tab by index.
@@ -161,6 +193,7 @@ func (t *AppTabs) Remove(item *TabItem) {
 func (t *AppTabs) RemoveIndex(index int) {
 	removeIndex(t, index)
 	t.Refresh()
+	t.syncDisabled()
 }
 
 // Select sets the specified TabItem to be selected and its content visible.
@@ -187,6 +220,7 @@ func (t *AppTabs) SelectedIndex() int {
 func (t *AppTabs) SetItems(items []*TabItem) {
 	setItems(t, items)
 	t.Refresh()
+	t.syncDisabled()
 }
 
 // SetTabLocation sets the location of the tab bar
@@ -199,6 +233,12 @@ func (t *AppTabs) SetTabLocation(l TabLocation) {
 func (t *AppTabs) Show() {
 	t.BaseWidget.Show()
 	t.SelectIndex(t.current)
+}
+
+// syncDisabled brings the widgets inside the tabs' content to the tabs'
+// state (disableCascade).
+func (t *AppTabs) syncDisabled() {
+	t.cascade.sync(t.Disabled(), tabsContent(t)...)
 }
 
 func (t *AppTabs) onUnselected() func(*TabItem) {
@@ -340,11 +380,24 @@ func (r *appTabsRenderer) Objects() []core.CanvasObject {
 }
 
 func (r *appTabsRenderer) Refresh() {
+	r.syncDisabled()
 	r.Layout(r.appTabs.Size())
 
 	r.refresh(r.appTabs)
 
 	canvas.Refresh(r.appTabs)
+}
+
+// syncDisabled brings the bar's own parts and the content to the tabs'
+// state: the overflow button is disabled with them, and a drag along the
+// tabs in progress is dropped.
+func (r *appTabsRenderer) syncDisabled() {
+	off := r.appTabs.Disabled()
+	setDisabled(r.action, off)
+	if off && r.drag.active {
+		r.drag.active = false
+	}
+	r.appTabs.syncDisabled()
 }
 
 func (r *appTabsRenderer) buildOverflowTabsButton() (overflow *widget.Button) {
