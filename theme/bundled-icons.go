@@ -14,6 +14,14 @@ var cancelIconRes = &bellui.StaticResource{
 	StaticContent: cancelIcon,
 }
 
+//go:embed icons/clear.svg
+var clearIcon []byte
+
+var clearIconRes = &bellui.StaticResource{
+	StaticName:    "clear.svg",
+	StaticContent: clearIcon,
+}
+
 //go:embed icons/check.svg
 var checkIcon []byte
 
@@ -780,6 +788,14 @@ var viewzoomfitIcon []byte
 var viewzoomfitIconRes = &bellui.StaticResource{
 	StaticName:    "view-zoom-fit.svg",
 	StaticContent: viewzoomfitIcon,
+}
+
+//go:embed icons/fullscreen-exit.svg
+var fullscreenexitIcon []byte
+
+var fullscreenexitIconRes = &bellui.StaticResource{
+	StaticName:    "fullscreen-exit.svg",
+	StaticContent: fullscreenexitIcon,
 }
 
 //go:embed icons/view-zoom-in.svg

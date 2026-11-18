@@ -250,7 +250,7 @@ func Test_ContentRemoveIcon_FileSource(t *testing.T) {
 
 func Test_ContentClearIcon_FileSource(t *testing.T) {
 	result := theme.ContentClearIcon().Name()
-	assert.Equal(t, "foreground_cancel.svg", result)
+	assert.Equal(t, "foreground_clear.svg", result)
 }
 
 func Test_ContentCutIcon_FileSource(t *testing.T) {
@@ -400,7 +400,7 @@ func Test_ViewFullScreenIcon_FileSource(t *testing.T) {
 
 func Test_ViewRestoreIcon_FileSource(t *testing.T) {
 	result := theme.ViewRestoreIcon().Name()
-	assert.Equal(t, "foreground_view-zoom-fit.svg", result)
+	assert.Equal(t, "foreground_fullscreen-exit.svg", result)
 }
 
 func Test_ViewRefreshIcon_FileSource(t *testing.T) {
@@ -532,6 +532,51 @@ func TestClosedCaptionIcons(t *testing.T) {
 	}
 	if theme.ClosedCaptionIcon().Name() == theme.ClosedCaptionOffIcon().Name() {
 		t.Error("captions on and off are the same icon")
+	}
+}
+
+// ContentClearIcon and ViewRestoreIcon are their own files, Material's clear
+// and fullscreen_exit, rather than borrowing CancelIcon's and ZoomFitIcon's
+// (#1309).
+//
+// The files differ; two of the drawings do not, and each case is pinned here:
+//   - Material draws clear and close with the same path, and CancelIcon is
+//     that X (tabs, chips, search fields and dialogs use it as a close mark),
+//     so clear and CancelIcon look the same by Material's design.
+//   - ZoomFitIcon still draws view-zoom-fit.svg, whose path is Material's
+//     fullscreen_exit. Material has no zoom_fit; which drawing it should get
+//     is the open part of #1309. This assertion fails the day it changes.
+func TestClearAndRestoreIconsAreTheirOwnFiles(t *testing.T) {
+	for _, c := range []struct {
+		icon, other bellui.Resource
+		file        string
+		path        string // Material Icons' path, from its 24px SVG
+	}{
+		{
+			theme.ContentClearIcon(), theme.CancelIcon(), "clear.svg",
+			"M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z",
+		},
+		{
+			theme.ViewRestoreIcon(), theme.ZoomFitIcon(), "fullscreen-exit.svg",
+			"M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z",
+		},
+	} {
+		if !strings.HasSuffix(c.icon.Name(), "_"+c.file) {
+			t.Errorf("icon %s, want one named for %s", c.icon.Name(), c.file)
+		}
+		if c.icon.Name() == c.other.Name() {
+			t.Errorf("%s shares its file with %s", c.icon.Name(), c.other.Name())
+		}
+		if _, ok := c.icon.(*theme.ThemedResource); !ok {
+			t.Errorf("%s is %T, want a *theme.ThemedResource so it takes the theme's colour", c.file, c.icon)
+		}
+		if !strings.Contains(string(c.icon.Content()), `d="`+c.path+`"`) {
+			t.Errorf("%s does not draw Material's path", c.file)
+		}
+		// The two drawings that still coincide; see the comment above.
+		if !strings.Contains(string(c.other.Content()), `d="`+c.path+`"`) {
+			t.Errorf("%s no longer draws %s's path: update this test and #1309", c.other.Name(), c.file)
+		}
 	}
 }
 
