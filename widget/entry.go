@@ -3654,10 +3654,14 @@ func (e *Entry) syncSegments() {
 
 	if len(placeholder.Segments) > 0 {
 		textSegment := placeholder.Segments[0].(*TextSegment)
+		oldText, oldStyle := textSegment.Text, textSegment.Style
 		textSegment.Style.ColorName = colName
 		textSegment.Style.TextStyle = e.TextStyle
 		textSegment.Style.Alignment = e.Alignment
 		textSegment.Text = e.PlaceHolder
+		// An in-place edit keeps the segment's identity, and a same-length one its
+		// length too, so the row model would keep the old breaks (#1305).
+		placeholder.segmentEdited(textSegment, oldText, oldStyle)
 	}
 }
 
