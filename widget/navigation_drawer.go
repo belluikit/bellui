@@ -114,10 +114,6 @@ func (d *NavigationDrawer) Show(c core.Canvas) {
 		bg := canvas.NewRectangle(color.Transparent)
 		bg.CornerRadius = 28
 
-		icon := canvas.NewImageFromResource(nil)
-		icon.FillMode = canvas.ImageFillContain
-		icon.Resize(geo.NewSize(24, 24))
-
 		label := canvas.NewText(item.Label, th.Color(theme.ColorNameOnSurface, v))
 		label.TextSize = 14
 
@@ -130,13 +126,19 @@ func (d *NavigationDrawer) Show(c core.Canvas) {
 		} else {
 			label.Color = th.Color(theme.ColorNameOnSurfaceVariant, v)
 		}
-		// An item with no icon is a label alone, starting where the icon
-		// would (#1179).
+		// The icon gets its source before its size, so the Resize draws it
+		// (#1298). An item with no icon is a label alone, starting where the
+		// icon would (#1179).
+		var res bellui.Resource
 		if item.Icon != nil {
-			icon.Resource = theme.NewColoredResource(item.Icon, iconColor)
-		} else {
+			res = theme.NewColoredResource(item.Icon, iconColor)
+		}
+		icon := canvas.NewImageFromResource(res)
+		icon.FillMode = canvas.ImageFillContain
+		if res == nil {
 			icon.Hide()
 		}
+		icon.Resize(geo.NewSize(24, 24))
 
 		row := &drawerItemWidget{
 			bg: bg, icon: icon, label: label,

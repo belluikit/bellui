@@ -22,7 +22,7 @@ func PaintImage(img *canvas.Image, c core.Canvas, width, height int) image.Image
 	if img.Size().IsZero() && c == nil { // an image without size or canvas won't get rendered unless we setup
 		img.Resize(geo.NewSize(float32(width), float32(height)))
 	}
-	cache.RenderDeferredSVG(img)
+	cache.RenderDeferredImage(img)
 	dst, err := paintImage(img, width, height)
 	if err != nil {
 		bellui.LogError("failed to paint image", err)

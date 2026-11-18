@@ -82,13 +82,18 @@ type Image struct {
 	// svgDeferred is set when Refresh put off rasterizing the SVG because the
 	// image was not on screen: it is rasterized when first drawn (#1137).
 	svgDeferred bool
+	// sawSource is set once Refresh has run with a File or Resource. A source
+	// set without a Refresh after it, as on an image sized before it had one,
+	// is loaded when the image is first drawn instead (#1298).
+	sawSource bool
 
 	// one of the following sources will provide our image data
 	File     string          // Load the image from a file
 	Resource bellui.Resource // Load the image from an in-memory resource
 	// Image is the image to draw. Set it to draw a loaded image. For a File
 	// or Resource it holds the pixels drawn from them, filled by Refresh; an
-	// SVG out of sight is filled only once it is first drawn (#1137).
+	// SVG out of sight is filled only once it is first drawn (#1137), and so
+	// is a File or Resource no Refresh has run with yet (#1298).
 	Image image.Image
 
 	Translucency float64    // Set a translucency value > 0.0 to fade the image
@@ -158,17 +163,28 @@ func (i *Image) Move(pos geo.Position) {
 
 // Refresh causes this image to be redrawn with its configured state.
 func (i *Image) Refresh() {
+	if i.load() {
+		Refresh(i)
+	}
+}
+
+// load reads the image's source into Image at its current size, and reports
+// whether the canvas should be told to draw it again.
+func (i *Image) load() bool {
 	// Snapshot source fields to avoid TOCTOU races with concurrent writers.
-	i.propMu.RLock()
+	i.propMu.Lock()
 	file := i.File
 	res := i.Resource
 	img := i.Image
-	i.propMu.RUnlock()
+	if file != "" || res != nil {
+		i.sawSource = true
+	}
+	i.propMu.Unlock()
 
 	rc, err := i.updateReader(file, res)
 	if err != nil {
 		bellui.LogError("Failed to load image", err)
-		return
+		return false
 	}
 	if rc != nil {
 		rcMem := rc
@@ -179,7 +195,7 @@ func (i *Image) Refresh() {
 		r, err := i.updateAspectAndMinSize(rc)
 		if err != nil {
 			bellui.LogError("Failed to load image", err)
-			return
+			return false
 		}
 		rc = io.NopCloser(r)
 		i.propMu.Lock()
@@ -197,11 +213,9 @@ func (i *Image) Refresh() {
 			i.propMu.Lock()
 			i.previousRender = false
 			i.propMu.Unlock()
-
-			Refresh(i)
-			return
+			return true
 		}
-		return
+		return false
 	}
 
 	if file != "" || res != nil {
@@ -210,7 +224,7 @@ func (i *Image) Refresh() {
 		height := size.Height
 
 		if width == 0 || height == 0 {
-			return
+			return false
 		}
 
 		i.propMu.RLock()
@@ -218,17 +232,17 @@ func (i *Image) Refresh() {
 		i.propMu.RUnlock()
 		if isSVG {
 			if !i.drawSVG(width, height) {
-				return
+				return false
 			}
 		} else {
 			if rc == nil {
-				return
+				return false
 			}
 
 			decoded, err := decodeImage(rc)
 			if err != nil {
 				bellui.LogError("Failed to render image", err)
-				return
+				return false
 			}
 			i.Image = decoded
 		}
@@ -237,7 +251,7 @@ func (i *Image) Refresh() {
 	i.propMu.Lock()
 	i.previousRender = true
 	i.propMu.Unlock()
-	Refresh(i)
+	return true
 }
 
 // Resize on an image will scale the content or reposition it according to FillMode.
@@ -544,15 +558,28 @@ func (i *Image) renderSVG(width, height float32) (image.Image, error) {
 }
 
 func init() {
-	cache.RenderDeferredSVG = renderDeferredSVG
+	cache.RenderDeferredImage = renderDeferredImage
 }
 
-// renderDeferredSVG rasterizes the SVG of an Image whose Refresh put it off
-// while it was not on screen, now that a painter draws it (#1137).
-func renderDeferredSVG(o core.CanvasObject) {
+// renderDeferredImage draws what an Image put off, now that a painter draws
+// it: the SVG its Refresh did not rasterize while it was out of sight
+// (#1137), or a File or Resource set with no Refresh after it (#1298). A
+// widget that sized an image before giving it a Resource, and set the
+// Resource last, had an image nothing ever drew. The canvas is not told:
+// the painter reads the pixels straight after this.
+func renderDeferredImage(o core.CanvasObject) {
 	i, ok := o.(*Image)
 	if !ok {
 		return
+	}
+	i.propMu.RLock()
+	unseen := !i.sawSource && (i.File != "" || i.Resource != nil)
+	i.propMu.RUnlock()
+	if unseen {
+		// An SVG the painter is asked to draw while bellui reckons it out of
+		// sight, as a capture of an object off any canvas, is deferred by
+		// load and rasterized just below.
+		i.load()
 	}
 	i.propMu.Lock()
 	deferred := i.svgDeferred

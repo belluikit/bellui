@@ -85,7 +85,7 @@ func drawImage(c core.Canvas, img *canvas.Image, pos geo.Position, base *image.N
 	height := scale.ToScreenCoordinate(c, bounds.Height)
 	scaledX, scaledY := scale.ToScreenCoordinate(c, pos.X), scale.ToScreenCoordinate(c, pos.Y)
 
-	cache.RenderDeferredSVG(img)
+	cache.RenderDeferredImage(img)
 	origImg := img.Image
 	if img.FillMode != canvas.ImageFillCover {
 		origImg = painter.PaintImage(img, c, width, height)
