@@ -3638,9 +3638,17 @@ func lineBoundsWord(seg *TextSegment, text []rune, low, high, lineEnd int, trunc
 				if trunc == bellui.TextTruncateEllipsis {
 					include = 0
 					ellipsis = true
+				} else {
+					// A row of one character still keeps 、。）with the
+					// character before them and （“ with the one after (#1300).
+					include = cjkLineBreak(text[low:lineEnd], 1)
 				}
 				st.bounds = append(st.bounds, rowBoundary{[]RichTextSegment{seg}, st.reuse, low, low + include, ellipsis})
-				low++
+				if include > 1 {
+					low += include
+				} else {
+					low++
+				}
 				high = low + 1
 				st.reuse++
 				st.measureWidth = max.Width
@@ -3651,6 +3659,29 @@ func lineBoundsWord(seg *TextSegment, text []rune, low, high, lineEnd int, trunc
 				}
 			} else {
 				spaceIndex := findSpaceIndex(sub, fallback)
+				if spaceIndex == fallback && !breakableSpace(sub[fallback]) {
+					// No space to break at: the fallback lands wherever the
+					// line overflowed, which in CJK text must not start a row
+					// with 、。）or end one with （“ (#1300).
+					spaceIndex = cjkLineBreak(sub, fallback)
+					if spaceIndex > fallback {
+						// No earlier point would do, so the row runs past
+						// the width up to the first one that does. It is
+						// placed here: measured again, it would not fit, and
+						// the same break would come back.
+						st.bounds = append(st.bounds, rowBoundary{[]RichTextSegment{seg}, st.reuse, low, low + spaceIndex, false})
+						st.reuse++
+						low += spaceIndex
+						high = lineEnd
+						if low < high && breakableSpace(text[low]) {
+							low++
+						}
+						st.measureWidth = max.Width
+
+						st.yPos += measured.Height
+						continue
+					}
+				}
 				if spaceIndex == 0 {
 					spaceIndex = 1
 				}
