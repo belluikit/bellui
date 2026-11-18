@@ -648,7 +648,7 @@ var icons = map[bellui.ThemeIconName]bellui.Resource{
 	IconNameRadioButtonFill:    NewThemedResource(radiobuttonfillIconRes),
 
 	IconNameContentAdd:    NewThemedResource(contentaddIconRes),
-	IconNameContentClear:  NewThemedResource(cancelIconRes),
+	IconNameContentClear:  NewThemedResource(clearIconRes),
 	IconNameContentRemove: NewThemedResource(contentremoveIconRes),
 	IconNameContentCut:    NewThemedResource(contentcutIconRes),
 	IconNameContentCopy:   NewThemedResource(contentcopyIconRes),
@@ -740,7 +740,7 @@ var icons = map[bellui.ThemeIconName]bellui.Resource{
 
 	IconNameViewFullScreen: NewThemedResource(viewfullscreenIconRes),
 	IconNameViewRefresh:    NewThemedResource(viewrefreshIconRes),
-	IconNameViewRestore:    NewThemedResource(viewzoomfitIconRes),
+	IconNameViewRestore:    NewThemedResource(fullscreenexitIconRes),
 	IconNameViewZoomFit:    NewThemedResource(viewzoomfitIconRes),
 	IconNameViewZoomIn:     NewThemedResource(viewzoominIconRes),
 	IconNameViewZoomOut:    NewThemedResource(viewzoomoutIconRes),

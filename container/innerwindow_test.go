@@ -105,7 +105,7 @@ func TestInnerWindow_SetMaximized(t *testing.T) {
 	assert.Equal(t, "foreground_maximize.svg", icon.b.Icon.Name())
 
 	w.SetMaximized(true)
-	assert.Equal(t, "foreground_view-zoom-fit.svg", icon.b.Icon.Name())
+	assert.Equal(t, "foreground_fullscreen-exit.svg", icon.b.Icon.Name())
 }
 
 func TestInnerWindow_SetPadded(t *testing.T) {
