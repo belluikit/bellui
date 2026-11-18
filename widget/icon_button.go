@@ -105,11 +105,11 @@ type IconButton struct {
 	// ButtonSize picks the button's size variant. It is not called Size
 	// because Size returns the widget's current size.
 	ButtonSize IconButtonSize
-	// Importance colours the button. Only DangerImportance changes it, for a
+	// Importance colours the button with a status, such as Danger for a
 	// destructive action (#1327): Standard and Outlined draw the icon (and
-	// Outlined its outline) in the error colour, Filled fills with the error
-	// colour and FilledTonal with the error container. Any other importance
-	// draws the button as Style says.
+	// Outlined its outline) in the status colour, Filled fills with it and
+	// FilledTonal with its container (Success and Warning have none, so the
+	// colour itself). Medium, High and Low draw the button as Style says.
 	Importance Importance
 	OnTapped   func() `json:"-"`
 
@@ -283,6 +283,9 @@ func (r *iconButtonRenderer) Refresh() {
 	if r.btn.Disabled() {
 		fgColorName = theme.ColorNameDisabled
 		r.bg.FillColor = color.Transparent
+		if r.btn.Style == IconButtonStyleOutlined {
+			r.bg.StrokeColor = th.Color(theme.ColorNameOutlineVariant, v)
+		}
 	}
 
 	r.bg.Refresh()
@@ -301,26 +304,26 @@ func (r *iconButtonRenderer) Refresh() {
 // style and importance; the background is empty for an outlined button and
 // the outline for every other style.
 func (r *iconButtonRenderer) colorNames() (bg, fg, outline bellui.ThemeColorName) {
-	danger := r.btn.Importance == DangerImportance
+	col, on, container, onContainer, status := statusRoles(r.btn.Importance)
 	switch r.btn.Style {
 	case IconButtonStyleFilled:
-		if danger {
-			return theme.ColorNameError, theme.ColorNameForegroundOnError, ""
+		if status {
+			return col, on, ""
 		}
 		return theme.ColorNamePrimary, theme.ColorNameForegroundOnPrimary, ""
 	case IconButtonStyleFilledTonal:
-		if danger {
-			return theme.ColorNameErrorContainer, theme.ColorNameOnErrorContainer, ""
+		if status {
+			return container, onContainer, ""
 		}
 		return theme.ColorNameSecondaryContainer, theme.ColorNameOnSecondaryContainer, ""
 	case IconButtonStyleOutlined:
-		if danger {
-			return "", theme.ColorNameError, theme.ColorNameError
+		if status {
+			return "", col, col
 		}
 		return "", theme.ColorNameOnSurfaceVariant, theme.ColorNameOutlineVariant
 	default: // Standard — visible background for contrast on light surfaces.
-		if danger {
-			return theme.ColorNameButton, theme.ColorNameError, ""
+		if status {
+			return theme.ColorNameButton, col, ""
 		}
 		return theme.ColorNameButton, theme.ColorNameOnSurfaceVariant, ""
 	}

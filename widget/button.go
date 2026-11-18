@@ -77,17 +77,18 @@ type Button struct {
 	// Low differs from Medium only when disabled, where it draws no disabled
 	// background. For a low-emphasis button, set Style to ButtonStyleText.
 	//
-	// Danger also applies in the other styles, so a destructive action can be
-	// any emphasis (#1327): Filled fills with the error colour, FilledTonal with
-	// the error container, and Elevated, Outlined and Text draw their label and
-	// icon (and Outlined its outline) in the error colour. The other
-	// importances apply only to ButtonStyleDefault.
+	// Danger, Success and Warning also apply in the other styles, so a
+	// destructive action can be any emphasis (#1327): Filled fills with the
+	// status colour, FilledTonal with its container (Success and Warning have
+	// none, so the colour itself), and Elevated, Outlined and Text draw their
+	// label and icon (and Outlined its outline) in the status colour. High and
+	// Low apply only to ButtonStyleDefault.
 	//
 	// Since: 1.0
 	Importance Importance
 	// Style sets the MD3 visual variant. When ButtonStyleDefault, the Importance
 	// field controls colors. Other styles override Importance for color
-	// selection, except DangerImportance (see Importance).
+	// selection, except Danger, Success and Warning (see Importance).
 	Style         ButtonStyle
 	Alignment     ButtonAlign
 	IconPlacement ButtonIconPlacement
@@ -577,8 +578,8 @@ func (r *buttonRenderer) buttonColorNames() (foreground, background, backgroundB
 			style = ButtonStyleFilledTonal
 		}
 	}
-	if b.Importance == DangerImportance {
-		return dangerColorNames(style, backgroundBlend)
+	if _, _, _, _, ok := statusRoles(b.Importance); ok {
+		return statusColorNames(style, b.Importance, backgroundBlend)
 	}
 	switch style {
 	case ButtonStyleFilled:
@@ -602,26 +603,44 @@ func (r *buttonRenderer) buttonColorNames() (foreground, background, backgroundB
 	return foreground, background, backgroundBlend
 }
 
-// dangerColorNames are the colours of a DangerImportance button in a style
-// other than ButtonStyleDefault: the style's own roles, with the error group
-// in place of the primary and secondary ones.
-func dangerColorNames(style ButtonStyle, blend bellui.ThemeColorName) (foreground, background, backgroundBlend bellui.ThemeColorName) {
+// statusRoles are the colour roles of a status importance: the colour, its
+// contrast colour, and the tonal container pair. Success and Warning have no
+// container roles, so their tonal pair is the colour pair. ok is false for an
+// importance that is not a status.
+func statusRoles(imp Importance) (col, on, container, onContainer bellui.ThemeColorName, ok bool) {
+	switch imp {
+	case DangerImportance:
+		return theme.ColorNameError, theme.ColorNameForegroundOnError,
+			theme.ColorNameErrorContainer, theme.ColorNameOnErrorContainer, true
+	case SuccessImportance:
+		return theme.ColorNameSuccess, theme.ColorNameForegroundOnSuccess,
+			theme.ColorNameSuccess, theme.ColorNameForegroundOnSuccess, true
+	case WarningImportance:
+		return theme.ColorNameWarning, theme.ColorNameForegroundOnWarning,
+			theme.ColorNameWarning, theme.ColorNameForegroundOnWarning, true
+	}
+	return "", "", "", "", false
+}
+
+// statusColorNames are the colours of a Danger, Success or Warning button in
+// a style other than ButtonStyleDefault: the style's own roles, with the
+// status colours in place of the primary and secondary ones.
+func statusColorNames(style ButtonStyle, imp Importance, blend bellui.ThemeColorName) (foreground, background, backgroundBlend bellui.ThemeColorName) {
+	col, on, container, onContainer, _ := statusRoles(imp)
 	backgroundBlend = blend
 	switch style {
 	case ButtonStyleFilled:
-		foreground = theme.ColorNameForegroundOnError
-		background = theme.ColorNameError
+		foreground, background = on, col
 	case ButtonStyleFilledTonal:
-		foreground = theme.ColorNameOnErrorContainer
-		background = theme.ColorNameErrorContainer
+		foreground, background = onContainer, container
 	case ButtonStyleElevated:
-		foreground = theme.ColorNameError
+		foreground = col
 		background = theme.ColorNameSurfaceContainerLow
 	case ButtonStyleOutlined:
-		foreground = theme.ColorNameError
+		foreground = col
 		background = theme.ColorNameButton
 	default: // ButtonStyleText
-		foreground = theme.ColorNameError
+		foreground = col
 		if blend != "" {
 			background = theme.ColorNameSurface
 		}
@@ -629,11 +648,11 @@ func dangerColorNames(style ButtonStyle, blend bellui.ThemeColorName) (foregroun
 	return foreground, background, backgroundBlend
 }
 
-// outlineColorName is the colour of an Outlined button's outline: the error
-// colour for a DangerImportance button that is not disabled.
+// outlineColorName is the colour of an Outlined button's outline: the status
+// colour for a status importance button that is not disabled.
 func (r *buttonRenderer) outlineColorName() bellui.ThemeColorName {
-	if r.button.Importance == DangerImportance && !r.button.Disabled() {
-		return theme.ColorNameError
+	if col, _, _, _, ok := statusRoles(r.button.Importance); ok && !r.button.Disabled() {
+		return col
 	}
 	return theme.ColorNameOutline
 }
