@@ -535,30 +535,35 @@ func TestClosedCaptionIcons(t *testing.T) {
 	}
 }
 
-// ContentClearIcon and ViewRestoreIcon are their own files, Material's clear
-// and fullscreen_exit, rather than borrowing CancelIcon's and ZoomFitIcon's
-// (#1309).
+// ContentClearIcon, ViewRestoreIcon and ZoomFitIcon are their own files,
+// Material's clear, fullscreen_exit and fit_screen, rather than borrowing
+// another icon's (#1309). Material has no zoom_fit; fit_screen is the
+// drawing chosen for ZoomFitIcon on #1309.
 //
-// The files differ; two of the drawings do not, and each case is pinned here:
-//   - Material draws clear and close with the same path, and CancelIcon is
-//     that X (tabs, chips, search fields and dialogs use it as a close mark),
-//     so clear and CancelIcon look the same by Material's design.
-//   - ZoomFitIcon still draws view-zoom-fit.svg, whose path is Material's
-//     fullscreen_exit. Material has no zoom_fit; which drawing it should get
-//     is the open part of #1309. This assertion fails the day it changes.
-func TestClearAndRestoreIconsAreTheirOwnFiles(t *testing.T) {
+// One pair still looks the same, by Material's design: Material draws clear
+// and close with the same path, and CancelIcon is that X (tabs, chips, search
+// fields and dialogs use it as a close mark). sameDrawing pins it.
+func TestClearRestoreAndZoomFitIconsAreTheirOwnFiles(t *testing.T) {
 	for _, c := range []struct {
 		icon, other bellui.Resource
 		file        string
 		path        string // Material Icons' path, from its 24px SVG
+		sameDrawing bool   // other draws path too
 	}{
 		{
 			theme.ContentClearIcon(), theme.CancelIcon(), "clear.svg",
 			"M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z",
+			true,
 		},
 		{
 			theme.ViewRestoreIcon(), theme.ZoomFitIcon(), "fullscreen-exit.svg",
 			"M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z",
+			false,
+		},
+		{
+			theme.ZoomFitIcon(), theme.ViewRestoreIcon(), "view-zoom-fit.svg",
+			"M17 4h3c1.1 0 2 .9 2 2v2h-2V6h-3V4zM4 8V6h3V4H4c-1.1 0-2 .9-2 2v2h2zm16 8v2h-3v2h3c1.1 0 2-.9 2-2v-2h-2zM7 18H4v-2H2v2c0 1.1.9 2 2 2h3v-2zM18 8H6v8h12V8z",
+			false,
 		},
 	} {
 		if !strings.HasSuffix(c.icon.Name(), "_"+c.file) {
@@ -573,9 +578,8 @@ func TestClearAndRestoreIconsAreTheirOwnFiles(t *testing.T) {
 		if !strings.Contains(string(c.icon.Content()), `d="`+c.path+`"`) {
 			t.Errorf("%s does not draw Material's path", c.file)
 		}
-		// The two drawings that still coincide; see the comment above.
-		if !strings.Contains(string(c.other.Content()), `d="`+c.path+`"`) {
-			t.Errorf("%s no longer draws %s's path: update this test and #1309", c.other.Name(), c.file)
+		if got := strings.Contains(string(c.other.Content()), `d="`+c.path+`"`); got != c.sameDrawing {
+			t.Errorf("%s draws %s's path: %v, want %v", c.other.Name(), c.file, got, c.sameDrawing)
 		}
 	}
 }
