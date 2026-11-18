@@ -45,7 +45,9 @@ package mobile
 //	openssl smime -verify -in CERT.RSA -inform DER -content CERT.SF cert.pem
 //
 // The APK format imposes two extra restrictions on the ZIP format. First,
-// it is uncompressed. Second, each contained file is 4-byte aligned, and each
+// what Android maps from the archive is uncompressed: this Writer stores
+// everything except assets that compress (apkMethod). Second, each contained
+// file is 4-byte aligned, and each
 // native library 16 KB aligned (zipalign -P 16), so that a device with 16 KB
 // pages can map it straight from the archive (#626). This allows the Android
 // OS to mmap contents without unpacking the archive.
@@ -128,8 +130,9 @@ func (w *Writer) create(name string) (io.Writer, error) {
 	extra := apkAlignPadding(start, apkAlignment(name))
 
 	zipfw, err := w.w.CreateHeader(&zip.FileHeader{
-		Name:  name,
-		Extra: make([]byte, extra),
+		Name:   name,
+		Extra:  make([]byte, extra),
+		Method: apkMethod(name),
 	})
 	if err != nil {
 		return nil, err
@@ -149,6 +152,43 @@ func apkAlignment(name string) int {
 		return 16384
 	}
 	return 4
+}
+
+// apkMethod is how a file is stored in the archive. An asset is deflated
+// unless its extension is one the Android Gradle plugin leaves stored by
+// default, so a text asset such as THIRD_PARTY_NOTICES.txt no longer costs its
+// full size in the download (#1285). Everything else stays stored: native
+// libraries are mapped from the archive, resources.arsc must be stored from
+// Android 11, and the rest was never measured to matter.
+//
+// A deflated asset still reads through AssetManager.open and AAsset_read;
+// only AssetManager.openFd and AAsset_openFileDescriptor, which hand out a
+// slice of the APK itself, need it stored. Media and images, the files that
+// are opened that way, are on the stored list.
+func apkMethod(name string) uint16 {
+	if !strings.HasPrefix(name, "assets/") {
+		return zip.Store
+	}
+	lower := strings.ToLower(name)
+	for _, ext := range apkNoCompressExtensions {
+		if strings.HasSuffix(lower, ext) {
+			return zip.Store
+		}
+	}
+	return zip.Deflate
+}
+
+// apkNoCompressExtensions are the extensions an asset keeps stored: the
+// Android Gradle plugin's default list (DEFAULT_AAPT_NO_COMPRESS_EXTENSIONS in
+// com.android.builder.packaging.PackagingUtils, plus the .tflite it always
+// adds), matched as it matches them, as a case-insensitive suffix. They are
+// already compressed, or are files an app opens with openFd.
+var apkNoCompressExtensions = []string{
+	".jpg", ".jpeg", ".png", ".gif", ".opus", ".wav", ".mp2", ".mp3", ".ogg",
+	".aac", ".mpg", ".mpeg", ".mid", ".midi", ".smf", ".jet", ".rtttl", ".imy",
+	".xmf", ".mp4", ".m4a", ".m4v", ".3gp", ".3gpp", ".3g2", ".3gpp2", ".amr",
+	".awb", ".wma", ".wmv", ".webm", ".mkv", ".webp",
+	".tflite",
 }
 
 // apkAlignPadding is how many bytes of padding move start up to the next
