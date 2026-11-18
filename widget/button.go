@@ -71,16 +71,23 @@ type Button struct {
 	DisableableWidget
 	Text string
 	Icon bellui.Resource
-	// Specify how prominent the button should be. It only applies while Style is
+	// Specify how prominent the button should be. While Style is
 	// ButtonStyleDefault: High draws the button Filled; Danger, Success and Warning
 	// fill it with that status colour; Medium and Low both draw it FilledTonal.
 	// Low differs from Medium only when disabled, where it draws no disabled
 	// background. For a low-emphasis button, set Style to ButtonStyleText.
 	//
+	// Danger also applies in the other styles, so a destructive action can be
+	// any emphasis (#1327): Filled fills with the error colour, FilledTonal with
+	// the error container, and Elevated, Outlined and Text draw their label and
+	// icon (and Outlined its outline) in the error colour. The other
+	// importances apply only to ButtonStyleDefault.
+	//
 	// Since: 1.0
 	Importance Importance
 	// Style sets the MD3 visual variant. When ButtonStyleDefault, the Importance
-	// field controls colors. Other styles override Importance for color selection.
+	// field controls colors. Other styles override Importance for color
+	// selection, except DangerImportance (see Importance).
 	Style         ButtonStyle
 	Alignment     ButtonAlign
 	IconPlacement ButtonIconPlacement
@@ -473,7 +480,7 @@ func (r *buttonRenderer) applyTheme() {
 		switch r.button.Style {
 		case ButtonStyleOutlined:
 			bg.StrokeWidth = 1
-			bg.StrokeColor = th.Color(theme.ColorNameOutline, v)
+			bg.StrokeColor = th.Color(r.outlineColorName(), v)
 		case ButtonStyleText:
 			bg.StrokeWidth = 0
 			bg.StrokeColor = color.Transparent
@@ -570,6 +577,9 @@ func (r *buttonRenderer) buttonColorNames() (foreground, background, backgroundB
 			style = ButtonStyleFilledTonal
 		}
 	}
+	if b.Importance == DangerImportance {
+		return dangerColorNames(style, backgroundBlend)
+	}
 	switch style {
 	case ButtonStyleFilled:
 		foreground = theme.ColorNameForegroundOnPrimary
@@ -590,6 +600,42 @@ func (r *buttonRenderer) buttonColorNames() (foreground, background, backgroundB
 		}
 	}
 	return foreground, background, backgroundBlend
+}
+
+// dangerColorNames are the colours of a DangerImportance button in a style
+// other than ButtonStyleDefault: the style's own roles, with the error group
+// in place of the primary and secondary ones.
+func dangerColorNames(style ButtonStyle, blend bellui.ThemeColorName) (foreground, background, backgroundBlend bellui.ThemeColorName) {
+	backgroundBlend = blend
+	switch style {
+	case ButtonStyleFilled:
+		foreground = theme.ColorNameForegroundOnError
+		background = theme.ColorNameError
+	case ButtonStyleFilledTonal:
+		foreground = theme.ColorNameOnErrorContainer
+		background = theme.ColorNameErrorContainer
+	case ButtonStyleElevated:
+		foreground = theme.ColorNameError
+		background = theme.ColorNameSurfaceContainerLow
+	case ButtonStyleOutlined:
+		foreground = theme.ColorNameError
+		background = theme.ColorNameButton
+	default: // ButtonStyleText
+		foreground = theme.ColorNameError
+		if blend != "" {
+			background = theme.ColorNameSurface
+		}
+	}
+	return foreground, background, backgroundBlend
+}
+
+// outlineColorName is the colour of an Outlined button's outline: the error
+// colour for a DangerImportance button that is not disabled.
+func (r *buttonRenderer) outlineColorName() bellui.ThemeColorName {
+	if r.button.Importance == DangerImportance && !r.button.Disabled() {
+		return theme.ColorNameError
+	}
+	return theme.ColorNameOutline
 }
 
 // contentColor is the colour of the button's text and icon, which its state
