@@ -13,6 +13,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unicode"
 	"weak"
 
 	"github.com/belluikit/bellui/internal/render"
@@ -114,12 +115,14 @@ func lookupFaces(theme, fallback, emoji bellui.Resource, family string, style be
 	}
 
 	if emoji != nil {
-		faces.addFace(loadMeasureFont(emoji))
+		faces.emoji = loadMeasureFont(emoji)
+		faces.addFace(faces.emoji)
 	}
 	// Bundled UI-symbol fallbacks (✓, ☐, arrows, ⌘, geometric shapes, …) sit
 	// before the host locale face so these glyphs keep identical metrics on
 	// every platform instead of resolving through a host system font (pre-rebrand tracker #686).
 	addSymbolsFallbackFaces(faces)
+	faces.compiled = len(faces.faces)
 
 	// The host locale face comes next in the chain, but resolving it scans the
 	// system fonts (tens of MB at startup), so it is looked up on the first rune
@@ -145,9 +148,11 @@ func CachedFontFace(style bellui.TextStyle, source bellui.Resource, o core.Canva
 			// bundled symbol fallbacks working, and rely on ResolveFace for
 			// app-registered (e.g. CJK) and system fallback.
 			if emoji := theme.DefaultEmojiFont(); emoji != nil {
-				faces.addFace(loadMeasureFont(emoji))
+				faces.emoji = loadMeasureFont(emoji)
+				faces.addFace(faces.emoji)
 			}
 			addSymbolsFallbackFaces(faces)
+			faces.compiled = len(faces.faces)
 
 			val = newFontCacheItem(faces)
 			val.lastAccess.Store(now)
@@ -795,7 +800,7 @@ func walkString(faces shaping.Fontmap, s string, textSize fixed.Int26_6, style b
 	// content shapes in the same face as the space, so this is a no-op there.
 	lineBounds := out.LineBounds
 
-	ins := segmenter.Split(in, faces)
+	ins := segmenter.Split(in, withPresentation(faces, in.Text))
 	for _, in := range ins {
 		inEnd := in.RunEnd
 
@@ -1297,7 +1302,7 @@ func LineVisualLayout(faces shaping.Fontmap, runes []rune, textSize float32, sty
 	x := float32(0)
 	// Segmenter.Split returns runs in visual (left-to-right) order; placing each
 	// at the running x reproduces the paragraph's bidi visual order.
-	for _, run := range segmenter.Split(in, faces) {
+	for _, run := range segmenter.Split(in, withPresentation(faces, in.Text)) {
 		if run.Direction.Progression() == di.TowardTopLeft {
 			rtl = true
 		}
@@ -1500,7 +1505,7 @@ func StyledLineVisualLayout(runs []StyledRun) LineLayout {
 		// Segmenter.Split orders this run's own directional sub-runs visually; each
 		// becomes an atomic fragment ranked by its leftmost rune in the whole-line
 		// visual order, so fragments from different runs interleave correctly.
-		for _, sub := range segmenter.Split(in, faces) {
+		for _, sub := range segmenter.Split(in, withPresentation(faces, in.Text)) {
 			out := shaper.Shape(sub)
 			rank := visualSeq[bidiOff+sub.RunStart]
 			for r := sub.RunStart + 1; r < sub.RunEnd; r++ {
@@ -1554,7 +1559,7 @@ func lineVisualSeq(runes []rune, style bellui.TextStyle, source bellui.Resource)
 	}
 	segmenter := &shaping.Segmenter{}
 	s := 0
-	for _, run := range segmenter.Split(in, faces) {
+	for _, run := range segmenter.Split(in, withPresentation(faces, in.Text)) {
 		if run.Direction.Progression() == di.TowardTopLeft {
 			anyRTL = true
 			for r := run.RunEnd - 1; r >= run.RunStart; r-- {
@@ -1699,6 +1704,13 @@ type dynamicFontMap struct {
 	// localeAspect, on the first rune faces does not cover (#469).
 	localePending bool
 	localeAspect  font.Aspect
+
+	// emoji is the bundled colour emoji face, nil in a chain without one, and
+	// compiled the number of compiled-in faces at the front of faces. A rune
+	// whose presentation is text looks in the compiled-in faces other than
+	// emoji first (#1260).
+	emoji    *font.Face
+	compiled int
 }
 
 // debugFontEscape, when BELLUI_DEBUG_FONTESCAPE is set, logs every rune whose
@@ -1708,7 +1720,34 @@ type dynamicFontMap struct {
 // (the pre-rebrand tracker #686 diagnostic).
 var debugFontEscape = os.Getenv("BELLUI_DEBUG_FONTESCAPE") != ""
 
+// ResolveFace picks the face for r drawn in its default presentation. Text
+// that may hold variation selectors is resolved through [withPresentation].
 func (d *dynamicFontMap) ResolveFace(r rune) *font.Face {
+	return d.resolveFace(r, !unicode.Is(emojiPresentation, r))
+}
+
+// resolveFace picks the face for r. With asText, the compiled-in faces other
+// than the emoji face are tried first, and the emoji face is used only when
+// none of them has r; otherwise the emoji face comes first (#1260). Either way
+// the colour glyph beats a host font, so the result does not depend on the
+// host or on what earlier text loaded.
+func (d *dynamicFontMap) resolveFace(r rune, asText bool) *font.Face {
+	if d.emoji != nil {
+		if asText {
+			for _, f := range d.faces[:d.compiled] {
+				if f == d.emoji {
+					continue
+				}
+				if _, ok := f.NominalGlyph(r); ok {
+					return f
+				}
+			}
+		}
+		if _, ok := d.emoji.NominalGlyph(r); ok {
+			return d.emoji
+		}
+	}
+
 	for i, f := range d.faces {
 		if _, ok := f.NominalGlyph(r); ok {
 			if debugFontEscape && d.systemStart > 0 && i >= d.systemStart {
