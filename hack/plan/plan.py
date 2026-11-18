@@ -6,6 +6,11 @@ their open blockers (native GitHub blocked-by edges).
 
 The project answers what/when; the issue body answers how.
 Needs: gh (authenticated; project + repo scopes).
+
+trendvidia is a user account, so its projects are visible only to the
+trendvidia login itself; with another gh account active, item-list fails
+with "Could not resolve to a ProjectV2". The trendvidia login's token is
+used when gh holds one, unless GH_TOKEN is already set.
 """
 import json
 import os
@@ -14,13 +19,21 @@ import subprocess
 import sys
 
 PROJECT = os.environ.get("PLAN_PROJECT", "2")
+OWNER = "trendvidia"
 EPIC_RE = re.compile(r"^\[?Epic[\]:]")
 TRANCHE_ORDER = {"Now": 0, "Next": 1, "Later": 2, "Parked": 3}
 PRIO = {"P0": 0, "P1": 1, "P2": 2}
 
+ENV = dict(os.environ)
+if not ENV.get("GH_TOKEN"):
+    tok = subprocess.run(["gh", "auth", "token", "--user", OWNER],
+                         capture_output=True, text=True)
+    if tok.returncode == 0 and tok.stdout.strip():
+        ENV["GH_TOKEN"] = tok.stdout.strip()
+
 
 def gh(*args):
-    r = subprocess.run(["gh", *args], capture_output=True, text=True)
+    r = subprocess.run(["gh", *args], capture_output=True, text=True, env=ENV)
     if r.returncode != 0:
         sys.exit("gh %s failed: %s" % (" ".join(args[:3]), r.stderr.strip()))
     return json.loads(r.stdout) if r.stdout.strip() else None
@@ -35,7 +48,7 @@ def blockers_of(repo, num):
 # --limit must stay ahead of the board size: gh silently truncates past it,
 # which made freshly-triaged items vanish from the plan once the board passed
 # 200 items. Fail loudly when we hit the ceiling instead.
-items = gh("project", "item-list", PROJECT, "--owner", "trendvidia",
+items = gh("project", "item-list", PROJECT, "--owner", OWNER,
            "--format", "json", "--limit", "1000")["items"]
 if len(items) >= 1000:
     sys.exit("board has >= 1000 items; raise the --limit in plan.py")
