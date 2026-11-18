@@ -73,6 +73,7 @@ func TestPainter_clippedShapeDrawsInPlace(t *testing.T) {
 					placed.Resize(size.AddWidthHeight(2*margin, 2*margin))
 				}
 				c := test.NewCanvas()
+				c.SetPadded(false) // the box below is in unpadded canvas pixels
 				c.SetScale(3)
 				c.SetContent(container.NewWithoutLayout(placed))
 				c.Resize(geo.NewSize(100, 80))
@@ -113,4 +114,55 @@ func sameRGBA(a, b color.Color) bool {
 	ar, ag, ab, aa := a.RGBA()
 	br, bg, bb, ba := b.RGBA()
 	return ar == br && ag == bg && ab == bb && aa == ba
+}
+
+// A Scene3D has no padding, but a clip that cuts into the scene itself (a
+// scroll moved part of it out of view) moved it the same way (#1330).
+func TestPainter_clippedScene3DDrawsInPlace(t *testing.T) {
+	test.ApplyTheme(t, test.Theme())
+	pos, size := geo.NewPos(20, 20), geo.NewSize(60, 40)
+	cut := float32(10) // the clip starts this far into the scene
+	paint := func(clipped bool) image.Image {
+		s := canvas.NewScene3D()
+		s.Meshes = []canvas.Mesh3D{{
+			Vertices:  []canvas.Vec3{{X: -2, Y: -1.5, Z: 0}, {X: 2, Y: -1, Z: 0}, {X: 0, Y: 2, Z: 0}},
+			Faces:     []canvas.Face{{A: 0, B: 1, C: 2}},
+			FillColor: color.NRGBA{R: 0xd0, A: 0xff},
+		}}
+		s.Resize(size)
+		var placed core.CanvasObject = s
+		s.Move(pos)
+		if clipped {
+			s.Move(geo.NewPos(-cut, -cut))
+			placed = container.NewClip(container.NewWithoutLayout(s))
+			placed.Move(pos.AddXY(cut, cut))
+			placed.Resize(size.SubtractWidthHeight(cut, cut))
+		}
+		c := test.NewCanvas()
+		c.SetPadded(false) // the boxes below are in unpadded canvas pixels
+		c.SetScale(3)
+		c.SetContent(container.NewWithoutLayout(placed))
+		c.Resize(geo.NewSize(100, 80))
+		return software.NewPainter().Paint(c)
+	}
+	free, clipped := paint(false), paint(true)
+
+	box := image.Rect(3*(20+10), 3*(20+10), 3*80, 3*60)
+	drawn, differ := 0, 0
+	for y := box.Min.Y; y < box.Max.Y; y++ {
+		for x := box.Min.X; x < box.Max.X; x++ {
+			if !sameRGBA(free.At(x, y), free.At(0, 0)) {
+				drawn++
+			}
+			if !sameRGBA(free.At(x, y), clipped.At(x, y)) {
+				differ++
+			}
+		}
+	}
+	if drawn == 0 || drawn == box.Dx()*box.Dy() {
+		t.Fatalf("the scene drew %d of %d pixels inside the clip; a shift would not show", drawn, box.Dx()*box.Dy())
+	}
+	if differ > 0 {
+		t.Errorf("%d of %d pixels inside the clip differ from the unclipped scene", differ, box.Dx()*box.Dy())
+	}
 }
