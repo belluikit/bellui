@@ -360,6 +360,8 @@ func (hl *Hyperlink) syncSegments() {
 		}
 	} else {
 		segment := hl.provider.Segments[0].(*TextSegment)
+		oldText, oldStyle := segment.Text, segment.Style
+		defer func() { hl.provider.segmentEdited(segment, oldText, oldStyle) }()
 		segment.Style.Alignment = hl.Alignment
 		segment.Style.ColorName = hl.colorName()
 		segment.Style.TextStyle = hl.TextStyle

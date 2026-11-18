@@ -1607,7 +1607,10 @@ func (e *Entry) SetPlaceHolder(text string) {
 	onMain(func() {
 		e.Theme() // setup theme cache before locking
 		e.PlaceHolder = text
-		e.placeholderProvider().Segments[0].(*TextSegment).Text = text
+		seg := e.placeholderProvider().Segments[0].(*TextSegment)
+		oldText := seg.Text
+		seg.Text = text
+		e.placeholder.segmentEdited(seg, oldText, seg.Style)
 		e.placeholder.updateRowBounds()
 		e.placeholderProvider().Refresh()
 	})

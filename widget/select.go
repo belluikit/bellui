@@ -546,6 +546,7 @@ func (s *selectRenderer) updateLabel() {
 	}
 
 	segment := s.label.Segments[0].(*TextSegment)
+	oldText, oldStyle := segment.Text, segment.Style
 	segment.Style.Alignment = s.combo.Alignment
 	if s.combo.Disabled() {
 		segment.Style.ColorName = theme.ColorNameDisabled
@@ -557,5 +558,6 @@ func (s *selectRenderer) updateLabel() {
 	} else {
 		segment.Text = s.combo.Selected
 	}
+	s.label.segmentEdited(segment, oldText, oldStyle)
 	s.label.Refresh()
 }

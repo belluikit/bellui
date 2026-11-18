@@ -757,6 +757,16 @@ func (t *RichText) String() string {
 	return t.strMemo
 }
 
+// segmentEdited invalidates the row model after the widget owning seg edited it in
+// place. The content checks only see lengths and identity, so a same-length edit
+// to text of other widths would keep the old line breaks (#1305); Label does the
+// same comparison in its syncSegments.
+func (t *RichText) segmentEdited(seg *TextSegment, oldText string, oldStyle RichTextStyle) {
+	if seg.Text != oldText || seg.Style != oldStyle {
+		t.rowBoundsVersion++
+	}
+}
+
 // charMinSize returns the average char size to use for internal computation
 func (t *RichText) charMinSize(concealed bool, style bellui.TextStyle, textSize float32) geo.Size {
 	defaultChar := "M"
