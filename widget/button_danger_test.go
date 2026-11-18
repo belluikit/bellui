@@ -105,6 +105,20 @@ func TestIconButton_Danger(t *testing.T) {
 	}
 }
 
+// A disabled Danger icon button draws as any disabled one does: the outline
+// of an Outlined one is not left red.
+func TestIconButton_DangerDisabled(t *testing.T) {
+	test.NewTempApp(t)
+	b := NewIconButton(theme.DeleteIcon(), nil)
+	b.Style = IconButtonStyleOutlined
+	b.Importance = DangerImportance
+	b.Disable()
+	r := cache.Renderer(b).(*iconButtonRenderer)
+
+	assert.Equal(t, theme.ColorNameDisabled, themeColorOf(t, r.icon))
+	assert.Equal(t, colorOf(theme.ColorNameOutlineVariant), r.bg.StrokeColor)
+}
+
 // Without an importance an icon button keeps its style's colours.
 func TestIconButton_MediumImportanceKeepsStyleColours(t *testing.T) {
 	test.NewTempApp(t)

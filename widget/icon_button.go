@@ -283,6 +283,9 @@ func (r *iconButtonRenderer) Refresh() {
 	if r.btn.Disabled() {
 		fgColorName = theme.ColorNameDisabled
 		r.bg.FillColor = color.Transparent
+		if r.btn.Style == IconButtonStyleOutlined {
+			r.bg.StrokeColor = th.Color(theme.ColorNameOutlineVariant, v)
+		}
 	}
 
 	r.bg.Refresh()
