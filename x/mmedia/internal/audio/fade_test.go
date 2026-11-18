@@ -157,6 +157,38 @@ func (c *mixContext) played() []float32 {
 	return append([]float32(nil), c.out...)
 }
 
+// last is the last frame played, or 0 before any.
+func (c *mixContext) last() float32 {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if len(c.out) == 0 {
+		return 0
+	}
+	return c.out[len(c.out)-1]
+}
+
+// blocks counts the blocks the device has played, which is one per mix.
+func (c *mixContext) blocks() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.out) / c.frames
+}
+
+// waitBlocks waits until the device has mixed n more blocks, rather than for a
+// time a loaded machine can overrun (#1320).
+func (c *mixContext) waitBlocks(t *testing.T, what string, n int) {
+	t.Helper()
+	want := c.blocks() + n
+	waitFor(t, what, 5*time.Second, func() bool { return c.blocks() >= want })
+}
+
+// waitHeard waits until the device plays sound of sign's sign above half of
+// level.
+func (c *mixContext) waitHeard(t *testing.T, what string, level, sign float32) {
+	t.Helper()
+	waitFor(t, what, 5*time.Second, func() bool { return c.last()*sign > level/2 })
+}
+
 type mixPlayer struct {
 	src io.Reader
 
@@ -320,19 +352,9 @@ func TestEdgesFade(t *testing.T) {
 			// there; a pause or a stop waits for the device to be suspended,
 			// which is after it has played the fade out; and the seek waits
 			// for silence before the new position, as a network seek has.
-			last := func() float32 {
-				c.mu.Lock()
-				defer c.mu.Unlock()
-				if len(c.out) == 0 {
-					return 0
-				}
-				return c.out[len(c.out)-1]
-			}
-			heard := func(what string, sign float32) {
-				waitFor(t, what, 5*time.Second, func() bool { return last()*sign > full/2 })
-			}
+			heard := func(what string, sign float32) { c.waitHeard(t, what, full, sign) }
 			quiet := func(what string) {
-				waitFor(t, what, 5*time.Second, func() bool { return abs32(last()) < 0.01 })
+				waitFor(t, what, 5*time.Second, func() bool { return abs32(c.last()) < 0.01 })
 			}
 			suspended := func(what string, n int) {
 				waitFor(t, what, 5*time.Second, func() bool {
@@ -404,14 +426,14 @@ func TestSeekFadesInAfterAStalledRefill(t *testing.T) {
 	o := newOutput(c, 2)
 	o.WriteSamples(tone(time.Second, level))
 	o.Start()
-	time.Sleep(20 * time.Millisecond)
+	c.waitHeard(t, "the start", full, 1)
 	o.Rebase(time.Second)
 	p := o.player.(*mixPlayer)
 	p.stall(true)
-	o.WriteSamples(tone(time.Second, -level)) // the seek and its fade-in
-	time.Sleep(10 * time.Millisecond)         // blocks mixed from an empty player
+	o.WriteSamples(tone(time.Second, -level))               // the seek and its fade-in
+	c.waitBlocks(t, "blocks mixed from an empty player", 3) // what used to spend the fade
 	p.stall(false)
-	time.Sleep(40 * time.Millisecond)
+	c.waitHeard(t, "the new position", full, -1)
 
 	steps := edges(c.played(), full)
 	if len(steps) != 3 {
@@ -433,9 +455,9 @@ func TestStartFadesInAfterAStalledFill(t *testing.T) {
 	o := newOutput(c, 2)
 	o.WriteSamples(tone(time.Second, level))
 	o.Start()
-	time.Sleep(10 * time.Millisecond)
+	c.waitBlocks(t, "blocks mixed from an empty player", 3)
 	o.player.(*mixPlayer).stall(false)
-	time.Sleep(40 * time.Millisecond)
+	c.waitHeard(t, "the start", full, 1)
 
 	steps := edges(c.played(), full)
 	if len(steps) != 1 {
