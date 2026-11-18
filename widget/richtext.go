@@ -2010,6 +2010,21 @@ func (t *RichText) stampContent() {
 	t.lastSegments = append(t.lastSegments[:0], t.Segments...)
 }
 
+// editSegment applies edit to seg, a text segment of t, in place, and
+// invalidates the row model when the edit changed the segment's text or style.
+// SyncState cannot see such an edit: the segment keeps its identity, and when
+// the new text has the old byte length the fingerprint is unchanged too, so the
+// rows stayed broken where the old text broke (#1305). bellui's widgets that
+// edit their own segment go through here; Label.syncSegments does the same by
+// hand.
+func (t *RichText) editSegment(seg *TextSegment, edit func(*TextSegment)) {
+	text, style := seg.Text, seg.Style
+	edit(seg)
+	if seg.Text != text || seg.Style != style {
+		t.rowBoundsVersion++
+	}
+}
+
 // contentChanged reports whether the content moved since the last stampContent.
 // The fingerprint alone misses Segments replaced by new ones of the same count and
 // lengths, while the row bounds still hold, and draw, the old ones (#1302); so the

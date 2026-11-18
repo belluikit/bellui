@@ -1607,7 +1607,8 @@ func (e *Entry) SetPlaceHolder(text string) {
 	onMain(func() {
 		e.Theme() // setup theme cache before locking
 		e.PlaceHolder = text
-		e.placeholderProvider().Segments[0].(*TextSegment).Text = text
+		p := e.placeholderProvider()
+		p.editSegment(p.Segments[0].(*TextSegment), func(seg *TextSegment) { seg.Text = text })
 		e.placeholder.updateRowBounds()
 		e.placeholderProvider().Refresh()
 	})
@@ -3650,11 +3651,12 @@ func (e *Entry) syncSegments() {
 	placeholder.Wrapping = wrap
 
 	if len(placeholder.Segments) > 0 {
-		textSegment := placeholder.Segments[0].(*TextSegment)
-		textSegment.Style.ColorName = colName
-		textSegment.Style.TextStyle = e.TextStyle
-		textSegment.Style.Alignment = e.Alignment
-		textSegment.Text = e.PlaceHolder
+		placeholder.editSegment(placeholder.Segments[0].(*TextSegment), func(textSegment *TextSegment) {
+			textSegment.Style.ColorName = colName
+			textSegment.Style.TextStyle = e.TextStyle
+			textSegment.Style.Alignment = e.Alignment
+			textSegment.Text = e.PlaceHolder
+		})
 	}
 }
 

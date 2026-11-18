@@ -545,17 +545,18 @@ func (s *selectRenderer) updateLabel() {
 		s.combo.PlaceHolder = defaultPlaceHolder
 	}
 
-	segment := s.label.Segments[0].(*TextSegment)
-	segment.Style.Alignment = s.combo.Alignment
-	if s.combo.Disabled() {
-		segment.Style.ColorName = theme.ColorNameDisabled
-	} else {
-		segment.Style.ColorName = theme.ColorNameForeground
-	}
-	if s.combo.Selected == "" {
-		segment.Text = s.combo.PlaceHolder
-	} else {
-		segment.Text = s.combo.Selected
-	}
+	s.label.editSegment(s.label.Segments[0].(*TextSegment), func(segment *TextSegment) {
+		segment.Style.Alignment = s.combo.Alignment
+		if s.combo.Disabled() {
+			segment.Style.ColorName = theme.ColorNameDisabled
+		} else {
+			segment.Style.ColorName = theme.ColorNameForeground
+		}
+		if s.combo.Selected == "" {
+			segment.Text = s.combo.PlaceHolder
+		} else {
+			segment.Text = s.combo.Selected
+		}
+	})
 	s.label.Refresh()
 }

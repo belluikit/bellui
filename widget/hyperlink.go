@@ -359,19 +359,22 @@ func (hl *Hyperlink) syncSegments() {
 			},
 		}
 	} else {
-		segment := hl.provider.Segments[0].(*TextSegment)
-		segment.Style.Alignment = hl.Alignment
-		segment.Style.ColorName = hl.colorName()
-		segment.Style.TextStyle = hl.TextStyle
-		segment.Style.FontSource = hl.FontSource
-		segment.Text = hl.Text
+		hl.provider.editSegment(hl.provider.Segments[0].(*TextSegment), func(segment *TextSegment) {
+			segment.Style.Alignment = hl.Alignment
+			segment.Style.ColorName = hl.colorName()
+			segment.Style.TextStyle = hl.TextStyle
+			segment.Style.FontSource = hl.FontSource
+			segment.Text = hl.Text
+		})
 	}
 
 	sizeName := hl.SizeName
 	if sizeName == "" {
 		sizeName = theme.SizeNameText
 	}
-	hl.provider.Segments[0].(*TextSegment).Style.SizeName = sizeName
+	hl.provider.editSegment(hl.provider.Segments[0].(*TextSegment), func(segment *TextSegment) {
+		segment.Style.SizeName = sizeName
+	})
 	hl.textSize, _ = bellui.MeasureTextFull(hl.Text, th.Size(sizeName), hl.TextStyle, hl.FontSource)
 }
 

@@ -425,7 +425,7 @@ func (r *buttonRenderer) Refresh() {
 	th := r.button.Theme()
 	r.label.inset = geo.NewSquareSize(th.Size(theme.SizeNameInnerPadding))
 
-	r.label.Segments[0].(*TextSegment).Text = r.button.Text
+	r.label.editSegment(r.label.Segments[0].(*TextSegment), func(seg *TextSegment) { seg.Text = r.button.Text })
 	r.updateIconAndText()
 	r.applyTheme()
 
@@ -493,7 +493,7 @@ func (r *buttonRenderer) applyTheme() {
 		r.gradientBG.Hide()
 	}
 
-	r.label.Segments[0].(*TextSegment).Style.ColorName = fgColorName
+	r.label.editSegment(r.label.Segments[0].(*TextSegment), func(seg *TextSegment) { seg.Style.ColorName = fgColorName })
 	r.label.Refresh()
 	if r.icon != nil && r.icon.Resource != nil {
 		icon := r.icon.Resource

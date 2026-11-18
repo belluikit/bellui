@@ -349,20 +349,21 @@ func (r *searchSelectRenderer) Refresh() {
 }
 
 func (r *searchSelectRenderer) updateLabel() {
-	seg := r.label.Segments[0].(*TextSegment)
-	if r.combo.Disabled() {
-		seg.Style.ColorName = theme.ColorNameDisabled
-	} else {
-		seg.Style.ColorName = theme.ColorNameForeground
-	}
-	if r.combo.Selected == "" {
-		seg.Text = r.combo.PlaceHolder
-		if seg.Text == "" {
-			seg.Text = "(Select one)"
+	r.label.editSegment(r.label.Segments[0].(*TextSegment), func(seg *TextSegment) {
+		if r.combo.Disabled() {
+			seg.Style.ColorName = theme.ColorNameDisabled
+		} else {
+			seg.Style.ColorName = theme.ColorNameForeground
 		}
-	} else {
-		seg.Text = r.combo.Selected
-	}
+		if r.combo.Selected == "" {
+			seg.Text = r.combo.PlaceHolder
+			if seg.Text == "" {
+				seg.Text = "(Select one)"
+			}
+		} else {
+			seg.Text = r.combo.Selected
+		}
+	})
 	r.label.Refresh()
 }
 
