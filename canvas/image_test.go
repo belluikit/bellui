@@ -271,3 +271,62 @@ type sliceResource struct {
 
 func (r sliceResource) Name() string    { return r.name }
 func (r sliceResource) Content() []byte { return r.data }
+
+// An image sized before it had a source, then given a Resource with no
+// Refresh after it, is drawn when it is first painted. Its Resize with no
+// source had nothing to draw, setting Resource tells nothing, and a later
+// Resize to the same size returns early, so nothing drew it: a
+// NavigationDrawer built its icons this way and captures showed none (#1298).
+func TestImage_SourceSetAfterResizeIsDrawn(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("testdata", "arc_80_100.png"))
+	assert.NoError(t, err)
+	for name, res := range map[string]bellui.Resource{
+		"svg": theme.NewColoredResource(theme.HomeIcon(), theme.ColorNamePrimary),
+		"png": bellui.NewStaticResource("arc.png", data),
+	} {
+		t.Run(name, func(t *testing.T) {
+			test.NewTempApp(t)
+			img := canvas.NewImageFromResource(nil)
+			img.Resize(geo.NewSize(40, 40))
+			w := test.NewTempWindow(t, container.NewWithoutLayout(img))
+			w.Resize(geo.NewSize(60, 60))
+			img.Resource = res
+			img.Resize(geo.NewSize(40, 40)) // same size: returns early
+
+			out := w.Canvas().Capture()
+			assert.NotNil(t, img.Image, "loaded when painted")
+			coloured := 0
+			b := out.Bounds()
+			for y := b.Min.Y; y < b.Max.Y; y++ {
+				for x := b.Min.X; x < b.Max.X; x++ {
+					r, g, bl, _ := out.At(x, y).RGBA()
+					if r != g || g != bl { // the image is coloured, the window grey
+						coloured++
+					}
+				}
+			}
+			assert.NotZero(t, coloured, "drawn in the capture")
+		})
+	}
+}
+
+// A source that fails to load when painted is not read again on every frame:
+// only a Refresh tries it again.
+func TestImage_SourceSetAfterResizeFailingIsReadOnce(t *testing.T) {
+	test.NewTempApp(t)
+	res := &countingResource{Resource: bellui.NewStaticResource("broken.png", []byte("not a png"))}
+	img := canvas.NewImageFromResource(nil)
+	img.Resize(geo.NewSize(40, 40))
+	w := test.NewTempWindow(t, container.NewWithoutLayout(img))
+	w.Resize(geo.NewSize(60, 60))
+	img.Resource = res
+
+	w.Canvas().Capture()
+	reads := res.reads
+	assert.NotZero(t, reads, "the first paint tries the source")
+	for range 5 {
+		w.Canvas().Capture()
+	}
+	assert.Equal(t, reads, res.reads, "later paints do not")
+	assert.Nil(t, img.Image)
+}
