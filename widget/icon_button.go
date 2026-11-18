@@ -105,6 +105,12 @@ type IconButton struct {
 	// ButtonSize picks the button's size variant. It is not called Size
 	// because Size returns the widget's current size.
 	ButtonSize IconButtonSize
+	// Importance colours the button. Only DangerImportance changes it, for a
+	// destructive action (#1327): Standard and Outlined draw the icon (and
+	// Outlined its outline) in the error colour, Filled fills with the error
+	// colour and FilledTonal with the error container. Any other importance
+	// draws the button as Style says.
+	Importance Importance
 	OnTapped   func() `json:"-"`
 
 	hovered bool
@@ -257,22 +263,11 @@ func (r *iconButtonRenderer) Refresh() {
 	container, _ := r.btn.ButtonSize.dims(th)
 	r.bg.CornerRadius = container / 2
 
-	var bgColorName, fgColorName bellui.ThemeColorName
-	switch r.btn.Style {
-	case IconButtonStyleFilled:
-		bgColorName = theme.ColorNamePrimary
-		fgColorName = theme.ColorNameForegroundOnPrimary
-	case IconButtonStyleFilledTonal:
-		bgColorName = theme.ColorNameSecondaryContainer
-		fgColorName = theme.ColorNameOnSecondaryContainer
-	case IconButtonStyleOutlined:
-		fgColorName = theme.ColorNameOnSurfaceVariant
+	bgColorName, fgColorName, outlineColorName := r.colorNames()
+	if r.btn.Style == IconButtonStyleOutlined {
 		r.bg.FillColor = color.Transparent
 		r.bg.StrokeWidth = 1
-		r.bg.StrokeColor = th.Color(theme.ColorNameOutlineVariant, v)
-	default: // Standard — visible background for contrast on light surfaces.
-		bgColorName = theme.ColorNameButton
-		fgColorName = theme.ColorNameOnSurfaceVariant
+		r.bg.StrokeColor = th.Color(outlineColorName, v)
 	}
 
 	if bgColorName != "" {
@@ -300,4 +295,33 @@ func (r *iconButtonRenderer) Refresh() {
 
 	r.Layout(r.btn.Size())
 	canvas.Refresh(r.btn.super())
+}
+
+// colorNames are the button's background, icon and outline colours for its
+// style and importance; the background is empty for an outlined button and
+// the outline for every other style.
+func (r *iconButtonRenderer) colorNames() (bg, fg, outline bellui.ThemeColorName) {
+	danger := r.btn.Importance == DangerImportance
+	switch r.btn.Style {
+	case IconButtonStyleFilled:
+		if danger {
+			return theme.ColorNameError, theme.ColorNameForegroundOnError, ""
+		}
+		return theme.ColorNamePrimary, theme.ColorNameForegroundOnPrimary, ""
+	case IconButtonStyleFilledTonal:
+		if danger {
+			return theme.ColorNameErrorContainer, theme.ColorNameOnErrorContainer, ""
+		}
+		return theme.ColorNameSecondaryContainer, theme.ColorNameOnSecondaryContainer, ""
+	case IconButtonStyleOutlined:
+		if danger {
+			return "", theme.ColorNameError, theme.ColorNameError
+		}
+		return "", theme.ColorNameOnSurfaceVariant, theme.ColorNameOutlineVariant
+	default: // Standard — visible background for contrast on light surfaces.
+		if danger {
+			return theme.ColorNameButton, theme.ColorNameError, ""
+		}
+		return theme.ColorNameButton, theme.ColorNameOnSurfaceVariant, ""
+	}
 }
