@@ -119,3 +119,29 @@ func TestCJKLineBreak_AtTextEnd(t *testing.T) {
 	assert.Equal(t, 1, cjkLineBreak([]rune("好好"), 1))
 	assert.Equal(t, 2, cjkLineBreak([]rune("（好"), 1), "（ goes down with 好")
 }
+
+// At a width under one character every logical line still gets its rows:
+// reaching the end of one line in the one-character-per-row path ends that
+// line, not the text (#1317).
+func TestLineBounds_WrapWordNarrowerThanACharacterKeepsEveryLine(t *testing.T) {
+	measurer := func(text []rune) geo.Size { return geo.NewSize(float32(len(text))*10, 10) }
+	maxSize := geo.NewSize(5, 10000)
+
+	for text, want := range map[string][]string{
+		"ab\ncd":     {"a", "b", "c", "d"},
+		"ab\ncd\nef": {"a", "b", "c", "d", "e", "f"},
+		"ab\n\ncd":   {"a", "b", "", "c", "d"},
+		"a\nb":       {"a", "b"},
+		"好。\n好":      {"好。", "好"},
+	} {
+		seg := &TextSegment{Text: text}
+		bounds, _ := lineBounds(seg, bellui.TextWrapWord, bellui.TextTruncateOff, maxSize.Width, maxSize, measurer)
+
+		runes := []rune(text)
+		rows := []string{}
+		for _, b := range bounds {
+			rows = append(rows, string(runes[b.begin:b.end]))
+		}
+		assert.Equal(t, want, rows, "rows of %q", text)
+	}
+}

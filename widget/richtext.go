@@ -3665,7 +3665,9 @@ func lineBoundsWord(seg *TextSegment, text []rune, low, high, lineEnd int, trunc
 
 				st.yPos += measured.Height
 				if high > lineEnd {
-					return true, st.bounds, st.yPos
+					// This logical line is done; the next one still gets
+					// its rows (#1317).
+					return false, nil, 0
 				}
 			} else {
 				spaceIndex := findSpaceIndex(sub, fallback)
