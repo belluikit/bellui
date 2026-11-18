@@ -1,6 +1,7 @@
 package painter
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"testing"
@@ -13,10 +14,12 @@ import (
 	"github.com/belluikit/typesetting/shaping"
 )
 
-// The table must follow the Go standard library's Unicode version; when Go
-// moves to a newer one, regenerate it with go generate (#1260).
+// The table must not fall behind the Go standard library's Unicode version;
+// when Go moves to a newer one, regenerate it with go generate (#1260). It may
+// be ahead: go.mod's older Go still builds the module, with older tables.
 func TestEmojiPresentationTableVersion(t *testing.T) {
-	assert.Equal(t, unicode.Version, emojiPresentationVersion, "run go generate ./internal/painter/")
+	assert.GreaterOrEqual(t, unicodeVersion(t, emojiPresentationVersion), unicodeVersion(t, unicode.Version),
+		"table %s is older than unicode.Version %s: run go generate ./internal/painter/", emojiPresentationVersion, unicode.Version)
 
 	for _, r := range "⭐⚡☕⚽❗⌚😀🦀" {
 		assert.True(t, unicode.Is(emojiPresentation, r), "%q defaults to emoji", r)
@@ -24,6 +27,15 @@ func TestEmojiPresentationTableVersion(t *testing.T) {
 	for _, r := range "✔☑⚠♥❤↔▶◀✉ℹ☀©#1" {
 		assert.False(t, unicode.Is(emojiPresentation, r), "%q defaults to text", r)
 	}
+}
+
+// unicodeVersion packs "major.minor.patch" into one comparable number.
+func unicodeVersion(t *testing.T, v string) int {
+	t.Helper()
+	var major, minor, patch int
+	_, err := fmt.Sscanf(v, "%d.%d.%d", &major, &minor, &patch)
+	require.NoError(t, err, "version %q", v)
+	return major*1_000_000 + minor*1_000 + patch
 }
 
 func defaultFontMap(t *testing.T) *dynamicFontMap {
