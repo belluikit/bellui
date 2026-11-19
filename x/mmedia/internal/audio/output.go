@@ -26,7 +26,7 @@ const DeviceSampleRate = 48000
 // another count (#707).
 const defaultChannels = 2
 
-// Output manages audio playback via ebitengine/oto.
+// Output manages audio playback via oto (the belluikit/oto fork).
 type Output struct {
 	mu         sync.Mutex
 	ctx        otoContext // nil for a detached Output
