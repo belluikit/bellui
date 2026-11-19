@@ -54,6 +54,7 @@ func (*TreeView) DrawsDisabledLook() bool          { return true }
 func (*BottomAppBar) DrawsDisabledLook() bool   { return true }
 func (*ButtonGroup) DrawsDisabledLook() bool    { return true }
 func (*CheckGroup) DrawsDisabledLook() bool     { return true }
+func (*ChipGroup) DrawsDisabledLook() bool      { return true }
 func (*DateTimePicker) DrawsDisabledLook() bool { return true }
 func (*FontPicker) DrawsDisabledLook() bool     { return true }
 func (*Form) DrawsDisabledLook() bool           { return true }
