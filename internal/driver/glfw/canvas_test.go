@@ -19,6 +19,7 @@ import (
 	"github.com/belluikit/bellui/internal/async"
 	"github.com/belluikit/bellui/internal/build"
 	internalTest "github.com/belluikit/bellui/internal/test"
+	"github.com/belluikit/bellui/layout"
 	"github.com/belluikit/bellui/test"
 	"github.com/belluikit/bellui/theme"
 	"github.com/belluikit/bellui/widget"
@@ -733,4 +734,32 @@ func (s *safeCanvas) TexScale() (ret float32) {
 
 func (s *safeCanvas) ToggleMenu() {
 	runOnMain(s.glCanvas.ToggleMenu)
+}
+
+// New content is laid out at the canvas's width, not at its own min width:
+// rows that wrap are at their tallest at their narrowest, and the window
+// grew to that height and kept it (#1349).
+func TestGlCanvas_SetContentWrapsAtCanvasWidth(t *testing.T) {
+	w := createWindow("Test")
+	c := w.Canvas()
+	w.Resize(geo.NewSize(600, 200))
+	runOnMain(func() {
+		assert.Equal(t, geo.NewSize(600, 200), c.Size())
+	})
+
+	var items []core.CanvasObject
+	for range 10 {
+		r := canvas.NewRectangle(color.Black)
+		r.SetMinSize(geo.NewSize(50, 20))
+		items = append(items, r)
+	}
+	wrap := container.New(layout.NewRowWrapLayout(), items...)
+	w.SetContent(container.NewVBox(wrap))
+
+	runOnMain(func() {
+		// One-a-row at 50 wide is 10*20 plus padding, taller than 200;
+		// at the canvas's width the ten fit in two rows or fewer.
+		assert.Equal(t, geo.NewSize(600, 200), c.Size())
+		assert.Less(t, wrap.MinSize().Height, float32(50))
+	})
 }
