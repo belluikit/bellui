@@ -222,6 +222,10 @@ func (o *Output) WriteSamples(data []byte) {
 // so the old audio was traded for a gap; with a chunk waiting, it refills
 // with the new position's audio. oto pulls even while paused, so a paused
 // player is emptied the same way and stays paused.
+//
+// The player may already hold some of the new position, pulled as it arrived
+// in pieces smaller than a chunk. Emptying it dropped that too, unheard but
+// counted as played (#1336), so puller.Seek puts it back in the ring.
 func (o *Output) flushPlayer() {
 	if o.buffer.Available() < playerBufferBytes(o.sampleRate, o.channels) {
 		return
@@ -230,6 +234,9 @@ func (o *Output) flushPlayer() {
 	defer o.mu.Unlock()
 	if o.flushPending.Swap(false) && o.player != nil {
 		_, _ = o.player.Seek(0, io.SeekCurrent)
+		// What it pulled from the new position went back into the ring, to be
+		// pulled and counted again (puller.Seek).
+		o.playedBase += o.pull.takeRestored()
 		if o.playing {
 			o.fade(o.volume)
 		}

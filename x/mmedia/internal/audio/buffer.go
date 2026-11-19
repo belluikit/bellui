@@ -16,6 +16,10 @@ type RingBuffer struct {
 
 	// totalRead tracks total bytes consumed, used for audio clock.
 	totalRead int64
+
+	// readBack is how many of the bytes read since the last Clear are still
+	// in buf just before r, not yet overwritten: what unread can give back.
+	readBack int
 }
 
 func NewRingBuffer(size int) *RingBuffer {
@@ -39,6 +43,9 @@ func (rb *RingBuffer) Write(p []byte) (int, error) {
 		}
 		rb.full = rb.w == rb.r
 	}
+	// What was read is overwritten from its oldest end once the free space
+	// in front of the writer runs out.
+	rb.readBack = min(rb.readBack, len(rb.buf)-rb.available())
 	return n, nil
 }
 
@@ -64,6 +71,7 @@ func (rb *RingBuffer) read(p []byte) int {
 		rb.full = false
 	}
 	rb.totalRead += int64(n)
+	rb.readBack = min(rb.readBack+n, len(rb.buf))
 
 	// Silence keeps the audio output running smoothly.
 	clear(p[n:])
@@ -102,6 +110,7 @@ func (rb *RingBuffer) Reset() {
 	rb.w = 0
 	rb.full = false
 	rb.totalRead = 0
+	rb.readBack = 0
 }
 
 // Cap returns the total capacity of the buffer in bytes.
@@ -116,6 +125,25 @@ func (rb *RingBuffer) Clear() {
 	rb.r = 0
 	rb.w = 0
 	rb.full = false
+	rb.readBack = 0
+}
+
+// unreadAll puts back everything read since the last Clear that is still in
+// the buffer, to be read again, and reports how many bytes that was. After a
+// seek, that is the new position's audio the player pulled and then dropped
+// when flushPlayer emptied it (#1336).
+func (rb *RingBuffer) unreadAll() int {
+	rb.mu.Lock()
+	defer rb.mu.Unlock()
+	n := rb.readBack
+	if n == 0 {
+		return 0
+	}
+	rb.r = (rb.r - n + len(rb.buf)) % len(rb.buf)
+	rb.full = rb.r == rb.w
+	rb.totalRead -= int64(n)
+	rb.readBack = 0
+	return n
 }
 
 // Seek lets oto's Player clear what it has pulled: Player.Seek empties its own
