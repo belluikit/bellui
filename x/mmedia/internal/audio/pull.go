@@ -1,6 +1,7 @@
 package audio
 
 import (
+	"io"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -58,6 +59,8 @@ type puller struct {
 	pendingLen int
 	heldAtPull int
 	pulledAt   time.Time
+
+	restored int64 // audio given back to the ring by Seek, until takeRestored
 }
 
 // pull is one read by the player: where in the pulled bytes it ended, and
@@ -99,10 +102,35 @@ func (p *puller) Read(b []byte) (int, error) {
 	return len(b), nil
 }
 
-// Seek is the ring's: Player.Seek, which empties the player, needs its source
-// to be an io.Seeker.
+// Seek is called by Player.Seek, which empties the player, once no pull is in
+// flight and before the next: Player.Seek needs its source to be an io.Seeker.
+//
+// The player held only audio from after the last Rebase's Clear that it
+// pulled and has not been heard: the old position played out faded to silence
+// first. Dropped, it would be skipped, though counted as played, so the new
+// position started late and the position ran ahead by it (#1336). So the ring
+// gives it back to be pulled again, and restored says how much, for the
+// Output to take off the position.
 func (p *puller) Seek(offset int64, whence int) (int64, error) {
+	if offset != 0 || whence != io.SeekCurrent {
+		return p.ring.Seek(offset, whence)
+	}
+	n := p.ring.unreadAll()
+	p.mu.Lock()
+	p.restored += int64(n)
+	p.pending = false // a pull in flight was discarded, and the player holds nothing
+	p.mu.Unlock()
 	return p.ring.Seek(offset, whence)
+}
+
+// takeRestored is how much audio Seek has given back to the ring since the
+// last call: pulled, so counted, and to be pulled and counted again.
+func (p *puller) takeRestored() int64 {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	n := p.restored
+	p.restored = 0
+	return n
 }
 
 // player is the player the puller asks.
@@ -209,5 +237,6 @@ func (p *puller) reset() {
 	p.seq++
 	p.pulled, p.audio, p.n = 0, 0, 0
 	p.pending = false
+	p.restored = 0
 	p.level.reset()
 }

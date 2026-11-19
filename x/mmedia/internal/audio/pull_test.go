@@ -1,6 +1,7 @@
 package audio
 
 import (
+	"encoding/binary"
 	"testing"
 	"time"
 )
@@ -141,5 +142,46 @@ func TestASeekCountsFromWhatItPulls(t *testing.T) {
 	f.held -= chunk / 3
 	if got, want := o.PlaybackPosition(), 5*time.Second+playerChunk/3; got != want {
 		t.Errorf("position %v; want %v, what it played since the seek", got, want)
+	}
+}
+
+// TestASeekKeepsWhatThePlayerPulledBeforeTheFlush pins #1336: after a seek,
+// oto pulls the new position's first samples from the ring as they arrive,
+// and flushPlayer's Player.Seek then drops everything the player holds, those
+// samples with it. They were never heard, but the puller counted them as
+// played, so the new position started late and the position ran ahead by
+// them: 64 ms on macos-15, the player holding nothing.
+func TestASeekKeepsWhatThePlayerPulledBeforeTheFlush(t *testing.T) {
+	c := newMixContext(1024, 0, time.Hour) // the test mixes, and fills the player
+	defer c.close()
+	o := newOutput(c, 2)
+	defer o.Stop()
+	o.WriteSamples(tone(time.Second, 1000)) // the old position
+	o.Start()
+	p := c.players[0]
+	p.fill() // a chunk of the old position
+
+	o.Rebase(5 * time.Second)
+	for range 10 {
+		c.mix() // the player plays out what it held, faded out, and pads with silence
+	}
+	o.WriteSamples(tone(50*time.Millisecond, 2000)) // less than a chunk: no flush yet
+	for i := 0; o.Buffered() > 0; i++ {
+		if i == 100 {
+			t.Fatal("the player never pulled the first samples of the new position")
+		}
+		c.mix() // until oto has pulled them, as it does while the decoder catches up
+	}
+	o.WriteSamples(tone(time.Second, 3000)) // a chunk is waiting: flushPlayer
+	p.fill()                                // the flush emptied the player: it refills
+
+	p.mu.Lock()
+	head := int16(binary.LittleEndian.Uint16(p.buf))
+	p.mu.Unlock()
+	if head != 2000 {
+		t.Errorf("the player starts the new position with sample %d; want 2000, the first written after the seek", head)
+	}
+	if got := o.PlaybackPosition(); got != 5*time.Second {
+		t.Errorf("position %v after the flush, nothing of the new position played; want 5s", got)
 	}
 }
