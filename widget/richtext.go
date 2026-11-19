@@ -153,6 +153,11 @@ func (t *RichText) AccessibleVirtualNodes() []core.AccessibleVirtualNode {
 // Since: 1.0
 type RichText struct {
 	BaseWidget
+
+	// Segments is the content, in order. After changing it, call Refresh. To
+	// change a segment, replace it with a new one rather than editing its
+	// fields: the layout is rebuilt when a segment is added, removed, replaced
+	// or changes length, and an in-place edit that keeps the length is missed.
 	Segments []RichTextSegment
 	Wrapping bellui.TextWrap
 	Scroll   bellui.ScrollDirection

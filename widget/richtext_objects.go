@@ -957,6 +957,12 @@ type RichTextSegment interface {
 
 // TextSegment represents the styling for a segment of rich text.
 //
+// To change the text or style of a segment a RichText is showing, put a new
+// TextSegment in its place in RichText.Segments (or call SetSegments) and
+// then Refresh. Editing Text or Style of the existing segment is not reliably
+// seen: if the text keeps its byte length, the RichText keeps the line breaks
+// and truncation it worked out for the old content.
+//
 // Since: 1.0
 type TextSegment struct {
 	Style RichTextStyle
