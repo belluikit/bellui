@@ -42,7 +42,9 @@ var _ core.Layout = (*rowWrapLayout)(nil)
 // For a RowWrapLayout this is initially the width of the widest child
 // and the height of the tallest child multiplied by the number of children,
 // with appropriate padding between them.
-// After Layout() has run it returns the actual min size.
+// After Layout() has run it is the widest child's width and the height the
+// rows took at the width laid out. Not the width of the widest row, which
+// would keep the parent from ever getting narrower than it (#1346).
 func (l *rowWrapLayout) MinSize(objects []core.CanvasObject) geo.Size {
 	if len(objects) == 0 {
 		return geo.NewSize(0, 0)
@@ -126,7 +128,7 @@ func (l *rowWrapLayout) Layout(objects []core.CanvasObject, containerSize geo.Si
 		}
 		o.Resize(sizes[i])
 		o.Move(geo.NewPos(x, y))
-		minSize.Width = geo.Max(minSize.Width, x+sizes[i].Width)
+		minSize.Width = geo.Max(minSize.Width, o.MinSize().Width)
 		x += sizes[i].Width + l.horizontalPadding
 	}
 	if len(rowHeights) > 0 {

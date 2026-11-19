@@ -96,10 +96,26 @@ func TestRowWrapLayout_MinSize(t *testing.T) {
 		// when/then
 		got := container.MinSize()
 
-		// then
+		// then: the widest child, not the first row (#1346)
 		p := theme.Padding()
-		want := geo.NewSize(10+p+20, 10+p+10)
+		want := geo.NewSize(20, 10+p+10)
 		assert.Equal(t, want, got)
+	})
+	t.Run("should let the parent get narrower after a wide layout", func(t *testing.T) {
+		// given: three objects laid out in one row
+		a := makeObject(10, 10)
+		b := makeObject(20, 10)
+		c := makeObject(30, 10)
+		container := container.New(layout.NewRowWrapLayout(), a, b, c)
+		container.Resize(geo.NewSize(200, 50))
+		p := theme.Padding()
+		assert.Equal(t, geo.NewSize(30, 10), container.MinSize())
+
+		// when: the parent gives it only its min width
+		container.Resize(geo.NewSize(30, 50))
+
+		// then: one object a row, still no wider than the widest (#1346)
+		assert.Equal(t, geo.NewSize(30, 10+p+10+p+10), container.MinSize())
 	})
 }
 
