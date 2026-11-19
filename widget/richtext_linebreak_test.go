@@ -175,11 +175,12 @@ func TestLineBounds_WrapWordCJKKeepsLatinWords(t *testing.T) {
 	}
 }
 
-// The case #1318 leaves open: a Latin word glued to a closing mark, here
-// "Choro、", is one unit, since 、 may not start a row. When the word fits on
-// a row but the unit does not, the word still splits. If this changes, the
-// open question on #1318 was decided: update this test with it.
-func TestLineBounds_WrapWordCJKLatinBeforeClosingMarkStillSplits(t *testing.T) {
+// A Latin word glued to a closing mark, here "Choro、", is one unit, since 、
+// may not start a row. When the word fits on a row but the unit does not, the
+// word splits rather than the row running past the width: bellui does not clip
+// text at a widget's edge, so an overflowing row paints over its neighbour.
+// Decided on #1318 (option B), so a change here needs that decision revisited.
+func TestLineBounds_WrapWordCJKLatinBeforeClosingMarkSplits(t *testing.T) {
 	assert.Equal(t, []string{"Chor", "o、昆比"}, wrapRows("Choro、昆比", 50))
 }
 
