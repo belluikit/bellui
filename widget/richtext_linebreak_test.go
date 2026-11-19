@@ -145,3 +145,61 @@ func TestLineBounds_WrapWordNarrowerThanACharacterKeepsEveryLine(t *testing.T) {
 		assert.Equal(t, want, rows, "rows of %q", text)
 	}
 }
+
+// wrapRows word-wraps text at width with a measurer of 10 per character.
+func wrapRows(text string, width float32) []string {
+	measurer := func(text []rune) geo.Size { return geo.NewSize(float32(len(text))*10, 10) }
+	maxSize := geo.NewSize(width, 10000)
+	seg := &TextSegment{Text: text}
+	bounds, _ := lineBounds(seg, bellui.TextWrapWord, bellui.TextTruncateOff, width, maxSize, measurer)
+	runes := []rune(text)
+	rows := []string{}
+	for _, b := range bounds {
+		rows = append(rows, string(runes[b.begin:b.end]))
+	}
+	return rows
+}
+
+// A Latin word or a number among ideographs moves down whole when it fits on a
+// row, rather than splitting where the row overflowed (#1318). One wider than
+// the row still breaks inside, as it must.
+func TestLineBounds_WrapWordCJKKeepsLatinWords(t *testing.T) {
+	for text, want := range map[string][]string{
+		"亚Choro亚":      {"亚", "Choro", "亚"},
+		"价格12345元":     {"价格", "12345", "元"},
+		"好的Choro昆比":    {"好的", "Choro", "昆比"},
+		"亚Chorochoro亚": {"亚", "Choro", "choro", "亚"}, // wider than the row
+		"Chorochoro":   {"Choro", "choro"},           // Latin only: unchanged
+	} {
+		assert.Equal(t, want, wrapRows(text, 50), "rows of %q", text)
+	}
+}
+
+// The case #1318 leaves open: a Latin word glued to a closing mark, here
+// "Choro、", is one unit, since 、 may not start a row. When the word fits on
+// a row but the unit does not, the word still splits. If this changes, the
+// open question on #1318 was decided: update this test with it.
+func TestLineBounds_WrapWordCJKLatinBeforeClosingMarkStillSplits(t *testing.T) {
+	assert.Equal(t, []string{"Chor", "o、昆比"}, wrapRows("Choro、昆比", 50))
+}
+
+// Widget-level #1318 with the test font's real metrics: at 55 "Choro" (53.4
+// wide) fits a row, and moves down whole instead of drawing "亚Cho" / "ro昆".
+func TestLabel_WrapWordCJKKeepsLatinWord(t *testing.T) {
+	test.NewTempApp(t)
+
+	const text = "昆比亚Choro昆比亚"
+	l := NewLabel(text)
+	l.Wrapping = bellui.TextWrapWord
+	r := test.TempWidgetRenderer(t, l)
+	require.LessOrEqual(t, NewLabel("Choro").MinSize().Width, float32(55), "Choro must fit the row for this to prove anything")
+
+	l.Resize(geo.NewSize(55, 2000))
+	r.Refresh()
+	runes := []rune(text)
+	var rows []string
+	for _, b := range l.provider.rowBounds {
+		rows = append(rows, string(runes[b.begin:b.end]))
+	}
+	assert.Contains(t, rows, "Choro")
+}

@@ -108,13 +108,22 @@ var cjkNoLineEnd = &unicode.RangeTable{
 // cjkLineBreak moves a fallback break at index i of text, so the row before
 // it does not end with an opening mark and the row from it does not start with
 // a closing one. It moves back first, carrying the character before the
-// punctuation down with it, as CSS line-break: normal does. When no point in
-// (0, i] will do, as when a row holds a single ideograph, it moves forward to
-// the first point that will, or to len(text): the row then runs past the
-// width, as a browser lets it, rather than start with "、".
+// punctuation down with it, as CSS line-break: normal does. It prefers a break
+// next to CJK text, so a Latin word or number among ideographs moves down whole
+// rather than splitting where the row overflowed (#1318); only when the row
+// holds no such break does it take the nearest one, as a Latin word wider than
+// the row needs. When no point in (0, i] will do, as when a row holds a single
+// ideograph, it moves forward to the first point that will, or to len(text):
+// the row then runs past the width, as a browser lets it, rather than start
+// with "、".
 func cjkLineBreak(text []rune, i int) int {
 	if i >= len(text) {
 		return len(text) // the row already ends the text
+	}
+	for j := i; j > 0; j-- {
+		if cjkBreakAllowed(text, j) && (isCJK(text[j-1]) || isCJK(text[j])) {
+			return j
+		}
 	}
 	for j := i; j > 0; j-- {
 		if cjkBreakAllowed(text, j) {
@@ -132,4 +141,20 @@ func cjkLineBreak(text []rune, i int) int {
 // cjkBreakAllowed reports whether text may break before index j, 0 < j < len(text).
 func cjkBreakAllowed(text []rune, j int) bool {
 	return !unicode.Is(cjkNoLineStart, text[j]) && !unicode.Is(cjkNoLineEnd, text[j-1])
+}
+
+// isCJK reports whether r is written without spaces between words, so a line
+// may break on either side of it: an ideograph, kana, hangul or bopomofo, or a
+// mark from the CJK punctuation and fullwidth blocks. UAX #14 gives these
+// classes such as ID, CL and OP, where Latin letters and digits are AL and NU,
+// which do not break between each other (LB28, LB29).
+func isCJK(r rune) bool {
+	switch {
+	case r >= 0x3000 && r <= 0x303F, // CJK Symbols and Punctuation
+		r >= 0xFE10 && r <= 0xFE1F, // Vertical Forms
+		r >= 0xFE30 && r <= 0xFE4F, // CJK Compatibility Forms
+		r >= 0xFF00 && r <= 0xFFEF: // Halfwidth and Fullwidth Forms
+		return true
+	}
+	return unicode.In(r, unicode.Han, unicode.Hiragana, unicode.Katakana, unicode.Hangul, unicode.Bopomofo)
 }
