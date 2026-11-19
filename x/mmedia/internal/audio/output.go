@@ -230,6 +230,23 @@ func (o *Output) flushPlayer() {
 	if o.buffer.Available() < playerBufferBytes(o.sampleRate, o.channels) {
 		return
 	}
+	o.flushNow()
+}
+
+// EndOfStream says the samples written since the last Rebase run to the end of
+// the stream: no more are coming until the next seek. After a seek within a
+// chunk of the end, the ring never holds the chunk flushPlayer waits for, so
+// the player was never emptied nor faded back in, and the tail played at the
+// faded-out volume: silent (#1340). It flushes now with what the ring holds.
+// Without a seek pending, it does nothing.
+func (o *Output) EndOfStream() {
+	if o.flushPending.Load() {
+		o.flushNow()
+	}
+}
+
+// flushNow is flushPlayer's work, whatever the ring holds.
+func (o *Output) flushNow() {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	if o.flushPending.Swap(false) && o.player != nil {
@@ -469,6 +486,17 @@ func (o *Output) Volume() float64 {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	return o.volume
+}
+
+// PlayingVolume is the volume the device plays at now: Volume, or less while
+// a start, pause, stop or seek fades the sound, and 0 when there is no player.
+func (o *Output) PlayingVolume() float64 {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if o.player == nil {
+		return 0
+	}
+	return o.player.Volume()
 }
 
 // PlaybackPosition returns the current audio playback position: the audio

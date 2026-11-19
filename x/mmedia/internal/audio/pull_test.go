@@ -185,3 +185,61 @@ func TestASeekKeepsWhatThePlayerPulledBeforeTheFlush(t *testing.T) {
 		t.Errorf("position %v after the flush, nothing of the new position played; want 5s", got)
 	}
 }
+
+// TestASeekNearTheEndPlaysTheTail pins #1340: after a seek within a chunk of
+// the end, the ring never held the chunk flushPlayer waits for, so the player
+// was never faded back in, and the rest of the track played at the volume
+// Rebase faded it out to: silent. EndOfStream flushes with what there is.
+func TestASeekNearTheEndPlaysTheTail(t *testing.T) {
+	c := newMixContext(1024, 0, time.Hour) // the test mixes
+	defer c.close()
+	o := newOutput(c, 2)
+	defer o.Stop()
+	o.WriteSamples(tone(time.Second, 1000))
+	o.Start()
+	for range 5 {
+		c.mix()
+	}
+	o.Rebase(5 * time.Second)
+	for range 10 {
+		c.mix() // the device plays the fade out, as Rebase waits for it to
+	}
+	const level = 16000
+	tail := tone(100*time.Millisecond, level) // the last of the track: less than a chunk
+	o.WriteSamples(tail)
+	o.EndOfStream()
+
+	before := len(c.played())
+	for i := 0; o.Unplayed() > 0; i++ {
+		if i == 100 {
+			t.Fatal("the tail never played out")
+		}
+		c.mix()
+	}
+	out := c.played()[before:]
+	var peak float32
+	loud := 0
+	for _, v := range out {
+		peak = max(peak, abs32(v))
+		if abs32(v) > level/32768.0/2 {
+			loud++
+		}
+	}
+	if want := float32(level) / 32768 * 0.95; peak < want {
+		t.Errorf("the tail peaked at %.3f; want about %.3f, the level written", peak, float32(level)/32768)
+	}
+	// Faded in, so most of it, not all, is above half its level.
+	frames := len(tail) / 4
+	if loud < frames*3/4 {
+		t.Errorf("%d of the tail's %d frames played above half its level; want most of them", loud, frames)
+	}
+	// The first edge is the tail coming in; the last is the track's own end,
+	// which the test tone cuts at full level.
+	steps := edges(out, float32(level)/32768)
+	if len(steps) == 0 {
+		t.Fatal("the tail never came in")
+	}
+	if steps[0] > 0.05 {
+		t.Errorf("the tail comes in with a step of %.3f: a click, not a fade", steps[0])
+	}
+}

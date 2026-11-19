@@ -1405,6 +1405,7 @@ func (p *Pipeline) decodeAhead(stop <-chan struct{}) {
 		p.ended.Store(ended)
 
 		if ended {
+			p.audioEnded()
 			if pool := p.pool.Load(); pool != nil {
 				select {
 				case pool.queue <- timedFrame{gen: gen}: // nil img: end of stream
@@ -1457,6 +1458,23 @@ func (p *Pipeline) decodeAhead(stop <-chan struct{}) {
 			}
 		}
 	}
+}
+
+// audioEnded tells the audio output that the decoder has written the last of
+// the stream, so a seek within a chunk of the end fades its tail in rather
+// than playing it at the faded-out volume (#1340). Under audioMu and checked
+// against the seek generation, as the audio writes are: after a later seek,
+// what the output holds is that seek's start, not the end.
+func (p *Pipeline) audioEnded() {
+	if p.audioOutput == nil {
+		return
+	}
+	p.audioMu.Lock()
+	defer p.audioMu.Unlock()
+	if p.srcGen.Load() != p.seekGen.Load() {
+		return
+	}
+	p.audioOutput.EndOfStream()
 }
 
 // awaitSeekAfterEnd waits, once the end-of-stream marker is queued, for a seek
