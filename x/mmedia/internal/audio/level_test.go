@@ -73,3 +73,44 @@ func TestLevelFollowsWhatIsHeardNotWhatIsPulled(t *testing.T) {
 	f.held = chunk / 2
 	near(t, "into the silent chunk", o.Level(), 0)
 }
+
+// TestLevelFallsWithTheFades pins #1342: the level took the volume setting,
+// not the volume the player is at, so while a pause or a seek had the player
+// faded to silence it reported the full level of audio nobody heard (0.060
+// during a seek's silence, measured on a Mac, with the player at 0.00). It
+// plays a constant level through a device the test mixes, so the level is
+// v/32768 times the player's volume and nothing else.
+func TestLevelFallsWithTheFades(t *testing.T) {
+	const v = 16384
+	full := float32(v) / (1 << 15)
+	c := newMixContext(96, 3, 2*time.Millisecond)
+	defer c.close()
+	o := newOutput(c, 2)
+	defer o.Stop()
+	playing := func(what string, want float32) {
+		t.Helper()
+		waitFor(t, what, 5*time.Second, func() bool { return math.Abs(float64(o.Level()-want)) < 0.002 })
+	}
+
+	o.WriteSamples(tone(time.Second, v))
+	o.Start()
+	playing("the tone at full volume", full)
+	o.SetVolume(0.5)
+	playing("the tone at volume 0.5", full/2)
+	o.SetVolume(1)
+	playing("the tone back at full volume", full)
+
+	o.Pause() // returns once faded out
+	if got := o.Level(); got != 0 {
+		t.Errorf("level %.4f while paused, with the player at volume %.2f; want 0", got, o.PlayingVolume())
+	}
+	o.Resume()
+	playing("the tone after the resume", full)
+
+	o.Rebase(time.Second) // a seek: silent until the new position arrives
+	if got := o.Level(); got != 0 {
+		t.Errorf("level %.4f during the seek's silence, with the player at volume %.2f; want 0", got, o.PlayingVolume())
+	}
+	o.WriteSamples(tone(time.Second, v))
+	playing("the new position", full)
+}

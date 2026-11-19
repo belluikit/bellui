@@ -571,9 +571,17 @@ func (o *Output) Rebase(pos time.Duration) {
 // Level is the RMS, 0 to 1, of the audio playing now: the 20 ms window at the
 // playback position, with the volume applied. It is what is heard, not what
 // was last handed to the device, which runs a pull ahead. The volume is the
-// current one, as oto applies it to what the player holds as well (SetVolume).
+// one the player is at now, as oto applies it to what the player holds as well
+// (SetVolume): 0 while a pause or a seek has it faded out, which the setting
+// is not (#1342). With no player, as on a detached Output, nothing fades, and
+// it is the setting.
 func (o *Output) Level() float32 {
-	volume := float32(o.Volume())
+	o.mu.Lock()
+	volume := float32(o.volume)
+	if o.player != nil {
+		volume = float32(o.player.Volume())
+	}
+	o.mu.Unlock()
 	played, _ := o.pull.played()
 	o.pull.mu.Lock()
 	defer o.pull.mu.Unlock()
