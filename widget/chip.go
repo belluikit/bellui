@@ -26,10 +26,11 @@ const (
 )
 
 var (
-	_ event.Tappable   = (*Chip)(nil)
-	_ event.Hoverable  = (*Chip)(nil)
-	_ core.Accessible  = (*Chip)(nil)
-	_ core.Disableable = (*Chip)(nil)
+	_ event.Tappable          = (*Chip)(nil)
+	_ event.Hoverable         = (*Chip)(nil)
+	_ core.Accessible         = (*Chip)(nil)
+	_ core.AccessibleStateful = (*Chip)(nil)
+	_ core.Disableable        = (*Chip)(nil)
 )
 
 // AccessibleRole returns [core.RoleButton].
@@ -37,6 +38,16 @@ func (c *Chip) AccessibleRole() core.AccessibleRole { return core.RoleButton }
 
 // AccessibleLabel returns the chip text.
 func (c *Chip) AccessibleLabel() string { return c.Text }
+
+// AccessibleState reports a selected filter chip as selected, so a screen
+// reader can tell it from an unselected one (#1348). The tree adds the
+// disabled state itself.
+func (c *Chip) AccessibleState() core.AccessibleState {
+	if c.Style == ChipStyleFilter && c.Selected {
+		return core.StateSelected
+	}
+	return 0
+}
 
 // Chip is a compact MD3 element for selections, filters, or actions.
 //

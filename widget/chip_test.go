@@ -3,6 +3,7 @@ package widget_test
 import (
 	"testing"
 
+	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/test"
 	"github.com/belluikit/bellui/widget"
@@ -79,4 +80,18 @@ func TestInputChip_BodyTap(t *testing.T) {
 	test.TapAt(c, geo.NewPos(3, c.Size().Height/2))
 	assert.True(t, tapped)
 	assert.False(t, deleted)
+}
+
+// A selected filter chip reports itself selected; another style, or an
+// unselected one, reports nothing (#1348).
+func TestChip_AccessibleState(t *testing.T) {
+	test.NewTempApp(t)
+	c := widget.NewFilterChip("Jazz", nil)
+	assert.Equal(t, core.AccessibleState(0), c.AccessibleState())
+	test.Tap(c)
+	assert.True(t, c.AccessibleState().Has(core.StateSelected))
+
+	assist := widget.NewChip("Help", nil)
+	assist.Selected = true
+	assert.Equal(t, core.AccessibleState(0), assist.AccessibleState())
 }
