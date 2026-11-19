@@ -241,9 +241,13 @@ func (c *glCanvas) Scale() float32 {
 }
 
 func (c *glCanvas) SetContent(content core.CanvasObject) {
-	content.Resize(content.MinSize()) // give it the space it wants then calculate the real min
+	// Lay it out in the space the canvas has, or its min size where that is
+	// larger, then ask again what its true min is: a layout that wraps
+	// reports it only once laid out. Not at its min size alone: content
+	// whose rows wrap is at its tallest at its narrowest, and the window
+	// grew to that height and kept it (#1349).
+	content.Resize(c.contentSize(c.size.Max(c.canvasSize(content.MinSize()))))
 
-	// the pass above makes some layouts wide enough to wrap, so we ask again what the true min is.
 	newSize := c.size.Max(c.canvasSize(content.MinSize()))
 
 	c.setContent(content)
