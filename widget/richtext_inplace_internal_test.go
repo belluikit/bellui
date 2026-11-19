@@ -66,6 +66,22 @@ func TestRichText_InPlaceSameLengthEdit_Relayouts(t *testing.T) {
 			set:  func(obj core.CanvasObject, text string) { obj.(*Entry).SetPlaceHolder(text) },
 			rich: func(obj core.CanvasObject) *RichText { return obj.(*Entry).placeholderProvider() },
 		},
+		// The exported field, applied by Refresh through Entry.syncSegments rather
+		// than SetPlaceHolder.
+		"Entry.PlaceHolder field": {
+			build: func(text string) core.CanvasObject {
+				e := NewMultiLineEntry()
+				e.Wrapping = bellui.TextWrapWord
+				e.PlaceHolder = text
+				return e
+			},
+			set: func(obj core.CanvasObject, text string) {
+				e := obj.(*Entry)
+				e.PlaceHolder = text
+				e.Refresh()
+			},
+			rich: func(obj core.CanvasObject) *RichText { return obj.(*Entry).placeholderProvider() },
+		},
 		"Select.SetSelected": {
 			build: func(text string) core.CanvasObject {
 				s := NewSelect([]string{inplaceNarrow, inplaceWide}, nil)
@@ -111,4 +127,32 @@ func TestRichText_InPlaceSameLengthEdit_Relayouts(t *testing.T) {
 			assert.Equal(t, want, drawnRows(tc.rich(edited)))
 		})
 	}
+}
+
+// Entry.syncSegments restyles the placeholder segment in place too, so a style
+// that changes glyph widths must re-lay it out like a fresh placeholder (#1305).
+func TestEntry_PlaceHolderRestyle_Relayouts(t *testing.T) {
+	test.NewTempApp(t)
+	build := func(style bellui.TextStyle) *Entry {
+		e := NewMultiLineEntry()
+		e.Wrapping = bellui.TextWrapWord
+		e.TextStyle = style
+		e.PlaceHolder = inplaceNarrow
+		w := test.NewTempWindow(t, e)
+		w.SetPadded(false)
+		w.Resize(geo.NewSize(120, 300))
+		e.Refresh()
+		return e
+	}
+	bold := bellui.TextStyle{Bold: true}
+
+	want := drawnRows(build(bold).placeholderProvider())
+
+	edited := build(bellui.TextStyle{})
+	before := drawnRows(edited.placeholderProvider())
+	edited.TextStyle = bold
+	edited.Refresh()
+
+	assert.NotEqual(t, rowLens(want), rowLens(before), "regular and bold text break alike; this proves nothing")
+	assert.Equal(t, want, drawnRows(edited.placeholderProvider()))
 }
