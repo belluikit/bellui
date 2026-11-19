@@ -46,8 +46,8 @@ github.com/trendvidia/protocompile v0.38.1 h1:re1MMH6toErAPYXKYOE9atomZOQLUPeeew
 github.com/trendvidia/protocompile v0.38.1/go.mod h1:WbN5LRddJxOCdAC9pi2yI5djQ1E6g2uTli/9DwrjZ6Y=
 github.com/trendvidia/protos v0.1.4 h1:uKa2KUCKDFmAHT0iIuypwoUv+k7dM/u1d1zUWPV00kA=
 github.com/trendvidia/protos v0.1.4/go.mod h1:NPP4w6dOu7BkD8psH0cWJamHHiEpi8QfgP88vKkMXUI=
-github.com/trendvidia/protowire-go v1.16.0 h1:Hd8IfFkcp1WsLPYiFrK9clbjPxWflJMijdP5oLdeH+c=
-github.com/trendvidia/protowire-go v1.16.0/go.mod h1:55QaDXgzv0Q6jq9pTzzyTuwEF88bWDkf0TU8XwGYS7k=
+github.com/trendvidia/protowire-go v1.18.0 h1:5CnKhF5wgJ/MvD7tRyu43OQEZVwGpqsGqv0Iw5yBvfE=
+github.com/trendvidia/protowire-go v1.18.0/go.mod h1:55QaDXgzv0Q6jq9pTzzyTuwEF88bWDkf0TU8XwGYS7k=
 github.com/urfave/cli/v2 v2.27.1 h1:8xSQ6szndafKVRmfyeUMxkNUJQMjL1F2zmsZ+qHpfho=
 github.com/urfave/cli/v2 v2.27.1/go.mod h1:8qnjx1vcq5s2/wpsqoZFndg2CE5tNFyrTvS6SinrnYQ=
 github.com/xrash/smetrics v0.0.0-20201216005158-039620a65673 h1:bAn7/zixMGCfxrRTfdpNzjtPYqr8smhKouy9mxVdGPU=
