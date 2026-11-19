@@ -19,8 +19,6 @@ type enhancedTheme struct {
 	palettes      *CorePalettes
 	darkScheme    *MD3Scheme
 	lightScheme   *MD3Scheme
-	// Warning palette (not part of MD3, kept for compatibility).
-	warningPalette *TonalPalette
 }
 
 var (
@@ -121,12 +119,17 @@ func (t *enhancedTheme) Color(n bellui.ThemeColorName, v bellui.ThemeVariant) co
 		return c
 	}
 
-	// Warning uses a separate palette, not the primary-derived scheme.
+	// Warning and success use palettes of their own, not the
+	// primary-derived scheme.
 	switch n {
 	case ColorNameWarning:
-		return t.warningColor(v)
+		return statusColor(warningPalette, v)
 	case ColorNameForegroundOnWarning:
-		return t.warningOnColor(v)
+		return statusOnColor(warningPalette, v)
+	case ColorNameSuccess:
+		return statusColor(successPalette, v)
+	case ColorNameForegroundOnSuccess:
+		return statusOnColor(successPalette, v)
 	}
 
 	return t.builtin.Color(n, v)
@@ -202,8 +205,6 @@ var legacyMD3ColorFields = map[bellui.ThemeColorName]func(*MD3Scheme) color.Colo
 	ColorNameDisabledButton:      func(s *MD3Scheme) color.Color { return s.SurfaceContainerLow },
 	ColorNameError:               func(s *MD3Scheme) color.Color { return s.Error },
 	ColorNameForegroundOnError:   func(s *MD3Scheme) color.Color { return s.OnError },
-	ColorNameSuccess:             func(s *MD3Scheme) color.Color { return s.Tertiary },
-	ColorNameForegroundOnSuccess: func(s *MD3Scheme) color.Color { return s.OnTertiary },
 	ColorNameInputBackground:     func(s *MD3Scheme) color.Color { return s.SurfaceContainerHighest },
 	ColorNameInputBorder:         func(s *MD3Scheme) color.Color { return s.Outline },
 	ColorNameHeaderBackground:    func(s *MD3Scheme) color.Color { return s.SurfaceContainerLow },
@@ -231,7 +232,6 @@ func (t *enhancedTheme) md3Scheme(v bellui.ThemeVariant) *MD3Scheme {
 		t.palettes = CorePalettesFromPrimary(primaryColor)
 		t.darkScheme = DarkSchemeFromPalettes(t.palettes)
 		t.lightScheme = LightSchemeFromPalettes(t.palettes)
-		t.warningPalette = NewTonalPalette(40, 80) // orange hue
 		t.cachedPrimary = primary
 	}
 
@@ -241,20 +241,34 @@ func (t *enhancedTheme) md3Scheme(v bellui.ThemeVariant) *MD3Scheme {
 	return t.darkScheme
 }
 
-func (t *enhancedTheme) warningColor(v bellui.ThemeVariant) color.NRGBA {
-	t.md3Scheme(v) // ensure palette is initialized
-	if v == VariantLight {
-		return t.warningPalette.Tone(40)
-	}
-	return t.warningPalette.Tone(80)
+// The palettes of the status colours MD3 lacks: the hues of the builtin
+// theme's constants, so each name keeps its meaning (amber, green) whatever
+// the primary (#1338).
+var (
+	warningPalette = statusPalette(colorDarkWarning)
+	successPalette = statusPalette(colorDarkSuccess)
+)
+
+func statusPalette(c color.NRGBA) *TonalPalette {
+	return NewTonalPalette(HCTFromColor(c).Hue, 80)
 }
 
-func (t *enhancedTheme) warningOnColor(v bellui.ThemeVariant) color.NRGBA {
-	t.md3Scheme(v)
+// statusColor is a status palette's colour in variant v, at MD3's
+// custom-colour tones: 40 on light, 80 on dark.
+func statusColor(p *TonalPalette, v bellui.ThemeVariant) color.NRGBA {
 	if v == VariantLight {
-		return t.warningPalette.Tone(100)
+		return p.Tone(40)
 	}
-	return t.warningPalette.Tone(20)
+	return p.Tone(80)
+}
+
+// statusOnColor is the colour that reads on statusColor: tone 100 on
+// light, 20 on dark.
+func statusOnColor(p *TonalPalette, v bellui.ThemeVariant) color.NRGBA {
+	if v == VariantLight {
+		return p.Tone(100)
+	}
+	return p.Tone(20)
 }
 
 func withAlpha(c color.NRGBA, a uint8) color.NRGBA {
