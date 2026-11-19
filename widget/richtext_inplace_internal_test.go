@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/core"
@@ -155,4 +156,49 @@ func TestEntry_PlaceHolderRestyle_Relayouts(t *testing.T) {
 
 	assert.NotEqual(t, rowLens(want), rowLens(before), "regular and bold text break alike; this proves nothing")
 	assert.Equal(t, want, drawnRows(edited.placeholderProvider()))
+}
+
+// The TextSegment and RichText.Segments docs tell apps to replace a segment to
+// change it, because an in-place same-length edit is not seen (#1305, option E).
+// These pin both halves of that contract.
+func TestRichText_SegmentChangeContract(t *testing.T) {
+	bold := RichTextStyleInline
+	bold.TextStyle.Bold = true
+	for name, tc := range map[string]struct {
+		from, to TextSegment
+	}{
+		"text":  {from: TextSegment{Style: RichTextStyleInline, Text: inplaceNarrow}, to: TextSegment{Style: RichTextStyleInline, Text: inplaceWide}},
+		"style": {from: TextSegment{Style: RichTextStyleInline, Text: inplaceNarrow}, to: TextSegment{Style: bold, Text: inplaceNarrow}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			test.NewTempApp(t)
+			show := func(seg TextSegment) *RichText {
+				rt := NewRichText(&seg)
+				rt.Wrapping = bellui.TextWrapWord
+				w := test.NewTempWindow(t, rt)
+				w.SetPadded(false)
+				w.Resize(geo.NewSize(120, 300))
+				rt.Refresh()
+				return rt
+			}
+			want := drawnRows(show(tc.to))
+
+			replaced := show(tc.from)
+			before := drawnRows(replaced)
+			require.NotEqual(t, rowLens(want), rowLens(before), "old and new content break alike; this proves nothing")
+			next := tc.to
+			replaced.Segments[0] = &next
+			replaced.Refresh()
+			assert.Equal(t, want, drawnRows(replaced), "a replaced segment must be laid out afresh")
+
+			// The documented gap. If this starts re-laying out, in-place edits are
+			// covered after all: update the TextSegment and RichText.Segments docs
+			// and the #1305 changelog advice, then drop this half.
+			edited := show(tc.from)
+			seg := edited.Segments[0].(*TextSegment)
+			seg.Text, seg.Style = tc.to.Text, tc.to.Style
+			edited.Refresh()
+			assert.Equal(t, rowLens(before), rowLens(drawnRows(edited)), "in-place edits now re-lay out; the docs say they don't")
+		})
+	}
 }
