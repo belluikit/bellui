@@ -122,10 +122,15 @@ func TestSubmitFrameReclaimsDestroyedTextures(t *testing.T) {
 	// keep freed memory for reuse, so measure past it. From there it grows
 	// under 1 MB per 500 frames with the poll, and about 34 MB without it.
 	//
-	// A leak grows every window by the same amount; what Metal and the
-	// allocator keep after heavy GPU use, such as a perfscenes loop just
-	// before, moves the resident size by up to 12 MB in one window and not
-	// the next (#478). So the test judges the median of several windows.
+	// A leak grows every window: with submitFrame's poll removed, five
+	// windows grew [14.6 13.0 12.4 12.7 12.4] MB, never under 12 (#1316).
+	// What moves the resident size otherwise comes and goes: Metal and the
+	// allocator keeping memory after heavy GPU use, such as a perfscenes loop
+	// just before, add up to 12 MB in one window and not the next (#478), and
+	// other test binaries using the GPU at once, as a full go test ./... does,
+	// added 9.9, 12.9 and 15.8 MB to three windows of five and 36-56 MB to
+	// one (#1316). So the test judges the second-smallest window: a leak fails
+	// it in every window, and noise must spike four windows of five to.
 	for range 300 {
 		frame()
 		time.Sleep(pace)
@@ -142,7 +147,8 @@ func TestSubmitFrameReclaimsDestroyedTextures(t *testing.T) {
 	}
 	t.Logf("resident size grew %.1f MB per %d frames, paced at %v", growth, framesPerWindow, pace)
 	slices.Sort(growth)
-	if growth[windows/2] < 4.0 {
+	quiet := growth[1]
+	if quiet < 4.0 {
 		return
 	}
 	// A GPU that slowed during the test past the pacing was outrun, and its
@@ -153,10 +159,10 @@ func TestSubmitFrameReclaimsDestroyedTextures(t *testing.T) {
 	now := timeGPU()
 	if now > pace {
 		t.Skipf("the GPU slowed from %v to %v per frame during the test, past the pacing of %v: "+
-			"the growth (median %.1f MB) is its backlog, not necessarily a leak", gpuFrame, now, pace, growth[windows/2])
+			"the growth (second-smallest window %.1f MB) is its backlog, not necessarily a leak", gpuFrame, now, pace, quiet)
 	}
-	t.Fatalf("destroyed targets are not being freed: median %.1f MB per window (limit 4), "+
-		"the GPU taking %v per frame before and %v after", growth[windows/2], gpuFrame, now)
+	t.Fatalf("destroyed targets are not being freed: even the second-smallest window grew %.1f MB (limit 4), "+
+		"the GPU taking %v per frame before and %v after", quiet, gpuFrame, now)
 }
 
 // residentBytes is the process's resident set size.
