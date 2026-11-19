@@ -187,3 +187,33 @@ func TestAudioEndLetsTheDeviceRest(t *testing.T) {
 		t.Error("the Output does not count as playing after Play from the end")
 	}
 }
+
+// TestAudioSeekNearTheEndIsHeard pins #1340 through the pipeline: a seek to
+// within a chunk of the end of a track played the rest of it at the volume
+// the seek faded out to, silent, because the audio output waits for a chunk
+// of the new position before it fades back in, and the track has less. The
+// decoder now tells it when the stream has ended.
+func TestAudioSeekNearTheEndIsHeard(t *testing.T) {
+	p, ended := playCoverMP3(t)
+	time.Sleep(300 * time.Millisecond) // past the start's fade in
+	if v := p.audioOutput.PlayingVolume(); v < 0.99 {
+		t.Fatalf("playing at volume %.2f before the seek: the test measures nothing", v)
+	}
+
+	p.Seek(p.Duration() - 100*time.Millisecond)
+	var loudest float64 // the volume the tail played at
+	timeout := time.After(3 * time.Second)
+	for {
+		select {
+		case <-ended:
+			if loudest < 0.99 {
+				t.Errorf("the last 100ms played at volume %.2f at most after a seek to them; want 1, faded back in", loudest)
+			}
+			return
+		case <-timeout:
+			t.Fatalf("no end 3s after a seek to 100ms before the end; time %v", p.CurrentTime())
+		case <-time.After(2 * time.Millisecond):
+			loudest = max(loudest, p.audioOutput.PlayingVolume())
+		}
+	}
+}
