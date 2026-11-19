@@ -24,6 +24,15 @@ type gradient interface {
 	Size() geo.Size
 }
 
+// drawClipped draws raw, whose top-left lands at (x, y) on base, into
+// bounds, the part of it the clip leaves. The source point moves by however
+// much of raw's top and left was cut, whether by the canvas edge or by a
+// clip: moving it only for an off-canvas shape drew a clipped one shifted
+// by its padding (#1330).
+func drawClipped(base *image.NRGBA, bounds image.Rectangle, raw image.Image, x, y int) {
+	draw.Draw(base, bounds, raw, bounds.Min.Sub(image.Pt(x, y)), draw.Over)
+}
+
 func drawArc(c core.Canvas, arc *canvas.Arc, pos geo.Position, base *image.NRGBA, clip image.Rectangle) {
 	pad := painter.VectorPad(arc)
 	scaledWidth := scale.ToScreenCoordinate(c, arc.Size().Width+pad*2)
@@ -35,15 +44,7 @@ func drawArc(c core.Canvas, arc *canvas.Arc, pos geo.Position, base *image.NRGBA
 		return float32(math.Round(float64(in) * float64(c.Scale())))
 	})
 
-	// the clip intersect above cannot be negative, so we may need to compensate
-	offX, offY := 0, 0
-	if scaledX < 0 {
-		offX = -scaledX
-	}
-	if scaledY < 0 {
-		offY = -scaledY
-	}
-	draw.Draw(base, bounds, raw, image.Point{offX, offY}, draw.Over)
+	drawClipped(base, bounds, raw, scaledX, scaledY)
 }
 
 func drawCircle(c core.Canvas, circle *canvas.Circle, pos geo.Position, base *image.NRGBA, clip image.Rectangle) {
@@ -57,15 +58,7 @@ func drawCircle(c core.Canvas, circle *canvas.Circle, pos geo.Position, base *im
 		return float32(math.Round(float64(in) * float64(c.Scale())))
 	})
 
-	// the clip intersect above cannot be negative, so we may need to compensate
-	offX, offY := 0, 0
-	if scaledX < 0 {
-		offX = -scaledX
-	}
-	if scaledY < 0 {
-		offY = -scaledY
-	}
-	draw.Draw(base, bounds, raw, image.Point{offX, offY}, draw.Over)
+	drawClipped(base, bounds, raw, scaledX, scaledY)
 }
 
 func drawGradient(c core.Canvas, g gradient, pos geo.Position, base *image.NRGBA, clip image.Rectangle) {
@@ -171,15 +164,7 @@ func drawLine(c core.Canvas, line *canvas.Line, pos geo.Position, base *image.NR
 		return float32(math.Round(float64(in) * float64(c.Scale())))
 	})
 
-	// the clip intersect above cannot be negative, so we may need to compensate
-	offX, offY := 0, 0
-	if scaledX < 0 {
-		offX = -scaledX
-	}
-	if scaledY < 0 {
-		offY = -scaledY
-	}
-	draw.Draw(base, bounds, raw, image.Point{offX, offY}, draw.Over)
+	drawClipped(base, bounds, raw, scaledX, scaledY)
 }
 
 func drawTex(x, y, width, height int, base *image.NRGBA, tex image.Image, clip image.Rectangle, alpha float64) {
@@ -312,15 +297,7 @@ func drawOblongStroke(c core.Canvas, obj core.CanvasObject, width, height float3
 		return float32(math.Round(float64(in) * float64(c.Scale())))
 	})
 
-	// the clip intersect above cannot be negative, so we may need to compensate
-	offX, offY := 0, 0
-	if scaledX < 0 {
-		offX = -scaledX
-	}
-	if scaledY < 0 {
-		offY = -scaledY
-	}
-	draw.Draw(base, bounds, raw, image.Point{offX, offY}, draw.Over)
+	drawClipped(base, bounds, raw, scaledX, scaledY)
 }
 
 func drawPolygon(c core.Canvas, polygon *canvas.Polygon, pos geo.Position, base *image.NRGBA, clip image.Rectangle) {
@@ -334,15 +311,7 @@ func drawPolygon(c core.Canvas, polygon *canvas.Polygon, pos geo.Position, base 
 		return float32(math.Round(float64(in) * float64(c.Scale())))
 	})
 
-	// the clip intersect above cannot be negative, so we may need to compensate
-	offX, offY := 0, 0
-	if scaledX < 0 {
-		offX = -scaledX
-	}
-	if scaledY < 0 {
-		offY = -scaledY
-	}
-	draw.Draw(base, bounds, raw, image.Point{offX, offY}, draw.Over)
+	drawClipped(base, bounds, raw, scaledX, scaledY)
 }
 
 func drawPath(c core.Canvas, path *canvas.Path, pos geo.Position, base *image.NRGBA, clip image.Rectangle) {
@@ -361,14 +330,7 @@ func drawPath(c core.Canvas, path *canvas.Path, pos geo.Position, base *image.NR
 		return float32(math.Round(float64(in) * float64(c.Scale())))
 	})
 
-	offX, offY := 0, 0
-	if scaledX < 0 {
-		offX = -scaledX
-	}
-	if scaledY < 0 {
-		offY = -scaledY
-	}
-	draw.Draw(base, bounds, raw, image.Point{offX, offY}, draw.Over)
+	drawClipped(base, bounds, raw, scaledX, scaledY)
 }
 
 func drawRectangle(c core.Canvas, rect *canvas.Rectangle, pos geo.Position, base *image.NRGBA, clip image.Rectangle) {
