@@ -5,7 +5,7 @@ go 1.26.2
 require (
 	github.com/belluikit/bellui v1.3.0-rc.2
 	github.com/stretchr/testify v1.12.1
-	github.com/trendvidia/protowire-go v1.18.0
+	github.com/trendvidia/protowire-go v1.19.0
 	google.golang.org/protobuf v1.36.12
 )
 

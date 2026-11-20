@@ -37,7 +37,7 @@ require (
 	github.com/nicksnyder/go-i18n/v2 v2.5.1 // indirect
 	github.com/rymdport/portal v0.4.2 // indirect
 	github.com/stretchr/testify v1.12.1 // indirect
-	github.com/trendvidia/protowire-go v1.18.0 // indirect
+	github.com/trendvidia/protowire-go v1.19.0 // indirect
 	github.com/yuin/goldmark v1.8.5 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/image v0.44.0 // indirect
