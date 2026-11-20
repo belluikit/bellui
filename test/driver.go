@@ -94,6 +94,10 @@ func (d *driver) DoFromGoroutine(f func(), _ bool) {
 	async.EnsureNotMain(func() { doSerialized(f) })
 }
 
+// DoRunsInline reports true: DoFromGoroutine runs the call at once, behind the
+// driver lock, and never posts it (bellui.DoRunsInline).
+func (d *driver) DoRunsInline() bool { return true }
+
 func doSerialized(f func()) {
 	gid := thread.GoroutineID()
 	if doOwner.Load() == gid {

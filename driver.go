@@ -58,6 +58,15 @@ type DoubleTapDriver interface {
 	DoubleTapDelay() time.Duration
 }
 
+// InlineDoDriver is an optional interface that a [Driver] implements when its
+// [Driver.DoFromGoroutine] runs the call at once on the caller's goroutine
+// rather than posting it to a main loop. See [DoRunsInline].
+//
+// Since: 1.3
+type InlineDoDriver interface {
+	DoRunsInline() bool
+}
+
 // OnScreenDriver is an optional interface that a [Driver] can implement to
 // report whether an object is on screen. See [IsOnScreen].
 type OnScreenDriver interface {
@@ -160,6 +169,28 @@ func DoubleTapDelay() time.Duration {
 		}
 	}
 	return defaultDoubleTapDelay
+}
+
+// DoRunsInline reports whether [Do] and [DoAndWait] run the call at once on
+// the caller's goroutine instead of posting it to the main goroutine. The test
+// driver does this, behind a driver lock, so a [Do] there blocks while another
+// goroutine holds that lock. The desktop and mobile drivers post. With no app
+// or driver, it reports false.
+//
+// Use it when work must reach the main goroutine without the caller ever
+// waiting: post with [Do] when this is false, and run the work inline when it
+// is true, since there is no main loop to post to. [IsMainGoroutine] cannot
+// answer this: a desktop binary registers its main goroutine at init, test
+// driver or not.
+//
+// Since: 1.3
+func DoRunsInline() bool {
+	if a := CurrentApp(); a != nil {
+		if d, ok := a.Driver().(InlineDoDriver); ok {
+			return d.DoRunsInline()
+		}
+	}
+	return false
 }
 
 // IsOnScreen reports whether obj is drawn: the last frame of a window that is

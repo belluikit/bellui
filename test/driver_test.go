@@ -106,3 +106,14 @@ func TestDriver_DoFromGoroutineSerializedAcrossInstances(t *testing.T) {
 		assert.Equal(t, calls, shared)
 	}, true)
 }
+
+// The test driver runs Do at once on the caller's goroutine, and says so
+// (#1356): a caller that must not wait for main runs its work inline here.
+func TestDriver_DoRunsInline(t *testing.T) {
+	NewTempApp(t)
+	assert.True(t, bellui.DoRunsInline())
+
+	ran := false
+	bellui.Do(func() { ran = true })
+	assert.True(t, ran, "the call ran before Do returned, as DoRunsInline says")
+}
