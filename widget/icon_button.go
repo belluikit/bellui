@@ -19,7 +19,9 @@ import (
 type IconButtonStyle int
 
 const (
-	// IconButtonStyleStandard has no background, icon color OnSurfaceVariant.
+	// IconButtonStyleStandard has an OnSurfaceVariant icon. Unlike MD3's
+	// transparent container, it is filled with [theme.ColorNameButton], which
+	// keeps the button visible against light surfaces; a disabled one has no fill.
 	IconButtonStyleStandard IconButtonStyle = iota
 	// IconButtonStyleFilled has Primary background, OnPrimary icon.
 	IconButtonStyleFilled
