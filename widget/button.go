@@ -35,7 +35,10 @@ const (
 	ButtonStyleFilledTonal
 	// ButtonStyleElevated uses surface color with shadow and Primary text (MD3 Elevated).
 	ButtonStyleElevated
-	// ButtonStyleOutlined uses transparent background with border (MD3 Outlined).
+	// ButtonStyleOutlined uses a border and Primary text (MD3 Outlined). Unlike
+	// MD3's transparent container, it is filled with [theme.ColorNameButton]
+	// (or [theme.ColorNameDisabledButton] when disabled, unless it has
+	// LowImportance), which keeps the button visible against light surfaces.
 	ButtonStyleOutlined
 	// ButtonStyleText uses transparent background with Primary text (MD3 Text).
 	ButtonStyleText
