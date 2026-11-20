@@ -13,7 +13,7 @@ require (
 	github.com/natefinch/atomic v1.0.1
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/stretchr/testify v1.12.1
-	github.com/trendvidia/protowire-go v1.18.0
+	github.com/trendvidia/protowire-go v1.19.0
 	github.com/urfave/cli/v2 v2.27.1
 	golang.org/x/mod v0.35.0
 	golang.org/x/sys v0.47.0

@@ -41,7 +41,7 @@ require (
 	github.com/belluikit/gocef v0.5.0
 	github.com/go-text/typesetting-utils v0.0.0-20260419141703-4ffe8874dabc
 	github.com/jsummers/gobmp v0.0.0-20230614200233-a9de23ed2e25
-	github.com/trendvidia/protowire-go v1.18.0
+	github.com/trendvidia/protowire-go v1.19.0
 	google.golang.org/protobuf v1.36.12
 )
 
