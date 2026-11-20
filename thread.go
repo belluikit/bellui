@@ -17,6 +17,22 @@ func IsMainGoroutine() bool {
 	return thread.IsMainGoroutine()
 }
 
+// MainGoroutineRegistered reports whether a driver has registered its main
+// (GUI) goroutine. A desktop or mobile driver does so when it starts; the test
+// driver never does, and it runs [Do] and [DoAndWait] calls at once on the
+// caller's goroutine, behind a driver lock, rather than posting them.
+//
+// Use this when work must reach the main goroutine without the caller waiting:
+// with a main goroutine registered, [Do] posts it; without one, there is no
+// main goroutine to post to, and running it inline is the equivalent.
+// [IsMainGoroutine] cannot answer this: until a main goroutine is registered it
+// reports false on desktop and true on mobile, for every goroutine.
+//
+// Since: 1.3
+func MainGoroutineRegistered() bool {
+	return thread.MainGoroutineRegistered()
+}
+
 // RunOnMain runs fn on the main (GUI) goroutine and waits for it to complete.
 // If the caller is already on the main goroutine — or no running app/driver is
 // available (e.g. in unit tests) — fn runs inline. Otherwise it is dispatched via
