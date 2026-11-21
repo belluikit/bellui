@@ -44,9 +44,9 @@ func Test_servingMessage_NoManifest(t *testing.T) {
 	t.Cleanup(func() { _ = os.RemoveAll(p.tempDir) })
 	require.Empty(t, s.appData.AppID, "the case under test: no manifest, so no app ID")
 
-	assert.Equal(t, "Serving hello at: http://localhost:8080\n", servingMessage(s.appData, 8080))
+	assert.Equal(t, "Serving hello at: http://localhost:8080\n", servingMessage(s.appData, "http", 8080))
 
 	s.appData.AppID = "com.example.hello"
-	assert.Equal(t, "Serving com.example.hello at: http://localhost:8080\n", servingMessage(s.appData, 8080),
+	assert.Equal(t, "Serving com.example.hello at: http://localhost:8080\n", servingMessage(s.appData, "http", 8080),
 		"an app ID, when there is one, still names the app")
 }

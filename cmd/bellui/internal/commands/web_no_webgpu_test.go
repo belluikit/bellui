@@ -109,14 +109,14 @@ func warmChrome(t *testing.T, chrome string) {
 	t.Logf("Chrome warm-up (blank page) took %v", time.Since(start).Round(time.Millisecond))
 }
 
-// dumpPage opens url in headless Chrome with a profile in dir and returns
-// the DOM once the page has settled.
-func dumpPage(t *testing.T, chrome, dir, url string) []byte {
+// dumpPage opens url in headless Chrome with a profile in dir, and any extra
+// flags, and returns the DOM once the page has settled.
+func dumpPage(t *testing.T, chrome, dir, url string, extra ...string) []byte {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, chrome,
-		append(chromeFlags(dir), "--virtual-time-budget=3000", "--dump-dom", url)...)
+		append(append(chromeFlags(dir), extra...), "--virtual-time-budget=3000", "--dump-dom", url)...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
