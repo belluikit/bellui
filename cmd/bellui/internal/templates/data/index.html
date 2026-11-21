@@ -95,6 +95,11 @@
 				webgpu_support().then(function(ok) {
 					if (ok) {
 						start_application();
+					} else if (window.isSecureContext === false) {
+						// Browsers offer WebGPU only to a secure page (https, or
+						// localhost), so over plain http another browser cannot
+						// help (#1358).
+						report_error("WebGPU needs a secure page: open this app over https, or at localhost on this computer.");
 					} else {
 						report_error("This browser does not support WebGPU, which this application needs. Try a recent version of Chrome, Edge or Safari.");
 					}
