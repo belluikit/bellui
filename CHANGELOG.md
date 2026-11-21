@@ -19,6 +19,30 @@ one per change, so that open pull requests do not conflict here. Run
 `go run ./hack/changelog preview` to see them assembled; the release folds them
 into a section below.
 
+## v1.3.0-rc.4 — 2026-11-21
+
+The fourth release candidate for v1.3.0, cut the same day as rc.3 for one
+change that DaySong asked for: a selected filter chip, including every chip
+in a `ChipGroup`, now shows a check mark, as Material 3's does. A chip with
+no icon of its own grows by an icon while selected, so a row of chips may
+reflow (see *Changed*). The final v1.3.0 still follows the release check by
+hand. The `x/*` modules and the `bellui` command are released at
+v1.3.0-rc.4 with it, except x/mmedia, which is v1.3.0-rc.5, one ahead as
+since rc.2.
+
+### Changed
+
+* **A selected filter chip shows a check mark, as Material 3's does**
+  ([#1364](https://github.com/belluikit/bellui/issues/1364)). A selected
+  `ChipStyleFilter` chip differed from an unselected one only by its fill,
+  which was hard to tell apart. It now leads with `theme.ConfirmIcon()` in
+  the on-secondary-container colour, or the disabled colour when the chip is
+  disabled, and at the right under a right-to-left layout. A chip with an
+  icon of its own shows the check in its place and keeps its width; a chip
+  without one grows by an icon and its gap while selected, so the chips
+  after it move along. Every `ChipGroup` gets it, single-choice ones
+  included. Assist and input chips are unchanged.
+
 ## v1.3.0-rc.3 — 2026-11-21
 
 The third release candidate for v1.3.0, cut so that Player and the apps on it
