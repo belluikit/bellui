@@ -20,7 +20,7 @@ type ChipStyle int
 
 const (
 	ChipStyleAssist     ChipStyle = iota // Outlined, icon+label
-	ChipStyleFilter                      // Selectable; secondary-container fill when selected (no checkmark)
+	ChipStyleFilter                      // Selectable; when selected, secondary-container fill and a leading check mark
 	ChipStyleInput                       // Label + delete button
 	ChipStyleSuggestion                  // Outlined, label only
 )
@@ -258,6 +258,16 @@ func (c *Chip) CreateRenderer() core.WidgetRenderer {
 		objects = append(objects, icon)
 	}
 
+	// MD3's filter chip shows a check mark while selected, in the leading
+	// icon's place (#1364): the fill alone was hard to tell from unselected.
+	var check *canvas.Image
+	if c.Style == ChipStyleFilter {
+		check = canvas.NewImageFromResource(theme.ConfirmIcon())
+		check.FillMode = canvas.ImageFillContain
+		check.Hide()
+		objects = append(objects, check)
+	}
+
 	var deleteBtn *canvas.Image
 	if c.Style == ChipStyleInput && c.OnDeleted != nil {
 		deleteBtn = canvas.NewImageFromResource(theme.CancelIcon())
@@ -270,6 +280,7 @@ func (c *Chip) CreateRenderer() core.WidgetRenderer {
 		bg:           bg,
 		label:        label,
 		icon:         icon,
+		check:        check,
 		deleteBtn:    deleteBtn,
 		chip:         c,
 	}
@@ -282,8 +293,23 @@ type chipRenderer struct {
 	bg        *canvas.Rectangle
 	label     *canvas.Text
 	icon      *canvas.Image
+	check     *canvas.Image // a filter chip's check mark, shown while selected
 	deleteBtn *canvas.Image
 	chip      *Chip
+}
+
+// checked is whether the chip shows its check mark: a selected filter chip.
+func (r *chipRenderer) checked() bool {
+	return r.check != nil && r.chip.Style == ChipStyleFilter && r.chip.Selected
+}
+
+// leading is the icon at the chip's start: the check mark while checked, in
+// place of the chip's own icon, else that icon, or nil.
+func (r *chipRenderer) leading() *canvas.Image {
+	if r.checked() {
+		return r.check
+	}
+	return r.icon
 }
 
 func (r *chipRenderer) MinSize() geo.Size {
@@ -295,8 +321,8 @@ func (r *chipRenderer) MinSize() geo.Size {
 
 	textWidth := bellui.MeasureText(r.chip.Text, textSize, bellui.TextStyle{}).Width
 	w := hPad + textWidth + hPad // left pad + text + right pad
-	if r.chip.Icon != nil {
-		w += iconSz + 8 // icon + gap
+	if r.chip.Icon != nil || r.checked() {
+		w += iconSz + 8 // leading icon or check mark + gap
 	}
 	if r.deleteBtn != nil {
 		w += iconSz + 4 // delete + gap
@@ -313,9 +339,9 @@ func (r *chipRenderer) Layout(size geo.Size) {
 	r.bg.Resize(size)
 	x := hPad
 
-	if r.icon != nil {
-		r.icon.Resize(geo.NewSize(iconSz, iconSz))
-		r.icon.Move(geo.NewPos(x, (size.Height-iconSz)/2))
+	if lead := r.leading(); lead != nil {
+		lead.Resize(geo.NewSize(iconSz, iconSz))
+		lead.Move(geo.NewPos(x, (size.Height-iconSz)/2))
 		x += iconSz + 8
 	}
 
@@ -333,8 +359,8 @@ func (r *chipRenderer) Layout(size geo.Size) {
 	// icon sits on the right; the full-width bg maps onto itself. The press
 	// ripples are left out: a press places them.
 	mirrored := []core.CanvasObject{r.bg, r.label}
-	if r.icon != nil {
-		mirrored = append(mirrored, r.icon)
+	if lead := r.leading(); lead != nil {
+		mirrored = append(mirrored, lead)
 	}
 	if r.deleteBtn != nil {
 		mirrored = append(mirrored, r.deleteBtn)
@@ -380,6 +406,7 @@ func (r *chipRenderer) Refresh() {
 		r.icon.Resource = theme.NewColoredResource(r.chip.Icon, theme.ColorNamePrimary)
 		r.icon.Refresh()
 	}
+	r.showCheck(theme.NewColoredResource(theme.ConfirmIcon(), theme.ColorNameOnSecondaryContainer))
 	if r.deleteBtn != nil {
 		r.deleteBtn.Resource = theme.NewColoredResource(theme.CancelIcon(), theme.ColorNameOnSurfaceVariant)
 		r.deleteBtn.Refresh()
@@ -409,11 +436,34 @@ func (r *chipRenderer) refreshDisabled(th bellui.Theme, v bellui.ThemeVariant) {
 		r.icon.Resource = theme.NewDisabledResource(r.chip.Icon)
 		r.icon.Refresh()
 	}
+	r.showCheck(theme.NewDisabledResource(theme.ConfirmIcon()))
 	if r.deleteBtn != nil {
 		r.deleteBtn.Resource = theme.NewDisabledResource(theme.CancelIcon())
 		r.deleteBtn.Refresh()
 	}
 	r.relayout()
+}
+
+// showCheck shows the check mark, drawn as res, while the chip is checked,
+// and the chip's own icon only while it isn't: the mark takes its place.
+func (r *chipRenderer) showCheck(res bellui.Resource) {
+	if r.check == nil {
+		return
+	}
+	if r.checked() {
+		r.check.Resource = res
+		r.check.Show()
+		r.check.Refresh()
+	} else {
+		r.check.Hide()
+	}
+	if r.icon != nil {
+		if r.checked() {
+			r.icon.Hide()
+		} else {
+			r.icon.Show()
+		}
+	}
 }
 
 func (r *chipRenderer) relayout() {
