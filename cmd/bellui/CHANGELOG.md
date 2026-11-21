@@ -17,6 +17,68 @@ one per change, so that open pull requests do not conflict here. Run
 `go run ./hack/changelog preview -C cmd/bellui` to see them assembled; the release folds them
 into a section below.
 
+## v1.3.0-rc.3 — 2026-11-21
+
+Cut with toolkit v1.3.0-rc.3. `bellui serve --https` and `--tunnel` let a
+phone open a served WebGPU app, which browsers allow only on a secure page,
+and the page served over plain http now says that is why WebGPU is missing.
+Linux web views bundle Chromium 156, an iOS release signs when two
+certificates share a name, and Android packages compress their text assets.
+Built against bellui v1.3.0-rc.3.
+
+### Security
+
+* **Linux web views bundle Chromium 156**
+  ([#1112](https://github.com/belluikit/bellui/issues/1112)). `bellui package`
+  now lays out CEF 156.0.30 (Chromium 156.0.8078.96) beside a Linux app,
+  replacing CEF 154, which had fallen three major versions behind Chrome
+  stable. It is one major behind now: CEF has published no stable 157 build.
+  The payload comes from gocef-libs v0.3.0, and its checksums are verified as
+  before.
+
+### Added
+
+* **`bellui serve` can give a phone a secure page**
+  ([#1359](https://github.com/belluikit/bellui/issues/1359)). Browsers offer
+  WebGPU only over https or at `localhost`, so a served app could not start on
+  another device. `--https` serves with a self-signed certificate made for
+  this machine's addresses, and prints each network address and the
+  certificate's SHA-256 fingerprint. The browser warns once per run before
+  opening the page. `--tunnel` also opens a Cloudflare quick tunnel and prints
+  its public `trycloudflare.com` address, whose certificate browsers trust. It
+  needs `cloudflared` on the PATH and no Cloudflare account, and anyone with
+  the address can open the app while `serve` runs. `serve` now stops on
+  SIGTERM as well as Ctrl-C, and takes the tunnel down with it.
+
+### Fixed
+
+* **A web app opened over plain http says why WebGPU is missing**
+  ([#1358](https://github.com/belluikit/bellui/issues/1358)). Browsers offer
+  WebGPU only to a secure page: https, or `localhost`. So an app from
+  `bellui serve` opened at a network address, such as from a phone on the
+  LAN, said "This browser does not support WebGPU" in every browser, and
+  advised trying another one. Its page now says "WebGPU needs a secure page:
+  open this app over https, or at localhost on this computer." A browser
+  that really lacks WebGPU gets the old message.
+* **Text assets in an Android package are compressed**
+  ([#1285](https://github.com/belluikit/bellui/issues/1285)). `bellui package`
+  stored every file of `assets/` uncompressed, so DaySong's 4.4 MB
+  `THIRD_PARTY_NOTICES.txt` added 4.4 MB to its APK. Assets are now deflated
+  (391 KB for that file), except the media and image types the Android Gradle
+  plugin also leaves stored (`.png`, `.jpg`, `.webp`, `.mp3`, `.ogg`, `.mp4`
+  and the rest of its default list, plus `.tflite`), so `AssetManager.openFd`
+  still works on those. A deflated asset reads through `AssetManager.open` and
+  `AAsset_read` as before; only `openFd` refuses it. Library assets from
+  `android/libs` follow the same rule. Native libraries, `classes.dex`,
+  `resources.arsc` and `res/` are stored as before.
+* **An iOS release signs when two certificates share a name**
+  ([#1249](https://github.com/belluikit/bellui/issues/1249)). Apple allows
+  several "Apple Distribution" certificates, and they all have the same name,
+  so `bellui release -os ios` failed with `codesign`'s "ambiguous" error. With
+  `-profile`, the release now signs with the one identity in the keychain that
+  the provisioning profile allows, and says which. `-certificate` also takes a
+  certificate's SHA-1, for `bellui package` as well as a release.
+
 ## v1.3.0-rc.2 — 2026-11-14
 
 Cut with toolkit v1.3.0-rc.2. Android and iOS packages now carry the FFmpeg

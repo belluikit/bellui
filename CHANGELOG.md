@@ -19,6 +19,344 @@ one per change, so that open pull requests do not conflict here. Run
 `go run ./hack/changelog preview` to see them assembled; the release folds them
 into a section below.
 
+## v1.3.0-rc.3 — 2026-11-21
+
+The third release candidate for v1.3.0, cut so that Player and the apps on it
+get what landed since rc.2 while the release is still validated by hand; the
+final v1.3.0 follows that check. It holds 38 entries, most of them fixes (25):
+word wrap in Chinese and Japanese text, windows that could not shrink around
+wrapping content, x/mmedia seeks that clicked, skipped the start of the new
+position or downloaded an MP3 up to the target first, and touch scrolling and
+taps in x/tables. New: `widget.ChipGroup`, Danger, Success and Warning
+versions of every Button style and of `IconButton`, shopping and subscription
+icons, an `OnOpenChanged` callback on `NavigationDrawer`, and disabled
+`AppTabs`, `DocTabs` and `InnerWindow`. Things that may need a look (see
+*Changed*): symbols such as ✔ ❤ ▶ now draw as plain text rather than colour
+emoji, a JSON or PXF theme that overrides the `help` icon now overrides the
+question mark, a touch drag on a reorderable tree row or a DAG palette entry
+scrolls unless it starts with a long-press, and a disabled List, Tree or
+TreeView no longer scrolls under the wheel. x/mmedia now requires goffmpeg
+v0.13.1. The `x/*` modules and the `bellui` command are released at
+v1.3.0-rc.3 with it, except x/mmedia, which is v1.3.0-rc.4 because its own
+rc.3 was taken on 2026-11-15.
+
+### Added
+
+* **`widget.ChipGroup`: chips to pick from, one per option**
+  ([#1348](https://github.com/belluikit/bellui/issues/1348)). It takes
+  `Options`, `Selected`, `Required` and `OnChanged` as `CheckGroup` does, and
+  `Multiple` picks any number instead of one. Each chip is as wide as its
+  label, and the chips wrap onto the next row.
+* **A destructive action can be a red text, outlined or icon button**
+  ([#1327](https://github.com/belluikit/bellui/issues/1327)). `Button`'s
+  `DangerImportance` used to colour only the default style; it now applies
+  in every style: Text, Outlined and Elevated draw the label and icon (and
+  Outlined its outline) in the error colour, Filled fills with it and
+  FilledTonal with the error container. `IconButton` gains an `Importance`
+  field with the same meaning: Danger draws a Standard or Outlined icon in the
+  error colour and fills a Filled or FilledTonal one. The other importances
+  still apply only to a default-style `Button`.
+* **Success and Warning colour every Button style, and IconButton, as Danger
+  does** ([#1327](https://github.com/belluikit/bellui/issues/1327)). Text,
+  Outlined and Elevated draw the label and icon (and Outlined its outline) in
+  the status colour; Filled and FilledTonal fill with it, since the theme has
+  no Success or Warning container. The same holds for `IconButton.Importance`.
+  High and Low still apply only to a default-style `Button`.
+* **Theme icons for an in-app purchase flow**
+  ([#1303](https://github.com/belluikit/bellui/issues/1303)), from Material
+  Icons and themed like the rest of the set: `ShoppingCartIcon`,
+  `AddShoppingCartIcon`, `StorefrontIcon`, `ShoppingBagIcon`,
+  `WorkspacePremiumIcon` (a medal, for a premium feature), `DiamondIcon`,
+  `AutorenewIcon` (for a subscription that renews), `CardMembershipIcon`,
+  `CreditCardIcon`, `ReceiptLongIcon` and `LockIcon`, each with its
+  `IconName` constant.
+* **NavigationDrawer says when it opens or closes**
+  ([#1280](https://github.com/belluikit/bellui/issues/1280)). `OnOpenChanged`
+  is told each time, whatever did it: Show, Hide, Toggle, a destination, or
+  the user dismissing it (the scrim, Escape, the accessibility action). It
+  fires on a change only, so an app can show what its drawer button would
+  do, such as an X while the drawer is open.
+* **x/tables: a column's SortingOrder sets what its header taps cycle through**
+  ([#1275](https://github.com/belluikit/bellui/issues/1275)). `ColumnDef.SortingOrder`
+  (and `DefaultColumnDef.SortingOrder`), as AG Grid's `sortingOrder`: the
+  first tap gives its first direction, each later tap the next, round again,
+  Shift too. Leave `SortNone` out and the column never goes back to
+  unsorted, as a list that always comes in that column's order wants. Unset,
+  the cycle is ascending, descending, none, as before.
+* **AppTabs, DocTabs and InnerWindow can be disabled**
+  ([#1218](https://github.com/belluikit/bellui/issues/1218)). `Disable`,
+  `Enable` and `Disabled`, as other widgets have. A disabled container keeps
+  its place and takes no input: no tab switch, close, new tab, menu or drag
+  in the tab bar, no close, minimise, maximise, move or resize of the
+  window, and no focus. Like HTML's `<fieldset disabled>`, it also disables
+  every widget inside its content that can be disabled, in every tab, and
+  `Enable` brings back only those, so a widget the app disabled itself stays
+  disabled. Content added while it is disabled is disabled; content taken out
+  is released. A widget added deep inside the content is caught at the
+  container's next refresh. Calls from code, such as `Select`, still work.
+  A disabled tab's label and icon are no longer dimmed twice.
+
+### Changed
+
+* **`ContentClearIcon` and `ViewRestoreIcon` have their own files**
+  ([#1309](https://github.com/belluikit/bellui/issues/1309)), Material's
+  `clear.svg` and `fullscreen-exit.svg`, instead of sharing `CancelIcon`'s
+  and `ZoomFitIcon`'s. What they draw is unchanged: they already drew those
+  Material icons. Only their resource names change (`foreground_clear.svg`,
+  `foreground_fullscreen-exit.svg`).
+* **`ZoomFitIcon` draws Material's `fit_screen`**
+  ([#1309](https://github.com/belluikit/bellui/issues/1309)). It used to draw
+  `fullscreen_exit`, the same picture as `ViewRestoreIcon`; Material has no
+  `zoom_fit` icon. The resource name stays `foreground_view-zoom-fit.svg`.
+* **Theme icon names follow Player's vocabulary**
+  ([#1307](https://github.com/belluikit/bellui/issues/1307)): 73 `IconName*`
+  values become Player's snake_case Material names, for example `mediaPlay` →
+  `play`, `contentAdd` → `add` and `viewRestore` → `fullscreen_exit`. Code
+  that uses the constants is unaffected. A JSON or PXF theme that overrides an
+  icon under its old name still does. **One name moves:** `help` now names
+  `QuestionIcon`, and `HelpIcon` is `help_outline`, so a theme overriding
+  `help` now overrides the question mark.
+* **On touch, a reorderable tree row or a DAG palette entry moves after a
+  long-press, and a plain swipe on it scrolls**
+  ([#1296](https://github.com/belluikit/bellui/issues/1296)). A `TreeView`
+  with `AllowReorder` or `AllowReparent`, and the x/dag palette, took every
+  touch drag that started on a row or an entry, so a finger on one could not
+  scroll the list. Now a swipe scrolls it, and a long-press then a drag moves
+  the row or drags the entry out onto the canvas, the way a long-press then a
+  drag selects text in an `Entry`. A long-press on a row also selects it, or
+  presses the button under the finger. Mouse clicks and drags are unchanged:
+  a mouse drag still moves a row or an entry at once, and a slow click (the
+  button held still past the long-press delay) still selects the row or adds
+  the entry's node.
+* **Symbols like ✔ ⚠ ❤ ▶ and the arrows draw as plain text, not colour
+  emoji** ([#1260](https://github.com/belluikit/bellui/issues/1260)). Text
+  now follows Unicode's default presentation for each character: symbols
+  meant to look like text draw from the bundled symbol fonts, in the text
+  colour, and characters meant to look like emoji (⭐ ⚡ ☕ 😀) still draw in
+  colour. An app that wants the colour version of a text-style symbol adds
+  U+FE0F after it ("❤️"); U+FE0E after an emoji asks for the plain
+  glyph. Apps that used ✔ or ❤ and got a colour glyph will now see a plain
+  one. Text-style symbols that no bundled text font has (🖥 🗑 🛠 and about a
+  hundred more) still draw as emoji.
+* **Disabled List, Tree, TreeView, TopAppBar and text editors follow the
+  owner's decisions** ([#1251](https://github.com/belluikit/bellui/issues/1251)).
+  A wheel scroll or touch drag over a disabled List, Tree or TreeView now moves
+  neither it nor the scroll around it; it used to scroll the page. A disabled
+  TopAppBar keeps its title at full colour, and only its buttons look disabled.
+  The focus manager refuses the focus to a disabled widget, from a click, code
+  or assistive tech, unless its text stays selectable while disabled: the new
+  `core.SelectableWhenDisabled`, which `Entry` and the selection of `Label` and
+  `RichText` implement. A disabled `RichEntry` or code editor could be focused
+  from code before.
+
+### Fixed
+
+* **A window with wrapping content can get shorter**
+  ([#1349](https://github.com/belluikit/bellui/issues/1349)). New content was
+  laid out at its narrowest width before anything else, where rows that wrap
+  (`RowWrapLayout`, `ChipGroup`) are tallest, and the window grew to that
+  height and kept it. Desktop only: a phone already sized new content to its
+  screen.
+* **A screen reader hears that a filter chip is selected**
+  ([#1348](https://github.com/belluikit/bellui/issues/1348)). `Chip` reported
+  no state, so a selected filter chip sounded like an unselected one.
+* **A window holding a `RowWrapLayout` can get narrower again**
+  ([#1346](https://github.com/belluikit/bellui/issues/1346)). After a layout,
+  the layout's minimum width was its widest row, so the window, or a phone
+  turned to portrait, could not get narrower than that row. It is now the
+  widest child; the minimum height is still the height the rows took.
+* **x/mmedia's audio level reads 0 while a seek has the sound faded out**
+  ([#1342](https://github.com/belluikit/bellui/issues/1342)).
+  `AudioPlayback.Level` took the volume setting, not the volume the sound was
+  playing at, so through a seek's silence a level meter showed the full level
+  of audio nobody heard. It now follows the fades.
+* **A seek to the last moment of a track in x/mmedia is heard**
+  ([#1340](https://github.com/belluikit/bellui/issues/1340)). Seeking to less
+  than about 150 ms before the end of a track played those last moments
+  silently, because the sound was faded out for the seek and only faded back
+  in once that much audio had arrived. The end of the stream now fades it in
+  too.
+* **A seek in x/mmedia no longer skips the start of the new position**
+  ([#1336](https://github.com/belluikit/bellui/issues/1336)). When the decoder
+  delivered the first audio after a seek in small pieces, as it does while it
+  catches up, the audio device could take those pieces before the player was
+  emptied of the old position's sound. Emptying it then dropped them, so up to
+  a pull of the new position (about 50–150 ms) went unheard, and the reported
+  position ran ahead by the same amount. That audio is now put back and plays.
+* **Headless captures draw a clipped stroke where it is**
+  ([#1330](https://github.com/belluikit/bellui/issues/1330)). In the software
+  painter, which draws `Canvas.Capture`, test images and screenshots, a
+  stroked rectangle, circle, arc, line, polygon or path inside a scroll or
+  other clip was drawn shifted right and down by a few pixels, with its right
+  and bottom edges cut off. A `Scene3D` cut by a clip had the same fault. The
+  GPU painters were never affected.
+* **Word wrap keeps a Latin word or a number in Chinese or Japanese text in
+  one piece when it fits on a line**
+  ([#1318](https://github.com/belluikit/bellui/issues/1318)). Where a line of
+  CJK text overflowed in the middle of an embedded word, the word was split
+  there: `"亚Cho" / "ro昆"`. It now moves to the next line whole, breaking next
+  to the CJK text around it instead. A word wider than the line still breaks
+  inside, and so does one followed by a mark a line may not start with, such
+  as `、`, when the two don't fit together. Latin-only text wraps as before.
+* **Word-wrapped text narrower than one character keeps all its lines**
+  ([#1317](https://github.com/belluikit/bellui/issues/1317)). A `RichText`
+  (and a `Label` on it) squeezed below the width of one character drew only
+  its first line, one character per row, and dropped every line after it.
+  Each line now gets its rows.
+* **A Hyperlink, Entry placeholder, Select or SearchSelect re-wraps when its
+  text changes to text of the same length**
+  ([#1305](https://github.com/belluikit/bellui/issues/1305)). They kept the old
+  line breaks, so `Hyperlink.SetText("WWWW WWWW")` after `"iiii iiii"` drew the
+  wide text on the narrow text's rows and overflowed, and a Select cut its new
+  selection where the old one was cut. The Entry placeholder re-wraps however
+  it changes: through `SetPlaceHolder`, by setting the `PlaceHolder` field and
+  calling `Refresh()`, or when a new `TextStyle` changes its width. App code
+  that edits a `TextSegment`'s text or style in place and calls `Refresh()` is
+  not re-wrapped when the length is unchanged; put a new segment in its place
+  instead, as the `TextSegment` and `RichText.Segments` docs now say.
+* **Word-wrapped Chinese and Japanese no longer start a line with 、。，）！？：；
+  or end one with （“「**
+  ([#1300](https://github.com/belluikit/bellui/issues/1300)). Text without
+  spaces breaks wherever the line overflows, and that could put an
+  ideographic comma at the start of a line. The break now moves back one
+  character, carrying it down with the punctuation, as browsers do. Where a
+  line is too narrow for that, the punctuation stays on its line and the line
+  runs slightly past the width. The marks are the closing, opening and
+  non-starter classes of Unicode's line-breaking rules (UAX #14) for the CJK
+  and full-width punctuation blocks; Latin wrapping is unchanged.
+* **Screenshots and golden images show a NavigationDrawer's item icons**
+  ([#1298](https://github.com/belluikit/bellui/issues/1298)). The drawer sized
+  each icon before giving it its image, so nothing drew it and a capture
+  showed the labels beside an empty space. More generally, a `canvas.Image`
+  given a `File` or `Resource` with no `Refresh()` after it is now loaded when
+  it is first painted, by every painter. A source that fails to load then is
+  not retried on every frame; call `Refresh()` to try it again.
+* **SVG strokes scale with the image**
+  ([#1292](https://github.com/belluikit/bellui/issues/1292)). A stroke kept its
+  `stroke-width` in pixels whatever size the SVG was drawn at, so a small icon
+  got strokes far too wide and a stroked circle could fill in, while a large
+  one got strokes too thin. A 7-unit stroke on a 120-unit viewBox now measures
+  2.3 px at 40 px and 14 px at 240 px, as in a browser. Dash lengths scale the
+  same way. Stroked SVGs drawn at other than their viewBox size, such as the
+  Okta sign-in logo, now look slightly different: they are drawn as the file says.
+* **x/mmedia: a seek or a start fades in instead of clicking when the audio refill is late**
+  ([#1273](https://github.com/belluikit/bellui/issues/1273)). If oto's reader was late refilling the player after a
+  seek or at the start of a song, the device mixed empty blocks meanwhile, and
+  each one used up part of the fade-in. The sound then began at full volume, a
+  click. An empty block now leaves the fade for the audio that follows. This
+  needs the belluikit/oto fork at f6c58126, which x/mmedia now pins.
+* **x/tables: a tap on a DataGrid column header sorts on a touch screen**
+  ([#1268](https://github.com/belluikit/bellui/issues/1268)). The header
+  sorted on a mouse press, and a phone sends a tap with no press, so tapping a
+  header there did nothing. It now sorts on the tap, which a finger and a mouse
+  click both send: a click still sorts once, and Shift on its press still adds
+  a column. A tap on a column border, the resize handle, sorts nothing, and a
+  drag no longer sorts when it starts.
+* **A drag after a long-press keeps the selected word and extends it a word at a time**
+  ([#1267](https://github.com/belluikit/bellui/issues/1267)). On a touch screen, a held finger creeps a few points once
+  the long-press has fired, and that creep moved the end of the selection: a
+  long-pressed "unwrapped" shrank to "unw" on the iPad and on Android. Now,
+  while the finger stays on the word or the spaces beside it, the selection
+  stays that word. Dragged further, it runs from the word's far edge to the
+  whole word under the finger, forwards or backwards and across rows. This
+  covers `Entry`, `RichEntry` and selectable `Label`/`RichText`. Mouse drags,
+  selection-handle drags and plain touch drags are unchanged.
+* **A swipe that starts on a chart, table, tree or grid scrolls the page around it**
+  ([#1266](https://github.com/belluikit/bellui/issues/1266)). These widgets
+  took every touch drag that started on them, even one they did nothing
+  with, so the page under the finger never moved. Each now takes only the
+  drags it uses (`event.DragClaimer`). An x/charts `Chart` keeps a drag
+  while a drawing tool or drawing, brush, map or 3D scene uses it, and a
+  sideways one while it is zoomed; its `DataZoomSlider` keeps sideways drags.
+  A `TreeView` row keeps a drag only when rows can be moved, so a tree
+  without reordering scrolls under the finger again. A `Table` keeps none,
+  and a touch on a `Table` no longer starts resizing row 0, which made a
+  swipe at the table's end stretch that row. An x/tables `DataGrid` keeps a
+  drag while its body can still move that way, and its header keeps none. A
+  disabled `TimePicker`, an `Interactive` with no drag callback, and the
+  parts of an x/dag `DAGCanvas` whose gesture is switched off (or the whole
+  canvas while disabled) leave the drag to what is around them. Mouse drags
+  are unchanged.
+* **x/tables: group header rows no longer cover the scroll bars**
+  ([#1258](https://github.com/belluikit/bellui/pull/1258)). In a grouped
+  DataGrid the group-row overlay spanned the whole body, so every group header
+  was drawn over the vertical scroll bar, and a header at the bottom over the
+  horizontal one: the bar showed in pieces between groups. The overlay now
+  leaves the bars' strips uncovered, and the cell bands paint the header's
+  colour underneath, so a header still reads as one band.
+* **x/tables: a pinned-right column no longer hides the scroll bars, and the last column can be reached**
+  ([#1257](https://github.com/belluikit/bellui/issues/1257)). The pinned-right band was drawn over the vertical scroll
+  bar, which showed only as dashes between rows, and over the end of the
+  horizontal one. It now leaves a gutter for the vertical bar while the body
+  scrolls vertically, as AG Grid does, and stops above the horizontal bar.
+  The scroll content also gained room at its end, so the last unpinned column
+  can be scrolled clear of the pinned band. With no vertical overflow the
+  layout is as before.
+* **x/tables: disclosure arrows draw as the theme's icons, not as a colour emoji**
+  ([#1256](https://github.com/belluikit/bellui/issues/1256)). A collapsed group showed a blue play-button emoji on
+  every platform, because the arrow was a text ▶ and the bundled emoji font is
+  consulted before the symbol fonts. Group headers, tree nodes and
+  master-detail rows, in the main and pinned bands, now draw
+  `theme.MenuDropDownIcon` when expanded and `theme.MenuExpandIcon` when
+  collapsed, in the theme's icon colour, and the disabled icon when the grid is
+  disabled.
+* **x/tables: group headers and pinned cells redraw when the rows change**
+  ([#1254](https://github.com/belluikit/bellui/issues/1254)). `RefreshData`, sorting, filtering, paging and
+  `ToggleGroup` refreshed only the cells and the column header. A grouped
+  grid already on screen kept its group headers where they were until the next
+  layout or scroll, so rows that arrived later had no headers, and collapsing a
+  group left headers drawn over the wrong rows. The header overlay and the
+  pinned bands are now refreshed with the cells.
+* **x/tables: a tap on a DataGrid group header expands or collapses the group**
+  ([#1252](https://github.com/belluikit/bellui/issues/1252)). Before, a pointer
+  tap on a header row from `SetRowGroupColumn` did nothing to the group and
+  reported `OnCellClicked` for the header's row, so on a phone, with no Enter
+  key, a group could not be collapsed at all. A tap anywhere on the header row
+  now goes through `ToggleGroup`, the same path as Enter/Space and the
+  accessible expand/collapse action, and no longer calls `OnCellClicked`, like
+  the detail and tree chevrons. A press still moves the keyboard cursor to the
+  header row.
+* **A disabled RichEntry dims its images, and a disabled x/editor Editor its
+  gutter and decorations**
+  ([#1232](https://github.com/belluikit/bellui/issues/1232)). Both widgets draw
+  their own disabled look, so the paint walk does not dim them (#1223), and
+  until now they dimmed only their text: images, line numbers, fold chevrons,
+  breakpoint and diagnostic markers, squiggles, find-match highlights and
+  redaction bars stayed at full colour beside dimmed text, on every platform.
+  A disabled RichEntry now draws its block and inline images at 38% opacity.
+  A disabled Editor draws its line numbers and fold placeholders in the
+  disabled text colour, its other marks at 38% of their own colour, and its
+  redaction bars still opaque (a translucent bar would show the secret) in
+  their colour mixed 38% over the theme background. Gutter providers, marker
+  functions and decorators the app supplies are the app's content and keep the
+  colours the app gave them. Enable restores everything.
+* **A disabled widget looks the same on every platform, and is no longer dimmed
+  twice on desktop**
+  ([#1223](https://github.com/belluikit/bellui/issues/1223)). The desktop dimmed
+  every disabled widget to 38% on top of the disabled colours most widgets draw
+  themselves, so a disabled Button's label showed at about 14% of the text
+  colour instead of MD3's 38%. Mobile and test captures dimmed nothing, so a
+  widget with no disabled look of its own looked enabled there. Now a widget
+  that draws its own disabled look implements the new `core.DisabledLook` and
+  is left alone, and every other disabled widget is dimmed to 38% on desktop,
+  on mobile and in test captures alike. An app widget built on
+  `DisableableWidget` keeps the dim unless it implements `DrawsDisabledLook`.
+  A selectable Label's selection highlight is no longer dimmed on desktop.
+* **x/mmedia: a seek in a CBR MP3 over http asks for the bytes it needs, and a seek the server refuses says so in words**
+  ([#1098](https://github.com/belluikit/bellui/issues/1098)). A seek read the
+  file forward from its start to the target: a seek near the end of a
+  12-minute song downloaded all 23 MB before it. On a server that ignores
+  `Range`, some seeks failed with `seek failed: -38`. Now the first seek in an
+  http(s) MP3 reads the start of the file to find whether it is CBR. A CBR
+  file is opened again with FFmpeg's fast seek, so each seek is one ranged
+  request near the target and lands exactly, also on a server that ignores
+  `Range`. A VBR file seeks as before: fast seek would land it up to 1% of the
+  song early and leave the shown position off by a second or more. A seek the
+  server cannot make fails with "the server does not let this stream be seeked
+  in", with FFmpeg's code still reachable through `errors.As`, and a seek over
+  an expired link reports the server's refusal, as playing on did. Requires
+  goffmpeg v0.13.1.
+
 ## v1.3.0-rc.2 — 2026-11-14
 
 The second release candidate for v1.3.0, cut so that Player and the apps on
