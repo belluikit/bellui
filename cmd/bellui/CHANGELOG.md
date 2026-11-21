@@ -17,6 +17,12 @@ one per change, so that open pull requests do not conflict here. Run
 `go run ./hack/changelog preview -C cmd/bellui` to see them assembled; the release folds them
 into a section below.
 
+## v1.3.0-rc.4 — 2026-11-21
+
+Cut with toolkit v1.3.0-rc.4, so that the command and the toolkit keep one
+version. The command itself has no changes since v1.3.0-rc.3. Built against
+bellui v1.3.0-rc.4.
+
 ## v1.3.0-rc.3 — 2026-11-21
 
 Cut with toolkit v1.3.0-rc.3. `bellui serve --https` and `--tunnel` let a
