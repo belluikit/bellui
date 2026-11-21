@@ -5,7 +5,7 @@ module github.com/belluikit/bellui/x/mmedia/hack/bgposprobe
 go 1.26.2
 
 require (
-	github.com/belluikit/bellui v1.3.0-rc.3
+	github.com/belluikit/bellui v1.3.0-rc.4
 	github.com/belluikit/bellui/x/mmedia v0.0.0
 )
 

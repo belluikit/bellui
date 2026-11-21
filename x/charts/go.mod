@@ -2,7 +2,7 @@ module github.com/belluikit/bellui/x/charts
 
 go 1.26.2
 
-require github.com/belluikit/bellui v1.3.0-rc.3
+require github.com/belluikit/bellui v1.3.0-rc.4
 
 require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
