@@ -71,6 +71,9 @@ func entry(s []float32, i int) float32 {
 // instead (start/top-aligned within the freed space). CrossAlign places
 // children at their natural height instead, at the top, centre or bottom.
 //
+// Under a right-to-left layout the row is mirrored: the first child sits at
+// the right edge (#1372).
+//
 // Since: 1.0
 type FlexHBoxLayout struct {
 	Flex       []float32  // flex grow factor per child (0 = fixed size)
@@ -202,6 +205,9 @@ func (l *FlexHBoxLayout) Layout(objects []core.CanvasObject, size geo.Size) {
 		x += w
 		first = false
 	}
+	if layoutRTL() {
+		MirrorChildren(objects, size.Width)
+	}
 }
 
 // FlexVBoxLayout is the vertical equivalent of FlexHBoxLayout.
@@ -210,10 +216,11 @@ func (l *FlexHBoxLayout) Layout(objects []core.CanvasObject, size geo.Size) {
 // The main axis is vertical: Flex/MinHeight/MaxHeight constrain height. The
 // cross axis is horizontal and children are stretched to the container width by
 // default; the optional MinWidth/MaxWidth arrays clamp a child's width instead
-// (start/left-aligned within the freed space). CrossAlign places children at
-// their natural width instead, at the left, centre or right: their MinSize
+// (start-aligned within the freed space). CrossAlign places children at
+// their natural width instead, at the start, centre or end: their MinSize
 // width, or for a core.FitWidther such as wrapping text its FitWidth, up to the
-// column's width (#1198).
+// column's width (#1198). Start is the left edge, or the right one under a
+// right-to-left layout (#1372).
 //
 // Since: 1.0
 type FlexVBoxLayout struct {
@@ -337,5 +344,8 @@ func (l *FlexVBoxLayout) Layout(objects []core.CanvasObject, size geo.Size) {
 		o.Resize(geo.NewSize(w, h))
 		y += h
 		first = false
+	}
+	if layoutRTL() {
+		MirrorChildren(objects, size.Width)
 	}
 }

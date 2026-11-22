@@ -75,6 +75,7 @@ func (l *rowWrapLayout) minHeight(rowHeight float32, rowCount int) float32 {
 // its tallest object, and wrap objects into additional rows as needed.
 // A core.FitWidther, such as wrapping text, gets its FitWidth, up to the
 // container's width, and the height it needs at that width (#1199).
+// Under a right-to-left layout each row starts at the right edge (#1372).
 func (l *rowWrapLayout) Layout(objects []core.CanvasObject, containerSize geo.Size) {
 	if len(objects) == 0 {
 		return
@@ -135,4 +136,7 @@ func (l *rowWrapLayout) Layout(objects []core.CanvasObject, containerSize geo.Si
 		minSize.Height = y + rowHeights[current]
 	}
 	l.minSize = minSize
+	if layoutRTL() {
+		MirrorChildren(objects, containerSize.Width)
+	}
 }

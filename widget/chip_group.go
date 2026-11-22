@@ -119,7 +119,6 @@ type chipGroupRenderer struct {
 func (r *chipGroupRenderer) Layout(size geo.Size) {
 	objects := r.Objects()
 	r.layout.Layout(objects, size)
-	mirrorIfRTL(objects, size.Width) // the row-wrap layout itself does not (#1372)
 	alignRows(objects, size.Width, r.group.Alignment)
 }
 
