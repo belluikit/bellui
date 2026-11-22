@@ -3,9 +3,11 @@ package widget_test
 import (
 	"testing"
 
+	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/test"
+	"github.com/belluikit/bellui/theme"
 	"github.com/belluikit/bellui/widget"
 
 	"github.com/stretchr/testify/assert"
@@ -146,4 +148,80 @@ func TestChipGroup_Wraps(t *testing.T) {
 
 func TestChipGroup_Interfaces(t *testing.T) {
 	var _ core.Disableable = widget.NewChipGroup(nil, false, nil)
+}
+
+// TestChipGroup_Alignment lays out chips that wrap over three rows, the last
+// one shorter, and checks where each row sits for every alignment, in both
+// directions (#1371).
+func TestChipGroup_Alignment(t *testing.T) {
+	test.NewTempApp(t)
+	options := []string{"aaaa", "bbbb", "cccc", "dddd", "eeee", "ffff", "gggg"}
+	names := map[bellui.TextAlign]string{
+		bellui.TextAlignLeading: "start", bellui.TextAlignCenter: "center", bellui.TextAlignTrailing: "end",
+	}
+
+	for _, rtl := range []bool{false, true} {
+		for _, align := range []bellui.TextAlign{bellui.TextAlignLeading, bellui.TextAlignCenter, bellui.TextAlignTrailing} {
+			name := names[align]
+			if rtl {
+				name += "/rtl"
+			}
+			t.Run(name, func(t *testing.T) {
+				dir := bellui.DirectionLTR
+				if rtl {
+					dir = bellui.DirectionRTL
+				}
+				bellui.SetLayoutDirection(dir)
+				defer bellui.SetLayoutDirection(bellui.DirectionAuto)
+
+				g := widget.NewChipGroup(options, true, nil)
+				g.Alignment = align
+				chips := chipsOf(t, g)
+				gap := 2 * theme.Padding()
+				var widest float32
+				for _, c := range chips {
+					widest = max(widest, c.MinSize().Width)
+				}
+				// Room for three chips a row but not four: rows of 3, 3, 1.
+				width := 3*widest + 3*gap + widest/2
+				g.Resize(geo.NewSize(width, 500))
+
+				rows := [][]*widget.Chip{chips[0:3], chips[3:6], chips[6:7]}
+				for i, row := range rows {
+					y := row[0].Position().Y
+					left, right := width, float32(0)
+					var rowW float32
+					for j, c := range row {
+						assert.Equal(t, y, c.Position().Y, "row %d chip %d shares the row", i, j)
+						left = min(left, c.Position().X)
+						right = max(right, c.Position().X+c.Size().Width)
+						rowW += c.Size().Width
+					}
+					rowW += float32(len(row)-1) * gap
+					if i < 2 {
+						assert.Less(t, y, chips[3*(i+1)].Position().Y, "row %d ends before the next chip", i)
+					}
+					assert.InDelta(t, rowW, right-left, 0.01, "row %d is packed", i)
+
+					var wantLeft float32
+					switch {
+					case align == bellui.TextAlignCenter:
+						wantLeft = (width - rowW) / 2
+					case (align == bellui.TextAlignLeading) != rtl:
+						wantLeft = 0
+					default:
+						wantLeft = width - rowW
+					}
+					assert.InDelta(t, wantLeft, left, 0.01, "row %d's left edge", i)
+
+					first := row[0]
+					if rtl {
+						assert.InDelta(t, right, first.Position().X+first.Size().Width, 0.01, "row %d starts at its right", i)
+					} else {
+						assert.InDelta(t, left, first.Position().X, 0.01, "row %d starts at its left", i)
+					}
+				}
+			})
+		}
+	}
 }
