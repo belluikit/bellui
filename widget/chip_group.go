@@ -3,10 +3,12 @@ package widget
 import (
 	"slices"
 
+	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/widget"
+	"github.com/belluikit/bellui/lang"
 	"github.com/belluikit/bellui/layout"
 	"github.com/belluikit/bellui/theme"
 )
@@ -27,6 +29,10 @@ var (
 // selected chip deselects it, unless Required is set and it is the last
 // one selected. A disabled group's chips are disabled.
 //
+// Alignment places each row of chips at the start, the center or the end
+// of the group's width. Start and end follow the layout direction, so under
+// right-to-left the rows start at the right edge.
+//
 // Since: 1.3
 type ChipGroup struct {
 	DisableableWidget
@@ -34,6 +40,12 @@ type ChipGroup struct {
 	Selected []string
 	Multiple bool
 	Required bool
+	// Alignment places each row of chips: TextAlignLeading (the default)
+	// at the start of the group's width, TextAlignCenter in its middle and
+	// TextAlignTrailing at its end (#1371).
+	//
+	// Since: 1.3
+	Alignment bellui.TextAlign
 	// OnChanged fires with the selected options after a tap or SetSelected
 	// changes them, in the order they were selected.
 	OnChanged func([]string) `json:"-"`
@@ -105,7 +117,55 @@ type chipGroupRenderer struct {
 }
 
 func (r *chipGroupRenderer) Layout(size geo.Size) {
-	r.layout.Layout(r.Objects(), size)
+	objects := r.Objects()
+	r.layout.Layout(objects, size)
+	mirrorIfRTL(objects, size.Width) // the row-wrap layout itself does not (#1372)
+	alignRows(objects, size.Width, r.group.Alignment)
+}
+
+// alignRows moves each row the row-wrap layout made, the chips that share a
+// y, so that it sits at the start, center or end of width. It measures each
+// row's span instead of assuming the layout started it at x = 0, so it
+// holds whichever edge the layout packed the row against.
+func alignRows(objects []core.CanvasObject, width float32, align bellui.TextAlign) {
+	start := 0
+	for start < len(objects) {
+		if !objects[start].Visible() {
+			start++
+			continue
+		}
+		y := objects[start].Position().Y
+		minX, maxX := width, float32(0)
+		end := start
+		for ; end < len(objects); end++ {
+			o := objects[end]
+			if !o.Visible() {
+				continue
+			}
+			if o.Position().Y != y {
+				break
+			}
+			minX = geo.Min(minX, o.Position().X)
+			maxX = geo.Max(maxX, o.Position().X+o.Size().Width)
+		}
+		var dx float32
+		switch lang.ResolveAlign(align) {
+		case bellui.TextAlignCenter:
+			dx = (width-(maxX-minX))/2 - minX
+		case bellui.TextAlignTrailing:
+			dx = width - maxX
+		default:
+			dx = -minX
+		}
+		if dx != 0 {
+			for _, o := range objects[start:end] {
+				if o.Visible() {
+					o.Move(o.Position().AddXY(dx, 0))
+				}
+			}
+		}
+		start = end
+	}
 }
 
 func (r *chipGroupRenderer) MinSize() geo.Size {
