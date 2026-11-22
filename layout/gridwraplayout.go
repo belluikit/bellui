@@ -25,6 +25,7 @@ func NewGridWrapLayout(size geo.Size) core.Layout {
 // Layout is called to pack all child objects into a specified size.
 // For a GridWrapLayout this will attempt to lay all the child objects in a row
 // and wrap to a new row if the size is not large enough.
+// Under a right-to-left layout the rows fill from the right edge (#1372).
 func (g *gridWrapLayout) Layout(objects []core.CanvasObject, size geo.Size) {
 	padding := theme.Padding()
 	g.colCount = 1
@@ -54,6 +55,9 @@ func (g *gridWrapLayout) Layout(objects []core.CanvasObject, size geo.Size) {
 			x += g.CellSize.Width + padding
 		}
 		i++
+	}
+	if layoutRTL() {
+		MirrorChildren(objects, size.Width)
 	}
 }
 

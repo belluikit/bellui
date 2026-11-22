@@ -209,7 +209,7 @@ HarfBuzz in the go-text/typesetting fork fully supports Arabic shaping (`ot_shap
 **Layout mirroring:**
 - `TextAlignLeading`/`TextAlignTrailing` exist but are applied as fixed left/right — make them direction-aware
 - Add `LayoutDirection` to `fyne.App` or `fyne.Canvas` (auto-detected from locale, overridable)
-- Mirror horizontal layouts (`HBox`, `Border`, `Form`, `Grid`) when direction is RTL ✅ Phase 3
+- Mirror horizontal layouts (`HBox`, `Border`, `Form`, `Grid`) when direction is RTL ✅ Phase 3; `RowWrap`, `GridWrap`, `FlexHBox`/`FlexVBox` ✅ #1372
 - Flip scroll direction, navigation order, and icon placement for RTL ✅ Phase 4 (pre-rebrand tracker #21)
 - Mirror custom-renderer widget internals + flip their spatial arrow nav ✅ Phase 5 (pre-rebrand tracker #122, pre-rebrand tracker #123)
 
