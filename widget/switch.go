@@ -221,8 +221,12 @@ func (r *switchRenderer) Refresh() {
 		r.track.FillColor = th.Color(theme.ColorNamePrimary, v)
 		r.thumb.FillColor = th.Color(theme.ColorNameForegroundOnPrimary, v)
 		if r.sw.Disabled() {
-			r.track.FillColor = th.Color(theme.ColorNameDisabled, v)
-			r.thumb.FillColor = th.Color(theme.ColorNameOnSurface, v)
+			// M3's disabled selected switch: an on-surface track at 12% and a
+			// surface handle (md-comp-switch tokens, design system v0.192).
+			// The handle was on-surface, near black in a light theme, the
+			// heaviest thing on a page of dimmed controls (#1394).
+			r.track.FillColor = withAlpha(th.Color(theme.ColorNameOnSurface, v), 0x1f)
+			r.thumb.FillColor = th.Color(theme.ColorNameSurface, v)
 		}
 	} else {
 		r.track.FillColor = th.Color(theme.ColorNameSurfaceContainerHighest, v)
