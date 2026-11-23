@@ -324,8 +324,12 @@ type Entry struct {
 	hlPrefill       *bellui.Animation
 	hlPrefillArming bool
 	placeholder     RichText
-	content         *entryContent
-	scroll          *widget.Scroll
+
+	// actionDisabledByEntry is the ActionItem the entry disabled because it
+	// was disabled itself, for Enable to switch back on (#1404).
+	actionDisabledByEntry core.Disableable
+	content               *entryContent
+	scroll                *widget.Scroll
 
 	// useful for Form validation (as the error text should only be shown when
 	// the entry is unfocused)
@@ -383,7 +387,9 @@ type Entry struct {
 	// Since: 1.0
 	ProtectedRanges []ProtectedRange `json:"-"`
 
-	// ActionItem is a small item which is displayed at the outer right of the entry (like a password revealer)
+	// ActionItem is a small item which is displayed at the outer right of the entry (like a password revealer).
+	// While the entry is disabled, an ActionItem that can be disabled is disabled with it, and enabled again
+	// with it unless the app had disabled it itself (#1404).
 	ActionItem      core.CanvasObject `json:"-"`
 	binder          basicBinder
 	conversionError error
@@ -3987,6 +3993,31 @@ func (e *Entry) setFieldsAndRefresh(f func()) {
 
 var _ core.WidgetRenderer = (*entryRenderer)(nil)
 
+// syncActionItemDisabled puts the action item in the entry's disabled state:
+// a SearchField's clear button or a DateEntry's calendar button stayed live
+// in a disabled entry (#1404). It switches back on only an item it switched
+// off, so one the app disabled itself stays disabled, as a container's
+// cascade does.
+func (e *Entry) syncActionItemDisabled() {
+	d, ok := e.ActionItem.(core.Disableable)
+	if !ok {
+		e.actionDisabledByEntry = nil
+		return
+	}
+	if e.actionDisabledByEntry != nil && e.actionDisabledByEntry != d {
+		e.actionDisabledByEntry.Enable() // the item was replaced: release the old one
+		e.actionDisabledByEntry = nil
+	}
+	switch {
+	case e.Disabled() && !d.Disabled():
+		d.Disable()
+		e.actionDisabledByEntry = d
+	case !e.Disabled() && e.actionDisabledByEntry == d:
+		d.Enable()
+		e.actionDisabledByEntry = nil
+	}
+}
+
 type entryRenderer struct {
 	box, border *canvas.Rectangle
 	indicator   float32 // the filled style's indicator thickness, from shapeEntryChrome
@@ -4231,6 +4262,7 @@ func (r *entryRenderer) Refresh() {
 	v := bellui.CurrentApp().Settings().ThemeVariant()
 	r.refreshBoxAndBorder(th, v, focusedAppearance)
 
+	r.entry.syncActionItemDisabled()
 	if r.entry.ActionItem != nil {
 		r.entry.ActionItem.Refresh()
 	}
