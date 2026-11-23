@@ -1,6 +1,7 @@
 package widget_test
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/belluikit/bellui"
@@ -227,42 +228,59 @@ func TestChipGroup_Alignment(t *testing.T) {
 	}
 }
 
-// newExcludable is a multiple-choice group that opts into the excluded
-// state, recording what each callback reports and how often it fires.
-func newExcludable(t *testing.T, options ...string) (g *widget.ChipGroup, sel, exc *[]string, selFired, excFired *int) {
-	t.Helper()
-	lang.SetLocaleForTests(t, "en-US") // the labels below are English
-	sel, exc = new([]string), new([]string)
-	selFired, excFired = new(int), new(int)
-	g = widget.NewChipGroup(options, true, func(s []string) { *sel = s; *selFired++ })
-	g.Excludable = true
-	g.OnExcludedChanged = func(e []string) { *exc = e; *excFired++ }
-	return g, sel, exc, selFired, excFired
+// stateEvent is one call of OnStateChanged.
+type stateEvent struct {
+	option string
+	state  widget.ChipState
 }
 
-// Each tap moves a chip off → selected → excluded → off, and the group
-// reports both lists (#1383).
+// recorder keeps what a group's callbacks report.
+type recorder struct {
+	sel      []string
+	selFired int
+	events   []stateEvent
+}
+
+// newExcludable is a multiple-choice group that opts into the excluded
+// state, recording what its callbacks report.
+func newExcludable(t *testing.T, options ...string) (*widget.ChipGroup, *recorder) {
+	t.Helper()
+	lang.SetLocaleForTests(t, "en-US") // the labels below are English
+	rec := &recorder{}
+	g := widget.NewChipGroup(options, true, func(s []string) { rec.sel = s; rec.selFired++ })
+	g.Excludable = true
+	g.OnStateChanged = func(o string, s widget.ChipState) { rec.events = append(rec.events, stateEvent{o, s}) }
+	return g, rec
+}
+
+// Each tap moves a chip off → selected → excluded → off, and OnStateChanged
+// reports the option and its new state once per tap (#1383).
 func TestChipGroup_ExcludableCycle(t *testing.T) {
 	test.NewTempApp(t)
-	g, sel, exc, selFired, excFired := newExcludable(t, "Rock", "Jazz", "Pop")
+	g, rec := newExcludable(t, "Rock", "Jazz", "Pop")
 	chips := chipsOf(t, g)
 
 	test.Tap(chips[0]) // Rock: off → selected
-	assert.Equal(t, []string{"Rock"}, *sel)
-	assert.Equal(t, 1, *selFired)
-	assert.Zero(t, *excFired, "the excluded list did not change")
+	assert.Equal(t, []stateEvent{{"Rock", widget.ChipStateSelected}}, rec.events)
+	assert.Equal(t, []string{"Rock"}, rec.sel)
+	assert.Equal(t, 1, rec.selFired)
 	assert.True(t, chips[0].Selected)
 
-	// During the next tap both lists are already updated when OnChanged
-	// fires, so an app reading the group sees one consistent state.
-	var seenExcluded []string
-	g.OnChanged = func(s []string) { *sel = s; *selFired++; seenExcluded = g.Excluded }
+	// During the next tap both lists are already updated when the
+	// callbacks fire, so an app reading the group sees one state.
+	var seenExcluded, seenSelected []string
+	g.OnStateChanged = func(o string, s widget.ChipState) {
+		rec.events = append(rec.events, stateEvent{o, s})
+		seenExcluded, seenSelected = g.Excluded, g.Selected
+	}
 	test.Tap(chips[0]) // Rock: selected → excluded
-	assert.Empty(t, *sel)
-	assert.Equal(t, []string{"Rock"}, *exc)
-	assert.Equal(t, []string{"Rock"}, seenExcluded, "Excluded is set before OnChanged fires")
-	assert.Equal(t, 2, *selFired)
-	assert.Equal(t, 1, *excFired)
+	assert.Equal(t, stateEvent{"Rock", widget.ChipStateExcluded}, rec.events[1])
+	assert.Len(t, rec.events, 2, "one event for one tap")
+	assert.Equal(t, []string{"Rock"}, seenExcluded)
+	assert.Empty(t, seenSelected)
+	assert.Empty(t, rec.sel, "OnChanged reports the selection that lost Rock")
+	assert.Equal(t, 2, rec.selFired)
+	assert.Equal(t, widget.ChipStateExcluded, g.State("Rock"))
 	assert.False(t, chips[0].Selected)
 	assert.Equal(t, "Rock, excluded", chips[0].AccessibleLabel())
 
@@ -271,9 +289,11 @@ func TestChipGroup_ExcludableCycle(t *testing.T) {
 	assert.Equal(t, []string{"Rock", "Jazz"}, g.Excluded, "in the order excluded")
 
 	test.Tap(chips[0]) // Rock: excluded → off
-	assert.Equal(t, []string{"Jazz"}, *exc)
-	assert.Equal(t, 3, *excFired)
-	assert.Equal(t, 4, *selFired, "the selection did not change on the last tap")
+	assert.Equal(t, stateEvent{"Rock", widget.ChipStateOff}, rec.events[len(rec.events)-1])
+	assert.Len(t, rec.events, 5)
+	assert.Equal(t, []string{"Jazz"}, g.Excluded)
+	assert.Equal(t, 4, rec.selFired, "the selection did not change on the last tap")
+	assert.Equal(t, widget.ChipStateOff, g.State("Rock"))
 	assert.Equal(t, "Rock", chips[0].AccessibleLabel())
 	assert.Equal(t, core.AccessibleState(0), chips[0].AccessibleState())
 }
@@ -282,7 +302,7 @@ func TestChipGroup_ExcludableCycle(t *testing.T) {
 // the user's language.
 func TestChipGroup_ExcludedLabelTranslated(t *testing.T) {
 	test.NewTempApp(t)
-	g, _, _, _, _ := newExcludable(t, "Rock")
+	g, _ := newExcludable(t, "Rock")
 	lang.SetLocaleForTests(t, "de-DE")
 	g.SetExcludedSilently([]string{"Rock"})
 	assert.Equal(t, "Rock, ausgeschlossen", chipsOf(t, g)[0].AccessibleLabel())
@@ -292,13 +312,11 @@ func TestChipGroup_ExcludedLabelTranslated(t *testing.T) {
 // option is never in both (#1383).
 func TestChipGroup_ExcludableSetSilently(t *testing.T) {
 	test.NewTempApp(t)
-	g, _, _, selFired, excFired := newExcludable(t, "Rock", "Jazz", "Pop")
+	g, rec := newExcludable(t, "Rock", "Jazz", "Pop")
 	chips := chipsOf(t, g)
 
 	g.SetSelectedSilently([]string{"Rock", "Jazz"})
 	g.SetExcludedSilently([]string{"Jazz", "Pop"})
-	assert.Zero(t, *selFired)
-	assert.Zero(t, *excFired)
 	assert.Equal(t, []string{"Rock"}, g.Selected, "excluding Jazz took it out of the selection")
 	assert.Equal(t, []string{"Jazz", "Pop"}, g.Excluded)
 	assert.True(t, chips[0].Selected)
@@ -315,18 +333,19 @@ func TestChipGroup_ExcludableSetSilently(t *testing.T) {
 	g.Selected = []string{"Rock"}
 	g.Excluded = []string{"Rock", "Pop"}
 	g.Refresh()
-	assert.Zero(t, *selFired)
-	assert.Zero(t, *excFired)
 	assert.Equal(t, []string{"Pop"}, g.Excluded)
 	assert.True(t, chips[0].Selected)
 	assert.Equal(t, "Rock", chips[0].AccessibleLabel())
+
+	assert.Zero(t, rec.selFired)
+	assert.Empty(t, rec.events)
 }
 
 // Each setter keeps the lists apart with the list it sets winning, even
 // before the group has been drawn.
 func TestChipGroup_ExcludableSettersBeforeDrawn(t *testing.T) {
 	test.NewTempApp(t)
-	g, _, _, _, _ := newExcludable(t, "Rock", "Jazz")
+	g, _ := newExcludable(t, "Rock", "Jazz")
 	g.SetExcludedSilently([]string{"Jazz"})
 	g.SetSelectedSilently([]string{"Jazz"})
 	assert.Empty(t, g.Excluded)
@@ -339,52 +358,84 @@ func TestChipGroup_ExcludableSettersBeforeDrawn(t *testing.T) {
 	assert.Empty(t, g.Selected)
 }
 
-// SetExcluded and SetSelected report, each also reporting the other list
-// when it takes an option out of it.
+// SetExcluded and SetSelected report each option whose state they change,
+// in option order, and OnChanged when the selection changes.
 func TestChipGroup_ExcludableSetReports(t *testing.T) {
 	test.NewTempApp(t)
-	g, sel, exc, selFired, excFired := newExcludable(t, "Rock", "Jazz")
+	g, rec := newExcludable(t, "Rock", "Jazz", "Pop")
 	g.SetSelectedSilently([]string{"Rock", "Jazz"})
 
-	g.SetExcluded([]string{"Jazz"})
-	assert.Equal(t, []string{"Jazz"}, *exc)
-	assert.Equal(t, []string{"Rock"}, *sel)
-	assert.Equal(t, 1, *excFired)
-	assert.Equal(t, 1, *selFired)
+	g.SetExcluded([]string{"Pop", "Jazz"})
+	assert.Equal(t, []stateEvent{{"Jazz", widget.ChipStateExcluded}, {"Pop", widget.ChipStateExcluded}}, rec.events)
+	assert.Equal(t, []string{"Rock"}, rec.sel)
+	assert.Equal(t, 1, rec.selFired)
 
+	rec.events = nil
 	g.SetSelected([]string{"Rock", "Jazz"})
-	assert.Empty(t, *exc)
-	assert.Equal(t, 2, *excFired)
-	assert.Equal(t, 2, *selFired)
+	assert.Equal(t, []stateEvent{{"Jazz", widget.ChipStateSelected}}, rec.events, "Rock was already selected; Pop stays excluded")
+	assert.Equal(t, []string{"Pop"}, g.Excluded)
+	assert.Equal(t, 2, rec.selFired)
 }
 
 // An app refuses a change by putting the lists back from the callback:
-// DaySong keeps the last chip from being excluded this way (#1383).
+// DaySong keeps the last chip from being excluded this way (#1383). The
+// lists it puts back fire nothing more.
 func TestChipGroup_ExcludableRefuse(t *testing.T) {
 	test.NewTempApp(t)
-	g, _, _, _, _ := newExcludable(t, "Rock", "Jazz")
+	g, rec := newExcludable(t, "Rock", "Jazz")
 	g.SetExcludedSilently([]string{"Jazz"})
 	g.SetSelectedSilently([]string{"Rock"})
-	g.OnExcludedChanged = func(e []string) {
-		if len(e) == len(g.Options) {
-			g.SetSelectedSilently([]string{e[len(e)-1]})
-			g.SetExcludedSilently(e[:len(e)-1])
+	fired := 0
+	g.OnStateChanged = func(o string, s widget.ChipState) {
+		fired++
+		if s == widget.ChipStateExcluded && len(g.Excluded) == len(g.Options) {
+			g.SetExcludedSilently(slices.DeleteFunc(slices.Clone(g.Excluded), func(e string) bool { return e == o }))
+			g.SetSelectedSilently([]string{o})
 		}
 	}
 	chips := chipsOf(t, g)
 
 	test.Tap(chips[0]) // Rock: selected → excluded, refused
+	assert.Equal(t, 1, fired)
 	assert.Equal(t, []string{"Rock"}, g.Selected)
 	assert.Equal(t, []string{"Jazz"}, g.Excluded)
 	assert.True(t, chips[0].Selected)
 	assert.Equal(t, "Rock", chips[0].AccessibleLabel())
+	assert.Equal(t, 1, rec.selFired, "OnChanged saw the tap's selection before the refusal")
+}
+
+// SetSelected fires OnChanged even when the selection is unchanged, as it
+// did before #1383, while OnStateChanged reports only real changes.
+func TestChipGroup_SetSelectedSameFires(t *testing.T) {
+	test.NewTempApp(t)
+	g, rec := newExcludable(t, "Rock", "Jazz")
+	g.SetSelectedSilently([]string{"Rock"})
+	g.SetSelected([]string{"Rock"})
+	assert.Equal(t, 1, rec.selFired)
+	assert.Empty(t, rec.events)
+}
+
+// The states are compared once, before anything fires: a callback that
+// changes another option from code does not get a report of that change.
+func TestChipGroup_StateChangedFromCallbackNotReported(t *testing.T) {
+	test.NewTempApp(t)
+	g, rec := newExcludable(t, "Rock", "Jazz")
+	g.OnStateChanged = func(o string, s widget.ChipState) {
+		rec.events = append(rec.events, stateEvent{o, s})
+		if o == "Rock" {
+			g.SetSelectedSilently([]string{"Rock", "Jazz"})
+		}
+	}
+	test.Tap(chipsOf(t, g)[0])
+	assert.Equal(t, []stateEvent{{"Rock", widget.ChipStateSelected}}, rec.events)
+	assert.Equal(t, []string{"Rock", "Jazz"}, g.Selected)
 }
 
 // A Required group's last selected chip stays selected rather than moving
 // on to excluded.
 func TestChipGroup_ExcludableRequired(t *testing.T) {
 	test.NewTempApp(t)
-	g, _, _, selFired, excFired := newExcludable(t, "Rock", "Jazz")
+	g, rec := newExcludable(t, "Rock", "Jazz")
 	g.Required = true
 	g.SetSelectedSilently([]string{"Rock"})
 	chips := chipsOf(t, g)
@@ -392,12 +443,13 @@ func TestChipGroup_ExcludableRequired(t *testing.T) {
 	test.Tap(chips[0])
 	assert.Equal(t, []string{"Rock"}, g.Selected)
 	assert.Empty(t, g.Excluded)
-	assert.Zero(t, *selFired)
-	assert.Zero(t, *excFired)
+	assert.Zero(t, rec.selFired)
+	assert.Empty(t, rec.events)
 }
 
 // Without the opt-in, or in a single-choice group, a tap toggles as it did
-// before, and Excluded draws nothing (#1383).
+// before, Excluded draws nothing, and OnStateChanged reports only off and
+// selected (#1383).
 func TestChipGroup_NotExcludableUnchanged(t *testing.T) {
 	test.NewTempApp(t)
 	for _, tc := range []struct {
@@ -409,14 +461,15 @@ func TestChipGroup_NotExcludableUnchanged(t *testing.T) {
 		{"single, excludable", false, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			excFired := 0
+			var events []stateEvent
 			g := widget.NewChipGroup([]string{"Rock", "Jazz"}, tc.multiple, nil)
 			g.Excludable = tc.excludable
-			g.OnExcludedChanged = func([]string) { excFired++ }
+			g.OnStateChanged = func(o string, s widget.ChipState) { events = append(events, stateEvent{o, s}) }
 			g.Excluded = []string{"Jazz"}
 			g.Refresh()
 			chips := chipsOf(t, g)
 			assert.Equal(t, "Jazz", chips[1].AccessibleLabel(), "not drawn excluded")
+			assert.Equal(t, widget.ChipStateOff, g.State("Jazz"))
 
 			test.Tap(chips[0])
 			assert.Equal(t, []string{"Rock"}, g.Selected)
@@ -424,9 +477,23 @@ func TestChipGroup_NotExcludableUnchanged(t *testing.T) {
 			assert.Empty(t, g.Selected, "a second tap deselects")
 			assert.Equal(t, []string{"Jazz"}, g.Excluded, "untouched")
 			assert.Equal(t, "Rock", chips[0].AccessibleLabel())
-			assert.Zero(t, excFired)
+			assert.Equal(t, []stateEvent{{"Rock", widget.ChipStateSelected}, {"Rock", widget.ChipStateOff}}, events)
 		})
 	}
+}
+
+// In a single-choice group a tap that moves the selection changes two
+// options, and OnStateChanged reports both, in option order.
+func TestChipGroup_SingleStateChanged(t *testing.T) {
+	test.NewTempApp(t)
+	var events []stateEvent
+	g := widget.NewChipGroup([]string{"Rock", "Jazz"}, false, nil)
+	g.OnStateChanged = func(o string, s widget.ChipState) { events = append(events, stateEvent{o, s}) }
+	g.SetSelectedSilently([]string{"Jazz"})
+	chips := chipsOf(t, g)
+
+	test.Tap(chips[0])
+	assert.Equal(t, []stateEvent{{"Rock", widget.ChipStateSelected}, {"Jazz", widget.ChipStateOff}}, events)
 }
 
 // The three states side by side, in the light and the dark theme (#1383).
