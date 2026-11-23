@@ -3,11 +3,13 @@ package chart
 import (
 	"image/color"
 	"math"
+	"reflect"
 
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/theme"
 
 	"github.com/belluikit/bellui/x/charts/animate"
 	"github.com/belluikit/bellui/x/charts/axis"
@@ -80,6 +82,13 @@ type chartRenderer struct {
 	cachedPalette      []color.Color
 	cachedSize         geo.Size
 	hasCachedBase      bool
+
+	// builtTheme and builtVariant are what the last full rebuild drew with.
+	// A theme change only calls Refresh, with no dirty flag set, so Refresh
+	// compares them with the current ones to notice it (#1381).
+	builtTheme   bellui.Theme
+	builtVariant bellui.ThemeVariant
+	hasBuiltLook bool
 }
 
 func newChartRenderer(c *Chart) *chartRenderer {
@@ -152,6 +161,12 @@ func (r *chartRenderer) Refresh() {
 	animActive := r.chart.animCtrl.Active
 	r.chart.mu.Unlock()
 
+	// A theme change (variant flip or a replaced theme) sets no dirty flag:
+	// the theme walk just calls Refresh. Rebuild if the look changed.
+	if r.lookChanged() {
+		dirty |= dirtyFull
+	}
+
 	// Nothing to do — skip redundant rebuilds (e.g., bellui.Do callbacks
 	// that arrive after the pending flags were already consumed).
 	if dirty == 0 {
@@ -166,6 +181,56 @@ func (r *chartRenderer) Refresh() {
 	} else {
 		r.fullRebuild(size)
 	}
+}
+
+// lookChanged reports whether the theme or variant differs from what the last
+// full rebuild drew with. Before any rebuild there is nothing to compare, so it
+// reports false and the dirty flags decide.
+func (r *chartRenderer) lookChanged() bool {
+	if !r.hasBuiltLook {
+		return false
+	}
+	variant := bellui.CurrentApp().Settings().ThemeVariant()
+	if variant != r.builtVariant {
+		return true
+	}
+	th := r.chart.Theme()
+	if same, ok := sameTheme(th, r.builtTheme); ok {
+		return !same
+	}
+	// A theme of the same type that cannot be compared: fall back to the
+	// colours the chart's frame is drawn in.
+	return themeColors(th, variant) != themeColors(r.builtTheme, variant)
+}
+
+// sameTheme reports whether a and b are the same theme, and ok=false when
+// that cannot be told because their type cannot be compared (a struct holding
+// a map, say), where == would panic.
+func sameTheme(a, b bellui.Theme) (same, ok bool) {
+	if a == nil || b == nil {
+		return a == b, true
+	}
+	ta, tb := reflect.TypeOf(a), reflect.TypeOf(b)
+	if ta != tb {
+		return false, true
+	}
+	defer func() {
+		if recover() != nil {
+			same, ok = false, false
+		}
+	}()
+	return a == b, true
+}
+
+// themeColors is the background, foreground and primary colour th gives for
+// variant, as comparable RGBA values.
+func themeColors(th bellui.Theme, variant bellui.ThemeVariant) [3][4]uint32 {
+	var out [3][4]uint32
+	for i, name := range []bellui.ThemeColorName{theme.ColorNameBackground, theme.ColorNameForeground, theme.ColorNamePrimary} {
+		cr, cg, cb, ca := th.Color(name, variant).RGBA()
+		out[i] = [4]uint32{cr, cg, cb, ca}
+	}
+	return out
 }
 
 // refreshInteractive rebuilds only the interactive layer (tooltip + brush)
@@ -277,6 +342,7 @@ func (r *chartRenderer) fullRebuild(size geo.Size) {
 		resolver.SetPalette(opt.Color)
 	}
 	r.textColor = resolver.TitleColor() // series labels on the plot (#343)
+	r.builtTheme, r.builtVariant, r.hasBuiltLook = th, variant, true
 
 	var objects []core.CanvasObject
 
