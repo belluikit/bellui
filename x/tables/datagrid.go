@@ -589,13 +589,15 @@ func (g *DataGrid) UpdateCell(row, col int, obj core.CanvasObject) {
 	}
 
 	rc.renderer.UpdateCell(obj, cell.Params{
-		RowIndex:   row,
-		ColIndex:   col,
-		Value:      value,
-		RowData:    rowData,
-		CellWidth:  rc.width,
-		IsSelected: g.isCellSelected(row, col),
-		IsHovered:  g.isCellHovered(row, col),
+		RowIndex:  row,
+		ColIndex:  col,
+		Value:     value,
+		RowData:   rowData,
+		CellWidth: rc.width,
+		// col is a main-column index; selection and a CellID use the
+		// absolute display index, pinned-left columns first (#1401).
+		IsSelected: g.isCellSelected(row, g.PinnedLeftCount()+col),
+		IsHovered:  g.isCellHovered(row, g.PinnedLeftCount()+col),
 	})
 	g.dimBuiltinCell(rc, obj)
 }
@@ -822,11 +824,13 @@ func (g *DataGrid) PinnedUpdateCell(row, displayCol int, obj core.CanvasObject) 
 		value = rc.def.ValueFormatter(value)
 	}
 	rc.renderer.UpdateCell(obj, cell.Params{
-		RowIndex:  row,
-		ColIndex:  displayCol,
-		Value:     value,
-		RowData:   rowData,
-		CellWidth: rc.width,
+		RowIndex:   row,
+		ColIndex:   displayCol,
+		Value:      value,
+		RowData:    rowData,
+		CellWidth:  rc.width,
+		IsSelected: g.isCellSelected(row, displayCol), // a pinned cell is drawn selected too (#1401)
+		IsHovered:  g.isCellHovered(row, displayCol),
 	})
 	g.dimBuiltinCell(rc, obj)
 }
