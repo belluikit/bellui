@@ -29,6 +29,7 @@ messages = {
   Yes: "Ναι"
   april: "Απρίλιος"
   august: "Αύγουστος"
+  "chip.excluded": "{Label}, εξαιρείται"
   december: "Δεκέμβριος"
   february: "Φεβρουάριος"
   "file.name": {

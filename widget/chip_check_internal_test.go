@@ -111,3 +111,47 @@ func TestChipGroup_RelaysOutForTheCheckMark(t *testing.T) {
 	assert.InDelta(t, before+iconSz+8, g.chips[1].Position().X, 0.01, "the second chip moved along by the first one's mark")
 	assert.True(t, test.TempWidgetRenderer(t, g.chips[0]).(*chipRenderer).check.Visible())
 }
+
+// An excluded chip shows a cross in the check mark's place and strikes its
+// label through, so the state does not rest on colour; it widens for the
+// cross as for the mark (#1383).
+func TestFilterChip_CrossWhileExcluded(t *testing.T) {
+	test.NewTempApp(t)
+	c := NewFilterChip("Pop", nil)
+	c.Icon = theme.HomeIcon()
+	r := test.TempWidgetRenderer(t, c).(*chipRenderer)
+	require.NotNil(t, r.cross)
+	assert.False(t, r.cross.Visible())
+	assert.False(t, r.label.TextStyle.Strikethrough)
+	withIcon := c.MinSize()
+
+	c.excluded = true
+	c.Refresh()
+	assert.True(t, r.cross.Visible(), "excluded: a cross")
+	assert.False(t, r.check.Visible())
+	assert.False(t, r.icon.Visible(), "the icon gives way to the cross")
+	assert.True(t, r.label.TextStyle.Strikethrough, "the label is struck through")
+	assert.InDelta(t, withIcon.Width, c.MinSize().Width, 0.01)
+
+	// Disabled, the cross and the strike stay: only the colours dim.
+	c.Disable()
+	assert.True(t, r.cross.Visible())
+	assert.True(t, r.label.TextStyle.Strikethrough)
+	c.Enable()
+
+	// Selected wins over excluded.
+	c.Selected = true
+	c.Refresh()
+	assert.False(t, r.cross.Visible())
+	assert.True(t, r.check.Visible())
+	assert.False(t, r.label.TextStyle.Strikethrough)
+
+	c.Selected, c.excluded, c.Icon = false, true, nil
+	plain := NewFilterChip("Pop", nil)
+	c.Refresh()
+	iconSz := c.Theme().Size(theme.SizeNameIconSize) * 0.75
+	assert.InDelta(t, plain.MinSize().Width+iconSz+8, c.MinSize().Width, 0.01, "the chip widens by the cross and its gap")
+	c.Resize(c.MinSize())
+	r.Layout(c.Size())
+	assert.Less(t, r.cross.Position().X, r.label.Position().X, "the cross leads the label")
+}

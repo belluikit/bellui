@@ -29,6 +29,7 @@ messages = {
   Yes: "はい"
   april: "4月"
   august: "8月"
+  "chip.excluded": "{Label}、除外"
   december: "12月"
   february: "2月"
   "file.name": {
