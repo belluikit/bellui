@@ -2,6 +2,7 @@ package tables
 
 import (
 	"io"
+	"sort"
 
 	"github.com/belluikit/bellui/x/tables/export"
 	"github.com/belluikit/bellui/x/tables/pipeline"
@@ -44,6 +45,7 @@ func (a *GridAPI) DeselectAll() {
 	a.grid.selectedCell = nil
 	a.grid.selCellRow, a.grid.selCellCol = -1, 0
 	a.grid.selectedRows = make(map[int]bool)
+	a.grid.selectedCells = nil
 	a.grid.Refresh()
 }
 
@@ -149,9 +151,32 @@ func (a *GridAPI) SelectAll() {
 	a.grid.SelectAll()
 }
 
-// GetSelectedCells returns the currently selected cell, if any.
+// GetSelectedCells returns the cursor cell, the one last clicked or moved to,
+// in display coordinates, or nil. In SelectionMultiCell it is one cell of the
+// selection at most: SelectedCells lists them all.
 func (a *GridAPI) GetSelectedCells() *CellID {
 	return a.grid.selectedCell
+}
+
+// SelectedCells returns the cells selected in SelectionMultiCell, ordered by
+// row and then column. Each CellID's Row is a source-row index (into the
+// underlying data), as GetSelectedRows returns, so it stays valid across
+// sort, filter and paginate; Col is the absolute display column, pinned-left
+// columns first. It is empty in the other modes (#1401).
+//
+// Since: 1.3
+func (a *GridAPI) SelectedCells() []CellID {
+	cells := make([]CellID, 0, len(a.grid.selectedCells))
+	for c := range a.grid.selectedCells {
+		cells = append(cells, CellID{Row: c.src, Col: c.col})
+	}
+	sort.Slice(cells, func(i, j int) bool {
+		if cells[i].Row != cells[j].Row {
+			return cells[i].Row < cells[j].Row
+		}
+		return cells[i].Col < cells[j].Col
+	})
+	return cells
 }
 
 // --- Editing ---
