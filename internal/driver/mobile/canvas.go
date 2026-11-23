@@ -261,21 +261,29 @@ func (c *canvas) applyThemeOutOfTreeObjects() {
 // driver.ObjectAtPositionMatching through the canvas capability assertion
 // (#245), so it must stay equivalent to what tap dispatch uses.
 func (c *canvas) FindObjectAtPositionMatching(pos geo.Position, test func(object core.CanvasObject) bool) (core.CanvasObject, geo.Position, int) {
+	obj, lpos, layer, _ := c.FindEnabledObjectAtPositionMatching(pos, test)
+	return obj, lpos, layer
+}
+
+// FindEnabledObjectAtPositionMatching is FindObjectAtPositionMatching that
+// also reports whether the object found lies inside a disabled widget, and
+// so takes no press, tap or drag (intdriver.InertUnder, #1378).
+func (c *canvas) FindEnabledObjectAtPositionMatching(pos geo.Position, test func(object core.CanvasObject) bool) (core.CanvasObject, geo.Position, int, bool) {
 	overlay := c.Overlays().Top()
 	// Only trust the spatial index while the canvas is clean — it is rebuilt
 	// during the paint walk and is stale between a change and the next frame (pre-rebrand tracker #590).
 	if overlay == nil {
 		if idx := c.SpatialIndex(); idx != nil && !c.IsDirty() {
-			if obj, lpos, ok := idx.FindObjectAtPositionMatching(pos, test); ok {
-				return obj, lpos, 0
+			if obj, lpos, ok, inert := idx.FindEnabledObjectAtPositionMatching(pos, test); ok {
+				return obj, lpos, 0, inert
 			}
-			return nil, geo.Position{}, 0
+			return nil, geo.Position{}, 0, false
 		}
 	}
 	if c.menu != nil {
-		return intdriver.FindObjectAtPositionMatching(pos, test, c.Overlays().List(), c.menu)
+		return intdriver.FindEnabledObjectAtPositionMatching(pos, test, c.Overlays().List(), c.menu)
 	}
-	return intdriver.FindObjectAtPositionMatching(pos, test, c.Overlays().List(), c.windowHead, c.content)
+	return intdriver.FindEnabledObjectAtPositionMatching(pos, test, c.Overlays().List(), c.windowHead, c.content)
 }
 
 func (c *canvas) overlayChanged() {
@@ -353,6 +361,10 @@ type mobileFinder struct {
 
 func (f *mobileFinder) FindObjectAtPositionMatching(pos geo.Position, test func(core.CanvasObject) bool) (core.CanvasObject, geo.Position, int) {
 	return f.canvas.FindObjectAtPositionMatching(pos, test)
+}
+
+func (f *mobileFinder) FindEnabledObjectAtPositionMatching(pos geo.Position, test func(core.CanvasObject) bool) (core.CanvasObject, geo.Position, int, bool) {
+	return f.canvas.FindEnabledObjectAtPositionMatching(pos, test)
 }
 
 func (f *mobileFinder) CanvasForTouch() core.Canvas {

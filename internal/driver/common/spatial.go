@@ -26,6 +26,11 @@ type spatialEntry struct {
 	// cut is the innermost turned clip the object lies in, an index into
 	// SpatialIndex.cuts, or -1.
 	cut int32
+	// node is the object's render node, nil when added without one. Its
+	// parents say whether the object lies inside a disabled widget, read when
+	// it is hit (#1378); the index is used only while the canvas is clean, so
+	// the nodes are the ones it was built from.
+	node *RenderCacheNode
 }
 
 // turnedCut is a clip whose world transform turns or skews it. The clip
@@ -114,7 +119,7 @@ func (b *spatialIndexBuilder) add(
 	w, h float32,
 	clipPos geo.Position, clipSize geo.Size,
 ) {
-	b.idx.add(obj, wt, w, h, clipPos, clipSize, -1)
+	b.idx.add(obj, wt, w, h, clipPos, clipSize, -1, nil)
 }
 
 func (idx *SpatialIndex) add(
@@ -123,6 +128,7 @@ func (idx *SpatialIndex) add(
 	w, h float32,
 	clipPos geo.Position, clipSize geo.Size,
 	cut int32,
+	node *RenderCacheNode,
 ) {
 	if w <= 0 || h <= 0 {
 		return
@@ -155,7 +161,7 @@ func (idx *SpatialIndex) add(
 		obj: obj, wt: wt, w: w, h: h,
 		screenMinX: sMinX, screenMinY: sMinY, screenMaxX: sMaxX, screenMaxY: sMaxY,
 		clipMinX: cMinX, clipMinY: cMinY, clipMaxX: cMaxX, clipMaxY: cMaxY,
-		cut: cut,
+		cut: cut, node: node,
 	})
 	idx.spans = append(idx.spans, cellSpan{int32(colMin), int32(colMax), int32(rowMin), int32(rowMax)})
 }
@@ -226,13 +232,25 @@ func (idx *SpatialIndex) FindObjectAtPositionMatching(
 	mouse geo.Position,
 	matches func(core.CanvasObject) bool,
 ) (core.CanvasObject, geo.Position, bool) {
+	obj, pos, ok, _ := idx.FindEnabledObjectAtPositionMatching(mouse, matches)
+	return obj, pos, ok
+}
+
+// FindEnabledObjectAtPositionMatching is FindObjectAtPositionMatching that
+// also reports whether the object found lies inside a disabled widget
+// (driver.InertUnder, #1378).
+func (idx *SpatialIndex) FindEnabledObjectAtPositionMatching(
+	mouse geo.Position,
+	matches func(core.CanvasObject) bool,
+) (core.CanvasObject, geo.Position, bool, bool) {
 	cell, ok := idx.cell(mouse)
 	if !ok {
-		return nil, geo.Position{}, false
+		return nil, geo.Position{}, false, false
 	}
 
 	var found core.CanvasObject
 	var foundPos geo.Position
+	var foundNode *RenderCacheNode
 
 	for _, i := range cell {
 		e := &idx.entries[i]
@@ -262,13 +280,29 @@ func (idx *SpatialIndex) FindObjectAtPositionMatching(
 		if matches(e.obj) {
 			found = e.obj
 			foundPos = geo.NewPos(localX, localY)
+			foundNode = e.node
 		}
 	}
 
 	if found == nil {
-		return nil, geo.Position{}, false
+		return nil, geo.Position{}, false, false
 	}
-	return found, foundPos, true
+	return found, foundPos, true, foundNode.inert(found)
+}
+
+// inert reports whether obj, the object of node n, lies inside a disabled
+// widget (driver.InertUnder). A nil node knows no ancestors.
+func (n *RenderCacheNode) inert(obj core.CanvasObject) bool {
+	if n == nil {
+		return false
+	}
+	return driver.InertUnder(obj, func(yield func(core.CanvasObject) bool) {
+		for p := n.parent; p != nil; p = p.parent {
+			if p.obj != nil && !yield(p.obj) {
+				return
+			}
+		}
+	})
 }
 
 // FindAllObjectsAtPositionMatching returns all matching objects at mouse,

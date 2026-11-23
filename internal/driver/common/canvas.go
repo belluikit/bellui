@@ -1185,7 +1185,7 @@ func (c *Canvas) addCacheNodes(node *RenderCacheNode, b *SpatialIndex, cut int32
 	if obj != nil && obj.Visible() {
 		s := obj.Size()
 		if s.Width > 0 && s.Height > 0 {
-			b.add(obj, node.worldTransform, s.Width, s.Height, node.clipPos, node.clipSize, cut)
+			b.add(obj, node.worldTransform, s.Width, s.Height, node.clipPos, node.clipSize, cut, node)
 			if node.paintCulled {
 				return
 			}

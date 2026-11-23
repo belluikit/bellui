@@ -28,7 +28,32 @@ const (
 // (uses FindObjectAtPositionMatching directly).
 type ObjectFinder interface {
 	FindObjectAtPositionMatching(pos geo.Position, test func(core.CanvasObject) bool) (core.CanvasObject, geo.Position, int)
+	// FindEnabledObjectAtPositionMatching is FindObjectAtPositionMatching
+	// that also reports whether the object found lies inside a disabled
+	// widget (driver.InertUnder, #1378).
+	FindEnabledObjectAtPositionMatching(pos geo.Position, test func(core.CanvasObject) bool) (core.CanvasObject, geo.Position, int, bool)
 	CanvasForTouch() core.Canvas
+}
+
+// findPressable finds the object a press, tap or long press at pos goes to.
+// One inside a disabled widget takes none: nil (#1378).
+func (h *TouchHandler) findPressable(pos geo.Position, test func(core.CanvasObject) bool) (core.CanvasObject, geo.Position, int) {
+	co, objPos, layer, inert := h.Finder.FindEnabledObjectAtPositionMatching(pos, test)
+	if inert {
+		return nil, geo.Position{}, layer
+	}
+	return co, objPos, layer
+}
+
+// findDraggable finds the object a drag at pos goes to. One inside a
+// disabled widget takes none, unless it scrolls (driver.DropsInertDrag,
+// #1378).
+func (h *TouchHandler) findDraggable(pos geo.Position, test func(core.CanvasObject) bool) (core.CanvasObject, geo.Position) {
+	co, objPos, _, inert := h.Finder.FindEnabledObjectAtPositionMatching(pos, test)
+	if driver.DropsInertDrag(co, inert) {
+		return nil, geo.Position{}
+	}
+	return co, objPos
 }
 
 // TouchHandler implements tap, drag, and double-tap event handling logic
@@ -257,7 +282,7 @@ func (h *TouchHandler) tapDownSingle(pos geo.Position, tapID int) {
 		core.NotifyToolTip(tipObj, c)
 	}
 
-	co, objPos, layer := h.Finder.FindObjectAtPositionMatching(pos, func(object core.CanvasObject) bool {
+	co, objPos, layer := h.findPressable(pos, func(object core.CanvasObject) bool {
 		switch object.(type) {
 		case mobile.Touchable, event.Focusable:
 			return true
@@ -354,7 +379,7 @@ func (h *TouchHandler) fireLongPress(pos geo.Position, tapID, seq int) {
 		return // lifted, moved, or re-pressed since armed
 	}
 
-	co, objPos, _ := h.Finder.FindObjectAtPositionMatching(pos, func(object core.CanvasObject) bool {
+	co, objPos, _ := h.findPressable(pos, func(object core.CanvasObject) bool {
 		_, ok := object.(event.LongPressable)
 		return ok
 	})
@@ -422,7 +447,7 @@ func (h *TouchHandler) TapMove(pos geo.Position, tapID int,
 	h.LastTapDelta[tapID] = offset
 	h.trackVelocity(tapID, pos, false)
 
-	co, objPos, _ := h.Finder.FindObjectAtPositionMatching(pos, func(object core.CanvasObject) bool {
+	co, objPos := h.findDraggable(pos, func(object core.CanvasObject) bool {
 		if _, ok := object.(event.Draggable); ok {
 			return true
 		} else if _, ok := object.(mobile.Touchable); ok {
@@ -455,7 +480,7 @@ func (h *TouchHandler) TapMove(pos geo.Position, tapID int,
 		// an upward drag to the scroll around it.
 		claims := h.dragClaims(tapID, offset)
 		dragCo, dragPos := co, objPos
-		if originCo, originPos, _ := h.Finder.FindObjectAtPositionMatching(previousPos, claims); originCo != nil {
+		if originCo, originPos := h.findDraggable(previousPos, claims); originCo != nil {
 			dragCo, dragPos = originCo, originPos
 		} else if co != nil && !claims(co) {
 			dragCo = nil
@@ -591,7 +616,7 @@ func (h *TouchHandler) TapUp(pos geo.Position, tapID int,
 
 	duration := time.Since(h.LastTapDown[tapID])
 
-	co, objPos, _ := h.Finder.FindObjectAtPositionMatching(pos, func(object core.CanvasObject) bool {
+	co, objPos, _ := h.findPressable(pos, func(object core.CanvasObject) bool {
 		if _, ok := object.(event.Tappable); ok {
 			return true
 		} else if _, ok := object.(event.SecondaryTappable); ok {

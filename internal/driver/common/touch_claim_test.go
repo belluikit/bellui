@@ -131,4 +131,9 @@ func (f *originlessFinder) FindObjectAtPositionMatching(pos geo.Position,
 	return nil, pos, 1
 }
 
+func (f *originlessFinder) FindEnabledObjectAtPositionMatching(pos geo.Position, test func(core.CanvasObject) bool) (core.CanvasObject, geo.Position, int, bool) {
+	o, p, l := f.FindObjectAtPositionMatching(pos, test)
+	return o, p, l, false
+}
+
 func (f *originlessFinder) CanvasForTouch() core.Canvas { return nil }

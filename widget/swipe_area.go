@@ -103,8 +103,10 @@ var (
 //
 // A disabled SwipeArea reports no swipe: a drag moves no card and calls
 // neither OnSwiped nor OnSwipeProgress, and it is left to the scroll around
-// the area. The content is the app's and is left as it is: a tap still
-// reaches it. The area draws nothing of its own, so it has no disabled look.
+// the area. The content is the app's and is not disabled, but the drivers
+// drop the taps, presses and hovers that land on it, as they do inside every
+// disabled widget (#1378). The area draws nothing of its own, so it has no
+// disabled look.
 //
 // Since: 1.3
 type SwipeArea struct {
