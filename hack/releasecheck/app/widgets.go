@@ -5,6 +5,7 @@ import (
 	"image"
 	"image/color"
 	"image/draw"
+	"net/url"
 	"time"
 
 	"github.com/belluikit/bellui"
@@ -65,18 +66,24 @@ func disabledTab() core.CanvasObject {
 	treeView := newTreeView(false)
 
 	// The containers: each holds an app-disabled check that must stay
-	// disabled when the container is enabled again (#1218).
+	// disabled when the container is enabled again (#1218), and a link,
+	// which cannot be disabled itself, so only its container stops it
+	// (#1288, #1378).
+	link := func() *widget.Hyperlink {
+		u, _ := url.Parse("https://example.com/")
+		return widget.NewHyperlink("A link to example.com", u)
+	}
 	appDisabled := widget.NewCheck("Disabled by the app", nil)
 	appDisabled.Disable()
 	tabs := container.NewAppTabs(
-		container.NewTabItem("First tab", container.NewVBox(widget.NewEntry(), widget.NewButton("Button in a tab", tapped("Button in a tab")), appDisabled)),
+		container.NewTabItem("First tab", container.NewVBox(widget.NewEntry(), widget.NewButton("Button in a tab", tapped("Button in a tab")), link(), appDisabled)),
 		container.NewTabItem("Second tab", container.NewVBox(widget.NewButton("Button in the second tab", tapped("Button in the second tab")), widget.NewCheck("Check in the second tab", nil))),
 	)
 	docs := container.NewDocTabs(
 		container.NewTabItem("Doc one", widget.NewButton("Button in a doc tab", tapped("Button in a doc tab"))),
 		container.NewTabItem("Doc two", widget.NewLabel("Second document")),
 	)
-	inner := container.NewInnerWindow("Inner window", container.NewVBox(widget.NewEntry(), widget.NewButton("Button in the window", tapped("Button in the window"))))
+	inner := container.NewInnerWindow("Inner window", container.NewVBox(widget.NewEntry(), widget.NewButton("Button in the window", tapped("Button in the window")), link()))
 
 	button := widget.NewButton("Button", tapped("Button"))
 	iconButton := widget.NewButtonWithIcon("Icon button", theme.ContentAddIcon(), tapped("Icon button"))
@@ -132,7 +139,7 @@ func disabledTab() core.CanvasObject {
 			box(320, 120, carousel), box(320, 180, list), box(320, 180, tree), box(320, 180, treeView),
 		)),
 		widget.NewCard("Containers", "Each holds a check the app disabled itself", container.NewVBox(
-			box(360, 200, tabs), box(360, 120, docs), box(360, 180, inner),
+			box(360, 230, tabs), box(360, 120, docs), box(360, 210, inner),
 		)),
 	))
 }
