@@ -413,6 +413,11 @@ type RichText struct {
 	// (#1232); like AllowRemoteContent it reaches each ImageSegment in
 	// cachedSegmentVisual.
 	dimImages bool
+
+	// drawnDisabled is set by a widget that owns this RichText and draws it
+	// in the disabled colours itself, so the paint walk does not dim it again
+	// under a disabled container (#1393).
+	drawnDisabled bool
 }
 
 // virtualRowBuffer is the number of extra rows materialised above and below the
@@ -424,6 +429,15 @@ const virtualRowBuffer = 8
 // documents stay on the simple full-materialisation path: windowing and the
 // volatile-row estimate jitter are pure overhead at small sizes.
 const varHeightMinRows = 2000
+
+// DrawsDisabledLook reports whether the widget that owns this RichText draws
+// it in the disabled colours itself, as a Button's label or an Entry's text
+// is drawn, so the paint walk leaves it alone under a disabled container
+// (core.DisabledLook). A RichText an app shows itself reports false, and is
+// dimmed under a disabled container like the rest of its content (#1393).
+//
+// Since: 1.3
+func (t *RichText) DrawsDisabledLook() bool { return t.drawnDisabled }
 
 // NewRichText returns a new RichText widget that renders the given text and segments.
 // If no segments are specified it will be converted to a single segment using the default text settings.

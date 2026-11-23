@@ -2934,6 +2934,7 @@ func (e *Entry) pasteFromClipboard(clipboard bellui.Clipboard) {
 // placeholderProvider returns the placeholder text handler for this entry
 func (e *Entry) placeholderProvider() *RichText {
 	e.placeholder.ExtendBaseWidget(&e.placeholder)
+	e.placeholder.drawnDisabled = true // the entry colours it (#1393)
 	if len(e.placeholder.Segments) > 0 {
 		return &e.placeholder
 	}
@@ -3685,6 +3686,7 @@ func (e *Entry) syncSelectable() {
 // textProvider returns the text handler for this entry
 func (e *Entry) textProvider() *RichText {
 	e.text.ExtendBaseWidget(&e.text)
+	e.text.drawnDisabled = true // the entry colours it (#1393)
 	// Always keep RowHighlighter and ShowLineNumbers in sync.
 	if e.LineHighlighter != nil {
 		e.text.RowHighlighter = e.styleRunsForRow

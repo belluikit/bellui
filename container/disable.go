@@ -10,11 +10,21 @@ import (
 // look: their tab strip or window chrome draws the disabled colours, and the
 // widgets they disable inside their content draw theirs. Dimming the whole
 // subtree would dim those twice (core.DisabledLook, #1223). App content that
-// cannot be disabled, a plain Label, stays as it is drawn.
+// cannot be disabled, a plain Label or a link, is dimmed by the paint walk
+// instead, as is everything under a disabled container that has no disabled
+// look of its own (#1393).
 
 func (*AppTabs) DrawsDisabledLook() bool     { return true }
 func (*DocTabs) DrawsDisabledLook() bool     { return true }
 func (*InnerWindow) DrawsDisabledLook() bool { return true }
+
+// DrawsDisabledLook reports that a Clip leaves the look to others: it only
+// clips and draws nothing of its own, so under a disabled container the
+// widgets inside it are dimmed or not by their own looks (#1393), and a
+// table header's text under a Clip is not dimmed a second time.
+//
+// Since: 1.3
+func (*Clip) DrawsDisabledLook() bool { return true }
 
 // A tab of a disabled TabItem draws its label and icon in the disabled
 // colour. Before #1218 the walk dimmed it as well, to about 14%.

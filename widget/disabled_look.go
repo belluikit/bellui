@@ -46,6 +46,17 @@ func (*TimePicker) DrawsDisabledLook() bool        { return true }
 func (*Tree) DrawsDisabledLook() bool              { return true }
 func (*TreeView) DrawsDisabledLook() bool          { return true }
 
+// Parts their owner draws in the disabled colours, which the paint walk must
+// not dim again under a disabled container (#1393).
+
+func (*segmentWidget) DrawsDisabledLook() bool { return true }
+func (*dateDayCell) DrawsDisabledLook() bool   { return true }
+func (*treeViewItem) DrawsDisabledLook() bool  { return true }
+
+// A TreeView row recolours its node content too, so nothing under it is dimmed
+// again (the paint walk's disabledSubtree, #1393).
+func (*treeViewItem) DrawsDisabledSubtree() bool { return true }
+
 // They disable children that draw the disabled colours, and dimming the whole
 // subtree would dim those children twice. TopAppBar disables its controls and
 // keeps its title at full colour (#1226, #1251). BottomAppBar disables its FAB;

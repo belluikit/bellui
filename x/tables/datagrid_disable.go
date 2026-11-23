@@ -11,8 +11,9 @@ import (
 var _ core.Disableable = (*DataGrid)(nil)
 
 // DrawsDisabledLook reports that the paint walk must not dim a disabled
-// DataGrid (bellui's core.DisabledLook, belluikit/bellui#1223): it draws its own text in the disabled colour, and the content an app
-// supplies (CellRenderer cells, master-detail content) is the app's.
+// DataGrid (bellui's core.DisabledLook, belluikit/bellui#1223): it draws its own text in the disabled colour; the content an app
+// supplies (CellRenderer cells, master-detail content) is dimmed by the walk
+// (belluikit/bellui#1393).
 func (*DataGrid) DrawsDisabledLook() bool { return true }
 
 // Disable makes the grid visible but inert (belluikit/player#641): it keeps
@@ -27,7 +28,9 @@ func (*DataGrid) DrawsDisabledLook() bool { return true }
 // opened, by the user or by StartEditing and ShowFilterPopup.
 //
 // Content the app supplies (a column's CellRenderer cells, master-detail
-// content) is the app's: it is not disabled, dimmed or blocked here.
+// content) is the app's: the grid does not disable or block it. The paint walk
+// draws it dimmed while the grid is disabled, as it does any content under a
+// disabled widget (belluikit/bellui#1393).
 //
 // Disable is safe before the grid is drawn.
 func (g *DataGrid) Disable() {

@@ -945,6 +945,7 @@ func (e *RichEntry) caretDoc() (*richEntryDoc, int) {
 
 func (e *RichEntry) syncProvider() {
 	e.provider.ExtendBaseWidget(&e.provider)
+	e.provider.drawnDisabled = true // the rich entry recolours it (#1393)
 	e.provider.Scroll = widget.ScrollNone
 	segs := e.displaySegments()
 	swapped := false // the provider is handed other segments of the same length

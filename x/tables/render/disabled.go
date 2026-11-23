@@ -56,3 +56,20 @@ func (tc ThemeColors) disabled() ThemeColors {
 	tc.Focus = color.Transparent
 	return tc
 }
+
+// The widgets the grid builds draw its own text in the disabled colour
+// (resolveColors), so under a disabled grid the paint walk must not dim them
+// again (core.DisabledLook). Content an app supplies, a column's CellRenderer
+// cells inside a cellHost, has no such look and is dimmed by the walk
+// (belluikit/bellui#1393).
+
+func (*cellHost) DrawsDisabledLook() bool          { return true }
+func (*CellsWidget) DrawsDisabledLook() bool       { return true }
+func (*CellsRenderer) DrawsDisabledLook() bool     { return true }
+func (*PinnedCellsWidget) DrawsDisabledLook() bool { return true }
+func (*HeaderWidget) DrawsDisabledLook() bool      { return true }
+func (*FloatingFilterRow) DrawsDisabledLook() bool { return true }
+func (*GroupRowOverlay) DrawsDisabledLook() bool   { return true }
+func (*groupRowWidget) DrawsDisabledLook() bool    { return true }
+func (*LoadingOverlay) DrawsDisabledLook() bool    { return true }
+func (*StatusBar) DrawsDisabledLook() bool         { return true }

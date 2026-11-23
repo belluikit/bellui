@@ -609,6 +609,14 @@ type Scroll struct {
 	nextListenerID  int
 }
 
+// DrawsDisabledLook reports that the paint walk leaves a Scroll's own drawing,
+// its bars and shadows, as it is under a disabled container, as it was before
+// #1393; the widgets it scrolls are dimmed or not by their own looks. A
+// disabled collection stops its scrolling itself (Inert, #1215).
+//
+// Since: 1.3
+func (s *Scroll) DrawsDisabledLook() bool { return true }
+
 // AddScrollListener registers fn to be called whenever the scroll offset
 // changes, returning a function that removes the registration. Unlike the
 // single-slot [Scroll.OnScrolled] field, any number of listeners can attach and

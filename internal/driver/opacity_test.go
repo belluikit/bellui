@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/core"
 )
 
@@ -129,4 +130,75 @@ func TestOpacityStack_OnlyChangesReachThePainter(t *testing.T) {
 	s.Pop(p)
 	s.Pop(p)
 	assert.Equal(t, 2, p.calls, "into the group and out of it")
+}
+
+// contentWidget is an app's widget with no disabled look of its own, as a
+// Label or a Hyperlink is: a widget the stack can tell apart from what it
+// draws.
+type contentWidget struct{ core.CanvasObject }
+
+func (contentWidget) CreateRenderer() core.WidgetRenderer { return nil }
+
+// disabledHost is a disabled container that draws its own disabled look, as
+// AppTabs and List do, and disables only its Disableable children.
+type disabledHost struct{ contentWidget }
+
+func (disabledHost) Disabled() bool          { return true }
+func (disabledHost) Enable()                 {}
+func (disabledHost) Disable()                {}
+func (disabledHost) DrawsDisabledLook() bool { return true }
+
+// ownLookWidget is an enabled widget that draws its own disabled look, as a
+// Button or an Entry's text does.
+type ownLookWidget struct{ contentWidget }
+
+func (ownLookWidget) DrawsDisabledLook() bool { return true }
+
+// subtreeWidget draws all it holds in the disabled colours, as a TreeView
+// row recolours its node.
+type subtreeWidget struct{ ownLookWidget }
+
+func (subtreeWidget) DrawsDisabledSubtree() bool { return true }
+
+// Under a container that draws its own disabled look, what a widget with no
+// look of its own draws is dimmed once: a link or a list row's label stayed at
+// full colour while it took no input (#1393). What a widget with its own look
+// draws is not dimmed again, and neither is anything under a part that already
+// draws its subtree disabled, or under a dim already in effect.
+func TestOpacityStack_DimsInertContent(t *testing.T) {
+	p := &recordedOpacity{v: 1}
+	var s OpacityStack
+	drawnBy := func(path ...core.CanvasObject) float32 {
+		for _, o := range path {
+			s.Push(p, o)
+		}
+		v := s.Current()
+		for range path {
+			s.Pop(p)
+		}
+		return v
+	}
+	text := plainObject{} // a canvas object a widget draws
+
+	assert.Equal(t, float32(1), drawnBy(contentWidget{}, text), "not under a disabled widget")
+	assert.InDelta(t, 0.38, drawnBy(disabledHost{}, contentWidget{}, text), 1e-6, "a label in a disabled tab")
+	assert.InDelta(t, 0.38, drawnBy(disabledHost{}, &bellui.Container{}, contentWidget{}, contentWidget{}, text), 1e-6,
+		"containers and nested widgets pass through: dimmed once")
+	assert.Equal(t, float32(1), drawnBy(disabledHost{}, contentWidget{}), "a widget itself draws nothing")
+	assert.Equal(t, float32(1), drawnBy(disabledHost{}, &bellui.Container{}), "nor does a container")
+	assert.Equal(t, float32(1), drawnBy(disabledHost{}, text), "the host's own drawing")
+	assert.Equal(t, float32(1), drawnBy(disabledHost{}, ownLookWidget{}, text), "a Button draws its own look")
+	assert.InDelta(t, 0.38, drawnBy(disabledHost{}, ownLookWidget{}, contentWidget{}, text), 1e-6,
+		"content inside a widget with its own look, as a List row's label")
+	assert.Equal(t, float32(1), drawnBy(disabledHost{}, subtreeWidget{}, contentWidget{}, text),
+		"a part that draws its subtree disabled is not dimmed again")
+	assert.InDelta(t, 0.38, drawnBy(disabledObject{}, contentWidget{}, text), 1e-6,
+		"under a disabled widget dimmed as a whole: once, not twice")
+
+	s.Push(p, disabledHost{})
+	s.EnterBoundary(p)
+	assert.InDelta(t, 0.38, drawnBy(contentWidget{}, text), 1e-6, "inert carries into a repaint boundary")
+	s.ExitBoundary(p)
+	s.Pop(p)
+	assert.Equal(t, float32(1), s.Current())
 }

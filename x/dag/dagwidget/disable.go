@@ -12,7 +12,8 @@ var _ core.Disableable = (*DAGCanvas)(nil)
 
 // DrawsDisabledLook reports that the paint walk must not dim a disabled
 // DAGCanvas (bellui's core.DisabledLook, belluikit/bellui#1223): it draws its nodes, edges, groups, ports and annotations in the disabled
-// colours itself, and a node's Content, the app's, is left alone.
+// colours itself; a node's Content, the app's, is dimmed by the walk
+// (belluikit/bellui#1393).
 func (*DAGCanvas) DrawsDisabledLook() bool { return true }
 
 // Disable makes the canvas visible but inert (belluikit/player#641): it keeps
@@ -30,8 +31,10 @@ func (*DAGCanvas) DrawsDisabledLook() bool { return true }
 //
 // The app's own calls (AddNode, DeleteSelected, SelectNode, the Graph, the
 // Commands stack) still work: Disable refuses the user's input, not the app.
-// A node's Content is the app's and is left alone, and so are the Palette
-// and the PropertiesPanel, which are separate widgets.
+// A node's Content is the app's: the canvas does not disable it, and the
+// paint walk draws it dimmed, as it does any content under a disabled widget
+// (belluikit/bellui#1393). The Palette and the PropertiesPanel are separate
+// widgets and are left alone.
 //
 // Disable is safe before the canvas is drawn.
 func (c *DAGCanvas) Disable() {
@@ -173,3 +176,22 @@ func (t disabledTheme) Color(n bellui.ThemeColorName, v bellui.ThemeVariant) col
 	}
 	return t.Theme.Color(n, v)
 }
+
+// The parts the canvas builds draw its nodes, edges, groups, ports, handles
+// and annotations in the disabled colours themselves, so under a disabled
+// canvas the paint walk must not dim them again (core.DisabledLook). A node's
+// Content, the app's, has no such look and is dimmed by the walk
+// (belluikit/bellui#1393).
+
+func (*NodeWidget) DrawsDisabledLook() bool           { return true }
+func (*nodeConnectorHandle) DrawsDisabledLook() bool  { return true }
+func (*PortWidget) DrawsDisabledLook() bool           { return true }
+func (*EdgeWidget) DrawsDisabledLook() bool           { return true }
+func (*LinkEdgeWidget) DrawsDisabledLook() bool       { return true }
+func (*GroupWidget) DrawsDisabledLook() bool          { return true }
+func (*groupTitleBar) DrawsDisabledLook() bool        { return true }
+func (*groupCollapseButton) DrawsDisabledLook() bool  { return true }
+func (*groupConnectorHandle) DrawsDisabledLook() bool { return true }
+func (*GroupEdgeWidget) DrawsDisabledLook() bool      { return true }
+func (*HandleWidget) DrawsDisabledLook() bool         { return true }
+func (*AnnotationWidget) DrawsDisabledLook() bool     { return true }

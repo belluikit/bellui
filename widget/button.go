@@ -134,6 +134,7 @@ func (b *Button) CreateRenderer() core.WidgetRenderer {
 	seg.Style.Alignment = bellui.TextAlignCenter
 	text := NewRichText(seg)
 	text.inset = geo.NewSquareSize(th.Size(theme.SizeNameInnerPadding))
+	text.drawnDisabled = true // the button colours its label (#1393)
 
 	background := canvas.NewRectangle(th.Color(theme.ColorNameButton, v))
 	background.CornerRadius = buttonRadius(th)
