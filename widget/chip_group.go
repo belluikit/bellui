@@ -18,6 +18,21 @@ var (
 	_ core.Disableable = (*ChipGroup)(nil)
 )
 
+// ChipState is the state of one option's chip in a ChipGroup (#1383).
+//
+// Since: 1.3
+type ChipState int
+
+const (
+	// ChipStateOff is an option neither selected nor excluded.
+	ChipStateOff ChipState = iota
+	// ChipStateSelected is an option in the group's Selected list.
+	ChipStateSelected
+	// ChipStateExcluded is an option in the Excluded list of a group
+	// whose chips have the excluded state (Multiple and Excludable).
+	ChipStateExcluded
+)
+
 // ChipGroup is a set of filter chips to pick from, one per option, as
 // CheckGroup and RadioGroup are with checkboxes and radio buttons (#1348).
 // Each chip is as wide as its label, and the chips wrap onto the next row
@@ -68,15 +83,16 @@ type ChipGroup struct {
 	// OnChanged fires with the selected options after a tap or SetSelected
 	// changes them, in the order they were selected.
 	OnChanged func([]string) `json:"-"`
-	// OnExcludedChanged fires with the excluded options after a tap or
-	// SetExcluded changes them. A tap that moves a chip from selected to
-	// excluded changes both lists: both are updated before OnChanged, then
-	// OnExcludedChanged, fires. Either callback can refuse the change by
-	// putting the lists back with SetSelectedSilently and
-	// SetExcludedSilently.
+	// OnStateChanged fires with an option and its new state for each
+	// option whose state a tap, SetSelected or SetExcluded changes, in the
+	// order of Options, after OnChanged. A tap changes one option, or two
+	// in a single-choice group when the selection moves. Selected and
+	// Excluded are both updated before anything fires. A callback can
+	// refuse the change by putting the lists back with SetSelectedSilently
+	// and SetExcludedSilently.
 	//
 	// Since: 1.3
-	OnExcludedChanged func([]string) `json:"-"`
+	OnStateChanged func(option string, state ChipState) `json:"-"`
 
 	chips []*Chip
 }
@@ -91,20 +107,14 @@ func NewChipGroup(options []string, multiple bool, changed func([]string)) *Chip
 	return g
 }
 
-// SetSelected selects the options, fires OnChanged and refreshes. An option
-// it selects leaves Excluded, which fires OnExcludedChanged.
+// SetSelected selects the options, fires OnChanged and OnStateChanged, and
+// refreshes. An option it selects leaves Excluded.
 //
 // Since: 1.3
 func (g *ChipGroup) SetSelected(options []string) {
-	g.Selected = options
-	excludedChanged := g.dropFrom(&g.Excluded, options)
-	if g.OnChanged != nil {
-		g.OnChanged(options)
-	}
-	if excludedChanged {
-		g.fireExcluded()
-	}
-	g.Refresh()
+	exc := slices.Clone(g.Excluded)
+	dropFrom(&exc, options)
+	g.change(options, exc, true)
 }
 
 // SetSelectedSilently selects the options and refreshes, as SetSelected
@@ -116,18 +126,14 @@ func (g *ChipGroup) SetSelectedSilently(options []string) {
 	g.Refresh()
 }
 
-// SetExcluded excludes the options, fires OnExcludedChanged and refreshes.
-// An option it excludes leaves Selected, which fires OnChanged.
+// SetExcluded excludes the options, fires OnStateChanged and refreshes. An
+// option it excludes leaves Selected, which fires OnChanged too.
 //
 // Since: 1.3
 func (g *ChipGroup) SetExcluded(options []string) {
-	g.Excluded = options
-	selectedChanged := g.dropFrom(&g.Selected, options)
-	if selectedChanged && g.OnChanged != nil {
-		g.OnChanged(g.Selected)
-	}
-	g.fireExcluded()
-	g.Refresh()
+	sel := slices.Clone(g.Selected)
+	dropFrom(&sel, options)
+	g.change(sel, options, false)
 }
 
 // SetExcludedSilently excludes the options and refreshes, as SetExcluded
@@ -136,25 +142,64 @@ func (g *ChipGroup) SetExcluded(options []string) {
 // Since: 1.3
 func (g *ChipGroup) SetExcludedSilently(options []string) {
 	g.Excluded = options
-	g.dropFrom(&g.Selected, options)
+	dropFrom(&g.Selected, options)
 	g.Refresh()
+}
+
+// State returns the option's state: excluded only in a group whose chips
+// have the excluded state, as that is the only place it is drawn.
+//
+// Since: 1.3
+func (g *ChipGroup) State(option string) ChipState {
+	switch {
+	case slices.Contains(g.Selected, option):
+		return ChipStateSelected
+	case g.excludes() && slices.Contains(g.Excluded, option):
+		return ChipStateExcluded
+	}
+	return ChipStateOff
+}
+
+// change sets both lists, then fires OnChanged, when the selection changed
+// or always is set, and OnStateChanged for each option whose state
+// changed, and refreshes. The states are compared once, before anything
+// fires, so a callback that puts the lists back does not fire more.
+func (g *ChipGroup) change(sel, exc []string, always bool) {
+	before := g.states()
+	selChanged := !slices.Equal(sel, g.Selected)
+	g.Selected, g.Excluded = sel, exc
+	after := g.states()
+	if (always || selChanged) && g.OnChanged != nil {
+		g.OnChanged(sel)
+	}
+	if g.OnStateChanged != nil {
+		for i, opt := range g.Options {
+			if before[i] != after[i] {
+				g.OnStateChanged(opt, after[i])
+			}
+		}
+	}
+	g.Refresh()
+}
+
+// states returns each option's state, in the order of Options.
+func (g *ChipGroup) states() []ChipState {
+	out := make([]ChipState, len(g.Options))
+	for i, opt := range g.Options {
+		out[i] = g.State(opt)
+	}
+	return out
 }
 
 // dropFrom removes the options from *list, reporting whether any was there.
 // It replaces the slice rather than editing it, as the app may hold it.
-func (g *ChipGroup) dropFrom(list *[]string, options []string) bool {
+func dropFrom(list *[]string, options []string) bool {
 	kept := slices.DeleteFunc(slices.Clone(*list), func(o string) bool { return slices.Contains(options, o) })
 	if len(kept) == len(*list) {
 		return false
 	}
 	*list = kept
 	return true
-}
-
-func (g *ChipGroup) fireExcluded() {
-	if g.OnExcludedChanged != nil {
-		g.OnExcludedChanged(g.Excluded)
-	}
 }
 
 // excludes reports whether the group's chips have the excluded state.
@@ -201,8 +246,8 @@ func (g *ChipGroup) chipTapped(c *Chip) {
 }
 
 // cycle moves opt one state on, off → selected → excluded → off, and fires
-// the callback of each list that changed once both are updated. A Required
-// group's last selected chip stays selected.
+// the callbacks once both lists are updated. A Required group's last
+// selected chip stays selected.
 func (g *ChipGroup) cycle(opt string) {
 	sel, exc := g.Selected, g.Excluded
 	switch {
@@ -217,15 +262,7 @@ func (g *ChipGroup) cycle(opt string) {
 	default:
 		sel = append(slices.Clone(sel), opt)
 	}
-	selChanged, excChanged := len(sel) != len(g.Selected), len(exc) != len(g.Excluded)
-	g.Selected, g.Excluded = sel, exc
-	if selChanged && g.OnChanged != nil {
-		g.OnChanged(sel)
-	}
-	if excChanged {
-		g.fireExcluded()
-	}
-	g.Refresh()
+	g.change(sel, exc, false)
 }
 
 type chipGroupRenderer struct {
@@ -302,7 +339,7 @@ func (r *chipGroupRenderer) Refresh() {
 func (r *chipGroupRenderer) sync() {
 	g := r.group
 	g.Options = removeDuplicates(g.Options)
-	g.dropFrom(&g.Excluded, g.Selected) // never in both: selected wins
+	dropFrom(&g.Excluded, g.Selected) // never in both: selected wins
 	chips := g.chips
 	for len(chips) < len(g.Options) {
 		c := &Chip{Style: ChipStyleFilter}
