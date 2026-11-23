@@ -71,7 +71,16 @@ func disabledTab() core.CanvasObject {
 	// (#1288, #1378).
 	link := func() *widget.Hyperlink {
 		u, _ := url.Parse("https://example.com/")
-		return widget.NewHyperlink("A link to example.com", u)
+		l := widget.NewHyperlink("A link to example.com", u)
+		l.OnTapped = func() {
+			tapped("Link")()
+			if !probing { // the probe checks the tap without opening a browser
+				if err := bellui.OpenURL(u); err != nil {
+					bellui.LogError("open the link", err)
+				}
+			}
+		}
+		return l
 	}
 	appDisabled := widget.NewCheck("Disabled by the app", nil)
 	appDisabled.Disable()

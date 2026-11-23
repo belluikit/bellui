@@ -723,6 +723,7 @@ var checks = []check{
 			"Right-to-left, Start and End swap sides; the first chip of each row is the rightmost.",
 			"Right-to-left, the flow starts with 1 at the right edge and every row runs leftwards; the flex row reads \"1 first\" at the right; the flex column's buttons sit at the right edge.",
 			"Toggling back restores the left-to-right layout exactly.",
+			"Known, not a failure in this release (#1392, owner 2026-11-23): the Start / Center / End radio row does not mirror, and right-to-left its circles overlap the labels.",
 		},
 	},
 

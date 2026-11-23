@@ -8,9 +8,11 @@
 //	go run -tags accessibility ./hack/releasecheck/app  # desktop, screen readers
 //	cd hack/releasecheck/app && bellui serve            # web
 //	cd hack/releasecheck/app && bellui package -os android
+//	go run ./hack/releasecheck/app -probe DIR             # macOS: the scripted probe (probe.go)
 package main
 
 import (
+	"flag"
 	"fmt"
 	"image/color"
 	"time"
@@ -35,6 +37,8 @@ const (
 )
 
 func main() {
+	probeDir := flag.String("probe", "", "macOS: drive the scripted release checks, write DIR/report.md and captures, then quit")
+	flag.Parse()
 	a := app.NewWithID("io.bellui.releasecheck")
 	if err := lang.AddTranslationsForLocale([]byte(greetingEN), "en"); err != nil {
 		bellui.LogError("English catalog", err)
@@ -60,6 +64,9 @@ func main() {
 	w.SetContent(tabs)
 	w.Resize(geo.NewSize(900, 640))
 	w.Show()
+	if *probeDir != "" {
+		go runProbe(a, w, tabs, *probeDir)
+	}
 	a.Run()
 }
 
