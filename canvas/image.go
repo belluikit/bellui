@@ -604,8 +604,8 @@ func renderDeferredImage(o core.CanvasObject) {
 // profile it declares, so a Display P3 or Adobe RGB photo is drawn in its own
 // colours rather than as if it were sRGB (#802). An image that declares no
 // profile, or sRGB, is drawn as decoded. One whose profile Bellui does not
-// convert (CMYK, Lab, lookup tables) or cannot read is drawn as sRGB too, and
-// logged once per kind.
+// convert (CMYK, greyscale, Lab, lookup tables) or cannot read is drawn as
+// sRGB too, and logged once per kind.
 func decodeImage(r io.Reader) (image.Image, error) {
 	data, err := io.ReadAll(r)
 	if err != nil {

@@ -558,10 +558,10 @@ cannot be moved.
   `SetContent`, calls it with the page it dropped. The next frame then lets go
   of the page's renderers, canvas records and textures, as `SetContent` does
   for the content it replaces; they used to stay until a paint at least a
-  minute later, which an idle app does not draw. It also takes the focus from
-  a focused widget on the dropped page, which would otherwise keep it and
-  receive the keys typed after. A driver provides it through the optional
-  `ReleasingDriver`.
+  minute later, which an idle app does not draw. A focused widget on the
+  dropped page loses the focus with or without it
+  ([#1089](https://github.com/belluikit/bellui/issues/1089), below). A driver
+  provides it through the optional `ReleasingDriver`.
 * **`AppTabs.DragToSelect` lets users drag along the tab titles to move the selection indicator**
   ([#1080](https://github.com/belluikit/bellui/pull/1080)). The indicator
   follows the pointer, fitting each tab as it passes over it, and the release
@@ -2288,7 +2288,9 @@ modules are released at v1.3.0-rc.1 with it.
   - A drawing made with a tool never reuses an ID the app already gave its own
     drawing, so `RemoveDrawing` removes the right one.
   - `DrilldownEvent.Hit` carries the clicked point. A breadcrumb click emits
-    `EventDrillUp` and restores the parent's zoom, as `DrillUp` does.
+    `EventDrillUp` and resets the zoom to the one the parent chart's
+    `DataZoom` option starts at, as `DrillUp` does; a zoom the user made on
+    the parent before drilling down is not kept.
   - Timeline playback runs each step, and its callback, on the UI thread.
 * **x/charts: series options and the legend**
   ([#343](https://github.com/belluikit/bellui/issues/343)).
