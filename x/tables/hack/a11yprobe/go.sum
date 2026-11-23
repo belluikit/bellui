@@ -2,8 +2,8 @@ github.com/BurntSushi/toml v1.5.0 h1:W5quZX/G/csjUnuI8SUYlsHs9M38FC7znL0lIO+DvMg
 github.com/BurntSushi/toml v1.5.0/go.mod h1:ukJfTF/6rtPPRCnwkur4qwRxa8vTRFBF0uk2lLoLwho=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=
 github.com/Microsoft/go-winio v0.6.2/go.mod h1:yd8OoFMLzJbo9gZq8j5qaps8bJ9aShtEA8Ipt1oGCvU=
-github.com/belluikit/bellui v1.3.0-rc.4 h1:8VQTM3NfurzaCTk9MsLUjOe/0710gKzlbR88oLq6UvA=
-github.com/belluikit/bellui v1.3.0-rc.4/go.mod h1:7nEmXNE7hWvDYicApDtiRx5JRob2pXiq3c88M3J1xBM=
+github.com/belluikit/bellui v1.3.0-rc.5 h1:wGRxVRdvgQmSO7VA7Zz9f05Otx7MEAgfPfjDqZxEqLg=
+github.com/belluikit/bellui v1.3.0-rc.5/go.mod h1:7nEmXNE7hWvDYicApDtiRx5JRob2pXiq3c88M3J1xBM=
 github.com/belluikit/fsnotify v1.10.2 h1:Kbop0VxWluUIAKunk+4op1v0KCkHfAFnAGAmVrD3Lc8=
 github.com/belluikit/fsnotify v1.10.2/go.mod h1:Zn9GYvdu+eJ1E+cDTkxZNY53ykn9kVXly2SAPLfPpLk=
 github.com/belluikit/gl-js v0.2.1 h1:DWtRW7ztetpAfztJ3msW9YWFWVaydmMlfT2sa6GrAEY=
