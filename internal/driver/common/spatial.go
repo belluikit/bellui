@@ -290,14 +290,14 @@ func (idx *SpatialIndex) FindEnabledObjectAtPositionMatching(
 	return found, foundPos, true, foundNode.inert(found)
 }
 
-// inert reports whether obj, the object of node n, lies inside a disabled
+// inert reports whether obj, the object of node r, lies inside a disabled
 // widget (driver.InertUnder). A nil node knows no ancestors.
-func (n *RenderCacheNode) inert(obj core.CanvasObject) bool {
-	if n == nil {
+func (r *RenderCacheNode) inert(obj core.CanvasObject) bool {
+	if r == nil {
 		return false
 	}
 	return driver.InertUnder(obj, func(yield func(core.CanvasObject) bool) {
-		for p := n.parent; p != nil; p = p.parent {
+		for p := r.parent; p != nil; p = p.parent {
 			if p.obj != nil && !yield(p.obj) {
 				return
 			}

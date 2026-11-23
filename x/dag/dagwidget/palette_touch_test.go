@@ -33,6 +33,16 @@ func (f *pageFinder) FindObjectAtPositionMatching(pos geo.Position,
 	return intdriver.FindObjectAtPositionMatching(pos, matches, nil, f.content)
 }
 
+// FindEnabledObjectAtPositionMatching is the ObjectFinder method toolkits
+// with #1378 call; nothing here is disabled, so no hit is inert. It calls the
+// older finder, so the test builds against the pinned toolkit too.
+func (f *pageFinder) FindEnabledObjectAtPositionMatching(pos geo.Position,
+	matches func(core.CanvasObject) bool,
+) (core.CanvasObject, geo.Position, int, bool) {
+	o, p, l := f.FindObjectAtPositionMatching(pos, matches)
+	return o, p, l, false
+}
+
 func (f *pageFinder) CanvasForTouch() core.Canvas { return nil }
 
 func touchDrag(d event.Draggable, ev *event.DragEvent) { d.Dragged(ev) }
