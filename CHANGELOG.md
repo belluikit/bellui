@@ -19,6 +19,101 @@ one per change, so that open pull requests do not conflict here. Run
 `go run ./hack/changelog preview` to see them assembled; the release folds them
 into a section below.
 
+## v1.3.0-rc.5 — 2026-11-23
+
+The fifth release candidate for v1.3.0. A `ChipGroup` can now let people
+exclude options as well as pick them, which DaySong asked for. Its rows can
+be centered or put at the end, and they follow a right-to-left layout, as do
+the wrapping and flex layouts. Nothing inside a disabled container takes a
+tap, a press, a hover or the Tab key any more. x/charts follows a light/dark
+change while the app runs. Two additions from rc.2 that its changelog missed
+are listed here too. The final v1.3.0 still follows the release check by
+hand. The `x/*` modules and the `bellui` command are released at
+v1.3.0-rc.5 with it, except x/mmedia, which is v1.3.0-rc.6, one ahead as
+since rc.2.
+
+### Added
+
+* **A `ChipGroup` can let people exclude options as well as pick them**
+  ([#1383](https://github.com/belluikit/bellui/issues/1383)). Set
+  `Excludable` on a group with `Multiple`, and each tap moves a chip from off
+  to selected, to excluded, and back to off. Excluded options are kept in the
+  new `Excluded` list; an option is never in both lists. The new
+  `OnStateChanged` callback reports each option whose state changes, with
+  its new `ChipState` (`ChipStateOff`, `ChipStateSelected`,
+  `ChipStateExcluded`), in every `ChipGroup`, and `State` reads one option's
+  state. An excluded chip shows a cross where the check mark goes, an
+  error-coloured outline and its label struck through, so the state does not
+  rest on colour; Material 3 has no excluded filter chip, so this look is
+  BellUI's own. A screen reader reads it as "Rock, excluded", translated.
+  `SetExcluded` reports the change and `SetSelectedSilently` and
+  `SetExcludedSilently` set either list without firing anything, so an app
+  can refuse a change by putting the lists back. Single-choice groups and
+  groups without `Excludable` work as before.
+* **A `ChipGroup` can center its rows of chips, or put them at the end**
+  ([#1371](https://github.com/belluikit/bellui/issues/1371)). The new
+  `Alignment` field takes `TextAlignLeading` (the default, so existing
+  layouts do not change), `TextAlignCenter` or `TextAlignTrailing`, and
+  places each row on its own, so a shorter last row is centered or trailed
+  too. Start and end follow the layout direction. Under a right-to-left
+  layout a group's chips now also run from the right edge, first chip
+  rightmost, where they used to wrap from the left.
+* **A card `SwipeArea` can spring back or stay put for some directions**
+  ([#1103](https://github.com/belluikit/bellui/issues/1103), in v1.3.0-rc.2
+  but missing from its changelog). With `Follow` set, every swipe used to
+  throw the card off. `Directions` maps a `SwipeDirection` to a
+  `SwipeCardMode`: `SwipeThrow` (the zero value, and what a direction not in
+  the map gets) throws it as before; `SwipeStay` lets the card follow the
+  finger and springs it back, running `OnSwiped` at the release; `SwipeIgnore`
+  keeps the card at rest that way and reports nothing.
+* **`auth.OIDCConfig.Nonce` lets the app supply the sign-in nonce**
+  ([#1043](https://github.com/belluikit/bellui/pull/1043), in v1.3.0-rc.2
+  but missing from its changelog). The flow always sent a random nonce of its
+  own, which the app never saw, so the app's server could not check an ID
+  token against a nonce it issued. When `Nonce` is set, it is sent in the
+  authorization request and the ID token must carry it, so a captured token
+  cannot be replayed against another request. Empty keeps the random nonce,
+  checked the same way.
+
+### Fixed
+
+* **x/charts: a chart follows a light/dark or theme change while the app runs**
+  ([#1381](https://github.com/belluikit/bellui/issues/1381)). A chart kept the
+  colours it was first drawn with, so switching the system appearance, or
+  calling `Settings().SetThemeVariant` or `SetTheme`, left a dark chart in a
+  light window or the reverse. A chart now redraws in the new theme's colours,
+  in a `ChartGroup` too.
+* **Nothing inside a disabled container takes a tap, a press or a hover**
+  ([#1378](https://github.com/belluikit/bellui/issues/1378)). A widget that
+  cannot be disabled itself, such as `Hyperlink` or `Table`, still took
+  taps inside a disabled `AppTabs`, `InnerWindow` or other disabled widget,
+  so a link opened and a cell was selected. The drivers now drop a tap,
+  secondary or double tap, long press, mouse press, hover or drag that lands
+  inside a disabled widget, as if it had landed on a disabled `Button`. This
+  also covers the app's content inside a disabled `List` row, `Carousel`
+  page or `SwipeArea`, which used to take taps. Scrolling is unchanged: the
+  wheel and a scrolling drag still reach the widget under them, which
+  decides for itself. A disabled `Entry`'s text can still be selected.
+* **Wrapping rows and flex boxes follow a right-to-left layout**
+  ([#1372](https://github.com/belluikit/bellui/issues/1372)). Under a
+  right-to-left layout, `RowWrapLayout`, `GridWrapLayout` and
+  `FlexHBoxLayout` still put their first child at the left edge and filled
+  each row rightwards. They now start at the right edge, as `HBox`, `Grid`
+  and the other standard layouts already did, and so does every row a wrap
+  starts. In a `FlexVBoxLayout`, `CrossStart` now puts a child at the
+  leading edge, the right one under right-to-left, as its doc comment said,
+  and `CrossEnd` at the left. Left-to-right layouts are unchanged.
+* **Tab no longer reaches a link inside a disabled container**
+  ([#1288](https://github.com/belluikit/bellui/issues/1288)). A focusable
+  widget that cannot be disabled itself, such as `Hyperlink`, stayed
+  reachable by Tab inside a disabled `AppTabs`, `DocTabs`, `InnerWindow` or
+  any other disabled widget, and Space or Enter opened its link. The focus
+  manager now treats a disabled widget's whole subtree as disabled, as HTML's
+  `<fieldset disabled>` does: Tab skips it and `Focus` refuses what is inside.
+  A widget whose text stays selectable while disabled (`Entry`, a `Label`'s
+  selection) can still take the focus a selection needs. A tap on such a link
+  is not covered: it still opens it.
+
 ## v1.3.0-rc.4 — 2026-11-21
 
 The fourth release candidate for v1.3.0, cut the same day as rc.3 for one
