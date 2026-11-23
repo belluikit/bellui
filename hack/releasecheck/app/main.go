@@ -54,6 +54,7 @@ func main() {
 		container.NewTabItem("Drawer", drawerTab(w)),
 		container.NewTabItem("Swipes", swipesTab()),
 		container.NewTabItem("Text", textTab(w)),
+		container.NewTabItem("Chips & layout", chipsTab()),
 	)
 	w.SetMainMenu(bellui.NewMainMenu(demoMenu("Check")))
 	w.SetContent(tabs)

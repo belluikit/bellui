@@ -89,6 +89,24 @@ func swipesTab() core.CanvasObject {
 		card.Refresh()
 	}
 
+	// A second card treats each way differently (#1103): left throws it,
+	// right springs it back, up and down leave it at rest.
+	moded := widget.NewLabel("Directions card: not swiped yet")
+	modes := widget.NewSwipeArea(widget.NewCard("Directions card", "Left throws, right springs back, up or down does nothing", nil), nil)
+	modes.Follow = true
+	modes.Directions = map[widget.SwipeDirection]widget.SwipeCardMode{
+		widget.SwipeRight: widget.SwipeStay, widget.SwipeUp: widget.SwipeIgnore, widget.SwipeDown: widget.SwipeIgnore,
+	}
+	n := 0
+	modes.OnSwiped = func(d widget.SwipeDirection) {
+		n++
+		moded.SetText(fmt.Sprintf("Directions card: swiped %s (%d so far)", d, n))
+		if d == widget.SwipeLeft {
+			modes.Content = widget.NewCard("Directions card", "A new card: left throws, right springs back", nil)
+			modes.Refresh()
+		}
+	}
+
 	var filler []core.CanvasObject
 	for i := 1; i <= 15; i++ {
 		filler = append(filler, widget.NewLabel(fmt.Sprintf("Page row %d", i)))
@@ -108,6 +126,7 @@ func swipesTab() core.CanvasObject {
 		widget.NewLabel("Multi-line entry:"), box(320, 120, multi),
 		picked, box(200, 160, wheel),
 		swiped, box(320, 120, card),
+		moded, box(320, 120, modes),
 	}
 	return container.NewVScroll(container.NewVBox(append(parts, filler...)...))
 }

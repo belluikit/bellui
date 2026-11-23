@@ -151,7 +151,7 @@ var checks = []check{
 		},
 	},
 	{
-		ID: "SM-02", Area: "smoke", Title: "Light, dark and dense themes", Refs: []string{"#688", "#695"},
+		ID: "SM-02", Area: "smoke", Title: "Light, dark and dense themes", Refs: []string{"#688", "#695", "#1381"},
 		Where: gallery + ", top app bar toggles, and the Theme page",
 		Steps: []string{
 			"Toggle light/dark in the app bar twice, then toggle dense twice.",
@@ -220,6 +220,27 @@ var checks = []check{
 			"No row, separator or header ever shows the app theme's colours.",
 		},
 	},
+	{
+		ID: "SM-07", Area: "smoke", Title: "A window around wrapping content can shrink again", Platforms: desktop, Refs: []string{"#1349", "#1346"},
+		Where: companion,
+		Steps: []string{
+			"Start the companion app and open the Chips & layout tab, then the Text tab.",
+			"Drag the window much wider, then narrower than it started, then shorter.",
+		},
+		Expect: []string{
+			"The window opens at its set size and does not grow taller when either tab opens (#1349).",
+			"It can be made narrower and shorter again after being widened; the chips and the flow re-wrap to fit (#1346).",
+		},
+	},
+	{
+		ID: "SM-08", Area: "smoke", Title: "SVG strokes scale with the image", Refs: []string{"#1292"},
+		Where: companion + " → Chips & layout → SVG strokes scale",
+		Steps: []string{"Compare the small ring with the large one."},
+		Expect: []string{
+			"The large ring is the small one magnified: its orange stroke is about 14 px wide, the small one's about 2 px, and the blue dashes scale the same way.",
+			"The small ring's stroke does not fill it in.",
+		},
+	},
 
 	// ---- widgets ----
 	{
@@ -245,18 +266,20 @@ var checks = []check{
 		},
 	},
 	{
-		ID: "WG-02", Area: "widgets", Title: "A disabled container disables what it holds", Refs: []string{"#1218"}, Special: true,
+		ID: "WG-02", Area: "widgets", Title: "A disabled container disables what it holds", Refs: []string{"#1218", "#1378", "#1288"}, Special: true,
 		Where: companion + " → Disabled → Containers (tabs, document tabs, an inner window)",
 		Steps: []string{
 			"Tick \"Disable everything below\".",
 			"Tap \"Second tab\" and \"Doc two\"; drag the inner window by its title bar and by its corner; press its close, minimise and maximise buttons.",
-			"Tap the buttons and entries inside the three containers.",
+			"Tap the buttons and entries inside the three containers, and the link to example.com in the first tab and in the inner window; hover over the links.",
+			"Keyboard (desktop, web): press Tab through the page, then Space or Enter wherever the focus lands.",
 			"Untick the box, then look at the \"Disabled by the app\" check in the first tab.",
 		},
 		Expect: []string{
 			"While disabled, no tab switches, no document tab closes, and the inner window neither moves, resizes nor closes.",
 			"Every button and entry inside them, in every tab, looks disabled and does nothing.",
 			"The tab labels are dimmed once, not twice.",
+			"The links open nothing and show no hover underline or pointer, and Tab never stops on them, so Space or Enter cannot open them (#1378, #1288).",
 			"After unticking, everything inside works again, except \"Disabled by the app\", which stays disabled because the app disabled it itself.",
 		},
 	},
@@ -327,6 +350,33 @@ var checks = []check{
 			"The French text never starts a line with \":\", \";\", \"!\" or \"»\", and \"10 km\" stays on one line (#1099).",
 			"The long snackbar wraps inside the window with its Undo button at the end, cut off at neither edge (#1106).",
 			"Two snackbars at once show as one: only \"Second snackbar\" (#1038).",
+		},
+	},
+	{
+		ID: "WG-07", Area: "widgets", Title: "Chips: selected and excluded", Special: true, Refs: []string{"#1383", "#1364"},
+		Where: companion + " → Chips & layout → Chips: selected and excluded",
+		Steps: []string{
+			"Tap Rock once, twice and a third time, reading the status lines after each tap.",
+			"Tap Jazz, Pop and Folk twice each, so all of them are excluded but Rock, then tap Rock twice.",
+			"Toggle light/dark on the Direction tab and come back.",
+			"Tick \"Disable the group\", tap the chips, then untick it.",
+			"In the \"One at a time\" group, tap Small, Medium, then Medium again.",
+		},
+		Expect: []string{
+			"Rock goes selected (filled, a check mark in front), then excluded (a cross in front, a red outline and its label struck through), then off. Each tap's change is named on \"Last change\".",
+			"The fourth style cannot be excluded: Rock stays selected and \"Last change\" says the last style cannot be excluded.",
+			"Selected, excluded and off are easy to tell apart in both light and dark, without relying on colour: the check mark, the cross and the strike-through show it.",
+			"Disabled, the chips keep their check mark, cross and strike-through in the disabled colours and take no tap.",
+			"The one-at-a-time group never shows the excluded look: a second tap on Medium deselects it.",
+		},
+	},
+	{
+		ID: "WG-08", Area: "widgets", Title: "Destructive buttons are red in every style", Refs: []string{"#1327"},
+		Where: gallery + " → Actions → Danger",
+		Steps: []string{"Look at the card in light, then toggle to dark and look again. Press each button."},
+		Expect: []string{
+			"Text, Outlined and Elevated buttons draw their label and icon in red (Outlined its outline too); Filled is filled red and FilledTonal with the pale error colour; the danger icon buttons are red or red-filled.",
+			"Each still shows a pressed state, in both themes.",
 		},
 	},
 
@@ -498,17 +548,19 @@ var checks = []check{
 		},
 	},
 	{
-		ID: "TK-13", Area: "touch", Title: "Wheel picker and swipe card", Refs: []string{"#977", "#984", "#989"},
+		ID: "TK-13", Area: "touch", Title: "Wheel picker and swipe card", Refs: []string{"#977", "#984", "#989", "#1103"},
 		Where: companion + " → Swipes, near the end of the page",
 		Per:   map[string]string{"desktop": "Use the mouse: press, drag, release.", "web": "Use the mouse: press, drag, release."},
 		Steps: []string{
 			"Spin the wheel up with a short flick, then drag it down slowly past its first item.",
 			"Drag the swipe card a little sideways and let go; then drag it most of the way off and let go; then flick it.",
+			"Under it, flick the directions card left, then right, then up and down.",
 		},
 		Expect: []string{
 			"The wheel coasts and settles with one item centred, and \"Wheel: Item N\" names that item. Past the first item it resists and springs back.",
 			"Items away from the centre are smaller and fainter.",
 			"The card follows the finger and tilts a little; a short drag springs back, a long drag or a flick throws it off, \"Card: swiped left\" (or right) shows and a new card takes its place.",
+			"The directions card: left throws it off and a new one comes; right lets it follow, then springs it back with \"swiped right\" counted; up and down do not move it and count nothing (#1103).",
 		},
 	},
 
@@ -658,6 +710,21 @@ var checks = []check{
 		Steps:  []string{"Start the gallery without touching the RTL toggle; open Navigation and Inputs."},
 		Expect: []string{"The gallery starts right-to-left, as RTL-01 with the toggle on; text without a translation stays English."},
 	},
+	{
+		ID: "RTL-07", Area: "rtl", Title: "Chip rows and wrapping layouts in right-to-left", Refs: []string{"#1371", "#1372"},
+		Where: companion + " → Chips & layout",
+		Steps: []string{
+			"Under \"Chip rows\", choose Start, Center and End in turn.",
+			"Press \"Toggle the app's direction\" and choose Start, Center and End again; look at the row-wrap flow, the flex row and the flex column.",
+			"Toggle the direction back.",
+		},
+		Expect: []string{
+			"Each row of chips sits at the left, the middle or the right, the shorter last row included.",
+			"Right-to-left, Start and End swap sides; the first chip of each row is the rightmost.",
+			"Right-to-left, the flow starts with 1 at the right edge and every row runs leftwards; the flex row reads \"1 first\" at the right; the flex column's buttons sit at the right edge.",
+			"Toggling back restores the left-to-right layout exactly.",
+		},
+	},
 
 	// ---- a11y ----
 	{
@@ -735,6 +802,19 @@ var checks = []check{
 			"The app bar's title is read as before; its icons are read as unavailable.",
 		},
 	},
+	{
+		ID: "A11Y-08", Area: "a11y", Title: "A screen reader hears selected and excluded chips", Platforms: native, Refs: []string{"#1383", "#1348"}, Special: true,
+		Where: companion + " (a11y build) → Chips & layout",
+		Steps: []string{
+			"With the screen reader on, move to Rock and activate it twice, listening after each.",
+			"On the Locale tab choose de-DE, come back and move to Rock again; then choose System.",
+		},
+		Expect: []string{
+			"After the first activation Rock is read as selected (the platform's word for it).",
+			"After the second it is read as \"Rock, excluded\".",
+			"In German it is read as \"Rock, ausgeschlossen\".",
+		},
+	},
 
 	// ---- charts ----
 	{
@@ -797,6 +877,13 @@ var checks = []check{
 			"A save dialog opens; the saved PNG is the chart only, with no toolbox, zoom buttons or tooltip in it.",
 		},
 	},
+	{
+		ID: "CH-07", Area: "charts", Title: "A chart follows a light/dark switch", Refs: []string{"#1381"},
+		Where:  gallery + " → Theme page (choose System), then Charts → Basic",
+		Per:    map[string]string{"web": "DevTools → Rendering → Emulate prefers-color-scheme switches it too."},
+		Steps:  []string{"With a chart showing, switch the OS (or browser) between light and dark, twice."},
+		Expect: []string{"Each chart redraws in the new theme's colours with the rest of the window: no dark chart in a light window or the reverse."},
+	},
 
 	// ---- tables ----
 	{
@@ -845,7 +932,7 @@ var checks = []check{
 		},
 	},
 	{
-		ID: "TB-05", Area: "tables", Title: "A tap on a column header sorts, also on a phone", Refs: []string{"#1268"},
+		ID: "TB-05", Area: "tables", Title: "A tap on a column header sorts, also on a phone", Refs: []string{"#1268", "#1275"},
 		Where: gallery + " → Data Grid → Sort & Filter",
 		Steps: []string{
 			"Tap (or click) the Price header three times.",
@@ -853,7 +940,7 @@ var checks = []check{
 			"Drag the border between two headers to resize a column.",
 		},
 		Expect: []string{
-			"Each tap sorts once: ascending, descending, then unsorted, with the header's arrow showing which. In rc.2 a tap on a phone did nothing.",
+			"Each tap sorts once: ascending, descending, then unsorted, with the header's arrow showing which. In rc.2 a tap on a phone did nothing. This is the default order, which a column's SortingOrder can now change (#1275).",
 			"Shift-click adds Change % as a second sort column.",
 			"Resizing a column, or a drag starting on a header, does not sort.",
 		},
@@ -909,19 +996,21 @@ var checks = []check{
 		},
 	},
 	{
-		ID: "MD-04", Area: "media", Title: "Audio transport: seek, pause, stop, volume", Platforms: native, Refs: []string{"#831", "#833", "#855", "#1032"},
+		ID: "MD-04", Area: "media", Title: "Audio transport: seek, pause, stop, volume", Platforms: native, Refs: []string{"#831", "#833", "#855", "#1032", "#1336", "#1340"},
 		Where: gallery + " → Audio Player, any bundled clip",
 		Steps: []string{
 			"While it plays, seek to about 0:05.",
 			"Pause, seek to about 0:08, then play.",
 			"Stop, then play.",
 			"Move the volume control down and back up.",
+			"Seek to the last half second of the clip while it plays.",
 		},
 		Expect: []string{
-			"After the first seek the sixth note plays (the scale has one note a second), with no snippet of the old position first (#855).",
+			"After the first seek the sixth note plays (the scale has one note a second), with no snippet of the old position first (#855), and from the start of the note, not partway in (#1336).",
 			"After the paused seek, play resumes at the ninth note, not where it was paused.",
 			"Stop returns to 0:00, and play starts again from the first note at once, without holding at an earlier position (#833).",
 			"The volume follows the control at once (#1032).",
+			"The last half second is heard before the clip ends; it is not silent (#1340).",
 		},
 	},
 	{
@@ -1084,6 +1173,36 @@ var checks = []check{
 		Expect: []string{
 			"The command prints \"bundled CEF 156.0.30…\" (Chromium 156), with no checksum error.",
 			"The probe's web view draws its page.",
+		},
+	},
+	{
+		ID: "CLI-09", Area: "cli", Title: "Each command's --help names its own targets", Platforms: desktop, Refs: []string{"#1369"},
+		Where:  "A terminal, with the bellui command from setup",
+		Steps:  []string{"Run bellui build --help, bellui package --help, bellui release --help and bellui install --help, and read the --target/--os line of each."},
+		Expect: []string{"package and release name web, wasm and iossimulator; install names only devices (android…, ios, iossimulator); build names the bellui targets and says any other GOOS goes to Go."},
+	},
+	{
+		ID: "CLI-10", Area: "cli", Title: "bellui translate creates a missing catalog folder", Platforms: desktop, Refs: []string{"#1368"},
+		Where: "A copy of the companion app in a temporary folder (it has no translations/ folder)",
+		Setup: "cp -r hack/releasecheck/app /tmp/rc-app && cd /tmp/rc-app",
+		Steps: []string{"Run bellui translate translations/en.pxf, then ls -l translations."},
+		Expect: []string{
+			"It succeeds and creates translations/en.pxf; no error names a temporary file.",
+			"The catalog is readable by everyone (-rw-r--r--).",
+		},
+	},
+	{
+		ID: "CLI-11", Area: "cli", Title: "A phone opens a served app over https", Platforms: []string{"web"}, Refs: []string{"#1359", "#1358"}, Special: true,
+		Where: "The companion app served from this computer, opened on a phone on the same network",
+		Steps: []string{
+			"Run bellui serve in the companion app's folder and open the printed network address (http://<this computer's address>:8080) on the phone.",
+			"Stop it, run bellui serve --https, open the https network address it prints on the phone and accept the certificate warning once.",
+			"Optional, with cloudflared installed: bellui serve --tunnel and open the trycloudflare.com address it prints.",
+		},
+		Expect: []string{
+			"Over plain http the page says \"WebGPU needs a secure page: open this app over https, or at localhost on this computer.\", not that the browser lacks WebGPU.",
+			"Over https (and through the tunnel) the app starts and draws on the phone.",
+			"serve --https prints each network address and the certificate's SHA-256 fingerprint; Ctrl-C stops it, and the tunnel with it.",
 		},
 	},
 

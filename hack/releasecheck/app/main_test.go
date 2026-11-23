@@ -1,6 +1,8 @@
 package main
 
 import (
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/belluikit/bellui"
@@ -9,6 +11,7 @@ import (
 	"github.com/belluikit/bellui/lang"
 	"github.com/belluikit/bellui/test"
 	"github.com/belluikit/bellui/theme"
+	"github.com/belluikit/bellui/widget"
 )
 
 // Every tab builds and lays out in both variants, so the checklist never
@@ -21,7 +24,7 @@ func TestTabsBuild(t *testing.T) {
 		for name, tab := range map[string]core.CanvasObject{
 			"Locale": localeTab(w), "Direction": directionTab(w), "Theme override": overrideTab(),
 			"Menus": menusTab(w), "Touch & keys": touchTab(),
-			"Disabled": disabledTab(), "Drawer": drawerTab(w), "Swipes": swipesTab(), "Text": textTab(w),
+			"Disabled": disabledTab(), "Drawer": drawerTab(w), "Swipes": swipesTab(), "Text": textTab(w), "Chips & layout": chipsTab(),
 		} {
 			w.SetContent(tab)
 			w.Resize(geo.NewSize(700, 560))
@@ -47,5 +50,40 @@ func TestPersianGetsEnglishGreeting(t *testing.T) {
 		if got := lang.X("release.greeting", "Hello {Name}", map[string]any{"Name": "Ada"}); got != want {
 			t.Errorf("%s: greeting %q, want %q", loc, got, want)
 		}
+	}
+}
+
+// The Chips tab's group cycles a chip through its three states, and refuses
+// to exclude the last style, as the checklist's WG-07 expects (#1383).
+func TestExcludableCardRefusesTheLastStyle(t *testing.T) {
+	test.NewTempApp(t)
+	card := excludableCard().(*widget.Card)
+	box := card.Content.(*bellui.Container)
+	g := box.Objects[0].(*widget.ChipGroup)
+	tapChip := func(opt string) {
+		for _, o := range test.TempWidgetRenderer(t, g).Objects() {
+			if c := o.(*widget.Chip); c.Text == opt {
+				test.Tap(c)
+				return
+			}
+		}
+		t.Fatalf("no chip %q", opt)
+	}
+	for _, opt := range g.Options[:len(g.Options)-1] {
+		tapChip(opt)
+		tapChip(opt)
+	}
+	if want := g.Options[:len(g.Options)-1]; !slices.Equal(g.Excluded, want) {
+		t.Fatalf("excluded %v, want %v", g.Excluded, want)
+	}
+	last := g.Options[len(g.Options)-1]
+	tapChip(last)
+	tapChip(last)
+	if !slices.Equal(g.Selected, []string{last}) || slices.Contains(g.Excluded, last) {
+		t.Errorf("the last style was excluded: selected %v, excluded %v", g.Selected, g.Excluded)
+	}
+	status := box.Objects[1].(*widget.Label).Text
+	if !strings.Contains(status, "cannot be excluded") {
+		t.Errorf("status does not say the change was refused: %q", status)
 	}
 }
