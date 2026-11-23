@@ -35,6 +35,10 @@ func (f *embeddedFinder) FindObjectAtPositionMatching(pos geo.Position, test fun
 	return intdriver.FindObjectAtPositionMatching(pos, test, nil, nil, f.canvas.Content())
 }
 
+func (f *embeddedFinder) FindEnabledObjectAtPositionMatching(pos geo.Position, test func(core.CanvasObject) bool) (core.CanvasObject, geo.Position, int, bool) {
+	return intdriver.FindEnabledObjectAtPositionMatching(pos, test, nil, nil, f.canvas.Content())
+}
+
 func (f *embeddedFinder) CanvasForTouch() core.Canvas {
 	return f.canvas.WindowlessCanvas
 }

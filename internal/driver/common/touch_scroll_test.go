@@ -38,6 +38,11 @@ func (f *touchScrollFinder) FindObjectAtPositionMatching(pos geo.Position,
 	return nil, pos, 1
 }
 
+func (f *touchScrollFinder) FindEnabledObjectAtPositionMatching(pos geo.Position, test func(core.CanvasObject) bool) (core.CanvasObject, geo.Position, int, bool) {
+	o, p, l := f.FindObjectAtPositionMatching(pos, test)
+	return o, p, l, false
+}
+
 func (f *touchScrollFinder) CanvasForTouch() core.Canvas { return nil }
 
 // scrollableRect is Scrollable but not Draggable — the desktop Scroll's shape.

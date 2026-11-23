@@ -382,6 +382,47 @@ func (w *window) findObjectAtPositionMatching(canvas *glCanvas, mouse geo.Positi
 	return canvas.FindObjectAtPositionMatching(mouse, matches)
 }
 
+// findPressable finds the object a press, click, hover or long press at mouse
+// goes to. One inside a disabled widget takes none: nil, as if the pointer
+// were over a disabled Button (driver.InertUnder, #1378).
+func (w *window) findPressable(mouse geo.Position, matches func(object core.CanvasObject) bool) (core.CanvasObject, geo.Position, bool) {
+	obj, pos, _, inert := w.canvas.FindEnabledObjectAtPositionMatching(mouse, matches)
+	if inert {
+		return nil, geo.Position{}, true
+	}
+	return obj, pos, false
+}
+
+// hoverTarget finds the Hoverable under mouse and the cursor to show there.
+// Inside a disabled widget nothing is hovered and the cursor is the default
+// one, so a link there shows no hand (#1378).
+func (w *window) hoverTarget(mouse geo.Position) (core.CanvasObject, geo.Position, desktop.Cursor) {
+	cursor := desktop.Cursor(desktop.DefaultCursor)
+	obj, pos, inert := w.findPressable(mouse, func(object core.CanvasObject) bool {
+		if cursorable, ok := object.(desktop.Cursorable); ok {
+			cursor = cursorable.Cursor()
+		}
+
+		_, hover := object.(event.Hoverable)
+		return hover
+	})
+	if inert {
+		cursor = desktop.DefaultCursor
+	}
+	return obj, pos, cursor
+}
+
+// findDraggable finds the object a drag starting at mouse goes to. One inside
+// a disabled widget takes none, unless it scrolls (driver.DropsInertDrag,
+// #1378).
+func (w *window) findDraggable(mouse geo.Position, matches func(object core.CanvasObject) bool) (core.CanvasObject, geo.Position) {
+	obj, pos, _, inert := w.canvas.FindEnabledObjectAtPositionMatching(mouse, matches)
+	if driver.DropsInertDrag(obj, inert) {
+		return nil, geo.Position{}
+	}
+	return obj, pos
+}
+
 // stampDrag records user activity for a mouse moved with a button held. A
 // bare move does not count, since a mouse at rest can jitter (#1108).
 func (w *window) stampDrag() {
@@ -400,16 +441,7 @@ func (w *window) processMouseMoved(xpos float64, ypos float64) {
 
 	w.cancelLongPressOnMove(mousePos)
 
-	cursor := desktop.Cursor(desktop.DefaultCursor)
-
-	obj, pos, _ := w.findObjectAtPositionMatching(w.canvas, mousePos, func(object core.CanvasObject) bool {
-		if cursorable, ok := object.(desktop.Cursorable); ok {
-			cursor = cursorable.Cursor()
-		}
-
-		_, hover := object.(event.Hoverable)
-		return hover
-	})
+	obj, pos, cursor := w.hoverTarget(mousePos)
 
 	// While dragging a DnD-opted-in source (pre-rebrand tracker #819), force the grabbing cursor over
 	// whatever is under the pointer. Gated on DragImageProvider so ordinary
@@ -438,7 +470,7 @@ func (w *window) processMouseMoved(xpos float64, ypos float64) {
 	}
 
 	if w.mouseButton != 0 && w.mouseButton != desktop.MouseButtonSecondary && !w.mouseDragStarted {
-		obj, pos, _ := w.findObjectAtPositionMatching(w.canvas, previousPos, func(object core.CanvasObject) bool {
+		obj, pos := w.findDraggable(previousPos, func(object core.CanvasObject) bool {
 			_, ok := object.(event.Draggable)
 			return ok
 		})
@@ -716,7 +748,7 @@ func (w *window) processMouseClicked(button desktop.MouseButton, action action, 
 		w.hideToolTip() // a click dismisses any visible/pending tooltip
 	}
 
-	co, pos, _ := w.findObjectAtPositionMatching(w.canvas, mousePos, func(object core.CanvasObject) bool {
+	co, pos, _ := w.findPressable(mousePos, func(object core.CanvasObject) bool {
 		switch object.(type) {
 		case event.Tappable, event.SecondaryTappable, event.DoubleTappable, event.Focusable, desktop.Mouseable:
 			return true
@@ -847,7 +879,7 @@ func (w *window) armLongPress(button desktop.MouseButton, pos geo.Position) {
 		return // chorded or non-primary press: not a press-and-hold
 	}
 
-	co, _, _ := w.findObjectAtPositionMatching(w.canvas, pos, func(object core.CanvasObject) bool {
+	co, _, _ := w.findPressable(pos, func(object core.CanvasObject) bool {
 		_, ok := object.(event.LongPressable)
 		return ok
 	})
@@ -873,7 +905,7 @@ func (w *window) fireLongPress(seq int) {
 		return // released, moved, chorded or dragging since armed
 	}
 
-	co, pos, _ := w.findObjectAtPositionMatching(w.canvas, w.mousePos, func(object core.CanvasObject) bool {
+	co, pos, _ := w.findPressable(w.mousePos, func(object core.CanvasObject) bool {
 		_, ok := object.(event.LongPressable)
 		return ok
 	})

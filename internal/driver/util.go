@@ -172,8 +172,19 @@ func ClipBoundsForObject(object core.CanvasObject, trees []core.CanvasObject) (g
 // The matches function determines of the type of object that is found at this position is of a suitable type.
 // The various canvas roots and overlays that can be searched are also passed in.
 func FindObjectAtPositionMatching(mouse geo.Position, matches func(object core.CanvasObject) bool, overlays []core.CanvasObject, roots ...core.CanvasObject) (core.CanvasObject, geo.Position, int) {
+	found, pos, layer, _ := FindEnabledObjectAtPositionMatching(mouse, matches, overlays, roots...)
+	return found, pos, layer
+}
+
+// FindEnabledObjectAtPositionMatching is FindObjectAtPositionMatching that
+// also reports whether the object found lies inside a disabled widget, and so
+// takes no pointer input there (InertUnder, #1378).
+func FindEnabledObjectAtPositionMatching(mouse geo.Position, matches func(object core.CanvasObject) bool, overlays []core.CanvasObject, roots ...core.CanvasObject) (core.CanvasObject, geo.Position, int, bool) {
 	var found core.CanvasObject
 	var foundPos geo.Position
+	var foundInert bool
+	// Whether each walked object's descendants are inert (InertUnder).
+	var inertStack []bool
 
 	// Transform stack for composing worldTransform through the tree.
 	wtStack := []geo.Matrix{geo.Identity()}
@@ -200,6 +211,8 @@ func FindObjectAtPositionMatching(mouse geo.Position, matches func(object core.C
 		wtStack = append(wtStack, wt)
 		cut := len(cutStack) > 0 && cutStack[len(cutStack)-1]
 		cutStack = append(cutStack, cut || turnedClipMisses(walked, wt, mouse))
+		parentInert := len(inertStack) > 0 && inertStack[len(inertStack)-1]
+		inertStack = append(inertStack, childrenInert(walked, parentInert))
 		if cut {
 			return false
 		}
@@ -218,6 +231,7 @@ func FindObjectAtPositionMatching(mouse geo.Position, matches func(object core.C
 		if local, in := LocalHitPoint(wt, mouse, w, h); in && matchesHitTarget(walked, matches) {
 			found = walked
 			foundPos = local
+			foundInert = parentInert && !selectableWhenDisabled(walked)
 		}
 		return false
 	}
@@ -228,6 +242,9 @@ func FindObjectAtPositionMatching(mouse geo.Position, matches func(object core.C
 		}
 		if len(cutStack) > 0 {
 			cutStack = cutStack[:len(cutStack)-1]
+		}
+		if len(inertStack) > 0 {
+			inertStack = inertStack[:len(inertStack)-1]
 		}
 	}
 
@@ -245,9 +262,10 @@ func FindObjectAtPositionMatching(mouse geo.Position, matches func(object core.C
 		}
 		wtStack = wtStack[:1] // reset stack between walks
 		cutStack = cutStack[:0]
+		inertStack = inertStack[:0]
 		WalkVisibleObjectTree(overlay, beforeFunc, afterFunc)
 		if found != nil || !overlayPassesInput(overlay) {
-			return found, foundPos, layer
+			return found, foundPos, layer, foundInert
 		}
 	}
 	for _, root := range roots {
@@ -257,13 +275,74 @@ func FindObjectAtPositionMatching(mouse geo.Position, matches func(object core.C
 		}
 		wtStack = wtStack[:1] // reset stack between roots
 		cutStack = cutStack[:0]
+		inertStack = inertStack[:0]
 		WalkVisibleObjectTree(root, beforeFunc, afterFunc)
 		if found != nil {
 			break
 		}
 	}
 
-	return found, foundPos, layer
+	return found, foundPos, layer, foundInert
+}
+
+// A disabled widget's content takes no pointer input, as the controls of
+// HTML's <fieldset disabled> take none (#1378, owner 2026-11-22): a tap, a
+// press, a hover or a drag that lands on an object inside a disabled widget
+// is dropped, as if it had landed on a disabled Button, whether or not that
+// object can be disabled itself (a Hyperlink, a Table). Scrolling is left to
+// each widget, which decides it for itself (#1215, #1251).
+//
+// The nearest ancestor that is disabled or keeps its text selectable while
+// disabled (core.SelectableWhenDisabled) decides: under a disabled Entry its
+// selection layer still selects, as the focus manager lets it take the focus
+// (#1251, #1288).
+
+// childrenInert reports whether the objects inside o take no pointer input,
+// given whether those inside its parent take none.
+func childrenInert(o core.CanvasObject, parentInert bool) bool {
+	if selectableWhenDisabled(o) {
+		return false
+	}
+	if d, ok := o.(core.Disableable); ok && d.Disabled() {
+		return true
+	}
+	return parentInert
+}
+
+// InertUnder reports whether hit, found under the ancestors given nearest
+// first, takes no pointer input because one of them is disabled (#1378).
+func InertUnder(hit core.CanvasObject, ancestors func(yield func(core.CanvasObject) bool)) bool {
+	if selectableWhenDisabled(hit) {
+		return false
+	}
+	inert := false
+	ancestors(func(a core.CanvasObject) bool {
+		if selectableWhenDisabled(a) {
+			return false
+		}
+		if d, ok := a.(core.Disableable); ok && d.Disabled() {
+			inert = true
+			return false
+		}
+		return true
+	})
+	return inert
+}
+
+// DropsInertDrag reports whether a drag that lands on obj, which lies inside
+// a disabled widget (inert), is dropped: a scrolling object keeps its drag,
+// so a touch scroll inside disabled content behaves as the wheel does.
+func DropsInertDrag(obj core.CanvasObject, inert bool) bool {
+	if !inert {
+		return false
+	}
+	_, scrolls := obj.(event.Scrollable)
+	return !scrolls
+}
+
+func selectableWhenDisabled(o core.CanvasObject) bool {
+	s, ok := o.(core.SelectableWhenDisabled)
+	return ok && s.SelectableWhenDisabled()
 }
 
 // LocalHitPoint maps mouse, in canvas coordinates, into the coordinates of an

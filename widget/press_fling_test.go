@@ -22,6 +22,10 @@ func (f windowFinder) FindObjectAtPositionMatching(pos geo.Position, match func(
 	return intdriver.FindObjectAtPositionMatching(pos, match, nil, f.c.Content())
 }
 
+func (f windowFinder) FindEnabledObjectAtPositionMatching(pos geo.Position, match func(core.CanvasObject) bool) (core.CanvasObject, geo.Position, int, bool) {
+	return intdriver.FindEnabledObjectAtPositionMatching(pos, match, nil, f.c.Content())
+}
+
 func (f windowFinder) CanvasForTouch() core.Canvas { return f.c }
 
 // TestList_FlingLeavesNoRowPressed is #1091's done-when: a touch that goes

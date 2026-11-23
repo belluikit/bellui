@@ -47,6 +47,11 @@ func (f *lifetimeFinder) FindObjectAtPositionMatching(pos geo.Position,
 	return intdriver.FindObjectAtPositionMatching(pos, match, f.canvas.Overlays().List(), f.canvas.Content())
 }
 
+func (f *lifetimeFinder) FindEnabledObjectAtPositionMatching(pos geo.Position, test func(core.CanvasObject) bool) (core.CanvasObject, geo.Position, int, bool) {
+	o, p, l := f.FindObjectAtPositionMatching(pos, test)
+	return o, p, l, false
+}
+
 func (f *lifetimeFinder) CanvasForTouch() core.Canvas { return f.canvas }
 
 // tapOnce drives a full press-and-release on obj, which is what starts the

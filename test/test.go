@@ -52,9 +52,9 @@ func Drag(c core.Canvas, pos geo.Position, deltaX, deltaY float32) {
 		_, ok := object.(event.Draggable)
 		return ok
 	}
-	o, p, _ := intdriver.FindObjectAtPositionMatching(pos, matches, c.Overlays().List(), c.Content())
-	if o == nil {
-		return
+	o, p, _, inert := intdriver.FindEnabledObjectAtPositionMatching(pos, matches, c.Overlays().List(), c.Content())
+	if o == nil || intdriver.DropsInertDrag(o, inert) {
+		return // as the drivers do, a drag inside disabled content goes nowhere (#1378)
 	}
 	e := &event.DragEvent{
 		PointEvent: event.PointEvent{Position: p, AbsolutePosition: pos},
@@ -87,9 +87,9 @@ func DragSteps(c core.Canvas, pos geo.Position, deltaX, deltaY float32, steps in
 		_, ok := object.(event.Draggable)
 		return ok
 	}
-	o, p, _ := intdriver.FindObjectAtPositionMatching(pos, matches, c.Overlays().List(), c.Content())
-	if o == nil {
-		return
+	o, p, _, inert := intdriver.FindEnabledObjectAtPositionMatching(pos, matches, c.Overlays().List(), c.Content())
+	if o == nil || intdriver.DropsInertDrag(o, inert) {
+		return // as the drivers do, a drag inside disabled content goes nowhere (#1378)
 	}
 	drag := o.(event.Draggable)
 
@@ -158,7 +158,10 @@ func MoveMouse(c core.Canvas, pos geo.Position) {
 		_, ok := object.(event.Hoverable)
 		return ok
 	}
-	o, p, _ := intdriver.FindObjectAtPositionMatching(pos, matches, c.Overlays().List(), c.Content())
+	o, p, _, inert := intdriver.FindEnabledObjectAtPositionMatching(pos, matches, c.Overlays().List(), c.Content())
+	if inert {
+		o = nil // as the drivers do, nothing inside disabled content is hovered (#1378)
+	}
 	if o != nil {
 		hovered = o.(event.Hoverable)
 		ev := &event.HoverEvent{
@@ -318,7 +321,10 @@ func findTappable(c core.Canvas, pos geo.Position) (o core.CanvasObject, p geo.P
 		_, ok := object.(event.Tappable)
 		return ok
 	}
-	o, p, _ = intdriver.FindObjectAtPositionMatching(pos, matches, c.Overlays().List(), c.Content())
+	o, p, _, inert := intdriver.FindEnabledObjectAtPositionMatching(pos, matches, c.Overlays().List(), c.Content())
+	if inert {
+		return nil, geo.Position{} // as the drivers do, a tap inside disabled content goes nowhere (#1378)
+	}
 	return o, p
 }
 

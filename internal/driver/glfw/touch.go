@@ -174,6 +174,10 @@ func (f *touchFinder) FindObjectAtPositionMatching(pos geo.Position, test func(c
 	return f.w.findObjectAtPositionMatching(f.w.canvas, pos, test)
 }
 
+func (f *touchFinder) FindEnabledObjectAtPositionMatching(pos geo.Position, test func(core.CanvasObject) bool) (core.CanvasObject, geo.Position, int, bool) {
+	return f.w.canvas.FindEnabledObjectAtPositionMatching(pos, test)
+}
+
 func (f *touchFinder) CanvasForTouch() core.Canvas {
 	return f.w.canvas
 }

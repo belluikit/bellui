@@ -463,11 +463,15 @@ func TestSwipeArea_Disable(t *testing.T) {
 			assert.False(t, area.ClaimsDrag(geo.Delta{DX: 20}), "a disabled area claimed a swipe")
 			// A SwipeArea has no scroll, key or focus of its own, and draws
 			// nothing of its own to give a disabled look. Its content is the
-			// app's: a tap still reaches it.
+			// app's and is not disabled, but the drivers drop a tap that lands
+			// on it (#1378); the area's own Tapped, called by code, still
+			// passes one on.
+			test.TapCanvas(c, mid)
+			assert.Zero(t, taps, "a tap on the content of a disabled area reached it")
 			test.Tap(area)
 			assert.Zero(t, swiped, "OnSwiped fired")
 			assert.Zero(t, progress, "OnSwipeProgress fired")
-			assert.Equal(t, 1, taps, "the content's tap did not reach it")
+			assert.Equal(t, 1, taps, "the area's Tapped did not pass the tap on")
 			assert.False(t, content.Disabled(), "the app's content was disabled")
 
 			area.Enable()

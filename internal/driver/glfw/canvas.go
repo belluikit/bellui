@@ -143,19 +143,27 @@ func (c *glCanvas) InteractiveArea() (geo.Position, geo.Size) {
 // canvas capability assertion (#245), so it must stay equivalent to what tap
 // and mouse dispatch use.
 func (c *glCanvas) FindObjectAtPositionMatching(mouse geo.Position, matches func(object core.CanvasObject) bool) (core.CanvasObject, geo.Position, int) {
+	obj, pos, layer, _ := c.FindEnabledObjectAtPositionMatching(mouse, matches)
+	return obj, pos, layer
+}
+
+// FindEnabledObjectAtPositionMatching is FindObjectAtPositionMatching that
+// also reports whether the object found lies inside a disabled widget, and
+// so takes no press, tap, hover or drag (driver.InertUnder, #1378).
+func (c *glCanvas) FindEnabledObjectAtPositionMatching(mouse geo.Position, matches func(object core.CanvasObject) bool) (core.CanvasObject, geo.Position, int, bool) {
 	overlay := c.Overlays().Top()
 	// The spatial index is rebuilt during the paint walk, so between a content
 	// change and the next frame it does not reflect the current tree — only
 	// treat it as authoritative while the canvas is clean (pre-rebrand tracker #590).
 	if overlay == nil {
 		if idx := c.SpatialIndex(); idx != nil && !c.IsDirty() {
-			if obj, pos, ok := idx.FindObjectAtPositionMatching(mouse, matches); ok {
-				return obj, pos, 0
+			if obj, pos, ok, inert := idx.FindEnabledObjectAtPositionMatching(mouse, matches); ok {
+				return obj, pos, 0, inert
 			}
-			return nil, geo.Position{}, 0
+			return nil, geo.Position{}, 0, false
 		}
 	}
-	return driver.FindObjectAtPositionMatching(mouse, matches, c.Overlays().List(), c.menu, c.Content())
+	return driver.FindEnabledObjectAtPositionMatching(mouse, matches, c.Overlays().List(), c.menu, c.Content())
 }
 
 func (c *glCanvas) MinSize() geo.Size {
