@@ -169,6 +169,9 @@ func setup(platform, gallery string, run bool) {
 	steps := []step{
 		{"Build the bellui command from this checkout (the release's CLI fixes are part of what is tested)", filepath.Join(repo, "cmd", "bellui"), "go install .", true},
 		{"Get the gallery (skip if it is already there)", filepath.Dir(gallery), "git clone https://github.com/belluikit/gallery.git " + filepath.Base(gallery), true},
+		// setup builds whatever the gallery checkout holds, so a stale one tests
+		// an old gallery without saying so.
+		{"Check the gallery is current: setup builds what is checked out, so pull first if this says \"behind\"", gallery, "git fetch -q origin && git status -sb | head -1", true},
 		{"Point the gallery at this checkout instead of a published release", gallery, "go mod edit " + strings.Join(replaces, " ") + " && go mod tidy", true},
 	}
 	switch platform {
