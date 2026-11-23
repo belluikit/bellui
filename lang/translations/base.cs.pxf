@@ -29,6 +29,7 @@ messages = {
   Yes: "Ano"
   april: "Duben"
   august: "Srpen"
+  "chip.excluded": "{Label}, vyloučeno"
   december: "Prosinec"
   february: "Únor"
   "file.name": {

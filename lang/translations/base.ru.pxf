@@ -29,6 +29,7 @@ messages = {
   Yes: "Да"
   april: "Апрель"
   august: "Август"
+  "chip.excluded": "{Label}, исключено"
   december: "Декабрь"
   february: "Февраль"
   "file.name": {

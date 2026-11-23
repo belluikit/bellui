@@ -12,6 +12,7 @@ import (
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/cache"
 	internalWidget "github.com/belluikit/bellui/internal/widget"
+	"github.com/belluikit/bellui/lang"
 	"github.com/belluikit/bellui/theme"
 )
 
@@ -36,8 +37,15 @@ var (
 // AccessibleRole returns [core.RoleButton].
 func (c *Chip) AccessibleRole() core.AccessibleRole { return core.RoleButton }
 
-// AccessibleLabel returns the chip text.
-func (c *Chip) AccessibleLabel() string { return c.Text }
+// AccessibleLabel returns the chip text. An excluded chip in a ChipGroup
+// adds that it is excluded ("Rock, excluded"): core.AccessibleState has no
+// state for it, and the label is what every screen reader reads (#1383).
+func (c *Chip) AccessibleLabel() string {
+	if c.isExcluded() {
+		return lang.LocalizeKey("chip.excluded", "{Label}, excluded", map[string]any{"Label": c.Text})
+	}
+	return c.Text
+}
 
 // AccessibleState reports a selected filter chip as selected, so a screen
 // reader can tell it from an unselected one (#1348). The tree adds the
@@ -47,6 +55,12 @@ func (c *Chip) AccessibleState() core.AccessibleState {
 		return core.StateSelected
 	}
 	return 0
+}
+
+// isExcluded reports whether the chip shows the excluded state: a filter
+// chip a ChipGroup has excluded, and not selected.
+func (c *Chip) isExcluded() bool {
+	return c.Style == ChipStyleFilter && c.excluded && !c.Selected
 }
 
 // Chip is a compact MD3 element for selections, filters, or actions.
@@ -66,6 +80,9 @@ type Chip struct {
 	deletePress internalWidget.PressTarget // the delete X's own, on an input chip
 
 	hovered bool
+	// excluded is set by an excludable ChipGroup for an option it excludes
+	// (#1383).
+	excluded bool
 }
 
 // NewChip creates an assist/suggestion chip.
@@ -157,8 +174,11 @@ func (c *Chip) pressShape() (internalWidget.PressShape, bool) {
 	}
 	th := c.Theme()
 	content := theme.ColorNameOnSurface
-	if c.Style == ChipStyleFilter && c.Selected {
+	switch {
+	case c.Style == ChipStyleFilter && c.Selected:
 		content = theme.ColorNameOnSecondaryContainer
+	case c.isExcluded():
+		content = theme.ColorNameError
 	}
 	return internalWidget.PressShape{
 		Size:         c.Size(),
@@ -260,12 +280,16 @@ func (c *Chip) CreateRenderer() core.WidgetRenderer {
 
 	// MD3's filter chip shows a check mark while selected, in the leading
 	// icon's place (#1364): the fill alone was hard to tell from unselected.
-	var check *canvas.Image
+	// An excluded chip shows a cross in the same place (#1383).
+	var check, cross *canvas.Image
 	if c.Style == ChipStyleFilter {
 		check = canvas.NewImageFromResource(theme.ConfirmIcon())
 		check.FillMode = canvas.ImageFillContain
 		check.Hide()
-		objects = append(objects, check)
+		cross = canvas.NewImageFromResource(theme.CancelIcon())
+		cross.FillMode = canvas.ImageFillContain
+		cross.Hide()
+		objects = append(objects, check, cross)
 	}
 
 	var deleteBtn *canvas.Image
@@ -281,6 +305,7 @@ func (c *Chip) CreateRenderer() core.WidgetRenderer {
 		label:        label,
 		icon:         icon,
 		check:        check,
+		cross:        cross,
 		deleteBtn:    deleteBtn,
 		chip:         c,
 	}
@@ -294,6 +319,7 @@ type chipRenderer struct {
 	label     *canvas.Text
 	icon      *canvas.Image
 	check     *canvas.Image // a filter chip's check mark, shown while selected
+	cross     *canvas.Image // a filter chip's cross, shown while excluded
 	deleteBtn *canvas.Image
 	chip      *Chip
 }
@@ -303,11 +329,20 @@ func (r *chipRenderer) checked() bool {
 	return r.check != nil && r.chip.Style == ChipStyleFilter && r.chip.Selected
 }
 
-// leading is the icon at the chip's start: the check mark while checked, in
-// place of the chip's own icon, else that icon, or nil.
+// crossed is whether the chip shows its cross: an excluded filter chip.
+func (r *chipRenderer) crossed() bool {
+	return r.cross != nil && r.chip.isExcluded()
+}
+
+// leading is the icon at the chip's start: the check mark while checked or
+// the cross while crossed, in place of the chip's own icon, else that icon,
+// or nil.
 func (r *chipRenderer) leading() *canvas.Image {
-	if r.checked() {
+	switch {
+	case r.checked():
 		return r.check
+	case r.crossed():
+		return r.cross
 	}
 	return r.icon
 }
@@ -321,8 +356,8 @@ func (r *chipRenderer) MinSize() geo.Size {
 
 	textWidth := bellui.MeasureText(r.chip.Text, textSize, bellui.TextStyle{}).Width
 	w := hPad + textWidth + hPad // left pad + text + right pad
-	if r.chip.Icon != nil || r.checked() {
-		w += iconSz + 8 // leading icon or check mark + gap
+	if r.chip.Icon != nil || r.checked() || r.crossed() {
+		w += iconSz + 8 // leading icon, check mark or cross + gap
 	}
 	if r.deleteBtn != nil {
 		w += iconSz + 4 // delete + gap
@@ -375,6 +410,9 @@ func (r *chipRenderer) Refresh() {
 	r.bg.CornerRadius = th.Size(theme.SizeNameShapeSmall) // MD3: small shape for chips
 	r.label.Text = r.chip.Text
 	r.label.TextSize = th.Size(theme.SizeNameLabelLarge)
+	// Struck through while excluded, so the state does not rest on colour
+	// alone (#1383).
+	r.label.TextStyle.Strikethrough = r.crossed()
 
 	if r.chip.Disabled() {
 		r.refreshDisabled(th, v)
@@ -389,6 +427,17 @@ func (r *chipRenderer) Refresh() {
 		r.bg.FillColor = bgColor
 		r.bg.StrokeWidth = 0
 		r.label.Color = th.Color(theme.ColorNameOnSecondaryContainer, v)
+	} else if r.crossed() {
+		// BellUI's own look: MD3 has no excluded filter chip. An
+		// error-coloured outline and cross around the struck-through label.
+		errColor := th.Color(theme.ColorNameError, v)
+		r.bg.FillColor = color.Transparent
+		if r.chip.hovered {
+			r.bg.FillColor = theme.StateLayerHover(errColor)
+		}
+		r.bg.StrokeWidth = 1
+		r.bg.StrokeColor = errColor
+		r.label.Color = th.Color(theme.ColorNameOnSurface, v)
 	} else {
 		r.bg.FillColor = color.Transparent
 		r.bg.StrokeWidth = 1
@@ -406,7 +455,8 @@ func (r *chipRenderer) Refresh() {
 		r.icon.Resource = theme.NewColoredResource(r.chip.Icon, theme.ColorNamePrimary)
 		r.icon.Refresh()
 	}
-	r.showCheck(theme.NewColoredResource(theme.ConfirmIcon(), theme.ColorNameOnSecondaryContainer))
+	r.showCheck(theme.NewColoredResource(theme.ConfirmIcon(), theme.ColorNameOnSecondaryContainer),
+		theme.NewColoredResource(theme.CancelIcon(), theme.ColorNameError))
 	if r.deleteBtn != nil {
 		r.deleteBtn.Resource = theme.NewColoredResource(theme.CancelIcon(), theme.ColorNameOnSurfaceVariant)
 		r.deleteBtn.Refresh()
@@ -436,7 +486,7 @@ func (r *chipRenderer) refreshDisabled(th bellui.Theme, v bellui.ThemeVariant) {
 		r.icon.Resource = theme.NewDisabledResource(r.chip.Icon)
 		r.icon.Refresh()
 	}
-	r.showCheck(theme.NewDisabledResource(theme.ConfirmIcon()))
+	r.showCheck(theme.NewDisabledResource(theme.ConfirmIcon()), theme.NewDisabledResource(theme.CancelIcon()))
 	if r.deleteBtn != nil {
 		r.deleteBtn.Resource = theme.NewDisabledResource(theme.CancelIcon())
 		r.deleteBtn.Refresh()
@@ -444,26 +494,33 @@ func (r *chipRenderer) refreshDisabled(th bellui.Theme, v bellui.ThemeVariant) {
 	r.relayout()
 }
 
-// showCheck shows the check mark, drawn as res, while the chip is checked,
-// and the chip's own icon only while it isn't: the mark takes its place.
-func (r *chipRenderer) showCheck(res bellui.Resource) {
+// showCheck shows the check mark, drawn as checkRes, while the chip is
+// checked, the cross, drawn as crossRes, while it is crossed, and the chip's
+// own icon only while neither is: the mark takes its place.
+func (r *chipRenderer) showCheck(checkRes, crossRes bellui.Resource) {
 	if r.check == nil {
 		return
 	}
-	if r.checked() {
-		r.check.Resource = res
-		r.check.Show()
-		r.check.Refresh()
-	} else {
-		r.check.Hide()
-	}
+	showMark(r.check, checkRes, r.checked())
+	showMark(r.cross, crossRes, r.crossed())
 	if r.icon != nil {
-		if r.checked() {
+		if r.checked() || r.crossed() {
 			r.icon.Hide()
 		} else {
 			r.icon.Show()
 		}
 	}
+}
+
+// showMark shows img drawn as res while on, and hides it otherwise.
+func showMark(img *canvas.Image, res bellui.Resource, on bool) {
+	if !on {
+		img.Hide()
+		return
+	}
+	img.Resource = res
+	img.Show()
+	img.Refresh()
 }
 
 func (r *chipRenderer) relayout() {

@@ -29,6 +29,7 @@ messages = {
   Yes: "ஆம்"
   april: "ஏப்ரல்"
   august: "ஆகஸ்ட்"
+  "chip.excluded": "{Label}, விலக்கப்பட்டது"
   december: "டிசம்பர்"
   february: "பிப்ரவரி"
   "file.name": {

@@ -6,6 +6,7 @@ import (
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/lang"
 	"github.com/belluikit/bellui/test"
 	"github.com/belluikit/bellui/theme"
 	"github.com/belluikit/bellui/widget"
@@ -223,5 +224,232 @@ func TestChipGroup_Alignment(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+// newExcludable is a multiple-choice group that opts into the excluded
+// state, recording what each callback reports and how often it fires.
+func newExcludable(t *testing.T, options ...string) (g *widget.ChipGroup, sel, exc *[]string, selFired, excFired *int) {
+	t.Helper()
+	lang.SetLocaleForTests(t, "en-US") // the labels below are English
+	sel, exc = new([]string), new([]string)
+	selFired, excFired = new(int), new(int)
+	g = widget.NewChipGroup(options, true, func(s []string) { *sel = s; *selFired++ })
+	g.Excludable = true
+	g.OnExcludedChanged = func(e []string) { *exc = e; *excFired++ }
+	return g, sel, exc, selFired, excFired
+}
+
+// Each tap moves a chip off → selected → excluded → off, and the group
+// reports both lists (#1383).
+func TestChipGroup_ExcludableCycle(t *testing.T) {
+	test.NewTempApp(t)
+	g, sel, exc, selFired, excFired := newExcludable(t, "Rock", "Jazz", "Pop")
+	chips := chipsOf(t, g)
+
+	test.Tap(chips[0]) // Rock: off → selected
+	assert.Equal(t, []string{"Rock"}, *sel)
+	assert.Equal(t, 1, *selFired)
+	assert.Zero(t, *excFired, "the excluded list did not change")
+	assert.True(t, chips[0].Selected)
+
+	// During the next tap both lists are already updated when OnChanged
+	// fires, so an app reading the group sees one consistent state.
+	var seenExcluded []string
+	g.OnChanged = func(s []string) { *sel = s; *selFired++; seenExcluded = g.Excluded }
+	test.Tap(chips[0]) // Rock: selected → excluded
+	assert.Empty(t, *sel)
+	assert.Equal(t, []string{"Rock"}, *exc)
+	assert.Equal(t, []string{"Rock"}, seenExcluded, "Excluded is set before OnChanged fires")
+	assert.Equal(t, 2, *selFired)
+	assert.Equal(t, 1, *excFired)
+	assert.False(t, chips[0].Selected)
+	assert.Equal(t, "Rock, excluded", chips[0].AccessibleLabel())
+
+	test.Tap(chips[1]) // Jazz: off → selected
+	test.Tap(chips[1]) // Jazz: selected → excluded
+	assert.Equal(t, []string{"Rock", "Jazz"}, g.Excluded, "in the order excluded")
+
+	test.Tap(chips[0]) // Rock: excluded → off
+	assert.Equal(t, []string{"Jazz"}, *exc)
+	assert.Equal(t, 3, *excFired)
+	assert.Equal(t, 4, *selFired, "the selection did not change on the last tap")
+	assert.Equal(t, "Rock", chips[0].AccessibleLabel())
+	assert.Equal(t, core.AccessibleState(0), chips[0].AccessibleState())
+}
+
+// The screen reader's "excluded" comes from the catalogs, so it is read in
+// the user's language.
+func TestChipGroup_ExcludedLabelTranslated(t *testing.T) {
+	test.NewTempApp(t)
+	g, _, _, _, _ := newExcludable(t, "Rock")
+	lang.SetLocaleForTests(t, "de-DE")
+	g.SetExcludedSilently([]string{"Rock"})
+	assert.Equal(t, "Rock, ausgeschlossen", chipsOf(t, g)[0].AccessibleLabel())
+}
+
+// Both lists can be set from code without firing either callback, and an
+// option is never in both (#1383).
+func TestChipGroup_ExcludableSetSilently(t *testing.T) {
+	test.NewTempApp(t)
+	g, _, _, selFired, excFired := newExcludable(t, "Rock", "Jazz", "Pop")
+	chips := chipsOf(t, g)
+
+	g.SetSelectedSilently([]string{"Rock", "Jazz"})
+	g.SetExcludedSilently([]string{"Jazz", "Pop"})
+	assert.Zero(t, *selFired)
+	assert.Zero(t, *excFired)
+	assert.Equal(t, []string{"Rock"}, g.Selected, "excluding Jazz took it out of the selection")
+	assert.Equal(t, []string{"Jazz", "Pop"}, g.Excluded)
+	assert.True(t, chips[0].Selected)
+	assert.Equal(t, "Jazz, excluded", chips[1].AccessibleLabel())
+	assert.Equal(t, "Pop, excluded", chips[2].AccessibleLabel())
+
+	g.SetSelectedSilently([]string{"Pop"})
+	assert.Equal(t, []string{"Jazz"}, g.Excluded, "selecting Pop took it out of the exclusion")
+	assert.True(t, chips[2].Selected)
+	assert.Equal(t, "Pop", chips[2].AccessibleLabel())
+
+	// Setting the fields and refreshing fires nothing either; an option in
+	// both lists is drawn selected and leaves Excluded.
+	g.Selected = []string{"Rock"}
+	g.Excluded = []string{"Rock", "Pop"}
+	g.Refresh()
+	assert.Zero(t, *selFired)
+	assert.Zero(t, *excFired)
+	assert.Equal(t, []string{"Pop"}, g.Excluded)
+	assert.True(t, chips[0].Selected)
+	assert.Equal(t, "Rock", chips[0].AccessibleLabel())
+}
+
+// Each setter keeps the lists apart with the list it sets winning, even
+// before the group has been drawn.
+func TestChipGroup_ExcludableSettersBeforeDrawn(t *testing.T) {
+	test.NewTempApp(t)
+	g, _, _, _, _ := newExcludable(t, "Rock", "Jazz")
+	g.SetExcludedSilently([]string{"Jazz"})
+	g.SetSelectedSilently([]string{"Jazz"})
+	assert.Empty(t, g.Excluded)
+	g.SetExcludedSilently([]string{"Jazz"})
+	assert.Empty(t, g.Selected)
+
+	g.SetSelected([]string{"Jazz"})
+	assert.Empty(t, g.Excluded)
+	g.SetExcluded([]string{"Jazz"})
+	assert.Empty(t, g.Selected)
+}
+
+// SetExcluded and SetSelected report, each also reporting the other list
+// when it takes an option out of it.
+func TestChipGroup_ExcludableSetReports(t *testing.T) {
+	test.NewTempApp(t)
+	g, sel, exc, selFired, excFired := newExcludable(t, "Rock", "Jazz")
+	g.SetSelectedSilently([]string{"Rock", "Jazz"})
+
+	g.SetExcluded([]string{"Jazz"})
+	assert.Equal(t, []string{"Jazz"}, *exc)
+	assert.Equal(t, []string{"Rock"}, *sel)
+	assert.Equal(t, 1, *excFired)
+	assert.Equal(t, 1, *selFired)
+
+	g.SetSelected([]string{"Rock", "Jazz"})
+	assert.Empty(t, *exc)
+	assert.Equal(t, 2, *excFired)
+	assert.Equal(t, 2, *selFired)
+}
+
+// An app refuses a change by putting the lists back from the callback:
+// DaySong keeps the last chip from being excluded this way (#1383).
+func TestChipGroup_ExcludableRefuse(t *testing.T) {
+	test.NewTempApp(t)
+	g, _, _, _, _ := newExcludable(t, "Rock", "Jazz")
+	g.SetExcludedSilently([]string{"Jazz"})
+	g.SetSelectedSilently([]string{"Rock"})
+	g.OnExcludedChanged = func(e []string) {
+		if len(e) == len(g.Options) {
+			g.SetSelectedSilently([]string{e[len(e)-1]})
+			g.SetExcludedSilently(e[:len(e)-1])
+		}
+	}
+	chips := chipsOf(t, g)
+
+	test.Tap(chips[0]) // Rock: selected → excluded, refused
+	assert.Equal(t, []string{"Rock"}, g.Selected)
+	assert.Equal(t, []string{"Jazz"}, g.Excluded)
+	assert.True(t, chips[0].Selected)
+	assert.Equal(t, "Rock", chips[0].AccessibleLabel())
+}
+
+// A Required group's last selected chip stays selected rather than moving
+// on to excluded.
+func TestChipGroup_ExcludableRequired(t *testing.T) {
+	test.NewTempApp(t)
+	g, _, _, selFired, excFired := newExcludable(t, "Rock", "Jazz")
+	g.Required = true
+	g.SetSelectedSilently([]string{"Rock"})
+	chips := chipsOf(t, g)
+
+	test.Tap(chips[0])
+	assert.Equal(t, []string{"Rock"}, g.Selected)
+	assert.Empty(t, g.Excluded)
+	assert.Zero(t, *selFired)
+	assert.Zero(t, *excFired)
+}
+
+// Without the opt-in, or in a single-choice group, a tap toggles as it did
+// before, and Excluded draws nothing (#1383).
+func TestChipGroup_NotExcludableUnchanged(t *testing.T) {
+	test.NewTempApp(t)
+	for _, tc := range []struct {
+		name                 string
+		multiple, excludable bool
+	}{
+		{"multiple", true, false},
+		{"single", false, false},
+		{"single, excludable", false, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			excFired := 0
+			g := widget.NewChipGroup([]string{"Rock", "Jazz"}, tc.multiple, nil)
+			g.Excludable = tc.excludable
+			g.OnExcludedChanged = func([]string) { excFired++ }
+			g.Excluded = []string{"Jazz"}
+			g.Refresh()
+			chips := chipsOf(t, g)
+			assert.Equal(t, "Jazz", chips[1].AccessibleLabel(), "not drawn excluded")
+
+			test.Tap(chips[0])
+			assert.Equal(t, []string{"Rock"}, g.Selected)
+			test.Tap(chips[0])
+			assert.Empty(t, g.Selected, "a second tap deselects")
+			assert.Equal(t, []string{"Jazz"}, g.Excluded, "untouched")
+			assert.Equal(t, "Rock", chips[0].AccessibleLabel())
+			assert.Zero(t, excFired)
+		})
+	}
+}
+
+// The three states side by side, in the light and the dark theme (#1383).
+func TestChipGroup_ExcludedRenders(t *testing.T) {
+	for _, v := range []struct {
+		name    string
+		variant bellui.ThemeVariant
+	}{{"light", theme.VariantLight}, {"dark", theme.VariantDark}} {
+		t.Run(v.name, func(t *testing.T) {
+			a := test.NewTempApp(t)
+			test.ApplyTheme(t, theme.DefaultTheme())
+			a.Settings().(interface{ SetThemeVariant(bellui.ThemeVariant) }).SetThemeVariant(v.variant)
+
+			g := widget.NewChipGroup([]string{"Rock", "Jazz", "Pop"}, true, nil)
+			g.Excludable = true
+			g.Selected = []string{"Rock"}
+			g.Excluded = []string{"Jazz"}
+			w := test.NewTempWindow(t, g)
+			w.Resize(geo.NewSize(300, 60))
+			test.AssertRendersToImage(t, "chip_group/excluded_"+v.name+".png", w.Canvas())
+
+			g.Disable()
+			test.AssertRendersToImage(t, "chip_group/excluded_disabled_"+v.name+".png", w.Canvas())
+		})
 	}
 }
