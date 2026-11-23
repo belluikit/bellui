@@ -119,5 +119,5 @@ func (r *pictorialRenderer) Render(ctx RenderContext) []core.CanvasObject {
 		}
 	}
 
-	return objects
+	return clipX(objects, ctx.Viewport) // #1396
 }

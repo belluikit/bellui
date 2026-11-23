@@ -192,5 +192,5 @@ func (r *candlestickRenderer) Render(ctx RenderContext) []core.CanvasObject {
 		}
 	}
 
-	return objects
+	return clipX(objects, ctx.Viewport) // #1396
 }

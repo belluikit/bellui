@@ -142,5 +142,5 @@ func (r *boxplotRenderer) Render(ctx RenderContext) []core.CanvasObject {
 		objects = append(objects, lowerCap)
 	}
 
-	return objects
+	return clipX(objects, ctx.Viewport) // #1396
 }

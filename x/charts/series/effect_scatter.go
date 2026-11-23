@@ -132,5 +132,5 @@ func (r *effectScatterRenderer) Render(ctx RenderContext) []core.CanvasObject {
 		objects = append(objects, circle)
 	}
 
-	return objects
+	return clipX(objects, ctx.Viewport) // #1396
 }
