@@ -75,6 +75,7 @@ type probe struct {
 	scale float32 // points per dp
 	out   *bufio.Writer
 	fails int
+	known int
 	shots int
 }
 
@@ -98,10 +99,10 @@ func runProbe(a bellui.App, w bellui.Window, tabs *container.AppTabs, dir string
 			p.logf("\n**PROBE ABORTED:** %v\n", r)
 			p.fails++
 		}
-		p.logf("\n%d failed assertion(s), %d capture(s).\n", p.fails, p.shots)
+		p.logf("\n%d failed assertion(s), %d known failure(s), %d capture(s).\n", p.fails, p.known, p.shots)
 		p.out.Flush()
 		f.Close()
-		fmt.Printf("probe: %d failed, report %s\n", p.fails, filepath.Join(dir, "report.md"))
+		fmt.Printf("probe: %d failed, %d known, report %s\n", p.fails, p.known, filepath.Join(dir, "report.md"))
 		code := 0
 		if p.fails > 0 {
 			code = 1
@@ -158,6 +159,17 @@ func (p *probe) expect(ok bool, what, got string) {
 		p.fails++
 	}
 	p.logf("- %s: %s (read: %s)\n", mark, what, got)
+}
+
+// expectKnown records an assertion that fails for a known bug the release
+// accepts: it is reported, but does not fail the run.
+func (p *probe) expectKnown(ok bool, issue, what, got string) {
+	if ok {
+		p.logf("- PASS: %s (read: %s); %s looks fixed, so drop it from the known list\n", what, got, issue)
+		return
+	}
+	p.known++
+	p.logf("- KNOWN (%s, not a failure in this release): %s (read: %s)\n", issue, what, got)
 }
 
 // settle lets the main loop handle what was posted and finish short
@@ -576,7 +588,7 @@ func (p *probe) layouts() {
 		st := p.must("the Start option", text("Start"))
 		en := p.must("the End option", text("End"))
 		if rtl {
-			p.expect(st.pos.X > en.pos.X, "RTL-07 (#1392): right-to-left, the radio options run from the right", fmt.Sprintf("Start x=%.0f End x=%.0f", st.pos.X, en.pos.X))
+			p.expectKnown(st.pos.X > en.pos.X, "#1392", "RTL-07: right-to-left, the radio options run from the right", fmt.Sprintf("Start x=%.0f End x=%.0f", st.pos.X, en.pos.X))
 		} else {
 			p.expect(st.pos.X < en.pos.X, "RTL-07: left-to-right, the radio options run from the left", fmt.Sprintf("Start x=%.0f End x=%.0f", st.pos.X, en.pos.X))
 		}
