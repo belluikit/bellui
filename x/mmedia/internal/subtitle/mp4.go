@@ -58,8 +58,8 @@ func parseVTTC(data []byte) string {
 	return ""
 }
 
-// BuildTrackFromMP4Samples builds a subtitle Track from a series of
-// MP4 subtitle samples with their timestamps and durations.
+// MP4SubtitleSample is one subtitle sample from an MP4 track, with its
+// timestamp, duration and codec, for BuildTrackFromMP4Samples.
 type MP4SubtitleSample struct {
 	Data     []byte
 	PTS      time.Duration

@@ -271,11 +271,6 @@ func (s *FFmpegSource) SetAudioSampleRate(rate int) error {
 	return nil
 }
 
-// Decode decodes one unit of media per call: for video streams it decodes
-// up to the next video frame (dispatching any interleaved audio along the
-// way); for audio-only streams it decodes one audio packet. The pipeline's
-// decode-ahead loop provides pacing through frame-queue and audio-buffer
-// back-pressure, so the elapsed argument is ignored.
 // IgnoreVideo makes the source audio-only: it reports no video, and Decode
 // skips video packets. For a player with no picture, so that a video stream
 // never paces its audio (#850). A song's embedded cover art is no longer one:
@@ -287,6 +282,11 @@ func (s *FFmpegSource) IgnoreVideo() {
 	s.videoCallback = nil
 }
 
+// Decode decodes one unit of media per call: for video streams it decodes
+// up to the next video frame (dispatching any interleaved audio along the
+// way); for audio-only streams it decodes one audio packet. The pipeline's
+// decode-ahead loop provides pacing through frame-queue and audio-buffer
+// back-pressure, so the elapsed argument is ignored.
 func (s *FFmpegSource) Decode(_ time.Duration) {
 	// An interrupted source is nowhere in particular until a Seek or Rewind
 	// reopens it; see Interrupt.

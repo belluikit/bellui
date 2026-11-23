@@ -8,6 +8,7 @@ import (
 	"image/png"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
 	"time"
 
@@ -151,7 +152,7 @@ func TestMapSeries_CompositeInvalidatedByViewChange(t *testing.T) {
 
 func TestHashTiles(t *testing.T) {
 	a := []coord.TileCoord{{Z: 1, X: 0, Y: 0}, {Z: 1, X: 1, Y: 0}}
-	if hashTiles(a) != hashTiles(a) {
+	if hashTiles(a) != hashTiles(slices.Clone(a)) {
 		t.Error("the digest must be stable")
 	}
 	if hashTiles(a) == hashTiles(a[:1]) {

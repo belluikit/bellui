@@ -32,7 +32,7 @@ func (s *MapSeries) SeriesType() Type { return TypeMap }
 func (s *MapSeries) Name() string     { return s.SeriesName }
 func (s *MapSeries) sealed()          {}
 
-// mapState holds runtime state for a map series (tile cache, geo coord).
+// MapState holds runtime state for a map series (tile cache, geo coord).
 // Stored on the chart widget and reused across renders.
 type MapState struct {
 	GeoCoord  *coord.GeoCoord

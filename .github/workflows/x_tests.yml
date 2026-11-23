@@ -15,7 +15,8 @@ name: X Submodule Tests
 # because a CLI break is only a CLI break; here the cross-module edge is the
 # point.
 #
-# Still not covered here, and still tracked in #13: staticcheck, gocyclo and
+# staticcheck runs here too (#1397), once its findings in all five modules
+# were fixed. Still not covered, and still tracked in #13: gocyclo and
 # `buf lint` for x/. Those carry real violations today (up to 67 gocyclo in
 # x/editor, see #18), so adding them now would gate on pre-existing debt
 # instead of on this PR. They are scoped out, not forgiven.
@@ -107,6 +108,20 @@ jobs:
             (cd "x/$m" && go mod edit -replace github.com/belluikit/bellui=../..)
           done
           git diff --stat -- 'x/*/go.mod'
+
+      # staticcheck is package-based like vet, so the root static_analysis.yml
+      # run stops at each x/ module's boundary and never saw these (#1397).
+      # Same version as there (latest), against this checkout as resolved
+      # above, with each leg's build tags.
+      - name: staticcheck each x/ module
+        run: |
+          set -e
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+          for m in $X_MODULES; do
+            echo "::group::staticcheck x/$m"
+            (cd "x/$m" && "$(go env GOPATH)/bin/staticcheck" -tags "${{ matrix.tags }}" ./...)
+            echo "::endgroup::"
+          done
 
       - name: Build, vet and test each x/ module
         run: |

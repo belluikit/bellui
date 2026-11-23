@@ -6,7 +6,6 @@ import (
 
 	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/core"
-	"github.com/belluikit/bellui/x/charts/axis"
 	"github.com/belluikit/bellui/x/charts/coord"
 )
 
@@ -588,15 +587,4 @@ func TestBoxplotDataRange(t *testing.T) {
 	if yMin != 5 || yMax != 95 {
 		t.Errorf("yRange: got [%f, %f], want [5, 95]", yMin, yMax)
 	}
-}
-
-// makeTestCoordForSeriesWithBounds is a helper for cartesian series tests.
-func makeTestCoordForSeriesWithBounds(xMin, xMax, yMin, yMax float64) *coord.Cartesian2D {
-	xScale := axis.NewLinearScale(5, nil, nil)
-	yScale := axis.NewLinearScale(5, nil, nil)
-	xScale.SetRange(xMin, xMax)
-	yScale.SetRange(yMin, yMax)
-	c := coord.NewCartesian2D(xScale, yScale)
-	c.SetBounds(coord.Rect{X: 0, Y: 0, W: 500, H: 300})
-	return c
 }

@@ -7,16 +7,6 @@ type columnLayout struct {
 	main        []*resolvedColumn
 	pinnedRight []*resolvedColumn
 	all         []*resolvedColumn // all visible columns in display order (left + main + right)
-	groups      []columnGroup     // top-level column groups
-}
-
-// columnGroup represents a group header spanning multiple child columns.
-type columnGroup struct {
-	def       *ColumnDef
-	startCol  int  // index into layout.all
-	endCol    int  // exclusive
-	collapsed bool // true if group is collapsed (children hidden)
-	depth     int  // nesting depth (0 = top-level)
 }
 
 // computeLayout builds the column layout from resolved columns.

@@ -138,6 +138,9 @@ func TestViewport_RowY(t *testing.T) {
 	if y != expectedY {
 		t.Errorf("row 2: expected y=%f, got %f", expectedY, y)
 	}
+	if h != 30 {
+		t.Errorf("row 2: expected h=30, got %f", h)
+	}
 }
 
 func TestViewport_ColX(t *testing.T) {

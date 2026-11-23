@@ -321,15 +321,6 @@ func (r *lineRenderer) stepMidpoint(step StepType, p1, p2 geo.Position) geo.Posi
 	}
 }
 
-func newLine(p1, p2 geo.Position, c color.Color, width float32) *canvas.Line {
-	return &canvas.Line{
-		Position1:   p1,
-		Position2:   p2,
-		StrokeColor: c,
-		StrokeWidth: width,
-	}
-}
-
 func newClippedLine(p1, p2 geo.Position, c color.Color, width, clipMinX, clipMinY, clipMaxX, clipMaxY float32) *canvas.Line {
 	cx1, cy1, cx2, cy2, visible := mathutil.ClipLineToRect(
 		p1.X, p1.Y, p2.X, p2.Y,

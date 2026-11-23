@@ -583,17 +583,17 @@ func (c *Chart) updateGeoSeriesCoords() {
 
 // --- Hoverable ---
 
-// MouseIn is called when the cursor enters the chart widget.
+// HoverIn is called when the cursor enters the chart widget.
 func (c *Chart) HoverIn(e *event.HoverEvent) {
 	c.handleHover(e.Position)
 }
 
-// MouseMoved is called when the cursor moves within the chart widget.
+// HoverMoved is called when the cursor moves within the chart widget.
 func (c *Chart) HoverMoved(e *event.HoverEvent) {
 	c.handleHover(e.Position)
 }
 
-// MouseOut is called when the cursor leaves the chart widget.
+// HoverOut is called when the cursor leaves the chart widget.
 //
 // It is idempotent: the chart repaints and emits [interact.EventMouseOut] only
 // when the call actually cleared a visible tooltip. An "out" for a chart that

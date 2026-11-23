@@ -30,7 +30,6 @@ type OnErrorFunc func(err error)
 // target, clamped to the media.
 type OnSeekFunc func(from, to time.Duration)
 
-// Pipeline orchestrates media demuxing, decoding, and presentation.
 // PlaybackStats holds real-time playback metrics.
 type PlaybackStats struct {
 	FramesDecoded  int64
@@ -52,6 +51,7 @@ type PlaybackStats struct {
 	MaxSyncOffset time.Duration
 }
 
+// Pipeline orchestrates media demuxing, decoding, and presentation.
 type Pipeline struct {
 	mu sync.Mutex
 

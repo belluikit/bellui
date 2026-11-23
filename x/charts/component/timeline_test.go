@@ -14,8 +14,7 @@ import (
 func TestTimeline_PlaybackStepsOnTheUIThread(t *testing.T) {
 	test.NewTempApp(t)
 	steps := make(chan int, 16)
-	var ts *TimelineState
-	ts = NewTimelineState(4, TimelineConfig{Interval: time.Millisecond}, func(i int) { steps <- i })
+	ts := NewTimelineState(4, TimelineConfig{Interval: time.Millisecond}, func(i int) { steps <- i })
 
 	bellui.DoAndWait(ts.Play)
 	for want := 1; want <= 3; want++ {
