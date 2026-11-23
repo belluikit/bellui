@@ -26,7 +26,7 @@ require go.yaml.in/yaml/v3 v3.0.5 // indirect
 
 require (
 	github.com/akavel/rsrc v0.10.2 // indirect
-	github.com/belluikit/bellui v1.3.0-rc.4
+	github.com/belluikit/bellui v1.3.0-rc.5
 	github.com/cpuguy83/go-md2man/v2 v2.0.7 // indirect
 	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
 	github.com/jsummers/gobmp v0.0.0-20230614200233-a9de23ed2e25 // indirect
