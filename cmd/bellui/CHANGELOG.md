@@ -17,6 +17,32 @@ one per change, so that open pull requests do not conflict here. Run
 `go run ./hack/changelog preview -C cmd/bellui` to see them assembled; the release folds them
 into a section below.
 
+## v1.3.0-rc.5 — 2026-11-23
+
+Cut with toolkit v1.3.0-rc.5. `--help` names the targets each command
+really takes, and `bellui translate` creates a missing catalog folder.
+Built against bellui v1.3.0-rc.5.
+
+### Fixed
+
+* **`--help` lists the targets each command takes**
+  ([#1369](https://github.com/belluikit/bellui/issues/1369)). The
+  `--target`/`--os` help was one list shared by `build`, `package`,
+  `release` and `install`, and it was right for none of them: `package` and
+  `release` take `web`, `wasm` and `iossimulator`, which it left out, and
+  `install` takes only a device (`android…`, `ios`, `iossimulator`) and
+  refuses the desktop targets it named. Each command's help now names its
+  own. `build` names the bellui targets and says it passes any other GOOS to
+  Go.
+* **`bellui translate` creates the catalog's folder when it is missing**
+  ([#1368](https://github.com/belluikit/bellui/issues/1368)). In an app with
+  no `translations/` folder, `bellui translate translations/en.pxf` failed
+  with an error naming a temporary file (`translations/en.pxf-1146338075`).
+  It now creates the folder, as `bellui init` does, and an error that
+  remains names the catalog. The catalog is also written readable by
+  everyone (`0644`), or with the mode of the file it replaces, where it used
+  to come out owner-only (`0600`).
+
 ## v1.3.0-rc.4 — 2026-11-21
 
 Cut with toolkit v1.3.0-rc.4, so that the command and the toolkit keep one
