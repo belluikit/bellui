@@ -177,12 +177,25 @@ func updateTranslationsFile(file string, files []string, opts *translateOpts) er
 	return writeTranslationsFile(b, file)
 }
 
-// Write data to given file and rename atomically to prevent file corruption
-func writeTranslationsFile(b []byte, file string) error {
-	nf, err := os.CreateTemp(filepath.Dir(file), filepath.Base(file)+"-*")
-	if err != nil {
-		return err
+// Write data to given file and rename atomically to prevent file corruption.
+// The catalog's folder is created when it is missing, as `bellui init` makes
+// translations/ (#1368); before, the temporary file could not be created and
+// the error named it, not the folder.
+func writeTranslationsFile(b []byte, file string) (err error) {
+	dir := filepath.Dir(file)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("creating the folder for %s: %w", file, err)
 	}
+	nf, err := os.CreateTemp(dir, filepath.Base(file)+"-*")
+	if err != nil {
+		return fmt.Errorf("writing %s: %w", file, err)
+	}
+	defer func() {
+		if err != nil {
+			nf.Close()
+			os.Remove(nf.Name()) // leave no temporary file behind a failed write
+		}
+	}()
 
 	if len(b) > 0 && b[len(b)-1] != '\n' {
 		b = append(b, '\n')

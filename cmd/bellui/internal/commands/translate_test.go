@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const exampleSource = `
@@ -153,6 +154,30 @@ func TestWriteTranslationsFile(t *testing.T) {
 			assert.Equal(t, byte('\n'), b[len(b)-1])
 		}
 	}
+}
+
+// A catalog whose folder does not exist yet gets the folder (#1368). Before,
+// the command failed naming the temporary file it could not create.
+func TestWriteTranslationsFile_MissingFolder(t *testing.T) {
+	dst := filepath.Join(t.TempDir(), "translations", "nested", "en.pxf")
+	require.NoError(t, writeTranslationsFile([]byte("a = 1"), dst))
+	b, err := os.ReadFile(dst)
+	require.NoError(t, err)
+	assert.Equal(t, "a = 1\n", string(b))
+	left, err := os.ReadDir(filepath.Dir(dst))
+	require.NoError(t, err)
+	assert.Len(t, left, 1, "a temporary file was left behind")
+}
+
+// A folder that cannot be made is named in the error, not a temporary file.
+func TestWriteTranslationsFile_FolderIsAFile(t *testing.T) {
+	dir := t.TempDir()
+	blocker := filepath.Join(dir, "translations")
+	require.NoError(t, os.WriteFile(blocker, nil, 0o644))
+	err := writeTranslationsFile([]byte("a = 1"), filepath.Join(blocker, "en.pxf"))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "creating the folder for")
+	assert.NotContains(t, err.Error(), "en.pxf-")
 }
 
 func TestUpdateTranslationsHash(t *testing.T) {
