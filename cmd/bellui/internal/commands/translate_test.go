@@ -6,8 +6,10 @@ import (
 	"go/parser"
 	"go/token"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -167,6 +169,26 @@ func TestWriteTranslationsFile_MissingFolder(t *testing.T) {
 	left, err := os.ReadDir(filepath.Dir(dst))
 	require.NoError(t, err)
 	assert.Len(t, left, 1, "a temporary file was left behind")
+}
+
+// A new catalog is readable by everyone, like any source file, and a
+// rewritten one keeps its mode. The temporary file it is written through is
+// owner-only, and before this the catalog was too.
+func TestWriteTranslationsFile_Mode(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Windows has no Unix permission bits")
+	}
+	dst := filepath.Join(t.TempDir(), "en.pxf")
+	require.NoError(t, writeTranslationsFile([]byte("a = 1"), dst))
+	fi, err := os.Stat(dst)
+	require.NoError(t, err)
+	assert.Equal(t, fs.FileMode(0o644), fi.Mode().Perm())
+
+	require.NoError(t, os.Chmod(dst, 0o664))
+	require.NoError(t, writeTranslationsFile([]byte("a = 2"), dst))
+	fi, err = os.Stat(dst)
+	require.NoError(t, err)
+	assert.Equal(t, fs.FileMode(0o664), fi.Mode().Perm())
 }
 
 // A folder that cannot be made is named in the error, not a temporary file.

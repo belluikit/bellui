@@ -210,6 +210,17 @@ func writeTranslationsFile(b []byte, file string) (err error) {
 		return io.ErrShortWrite
 	}
 
+	// The temporary file is created owner-only (0600); a catalog is a source
+	// file like any other, so it keeps the mode of the one it replaces, or
+	// gets 0644 when new.
+	mode := fs.FileMode(0o644)
+	if fi, err := os.Stat(file); err == nil {
+		mode = fi.Mode().Perm()
+	}
+	if err := nf.Chmod(mode); err != nil {
+		return err
+	}
+
 	if err := nf.Close(); err != nil {
 		return err
 	}
