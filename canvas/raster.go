@@ -138,10 +138,11 @@ func (r *Raster) SetPixels(pix []byte, width, height int) {
 }
 
 // SetYCbCr updates the raster's content with a video frame as it was decoded:
-// Y'CbCr planes, encoded with the given colour matrix and range. The GPU
-// painters upload the planes and convert them to RGB on the GPU: at 4:2:0 that
-// uploads 1.5 bytes a pixel instead of SetPixels' 4, and converts nothing on
-// the processor. The software painter converts in Go. Any subsample ratio
+// Y'CbCr planes, encoded with the given colour matrix and range. The WebGPU
+// painter uploads the planes and converts them to RGB on the GPU: at 4:2:0
+// that uploads 1.5 bytes a pixel instead of SetPixels' 4, and converts nothing
+// on the processor. The GL and software painters convert on the processor, by
+// the same matrix and range. Any subsample ratio
 // image.YCbCr has is drawn. It replaces anything set by SetPixels, and
 // automatically calls Refresh to trigger a repaint.
 //
