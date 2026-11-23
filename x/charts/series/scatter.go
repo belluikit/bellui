@@ -157,5 +157,5 @@ func (r *scatterRenderer) Render(ctx RenderContext) []core.CanvasObject {
 		objects = append(objects, obj)
 	}
 
-	return objects
+	return clipX(objects, ctx.Viewport) // #1396
 }

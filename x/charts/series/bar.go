@@ -191,5 +191,5 @@ func (r *barRenderer) Render(ctx RenderContext) []core.CanvasObject {
 		objects = append(objects, rect)
 	}
 
-	return objects
+	return clipX(objects, ctx.Viewport) // #1396
 }
