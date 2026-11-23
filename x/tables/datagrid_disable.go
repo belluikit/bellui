@@ -10,6 +10,11 @@ import (
 
 var _ core.Disableable = (*DataGrid)(nil)
 
+// DrawsDisabledLook reports that the paint walk must not dim a disabled
+// DataGrid (bellui's core.DisabledLook, belluikit/bellui#1223): it draws its own text in the disabled colour, and the content an app
+// supplies (CellRenderer cells, master-detail content) is the app's.
+func (*DataGrid) DrawsDisabledLook() bool { return true }
+
 // Disable makes the grid visible but inert (belluikit/player#641): it keeps
 // its place and its rows, draws its own text in the disabled colour, and
 // takes no input. Taps, double-taps and secondary taps select, sort, open,
@@ -25,11 +30,6 @@ var _ core.Disableable = (*DataGrid)(nil)
 // content) is the app's: it is not disabled, dimmed or blocked here.
 //
 // Disable is safe before the grid is drawn.
-// DrawsDisabledLook reports that the paint walk must not dim a disabled
-// DataGrid (bellui's core.DisabledLook, belluikit/bellui#1223): it draws its own text in the disabled colour, and the content an app
-// supplies (CellRenderer cells, master-detail content) is the app's.
-func (*DataGrid) DrawsDisabledLook() bool { return true }
-
 func (g *DataGrid) Disable() {
 	if g.disabled {
 		return

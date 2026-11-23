@@ -48,9 +48,3 @@ func markupSegments(value string, kind MarkupKind) []widget.RichTextSegment {
 	}
 	return []widget.RichTextSegment{&widget.TextSegment{Text: value}}
 }
-
-// setMarkup replaces a RichText's whole content with value rendered per kind.
-func setMarkup(rt *widget.RichText, value string, kind MarkupKind) {
-	rt.Segments = markupSegments(value, kind)
-	rt.Refresh()
-}

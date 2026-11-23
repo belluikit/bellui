@@ -2,7 +2,6 @@ package tables
 
 import (
 	"fmt"
-	"math"
 
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/container"
@@ -17,8 +16,6 @@ import (
 	"github.com/belluikit/bellui/x/tables/render"
 	gridTheme "github.com/belluikit/bellui/x/tables/theme"
 )
-
-const noCellMatch = math.MaxInt
 
 // Compile-time interface checks.
 var (
@@ -787,7 +784,9 @@ func (g *DataGrid) PinnedRightCount() int {
 	return len(g.visibleLayout().pinnedRight)
 }
 
-// Pinned column access — uses absolute display index (visibleCol) not mainCol.
+// PinnedColumnTypeName is the type name of the column at display index
+// displayCol: pinned column access uses the absolute display index
+// (visibleCol), not mainCol.
 func (g *DataGrid) PinnedColumnTypeName(displayCol int) string {
 	rc := g.visibleCol(displayCol)
 	if rc == nil {
@@ -2399,10 +2398,8 @@ func (g *DataGrid) selectCellWithModifiers(id CellID, mod event.KeyModifier) {
 		setSelectedCell()
 
 	case SelectionMultiCell:
-		ctrl := mod&event.KeyModifierControl != 0 || mod&event.KeyModifierSuper != 0
-		if ctrl {
-			// Toggle — for now multi-cell uses selectedRows as a simple model
-		}
+		// Ctrl/Cmd-click does not toggle a cell yet (#1401): multi-cell
+		// selection is still the single-cell model below.
 		setSelectedCell()
 		selectOnly(src)
 	}

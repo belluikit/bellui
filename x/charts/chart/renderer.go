@@ -542,7 +542,8 @@ func (r *chartRenderer) computeLayout(
 	showLegend := opt.Legend != nil || len(opt.Series) > 1
 	if showLegend && len(legendItems) > 0 {
 		legendY := size.Height - grid.Bottom
-		legendObjs, legendLayout, legendHeight = component.RenderLegend(
+		// The first pass only measures the legend's height.
+		_, _, legendHeight = component.RenderLegend(
 			legendItems, opt.Legend, grid.Left, legendY, size.Width-grid.Left-grid.Right, resolver,
 		)
 		// Adjust legend Y to be above the bottom margin

@@ -161,13 +161,13 @@ func (s *DataZoomSlider) DragEnd() {
 	s.dragging = dragNone
 }
 
-// MouseIn is a no-op (satisfies event.Hoverable).
+// HoverIn is a no-op (satisfies event.Hoverable).
 func (s *DataZoomSlider) HoverIn(_ *event.HoverEvent) {}
 
-// MouseMoved is a no-op (satisfies event.Hoverable).
+// HoverMoved is a no-op (satisfies event.Hoverable).
 func (s *DataZoomSlider) HoverMoved(_ *event.HoverEvent) {}
 
-// MouseOut is a no-op (satisfies event.Hoverable).
+// HoverOut is a no-op (satisfies event.Hoverable).
 func (s *DataZoomSlider) HoverOut() {}
 
 // --- Renderer ---

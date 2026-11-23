@@ -2,7 +2,6 @@ package mmedia
 
 import (
 	"io"
-	"sync"
 	"time"
 
 	"github.com/belluikit/bellui/core"
@@ -18,7 +17,6 @@ import (
 type VideoPlayer struct {
 	widget.BaseWidget
 
-	mu      sync.Mutex
 	pipe    *pipeline.Pipeline
 	surface *videoSurface
 	minSize geo.Size

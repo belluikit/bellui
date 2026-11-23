@@ -10,6 +10,11 @@ import (
 
 var _ core.Disableable = (*DAGCanvas)(nil)
 
+// DrawsDisabledLook reports that the paint walk must not dim a disabled
+// DAGCanvas (bellui's core.DisabledLook, belluikit/bellui#1223): it draws its nodes, edges, groups, ports and annotations in the disabled
+// colours itself, and a node's Content, the app's, is left alone.
+func (*DAGCanvas) DrawsDisabledLook() bool { return true }
+
 // Disable makes the canvas visible but inert (belluikit/player#641): it keeps
 // its place and its graph, draws its own nodes, edges, groups, ports and
 // annotations in the disabled colours, and takes no input. Taps and secondary
@@ -29,11 +34,6 @@ var _ core.Disableable = (*DAGCanvas)(nil)
 // and the PropertiesPanel, which are separate widgets.
 //
 // Disable is safe before the canvas is drawn.
-// DrawsDisabledLook reports that the paint walk must not dim a disabled
-// DAGCanvas (bellui's core.DisabledLook, belluikit/bellui#1223): it draws its nodes, edges, groups, ports and annotations in the disabled
-// colours itself, and a node's Content, the app's, is left alone.
-func (*DAGCanvas) DrawsDisabledLook() bool { return true }
-
 func (c *DAGCanvas) Disable() {
 	if c.disabled {
 		return

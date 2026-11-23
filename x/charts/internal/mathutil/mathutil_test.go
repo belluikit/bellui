@@ -78,7 +78,7 @@ func TestNiceTicks(t *testing.T) {
 	}
 
 	// Equal min/max should produce a valid range
-	niceMin, niceMax, interval = NiceTicks(50, 50, 5)
+	niceMin, niceMax, _ = NiceTicks(50, 50, 5)
 	if niceMax <= niceMin {
 		t.Errorf("NiceTicks with equal bounds: min=%v, max=%v", niceMin, niceMax)
 	}
