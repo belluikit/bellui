@@ -38,7 +38,7 @@ func Release() *cli.Command {
 		Aliases: []string{"r"},
 		Usage:   "Prepares an application for public distribution",
 		Flags: []cli.Flag{
-			stringFlags["target"](&r.os),
+			targetFlag(&r.os, packageTargets...),
 			stringFlags["keystore"](&r.keyStore),
 			stringFlags["keystore-pass"](&r.keyStorePass),
 			stringFlags["key-name"](&r.keyName),

@@ -186,14 +186,18 @@ var stringFlags = map[string]func(*string) cli.Flag{
 			Destination: dst,
 		}
 	},
-	"target": func(dst *string) cli.Flag {
-		return &cli.StringFlag{
-			Name:        "target",
-			Aliases:     []string{"os"},
-			Usage:       "set operating system to target (android, android/arm, android/arm64, android/amd64, android/386, darwin, freebsd, ios, linux, netbsd, openbsd, windows)",
-			Destination: dst,
-		}
-	},
+}
+
+// targetFlag is a command's --target (alias --os) flag. Its usage lists the
+// targets that command accepts, which differ between commands, so the help
+// cannot name a target the command refuses or leave out one it takes (#1369).
+func targetFlag(dst *string, targets ...string) cli.Flag {
+	return &cli.StringFlag{
+		Name:        "target",
+		Aliases:     []string{"os"},
+		Usage:       "set operating system to target (" + strings.Join(targets, ", ") + ")",
+		Destination: dst,
+	}
 }
 
 var boolFlags = map[string]func(*bool) cli.Flag{

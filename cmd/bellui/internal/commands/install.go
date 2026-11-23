@@ -18,6 +18,13 @@ import (
 	"golang.org/x/tools/go/vcs"
 )
 
+// installTargets are the --target values install accepts: a device to
+// install on. Without --target it installs for this computer.
+var installTargets = []string{
+	"android", "android/arm", "android/arm64", "android/amd64", "android/386",
+	"ios", "iossimulator", "unset for this computer",
+}
+
 // Install returns the cli command for installing bellui applications
 func Install() *cli.Command {
 	i := NewInstaller()
@@ -30,7 +37,7 @@ func Install() *cli.Command {
 		Description: "The install command packages an application for the current platform and copies it\n" +
 			"into the system location for applications by default.",
 		Flags: []cli.Flag{
-			stringFlags["target"](&i.os),
+			targetFlag(&i.os, installTargets...),
 			stringFlags["dst"](&i.installDir),
 			stringFlags["icon"](&i.icon),
 			boolFlags["use-raw-icon"](&i.rawIcon),
