@@ -53,6 +53,14 @@ func NewBuilder() *Builder {
 	return &Builder{appData: &appData{}}
 }
 
+// buildTargets are named in build's --target usage. build also passes any
+// other value to Go as GOOS, so the list is the bellui ones and a pointer to
+// the rest.
+var buildTargets = []string{
+	"android", "darwin", "freebsd", "ios", "linux", "netbsd", "openbsd",
+	"wasm", "web", "windows", "or any other GOOS",
+}
+
 // Build returns the cli command for building bellui applications
 func Build() *cli.Command {
 	b := NewBuilder()
@@ -63,7 +71,7 @@ func Build() *cli.Command {
 		Usage:       "Builds an application",
 		Description: "You can specify --target to define the OS to build for. The executable file will default to an appropriate name but can be overridden using -o.",
 		Flags: []cli.Flag{
-			stringFlags["target"](&b.os),
+			targetFlag(&b.os, buildTargets...),
 			stringFlags["src"](&b.srcdir),
 			stringFlags["tags"](&b.tagsToParse),
 			boolFlags["release"](&b.release),

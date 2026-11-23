@@ -32,6 +32,14 @@ const (
 	defaultAppVersion = "0.0.1"
 )
 
+// packageTargets are the --target values package (and so release) accepts:
+// the cases of doPackage's switch, which a test holds them to (#1369).
+var packageTargets = []string{
+	"android", "android/arm", "android/arm64", "android/amd64", "android/386",
+	"darwin", "freebsd", "ios", "iossimulator", "linux", "netbsd", "openbsd",
+	"wasm", "web", "windows",
+}
+
 // Package returns the cli command for packaging bellui applications
 func Package() *cli.Command {
 	p := NewPackager()
@@ -42,7 +50,7 @@ func Package() *cli.Command {
 		Usage:       "Packages an application for distribution",
 		Description: "You may specify the --executable to package, otherwise --source-dir will be built.",
 		Flags: []cli.Flag{
-			stringFlags["target"](&p.os),
+			targetFlag(&p.os, packageTargets...),
 			stringFlags["executable"](&p.exe),
 			stringFlags["name"](&p.Name),
 			stringFlags["tags"](&p.tags),
