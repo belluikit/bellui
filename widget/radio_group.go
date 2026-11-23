@@ -191,11 +191,7 @@ func (r *radioGroupRenderer) Layout(size geo.Size) {
 	}
 	// Under RTL the items run from the right edge, the first rightmost
 	// (#1392).
-	items := make([]core.CanvasObject, len(r.items))
-	for i, item := range r.items {
-		items[i] = item
-	}
-	mirrorIfRTL(items, size.Width)
+	mirrorIfRTL(r.items, size.Width)
 }
 
 // MinSize calculates the minimum size of a radio item.
