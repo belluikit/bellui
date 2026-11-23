@@ -188,9 +188,13 @@ func (r *radioItemRenderer) Layout(size geo.Size) {
 	r.focusIndicator.Resize(focusIndicatorSize)
 	r.focusIndicator.Move(geo.NewPos(borderSize, (size.Height-focusIndicatorSize.Height)/2))
 
-	labelSize := geo.NewSize(size.Width, size.Height)
-	r.label.Resize(labelSize)
-	r.label.Move(geo.NewPos(focusIndicatorSize.Width+th.Size(theme.SizeNamePadding), 0))
+	// The label takes the width left beside the circle. It took the whole
+	// item's width, which ran past the item: unseen while the text reads
+	// from the left, but right-to-left it put the text on the next item
+	// (#1392).
+	xOff := focusIndicatorSize.Width + th.Size(theme.SizeNamePadding)
+	r.label.Resize(geo.NewSize(size.Width-xOff, size.Height))
+	r.label.Move(geo.NewPos(xOff, 0))
 
 	iconPos := geo.NewPos(innerPadding/2+borderSize, (size.Height-iconInlineSize)/2)
 	iconSize := geo.NewSquareSize(iconInlineSize)
@@ -198,6 +202,10 @@ func (r *radioItemRenderer) Layout(size geo.Size) {
 	r.icon.Move(iconPos)
 	r.over.Resize(iconSize)
 	r.over.Move(iconPos)
+
+	// Under RTL reflect, as a Check does, so the circle sits on the right and
+	// the label on its left (#1392).
+	mirrorIfRTL([]core.CanvasObject{&r.focusIndicator, &r.icon, &r.over, r.label}, size.Width)
 }
 
 func (r *radioItemRenderer) MinSize() geo.Size {

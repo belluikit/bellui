@@ -711,7 +711,7 @@ var checks = []check{
 		Expect: []string{"The gallery starts right-to-left, as RTL-01 with the toggle on; text without a translation stays English."},
 	},
 	{
-		ID: "RTL-07", Area: "rtl", Title: "Chip rows and wrapping layouts in right-to-left", Refs: []string{"#1371", "#1372"},
+		ID: "RTL-07", Area: "rtl", Title: "Chip rows and wrapping layouts in right-to-left", Refs: []string{"#1371", "#1372", "#1392"},
 		Where: companion + " → Chips & layout",
 		Steps: []string{
 			"Under \"Chip rows\", choose Start, Center and End in turn.",
@@ -723,7 +723,7 @@ var checks = []check{
 			"Right-to-left, Start and End swap sides; the first chip of each row is the rightmost.",
 			"Right-to-left, the flow starts with 1 at the right edge and every row runs leftwards; the flex row reads \"1 first\" at the right; the flex column's buttons sit at the right edge.",
 			"Toggling back restores the left-to-right layout exactly.",
-			"Known, not a failure in this release (#1392, owner 2026-11-23): the Start / Center / End radio row does not mirror, and right-to-left its circles overlap the labels.",
+			"The Start / Center / End radio row mirrors too: right-to-left each circle sits right of its label, and Start is rightmost (#1392).",
 		},
 	},
 

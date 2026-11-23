@@ -163,7 +163,7 @@ type radioGroupRenderer struct {
 }
 
 // Layout the components of the radio widget
-func (r *radioGroupRenderer) Layout(_ geo.Size) {
+func (r *radioGroupRenderer) Layout(size geo.Size) {
 	count := 1
 	if len(r.items) > 0 {
 		count = len(r.items)
@@ -189,6 +189,9 @@ func (r *radioGroupRenderer) Layout(_ geo.Size) {
 			y += itemHeight
 		}
 	}
+	// Under RTL the items run from the right edge, the first rightmost
+	// (#1392).
+	mirrorIfRTL(r.items, size.Width)
 }
 
 // MinSize calculates the minimum size of a radio item.

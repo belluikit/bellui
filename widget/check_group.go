@@ -175,7 +175,7 @@ type checkGroupRenderer struct {
 }
 
 // Layout the components of the checks widget
-func (r *checkGroupRenderer) Layout(_ geo.Size) {
+func (r *checkGroupRenderer) Layout(size geo.Size) {
 	count := 1
 	if len(r.items) > 0 {
 		count = len(r.items)
@@ -201,6 +201,13 @@ func (r *checkGroupRenderer) Layout(_ geo.Size) {
 			y += itemHeight
 		}
 	}
+	// Under RTL the items run from the right edge, the first rightmost
+	// (#1392).
+	items := make([]core.CanvasObject, len(r.items))
+	for i, item := range r.items {
+		items[i] = item
+	}
+	mirrorIfRTL(items, size.Width)
 }
 
 // MinSize calculates the minimum size of a checks item.
