@@ -4,6 +4,7 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/internal/app"
@@ -69,7 +70,13 @@ func TestFocusManager_DisabledAncestorBlocksFocus(t *testing.T) {
 		assert.True(t, entry.Disabled())
 		assert.False(t, inChain(m, entry), "Tab reaches the disabled entry")
 		assert.True(t, m.Focus(entry))
-		assert.Equal(t, event.Focusable(entry), m.Focused(), "a disabled Entry keeps its text selectable (#1251)")
+		if bellui.CurrentDevice().IsMobile() {
+			// On mobile a disabled text input takes no focus, so it does not
+			// summon the soft keyboard: the existing rule, unchanged here.
+			assert.True(t, m.Focused() == nil, "a disabled Entry took the focus on mobile")
+			return
+		}
+		assert.True(t, m.Focused() == event.Focusable(entry), "a disabled Entry keeps its text selectable (#1251)")
 	})
 }
 
