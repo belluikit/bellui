@@ -6,7 +6,7 @@
 					<circle pos="2,2" size="28x28"/>
 					<image pos="6,6" rsc="radioButtonFillIcon" size="iconInlineSize" themed="primary"/>
 					<image pos="6,6" rsc="radioButtonIcon" size="iconInlineSize" themed="primary"/>
-					<text pos="32,0" size="66x32">Test</text>
+					<text pos="32,0" size="34x32">Test</text>
 				</widget>
 			</widget>
 		</container>

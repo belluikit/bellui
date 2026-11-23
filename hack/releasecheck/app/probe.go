@@ -588,7 +588,7 @@ func (p *probe) layouts() {
 		st := p.must("the Start option", text("Start"))
 		en := p.must("the End option", text("End"))
 		if rtl {
-			p.expectKnown(st.pos.X > en.pos.X, "#1392", "RTL-07: right-to-left, the radio options run from the right", fmt.Sprintf("Start x=%.0f End x=%.0f", st.pos.X, en.pos.X))
+			p.expect(st.pos.X > en.pos.X, "RTL-07 (#1392): right-to-left, the radio options run from the right", fmt.Sprintf("Start x=%.0f End x=%.0f", st.pos.X, en.pos.X))
 		} else {
 			p.expect(st.pos.X < en.pos.X, "RTL-07: left-to-right, the radio options run from the left", fmt.Sprintf("Start x=%.0f End x=%.0f", st.pos.X, en.pos.X))
 		}
