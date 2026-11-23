@@ -50,8 +50,21 @@ var (
 // Editor (bellui's core.DisabledLook, belluikit/bellui#1223): its Entry and
 // find bar are disabled and draw their own disabled look, and the editor dims
 // its own gutter and decorations (#1232). The app's gutter providers and
-// decorators are left as the app draws them.
+// decorators draw as the app draws them; a widget among them with no disabled
+// look of its own is dimmed by the paint walk, as app content is under any
+// disabled widget (belluikit/bellui#1393).
 func (*Editor) DrawsDisabledLook() bool { return true }
+
+// The editor's own parts draw the disabled look themselves (the gutter and
+// decorations are dimmed by the editor, #1232) or draw nothing, so the paint
+// walk must not dim them again under a disabled editor (#1393).
+
+func (*gutterWidget) DrawsDisabledLook() bool     { return true }
+func (*decoratorOverlay) DrawsDisabledLook() bool { return true }
+func (*disabledShield) DrawsDisabledLook() bool   { return true }
+func (*hoverCapture) DrawsDisabledLook() bool     { return true }
+func (*hoverCard) DrawsDisabledLook() bool        { return true }
+func (*sigArrow) DrawsDisabledLook() bool         { return true }
 
 // Disable makes the editor visible but inert (see the note above). Open
 // popovers close, a focus inside the editor is dropped, and the find bar, if
