@@ -2,6 +2,7 @@ package tables
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/container"
@@ -133,6 +134,9 @@ type DataGrid struct {
 	selectedRows map[int]bool // set of selected source rows
 	selCellRow   int          // source row of the selected cell (-1 = none)
 	selCellCol   int          // column of the selected cell
+	// selectedCells is SelectionMultiCell's selection: source row and
+	// absolute display column of each selected cell (#1401).
+	selectedCells map[selCell]bool
 
 	selectedCell *CellID // live cursor cell in DISPLAY coords (editing/scroll/API)
 	hoveredCell  *CellID // transient hover cell in DISPLAY coords
@@ -142,6 +146,7 @@ type DataGrid struct {
 	offset       geo.Position
 	lastModifier event.KeyModifier
 	anchorRow    int // display-row anchor for shift+click range selection
+	anchorCol    int // absolute-column anchor for a shift+click cell rectangle
 
 	// Editing state
 	editingCell  *CellID
@@ -2333,9 +2338,9 @@ func (g *DataGrid) remapCursorAfterReindex() {
 	// Reset the shift-range anchor after a reindex (AG Grid behavior): the
 	// visual range origin is no longer meaningful once rows have moved.
 	if g.currentFocus.Row >= 0 {
-		g.anchorRow = g.currentFocus.Row
+		g.anchorRow, g.anchorCol = g.currentFocus.Row, g.currentFocus.Col
 	} else {
-		g.anchorRow = 0
+		g.anchorRow, g.anchorCol = 0, 0
 	}
 }
 
@@ -2402,10 +2407,9 @@ func (g *DataGrid) selectCellWithModifiers(id CellID, mod event.KeyModifier) {
 		setSelectedCell()
 
 	case SelectionMultiCell:
-		// Ctrl/Cmd-click does not toggle a cell yet (#1401): multi-cell
-		// selection is still the single-cell model below.
+		g.selectMultiCell(id, src, mod)
 		setSelectedCell()
-		selectOnly(src)
+		g.selectedRows = make(map[int]bool) // cells are selected, not their rows
 	}
 
 	g.fireSelectionChanged()
@@ -2416,11 +2420,29 @@ func (g *DataGrid) fireSelectionChanged() {
 	if g.OnSelectionChanged == nil {
 		return
 	}
+	g.OnSelectionChanged(g.selectedSourceRows())
+}
+
+// selectedSourceRows is the selection as source rows: the selected rows, or
+// in SelectionMultiCell the rows that hold a selected cell, each once.
+func (g *DataGrid) selectedSourceRows() []int {
+	if g.SelectionMode == SelectionMultiCell {
+		seen := map[int]bool{}
+		rows := []int{}
+		for c := range g.selectedCells {
+			if !seen[c.src] {
+				seen[c.src] = true
+				rows = append(rows, c.src)
+			}
+		}
+		sort.Ints(rows)
+		return rows
+	}
 	rows := make([]int, 0, len(g.selectedRows))
 	for r := range g.selectedRows {
 		rows = append(rows, r)
 	}
-	g.OnSelectionChanged(rows)
+	return rows
 }
 
 // SelectAll selects all currently-displayed rows (for multi-row mode), keyed by
@@ -2440,13 +2462,63 @@ func (g *DataGrid) SelectAll() {
 	g.Refresh()
 }
 
+// selCell is a cell of a SelectionMultiCell selection: its source row and
+// absolute display column.
+type selCell struct{ src, col int }
+
+// selectMultiCell applies a click on id, at source row src, to the
+// SelectionMultiCell selection (#1401): a plain click selects that cell alone,
+// Ctrl/Cmd toggles it and keeps the others, Shift selects the rectangle from
+// the anchor cell to it. The anchor moves on a plain or Ctrl click.
+func (g *DataGrid) selectMultiCell(id CellID, src int, mod event.KeyModifier) {
+	shift := mod&event.KeyModifierShift != 0
+	ctrl := mod&event.KeyModifierControl != 0 || mod&event.KeyModifierSuper != 0
+	switch {
+	case shift:
+		g.selectedCells = make(map[selCell]bool)
+		r0, r1 := min(g.anchorRow, id.Row), max(g.anchorRow, id.Row)
+		c0, c1 := min(g.anchorCol, id.Col), max(g.anchorCol, id.Col)
+		for r := r0; r <= r1; r++ {
+			s := g.sourceRow(r)
+			if s < 0 {
+				continue
+			}
+			for c := c0; c <= c1; c++ {
+				g.selectedCells[selCell{s, c}] = true
+			}
+		}
+	case ctrl:
+		if g.selectedCells == nil {
+			g.selectedCells = make(map[selCell]bool)
+		}
+		if k := (selCell{src, id.Col}); g.selectedCells[k] {
+			delete(g.selectedCells, k)
+		} else if src >= 0 {
+			g.selectedCells[k] = true
+		}
+		g.anchorRow, g.anchorCol = id.Row, id.Col
+	default:
+		g.selectedCells = make(map[selCell]bool)
+		if src >= 0 {
+			g.selectedCells[selCell{src, id.Col}] = true
+		}
+		g.anchorRow, g.anchorCol = id.Row, id.Col
+	}
+}
+
 // isCellSelected reports whether the given DISPLAY cell is selected. It resolves
 // the display row to its source identity before checking the (source-keyed)
 // selection state, so highlights track the underlying data across re-sort.
+// col is the absolute display column, pinned-left columns first.
 func (g *DataGrid) isCellSelected(row, col int) bool {
 	src := g.sourceRow(row)
 	if src < 0 {
 		return false
+	}
+	if g.SelectionMode == SelectionMultiCell {
+		// The selected cells only: the cursor cell is not one after a
+		// Ctrl/Cmd click took it out.
+		return g.selectedCells[selCell{src, col}]
 	}
 	if g.selectedRows[src] {
 		return true

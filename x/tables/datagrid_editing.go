@@ -399,6 +399,10 @@ func (g *DataGrid) CanRedo() bool { return g.undoPos < len(g.undoStack) }
 
 // copySelection copies the selected cells' values to the system clipboard.
 func (g *DataGrid) copySelection() {
+	if g.SelectionMode == SelectionMultiCell {
+		g.copySelectedCells()
+		return
+	}
 	if len(g.selectedRows) == 0 && g.selCellRow < 0 {
 		return
 	}
@@ -516,3 +520,56 @@ func (g *DataGrid) pasteToSelection() {
 
 // Ensure CellRendererFactory conformance for editor-related renderers.
 var _ cell.RendererFactory = (*cell.TextRenderer)(nil)
+
+// copySelectedCells copies a SelectionMultiCell selection (#1401): a line per
+// row that holds a selected cell, in the order the rows are shown, with that
+// row's selected cells tab-separated in column order. A row filtered out of
+// view is left out.
+func (g *DataGrid) copySelectedCells() {
+	if len(g.selectedCells) == 0 {
+		return
+	}
+	idx := g.pipe.Index()
+	byRow := map[int][]int{} // display row -> absolute columns
+	for c := range g.selectedCells {
+		if d := idx.DisplayRow(c.src); d >= 0 {
+			byRow[d] = append(byRow[d], c.col)
+		}
+	}
+	rows := make([]int, 0, len(byRow))
+	for d := range byRow {
+		rows = append(rows, d)
+	}
+	sort.Ints(rows)
+
+	var sb strings.Builder
+	for ri, row := range rows {
+		if ri > 0 {
+			sb.WriteByte('\n')
+		}
+		rowData := g.pipe.DisplayRow(row)
+		cols := byRow[row]
+		sort.Ints(cols)
+		for ci, col := range cols {
+			if ci > 0 {
+				sb.WriteByte('\t')
+			}
+			rc := g.visibleCol(col)
+			if rc == nil || rowData == nil {
+				continue
+			}
+			var value any
+			if rc.def.ValueGetter != nil {
+				value = rc.def.ValueGetter(rowData)
+			} else {
+				value = defaultFieldAccess(rowData, rc.def.Field)
+			}
+			if rc.def.ValueFormatter != nil {
+				sb.WriteString(rc.def.ValueFormatter(value))
+			} else {
+				sb.WriteString(fmt.Sprint(value))
+			}
+		}
+	}
+	bellui.CurrentApp().Clipboard().SetContent(sb.String())
+}

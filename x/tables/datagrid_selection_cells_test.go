@@ -6,8 +6,10 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
+	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/test"
 
@@ -94,4 +96,69 @@ func TestDataGrid_HoveredCellDrawnInItsColumn(t *testing.T) {
 	g.hoveredCell = &CellID{Row: 2, Col: 0} // "p", pinned left
 	g.Refresh()
 	assert.Equal(t, []string{"p:2"}, selectedDrawn(hov))
+}
+
+// SelectionMultiCell, as a mouse click applies it (#1401): a plain click
+// selects one cell, Ctrl/Cmd-click toggles one and keeps the others,
+// Shift-click selects the rectangle from the last clicked cell. Only the
+// selected cells are drawn selected, not their rows.
+func TestDataGrid_MultiCellSelection(t *testing.T) {
+	g, sel := spyGrid(t, SelectionMultiCell)
+	var reported []int
+	fired := 0
+	g.OnSelectionChanged = func(rows []int) { reported = rows; fired++ }
+	click := func(row, col int, mod event.KeyModifier) {
+		g.selectCellWithModifiers(CellID{Row: row, Col: col}, mod)
+		g.Refresh()
+	}
+	ctrl, cmd, shift := event.KeyModifierControl, event.KeyModifierSuper, event.KeyModifierShift
+
+	click(1, 1, 0) // "a" row 1
+	assert.Equal(t, []string{"a:1"}, selectedDrawn(sel), "one cell, not its row")
+	assert.Equal(t, []CellID{{Row: 1, Col: 1}}, g.API().SelectedCells())
+	assert.Equal(t, []int{1}, reported)
+
+	click(3, 2, ctrl) // add "b" row 3
+	click(0, 0, cmd)  // add pinned "p" row 0, with Cmd
+	assert.Equal(t, []string{"a:1", "b:3", "p:0"}, selectedDrawn(sel))
+	assert.Equal(t, []CellID{{Row: 0, Col: 0}, {Row: 1, Col: 1}, {Row: 3, Col: 2}}, g.API().SelectedCells())
+	assert.Equal(t, []int{0, 1, 3}, reported)
+	assert.Empty(t, g.API().GetSelectedRows(), "cells are selected, not rows")
+
+	click(3, 2, ctrl) // take "b" row 3 out again
+	assert.Equal(t, []string{"a:1", "p:0"}, selectedDrawn(sel))
+	assert.False(t, g.IsSelected(3, 2), "the cursor cell a Ctrl-click took out is not selected")
+	assert.True(t, g.IsSelected(1, 1), "a screen reader hears each selected cell")
+
+	click(1, 1, 0)     // anchor at "a" row 1
+	click(2, 2, shift) // rectangle to "b" row 2
+	assert.Equal(t, []string{"a:1", "a:2", "b:1", "b:2"}, selectedDrawn(sel))
+	assert.Equal(t, 6, fired, "each click reports")
+
+	click(0, 0, 0) // a plain click starts over
+	assert.Equal(t, []string{"p:0"}, selectedDrawn(sel))
+
+	g.API().DeselectAll()
+	assert.Empty(t, selectedDrawn(sel))
+	assert.Empty(t, g.API().SelectedCells())
+}
+
+// The selection is kept by source row, so a sort moves it with its data, and
+// copy puts the selected cells on the clipboard, a line per row in the order
+// shown, tab-separated by column.
+func TestDataGrid_MultiCellSurvivesSortAndCopies(t *testing.T) {
+	g, sel := spyGrid(t, SelectionMultiCell)
+	g.selectCellWithModifiers(CellID{Row: 0, Col: 1}, 0)                        // "a" of row0
+	g.selectCellWithModifiers(CellID{Row: 2, Col: 2}, event.KeyModifierControl) // "b" of row2
+	g.selectCellWithModifiers(CellID{Row: 2, Col: 0}, event.KeyModifierControl) // "p" of row2
+
+	g.copySelection()
+	assert.Equal(t, "row0\nrow2\trow2", bellui.CurrentApp().Clipboard().Content())
+
+	g.API().SetSort(SortItem{ColID: "a", Direction: SortDescending}) // row3, row2, row1, row0
+	g.Refresh()
+	assert.Equal(t, []string{"a:3", "b:1", "p:1"}, selectedDrawn(sel), "the cells move with their rows")
+	assert.Equal(t, []CellID{{Row: 0, Col: 1}, {Row: 2, Col: 0}, {Row: 2, Col: 2}}, g.API().SelectedCells(), "source rows")
+	g.copySelection()
+	assert.Equal(t, "row2\trow2\nrow0", bellui.CurrentApp().Clipboard().Content(), "rows in the order shown")
 }
