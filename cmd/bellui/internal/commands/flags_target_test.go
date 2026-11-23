@@ -83,3 +83,31 @@ func TestTargetFlag_Usage(t *testing.T) {
 		})
 	}
 }
+
+// Each command's --app-id usage names only targets that command takes:
+// install's used to offer darwin and windows (#1390).
+func TestAppIDFlag_Usage(t *testing.T) {
+	for _, c := range []struct {
+		cmd  *cli.Command
+		want string
+	}{
+		{Package(), appIDUsagePackage},
+		{Release(), appIDUsagePackage},
+		{Install(), appIDUsageInstall},
+		{Init(), appIDUsageInit},
+	} {
+		t.Run(c.cmd.Name, func(t *testing.T) {
+			var f *cli.StringFlag
+			for _, fl := range c.cmd.Flags {
+				if sf, ok := fl.(*cli.StringFlag); ok && sf.Name == "app-id" {
+					f = sf
+				}
+			}
+			require.NotNil(t, f, "no --app-id flag")
+			assert.Equal(t, c.want, f.Usage)
+			assert.Equal(t, []string{"id", "appID"}, f.Aliases, "the aliases stay")
+		})
+	}
+	assert.NotContains(t, appIDUsageInstall, "darwin")
+	assert.NotContains(t, appIDUsageInstall, "windows")
+}

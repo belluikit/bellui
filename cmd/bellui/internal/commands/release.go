@@ -48,7 +48,7 @@ func Release() *cli.Command {
 			stringFlags["app-version"](&r.AppVersion),
 			intFlags["app-build"](&r.AppBuild),
 			intFlags["android-min-sdk"](&r.androidMinSDK),
-			stringFlags["app-id"](&r.AppID),
+			appIDFlag(&r.AppID, appIDUsagePackage),
 			stringFlags["certificate"](&r.certificate),
 			stringFlags["profile"](&r.profile),
 			stringFlags["developer"](&r.developer),

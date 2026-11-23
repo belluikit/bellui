@@ -60,7 +60,7 @@ func Package() *cli.Command {
 			stringFlags["src"](&p.srcDir),
 			stringFlags["icon"](&p.icon),
 			boolFlags["use-raw-icon"](&p.rawIcon),
-			stringFlags["app-id"](&p.AppID),
+			appIDFlag(&p.AppID, appIDUsagePackage),
 			stringFlags["certificate"](&p.certificate),
 			stringFlags["profile"](&p.profile),
 			boolFlags["release"](&p.release),

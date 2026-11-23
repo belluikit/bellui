@@ -41,7 +41,7 @@ func Install() *cli.Command {
 			stringFlags["dst"](&i.installDir),
 			stringFlags["icon"](&i.icon),
 			boolFlags["use-raw-icon"](&i.rawIcon),
-			stringFlags["app-id"](&i.AppID),
+			appIDFlag(&i.AppID, appIDUsageInstall),
 			boolFlags["release"](&i.release),
 			stringFlags["tags"](&i.tags),
 			boolFlags["verbose"](&i.verbose),

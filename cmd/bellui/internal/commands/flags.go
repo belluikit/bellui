@@ -42,14 +42,6 @@ func (k *keyValueFlag) String() string {
 }
 
 var stringFlags = map[string]func(*string) cli.Flag{
-	"app-id": func(dst *string) cli.Flag {
-		return &cli.StringFlag{
-			Name:        "app-id",
-			Aliases:     []string{"id", "appID"},
-			Usage:       "set app-id in reversed domain notation for android, darwin, and windows targets, or a valid provisioning profile for ios",
-			Destination: dst,
-		}
-	},
 	"app-version": func(dst *string) cli.Flag {
 		return &cli.StringFlag{
 			Name:        "app-version",
@@ -186,6 +178,26 @@ var stringFlags = map[string]func(*string) cli.Flag{
 			Destination: dst,
 		}
 	},
+}
+
+// The --app-id usage of each command that takes one. The commands use the id
+// for different targets, so one shared text named targets a command refuses:
+// install's said darwin and windows (#1390).
+const (
+	appIDUsagePackage = "set app-id in reversed domain notation for android, darwin, and windows targets, or a valid provisioning profile for ios"
+	appIDUsageInstall = "set app-id in reversed domain notation for android and iossimulator targets, or a valid provisioning profile for ios"
+	appIDUsageInit    = "set app-id in reversed domain notation, written to manifest.pxf (default: made from the module path)"
+)
+
+// appIDFlag is a command's --app-id flag (aliases --id and --appID), with
+// that command's usage.
+func appIDFlag(dst *string, usage string) cli.Flag {
+	return &cli.StringFlag{
+		Name:        "app-id",
+		Aliases:     []string{"id", "appID"},
+		Usage:       usage,
+		Destination: dst,
+	}
 }
 
 // targetFlag is a command's --target (alias --os) flag. Its usage lists the
