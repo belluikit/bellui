@@ -27,7 +27,7 @@ func Init() *cli.Command {
 		Description: "Initializes a new Bellui project in the current directory, including\n" +
 			"a go.mod, main.go, and manifest.pxf file (unless existing).",
 		Flags: []cli.Flag{
-			stringFlags["app-id"](nil),
+			appIDFlag(nil, appIDUsageInit),
 			stringFlags["name"](nil),
 			stringFlags["icon"](nil),
 			boolFlags["verbose"](nil),
