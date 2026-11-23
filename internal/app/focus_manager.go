@@ -28,8 +28,8 @@ func NewFocusManager(c core.CanvasObject) *FocusManager {
 // Focus focuses the given obj.
 func (f *FocusManager) Focus(obj event.Focusable) bool {
 	if obj != nil {
-		var hiddenAncestor core.CanvasObject
-		hidden := false
+		var hiddenAncestor, disabledAncestor core.CanvasObject
+		hidden, insideDisabled := false, false
 		found := driver.WalkCompleteObjectTree(
 			f.content,
 			func(object core.CanvasObject, _, _ geo.Position, _ geo.Size) bool {
@@ -38,13 +38,22 @@ func (f *FocusManager) Focus(obj event.Focusable) bool {
 				}
 				if object == obj.(core.CanvasObject) {
 					hidden = hiddenAncestor != nil
+					insideDisabled = disabledAncestor != nil
 					return true
+				}
+				if disabledAncestor == nil {
+					if d, ok := object.(core.Disableable); ok && d.Disabled() {
+						disabledAncestor = object
+					}
 				}
 				return false
 			},
 			func(object core.CanvasObject, pos geo.Position, _ core.CanvasObject) {
 				if hiddenAncestor == object {
 					hiddenAncestor = nil
+				}
+				if disabledAncestor == object {
+					disabledAncestor = nil
 				}
 			},
 		)
@@ -54,12 +63,19 @@ func (f *FocusManager) Focus(obj event.Focusable) bool {
 		if hidden {
 			return true
 		}
+		if insideDisabled && !selectableWhenDisabled(obj) {
+			// Inside a disabled widget nothing takes the focus, like the
+			// controls of HTML's <fieldset disabled>, whether or not it can be
+			// disabled itself (#1288). A widget whose text stays selectable
+			// while disabled may still take the focus a selection needs.
+			return true
+		}
 		if dis, ok := obj.(core.Disableable); ok && dis.Disabled() {
 			// A disabled widget takes no focus, from a click, code or assistive
 			// tech, unless its text stays selectable while disabled (#1251).
 			// It used to be enough to have SelectedText, which let a disabled
 			// RichEntry or code editor be focused from code.
-			if s, ok := obj.(core.SelectableWhenDisabled); !ok || !s.SelectableWhenDisabled() {
+			if !selectableWhenDisabled(obj) {
 				return true
 			}
 			// On mobile a disabled text *input* must not take focus (it would
@@ -75,6 +91,13 @@ func (f *FocusManager) Focus(obj event.Focusable) bool {
 	}
 	f.focus(obj)
 	return true
+}
+
+// selectableWhenDisabled reports whether obj keeps its text selectable while
+// disabled, and so may take the focus a selection needs (#1251).
+func selectableWhenDisabled(obj event.Focusable) bool {
+	s, ok := obj.(core.SelectableWhenDisabled)
+	return ok && s.SelectableWhenDisabled()
 }
 
 // Focused returns the currently focused object or nil if none.
@@ -226,8 +249,18 @@ func (f *FocusManager) focusOrder() []focusEntry {
 	}
 	root := &focusBlock{dir: rootDir}
 	blocks := []*focusBlock{root}
+	// Tab skips a disabled widget and everything inside it, as the controls
+	// of HTML's <fieldset disabled>: a focusable that cannot be disabled
+	// itself (a Hyperlink) is not reached inside a disabled container either
+	// (#1288). The walk has no way to skip a subtree, so it notes the
+	// disabled widget and ignores what it meets until it leaves it.
+	var disabledAncestor core.CanvasObject
 	driver.WalkVisibleObjectTree(f.content, func(obj core.CanvasObject, pos geo.Position, _ geo.Position, _ geo.Size) bool {
+		if disabledAncestor != nil {
+			return false
+		}
 		if w, ok := obj.(core.Disableable); ok && w.Disabled() {
+			disabledAncestor = obj
 			return false // disabled widget cannot receive focus
 		}
 		top := blocks[len(blocks)-1]
@@ -245,6 +278,9 @@ func (f *FocusManager) focusOrder() []focusEntry {
 		}
 		return false
 	}, func(obj core.CanvasObject, _ geo.Position, _ core.CanvasObject) {
+		if disabledAncestor == obj {
+			disabledAncestor = nil
+		}
 		if len(blocks) > 1 && blocks[len(blocks)-1].obj == obj {
 			blocks = blocks[:len(blocks)-1]
 		}
