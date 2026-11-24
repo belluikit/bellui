@@ -20,12 +20,19 @@ import (
 var (
 	// RichTextStyleBlockquote represents a quote presented in an indented block.
 	//
+	// The preset carries an unexported mark that makes a run part of a
+	// blockquote, so a copy of it stays a blockquote whatever fields are
+	// changed: made bold, inline, aligned or recoloured. A style written out
+	// field by field with the same values is not a blockquote. The Markdown and
+	// HTML parsers set the mark on every run they put in a quote.
+	//
 	// Since: 1.0
 	RichTextStyleBlockquote = RichTextStyle{
-		ColorName: theme.ColorNameOnSurfaceVariant,
-		Inline:    false,
-		SizeName:  theme.SizeNameBodyMedium,
-		TextStyle: bellui.TextStyle{Italic: true},
+		ColorName:  theme.ColorNameOnSurfaceVariant,
+		Inline:     false,
+		SizeName:   theme.SizeNameBodyMedium,
+		TextStyle:  bellui.TextStyle{Italic: true},
+		blockquote: true,
 	}
 	// RichTextStyleCodeBlock represents a code block segment.
 	//
@@ -929,16 +936,68 @@ type RichTextStyle struct {
 
 	// an internal detail where we obscure password fields
 	concealed bool
+
+	// blockquote marks a run as part of a blockquote, which is drawn and
+	// wrapped indented. RichTextStyleBlockquote carries it, and the parsers
+	// set it on every run inside a quote (markBlockquote).
+	blockquote bool
 }
 
-// isBlockquote reports whether this style is the blockquote preset, ignoring any
-// per-segment FontSource. FontSource (pre-rebrand tracker #494) composes with any preset, so a
-// blockquote that also carries a custom font must still be laid out as a
-// blockquote (indented) rather than falling back to a plain paragraph — a whole
-// struct comparison against RichTextStyleBlockquote would miss it.
+// isBlockquote reports whether this style is part of a blockquote. It reads
+// the mark, not the style's look: comparing with RichTextStyleBlockquote made
+// a quote's bold or italic run, or the preset with any field changed, a plain
+// paragraph, and a row starting with one lost its indent (#1443).
 func (s RichTextStyle) isBlockquote() bool {
-	s.FontSource = nil
-	return s == RichTextStyleBlockquote
+	return s.blockquote
+}
+
+// markBlockquote marks each text segment and link of segs as part of a
+// blockquote.
+func markBlockquote(segs []RichTextSegment) {
+	for _, seg := range segs {
+		switch s := seg.(type) {
+		case *TextSegment:
+			s.Style.blockquote = true
+		case *HyperlinkSegment:
+			s.Style.blockquote = true
+		}
+	}
+}
+
+// inBlockquote reports whether seg is a run of a blockquote: a text segment
+// or a link whose style carries the mark. A row starting with one is drawn
+// and wrapped at the blockquote indent.
+func inBlockquote(seg RichTextSegment) bool {
+	switch s := seg.(type) {
+	case *TextSegment:
+		return s.Style.isBlockquote()
+	case *HyperlinkSegment:
+		return s.Style.isBlockquote()
+	}
+	return false
+}
+
+// endQuoteParagraph ends a quote's paragraph after segs: its last run becomes
+// a block run, so the text flows on one line up to there and the next
+// paragraph starts below. A quote's runs are inline, so emphasis or code in
+// the middle of a quote stays on its line. When the paragraph does not end in
+// a text run, a marked empty block run ends it.
+func endQuoteParagraph(segs []RichTextSegment) []RichTextSegment {
+	if len(segs) > 0 {
+		if text, ok := segs[len(segs)-1].(*TextSegment); ok {
+			text.Style.Inline = false
+			return segs
+		}
+	}
+	return append(segs, &TextSegment{Style: RichTextStyleBlockquote})
+}
+
+// quoteRunStyle is the style of a run of text inside a quote: the blockquote
+// preset, inline.
+func quoteRunStyle() RichTextStyle {
+	s := RichTextStyleBlockquote
+	s.Inline = true
+	return s
 }
 
 // RichTextSegment describes any element that can be rendered in a RichText widget.
