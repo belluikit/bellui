@@ -344,3 +344,42 @@ func TestRichTextStyle_BlockquoteMarkSurvivesCopies(t *testing.T) {
 	assert.False(t, lookAlike.isBlockquote(), "a style that only looks like the preset is not a blockquote")
 	assert.False(t, RichTextStyleParagraph.isBlockquote())
 }
+
+// A trailing or centred blockquote, possible now that a copy of the preset
+// with its alignment changed stays one, has its carets on its glyphs on the
+// dense and the lazy path (#1443, #1441). The caret offset centres a row in
+// the width left of the indent and then adds the indent, so it must match
+// where layout draws the row.
+func TestRichText_AlignedBlockquoteCaretsSitOnItsText(t *testing.T) {
+	test.NewTempApp(t)
+	for _, align := range []bellui.TextAlign{bellui.TextAlignLeading, bellui.TextAlignTrailing, bellui.TextAlignCenter} {
+		for _, virt := range []bool{false, true} {
+			where := fmt.Sprintf("align %v, lazy path %v", align, virt)
+			st := RichTextStyleBlockquote
+			st.Alignment = align
+			require.True(t, st.isBlockquote(), where)
+			rt := NewRichText(&TextSegment{Style: st, Text: "Hello"})
+			rt.Selectable = true
+			rt.Scroll = widget.ScrollVerticalOnly
+			rt.Virtualize = virt
+			w := test.NewWindow(rt)
+			w.Resize(geo.NewSize(300, 120))
+			require.Equal(t, virt, rt.lazy, where)
+
+			texts := rowTexts(t, rt)
+			require.Len(t, texts, 1, where)
+			if align == bellui.TextAlignLeading {
+				pad := rt.Theme().Size(theme.SizeNameInnerPadding)
+				assert.InDelta(t, pad+blockquoteIndent(rt.Theme()), texts[0].Position().X, 0.01, "%s: drawn at the indent", where)
+			}
+			pad := rt.Theme().Size(theme.SizeNameInnerPadding)
+			size := rt.Theme().Size(theme.SizeNameText)
+			for _, col := range []int{0, 5} {
+				caret := rt.lineSizeToColumn(col, 0, size, pad, true).Width + rt.selection.alignOffsetX(0)
+				want := texts[0].Position().X + bellui.MeasureText(texts[0].Text[:col], texts[0].TextSize, texts[0].TextStyle).Width
+				assert.InDelta(t, want, caret, 0.05, "%s: caret at column %d", where, col)
+			}
+			w.Close()
+		}
+	}
+}
