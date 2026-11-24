@@ -9,6 +9,7 @@ import (
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/test"
+	"github.com/belluikit/bellui/theme"
 )
 
 // A segment whose first row is narrowed with nothing before it, as a
@@ -37,6 +38,25 @@ func TestLineBounds_NarrowedFirstRowWithoutContentIsNotLeftEmpty(t *testing.T) {
 		after, _ := lineBoundsAfter(seg, c.wrap, bellui.TextTruncateOff, c.firstWidth, maxSize, measurer, true)
 		require.Greater(t, len(after), 1, c.name)
 		assert.Equal(t, after[0].begin, after[0].end, "%s: after earlier content the segment starts on the next row", c.name)
+	}
+}
+
+// The windowed block build (shapeBlock, for long documents) wraps a
+// blockquote's first row the same way: never empty (#1435).
+func TestRichText_ShapeBlockBlockquoteFirstRowNeverEmpty(t *testing.T) {
+	test.NewTempApp(t)
+	for _, wrap := range []bellui.TextWrap{bellui.TextWrapWord, bellui.TextWrapBreak} {
+		for _, text := range []string{"Supercalifragilisticexpialidocious is a word", "W"} {
+			rt := NewRichText()
+			rt.Wrapping = wrap
+			segs := []RichTextSegment{&TextSegment{Style: RichTextStyleBlockquote, Text: text}}
+			innerPad := rt.Theme().Size(theme.SizeNameInnerPadding)
+			for width := float32(2); width <= 400; width++ {
+				bounds := rt.shapeBlock(segs, width, innerPad)
+				require.NotEmpty(t, bounds)
+				assert.Greater(t, bounds[0].end, bounds[0].begin, "wrap %v, %q at width %v", wrap, text, width)
+			}
+		}
 	}
 }
 
