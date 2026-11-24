@@ -29,6 +29,14 @@ func (t *ToolbarAction) ToolbarObject() core.CanvasObject {
 	t.button.Icon = t.Icon
 	t.button.OnTapped = t.OnActivated
 
+	return t.btn()
+}
+
+// btn returns the button, extended first: it is held by value, and SetIcon or
+// Disable called before the toolbar renders would otherwise log the
+// ExtendBaseWidget warning (#1425).
+func (t *ToolbarAction) btn() *Button {
+	t.button.ExtendBaseWidget(&t.button)
 	return &t.button
 }
 
@@ -37,28 +45,28 @@ func (t *ToolbarAction) ToolbarObject() core.CanvasObject {
 // Since: 1.0
 func (t *ToolbarAction) SetIcon(icon bellui.Resource) {
 	t.Icon = icon
-	t.button.SetIcon(t.Icon)
+	t.btn().SetIcon(t.Icon)
 }
 
 // Enable this ToolbarAction, updating any style or features appropriately.
 //
 // Since: 1.0
 func (t *ToolbarAction) Enable() {
-	t.button.Enable()
+	t.btn().Enable()
 }
 
 // Disable this ToolbarAction so that it cannot be interacted with, updating any style appropriately.
 //
 // Since: 1.0
 func (t *ToolbarAction) Disable() {
-	t.button.Disable()
+	t.btn().Disable()
 }
 
 // Disabled returns true if this ToolbarAction is currently disabled or false if it can currently be interacted with.
 //
 // Since: 1.0
 func (t *ToolbarAction) Disabled() bool {
-	return t.button.Disabled()
+	return t.btn().Disabled()
 }
 
 // NewToolbarAction returns a new push button style ToolbarItem

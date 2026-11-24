@@ -90,9 +90,9 @@ func assertNoExtendWarning(t *testing.T, f func()) {
 	}
 }
 
-// TwoStateToolbarAction holds its button by value; a method called on it
+// The toolbar actions hold their button by value; a method called on it
 // before it was extended logged the warning (#1425).
-func TestTwoStateToolbarAction_NoExtendBaseWidgetWarning(t *testing.T) {
+func TestToolbarActions_NoExtendBaseWidgetWarning(t *testing.T) {
 	test.NewTempApp(t)
 	t.Run("NewTwoStateToolbarAction", func(t *testing.T) {
 		assertNoExtendWarning(t, func() {
@@ -104,12 +104,24 @@ func TestTwoStateToolbarAction_NoExtendBaseWidgetWarning(t *testing.T) {
 			(&TwoStateToolbarAction{}).SetOn(true)
 		})
 	})
+	t.Run("ToolbarAction Disable before render", func(t *testing.T) {
+		assertNoExtendWarning(t, func() {
+			NewToolbarAction(theme.HomeIcon(), nil).Disable()
+		})
+	})
+	t.Run("ToolbarAction SetIcon before render", func(t *testing.T) {
+		assertNoExtendWarning(t, func() {
+			NewToolbarAction(theme.HomeIcon(), nil).SetIcon(theme.MenuIcon())
+		})
+	})
 	t.Run("shown in a toolbar", func(t *testing.T) {
 		assertNoExtendWarning(t, func() {
+			act := NewToolbarAction(theme.HomeIcon(), nil)
 			two := NewTwoStateToolbarAction(theme.MediaPlayIcon(), theme.MediaPauseIcon(), nil)
-			w := test.NewWindow(NewToolbar(two))
+			w := test.NewWindow(NewToolbar(act, two))
 			defer w.Close()
 			two.SetOn(true)
+			act.Disable()
 		})
 	})
 }
