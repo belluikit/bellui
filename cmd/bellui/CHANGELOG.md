@@ -17,6 +17,22 @@ one per change, so that open pull requests do not conflict here. Run
 `go run ./hack/changelog preview -C cmd/bellui` to see them assembled; the release folds them
 into a section below.
 
+## v1.3.0 — 2026-11-24
+
+Cut with toolkit v1.3.0. `bellui install --help` describes `--app-id` for
+the targets `install` takes. Built against bellui v1.3.0.
+
+### Fixed
+
+* **`bellui install --help` describes `--app-id` for the targets it takes**
+  ([#1390](https://github.com/belluikit/bellui/issues/1390)). `install`
+  shared `package`'s text, which says the id is in reversed domain notation
+  for android, darwin and windows targets, but `install` takes neither darwin
+  nor windows. Its help now names android and iossimulator for the reversed
+  domain id, and ios for a provisioning profile. `init`'s help says the id is
+  written to `manifest.pxf` and made from the module path when not given.
+  `package` and `release` are unchanged.
+
 ## v1.3.0-rc.5 — 2026-11-23
 
 Cut with toolkit v1.3.0-rc.5. `--help` names the targets each command
