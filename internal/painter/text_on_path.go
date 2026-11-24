@@ -179,11 +179,9 @@ func DrawTextOnPath(top *canvas.TextOnPath, scale float32) *image.NRGBA {
 		tmp := image.NewNRGBA(image.Rect(0, 0, glyphW, glyphH))
 
 		baseline := int(math.Ceil(float64(g.ascent)))
-		if g.run.Glyphs[0].GlyphID == 0 {
-			r.DrawStringAt(string([]rune{0xfffd}), tmp, 0, baseline, face.Fonts.ResolveFace(0xfffd))
-		} else {
-			r.DrawShapedRunAt(g.run, tmp, 0, baseline)
-		}
+		// A missing glyph is drawn as its face's .notdef, which fits the
+		// advance tmp is sized from (#1446).
+		r.DrawShapedRunAt(g.run, tmp, 0, baseline)
 
 		// Compute affine transform: rotate around glyph center, then translate to path position.
 		// Source glyph center in temp image coordinates.
