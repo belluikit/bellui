@@ -139,6 +139,11 @@ type Entry struct {
 	validationStatus    *validationStatus
 	onValidationChanged func(error)
 	validationError     error
+	// onTextChecked runs wherever the Validator would, after each text change,
+	// whether or not a validator is set: a hook for a widget built on Entry
+	// (SearchField), which must not claim the app's Validator to hear about
+	// changes (#1411). It can also run when the text did not change.
+	onTextChecked func()
 
 	// If true, the Validator runs automatically on render without user interaction.
 	// It will reflect any validation errors found or those explicitly set via SetValidationError().

@@ -47,6 +47,9 @@ func (e *Entry) Validate() error {
 
 // validate works like Validate but only updates the internal state and does not refresh.
 func (e *Entry) validate() {
+	if e.onTextChecked != nil {
+		e.onTextChecked()
+	}
 	if !e.hasValidator() {
 		return
 	}
