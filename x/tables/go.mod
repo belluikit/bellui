@@ -3,7 +3,7 @@ module github.com/belluikit/bellui/x/tables
 go 1.26.2
 
 require (
-	github.com/belluikit/bellui v1.3.0-rc.5
+	github.com/belluikit/bellui v1.3.0
 	github.com/stretchr/testify v1.12.1
 )
 
