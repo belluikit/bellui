@@ -3533,6 +3533,15 @@ func float32ToFixed266(f float32) fixed.Int26_6 {
 // It will return a slice containing the boundary metadata of each line with the given wrapping applied and the
 // total height required to render the boundaries at the given width/height constraints
 func lineBounds(seg *TextSegment, wrap bellui.TextWrap, trunc bellui.TextTruncation, firstWidth float32, max geo.Size, measurer func([]rune) geo.Size) ([]rowBoundary, float32) {
+	return lineBoundsAfter(seg, wrap, trunc, firstWidth, max, measurer, firstWidth < max.Width)
+}
+
+// lineBoundsAfter is lineBounds told whether the segment's first row already
+// holds earlier content (continues): only then may that row be left empty, the
+// segment starting on the next row. A first row narrowed for another reason, a
+// blockquote's left padding, has nothing before it, so it keeps what fits
+// (#1435). lineBounds guesses continues from a narrowed firstWidth.
+func lineBoundsAfter(seg *TextSegment, wrap bellui.TextWrap, trunc bellui.TextTruncation, firstWidth float32, max geo.Size, measurer func([]rune) geo.Size, continues bool) ([]rowBoundary, float32) {
 	lines := splitLines(seg)
 
 	if wrap == bellui.TextWrap(bellui.TextTruncateClip) {
@@ -3548,7 +3557,7 @@ func lineBounds(seg *TextSegment, wrap bellui.TextWrap, trunc bellui.TextTruncat
 
 	measureWidth := float32(math.Min(float64(firstWidth), float64(max.Width)))
 	text := []rune(seg.Text)
-	st := lineWrapState{measureWidth: measureWidth}
+	st := lineWrapState{measureWidth: measureWidth, continues: continues}
 	// The checker must read the live st.measureWidth: after the first row the
 	// wrap width resets from firstWidth (the leftover after preceding inline
 	// segments) to the full max.Width, and a checker frozen at the narrow first
@@ -3597,6 +3606,16 @@ type lineWrapState struct {
 	reuse        int
 	measureWidth float32
 	yPos         float32
+	// continues: the first row already holds earlier segments' content, so
+	// it may be left empty to start this segment on the next row.
+	continues bool
+}
+
+// mayLeaveRowEmpty reports whether the row being filled may be closed with
+// nothing of this segment on it: only the first row, narrowed by what an
+// earlier segment left, and only when that earlier content is there (#1435).
+func (st *lineWrapState) mayLeaveRowEmpty(max geo.Size) bool {
+	return st.continues && st.measureWidth < max.Width
 }
 
 // lineBoundsBreak handles bellui.TextWrapBreak wrapping for a single logical line.
@@ -3620,7 +3639,7 @@ func lineBoundsBreak(seg *TextSegment, text []rune, low, high, lineEnd int, trun
 		} else {
 			newHigh := binarySearch(widthChecker, low, high)
 			if newHigh <= low {
-				if st.measureWidth < max.Width {
+				if st.mayLeaveRowEmpty(max) {
 					// Wrap to next line at full width instead of 1-char lines.
 					st.bounds = append(st.bounds, rowBoundary{[]RichTextSegment{seg}, st.reuse, low, low, false})
 					st.reuse++
@@ -3673,7 +3692,7 @@ func lineBoundsWord(seg *TextSegment, text []rune, low, high, lineEnd int, trunc
 
 			noSpace := false
 			if fallback < 1 { // even a character won't fit
-				if st.measureWidth < max.Width {
+				if st.mayLeaveRowEmpty(max) {
 					// Character doesn't fit in remaining first-line width but
 					// would fit at full width. Wrap to next line instead of
 					// placing one char per line.
@@ -3757,9 +3776,10 @@ func lineBoundsWord(seg *TextSegment, text []rune, low, high, lineEnd int, trunc
 			// has only the leftover width. A word that does not fit there moves
 			// whole to the next row, as it would in one segment, instead of
 			// being cut where the leftover ends (#1423).
-			wordToNextRow := noSpace && st.measureWidth < max.Width && splitsWord(sub, high-low) &&
+			wordToNextRow := noSpace && st.mayLeaveRowEmpty(max) && splitsWord(sub, high-low) &&
 				measurer(sub[:firstBreakableSpace(sub)]).Width <= max.Width
-			if noSpace && high == fallback && subWidth <= max.Width || wordToNextRow { // add a newline as there is more space on next
+			restToNextRow := noSpace && st.continues && high == fallback && subWidth <= max.Width
+			if restToNextRow || wordToNextRow { // add a newline as there is more space on next
 				st.bounds = append(st.bounds, rowBoundary{[]RichTextSegment{seg}, st.reuse, low, low, false})
 				st.reuse++
 				high = oldHigh

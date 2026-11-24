@@ -183,10 +183,10 @@ func (c *denseBuildCtx) iterate(segList []RichTextSegment, cps []denseCheckpoint
 		if textSeg.Style.isBlockquote() {
 			leftPad = c.innerPadding * 2
 		}
-		retBounds, height := lineBounds(textSeg, t.Wrapping, t.Truncation, c.wrapWidth-leftPad, geo.NewSize(c.maxWidth, c.fitSize.Height), func(text []rune) geo.Size {
+		retBounds, height := lineBoundsAfter(textSeg, t.Wrapping, t.Truncation, c.wrapWidth-leftPad, geo.NewSize(c.maxWidth, c.fitSize.Height), func(text []rune) geo.Size {
 			m, _ := bellui.MeasureTextFull(string(text), textSize, textStyle, textSource)
 			return m
-		})
+		}, c.open)
 		if c.open {
 			if len(retBounds) > 0 {
 				last := len(c.bounds) - 1

@@ -87,10 +87,10 @@ func (t *RichText) shapeBlock(segs []RichTextSegment, maxWidth, innerPadding flo
 		if textSeg.Style.isBlockquote() {
 			leftPad = innerPadding * 2
 		}
-		retBounds, _ := lineBounds(textSeg, t.Wrapping, bellui.TextTruncateOff, wrapWidth-leftPad, bigHeight, func(text []rune) geo.Size {
+		retBounds, _ := lineBoundsAfter(textSeg, t.Wrapping, bellui.TextTruncateOff, wrapWidth-leftPad, bigHeight, func(text []rune) geo.Size {
 			m, _ := bellui.MeasureTextFull(string(text), textSize, textStyle, textSource)
 			return m
-		})
+		}, currentBound != nil)
 		if currentBound != nil {
 			if len(retBounds) > 0 {
 				bounds[len(bounds)-1].end = retBounds[0].end
