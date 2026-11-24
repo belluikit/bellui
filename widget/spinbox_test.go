@@ -259,3 +259,130 @@ func TestSpinBox_FieldWidensWhenRangeChanges(t *testing.T) {
 	assert.Greater(t, s.MinSize().Width, narrow, "a wider Max widens the box after Refresh")
 	assertSpinBoxFieldFits(t, s, 10000000)
 }
+
+// newReportingSpinBox returns a shown spin box at value 3 of [0, 10] step 1,
+// and a pointer counting its OnChanged calls from here on.
+func newReportingSpinBox(t *testing.T) (*SpinBox, *int) {
+	t.Helper()
+	s := NewSpinBox(0, 10, 1)
+	test.NewTempWindow(t, s)
+	s.SetValue(3)
+	calls := 0
+	s.OnChanged = func(float64) { calls++ }
+	return s, &calls
+}
+
+func TestSpinBox_RefreshReformatsForNewStep(t *testing.T) {
+	s, calls := newReportingSpinBox(t)
+	assert.Equal(t, "3", s.entry.Text)
+
+	s.Step = 0.25
+	s.Refresh()
+	assert.Equal(t, "3.00", s.entry.Text, "the field shows the value formatted for the new step")
+	assert.Equal(t, 3.0, s.Value)
+	assert.Zero(t, *calls, "Refresh does not report")
+}
+
+func TestSpinBox_RefreshClampsToNewMaxSilently(t *testing.T) {
+	s, calls := newReportingSpinBox(t)
+
+	s.Max = 2
+	s.Refresh()
+	assert.Equal(t, 2.0, s.Value, "Value is clamped into the new range")
+	assert.Equal(t, "2", s.entry.Text)
+	assert.True(t, s.incBtn.Disabled(), "+ is disabled at the new Max")
+	assert.False(t, s.decBtn.Disabled())
+	assert.Zero(t, *calls, "a clamp by Refresh does not report")
+
+	s.Min = 2
+	s.Max = 20
+	s.Refresh()
+	assert.False(t, s.incBtn.Disabled(), "+ is enabled again below the new Max")
+	assert.True(t, s.decBtn.Disabled(), "- is disabled at the new Min")
+	assert.Zero(t, *calls)
+}
+
+func TestSpinBox_RefreshShowsValueFieldWrite(t *testing.T) {
+	s, calls := newReportingSpinBox(t)
+
+	s.Value = 7
+	s.Refresh()
+	assert.Equal(t, "7", s.entry.Text)
+	assert.False(t, s.incBtn.Disabled())
+	assert.False(t, s.decBtn.Disabled())
+
+	s.Value = 10
+	s.Refresh()
+	assert.Equal(t, "10", s.entry.Text)
+	assert.True(t, s.incBtn.Disabled(), "+ is disabled when a field write reaches Max")
+	assert.Zero(t, *calls)
+}
+
+func TestSpinBox_RefreshKeepsHalfTypedValue(t *testing.T) {
+	s := NewSpinBox(0, 10, 0.5)
+	w := test.NewTempWindow(t, s)
+	calls := 0
+	s.OnChanged = func(float64) { calls++ }
+
+	// The user clears the field and starts typing 2.5. Runes go straight to
+	// the entry: test.Type focuses it again on each call, which selects the
+	// text, so a second call would replace it.
+	w.Canvas().Focus(s.entry)
+	s.entry.SetText("")
+	s.entry.TypedRune('2')
+	s.entry.TypedRune('.')
+	assert.Equal(t, "2.", s.entry.Text)
+	assert.Equal(t, 2.0, s.Value)
+	typed := calls
+
+	// The app refreshes the box, say from an unrelated update, mid-typing.
+	s.Refresh()
+	assert.Equal(t, "2.", s.entry.Text, "a Refresh keeps text that still stands for Value")
+	assert.Equal(t, typed, calls)
+
+	s.entry.TypedRune('5')
+	assert.Equal(t, "2.5", s.entry.Text)
+	assert.Equal(t, 2.5, s.Value)
+
+	// Typed text that no longer stands for Value is replaced: here the app
+	// lowers Max below what was typed.
+	s.Max = 1
+	s.Refresh()
+	assert.Equal(t, 1.0, s.Value)
+	assert.Equal(t, "1.0", s.entry.Text)
+}
+
+func TestSpinBox_RefreshKeepsFirstDigitBelowMin(t *testing.T) {
+	s := NewSpinBox(5, 20, 1)
+	w := test.NewTempWindow(t, s)
+
+	// Typing 15 into [5, 20]: the "1" alone reads as 1, which parseAndUpdate
+	// clamps to 5. The text is still the user's first digit.
+	w.Canvas().Focus(s.entry)
+	s.entry.SetText("")
+	s.entry.TypedRune('1')
+	assert.Equal(t, 5.0, s.Value)
+
+	s.Refresh()
+	assert.Equal(t, "1", s.entry.Text, "a Refresh does not replace the first digit with Min")
+
+	s.entry.TypedRune('5')
+	assert.Equal(t, "15", s.entry.Text)
+	assert.Equal(t, 15.0, s.Value)
+
+	// A field write to Value while the user's text is in the field shows the
+	// written value.
+	s.Value = 8
+	s.Refresh()
+	assert.Equal(t, "8", s.entry.Text)
+}
+
+func TestSpinBox_RefreshBeforeRender(t *testing.T) {
+	s := &SpinBox{Min: 0, Max: 10, Step: 1, Value: 42}
+	assert.NotPanics(t, s.Refresh, "no entry yet")
+
+	test.NewTempWindow(t, s)
+	assert.Equal(t, 10.0, s.Value, "the first render clamps a literal's Value")
+	assert.Equal(t, "10", s.entry.Text)
+	assert.True(t, s.incBtn.Disabled())
+}

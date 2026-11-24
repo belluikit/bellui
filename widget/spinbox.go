@@ -23,6 +23,15 @@ var (
 
 // SpinBox is a numeric input with increment and decrement buttons.
 //
+// Its number field is as wide as the wider of Min and Max as the box formats
+// them, so every value it can hold shows whole (#1420). A huge finite end
+// makes a correspondingly wide field; an end that is meant to be unbounded
+// should be math.Inf(-1) or math.Inf(1), which takes no width.
+//
+// After writing Value, Min, Max or Step directly, call Refresh: it clamps
+// Value into [Min, Max], shows it formatted for Step and updates the buttons,
+// without calling OnChanged (#1433). SetValue is the reporting setter.
+//
 // Since: 1.0
 type SpinBox struct {
 	DisableableWidget
@@ -43,6 +52,10 @@ type SpinBox struct {
 	decBtn       *Button
 	content      *bellui.Container
 	settingValue bool
+	// shownText is the entry text the box itself last wrote. Text that
+	// differs from it was typed by the user, and Refresh keeps it while it
+	// still stands for Value (#1433).
+	shownText string
 }
 
 // NewSpinBox creates a new spin box with the given range and step.
@@ -102,18 +115,65 @@ func (s *SpinBox) PerformAccessibleAction(name string) {
 
 // SetValue sets the spin box value, clamping to [Min, Max].
 func (s *SpinBox) SetValue(val float64) {
-	val = math.Max(s.Min, math.Min(s.Max, val))
+	val = s.clamp(val)
 	if val == s.Value {
 		return
 	}
 	s.Value = val
-	s.settingValue = true
-	s.entry.SetText(s.formatValue())
-	s.settingValue = false
+	s.showValue()
 	s.updateButtonState()
 	if f := s.OnChanged; f != nil {
 		f(s.Value)
 	}
+}
+
+// Refresh brings the box in line with its fields after they were written
+// directly: Value is clamped into [Min, Max], the field shows it formatted
+// for Step, and the buttons follow the range. It is silent: OnChanged is not
+// called, as a slider's Refresh clamps its value silently (#1433). Text the
+// user is typing is kept while it still stands for Value, so a Refresh in the
+// middle of typing "1.5" does not turn "1." into "1.00".
+func (s *SpinBox) Refresh() {
+	s.ExtendBaseWidget(s)
+	if s.entry != nil {
+		s.syncFields()
+	}
+	s.DisableableWidget.Refresh()
+}
+
+// syncFields clamps Value, re-shows it and updates the buttons, silently.
+func (s *SpinBox) syncFields() {
+	clamped := s.clamp(s.Value)
+	moved := clamped != s.Value
+	s.Value = clamped
+	if s.entry.Text != s.shownText && !moved {
+		// The user has typed since the box last wrote the field, and the
+		// range still holds Value: keep the text if it is what they typed
+		// for this value, read as parseAndUpdate reads it. A Value the new
+		// range moved is shown, since the typed text no longer stands for it.
+		if val, err := strconv.ParseFloat(s.entry.Text, 64); err == nil && s.clamp(val) == s.Value {
+			s.updateButtonState()
+			return
+		}
+	}
+	if s.entry.Text != s.formatValue() {
+		s.showValue()
+	}
+	s.updateButtonState()
+}
+
+// clamp limits v to [Min, Max].
+func (s *SpinBox) clamp(v float64) float64 {
+	return math.Max(s.Min, math.Min(s.Max, v))
+}
+
+// showValue writes the formatted Value into the field without reporting it.
+func (s *SpinBox) showValue() {
+	text := s.formatValue()
+	s.settingValue = true
+	s.entry.SetText(text)
+	s.settingValue = false
+	s.shownText = text
 }
 
 // FocusGained delegates focus to the internal entry.
@@ -168,6 +228,7 @@ func (s *SpinBox) CreateRenderer() core.WidgetRenderer {
 	if s.content == nil {
 		s.setupUI()
 	}
+	s.syncFields() // a literal, or fields written before the first render (#1433)
 	return NewSimpleRenderer(s.content)
 }
 
@@ -202,7 +263,7 @@ func (s *SpinBox) setupUI() {
 		}
 		return false
 	}
-	s.entry.SetText(s.formatValue())
+	s.showValue()
 
 	s.content = &bellui.Container{Layout: &spinBoxLayout{spin: s}, Objects: []core.CanvasObject{s.decBtn, s.entry, s.incBtn}}
 	s.updateButtonState()
@@ -292,8 +353,7 @@ func (s *SpinBox) parseAndUpdate(text string) {
 	if err != nil {
 		return
 	}
-	val = math.Max(s.Min, math.Min(s.Max, val))
-	s.Value = val
+	s.Value = s.clamp(val)
 	s.updateButtonState()
 	if f := s.OnChanged; f != nil {
 		f(s.Value)
