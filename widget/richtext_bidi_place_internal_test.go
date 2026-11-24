@@ -6,7 +6,6 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"unicode"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,7 +15,6 @@ import (
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/cache"
-	paint "github.com/belluikit/bellui/internal/painter"
 	"github.com/belluikit/bellui/test"
 	"github.com/belluikit/bellui/theme"
 )
@@ -67,38 +65,6 @@ func assertInkAligned(t *testing.T, want, got []bool, msg string) bool {
 		assert.Empty(t, stray, "%s: columns with ink in only one of the two", msg)
 }
 
-// hasGlyphs reports whether this build has a font that draws every letter of
-// s. A wasm build has no system fonts, so no Hebrew. There a missing letter is
-// drawn as U+FFFD, which is wider than the letter's advance: inside one text
-// object it spills over its neighbours, and at the edge of a split segment's
-// object it is clipped. So no ink comparison between the two can hold there,
-// while where each object is placed still can.
-func hasGlyphs(s string) bool {
-	fonts := paint.CachedFontFace(bellui.TextStyle{}, nil, nil).Fonts
-	for _, r := range s {
-		if !unicode.IsLetter(r) {
-			continue
-		}
-		f := fonts.ResolveFace(r)
-		if f == nil {
-			return false
-		}
-		if _, ok := f.NominalGlyph(r); !ok {
-			return false
-		}
-	}
-	return true
-}
-
-// skipWithoutGlyphs skips a test whose oracle is drawn ink when this build
-// has no font for s (hasGlyphs).
-func skipWithoutGlyphs(t *testing.T, s string) {
-	t.Helper()
-	if !hasGlyphs(s) {
-		t.Skipf("no font draws %q on this build, so the one-segment ink is no oracle (hasGlyphs)", s)
-	}
-}
-
 // A row of several segments holding right-to-left text is drawn in the row's
 // bidi visual order, as the same text in one segment is, in either window
 // direction and at every alignment (#1441). Drawn side by side, the segments
@@ -115,7 +81,6 @@ func skipWithoutGlyphs(t *testing.T, s string) {
 // logically (#341).
 func TestRichText_RTLSegmentsDrawnInVisualOrder(t *testing.T) {
 	test.NewTempApp(t)
-	skipWithoutGlyphs(t, "שלום")
 	defer bellui.SetLayoutDirection(bellui.DirectionAuto)
 	texts := []struct {
 		name  string
@@ -162,7 +127,6 @@ func TestRichText_RTLSegmentsDrawnInVisualOrder(t *testing.T) {
 // in logical order (#341), so the one-segment line is no oracle for it.
 func TestRichText_RTLSegmentsDrawnInVisualOrderWrapped(t *testing.T) {
 	test.NewTempApp(t)
-	skipWithoutGlyphs(t, "שלום")
 	defer bellui.SetLayoutDirection(bellui.DirectionAuto)
 	bellui.SetLayoutDirection(bellui.DirectionRTL)
 	parts := []string{"שלום עולם זה ", "טקסט ארוך מאוד", " שעובר לשורה הבאה בסוף"}
@@ -340,7 +304,6 @@ func BenchmarkRichTextRTLSegmentsResize(b *testing.B) {
 // direction it was computed in.
 func TestRichText_RTLSegmentsFollowADirectionChange(t *testing.T) {
 	test.NewTempApp(t)
-	skipWithoutGlyphs(t, "שלום")
 	defer bellui.SetLayoutDirection(bellui.DirectionAuto)
 	bellui.SetLayoutDirection(bellui.DirectionLTR)
 	parts := []string{"שלום עולם ", "זה טקסט"}

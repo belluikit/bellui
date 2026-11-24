@@ -293,13 +293,8 @@ func DrawString(dst draw.Image, s string, clr color.Color, f shaping.Fontmap, fo
 			y = lineBaseline(base, r.PixScale)
 		}
 		lastRun = run
-		if len(run.Glyphs) == 1 {
-			if run.Glyphs[0].GlyphID == 0 {
-				r.DrawStringAt(string([]rune{0xfffd}), dst, int(x), y, f.ResolveFace(0xfffd))
-				continue
-			}
-		}
-
+		// A missing glyph (GlyphID 0) is drawn too: it is its face's .notdef,
+		// usually a box, and fits the advance the line was measured with.
 		r.DrawShapedRunAt(run, dst, int(x), y)
 	}
 
@@ -439,9 +434,11 @@ func parseMeasureFont(content []byte) *font.Face {
 	return loaded
 }
 
-// MeasureString returns how far dot would advance by drawing s with f.
-// Tabs are translated into a dot location change.
-func MeasureString(f shaping.Fontmap, s string, textSize float32, style bellui.TextStyle) (size geo.Size, advance float32) {
+// MeasureString returns the size of s drawn on one line with f: its width is
+// how far dot advances, tabs included. base is the baseline's distance from
+// the top of the line, unscaled.
+func MeasureString(f shaping.Fontmap, s string, textSize float32, style bellui.TextStyle) (size geo.Size, base float32) {
+	var advance float32
 	return walkString(f, s, float32ToFixed266(textSize), style, &advance, 1, func(shaping.Output, float32) {})
 }
 
@@ -461,9 +458,11 @@ func MeasureStyledRuns(runs []canvas.TextRun, defaultSize float32) (size geo.Siz
 			sz = defaultSize
 		}
 		face := CachedFontFace(run.TextStyle, run.FontSource, nil)
-		s, adv := MeasureString(face.Fonts, run.Text, sz, run.TextStyle)
-		advances[i] = adv
-		totalWidth += adv
+		// The width, not MeasureString's second result, which is the
+		// baseline: the run's ascent was reported as its advance.
+		s, _ := MeasureString(face.Fonts, run.Text, sz, run.TextStyle)
+		advances[i] = s.Width
+		totalWidth += s.Width
 		if s.Height > maxHeight {
 			maxHeight = s.Height
 		}
@@ -536,7 +535,7 @@ func DrawStyledRuns(dst draw.Image, runs []canvas.TextRun, defaultColor color.Co
 		walkString(face.Fonts, string(g.runes), float32ToFixed266(g.size), g.style, &advance, scale,
 			func(out shaping.Output, runX float32) {
 				lastRun = out
-				drawColoredOutput(&r, out, dst, int(x+runX), y, g.colors, defaultColor, face.Fonts)
+				drawColoredOutput(&r, out, dst, int(x+runX), y, g.colors, defaultColor)
 			})
 
 		if g.style.Underline && y > 0 {
@@ -608,8 +607,8 @@ func groupStyledRunsForDraw(runs []canvas.TextRun, defaultColor color.Color, def
 // joined run assembled from several differently-coloured TextRuns renders each
 // part in its own colour. The slices are drawn left to right, each starting
 // where the previous ended, so spacing matches drawing the run as a whole. A
-// lone missing glyph is drawn as the replacement character, as before.
-func drawColoredOutput(r *render.Renderer, out shaping.Output, dst draw.Image, startX, y int, colors []color.Color, defaultColor color.Color, faces shaping.Fontmap) {
+// missing glyph is drawn as its face's .notdef, like any other glyph.
+func drawColoredOutput(r *render.Renderer, out shaping.Output, dst draw.Image, startX, y int, colors []color.Color, defaultColor color.Color) {
 	glyphs := out.Glyphs
 	if len(glyphs) == 0 {
 		return
@@ -619,11 +618,6 @@ func drawColoredOutput(r *render.Renderer, out shaping.Output, dst draw.Image, s
 			return colors[idx]
 		}
 		return defaultColor
-	}
-	if len(glyphs) == 1 && glyphs[0].GlyphID == 0 {
-		r.Color = colorAt(glyphs[0])
-		r.DrawStringAt(string([]rune{0xfffd}), dst, startX, y, faces.ResolveFace(0xfffd))
-		return
 	}
 	x := startX
 	for i := 0; i < len(glyphs); {
@@ -913,12 +907,14 @@ func shapeCallback(shaper shaping.Shaper, in shaping.Input, x, scale, letterSpac
 				adv = 0
 			}
 
-			// A missing glyph is drawn on its own and x moves past it here,
-			// so its advance is not also added to the pending run's: counted
-			// twice, each run of missing glyphs measured one glyph wider than
-			// the shaper laid it out, and the text after it was drawn that
-			// much further on, apart from where the caret layout
-			// (LineVisualLayout) puts it.
+			// A missing glyph is its own run, which painters draw as its
+			// face's .notdef (#1446). It was split out to be drawn as U+FFFD;
+			// the split stays so the runs around it start on the pixels they
+			// always did. x moves past it here, so its advance is not also
+			// added to the pending run's: counted twice, each run of missing
+			// glyphs measured one glyph wider than the shaper laid it out,
+			// and the text after it was drawn that much further on, apart
+			// from where the caret layout (LineVisualLayout) puts it.
 			out.Glyphs = glyphs[i : i+1]
 			cb(out, x)
 			x += fixed266ToFloat32(glyphs[i].Advance) * scale
