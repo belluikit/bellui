@@ -28,7 +28,7 @@ type pressTarget = widget.PressTarget
 // A widget that defines TouchDown or MouseDown itself, to refuse a press
 // while disabled say, calls the PressTarget's method from its own.
 //
-// Since: 1.3
+// Since: 1.4
 type PressTarget = widget.PressTarget
 
 // PressShape is where a PressTarget's pressed state shows, in the widget's
@@ -36,7 +36,7 @@ type PressTarget = widget.PressTarget
 // text or icon, and the state layer is that colour at the theme's pressed
 // opacity.
 //
-// Since: 1.3
+// Since: 1.4
 type PressShape = widget.PressShape
 
 // AttachPress starts the pressed state of t for a new renderer and returns
@@ -44,7 +44,7 @@ type PressShape = widget.PressShape
 // layer shows; it returns false while the widget takes no press, such as
 // when it is disabled.
 //
-// Since: 1.3
+// Since: 1.4
 func AttachPress(t *PressTarget, shape func() (PressShape, bool)) *canvas.Ripple {
 	return widget.AttachPress(t, shape)
 }
@@ -53,13 +53,13 @@ func AttachPress(t *PressTarget, shape func() (PressShape, bool)) *canvas.Ripple
 // it. A pointer tap's press showed already, and this does nothing for it.
 // ev is nil for a tap with no position, which shows from the shape's centre.
 //
-// Since: 1.3
+// Since: 1.4
 func TapPress(t *PressTarget, ev *event.PointEvent) { widget.TapPress(t, ev) }
 
 // CancelPress ends the pressed state of t with no feedback left: the pointer
 // left the widget, or it stopped taking presses mid-press.
 //
-// Since: 1.3
+// Since: 1.4
 func CancelPress(t *PressTarget) { widget.CancelPress(t) }
 
 // rowPressShape is the pressed state of a row, a menu item or a cell: its
