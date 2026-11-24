@@ -7,6 +7,7 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"slices"
 	"strings"
 	"time"
@@ -95,7 +96,7 @@ func runProbe(a bellui.App, w bellui.Window, tabs *container.AppTabs, dir string
 	p := &probe{a: a, w: w, tabs: tabs, dir: dir, out: bufio.NewWriter(f)}
 	defer func() {
 		if r := recover(); r != nil {
-			p.logf("\n**PROBE ABORTED:** %v\n", r)
+			p.logf("\n**PROBE ABORTED:** %v\n\n```\n%s```\n", r, debug.Stack())
 			p.fails++
 		}
 		p.logf("\n%d failed assertion(s), %d capture(s).\n", p.fails, p.shots)
