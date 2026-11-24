@@ -1657,10 +1657,14 @@ func isASCII(s string) bool {
 // with RTL content reuse the bidi visual layout's total advance (the same width,
 // already computed). This underpins alignment offsets; see pre-rebrand issue #42.
 func (t *RichText) rowWidth(row int, textSize float32) float32 {
+	bound := t.rowBoundary(row)
 	if layout, ok := t.rowVisualLayout(row); ok {
+		if bound != nil {
+			bs, _ := rowBreakSpace(bound)
+			return layout.Width - bs
+		}
 		return layout.Width
 	}
-	bound := t.rowBoundary(row)
 	if bound == nil {
 		return bellui.MeasureText(string(t.row(row)), textSize, bellui.TextStyle{}).Width
 	}
@@ -1691,36 +1695,105 @@ func (t *RichText) rowWidth(row int, textSize float32) float32 {
 		m, _ := bellui.MeasureTextFull(string(measure), text.size(), text.Style.TextStyle, text.Style.FontSource)
 		width += m.Width
 	}
-	return width - rowBreakSpaceWidth(bound)
+	bs, _ := rowBreakSpace(bound)
+	return width - bs
 }
 
-// rowBreakSpaceWidth returns the width of the space a wrapped row broke at,
-// when that space ends the row: the break fell where one segment ends with a
-// space and the next one starts on the following row. A break inside a segment
+// rowBreakShift returns how far a row's caret and selection x must move so
+// they land on its glyphs once its break space is left out of the alignment
+// (rowBreakSpace): the space's width to the left when it sits at the row's
+// visual left, where a visual caret position counts it, else 0.
+func (t *RichText) rowBreakShift(row int) float32 {
+	bound := t.rowBoundary(row)
+	if bound == nil {
+		return 0
+	}
+	if bs, left := rowBreakSpace(bound); left {
+		return -bs
+	}
+	return 0
+}
+
+// rowBreakSpace returns the width of the space a wrapped row broke at, when
+// that space ends the row: the break fell where one segment ends with a space
+// and the next one starts on the following row. A break inside a segment
 // leaves its space out of both rows, so its row has none. Alignment leaves the
 // space out, as it is the break and not text (#1435): a trailing or centred row
 // would otherwise sit a space, or half one, short of where the same text in one
 // segment does. The row keeps the space, so caret and selection offsets are
 // unchanged. A space before a hard line break ("…" + "\n…") is text, and stays.
-func rowBreakSpaceWidth(bound *rowBoundary) float32 {
+//
+// left reports that the space is drawn at the row's visual left, not its
+// right: the row's text has right-to-left characters and its base direction
+// is right-to-left, so the logical end of the line is its left end. Text with
+// no right-to-left characters is drawn left to right whatever the base
+// direction, so its space stays on the right (#1437).
+func rowBreakSpace(bound *rowBoundary) (width float32, left bool) {
 	n := len(bound.segments)
 	if n < 2 || bound.end != 0 {
-		return 0
+		return 0, false
 	}
 	next, ok := bound.segments[n-1].(*TextSegment)
 	if !ok || next.Text == "" || next.Text[0] == '\n' {
-		return 0
+		return 0, false
 	}
 	prev, ok := bound.segments[n-2].(*TextSegment)
 	if !ok || prev.Text == "" || concealed(prev) || n == 2 && bound.begin >= utf8.RuneCountInString(prev.Text) {
-		return 0
+		return 0, false
 	}
-	r, _ := utf8.DecodeLastRuneInString(prev.Text)
+	r, size := utf8.DecodeLastRuneInString(prev.Text)
 	if !breakableSpace(r) {
-		return 0
+		return 0, false
 	}
-	m, _ := bellui.MeasureTextFull(string(r), prev.size(), prev.Style.TextStyle, prev.Style.FontSource)
-	return m.Width
+	// Measure the space after the character before it, as it is shaped there:
+	// after a Hebrew letter it takes the Hebrew face's advance, not the Latin
+	// one a lone space measures with.
+	tail := prev.Text[:len(prev.Text)-size]
+	before, _ := utf8.DecodeLastRuneInString(tail)
+	with, _ := bellui.MeasureTextFull(string([]rune{before, r}), prev.size(), prev.Style.TextStyle, prev.Style.FontSource)
+	without, _ := bellui.MeasureTextFull(string(before), prev.size(), prev.Style.TextStyle, prev.Style.FontSource)
+	if tail == "" {
+		with, _ = bellui.MeasureTextFull(string(r), prev.size(), prev.Style.TextStyle, prev.Style.FontSource)
+		without = geo.Size{}
+	}
+	return with.Width - without.Width, baseRTL(prev.Style.TextStyle) && rowHasRTL(bound)
+}
+
+// baseRTL reports whether text in style is laid out with a right-to-left base
+// direction, as the painter resolves it (resolveBaseDirection): an explicit
+// Direction, else the ambient UI direction.
+func baseRTL(style bellui.TextStyle) bool {
+	switch style.Direction {
+	case bellui.TextDirectionRTL:
+		return true
+	case bellui.TextDirectionLTR:
+		return false
+	}
+	return lang.IsRTLDirection()
+}
+
+// rowHasRTL reports whether any text on the row may hold right-to-left
+// characters.
+func rowHasRTL(bound *rowBoundary) bool {
+	last := len(bound.segments) - 1
+	for i, seg := range bound.segments {
+		ts, ok := seg.(*TextSegment)
+		if !ok {
+			continue
+		}
+		runes := []rune(ts.Text)
+		lo, hi := 0, len(runes)
+		if i == 0 {
+			lo = min(bound.begin, hi)
+		}
+		if i == last {
+			hi = min(bound.end, hi)
+		}
+		if lo < hi && paint.MayContainRTL(runes[lo:hi]) {
+			return true
+		}
+	}
+	return false
 }
 
 // rtlCaretX returns the visual x and height of logical column col within a row
@@ -2311,7 +2384,8 @@ func (r *textRenderer) layoutOneRow(bound rowBoundary, objs []core.CanvasObject,
 		if text, ok := bound.segments[0].(*TextSegment); ok && text.Style.isBlockquote() {
 			leftPad = lineSpacing * 4
 		}
-		_, y := r.layoutRowTrimmed(rowItems, rowAlign, left+leftPad, yPos, lineWidth-leftPad, rowBreakSpaceWidth(&bound))
+		bs, bsLeft := rowBreakSpace(&bound)
+		_, y := r.layoutRowTrimmed(rowItems, rowAlign, left+leftPad, yPos, lineWidth-leftPad, bs, bsLeft)
 		yPos += y
 		rowItems = nil
 	}
@@ -3329,13 +3403,15 @@ func (r *textRenderer) splitIntoFragments() {
 }
 
 func (r *textRenderer) layoutRow(texts []core.CanvasObject, align bellui.TextAlign, xPos, yPos, lineWidth float32) (float32, float32) {
-	return r.layoutRowTrimmed(texts, align, xPos, yPos, lineWidth, 0)
+	return r.layoutRowTrimmed(texts, align, xPos, yPos, lineWidth, 0, false)
 }
 
-// layoutRowTrimmed is layoutRow for a row whose last breakSpace of width is
-// the space it wrapped at (rowBreakSpaceWidth): a trailing or centred row is
-// aligned as if that space were not there.
-func (r *textRenderer) layoutRowTrimmed(texts []core.CanvasObject, align bellui.TextAlign, xPos, yPos, lineWidth, breakSpace float32) (float32, float32) {
+// layoutRowTrimmed is layoutRow for a row that ends in the space it wrapped at,
+// breakSpace wide (rowBreakSpace): the row is aligned as if that space were not
+// there. The space is drawn at the row's right end, or its left end when
+// breakLeft (right-to-left text in a right-to-left base direction, #1437), so
+// the glyphs move right or left by it, as the alignment needs.
+func (r *textRenderer) layoutRowTrimmed(texts []core.CanvasObject, align bellui.TextAlign, xPos, yPos, lineWidth, breakSpace float32, breakLeft bool) (float32, float32) {
 	// Resolve leading/trailing against the active layout direction so the row
 	// aligns to the correct edge under RTL (no-op for the default LTR layout).
 	align = lang.ResolveAlign(align)
@@ -3418,7 +3494,16 @@ func (r *textRenderer) layoutRowTrimmed(texts []core.CanvasObject, align bellui.
 	}
 
 	innerPadding := r.obj.Theme().Size(theme.SizeNameInnerPadding)
-	spare := lineWidth - xPos + breakSpace
+	spare := lineWidth - xPos
+	if breakLeft {
+		// A space at the left end: right alignment already puts the glyphs at
+		// the edge; centring moves them left by half of it, below.
+		if align == bellui.TextAlignCenter {
+			spare -= breakSpace
+		}
+	} else {
+		spare += breakSpace
+	}
 	// The segments grown below are positioned with a physical (already
 	// direction-resolved) alignment, but the painter applies lang.ResolveAlign
 	// to every canvas.Text. Wrapping the physical value in ResolveAlign here
@@ -3457,6 +3542,13 @@ func (r *textRenderer) layoutRowTrimmed(texts []core.CanvasObject, align bellui.
 		last := texts[len(texts)-1]
 		last.Resize(geo.NewSize(last.Size().Width+spare, last.Size().Height))
 		setAlign(last, lang.ResolveAlign(bellui.TextAlignLeading))
+		if breakLeft {
+			// Left aligned with the space at the left end: the glyphs start
+			// where the space did.
+			for _, text := range texts {
+				text.Move(text.Position().Add(geo.NewPos(-breakSpace, 0)))
+			}
+		}
 	}
 
 	return xPos - initialX, height
