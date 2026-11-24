@@ -8,6 +8,7 @@ import (
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/driver"
 	"github.com/belluikit/bellui/lang"
 	"github.com/belluikit/bellui/test"
 	"github.com/belluikit/bellui/theme"
@@ -32,6 +33,41 @@ func TestTabsBuild(t *testing.T) {
 				t.Errorf("variant %d: the %s tab has no size", v, name)
 			}
 		}
+	}
+}
+
+// No text widget on any tab is laid out narrower than it needs, at the
+// probe's window width: the Swipes tab's Directions card sat in a 320-pt box
+// it needed 368 pt for, so its subtitle ran through the card's padding and its
+// last letter showed past the border. Icon-only buttons are left out: the
+// inner window's own close, minimise and maximise are 10 pt by design.
+func TestTabsFitTheirText(t *testing.T) {
+	test.NewTempApp(t)
+	w := test.NewTempWindow(t, nil)
+	for name, tab := range map[string]core.CanvasObject{
+		"Locale": localeTab(w), "Direction": directionTab(w), "Theme override": overrideTab(),
+		"Menus": menusTab(w), "Touch & keys": touchTab(),
+		"Disabled": disabledTab(), "Drawer": drawerTab(w), "Swipes": swipesTab(), "Text": textTab(w), "Chips & layout": chipsTab(),
+	} {
+		w.SetContent(tab)
+		w.Resize(geo.NewSize(900, 3000))
+		driver.WalkVisibleObjectTree(tab, func(o core.CanvasObject, _, _ geo.Position, _ geo.Size) bool {
+			text := ""
+			switch v := o.(type) {
+			case *widget.Card:
+				text = v.Title + " / " + v.Subtitle
+			case *widget.Label:
+				text = v.Text
+			case *widget.Check:
+				text = v.Text
+			case *widget.Button:
+				text = v.Text
+			}
+			if text != "" && o.Size().Width+0.5 < o.MinSize().Width {
+				t.Errorf("%s tab: %T %q is %.0f pt wide and needs %.0f", name, o, text, o.Size().Width, o.MinSize().Width)
+			}
+			return false
+		}, nil)
 	}
 }
 

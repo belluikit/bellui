@@ -92,7 +92,7 @@ func swipesTab() core.CanvasObject {
 	// A second card treats each way differently (#1103): left throws it,
 	// right springs it back, up and down leave it at rest.
 	moded := widget.NewLabel("Directions card: not swiped yet")
-	modes := widget.NewSwipeArea(widget.NewCard("Directions card", "Left throws, right springs back, up or down does nothing", nil), nil)
+	modes := widget.NewSwipeArea(widget.NewCard("Directions card", "Left throws, right returns, up/down: nothing", nil), nil)
 	modes.Follow = true
 	modes.Directions = map[widget.SwipeDirection]widget.SwipeCardMode{
 		widget.SwipeRight: widget.SwipeStay, widget.SwipeUp: widget.SwipeIgnore, widget.SwipeDown: widget.SwipeIgnore,
