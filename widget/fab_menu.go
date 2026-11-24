@@ -30,8 +30,19 @@ func NewFABMenu(icon bellui.Resource, items []*FABMenuItem) *FABMenu {
 	return &FABMenu{Icon: icon, Items: items}
 }
 
-// Show displays the FAB menu at the given position on the canvas.
-// Typically positioned at bottom-right.
+// Show opens the menu above pos, the FAB's top corner on its trailing side.
+//
+// In a left-to-right window pos is the FAB's top-right corner: the menu opens
+// up and to the left of it, its right edge on pos.X and its bottom edge 8 dp
+// above pos.Y, which lines it up with a FAB at the trailing (right) edge. In a
+// right-to-left window it is the mirror: pass the FAB's top-left corner and
+// the menu opens up and to the right, its left edge on pos.X. The direction
+// is the window's; Show is given no FAB, so a container.DirectionScope around
+// the FAB does not change it.
+//
+// The menu is kept fully on the canvas: one that would open past an edge is
+// moved inside it, so a FAB at the leading edge gets a menu flush with that
+// edge rather than one that opens off-screen (#1424).
 func (f *FABMenu) Show(c core.Canvas, pos geo.Position) {
 	f.canvas = c
 	f.Hide()
@@ -59,11 +70,24 @@ func (f *FABMenu) Show(c core.Canvas, pos geo.Position) {
 
 	f.popUp = newPopUpWithBgColor(content, c, bgColor)
 
-	// Position above the FAB.
+	// Above the FAB, towards the leading side, then kept on the canvas.
 	contentSize := content.MinSize()
-	showPos := geo.NewPos(pos.X-contentSize.Width, pos.Y-contentSize.Height-8)
+	x := pos.X - contentSize.Width
+	if root := c.Content(); root != nil && isRTLAt(root) {
+		x = pos.X
+	}
+	showPos := clampToCanvas(geo.NewPos(x, pos.Y-contentSize.Height-8), contentSize, c.Size())
 	f.popUp.ShowAtPosition(showPos)
 	f.open = true
+}
+
+// clampToCanvas moves a box of the given size at pos so that it lies inside
+// a canvas of size canvas. A box larger than the canvas is pinned to its
+// top-left corner.
+func clampToCanvas(pos geo.Position, size, canvas geo.Size) geo.Position {
+	pos.X = max(0, min(pos.X, canvas.Width-size.Width))
+	pos.Y = max(0, min(pos.Y, canvas.Height-size.Height))
+	return pos
 }
 
 // Hide dismisses the FAB menu.
@@ -80,7 +104,7 @@ func (f *FABMenu) IsOpen() bool {
 	return f.open
 }
 
-// Toggle opens the menu if closed, closes if open.
+// Toggle opens the menu if closed, closes if open. pos is as for Show.
 func (f *FABMenu) Toggle(c core.Canvas, pos geo.Position) {
 	if f.open {
 		f.Hide()
