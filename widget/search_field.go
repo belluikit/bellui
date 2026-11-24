@@ -28,6 +28,7 @@ type SearchField struct {
 	OnChanged func(string) `json:"-"`
 
 	clearBtn *Button
+	reported string // the text OnChanged last reported
 }
 
 // NewSearchField creates a search input with the given callback fired on each text change.
@@ -37,6 +38,7 @@ func NewSearchField(changed func(string)) *SearchField {
 	sf := &SearchField{}
 	sf.OnChanged = changed
 	sf.ExtendBaseWidget(sf)
+	sf.onTextChecked = sf.textChecked
 	sf.PlaceHolder = "Search..."
 	return sf
 }
@@ -52,7 +54,9 @@ func (sf *SearchField) CreateRenderer() core.WidgetRenderer {
 	sf.ExtendBaseWidget(sf)
 
 	sf.Icon = sf.Theme().Icon(theme.IconNameSearch)
-	sf.Validator = sf.validate
+	// The entry's own hook, not its Validator: that one is the app's, and a
+	// validator draws a ✓ and keeps room for it beside the ✕ (#1411).
+	sf.onTextChecked = sf.textChecked
 
 	if sf.ActionItem == nil {
 		sf.clearBtn = sf.setupClearButton()
@@ -95,12 +99,17 @@ func (sf *SearchField) setupClearButton() *Button {
 	return btn
 }
 
-func (sf *SearchField) validate(_ string) error {
+// textChecked runs after each text change (and at other validation points):
+// it shows or hides the ✕ and reports a changed text to OnChanged, once.
+func (sf *SearchField) textChecked() {
 	sf.updateClearButtonVisibility()
+	if sf.Text == sf.reported {
+		return
+	}
+	sf.reported = sf.Text
 	if f := sf.OnChanged; f != nil {
 		f(sf.Text)
 	}
-	return nil // search fields have no validation errors
 }
 
 func (sf *SearchField) updateClearButtonVisibility() {
