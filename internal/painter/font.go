@@ -913,17 +913,22 @@ func shapeCallback(shaper shaping.Shaper, in shaping.Input, x, scale, letterSpac
 				adv = 0
 			}
 
+			// A missing glyph is drawn on its own and x moves past it here,
+			// so its advance is not also added to the pending run's: counted
+			// twice, each run of missing glyphs measured one glyph wider than
+			// the shaper laid it out, and the text after it was drawn that
+			// much further on, apart from where the caret layout
+			// (LineVisualLayout) puts it.
 			out.Glyphs = glyphs[i : i+1]
 			cb(out, x)
 			x += fixed266ToFloat32(glyphs[i].Advance) * scale
-			adv = 0
 
 			start = i + 1
 			pending = false
 		} else {
 			pending = true
+			adv += g.Advance
 		}
-		adv += g.Advance
 		glyphIndex++
 		if letterSpacing != 0 && glyphIndex < totalGlyphs {
 			x += letterSpacing * scale
