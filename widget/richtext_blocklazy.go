@@ -715,7 +715,7 @@ func (t *RichText) blockLazyVirtualWidth() float32 {
 		t.ensureBlockMeasured(i)
 		base := t.blockStartRow[i]
 		for sub := range t.blockRows[i] {
-			if rw := t.rowWidth(base+sub, textSize); rw > widest {
+			if rw := t.rowExtent(base+sub, textSize); rw > widest {
 				widest = rw
 			}
 		}

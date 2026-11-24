@@ -336,11 +336,16 @@ type RichText struct {
 	prefixDirty    bool            // lineStartRow needs rebuild after a rowCount change
 	estCharsPerRow float32         // estimate denominator (avg chars per wrapped row)
 	lazyMaxWidth   float32         // wrap/measure width the lazy model was built for
+	lazyIndent     float32         // blockquote indent its rows are wrapped narrower by (rowIndent)
 	lineScratch    []rune          // reusable scratch for per-line wrap measurement (ensureLineMeasured)
 	lazyFullBuilds int             // full content (re)builds of buf — test hook for identity-chain regressions (pre-rebrand tracker #400)
 	vwLine         int             // widest logical line (wrap-off virtual width cache, pre-rebrand tracker #403)
 	vwLen          int             // rune length of vwLine when cached
 	vwDirty        bool            // widest-line cache needs a rescan
+
+	// bidiPlace caches each right-to-left row's placement by its first object
+	// (cachedBidiPlacement).
+	bidiPlace map[core.CanvasObject]*bidiPlaceEntry
 
 	// Deferred text sync (pre-rebrand tracker #410). When deferText is set — by Entry when its
 	// DeferTextSync mode is on — lazySpliceText skips the per-edit document
@@ -571,6 +576,7 @@ func (t *RichText) CreateRenderer() core.WidgetRenderer {
 	t.selection = &focusSelectable{}
 	t.selection.ExtendBaseWidget(t.selection)
 	t.selection.focus = t.selection
+	t.selection.alignByRow = true
 	t.selection.theme = t.Theme()
 	t.selection.provider = t
 
@@ -1453,6 +1459,11 @@ func (t *RichText) rowStyledRuns(row int) ([]paint.StyledRun, bool) {
 	if bound == nil {
 		return nil, false
 	}
+	return t.boundStyledRuns(bound)
+}
+
+// boundStyledRuns is rowStyledRuns for a row's boundary.
+func (t *RichText) boundStyledRuns(bound *rowBoundary) ([]paint.StyledRun, bool) {
 	nSegs := len(bound.segments)
 	runs := make([]paint.StyledRun, 0, nSegs)
 	for i, seg := range bound.segments {
@@ -1502,7 +1513,13 @@ func (t *RichText) rowVisualLayout(row int) (paint.LineLayout, bool) {
 	if !ok {
 		return paint.LineLayout{}, false
 	}
+	return styledVisualLayout(styled)
+}
 
+// styledVisualLayout lays out a row's styled runs (boundStyledRuns) in bidi
+// visual order, as rowVisualLayout does; ok is false when the row has no
+// right-to-left run.
+func styledVisualLayout(styled []paint.StyledRun) (paint.LineLayout, bool) {
 	var layout paint.LineLayout
 	if len(styled) == 1 && !styled[0].Box {
 		face := paint.CachedFontFace(styled[0].Style, styled[0].FontSource, nil)
@@ -1763,6 +1780,49 @@ func rowBreakSpace(bound *rowBoundary) (width float32, left bool) {
 // left: layout indents by it, and wrapping narrows every row by it (#1437).
 func blockquoteIndent(th bellui.Theme) float32 {
 	return blockquoteIndentFor(th.Size(theme.SizeNameLineSpacing))
+}
+
+// rowAlignment returns the alignment a row is drawn with: its first segment's,
+// as layout reads it (layoutOneRow, layoutVirtualLazy).
+func (t *RichText) rowAlignment(row int) bellui.TextAlign {
+	bound := t.rowBoundary(row)
+	if bound == nil || len(bound.segments) == 0 {
+		return bellui.TextAlignLeading
+	}
+	return boundAlignment(bound)
+}
+
+// boundAlignment is rowAlignment for a row's boundary.
+func boundAlignment(bound *rowBoundary) bellui.TextAlign {
+	switch seg := bound.segments[0].(type) {
+	case *TextSegment:
+		return seg.Style.Alignment
+	case *HyperlinkSegment:
+		return seg.Alignment
+	}
+	return bellui.TextAlignLeading
+}
+
+// rowIndent returns how far in from the left a row is drawn: a blockquote's
+// indent (blockquoteIndent), else 0. Layout draws the row there, and the
+// caret, selection and hit-testing offsets follow it (#1441).
+func (t *RichText) rowIndent(row int) float32 {
+	bound := t.rowBoundary(row)
+	if bound == nil || len(bound.segments) == 0 {
+		return 0
+	}
+	if text, ok := bound.segments[0].(*TextSegment); ok && text.Style.isBlockquote() {
+		return blockquoteIndent(t.Theme())
+	}
+	return 0
+}
+
+// rowExtent returns how wide a row's content is drawn: its text (rowWidth)
+// from its indent (rowIndent). The minimum width is the widest of these; the
+// text's width alone left a blockquote's end past the edge by its indent
+// (#1441).
+func (t *RichText) rowExtent(row int, textSize float32) float32 {
+	return t.rowWidth(row, textSize) + t.rowIndent(row)
 }
 
 // blockquoteIndentFor is blockquoteIndent from the theme's line spacing, for
@@ -2353,12 +2413,7 @@ func (r *textRenderer) layoutOneRow(bound rowBoundary, objs []core.CanvasObject,
 
 	// The row's alignment comes from its leading segment; set it up front so a
 	// pre-block inline flush uses the row's own alignment.
-	rowAlign := bellui.TextAlignLeading
-	if text, ok := bound.segments[0].(*TextSegment); ok {
-		rowAlign = text.Style.Alignment
-	} else if link, ok := bound.segments[0].(*HyperlinkSegment); ok {
-		rowAlign = link.Alignment
-	}
+	rowAlign := boundAlignment(&bound)
 
 	i := oi
 	for segI := range bound.segments {
@@ -2397,7 +2452,11 @@ func (r *textRenderer) layoutOneRow(bound rowBoundary, objs []core.CanvasObject,
 			leftPad = blockquoteIndentFor(lineSpacing)
 		}
 		bs, bsLeft := rowBreakSpace(&bound)
-		_, y := r.layoutRowTrimmed(rowItems, rowAlign, left+leftPad, yPos, lineWidth-leftPad, bs, bsLeft)
+		var visual []float32
+		if len(rowItems) == len(bound.segments) {
+			visual = r.obj.bidiRowPlacement(&bound, rowItems, rowAlign, lineWidth-leftPad, bs, bsLeft)
+		}
+		_, y := r.layoutRowTrimmed(rowItems, rowAlign, left+leftPad, yPos, lineWidth-leftPad, bs, bsLeft, visual)
 		yPos += y
 		rowItems = nil
 	}
@@ -2732,6 +2791,11 @@ func (r *textRenderer) calculateMin(bounds []rowBoundary, wrap bellui.TextWrap, 
 		i += consumed
 
 		if needWidth {
+			// A blockquote is drawn in by its indent, as layoutOneRow draws it
+			// (#1441).
+			if text, ok := bound.segments[0].(*TextSegment); ok && text.Style.isBlockquote() {
+				rowWidth += blockquoteIndentFor(lineSpacing)
+			}
 			width = geo.Max(width, rowWidth)
 		}
 		height += rowHeight
@@ -2973,6 +3037,12 @@ func (r *textRenderer) layoutVirtualLazy(size geo.Size) {
 	align := bellui.TextAlignLeading
 	if seg, ok := t.singleSegment(); ok {
 		align = seg.Style.Alignment
+		// A blockquote is drawn indented, as the dense layout draws it (#1441).
+		if seg.Style.isBlockquote() {
+			indent := blockquoteIndent(th)
+			left += indent
+			lineWidth -= indent
+		}
 	}
 	objs := r.origObjs
 	rows := t.winRows
@@ -3415,7 +3485,7 @@ func (r *textRenderer) splitIntoFragments() {
 }
 
 func (r *textRenderer) layoutRow(texts []core.CanvasObject, align bellui.TextAlign, xPos, yPos, lineWidth float32) (float32, float32) {
-	return r.layoutRowTrimmed(texts, align, xPos, yPos, lineWidth, 0, false)
+	return r.layoutRowTrimmed(texts, align, xPos, yPos, lineWidth, 0, false, nil)
 }
 
 // layoutRowTrimmed is layoutRow for a row that ends in the space it wrapped at,
@@ -3423,7 +3493,12 @@ func (r *textRenderer) layoutRow(texts []core.CanvasObject, align bellui.TextAli
 // there. The space is drawn at the row's right end, or its left end when
 // breakLeft (right-to-left text in a right-to-left base direction, #1437), so
 // the glyphs move right or left by it, as the alignment needs.
-func (r *textRenderer) layoutRowTrimmed(texts []core.CanvasObject, align bellui.TextAlign, xPos, yPos, lineWidth, breakSpace float32, breakLeft bool) (float32, float32) {
+//
+// visual, when not nil, holds each object's x from xPos in the row's bidi
+// visual order (bidiRowPlacement), which already includes the alignment and
+// the break space: the objects are placed there at their own width instead of
+// side by side in logical order (#1441).
+func (r *textRenderer) layoutRowTrimmed(texts []core.CanvasObject, align bellui.TextAlign, xPos, yPos, lineWidth, breakSpace float32, breakLeft bool, visual []float32) (float32, float32) {
 	// Resolve leading/trailing against the active layout direction so the row
 	// aligns to the correct edge under RTL (no-op for the default LTR layout).
 	align = lang.ResolveAlign(align)
@@ -3503,6 +3578,17 @@ func (r *textRenderer) layoutRowTrimmed(texts []core.CanvasObject, align bellui.
 			delta := tallestBaseline - baselines[i]
 			text.Move(geo.NewPos(text.Position().X, yPos+delta))
 		}
+	}
+
+	if len(visual) == len(texts) {
+		// Each object keeps its own width, so its glyphs start at its left edge
+		// whatever the direction: the painter resolves the alignment once more,
+		// which lang.ResolveAlign here cancels.
+		for i, text := range texts {
+			text.Move(geo.NewPos(initialX+visual[i], text.Position().Y))
+			setAlign(text, lang.ResolveAlign(bellui.TextAlignLeading))
+		}
+		return xPos - initialX, height
 	}
 
 	innerPadding := r.obj.Theme().Size(theme.SizeNameInnerPadding)

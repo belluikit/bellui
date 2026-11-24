@@ -913,17 +913,22 @@ func shapeCallback(shaper shaping.Shaper, in shaping.Input, x, scale, letterSpac
 				adv = 0
 			}
 
+			// A missing glyph is drawn on its own and x moves past it here,
+			// so its advance is not also added to the pending run's: counted
+			// twice, each run of missing glyphs measured one glyph wider than
+			// the shaper laid it out, and the text after it was drawn that
+			// much further on, apart from where the caret layout
+			// (LineVisualLayout) puts it.
 			out.Glyphs = glyphs[i : i+1]
 			cb(out, x)
 			x += fixed266ToFloat32(glyphs[i].Advance) * scale
-			adv = 0
 
 			start = i + 1
 			pending = false
 		} else {
 			pending = true
+			adv += g.Advance
 		}
-		adv += g.Advance
 		glyphIndex++
 		if letterSpacing != 0 && glyphIndex < totalGlyphs {
 			x += letterSpacing * scale
@@ -1150,6 +1155,26 @@ func (l LineLayout) selectionSpans(start, end int, includeBox func(boxExtent) bo
 
 // BoxCount returns the number of opaque inline boxes in the line.
 func (l LineLayout) BoxCount() int { return len(l.boxes) }
+
+// RuneExtent returns the visual left and right of logical rune i's glyph
+// cluster. ok is false when i is out of range.
+func (l LineLayout) RuneExtent(i int) (left, right float32, ok bool) {
+	if i < 0 || i >= len(l.extents) {
+		return 0, 0, false
+	}
+	return l.extents[i][0], l.extents[i][1], true
+}
+
+// BoxExtent returns the visual left and right of the line's box-th opaque box,
+// in logical (run-supply) order. ok is false when there is no such box.
+func (l LineLayout) BoxExtent(box int) (left, right float32, ok bool) {
+	for _, b := range l.boxes {
+		if b.logical == box {
+			return b.left, b.right, true
+		}
+	}
+	return 0, 0, false
+}
 
 // BoxCaretX returns the visual caret x for the insertion point logically
 // before (after=false) or after (after=true) the line's box-th opaque box, in

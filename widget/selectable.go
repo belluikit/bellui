@@ -31,6 +31,11 @@ type selectable struct {
 	style                                                     bellui.TextStyle
 	alignment                                                 bellui.TextAlign
 
+	// alignByRow takes each row's alignment from the row (rowAlignment), as
+	// layout draws it, instead of alignment: a RichText's rows each carry
+	// their first segment's, while a Label or Entry sets one for the widget.
+	alignByRow bool
+
 	provider *RichText
 	theme    bellui.Theme
 	focus    event.Focusable
@@ -457,12 +462,26 @@ func (s *selectable) alignOffsetX(row int) float32 {
 }
 
 // alignOffsetXNoBreak is alignOffsetX before a row's break space shift.
+//
+// The row is placed as layout draws it: in from the left by its indent (a
+// blockquote's), and by a RichText row's own alignment (alignByRow). The
+// alignment field said leading for every RichText, so the carets and
+// selection of a trailing or centred RichText row sat at the leading edge,
+// away from its glyphs, and a blockquote's at the unindented edge (#1441).
 func (s *selectable) alignOffsetXNoBreak(row int) float32 {
+	if s.provider == nil {
+		return 0
+	}
+	align := s.alignment
+	if s.alignByRow {
+		align = s.provider.rowAlignment(row)
+	}
 	// Resolve against the active layout direction so the selection highlight
 	// tracks the text edge under RTL (no-op for the default LTR layout).
-	align := lang.ResolveAlign(s.alignment)
+	align = lang.ResolveAlign(align)
+	indent := s.provider.rowIndent(row)
 	if align == bellui.TextAlignLeading {
-		return 0
+		return indent
 	}
 	th := s.theme
 	textSize := th.Size(s.getSizeName())
@@ -471,17 +490,17 @@ func (s *selectable) alignOffsetXNoBreak(row int) float32 {
 	// trail exactly; a single-style measurement drifts when segments differ in
 	// size or weight (pre-rebrand issue #42).
 	textWidth := s.provider.rowWidth(row, textSize) + 2*innerPad
-	containerWidth := s.Size().Width
+	containerWidth := s.Size().Width - indent
 	if containerWidth <= textWidth {
-		return 0
+		return indent
 	}
 	switch align {
 	case bellui.TextAlignCenter:
-		return (containerWidth - textWidth) / 2
+		return indent + (containerWidth-textWidth)/2
 	case bellui.TextAlignTrailing:
-		return containerWidth - textWidth
+		return indent + containerWidth - textWidth
 	}
-	return 0
+	return indent
 }
 
 // cursorColAt returns the logical column a click at pos selects, plus the caret

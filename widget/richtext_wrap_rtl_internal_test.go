@@ -103,10 +103,12 @@ func TestRichText_BreakSpaceAlignedInEitherDirection(t *testing.T) {
 					}
 					compared++
 					y1 := int(secondRowY(t, split))
-					sMin, sMax := inkExtentX(sw.Canvas().Capture(), 0, y1)
-					wMin, wMax := inkExtentX(ww.Canvas().Capture(), 0, y1)
-					assert.InDelta(t, wMin, sMin, 1, "%s: ink starts where the whole row's does", where(width))
-					assert.InDelta(t, wMax, sMax, 1, "%s: ink ends where the whole row's does", where(width))
+					if hasGlyphs(tx.parts[0]) { // the ink is an oracle only when drawn with real glyphs
+						sMin, sMax := inkExtentX(sw.Canvas().Capture(), 0, y1)
+						wMin, wMax := inkExtentX(ww.Canvas().Capture(), 0, y1)
+						assert.InDelta(t, wMin, sMin, 1, "%s: ink starts where the whole row's does", where(width))
+						assert.InDelta(t, wMax, sMax, 1, "%s: ink ends where the whole row's does", where(width))
+					}
 
 					textSize := split.Theme().Size(theme.SizeNameText)
 					pad := split.Theme().Size(theme.SizeNameInnerPadding)

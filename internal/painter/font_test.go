@@ -219,7 +219,7 @@ func TestMeasureString(t *testing.T) {
 			size:     40,
 			string:   "Missing: स",
 			tabWidth: 4,
-			want:     195.3125,
+			want:     177.578125, // "Missing: " (159.84375) + the missing glyph once (17.734375)
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
