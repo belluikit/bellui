@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"image"
 	"image/color"
@@ -104,9 +105,43 @@ func disabledTab() core.CanvasObject {
 	date := widget.NewDatePicker(time.Date(2026, 3, 9, 0, 0, 0, 0, time.Local), nil)
 	clock := widget.NewTimePicker(9, 30, true, nil)
 
+	// A form, a search field and a date entry (#1403, #1404). The form
+	// disables its fields, labels, hint and error with it, but leaves a field
+	// the app disabled itself disabled when it is enabled again; the search
+	// field's clear button and the date entry's calendar button take no tap.
+	search := widget.NewSearchField(nil)
+	search.SetText("clear me with the ✕")
+	disabledSearch = search
+	dateEntry := widget.NewDateEntry()
+	dateEntry.SetDate(time.Date(2026, 3, 9, 0, 0, 0, 0, time.Local))
+	code := widget.NewEntry()
+	code.Validator = func(s string) error {
+		if len(s) != 4 {
+			return errors.New("the code has four characters")
+		}
+		return nil
+	}
+	code.SetText("12345")
+	name := widget.NewEntry()
+	name.SetText("Ada")
+	formAppDisabled := widget.NewEntry()
+	formAppDisabled.SetText("disabled by the app")
+	formAppDisabled.Disable()
+	form := &widget.Form{
+		Items: []*widget.FormItem{
+			{Text: "Name", Widget: name, HintText: "A hint under the name"},
+			{Text: "Code", Widget: code, HintText: "Four characters"},
+			{Text: "App's own", Widget: formAppDisabled},
+		},
+		OnSubmit: tapped("Form submit"),
+		OnCancel: tapped("Form cancel"),
+	}
+	code.Validate()
+
 	widgets := []core.Disableable{
 		button, iconButton, round, fab, entry, sel, slider, sw, check, radio, segments, chip, filter,
 		date, clock, rich, bar, nav, carousel, list, tree, treeView, tabs, docs, inner,
+		search, dateEntry, form,
 	}
 	setAll := func(off bool) {
 		for _, d := range widgets {
@@ -142,6 +177,9 @@ func disabledTab() core.CanvasObject {
 			container.NewHBox(chip, filter),
 		)),
 		widget.NewCard("Pickers", "", container.NewVBox(date, clock)),
+		widget.NewCard("Form and fields", "The \"App's own\" field stays disabled", container.NewVBox(
+			box(320, 40, search), box(320, 40, dateEntry), form,
+		)),
 		widget.NewCard("Rich entry", "", box(320, 90, rich)),
 		widget.NewCard("Bars", "", container.NewVBox(bar, nav)),
 		widget.NewCard("Collections (wheel or swipe over them)", "", container.NewVBox(
@@ -152,6 +190,10 @@ func disabledTab() core.CanvasObject {
 		)),
 	))
 }
+
+// disabledSearch is the Disabled tab's search field, for the probe to find
+// its clear button.
+var disabledSearch *widget.SearchField
 
 // swatch is a small solid image, so a dimmed image is easy to see.
 func swatch(c color.Color) image.Image {

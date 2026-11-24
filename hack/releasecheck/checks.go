@@ -245,11 +245,12 @@ var checks = []check{
 	// ---- widgets ----
 	{
 		ID: "WG-01", Area: "widgets", Title: "Disabled widgets are visible but inert, with one look", Special: true,
-		Refs:  []string{"#1212", "#1213", "#1214", "#1215", "#1216", "#1223", "#1232", "#1251"},
+		Refs:  []string{"#1212", "#1213", "#1214", "#1215", "#1216", "#1223", "#1232", "#1251", "#1393", "#1394", "#1403", "#1404"},
 		Where: companion + " → Disabled",
 		Steps: []string{
 			"Tick \"Disable everything below\".",
 			"Tap or click every control on the page: the buttons, FAB, entry, select, slider, switch, check, radio, segments, chips, the date and time pickers, the rich entry, the app bar's menu and search icons, the navigation bar's items, the carousel's arrow, and the rows of the list, tree and tree view. Try typing into the entry.",
+			"Under \"Form and fields\": click the search field's ✕, the date entry's calendar button, the form's three fields and its Cancel and Submit.",
 			"Drag the slider, the carousel and the time picker's dial.",
 			"Over the list, tree and tree view, turn the mouse wheel (desktop, web) or swipe up (phone).",
 			"In the entry, select a word, copy it and paste it somewhere else.",
@@ -259,14 +260,18 @@ var checks = []check{
 			"Every control keeps its place and shows MD3's disabled look: labels and icons at about 38% of the text colour. A disabled Button's label is as readable as the disabled entry's text; in rc.1 the desktop dimmed it twice, to about 14% (#1223).",
 			"The look is the same on desktop, phone and web. In rc.1 a phone dimmed nothing for a widget with no disabled look of its own.",
 			"The rich entry's orange image is dimmed with its text (#1232). The app bar's title stays at full colour; only its icons look disabled (#1251).",
+			"The list's, tree's and tree view's rows are dimmed with the rest (#1393); in rc.5 their labels stayed at full colour.",
+			"The switch, which is on, has a pale track and a light handle; in rc.5 its handle was near-black (#1394).",
+			"In the form, the labels, both hints and the Code field's error line are drawn disabled with its fields and buttons; in rc.5 only Cancel and Submit were (#1403).",
+			"The search field's ✕ does not clear the text and the date entry's calendar does not open (#1404).",
 			"Nothing responds: the status line reports no tap, no value, page, selection, date or time changes, nothing opens, and no pressed or hover state shows.",
 			"The wheel or swipe over the disabled list, tree and tree view moves neither them nor the page around them (#1251).",
 			"The disabled entry's text can still be selected and copied, but not edited.",
-			"After unticking, everything works again.",
+			"After unticking, everything works again, except the form's \"App's own\" field, which stays disabled because the app disabled it itself (#1403).",
 		},
 	},
 	{
-		ID: "WG-02", Area: "widgets", Title: "A disabled container disables what it holds", Refs: []string{"#1218", "#1378", "#1288"}, Special: true,
+		ID: "WG-02", Area: "widgets", Title: "A disabled container disables what it holds", Refs: []string{"#1218", "#1378", "#1288", "#1393"}, Special: true,
 		Where: companion + " → Disabled → Containers (tabs, document tabs, an inner window)",
 		Steps: []string{
 			"Tick \"Disable everything below\".",
@@ -279,6 +284,7 @@ var checks = []check{
 			"While disabled, no tab switches, no document tab closes, and the inner window neither moves, resizes nor closes.",
 			"Every button and entry inside them, in every tab, looks disabled and does nothing.",
 			"The tab labels are dimmed once, not twice.",
+			"The links and \"Second document\" are dimmed like everything else inside; in rc.5 the links stayed blue and the label at full colour (#1393).",
 			"The links open nothing and show no hover underline or pointer, and Tab never stops on them, so Space or Enter cannot open them (#1378, #1288).",
 			"After unticking, everything inside works again, except \"Disabled by the app\", which stays disabled because the app disabled it itself.",
 		},
@@ -825,7 +831,7 @@ var checks = []check{
 		Expect: []string{"Every swatch is the colour its series is drawn in; in v1.2.0 the 3D Line legend showed palette colours instead."},
 	},
 	{
-		ID: "CH-02", Area: "charts", Title: "Crosshair and zoom on candles", Refs: []string{"#343"}, Special: true,
+		ID: "CH-02", Area: "charts", Title: "Crosshair and zoom on candles", Refs: []string{"#343", "#1396"}, Special: true,
 		Where: gallery + " → Charts → Trading (Price multi-pane) and Financial → Candlestick",
 		Steps: []string{
 			"Hover (desktop/web) or press and hold (phone) over the candles.",
@@ -834,6 +840,7 @@ var checks = []check{
 		Expect: []string{
 			"A crosshair and an axis tooltip follow the pointer over the candles and the volume bars.",
 			"Zoomed in, the candles and bars get wider; they do not stay thin with wide gaps.",
+			"Zoomed in, no candle or volume bar is drawn outside its plot: none over the axis labels, past the plot's edges or into the other pane. In rc.5 they did, in both the price and the volume pane (#1396).",
 		},
 	},
 	{
@@ -944,6 +951,27 @@ var checks = []check{
 			"Each tap sorts once: ascending, descending, then unsorted, with the header's arrow showing which. In rc.2 a tap on a phone did nothing. This is the default order, which a column's SortingOrder can now change (#1275).",
 			"Shift-click adds Change % as a second sort column.",
 			"Resizing a column, or a drag starting on a header, does not sort.",
+		},
+	},
+	{
+		ID: "TB-06", Area: "tables", Title: "Multi-cell selection", Platforms: keyed, Refs: []string{"#1401"},
+		Where: gallery + " → Data Grid → Selection (Mode: Multiple cells)",
+		Steps: []string{
+			"Click a Company cell, then Ctrl-click (Cmd-click on macOS) a Price cell two rows down and a Symbol cell in another row.",
+			"Ctrl/Cmd-click the Price cell again.",
+			"Click a Company cell, then Shift-click a Price cell three rows down.",
+			"Press Ctrl/Cmd+C and paste into a text editor.",
+			"Click the Price header to sort.",
+			"Switch Mode to \"Multiple rows\" and click a row, then Ctrl/Cmd-click another.",
+		},
+		Expect: []string{
+			"Each click highlights the cell clicked and only it, also in the pinned Symbol column: no whole row, and no cell one column to the right. In rc.5 a click selected the row, and a pinned column put the highlight one column off.",
+			"Ctrl/Cmd-click adds a cell and keeps the others; a second Ctrl/Cmd-click on the same cell removes it.",
+			"Shift-click highlights the rectangle from the first cell to the second: four rows by three columns.",
+			"The line above the grid lists the source rows that hold a selected cell, after every click.",
+			"The paste has one line per row, the selected cells of that row separated by tabs, in the order shown.",
+			"After sorting, the highlighted cells moved with their rows.",
+			"In \"Multiple rows\" mode, whole rows are selected as before.",
 		},
 	},
 

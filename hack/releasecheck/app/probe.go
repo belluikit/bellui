@@ -424,6 +424,17 @@ func (p *probe) disabled() {
 	got = p.text("status", statusLabel)
 	p.expect(got == "Everything below is disabled.", "WG-02 (#1378): a click on a link inside a disabled container reaches nothing", got)
 
+	// WG-01 / #1404: the disabled search field's clear button.
+	searchText := func() (t string) { bellui.DoAndWait(func() { t = disabledSearch.Text }); return t }
+	var clear core.CanvasObject // read once: find runs its matcher on the main goroutine
+	bellui.DoAndWait(func() { clear = disabledSearch.ActionItem })
+	clearButton := func(o core.CanvasObject) bool { return clear != nil && o == clear }
+	p.reveal("the form", func(o core.CanvasObject) bool { _, ok := o.(*widget.Form); return ok })
+	p.shot("wg01-form-disabled", "WG-01 (#1403): the form's labels, hint, error, fields and buttons all disabled; the search field and date entry too")
+	p.click("the disabled search field's clear button", clearButton)
+	got = searchText()
+	p.expect(got == "clear me with the ✕", "WG-01 (#1404): a click on a disabled search field's ✕ leaves its text", got)
+
 	var before string
 	tabs := ofType[*container.AppTabs]()
 	inner := p.must("the inner tabs", func(o core.CanvasObject) bool {
@@ -463,6 +474,11 @@ func (p *probe) disabled() {
 		}
 	}
 	p.expect(reached, "control: enabled, Tab reaches the link", fmt.Sprintf("%d stops", len(seen)))
+
+	p.click("the search field's clear button", clearButton)
+	got = searchText()
+	p.expect(got == "", "control: enabled, the same click on the ✕ clears the search field", got)
+	bellui.DoAndWait(func() { disabledSearch.SetText("clear me with the ✕") })
 }
 
 // tabWalk presses Tab n times and returns each newly focused object,
