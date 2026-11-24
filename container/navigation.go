@@ -172,6 +172,11 @@ func (nav *Navigation) CreateRenderer() core.WidgetRenderer {
 			OnTapped: nav.OnForward,
 		},
 	}
+	// The buttons and title are held by value, so extend each before its first
+	// method call; Disable on an unextended widget logs the warning (#1425).
+	r.title.ExtendBaseWidget(&r.title)
+	r.back.ExtendBaseWidget(&r.back)
+	r.forward.ExtendBaseWidget(&r.forward)
 	r.back.Disable()
 	r.forward.Disable()
 
