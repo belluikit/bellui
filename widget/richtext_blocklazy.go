@@ -84,13 +84,17 @@ func (t *RichText) shapeBlock(segs []RichTextSegment, maxWidth, innerPadding flo
 		textSource := textSeg.Style.FontSource
 
 		leftPad := float32(0)
+		rowSize := bigHeight
 		if textSeg.Style.isBlockquote() {
-			leftPad = innerPadding * 2
+			// Every row of a blockquote is drawn indented, so every row
+			// wraps at the indented width (#1437).
+			leftPad = blockquoteIndent(t.Theme())
+			rowSize.Width -= leftPad
 		}
-		retBounds, _ := lineBounds(textSeg, t.Wrapping, bellui.TextTruncateOff, wrapWidth-leftPad, bigHeight, func(text []rune) geo.Size {
+		retBounds, _ := lineBoundsAfter(textSeg, t.Wrapping, bellui.TextTruncateOff, wrapWidth-leftPad, rowSize, func(text []rune) geo.Size {
 			m, _ := bellui.MeasureTextFull(string(text), textSize, textStyle, textSource)
 			return m
-		})
+		}, currentBound != nil)
 		if currentBound != nil {
 			if len(retBounds) > 0 {
 				bounds[len(bounds)-1].end = retBounds[0].end

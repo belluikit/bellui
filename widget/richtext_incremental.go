@@ -181,12 +181,14 @@ func (c *denseBuildCtx) iterate(segList []RichTextSegment, cps []denseCheckpoint
 
 		leftPad := float32(0)
 		if textSeg.Style.isBlockquote() {
-			leftPad = c.innerPadding * 2
+			leftPad = blockquoteIndent(c.th)
 		}
-		retBounds, height := lineBounds(textSeg, t.Wrapping, t.Truncation, c.wrapWidth-leftPad, geo.NewSize(c.maxWidth, c.fitSize.Height), func(text []rune) geo.Size {
+		// Every row of a blockquote is drawn indented, so every row wraps at
+		// the indented width, not only the first (#1437).
+		retBounds, height := lineBoundsAfter(textSeg, t.Wrapping, t.Truncation, c.wrapWidth-leftPad, geo.NewSize(c.maxWidth-leftPad, c.fitSize.Height), func(text []rune) geo.Size {
 			m, _ := bellui.MeasureTextFull(string(text), textSize, textStyle, textSource)
 			return m
-		})
+		}, c.open)
 		if c.open {
 			if len(retBounds) > 0 {
 				last := len(c.bounds) - 1

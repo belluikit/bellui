@@ -448,10 +448,20 @@ func (s *selectable) selectAll() {
 // alignOffsetX returns the horizontal offset for the given row to account
 // for center or trailing text alignment. For leading alignment it returns 0.
 func (s *selectable) alignOffsetX(row int) float32 {
+	if s.provider == nil {
+		return 0
+	}
+	// A row whose break space is drawn at its left end and left out of the
+	// alignment has its glyphs moved left by it; the caret follows (#1437).
+	return s.alignOffsetXNoBreak(row) + s.provider.rowBreakShift(row)
+}
+
+// alignOffsetXNoBreak is alignOffsetX before a row's break space shift.
+func (s *selectable) alignOffsetXNoBreak(row int) float32 {
 	// Resolve against the active layout direction so the selection highlight
 	// tracks the text edge under RTL (no-op for the default LTR layout).
 	align := lang.ResolveAlign(s.alignment)
-	if align == bellui.TextAlignLeading || s.provider == nil {
+	if align == bellui.TextAlignLeading {
 		return 0
 	}
 	th := s.theme
