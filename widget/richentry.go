@@ -1031,7 +1031,9 @@ func (e *RichEntry) syncSel() {
 		// which owns the caret/selection model — otherwise the selectable child
 		// shadows RichEntry's own Tapped/Dragged handlers and clicks never move
 		// the caret (keyboard-only navigation).
-		e.sel = &selectable{theme: e.Theme(), provider: &e.provider, focus: e, host: e}
+		// alignByRow: each row is drawn by its own segments' alignment, so the
+		// hit-testing and highlight follow it, as the caret does (caretRectAt).
+		e.sel = &selectable{theme: e.Theme(), provider: &e.provider, focus: e, host: e, alignByRow: true}
 		e.sel.ExtendBaseWidget(e.sel)
 	}
 	e.sel.theme = e.Theme()
@@ -1126,6 +1128,12 @@ func (e *RichEntry) caretRectAt(row, col int, imageRow bool) (pos geo.Position, 
 	}
 	if h <= 0 {
 		h = e.provider.charMinSize(false, bellui.TextStyle{}, textSize).Height
+	}
+	// The row is drawn by its alignment and indent (a blockquote's), and the
+	// hit-testing that sets the caret reads them through the same offset
+	// (#1441); without it the caret sat at the leading, unindented edge.
+	if e.sel != nil {
+		x += e.sel.alignOffsetX(row)
 	}
 	return geo.NewPos(x-inputBorder/2, y), geo.NewSize(inputBorder, h)
 }

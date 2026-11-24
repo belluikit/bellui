@@ -336,6 +336,7 @@ type RichText struct {
 	prefixDirty    bool            // lineStartRow needs rebuild after a rowCount change
 	estCharsPerRow float32         // estimate denominator (avg chars per wrapped row)
 	lazyMaxWidth   float32         // wrap/measure width the lazy model was built for
+	lazyIndent     float32         // blockquote indent its rows are wrapped narrower by (rowIndent)
 	lineScratch    []rune          // reusable scratch for per-line wrap measurement (ensureLineMeasured)
 	lazyFullBuilds int             // full content (re)builds of buf — test hook for identity-chain regressions (pre-rebrand tracker #400)
 	vwLine         int             // widest logical line (wrap-off virtual width cache, pre-rebrand tracker #403)
@@ -575,6 +576,7 @@ func (t *RichText) CreateRenderer() core.WidgetRenderer {
 	t.selection = &focusSelectable{}
 	t.selection.ExtendBaseWidget(t.selection)
 	t.selection.focus = t.selection
+	t.selection.alignByRow = true
 	t.selection.theme = t.Theme()
 	t.selection.provider = t
 
@@ -1780,6 +1782,49 @@ func blockquoteIndent(th bellui.Theme) float32 {
 	return blockquoteIndentFor(th.Size(theme.SizeNameLineSpacing))
 }
 
+// rowAlignment returns the alignment a row is drawn with: its first segment's,
+// as layout reads it (layoutOneRow, layoutVirtualLazy).
+func (t *RichText) rowAlignment(row int) bellui.TextAlign {
+	bound := t.rowBoundary(row)
+	if bound == nil || len(bound.segments) == 0 {
+		return bellui.TextAlignLeading
+	}
+	return boundAlignment(bound)
+}
+
+// boundAlignment is rowAlignment for a row's boundary.
+func boundAlignment(bound *rowBoundary) bellui.TextAlign {
+	switch seg := bound.segments[0].(type) {
+	case *TextSegment:
+		return seg.Style.Alignment
+	case *HyperlinkSegment:
+		return seg.Alignment
+	}
+	return bellui.TextAlignLeading
+}
+
+// rowIndent returns how far in from the left a row is drawn: a blockquote's
+// indent (blockquoteIndent), else 0. Layout draws the row there, and the
+// caret, selection and hit-testing offsets follow it (#1441).
+func (t *RichText) rowIndent(row int) float32 {
+	bound := t.rowBoundary(row)
+	if bound == nil || len(bound.segments) == 0 {
+		return 0
+	}
+	if text, ok := bound.segments[0].(*TextSegment); ok && text.Style.isBlockquote() {
+		return blockquoteIndent(t.Theme())
+	}
+	return 0
+}
+
+// rowExtent returns how wide a row's content is drawn: its text (rowWidth)
+// from its indent (rowIndent). The minimum width is the widest of these; the
+// text's width alone left a blockquote's end past the edge by its indent
+// (#1441).
+func (t *RichText) rowExtent(row int, textSize float32) float32 {
+	return t.rowWidth(row, textSize) + t.rowIndent(row)
+}
+
 // blockquoteIndentFor is blockquoteIndent from the theme's line spacing, for
 // the layout, which already holds it.
 func blockquoteIndentFor(lineSpacing float32) float32 {
@@ -2368,12 +2413,7 @@ func (r *textRenderer) layoutOneRow(bound rowBoundary, objs []core.CanvasObject,
 
 	// The row's alignment comes from its leading segment; set it up front so a
 	// pre-block inline flush uses the row's own alignment.
-	rowAlign := bellui.TextAlignLeading
-	if text, ok := bound.segments[0].(*TextSegment); ok {
-		rowAlign = text.Style.Alignment
-	} else if link, ok := bound.segments[0].(*HyperlinkSegment); ok {
-		rowAlign = link.Alignment
-	}
+	rowAlign := boundAlignment(&bound)
 
 	i := oi
 	for segI := range bound.segments {
@@ -2751,6 +2791,11 @@ func (r *textRenderer) calculateMin(bounds []rowBoundary, wrap bellui.TextWrap, 
 		i += consumed
 
 		if needWidth {
+			// A blockquote is drawn in by its indent, as layoutOneRow draws it
+			// (#1441).
+			if text, ok := bound.segments[0].(*TextSegment); ok && text.Style.isBlockquote() {
+				rowWidth += blockquoteIndentFor(lineSpacing)
+			}
 			width = geo.Max(width, rowWidth)
 		}
 		height += rowHeight
@@ -2992,6 +3037,12 @@ func (r *textRenderer) layoutVirtualLazy(size geo.Size) {
 	align := bellui.TextAlignLeading
 	if seg, ok := t.singleSegment(); ok {
 		align = seg.Style.Alignment
+		// A blockquote is drawn indented, as the dense layout draws it (#1441).
+		if seg.Style.isBlockquote() {
+			indent := blockquoteIndent(th)
+			left += indent
+			lineWidth -= indent
+		}
 	}
 	objs := r.origObjs
 	rows := t.winRows

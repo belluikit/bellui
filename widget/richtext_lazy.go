@@ -48,6 +48,12 @@ func (t *RichText) updateRowBoundsLazy(width float32) {
 	t.varHeight = false // single-segment uses the uniform-stride model, not varHeight (pre-rebrand tracker #158)
 	t.rowBounds = nil   // dense model is not used in the lazy path
 	t.lazyMaxWidth = maxWidth
+	// A blockquote's rows are drawn indented (layoutVirtualLazy), so they wrap
+	// narrower by the indent, as the dense and block builds do (#1441).
+	t.lazyIndent = 0
+	if seg.Style.isBlockquote() {
+		t.lazyIndent = blockquoteIndent(th)
+	}
 	// Reuse the canonical buffer when it already reflects seg.Text (maintained
 	// incrementally by the lazy edit path, or built by a prior pass for the same
 	// content), skipping the O(document) full build. The string compare is O(1)
@@ -73,7 +79,7 @@ func (t *RichText) updateRowBoundsLazy(width float32) {
 			t.lineRowCount[i] = 1
 		}
 	} else {
-		t.estCharsPerRow = t.computeEstCharsPerRow(seg, maxWidth)
+		t.estCharsPerRow = t.computeEstCharsPerRow(seg, maxWidth-t.lazyIndent)
 		// One vectorized buffer walk instead of a per-line LineStart query —
 		// per-line queries cost a chunk scan each on the rope backing (pre-rebrand tracker #403).
 		t.buf.ForEachLine(func(line, start, end int) bool {
@@ -285,14 +291,16 @@ func (t *RichText) ensureLineMeasured(line int) {
 		t.lineScratch = t.buf.AppendRunes(t.lineScratch[:0], low, high)
 		lineRunes := t.lineScratch
 		// firstWidth == max width for a single segment (no inline predecessor), so
-		// the width check uses the full wrap width like the dense lineBounds does.
+		// the width check uses the full wrap width like the dense lineBounds does,
+		// less a blockquote's indent.
+		wrapWidth := t.lazyMaxWidth - t.lazyIndent
 		widthChecker := func(lo, hi int) bool {
-			return measurer(lineRunes[lo:hi]).Width <= t.lazyMaxWidth
+			return measurer(lineRunes[lo:hi]).Width <= wrapWidth
 		}
-		st := lineWrapState{measureWidth: t.lazyMaxWidth}
+		st := lineWrapState{measureWidth: wrapWidth}
 		// Truncation is off in the lazy path, so the height limit never fires; pass a
 		// large height so the height-guarded early return is inert.
-		max := geo.NewSize(t.lazyMaxWidth, float32(math.MaxInt32))
+		max := geo.NewSize(wrapWidth, float32(math.MaxInt32))
 		lineBoundsForRange(seg, lineRunes, 0, high-low, t.Wrapping, bellui.TextTruncateOff, max, measurer, widthChecker, &st)
 		subs = st.bounds
 	}
@@ -462,7 +470,7 @@ func (t *RichText) lazyVirtualWidth() float32 {
 		txt = strings.Repeat(passwordChar, end-begin)
 	}
 	m, _ := bellui.MeasureTextFull(txt, seg.size(), seg.Style.TextStyle, seg.Style.FontSource)
-	return m.Width
+	return m.Width + t.lazyIndent // drawn in by a blockquote's indent (#1441)
 }
 
 // --- Incremental single-segment editing (pre-rebrand tracker #380, storage behind textbuf pre-rebrand tracker #400) ---

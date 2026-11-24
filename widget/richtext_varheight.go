@@ -203,7 +203,7 @@ func (t *RichText) varHeightVirtualWidth() float32 {
 		if i < 0 || i >= n {
 			return
 		}
-		if rw := t.rowWidth(i, textSize); rw > widest {
+		if rw := t.rowExtent(i, textSize); rw > widest {
 			widest = rw
 		}
 	}
@@ -238,7 +238,7 @@ func (t *RichText) widenVirtualWidthForWindow() {
 	}
 	textSize := t.Theme().Size(theme.SizeNameText)
 	for _, row := range t.winRows {
-		if rw := t.rowWidth(row, textSize); rw > t.virtWidth {
+		if rw := t.rowExtent(row, textSize); rw > t.virtWidth {
 			t.virtWidth = rw
 		}
 	}

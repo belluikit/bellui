@@ -16,6 +16,7 @@ import (
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/cache"
 	"github.com/belluikit/bellui/test"
+	"github.com/belluikit/bellui/theme"
 )
 
 // inkColumns reports, for each column of img, whether rows [y0, y1) hold
@@ -160,6 +161,50 @@ func TestRichText_RTLSegmentsDrawnInVisualOrderWrapped(t *testing.T) {
 		}
 	}
 	assert.Greater(t, compared, 20, "the split and whole paragraphs must wrap alike at many widths")
+}
+
+// An inline non-text segment in a right-to-left row is drawn where the caret
+// layout puts its box, so a tap on the link lands on the link's slot (#1441).
+// Which slot that is follows the caret layout's run order, which #341 covers.
+func TestRichText_RTLRowPlacesLinkAtItsBox(t *testing.T) {
+	test.NewTempApp(t)
+	defer bellui.SetLayoutDirection(bellui.DirectionAuto)
+	for _, dir := range []bellui.Direction{bellui.DirectionLTR, bellui.DirectionRTL} {
+		bellui.SetLayoutDirection(dir)
+		for _, align := range []bellui.TextAlign{bellui.TextAlignLeading, bellui.TextAlignTrailing, bellui.TextAlignCenter} {
+			where := fmt.Sprintf("window direction %v, align %v", dir, align)
+			st := RichTextStyleInline
+			st.Alignment = align
+			rt := NewRichText(
+				&TextSegment{Style: st, Text: "שלום "},
+				&HyperlinkSegment{Text: "קישור", Alignment: align},
+				&TextSegment{Style: st, Text: " עולם"},
+			)
+			rt.Selectable = true
+			w := test.NewWindow(rt)
+			w.Resize(geo.NewSize(400, 60))
+			require.Len(t, rt.rowBounds, 1, where)
+
+			layout, ok := rt.rowVisualLayout(0)
+			require.True(t, ok, where)
+			boxLeft, _, ok := layout.BoxExtent(0)
+			require.True(t, ok, where)
+			pad := rt.Theme().Size(theme.SizeNameInnerPadding)
+			want := boxLeft + pad - rt.inset.Width + rt.selection.alignOffsetX(0)
+
+			var link core.CanvasObject
+			for _, o := range test.TempWidgetRenderer(t, rt).Objects() {
+				if c, ok := o.(*bellui.Container); ok && len(c.Objects) > 0 {
+					if _, ok := c.Objects[0].(*Hyperlink); ok {
+						link = o
+					}
+				}
+			}
+			require.NotNil(t, link, where)
+			assert.InDelta(t, want, link.Position().X, 0.05, "%s: the link is drawn at its box", where)
+			w.Close()
+		}
+	}
 }
 
 // A segment whose runs a neighbour's text separates in the visual order can't
