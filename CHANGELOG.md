@@ -19,6 +19,178 @@ one per change, so that open pull requests do not conflict here. Run
 `go run ./hack/changelog preview` to see them assembled; the release folds them
 into a section below.
 
+## v1.4.0 — 2026-11-24
+
+Fixes found after v1.3.0, mostly in rich text and a few widgets, and one
+addition: widgets made outside bellui can show the same MD3 pressed state
+as bellui's own (`PressTarget`). Right-to-left rich text split into styled
+runs now reads in the right order, blockquotes are indented however they
+start and keep their emphasis, and a character no font can draw is shown
+as the font's own box instead of a mark that covered the text after it.
+`SpinBox` fits its widest value and shows what it holds, `TextGrid` keeps
+its rows and cursor columns right with line numbers on, and the 12-hour
+time picker fits a phone. Two changes may need a look, both under
+*Changed*: a `RichTextStyle` is a blockquote only when it comes from
+`RichTextStyleBlockquote`, and `TextGrid`'s cursor positions count text
+columns, not the line-number gutter. The x/ modules carry the version with
+no changes of their own. The release check for this version was the macOS
+probe only, not the hand check on each platform.
+
+### Added
+
+* **Widgets made outside bellui can show the MD3 pressed state**
+  ([#1449](https://github.com/belluikit/bellui/issues/1449)). `PressTarget`,
+  `PressShape`, `AttachPress`, `TapPress` and `CancelPress` are now in the
+  `widget` package. They are the helper bellui's own Hyperlink, Chip, tree
+  rows and tabs use, so a widget that embeds `PressTarget` gets the same
+  ripple, timing and colours. Its doc comment says where each call goes.
+
+### Changed
+
+* **A `RichTextStyle` is a blockquote when it comes from
+  `RichTextStyleBlockquote`, not when it looks like it**
+  ([#1443](https://github.com/belluikit/bellui/issues/1443)). The preset
+  now carries an unexported mark. A copy of it stays a blockquote whatever
+  fields are changed, so `RichTextStyleBlockquote` made bold, inline,
+  aligned or recoloured is still drawn indented; before, any changed field
+  made it a plain paragraph. A style written out field by field with the
+  preset's values is no longer a blockquote: start from the preset
+  instead. Comparing a style with `RichTextStyleBlockquote` using `==`
+  still works for an unchanged copy.
+* **`TextGrid.CursorLocationForPosition` and `PositionForCursorLocation` use
+  text columns with line numbers on**
+  ([#1434](https://github.com/belluikit/bellui/issues/1434)). `col` is now the
+  index into `Rows[row].Cells`, the same `col` that `SetCell`, `SetStyle` and
+  `SetRune` take. With `ShowLineNumbers`, the two methods used to count the
+  line-number gutter's cells as columns, so a click on a line's first
+  character came back as a column a few cells further right. A point over the
+  gutter now returns column 0, so the cursor goes to the start of the line.
+  Without line numbers nothing changes. A caller that subtracted the gutter
+  itself should stop doing so.
+
+### Fixed
+
+* **A character no font can draw is shown as the font's own box, inside its
+  space** ([#1446](https://github.com/belluikit/bellui/issues/1446)). It was
+  drawn as the replacement character (a diamond with a question mark), about
+  twice as wide as the space the line gave it, so it covered the text after
+  it and a run of such characters drew as one solid block. It shows on the
+  web, which has no system fonts, for any script the app bundles no font for.
+  It is now the font's missing-glyph box, usually an empty or crossed
+  rectangle, which fits its space in `canvas.Text`, `RichText`, styled text
+  and `TextOnPath`, and matches what the WebGPU painter already drew. A font
+  whose missing glyph is blank shows nothing there.
+* **A blockquote that starts with bold, italic or code text, or a link, is
+  indented**
+  ([#1443](https://github.com/belluikit/bellui/issues/1443)). In a
+  `RichText` parsed from Markdown or HTML, a quote such as
+  `> **Bold** start of a quote` or `> [a link](…) start` was drawn with no
+  indent, like a plain paragraph, and so was any row of a quote that started with such a run.
+  The parsers now mark every run they put in a quote, and a row starting
+  with a marked run is drawn, wrapped and given its carets at the indent.
+* **Text inside a blockquote flows on one line, keeping its emphasis**
+  ([#1443](https://github.com/belluikit/bellui/issues/1443)). In a
+  `RichText` parsed from Markdown or HTML, a quote broke its line after
+  every run of plain text: `> start **bold** end` drew "start" on one row
+  and "bold end" on the next, and the lines of a quote written over several
+  source lines were never joined into one paragraph. Quote text now flows
+  like any paragraph's, and each paragraph of a quote starts on a new row.
+  HTML's `<b>`, `<u>`, `<s>` and named fonts inside a `<blockquote>` are no longer
+  dropped, and Markdown entities such as `&amp;` inside a quote are decoded.
+* **Right-to-left rich text split into styled runs reads in the right order,
+  and carets land on the text of aligned lines and blockquotes**
+  ([#1441](https://github.com/belluikit/bellui/issues/1441)). In a `RichText`
+  or `RichEntry`, a line of Hebrew or Arabic made of several runs drew its
+  runs left to right in the order they were written, so a sentence split
+  into two runs showed its second half first, and its carets sat on the
+  other half's glyphs. The runs are now drawn in the line's bidirectional
+  order, where the carets already were. A run whose text is split by a
+  neighbour's in that order, which mixes directions inside one run, is
+  still drawn in written order. In a selectable `RichText`, carets, taps and
+  the selection highlight of a trailing or centred line sat at the leading
+  edge, away from the text; in a `RichEntry` the caret did. They now follow
+  each line's alignment. A blockquote's carets and selection now sit at its
+  indent, its minimum width counts the indent, and a scrolling `RichText`
+  with `Virtualize` set now draws a long blockquote indented, as it does
+  without `Virtualize`.
+* **Text after a character no font can draw is no longer pushed right**
+  ([#1441](https://github.com/belluikit/bellui/issues/1441)). Each run of
+  such characters advanced the line twice, so the text after it was drawn
+  one character's width too far on and the line measured that much too
+  wide, apart from where its carets were. It shows on the web, which has no
+  system fonts, for any script the app bundles no font for.
+* **A SpinBox shows the value it holds once you are done typing, and a screen
+  reader reads what it shows**
+  ([#1440](https://github.com/belluikit/bellui/issues/1440)). Typing "12" into
+  a 0–10 box set its value to 10 but left "12" in the field for good. The
+  field now shows "10" when it loses focus or Enter is pressed. It is not
+  corrected while typing, so "15" can still be typed into 10–20. The screen
+  reader used its own rounding and read 2.25 at step 0.25 as "2.2"; it now
+  reads the field's text. `OnChanged` still fires as each digit is typed, as
+  before.
+* **A SpinBox shows a new range, step or value after `Refresh`**
+  ([#1433](https://github.com/belluikit/bellui/issues/1433)). Writing `Min`,
+  `Max`, `Step` or `Value` directly and calling `Refresh` used to change
+  nothing on screen until the next button press: the field kept "3" after the
+  step became 0.25, and kept a value above a lowered `Max`. `Refresh` now
+  clamps `Value` into the range, shows it formatted for the step and updates
+  the +/− buttons, without calling `OnChanged`; `SetValue` stays the setter
+  that reports. Text the user is in the middle of typing is kept while it
+  still stands for the value. The first render does the same for a SpinBox
+  built as a literal. The field's width follows the wider of `Min` and `Max`,
+  with no cap: an unbounded side should be `math.Inf`, which takes no width.
+* **`container.Navigation` and toolbar actions no longer log an
+  `ExtendBaseWidget` warning** ([#1425](https://github.com/belluikit/bellui/issues/1425)).
+  Showing a `Navigation`, creating a `TwoStateToolbarAction`, or disabling or
+  re-iconing a `ToolbarAction` before its toolbar first rendered, logged
+  "bellui: widget BaseWidget used before ExtendBaseWidget was called" once
+  per widget, and the app could do nothing about it. Nothing renders
+  differently.
+* **A FAB menu opened from a FAB near the window's edge stays on screen**
+  ([#1424](https://github.com/belluikit/bellui/issues/1424)). `FABMenu.Show`
+  put the menu up and to the left of the point it was given and kept nothing
+  on the canvas, so a FAB near the left edge opened its actions off-screen. A
+  menu that would cross an edge is now moved inside the canvas. In a
+  right-to-left window it opens up and to the right of the point, which is
+  then the FAB's top-left corner. The doc now says where the menu opens.
+* **Word-wrapped rich text breaks across styled runs as it does inside one**
+  ([#1423](https://github.com/belluikit/bellui/issues/1423),
+  [#1435](https://github.com/belluikit/bellui/issues/1435),
+  [#1437](https://github.com/belluikit/bellui/issues/1437)). In a `RichText`
+  or a word-wrapping `RichEntry`, a line that broke where a styled run began
+  with a space no longer starts with that space, and a word of the next run no
+  longer gets cut where the line's leftover width ends. A trailing or centred
+  line that breaks where a run ends with a space now lines up with the same
+  text in one run, in left-to-right and right-to-left text alike, and its
+  selection highlight follows. A blockquote's first line is never left empty,
+  and every line of a blockquote now wraps at the width it is drawn in, so the
+  last word of a full line no longer runs past the right edge. Caret positions
+  in a `RichEntry` are unchanged.
+* **A `TextGrid` with line numbers keeps its rows inside the grid**
+  ([#1422](https://github.com/belluikit/bellui/issues/1422)). A row style's
+  background no longer runs past the grid's right edge with `ShowLineNumbers`
+  (by the gutter's width) or `ShowWhitespace` (by one cell). The longest row
+  no longer loses its last character, or its newline marker, to the gutter.
+  The grid's minimum width now counts the gutter and the marker, so a
+  scrolling grid reaches the row's last cell. `SetStyle`, `SetCell` and
+  `SetRune` on a grid that is showing now paint the cell straight away. Until
+  now they drew nothing until the whole grid refreshed. The gutter's width
+  comes from the document's line count. The blank rows below a short document
+  in a tall grid no longer add a digit.
+* **The 12-hour time picker and the date-and-time picker fit a 360 dp phone**
+  ([#1421](https://github.com/belluikit/bellui/issues/1421)). The 12-hour
+  `TimePicker` counted its AM/PM selector beside the dial, though it sits in
+  the header row, so it asked for 364 dp and `DateTimePicker` for 380. They
+  now ask for 304 and 344, and their dialogs no longer squeeze them on a
+  360 dp screen.
+* **A `SpinBox` is wide enough for every value its range allows**
+  ([#1420](https://github.com/belluikit/bellui/issues/1420)). Its number
+  field was the same width for every range, so a value with more digits was
+  cut off: with the default theme "999.75" showed as "999.7" and "-99999999"
+  as "-9999". The field is now as wide as the wider of `Min` and `Max`,
+  formatted as the box shows them, and changing them and calling `Refresh`
+  resizes it.
+
 ## v1.3.0 — 2026-11-24
 
 The v1.3.0 stable, closing out five release candidates, after the release
