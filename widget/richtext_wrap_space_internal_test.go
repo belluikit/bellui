@@ -106,6 +106,41 @@ func TestRichText_WrapNeverStartsRowWithBreakSpace(t *testing.T) {
 	}
 }
 
+// Split anywhere at a space, two segments of one style lay out the rows the
+// same text does as one segment: the split neither pushes the next word down a
+// row with its space in front nor cuts it where the leftover ends (#1423).
+func TestRichText_WrapSplitAtSpaceMatchesOneSegment(t *testing.T) {
+	test.NewTempApp(t)
+	const text = "Select a word and make it bold, italic or code."
+	whole := NewRichText(&TextSegment{Style: RichTextStyleInline, Text: text})
+	whole.Wrapping = bellui.TextWrapWord
+	w := test.NewWindow(whole)
+	defer w.Close()
+	w.Resize(geo.NewSize(500, 400))
+	for width := float32(160); width <= 340; width += 4 {
+		whole.Resize(geo.NewSize(width, 300))
+		want := richRowStrings(whole)
+		for i, r := range text {
+			if r != ' ' {
+				continue
+			}
+			for _, cut := range []int{i, i + 1} { // the space leads the second segment, or ends the first
+				split := NewRichText(
+					&TextSegment{Style: RichTextStyleInline, Text: text[:cut]},
+					&TextSegment{Style: RichTextStyleInline, Text: text[cut:]},
+				)
+				split.Wrapping = bellui.TextWrapWord
+				split.Resize(geo.NewSize(width, 300))
+				got := richRowStrings(split)
+				for j := range got {
+					got[j] = strings.TrimRight(got[j], " ")
+				}
+				assert.Equal(t, want, got, "width %v, split %q | %q", width, text[:cut], text[cut:])
+			}
+		}
+	}
+}
+
 // When even one rune of the next segment does not fit what is left of the
 // row, the segment starts on the next row, and not with its leading space.
 func TestLineBounds_WrapWordLeftoverSkipsLeadingSpace(t *testing.T) {
@@ -117,6 +152,28 @@ func TestLineBounds_WrapWordLeftoverSkipsLeadingSpace(t *testing.T) {
 	assert.Equal(t, 0, bounds[0].end, "nothing of the segment fits the leftover")
 	assert.Equal(t, 1, bounds[1].begin, "the next row starts after the space")
 	assert.Equal(t, 9, bounds[1].end)
+}
+
+// A word of the next segment that does not fit what is left of the row moves
+// whole to the next row instead of being cut where the leftover ends; CJK
+// text, which breaks between any two characters, still fills the leftover.
+func TestLineBounds_WrapWordLeftoverKeepsWordWhole(t *testing.T) {
+	measurer := func(text []rune) geo.Size { return geo.NewSize(float32(len(text))*10, 10) }
+	maxSize := geo.NewSize(100, 1000)
+
+	seg := &TextSegment{Text: "make it bold"}
+	bounds, _ := lineBounds(seg, bellui.TextWrapWord, bellui.TextTruncateOff, 30, maxSize, measurer)
+	require.NotEmpty(t, bounds)
+	assert.Equal(t, 0, bounds[0].end, "\"mak\" fits the leftover, but the word moves down whole")
+	assert.Equal(t, 0, bounds[1].begin)
+	assert.Equal(t, 7, bounds[1].end, "the next row holds \"make it\"")
+
+	// Its first "word", up to the space, would fit a full row, so only the CJK
+	// rule keeps it in the leftover.
+	cjk := &TextSegment{Text: "昆比亚萨尔 萨雷鬼桑巴探戈"}
+	bounds, _ = lineBounds(cjk, bellui.TextWrapWord, bellui.TextTruncateOff, 30, maxSize, measurer)
+	require.NotEmpty(t, bounds)
+	assert.Equal(t, 3, bounds[0].end, "CJK fills the leftover")
 }
 
 // A word-wrapped RichEntry rows and caret positions follow: the dropped space

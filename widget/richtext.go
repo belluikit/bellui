@@ -3502,6 +3502,28 @@ func breakableSpace(r rune) bool {
 	return unicode.IsSpace(r) && r != '\u00A0' && r != '\u2007' && r != '\u202F'
 }
 
+// splitsWord reports whether breaking text before index i cuts a word: the
+// runes on both sides are not spaces and neither is CJK text, which may break
+// between any two characters.
+func splitsWord(text []rune, i int) bool {
+	if i <= 0 || i >= len(text) {
+		return false
+	}
+	a, b := text[i-1], text[i]
+	return !breakableSpace(a) && !breakableSpace(b) && !isCJK(a) && !isCJK(b)
+}
+
+// firstBreakableSpace returns the index of the first breakable space in text,
+// or len(text) when it has none: the end of its first word.
+func firstBreakableSpace(text []rune) int {
+	for i, r := range text {
+		if breakableSpace(r) {
+			return i
+		}
+	}
+	return len(text)
+}
+
 func float32ToFixed266(f float32) fixed.Int26_6 {
 	return fixed.Int26_6(float64(f) * (1 << 6))
 }
@@ -3731,7 +3753,13 @@ func lineBoundsWord(seg *TextSegment, text []rune, low, high, lineEnd int, trunc
 
 				high = low + spaceIndex
 			}
-			if noSpace && high == fallback && subWidth <= max.Width { // add a newline as there is more space on next
+			// The first row of a segment that continues an earlier one's row
+			// has only the leftover width. A word that does not fit there moves
+			// whole to the next row, as it would in one segment, instead of
+			// being cut where the leftover ends (#1423).
+			wordToNextRow := noSpace && st.measureWidth < max.Width && splitsWord(sub, high-low) &&
+				measurer(sub[:firstBreakableSpace(sub)]).Width <= max.Width
+			if noSpace && high == fallback && subWidth <= max.Width || wordToNextRow { // add a newline as there is more space on next
 				st.bounds = append(st.bounds, rowBoundary{[]RichTextSegment{seg}, st.reuse, low, low, false})
 				st.reuse++
 				high = oldHigh
