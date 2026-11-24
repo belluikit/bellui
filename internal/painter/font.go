@@ -286,20 +286,22 @@ func DrawString(dst draw.Image, s string, clr color.Color, f shaping.Fontmap, fo
 	advance := float32(0)
 	y := math.MinInt
 	var lastRun shaping.Output
-	walkString(f, s, float32ToFixed266(fontSize), style, &advance, scale, func(run shaping.Output, x float32) {
+	runs, base := shapedRuns(f, s, fontSize, scale, style, &advance)
+	for _, sr := range runs {
+		run, x := sr.run, sr.x
 		if y == math.MinInt {
-			y = int(math.Ceil(float64(fixed266ToFloat32(run.LineBounds.Ascent) * r.PixScale)))
+			y = lineBaseline(base, r.PixScale)
 		}
 		lastRun = run
 		if len(run.Glyphs) == 1 {
 			if run.Glyphs[0].GlyphID == 0 {
 				r.DrawStringAt(string([]rune{0xfffd}), dst, int(x), y, f.ResolveFace(0xfffd))
-				return
+				continue
 			}
 		}
 
 		r.DrawShapedRunAt(run, dst, int(x), y)
-	})
+	}
 
 	if style.Underline && y != math.MinInt {
 		drawUnderline(dst, clr, y, lastRun.LineBounds, 0, int(advance), scale)
@@ -316,13 +318,39 @@ func DrawString(dst draw.Image, s string, clr color.Color, f shaping.Fontmap, fo
 func ShapeString(f shaping.Fontmap, s string, fontSize, scale float32, style bellui.TextStyle, cb func(run shaping.Output, x float32)) (baseline int) {
 	baseline = math.MinInt
 	advance := float32(0)
-	walkString(f, s, float32ToFixed266(fontSize), style, &advance, scale, func(run shaping.Output, x float32) {
+	runs, base := shapedRuns(f, s, fontSize, scale, style, &advance)
+	for _, sr := range runs {
 		if baseline == math.MinInt {
-			baseline = int(math.Ceil(float64(fixed266ToFloat32(run.LineBounds.Ascent) * scale)))
+			baseline = lineBaseline(base, scale)
 		}
-		cb(run, x)
-	})
+		cb(sr.run, sr.x)
+	}
 	return baseline
+}
+
+// shapedRun is one run walkString shaped, with its pen x in pixels.
+type shapedRun struct {
+	run shaping.Output
+	x   float32
+}
+
+// shapedRuns shapes s on one line and returns its runs with the line's
+// ascent. The runs are collected first because the line's ascent, which every
+// run is drawn on, is known only once the whole line is shaped: drawing on the
+// first run's ascent put a line starting with a symbol or an emoji off the
+// baseline it is measured with (#1412).
+func shapedRuns(f shaping.Fontmap, s string, fontSize, scale float32, style bellui.TextStyle, advance *float32) ([]shapedRun, float32) {
+	var runs []shapedRun
+	_, base := walkString(f, s, float32ToFixed266(fontSize), style, advance, scale, func(run shaping.Output, x float32) {
+		runs = append(runs, shapedRun{run, x})
+	})
+	return runs, base
+}
+
+// lineBaseline is the line's baseline in pixels from its top, for an ascent in
+// points.
+func lineBaseline(ascent, scale float32) int {
+	return int(math.Ceil(float64(ascent * scale)))
 }
 
 // drawUnderline draws a horizontal line below the text baseline, spanning the
@@ -798,7 +826,17 @@ func walkString(faces shaping.Fontmap, s string, textSize fixed.Int26_6, style b
 	// Union each run's LineBounds so the box fits the tallest glyph on the line,
 	// mirroring the shared-baseline max-ascent pass in DrawStyledRuns. Latin-only
 	// content shapes in the same face as the space, so this is a no-op there.
+	//
+	// The bundled UI-symbol faces are left out (#1412): they keep Noto's tall
+	// line metrics (up to 2.05 em against Roboto's 1.17) that their glyphs do not
+	// use, so a ✓ or → made a line 45-75% taller and moved its text down. Their
+	// glyphs fit the text face's line to within about 0.1 em.
 	lineBounds := out.LineBounds
+	union := func(face *font.Face, b shaping.Bounds) {
+		if !isBundledSymbolsFace(face) {
+			lineBounds = unionLineBounds(lineBounds, b)
+		}
+	}
 
 	ins := segmenter.Split(in, withPresentation(faces, in.Text))
 	for _, in := range ins {
@@ -811,7 +849,7 @@ func walkString(faces shaping.Fontmap, s string, textSize fixed.Int26_6, style b
 					in.RunEnd = i
 					var b shaping.Bounds
 					x, b = shapeCallback(shaper, in, x, scale, letterSpacing, cb)
-					lineBounds = unionLineBounds(lineBounds, b)
+					union(in.Face, b)
 				}
 				x = tabStop(spacew, x, style.TabWidth)
 
@@ -825,7 +863,7 @@ func walkString(faces shaping.Fontmap, s string, textSize fixed.Int26_6, style b
 
 		var b shaping.Bounds
 		x, b = shapeCallback(shaper, in, x, scale, letterSpacing, cb)
-		lineBounds = unionLineBounds(lineBounds, b)
+		union(in.Face, b)
 	}
 
 	*advance = x

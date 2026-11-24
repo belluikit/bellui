@@ -30,6 +30,20 @@ func symbolsFallbackFaces() []*font.Face {
 	return symbolsFaces
 }
 
+// isBundledSymbolsFace reports whether face is one of the bundled UI-symbol
+// faces, which do not grow a line's metrics (#1412).
+func isBundledSymbolsFace(face *font.Face) bool {
+	if face == nil {
+		return false
+	}
+	for _, f := range symbolsFallbackFaces() {
+		if f == face {
+			return true
+		}
+	}
+	return false
+}
+
 // addSymbolsFallbackFaces appends the bundled UI-symbol fallback faces to a
 // font chain.
 func addSymbolsFallbackFaces(faces *dynamicFontMap) {
