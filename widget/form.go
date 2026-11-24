@@ -69,6 +69,10 @@ type Form struct {
 	submitButton *Button
 
 	disabled bool
+	// disabledItems holds the item widgets Disable switched off, for Enable
+	// to switch back on: an item the app disabled itself stays disabled
+	// (#1403).
+	disabledItems []core.Disableable
 
 	onValidationChanged func(error)
 	validationError     error
@@ -111,6 +115,7 @@ func (f *Form) Refresh() {
 	f.ExtendBaseWidget(f)
 	cache.Renderer(f.super()) // we are about to make changes to renderer created content... not great!
 	f.ensureRenderItems()
+	f.disableItems() // one appended while disabled
 	f.updateButtons()
 	f.updateLabels()
 
@@ -124,31 +129,60 @@ func (f *Form) Refresh() {
 	canvas.Refresh(f.super()) // refresh ourselves for BG color - the above updates the content
 }
 
-// Enable enables submitting this form.
+// Enable enables the form: its buttons, and the items Disable disabled. An
+// item the app disabled itself stays disabled.
 //
 // Since: 1.0
 func (f *Form) Enable() {
 	f.disabled = false
+	for _, d := range f.disabledItems {
+		d.Enable()
+	}
+	f.disabledItems = nil
 	if f.cancelButton == nil {
 		return // not rendered yet: CreateRenderer applies the state
 	}
 	f.cancelButton.Enable()
 	f.checkValidation(nil) // as the form may be invalid
+	f.Refresh()
 }
 
-// Disable disables submitting this form.
+// Disable disables the form: submitting it, and every item widget that can
+// be disabled, as a disabled container does with its content. The labels and
+// helper text take the disabled colour. It disabled only the submit and cancel
+// buttons, so a form in a disabled tab kept live-looking fields and labels
+// (#1403). An item added while the form is disabled is disabled when the form
+// next refreshes.
 //
 // Since: 1.0
 func (f *Form) Disable() {
 	f.disabled = true
+	f.disableItems()
 	if f.cancelButton == nil {
 		return // not rendered yet: CreateRenderer applies the state
 	}
 	f.submitButton.Disable()
 	f.cancelButton.Disable()
+	f.Refresh()
 }
 
-// Disabled returns whether submitting the form is disabled.
+// disableItems disables, and records, each enabled item widget while the form
+// is disabled.
+func (f *Form) disableItems() {
+	if !f.disabled {
+		return
+	}
+	for _, item := range f.Items {
+		d, ok := item.Widget.(core.Disableable)
+		if !ok || d.Disabled() {
+			continue // not disableable, or the app's own, or ours already
+		}
+		d.Disable()
+		f.disabledItems = append(f.disabledItems, d)
+	}
+}
+
+// Disabled returns whether the form is disabled.
 // Note that, if the form fails validation, the submit button may be
 // disabled even if this method returns true.
 //
@@ -327,7 +361,11 @@ func (f *Form) setUpValidation(widget core.CanvasObject, i int) {
 		f.Items[i].invalid = err != nil
 		f.setValidationError(err)
 		f.checkValidation(err)
-		f.updateHelperText(f.Items[i])
+		if f.updateHelperText(f.Items[i]) {
+			// The item grew or shrank by the helper line: lay the form out
+			// again, or a same-size resize leaves the old layout (#1403).
+			f.Refresh()
+		}
 	}
 	if w, ok := widget.(bellui.Validatable); ok {
 		f.Items[i].invalid = w.Validate() != nil
@@ -366,13 +404,16 @@ func (f *Form) setValidationError(err error) {
 	}
 }
 
-func (f *Form) updateHelperText(item *FormItem) {
+// updateHelperText sets an item's hint or validation message, and reports
+// whether the line was shown or hidden by it.
+func (f *Form) updateHelperText(item *FormItem) bool {
 	th := f.Theme()
 	v := bellui.CurrentApp().Settings().ThemeVariant()
 
 	if item.helperOutput == nil {
-		return // testing probably, either way not rendered yet
+		return false // testing probably, either way not rendered yet
 	}
+	wasVisible := item.helperOutput.Visible()
 	showHintIfError := false
 	if e, ok := item.Widget.(*Entry); ok {
 		if !e.dirty || (e.focused && !item.wasFocused) {
@@ -390,6 +431,9 @@ func (f *Form) updateHelperText(item *FormItem) {
 		item.helperOutput.Text = item.validationError.Error()
 		item.helperOutput.Color = th.Color(theme.ColorNameError, v)
 	}
+	if f.disabled {
+		item.helperOutput.Color = th.Color(theme.ColorNameDisabled, v) // #1403
+	}
 
 	if item.helperOutput.Text == "" {
 		item.helperOutput.Hide()
@@ -397,6 +441,7 @@ func (f *Form) updateHelperText(item *FormItem) {
 		item.helperOutput.Show()
 	}
 	item.helperOutput.Refresh()
+	return item.helperOutput.Visible() != wasVisible
 }
 
 func (f *Form) updateLabels() {
@@ -417,14 +462,9 @@ func (f *Form) updateLabels() {
 			continue
 		}
 		l.TextSize = th.Size(theme.SizeNameText)
-		if dis, ok := item.Widget.(core.Disableable); ok {
-			if dis.Disabled() {
-				l.Color = th.Color(theme.ColorNameDisabled, v)
-			} else {
-				l.Color = th.Color(theme.ColorNameOnSurface, v)
-			}
-		} else {
-			l.Color = th.Color(theme.ColorNameOnSurface, v)
+		l.Color = th.Color(theme.ColorNameOnSurface, v)
+		if dis, ok := item.Widget.(core.Disableable); f.disabled || ok && dis.Disabled() {
+			l.Color = th.Color(theme.ColorNameDisabled, v)
 		}
 
 		l.Text = item.Text
