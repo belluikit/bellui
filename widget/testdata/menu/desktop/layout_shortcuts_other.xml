@@ -62,7 +62,7 @@
 								<widget pos="0,109" size="205x32" type="*widget.menuItem">
 									<text pos="8,8" size="138x16">d</text>
 									<text color="rgba(255,255,255,50)" pos="154,8" size="36x16">Shift+</text>
-									<text color="rgba(255,255,255,50)" pos="190,-4" size="7x28">↓</text>
+									<text color="rgba(255,255,255,50)" pos="190,8" size="7x16">↓</text>
 								</widget>
 								<widget pos="0,145" size="205x32" type="*widget.menuItem">
 									<text pos="8,8" size="103x16">e</text>
@@ -87,7 +87,7 @@
 								<widget pos="0,291" size="205x32" type="*widget.menuItem">
 									<text pos="8,8" size="106x16">i</text>
 									<text color="rgba(255,255,255,50)" pos="122,8" size="61x16">Alt+Shift+</text>
-									<text color="rgba(255,255,255,50)" pos="183,-4" size="14x28">←</text>
+									<text color="rgba(255,255,255,50)" pos="183,8" size="14x16">←</text>
 								</widget>
 								<widget pos="0,327" size="205x32" type="*widget.menuItem">
 									<text pos="8,8" size="67x16">j</text>
@@ -107,7 +107,7 @@
 								<widget pos="0,436" size="205x32" type="*widget.menuItem">
 									<text pos="8,8" size="57x16">m</text>
 									<text color="rgba(255,255,255,50)" pos="73,8" size="110x16">Ctrl+Shift+Super+</text>
-									<text color="rgba(255,255,255,50)" pos="183,-4" size="14x28">→</text>
+									<text color="rgba(255,255,255,50)" pos="183,8" size="14x16">→</text>
 								</widget>
 								<widget pos="0,473" size="205x32" type="*widget.menuItem">
 									<text pos="8,8" size="7x16">n</text>
@@ -122,7 +122,7 @@
 								<widget pos="0,546" size="205x32" type="*widget.menuItem">
 									<text pos="8,8" size="145x16">p</text>
 									<text color="rgba(255,255,255,50)" pos="161,8" size="29x16">Ctrl+</text>
-									<text color="rgba(255,255,255,50)" pos="190,-4" size="7x28">↑</text>
+									<text color="rgba(255,255,255,50)" pos="190,8" size="7x16">↑</text>
 								</widget>
 								<widget pos="0,582" size="205x32" type="*widget.menuItem">
 									<text pos="8,8" size="166x16">q</text>
