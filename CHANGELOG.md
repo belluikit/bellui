@@ -19,6 +19,130 @@ one per change, so that open pull requests do not conflict here. Run
 `go run ./hack/changelog preview` to see them assembled; the release folds them
 into a section below.
 
+## v1.3.0 — 2026-11-24
+
+The v1.3.0 stable, closing out five release candidates, after the release
+check passed by hand on desktop, Android, iOS and the web. The line in one
+paragraph: a long run of device work on phones and tablets (the on-screen
+keyboard, touch scrolling and taps, partial repaint, audio that no longer
+clicks or replays a piece of the last song when songs change, memory that
+grew while an app ran); 22 more widgets that can be disabled; MD3's pressed
+state on most tappable widgets, and Danger, Success and Warning versions of
+every Button style; new widgets and containers (`ChipGroup`, which can also
+let people exclude options, `WheelPicker`, `SwipeArea`, `container.Opacity`);
+the platform's own sign-in on phones (`auth.Authenticate`); images drawn in
+the colours their files declare; themes in PXF; drawing tools in x/charts;
+and audio playback with no widget in x/mmedia. What may need a look is under
+*Changed* in each release candidate below. The largest: bellui needs Go
+1.26.2 or newer, x/mmedia links FFmpeg as shared libraries and requires
+goffmpeg v0.13.1, translations use `{Name}` placeholders, and JSON catalogs
+are no longer read.
+
+Everything below is new since rc.5. Content inside a disabled widget is now
+drawn dimmed, and a disabled `Form` disables its fields (see *Changed*).
+x/tables can select several cells. A ✓, ✕, ★ or → no longer makes text
+taller. And there are fixes to right-to-left radio groups, the disabled
+switch, zoomed chart candles and the search field. The `x/*` modules and the
+`bellui` command are released at v1.3.0 with it.
+
+### Added
+
+* **x/tables: `SelectionMultiCell` selects several cells**
+  ([#1401](https://github.com/belluikit/bellui/issues/1401)). The mode was
+  documented as allowing multiple cells but kept one, and a click selected
+  that cell's whole row. Now a click selects a cell, Ctrl/Cmd-click adds or
+  removes one, and Shift-click selects the rectangle from the last clicked
+  cell; only the selected cells are drawn selected, and a screen reader hears
+  each. The selection follows its data through sort and filter. The new
+  `GridAPI.SelectedCells` lists the cells (Row a source row, as
+  `GetSelectedRows`), `OnSelectionChanged` reports the rows that hold one, and
+  copy puts them on the clipboard a line per row. `GetSelectedCells` is the
+  cursor cell, as before.
+
+### Changed
+
+* **A disabled `Form` disables its fields and draws its labels disabled**
+  ([#1403](https://github.com/belluikit/bellui/issues/1403)). `Form.Disable`
+  disabled only the submit and cancel buttons, so a form in a disabled tab,
+  which the tab disables as a whole, kept live-looking fields and labels at
+  full colour. It now disables every item widget that can be disabled, as a
+  disabled container does its content, and draws the item labels and their
+  hint and validation text in the disabled colour; `Enable` switches back on
+  only the items `Disable` switched off, so a field the app disabled itself
+  stays disabled. A form also lays itself out again when a field's hint or
+  error line appears or goes, where a resize to the same size had left the
+  old layout.
+
+### Fixed
+
+* **A ✓, ✕, ★ or → no longer makes text taller**
+  ([#1412](https://github.com/belluikit/bellui/issues/1412)). The bundled
+  symbol fonts kept Noto's tall line metrics, so a line containing one of
+  their characters grew 45–75% and its text moved down. In labels, buttons and
+  list rows, and in a one-line entry it overflowed and showed a vertical scroll
+  bar. Those fonts no longer grow a line; emoji and CJK still do, as before.
+  Text is now drawn on the baseline it is measured with when it starts with a
+  symbol or an emoji, and a one-line entry no longer scrolls up and down.
+* **`SearchField` no longer takes over the entry's `Validator`**
+  ([#1411](https://github.com/belluikit/bellui/issues/1411)). It used the
+  public `Validator` field to hear about text changes, so a search field with
+  text drew a validation ✓ beside its ✕ and kept room for it, any validator
+  an app set was overwritten when the field was drawn, and `OnChanged` fired
+  once with "" when the field first appeared. It now uses an internal hook:
+  no ✓, an app's `Validator` works, and `OnChanged` fires only when the text
+  changes.
+* **A disabled entry disables its action button**
+  ([#1404](https://github.com/belluikit/bellui/issues/1404)). A
+  `SearchField`'s clear button and a `DateEntry`'s calendar button stayed in
+  full colour, and live, inside a disabled field. An `Entry`'s `ActionItem`
+  that can be disabled is now disabled with the entry and enabled again with
+  it; one the app disabled itself stays disabled.
+* **x/tables: the selected and hovered cell are drawn in their own column**
+  ([#1401](https://github.com/belluikit/bellui/issues/1401)). With a column
+  pinned on the left, selecting or hovering a cell drew the next one selected
+  or hovered, and a pinned cell was never drawn selected.
+* **x/charts: zoomed in, shapes stay inside the plot**
+  ([#1396](https://github.com/belluikit/bellui/issues/1396)). Zoomed into a
+  chart, bars, candlesticks, boxplots, pictorial bars and scatter points were
+  drawn past the plot's left and right edges: over the Y axis labels, the
+  margins and the next pane of a `ChartGroup`. Bars and points for the
+  categories a zoom hides were drawn outside, and a candle or bar partly in
+  view was drawn whole, which zoomed in far is hundreds of pixels wide. Now a
+  bar, candle body or box is cut at the plot's edge, wicks and whiskers
+  outside it are left out, and a point or pictorial symbol is drawn only
+  while its middle is inside. Unzoomed charts draw exactly as before. Line
+  series already clipped and are unchanged.
+* **A disabled switch that is on looks disabled**
+  ([#1394](https://github.com/belluikit/bellui/issues/1394)). It drew a
+  near-black handle on a grey track in the light theme, the heaviest thing on
+  a page of dimmed controls, so it read as active. It now draws Material 3's
+  disabled selected switch: a track in the on-surface colour at 12% and a
+  handle in the surface colour. A disabled switch that is off is unchanged.
+* **Content inside a disabled container looks disabled**
+  ([#1393](https://github.com/belluikit/bellui/issues/1393)). A container
+  that draws its own disabled look (`AppTabs`, `DocTabs`, `InnerWindow`,
+  `List`, `Tree`, a `Form`, x/tables' `DataGrid`, x/dag's `DAGCanvas`)
+  disables only the widgets inside it that can be disabled, so a link, a
+  label in a tab or a list row, a card, a table's cells or an app's own widget
+  stayed at full colour while it took no input. Now everything such a widget
+  draws is dimmed to the disabled 38%, once: a `Button` or an `Entry` beside
+  it, which draw their own disabled look, are not dimmed again. Content an app
+  supplies to `DataGrid` and `DAGCanvas` is dimmed too, where their docs said
+  it was left alone; it is still not disabled or blocked by them. A widget's
+  scroll bars and raw canvas objects an app places directly in a container are
+  not dimmed. `RichText` gains `DrawsDisabledLook`, and `container.Clip` and
+  `container.Scroll` implement it.
+* **Radio and check groups mirror under a right-to-left layout**
+  ([#1392](https://github.com/belluikit/bellui/issues/1392)). Right-to-left,
+  a radio option's label moved to the right but its circle stayed on the
+  left, so in a horizontal `RadioGroup` each circle sat on the previous
+  option's label. Each option now puts its circle right of its label, as a
+  `Check` already did, and horizontal `RadioGroup`s and `CheckGroup`s run
+  from the right edge, first option rightmost; vertical ones line up on the
+  right. Left-to-right is unchanged on screen; a radio label's box is now as
+  wide as the room beside its circle rather than the whole option, which a
+  test that records object sizes will notice.
+
 ## v1.3.0-rc.5 — 2026-11-23
 
 The fifth release candidate for v1.3.0. A `ChipGroup` can now let people
