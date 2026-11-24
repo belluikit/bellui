@@ -439,9 +439,11 @@ func parseMeasureFont(content []byte) *font.Face {
 	return loaded
 }
 
-// MeasureString returns how far dot would advance by drawing s with f.
-// Tabs are translated into a dot location change.
-func MeasureString(f shaping.Fontmap, s string, textSize float32, style bellui.TextStyle) (size geo.Size, advance float32) {
+// MeasureString returns the size of s drawn on one line with f: its width is
+// how far dot advances, tabs included. base is the baseline's distance from
+// the top of the line, unscaled.
+func MeasureString(f shaping.Fontmap, s string, textSize float32, style bellui.TextStyle) (size geo.Size, base float32) {
+	var advance float32
 	return walkString(f, s, float32ToFixed266(textSize), style, &advance, 1, func(shaping.Output, float32) {})
 }
 
@@ -461,9 +463,11 @@ func MeasureStyledRuns(runs []canvas.TextRun, defaultSize float32) (size geo.Siz
 			sz = defaultSize
 		}
 		face := CachedFontFace(run.TextStyle, run.FontSource, nil)
-		s, adv := MeasureString(face.Fonts, run.Text, sz, run.TextStyle)
-		advances[i] = adv
-		totalWidth += adv
+		// The width, not MeasureString's second result, which is the
+		// baseline: the run's ascent was reported as its advance.
+		s, _ := MeasureString(face.Fonts, run.Text, sz, run.TextStyle)
+		advances[i] = s.Width
+		totalWidth += s.Width
 		if s.Height > maxHeight {
 			maxHeight = s.Height
 		}

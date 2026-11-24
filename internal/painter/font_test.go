@@ -324,6 +324,23 @@ func TestMeasureStyledRuns_MultipleRuns(t *testing.T) {
 	assert.InDelta(t, total, size.Width, 0.01)
 }
 
+// Each run's advance is its measured width, which DrawStyledRuns moves x by.
+// It was MeasureString's second result, the baseline, so every run reported
+// its ascent and the total width was the sum of the ascents.
+func TestMeasureStyledRuns_AdvanceIsTheRunsWidth(t *testing.T) {
+	runs := []canvas.TextRun{{Text: "Hello"}, {Text: " "}, {Text: "World, wide"}, {Text: "i", TextSize: 40}}
+	_, advances := painter.MeasureStyledRuns(runs, 20)
+	fonts := painter.CachedFontFace(bellui.TextStyle{}, nil, nil).Fonts
+	for i, run := range runs {
+		size := run.TextSize
+		if size == 0 {
+			size = 20
+		}
+		want, _ := painter.MeasureString(fonts, run.Text, size, bellui.TextStyle{})
+		assert.InDelta(t, want.Width, advances[i], 0.01, "run %d %q", i, run.Text)
+	}
+}
+
 func TestMeasureStyledRuns_EmptyRuns(t *testing.T) {
 	runs := []canvas.TextRun{
 		{Text: ""},
