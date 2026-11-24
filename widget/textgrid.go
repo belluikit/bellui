@@ -528,6 +528,39 @@ func (t *textGridContent) CreateRenderer() core.WidgetRenderer {
 	return r
 }
 
+// lineNumberWidth is how many digits the line-number gutter holds. It counts
+// the document's rows, not the blank rows a tall view adds below them: those
+// have no number, and counting them made the gutter, and with it the grid's
+// minimum width, change with the grid's height.
+func (t *textGridContent) lineNumberWidth() int {
+	return len(strconv.Itoa(len(t.text.Rows) + 1))
+}
+
+// gutterCells is how many cells come before a row's text: with
+// ShowLineNumbers, the right-aligned line number and its "|" separator.
+func (t *textGridContent) gutterCells() int {
+	if !t.text.ShowLineNumbers {
+		return 0
+	}
+	return t.lineNumberWidth() + 1
+}
+
+// contentCells is how many cells the longest row needs: the gutter, its text,
+// and the newline marker ShowWhitespace adds. A row never has fewer cells than
+// this, so nothing it shows is cut off, and the grid's minimum width is this
+// many cells wide, so a scroller can reach all of them (#1422).
+func (t *textGridContent) contentCells() int {
+	longest := 0
+	for _, row := range t.text.Rows {
+		longest = max(longest, len(row.Cells))
+	}
+	n := t.gutterCells() + longest
+	if t.text.ShowWhitespace {
+		n++
+	}
+	return n
+}
+
 func (t *textGridContent) refreshCell(row, col int) {
 	// Match the pooled widget by the document row it shows — the pool is
 	// not positional: after scrolling, visible[0] can be the widget for
@@ -573,11 +606,7 @@ func (t *textGridContentRenderer) Layout(s geo.Size) {
 }
 
 func (t *textGridContentRenderer) MinSize() geo.Size {
-	longestRow := float32(0)
-	for _, row := range t.text.text.Rows {
-		longestRow = geo.Max(longestRow, float32(len(row.Cells)))
-	}
-	return geo.NewSize(t.text.cellSize.Width*longestRow,
+	return geo.NewSize(t.text.cellSize.Width*float32(t.text.contentCells()),
 		t.text.cellSize.Height*float32(len(t.text.text.Rows)))
 }
 
@@ -712,17 +741,40 @@ func (t *textGridRow) refreshCell(col int) {
 		return
 	}
 
-	pos := t.cols + col
-	if pos*3+1 >= len(t.objects) {
+	// The text's first cell comes after the line-number gutter (#1422).
+	pos := t.text.gutterCells() + col
+	if pos*3+2 >= len(t.objects) {
 		return
 	}
 
 	row := t.text.text.Rows[t.row]
 
 	if len(row.Cells) > col {
-		cell := row.Cells[col]
-		t.setCellRune(cell.Rune, pos, cell.Style, row.Style)
+		t.setTextCell(pos, row.Cells[col], row.Style)
 	}
+}
+
+// setTextCell draws one of the row's text cells at cell position x, showing a
+// space or tab as its whitespace symbol when ShowWhitespace is on.
+func (t *textGridRow) setTextCell(x int, r TextGridCell, rowStyle TextGridStyle) {
+	if !t.text.text.ShowWhitespace || (r.Rune != ' ' && r.Rune != '\t') {
+		t.setCellRune(r.Rune, x, r.Style, rowStyle) // regular char
+		return
+	}
+
+	sym := textAreaSpaceSymbol
+	if r.Rune == '\t' {
+		sym = textAreaTabSymbol
+	}
+	if r.Style != nil && r.Style.BackgroundColor() != nil {
+		whitespaceBG := &CustomTextGridStyle{
+			FGColor: TextGridStyleWhitespace.TextColor(),
+			BGColor: r.Style.BackgroundColor(),
+		}
+		t.setCellRune(sym, x, whitespaceBG, rowStyle) // whitespace char
+		return
+	}
+	t.setCellRune(sym, x, TextGridStyleWhitespace, rowStyle) // whitespace char
 }
 
 func (t *textGridRow) setCellRune(str rune, pos int, style, rowStyle TextGridStyle) {
@@ -808,7 +860,7 @@ func (t *textGridRow) refreshCells() {
 	i := 0
 	if t.text.text.ShowLineNumbers {
 		lineStr := []rune(strconv.Itoa(t.row + 1))
-		pad := t.lineNumberWidth() - len(lineStr)
+		pad := t.text.lineNumberWidth() - len(lineStr)
 		for ; i < pad; i++ {
 			t.setCellRune(' ', x, TextGridStyleWhitespace, rowStyle) // padding space
 			x++
@@ -827,24 +879,7 @@ func (t *textGridRow) refreshCells() {
 		if i >= t.cols { // would be an overflow - bad
 			continue
 		}
-		if t.text.text.ShowWhitespace && (r.Rune == ' ' || r.Rune == '\t') {
-			sym := textAreaSpaceSymbol
-			if r.Rune == '\t' {
-				sym = textAreaTabSymbol
-			}
-
-			if r.Style != nil && r.Style.BackgroundColor() != nil {
-				whitespaceBG := &CustomTextGridStyle{
-					FGColor: TextGridStyleWhitespace.TextColor(),
-					BGColor: r.Style.BackgroundColor(),
-				}
-				t.setCellRune(sym, x, whitespaceBG, rowStyle) // whitespace char
-			} else {
-				t.setCellRune(sym, x, TextGridStyleWhitespace, rowStyle) // whitespace char
-			}
-		} else {
-			t.setCellRune(r.Rune, x, r.Style, rowStyle) // regular char
-		}
+		t.setTextCell(x, r, rowStyle)
 		i++
 		x++
 	}
@@ -871,27 +906,12 @@ func (t *TextGrid) tabWidth() int {
 	return t.TabWidth
 }
 
-func (t *textGridRow) lineNumberWidth() int {
-	return len(strconv.Itoa(t.text.rows + 1))
-}
-
+// updateGridSize sets how many cells the row has: as many as fit its width,
+// or more when the longest row needs them. The gutter and the newline marker
+// are part of what the longest row needs, never added on top of what fits:
+// that pushed a row style's background past the grid's right edge (#1422).
 func (t *textGridRow) updateGridSize(size geo.Size) {
-	bufCols := int(size.Width / t.text.cellSize.Width)
-	for _, row := range t.text.text.Rows {
-		lenCells := len(row.Cells)
-		if lenCells > bufCols {
-			bufCols = lenCells
-		}
-	}
-
-	if t.text.text.ShowWhitespace {
-		bufCols++
-	}
-	if t.text.text.ShowLineNumbers {
-		bufCols += t.lineNumberWidth()
-	}
-
-	t.cols = bufCols
+	t.cols = max(int(size.Width/t.text.cellSize.Width), t.text.contentCells())
 	t.addCellsIfRequired()
 }
 
@@ -922,11 +942,7 @@ func (t *textGridRowRenderer) Layout(size geo.Size) {
 }
 
 func (t *textGridRowRenderer) MinSize() geo.Size {
-	longestRow := float32(0)
-	for _, row := range t.obj.text.text.Rows {
-		longestRow = geo.Max(longestRow, float32(len(row.Cells)))
-	}
-	return geo.NewSize(t.obj.text.cellSize.Width*longestRow, t.obj.text.cellSize.Height)
+	return geo.NewSize(t.obj.text.cellSize.Width*float32(t.obj.text.contentCells()), t.obj.text.cellSize.Height)
 }
 
 func (t *textGridRowRenderer) Refresh() {
