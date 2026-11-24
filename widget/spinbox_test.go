@@ -7,6 +7,7 @@ import (
 
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/test"
+	"github.com/belluikit/bellui/theme"
 )
 
 func TestSpinBox_Creation(t *testing.T) {
@@ -209,4 +210,52 @@ func TestSpinBox_FormatValue_FractionalStep(t *testing.T) {
 		s.SetValue(tt.value)
 		assert.Equal(t, tt.want, s.entry.Text, "step %v value %v", tt.step, tt.value)
 	}
+}
+
+// assertSpinBoxFieldFits sizes the box to its minimum while it shows a short
+// value, then steps it to each of values without resizing and checks the
+// number field holds the whole text without scrolling: the text and its
+// padding are no wider than the field's viewport. The box must be sized from
+// its range, not from the value it shows now (#1420).
+func assertSpinBoxFieldFits(t *testing.T, s *SpinBox, values ...float64) {
+	t.Helper()
+	w := test.NewTempWindow(t, s)
+	size := s.MinSize()
+	w.Resize(size.AddWidthHeight(theme.Padding()*2, theme.Padding()*2))
+	s.Resize(size)
+	for _, v := range values {
+		s.SetValue(v)
+		assert.Equal(t, size, s.MinSize(), "the box keeps its size as the value changes")
+
+		border := s.entry.Theme().Size(theme.SizeNameInputBorder)
+		viewport := s.entry.Size().Width - border*2
+		need := s.entry.textProvider().MinSize().Width
+		assert.LessOrEqualf(t, need, viewport,
+			"%q needs %.1f but the field shows %.1f (box min width %.1f)", s.entry.Text, need, viewport, size.Width)
+	}
+}
+
+func TestSpinBox_FieldFitsWideRange(t *testing.T) {
+	test.NewTempApp(t).Settings().SetTheme(theme.DefaultTheme())
+	s := NewSpinBox(-100000, 100000, 1)
+	s.SetValue(0)
+	assertSpinBoxFieldFits(t, s, -100000, 100000, -99999)
+}
+
+func TestSpinBox_FieldFitsDecimalStep(t *testing.T) {
+	test.NewTempApp(t).Settings().SetTheme(theme.DefaultTheme())
+	s := NewSpinBox(0, 1000, 0.25)
+	assertSpinBoxFieldFits(t, s, 999.75, 1000)
+}
+
+func TestSpinBox_FieldWidensWhenRangeChanges(t *testing.T) {
+	test.NewTempApp(t).Settings().SetTheme(theme.DefaultTheme())
+	s := NewSpinBox(0, 10, 1)
+	test.NewTempWindow(t, s)
+	narrow := s.MinSize().Width
+
+	s.Max = 10000000
+	s.Refresh()
+	assert.Greater(t, s.MinSize().Width, narrow, "a wider Max widens the box after Refresh")
+	assertSpinBoxFieldFits(t, s, 10000000)
 }

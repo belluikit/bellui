@@ -204,7 +204,7 @@ func (s *SpinBox) setupUI() {
 	}
 	s.entry.SetText(s.formatValue())
 
-	s.content = &bellui.Container{Layout: &spinBoxLayout{}, Objects: []core.CanvasObject{s.decBtn, s.entry, s.incBtn}}
+	s.content = &bellui.Container{Layout: &spinBoxLayout{spin: s}, Objects: []core.CanvasObject{s.decBtn, s.entry, s.incBtn}}
 	s.updateButtonState()
 }
 
@@ -235,8 +235,14 @@ func (s *SpinBox) updateButtonState() {
 }
 
 func (s *SpinBox) formatValue() string {
+	return s.format(s.Value)
+}
+
+// format renders v the way the box displays its value: whole numbers for a
+// whole step, otherwise as many decimals as the step has (two at least).
+func (s *SpinBox) format(v float64) string {
 	if s.Step >= 1 && s.Step == math.Floor(s.Step) {
-		return fmt.Sprintf("%d", int64(s.Value))
+		return fmt.Sprintf("%d", int64(v))
 	}
 	// Determine decimal places from step
 	text := strconv.FormatFloat(s.Step, 'f', -1, 64)
@@ -254,7 +260,28 @@ func (s *SpinBox) formatValue() string {
 	if decimals == 0 {
 		decimals = 2
 	}
-	return strconv.FormatFloat(s.Value, 'f', decimals, 64)
+	return strconv.FormatFloat(v, 'f', decimals, 64)
+}
+
+// fieldMinWidth is the width the number field needs to show the widest value
+// the box can hold, Min or Max as the box formats them, without scrolling: the
+// text plus the entry's inner padding on both sides and its border (#1420).
+// The box clamps every value to [Min, Max], so nothing wider is ever displayed
+// by it. An infinite or NaN end has no width to fit and is skipped.
+func (s *SpinBox) fieldMinWidth() float32 {
+	th := s.entry.Theme()
+	textSize := th.Size(theme.SizeNameText)
+	widest := float32(0)
+	for _, v := range [...]float64{s.Min, s.Max} {
+		if math.IsInf(v, 0) || math.IsNaN(v) {
+			continue
+		}
+		widest = geo.Max(widest, bellui.MeasureText(s.format(v), textSize, s.entry.TextStyle).Width)
+	}
+	if widest == 0 {
+		return 0
+	}
+	return widest + th.Size(theme.SizeNameInnerPadding)*2 + th.Size(theme.SizeNameInputBorder)*2
 }
 
 func (s *SpinBox) parseAndUpdate(text string) {
@@ -275,7 +302,9 @@ func (s *SpinBox) parseAndUpdate(text string) {
 
 // --- spinBoxLayout: lays out [decBtn, entry, incBtn] ---
 
-type spinBoxLayout struct{}
+type spinBoxLayout struct {
+	spin *SpinBox // sizes the field to the widest value the range allows
+}
 
 func (l *spinBoxLayout) Layout(objects []core.CanvasObject, size geo.Size) {
 	if len(objects) < 3 {
@@ -306,7 +335,11 @@ func (l *spinBoxLayout) MinSize(objects []core.CanvasObject) geo.Size {
 	btnMin := objects[0].MinSize()
 	entryMin := objects[1].MinSize()
 	h := geo.Max(btnMin.Height, entryMin.Height)
-	w := btnMin.Height*2 + entryMin.Width // square buttons + entry
+	entryW := entryMin.Width
+	if l.spin != nil {
+		entryW = geo.Max(entryW, l.spin.fieldMinWidth())
+	}
+	w := btnMin.Height*2 + entryW // square buttons + entry
 	return geo.NewSize(w, h)
 }
 
