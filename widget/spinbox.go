@@ -81,10 +81,16 @@ func (s *SpinBox) AccessibleLabel() string { return "" }
 
 // AccessibleValue returns a human-readable representation of the current value.
 func (s *SpinBox) AccessibleValue() string {
-	if s.Step >= 1 {
-		return fmt.Sprintf("%d", int64(s.Value))
+	// The field's own text while it stands for Value, so a screen reader reads
+	// what is shown; otherwise Value as the field formats it (#1440). It used
+	// its own format, which read 2.25 at step 0.25 as "2.2" and 1.5 at step
+	// 1.5 as "1".
+	if s.entry != nil {
+		if v, err := strconv.ParseFloat(s.entry.Text, 64); err == nil && v == s.Value {
+			return s.entry.Text
+		}
 	}
-	return fmt.Sprintf("%.1f", s.Value)
+	return s.formatValue()
 }
 
 // AccessibleRange returns the minimum, maximum, and current spin box values.
@@ -160,6 +166,27 @@ func (s *SpinBox) syncFields() {
 		s.showValue()
 	}
 	s.updateButtonState()
+}
+
+// commitText makes the field show Value once the user is done typing (Enter
+// or focus loss, #1440). Value already follows what was typed, clamped to
+// [Min, Max]; text that was out of range, did not parse, or was written
+// loosely ("3.") is replaced by Value formatted for Step. Text that is
+// exactly Value is kept when Step's format would round it away, so a 2.5
+// typed at step 1 is not shown as "2" while Value is 2.5. It is silent:
+// Value does not change here, so OnChanged is not called.
+func (s *SpinBox) commitText() {
+	text := s.entry.Text
+	formatted := s.formatValue()
+	if text == formatted {
+		return
+	}
+	if v, err := strconv.ParseFloat(text, 64); err == nil && v == s.Value {
+		if f, err := strconv.ParseFloat(formatted, 64); err != nil || f != s.Value {
+			return
+		}
+	}
+	s.showValue()
 }
 
 // clamp limits v to [Min, Max].
@@ -251,6 +278,16 @@ func (s *SpinBox) setupUI() {
 	s.entry.ValidateWithBorder = true
 	s.entry.Entry.OnChanged = func(text string) {
 		s.parseAndUpdate(text)
+	}
+	// Typed text is corrected when the user is done with it, on Enter or
+	// when the field loses focus: "12" typed into 0–10 already set Value to
+	// 10, and now the field shows it (#1440). Correcting on every keystroke
+	// would fight typing: in 10–20 the "1" of "15" is below Min.
+	s.entry.OnSubmitted = func(string) { s.commitText() }
+	s.entry.onFocusChanged = func(focused bool) {
+		if !focused {
+			s.commitText()
+		}
 	}
 	s.entry.OnTypedKey = func(key *event.KeyEvent) bool {
 		switch key.Name {
