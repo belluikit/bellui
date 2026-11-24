@@ -977,6 +977,29 @@ func inBlockquote(seg RichTextSegment) bool {
 	return false
 }
 
+// endQuoteParagraph ends a quote's paragraph after segs: its last run becomes
+// a block run, so the text flows on one line up to there and the next
+// paragraph starts below. A quote's runs are inline, so emphasis or code in
+// the middle of a quote stays on its line. When the paragraph does not end in
+// a text run, a marked empty block run ends it.
+func endQuoteParagraph(segs []RichTextSegment) []RichTextSegment {
+	if len(segs) > 0 {
+		if text, ok := segs[len(segs)-1].(*TextSegment); ok {
+			text.Style.Inline = false
+			return segs
+		}
+	}
+	return append(segs, &TextSegment{Style: RichTextStyleBlockquote})
+}
+
+// quoteRunStyle is the style of a run of text inside a quote: the blockquote
+// preset, inline.
+func quoteRunStyle() RichTextStyle {
+	s := RichTextStyleBlockquote
+	s.Inline = true
+	return s
+}
+
 // RichTextSegment describes any element that can be rendered in a RichText widget.
 //
 // Since: 1.0

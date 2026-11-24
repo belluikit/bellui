@@ -61,6 +61,20 @@ type htmlStyle struct {
 	named map[string]bellui.Resource
 }
 
+// toQuoteStyle is the style of a run of text inside a <blockquote>: an inline
+// quote run (quoteRunStyle) with the emphasis and font of the elements around
+// it. Quote text used to take the bare preset, so <b> or <u> inside a quote
+// was dropped.
+func (s htmlStyle) toQuoteStyle() RichTextStyle {
+	q := quoteRunStyle()
+	q.FontSource = s.fontSource
+	q.TextStyle.Bold = s.bold
+	q.TextStyle.Monospace = s.monospace
+	q.TextStyle.Underline = s.underline
+	q.TextStyle.Strikethrough = s.strikethrough
+	return q
+}
+
 func (s htmlStyle) toRichTextStyle(inline bool) RichTextStyle {
 	return RichTextStyle{
 		ColorName:  theme.ColorNameForeground,
@@ -187,7 +201,7 @@ func handleTextNode(n *html.Node, style htmlStyle, blockquote bool) []RichTextSe
 	}
 
 	if blockquote {
-		return []RichTextSegment{&TextSegment{Style: RichTextStyleBlockquote, Text: text}}
+		return []RichTextSegment{&TextSegment{Style: style.toQuoteStyle(), Text: text}}
 	}
 	return []RichTextSegment{&TextSegment{Style: style.toRichTextStyle(true), Text: text}}
 }
@@ -265,6 +279,9 @@ func handleElementNode(n *html.Node, style htmlStyle, blockquote bool, listDepth
 	// Block elements
 	case atom.P:
 		children := walkHTMLChildren(n, style, blockquote, listDepth)
+		if blockquote {
+			return endQuoteParagraph(children)
+		}
 		return append(children, &TextSegment{Style: RichTextStyleParagraph})
 	case atom.H1:
 		return []RichTextSegment{&TextSegment{Style: RichTextStyleHeading, Text: collectText(n)}}
@@ -273,11 +290,7 @@ func handleElementNode(n *html.Node, style htmlStyle, blockquote bool, listDepth
 	case atom.H3, atom.H4, atom.H5, atom.H6:
 		return []RichTextSegment{&TextSegment{Style: htmlHeadingLevelStyle(n.DataAtom), Text: collectText(n)}}
 	case atom.Blockquote:
-		// Every run in the quote is marked, so whichever run starts a row
-		// draws it indented (#1443).
-		children := walkHTMLChildren(n, style, true, listDepth)
-		markBlockquote(children)
-		return children
+		return walkHTMLBlockquote(n, style, listDepth)
 	case atom.Pre:
 		text := collectPreText(n)
 		// Check for language class on <pre> or its <code> child (e.g., class="language-go")
@@ -349,6 +362,21 @@ func handleElementNode(n *html.Node, style htmlStyle, blockquote bool, listDepth
 		// Unsupported tags: strip the tag, keep text content
 		return walkHTMLChildren(n, style, blockquote, listDepth)
 	}
+}
+
+// walkHTMLBlockquote returns the segments of a <blockquote>. Every run in the
+// quote is marked, so whichever run starts a row draws it indented, and text
+// written straight inside the quote ends its line where the quote does
+// (#1443).
+func walkHTMLBlockquote(n *html.Node, style htmlStyle, listDepth int) []RichTextSegment {
+	children := walkHTMLChildren(n, style, true, listDepth)
+	markBlockquote(children)
+	if len(children) > 0 {
+		if text, ok := children[len(children)-1].(*TextSegment); ok && text.Style.Inline {
+			children = endQuoteParagraph(children)
+		}
+	}
+	return children
 }
 
 // htmlHeadingLevelStyle returns the bold paragraph style for an <h3>–<h6>

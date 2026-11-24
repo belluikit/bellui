@@ -125,10 +125,11 @@ func renderNode(source []byte, n ast.Node, blockquote bool, listDepth int, named
 
 func renderParagraph(source []byte, n ast.Node, blockquote bool, listDepth int, named map[string]bellui.Resource) ([]RichTextSegment, error) {
 	children, err := renderChildren(source, n, blockquote, listDepth, named)
-	if !blockquote {
-		linebreak := &TextSegment{Style: RichTextStyleParagraph}
-		children = append(children, linebreak)
+	if blockquote {
+		return endQuoteParagraph(children), err
 	}
+	linebreak := &TextSegment{Style: RichTextStyleParagraph}
+	children = append(children, linebreak)
 	return children, err
 }
 
@@ -213,7 +214,10 @@ func renderText(source []byte, t *ast.Text, n ast.Node, blockquote bool) []RichT
 	}
 	text = suffixSpaceIfAppropriate(text, n)
 	if blockquote {
-		return []RichTextSegment{&TextSegment{Style: RichTextStyleBlockquote, Text: text}}
+		// Inline, like the text of any paragraph: the paragraph's last run
+		// ends the line (endQuoteParagraph). Each quote run used to be a
+		// block, so a quote broke its line after every run of plain text.
+		return []RichTextSegment{&TextSegment{Style: quoteRunStyle(), Text: decodeText(text)}}
 	}
 	return []RichTextSegment{&TextSegment{Style: RichTextStyleInline, Text: decodeText(text)}}
 }

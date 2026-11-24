@@ -247,6 +247,80 @@ func TestRichText_EmphasisedQuoteDrawsAtItsIndentOnTheLazyPath(t *testing.T) {
 	}
 }
 
+// What the parsers make of a quote (#1443): every run in it is marked as a
+// blockquote, its text flows on one line as a paragraph's does, and the
+// emphasis inside it is kept. Each plain-text run in a quote used to be the
+// block preset itself, so a quote broke its line after every run of plain
+// text ("> start **bold** end" drew "start" on one row and "bold end",
+// unindented, on the next), joined no source lines, dropped HTML's <b> and
+// <u>, and showed "&amp;" undecoded.
+func TestRichText_QuoteRunsAreMarkedAndFlow(t *testing.T) {
+	test.NewTempApp(t)
+	rows := func(segs []RichTextSegment) []string {
+		rt := NewRichText(segs...)
+		rt.Wrapping = bellui.TextWrapWord
+		w := test.NewWindow(rt)
+		defer w.Close()
+		w.Resize(geo.NewSize(800, 400))
+		return richRowStrings(rt)
+	}
+	for _, tc := range []struct {
+		name string
+		html bool
+		src  string
+		rows []string
+	}{
+		{"emphasis inside", false, "> start **bold** end", []string{"start bold end"}},
+		{"code inside", false, "> start `code` end", []string{"start code end"}},
+		{"source lines", false, "> line one\n> line two", []string{"line one line two"}},
+		{"paragraph after", false, "> quote\n\nafter", []string{"quote", "after"}},
+		{"two paragraphs", false, "> one\n>\n> two", []string{"one", "two"}},
+		{"entity", false, "> a &amp; b", []string{"a & b"}},
+		// richRowStrings leaves out a link's text.
+		{"link last", false, "> see [docs](https://example.com)\n\nafter", []string{"see ", "after"}},
+		{"HTML emphasis inside", true, "<blockquote>start <b>bold</b> end</blockquote>", []string{"start bold end"}},
+		{"HTML paragraph after", true, "<blockquote>quote</blockquote><p>after</p>", []string{"quote", "after"}},
+		{"HTML paragraphs inside", true, "<blockquote><p>one</p><p>two <i>it</i></p></blockquote>", []string{"one", "two it"}},
+	} {
+		segs := parseQuote(tc.html, tc.src)
+		assert.Equal(t, tc.rows, rows(segs), "%s: rows", tc.name)
+		for _, seg := range segs {
+			text, ok := seg.(*TextSegment)
+			if !ok || strings.TrimSpace(text.Text) == "" {
+				continue
+			}
+			inQuote := text.Text != "after"
+			assert.Equal(t, inQuote, text.Style.isBlockquote(), "%s: run %q", tc.name, text.Text)
+		}
+	}
+
+	for _, tc := range []struct {
+		html bool
+		src  string
+	}{{false, "> start **bold** end"}, {true, "<blockquote>start <b>bold</b> end</blockquote>"}} {
+		for _, seg := range parseQuote(tc.html, tc.src) {
+			if text, ok := seg.(*TextSegment); ok && text.Text == "bold" {
+				assert.True(t, text.Style.TextStyle.Bold, "%s: the bold run stays bold", tc.src)
+				assert.True(t, text.Style.TextStyle.Italic, "%s: and keeps the quote's italics", tc.src)
+				assert.Equal(t, theme.ColorNameOnSurfaceVariant, text.Style.ColorName, "%s: and its colour", tc.src)
+			}
+		}
+	}
+	u := parseQuote(true, "<blockquote>start <u>under</u> <s>struck</s> end</blockquote>")
+	require.Len(t, u, 5)
+	assert.True(t, u[1].(*TextSegment).Style.TextStyle.Underline, "HTML <u> in a quote stays underlined")
+	assert.True(t, u[3].(*TextSegment).Style.TextStyle.Strikethrough, "HTML <s> in a quote stays struck through")
+
+	src := distinctFont()
+	r := NewRichText()
+	r.RegisterNamedFont("MyFont", src)
+	r.ParseHTML(`<blockquote>start <span style="font-family: MyFont">styled</span> end</blockquote>`)
+	require.Len(t, r.Segments, 3)
+	styled := r.Segments[1].(*TextSegment)
+	assert.Equal(t, src, styled.Style.FontSource, "a named font in a quote is kept")
+	assert.True(t, styled.Style.isBlockquote(), "and the run is still a quote run")
+}
+
 // A copy of the blockquote preset stays a blockquote whatever fields change;
 // a style written out field by field to look like it is not one (#1443).
 func TestRichTextStyle_BlockquoteMarkSurvivesCopies(t *testing.T) {
