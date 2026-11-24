@@ -72,6 +72,12 @@ func main() {
 
 // localeTab shows what the active locale resolves to and lets the tester
 // switch it at run time.
+// localePresses records, while the probe runs, the label of each locale
+// button press in order, so ED-05 can report which buttons its clicks reached
+// (#1431). Button callbacks run on the main goroutine; the probe reads it
+// there too.
+var localePresses []string
+
 func localeTab(w bellui.Window) core.CanvasObject {
 	info := widget.NewLabel("")
 	info.Wrapping = bellui.TextWrapWord
@@ -98,6 +104,9 @@ func localeTab(w bellui.Window) core.CanvasObject {
 			label = "System"
 		}
 		buttons = append(buttons, widget.NewButton(label, func() {
+			if probing {
+				localePresses = append(localePresses, label)
+			}
 			lang.SetLocale(bellui.Locale(loc))
 			refresh()
 		}))

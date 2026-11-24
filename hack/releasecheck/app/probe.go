@@ -833,14 +833,45 @@ func (p *probe) windowSize() {
 	p.settle(400 * time.Millisecond)
 }
 
+// fastRecord writes what ED-05's clicks reached: the locale each press set,
+// in order, the Locale tab's scroll offset before and after, the window's
+// direction and how many overlays are open. A failing run then says which
+// click went where (#1431).
+func (p *probe) fastRecord(scroll *container.Scroll, offStart float32) {
+	var presses []string
+	var offEnd float32
+	var rtl bool
+	var overlays int
+	bellui.DoAndWait(func() {
+		presses = append(presses, localePresses...)
+		if scroll != nil {
+			offEnd = scroll.Offset.Y
+		}
+		rtl = lang.IsRTL()
+		overlays = len(p.w.Canvas().Overlays().List())
+	})
+	p.logf("- INFO: ED-05 record: %d presses, scroll offset %.1f then %.1f, right-to-left %v, %d overlay(s) open: %s\n",
+		len(presses), offStart, offEnd, rtl, overlays, strings.Join(presses, " "))
+}
+
 func (p *probe) fast() {
 	p.selectTab("Locale")
 	locs := []string{"en-US", "de-DE", "ar-EG", "ja-JP", "fa-IR", "pt-BR"}
 	pos := map[string][2]float32{}
+	var scroll *container.Scroll
 	for _, l := range locs {
-		x, y := centre(p.reveal(l, button(l)))
+		f := p.reveal(l, button(l))
+		x, y := centre(f)
 		pos[l] = [2]float32{x, y}
+		scroll = f.scroll
 	}
+	var offStart float32
+	bellui.DoAndWait(func() {
+		localePresses = nil
+		if scroll != nil {
+			offStart = scroll.Offset.Y
+		}
+	})
 	startT := time.Now()
 	for i := 0; i < 60; i++ {
 		c := pos[locs[i%len(locs)]]
@@ -858,6 +889,7 @@ func (p *probe) fast() {
 		return
 	}
 	p.settle(800 * time.Millisecond)
+	p.fastRecord(scroll, offStart)
 	last := locs[(60-1)%len(locs)]
 	got := p.text("locale info", labelPrefix("Locale:"))
 	p.expect(strings.HasPrefix(got, "Locale: "+last[:2]), fmt.Sprintf("ED-05: after 60 fast clicks it ends on the last one, %s", last),
