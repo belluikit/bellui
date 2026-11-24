@@ -830,14 +830,33 @@ type timePickerRenderer struct {
 	clockRadius  float32
 }
 
+// MinSize is the wider of the dial and the header row, each with the
+// picker's padding on both sides. The AM/PM selector sits in the header row,
+// after the minute box, not beside the dial, so it only counts through the
+// header's width (#1421: counting it beside the dial made the 12-hour picker
+// 364 wide, wider than a 360 dp phone).
 func (r *timePickerRenderer) MinSize() geo.Size {
-	dialSize, padding, headerH, _, _, ampmW, _, _ := r.sizes()
+	dialSize, padding, headerH, timeBoxW, _, ampmW, _, _ := r.sizes()
 	w := dialSize + padding*2
+	_, _, mx, ampmX := headerXs(padding, timeBoxW)
+	headerRight := mx + timeBoxW
 	if !r.picker.Use24Hour {
-		w += ampmW + 8 // space for AM/PM
+		headerRight = ampmX + ampmW
 	}
+	w = geo.Max(w, headerRight+padding)
 	h := padding + headerH + dialSize + padding
 	return geo.NewSize(w, h)
+}
+
+// headerXs returns the x of the hour box, the colon, the minute box and the
+// AM/PM selector in the header row. Layout places them there and MinSize
+// measures the row from them, so the two cannot drift apart.
+func headerXs(padding, timeBoxW float32) (hx, colonX, mx, ampmX float32) {
+	hx = padding
+	colonX = hx + timeBoxW + 2
+	mx = colonX + 16
+	ampmX = mx + timeBoxW + 12
+	return hx, colonX, mx, ampmX
 }
 
 func (r *timePickerRenderer) Layout(size geo.Size) {
@@ -850,20 +869,17 @@ func (r *timePickerRenderer) Layout(size geo.Size) {
 
 	// Time display buttons.
 	timeY := padding + 20
-	hx := padding
+	hx, colonX, mx, ampmX := headerXs(padding, timeBoxW)
 	r.hourBtn.Move(geo.NewPos(hx, timeY))
 	r.hourBtn.Resize(geo.NewSize(timeBoxW, timeBoxH))
 
-	colonX := hx + timeBoxW + 2
 	r.colonText.Move(geo.NewPos(colonX, timeY+8))
 
-	mx := colonX + 16
 	r.minuteBtn.Move(geo.NewPos(mx, timeY))
 	r.minuteBtn.Resize(geo.NewSize(timeBoxW, timeBoxH))
 
 	// AM/PM — vertically centered alongside the time buttons.
 	if !r.picker.Use24Hour {
-		ampmX := mx + timeBoxW + 12
 		ampmTotalH := ampmH * 2
 		ampmY := timeY + (timeBoxH-ampmTotalH)/2
 		r.ampmBorder.Move(geo.NewPos(ampmX, ampmY))
