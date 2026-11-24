@@ -273,7 +273,11 @@ func handleElementNode(n *html.Node, style htmlStyle, blockquote bool, listDepth
 	case atom.H3, atom.H4, atom.H5, atom.H6:
 		return []RichTextSegment{&TextSegment{Style: htmlHeadingLevelStyle(n.DataAtom), Text: collectText(n)}}
 	case atom.Blockquote:
-		return walkHTMLChildren(n, style, true, listDepth)
+		// Every run in the quote is marked, so whichever run starts a row
+		// draws it indented (#1443).
+		children := walkHTMLChildren(n, style, true, listDepth)
+		markBlockquote(children)
+		return children
 	case atom.Pre:
 		text := collectPreText(n)
 		// Check for language class on <pre> or its <code> child (e.g., class="language-go")

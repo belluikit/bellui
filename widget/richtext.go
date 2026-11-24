@@ -1811,7 +1811,7 @@ func (t *RichText) rowIndent(row int) float32 {
 	if bound == nil || len(bound.segments) == 0 {
 		return 0
 	}
-	if text, ok := bound.segments[0].(*TextSegment); ok && text.Style.isBlockquote() {
+	if inBlockquote(bound.segments[0]) {
 		return blockquoteIndent(t.Theme())
 	}
 	return 0
@@ -2448,7 +2448,7 @@ func (r *textRenderer) layoutOneRow(bound rowBoundary, objs []core.CanvasObject,
 		}
 
 		leftPad := float32(0)
-		if text, ok := bound.segments[0].(*TextSegment); ok && text.Style.isBlockquote() {
+		if inBlockquote(bound.segments[0]) {
 			leftPad = blockquoteIndentFor(lineSpacing)
 		}
 		bs, bsLeft := rowBreakSpace(&bound)
@@ -2793,7 +2793,7 @@ func (r *textRenderer) calculateMin(bounds []rowBoundary, wrap bellui.TextWrap, 
 		if needWidth {
 			// A blockquote is drawn in by its indent, as layoutOneRow draws it
 			// (#1441).
-			if text, ok := bound.segments[0].(*TextSegment); ok && text.Style.isBlockquote() {
+			if inBlockquote(bound.segments[0]) {
 				rowWidth += blockquoteIndentFor(lineSpacing)
 			}
 			width = geo.Max(width, rowWidth)

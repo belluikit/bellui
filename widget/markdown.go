@@ -97,7 +97,11 @@ func renderNode(source []byte, n ast.Node, blockquote bool, listDepth int, named
 	case *ast.Text:
 		return renderText(source, t, n, blockquote), nil
 	case *ast.Blockquote:
-		return renderChildren(source, n, true, listDepth, named)
+		// Every run in the quote is marked, emphasis, code and headings
+		// included, so whichever run starts a row draws it indented (#1443).
+		children, err := renderChildren(source, n, true, listDepth, named)
+		markBlockquote(children)
+		return children, err
 	case *ast.Image:
 		return parseMarkdownImage(t), nil
 	case *ast.RawHTML:
