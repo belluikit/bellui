@@ -106,6 +106,10 @@ func (t *TextGrid) Append(text string) {
 // requested position. If the grid is scrolled the position will refer to the visible offset and not the distance
 // from the top left of the overall document.
 //
+// col is a text column: the index into Rows[row].Cells, the same col that SetCell, SetStyle and SetRune take. With
+// ShowLineNumbers the line-number gutter is not counted, and a point over the gutter returns col 0, so a cursor
+// placed there goes to the start of the line (#1434).
+//
 // Since: 1.0
 func (t *TextGrid) CursorLocationForPosition(p geo.Position) (row, col int) {
 	y := p.Y
@@ -117,7 +121,7 @@ func (t *TextGrid) CursorLocationForPosition(p geo.Position) (row, col int) {
 	}
 
 	row = int(y / t.content.cellSize.Height)
-	col = int(x / t.content.cellSize.Width)
+	col = max(int(x/t.content.cellSize.Width)-t.content.gutterCells(), 0)
 	return row, col
 }
 
@@ -156,10 +160,20 @@ func (t *TextGrid) ScrollToBottom() {
 // If the grid has been scrolled this will be taken into account so that the position compared to top left will
 // refer to the requested location.
 //
+// col is a text column, as CursorLocationForPosition returns it: the index into Rows[row].Cells. With
+// ShowLineNumbers, col 0 is the line's first character, after the line-number gutter (#1434).
+//
 // Since: 1.0
 func (t *TextGrid) PositionForCursorLocation(row, col int) geo.Position {
+	return t.positionForDrawnCell(row, t.content.gutterCells()+col)
+}
+
+// positionForDrawnCell is the relative position of the cell drawn at index
+// cell of row, counting the line-number gutter's cells; scrolling is taken
+// into account as PositionForCursorLocation does.
+func (t *TextGrid) positionForDrawnCell(row, cell int) geo.Position {
 	y := float32(row) * t.content.cellSize.Height
-	x := float32(col) * t.content.cellSize.Width
+	x := float32(cell) * t.content.cellSize.Width
 
 	if t.scroll != nil && t.scroll.Visible() {
 		y -= t.scroll.Offset.Y
@@ -194,7 +208,9 @@ func (t *TextGrid) SetText(text string) {
 	// If we don't update the scroll offset when the text is shorter,
 	// we may end up with no text displayed or text appearing partially cut off
 	if t.scroll != nil && t.Scroll != bellui.ScrollNone && len(rows) < oldRowsLen && t.scroll.Content != nil {
-		offset := t.PositionForCursorLocation(len(rows), 0)
+		// The drawn cell 0, not text column 0: that would scroll the
+		// line-number gutter out of view.
+		offset := t.positionForDrawnCell(len(rows), 0)
 		t.scroll.ScrollToOffset(geo.NewPos(offset.X, t.scroll.Offset.Y))
 		t.scroll.Refresh()
 	}
