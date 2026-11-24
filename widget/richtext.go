@@ -3649,6 +3649,7 @@ func lineBoundsWord(seg *TextSegment, text []rune, low, high, lineEnd int, trunc
 			last := low + len(sub) - 1
 			fallback := binarySearch(widthChecker, low, last) - low
 
+			noSpace := false
 			if fallback < 1 { // even a character won't fit
 				if st.measureWidth < max.Width {
 					// Character doesn't fit in remaining first-line width but
@@ -3658,6 +3659,12 @@ func lineBoundsWord(seg *TextSegment, text []rune, low, high, lineEnd int, trunc
 					st.reuse++
 					high = oldHigh
 					st.measureWidth = max.Width
+					// The row before broke here, so a space the segment
+					// starts with is the break and must not start the next
+					// row (#1423).
+					if low < high && breakableSpace(text[low]) {
+						low++
+					}
 
 					st.yPos += measured.Height
 					continue
@@ -3690,7 +3697,12 @@ func lineBoundsWord(seg *TextSegment, text []rune, low, high, lineEnd int, trunc
 				}
 			} else {
 				spaceIndex := findSpaceIndex(sub, fallback)
-				if spaceIndex == fallback && !breakableSpace(sub[fallback]) {
+				// findSpaceIndex returns fallback both when it finds no space
+				// and when the space sits exactly at fallback, the first rune
+				// that does not fit. Only the first is "no space": the second
+				// is a break that fits (#1423).
+				noSpace = spaceIndex == fallback && !breakableSpace(sub[fallback])
+				if noSpace {
 					// No space to break at: the fallback lands wherever the
 					// line overflowed, which in CJK text must not start a row
 					// with 、。）or end one with （“ (#1300).
@@ -3719,7 +3731,7 @@ func lineBoundsWord(seg *TextSegment, text []rune, low, high, lineEnd int, trunc
 
 				high = low + spaceIndex
 			}
-			if high == fallback && subWidth <= max.Width { // add a newline as there is more space on next
+			if noSpace && high == fallback && subWidth <= max.Width { // add a newline as there is more space on next
 				st.bounds = append(st.bounds, rowBoundary{[]RichTextSegment{seg}, st.reuse, low, low, false})
 				st.reuse++
 				high = oldHigh
