@@ -112,10 +112,11 @@ func TestTimePicker_MinSize(t *testing.T) {
 	assert.Greater(t, min.Width, float32(0))
 	assert.Greater(t, min.Height, float32(0))
 
-	// 24h mode should be narrower (no AM/PM).
+	// 24h mode is no wider (it has no AM/PM). It is not narrower either: the
+	// dial sets the width, and AM/PM fits in the header row (#1421).
 	tp24 := NewTimePicker(12, 0, true, nil)
 	min24 := tp24.MinSize()
-	assert.Less(t, min24.Width, min.Width)
+	assert.LessOrEqual(t, min24.Width, min.Width)
 }
 
 func TestTimePicker_Renderer(t *testing.T) {
