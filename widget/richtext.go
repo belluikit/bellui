@@ -1759,6 +1759,18 @@ func rowBreakSpace(bound *rowBoundary) (width float32, left bool) {
 	return with.Width - without.Width, baseRTL(prev.Style.TextStyle) && rowHasRTL(bound)
 }
 
+// blockquoteIndent is how far every row of a blockquote is drawn in from the
+// left: layout indents by it, and wrapping narrows every row by it (#1437).
+func blockquoteIndent(th bellui.Theme) float32 {
+	return blockquoteIndentFor(th.Size(theme.SizeNameLineSpacing))
+}
+
+// blockquoteIndentFor is blockquoteIndent from the theme's line spacing, for
+// the layout, which already holds it.
+func blockquoteIndentFor(lineSpacing float32) float32 {
+	return lineSpacing * 4
+}
+
 // baseRTL reports whether text in style is laid out with a right-to-left base
 // direction, as the painter resolves it (resolveBaseDirection): an explicit
 // Direction, else the ambient UI direction.
@@ -2382,7 +2394,7 @@ func (r *textRenderer) layoutOneRow(bound rowBoundary, objs []core.CanvasObject,
 
 		leftPad := float32(0)
 		if text, ok := bound.segments[0].(*TextSegment); ok && text.Style.isBlockquote() {
-			leftPad = lineSpacing * 4
+			leftPad = blockquoteIndentFor(lineSpacing)
 		}
 		bs, bsLeft := rowBreakSpace(&bound)
 		_, y := r.layoutRowTrimmed(rowItems, rowAlign, left+leftPad, yPos, lineWidth-leftPad, bs, bsLeft)
