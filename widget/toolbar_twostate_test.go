@@ -1,6 +1,10 @@
 package widget
 
 import (
+	"bytes"
+	"log"
+	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -70,4 +74,42 @@ func TestTwoStateToolbarAction_SetIcons(t *testing.T) {
 	tb := NewToolbar(action)
 	w := test.NewWindow(tb)
 	defer w.Close()
+}
+
+// assertNoExtendWarning runs f with the global logger captured and fails if
+// the "used before ExtendBaseWidget was called" warning fires (#1425).
+func assertNoExtendWarning(t *testing.T, f func()) {
+	t.Helper()
+	ResetExtendWarningsForTests(t)
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	defer log.SetOutput(os.Stderr)
+	f()
+	if strings.Contains(buf.String(), "used before ExtendBaseWidget") {
+		t.Errorf("ExtendBaseWidget warning logged:\n%s", buf.String())
+	}
+}
+
+// TwoStateToolbarAction holds its button by value; a method called on it
+// before it was extended logged the warning (#1425).
+func TestTwoStateToolbarAction_NoExtendBaseWidgetWarning(t *testing.T) {
+	test.NewTempApp(t)
+	t.Run("NewTwoStateToolbarAction", func(t *testing.T) {
+		assertNoExtendWarning(t, func() {
+			NewTwoStateToolbarAction(theme.MediaPlayIcon(), theme.MediaPauseIcon(), nil)
+		})
+	})
+	t.Run("TwoStateToolbarAction zero value", func(t *testing.T) {
+		assertNoExtendWarning(t, func() {
+			(&TwoStateToolbarAction{}).SetOn(true)
+		})
+	})
+	t.Run("shown in a toolbar", func(t *testing.T) {
+		assertNoExtendWarning(t, func() {
+			two := NewTwoStateToolbarAction(theme.MediaPlayIcon(), theme.MediaPauseIcon(), nil)
+			w := test.NewWindow(NewToolbar(two))
+			defer w.Close()
+			two.SetOn(true)
+		})
+	})
 }

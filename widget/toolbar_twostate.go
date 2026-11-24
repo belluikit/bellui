@@ -35,9 +35,16 @@ type TwoStateToolbarAction struct {
 // Since: 1.0
 func NewTwoStateToolbarAction(offIcon, onIcon bellui.Resource, onActivated func(on bool)) *TwoStateToolbarAction {
 	t := &TwoStateToolbarAction{OnActivated: onActivated, offIcon: offIcon, onIcon: onIcon}
-	t.button.SetIcon(t.offIcon)
+	t.btn().SetIcon(t.offIcon)
 	t.button.OnTapped = t.activated
 	return t
+}
+
+// btn returns the button, extended first: it is held by value, and a method
+// called on it before ExtendBaseWidget logs a warning (#1425).
+func (t *TwoStateToolbarAction) btn() *Button {
+	t.button.ExtendBaseWidget(&t.button)
+	return &t.button
 }
 
 // On returns the current state.
@@ -77,7 +84,7 @@ func (t *TwoStateToolbarAction) ToolbarObject() core.CanvasObject {
 	// synchronize properties
 	t.syncIcon()
 	t.button.OnTapped = t.activated
-	return &t.button
+	return t.btn()
 }
 
 func (t *TwoStateToolbarAction) activated() {
@@ -86,8 +93,8 @@ func (t *TwoStateToolbarAction) activated() {
 
 func (t *TwoStateToolbarAction) syncIcon() {
 	if t.on {
-		t.button.SetIcon(t.onIcon)
+		t.btn().SetIcon(t.onIcon)
 	} else {
-		t.button.SetIcon(t.offIcon)
+		t.btn().SetIcon(t.offIcon)
 	}
 }

@@ -198,3 +198,18 @@ func TestNavigation_ForwardRefresh(t *testing.T) {
 	nav.Forward()
 	assert.Equal(t, thrTit, r.title.Text)
 }
+
+// Navigation's renderer holds its back/forward buttons and title by value and
+// disabled the buttons before extending them, so every app that showed a
+// Navigation logged the ExtendBaseWidget warning (#1425).
+func TestNavigation_NoExtendBaseWidgetWarning(t *testing.T) {
+	test.NewTempApp(t)
+	assertNoExtendBaseWidgetWarning(t, func() {
+		nav := NewNavigationWithTitle(widget.NewLabel("root"), "Title")
+		w := test.NewWindow(nav)
+		defer w.Close()
+		nav.PushWithTitle(widget.NewLabel("a"), "A")
+		nav.Back()
+		nav.Forward()
+	})
+}
