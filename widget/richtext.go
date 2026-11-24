@@ -342,6 +342,10 @@ type RichText struct {
 	vwLen          int             // rune length of vwLine when cached
 	vwDirty        bool            // widest-line cache needs a rescan
 
+	// bidiPlace caches each right-to-left row's placement by its first object
+	// (cachedBidiPlacement).
+	bidiPlace map[core.CanvasObject]*bidiPlaceEntry
+
 	// Deferred text sync (pre-rebrand tracker #410). When deferText is set — by Entry when its
 	// DeferTextSync mode is on — lazySpliceText skips the per-edit document
 	// materialization: seg.Text and lazyStr keep the last-synced string object
@@ -1453,6 +1457,11 @@ func (t *RichText) rowStyledRuns(row int) ([]paint.StyledRun, bool) {
 	if bound == nil {
 		return nil, false
 	}
+	return t.boundStyledRuns(bound)
+}
+
+// boundStyledRuns is rowStyledRuns for a row's boundary.
+func (t *RichText) boundStyledRuns(bound *rowBoundary) ([]paint.StyledRun, bool) {
 	nSegs := len(bound.segments)
 	runs := make([]paint.StyledRun, 0, nSegs)
 	for i, seg := range bound.segments {
@@ -1502,7 +1511,13 @@ func (t *RichText) rowVisualLayout(row int) (paint.LineLayout, bool) {
 	if !ok {
 		return paint.LineLayout{}, false
 	}
+	return styledVisualLayout(styled)
+}
 
+// styledVisualLayout lays out a row's styled runs (boundStyledRuns) in bidi
+// visual order, as rowVisualLayout does; ok is false when the row has no
+// right-to-left run.
+func styledVisualLayout(styled []paint.StyledRun) (paint.LineLayout, bool) {
 	var layout paint.LineLayout
 	if len(styled) == 1 && !styled[0].Box {
 		face := paint.CachedFontFace(styled[0].Style, styled[0].FontSource, nil)
@@ -2397,7 +2412,11 @@ func (r *textRenderer) layoutOneRow(bound rowBoundary, objs []core.CanvasObject,
 			leftPad = blockquoteIndentFor(lineSpacing)
 		}
 		bs, bsLeft := rowBreakSpace(&bound)
-		_, y := r.layoutRowTrimmed(rowItems, rowAlign, left+leftPad, yPos, lineWidth-leftPad, bs, bsLeft)
+		var visual []float32
+		if len(rowItems) == len(bound.segments) {
+			visual = r.obj.bidiRowPlacement(&bound, rowItems, rowAlign, lineWidth-leftPad, bs, bsLeft)
+		}
+		_, y := r.layoutRowTrimmed(rowItems, rowAlign, left+leftPad, yPos, lineWidth-leftPad, bs, bsLeft, visual)
 		yPos += y
 		rowItems = nil
 	}
@@ -3415,7 +3434,7 @@ func (r *textRenderer) splitIntoFragments() {
 }
 
 func (r *textRenderer) layoutRow(texts []core.CanvasObject, align bellui.TextAlign, xPos, yPos, lineWidth float32) (float32, float32) {
-	return r.layoutRowTrimmed(texts, align, xPos, yPos, lineWidth, 0, false)
+	return r.layoutRowTrimmed(texts, align, xPos, yPos, lineWidth, 0, false, nil)
 }
 
 // layoutRowTrimmed is layoutRow for a row that ends in the space it wrapped at,
@@ -3423,7 +3442,12 @@ func (r *textRenderer) layoutRow(texts []core.CanvasObject, align bellui.TextAli
 // there. The space is drawn at the row's right end, or its left end when
 // breakLeft (right-to-left text in a right-to-left base direction, #1437), so
 // the glyphs move right or left by it, as the alignment needs.
-func (r *textRenderer) layoutRowTrimmed(texts []core.CanvasObject, align bellui.TextAlign, xPos, yPos, lineWidth, breakSpace float32, breakLeft bool) (float32, float32) {
+//
+// visual, when not nil, holds each object's x from xPos in the row's bidi
+// visual order (bidiRowPlacement), which already includes the alignment and
+// the break space: the objects are placed there at their own width instead of
+// side by side in logical order (#1441).
+func (r *textRenderer) layoutRowTrimmed(texts []core.CanvasObject, align bellui.TextAlign, xPos, yPos, lineWidth, breakSpace float32, breakLeft bool, visual []float32) (float32, float32) {
 	// Resolve leading/trailing against the active layout direction so the row
 	// aligns to the correct edge under RTL (no-op for the default LTR layout).
 	align = lang.ResolveAlign(align)
@@ -3503,6 +3527,17 @@ func (r *textRenderer) layoutRowTrimmed(texts []core.CanvasObject, align bellui.
 			delta := tallestBaseline - baselines[i]
 			text.Move(geo.NewPos(text.Position().X, yPos+delta))
 		}
+	}
+
+	if len(visual) == len(texts) {
+		// Each object keeps its own width, so its glyphs start at its left edge
+		// whatever the direction: the painter resolves the alignment once more,
+		// which lang.ResolveAlign here cancels.
+		for i, text := range texts {
+			text.Move(geo.NewPos(initialX+visual[i], text.Position().Y))
+			setAlign(text, lang.ResolveAlign(bellui.TextAlignLeading))
+		}
+		return xPos - initialX, height
 	}
 
 	innerPadding := r.obj.Theme().Size(theme.SizeNameInnerPadding)
