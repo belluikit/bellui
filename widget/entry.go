@@ -4617,7 +4617,14 @@ func (r *entryContentRenderer) updateScrollDirections() {
 	case bellui.TextWrapOff:
 		r.content.scroll.Direction = r.content.entry.Scroll
 	case bellui.TextWrap(bellui.TextTruncateClip): // this is now the default - but we scroll
-		r.content.scroll.Direction = widget.ScrollBoth
+		if r.content.entry.MultiLine {
+			r.content.scroll.Direction = widget.ScrollBoth
+		} else {
+			// One line scrolls sideways only: a line taller than the entry
+			// (an emoji or a CJK glyph makes one) is not something to scroll
+			// up and down to, nor to show a vertical scroll bar for (#1412).
+			r.content.scroll.Direction = widget.ScrollHorizontalOnly
+		}
 	default: // bellui.TextWrapBreak, bellui.TextWrapWord
 		r.content.scroll.Direction = widget.ScrollVerticalOnly
 	}
