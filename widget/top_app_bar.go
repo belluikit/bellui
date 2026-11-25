@@ -119,14 +119,6 @@ func (r *topAppBarRenderer) Layout(size geo.Size) {
 		x += stride
 	}
 
-	// Title. Resize the text to its measured size so the box width matches the
-	// glyphs: this keeps the painter's leading→trailing alignment flip a no-op
-	// and gives the RTL mirror pass below the correct width to reflect.
-	r.title.TextSize = th.Size(theme.SizeNameTitleLarge)
-	titleSize := r.title.MinSize()
-	r.title.Move(geo.NewPos(x, (size.Height-titleSize.Height)/2))
-	r.title.Resize(titleSize)
-
 	// Actions from right
 	ax := size.Width - padding*0.5
 	for i := len(r.actionBtns) - 1; i >= 0; i-- {
@@ -136,11 +128,58 @@ func (r *topAppBarRenderer) Layout(size geo.Size) {
 		ax -= padding * 0.25
 	}
 
+	// Title, in the room between the navigation button and the first action
+	// (the bar's end padding when there are none), keeping the same gap to an
+	// action as the navigation button keeps to the title. A title that does
+	// not fit ends in an ellipsis, so it never runs under an action (#1454).
+	end := size.Width - padding
+	if len(r.actionBtns) > 0 {
+		end = r.actionBtns[0].Position().X - padding*0.5
+	}
+	r.title.TextSize = th.Size(theme.SizeNameTitleLarge)
+	r.layoutTitle(x, end-x, size.Height)
+
 	// Under a right-to-left layout, reflect every child horizontally so the
 	// navigation icon and title sit at the trailing (right) edge and the action
 	// icons at the leading (left) edge. The full-width bg/divider map onto
 	// themselves, so a blanket pass is safe.
 	mirrorIfRTL(r.Objects(), size.Width)
+}
+
+// layoutTitle places the title at x in a room wide, truncating it with an
+// ellipsis when the whole title is wider, and drawing nothing when not even
+// the ellipsis fits. The text box is resized to the drawn text's measured
+// size, so the box width matches the glyphs: this keeps the painter's
+// leading→trailing alignment flip a no-op and gives the RTL mirror pass the
+// correct width to reflect.
+func (r *topAppBarRenderer) layoutTitle(x, room, height float32) {
+	shown := r.title.Text
+	r.title.Text = r.bar.Title
+	if r.title.MinSize().Width > room {
+		runes := []rune(r.bar.Title)
+		keep := 0
+		if room > 0 {
+			keep, _ = truncateLimit(r.bar.Title, r.title, room, []rune{'…'})
+			keep = min(keep, len(runes))
+		}
+		// The shaper's measure and MinSize can disagree by a fraction of a
+		// pixel, so trust MinSize, and shorten until it fits.
+		for ; keep >= 0; keep-- {
+			r.title.Text = string(runes[:keep]) + "…"
+			if r.title.MinSize().Width <= room {
+				break
+			}
+		}
+		if keep < 0 {
+			r.title.Text = "" // not even the ellipsis fits
+		}
+	}
+	if r.title.Text != shown {
+		r.title.Refresh()
+	}
+	titleSize := r.title.MinSize()
+	r.title.Move(geo.NewPos(x, (height-titleSize.Height)/2))
+	r.title.Resize(titleSize)
 }
 
 func (r *topAppBarRenderer) Refresh() {
@@ -153,7 +192,8 @@ func (r *topAppBarRenderer) Refresh() {
 	r.divider.FillColor = th.Color(theme.ColorNameOutlineVariant, v)
 	r.divider.Refresh()
 
-	r.title.Text = r.bar.Title
+	// Layout below sets the title's text: the whole title, or as much of it as
+	// fits (#1454).
 	r.title.Color = th.Color(theme.ColorNameOnSurface, v) // also while disabled (#1251)
 	r.title.Refresh()
 
