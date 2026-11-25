@@ -186,6 +186,13 @@ iOS only allows the background part when the app declares it, in
 Without that key, iOS still stops the audio when the app leaves the
 foreground (Apple's rule for the category, not measured here).
 
+An app that is recording from the microphone when x/mmedia opens the device
+keeps its recording: a session in the Record category moves to PlayAndRecord
+instead, playing from the speaker rather than the earpiece, and one already in PlayAndRecord is
+left as the app set it ([#1188](https://github.com/belluikit/bellui/issues/1188)).
+Before this, iOS refused the change to Playback while the capture ran, and the
+first song failed to open.
+
 On **Android**, playback continued in the background and on the lock screen
 with no extra setup on the one tablet measured (2026-10-27). Android may still
 freeze an app that sits in the background without playing.
