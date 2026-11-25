@@ -312,6 +312,51 @@ func TestNavigationDrawer_Side(t *testing.T) {
 	}
 }
 
+// A row starts at the start edge: in a right-to-left layout its icon is at the
+// right and its label before it, mirrored from left-to-right (#1459). They
+// stayed at the left in every direction. The gallery switches direction at
+// runtime, so the drawer is shown once before the switch and once after.
+func TestNavigationDrawer_RowsMirror(t *testing.T) {
+	test.NewTempApp(t)
+	t.Cleanup(func() { bellui.SetLayoutDirection(bellui.DirectionAuto) })
+	items := []*NavigationDrawerItem{
+		{Label: "Home", Icon: theme.HomeIcon()},
+		{Label: "Bare"}, // no icon: the label starts where the icon would
+	}
+	w := test.NewTempWindow(t, NewLabel("content"))
+	w.Resize(geo.NewSize(800, 400))
+	d := NewNavigationDrawer(items, nil)
+
+	type spot struct{ icon, label float32 }
+	at := func() (width float32, spots []spot) {
+		rows := drawerRows(t, d)
+		require.Len(t, rows, 2)
+		for _, r := range rows {
+			spots = append(spots, spot{r.icon.Position().X, r.label.Position().X})
+		}
+		return rows[0].Size().Width, spots
+	}
+
+	bellui.SetLayoutDirection(bellui.DirectionLTR)
+	d.Show(w.Canvas())
+	width, ltr := at()
+	d.Hide()
+	assert.Equal(t, spot{16, 52}, ltr[0])
+	assert.Equal(t, float32(16), ltr[1].label)
+
+	bellui.SetLayoutDirection(bellui.DirectionRTL)
+	d.Show(w.Canvas())
+	defer d.Hide()
+	rtlWidth, rtl := at()
+	require.Equal(t, width, rtlWidth)
+	rows := drawerRows(t, d)
+	for i, r := range rows {
+		assert.Equal(t, width-ltr[i].icon-r.icon.Size().Width, rtl[i].icon, "row %d: the icon mirrored", i)
+		assert.Equal(t, width-ltr[i].label-r.label.Size().Width, rtl[i].label, "row %d: the label mirrored", i)
+	}
+	assert.Less(t, rtl[0].label, rtl[0].icon, "the label is before the icon, to its left")
+}
+
 // On a canvas narrower than the drawer, as an iPhone with Display Zoom on
 // Larger is (320 pt), the drawer still sits against its edge and leaves a
 // strip of scrim on the other side (#1238). It was drawn 360 pt wide at

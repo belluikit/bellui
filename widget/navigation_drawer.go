@@ -430,17 +430,28 @@ func (r *drawerItemRenderer) MinSize() geo.Size {
 	return geo.NewSize(280, 56)
 }
 
+// Layout places the icon and then the label from the start edge: the left in
+// a left-to-right layout, the right in a right-to-left one (#1459). It reads
+// the item's own direction, not the ambient one, as a menu item does: the
+// drawer lays its rows out when shown, outside a layout walk.
 func (r *drawerItemRenderer) Layout(size geo.Size) {
+	rtl := isRTLAt(r.item)
+	place := func(o core.CanvasObject, x, y float32) {
+		if rtl {
+			x = size.Width - x - o.Size().Width
+		}
+		o.Move(geo.NewPos(x, y))
+	}
 	r.item.bg.Resize(size)
-	r.item.icon.Move(geo.NewPos(16, (size.Height-24)/2))
 	r.item.icon.Resize(geo.NewSize(24, 24))
+	place(r.item.icon, 16, (size.Height-24)/2)
 	labelSize := r.item.label.MinSize()
 	labelX := float32(52)
 	if !r.item.icon.Visible() {
 		labelX = 16
 	}
-	r.item.label.Move(geo.NewPos(labelX, (size.Height-labelSize.Height)/2))
 	r.item.label.Resize(labelSize)
+	place(r.item.label, labelX, (size.Height-labelSize.Height)/2)
 }
 
 func (r *drawerItemRenderer) Refresh() {
