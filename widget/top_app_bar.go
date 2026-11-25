@@ -26,10 +26,14 @@ type TopAppBarAction struct {
 	// Label names the action. The overflow menu shows it when the action is
 	// folded, and screen readers read it as the button's name. An action
 	// without a Label never folds.
+	//
+	// Since: 1.5
 	Label string
 
 	// Pinned keeps the action on the bar at any width: it never folds into
 	// the overflow menu.
+	//
+	// Since: 1.5
 	Pinned bool
 }
 
