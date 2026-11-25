@@ -3,9 +3,9 @@
 A release here is **annotated tags plus a `CHANGELOG.md` entry plus a GitHub
 Release on the main-module tag** (step 7). The Releases page is part of the
 release: the newest stable is marked **latest**, rc tags are marked
-pre-release, and the `x/*` tags deliberately get no Release object of their
-own (they always accompany a main-module release; a Release per tag would
-bury the real entries under five echoes). This reverses the earlier
+pre-release, and the `x/*` and `cmd/bellui` tags deliberately get no Release
+object of their own (they always accompany a main-module release; a Release
+per tag would bury the real entries under six echoes). This reverses the earlier
 "tags only, `gh release list` empty by design" stance — decided in
 [#136](https://github.com/belluikit/bellui/issues/136) (2026-08-05) so that
 the Releases page users actually look at is authoritative. There is no
@@ -15,8 +15,13 @@ document is the procedure.
 
 The repository is one main module plus **five** nested `x/*` modules
 (`charts`, `dag`, `editor`, `mmedia`, `tables`), and `cmd/bellui` — the CLI —
-which is its own module too. The `x/*` modules pin the toolkit by version and
-carry the same version as the toolkit, even when their own code is unchanged.
+which is its own module too. The `x/*` modules and `cmd/bellui` pin the
+toolkit by version and carry the same version as the toolkit, even when their
+own code is unchanged. So `go install
+github.com/belluikit/bellui/cmd/bellui@<version>` works for every release, and
+the install lines in the docs can name the toolkit's version
+([#1464](https://github.com/belluikit/bellui/issues/1464)). Until v1.5.0 the
+command was tagged only when it changed, and v1.4.0 has no `cmd/bellui` tag.
 
 Version line: `v1.0.0-rc.N` while the rebrand soaks, then `v1.0.0`.
 
@@ -63,9 +68,24 @@ go run ./hack/changelog release v1.0.0-rc.7
 With make: `make release-changelog VERSION=v1.0.0-rc.7`.
 
 Then write the section's opening summary under its heading, as earlier
-releases have one, and commit as `docs: changelog for <version>`. When the
-`bellui` command is released alongside, do the same for its changelog with
-`-C cmd/bellui` and its own version.
+releases have one. Do the same for the `bellui` command's changelog, with the
+same version:
+
+```sh
+go run ./hack/changelog release -C cmd/bellui v1.0.0-rc.7
+```
+
+When the command has no fragments, the tool refuses to write an empty section.
+Add it by hand below the Unreleased section of `cmd/bellui/CHANGELOG.md`:
+
+```markdown
+## v1.0.0-rc.7 — 2026-11-25
+
+Cut with toolkit v1.0.0-rc.7. No changes of its own. Built against bellui
+v1.0.0-rc.7.
+```
+
+Commit both as `docs: changelog for <version>`.
 
 A `bellui` command that writes PXF translation catalogs (#522) is released
 with or after the first toolkit release that reads them, never before:
@@ -97,15 +117,15 @@ Confirm the proxy can see it before continuing — this is what step 4 depends o
 go list -m github.com/belluikit/bellui@v1.0.0-rc.7   # may take a moment to appear
 ```
 
-### 4. Bump the `x/*` pins, and verify each by hand
+### 4. Bump the `x/*` and `cmd/bellui` pins, and verify each by hand
 
 `make release-pins VERSION=v1.0.0-rc.7` runs the loop below for every module
-(`X="charts tables"` narrows it).
+(`X="charts tables"` narrows the `x/*` ones; `cmd/bellui` is always included).
 
-For each of `charts dag editor mmedia tables`:
+For each of `x/charts x/dag x/editor x/mmedia x/tables cmd/bellui`:
 
 ```sh
-cd x/$m
+cd $m
 go get github.com/belluikit/bellui@v1.0.0-rc.7
 go mod tidy          # see below — not optional
 go build ./... && go vet ./... && go test ./...
@@ -151,7 +171,7 @@ Commit all of these `go.mod`/`go.sum` changes together, push.
 > is deliberate (it is what lets a PR change both sides at once) and is not
 > going away.
 
-### 5. Tag the `x/*` modules
+### 5. Tag the `x/*` modules and `cmd/bellui`
 
 First check that no module already has the version. An `x/*` module can be
 released on its own between toolkit releases, and a version the Go proxy has
@@ -171,8 +191,8 @@ on 2026-11-02, so with toolkit rc.2 it went out as rc.3.
 Then, on the commit from step 4:
 
 ```sh
-for m in charts dag editor mmedia tables; do
-  git tag -a "x/$m/v1.0.0-rc.7" -m "x/$m v1.0.0-rc.7"
+for m in x/charts x/dag x/editor x/mmedia x/tables cmd/bellui; do
+  git tag -a "$m/v1.0.0-rc.7" -m "$m v1.0.0-rc.7"
 done
 git push origin --tags
 ```
@@ -229,7 +249,12 @@ writing this:
   that wrong is the usual way this smoke test "fails" for the wrong reason.
 
 Repeat with one `x/` module (`go get github.com/belluikit/bellui/x/charts@…`)
-to prove step 5's tags are visible to the proxy.
+to prove step 5's tags are visible to the proxy, and install the command at
+the version:
+
+```sh
+GOBIN="$(mktemp -d)" go install github.com/belluikit/bellui/cmd/bellui@v1.0.0-rc.7
+```
 
 ### 7. GitHub Release on the main-module tag
 
@@ -253,8 +278,8 @@ gh release create v1.0.0 --verify-tag --latest \
 ```
 
 `--verify-tag` makes the command fail rather than invent a tag if step 3 was
-skipped. Only the main-module tag gets a Release; the `x/*` tags do not (see
-the top of this document).
+skipped. Only the main-module tag gets a Release; the `x/*` and
+`cmd/bellui` tags do not (see the top of this document).
 
 ## Linux webview releases carry a browser engine
 

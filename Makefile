@@ -190,22 +190,24 @@ release-status: ## Open milestone items, open PRs and main's CI
 .PHONY: release-changelog
 release-changelog: ## Step 1: fold changelog.d into CHANGELOG.md (deletes the fragments)
 	go run ./hack/changelog release $(VERSION)
+	@go run ./hack/changelog release -C cmd/bellui $(VERSION) || \
+		echo "# cmd/bellui: write its $(VERSION) section by hand (docs/RELEASING.md, step 1)"
 
 .PHONY: release-tag-commands
 release-tag-commands: ## Steps 3 and 5: print the tag commands (does not run them)
 	@echo "# 3. main module, once main's CI is green on the commit:"
 	@echo "git tag -a $(VERSION) -m \"$(VERSION)\" && git push origin $(VERSION)"
-	@echo "# 5. x/ modules, after release-pins is committed and pushed:"
-	@for m in $(X); do echo "git tag -a \"x/$$m/$(VERSION)\" -m \"x/$$m $(VERSION)\" && git push origin \"x/$$m/$(VERSION)\""; done
+	@echo "# 5. x/ modules and cmd/bellui, after release-pins is committed and pushed:"
+	@for m in $(addprefix x/,$(X)) cmd/bellui; do echo "git tag -a \"$$m/$(VERSION)\" -m \"$$m $(VERSION)\" && git push origin \"$$m/$(VERSION)\""; done
 	@git fetch -q origin --tags; for t in $(addprefix x/,$(addsuffix /$(VERSION),$(X))) cmd/bellui/$(VERSION); do \
 		if git rev-parse -q --verify "refs/tags/$$t" >/dev/null; then echo "# WARNING: $$t already exists; give that module the next free version"; fi; \
 	done
 
 .PHONY: release-pins
-release-pins: ## Step 4: move the x/ pins to the tagged $(VERSION) and verify each
-	@set -e; for m in $(X); do \
-		echo "== x/$$m"; \
-		( cd x/$$m && go get github.com/belluikit/bellui@$(VERSION) && go mod tidy && \
+release-pins: ## Step 4: move the x/ and cmd/bellui pins to the tagged $(VERSION) and verify each
+	@set -e; for m in $(addprefix x/,$(X)) cmd/bellui; do \
+		echo "== $$m"; \
+		( cd $$m && go get github.com/belluikit/bellui@$(VERSION) && go mod tidy && \
 		  go build ./... && go vet ./... && go test ./... ); \
 	done
 
@@ -215,4 +217,5 @@ release-smoke: ## Step 6: build a fresh consumer of the published $(VERSION)
 	printf '%s\n' 'package main' 'import (' '	"github.com/belluikit/bellui"' '	"github.com/belluikit/bellui/app"' \
 		'	"github.com/belluikit/bellui/widget"' ')' 'func main() {' '	a := app.New()' '	w := a.NewWindow("smoke")' \
 		'	w.SetContent(widget.NewLabel("hello"))' '	bellui.ShowAndRun(w)' '}' > main.go && \
-	go mod edit -require=github.com/belluikit/bellui@$(VERSION) && go mod tidy && go build . && echo "smoke build ok"
+	go mod edit -require=github.com/belluikit/bellui@$(VERSION) && go mod tidy && go build . && echo "smoke build ok" && \
+	GOBIN=$$d/bin go install github.com/belluikit/bellui/cmd/bellui@$(VERSION) && echo "cmd/bellui@$(VERSION) installs"
