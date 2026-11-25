@@ -1,18 +1,36 @@
 package widget
 
 import (
+	"slices"
+
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
 	internalWidget "github.com/belluikit/bellui/internal/widget"
+	"github.com/belluikit/bellui/lang"
 	"github.com/belluikit/bellui/theme"
 )
 
 // TopAppBarAction is an action icon in the top app bar.
+//
+// When the bar is too narrow for all its actions, it folds some of them into
+// an overflow (⋮) menu so the title keeps about three button widths. Only an
+// action with a Label folds, since a menu item is text, and never a Pinned
+// one. Folding starts from the last action, so put the most important ones
+// first (#1456).
 type TopAppBarAction struct {
 	Icon     bellui.Resource
 	OnTapped func()
+
+	// Label names the action. The overflow menu shows it when the action is
+	// folded, and screen readers read it as the button's name. An action
+	// without a Label never folds.
+	Label string
+
+	// Pinned keeps the action on the bar at any width: it never folds into
+	// the overflow menu.
+	Pinned bool
 }
 
 var _ core.Accessible = (*TopAppBar)(nil)
@@ -28,7 +46,9 @@ func (t *TopAppBar) AccessibleLabel() string { return t.Title }
 // A disabled bar draws its navigation and action icons in the disabled
 // colours, and those buttons refuse every press. They are the bar's own, built
 // from NavigationIcon and Actions. The title keeps its colour: it takes no
-// input, so only the controls look disabled (#1251).
+// input, so only the controls look disabled (#1251). The overflow (⋮) button
+// stays pressable, so the folded actions can still be seen, but every item in
+// its menu is disabled (#1456).
 type TopAppBar struct {
 	DisableableWidget
 	Title          string
@@ -68,23 +88,17 @@ func (t *TopAppBar) CreateRenderer() core.WidgetRenderer {
 		objects = append(objects, navBtn)
 	}
 
-	var actionBtns []*IconButton
-	for _, a := range t.Actions {
-		btn := NewIconButton(a.Icon, a.OnTapped)
-		actionBtns = append(actionBtns, btn)
-		objects = append(objects, btn)
-	}
-
 	r := &topAppBarRenderer{
 		BaseRenderer: internalWidget.NewBaseRenderer(objects),
 		bg:           bg,
 		divider:      divider,
 		title:        title,
 		navBtn:       navBtn,
-		actionBtns:   actionBtns,
 		bar:          t,
 	}
-	r.Refresh()
+	r.overflowBtn = NewIconButton(theme.MoreVerticalIcon(), r.showOverflow)
+	r.overflowBtn.SetAccessibilityLabel(lang.L("More options"))
+	r.Refresh() // builds the action buttons
 	return r
 }
 
@@ -96,6 +110,17 @@ type topAppBarRenderer struct {
 	navBtn     *IconButton
 	actionBtns []*IconButton
 	bar        *TopAppBar
+
+	// actions is what actionBtns were last built from, so Layout folds
+	// the actions the buttons show, even before Refresh sees a change to
+	// TopAppBar.Actions.
+	actions []TopAppBarAction
+	// folded holds the indexes of the actions in the overflow menu, in
+	// order; their buttons are left out of the bar while it is not empty, and
+	// overflowBtn put in.
+	folded      []int
+	overflowBtn *IconButton
+	menu        *PopUpMenu
 }
 
 func (r *topAppBarRenderer) MinSize() geo.Size {
@@ -119,12 +144,18 @@ func (r *topAppBarRenderer) Layout(size geo.Size) {
 		x += stride
 	}
 
-	// Actions from right
+	// Fold what does not fit into the overflow menu, then place the buttons
+	// left on the bar from the right, the overflow button last.
+	if folded := r.fold(size.Width-x, btnSize, padding); !slices.Equal(folded, r.folded) {
+		r.folded = folded
+		r.SetObjects(r.collectObjects())
+	}
+	buttons := r.barButtons()
 	ax := size.Width - padding*0.5
-	for i := len(r.actionBtns) - 1; i >= 0; i-- {
+	for i := len(buttons) - 1; i >= 0; i-- {
 		ax -= btnSize
-		r.actionBtns[i].Move(geo.NewPos(ax, (size.Height-btnSize)/2))
-		r.actionBtns[i].Resize(geo.NewSize(btnSize, btnSize))
+		buttons[i].Move(geo.NewPos(ax, (size.Height-btnSize)/2))
+		buttons[i].Resize(geo.NewSize(btnSize, btnSize))
 		ax -= padding * 0.25
 	}
 
@@ -133,8 +164,8 @@ func (r *topAppBarRenderer) Layout(size geo.Size) {
 	// action as the navigation button keeps to the title. A title that does
 	// not fit ends in an ellipsis, so it never runs under an action (#1454).
 	end := size.Width - padding
-	if len(r.actionBtns) > 0 {
-		end = r.actionBtns[0].Position().X - padding*0.5
+	if len(buttons) > 0 {
+		end = buttons[0].Position().X - padding*0.5
 	}
 	r.title.TextSize = th.Size(theme.SizeNameTitleLarge)
 	r.layoutTitle(x, end-x, size.Height)
@@ -144,6 +175,96 @@ func (r *topAppBarRenderer) Layout(size geo.Size) {
 	// icons at the leading (left) edge. The full-width bg/divider map onto
 	// themselves, so a blanket pass is safe.
 	mirrorIfRTL(r.Objects(), size.Width)
+}
+
+// fold returns the indexes of the actions that go into the overflow menu when
+// the title, the action buttons and the bar's end padding share avail: none
+// when every action fits with the title keeping three button widths. Else
+// labelled, unpinned actions fold from the last one, until the title has that
+// room or none are left. Folding a single action would only swap its button
+// for the overflow one, so it never happens alone. The minimum does not
+// depend on the title text, so the actions on the bar stay the same from one
+// title to the next (#1456).
+func (r *topAppBarRenderer) fold(avail, btnSize, padding float32) []int {
+	minTitle := btnSize * 3
+	room := func(buttons int) float32 {
+		if buttons == 0 {
+			return avail - padding
+		}
+		n := float32(buttons)
+		return avail - n*btnSize - (n-1)*padding*0.25 - padding
+	}
+
+	count := len(r.actions)
+	if room(count) >= minTitle {
+		return nil
+	}
+	var folded []int
+	for i := count - 1; i >= 0; i-- {
+		if a := r.actions[i]; a.Label == "" || a.Pinned {
+			continue
+		}
+		folded = append(folded, i)
+		if len(folded) > 1 && room(count-len(folded)+1) >= minTitle {
+			break
+		}
+	}
+	if len(folded) < 2 {
+		return nil
+	}
+	slices.Reverse(folded)
+	return folded
+}
+
+// barButtons returns the action buttons on the bar, in order: those of the
+// actions not folded, and the overflow button when some are.
+func (r *topAppBarRenderer) barButtons() []*IconButton {
+	if len(r.folded) == 0 {
+		return r.actionBtns
+	}
+	buttons := make([]*IconButton, 0, len(r.actionBtns)-len(r.folded)+1)
+	for i, btn := range r.actionBtns {
+		if !slices.Contains(r.folded, i) {
+			buttons = append(buttons, btn)
+		}
+	}
+	return append(buttons, r.overflowBtn)
+}
+
+// showOverflow opens the overflow menu under its button, listing the folded
+// actions by label and icon. On a disabled bar every item is disabled.
+func (r *topAppBarRenderer) showOverflow() {
+	c := bellui.CurrentApp().Driver().CanvasForObject(r.overflowBtn)
+	if c == nil || len(r.folded) == 0 {
+		return
+	}
+	off := r.bar.Disabled()
+	items := make([]*bellui.MenuItem, 0, len(r.folded))
+	for _, i := range r.folded {
+		a := r.actions[i]
+		tapped := a.OnTapped
+		item := bellui.NewMenuItemWithIcon(a.Label, a.Icon, func() {
+			if tapped != nil && !r.bar.Disabled() {
+				tapped()
+			}
+		})
+		item.Disabled = off
+		items = append(items, item)
+	}
+
+	menu := NewPopUpMenu(bellui.NewMenu("", items...), c)
+	inheritDirection(menu, r.overflowBtn)
+	// Hang the menu from the button's bottom edge, lined up with the bar's
+	// end: the button's right edge, or its left one under RTL, where the
+	// overflow button sits at the bar's left end.
+	btn, w := r.overflowBtn.Size(), menu.MinSize().Width
+	pos := bellui.AbsolutePositionForPoint(r.overflowBtn, geo.NewPos(btn.Width, btn.Height)).SubtractXY(w, 0)
+	if isRTLAt(r.overflowBtn) {
+		pos = bellui.AbsolutePositionForPoint(r.overflowBtn, geo.NewPos(0, btn.Height))
+	}
+	pos.X = max(pos.X, 0)
+	r.menu = menu
+	menu.ShowAtPosition(pos)
 }
 
 // layoutTitle places the title at x in a room wide, truncating it with an
@@ -219,17 +340,22 @@ func (r *topAppBarRenderer) Refresh() {
 		for _, a := range r.bar.Actions {
 			btn := NewIconButton(a.Icon, a.OnTapped)
 			btn.disabled = r.bar.Disabled()
+			btn.SetAccessibilityLabel(a.Label)
 			r.actionBtns = append(r.actionBtns, btn)
 		}
+		r.folded = nil // Layout folds afresh
 		changed = true
 	} else {
 		for i, a := range r.bar.Actions {
 			r.actionBtns[i].Icon = a.Icon
 			r.actionBtns[i].OnTapped = a.OnTapped
 			r.actionBtns[i].disabled = r.bar.Disabled()
+			r.actionBtns[i].SetAccessibilityLabel(a.Label)
 			r.actionBtns[i].Refresh()
 		}
 	}
+	r.actions = slices.Clone(r.bar.Actions)
+	r.overflowBtn.Refresh() // never disabled: its menu's items are (#1456)
 
 	if changed {
 		r.SetObjects(r.collectObjects())
@@ -243,7 +369,7 @@ func (r *topAppBarRenderer) collectObjects() []core.CanvasObject {
 	if r.navBtn != nil {
 		objects = append(objects, r.navBtn)
 	}
-	for _, btn := range r.actionBtns {
+	for _, btn := range r.barButtons() {
 		objects = append(objects, btn)
 	}
 	return objects
