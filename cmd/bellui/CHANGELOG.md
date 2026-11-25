@@ -17,6 +17,15 @@ one per change, so that open pull requests do not conflict here. Run
 `go run ./hack/changelog preview -C cmd/bellui` to see them assembled; the release folds them
 into a section below.
 
+## v1.5.0 — 2026-11-25
+
+Cut with toolkit v1.5.0. No changes of its own. Built against bellui
+v1.5.0. From this release the command is tagged with every toolkit
+release, so `go install github.com/belluikit/bellui/cmd/bellui@<version>`
+works for each one
+([#1464](https://github.com/belluikit/bellui/issues/1464)). There is no
+v1.4.0 of the command.
+
 ## v1.3.0 — 2026-11-24
 
 Cut with toolkit v1.3.0. `bellui install --help` describes `--app-id` for
