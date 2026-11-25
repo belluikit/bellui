@@ -888,15 +888,12 @@ func unionLineBounds(a, b shaping.Bounds) shaping.Bounds {
 
 func shapeCallback(shaper shaping.Shaper, in shaping.Input, x, scale, letterSpacing float32, cb func(shaping.Output, float32)) (float32, shaping.Bounds) {
 	out := shaper.Shape(in)
+	spaceClusters(&out, letterSpacing)
 	bounds := out.LineBounds
 	glyphs := out.Glyphs
 	start := 0
 	pending := false
 	adv := fixed.I(0)
-
-	// Count total glyphs for letter spacing calculation.
-	totalGlyphs := len(glyphs)
-	glyphIndex := 0
 
 	for i, g := range out.Glyphs {
 		if g.GlyphID == 0 {
@@ -925,10 +922,6 @@ func shapeCallback(shaper shaping.Shaper, in shaping.Input, x, scale, letterSpac
 			pending = true
 			adv += g.Advance
 		}
-		glyphIndex++
-		if letterSpacing != 0 && glyphIndex < totalGlyphs {
-			x += letterSpacing * scale
-		}
 	}
 
 	if pending {
@@ -938,6 +931,29 @@ func shapeCallback(shaper shaping.Shaper, in shaping.Input, x, scale, letterSpac
 		adv = 0
 	}
 	return x + fixed266ToFloat32(adv)*scale, bounds
+}
+
+// spaceClusters adds letterSpacing, in points, to the advance of each glyph
+// cluster of out but its last, so the gap is drawn wherever the glyphs are:
+// every painter, the caret layout and text on a path place glyphs by their
+// advances (#1453). The gap goes on the cluster's last glyph, so a combining
+// mark stays on its letter.
+//
+// Added to the pen once per glyph instead, it moved each run on by all of its
+// gaps before the run was drawn at its plain advances: letter-spaced text
+// started late by the spacing it should have had, and drew unspaced.
+func spaceClusters(out *shaping.Output, letterSpacing float32) {
+	if letterSpacing == 0 {
+		return
+	}
+	gap := fixed.Int26_6(math.Round(float64(letterSpacing) * (1 << 6)))
+	glyphs := out.Glyphs
+	for i := 0; i+1 < len(glyphs); i++ {
+		if glyphs[i+1].TextIndex() != glyphs[i].TextIndex() {
+			glyphs[i].Advance += gap
+			out.Advance += gap
+		}
+	}
 }
 
 // LineLayout is the visual layout of one logical line of a single text style.
@@ -1366,7 +1382,8 @@ func LineVisualLayout(faces shaping.Fontmap, runes []rune, textSize float32, sty
 			rtl = true
 		}
 		out := shaper.Shape(run)
-		x = recordRunCarets(out, x, 1, letterSpacing, carets, caretsBwd, extents, 0)
+		spaceClusters(&out, letterSpacing)
+		x = recordRunCarets(out, x, carets, caretsBwd, extents, 0)
 	}
 
 	// The line-end offset has no following rune (downstream) and the start offset
@@ -1503,7 +1520,6 @@ func StyledLineVisualLayout(runs []StyledRun) LineLayout {
 	type fragment struct {
 		out            shaping.Output
 		base           int
-		letterSpacing  float32
 		rank           int
 		isBox          bool
 		boxWidth       float32
@@ -1566,13 +1582,14 @@ func StyledLineVisualLayout(runs []StyledRun) LineLayout {
 		// visual order, so fragments from different runs interleave correctly.
 		for _, sub := range segmenter.Split(in, withPresentation(faces, in.Text)) {
 			out := shaper.Shape(sub)
+			spaceClusters(&out, letterSpacing)
 			rank := visualSeq[bidiOff+sub.RunStart]
 			for r := sub.RunStart + 1; r < sub.RunEnd; r++ {
 				if visualSeq[bidiOff+r] < rank {
 					rank = visualSeq[bidiOff+r]
 				}
 			}
-			frags = append(frags, fragment{out: out, base: textOff, letterSpacing: letterSpacing, rank: rank})
+			frags = append(frags, fragment{out: out, base: textOff, rank: rank})
 		}
 	}
 
@@ -1590,7 +1607,7 @@ func StyledLineVisualLayout(runs []StyledRun) LineLayout {
 			})
 			continue
 		}
-		x = recordRunCarets(frags[i].out, x, 1, frags[i].letterSpacing, carets, caretsBwd, extents, frags[i].base)
+		x = recordRunCarets(frags[i].out, x, carets, caretsBwd, extents, frags[i].base)
 	}
 	carets[textCount] = caretsBwd[textCount]
 	caretsBwd[0] = carets[0]
@@ -1644,7 +1661,7 @@ func lineVisualSeq(runes []rune, style bellui.TextStyle, source bellui.Resource)
 // the line (StyledLineVisualLayout shapes each style run separately) maps into
 // the line's global caret/extent tables. Callers shaping the whole line at once
 // pass base 0.
-func recordRunCarets(out shaping.Output, x, scale, letterSpacing float32, carets, caretsBwd []float32, extents [][2]float32, base int) float32 {
+func recordRunCarets(out shaping.Output, x float32, carets, caretsBwd []float32, extents [][2]float32, base int) float32 {
 	rtl := out.Direction.Progression() == di.TowardTopLeft
 	glyphs := out.Glyphs
 	n := len(glyphs)
@@ -1658,11 +1675,8 @@ func recordRunCarets(out shaping.Output, x, scale, letterSpacing float32, carets
 		adv := float32(0)
 		j := i
 		for j < n && glyphs[j].TextIndex() == cluster {
-			adv += fixed266ToFloat32(glyphs[j].Advance) * scale
+			adv += fixed266ToFloat32(glyphs[j].Advance)
 			j++
-			if letterSpacing != 0 && j < n {
-				adv += letterSpacing * scale
-			}
 		}
 		left, right := x, x+adv
 		// base shifts the cluster into the line's global tables; the grouping
