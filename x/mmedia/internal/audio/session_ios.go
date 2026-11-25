@@ -24,11 +24,15 @@ import (
 // app wants: it keeps playing in the background, as long as the app declares
 // UIBackgroundModes audio in its ios/Info.plist, and through silent mode.
 //
+// When the app is already recording from the microphone, the session goes to
+// PlayAndRecord instead, so the first song does not silence the capture
+// (#1188); session_ios.m says how.
+//
 // A failure is logged and does not stop the device from opening: audio still
 // plays in the foreground under the default category.
 func setupSession() {
 	if e := C.mmediaSetPlaybackSession(); e != nil {
-		bellui.LogError("x/mmedia: setting the audio session to Playback", errors.New(C.GoString(e)))
+		bellui.LogError("x/mmedia: setting up the audio session", errors.New(C.GoString(e)))
 		C.free(unsafe.Pointer(e))
 	}
 }
