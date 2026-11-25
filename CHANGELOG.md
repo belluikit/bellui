@@ -19,6 +19,57 @@ one per change, so that open pull requests do not conflict here. Run
 `go run ./hack/changelog preview` to see them assembled; the release folds them
 into a section below.
 
+## v1.5.0 — 2026-11-25
+
+One addition and three fixes, mostly for apps on a phone. `TopAppBar`
+folds the actions that don't fit into an overflow (⋮) menu, through the new
+`TopAppBarAction.Label` and `Pinned` fields, and cuts a long title short
+before its actions instead of drawing it under them. `NavigationDrawer` rows
+mirror in a right-to-left layout, and letter-spaced text, which includes
+every MD3 Body and Label style, is spaced between its letters instead of
+being shifted right. Nothing changes for existing code: an action with no
+`Label` never folds. The x/ modules carry the version with no changes of
+their own. The release check for this version was the macOS probe only, not
+the hand check on each platform.
+
+### Added
+
+* **`TopAppBar` folds the actions that don't fit into an overflow (⋮) menu**
+  ([#1456](https://github.com/belluikit/bellui/issues/1456)). When the
+  actions leave the title less than three button widths, the trailing ones
+  move into a menu that lists each by its label and icon. On a 360 dp phone
+  with five actions, the bar shows two and the ⋮. `TopAppBarAction` gains
+  `Label`, which the menu shows and screen readers read as the button's name,
+  and `Pinned`, which keeps an action on the bar. Only labelled, unpinned
+  actions fold, so a bar whose actions have no labels looks as it did. On a
+  disabled bar the ⋮ still opens, and every item in its menu is disabled.
+
+### Fixed
+
+* **`NavigationDrawer` rows are mirrored in a right-to-left layout**
+  ([#1459](https://github.com/belluikit/bellui/issues/1459)). The drawer
+  already opened against the right edge in right-to-left, but each row kept
+  its icon at the left and its label after it, so on a phone, where the drawer
+  covers most of the width, it looked as if it had opened from the left. A row
+  now starts at the right: the icon against the right edge and the label
+  before it. A row with no icon starts its label where the icon would be.
+* **A long `TopAppBar` title no longer runs under the action buttons**
+  ([#1454](https://github.com/belluikit/bellui/issues/1454)). The title used
+  to keep its full width whatever room the actions left, so on a 360 dp phone
+  with five actions every gallery title was drawn under the first one. A
+  title that doesn't fit is now cut to a prefix and an ellipsis before the
+  first action, and draws nothing if not even the ellipsis fits. Screen
+  readers still read the whole title.
+* **Letter-spaced text is spaced, and starts where it should**
+  ([#1453](https://github.com/belluikit/bellui/issues/1453)). Text with
+  `TextStyle.LetterSpacing` was drawn with no spacing between its glyphs and
+  shifted right by all the gaps it should have had, so every MD3 Body and
+  Label style looked indented: a 56-character Body Large line started about
+  27 dp late. The gap now goes after each letter, in drawing, measuring and
+  caret placement alike, on the software, GL and WebGPU paths, and a
+  combining mark stays on its letter. Text on a path is now letter-spaced
+  too; it was drawn unspaced before.
+
 ## v1.4.0 — 2026-11-24
 
 Fixes found after v1.3.0, mostly in rich text and a few widgets, and one
