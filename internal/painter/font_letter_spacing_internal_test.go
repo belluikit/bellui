@@ -146,3 +146,30 @@ func TestDrawTextOnPath_LetterSpacing(t *testing.T) {
 	gaps := float32(len(s) - 1)
 	assert.InDelta(t, float32(plainTo-plainFrom)+6*gaps, float32(to-from), 2, "the ink grows once per gap")
 }
+
+// The gap is drawn where the shaper splits the line into runs, too: here at
+// each change of face, from the text font to the emoji font and back. Each
+// run got gaps only between its own glyphs, so a line one font could not draw
+// whole was measured, drawn and caret-placed a gap short at every split.
+func TestWalkString_LetterSpacingAcrossRuns(t *testing.T) {
+	f := CachedFontFace(bellui.TextStyle{}, nil, nil).Fonts
+	const s = "ab\U0001F600cd"
+	var faces int
+	walkString(f, s, float32ToFixed266(40), bellui.TextStyle{}, new(float32), 1, func(shaping.Output, float32) { faces++ })
+	require.Equal(t, 3, faces, "the emoji is shaped as a run of its own")
+
+	plain := glyphXs(f, s, 40, bellui.TextStyle{})
+	gap := glyphXs(f, s, 40, spaced(4))
+	layout := LineVisualLayout(f, []rune(s), 40, spaced(4))
+	styled := StyledLineVisualLayout([]StyledRun{{Runes: []rune(s), TextSize: 40, Style: spaced(4)}})
+	for i := range []rune(s) {
+		assert.InDelta(t, plain[i]+4*float32(i), gap[i], 0.01, "glyph %d follows one gap per glyph before it", i)
+		assert.InDelta(t, gap[i], layout.Carets[i], 0.01, "rune %d's caret is where its glyph is drawn", i)
+		assert.InDelta(t, gap[i], styled.Carets[i], 0.01, "rune %d's RichText caret is where its glyph is drawn", i)
+	}
+	plainSize, _ := MeasureString(f, s, 40, bellui.TextStyle{})
+	size, _ := MeasureString(f, s, 40, spaced(4))
+	assert.InDelta(t, plainSize.Width+4*4, size.Width, 0.01, "four gaps between five glyphs")
+	assert.InDelta(t, size.Width, layout.Width, 0.01, "the caret layout is as wide as the measure")
+	assert.InDelta(t, size.Width, styled.Width, 0.01, "the RichText caret layout is as wide as the measure")
+}
