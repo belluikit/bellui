@@ -203,6 +203,30 @@ release-tag-commands: ## Steps 3 and 5: print the tag commands (does not run the
 		if git rev-parse -q --verify "refs/tags/$$t" >/dev/null; then echo "# WARNING: $$t already exists; give that module the next free version"; fi; \
 	done
 
+# A machine whose GOPRIVATE covers github.com/belluikit/* (the maintainer's
+# does) fetches these modules straight from GitHub, so go list and go get
+# there say nothing about proxy.golang.org, which is where a consumer gets
+# them (#1463). These targets ask the public proxy directly. Asking it for a
+# version is also what makes it fetch that version and add it to the index
+# pkg.go.dev reads.
+PROXY_MODS_X := $(addprefix x/,$(X)) cmd/bellui
+define proxy_check
+	@fail=0; for m in $(1); do \
+		p=github.com/belluikit/bellui; [ "$$m" = . ] || p=$$p/$$m; \
+		if out=$$(curl -fsS "https://proxy.golang.org/$$p/@v/$(VERSION).info" 2>&1); then \
+			echo "served: $$p@$(VERSION) $$out"; \
+		else echo "NOT SERVED: $$p@$(VERSION): $$out"; fail=1; fi; \
+	done; exit $$fail
+endef
+
+.PHONY: release-proxy
+release-proxy: ## Step 3: check proxy.golang.org serves the main module's $(VERSION)
+	$(call proxy_check,.)
+
+.PHONY: release-proxy-modules
+release-proxy-modules: ## Step 5: check proxy.golang.org serves $(VERSION) of each x/ module and cmd/bellui
+	$(call proxy_check,$(PROXY_MODS_X))
+
 .PHONY: release-pins
 release-pins: ## Step 4: move the x/ and cmd/bellui pins to the tagged $(VERSION) and verify each
 	@set -e; for m in $(addprefix x/,$(X)) cmd/bellui; do \
@@ -211,11 +235,27 @@ release-pins: ## Step 4: move the x/ and cmd/bellui pins to the tagged $(VERSION
 		  go build ./... && go vet ./... && go test ./... ); \
 	done
 
+# The smoke check resolves everything as a consumer without GOPRIVATE does:
+# - through the public proxy alone. With no ",direct" fallback, a module the
+#   proxy cannot serve fails the check instead of being fetched from GitHub.
+# - with GOPRIVATE and the rest set to a pattern that matches nothing. Set to
+#   empty, they fall back to what `go env -w` stored, which is where the
+#   maintainer's GOPRIVATE lives.
+# - into an empty module cache, since a cached module is never asked for
+#   again. The cache sits beside the smoke module, not in it, or go mod tidy
+#   reads it as the module's own packages.
+# The command is installed first: once bellui is in the cache, installing it
+# through the proxy fails (#1469).
+SMOKE_ENV := GOPRIVATE=none.invalid GONOPROXY=none.invalid GONOSUMDB=none.invalid \
+	GOPROXY=https://proxy.golang.org GOSUMDB=sum.golang.org
+
 .PHONY: release-smoke
-release-smoke: ## Step 6: build a fresh consumer of the published $(VERSION)
-	@d=$$(mktemp -d); echo "in $$d"; cd $$d && go mod init smoke >/dev/null 2>&1 && \
+release-smoke: ## Step 6: build a fresh consumer of $(VERSION), resolved through proxy.golang.org
+	@d=$$(mktemp -d); echo "in $$d/smoke"; mkdir $$d/smoke && cd $$d/smoke && \
+	export $(SMOKE_ENV) GOMODCACHE=$$d/modcache && trap 'go clean -modcache' EXIT && \
+	GOBIN=$$d/bin go install github.com/belluikit/bellui/cmd/bellui@$(VERSION) && echo "cmd/bellui@$(VERSION) installs" && \
+	go mod init smoke >/dev/null 2>&1 && \
 	printf '%s\n' 'package main' 'import (' '	"github.com/belluikit/bellui"' '	"github.com/belluikit/bellui/app"' \
 		'	"github.com/belluikit/bellui/widget"' ')' 'func main() {' '	a := app.New()' '	w := a.NewWindow("smoke")' \
 		'	w.SetContent(widget.NewLabel("hello"))' '	bellui.ShowAndRun(w)' '}' > main.go && \
-	go mod edit -require=github.com/belluikit/bellui@$(VERSION) && go mod tidy && go build . && echo "smoke build ok" && \
-	GOBIN=$$d/bin go install github.com/belluikit/bellui/cmd/bellui@$(VERSION) && echo "cmd/bellui@$(VERSION) installs"
+	go mod edit -require=github.com/belluikit/bellui@$(VERSION) && go mod tidy && go build . && echo "smoke build ok"

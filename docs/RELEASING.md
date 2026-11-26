@@ -50,7 +50,8 @@ Tag only on reports with no failure; file each failure first.
 
 **The main-module tag must exist and be fetchable before the `x/*` pins move.**
 `go get github.com/belluikit/bellui@<version>` in an `x/` module resolves the
-tag from the proxy — bumping the pins first simply fails. That is why the
+tag (from GitHub directly on a machine whose `GOPRIVATE` covers belluikit,
+from the proxy elsewhere) — bumping the pins first simply fails. That is why the
 `x/*` tags of past releases sit on a commit *after* the main tag rather than on
 it. Do not try to make them share a commit.
 
@@ -111,11 +112,27 @@ The changelog entry was dated when it was written in step 1. If that is not
 the date you are tagging on, correct it in a commit first and wait for its
 checks — the entry, the tag and the GitHub Release should name the same day.
 
-Confirm the proxy can see it before continuing — this is what step 4 depends on:
+Then ask the public Go proxy for it. `make release-proxy VERSION=v1.0.0-rc.7`
+does this:
 
 ```sh
-go list -m github.com/belluikit/bellui@v1.0.0-rc.7   # may take a moment to appear
+curl -fsS https://proxy.golang.org/github.com/belluikit/bellui/@v/v1.0.0-rc.7.info
 ```
+
+A consumer gets the module from proxy.golang.org, so that is the check that
+counts. Asking the proxy for the version is also what makes it fetch the tag
+and add the version to index.golang.org, the index pkg.go.dev reads. Until
+something asks, pkg.go.dev does not list the release. If the request fails
+right after the push, wait a few minutes and run it again.
+
+Do not use `go list -m github.com/belluikit/bellui@<version>` for this. On a
+machine whose `GOPRIVATE` covers `github.com/belluikit/*` (the maintainer's
+does), `go` fetches straight from GitHub and never asks the proxy, even with
+a fresh `GOMODCACHE`. Clearing the setting with `GOPRIVATE=` does not help:
+an empty variable falls back to the value `go env -w` stored. v1.5.0 passed
+`go list -m` and was reported as served by the proxy. The proxy first fetched
+it about 90 minutes later, and pkg.go.dev listed it only then
+([#1463](https://github.com/belluikit/bellui/issues/1463)).
 
 ### 4. Bump the `x/*` and `cmd/bellui` pins, and verify each by hand
 
@@ -197,6 +214,16 @@ done
 git push origin --tags
 ```
 
+Then ask the public proxy for each of them, as in step 3:
+
+```sh
+make release-proxy-modules VERSION=v1.0.0-rc.7
+```
+
+It prints `served:` and the proxy's answer for each module, or `NOT SERVED:`
+and fails. A module that has no tag at the version fails here: run on
+v1.4.0, it reports `cmd/bellui`, which that release did not tag.
+
 **Do not skip this.** rc.6 did: the pins were bumped but the tags were never
 cut, so the `x/*` modules have had no tag since rc.5 and `x/mmedia` has never
 been tagged at all — [#148](https://github.com/belluikit/bellui/issues/148) is
@@ -208,10 +235,27 @@ toolkit is at rc.6.
 `make release-smoke VERSION=v1.0.0-rc.7` runs this recipe in a fresh
 temporary directory.
 
-Cheap, and it catches a release that only works from inside this checkout:
+Cheap, and it catches a release that only works from inside this checkout.
+It resolves everything the way a consumer without `GOPRIVATE` does: through
+proxy.golang.org only, with no fallback to GitHub, into an empty module
+cache (a module already in the cache is never fetched again). The
+`GOPRIVATE` variables take a pattern that matches nothing, because an empty
+one falls back to the stored value (step 3). The cache sits beside the smoke
+module, not inside it, or `go mod tidy` reads the cache as the module's own
+packages.
+
+The command is installed first, while the cache is still empty. Installed
+after the build, with bellui already in the cache, `go install` fails through
+the proxy with `module github.com/belluikit/bellui@<version> found, but does
+not contain package github.com/belluikit/bellui/cmd/bellui`. That is a
+consumer-facing failure of its own, tracked in
+[#1469](https://github.com/belluikit/bellui/issues/1469).
 
 ```sh
-cd "$(mktemp -d)"
+d="$(mktemp -d)" && mkdir "$d/smoke" && cd "$d/smoke"
+export GOPRIVATE=none.invalid GONOPROXY=none.invalid GONOSUMDB=none.invalid \
+  GOPROXY=https://proxy.golang.org GOSUMDB=sum.golang.org GOMODCACHE="$d/modcache"
+GOBIN="$d/bin" go install github.com/belluikit/bellui/cmd/bellui@v1.0.0-rc.7
 go mod init smoke
 cat > main.go <<'EOF'
 package main
@@ -248,12 +292,12 @@ writing this:
   `w.ShowAndRun()`, and the program therefore imports the root package. Getting
   that wrong is the usual way this smoke test "fails" for the wrong reason.
 
-Repeat with one `x/` module (`go get github.com/belluikit/bellui/x/charts@…`)
-to prove step 5's tags are visible to the proxy, and install the command at
-the version:
+Repeat with one `x/` module (`go get github.com/belluikit/bellui/x/charts@…`),
+in the same environment, to prove a consumer can build against step 5's tags.
+Then remove the cache. Its files are read-only, so `rm -r` cannot remove it:
 
 ```sh
-GOBIN="$(mktemp -d)" go install github.com/belluikit/bellui/cmd/bellui@v1.0.0-rc.7
+go clean -modcache
 ```
 
 ### 7. GitHub Release on the main-module tag
