@@ -138,7 +138,8 @@ func (c *IconCursor) readTransformAttr(m1 rasterx.Matrix2D, k string) (rasterx.M
 		}
 	case "scale":
 		if ln == 1 {
-			m1 = m1.Scale(c.points[0], 0)
+			// scale(s) means scale(s, s): sy defaults to sx (#1474).
+			m1 = m1.Scale(c.points[0], c.points[0])
 		} else if ln == 2 {
 			m1 = m1.Scale(c.points[0], c.points[1])
 		} else {
