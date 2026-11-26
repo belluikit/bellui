@@ -82,6 +82,9 @@ type NavigationDrawer struct {
 	atRight bool              // the edge the shown drawer opened against
 	slide   *bellui.Animation // the slide in or out, while it runs
 	closing *PopUp            // the pop-up sliding out, until it is gone
+
+	inset     *bellui.Container // keeps the destinations clear of the system insets
+	placedFor drawerPlacement   // what the shown drawer's geometry was worked out from
 }
 
 // NewNavigationDrawer creates a navigation drawer.
@@ -158,35 +161,14 @@ func (d *NavigationDrawer) Show(c core.Canvas) {
 		objects = append(objects, row)
 	}
 
-	// The drawer surface runs edge to edge, but its destinations keep clear of
-	// the system insets (status bar, home indicator, a landscape notch).
-	insetPos, insetSize := c.InteractiveArea()
-	canvasSize := c.Size()
-	top := min(max(d.Top, 0), canvasSize.Height)
-	insetTop := max(insetPos.Y-top, 0)
-	insetBottom := max(canvasSize.Height-insetPos.Y-insetSize.Height, 0)
-	insetLeft := insetPos.X
-	insetRight := max(canvasSize.Width-insetPos.X-insetSize.Width, 0)
-
 	atRight := d.opensAtRight(c)
 	d.atRight = atRight
-	if atRight {
-		insetLeft = 0
-	} else {
-		insetRight = 0
-	}
-	// No wider than the canvas less a strip of scrim: the pop-up would cut a
-	// wider drawer to the canvas but keep its x, so an end drawer stopped
-	// short of its edge (#1238).
-	drawerWidth := min(float32(360)+insetLeft+insetRight, max(canvasSize.Width-drawerScrimStrip, 0))
 	content := &bellui.Container{Layout: layout.NewVBoxLayout(), Objects: objects}
 	padded := &bellui.Container{Layout: layout.NewPaddedLayout(), Objects: []core.CanvasObject{content}}
-	inset := &bellui.Container{
-		Layout:  layout.NewCustomPaddedLayout(insetTop, insetBottom, insetLeft, insetRight),
-		Objects: []core.CanvasObject{padded},
-	}
+	d.inset = &bellui.Container{Objects: []core.CanvasObject{padded}}
+	x, top, size := d.place(c)
 	// Scroll so destination lists taller than the canvas remain reachable.
-	scroll := internalWidget.NewScroll(inset)
+	scroll := internalWidget.NewScroll(d.inset)
 
 	if d.Modal {
 		d.popUp = NewModalPopUp(scroll, c)
@@ -199,18 +181,81 @@ func (d *NavigationDrawer) Show(c core.Canvas) {
 	// Hide does, so they slide it out too (#1186).
 	d.popUp.OnDismissed = d.Hide
 
-	x := float32(0)
-	if atRight {
-		x = canvasSize.Width - drawerWidth
-	}
-	d.popUp.Resize(geo.NewSize(drawerWidth, canvasSize.Height-top))
+	d.popUp.Resize(size)
 	d.popUp.Show()
 	if bellui.CurrentApp().Settings().ShowAnimations() {
-		d.slideIn(x, top, drawerWidth, canvasSize.Width, atRight)
+		d.slideIn(x, top, size.Width, c.Size().Width, atRight)
 	} else {
 		d.popUp.Move(geo.NewPos(x, top))
 	}
+	// Set last: the Show and Move above refresh the pop-up, and the drawer
+	// is already placed for this canvas.
+	p := d.popUp
+	p.onRefresh = func() { d.canvasChanged(p) }
 	d.setOpen(true)
+}
+
+// drawerPlacement is what a drawer's geometry was worked out from: the
+// canvas size and its interactive area, which a rotation changes (#1467).
+type drawerPlacement struct {
+	size     geo.Size
+	areaPos  geo.Position
+	areaSize geo.Size
+}
+
+func placementOf(c core.Canvas) drawerPlacement {
+	areaPos, areaSize := c.InteractiveArea()
+	return drawerPlacement{size: c.Size(), areaPos: areaPos, areaSize: areaSize}
+}
+
+// place works out the drawer's geometry on c: the x it rests at against its
+// edge, the top it starts at, and its size. It sets the inset container's
+// padding, which keeps the destinations clear of the system insets, and
+// records what the geometry was worked out from.
+func (d *NavigationDrawer) place(c core.Canvas) (x, top float32, size geo.Size) {
+	// The drawer surface runs edge to edge, but its destinations keep clear of
+	// the system insets (status bar, home indicator, a landscape notch).
+	d.placedFor = placementOf(c)
+	insetPos, insetSize := d.placedFor.areaPos, d.placedFor.areaSize
+	canvasSize := d.placedFor.size
+	top = min(max(d.Top, 0), canvasSize.Height)
+	insetTop := max(insetPos.Y-top, 0)
+	insetBottom := max(canvasSize.Height-insetPos.Y-insetSize.Height, 0)
+	insetLeft := insetPos.X
+	insetRight := max(canvasSize.Width-insetPos.X-insetSize.Width, 0)
+	if d.atRight {
+		insetLeft = 0
+	} else {
+		insetRight = 0
+	}
+	// No wider than the canvas less a strip of scrim: the pop-up would cut a
+	// wider drawer to the canvas but keep its x, so an end drawer stopped
+	// short of its edge (#1238).
+	width := min(float32(360)+insetLeft+insetRight, max(canvasSize.Width-drawerScrimStrip, 0))
+	d.inset.Layout = layout.NewCustomPaddedLayout(insetTop, insetBottom, insetLeft, insetRight)
+	if d.atRight {
+		x = canvasSize.Width - width
+	}
+	return x, top, geo.NewSize(width, canvasSize.Height-top)
+}
+
+// canvasChanged places the open drawer again when its canvas changed size or
+// insets since it was placed, as a rotation does: it stays against the edge
+// it opened on, spans the new height, and keeps clear of the new insets
+// (#1467). A slide in still running ends where the drawer now rests. The
+// pop-up calls it from its Refresh, which is how every driver tells an open
+// pop-up its canvas was resized, so it sets the geometry without refreshing
+// the pop-up again.
+func (d *NavigationDrawer) canvasChanged(p *PopUp) {
+	if p != d.popUp || placementOf(p.Canvas) == d.placedFor {
+		return // a drawer sliding out, or nothing changed
+	}
+	d.stopSlide()
+	x, top, size := d.place(p.Canvas)
+	p.coverTop = top
+	p.innerSize = size
+	p.innerPos = geo.NewPos(x, top)
+	p.innerPosMoved = true
 }
 
 // setOpen records whether the drawer is open, and tells OnOpenChanged when
@@ -247,9 +292,14 @@ func (d *NavigationDrawer) slideIn(x, top, width, canvasWidth float32, atRight b
 // is hiding: it absorbs taps on its scrim and leaves Escape to what is beneath.
 func (d *NavigationDrawer) slideOut(p *PopUp) {
 	from, top := p.innerPos.X, p.innerPos.Y
-	to := -p.innerSize.Width
-	if d.atRight {
-		to = p.Canvas.Size().Width
+	// The edge is read on every frame: a rotation during the slide moves the
+	// right edge, and a target fixed at the start would leave the drawer on
+	// screen when it hides (#1467).
+	to := func() float32 {
+		if d.atRight {
+			return p.Canvas.Size().Width
+		}
+		return -p.innerSize.Width
 	}
 	p.isHiding = true
 	d.closing = p
@@ -257,7 +307,7 @@ func (d *NavigationDrawer) slideOut(p *PopUp) {
 		if d.closing != p {
 			return
 		}
-		p.Move(geo.NewPos(from+(to-from)*done, top))
+		p.Move(geo.NewPos(from+(to()-from)*done, top))
 		if done >= 1 {
 			d.closing = nil
 			d.slide = nil
