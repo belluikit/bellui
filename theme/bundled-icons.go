@@ -574,6 +574,14 @@ var lockIconRes = &bellui.StaticResource{
 	StaticContent: lockIcon,
 }
 
+//go:embed icons/share.svg
+var shareIcon []byte
+
+var shareIconRes = &bellui.StaticResource{
+	StaticName:    "share.svg",
+	StaticContent: shareIcon,
+}
+
 //go:embed icons/place.svg
 var placeIcon []byte
 

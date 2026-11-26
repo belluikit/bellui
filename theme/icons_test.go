@@ -621,6 +621,20 @@ func TestPurchaseIcons(t *testing.T) {
 	}
 }
 
+// The share icon is its own file, themed like the rest (#1475).
+func TestShareIcon(t *testing.T) {
+	icon := theme.ShareIcon()
+	if icon == nil || !strings.HasSuffix(icon.Name(), "share.svg") {
+		t.Fatalf("icon %v, want one named for share.svg", icon)
+	}
+	if !strings.Contains(string(icon.Content()), "<path") {
+		t.Error("share.svg has no shape")
+	}
+	if _, ok := icon.(*theme.ThemedResource); !ok {
+		t.Errorf("share.svg is %T, want a *theme.ThemedResource so it takes the theme's colour", icon)
+	}
+}
+
 // The icons for navigation destinations about a place, people and a child
 // are their own files, themed like the rest (#1155).
 func TestNavigationDestinationIcons(t *testing.T) {

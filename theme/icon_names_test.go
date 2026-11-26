@@ -80,6 +80,7 @@ func TestIconNamesFollowPlayer(t *testing.T) {
 		IconNameCreditCard:        "credit_card",
 		IconNameReceiptLong:       "receipt_long",
 		IconNameLock:              "lock",
+		IconNameShare:             "share",
 		IconNameContentCut:        "cut",
 		IconNameContentPaste:      "paste",
 		IconNameContentUndo:       "undo",
@@ -136,7 +137,7 @@ func TestIconNamesFollowPlayer(t *testing.T) {
 		assert.False(t, seen[w], "%q names two icons", w)
 		seen[w] = true
 	}
-	assert.Len(t, want, 107)
+	assert.Len(t, want, 108)
 }
 
 // A theme file written before #1307 overrides an icon by its old name,
