@@ -19,6 +19,48 @@ one per change, so that open pull requests do not conflict here. Run
 `go run ./hack/changelog preview` to see them assembled; the release folds them
 into a section below.
 
+## v1.6.0 — 2026-11-26
+
+A share icon for the theme, and SVG drawing that matches a browser in three
+more places. `theme.ShareIcon` and `theme.IconNameShare` are the only API
+additions. The SVG fixes change
+what some images look like: a shape under a one-number `scale()` now appears
+instead of vanishing, a stroke under a stretching transform is wider along the
+stretched axis, and a stroke that sets no width or corner style is 1 unit wide
+with sharp corners, as in a browser, where it used to be 2 units with cut-off
+corners. The x/ modules and the `bellui` command carry the version with no
+changes of their own. The release check for this version was the macOS probe
+only, not the hand check on each platform.
+
+### Added
+
+* **A share icon in the theme**
+  ([#1475](https://github.com/belluikit/bellui/issues/1475)): `ShareIcon`
+  and `IconNameShare`, Material Icons' `share` (three connected dots, the
+  share symbol Android, Chrome and most web apps use), themed like the rest
+  of the set.
+
+### Fixed
+
+* **SVG strokes with no width or corner style draw as in a browser**
+  ([#1478](https://github.com/belluikit/bellui/issues/1478)). A stroke with
+  no `stroke-linejoin` had its outer corners cut off, and one with no
+  `stroke-width` was 2 units wide. Both now use SVG's defaults: sharp
+  (mitred) corners, which still fall back to a cut corner past the miter
+  limit, and a width of 1. SVGs that set these attributes draw as before.
+* **An SVG shape under a one-number `scale()` transform is drawn again**
+  ([#1474](https://github.com/belluikit/bellui/issues/1474)). `scale(0.5)`
+  squashed the shape to zero height, so it disappeared without an error. It
+  now scales both axes, as the SVG spec says, and draws the same as
+  `scale(0.5 0.5)`.
+* **An SVG stroke under a non-uniform transform stretches with the shape**
+  ([#1295](https://github.com/belluikit/bellui/issues/1295)). Under a
+  transform such as `scale(0.5 2)`, every side of a stroke used to get one
+  averaged width. Now each side gets the width a browser draws: an 8-unit
+  stroke is 4 px on the narrowed sides and 16 px on the stretched ones.
+  Uniform scaling draws exactly as before, and so do images shown with a
+  stretch fill mode, which already stretched their strokes.
+
 ## v1.5.1 — 2026-11-26
 
 Two fixes for apps on a phone, and no API changes. An open
