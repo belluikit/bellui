@@ -39,3 +39,8 @@ Treat as owned code; patch here.
   (`transformingScanner`) on its way to the rasterizer. The larger scale is
   deliberate: built at the smaller one, a thin stroke under a strong stretch
   rounds to zero width in the dasher's 1/64 px units and vanishes.
+* `DefaultStyle` uses SVG's initial values for a stroke: a width of 1 and
+  mitred joins (#1478). Upstream defaulted to a width of 2 and bevelled
+  joins, so a stroke with neither attribute was twice as thick as in a
+  browser and had its outer corners cut off. rasterx's `Miter` already falls
+  back to a bevel past the miter limit, as SVG does.
