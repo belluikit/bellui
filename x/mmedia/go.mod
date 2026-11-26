@@ -3,7 +3,7 @@ module github.com/belluikit/bellui/x/mmedia
 go 1.26.2
 
 require (
-	github.com/belluikit/bellui v1.5.1
+	github.com/belluikit/bellui v1.6.0
 	github.com/belluikit/goffmpeg v0.13.1
 	github.com/belluikit/oto/v3 v3.6.0-bellui.1
 )
