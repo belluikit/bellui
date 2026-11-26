@@ -51,6 +51,12 @@ type PopUp struct {
 	hideAnim          *bellui.Animation
 	hidingAbove       []core.CanvasObject // overlays above this one when Hide began; its fade's end removes them too
 	opacity           float32             // 0.0–1.0 for animation; 1.0 when fully visible
+	// onRefresh, when set, runs first in each Refresh, before the content is
+	// laid out. Every driver tells an open pop-up its canvas was resized by
+	// refreshing it, so a host that places the pop-up from the canvas's
+	// geometry, as a navigation drawer does, places it again here (#1467). It
+	// sets the fields it changes directly: Move and Resize would refresh again.
+	onRefresh func()
 }
 
 // Hide this widget, if it was previously visible
@@ -495,6 +501,9 @@ func (r *popUpRenderer) MinSize() geo.Size {
 }
 
 func (r *popUpRenderer) Refresh() {
+	if r.popUp.onRefresh != nil {
+		r.popUp.onRefresh()
+	}
 	th := r.popUp.Theme()
 	v := bellui.CurrentApp().Settings().ThemeVariant()
 	var bgColor color.Color
@@ -593,6 +602,9 @@ func (r *modalPopUpRenderer) MinSize() geo.Size {
 }
 
 func (r *modalPopUpRenderer) Refresh() {
+	if r.popUp.onRefresh != nil {
+		r.popUp.onRefresh()
+	}
 	th := r.popUp.Theme()
 	v := bellui.CurrentApp().Settings().ThemeVariant()
 
