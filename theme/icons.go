@@ -474,6 +474,12 @@ const (
 	// Since: 1.3
 	IconNameLock bellui.ThemeIconName = "lock"
 
+	// IconNameShare is the name of theme lookup for Material's share icon:
+	// three connected dots, the share symbol most apps use (#1475).
+	//
+	// Since: 1.6
+	IconNameShare bellui.ThemeIconName = "share"
+
 	// IconNamePlace is the name of theme lookup for the icon of a place (map pin), for a destination about location.
 	//
 	// Since: 1.3
@@ -731,6 +737,7 @@ var icons = map[bellui.ThemeIconName]bellui.Resource{
 	IconNameCreditCard:       NewThemedResource(creditcardIconRes),
 	IconNameReceiptLong:      NewThemedResource(receiptlongIconRes),
 	IconNameLock:             NewThemedResource(lockIconRes),
+	IconNameShare:            NewThemedResource(shareIconRes),
 	IconNamePlace:            NewThemedResource(placeIconRes),
 	IconNamePeople:           NewThemedResource(peopleIconRes),
 	IconNameChild:            NewThemedResource(childIconRes),
@@ -1412,6 +1419,14 @@ func ReceiptLongIcon() bellui.Resource {
 // Since: 1.3
 func LockIcon() bellui.Resource {
 	return safeIconLookup(IconNameLock)
+}
+
+// ShareIcon returns a resource containing Material's share icon for the
+// current theme: three connected dots, the share symbol most apps use
+//
+// Since: 1.6
+func ShareIcon() bellui.Resource {
+	return safeIconLookup(IconNameShare)
 }
 
 // PlaceIcon returns a resource containing the standard icon of a place (map pin), for a destination about location, for the current theme
