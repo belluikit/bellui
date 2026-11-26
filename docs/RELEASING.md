@@ -238,24 +238,31 @@ temporary directory.
 Cheap, and it catches a release that only works from inside this checkout.
 It resolves everything the way a consumer without `GOPRIVATE` does: through
 proxy.golang.org only, with no fallback to GitHub, into an empty module
-cache (a module already in the cache is never fetched again). The
-`GOPRIVATE` variables take a pattern that matches nothing, because an empty
-one falls back to the stored value (step 3). The cache sits beside the smoke
-module, not inside it, or `go mod tidy` reads the cache as the module's own
-packages.
+cache (a module already in the cache is never fetched again). The cache sits
+beside the smoke module, not inside it, or `go mod tidy` reads the cache as
+the module's own packages.
 
-The command is installed first, while the cache is still empty. Installed
-after the build, with bellui already in the cache, `go install` fails through
-the proxy with `module github.com/belluikit/bellui@<version> found, but does
-not contain package github.com/belluikit/bellui/cmd/bellui`. That is a
-consumer-facing failure of its own, tracked in
-[#1469](https://github.com/belluikit/bellui/issues/1469).
+The `GOPRIVATE` variables must be empty, and `GOENV=off` is what makes them
+empty: with the go env file in use, an empty value falls back to the stored
+one (step 3). A pattern that matches nothing is not the same as empty. Any
+non-empty `GONOPROXY`, set directly or through `GOPRIVATE`, makes the go
+command look in the module cache before the proxy. Once bellui is cached at a
+version, `go install github.com/belluikit/bellui/cmd/bellui@<that version>`
+then fails with `module github.com/belluikit/bellui@<version> found, but does
+not contain package github.com/belluikit/bellui/cmd/bellui`. That is a go
+command bug ([golang/go#58116](https://github.com/golang/go/issues/58116)),
+and the website's install section tells consumers who meet it what to run
+([#1469](https://github.com/belluikit/bellui/issues/1469)). `GOENV=off` also
+drops the stored `GOCACHE`, so the recipe passes it through.
+
+The command is installed after the build, with bellui already in the cache,
+because that is the order a consumer meets it in.
 
 ```sh
+GOCACHE="$(go env GOCACHE)"   # read before GOENV=off hides the stored value
 d="$(mktemp -d)" && mkdir "$d/smoke" && cd "$d/smoke"
-export GOPRIVATE=none.invalid GONOPROXY=none.invalid GONOSUMDB=none.invalid \
+export GOENV=off GOCACHE GOPRIVATE= GONOPROXY= GONOSUMDB= \
   GOPROXY=https://proxy.golang.org GOSUMDB=sum.golang.org GOMODCACHE="$d/modcache"
-GOBIN="$d/bin" go install github.com/belluikit/bellui/cmd/bellui@v1.0.0-rc.7
 go mod init smoke
 cat > main.go <<'EOF'
 package main
@@ -276,6 +283,8 @@ EOF
 go mod edit -require=github.com/belluikit/bellui@v1.0.0-rc.7
 go mod tidy   # resolves the imports AND writes the transitive go.sum entries
 go build .
+GOBIN="$d/bin" go install github.com/belluikit/bellui/cmd/bellui@v1.0.0-rc.7
+"$d/bin/bellui" version
 ```
 
 Two things this recipe gets right on purpose, both verified against rc.6 while

@@ -238,24 +238,29 @@ release-pins: ## Step 4: move the x/ and cmd/bellui pins to the tagged $(VERSION
 # The smoke check resolves everything as a consumer without GOPRIVATE does:
 # - through the public proxy alone. With no ",direct" fallback, a module the
 #   proxy cannot serve fails the check instead of being fetched from GitHub.
-# - with GOPRIVATE and the rest set to a pattern that matches nothing. Set to
-#   empty, they fall back to what `go env -w` stored, which is where the
-#   maintainer's GOPRIVATE lives.
+# - with GOPRIVATE, GONOPROXY and GONOSUMDB empty. GOENV=off is what makes
+#   them empty: otherwise an empty value falls back to what `go env -w` stored,
+#   which is where the maintainer's GOPRIVATE lives. A pattern that matches
+#   nothing is not the same thing. Any non-empty GONOPROXY makes the go command
+#   look in the module cache before the proxy, and that breaks installing the
+#   command once bellui is cached (#1469, golang/go#58116).
+#   GOENV=off also drops the stored GOCACHE, so it is passed through.
 # - into an empty module cache, since a cached module is never asked for
 #   again. The cache sits beside the smoke module, not in it, or go mod tidy
 #   reads it as the module's own packages.
-# The command is installed first: once bellui is in the cache, installing it
-# through the proxy fails (#1469).
-SMOKE_ENV := GOPRIVATE=none.invalid GONOPROXY=none.invalid GONOSUMDB=none.invalid \
+# The command is installed after the build, with bellui already in the cache,
+# because that is the order a consumer meets.
+SMOKE_ENV = GOENV=off GOCACHE=$(shell go env GOCACHE) GOPRIVATE= GONOPROXY= GONOSUMDB= \
 	GOPROXY=https://proxy.golang.org GOSUMDB=sum.golang.org
 
 .PHONY: release-smoke
 release-smoke: ## Step 6: build a fresh consumer of $(VERSION), resolved through proxy.golang.org
 	@d=$$(mktemp -d); echo "in $$d/smoke"; mkdir $$d/smoke && cd $$d/smoke && \
 	export $(SMOKE_ENV) GOMODCACHE=$$d/modcache && trap 'go clean -modcache' EXIT && \
-	GOBIN=$$d/bin go install github.com/belluikit/bellui/cmd/bellui@$(VERSION) && echo "cmd/bellui@$(VERSION) installs" && \
 	go mod init smoke >/dev/null 2>&1 && \
 	printf '%s\n' 'package main' 'import (' '	"github.com/belluikit/bellui"' '	"github.com/belluikit/bellui/app"' \
 		'	"github.com/belluikit/bellui/widget"' ')' 'func main() {' '	a := app.New()' '	w := a.NewWindow("smoke")' \
 		'	w.SetContent(widget.NewLabel("hello"))' '	bellui.ShowAndRun(w)' '}' > main.go && \
-	go mod edit -require=github.com/belluikit/bellui@$(VERSION) && go mod tidy && go build . && echo "smoke build ok"
+	go mod edit -require=github.com/belluikit/bellui@$(VERSION) && go mod tidy && go build . && echo "smoke build ok" && \
+	GOBIN=$$d/bin go install github.com/belluikit/bellui/cmd/bellui@$(VERSION) && "$$d/bin/bellui" version && \
+	echo "cmd/bellui@$(VERSION) installs"
