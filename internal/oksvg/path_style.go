@@ -28,12 +28,15 @@ type PathStyle struct {
 // styleAttribute describes draw options, such as {"fill":"black"; "stroke":"white"}.
 type styleAttribute = map[string]string
 
-// DefaultStyle sets the default PathStyle to fill black, winding rule,
-// full opacity, no stroke, ButtCap line end and Bevel line connect.
+// DefaultStyle sets the default PathStyle to SVG's initial values: fill
+// black, nonzero winding, full opacity, no stroke, a stroke width of 1, a
+// miter limit of 4, butt line ends and mitred joins. Upstream defaulted to a
+// width of 2 and bevelled joins, so a stroke with neither attribute was twice
+// as thick as in a browser and had its corners cut off (#1478).
 var DefaultStyle = PathStyle{
-	1.0, 1.0, 2.0, 0.0, 4.0, nil, true,
+	1.0, 1.0, 1.0, 0.0, 4.0, nil, true,
 	color.NRGBA{0x00, 0x00, 0x00, 0xff},
 	nil,
-	nil, nil, rasterx.ButtCap, rasterx.Bevel,
+	nil, nil, rasterx.ButtCap, rasterx.Miter,
 	rasterx.MatrixAdder{M: rasterx.Identity},
 }
