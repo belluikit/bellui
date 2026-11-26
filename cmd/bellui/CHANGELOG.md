@@ -17,6 +17,11 @@ one per change, so that open pull requests do not conflict here. Run
 `go run ./hack/changelog preview -C cmd/bellui` to see them assembled; the release folds them
 into a section below.
 
+## v1.5.1 — 2026-11-26
+
+Cut with toolkit v1.5.1. No changes of its own. Built against bellui
+v1.5.1.
+
 ## v1.5.0 — 2026-11-25
 
 Cut with toolkit v1.5.0. No changes of its own. Built against bellui

@@ -19,6 +19,38 @@ one per change, so that open pull requests do not conflict here. Run
 `go run ./hack/changelog preview` to see them assembled; the release folds them
 into a section below.
 
+## v1.5.1 — 2026-11-26
+
+Two fixes for apps on a phone, and no API changes. An open
+`NavigationDrawer` stays against its edge when the device rotates, and on
+iOS a song started while the app records from the microphone plays instead of
+failing. x/mmedia carries the iOS fix; the other x/ modules and the `bellui`
+command carry the version with no changes of their own. The release check for
+this version was the macOS probe only, not the hand check on each platform.
+
+### Fixed
+
+* **An open `NavigationDrawer` follows the device when it rotates**
+  ([#1467](https://github.com/belluikit/bellui/issues/1467)). It used to keep
+  the position and size it opened with. An end drawer turned from portrait to
+  landscape then sat near the left edge, and one turned from landscape to
+  portrait was off the screen, leaving only its scrim. Every drawer kept its
+  old height. Now the drawer stays against the edge it opened on, spans the
+  new height, and keeps its destinations clear of the new system insets. A
+  drawer turned while it slides in stops where it rests; one turned while it
+  slides out still leaves past its edge. Measured on a moto g power with
+  `hack/drawerrotateprobe`.
+* **x/mmedia on iOS: the first song now plays while the app records from the
+  microphone** ([#1188](https://github.com/belluikit/bellui/issues/1188)).
+  x/mmedia set the audio session to Playback when the first song of the
+  process opened the audio device. With a capture running, iOS refused that
+  change, so the session stayed in Record, which has no output, and the song
+  failed with "oto: AudioQueueStart failed". A session in Record now moves to
+  PlayAndRecord, so the song plays from the speaker and the capture keeps
+  running. A session already in PlayAndRecord is left alone, and with no
+  capture running the session is set to Playback as before. Measured on an
+  iPad with `x/mmedia/hack/micplayprobe`.
+
 ## v1.5.0 — 2026-11-25
 
 One addition and three fixes, mostly for apps on a phone. `TopAppBar`
