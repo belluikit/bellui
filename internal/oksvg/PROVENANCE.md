@@ -30,6 +30,12 @@ Treat as owned code; patch here.
   user units while the path's points arrive already transformed, so a stroke
   kept its width in pixels at every size: a 7-unit stroke on a 120-unit viewBox
   was 7 px at 40 px and at 240 px. Both srwiley/oksvg and fyne-io/oksvg still
-  have this. The scale is the square root of the transform's determinant,
-  exact for uniform scaling and rotation; a non-uniform transform would need
-  an elliptical pen, srwiley/oksvg#53, not done here.
+  have this. For a uniform scale, with or without rotation, the scale is the
+  square root of the transform's determinant.
+* A stroke under a non-uniform transform stretches with the shape, as in a
+  browser (#1295; upstream srwiley/oksvg#53, still open). The path is stroked
+  under a uniform scale by the transform's larger axis scale, and the rest of
+  the transform is applied to the outline by a scanner wrapper
+  (`transformingScanner`) on its way to the rasterizer. The larger scale is
+  deliberate: built at the smaller one, a thin stroke under a strong stretch
+  rounds to zero width in the dasher's 1/64 px units and vanishes.
