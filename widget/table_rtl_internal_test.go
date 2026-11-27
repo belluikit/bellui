@@ -227,10 +227,11 @@ func TestTable_RTLOpensAtFirstColumn(t *testing.T) {
 }
 
 // A table that scrolls only vertically keeps the strip the vertical scroll
-// bar reserves between its cells and the header column: right-to-left, the
-// cells are mirrored within the width the scroll gives them, so column 0 is
-// beside the bar, not under it, and its header and divider line up with it
-// (#779). The header column itself is at the right edge.
+// bar reserves on desktop between its cells and the header column:
+// right-to-left, the cells are mirrored within the width the scroll gives
+// them, so column 0 is beside the bar, not under it, and its header and
+// divider line up with it (#779). The header column itself is at the right
+// edge. A touch device reserves no strip, and the columns line up the same.
 func TestTable_RTLKeepsScrollBarStrip(t *testing.T) {
 	tableDirections(t, func(t *testing.T, rtl bool, w bellui.Window, _ *Table) {
 		tb := NewTableWithHeaders(
@@ -242,7 +243,13 @@ func TestTable_RTLKeepsScrollBarStrip(t *testing.T) {
 		r := test.TempWidgetRenderer(t, tb.cells).(*tableCellsRenderer)
 		viewport := tb.content.Size().Width
 		bar := viewport - tb.scrollSpan()
-		require.Greater(t, bar, float32(0), "the scroll reserves a strip for its vertical bar")
+		if bellui.CurrentDevice().IsMobile() {
+			// A touch device's bar overlays the cells and reserves nothing,
+			// so there is no strip; the columns must line up all the same.
+			require.Zero(t, bar, "a mobile scroll reserves no strip for its bar")
+		} else {
+			require.Greater(t, bar, float32(0), "the scroll reserves a strip for its vertical bar")
+		}
 
 		for col := 0; col < 3; col++ {
 			c, h := r.visible[TableCellID{Row: 0, Col: col}], r.headers[TableCellID{Row: -1, Col: col}]
