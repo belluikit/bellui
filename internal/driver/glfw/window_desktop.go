@@ -228,6 +228,9 @@ type window struct {
 	// paintRetryAt is set while the canvas holds changes a frame could not
 	// show: when to try painting them again (see noteFrameBegan).
 	paintRetryAt time.Time
+
+	// gesture is the touchpad gesture under way (#391).
+	gesture scrollGesture
 }
 
 func (w *window) SetFullScreen(full bool) {
@@ -809,14 +812,45 @@ func (w *window) mouseClicked(_ *glfw.Window, btn glfw.MouseButton, action glfw.
 	w.processMouseClicked(button, mouseAction, modifiers)
 }
 
-func (w *window) mouseScrolled(viewport *glfw.Window, xoff float64, yoff float64) {
-	if runtime.GOOS != "darwin" && xoff == 0 &&
-		(viewport.GetKey(glfw.KeyLeftShift) == glfw.Press ||
-			viewport.GetKey(glfw.KeyRightShift) == glfw.Press) {
+// mouseScrolledEx handles a scroll with its source, gesture phase and the
+// modifiers on the event (#391). As before, a wheel turned with shift held
+// scrolls sideways off macOS, which does that itself.
+func (w *window) mouseScrolledEx(_ *glfw.Window, xoff, yoff float64, source glfw.ScrollSource, phase glfw.GesturePhase, mods glfw.ModifierKey) {
+	if runtime.GOOS != "darwin" && xoff == 0 && mods&glfw.ModShift != 0 {
 		xoff, yoff = yoff, xoff
 	}
+	w.processScrollGesture(xoff, yoff, convertScrollSource(source), convertGesturePhase(phase), desktopModifier(mods))
+}
 
-	w.processMouseScrolled(xoff, yoff)
+// trackpadPinched handles a trackpad pinch step (#391).
+func (w *window) trackpadPinched(_ *glfw.Window, scale float64, phase glfw.GesturePhase) {
+	w.processTrackpadPinch(scale, convertGesturePhase(phase))
+}
+
+// convertScrollSource maps a GLFW scroll source. A platform that cannot
+// tell the device keeps reporting a mouse wheel, as every scroll was before
+// GLFW could tell (#391).
+func convertScrollSource(s glfw.ScrollSource) event.ScrollSource {
+	if s == glfw.ScrollSourceTouchpad {
+		return event.ScrollSourceTouchpad
+	}
+	return event.ScrollSourceMouseWheel
+}
+
+func convertGesturePhase(p glfw.GesturePhase) gesturePhase {
+	switch p {
+	case glfw.GesturePhaseBegan:
+		return gestureBegan
+	case glfw.GesturePhaseChanged:
+		return gestureChanged
+	case glfw.GesturePhaseEnded:
+		return gestureEnded
+	case glfw.GesturePhaseCancelled:
+		return gestureCancelled
+	case glfw.GesturePhaseMomentum:
+		return gestureMomentum
+	}
+	return gestureNone
 }
 
 func convertMouseButton(btn glfw.MouseButton, mods glfw.ModifierKey) (desktop.MouseButton, event.KeyModifier) {
@@ -1317,7 +1351,8 @@ func (w *window) create() {
 	win.SetContentScaleCallback(w.scaled)
 	win.SetCursorPosCallback(w.mouseMoved)
 	win.SetMouseButtonCallback(w.mouseClicked)
-	win.SetScrollCallback(w.mouseScrolled)
+	win.SetScrollExCallback(w.mouseScrolledEx)
+	win.SetPinchCallback(w.trackpadPinched)
 	win.SetTouchCallback(w.touchEvent)
 	win.SetDropCallback(w.processDropped)
 	win.SetKeyCallback(w.keyPressed)

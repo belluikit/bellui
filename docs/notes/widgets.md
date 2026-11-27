@@ -32,6 +32,16 @@ x modules pin a released toolkit, so they implement `ClaimsDrag` with only `geo.
 ### Scroll Event Propagation
 Nested scrollable containers now propagate scroll events to parent scrollables when the inner container reaches its boundary. Implemented via `ScrollConsumer` interface (`internal/driver/util.go`) and `TryScrolled()` on `widget.Scroll`. The GLFW driver iterates scrollables deepest-first.
 
+### Touchpad Gestures from the Pointer (#391, belluikit/glfw#13)
+The desktop driver uses GLFW's extended scroll and pinch callbacks (a belluikit/glfw extension). Decided by the owner, 2026-11-27 (#391):
+
+- **Phase.** `ScrollEvent.Phase` says where a scroll stands in a touchpad gesture: `ScrollPhaseBegan` (the first scroll that moves), `ScrollPhaseChanged`, `ScrollPhaseMomentum` (the coast after lift-off). It is `ScrollPhaseUnknown` for a wheel and for platforms that can't tell.
+- **The end.** The fingers lifting is not a scroll. It goes to `event.ScrollEnder`s, once per gesture, namely the ones under the pointer when the gesture began. A Scrollable never receives a scroll without movement: a gesture that starts without moving makes its first moving scroll the `Began` one (`internal/driver/glfw/scroll_gesture.go`).
+- **Platforms.** macOS reports source, every phase and the coast. Wayland reports source, began/changed and the end, but no coast. Windows and X11 report neither, and their scrolls keep `ScrollSourceMouseWheel` as before, so apps comparing against it see no change.
+- **Pinch.** A trackpad pinch goes to the `Pinchable` under the pointer when it began; it is reported on macOS only (Wayland is belluikit/glfw#14).
+- **ctrl+wheel.** Over a `Pinchable` it pinches instead of scrolling, because Windows precision touchpads and browsers send a trackpad pinch that way. A notch is a tenth of zoom, and the pinch ends 200 ms after its last step. Elsewhere ctrl+wheel scrolls.
+- **Web.** The browser driver still uses the plain scroll callback until glfw-js reports these.
+
 ### Scrollbar Space Reservation
 `widget.Scroll.ReserveBarSpace` (default `true`) reduces content width when a vertical scrollbar is active, preventing the scrollbar from overlapping content and fixing text wrapping at the right edge.
 
