@@ -26,6 +26,11 @@ type Viewport struct {
 
 	Padding float32 // separator thickness
 
+	// Leading is the width before the first column: the checkbox-selection
+	// column when the grid shows one (#1498). Column positions and the content
+	// width count it.
+	Leading float32
+
 	TotalRows int
 	TotalCols int
 
@@ -136,7 +141,7 @@ func (v *Viewport) ContentSize() geo.Size {
 		totalH = v.rowTops[v.TotalRows]
 	}
 
-	var totalW float32
+	totalW := v.Leading
 	if v.TotalCols > 0 {
 		lastCol := v.TotalCols - 1
 		totalW = v.ColPositions[lastCol] + v.ColWidths[lastCol]
@@ -171,7 +176,7 @@ func (v *Viewport) ColX(col int) (x, width float32) {
 // RecomputeColPositions rebuilds column position data from widths.
 func (v *Viewport) RecomputeColPositions() {
 	v.ColPositions = make([]float32, len(v.ColWidths))
-	x := float32(0)
+	x := v.Leading
 	for i, w := range v.ColWidths {
 		v.ColPositions[i] = x
 		x += w + v.Padding

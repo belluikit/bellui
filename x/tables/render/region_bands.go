@@ -38,6 +38,10 @@ type placeColumnFunc func(absCol int, x, w float32, dst []core.CanvasObject) []c
 type regionBands struct {
 	mainBand *bellui.Container // clip-local content of the scrolling main band
 	mainClip *container.Clip   // clips the main band to [mainX, mainRight)
+
+	// placeLead, when set, places what the row holds in the checkbox-selection
+	// column at the start of the main band, at clip-local x with width w.
+	placeLead func(x, w float32, dst []core.CanvasObject) []core.CanvasObject
 }
 
 // layout places every visible column into its band via place and returns the
@@ -78,7 +82,12 @@ func (rb *regionBands) layout(g RegionLayoutAccess, size geo.Size, place placeCo
 		clipW = 0
 	}
 	var mainObjs []core.CanvasObject
-	x := float32(0)
+	// The checkbox-selection column comes first in the main band and scrolls
+	// with it, as it does in the body (#1498).
+	x := selectionLead(g)
+	if x > 0 && rb.placeLead != nil {
+		mainObjs = rb.placeLead(-offsetX, x, mainObjs)
+	}
 	for i := plCount; i < plCount+mainCount; i++ {
 		mainObjs = place(i, x-offsetX, widthOf(i), mainObjs)
 		x += widthOf(i) + padding

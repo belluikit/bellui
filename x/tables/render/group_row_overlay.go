@@ -232,6 +232,7 @@ type aggGeometry struct {
 	plCount, mainCount    int
 	mainX, mainRight      float32
 	pinnedRightX, offsetX float32
+	lead                  float32 // the checkbox-selection column before the main columns
 	hasPinnedRight        bool
 }
 
@@ -248,6 +249,7 @@ func newAggGeometry(grid GridAccess, size geo.Size) aggGeometry {
 		mainRight:    size.Width,
 		pinnedRightX: prX,
 		offsetX:      grid.ScrollOffsetX(),
+		lead:         selectionLead(grid),
 	}
 	if pr > 0 && prW > 0 {
 		g.mainRight = prX
@@ -270,7 +272,7 @@ func (g aggGeometry) column(col int) (x, w float32, inMain, ok bool) {
 	switch {
 	case col < g.plCount:
 	case col < g.plCount+g.mainCount:
-		start, base, inMain = g.plCount, -g.offsetX, true
+		start, base, inMain = g.plCount, g.lead-g.offsetX, true
 	default:
 		if !g.hasPinnedRight {
 			return 0, 0, false, false

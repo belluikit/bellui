@@ -411,6 +411,7 @@ func (g *DataGrid) updateViewportGeometry() {
 	}
 	g.viewport.TotalCols = len(mainWidths)
 	g.viewport.ColWidths = mainWidths
+	g.viewport.Leading = g.selectionColumnWidth()
 	g.viewport.RecomputeColPositions()
 	g.viewport.DefaultRowHeight = g.rowHeight()
 	g.viewport.Padding = g.cellPadding()
@@ -748,6 +749,52 @@ func (g *DataGrid) GroupRowInfo(row int) (key string, childCount int, expanded b
 
 func (g *DataGrid) ShowCheckboxColumn() bool {
 	return g.Options.CheckboxSelection
+}
+
+// selectionColumnWidth is the width of the checkbox-selection column, the first
+// column of the scrolling main band, or 0 when the grid does not show it. The
+// main columns start this far into the band (#1498).
+func (g *DataGrid) selectionColumnWidth() float32 {
+	if g.ShowCheckboxColumn() {
+		return render.SelectionColumnWidth
+	}
+	return 0
+}
+
+// SelectAllState reports whether the header shows a select-all box in the
+// checkbox-selection column, and whether every displayed row or only some are
+// selected (render.SelectAllAccess). The box shows only when several rows can
+// be selected, as SelectAll needs.
+func (g *DataGrid) SelectAllState() (shown, all, some bool) {
+	if !g.ShowCheckboxColumn() || g.SelectionMode != SelectionMultiRow {
+		return false, false, false
+	}
+	if len(g.selectedRows) == 0 {
+		return true, false, false
+	}
+	rows, selected := 0, 0
+	for i, n := 0, g.RowCount(); i < n; i++ {
+		if s := g.sourceRow(i); s >= 0 { // a group header row is not selectable
+			rows++
+			if g.selectedRows[s] {
+				selected++
+			}
+		}
+	}
+	return true, rows > 0 && selected == rows, selected > 0
+}
+
+// SetAllRowsSelected backs the header's select-all box: true selects every
+// displayed row (SelectAll), false clears the row selection. Either reports
+// the change through OnSelectionChanged.
+func (g *DataGrid) SetAllRowsSelected(selected bool) {
+	if selected {
+		g.SelectAll()
+		return
+	}
+	g.selectedRows = make(map[int]bool)
+	g.fireSelectionChanged()
+	g.Refresh()
 }
 
 // ToggleGroup expands or collapses the row group with the given key and rebuilds
@@ -2166,6 +2213,13 @@ func (g *DataGrid) MouseDown(e *desktop.MouseEvent) {
 		return
 	}
 
+	// A press on a row's checkbox selects the row as a press on its first cell
+	// does, as the checkbox's accessible select action (SelectCell) does.
+	if row := g.selectionBoxRowAt(e.Position); row >= 0 {
+		g.selectCellWithModifiers(CellID{Row: row, Col: 0}, e.Modifier)
+		return
+	}
+
 	id := g.cellAtPosition(e.Position)
 	if id.Row >= 0 && id.Col >= 0 {
 		g.selectCellWithModifiers(id, e.Modifier)
@@ -2284,7 +2338,7 @@ func (g *DataGrid) headerBorderCol(x float32) int {
 	case len(layout.pinnedRight) > 0 && pinnedRightW > 0 && g.Size().Width > 0 && x >= pinnedRightX:
 		return borderIn(layout.pinnedRight, pinnedRightX, plCount+mainCount)
 	default:
-		return borderIn(layout.main, mainX-g.offset.X, plCount)
+		return borderIn(layout.main, mainX-g.offset.X+g.selectionColumnWidth(), plCount)
 	}
 }
 
@@ -2615,26 +2669,7 @@ func (g *DataGrid) cellAtPosition(pos geo.Position) CellID {
 		return CellID{Row: -1, Col: col}
 	}
 
-	// The floating-filter row, between the header and the body, has no cells.
-	top := g.bodyTop()
-	if pos.Y < top {
-		return CellID{Row: -1, Col: -1}
-	}
-
-	// Adjust for the rows above the body and the vertical scroll offset.
-	adjustedY := pos.Y - top + g.offset.Y
-
-	// Find row (uniform O(1) or variable O(log n) via the viewport prefix sum).
-	row := g.viewport.RowAtY(adjustedY)
-
-	// A tap inside an expanded detail band is not a data cell — the band hosts
-	// its own content, which handles its own events.
-	if row >= 0 {
-		ry, rh := g.viewport.RowY(row)
-		if band := g.DetailBandHeight(row); band > 0 && adjustedY >= ry+(rh-band) {
-			return CellID{Row: -1, Col: -1}
-		}
-	}
+	row := g.bodyRowAt(pos)
 
 	// Find column, honouring the fixed pinned bands vs the scrolling main band.
 	// columnAtX returns an ABSOLUTE display index (pinned-left, main, pinned-
@@ -2648,6 +2683,51 @@ func (g *DataGrid) cellAtPosition(pos geo.Position) CellID {
 	return CellID{Row: row, Col: col}
 }
 
+// bodyRowAt returns the display row whose cell band is under the widget
+// position pos, or -1. The floating-filter row, between the header and the
+// body, has no rows, and a tap inside an expanded detail band is in no cell:
+// the band hosts its own content, which handles its own events.
+func (g *DataGrid) bodyRowAt(pos geo.Position) int {
+	top := g.bodyTop()
+	if pos.Y < top {
+		return -1
+	}
+	// Adjust for the rows above the body and the vertical scroll offset.
+	adjustedY := pos.Y - top + g.offset.Y
+	// Uniform O(1) or variable O(log n) via the viewport prefix sum.
+	row := g.viewport.RowAtY(adjustedY)
+	if row >= 0 {
+		ry, rh := g.viewport.RowY(row)
+		if band := g.DetailBandHeight(row); band > 0 && adjustedY >= ry+(rh-band) {
+			return -1
+		}
+	}
+	return row
+}
+
+// selectionBoxRowAt returns the display row whose checkbox-selection cell is
+// under the widget position pos, or -1. That column is the start of the
+// scrolling main band and holds no layout column, so columnAtX reports none
+// there (#1498).
+func (g *DataGrid) selectionBoxRowAt(pos geo.Position) int {
+	lead := g.selectionColumnWidth()
+	if lead <= 0 {
+		return -1
+	}
+	mainX, pinnedRightX, pinnedRightW := g.hitRegions()
+	if pos.X < mainX || (pinnedRightW > 0 && pos.X >= pinnedRightX) {
+		return -1
+	}
+	if cx := pos.X - mainX + g.offset.X; cx < 0 || cx >= lead {
+		return -1
+	}
+	row := g.bodyRowAt(pos)
+	if row < 0 || row >= g.RowCount() || g.IsGroupRow(row) {
+		return -1
+	}
+	return row
+}
+
 // disclosureHitX maps a widget X into the coordinate frame of the first-visible
 // column's disclosure control (master-detail chevron or tree chevron), returning
 // the tap's X and the zone's left edge. The disclosure sits on the first
@@ -2659,10 +2739,7 @@ func (g *DataGrid) disclosureHitX(posX, depthIndent float32) (tapX, zoneLeft flo
 	if len(g.visibleLayout().pinnedLeft) > 0 {
 		return posX, depthIndent
 	}
-	zoneLeft = depthIndent
-	if g.ShowCheckboxColumn() {
-		zoneLeft += 32
-	}
+	zoneLeft = depthIndent + g.selectionColumnWidth()
 	return posX + g.offset.X, zoneLeft
 }
 
@@ -2773,6 +2850,11 @@ func (g *DataGrid) scrollToCell(id CellID) {
 	// band (mainCol out of [0, main count)).
 	if mainCol := id.Col - g.PinnedLeftCount(); mainCol >= 0 && mainCol < g.ColumnCount() {
 		x, w := g.viewport.ColX(mainCol)
+		if mainCol == 0 {
+			// The first main column brings the checkbox-selection column
+			// before it into view too (#1498).
+			x, w = 0, x+w
+		}
 		if x < g.offset.X {
 			newOffset.X = x
 		} else if x+w > g.offset.X+scrollSize.Width {
@@ -3017,7 +3099,8 @@ func (g *DataGrid) bandAnchors(size geo.Size) (mainX, pinnedRightX, pinnedRightW
 	if pinnedLeftW > 0 {
 		mainX += pad
 	}
-	mainColsW := float32(0)
+	// The main band holds the checkbox-selection column, then the main columns.
+	mainColsW := g.selectionColumnWidth()
 	for _, col := range layout.main {
 		mainColsW += col.width + pad
 	}
@@ -3116,8 +3199,10 @@ func (g *DataGrid) columnAtX(x float32) int {
 		base := len(layout.pinnedLeft) + len(layout.main)
 		return colIndexIn(layout.pinnedRight, x-pinnedRightX, pad, base)
 	}
-	// Main band: scrolls; content-x = (x - mainX) + offset.X.
-	return colIndexIn(layout.main, x-mainX+g.offset.X, pad, len(layout.pinnedLeft))
+	// Main band: scrolls; content-x = (x - mainX) + offset.X, and the main
+	// columns start past the checkbox-selection column, which is no layout
+	// column (#1498).
+	return colIndexIn(layout.main, x-mainX+g.offset.X-g.selectionColumnWidth(), pad, len(layout.pinnedLeft))
 }
 
 // defaultValueGetter extracts a value from row data using the field name.

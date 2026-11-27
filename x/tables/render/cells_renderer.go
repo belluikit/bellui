@@ -20,6 +20,29 @@ type cellKey struct {
 // the off-screen virtual-node provider so both report the same cell geometry.
 const checkboxCellWidth = 30
 
+// SelectionColumnWidth is the width of the checkbox-selection column: the
+// select control and the gap after it. The column is the first of the
+// scrolling main band, so the main columns start this far into the band, and
+// the header, the floating filters, hit-testing and the content width all
+// count it (#1498).
+const SelectionColumnWidth float32 = checkboxCellWidth + 2
+
+// checkboxColumnShower is the optional capability a RegionLayoutAccess has
+// when its grid can show the checkbox-selection column. GridAccess has it too.
+type checkboxColumnShower interface {
+	ShowCheckboxColumn() bool
+}
+
+// selectionLead returns the width of the checkbox-selection column at the start
+// of g's main band: SelectionColumnWidth when g shows that column, else 0. A
+// grid without the capability has no such column.
+func selectionLead(g any) float32 {
+	if s, ok := g.(checkboxColumnShower); ok && s.ShowCheckboxColumn() {
+		return SelectionColumnWidth
+	}
+	return 0
+}
+
 // Tree-data layout. TreeIndentPerLevel is the horizontal indentation added to a
 // tree row's first main column per depth level; TreeToggleWidth is the
 // disclosure-chevron slot that follows that indent (and doubles as the chevron
@@ -382,7 +405,7 @@ func (r *CellsRenderer) refreshCells() {
 			host.Move(geo.NewPos(0, y))
 			host.Resize(geo.NewSize(checkboxCellWidth, cellH))
 			objects = append(objects, host)
-			checkboxW = 32
+			checkboxW = SelectionColumnWidth
 		}
 
 		// Disclosure chevron for master rows, in the reserved left indent.
@@ -466,8 +489,8 @@ func (r *CellsRenderer) refreshCells() {
 			// host's a11y coordinates are absolute display order.
 			host.row, host.col = row, pinnedLeftCount+col
 
+			// ColX already starts past the checkbox-selection column.
 			x, colW := vp.ColX(col)
-			x += checkboxW
 			spanW := colW
 			for s := 1; s < span && col+s <= visCols.Max; s++ {
 				_, sw := vp.ColX(col + s)
