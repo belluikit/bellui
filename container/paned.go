@@ -7,6 +7,9 @@ import (
 	"github.com/belluikit/bellui/driver/desktop"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/driver"
+	"github.com/belluikit/bellui/lang"
+	"github.com/belluikit/bellui/layout"
 	"github.com/belluikit/bellui/theme"
 	"github.com/belluikit/bellui/widget"
 )
@@ -30,7 +33,8 @@ type Paned struct {
 }
 
 // NewHPaned creates a horizontally arranged paned container.
-// Panels are laid out left to right with vertical dividers between them.
+// Panels are laid out in reading order, left to right or, under a
+// right-to-left layout, right to left, with vertical dividers between them.
 //
 // Since: 1.0
 func NewHPaned(panels ...core.CanvasObject) *Paned {
@@ -185,6 +189,16 @@ func (r *panedRenderer) Layout(size geo.Size) {
 			}
 			offset += divThick
 		}
+	}
+
+	// Right-to-left, horizontal panels run from the right (#779).
+	if p.Horizontal && lang.IsRTLDirection() {
+		objs := make([]core.CanvasObject, 0, n+divCount)
+		objs = append(objs, p.Panels...)
+		for _, d := range r.dividers {
+			objs = append(objs, d)
+		}
+		layout.MirrorChildren(objs, size.Width)
 	}
 
 	// Update weights from actual lengths (so dragging is persistent)
@@ -352,6 +366,11 @@ func (d *paneDivider) Dragged(e *event.DragEvent) {
 	if p.Horizontal {
 		totalLen = p.Size().Width - totalDivider
 		drag = e.Dragged.DX
+		if driver.IsRTLAt(p) {
+			// Right-to-left, Panels[index] is right of the divider, so a
+			// drag to the right takes from it (#779).
+			drag = -drag
+		}
 	} else {
 		totalLen = p.Size().Height - totalDivider
 		drag = e.Dragged.DY

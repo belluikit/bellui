@@ -7,6 +7,9 @@ import (
 	"github.com/belluikit/bellui/driver/desktop"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/internal/driver"
+	"github.com/belluikit/bellui/lang"
+	"github.com/belluikit/bellui/layout"
 	"github.com/belluikit/bellui/theme"
 	"github.com/belluikit/bellui/widget"
 )
@@ -137,6 +140,10 @@ func (r *splitContainerRenderer) Layout(size geo.Size) {
 	r.split.Leading.Resize(leadingSize)
 	r.split.Trailing.Move(trailingPos)
 	r.split.Trailing.Resize(trailingSize)
+	// Right-to-left, a horizontal split puts Leading on the right (#779).
+	if r.split.Horizontal && lang.IsRTLDirection() {
+		layout.MirrorChildren([]core.CanvasObject{r.divider, r.split.Leading, r.split.Trailing}, size.Width)
+	}
 	canvas.Refresh(r.divider)
 }
 
@@ -305,6 +312,11 @@ func (d *divider) Dragged(e *event.DragEvent) {
 		leadingRatio = float64(d.split.Leading.MinSize().Width) / widthFree
 		trailingRatio = 1. - (float64(d.split.Trailing.MinSize().Width) / widthFree)
 		offset = float64(x-d.startDragOff.X) / widthFree
+		if driver.IsRTLAt(d.split) {
+			// Leading is on the right, so its share is what lies right of
+			// the divider (#779).
+			offset = 1 - offset
+		}
 	} else {
 		heightFree := float64(d.split.Size().Height - dividerThickness(d))
 		leadingRatio = float64(d.split.Leading.MinSize().Height) / heightFree
