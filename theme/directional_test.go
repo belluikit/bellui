@@ -45,9 +45,27 @@ func TestDirectionalResource_NonDirectionalUnchanged(t *testing.T) {
 	assert.NotContains(t, string(search.Content()), "matrix(-1,0,0,1")
 }
 
-func TestDirectionalResource_DirectionalSet(t *testing.T) {
+// TestDirectionalResource_Set pins which theme icons mirror under RTL: those
+// whose Material symbol is marked android:autoMirrored="true" in Google's
+// material-design-icons (#779). Every other icon keeps its orientation.
+func TestDirectionalResource_Set(t *testing.T) {
+	mirrored := map[bellui.ThemeIconName]bool{
+		// Mirrored since RTL Phase 4.
+		IconNameNavigateBack: true, IconNameNavigateNext: true, IconNameMenuExpand: true,
+		IconNameMailForward: true, IconNameMailReply: true, IconNameMailReplyAll: true,
+		// Added in #779.
+		IconNameContentCopy: true, IconNameContentRedo: true, IconNameContentUndo: true,
+		IconNameList: true, IconNameLogin: true, IconNameLogout: true, IconNameMailSend: true,
+		IconNameHelp: true, IconNameQuestion: true,
+		IconNameVolumeDown: true, IconNameVolumeMute: true, IconNameVolumeUp: true,
+		IconNameReceiptLong: true, IconNameFile: true, IconNameFileText: true,
+	}
 	withRTL(t)
-	for _, res := range []bellui.Resource{NavigateBackIcon(), NavigateNextIcon(), MenuExpandIcon()} {
-		assert.True(t, strings.Contains(res.Name(), "rtl_"), "%s should mirror under RTL", res.Name())
+	for name, res := range icons {
+		got := strings.Contains(res.Name(), "rtl_")
+		assert.Equal(t, mirrored[name], got, "%s: mirrored under RTL", name)
+	}
+	for name := range mirrored {
+		assert.Contains(t, icons, name)
 	}
 }
