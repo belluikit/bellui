@@ -97,6 +97,28 @@ type DataGrid struct {
 	// listener nears the end (#983, player#277).
 	OnVisibleRowsChanged func(first, last int)
 
+	// LeadingSwipeActions and TrailingSwipeActions give the buttons a row
+	// reveals when a finger swipes it sideways (#1483), for the row's source
+	// row; nil, or an empty list, means none that way. Leading actions sit at
+	// the row's leading edge, the left, or the right in a right-to-left
+	// layout, and a swipe away from that edge uncovers them; trailing ones
+	// sit at the other edge. The first of each list is the outermost. The
+	// grid asks for a row's actions when a swipe on it starts.
+	//
+	// A sideways touch drag scrolls the body while the body can move that
+	// way. One that starts with the body already at that edge, or on a grid
+	// that fits its width, swipes the row under the finger instead; a drag
+	// that scrolls into the edge stays a scroll. Released past half its
+	// actions, or flicked open, the row stays open; otherwise it slides back.
+	// A tap anywhere on the grid, a scroll or new data close an open row,
+	// and a sideways drag on it moves it again. Group headers, detail bands
+	// and a disabled grid do not swipe, and a mouse drag never does: on the
+	// desktop the actions are in the context menu (see RowSwipeAction).
+	//
+	// Since: 1.7
+	LeadingSwipeActions  func(sourceRow int) []RowSwipeAction
+	TrailingSwipeActions func(sourceRow int) []RowSwipeAction
+
 	// MasterDetail configures expandable detail rows.
 	MasterDetail MasterDetailConfig
 
@@ -117,6 +139,7 @@ type DataGrid struct {
 	pinnedLeftCells   *render.PinnedCellsWidget
 	pinnedRightCells  *render.PinnedCellsWidget
 	groupRowOverlay   *render.GroupRowOverlay
+	rowSwipeLayer     *rowSwipeLayer            // draws the swiped row (#1483)
 	floatingFilterRow *render.FloatingFilterRow // set by the renderer when floating filters are enabled
 	gridTheme         *gridTheme.GridTheme
 
@@ -182,6 +205,13 @@ type DataGrid struct {
 	// rendered is set once CreateRenderer has run: before that nothing in
 	// the grid can hold a focus, and no app need exist.
 	rendered bool
+
+	// swipe is the row a finger swipes, or that is open (#1483).
+	swipe rowSwipe
+	// rtl is whether the grid was last laid out right to left, which puts the
+	// leading swipe actions on the right. Event handlers read it, since the
+	// layout direction is only known during a layout.
+	rtl bool
 }
 
 // filterState holds the active filter for a column.
@@ -225,6 +255,7 @@ func NewDataGrid(columnDefs []*ColumnDef, length func() int, rowData func(row in
 		dragRow:        -1,
 		resizeCol:      -1,
 		reorderFromCol: -1,
+		swipe:          rowSwipe{src: -1},
 	}
 	g.ExtendBaseWidget(g)
 	g.init()
@@ -257,6 +288,7 @@ func (g *DataGrid) init() {
 	g.pinnedLeftCells = render.NewPinnedCellsWidget(g, render.PinnedLeft, g.pool, g.viewport)
 	g.pinnedRightCells = render.NewPinnedCellsWidget(g, render.PinnedRight, g.pool, g.viewport)
 	g.groupRowOverlay = render.NewGroupRowOverlay(g, g.viewport)
+	g.rowSwipeLayer = newRowSwipeLayer(g)
 	g.scrollContent = render.NewScrollContainer(g.cellsWidget)
 	g.scrollContent.SetOnScrolled(g.onScrolled)
 
@@ -442,6 +474,11 @@ func (g *DataGrid) cellPadding() float32 {
 }
 
 func (g *DataGrid) onScrolled(pos geo.Position) {
+	// A scroll closes an open row; the row a finger is swiping does not
+	// scroll.
+	if g.swipe.gesture != gestureSwipe {
+		g.closeSwipe(true)
+	}
 	g.offset = pos
 	g.viewport.Update(pos, g.scrollContent.Scroll.Size())
 	g.noteVisibleRows()
@@ -499,6 +536,9 @@ func (g *DataGrid) API() *GridAPI {
 
 // RefreshData re-reads data from the callbacks and refreshes the display.
 func (g *DataGrid) RefreshData() {
+	// The records may have moved under their source rows, so an open row
+	// closes rather than follow a row that may now be another.
+	g.closeSwipe(false)
 	g.detailContent = nil // data changed; drop cached detail objects
 	g.pipe.MarkDirty()
 	g.updateViewportGeometry()
@@ -1207,6 +1247,7 @@ func (g *DataGrid) rebuildPipeline() {
 	g.viewport.Update(g.offset, g.scrollContent.Scroll.Size())
 	g.noteVisibleRows()
 	g.refreshRowBands()
+	g.followSwipedRow()
 }
 
 // buildQuickFilter creates a cross-column filter that passes a row if any column
@@ -1540,6 +1581,11 @@ func (g *DataGrid) Tapped(e *event.PointEvent) {
 	if g.disabled {
 		return
 	}
+	// A tap while a row is open only closes it (#1483).
+	if g.swipe.src >= 0 {
+		g.closeSwipe(true)
+		return
+	}
 	if row := g.detailToggleAt(e.Position); row >= 0 {
 		g.ToggleDetail(row)
 		return
@@ -1592,11 +1638,15 @@ func (g *DataGrid) TappedSecondary(e *event.PointEvent) {
 		return
 	}
 
-	// Body cell: select, then hand off to the consumer's context-menu callback.
+	// Body cell: select, then hand off to the consumer's context-menu
+	// callback, or, without one, list the row's swipe actions (#1483).
 	if id.Row >= 0 && id.Col >= 0 {
+		g.closeSwipe(true)
 		g.selectCell(id)
 		if g.OnCellSecondaryTapped != nil {
 			g.OnCellSecondaryTapped(id, e)
+		} else {
+			g.showRowSwipeMenu(id.Row, e.AbsolutePosition)
 		}
 	}
 }
@@ -1763,12 +1813,18 @@ func (g *DataGrid) contextMenuFocusedCell() {
 	// geometry.
 	g.scrollToCell(id)
 	g.selectCell(id)
-	if g.OnCellContextMenu == nil {
+	if g.OnCellContextMenu == nil && g.LeadingSwipeActions == nil && g.TrailingSwipeActions == nil {
 		return
 	}
 	pos, size := g.cellWidgetRect(id)
 	abs := bellui.CurrentApp().Driver().AbsolutePositionForObject(g)
-	g.OnCellContextMenu(id, abs.Add(geo.NewPos(pos.X, pos.Y+size.Height)))
+	anchor := abs.Add(geo.NewPos(pos.X, pos.Y+size.Height))
+	if g.OnCellContextMenu == nil {
+		// Without the app's own menu, list the row's swipe actions (#1483).
+		g.showRowSwipeMenu(id.Row, anchor)
+		return
+	}
+	g.OnCellContextMenu(id, anchor)
 }
 
 func (g *DataGrid) TypedKey(e *event.KeyEvent) {
@@ -1947,6 +2003,9 @@ func (g *DataGrid) Dragged(e *event.DragEvent) {
 	// handler's scroll path never runs — scroll the body here, like a finger
 	// on any other scrollable content. Mouse drags never scroll the body.
 	if !g.mousePressed {
+		if g.swipeDragged(e) {
+			return
+		}
 		g.scrollContent.Scroll.Scrolled(&event.ScrollEvent{
 			PointEvent: e.PointEvent,
 			Scrolled:   e.Dragged,
@@ -1962,8 +2021,16 @@ func (g *DataGrid) Dragged(e *event.DragEvent) {
 // body's end, or along an axis it does not scroll, to the page. A gesture a
 // mouse press began keeps every drag. A disabled grid claims every drag and
 // ignores it, so nothing scrolls over it, as over a disabled List (#1251).
+//
+// With swipe actions (#1483) it also claims a sideways drag the body cannot
+// scroll, toward an edge rows have actions on: that drag swipes the row under
+// it. While a row is open it claims every drag, which closes the row, or
+// moves it when the drag runs sideways along it.
 func (g *DataGrid) ClaimsDrag(d geo.Delta) bool {
 	if g.disabled || g.resizeCol >= 0 || g.reorderFromCol >= 0 || g.dragRow >= 0 {
+		return true
+	}
+	if g.swipe.src >= 0 || g.swipeClaims(d) {
 		return true
 	}
 	return scrollCanMove(g.scrollContent.Scroll, d)
@@ -2004,6 +2071,8 @@ func abs32(f float32) float32 {
 }
 
 func (g *DataGrid) DragEnd() {
+	g.endSwipeGesture()
+
 	// Finalize column reorder
 	if g.reorderFromCol >= 0 {
 		// Region-aware mapping, shared with the header rendering and the body.

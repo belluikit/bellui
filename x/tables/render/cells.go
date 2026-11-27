@@ -23,7 +23,17 @@ type CellsWidget struct {
 	// band and the scroll bar gutter, so the last column can scroll clear of
 	// them (#1257).
 	trailingW float32
+
+	// omitDetail leaves expanded master rows' detail content out (OmitDetail).
+	omitDetail bool
 }
+
+// OmitDetail makes the widget leave the content of an expanded master row's
+// detail band out, drawing the band's background only. A second CellsWidget
+// that draws rows the grid's own already draws, as the swiped row is drawn
+// (#1483), needs it: a row's detail content is one object, cached by the grid,
+// and the grid's own CellsWidget holds it.
+func (c *CellsWidget) OmitDetail() { c.omitDetail = true }
 
 // GroupAggregate is one aggregate shown on a group header row.
 type GroupAggregate struct {

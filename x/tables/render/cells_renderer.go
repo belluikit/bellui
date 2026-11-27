@@ -345,7 +345,7 @@ func (r *CellsRenderer) refreshCells() {
 			db.Show()
 			objects = append(objects, db)
 
-			if content := grid.DetailContent(row); content != nil {
+			if content := grid.DetailContent(row); content != nil && !r.cells.omitDetail {
 				content.Move(geo.NewPos(0, y+cellH))
 				content.Resize(geo.NewSize(totalW, bandH))
 				content.Show()

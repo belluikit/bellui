@@ -6,6 +6,7 @@ import (
 	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/lang"
 	"github.com/belluikit/bellui/widget"
 
 	"github.com/belluikit/bellui/x/tables/render"
@@ -77,6 +78,9 @@ func (r *dataGridRenderer) doLayout(size geo.Size) {
 		return
 	}
 	g := r.grid
+	// The layout direction is known here, inside a layout or a widget's
+	// refresh; the swipe handlers read it later (#1483).
+	g.rtl = lang.IsRTLDirection()
 	headerH := g.HeaderHeight()
 	layout := g.visibleLayout()
 	padding := g.cellPadding()
@@ -181,6 +185,10 @@ func (r *dataGridRenderer) doLayout(size geo.Size) {
 	g.groupRowOverlay.Resize(geo.NewSize(size.Width, contentH))
 	g.groupRowOverlay.SetScrollBarInsets(g.scrollBarInsets(scrollSize))
 
+	// The swiped row, over every band (#1483).
+	g.rowSwipeLayer.Move(geo.NewPos(0, yOffset))
+	g.rowSwipeLayer.Resize(geo.NewSize(size.Width, contentH))
+
 	// Status bar
 	if r.statusBar != nil {
 		r.statusBar.Move(geo.NewPos(0, size.Height-statusBarH))
@@ -203,6 +211,9 @@ func (r *dataGridRenderer) doLayout(size geo.Size) {
 	g.pinnedLeftCells.Refresh()
 	g.pinnedRightCells.Refresh()
 	g.groupRowOverlay.Refresh()
+	if g.rowSwipeLayer.Visible() {
+		g.rowSwipeLayer.Refresh()
+	}
 }
 
 // scrollBarInsets returns the width of the vertical and the height of the
@@ -293,6 +304,8 @@ func (r *dataGridRenderer) rebuildObjects() {
 		// Above every cell band: group-header rows render once here, spanning
 		// pinned-left through pinned-right.
 		g.groupRowOverlay,
+		// The swiped row and its actions, drawn whole across the bands.
+		g.rowSwipeLayer,
 	)
 
 	if r.statusBar != nil {
