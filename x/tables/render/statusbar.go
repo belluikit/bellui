@@ -35,12 +35,17 @@ func NewStatusBar(grid StatusBarAccess) *StatusBar {
 
 func (sb *StatusBar) CreateRenderer() core.WidgetRenderer {
 	sb.ExtendBaseWidget(sb)
-	tc := resolveColors(sb.Grid)
-	return &statusBarRenderer{
+	r := &statusBarRenderer{
 		bar:   sb,
-		label: canvas.NewText("", tc.Foreground),
-		bg:    canvas.NewRectangle(tc.HeaderBg),
+		label: canvas.NewText("", nil),
+		bg:    canvas.NewRectangle(nil),
 	}
+	// The bar draws from its first frame: the grid lays it out but refreshes it
+	// only from its own Refresh, so a renderer that waited for a Refresh drew
+	// nothing until then (#1500).
+	r.objects = []core.CanvasObject{r.bg, r.label}
+	r.update()
+	return r
 }
 
 type statusBarRenderer struct {
@@ -61,6 +66,11 @@ func (r *statusBarRenderer) MinSize() geo.Size {
 }
 
 func (r *statusBarRenderer) Refresh() {
+	r.update()
+}
+
+// update sets the colours and the text from the grid's current state.
+func (r *statusBarRenderer) update() {
 	tc := resolveColors(r.bar.Grid)
 	r.bg.FillColor = tc.HeaderBg
 	r.label.Color = tc.Foreground
@@ -84,7 +94,6 @@ func (r *statusBarRenderer) Refresh() {
 
 	r.label.Text = text
 	r.label.TextSize = 11
-	r.objects = []core.CanvasObject{r.bg, r.label}
 }
 
 func (r *statusBarRenderer) Objects() []core.CanvasObject {
