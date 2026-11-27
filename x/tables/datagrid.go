@@ -989,6 +989,24 @@ func (g *DataGrid) OnResizeDragStart(col int, startX float32) {
 	g.dragStartPos = geo.NewPos(startX, 0)
 }
 
+// pinnedMaxWidth is the widest the pinned column rc can be while both pinned
+// bands, with their gaps and the vertical bar's gutter that pinned-right keeps
+// clear (#1257), fit in the grid.
+func (g *DataGrid) pinnedMaxWidth(rc *resolvedColumn) float32 {
+	layout := g.visibleLayout()
+	padding := g.cellPadding()
+	used := g.vScrollGutter(g.Size())
+	for _, band := range [][]*resolvedColumn{layout.pinnedLeft, layout.pinnedRight} {
+		for _, col := range band {
+			used += padding
+			if col != rc {
+				used += col.width
+			}
+		}
+	}
+	return g.Size().Width - used
+}
+
 func (g *DataGrid) OnResizeDrag(posX float32) {
 	if g.resizeCol < 0 {
 		return
@@ -1022,40 +1040,18 @@ func (g *DataGrid) OnResizeDrag(posX float32) {
 		newWidth = rc.def.MaxWidth
 	}
 
-	// Clamp so no column can grow beyond the grid width.
-	layout := g.visibleLayout()
-	padding := g.cellPadding()
-	pinnedLeftW := layout.pinnedLeftWidth(padding)
-
-	// Reserve the vertical bar's gutter, which pinned-right keeps clear when
-	// the bar shows (#1257). Without pinned-right there is none: the scroll
-	// clips its content internally.
-	scrollBarReserve := g.vScrollGutter(g.Size())
-
-	// Compute space used by everything EXCEPT the column being resized.
-	usedW := scrollBarReserve
-	if pinnedLeftW > 0 {
-		usedW += pinnedLeftW + padding
-	}
-	for _, col := range layout.main {
-		if col != rc {
-			usedW += col.width + padding
-		} else {
-			usedW += padding // gap for the resized column itself
+	// A main column has no cap on the grid's width: it scrolls with the body,
+	// which scrolls sideways to its border however wide it grows. A pinned
+	// column does not scroll, so it stops where the two pinned bands fill the
+	// grid: past that they would overlap, and a pinned-left column's border
+	// would leave the grid, where it could not be dragged back.
+	// The cap used to count the main columns as well, which made it negative
+	// once they overflowed the grid, so every drag in a grid that scrolls
+	// sideways collapsed the column to its minimum (#1499).
+	if rc.def.Pinned == PinLeft || rc.def.Pinned == PinRight {
+		if maxFit := g.pinnedMaxWidth(rc); newWidth > maxFit {
+			newWidth = geo.Max(maxFit, minW)
 		}
-	}
-	for _, col := range layout.pinnedRight {
-		if col != rc {
-			usedW += col.width + padding
-		}
-	}
-
-	maxFit := g.Size().Width - usedW
-	if maxFit < minW {
-		maxFit = minW
-	}
-	if newWidth > maxFit {
-		newWidth = maxFit
 	}
 
 	rc.width = newWidth
