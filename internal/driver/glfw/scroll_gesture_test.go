@@ -163,6 +163,12 @@ func TestWindow_CtrlWheelPinches(t *testing.T) {
 	ends[1]()
 	assert.Equal(t, 1, target.pinchEnds, "the pinch ends after its last step")
 
+	// A ctrl+wheel step that does not zoom (a sideways tilt) sends no pinch
+	// step of 1, and does not scroll either.
+	w.processScrollGesture(2, 0, wheel, gestureNone, ctrl)
+	assert.Len(t, target.pinches, 2)
+	assert.Empty(t, target.scrolls)
+
 	// Without ctrl it scrolls.
 	w.processScrollGesture(0, 1, wheel, gestureNone, 0)
 	assert.Len(t, target.scrolls, 1)
@@ -181,3 +187,27 @@ func TestWindow_CtrlWheelScrollsWhereNothingPinches(t *testing.T) {
 type scrollOnly struct{ *gestureTarget }
 
 func (s *scrollOnly) Pinched() {} // not event.Pinchable: wrong signature
+
+// A browser pinch arrives as ctrl+wheel steps whose deltaY add up to
+// -100 ln(scale) (measured in Chrome: a synthesized 2x pinch sent 18 events
+// summing to -69.31). The web driver gets them negated, and their product
+// comes back to the pinch's own scale. A mouse notch, one 100 px step, zooms
+// by a tenth, as on the desktop (#391).
+func TestBrowserWheelPinchScale(t *testing.T) {
+	total := 100 * math.Log(2) // a 2x pinch, as the web driver sees it
+	product := 1.0
+	for i := 0; i < 18; i++ {
+		product *= browserWheelPinchScale(total / 18)
+	}
+	assert.InDelta(t, 2, product, 1e-9, "the steps of a 2x pinch make 2x")
+
+	product = 1
+	for i := 0; i < 18; i++ {
+		product *= browserWheelPinchScale(-total / 18)
+	}
+	assert.InDelta(t, 0.5, product, 1e-9)
+
+	assert.InDelta(t, 1.1, browserWheelPinchScale(100), 1e-9, "a notch up zooms in by a tenth")
+	assert.InDelta(t, 1/1.1, browserWheelPinchScale(-100), 1e-9, "a notch down zooms out by a tenth")
+	assert.Equal(t, 1.0, browserWheelPinchScale(0))
+}

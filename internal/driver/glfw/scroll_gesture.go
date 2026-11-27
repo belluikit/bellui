@@ -29,9 +29,24 @@ const (
 	gestureMomentum                      // a scroll the system adds after they lifted
 )
 
-// wheelPinchRate turns a ctrl+wheel offset into a pinch scale: a wheel notch
-// (an offset of 1) zooms by a tenth.
+// wheelPinchRate turns a desktop ctrl+wheel offset into a pinch scale: a
+// wheel notch (an offset of 1) zooms by a tenth.
 var wheelPinchRate = math.Log(1.1)
+
+// browserPinchPixels is the wheel offset, in CSS pixels, of a browser pinch
+// that doubles the size divided by ln 2: Chrome sends a trackpad pinch to a
+// page as ctrl+wheel events whose deltaY add up to -100 ln(scale), measured
+// with a synthesized pinch (#391). A mouse wheel notch is a single event of
+// about 100 pixels, so each step is held to a tenth either way, as a desktop
+// notch zooms.
+const browserPinchPixels = 100
+
+// browserWheelPinchScale is the pinch scale of a browser ctrl+wheel offset
+// yoff, in the pixels the web driver gets them in: what the browser's own
+// pinch would be, at most a tenth either way per step.
+func browserWheelPinchScale(yoff float64) float64 {
+	return math.Min(1.1, math.Max(1/1.1, math.Exp(yoff/browserPinchPixels)))
+}
 
 // wheelPinchEnd is how long after the last ctrl+wheel step a wheel pinch
 // ends: a wheel has no lift-off to say so.
@@ -83,7 +98,7 @@ func (w *window) processScrollGesture(xoff, yoff float64, source event.ScrollSou
 
 	// ctrl+wheel over a Pinchable pinches it (#391): a Windows precision
 	// touchpad and the browsers send a trackpad pinch that way.
-	if phase == gestureNone && mods&event.KeyModifierControl != 0 && w.wheelPinched(yoff) {
+	if phase == gestureNone && mods&event.KeyModifierControl != 0 && w.wheelPinched(math.Exp(yoff*wheelPinchRate)) {
 		return
 	}
 
@@ -174,10 +189,10 @@ func (w *window) processTrackpadPinch(scale float64, phase gesturePhase) {
 	})
 }
 
-// wheelPinched turns a ctrl+wheel step over a Pinchable into a pinch step,
-// and reports whether there was one to pinch. The pinch ends wheelPinchEnd
-// after its last step.
-func (w *window) wheelPinched(yoff float64) bool {
+// wheelPinched turns a ctrl+wheel step over a Pinchable into a pinch step of
+// scale, and reports whether there was one to pinch. The pinch ends
+// wheelPinchEnd after its last step.
+func (w *window) wheelPinched(scale float64) bool {
 	g := &w.gesture
 	if g.wheelPinch == nil {
 		g.wheelPinch, g.wheelPinchOrigin = w.pinchableAt(w.mousePos)
@@ -185,10 +200,10 @@ func (w *window) wheelPinched(yoff float64) bool {
 			return false
 		}
 	}
-	if yoff != 0 {
+	if scale != 1 {
 		g.wheelPinch.Pinched(&event.PinchEvent{
 			PointEvent: event.PointEvent{AbsolutePosition: w.mousePos, Position: w.mousePos.Subtract(g.wheelPinchOrigin)},
-			Scale:      float32(math.Exp(yoff * wheelPinchRate)),
+			Scale:      float32(scale),
 		})
 	}
 	g.wheelPinchSeq++

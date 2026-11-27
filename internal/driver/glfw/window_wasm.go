@@ -302,7 +302,15 @@ func (w *window) mouseClicked(viewport *glfw.Window, btn glfw.MouseButton, actio
 }
 
 func (w *window) mouseScrolled(viewport *glfw.Window, xoff, yoff float64) {
+	// The wheel event's own modifiers, which glfw-js keeps: a browser sends a
+	// trackpad pinch as ctrl+wheel with no key pressed (#391).
+	mods := desktopModifier(viewport.GetCurrentMods())
 	runOnMainAsync(func() {
+		// ctrl+wheel over a Pinchable pinches it (#391), in the browser's own
+		// pinch scale (see browserWheelPinchScale).
+		if mods&event.KeyModifierControl != 0 && w.wheelPinched(browserWheelPinchScale(yoff)) {
+			return
+		}
 		if xoff == 0 &&
 			(viewport.GetKey(glfw.KeyLeftShift) == glfw.Press ||
 				viewport.GetKey(glfw.KeyRightShift) == glfw.Press) {
