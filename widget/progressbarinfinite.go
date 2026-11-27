@@ -10,6 +10,7 @@ import (
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/widget"
+	"github.com/belluikit/bellui/lang"
 	"github.com/belluikit/bellui/theme"
 )
 
@@ -26,6 +27,10 @@ type infProgressRenderer struct {
 	animation       bellui.Animation
 	wasRunning      bool
 	progress        *ProgressBarInfinite
+	// rtl is the direction the bar was last laid out in. The animation ticks
+	// outside a layout walk, where only a tree lookup could tell, so it reads
+	// the direction Layout saw instead.
+	rtl bool
 }
 
 // MinSize calculates the minimum size of a progress bar.
@@ -59,6 +64,10 @@ func (p *infProgressRenderer) updateBar(done float32) {
 	if barPos.X+barSize.Width > progressWidth {
 		barSize.Width = progressWidth - barPos.X
 	}
+	if p.rtl {
+		// Right-to-left, the sweep starts from the right (#779).
+		barPos.X = progressWidth - barPos.X - barSize.Width
+	}
 
 	p.bar.Resize(barSize)
 	p.bar.Move(barPos)
@@ -67,6 +76,7 @@ func (p *infProgressRenderer) updateBar(done float32) {
 
 // Layout the components of the infinite progress bar
 func (p *infProgressRenderer) Layout(size geo.Size) {
+	p.rtl = lang.IsRTLDirection()
 	p.background.Resize(size)
 }
 

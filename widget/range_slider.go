@@ -528,6 +528,11 @@ func (s *RangeSlider) TypedKey(key *event.KeyEvent) {
 		return
 	}
 
+	// The arrows move a thumb the way they point, so right-to-left, where
+	// the minimum is on the right, Left raises it (#779).
+	if isRTLAt(s) {
+		step = -step
+	}
 	switch key.Name {
 	case event.KeyRight:
 		s.adjustThumb(s.focusedHigh, step)
@@ -633,7 +638,11 @@ func (s *RangeSlider) getRatio(e *event.PointEvent) float64 {
 	if total <= 0 {
 		return 0
 	}
-	return (float64(e.Position.X) - endPad) / total
+	x := float64(e.Position.X)
+	if isRTLAt(s) {
+		x = float64(s.Size().Width) - x // the minimum is on the right (#779)
+	}
+	return (x - endPad) / total
 }
 
 func (s *RangeSlider) endOffset(iconSize, innerPad float32) float32 {
@@ -743,6 +752,15 @@ func (r *rangeSliderRenderer) Layout(size geo.Size) {
 	delta := (indicatorSize.Width - diameter) / 2
 	r.focusIndicator.Resize(indicatorSize)
 	r.focusIndicator.Move(focusThumb.Position().SubtractXY(delta, delta))
+
+	// Right-to-left, a horizontal range runs from the right: the low thumb
+	// is the right-hand one (#779).
+	if r.slider.Orientation != Vertical {
+		mirrorIfRTL([]core.CanvasObject{
+			r.track, r.active, r.lowThumb, r.highThumb,
+			r.lowProxy, r.highProxy, r.focusIndicator,
+		}, size.Width)
+	}
 }
 
 func (r *rangeSliderRenderer) Refresh() {

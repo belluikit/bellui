@@ -308,6 +308,9 @@ func (s *Slider) CursorPosition() geo.Position {
 		ratio = float32((s.Value - s.Min) / (s.Max - s.Min))
 	}
 	x := endPad + ratio*(size.Width-endPad*2)
+	if isRTLAt(s) {
+		x = size.Width - x // the thumb mirrors with the track (#779)
+	}
 	return geo.NewPos(x, size.Height/2-trackWidth)
 }
 
@@ -430,11 +433,18 @@ func (s *Slider) TypedKey(key *event.KeyEvent) {
 			s.SetValue(s.Value - s.Step)
 		}
 	} else {
+		// The arrows move the thumb the way they point, so right-to-left,
+		// where the minimum is on the right, Left raises the value (#779), as
+		// Android's Slider does.
+		step := s.Step
+		if isRTLAt(s) {
+			step = -step
+		}
 		switch key.Name {
 		case event.KeyLeft:
-			s.SetValue(s.Value - s.Step)
+			s.SetValue(s.Value - step)
 		case event.KeyRight:
-			s.SetValue(s.Value + s.Step)
+			s.SetValue(s.Value + step)
 		}
 	}
 }
@@ -471,6 +481,9 @@ func (s *Slider) getRatio(e *event.PointEvent) float64 {
 			return 1 - float64(y-pad)/float64(size.Height-pad*2)
 		}
 	case Horizontal:
+		if isRTLAt(s) {
+			x = size.Width - x // the minimum is on the right (#779)
+		}
 		if x > size.Width-pad {
 			return 1.0
 		} else if x < pad {
@@ -831,6 +844,16 @@ func (s *sliderRenderer) Layout(size geo.Size) {
 			y := endPad + (1-ratio)*(size.Height-endPad*2) - tickSize/2
 			tick.Move(geo.NewPos(x, y))
 		}
+	}
+
+	// Right-to-left, a horizontal slider runs from the right: the minimum is
+	// at the right end and the active track grows leftwards (#779).
+	if s.slider.Orientation == Horizontal {
+		objs := []core.CanvasObject{s.track, s.active, s.thumb, s.focusIndicator}
+		for _, tick := range s.ticks {
+			objs = append(objs, tick)
+		}
+		mirrorIfRTL(objs, size.Width)
 	}
 }
 
