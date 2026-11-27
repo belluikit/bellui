@@ -37,7 +37,7 @@ gestures. A first step clicks an enabled button and stops the run unless the
 tap arrives, so a check that expects nothing to happen cannot pass because
 input never arrived. It asserts what it can read back (status lines, chip
 states, focus, positions, stroke widths in pixels) for WG-01–03, WG-05,
-WG-07, RTL-07, SM-07, SM-08, TK-06, TK-13, I18N-01/03/04 and ED-05, and saves
+WG-07, RTL-04, RTL-07, SM-07, SM-08, TK-06, TK-13, I18N-01/03/04 and ED-05, and saves
 real-painter captures, listed as LOOK in the report, for a person to judge.
 
 The driver reads a click's position from the system cursor, so **the probe
