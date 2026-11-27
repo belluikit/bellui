@@ -107,18 +107,44 @@ func (h *cellHost) AccessibleIdentity() any {
 	return h.grid.AccessibleCellIdentity(h.row, h.col)
 }
 
+// RowActioner is what a grid with actions on its rows adds to GridAccess: the
+// actions a touch user reaches by swiping a row sideways (#1483). Every cell
+// of the row offers them, as a screen reader's custom actions, so a user who
+// cannot swipe can still choose one. A cell asks for it by type assertion and
+// offers only "select" without it.
+type RowActioner interface {
+	// AccessibleRowActions returns the actions of a display row, nil for none.
+	AccessibleRowActions(row int) []core.AccessibleAction
+	// PerformAccessibleRowAction runs the action of a display row that one of
+	// AccessibleRowActions' entries names.
+	PerformAccessibleRowAction(row int, name string)
+}
+
 // AccessibleActions returns the "select" action (mirroring fyne's own
-// tableCellHost). Declaring it is what makes the platform expose the cell's UIA
+// tableCellHost), then the row's actions when the grid has some (RowActioner).
+// Declaring "select" is what makes the platform expose the cell's UIA
 // SelectionItem pattern — carrying AccessibleState's StateSelected — and lets
 // assistive tech select the cell; without it the bridge drops selection state
 // on a RoleTableCell entirely.
 func (h *cellHost) AccessibleActions() []core.AccessibleAction {
-	return []core.AccessibleAction{{Name: core.ActionSelect, Description: "Select this cell"}}
+	actions := []core.AccessibleAction{{Name: core.ActionSelect, Description: "Select this cell"}}
+	if ra, ok := h.grid.(RowActioner); ok {
+		actions = append(actions, ra.AccessibleRowActions(h.row)...)
+	}
+	return actions
 }
 
-// PerformAccessibleAction selects the cell like a pointer tap would.
+// PerformAccessibleAction selects the cell like a pointer tap would, or runs
+// one of the row's actions.
 func (h *cellHost) PerformAccessibleAction(name string) {
-	if name == core.ActionSelect && !gridDisabled(h.grid) {
+	if gridDisabled(h.grid) {
+		return
+	}
+	if name == core.ActionSelect {
 		h.grid.SelectCell(h.row, h.col)
+		return
+	}
+	if ra, ok := h.grid.(RowActioner); ok {
+		ra.PerformAccessibleRowAction(h.row, name)
 	}
 }

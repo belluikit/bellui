@@ -53,6 +53,8 @@ func (g *DataGrid) Disable() {
 	g.reorderFromCol = -1
 	g.dragRow = -1
 	g.dragCol = -1
+	g.swipe.gesture = gestureUndecided
+	g.closeSwipe(false)
 
 	// The body scrolls through a container.Scroll inside the grid, which the
 	// wheel and the scroll bars reach directly. ScrollNone stops both and
