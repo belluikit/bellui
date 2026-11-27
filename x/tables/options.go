@@ -33,7 +33,9 @@ type GridOptions struct {
 	// The column is the first of the scrolling band, after any pinned-left
 	// columns, and scrolls sideways with the others. With SelectionMultiRow its
 	// header holds a select-all box, which selects every displayed row (as
-	// GridAPI.SelectAll does) or clears them all.
+	// GridAPI.SelectAll does) or clears them all. A click on a row's box
+	// toggles that row: with SelectionMultiRow it keeps the other rows, with
+	// SelectionSingleRow it replaces or clears the selected one.
 	CheckboxSelection bool
 
 	// ShowStatusBar shows a status bar at the bottom with selection count and aggregations.

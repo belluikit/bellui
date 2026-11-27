@@ -761,6 +761,33 @@ func (g *DataGrid) selectionColumnWidth() float32 {
 	return 0
 }
 
+// ToggleRowSelected is what a click on display row's select checkbox does
+// (render.RowSelectionToggler), as in AG Grid (#1504). With SelectionMultiRow
+// it adds the row to the selection or removes it, keeping the others. With
+// SelectionSingleRow it selects the row in place of the selected one, or clears
+// it if it was the selected one. In a cell mode the box stands for the row's
+// first cell, and a click selects that cell as a press on it does.
+func (g *DataGrid) ToggleRowSelected(row int) {
+	src := g.sourceRow(row)
+	if g.disabled || src < 0 {
+		g.Refresh() // the box toggled itself: show the row's state again
+		return
+	}
+	id := CellID{Row: row, Col: 0}
+	switch {
+	case g.SelectionMode == SelectionMultiRow:
+		g.selectCellWithModifiers(id, event.KeyModifierControl) // Ctrl toggles one row
+	case g.SelectionMode == SelectionSingleRow && g.selectedRows[src]:
+		g.selectedRows = make(map[int]bool)
+		g.fireSelectionChanged()
+		g.Refresh()
+	case g.SelectionMode == SelectionNone:
+		g.Refresh() // nothing is selectable: show the row's state again
+	default:
+		g.selectCellWithModifiers(id, 0)
+	}
+}
+
 // SelectAllState reports whether the header shows a select-all box in the
 // checkbox-selection column, and whether every displayed row or only some are
 // selected (render.SelectAllAccess). The box shows only when several rows can
@@ -2213,10 +2240,10 @@ func (g *DataGrid) MouseDown(e *desktop.MouseEvent) {
 		return
 	}
 
-	// A press on a row's checkbox selects the row as a press on its first cell
-	// does, as the checkbox's accessible select action (SelectCell) does.
-	if row := g.selectionBoxRowAt(e.Position); row >= 0 {
-		g.selectCellWithModifiers(CellID{Row: row, Col: 0}, e.Modifier)
+	// A press on a row's checkbox column selects nothing: the box's own tap
+	// toggles the row (ToggleRowSelected), and a touch screen sends that tap
+	// with no press (#1504).
+	if g.selectionBoxRowAt(e.Position) >= 0 {
 		return
 	}
 

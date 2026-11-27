@@ -209,11 +209,13 @@ func TestDataGrid_SelectionColumnScrollsLastColumnIntoView(t *testing.T) {
 	checkColumnsLineUp(t, g, cols)
 }
 
-// TestDataGrid_SelectionColumnPressSelectsRow checks that a press on a row's
-// checkbox still selects that row, as a press on its first cell does.
-func TestDataGrid_SelectionColumnPressSelectsRow(t *testing.T) {
+// TestDataGrid_SelectionColumnPress checks what a press in the checkbox column
+// does: nothing, since the box's own tap toggles the row (#1504), while a press
+// on the data cell beside it is that cell's.
+func TestDataGrid_SelectionColumnPress(t *testing.T) {
 	g := selectionColumnGrid(t, 400, 3, "alpha", "beta")
 	g.SelectionMode = SelectionMultiRow
+	g.API().SelectRow(0)
 
 	boxX, boxW := drawnCell(t, g, 1, 0)
 	_, rowH := g.viewport.RowY(1)
@@ -221,8 +223,8 @@ func TestDataGrid_SelectionColumnPressSelectsRow(t *testing.T) {
 	at := geo.NewPos(boxX+boxW/2, g.bodyTop()+ry+rowH/2)
 	g.MouseDown(&desktop.MouseEvent{PointEvent: event.PointEvent{Position: at}, Button: desktop.MouseButtonPrimary})
 	g.MouseUp(&desktop.MouseEvent{PointEvent: event.PointEvent{Position: at}, Button: desktop.MouseButtonPrimary})
-	if got := g.API().GetSelectedRows(); len(got) != 1 || got[0] != 1 {
-		t.Errorf("a press on row 1's checkbox selected %v, want [1]", got)
+	if got := g.API().GetSelectedRows(); len(got) != 1 || got[0] != 0 {
+		t.Errorf("a press on row 1's checkbox changed the selection to %v, want it left at [0]", got)
 	}
 
 	// A press on a data cell beside it is that cell's.
