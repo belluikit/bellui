@@ -13,6 +13,7 @@ import (
 	"github.com/belluikit/bellui/internal/cache"
 	col "github.com/belluikit/bellui/internal/color"
 	"github.com/belluikit/bellui/internal/widget"
+	"github.com/belluikit/bellui/lang"
 	"github.com/belluikit/bellui/layout"
 	"github.com/belluikit/bellui/theme"
 )
@@ -701,6 +702,16 @@ func (r *buttonRenderer) updateIconAndText() {
 
 func alignedPosition(align ButtonAlign, padding, objectSize, layoutSize geo.Size) (pos geo.Position) {
 	pos.Y = (layoutSize.Height - objectSize.Height) / 2
+	// Leading and trailing are the reading direction's start and end, so
+	// right-to-left the leading edge is the right one (#779).
+	if lang.IsRTLDirection() {
+		switch align {
+		case ButtonAlignLeading:
+			align = ButtonAlignTrailing
+		case ButtonAlignTrailing:
+			align = ButtonAlignLeading
+		}
+	}
 	switch align {
 	case ButtonAlignCenter:
 		pos.X = (layoutSize.Width - objectSize.Width) / 2
