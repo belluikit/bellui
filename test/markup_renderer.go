@@ -810,6 +810,8 @@ func knownResource(rsc bellui.Resource) string {
 		return "lockIcon"
 	case theme.ShareIcon():
 		return "shareIcon"
+	case theme.AccountCancelIcon():
+		return "accountCancelIcon"
 	case theme.PlaceIcon():
 		return "placeIcon"
 	case theme.PeopleIcon():

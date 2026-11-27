@@ -595,6 +595,12 @@ const (
 	// Since: 1.0
 	IconNameAccount bellui.ThemeIconName = "account"
 
+	// IconNameAccountCancel is the name of theme lookup for the account icon
+	// with a block sign: a contact that is blocked, or will be (#1485).
+	//
+	// Since: 1.7
+	IconNameAccountCancel bellui.ThemeIconName = "account_cancel"
+
 	// IconNameCalendar is the name of theme lookup for calendar icon.
 	//
 	// Since: 1.0
@@ -765,10 +771,11 @@ var icons = map[bellui.ThemeIconName]bellui.Resource{
 	IconNameStorage:  NewThemedResource(storageIconRes),
 	IconNameUpload:   NewThemedResource(uploadIconRes),
 
-	IconNameAccount:  NewThemedResource(accountIconRes),
-	IconNameCalendar: NewThemedResource(calendarIconRes),
-	IconNameLogin:    NewThemedResource(loginIconRes),
-	IconNameLogout:   NewThemedResource(logoutIconRes),
+	IconNameAccount:       NewThemedResource(accountIconRes),
+	IconNameAccountCancel: NewThemedResource(accountCancelIconRes),
+	IconNameCalendar:      NewThemedResource(calendarIconRes),
+	IconNameLogin:         NewThemedResource(loginIconRes),
+	IconNameLogout:        NewThemedResource(logoutIconRes),
 
 	IconNameList: NewThemedResource(listIconRes),
 	IconNameGrid: NewThemedResource(gridIconRes),
@@ -1674,6 +1681,15 @@ func UploadIcon() bellui.Resource {
 // AccountIcon returns a resource containing the standard account icon for the current theme
 func AccountIcon() bellui.Resource {
 	return safeIconLookup(IconNameAccount)
+}
+
+// AccountCancelIcon returns a resource containing the account icon with a
+// block sign for the current theme: the person of AccountIcon with the
+// "blocked" sign, for a contact that is blocked or will be (#1485).
+//
+// Since: 1.7
+func AccountCancelIcon() bellui.Resource {
+	return safeIconLookup(IconNameAccountCancel)
 }
 
 // CalendarIcon returns a resource containing the standard account icon for the current theme

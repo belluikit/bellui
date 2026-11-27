@@ -621,6 +621,24 @@ func TestPurchaseIcons(t *testing.T) {
 	}
 }
 
+// The blocked-contact icon is its own file, themed like the rest, and draws
+// the account icon's person with a block sign beside it (#1485).
+func TestAccountCancelIcon(t *testing.T) {
+	icon := theme.AccountCancelIcon()
+	if icon == nil || !strings.HasSuffix(icon.Name(), "account_cancel.svg") {
+		t.Fatalf("icon %v, want one named for account_cancel.svg", icon)
+	}
+	if !strings.Contains(string(icon.Content()), "<path") {
+		t.Error("account_cancel.svg has no shape")
+	}
+	if _, ok := icon.(*theme.ThemedResource); !ok {
+		t.Errorf("account_cancel.svg is %T, want a *theme.ThemedResource so it takes the theme's colour", icon)
+	}
+	if icon.Name() == theme.AccountIcon().Name() {
+		t.Error("the blocked-contact icon is the plain account icon")
+	}
+}
+
 // The share icon is its own file, themed like the rest (#1475).
 func TestShareIcon(t *testing.T) {
 	icon := theme.ShareIcon()

@@ -910,6 +910,14 @@ var accountIconRes = &bellui.StaticResource{
 	StaticContent: accountIcon,
 }
 
+//go:embed icons/account_cancel.svg
+var accountCancelIcon []byte
+
+var accountCancelIconRes = &bellui.StaticResource{
+	StaticName:    "account_cancel.svg",
+	StaticContent: accountCancelIcon,
+}
+
 //go:embed icons/calendar.svg
 var calendarIcon []byte
 

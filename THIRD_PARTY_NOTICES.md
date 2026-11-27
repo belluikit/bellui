@@ -102,6 +102,11 @@ Fonts used only by tests:
   [Material Design icons](https://github.com/google/material-design-icons),
   inherited from Fyne. They are licensed under Apache-2.0, which is reproduced in
   `theme/icons/LICENSE-MaterialIcons.txt`.
+- **Material Design Icons (Pictogrammers).** `theme/icons/account.svg` and
+  `theme/icons/account_cancel.svg` are from Pictogrammers'
+  [Material Design Icons](https://github.com/Templarian/MaterialDesign)
+  (`account`, `account-cancel`), whose icons are distributed under Apache-2.0,
+  the same license text as `theme/icons/LICENSE-MaterialIcons.txt`.
 - **Go gopher.** `default-icon.png`, `spinner_dark.gif` and `spinner_light.gif`
   in `cmd/bellui/internal/templates/data/` show a gopher. The Go gopher was
   designed by Renée French and is licensed under
