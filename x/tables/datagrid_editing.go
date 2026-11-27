@@ -289,14 +289,11 @@ func (g *DataGrid) editingCellRect(id CellID, size geo.Size) (pos geo.Position, 
 
 	// Vertical: the body starts below the header (and floating-filter row) and
 	// scrolls by offset.Y; the row's cell band excludes any expanded detail
-	// band. The 30/24 constants match dataGridRenderer.doLayout.
-	top := g.HeaderHeight()
-	if g.floatingFilterRow != nil {
-		top += 30
-	}
+	// band.
+	top := g.bodyTop()
 	bottom := size.Height
 	if g.Options.ShowStatusBar {
-		bottom -= 24
+		bottom -= statusBarHeight
 	}
 	ry, rh := g.viewport.RowY(id.Row)
 	if band := g.DetailBandHeight(id.Row); band > 0 {

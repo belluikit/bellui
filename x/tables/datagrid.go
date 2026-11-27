@@ -1483,7 +1483,7 @@ func (g *DataGrid) layoutColForDisplay(displayCol int) int {
 // AccessibleScrollCellIntoView.
 func (g *DataGrid) cellRealizeRect(row, layoutCol int) (geo.Position, geo.Size) {
 	y, h := g.viewport.RowY(row)
-	pos := geo.NewPos(0, g.HeaderHeight()+y-g.offset.Y)
+	pos := geo.NewPos(0, g.bodyTop()+y-g.offset.Y)
 	size := geo.NewSize(0, h)
 	if mainCol := layoutCol - g.PinnedLeftCount(); mainCol >= 0 && mainCol < g.ColumnCount() {
 		x, w := g.viewport.ColX(mainCol)
@@ -1504,7 +1504,7 @@ func (g *DataGrid) cellRealizeRect(row, layoutCol int) (geo.Position, geo.Size) 
 // currentFocus); callers pass an in-range id.
 func (g *DataGrid) cellWidgetRect(id CellID) (geo.Position, geo.Size) {
 	y, h := g.viewport.RowY(id.Row)
-	pos := geo.NewPos(0, g.HeaderHeight()+y-g.offset.Y)
+	pos := geo.NewPos(0, g.bodyTop()+y-g.offset.Y)
 	size := geo.NewSize(0, h)
 
 	layout := g.visibleLayout()
@@ -2546,8 +2546,14 @@ func (g *DataGrid) cellAtPosition(pos geo.Position) CellID {
 		return CellID{Row: -1, Col: col}
 	}
 
-	// Adjust for header and vertical scroll offset.
-	adjustedY := pos.Y - headerH + g.offset.Y
+	// The floating-filter row, between the header and the body, has no cells.
+	top := g.bodyTop()
+	if pos.Y < top {
+		return CellID{Row: -1, Col: -1}
+	}
+
+	// Adjust for the rows above the body and the vertical scroll offset.
+	adjustedY := pos.Y - top + g.offset.Y
 
 	// Find row (uniform O(1) or variable O(log n) via the viewport prefix sum).
 	row := g.viewport.RowAtY(adjustedY)
@@ -2601,11 +2607,11 @@ func (g *DataGrid) detailToggleAt(pos geo.Position) int {
 	if toggleW <= 0 {
 		return -1
 	}
-	headerH := g.HeaderHeight()
-	if pos.Y < headerH {
+	top := g.bodyTop()
+	if pos.Y < top {
 		return -1
 	}
-	adjustedY := pos.Y - headerH + g.offset.Y
+	adjustedY := pos.Y - top + g.offset.Y
 
 	row := g.viewport.RowAtY(adjustedY)
 	if row < 0 || row >= g.RowCount() || !g.IsMasterRow(row) {
@@ -2637,11 +2643,11 @@ func (g *DataGrid) groupRowAt(pos geo.Position) int {
 	if g.groupTransform == nil {
 		return -1
 	}
-	headerH := g.HeaderHeight()
-	if pos.Y < headerH {
+	top := g.bodyTop()
+	if pos.Y < top {
 		return -1
 	}
-	row := g.viewport.RowAtY(pos.Y - headerH + g.offset.Y)
+	row := g.viewport.RowAtY(pos.Y - top + g.offset.Y)
 	if row < 0 || row >= g.RowCount() || !g.IsGroupRow(row) {
 		return -1
 	}
@@ -2652,11 +2658,11 @@ func (g *DataGrid) treeToggleAt(pos geo.Position) int {
 	if !g.treeActive() {
 		return -1
 	}
-	headerH := g.HeaderHeight()
-	if pos.Y < headerH {
+	top := g.bodyTop()
+	if pos.Y < top {
 		return -1
 	}
-	adjustedY := pos.Y - headerH + g.offset.Y
+	adjustedY := pos.Y - top + g.offset.Y
 
 	row := g.viewport.RowAtY(adjustedY)
 	if row < 0 || row >= g.RowCount() {
@@ -2680,16 +2686,16 @@ func (g *DataGrid) scrollToCell(id CellID) {
 	}
 
 	y, h := g.viewport.RowY(id.Row)
+	// The scroll is the body: its height is already below the header.
 	scrollSize := g.scrollContent.Scroll.Size()
-	headerH := g.HeaderHeight()
 
 	newOffset := g.offset
 
 	// Vertical scroll (rows are shared across all column bands).
 	if y < g.offset.Y {
 		newOffset.Y = y
-	} else if y+h > g.offset.Y+scrollSize.Height-headerH {
-		newOffset.Y = y + h - scrollSize.Height + headerH
+	} else if y+h > g.offset.Y+scrollSize.Height {
+		newOffset.Y = y + h - scrollSize.Height
 	}
 
 	// Horizontal scroll only for main columns — the pinned bands are always
@@ -2966,6 +2972,19 @@ func (g *DataGrid) vScrollGutter(size geo.Size) float32 {
 		return 0
 	}
 	return g.Theme().Size(bellui.ThemeSizeName("scrollBar"))
+}
+
+// bodyTop is where the body (the main scroll and the bands beside it) starts:
+// below the header and the floating-filter row, as dataGridRenderer.doLayout
+// places it. Hit-testing and cell rectangles measure rows from here; measuring
+// from the header alone put every tap on a grid with floating filters on the
+// row below.
+func (g *DataGrid) bodyTop() float32 {
+	top := g.HeaderHeight()
+	if g.floatingFilterRow != nil {
+		top += floatingFilterHeight
+	}
+	return top
 }
 
 // bodyHeight is the height of the body (the main scroll and the bands beside
