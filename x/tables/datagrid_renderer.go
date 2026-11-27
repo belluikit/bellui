@@ -91,6 +91,13 @@ func (r *dataGridRenderer) doLayout(size geo.Size) {
 	// hit-testing and the region rows place the columns.
 	mainX, pinnedRightX, pinnedRightW := g.bandAnchors(size)
 
+	// The viewport's column positions start past the checkbox-selection
+	// column. Options.CheckboxSelection can change after the geometry was
+	// built, and a layout, unlike Refresh, does not rebuild it (#1498).
+	if g.viewport.Leading != g.selectionColumnWidth() {
+		g.updateViewportGeometry()
+	}
+
 	// Background
 	r.bg.Resize(size)
 

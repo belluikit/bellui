@@ -53,6 +53,33 @@ type HeaderTextHider interface {
 	ColumnHeaderTextHidden(col int) bool
 }
 
+// SelectAllAccess is an optional capability of a HeaderAccess: a grid that
+// offers to select all its rows from the checkbox-selection column's header
+// cell. The header then holds a select-all box there (#1498). A grid without
+// it leaves that cell empty.
+type SelectAllAccess interface {
+	// SelectAllState reports whether the box shows, and whether every row or
+	// only some are selected.
+	SelectAllState() (shown, all, some bool)
+	// SetAllRowsSelected selects every row, or clears them all.
+	SetAllRowsSelected(selected bool)
+}
+
+// selectAllCheck is the header's select-all box: a check named for assistive
+// tech, which would otherwise read a nameless checkbox in the header.
+type selectAllCheck struct {
+	widget.Check
+}
+
+func newSelectAllCheck() *selectAllCheck {
+	c := &selectAllCheck{}
+	c.ExtendBaseWidget(c)
+	return c
+}
+
+// AccessibleLabel names the box.
+func (c *selectAllCheck) AccessibleLabel() string { return "Select all rows" }
+
 // SortIndicator represents the sort state of a column header.
 type SortIndicator int
 
@@ -187,6 +214,7 @@ type headerRenderer struct {
 	sortArrows []*canvas.Text    // "▲" or "▼" indicators
 	filterDots []*canvas.Circle  // small dot when filter active
 	a11y       []*headerCellA11y // invisible accessible node per column (#109)
+	selectAll  *selectAllCheck   // in the checkbox-selection column, when the grid offers it
 
 	// bands places the columns in the body's three bands and clips the scrolling
 	// main band so its canvas objects cannot render outside [mainX, mainRight)
@@ -341,8 +369,43 @@ func (r *headerRenderer) rebuild(size geo.Size) {
 		return dst
 	}
 
+	r.bands.placeLead = r.placeSelectAll
+
 	// The full-width background sits behind everything; the shared helper layers
 	// the clipped main band and the fixed pinned bands on top.
 	r.objects = r.bands.layout(grid, size, placeCol, r.bg)
 	theme.MatchScope(r.header, r.objects...) // see CellsRenderer.refreshCells (#758)
+}
+
+// placeSelectAll places the select-all box in the checkbox-selection column's
+// header cell, at clip-local x and width w, when the grid offers it. Its state
+// follows the rows: checked when all are selected, partial when some are. A tap
+// on a partial box checks it, so it selects all.
+func (r *headerRenderer) placeSelectAll(x, w float32, dst []core.CanvasObject) []core.CanvasObject {
+	grid := r.header.Grid
+	sa, ok := grid.(SelectAllAccess)
+	if !ok {
+		return dst
+	}
+	shown, all, some := sa.SelectAllState()
+	if !shown {
+		return dst
+	}
+	if r.selectAll == nil {
+		r.selectAll = newSelectAllCheck()
+		r.selectAll.OnChanged = func(checked bool) {
+			if s, ok := r.header.Grid.(SelectAllAccess); ok {
+				s.SetAllRowsSelected(checked)
+			}
+		}
+	}
+	c := r.selectAll
+	// Set the state directly: SetChecked would report it back as a change.
+	c.Checked, c.Partial = all, some && !all
+	syncDisabled(c, gridDisabled(grid))
+	c.Refresh()
+	h := grid.HeaderHeight()
+	c.Move(geo.NewPos(x, 0))
+	c.Resize(geo.NewSize(checkboxCellWidth, h))
+	return append(dst, c)
 }
