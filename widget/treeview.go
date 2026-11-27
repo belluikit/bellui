@@ -612,7 +612,7 @@ func (tv *TreeView) TypedKey(ev *event.KeyEvent) {
 		tv.focusNext()
 	case event.KeyUp:
 		tv.focusPrevious()
-	case event.KeyRight:
+	case towardChild(tv):
 		tv.mu.RLock()
 		n, ok := tv.nodeMap[tv.currentFocus]
 		isBranch := ok && (len(n.children) > 0 || n.hasMore)
@@ -624,7 +624,7 @@ func (tv *TreeView) TypedKey(ev *event.KeyEvent) {
 				tv.OpenBranch(tv.currentFocus)
 			}
 		}
-	case event.KeyLeft:
+	case towardParent(tv):
 		tv.mu.RLock()
 		n, ok := tv.nodeMap[tv.currentFocus]
 		isBranch := ok && (len(n.children) > 0 || n.hasMore)
