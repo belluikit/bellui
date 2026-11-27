@@ -391,6 +391,25 @@ func (t *Tree) ToggleBranch(uid string) {
 	}
 }
 
+// towardParent is the arrow that points from a row toward its parent's
+// indent: Left, or Right under right-to-left, where rows indent from the
+// right (#779). It closes an open branch or moves to the parent.
+func towardParent(obj core.CanvasObject) event.KeyName {
+	if isRTLAt(obj) {
+		return event.KeyRight
+	}
+	return event.KeyLeft
+}
+
+// towardChild is the other horizontal arrow: it opens a branch or moves into
+// its first child.
+func towardChild(obj core.CanvasObject) event.KeyName {
+	if isRTLAt(obj) {
+		return event.KeyLeft
+	}
+	return event.KeyRight
+}
+
 // TypedKey is called if a key event happens while this Tree is focused.
 func (t *Tree) TypedKey(ev *event.KeyEvent) {
 	if t.Disabled() {
@@ -409,7 +428,7 @@ func (t *Tree) TypedKey(ev *event.KeyEvent) {
 		if idx := t.flatIndex(t.currentFocus); idx >= 0 && idx+1 < len(t.flatNodes) {
 			t.setItemFocus(t.flatNodes[idx+1])
 		}
-	case event.KeyLeft:
+	case towardParent(t):
 		// If the current focus is on a branch which is open, just close it
 		if t.IsBranch(t.currentFocus) && t.IsBranchOpen(t.currentFocus) {
 			t.CloseBranch(t.currentFocus)
@@ -421,7 +440,7 @@ func (t *Tree) TypedKey(ev *event.KeyEvent) {
 				}
 			})
 		}
-	case event.KeyRight:
+	case towardChild(t):
 		if t.IsBranch(t.currentFocus) {
 			t.OpenBranch(t.currentFocus)
 		}
@@ -1155,7 +1174,9 @@ func (n *treeNode) AccessibleLevel() int { return n.depth + 1 }
 
 func (n *treeNode) partialRefresh() {
 	if r := cache.Renderer(n.super()); r != nil {
-		r.(*treeNodeRenderer).partialRefresh()
+		// Hover reaches here outside a layout walk, so the row is laid out
+		// in its own direction (#779).
+		inDirectionOf(n.super(), r.(*treeNodeRenderer).partialRefresh)
 	}
 }
 
@@ -1193,6 +1214,16 @@ func (r *treeNodeRenderer) Layout(size geo.Size) {
 		r.treeNode.content.Move(geo.NewPos(x, y))
 		r.treeNode.content.Resize(geo.NewSize(size.Width-x, size.Height))
 	}
+	// Right-to-left, the indent and the expand icon are on the right, and
+	// the content ends at the icon (#779). The background is full width.
+	var objs []core.CanvasObject
+	if r.treeNode.icon != nil {
+		objs = append(objs, r.treeNode.icon)
+	}
+	if r.treeNode.content != nil {
+		objs = append(objs, r.treeNode.content)
+	}
+	mirrorIfRTL(objs, size.Width)
 }
 
 func (r *treeNodeRenderer) MinSize() (min geo.Size) {

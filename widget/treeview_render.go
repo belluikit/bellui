@@ -364,6 +364,7 @@ func (r *treeViewContentRenderer) layoutLoadMoreIndicators(st *treeViewLayoutSta
 		activity.Move(geo.NewPos(indentX, st.y))
 		activity.Resize(geo.NewSize(st.width-indentX-st.pad, activityHeight))
 		activity.Show()
+		mirrorIfRTL([]core.CanvasObject{activity}, st.width) // with the rows' indent (#779)
 		r.objects = append(r.objects, activity)
 		st.y += activityHeight
 
@@ -429,6 +430,7 @@ func (r *treeViewContentRenderer) layoutGuideLines(st *treeViewLayoutState, size
 		line.FillColor = guideColor
 		line.Move(geo.NewPos(x, 0))
 		line.Resize(geo.NewSize(guideThickness, size.Height))
+		mirrorIfRTL([]core.CanvasObject{line}, st.width) // with the rows' indent (#779)
 		r.objects = append(r.objects, line)
 		guideIdx++
 	}
@@ -1167,6 +1169,14 @@ func (r *treeViewItemRenderer) Layout(size geo.Size) {
 		r.content.Move(geo.NewPos(x, (size.Height-contentHeight)/2))
 		r.content.Resize(geo.NewSize(contentWidth, contentHeight))
 	}
+
+	// Right-to-left, the indent, chevron and node icon are on the right and
+	// the hover buttons on the left (#779). The background is full width.
+	objs := []core.CanvasObject{r.chevron, r.renameBtn, r.deleteBtn, r.renameEntry, r.content}
+	if r.icon != nil {
+		objs = append(objs, r.icon)
+	}
+	mirrorIfRTL(objs, size.Width)
 }
 
 func (r *treeViewItemRenderer) Refresh() {
