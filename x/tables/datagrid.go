@@ -480,8 +480,8 @@ func (g *DataGrid) onScrolled(pos geo.Position) {
 	if g.swipe.gesture != gestureSwipe {
 		g.closeSwipe(true)
 	}
-	g.offset = pos
-	g.viewport.Update(pos, g.scrollContent.Scroll.Size())
+	g.offset = geo.NewPos(g.flipScrollX(pos.X), pos.Y) // from the leading edge (#779)
+	g.viewport.Update(g.offset, g.scrollContent.Scroll.Size())
 	g.noteVisibleRows()
 	g.cellsWidget.Refresh()
 
@@ -1088,7 +1088,7 @@ func (g *DataGrid) OnResizeDrag(posX float32) {
 	if rc == nil {
 		return
 	}
-	newWidth := g.dragStartSize + (posX - g.dragStartPos.X)
+	newWidth := g.dragStartSize + g.resizeDelta(g.dragStartPos.X, posX)
 
 	// Clamp to min — use the header text width as the floor so headers don't overlap.
 	headerText := rc.def.Header()
@@ -1600,6 +1600,7 @@ func (g *DataGrid) cellRealizeRect(row, layoutCol int) (geo.Position, geo.Size) 
 		pos.X = x - g.offset.X
 		size.Width = w
 	}
+	pos.X = g.drawnX(pos.X, size.Width, g.Size().Width)
 	return pos, size
 }
 
@@ -1633,6 +1634,7 @@ func (g *DataGrid) cellWidgetRect(id CellID) (geo.Position, geo.Size) {
 		x, w := colSpanIn(layout.pinnedRight, id.Col-nLeft-len(layout.main), pad)
 		pos.X, size.Width = pinnedRightX+x, w
 	}
+	pos.X = g.drawnX(pos.X, size.Width, g.Size().Width)
 	return pos, size
 }
 
@@ -1977,11 +1979,11 @@ func (g *DataGrid) TypedKey(e *event.KeyEvent) {
 		if g.currentFocus.Row > 0 {
 			g.currentFocus.Row--
 		}
-	case event.KeyRight:
+	case g.towardLastColumn():
 		if g.currentFocus.Col < cols-1 {
 			g.currentFocus.Col++
 		}
-	case event.KeyLeft:
+	case g.towardFirstColumn():
 		if g.currentFocus.Col > 0 {
 			g.currentFocus.Col--
 		}
@@ -2038,7 +2040,7 @@ func (g *DataGrid) Dragged(e *event.DragEvent) {
 		if rc == nil {
 			return
 		}
-		newWidth := g.dragStartSize + (e.Position.X - g.dragStartPos.X)
+		newWidth := g.dragStartSize + g.resizeDelta(g.dragStartPos.X, e.Position.X)
 		minW := float32(40)
 		if rc.def.MinWidth > 0 {
 			minW = rc.def.MinWidth
@@ -2331,7 +2333,9 @@ func (g *DataGrid) Cursor() desktop.Cursor {
 // is within the resize threshold of widget-X x, or -1. It walks the same region
 // bands the header is drawn in (pinned-left fixed, main scrolled by offset.X,
 // pinned-right overlay) so the resize grab lines up with the visible divider.
+// x is a pointer's, as drawn; right to left it is mapped back first (#779).
 func (g *DataGrid) headerBorderCol(x float32) int {
+	x = g.ltrX(x)
 	layout := g.visibleLayout()
 	pad := g.cellPadding()
 	threshold := float32(4)
@@ -2730,12 +2734,14 @@ func (g *DataGrid) bodyRowAt(pos geo.Position) int {
 // selectionBoxRowAt returns the display row whose checkbox-selection cell is
 // under the widget position pos, or -1. That column is the start of the
 // scrolling main band and holds no layout column, so columnAtX reports none
-// there (#1498).
+// there (#1498). pos is a pointer's, as drawn; right to left its x is mapped
+// back first (#779).
 func (g *DataGrid) selectionBoxRowAt(pos geo.Position) int {
 	lead := g.selectionColumnWidth()
 	if lead <= 0 {
 		return -1
 	}
+	pos.X = g.ltrX(pos.X)
 	mainX, pinnedRightX, pinnedRightW := g.hitRegions()
 	if pos.X < mainX || (pinnedRightW > 0 && pos.X >= pinnedRightX) {
 		return -1
@@ -2757,7 +2763,9 @@ func (g *DataGrid) selectionBoxRowAt(pos geo.Position) int {
 // leading checkbox gutter — otherwise on the first main column, which scrolls
 // with the body and sits past the checkbox gutter. depthIndent is the per-row
 // indent before the chevron slot (0 for master-detail, depth-based for trees).
+// posX is a pointer's, as drawn; right to left it is mapped back first (#779).
 func (g *DataGrid) disclosureHitX(posX, depthIndent float32) (tapX, zoneLeft float32) {
+	posX = g.ltrX(posX)
 	if len(g.visibleLayout().pinnedLeft) > 0 {
 		return posX, depthIndent
 	}
@@ -2885,7 +2893,7 @@ func (g *DataGrid) scrollToCell(id CellID) {
 	}
 
 	if newOffset != g.offset {
-		g.scrollContent.ScrollTo(newOffset)
+		g.scrollContent.ScrollTo(geo.NewPos(g.flipScrollX(newOffset.X), newOffset.Y))
 	}
 }
 
@@ -3206,7 +3214,9 @@ func colIndexIn(cols []*resolvedColumn, localX, pad float32, base int) int {
 // drawn at fixed positions (no horizontal scroll), while the main band scrolls by
 // offset.X. This replaces the naive "pos.X + offset.X over layout.all", which
 // wrongly added the main scroll offset to taps on the fixed pinned columns.
+// x is a pointer's, as drawn; right to left it is mapped back first (#779).
 func (g *DataGrid) columnAtX(x float32) int {
+	x = g.ltrX(x)
 	layout := g.visibleLayout()
 	pad := g.cellPadding()
 	mainX, pinnedRightX, pinnedRightW := g.hitRegions()

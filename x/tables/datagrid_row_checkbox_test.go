@@ -15,17 +15,15 @@ import (
 )
 
 // rowBox returns row's select checkbox as the grid draws it, and its centre in
-// grid coordinates.
+// grid coordinates. It finds the box by its row alone, so it holds beside
+// pinned bands and right to left.
 func rowBox(t *testing.T, g *DataGrid, row int) (*widget.Check, geo.Position) {
 	t.Helper()
-	x, w := drawnCell(t, g, row, 0)
+	ry, rh := g.viewport.RowY(row)
+	centreY := g.bodyTop() + ry - g.offset.Y + rh/2
 	for _, p := range drawnObjects(g) {
-		if c, ok := p.obj.(*widget.Check); ok && !p.inHeader && near(p.pos.X, x) {
-			ry, rh := g.viewport.RowY(row)
-			centreY := g.bodyTop() + ry - g.offset.Y + rh/2
-			if p.pos.Y <= centreY && centreY < p.pos.Y+c.Size().Height {
-				return c, geo.NewPos(x+w/2, centreY)
-			}
+		if c, ok := p.obj.(*widget.Check); ok && !p.inHeader && p.pos.Y <= centreY && centreY < p.pos.Y+c.Size().Height {
+			return c, geo.NewPos(p.pos.X+c.Size().Width/2, centreY)
 		}
 	}
 	t.Fatalf("no checkbox drawn for row %d", row)

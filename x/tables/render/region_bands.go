@@ -5,6 +5,8 @@ import (
 	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/lang"
+	"github.com/belluikit/bellui/layout"
 )
 
 // RegionLayoutAccess is the geometry a horizontally-scrolling region row (the
@@ -124,6 +126,14 @@ func (rb *regionBands) layout(g RegionLayoutAccess, size geo.Size, place placeCo
 			objects = place(i, x, widthOf(i), objects)
 			x += widthOf(i) + padding
 		}
+	}
+
+	// Right to left the row is mirrored as the body is (#779): the main band
+	// within its clip, and the clip and the pinned bands across the row. The
+	// renderers calling this run in their widget's own direction.
+	if lang.IsRTLDirection() {
+		layout.MirrorChildren(mainObjs, clipW)
+		layout.MirrorChildren(objects, size.Width)
 	}
 
 	return objects

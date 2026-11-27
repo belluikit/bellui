@@ -303,7 +303,7 @@ func (g *DataGrid) editingCellRect(id CellID, size geo.Size) (pos geo.Position, 
 	if y+rh <= top || y >= bottom {
 		return geo.Position{}, geo.Size{}, false
 	}
-	return geo.NewPos(x, y), geo.NewSize(w, rh), true
+	return geo.NewPos(g.drawnX(x, w, size.Width), y), geo.NewSize(w, rh), true // mirrored right to left (#779)
 }
 
 // bandColX returns the band-local x of the i-th column within a fixed band.

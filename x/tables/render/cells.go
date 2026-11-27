@@ -26,6 +26,15 @@ type CellsWidget struct {
 
 	// omitDetail leaves expanded master rows' detail content out (OmitDetail).
 	omitDetail bool
+
+	// rtl is whether the cells were last placed right to left, mirrored
+	// across the widget's width (#779). The virtual accessible nodes, read
+	// outside a layout, are placed the same way.
+	rtl bool
+
+	// resized, when set, runs after the widget changes size. The
+	// ScrollContainer holding it uses it to keep its scroll position (#779).
+	resized func()
 }
 
 // OmitDetail makes the widget leave the content of an expanded master row's
@@ -185,6 +194,14 @@ func (c *CellsWidget) HoldsFocusable(o any) bool {
 		}
 	}
 	return false
+}
+
+// Resize resizes the cells and tells the scroll holding them.
+func (c *CellsWidget) Resize(s geo.Size) {
+	c.BaseWidget.Resize(s)
+	if c.resized != nil {
+		c.resized()
+	}
 }
 
 // MinSize returns the total content size (all rows * all columns), plus the

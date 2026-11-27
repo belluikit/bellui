@@ -3,6 +3,7 @@ package render
 import (
 	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/lang"
 )
 
 // ScrollContainer wraps a CellsWidget in a Bellui scroll container.
@@ -17,10 +18,27 @@ type ScrollContainer struct {
 // is managed by the DataGrid layout.
 func NewScrollContainer(cells *CellsWidget) *ScrollContainer {
 	scroll := container.NewScroll(cells)
-	return &ScrollContainer{
+	sc := &ScrollContainer{
 		Scroll: scroll,
 		cells:  cells,
 	}
+	cells.resized = sc.keepLeadingOffset
+	return sc
+}
+
+// keepLeadingOffset keeps the scroll's distance from the cells' leading edge
+// when they change width. Right to left that edge is the right one, where
+// column 0 is, so the cells grow and shrink at their left end, and the Scroll,
+// which measures its offset from the left, must move by as much (#779). The
+// grid's offset, ScrollOffsetX, is measured from the leading edge. The
+// Scroll resizes the cells in its layout, in its own direction, and applies
+// this offset right after.
+func (sc *ScrollContainer) keepLeadingOffset() {
+	if !lang.IsRTLDirection() || sc.cells.Grid == nil {
+		return
+	}
+	far := sc.cells.Size().Width - sc.Scroll.Size().Width
+	sc.Scroll.Offset.X = geo.Max(0, far-sc.cells.Grid.ScrollOffsetX())
 }
 
 // SetOnScrolled sets the callback invoked when the scroll position changes.
