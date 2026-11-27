@@ -232,7 +232,6 @@ func TestTable_RTLOpensAtFirstColumn(t *testing.T) {
 // beside the bar, not under it, and its header and divider line up with it
 // (#779). The header column itself is at the right edge.
 func TestTable_RTLKeepsScrollBarStrip(t *testing.T) {
-	type part struct{ x, w float32 }
 	tableDirections(t, func(t *testing.T, rtl bool, w bellui.Window, _ *Table) {
 		tb := NewTableWithHeaders(
 			func() (int, int) { return 40, 3 },
