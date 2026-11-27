@@ -151,3 +151,25 @@ func TestInfiniteProgressRenderer_OutOfSightDrawsNothing(t *testing.T) {
 	lr.updateBar(0.5)
 	assert.Zero(t, lr.bar.Size().Width, "a bar in no window was drawn")
 }
+
+// Right-to-left, the infinite bar's sweep starts from the right (#779): each
+// step is the left-to-right bar reflected across the width.
+func TestInfiniteProgressRenderer_RTL(t *testing.T) {
+	test.NewTempApp(t)
+	bellui.SetLayoutDirection(bellui.DirectionRTL)
+	defer bellui.SetLayoutDirection(bellui.DirectionAuto)
+	bar := NewProgressBarInfinite()
+	width := float32(100.0)
+	test.NewTempWindow(t, &bellui.Container{Objects: []core.CanvasObject{bar}}) // drawn: on screen
+	bar.Resize(geo.NewSize(width, 10))
+	render := test.TempWidgetRenderer(t, bar).(*infProgressRenderer)
+	render.Layout(bar.Size())
+
+	render.updateBar(0.0)
+	assert.Equal(t, width, render.bar.Position().X+render.bar.Size().Width, "it starts at the right edge")
+	render.updateBar(0.25)
+	assert.Greater(t, render.bar.Position().X, width/2, "a quarter in, it is in the right half")
+	render.updateBar(1.0)
+	assert.Equal(t, float32(0), render.bar.Position().X, "it ends at the left edge")
+	bar.Hide()
+}

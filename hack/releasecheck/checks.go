@@ -647,7 +647,8 @@ var checks = []check{
 			"Directional icons (back, forward, navigate) point the other way.",
 			"On Actions, the extended FAB's icon sits beside its label, not over it (#945).",
 			"On Charts, with the window narrow enough that the tabs overflow, the tab indicator sits under the selected tab (#1078, #1080).",
-			"Known, not a failure in this release (#779): Slider, ProgressBar, Split, Tree and Table column order keep their left-to-right shape.",
+			"Sliders and progress bars run from the right: a bar fills leftwards, and a slider's minimum is at its right end (#779).",
+			"Known, not a failure in this release (#779): Split, Tree and Table column order keep their left-to-right shape.",
 			"Toggling off restores the left-to-right layout exactly.",
 		},
 	},
@@ -680,19 +681,21 @@ var checks = []check{
 		},
 	},
 	{
-		ID: "RTL-04", Area: "rtl", Title: "A right-to-left scope inside a left-to-right window", Refs: []string{"#696", "#749", "#760"}, Special: true,
+		ID: "RTL-04", Area: "rtl", Title: "A right-to-left scope inside a left-to-right window", Refs: []string{"#696", "#749", "#760", "#779"}, Special: true,
 		Where: companion + " → Direction, \"Right-to-left scope\" card",
 		Steps: []string{
 			"Press \"Report direction\".",
 			"Click the outside entry, then press Tab through the scope's controls and its three buttons.",
 			"Open the scope's Select.",
 			"Press \"Toggle light / dark\" twice, then \"Report direction\" again.",
+			"Click the scope's slider near its right end, then a quarter of the way from its left end, and press the left arrow.",
 		},
 		Expect: []string{
 			"It reports \"DirectionOf(entry) = right-to-left\"; the outside entry stays left-to-right.",
 			"Inside the scope, labels are on the right, and the buttons read First, Second, Third from right to left; Tab goes First → Second → Third (#749).",
 			"The Select's list opens aligned to the right edge of the field.",
 			"After the theme change the scope is still right-to-left (#696).",
+			"The slider's active track is on the right. The right-end click sets it to 0, the quarter click to about 7, and Left raises it by one (#779).",
 		},
 	},
 	{

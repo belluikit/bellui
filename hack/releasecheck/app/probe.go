@@ -133,6 +133,7 @@ func runProbe(a bellui.App, w bellui.Window, tabs *container.AppTabs, dir string
 		{"Input reaches the driver (control)", p.control},
 		{"WG-01 / WG-02 / WG-03 Disabled", p.disabled},
 		{"WG-07 Chips", p.chips},
+		{"RTL-04 Slider in a right-to-left scope", p.scopeSlider},
 		{"RTL-07 Chip rows and layouts", p.layouts},
 		{"SM-08 SVG strokes", p.strokes},
 		{"TK-13 Swipe cards", p.swipes},
@@ -616,6 +617,34 @@ func (p *probe) layouts() {
 
 // strokes measures the ring's orange stroke across its middle row at both
 // sizes, in captured pixels.
+// scopeSlider drives the slider inside the Direction tab's right-to-left
+// scope: its minimum is at the right end, and Left raises it (#779).
+func (p *probe) scopeSlider() {
+	p.selectTab("Direction")
+	f := p.reveal("the scope's slider", func(o core.CanvasObject) bool {
+		s, ok := o.(*widget.Slider)
+		return ok && s.Max == 10
+	})
+	slider := f.obj.(*widget.Slider)
+	value := func() (v float64) {
+		bellui.DoAndWait(func() { v = slider.Value })
+		return v
+	}
+	size := f.obj.Size()
+	y := f.pos.Y + size.Height/2
+	p.clickAt(f.pos.X+size.Width-2, y)
+	got := value()
+	p.expect(got == 0, "RTL-04 (#779): a click at the right end of a right-to-left slider sets its minimum", fmt.Sprint(got))
+	p.clickAt(f.pos.X+size.Width/4, y)
+	quarter := value()
+	p.expect(quarter >= 7 && quarter <= 8, "RTL-04 (#779): a quarter from the left is three quarters up", fmt.Sprint(quarter))
+	p.press(keyLeft)
+	got = value()
+	p.expect(got == quarter+1, "RTL-04 (#779): Left moves the thumb left, which raises the value", fmt.Sprintf("%v after %v", got, quarter))
+	p.shot("rtl04-scope-slider", "RTL-04: the scope's slider runs from the right, its thumb three quarters up")
+	bellui.DoAndWait(func() { slider.SetValue(3) })
+}
+
 func (p *probe) strokes() {
 	p.selectTab("Chips & layout")
 	f := p.reveal("the stroke card", card("SVG strokes scale"))

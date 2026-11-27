@@ -68,9 +68,14 @@ func (p *progressRenderer) updateBar() {
 func (p *progressRenderer) Layout(size geo.Size) {
 	p.calculateRatio()
 
+	p.bar.Move(geo.Position{})
 	p.bar.Resize(geo.NewSize(size.Width*p.ratio, size.Height))
 	p.background.Resize(size)
 	p.label.Resize(size)
+	// Right-to-left, the bar fills from the right (#779), as Flutter's
+	// LinearProgressIndicator does. An app that wants it left-to-right
+	// wraps it in a container.DirectionScope.
+	mirrorIfRTL([]core.CanvasObject{&p.bar}, size.Width)
 }
 
 // applyTheme updates the progress bar to match the current theme
