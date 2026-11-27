@@ -77,6 +77,9 @@ type probe struct {
 	out   *bufio.Writer
 	fails int
 	shots int
+	// grab takes one capture. Nil means the window's own Capture; a test
+	// sets it to stand in for a window that gives no frame.
+	grab func() image.Image
 }
 
 // runProbe runs every scenario, writes the report and quits the app.
@@ -168,9 +171,38 @@ func (p *probe) settle(d time.Duration) {
 	bellui.DoAndWait(func() {})
 }
 
+// captureTries is how many times capture asks for a frame before it gives up.
+const captureTries = 5
+
+// capture returns a capture of the window, or nil after recording a failure.
+// Capture returns nil when the frame painted for it never began: on macOS a
+// window something else covers gets none (#631), and the first frame after a
+// theme change can be late. It asks again a few times, a frame apart, and
+// then fails this capture rather than abort the run (#1415).
+func (p *probe) capture(name string) image.Image {
+	grab := p.grab
+	if grab == nil {
+		grab = func() (img image.Image) {
+			bellui.DoAndWait(func() { img = p.w.Canvas().Capture() })
+			return img
+		}
+	}
+	for i := 0; i < captureTries; i++ {
+		if img := grab(); img != nil {
+			return img
+		}
+		p.settle(100 * time.Millisecond)
+	}
+	p.expect(false, "capture "+name+": the window gave a frame",
+		fmt.Sprintf("no frame in %d tries; is something covering the window?", captureTries))
+	return nil
+}
+
 func (p *probe) shot(name, note string) {
-	var img image.Image
-	bellui.DoAndWait(func() { img = p.w.Canvas().Capture() })
+	img := p.capture(name)
+	if img == nil {
+		return
+	}
 	path := filepath.Join(p.dir, name+".png")
 	f, err := os.Create(path)
 	if err == nil {
@@ -619,8 +651,10 @@ func (p *probe) layouts() {
 func (p *probe) strokes() {
 	p.selectTab("Chips & layout")
 	f := p.reveal("the stroke card", card("SVG strokes scale"))
-	var img image.Image
-	bellui.DoAndWait(func() { img = p.w.Canvas().Capture() })
+	img := p.capture("for SM-08")
+	if img == nil {
+		return
+	}
 	var canvasW float32
 	bellui.DoAndWait(func() { canvasW = p.w.Canvas().Size().Width })
 	px := float32(img.Bounds().Dx()) / canvasW // pixels per dp
