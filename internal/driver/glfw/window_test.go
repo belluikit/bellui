@@ -1173,7 +1173,7 @@ func TestWindow_Scrolled(t *testing.T) {
 	ensureCanvasSize(t, w, minSize.AddWidthHeight(theme.Padding()*2, theme.Padding()*2))
 
 	w.mousePos = geo.NewPos(50, 60)
-	w.mouseScrolled(w.viewport, 10, 10)
+	w.mouseScrolledEx(w.viewport, 10, 10, glfw.ScrollSourceWheel, glfw.GesturePhaseNone, 0)
 
 	if e, _ := o.popScrollEvent().(*event.ScrollEvent); assert.NotNil(t, e, "scroll event") {
 		assert.Equal(t, geo.NewPos(50, 60), e.AbsolutePosition)

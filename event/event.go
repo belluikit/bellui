@@ -76,11 +76,42 @@ const (
 	ScrollSourceTouch
 )
 
+// ScrollPhase is where a scroll stands in a touchpad gesture (#391).
+//
+// Since: 1.7
+type ScrollPhase int
+
+const (
+	// ScrollPhaseUnknown is a scroll outside any gesture the platform
+	// reported: a mouse wheel, or a platform that does not say.
+	ScrollPhaseUnknown ScrollPhase = iota
+
+	// ScrollPhaseBegan is the first scroll of a gesture that moves, as the
+	// fingers start moving.
+	ScrollPhaseBegan
+
+	// ScrollPhaseChanged is a scroll of the fingers moving.
+	ScrollPhaseChanged
+
+	// ScrollPhaseMomentum is a scroll the system adds after the fingers
+	// lifted, as the content coasts to a stop. A widget that acts on a
+	// gesture rather than on movement, such as a row swiped open, ignores it.
+	ScrollPhaseMomentum
+)
+
 // ScrollEvent defines the parameters of a pointer or other scroll event.
 type ScrollEvent struct {
 	PointEvent
 	Scrolled geo.Delta
 	Source   ScrollSource
+
+	// Phase is where the scroll stands in a touchpad gesture. macOS reports
+	// it for a trackpad, and Wayland for a finger scroll; elsewhere, and for
+	// a mouse wheel, it is ScrollPhaseUnknown. The gesture's end is not a
+	// scroll: a ScrollEnder is told of it.
+	//
+	// Since: 1.7
+	Phase ScrollPhase
 }
 
 // DragEvent defines the parameters of a pointer or other drag event.
@@ -296,6 +327,18 @@ type PreeditPositioner interface {
 // Scrollable describes any CanvasObject that can be scrolled.
 type Scrollable interface {
 	Scrolled(*ScrollEvent)
+}
+
+// ScrollEnder is a Scrollable told when the fingers of a touchpad gesture
+// lift (#391). It is told once per gesture whose scrolls it was offered,
+// after the last scroll the fingers made and before any momentum. A
+// Scrollable that is not a ScrollEnder is never told: it receives no scroll
+// without movement.
+//
+// Since: 1.7
+type ScrollEnder interface {
+	Scrollable
+	ScrollEnded()
 }
 
 // Note: Shortcutable is defined in the root bellui package (shortcut.go)

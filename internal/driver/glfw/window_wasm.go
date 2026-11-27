@@ -124,6 +124,9 @@ type window struct {
 	// paintRetryAt is set while the canvas holds changes a frame could not
 	// show: when to try painting them again (see noteFrameBegan).
 	paintRetryAt time.Time
+
+	// gesture is the touchpad gesture under way (#391).
+	gesture scrollGesture
 }
 
 func (w *window) SetFullScreen(full bool) {

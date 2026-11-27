@@ -1080,6 +1080,12 @@ func (w *window) scrollablesAt(pos geo.Position) []driver.ObjectAtPosition {
 // position is worked out again from where it is now: a chain kept for a whole
 // touch gesture moves while the gesture scrolls it.
 func (w *window) dispatchScrollChain(scrollables []driver.ObjectAtPosition, pos geo.Position, delta geo.Delta, source event.ScrollSource, relocate bool) bool {
+	return w.dispatchScrollChainPhase(scrollables, pos, delta, source, event.ScrollPhaseUnknown, relocate)
+}
+
+// dispatchScrollChainPhase is dispatchScrollChain for a scroll with a touchpad
+// gesture phase (#391).
+func (w *window) dispatchScrollChainPhase(scrollables []driver.ObjectAtPosition, pos geo.Position, delta geo.Delta, source event.ScrollSource, phase event.ScrollPhase, relocate bool) bool {
 	if len(scrollables) == 0 {
 		return false
 	}
@@ -1088,6 +1094,7 @@ func (w *window) dispatchScrollChain(scrollables []driver.ObjectAtPosition, pos 
 	ev.Scrolled = delta
 	ev.AbsolutePosition = pos
 	ev.Source = source
+	ev.Phase = phase
 
 	for _, oap := range scrollables {
 		ev.Position = oap.Position
