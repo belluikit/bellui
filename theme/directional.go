@@ -12,6 +12,13 @@ import (
 // Non-directional icons (search, settings, a clock) are never wrapped and so
 // keep their orientation under every locale.
 //
+// Which icons are directional follows Material Symbols: an icon is wrapped
+// when the Android drawable of the same Material symbol is marked
+// android:autoMirrored="true" (#779). That takes in undo and redo, send, the
+// list and file icons, login and logout, help, copy and the volume icons,
+// and leaves out the media controls. TestDirectionalResource_Set pins the
+// whole classification, so a new icon is classified on purpose.
+//
 // The direction is resolved lazily inside [directionalResource.Name] and
 // [directionalResource.Content] (via [lang.IsRTLDirection]) rather than captured
 // once, so a runtime direction change (see
