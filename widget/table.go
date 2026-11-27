@@ -14,6 +14,8 @@ import (
 	"github.com/belluikit/bellui/internal/async"
 	"github.com/belluikit/bellui/internal/cache"
 	"github.com/belluikit/bellui/internal/widget"
+	"github.com/belluikit/bellui/lang"
+	"github.com/belluikit/bellui/layout"
 	"github.com/belluikit/bellui/theme"
 )
 
@@ -113,6 +115,13 @@ type Table struct {
 	top, left, corner, dividerLayer                              *clip
 	hoverHeaderRow, hoverHeaderCol, dragCol, dragRow             int
 	dragStartPos                                                 geo.Position
+
+	// rtl is the direction the table was last laid out in (#779). Its parts
+	// are placed left-to-right and then mirrored, and pointer input is mapped
+	// back the same way; offset is then measured from the right, where the
+	// first column is. Hit-testing and scrolling read it, not a lookup, so
+	// they agree with what is drawn.
+	rtl bool
 }
 
 // AccessibleRole returns [core.RoleTable].
@@ -195,6 +204,7 @@ func (t *Table) CreateRenderer() core.WidgetRenderer {
 	r.SetObjects([]core.CanvasObject{t.top, t.left, t.corner, t.dividerLayer, t.content})
 	t.content.OnScrolled = func(pos geo.Position) {
 		t.offset = pos
+		t.offset.X = t.scrollX()
 		t.cells.refreshForID(onlyNewTableCellsID)
 	}
 
@@ -220,7 +230,11 @@ func (t *Table) Dragged(e *event.DragEvent) {
 	startSize := t.dragStartSize
 
 	if col != noCellMatch {
-		newSize := startSize + (e.Position.X - startPos.X)
+		dx := e.Position.X - startPos.X
+		if t.rtl {
+			dx = -dx // a column's trailing edge is its left one (#779)
+		}
+		newSize := startSize + dx
 		if newSize < min.Width {
 			newSize = min.Width
 		}
@@ -403,7 +417,7 @@ func (t *Table) TypedKey(ev *event.KeyEvent) {
 		t.currentFocus.Row++
 		t.ScrollTo(t.currentFocus)
 		t.RefreshItem(t.currentFocus)
-	case event.KeyLeft:
+	case t.towardFirstColumn():
 		if t.currentFocus.Col <= 0 {
 			return
 		}
@@ -411,7 +425,7 @@ func (t *Table) TypedKey(ev *event.KeyEvent) {
 		t.currentFocus.Col--
 		t.ScrollTo(t.currentFocus)
 		t.RefreshItem(t.currentFocus)
-	case event.KeyRight:
+	case t.towardLastColumn():
 		if f := t.Length; f != nil {
 			_, cols := f()
 			if t.currentFocus.Col >= cols-1 {
@@ -534,7 +548,7 @@ func (t *Table) ScrollTo(id TableCellID) {
 	}
 
 	t.offset = scrollPos
-	t.content.Offset = scrollPos
+	t.content.Offset = geo.NewPos(t.visualScrollX(scrollPos.X), scrollPos.Y)
 	t.content.Refresh()
 	t.finishScroll()
 }
@@ -567,12 +581,14 @@ func (t *Table) ScrollToLeading() {
 		return
 	}
 
-	t.content.Offset.X = 0
+	t.content.Offset.X = t.visualScrollX(0)
 	t.offset.X = 0
 	t.finishScroll()
 }
 
-// ScrollToOffset scrolls the table to a specific position
+// ScrollToOffset scrolls the table to a specific position. Under a
+// right-to-left layout, X is measured from the right edge, where the first
+// column is.
 //
 // Since: 1.0
 func (t *Table) ScrollToOffset(off geo.Position) {
@@ -580,8 +596,9 @@ func (t *Table) ScrollToOffset(off geo.Position) {
 		return
 	}
 
-	t.content.ScrollToOffset(off)
+	t.content.ScrollToOffset(geo.NewPos(t.visualScrollX(off.X), off.Y))
 	t.offset = t.content.Offset
+	t.offset.X = t.scrollX()
 	t.finishScroll()
 }
 
@@ -613,7 +630,7 @@ func (t *Table) ScrollToTrailing() {
 		return
 	}
 
-	t.content.Offset.X = scrollX
+	t.content.Offset.X = t.visualScrollX(scrollX)
 	t.offset.X = scrollX
 	t.finishScroll()
 }
@@ -679,6 +696,7 @@ func (t *Table) columnAt(pos geo.Position) int {
 	}
 
 	visibleColWidths, offX, minCol, maxCol := t.visibleColumnWidths(t.cellSize.Width, dataCols)
+	pos.X = t.ltrX(pos.X)
 	i := minCol
 	end := maxCol
 	if pos.X < t.stuckXOff+t.stuckWidth {
@@ -686,7 +704,7 @@ func (t *Table) columnAt(pos geo.Position) int {
 		end = t.StickyColumnCount
 		i = 0
 	} else {
-		pos.X += t.content.Offset.X
+		pos.X += t.scrollX()
 		offX += t.stuckXOff
 	}
 	padding := t.Theme().Size(theme.SizeNamePadding)
@@ -753,12 +771,114 @@ func (t *Table) finishScroll() {
 	t.cells.Refresh()
 }
 
+// Right-to-left (#779), the table is placed as it would be left-to-right and
+// then mirrored, region by region: the header column and sticky columns go
+// to the right edge and the scrolling cells to their left, column 0 first.
+// The cells scroll in the Scroll's own coordinates, so offset, which the
+// placement reads, is kept measured from the right, where the first column
+// is, and converted where the table sets or reads the Scroll's offset.
+
+// scrollMaxX is how far the cells scroll horizontally.
+func (t *Table) scrollMaxX() float32 {
+	return geo.Max(0, t.cells.Size().Width-t.content.Size().Width)
+}
+
+// scrollX is the horizontal scroll measured from the leading edge: the
+// Scroll's offset left-to-right, its distance from the right end
+// right-to-left.
+func (t *Table) scrollX() float32 {
+	if !t.rtl {
+		return t.content.Offset.X
+	}
+	return geo.Max(0, t.scrollMaxX()-t.content.Offset.X)
+}
+
+// visualScrollX is the Scroll offset for a scroll x measured from the
+// leading edge.
+func (t *Table) visualScrollX(x float32) float32 {
+	if !t.rtl {
+		return x
+	}
+	return geo.Max(0, t.scrollMaxX()-x)
+}
+
+// scrollSpan is the width the scrolling part is mirrored across, within the
+// cells' viewport: all of it when the cells overflow, else the width the
+// Scroll gave them, which leaves out a vertical scroll bar's strip.
+func (t *Table) scrollSpan() float32 {
+	return t.cells.Size().Width - t.scrollMaxX()
+}
+
+// mirrorPlaced mirrors an object placed on the table left-to-right, in the
+// divider layer's coordinates: across the scrolling part if it belongs to it,
+// else across the whole table.
+func (t *Table) mirrorPlaced(o core.CanvasObject, scrolling bool) {
+	if !t.rtl {
+		return
+	}
+	width := t.Size().Width
+	if scrolling {
+		width += t.scrollSpan() - t.content.Size().Width
+	}
+	layout.MirrorChildren([]core.CanvasObject{o}, width)
+}
+
+// ltrX maps an x on the table, as drawn, to where it is left-to-right, which
+// is what hit-testing measures in. The strip a vertical scroll bar takes
+// between the cells and the header column maps past every column.
+func (t *Table) ltrX(x float32) float32 {
+	if !t.rtl {
+		return x
+	}
+	viewport := t.content.Size().Width
+	if x >= viewport {
+		return t.Size().Width - x // the header column and sticky columns
+	}
+	span := t.scrollSpan()
+	if x >= span {
+		return float32(math.Inf(1))
+	}
+	return t.Size().Width - viewport + span - x
+}
+
+// towardFirstColumn is the arrow key that moves the focus a column toward
+// column 0: Left, or Right under right-to-left, where column 0 is at the
+// right.
+func (t *Table) towardFirstColumn() event.KeyName {
+	if t.rtl {
+		return event.KeyRight
+	}
+	return event.KeyLeft
+}
+
+// towardLastColumn is the other horizontal arrow key.
+func (t *Table) towardLastColumn() event.KeyName {
+	if t.rtl {
+		return event.KeyLeft
+	}
+	return event.KeyRight
+}
+
+// mirror mirrors the cells and headers placed left-to-right by refreshForID:
+// the scrolling cells across their own width, the column headers and sticky
+// rows across the scrolling part's width, and the header column and sticky
+// columns across theirs. The header row's background spans the table and
+// stays put.
+func (r *tableCellsRenderer) mirror(cells []core.CanvasObject) {
+	t := r.cells.t
+	layout.MirrorChildren(cells, r.cells.Size().Width)
+	layout.MirrorChildren(t.top.Content.(*bellui.Container).Objects, t.scrollSpan())
+	r.headRowBG.Move(geo.Position{})
+	layout.MirrorChildren(t.left.Content.(*bellui.Container).Objects, t.left.Size().Width)
+	layout.MirrorChildren(t.corner.Content.(*bellui.Container).Objects, t.corner.Size().Width)
+}
+
 func (t *Table) hoverAt(pos geo.Position) {
 	col := t.columnAt(pos)
 	row := t.rowAt(pos)
 	t.hoveredCell = &TableCellID{row, col}
 	overHeaderRow := t.ShowHeaderRow && pos.Y < t.headerSize.Height
-	overHeaderCol := t.ShowHeaderColumn && pos.X < t.headerSize.Width
+	overHeaderCol := t.ShowHeaderColumn && t.ltrX(pos.X) < t.headerSize.Width
 	if overHeaderRow && !overHeaderCol {
 		if col >= 0 {
 			t.hoverHeaderCol = noCellMatch
@@ -1100,6 +1220,7 @@ type tableRenderer struct {
 
 func (t *tableRenderer) Layout(s geo.Size) {
 	th := t.t.Theme()
+	t.t.rtl = lang.IsRTLDirection()
 
 	t.calculateHeaderSizes(th)
 	off := geo.NewPos(t.t.stuckWidth, t.t.stuckHeight)
@@ -1117,7 +1238,13 @@ func (t *tableRenderer) Layout(s geo.Size) {
 	t.t.top.Resize(geo.NewSize(s.Width-off.X, off.Y))
 	t.t.left.Move(geo.NewPos(0, off.Y))
 	t.t.left.Resize(geo.NewSize(off.X, s.Height-off.Y))
+	t.t.corner.Move(geo.Position{})
 	t.t.corner.Resize(geo.NewSize(off.X, off.Y))
+	// Right-to-left, the header column and sticky columns are on the right
+	// and the scrolling cells on their left (#779).
+	if t.t.rtl {
+		layout.MirrorChildren([]core.CanvasObject{t.t.content, t.t.top, t.t.left, t.t.corner}, s.Width)
+	}
 
 	t.t.dividerLayer.Resize(s)
 	if t.t.HideSeparators {
@@ -1311,6 +1438,12 @@ func (c *tableCells) CreateRenderer() core.WidgetRenderer {
 
 func (c *tableCells) Resize(s geo.Size) {
 	c.BaseWidget.Resize(s)
+	if c.t.rtl {
+		// Right-to-left the cells grow and shrink at their left end, so the
+		// scroll keeps its distance from the right, where the first column
+		// is (#779). The scroll applies this offset right after resizing us.
+		c.t.content.Offset.X = c.t.visualScrollX(c.t.offset.X)
+	}
 	c.refreshForID(onlyNewTableCellsID) // trigger a redraw
 }
 
@@ -1464,7 +1597,7 @@ func (r *tableCellsRenderer) refreshForID(toDraw TableCellID) {
 		for col := startCol; col < maxCol; col++ {
 			displayCol(row, col, rowHeight, cells)
 		}
-		cellXOffset = r.cells.t.content.Offset.X
+		cellXOffset = r.cells.t.scrollX()
 		if r.cells.t.ShowHeaderColumn {
 			cellXOffset += r.cells.t.headerSize.Width
 		}
@@ -1480,7 +1613,7 @@ func (r *tableCellsRenderer) refreshForID(toDraw TableCellID) {
 		separatorThickness, th, v)
 	cells = append(cells, inline...)
 
-	offX -= r.cells.t.content.Offset.X
+	offX -= r.cells.t.scrollX()
 	cellYOffset = r.cells.t.stuckYOff
 	for row := 0; row < stickRows; row++ {
 		displayRow(row, &r.cells.t.top.Content.(*bellui.Container).Objects)
@@ -1513,6 +1646,9 @@ func (r *tableCellsRenderer) refreshForID(toDraw TableCellID) {
 		}
 	}
 
+	if r.cells.t.rtl {
+		r.mirror(cells)
+	}
 	r.SetObjects(cells)
 
 	r.updateCells(toDraw, r.visible, wasVisible)
@@ -1629,6 +1765,7 @@ func (r *tableCellsRenderer) moveIndicators() {
 			r.dividers[divs].Resize(geo.NewSize(separatorThickness, size.Height))
 			r.dividers[divs].Move(geo.NewPos(xPos, 0))
 			r.dividers[divs].Show()
+			r.cells.t.mirrorPlaced(r.dividers[divs], false)
 			divs++
 		}
 	}
@@ -1636,10 +1773,11 @@ func (r *tableCellsRenderer) moveIndicators() {
 	for x := offX + r.cells.t.stuckWidth + visibleColWidths[i]; i < maxCol-1 && divs < colDivs; x += visibleColWidths[i] + padding {
 		i++
 
-		xPos := x - r.cells.t.content.Offset.X + dividerOff
+		xPos := x - r.cells.t.scrollX() + dividerOff
 		r.dividers[divs].Resize(geo.NewSize(separatorThickness, size.Height))
 		r.dividers[divs].Move(geo.NewPos(xPos, 0))
 		r.dividers[divs].Show()
+		r.cells.t.mirrorPlaced(r.dividers[divs], true)
 		divs++
 	}
 
@@ -1697,7 +1835,7 @@ func (r *tableCellsRenderer) moveMarker(marker core.CanvasObject, row, col int, 
 	}
 	x1 := xPos
 	if col >= stickCols {
-		x1 -= r.cells.t.content.Offset.X
+		x1 -= r.cells.t.scrollX()
 	}
 	x2 := x1 + widths[col]
 
@@ -1737,6 +1875,7 @@ func (r *tableCellsRenderer) moveMarker(marker core.CanvasObject, row, col int, 
 		marker.Resize(geo.NewSize(x2-left, y2-top))
 
 		marker.Show()
+		r.cells.t.mirrorPlaced(marker, col >= stickCols)
 	}
 	marker.Refresh()
 }
@@ -1754,7 +1893,7 @@ func (r *tableCellsRenderer) refreshHeaders(visibleRowHeights, visibleColWidths 
 	corner := []core.CanvasObject{r.headColStickyBG, r.headRowStickyBG}
 	over = []core.CanvasObject{r.headRowBG}
 	if r.cells.t.ShowHeaderRow {
-		cellXOffset := offX - r.cells.t.content.Offset.X
+		cellXOffset := offX - r.cells.t.scrollX()
 		displayColHeader := func(col int, list *[]core.CanvasObject) {
 			id := TableCellID{-1, col}
 			colWidth := visibleColWidths[col]
@@ -1840,16 +1979,19 @@ func (r *tableCellsRenderer) refreshHeaders(visibleRowHeights, visibleColWidths 
 
 	r.headColBG.Hidden = !r.cells.t.ShowHeaderColumn
 	r.headColBG.FillColor = th.Color(theme.ColorNameSurfaceContainerLow, v)
+	r.headColBG.Move(geo.Position{}) // mirrored below under RTL, so placed afresh
 	r.headColBG.Resize(geo.NewSize(colWidth, r.cells.t.Size().Height))
 
 	r.headColStickyBG.Hidden = !r.cells.t.ShowHeaderColumn
 	r.headColStickyBG.FillColor = th.Color(theme.ColorNameSurfaceContainerLow, v)
+	r.headColStickyBG.Move(geo.Position{})
 	r.headColStickyBG.Resize(geo.NewSize(colWidth, r.cells.t.stuckHeight+rowHeight))
 	r.headRowBG.Hidden = !r.cells.t.ShowHeaderRow
 	r.headRowBG.FillColor = th.Color(theme.ColorNameSurfaceContainerLow, v)
 	r.headRowBG.Resize(geo.NewSize(r.cells.t.Size().Width, rowHeight))
 	r.headRowStickyBG.Hidden = !r.cells.t.ShowHeaderRow
 	r.headRowStickyBG.FillColor = th.Color(theme.ColorNameSurfaceContainerLow, v)
+	r.headRowStickyBG.Move(geo.Position{})
 	r.headRowStickyBG.Resize(geo.NewSize(r.cells.t.stuckWidth+colWidth, rowHeight))
 	r.cells.t.corner.Content.(*bellui.Container).Objects = corner
 	r.cells.t.corner.Content.Refresh()
