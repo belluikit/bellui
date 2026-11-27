@@ -789,37 +789,36 @@ func (g *DataGrid) ToggleRowSelected(row int) {
 }
 
 // SelectAllState reports whether the header shows a select-all box in the
-// checkbox-selection column, and whether every displayed row or only some are
-// selected (render.SelectAllAccess). The box shows only when several rows can
-// be selected, as SelectAll needs.
+// checkbox-selection column, and whether every row of the grid or only some
+// are selected (render.SelectAllAccess). It counts every source row, those a
+// filter hides and those on other pages too, as the box selects them. The box
+// shows only when several rows can be selected.
 func (g *DataGrid) SelectAllState() (shown, all, some bool) {
 	if !g.ShowCheckboxColumn() || g.SelectionMode != SelectionMultiRow {
 		return false, false, false
 	}
-	if len(g.selectedRows) == 0 {
-		return true, false, false
-	}
-	rows, selected := 0, 0
-	for i, n := 0, g.RowCount(); i < n; i++ {
-		if s := g.sourceRow(i); s >= 0 { // a group header row is not selectable
-			rows++
-			if g.selectedRows[s] {
-				selected++
-			}
+	n := g.TotalRowCount()
+	selected := 0
+	for s, on := range g.selectedRows {
+		if on && s >= 0 && s < n {
+			selected++
 		}
 	}
-	return true, rows > 0 && selected == rows, selected > 0
+	return true, n > 0 && selected == n, selected > 0
 }
 
-// SetAllRowsSelected backs the header's select-all box: true selects every
-// displayed row (SelectAll), false clears the row selection. Either reports
-// the change through OnSelectionChanged.
+// SetAllRowsSelected backs the header's select-all box. true selects every row
+// of the grid, those a filter hides and those on other pages too, as AG Grid's
+// header checkbox does by default (selectAll 'all'); GridAPI.SelectAll selects
+// only the displayed rows. false clears the row selection. Either reports the
+// change through OnSelectionChanged.
 func (g *DataGrid) SetAllRowsSelected(selected bool) {
-	if selected {
-		g.SelectAll()
-		return
-	}
 	g.selectedRows = make(map[int]bool)
+	if selected {
+		for s, n := 0, g.TotalRowCount(); s < n; s++ {
+			g.selectedRows[s] = true
+		}
+	}
 	g.fireSelectionChanged()
 	g.Refresh()
 }

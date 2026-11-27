@@ -32,8 +32,9 @@ type GridOptions struct {
 	// CheckboxSelection shows checkboxes in the first column for row selection.
 	// The column is the first of the scrolling band, after any pinned-left
 	// columns, and scrolls sideways with the others. With SelectionMultiRow its
-	// header holds a select-all box, which selects every displayed row (as
-	// GridAPI.SelectAll does) or clears them all. A click on a row's box
+	// header holds a select-all box, which selects every row, those a filter
+	// hides and those on other pages too (GridAPI.SelectAll selects only the
+	// displayed rows), or clears them all. A click on a row's box
 	// toggles that row: with SelectionMultiRow it keeps the other rows, with
 	// SelectionSingleRow it replaces or clears the selected one.
 	CheckboxSelection bool

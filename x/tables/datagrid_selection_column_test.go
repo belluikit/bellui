@@ -396,3 +396,55 @@ func TestDataGrid_SelectionColumnScrollToFirstColumn(t *testing.T) {
 		t.Errorf("after scrolling to the first column the offset is %v, want 0 (the checkbox column shown)", g.offset.X)
 	}
 }
+
+// TestDataGrid_SelectAllBoxSelectsEveryRow checks AG Grid's default
+// (selectAll 'all'): the box selects every row of the grid, those a filter
+// hides and those on other pages too, and its state counts all of them.
+func TestDataGrid_SelectAllBoxSelectsEveryRow(t *testing.T) {
+	g := selectionColumnGrid(t, 400, 6, "alpha", "beta")
+	g.SelectionMode = SelectionMultiRow
+	g.API().EnablePagination(2)
+	g.OnFloatingFilterChanged(0, "1") // alpha holds the row index: only row 1 passes
+	if g.RowCount() != 1 {
+		t.Fatalf("the filter shows %d rows, want 1", g.RowCount())
+	}
+
+	tapCentre(selectAllBox(g))
+	if got := g.API().GetSelectedRows(); len(got) != 6 {
+		t.Errorf("with a filter and pages, select-all selected source rows %v, want all 6", got)
+	}
+	if s := selectAllBox(g).(core.AccessibleStateful).AccessibleState(); s&core.StateChecked == 0 {
+		t.Errorf("with every row selected the box's state is %v, want checked", s)
+	}
+
+	// Only the rows shown selected is some, not all.
+	tapCentre(selectAllBox(g))
+	g.SelectAll() // GridAPI.SelectAll: the displayed rows
+	if s := selectAllBox(g).(core.AccessibleStateful).AccessibleState(); s&core.StatePartial == 0 || s&core.StateChecked != 0 {
+		t.Errorf("with only the shown row selected the box's state is %v, want partial", s)
+	}
+}
+
+// TestDataGrid_SelectAllBoxAfterRowsRemoved checks the box's state once rows
+// are removed from the data while selected: it counts only rows that still
+// exist, so every remaining row selected is still all.
+func TestDataGrid_SelectAllBoxAfterRowsRemoved(t *testing.T) {
+	data := make([]map[string]any, 6)
+	for i := range data {
+		data[i] = map[string]any{"alpha": i}
+	}
+	g := newTestGrid(t, data, []*ColumnDef{{Field: "alpha", HeaderName: "alpha", Width: 100}})
+	g.Options.CheckboxSelection = true
+	g.SelectionMode = SelectionMultiRow
+	w := test.NewWindow(g)
+	defer w.Close()
+	w.Resize(geo.NewSize(400, 300))
+
+	tapCentre(selectAllBox(g))
+	n := 4
+	g.Length = func() int { return n }
+	g.RefreshData()
+	if s := selectAllBox(g).(core.AccessibleStateful).AccessibleState(); s&core.StateChecked == 0 {
+		t.Errorf("with every remaining row selected the box's state is %v, want checked", s)
+	}
+}
