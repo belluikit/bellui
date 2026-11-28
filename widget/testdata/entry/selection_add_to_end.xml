@@ -4,7 +4,7 @@
 			<rectangle fillColor="inputBackground" pos="2,2" size="116x96" topLeftRadius="4" topRightRadius="4"/>
 			<widget pos="2,2" size="116x96" type="*widget.Scroll">
 				<widget size="116x96" type="*widget.entryContent">
-					<widget size="0x0" type="*widget.selectable">
+					<widget size="116x96" type="*widget.selectable">
 						<rectangle fillColor="selection" pos="22,22" size="31x16"/>
 					</widget>
 					<widget size="116x96" type="*widget.RichText">
