@@ -261,7 +261,8 @@ static void belluiReportNotificationAuth(long long ident, int tries) {
 // of its local notification sends asks too), tapping Allow answers the first
 // one granted NO, about 25 ms before the second gets YES, and at that moment
 // the stored status is still not determined. Measured on the iOS 26.5
-// simulator, 4 of 4 runs (#1517).
+// simulator (#1517): the first request's flag was NO in 2 of 2 runs, and
+// reading the status as it arrived gave not determined in 2 of 2 more.
 void belluiRequestNotificationAuth(long long ident) {
 	UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
 	[center requestAuthorizationWithOptions:(UNAuthorizationOptionAlert | UNAuthorizationOptionSound)
