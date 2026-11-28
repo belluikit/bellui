@@ -133,24 +133,26 @@ type DataGrid struct {
 	Options GridOptions
 
 	// Internal state
-	api               *GridAPI
-	pipe              *pipeline.Pipeline
-	resolvedCols      []*resolvedColumn
-	viewport          *render.Viewport
-	reportedRows      render.Range // last range OnVisibleRowsChanged was given
-	rowsReported      bool         // whether it has been given one
-	pool              *render.CellPool
-	cellsWidget       *render.CellsWidget
-	headerWidget      *render.HeaderWidget
-	scrollContent     *render.ScrollContainer
-	pinnedLeftCells   *render.PinnedCellsWidget
-	pinnedRightCells  *render.PinnedCellsWidget
-	groupRowOverlay   *render.GroupRowOverlay
-	rowSwipeLayer     *rowSwipeLayer    // draws the swiped row (#1483)
-	rowLiftLayer      *rowSwipeLayer    // draws a row being moved (#1512)
-	dropLine          *canvas.Rectangle // where a moved row will land (#1512)
-	lift              rowLift
-	liftGen           int                       // counts lifts, so a late callback knows its own
+	api              *GridAPI
+	pipe             *pipeline.Pipeline
+	resolvedCols     []*resolvedColumn
+	viewport         *render.Viewport
+	reportedRows     render.Range // last range OnVisibleRowsChanged was given
+	rowsReported     bool         // whether it has been given one
+	pool             *render.CellPool
+	cellsWidget      *render.CellsWidget
+	headerWidget     *render.HeaderWidget
+	scrollContent    *render.ScrollContainer
+	pinnedLeftCells  *render.PinnedCellsWidget
+	pinnedRightCells *render.PinnedCellsWidget
+	groupRowOverlay  *render.GroupRowOverlay
+	rowSwipeLayer    *rowSwipeLayer    // draws the swiped row (#1483)
+	rowLiftLayer     *rowSwipeLayer    // draws a row being moved (#1512)
+	dropLine         *canvas.Rectangle // where a moved row will land (#1512)
+	lift             rowLift
+	liftGen          int  // counts lifts, so a late callback knows its own
+	liftCancelled    bool // the gesture's lift was cancelled (Escape): its moves lift nothing
+
 	floatingFilterRow *render.FloatingFilterRow // set by the renderer when floating filters are enabled
 	gridTheme         *gridTheme.GridTheme
 
@@ -2208,6 +2210,7 @@ func (g *DataGrid) DragEnd() {
 		g.dropLift()
 		g.dragRow = -1
 	}
+	g.liftCancelled = false
 
 	g.dragCol = -1
 	g.resizeCol = -1
@@ -2241,6 +2244,7 @@ func (g *DataGrid) MouseDown(e *desktop.MouseEvent) {
 	g.endEditOnPress()
 	g.lastModifier = e.Modifier
 	g.mousePressed = true
+	g.liftCancelled = false
 	g.pressDragged = false
 
 	// Check for column resize or reorder drag start. The header shares the body's
@@ -2314,7 +2318,9 @@ func (g *DataGrid) MouseDown(e *desktop.MouseEvent) {
 // the gesture.
 func (g *DataGrid) MouseUp(e *desktop.MouseEvent) {
 	g.mousePressed = false
-	if !g.pressDragged {
+	// A lifted row means the press dragged, though a grip took the drag and
+	// the grid's own Dragged never ran (#1512).
+	if !g.pressDragged && !g.lift.active {
 		g.dragRow = -1
 		g.reorderFromCol = -1
 		g.resizeCol = -1

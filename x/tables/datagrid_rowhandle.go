@@ -92,7 +92,7 @@ func (h *rowHandle) ClaimsDrag(geo.Delta) bool { return h.grid.rowsReorderable()
 // Dragged lifts the row on the drag's first move and moves it after.
 func (h *rowHandle) Dragged(e *event.DragEvent) {
 	g := h.grid
-	if !g.rowsReorderable() || h.row < 0 {
+	if !g.rowsReorderable() || h.row < 0 || g.liftCancelled {
 		return
 	}
 	y := g.gridY(e.AbsolutePosition)
@@ -108,6 +108,7 @@ func (h *rowHandle) DragEnd() {
 	g := h.grid
 	g.dropLift()
 	g.dragRow = -1
+	g.liftCancelled = false
 }
 
 // gridY is the height in the grid of a point on the canvas.
@@ -168,6 +169,7 @@ var afterHoldCancel = func(f func()) {
 // back.
 func (g *DataGrid) TouchDown(*mobile.TouchEvent) {
 	g.putHeldRowBack()
+	g.liftCancelled = false
 }
 
 // TouchUp ends the touch: a row its hold lifted and no drag moved goes back.
@@ -220,6 +222,9 @@ func (c *liftCover) CreateRenderer() core.WidgetRenderer {
 
 func (c *liftCover) Dragged(e *event.DragEvent) {
 	g := c.grid
+	if g.liftCancelled {
+		return
+	}
 	g.lift.held, g.lift.cancelPending = false, false // a drag moves it now
 	g.moveLift(g.gridY(e.AbsolutePosition))
 }
@@ -229,6 +234,7 @@ func (c *liftCover) DragEnd() {
 	c.Hide()
 	g.dropLift()
 	g.dragRow = -1
+	g.liftCancelled = false
 }
 
 // TappedSecondary is the release of a hold that did not drag: the row goes

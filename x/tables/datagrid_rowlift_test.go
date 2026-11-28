@@ -101,6 +101,8 @@ func TestDataGrid_LiftEscapeCancels(t *testing.T) {
 	g.TypedKey(&event.KeyEvent{Name: event.KeyEscape})
 	assert.False(t, g.lift.active)
 	assert.False(t, g.rowLiftLayer.Visible())
+	g.Dragged(dragTo(rowEdge(g, 6, 0.25), geo.Delta{DY: 10}))
+	assert.False(t, g.lift.active, "the pointer moving on after Escape lifted the row again")
 	release(g, p)
 	assert.Empty(t, *moved, "a cancelled drag moved nothing")
 	assert.Equal(t, -1, g.dragRow)

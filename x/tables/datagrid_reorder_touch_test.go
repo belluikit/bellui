@@ -303,3 +303,38 @@ func TestDataGrid_TouchHoldOldWaitLeavesANewLift(t *testing.T) {
 	hg.later[1]()
 	assert.False(t, hg.g.lift.active, "its own wait did")
 }
+
+// Escape during a grip drag puts the row back, and the rest of that drag
+// lifts nothing: the pointer keeps moving after the key, and a grip's next
+// move used to lift the row again (seen on a Mac). The next drag works.
+func TestDataGrid_EscapeOnAGripDragStaysCancelled(t *testing.T) {
+	hg := newHandleGrid(t, true)
+	g := hg.g
+	h := hg.handleIn(t, 1)
+	abs := bellui.CurrentApp().Driver().AbsolutePositionForObject(g)
+	drag := func(row int, frac float32) {
+		h.Dragged(&event.DragEvent{PointEvent: event.PointEvent{AbsolutePosition: abs.Add(hg.at(row, 20, frac))}, Dragged: geo.NewDelta(0, 10)})
+	}
+	press := hg.at(1, 20, 0.5)
+	g.MouseDown(pressAt(press, 0))
+	drag(2, 0.5)
+	drag(3, 0.5)
+	require.True(t, g.lift.active)
+	g.TypedKey(&event.KeyEvent{Name: event.KeyEscape})
+	require.False(t, g.lift.active)
+	drag(3, 0.8)
+	drag(4, 0.3)
+	assert.False(t, g.lift.active, "the drag lifted the row again after Escape")
+	g.MouseUp(pressAt(hg.at(4, 20, 0.3), 0))
+	h.DragEnd()
+	assert.Empty(t, hg.moved, "a drag cancelled by Escape moved a row")
+
+	// The next drag lifts and moves as usual.
+	g.MouseDown(pressAt(press, 0))
+	drag(2, 0.5)
+	drag(3, 0.8)
+	require.True(t, g.lift.active, "the drag after a cancelled one lifts")
+	g.MouseUp(pressAt(hg.at(3, 20, 0.8), 0))
+	h.DragEnd()
+	assert.Equal(t, [][2]int{{1, 3}}, hg.moved)
+}
