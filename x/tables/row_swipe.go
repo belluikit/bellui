@@ -21,6 +21,14 @@ import (
 // asks for a row's actions through DataGrid.LeadingSwipeActions and
 // DataGrid.TrailingSwipeActions.
 //
+// A two-finger trackpad swipe over the row works the same way where the
+// platform reports when the fingers touch and lift: macOS, and Wayland. It
+// follows the same rule as touch: the gesture scrolls the body while the body
+// can move that way, and swipes the row only when it starts with the body
+// already at that edge. The coast after the fingers lift never swipes. Other
+// platforms (Windows, X11, the browsers) report no such gesture, so a
+// trackpad there only scrolls the grid.
+//
 // The same actions are reachable without a swipe: a screen reader offers them
 // as actions on each of the row's cells, and a secondary tap or the Menu key
 // on the row lists them in a menu when the app shows no context menu of its
@@ -109,10 +117,15 @@ type rowSwipe struct {
 	left, right []RowSwipeAction
 
 	gesture swipeGesture
-	from    float32 // offset when the drag began
-	travel  float32 // the finger's sideways travel in this drag
-	speed   swipeSpeed
-	moving  *bellui.Animation
+	// pad is what the touchpad gesture under way over the rows does, and
+	// padCoast whether the coast after it lifted is the swipe's, which then
+	// moves nothing.
+	pad      swipeGesture
+	padCoast bool
+	from     float32 // offset when the drag began
+	travel   float32 // the finger's sideways travel in this drag
+	speed    swipeSpeed
+	moving   *bellui.Animation
 }
 
 // swipeSpeed measures how fast a drag was moving sideways when the finger
@@ -285,6 +298,98 @@ func (g *DataGrid) moveSwipe(dx float32) {
 	s.travel += dx
 	s.speed.add(swipeNow(), s.travel)
 	g.placeSwipe(g.followFinger(s.from + s.travel))
+}
+
+// RowScrolled offers the grid a scroll over its rows before the body's Scroll
+// sees it (render.RowScroller), and reports whether the grid took it. Only a
+// touchpad gesture's scrolls can swipe a row, by the same rule as a touch
+// drag: its first scroll decides, swiping the row under the pointer when it
+// runs sideways toward an edge the row has actions on and the body cannot
+// scroll that way. The swipe then keeps every scroll of the gesture until the
+// fingers lift (ScrollEnded), and the coast after it moves nothing. A wheel,
+// and a gesture from a platform that reports none, are left to the Scroll.
+func (g *DataGrid) RowScrolled(ev *event.ScrollEvent) bool {
+	if g.disabled || ev.Source != event.ScrollSourceTouchpad {
+		return false
+	}
+	s := &g.swipe
+	switch ev.Phase {
+	case event.ScrollPhaseBegan:
+		// The driver has told the grid that any gesture before this one ended.
+		s.padCoast = false
+		s.pad = g.startPadGesture(ev)
+	case event.ScrollPhaseChanged:
+	case event.ScrollPhaseMomentum:
+		return s.padCoast
+	default:
+		return false
+	}
+	if s.pad != gestureSwipe {
+		return false
+	}
+	g.moveSwipe(ev.Scrolled.DX)
+	return true
+}
+
+// startPadGesture decides what a touchpad gesture whose first scroll is ev
+// does, as startSwipeGesture decides a touch drag. The pointer stays where
+// the gesture began, so the row under it is the one swiped.
+func (g *DataGrid) startPadGesture(ev *event.ScrollEvent) swipeGesture {
+	s := &g.swipe
+	d := ev.Scrolled
+	src := g.swipeRowAt(g.gridPosition(ev.AbsolutePosition))
+	if s.src >= 0 {
+		if sideways(d) && src == s.src {
+			g.continueSwipe()
+			return gestureSwipe
+		}
+		g.closeSwipe(true)
+		return gestureScroll
+	}
+	if !sideways(d) || src < 0 || g.scrollCanMoveBy(d) {
+		return gestureScroll
+	}
+	left, right := g.swipeActionsFor(src)
+	if (d.DX > 0 && len(left) == 0) || (d.DX < 0 && len(right) == 0) {
+		return gestureScroll
+	}
+	s.src, s.left, s.right = src, left, right
+	s.offset = 0
+	g.continueSwipe()
+	return gestureSwipe
+}
+
+// scrollCanMoveBy reports whether the body's Scroll would move for a pointer
+// scroll of d. The Scroll reverses a pointer's sideways scroll in a
+// right-to-left layout, so its content runs the other way from a touch drag
+// of the same delta.
+func (g *DataGrid) scrollCanMoveBy(d geo.Delta) bool {
+	if g.rtl {
+		d.DX = -d.DX
+	}
+	return scrollCanMove(g.scrollContent.Scroll, d)
+}
+
+// gridPosition maps a canvas position to the grid's own coordinates.
+func (g *DataGrid) gridPosition(abs geo.Position) geo.Position {
+	app := bellui.CurrentApp()
+	if app == nil {
+		return abs
+	}
+	return abs.Subtract(app.Driver().AbsolutePositionForObject(g))
+}
+
+// ScrollEnded is told when the fingers of a touchpad gesture over the grid
+// lift (event.ScrollEnder): a row they were swiping is released, as when a
+// finger lifts, and the coast that follows moves nothing.
+func (g *DataGrid) ScrollEnded() {
+	s := &g.swipe
+	swiping := s.pad == gestureSwipe
+	s.pad = gestureUndecided
+	s.padCoast = swiping
+	if swiping {
+		g.releaseSwipe()
+	}
 }
 
 // endSwipeGesture ends the touch drag under way: a row swipe is released.
@@ -554,7 +659,11 @@ func (g *DataGrid) showRowSwipeMenu(row int, pos geo.Position) bool {
 	return true
 }
 
-var _ render.RowActioner = (*DataGrid)(nil)
+var (
+	_ render.RowActioner = (*DataGrid)(nil)
+	_ render.RowScroller = (*DataGrid)(nil)
+	_ event.ScrollEnder  = (*DataGrid)(nil)
+)
 
 // Accessible names of swipe actions: the side and the action's place in it,
 // so the names a platform registers stay few however many rows there are.
