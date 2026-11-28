@@ -151,6 +151,7 @@ type DataGrid struct {
 	dropLine          *canvas.Rectangle // where a moved row will land (#1512)
 	lift              rowLift
 	liftGen           int                       // counts lifts, so a late callback knows its own
+	reorderHint       *widget.Toast             // the grey grips' hint on screen (#1512)
 	floatingFilterRow *render.FloatingFilterRow // set by the renderer when floating filters are enabled
 	gridTheme         *gridTheme.GridTheme
 

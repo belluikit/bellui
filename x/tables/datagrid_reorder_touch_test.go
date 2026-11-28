@@ -21,6 +21,8 @@ import (
 	"github.com/belluikit/bellui/internal/driver/common"
 	"github.com/belluikit/bellui/test"
 	"github.com/belluikit/bellui/theme"
+
+	"github.com/belluikit/bellui/x/tables/pipeline"
 )
 
 // handleGrid is a 300x400 window filled by a grid of 100 rows with a grip
@@ -302,4 +304,99 @@ func TestDataGrid_TouchHoldOldWaitLeavesANewLift(t *testing.T) {
 	assert.True(t, hg.g.lift.active, "an old wait put a newer held row back")
 	hg.later[1]()
 	assert.False(t, hg.g.lift.active, "its own wait did")
+}
+
+// The hint a grey grip gives says what turned reordering off; there is none
+// while rows can move, or when the app turned it off itself.
+func TestDataGrid_ReorderOffReason(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		set  func(*DataGrid)
+		want string
+	}{
+		{"on", func(*DataGrid) {}, ""},
+		{"sorted", func(g *DataGrid) { g.API().SetSort(SortItem{ColID: "n", Direction: SortAscending}) }, "Clear the sort to reorder rows"},
+		{"grouped", func(g *DataGrid) { g.API().SetRowGroupColumn("n") }, "Remove the grouping to reorder rows"},
+		{"pivot", func(g *DataGrid) { g.API().SetPivot("n", "n", "n", pipeline.AggCount) }, "Turn off the pivot to reorder rows"},
+		{"tree", func(g *DataGrid) {
+			g.API().SetTreeData(func(r any) any { return r.(map[string]any)["n"] }, func(any) int { return -1 })
+		}, "Rows in a tree can't be reordered"},
+		{"app turned it off", func(g *DataGrid) {
+			g.Options.RowDragEnabled = false
+			g.API().SetSort(SortItem{ColID: "n", Direction: SortAscending})
+		}, ""},
+		{"disabled", func(g *DataGrid) { g.Disable() }, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			hg := newHandleGrid(t, true)
+			tc.set(hg.g)
+			assert.Equal(t, tc.want, hg.g.reorderOffReason())
+		})
+	}
+}
+
+// dismissHint takes a hint's toast down so its timer does not outlive the
+// test.
+func dismissHint(t *testing.T, g *DataGrid) {
+	t.Cleanup(func() {
+		if g.reorderHint != nil {
+			g.reorderHint.Dismiss()
+		}
+	})
+}
+
+// Tapping a grey grip shows why it is grey, once at a time; tapping a live
+// grip is a tap on its cell, as before it had a grip.
+func TestDataGrid_GreyGripTapShowsTheHint(t *testing.T) {
+	hg := newHandleGrid(t, true)
+	g := hg.g
+	dismissHint(t, g)
+	var clicked []CellID
+	g.OnCellClicked = func(id CellID) { clicked = append(clicked, id) }
+	abs := bellui.CurrentApp().Driver().AbsolutePositionForObject(g)
+	tap := func(row int) {
+		p := hg.at(row, 20, 0.5)
+		hg.handleIn(t, row).Tapped(&event.PointEvent{AbsolutePosition: abs.Add(p)})
+	}
+
+	tap(2)
+	assert.Nil(t, g.reorderHint, "a live grip gives no hint")
+	require.Len(t, clicked, 1, "a tap on a live grip is a tap on its cell")
+	assert.Equal(t, 2, clicked[0].Row)
+
+	g.API().SetSort(SortItem{ColID: "n", Direction: SortAscending})
+	tap(2)
+	require.NotNil(t, g.reorderHint)
+	assert.Equal(t, "Clear the sort to reorder rows", g.reorderHint.Text)
+	first := g.reorderHint
+	overlays := func() int { return len(bellui.CurrentApp().Driver().CanvasForObject(g).Overlays().List()) }
+	shown := overlays()
+	tap(3)
+	assert.NotSame(t, first, g.reorderHint, "a second tap replaced the hint")
+	assert.Equal(t, shown, overlays(), "the second hint replaced the first, not stacked on it")
+	assert.Len(t, clicked, 1, "a tap on a grey grip is only the hint")
+}
+
+// Holding a grey grip shows the hint too, by finger or held mouse button;
+// holding elsewhere on a sorted grid does not.
+func TestDataGrid_GreyGripHoldShowsTheHint(t *testing.T) {
+	hg := newHandleGrid(t, true)
+	g := hg.g
+	dismissHint(t, g)
+	g.API().SetSort(SortItem{ColID: "n", Direction: SortAscending})
+
+	g.LongPressed(&event.PointEvent{Position: hg.at(2, 100, 0.5)})
+	assert.Nil(t, g.reorderHint, "a hold off the grips gives no hint")
+
+	hg.hold(t, 9, hg.at(2, 20, 0.5))
+	require.NotNil(t, g.reorderHint, "a held grey grip gives the hint")
+	hg.release(9, hg.at(2, 20, 0.5))
+
+	g.reorderHint.Dismiss()
+	g.reorderHint = nil
+	p := hg.at(4, 20, 0.5)
+	g.MouseDown(pressAt(p, 0))
+	g.LongPressed(&event.PointEvent{Position: p})
+	assert.NotNil(t, g.reorderHint, "a mouse held on a grey grip gives the hint")
+	g.MouseUp(pressAt(p, 0))
 }
