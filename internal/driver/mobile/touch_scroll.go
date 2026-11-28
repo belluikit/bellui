@@ -89,10 +89,17 @@ func (c *canvas) scrollablesAt(pos geo.Position) []intdriver.ObjectAtPosition {
 // is worked out again from where it is now, because the chain is kept for a
 // whole gesture and moves while the gesture scrolls it.
 func (c *canvas) dispatchScrollChain(chain []intdriver.ObjectAtPosition, pos geo.Position, delta geo.Delta) bool {
+	return c.dispatchScrollChainAs(chain, pos, delta, event.ScrollSourceTouch, event.ScrollPhaseUnknown)
+}
+
+// dispatchScrollChainAs is dispatchScrollChain for a scroll of any source and
+// phase: a mouse wheel or touchpad scroll uses it too (pointer_scroll.go).
+func (c *canvas) dispatchScrollChainAs(chain []intdriver.ObjectAtPosition, pos geo.Position, delta geo.Delta, source event.ScrollSource, phase event.ScrollPhase) bool {
 	ev := &event.ScrollEvent{}
 	ev.Scrolled = delta
 	ev.AbsolutePosition = pos
-	ev.Source = event.ScrollSourceTouch
+	ev.Source = source
+	ev.Phase = phase
 	for _, oap := range chain {
 		// Through the inverse world transform, as the hit-test found it (#1003).
 		ev.Position, _ = intdriver.PositionForAbsolutePoint(oap.Object, pos, c.ObjectTrees())

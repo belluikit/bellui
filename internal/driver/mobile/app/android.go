@@ -42,6 +42,8 @@ extern EGLSurface surface;
 char* createEGLSurface(ANativeWindow* window);
 char* destroyEGLSurface();
 int32_t getKeyRune(JNIEnv* env, AInputEvent* e);
+int32_t motionClassification(AInputEvent* e);
+extern float scroll_factor_v, scroll_factor_h;
 
 void showKeyboard(JNIEnv* env, int keyboardType);
 void hideKeyboard(JNIEnv* env);
@@ -819,6 +821,24 @@ func processEvent(env *C.JNIEnv, e *C.AInputEvent) {
 	case C.AINPUT_EVENT_TYPE_KEY:
 		processKey(env, e)
 	case C.AINPUT_EVENT_TYPE_MOTION:
+		action := int32(C.AMotionEvent_getAction(e))
+		switch classifyMotion(action, int32(C.motionClassification(e))) {
+		case motionIgnore:
+			return
+		case motionWheel:
+			theApp.events.In() <- wheelScroll(
+				float32(C.AMotionEvent_getX(e, 0)), float32(C.AMotionEvent_getY(e, 0)),
+				float32(C.AMotionEvent_getAxisValue(e, C.AMOTION_EVENT_AXIS_VSCROLL, 0)),
+				float32(C.AMotionEvent_getAxisValue(e, C.AMOTION_EVENT_AXIS_HSCROLL, 0)),
+				float32(C.scroll_factor_v), float32(C.scroll_factor_h))
+			return
+		case motionTouchpad:
+			theApp.events.In() <- touchpadScroll(action,
+				float32(C.AMotionEvent_getX(e, 0)), float32(C.AMotionEvent_getY(e, 0)),
+				float32(C.AMotionEvent_getAxisValue(e, motionAxisGestureScrollX, 0)),
+				float32(C.AMotionEvent_getAxisValue(e, motionAxisGestureScrollY, 0)))
+			return
+		}
 		// At most one of the events in this batch is an up or down event; get its index and change.
 		upDownIndex := C.size_t(C.AMotionEvent_getAction(e)&C.AMOTION_EVENT_ACTION_POINTER_INDEX_MASK) >> C.AMOTION_EVENT_ACTION_POINTER_INDEX_SHIFT
 		upDownType := touch.TypeMove
@@ -856,8 +876,32 @@ func processEvent(env *C.JNIEnv, e *C.AInputEvent) {
 	}
 }
 
+// MotionEvent.AXIS_GESTURE_SCROLL_X_DISTANCE and _Y_DISTANCE (API 34), which
+// NDK r26's headers do not have: how far a touchpad two-finger swipe moved
+// since its last event, in pixels (#1510). A swipe whose fingers move down
+// reports a negative Y (measured on the pixel143 emulator with a uinput
+// touchpad).
+const (
+	motionAxisGestureScrollX = 50
+	motionAxisGestureScrollY = 51
+)
+
 // keyaction.go mirrors the NDK's key actions so its conversion is tested off
 // Android. These fail to compile if a mirrored value differs from the NDK's.
+var (
+	_ [motionActionMask - C.AMOTION_EVENT_ACTION_MASK]struct{}                    = [0]struct{}{}
+	_ [motionActionDown - C.AMOTION_EVENT_ACTION_DOWN]struct{}                    = [0]struct{}{}
+	_ [motionActionUp - C.AMOTION_EVENT_ACTION_UP]struct{}                        = [0]struct{}{}
+	_ [motionActionMove - C.AMOTION_EVENT_ACTION_MOVE]struct{}                    = [0]struct{}{}
+	_ [motionActionCancel - C.AMOTION_EVENT_ACTION_CANCEL]struct{}                = [0]struct{}{}
+	_ [motionActionHoverMove - C.AMOTION_EVENT_ACTION_HOVER_MOVE]struct{}         = [0]struct{}{}
+	_ [motionActionScroll - C.AMOTION_EVENT_ACTION_SCROLL]struct{}                = [0]struct{}{}
+	_ [motionActionHoverEnter - C.AMOTION_EVENT_ACTION_HOVER_ENTER]struct{}       = [0]struct{}{}
+	_ [motionActionHoverExit - C.AMOTION_EVENT_ACTION_HOVER_EXIT]struct{}         = [0]struct{}{}
+	_ [motionActionButtonPress - C.AMOTION_EVENT_ACTION_BUTTON_PRESS]struct{}     = [0]struct{}{}
+	_ [motionActionButtonRelease - C.AMOTION_EVENT_ACTION_BUTTON_RELEASE]struct{} = [0]struct{}{}
+)
+
 var (
 	_ [keyActionDown - C.AKEY_EVENT_ACTION_DOWN]struct{}         = [0]struct{}{}
 	_ [keyActionUp - C.AKEY_EVENT_ACTION_UP]struct{}             = [0]struct{}{}

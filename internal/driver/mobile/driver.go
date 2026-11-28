@@ -34,6 +34,7 @@ import (
 	"github.com/belluikit/bellui/internal/driver/mobile/event/key"
 	"github.com/belluikit/bellui/internal/driver/mobile/event/lifecycle"
 	"github.com/belluikit/bellui/internal/driver/mobile/event/paint"
+	"github.com/belluikit/bellui/internal/driver/mobile/event/scroll"
 	"github.com/belluikit/bellui/internal/driver/mobile/event/size"
 	"github.com/belluikit/bellui/internal/driver/mobile/event/textedit"
 	"github.com/belluikit/bellui/internal/driver/mobile/event/touch"
@@ -463,6 +464,8 @@ func (d *driver) Run() {
 					// (pre-rebrand tracker #1104). exploreTouch suppresses the former and routes
 					// qualified passthrough streams into the normal pipeline.
 					d.routeTouch(current, e, app.TouchExplorationEnabled())
+				case scroll.Event:
+					d.handlePointerScroll(current, e)
 				case app.KeyboardDoneEvent:
 					// Done submits like Return, then closes the keyboard; the
 					// widget keeps the focus (#822).
@@ -1584,6 +1587,19 @@ func (d *driver) handleTouch(current *window, e touch.Event) {
 	case touch.TypeCancel:
 		d.tapCancelCanvas(w, e.X, e.Y, e.Sequence)
 	}
+}
+
+// handlePointerScroll delivers a mouse wheel or touchpad scroll (#1510) to the
+// current window, converting its pixels to canvas units.
+func (d *driver) handlePointerScroll(w *window, e scroll.Event) {
+	if w == nil {
+		return
+	}
+	activity.Stamp()
+	s := w.canvas.Scale()
+	// A pointer's position is exact: no finger compensation (tapYOffset).
+	pos := geo.NewPos(scale.ToBelluiCoordinate(w.canvas, int(e.X)), scale.ToBelluiCoordinate(w.canvas, int(e.Y)))
+	w.canvas.PointerScrolled(pos, geo.NewDelta(e.DX/s, e.DY/s), e.Touchpad, e.Phase)
 }
 
 // cancelWindowTouches ends every touch that began in w, which is closing: its
