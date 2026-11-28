@@ -1865,6 +1865,14 @@ func (g *DataGrid) FocusLost() {
 
 func (g *DataGrid) TypedRune(_ rune) {}
 
+// AcceptsTab keeps Tab and Shift+Tab in an enabled grid, where they move the
+// keyboard cursor from cell to cell (event.Tabbable, owner decision on
+// #1512). Without it the toolkit moved window focus on Tab, and the grid's
+// own Tab handling was never reached. Ctrl+Tab, or Escape then Tab, still
+// leaves the grid, so a keyboard user is never trapped. A disabled grid
+// keeps nothing.
+func (g *DataGrid) AcceptsTab() bool { return !g.disabled }
+
 // toggleFocusedGroup expands/collapses the group when the keyboard cursor is on
 // a group-header row, routing through the same ToggleGroup path as a pointer tap
 // and the accessible expand/collapse action. It returns true when it handled a
@@ -2004,8 +2012,12 @@ func (g *DataGrid) TypedKey(e *event.KeyEvent) {
 		g.activateFocusedRow()
 		return
 	case event.KeyTab:
-		// Move to next cell (or previous with shift, tracked via lastModifier)
-		if g.lastModifier&event.KeyModifierShift != 0 {
+		// Tab moves to the next cell, Shift+Tab to the previous one, wrapping
+		// across rows (owner decision on #1512): the grid keeps Tab
+		// (AcceptsTab), and Ctrl+Tab or Escape then Tab leaves it. Shift comes
+		// from the key itself; it was read from the last mouse press, so
+		// Shift+Tab went forward.
+		if e.Modifier&event.KeyModifierShift != 0 {
 			if g.currentFocus.Col > 0 {
 				g.currentFocus.Col--
 			} else if g.currentFocus.Row > 0 {
