@@ -48,6 +48,7 @@ import (
 	"github.com/belluikit/bellui/internal/driver/mobile/event/lifecycle"
 	"github.com/belluikit/bellui/internal/driver/mobile/event/paint"
 	"github.com/belluikit/bellui/internal/driver/mobile/event/size"
+	"github.com/belluikit/bellui/internal/driver/mobile/event/scroll"
 	"github.com/belluikit/bellui/internal/driver/mobile/event/touch"
 )
 
@@ -205,6 +206,18 @@ func touchesFresh() { sendTouchEvents(touchIDs.reset()) }
 //export sendTouch
 func sendTouch(cTouch, cTouchType uintptr, x, y float32) {
 	sendTouchEvents(touchIDs.events(cTouch, touch.Type(cTouchType), x, y))
+}
+
+//export sendScroll
+func sendScroll(x, y, dx, dy float32, touchpad bool, phase int) {
+	e := scroll.Event{X: x, Y: y, Touchpad: touchpad, Phase: scroll.Phase(phase)}
+	if e.Phase != scroll.PhaseEnded {
+		e.DX, e.DY = dx, dy
+	}
+	if !touchpad && e.DX == 0 && e.DY == 0 {
+		return
+	}
+	theApp.events.In() <- e
 }
 
 func sendTouchEvents(events []touch.Event) {

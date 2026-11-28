@@ -635,6 +635,23 @@ continueUserActivity:(NSUserActivity *)userActivity
 	self.glview.multipleTouchEnabled = true; // TODO expose setting to user.
 	self.glview.context = self.context;
 	self.glview.userInteractionEnabled = YES;
+
+	// A trackpad's two-finger scroll and a mouse wheel reach an iPad app only
+	// through a pan recognizer that allows scroll types, never as touches
+	// (#1510). One recognizer per kind tells them apart: continuous is a
+	// trackpad, discrete a wheel. Neither takes a finger on the glass.
+	if (@available(iOS 13.4, *)) {
+		UIPanGestureRecognizer *pad = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(trackpadScrolled:)];
+		pad.allowedScrollTypesMask = UIScrollTypeMaskContinuous;
+		pad.allowedTouchTypes = @[];
+		pad.cancelsTouchesInView = NO;
+		[self.glview addGestureRecognizer:pad];
+		UIPanGestureRecognizer *wheel = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(wheelScrolled:)];
+		wheel.allowedScrollTypesMask = UIScrollTypeMaskDiscrete;
+		wheel.allowedTouchTypes = @[];
+		wheel.cancelsTouchesInView = NO;
+		[self.glview addGestureRecognizer:wheel];
+	}
 	//self.glview.enableSetNeedsDisplay = YES; // only invoked once
 
 	// Do not use the GLKViewController draw loop.
@@ -727,6 +744,49 @@ static void sendTouches(int change, NSSet* touches, UIEvent* event) {
 	for (UITouch* touch in touches) {
 		CGPoint p = [touch locationInView:touch.view];
 		sendTouch((GoUintptr)touch, (GoUintptr)change, p.x*scale, p.y*scale);
+	}
+}
+
+#define SCROLL_PHASE_NONE    0 // scroll.PhaseNone
+#define SCROLL_PHASE_BEGAN   1 // scroll.PhaseBegan
+#define SCROLL_PHASE_CHANGED 2 // scroll.PhaseChanged
+#define SCROLL_PHASE_ENDED   3 // scroll.PhaseEnded
+
+// sendPan reports a scroll pan's movement since its last report to Go, in
+// pixels. UIKit's translation follows the content, as bellui's scroll delta
+// does: positive y scrolls toward the top.
+static void sendPan(UIPanGestureRecognizer *g, BOOL touchpad, int phase) {
+	CGFloat scale = [UIScreen mainScreen].nativeScale;
+	CGPoint p = [g locationInView:g.view];
+	CGPoint t = [g translationInView:g.view];
+	[g setTranslation:CGPointZero inView:g.view];
+	sendScroll(p.x*scale, p.y*scale, t.x*scale, t.y*scale, touchpad, phase);
+}
+
+- (void)trackpadScrolled:(UIPanGestureRecognizer *)g {
+	switch (g.state) {
+	case UIGestureRecognizerStateBegan:
+		sendPan(g, YES, SCROLL_PHASE_BEGAN);
+		sendPan(g, YES, SCROLL_PHASE_CHANGED); // its first movement, if any
+		break;
+	case UIGestureRecognizerStateChanged:
+		sendPan(g, YES, SCROLL_PHASE_CHANGED);
+		break;
+	case UIGestureRecognizerStateEnded:
+	case UIGestureRecognizerStateCancelled:
+	case UIGestureRecognizerStateFailed:
+		sendPan(g, YES, SCROLL_PHASE_ENDED);
+		break;
+	default:
+		break;
+	}
+}
+
+// A wheel's pan is a run of notches with no fingers to lift: each report is
+// a plain wheel step.
+- (void)wheelScrolled:(UIPanGestureRecognizer *)g {
+	if (g.state == UIGestureRecognizerStateBegan || g.state == UIGestureRecognizerStateChanged) {
+		sendPan(g, NO, SCROLL_PHASE_NONE);
 	}
 }
 
