@@ -2687,10 +2687,16 @@ func (g *DataGrid) isCellSelected(row, col int) bool {
 	if src < 0 {
 		return false
 	}
-	if g.SelectionMode == SelectionMultiCell {
+	switch g.SelectionMode {
+	case SelectionMultiCell:
 		// The selected cells only: the cursor cell is not one after a
 		// Ctrl/Cmd click took it out.
 		return g.selectedCells[selCell{src, col}]
+	case SelectionSingleRow, SelectionMultiRow:
+		// A cell is selected exactly when its row is. The cursor cell is no
+		// selection here: counting it kept a row drawn selected, and its box
+		// checked, after a click deselected it (#1524).
+		return g.selectedRows[src]
 	}
 	if g.selectedRows[src] {
 		return true
