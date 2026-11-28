@@ -205,6 +205,9 @@ func (h *HeaderWidget) ClaimsDrag(geo.Delta) bool {
 }
 
 func (h *HeaderWidget) DragEnd() {
+	// A press that dragged is no tap, so its modifiers are not the next tap's:
+	// a finger's tap sends no press of its own, and would sort with them.
+	h.pressed, h.pressedMod = false, 0
 	h.endResize()
 }
 

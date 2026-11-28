@@ -175,3 +175,24 @@ func TestDataGrid_MouseDragStillReordersColumns(t *testing.T) {
 	assert.Equal(t, "b", g.visibleCol(0).def.ColID, "column a moved after b")
 	assert.Equal(t, -1, g.reorderFromCol)
 }
+
+// A press that drags on a header is no tap. Its modifiers used to stay for the
+// next tap, and a finger's tap, which sends no press of its own, sorted with
+// the dragging press's Shift: it added a column to the sort instead of
+// sorting by its own.
+func TestDataGrid_HeaderDragLeavesNoModifierForTheNextTap(t *testing.T) {
+	g, _ := pressGrid(t)
+	h := g.headerWidget
+	y := g.HeaderHeight() / 2
+	h.Tapped(&event.PointEvent{Position: geo.NewPos(40, y)})
+	require.Equal(t, fmt.Sprint([]SortItem{{ColID: "a", Direction: SortAscending}}), fmt.Sprint(g.API().GetSort()))
+
+	h.MouseDown(pressAt(geo.NewPos(140, y), event.KeyModifierShift))
+	h.Dragged(dragTo(geo.NewPos(160, y), geo.Delta{DX: 20}))
+	h.MouseUp(pressAt(geo.NewPos(160, y), event.KeyModifierShift))
+	h.DragEnd()
+
+	h.Tapped(&event.PointEvent{Position: geo.NewPos(140, y)})
+	assert.Equal(t, fmt.Sprint([]SortItem{{ColID: "b", Direction: SortAscending}}), fmt.Sprint(g.API().GetSort()),
+		"a finger's tap on b sorts by b alone")
+}
