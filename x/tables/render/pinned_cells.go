@@ -238,7 +238,10 @@ func (r *pinnedCellsRenderer) refresh(size geo.Size) {
 		if grid.IsAlternateRow(row) {
 			rowBg.FillColor = altColor
 		}
-		if grid.IsSelected(row, colStart) {
+		// The row's selection (the row selection modes); a cell selected on
+		// its own is highlighted by itself below (#1524).
+		rowSelected := grid.IsSelected(row, -1)
+		if rowSelected {
 			rowBg.FillColor = selColor
 		}
 		if grid.IsGroupRow(row) {
@@ -277,6 +280,15 @@ func (r *pinnedCellsRenderer) refresh(size geo.Size) {
 			colW := float32(100)
 			if col < len(widths) {
 				colW = widths[col]
+			}
+
+			// A cell selected on its own is highlighted under its disclosure
+			// and content; a selected row is already, by its background (#1524).
+			if !rowSelected && grid.IsSelected(row, col) {
+				sel := canvas.NewRectangle(selColor)
+				sel.Move(geo.NewPos(x, visY))
+				sel.Resize(geo.NewSize(colW, visH))
+				objects = append(objects, sel)
 			}
 
 			// Tree / master-detail disclosure on the first pinned-left column:

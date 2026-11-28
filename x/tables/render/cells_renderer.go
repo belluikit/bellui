@@ -2,6 +2,7 @@ package render
 
 import (
 	"image/color"
+	"slices"
 
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
@@ -91,6 +92,7 @@ type CellsRenderer struct {
 	// selection state, with the interactive widget.Check reachable inside it.
 	checkboxHosts []*cellHost
 	detailBgs     []*canvas.Rectangle
+	cellSels      []*canvas.Rectangle // highlights of cells selected on their own (#1524)
 	chevrons      []*canvas.Image
 	masterA11y    []*masterRowA11y
 	treeChevrons  []*canvas.Image
@@ -337,6 +339,7 @@ func (r *CellsRenderer) refreshCells() {
 	objects := make([]core.CanvasObject, 0, estCells+64)
 
 	bgIdx := 0
+	selIdx := 0
 	cbIdx := 0
 	detailIdx := 0
 	chevIdx := 0
@@ -373,6 +376,9 @@ func (r *CellsRenderer) refreshCells() {
 		rowBg.Resize(geo.NewSize(rowBgW, cellH))
 		rowBg.Show()
 		objects = append(objects, rowBg)
+		// A selected cell's highlight goes here, just above the row's
+		// background, so the row's checkbox and chevrons stay above it.
+		selAt := len(objects)
 
 		// Detail band: a background panel plus the consumer's detail content.
 		if bandH > 0 {
@@ -499,6 +505,7 @@ func (r *CellsRenderer) refreshCells() {
 
 		// Data cells — viewport only contains main (non-pinned) columns,
 		// so render all visible viewport columns.
+		rowSelected := grid.IsSelected(row, -1)
 		col := visCols.Min
 		for col <= visCols.Max {
 			span := grid.ColSpanAt(row, col)
@@ -522,6 +529,14 @@ func (r *CellsRenderer) refreshCells() {
 			for s := 1; s < span && col+s <= visCols.Max; s++ {
 				_, sw := vp.ColX(col + s)
 				spanW += sw + vp.Padding
+			}
+
+			// A cell selected on its own (the cell selection modes) is
+			// highlighted under its content; a selected row is already
+			// highlighted whole by its background (#1524).
+			if !rowSelected && grid.IsSelected(row, pinnedLeftCount+col) {
+				objects = slices.Insert(objects, selAt, core.CanvasObject(r.cellSelection(selIdx, x, y, spanW, cellH, tc.Selection)))
+				selIdx++
 			}
 
 			// The first main column reserves a left indent for the disclosure
@@ -560,6 +575,9 @@ func (r *CellsRenderer) refreshCells() {
 	}
 	for i := detailIdx; i < len(r.detailBgs); i++ {
 		r.detailBgs[i].Hide()
+	}
+	for i := selIdx; i < len(r.cellSels); i++ {
+		r.cellSels[i].Hide()
 	}
 
 	// Right to left, everything placed above is mirrored across the cells'
@@ -632,13 +650,29 @@ func (r *CellsRenderer) coverTrailing(objects []core.CanvasObject, tc ThemeColor
 	return objects
 }
 
+// cellSelection returns the i-th pooled highlight of a selected cell, placed
+// over the cell.
+func (r *CellsRenderer) cellSelection(i int, x, y, w, h float32, c color.Color) *canvas.Rectangle {
+	if i >= len(r.cellSels) {
+		r.cellSels = append(r.cellSels, canvas.NewRectangle(c))
+	}
+	sel := r.cellSels[i]
+	sel.FillColor = c
+	sel.Move(geo.NewPos(x, y))
+	sel.Resize(geo.NewSize(w, h))
+	sel.Show()
+	return sel
+}
+
 // rowBgColor is the background of a display row's cell band: the group colour
 // on a group header, else selection over alternation over the plain background.
+// Selection here is the row's (the row selection modes): a cell selected on
+// its own is highlighted by itself, not by its row (#1524).
 func rowBgColor(grid GridAccess, row int, tc ThemeColors) color.Color {
 	switch {
 	case grid.IsGroupRow(row):
 		return tc.GroupRowBg
-	case grid.IsSelected(row, 0):
+	case grid.IsSelected(row, -1):
 		return tc.Selection
 	case grid.IsAlternateRow(row):
 		return tc.RowAlternate
