@@ -1,7 +1,7 @@
 <canvas padded size="120x120">
 	<content>
 		<widget pos="4,4" size="112x112" type="*widget.Table">
-			<widget pos="32,0" size="79x32" type="*widget.clip">
+			<widget pos="32,0" size="79x32" type="*widget.headerClip">
 				<container size="0x0">
 					<rectangle fillColor="rgba(26,26,26,255)" size="112x32"/>
 					<widget size="39x32" type="*widget.Label">
@@ -21,7 +21,7 @@
 					</widget>
 				</container>
 			</widget>
-			<widget pos="0,32" size="32x79" type="*widget.clip">
+			<widget pos="0,32" size="32x79" type="*widget.headerClip">
 				<container size="0x0">
 					<rectangle fillColor="rgba(26,26,26,255)" size="32x112"/>
 				</container>

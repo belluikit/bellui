@@ -384,3 +384,59 @@ func Test_canvas_LongPressThenDragMovesTreeViewRow(t *testing.T) {
 	assert.NotEqual(t, widget.TreeViewNodeID("0"), tree.ChildIDs("")[0], "the long-press then drag moved the first row")
 	assert.Contains(t, tree.ChildIDs("")[1:4], widget.TreeViewNodeID("0"), "to where the finger let go")
 }
+
+// A long-press on a Table's header divider, then a drag, resizes the column on
+// touch (#1293): a finger never hovers, so before, nothing found the divider.
+// A plain swipe over the header still resizes nothing and scrolls the page,
+// and a long-press away from any divider resizes nothing either.
+func Test_canvas_LongPressThenDragResizesTableColumn(t *testing.T) {
+	var width0 float32
+	table := widget.NewTable(
+		func() (int, int) { return 50, 4 },
+		func() core.CanvasObject { return filler(60, 30) },
+		func(id widget.TableCellID, o core.CanvasObject) {
+			if id.Row == 0 && id.Col == 0 {
+				width0 = o.Size().Width
+			}
+		},
+	)
+	table.ShowHeaderRow = true
+	box := container.NewGridWrap(geo.NewSize(300, 200), table)
+	page := container.NewVScroll(container.NewVBox(box, filler(100, 600)))
+	c := claimCanvas(page, geo.NewSize(300, 300))
+	readWidth := func() float32 {
+		table.RefreshItem(widget.TableCellID{Row: 0, Col: 0})
+		return width0
+	}
+	start := readWidth()
+	require.Equal(t, float32(60), start)
+
+	// The divider after column 0 is in the padding past its 60 points; the
+	// finger lands a few points short of it.
+	press := geo.NewPos(57, 10)
+	swipe(c, 1, press, press.AddXY(40, 0))
+	assert.Equal(t, start, readWidth(), "a plain swipe over the header resized nothing")
+
+	longPressDrag := func(press geo.Position, dx float32) {
+		c.TapDown(press, 0)
+		waitAndCheck(400, func() {})
+		for i := 1; i <= 10; i++ {
+			c.TapMove(press.AddXY(dx*float32(i)/10, 0), 0, claimDrag)
+		}
+		lprTapUp(c, press.AddXY(dx, 0))
+	}
+	longPressDrag(geo.NewPos(30, 10), 40)
+	assert.Equal(t, start, readWidth(), "a long-press inside a header cell resized nothing")
+
+	longPressDrag(press, 40)
+	assert.InDelta(t, start+40, readWidth(), 0.5, "the long-press then drag widened column 0 by the drag")
+	assert.Zero(t, page.Offset.Y)
+
+	// The resize ended with the finger: a later swipe resizes nothing more,
+	// and an upward swipe over the header still scrolls the page (#1266).
+	swipe(c, 2, press, press.AddXY(40, 0))
+	assert.InDelta(t, start+40, readWidth(), 0.5)
+	swipe(c, 3, press, press.SubtractXY(0, 60))
+	assert.Equal(t, float32(60), page.Offset.Y, "a plain upward swipe over the header scrolled the page")
+	assert.InDelta(t, start+40, readWidth(), 0.5)
+}

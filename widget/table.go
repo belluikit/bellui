@@ -13,6 +13,7 @@ import (
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/internal/async"
 	"github.com/belluikit/bellui/internal/cache"
+	intdriver "github.com/belluikit/bellui/internal/driver"
 	"github.com/belluikit/bellui/internal/widget"
 	"github.com/belluikit/bellui/lang"
 	"github.com/belluikit/bellui/layout"
@@ -112,7 +113,8 @@ type Table struct {
 
 	cellSize, headerSize                                         geo.Size
 	stuckXOff, stuckYOff, stuckWidth, stuckHeight, dragStartSize float32
-	top, left, corner, dividerLayer                              *clip
+	top, left                                                    *headerClip
+	corner, dividerLayer                                         *clip
 	hoverHeaderRow, hoverHeaderCol, dragCol, dragRow             int
 	dragStartPos                                                 geo.Position
 
@@ -188,8 +190,8 @@ func (t *Table) CreateRenderer() core.WidgetRenderer {
 	t.cellSize = t.templateSize()
 	t.cells = newTableCells(t)
 	t.content = widget.NewScroll(t.cells)
-	t.top = newClip(t, &bellui.Container{})
-	t.left = newClip(t, &bellui.Container{})
+	t.top = newHeaderClip(t, &bellui.Container{})
+	t.left = newHeaderClip(t, &bellui.Container{})
 	t.corner = newClip(t, &bellui.Container{})
 	t.dividerLayer = newClip(t, &bellui.Container{})
 	t.dragCol = noCellMatch
@@ -252,8 +254,8 @@ func (t *Table) Dragged(e *event.DragEvent) {
 // ClaimsDrag takes a touch drag only while a header resize is under way, and
 // leaves every other drag to the scrolls inside and around the table
 // (event.DragClaimer, #1266). A resize starts from a mouse press over a header
-// divider, and a touch sends no mouse press, so on touch the table itself
-// claims nothing: its content scroll takes the drags it can follow, and the
+// divider, or on touch from a long-press on one (#1293), so a plain swipe
+// claims nothing: the content scroll takes the drags it can follow, and the
 // page the rest.
 func (t *Table) ClaimsDrag(geo.Delta) bool {
 	return t.dragCol != noCellMatch || t.dragRow != noCellMatch
@@ -958,6 +960,36 @@ func (t *Table) tapped(pos geo.Position) {
 			t.dragStartSize = size
 		}
 	}
+}
+
+// longPressHeader starts resizing the header divider nearest pos, in the
+// table's coordinates, when one is within a finger's reach (#1293). A finger
+// never hovers, so nothing found the divider before, and a touch had no way to
+// resize a column or row. The held finger's drag then goes to the header strip
+// it pressed (a drag after a hold-fired long-press is not offered around) and
+// resizes, as a mouse drag from the divider does. start is the press in the
+// strip's coordinates, which its drags are reported in. It reports whether a
+// resize is under way.
+func (t *Table) longPressHeader(pos, start geo.Position) bool {
+	if t.dragCol != noCellMatch || t.dragRow != noCellMatch {
+		return true // a mouse press on the divider armed it already
+	}
+	defer func() {
+		// A finger leaves no hover behind.
+		t.hoverHeaderRow, t.hoverHeaderCol = noCellMatch, noCellMatch
+		t.hoverOut()
+	}()
+	reach := t.Theme().Size(theme.SizeNameIconButtonSize) / 4
+	for d := float32(0); d <= reach; d++ {
+		for _, near := range []geo.Position{pos.AddXY(d, 0), pos.AddXY(-d, 0), pos.AddXY(0, d), pos.AddXY(0, -d)} {
+			t.hoverAt(near)
+			if t.hoverHeaderCol != noCellMatch || t.hoverHeaderRow != noCellMatch {
+				t.tapped(start)
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (t *Table) templateSize() geo.Size {
@@ -2002,6 +2034,50 @@ func newClip(t *Table, o core.CanvasObject) *clip {
 	c.Direction = widget.ScrollNone
 
 	return c
+}
+
+// headerClip is the clip of the header row or the header column. It also takes
+// a long-press, which on touch starts resizing the divider under the finger
+// (#1293). Only the headers do: a long-press elsewhere in the table keeps its
+// old handling.
+type headerClip struct {
+	clip
+}
+
+func newHeaderClip(t *Table, o core.CanvasObject) *headerClip {
+	c := &headerClip{}
+	c.t = t
+	c.Content = o
+	c.Direction = widget.ScrollNone
+	return c
+}
+
+// LongPressed starts a resize when the long-press is on a header divider.
+//
+// Anywhere else it answers as the tap it would otherwise have been (as a
+// TreeView row does, #1296). The drivers send no tap for the release of a
+// hold-fired press, and the desktop fires a long-press for a mouse held still
+// too, so without this a slow click on a button in a header, such as a sort
+// button, would do nothing. The tap goes to the Tappable under the press in
+// the header. A plain header has none, and the table's own tap does nothing
+// on a header.
+func (c *headerClip) LongPressed(e *event.PointEvent) {
+	if c.t.longPressHeader(e.Position.Add(c.Position()), e.Position) {
+		return
+	}
+	// The strip's container has no size of its own, so the hit test starts
+	// from the header cells in it.
+	var cells []core.CanvasObject
+	if box, ok := c.Content.(*bellui.Container); ok {
+		cells = box.Objects
+	}
+	co, pos, _ := intdriver.FindObjectAtPositionMatching(e.Position.Subtract(c.Content.Position()), func(o core.CanvasObject) bool {
+		_, ok := o.(event.Tappable)
+		return ok
+	}, nil, cells...)
+	if tap, ok := co.(event.Tappable); ok {
+		tap.Tapped(&event.PointEvent{Position: pos, AbsolutePosition: e.AbsolutePosition})
+	}
 }
 
 func (c *clip) DragEnd() {
