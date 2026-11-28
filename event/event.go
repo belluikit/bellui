@@ -106,9 +106,10 @@ type ScrollEvent struct {
 	Source   ScrollSource
 
 	// Phase is where the scroll stands in a touchpad gesture. macOS reports
-	// it for a trackpad, and Wayland for a finger scroll; elsewhere, and for
-	// a mouse wheel, it is ScrollPhaseUnknown. The gesture's end is not a
-	// scroll: a ScrollEnder is told of it.
+	// it for a trackpad, Wayland for a finger scroll, and Android 14+ and
+	// iPadOS for a touchpad; elsewhere, and for a mouse wheel, it is
+	// ScrollPhaseUnknown. The gesture's end is not a scroll: a ScrollEnder is
+	// told of it.
 	//
 	// Since: 1.7
 	Phase ScrollPhase
