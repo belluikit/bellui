@@ -8,6 +8,12 @@
 // the way across archives at once. The toggle at the top lays the grid out
 // right to left, which puts Flag on the right.
 //
+// On a Mac (and under Wayland) a two-finger trackpad swipe over a row follows
+// the same rule. Lift the fingers to settle the row; the coast after a swipe
+// moves nothing. To run it against the checkout rather than the pinned
+// release, add replace github.com/belluikit/bellui => ../../../.. to its
+// go.mod first.
+//
 // Every action and cell click is printed, which on Android reaches logcat
 // under the tag Bellui:
 //
