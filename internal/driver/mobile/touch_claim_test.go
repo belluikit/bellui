@@ -387,8 +387,8 @@ func Test_canvas_LongPressThenDragMovesTreeViewRow(t *testing.T) {
 
 // A long-press on a Table's header divider, then a drag, resizes the column on
 // touch (#1293): a finger never hovers, so before, nothing found the divider.
-// A plain swipe over the header still resizes nothing, and a long-press away
-// from any divider does not either.
+// A plain swipe over the header still resizes nothing and scrolls the page,
+// and a long-press away from any divider resizes nothing either.
 func Test_canvas_LongPressThenDragResizesTableColumn(t *testing.T) {
 	var width0 float32
 	table := widget.NewTable(
@@ -432,7 +432,11 @@ func Test_canvas_LongPressThenDragResizesTableColumn(t *testing.T) {
 	assert.InDelta(t, start+40, readWidth(), 0.5, "the long-press then drag widened column 0 by the drag")
 	assert.Zero(t, page.Offset.Y)
 
-	// The resize ended with the finger: a later swipe resizes nothing more.
+	// The resize ended with the finger: a later swipe resizes nothing more,
+	// and an upward swipe over the header still scrolls the page (#1266).
 	swipe(c, 2, press, press.AddXY(40, 0))
+	assert.InDelta(t, start+40, readWidth(), 0.5)
+	swipe(c, 3, press, press.SubtractXY(0, 60))
+	assert.Equal(t, float32(60), page.Offset.Y, "a plain upward swipe over the header scrolled the page")
 	assert.InDelta(t, start+40, readWidth(), 0.5)
 }
