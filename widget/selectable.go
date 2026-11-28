@@ -748,7 +748,11 @@ type selectableRenderer struct {
 func (r *selectableRenderer) Destroy() {
 }
 
+// Layout runs when the selection's size changes. A centred or trailing row's
+// highlight is placed against that width, so it is rebuilt to follow its text
+// (#1523). With nothing selected that builds no highlight.
 func (r *selectableRenderer) Layout(geo.Size) {
+	r.Refresh()
 }
 
 func (r *selectableRenderer) MinSize() geo.Size {

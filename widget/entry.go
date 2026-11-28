@@ -4492,6 +4492,13 @@ func (r *entryContentRenderer) Destroy() {
 func (r *entryContentRenderer) Layout(size geo.Size) {
 	r.provider.Resize(size)
 	r.placeholder.Resize(size)
+	// The selection measures where centred or trailing text starts against
+	// its own width, so it takes the text's. Left at zero it drew every
+	// highlight from the left edge: under right-to-left text, and under a
+	// centre or trailing alignment (#1523).
+	if sel := r.content.entry.sel; sel != nil {
+		sel.Resize(size)
+	}
 }
 
 func (r *entryContentRenderer) MinSize() geo.Size {
