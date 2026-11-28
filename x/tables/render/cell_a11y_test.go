@@ -157,7 +157,7 @@ func repeat(v float32, n int) []float32 {
 
 func TestCellHost_Accessibility(t *testing.T) {
 	g := &fakeGrid{rows: 3, cols: 2, selected: map[cellKey]bool{{1, 0}: true}}
-	h := newCellHost(g, g.CreateCell(0))
+	h := newCellHost(g, g.CreateCell(0), "")
 	h.row, h.col = 1, 0
 
 	if h.AccessibleRole() != core.RoleTableCell {
@@ -187,7 +187,7 @@ func TestCellHost_StateFocused(t *testing.T) {
 		selected: map[cellKey]bool{{1, 0}: true}, // selected but not the cursor
 		focused:  map[cellKey]bool{{2, 1}: true}, // the cursor cell (unselected)
 	}
-	h := newCellHost(g, g.CreateCell(0))
+	h := newCellHost(g, g.CreateCell(0), "")
 
 	h.row, h.col = 2, 1 // the cursor cell
 	st := h.AccessibleState()
@@ -219,7 +219,7 @@ func TestCellHost_StateFocused(t *testing.T) {
 // cell like a tap. The checkbox host's sentinel column -1 selects the row.
 func TestCellHost_SelectAction(t *testing.T) {
 	g := &fakeGrid{rows: 3, cols: 2}
-	h := newCellHost(g, g.CreateCell(0))
+	h := newCellHost(g, g.CreateCell(0), "")
 	h.row, h.col = 2, 1
 
 	acts := h.AccessibleActions()
@@ -243,7 +243,7 @@ func TestCellHost_SelectAction(t *testing.T) {
 // and main/pinned-right columns shift one place right.
 func TestCellHost_CheckboxVisualSlot(t *testing.T) {
 	g := &fakeGrid{checkbox: true, pinnedLeft: 2}
-	h := newCellHost(g, g.CreateCell(0))
+	h := newCellHost(g, g.CreateCell(0), "")
 	cases := []struct{ internal, want int }{
 		{0, 0}, {1, 1}, // pinned-left columns unchanged
 		{-1, 2},        // checkbox host -> PinnedLeftCount

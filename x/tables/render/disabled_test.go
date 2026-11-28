@@ -57,7 +57,7 @@ func TestRenderParts_RefuseInputWhileGridDisabled(t *testing.T) {
 	}
 	grid := &disabledGrid{fakeGrid: fg, off: true}
 
-	host := newCellHost(grid, canvas.NewText("", nil))
+	host := newCellHost(grid, canvas.NewText("", nil), "")
 	host.row, host.col = 1, 1
 	group := newGroupRowA11y(grid)
 	group.set("g", 1, false, nil)

@@ -302,7 +302,14 @@ func (r *CellsRenderer) obtainHost(typeName string, col int) *cellHost {
 		r.hostPool[typeName] = hosts[:len(hosts)-1]
 		return h
 	}
-	return newCellHost(r.cells.Grid, r.cells.Grid.CreateCell(col))
+	content := r.cells.Grid.CreateCell(col)
+	if content == nil {
+		// A column the viewport names that the grid no longer has (its
+		// copy in a row layer can be a step behind): an empty cell, which
+		// UpdateCell leaves alone.
+		content = canvas.NewRectangle(color.Transparent)
+	}
+	return newCellHost(r.cells.Grid, content, typeName)
 }
 
 // releaseHost returns a host (and the content it owns) to the pool for its
@@ -416,7 +423,7 @@ func (r *CellsRenderer) refreshCells() {
 		if showCheckbox {
 			if cbIdx >= len(r.checkboxes) {
 				cb := widget.NewCheck("", nil)
-				host := newCellHost(grid, cb)
+				host := newCellHost(grid, cb, "")
 				host.col = -1
 				// The box's own tap (or accessible toggle) is what toggles the
 				// row; the grid's press there does nothing (#1504).
@@ -513,7 +520,7 @@ func (r *CellsRenderer) refreshCells() {
 			typeName := grid.ColumnTypeName(col)
 
 			var host *cellHost
-			if existing, exists := r.visible[key]; exists {
+			if existing, exists := r.visible[key]; exists && existing.(*cellHost).typeName == typeName {
 				host = existing.(*cellHost)
 				delete(r.visible, key)
 			} else {
@@ -564,9 +571,9 @@ func (r *CellsRenderer) refreshCells() {
 
 	objects = r.coverTrailing(objects, tc)
 
-	for key, obj := range r.visible {
-		typeName := grid.ColumnTypeName(key.col)
-		r.releaseHost(typeName, obj.(*cellHost))
+	for _, obj := range r.visible {
+		h := obj.(*cellHost)
+		r.releaseHost(h.typeName, h)
 	}
 	r.visible = newVisible
 
