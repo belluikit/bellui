@@ -241,7 +241,7 @@ Implementation: `internal/driver/glfw/clipboard_flavors_{darwin,windows,linux,wa
 - **Payload** is the whole `userInfo` as JSON, decoded into `PushNotification.Payload` (`aps` included); `Title`/`Body` come from `aps.alert`, a string (the body) or a dictionary.
 - **Out of scope:** silent (background) pushes, actions on remote pushes, Android, macOS.
 - **Entitlement:** `aps-environment` is `$(APS_ENVIRONMENT)` in `ios/Entitlements.plist`, filled in by build kind (iOS Packaging, below).
-- Unit tests: `app/push_test.go` (payload decoding, holding without a run or callback), `app/push_delivery_test.go` (`ci`: the cold-launch hold through main-goroutine delivery, the foreground answer), `cmd/bellui/internal/mobile/ios_extras_test.go` (`TestIOSEntitlementsAPSEnvironment`). Live-verify harness: `hack/pushprobe`.
+- Unit tests: `app/push_test.go` (payload decoding, holding without a run or callback), `app/push_delivery_test.go` (`ci`: the cold-launch hold through main-goroutine delivery, the foreground answer), `cmd/bellui/internal/mobile/ios_extras_test.go` (`TestIOSEntitlementsAPSEnvironment`). Live-verify harness: `hack/pushprobe`; `hack/pushprobe/simtest/run.sh` runs every case on a booted simulator (an XCUITest bundle taps the permission alert, banners and an action button) and prints PASS/FAIL per case. A real device still needs a push-capable provisioning profile and a push sent through APNs's sandbox.
 
 ### Android Back and the target API (#935)
 

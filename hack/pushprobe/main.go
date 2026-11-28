@@ -26,6 +26,8 @@
 // callbacks through the same app delegate since #1517, and must not reach
 // the push callbacks.
 //
+// hack/pushprobe/simtest/run.sh drives all of it on a simulator, with taps.
+//
 // A device build needs a provisioning profile with Push Notifications, and a
 // push sent through APNs's sandbox with the app's key.
 package main
