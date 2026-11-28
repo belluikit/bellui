@@ -2,9 +2,11 @@ package tables
 
 import (
 	"fmt"
+	"image/color"
 	"sort"
 
 	"github.com/belluikit/bellui"
+	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/driver/desktop"
@@ -144,7 +146,10 @@ type DataGrid struct {
 	pinnedLeftCells   *render.PinnedCellsWidget
 	pinnedRightCells  *render.PinnedCellsWidget
 	groupRowOverlay   *render.GroupRowOverlay
-	rowSwipeLayer     *rowSwipeLayer            // draws the swiped row (#1483)
+	rowSwipeLayer     *rowSwipeLayer    // draws the swiped row (#1483)
+	rowLiftLayer      *rowSwipeLayer    // draws a row being moved (#1512)
+	dropLine          *canvas.Rectangle // where a moved row will land (#1512)
+	lift              rowLift
 	floatingFilterRow *render.FloatingFilterRow // set by the renderer when floating filters are enabled
 	gridTheme         *gridTheme.GridTheme
 
@@ -192,7 +197,8 @@ type DataGrid struct {
 	activeTooltip   *widget.PopUp
 
 	dragCol          int
-	dragRow          int // for row drag reorder (-1 = none)
+	dragRow          int     // for row drag reorder (-1 = none)
+	dragPressY       float32 // where the press that armed dragRow went down
 	dragStartSize    float32
 	nearResizeBorder bool         // true when mouse is near a column header border
 	resizeCol        int          // column index being resize-dragged (-1 = none)
@@ -299,6 +305,9 @@ func (g *DataGrid) init() {
 	g.pinnedRightCells = render.NewPinnedCellsWidget(g, render.PinnedRight, g.pool, g.viewport)
 	g.groupRowOverlay = render.NewGroupRowOverlay(g, g.viewport)
 	g.rowSwipeLayer = newRowSwipeLayer(g)
+	g.rowLiftLayer = newRowLiftLayer(g)
+	g.dropLine = canvas.NewRectangle(color.Transparent)
+	g.dropLine.Hide()
 	g.scrollContent = render.NewScrollContainer(g.cellsWidget)
 	g.scrollContent.SetOnScrolled(g.onScrolled)
 
@@ -1949,6 +1958,9 @@ func (g *DataGrid) TypedKey(e *event.KeyEvent) {
 
 	switch e.Name {
 	case event.KeyEscape:
+		if g.cancelLift() {
+			return
+		}
 		if g.IsEditing() {
 			g.StopEditing()
 		}
@@ -2087,9 +2099,13 @@ func (g *DataGrid) Dragged(e *event.DragEvent) {
 		return
 	}
 
-	// Row drag reorder
+	// Row drag reorder: the press's first move lifts the row (#1512).
 	if g.dragRow >= 0 {
+		if !g.lift.active {
+			g.liftRow(g.dragPressY)
+		}
 		g.lastMousePos = e.Position
+		g.moveLift(e.Position.Y)
 		return
 	}
 
@@ -2177,12 +2193,9 @@ func (g *DataGrid) DragEnd() {
 		g.reorderFromCol = -1
 	}
 
-	// Finalize row drag reorder
+	// Finalize row drag reorder: the row goes where the line showed.
 	if g.dragRow >= 0 {
-		dropID := g.cellAtPosition(g.lastMousePos)
-		if dropID.Row >= 0 && dropID.Row != g.dragRow {
-			g.MoveRow(g.dragRow, dropID.Row)
-		}
+		g.dropLift()
 		g.dragRow = -1
 	}
 
@@ -2276,6 +2289,7 @@ func (g *DataGrid) MouseDown(e *desktop.MouseEvent) {
 		// Start row drag if enabled
 		if g.rowsReorderable() {
 			g.dragRow = id.Row
+			g.dragPressY = e.Position.Y
 		}
 	}
 }
