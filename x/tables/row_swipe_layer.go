@@ -32,6 +32,11 @@ type rowSwipeLayer struct {
 
 	grid *DataGrid
 
+	// lifting makes this the layer of a row being moved by a drag (#1512,
+	// datagrid_rowlift.go) rather than swiped: the copy follows the pointer
+	// up and down, with no actions behind it and no cover over it.
+	lifting bool
+
 	// vp is a copy of the grid's viewport with only the swiped row visible,
 	// which the cell widgets below draw from.
 	vp                      *render.Viewport
@@ -54,12 +59,21 @@ func newRowSwipeLayer(g *DataGrid) *rowSwipeLayer {
 	return l
 }
 
+// newRowLiftLayer makes the layer that draws a row being moved (#1512).
+func newRowLiftLayer(g *DataGrid) *rowSwipeLayer {
+	l := newRowSwipeLayer(g)
+	l.lifting = true
+	l.cover.Hide()
+	return l
+}
+
 func (l *rowSwipeLayer) CreateRenderer() core.WidgetRenderer {
 	l.ExtendBaseWidget(l)
-	r := &rowSwipeLayerRenderer{layer: l, bg: canvas.NewRectangle(color.Transparent)}
+	r := &rowSwipeLayerRenderer{layer: l, bg: canvas.NewRectangle(color.Transparent), outline: canvas.NewRectangle(color.Transparent)}
+	r.outline.Hide()
 	r.mainBand = container.NewWithoutLayout(l.cells)
 	r.mainClip = container.NewClip(r.mainBand)
-	r.row = container.NewWithoutLayout(r.bg, l.pinnedLeft, r.mainClip, l.pinnedRight, l.cover)
+	r.row = container.NewWithoutLayout(r.bg, l.pinnedLeft, r.mainClip, l.pinnedRight, r.outline, l.cover)
 	r.band = container.NewWithoutLayout(r.row)
 	r.clip = container.NewClip(r.band)
 	return r
@@ -74,6 +88,8 @@ type rowSwipeLayerRenderer struct {
 	band *bellui.Container
 	row  *bellui.Container
 	bg   *canvas.Rectangle
+	// outline frames a lifted row above its cells (#1512).
+	outline *canvas.Rectangle
 
 	// The main columns scroll sideways under the pinned ones: in the row they
 	// sit in their own clip, at the main band's place, moved by the body's
@@ -99,8 +115,13 @@ func (r *rowSwipeLayerRenderer) refresh(size geo.Size) {
 	l := r.layer
 	g := l.grid
 	s := &g.swipe
-	row := -1
-	if s.src >= 0 {
+	row, dx := -1, s.offset
+	switch {
+	case l.lifting:
+		if g.lift.active {
+			row, dx = g.dragRow, 0
+		}
+	case s.src >= 0:
 		row = g.displayRowForSource(s.src)
 	}
 	if row < 0 || row >= g.RowCount() || size.Width <= 0 || size.Height <= 0 {
@@ -113,6 +134,9 @@ func (r *rowSwipeLayerRenderer) refresh(size geo.Size) {
 	rowY, rowH := g.viewport.RowY(row)
 	cellH := rowH - g.DetailBandHeight(row)
 	y := rowY - g.offset.Y
+	if l.lifting {
+		y = g.lift.pointerY - g.lift.grab // the copy follows the pointer
+	}
 	top, bottom := geo.Max(y, 0), geo.Min(y+cellH, size.Height)
 	if bottom <= top {
 		r.objects = nil
@@ -124,13 +148,24 @@ func (r *rowSwipeLayerRenderer) refresh(size geo.Size) {
 	r.band.Move(geo.NewPos(0, y-top))
 	r.band.Resize(geo.NewSize(width, cellH))
 
-	r.layoutButtons(width, cellH)
+	if !l.lifting {
+		r.layoutButtons(width, cellH)
+	}
 
 	// The row, slid by the offset over a background that hides the one the
 	// bands draw beneath it.
-	r.row.Move(geo.NewPos(s.offset, 0))
+	r.row.Move(geo.NewPos(dx, 0))
 	r.row.Resize(geo.NewSize(width, cellH))
-	r.bg.FillColor = render.ResolveThemeColors().Background
+	colors := render.ResolveThemeColors()
+	r.bg.FillColor = colors.Background
+	if l.lifting {
+		// Outlined above its cells, so the lifted copy reads as picked up.
+		r.outline.StrokeColor, r.outline.StrokeWidth = colors.Primary, 1
+		r.outline.Move(geo.NewPos(0, 0))
+		r.outline.Resize(geo.NewSize(width, cellH))
+		r.outline.Show()
+		r.outline.Refresh()
+	}
 	r.bg.Move(geo.NewPos(0, 0))
 	r.bg.Resize(geo.NewSize(width, cellH))
 	r.bg.Refresh()

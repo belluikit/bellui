@@ -196,9 +196,13 @@ func (r *dataGridRenderer) doLayout(size geo.Size) {
 	g.groupRowOverlay.Resize(geo.NewSize(size.Width, contentH))
 	g.groupRowOverlay.SetScrollBarInsets(g.scrollBarInsets(scrollSize))
 
-	// The swiped row, over every band (#1483).
+	// The swiped row, over every band (#1483), and a row being moved with the
+	// line where it will land (#1512).
 	g.rowSwipeLayer.Move(geo.NewPos(0, yOffset))
 	g.rowSwipeLayer.Resize(geo.NewSize(size.Width, contentH))
+	g.rowLiftLayer.Move(geo.NewPos(0, yOffset))
+	g.rowLiftLayer.Resize(geo.NewSize(size.Width, contentH))
+	g.layoutDropLine(g.dropLine, size.Width)
 
 	// Status bar
 	if r.statusBar != nil {
@@ -224,6 +228,9 @@ func (r *dataGridRenderer) doLayout(size geo.Size) {
 	g.groupRowOverlay.Refresh()
 	if g.rowSwipeLayer.Visible() {
 		g.rowSwipeLayer.Refresh()
+	}
+	if g.rowLiftLayer.Visible() {
+		g.rowLiftLayer.Refresh()
 	}
 }
 
@@ -317,6 +324,9 @@ func (r *dataGridRenderer) rebuildObjects() {
 		g.groupRowOverlay,
 		// The swiped row and its actions, drawn whole across the bands.
 		g.rowSwipeLayer,
+		// The line where a moved row will land, and the row itself above it.
+		g.dropLine,
+		g.rowLiftLayer,
 	)
 
 	if r.statusBar != nil {
