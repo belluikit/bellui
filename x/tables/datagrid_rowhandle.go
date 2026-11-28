@@ -68,6 +68,56 @@ func (r *rowHandleRenderer) UpdateCell(obj core.CanvasObject, p cell.Params) {
 	h.icon.SetResource(res)
 }
 
+// reorderOffReason is the hint a grey grip gives when it is touched or
+// clicked (owner, 2026-11-28): why the grid has turned row moving off, and
+// how to turn it back on. It is "" while rows can move, and when the app
+// turned it off itself (RowDragEnabled unset, or the grid disabled), which
+// the app explains if it wants to.
+func (g *DataGrid) reorderOffReason() string {
+	switch {
+	case !g.Options.RowDragEnabled || g.disabled:
+		return ""
+	case len(g.sortModel) > 0:
+		return "Clear the sort to reorder rows"
+	case g.groupTransform != nil:
+		return "Remove the grouping to reorder rows"
+	case g.pivotTransform != nil:
+		return "Turn off the pivot to reorder rows"
+	case g.treeTransform != nil:
+		return "Rows in a tree can't be reordered"
+	}
+	return ""
+}
+
+// showReorderHint shows reorderOffReason as a toast, one at a time: a second
+// touch replaces the first rather than stacking another. A toast is a status
+// message, so screen readers announce it.
+func (g *DataGrid) showReorderHint() {
+	msg := g.reorderOffReason()
+	if msg == "" {
+		return
+	}
+	c := bellui.CurrentApp().Driver().CanvasForObject(g)
+	if c == nil {
+		return
+	}
+	if g.reorderHint != nil {
+		g.reorderHint.Dismiss()
+	}
+	g.reorderHint = widget.ShowToast(msg, c)
+}
+
+// onRowDragHandle reports whether pos, in the grid's coordinates, is in a
+// handle column's cell.
+func (g *DataGrid) onRowDragHandle(pos geo.Position) bool {
+	id := g.cellAtPosition(pos)
+	if id.Row < 0 || id.Col < 0 {
+		return false
+	}
+	rc := g.visibleCol(id.Col)
+	return rc != nil && rc.def.RowDragHandle
+}
+
 // rowHandle is a grip in a handle column's cell. Dragging it moves its row.
 type rowHandle struct {
 	widget.BaseWidget
@@ -79,7 +129,20 @@ type rowHandle struct {
 var (
 	_ event.Draggable   = (*rowHandle)(nil)
 	_ event.DragClaimer = (*rowHandle)(nil)
+	_ event.Tappable    = (*rowHandle)(nil)
 )
+
+// Tapped on a grey grip says why it is grey. On a live one it is the grid's
+// tap, as on any other cell.
+func (h *rowHandle) Tapped(e *event.PointEvent) {
+	g := h.grid
+	if !g.rowsReorderable() {
+		g.showReorderHint()
+		return
+	}
+	pos := e.AbsolutePosition.Subtract(bellui.CurrentApp().Driver().AbsolutePositionForObject(g))
+	g.Tapped(&event.PointEvent{Position: pos, AbsolutePosition: e.AbsolutePosition})
+}
 
 func (h *rowHandle) CreateRenderer() core.WidgetRenderer {
 	return widget.NewSimpleRenderer(h.icon)
@@ -125,6 +188,9 @@ func (g *DataGrid) gridY(abs geo.Position) float32 {
 func (g *DataGrid) LongPressed(e *event.PointEvent) {
 	if g.disabled {
 		return
+	}
+	if !g.rowsReorderable() && g.onRowDragHandle(e.Position) {
+		g.showReorderHint() // a held grey grip says why, as a tapped one does
 	}
 	if g.mousePressed {
 		g.Tapped(e)
