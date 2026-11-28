@@ -140,6 +140,16 @@ type ColumnDef struct {
 	// Movable controls whether this column can be reordered by drag. Nil inherits.
 	Movable *bool
 
+	// RowDragHandle makes this column the rows' drag handle (#1512): its cells
+	// draw a grip, and a drag that starts on one moves its row up or down, by
+	// mouse or by touch, while GridOptions.RowDragEnabled is set and no sort,
+	// grouping, pivot or tree data orders the rows (the grip is drawn
+	// disabled then). With a handle the mouse moves rows only from it; without
+	// one, a mouse drag anywhere on a row does. On touch a row can also be
+	// held and then dragged from anywhere. The column shows no value, so it
+	// needs no Field; give it a narrow Width.
+	RowDragHandle bool
+
 	// HeaderComponent returns a custom widget for this column's header.
 	// If nil, a default text header is used.
 	HeaderComponent func() core.CanvasObject

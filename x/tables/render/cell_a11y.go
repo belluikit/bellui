@@ -30,6 +30,11 @@ type cellHost struct {
 	grid     GridAccess
 	content  core.CanvasObject
 	row, col int
+	// typeName is the cell type its content was made for. A host is only
+	// reused, and pooled, as that type: columns can change under a visible
+	// cell (hidden, moved, re-resolved), and a renderer handed another
+	// type's content panics on it (#1512).
+	typeName string
 }
 
 var (
@@ -40,8 +45,8 @@ var (
 	_ core.AccessibleActioner   = (*cellHost)(nil)
 )
 
-func newCellHost(grid GridAccess, content core.CanvasObject) *cellHost {
-	h := &cellHost{grid: grid, content: content}
+func newCellHost(grid GridAccess, content core.CanvasObject, typeName string) *cellHost {
+	h := &cellHost{grid: grid, content: content, typeName: typeName}
 	h.ExtendBaseWidget(h)
 	return h
 }

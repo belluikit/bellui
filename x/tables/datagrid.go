@@ -395,9 +395,12 @@ func (g *DataGrid) resolveColumn(def *ColumnDef, index int) *resolvedColumn {
 	}
 
 	// Resolve renderer
-	if def.CellRenderer != nil {
+	switch {
+	case def.RowDragHandle && def.CellRenderer == nil:
+		col.renderer = &rowHandleRenderer{grid: g}
+	case def.CellRenderer != nil:
 		col.renderer = def.CellRenderer
-	} else {
+	default:
 		col.builtin = true
 		switch def.Type {
 		case ColumnNumber:
@@ -2287,7 +2290,8 @@ func (g *DataGrid) MouseDown(e *desktop.MouseEvent) {
 	if id.Row >= 0 && id.Col >= 0 {
 		g.selectCellWithModifiers(id, e.Modifier)
 		// Start row drag if enabled
-		if g.rowsReorderable() {
+		// With a handle column only its grips move rows (owner decision 2).
+		if g.rowsReorderable() && !g.hasRowDragHandle() {
 			g.dragRow = id.Row
 			g.dragPressY = e.Position.Y
 		}

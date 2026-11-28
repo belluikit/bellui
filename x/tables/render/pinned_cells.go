@@ -135,7 +135,7 @@ func (r *pinnedCellsRenderer) obtainPinnedHost(typeName string, displayCol int) 
 		r.hostPool[typeName] = hosts[:len(hosts)-1]
 		return h
 	}
-	return newCellHost(r.widget.Grid, r.widget.Grid.PinnedCreateCell(displayCol))
+	return newCellHost(r.widget.Grid, r.widget.Grid.PinnedCreateCell(displayCol), typeName)
 }
 
 func (r *pinnedCellsRenderer) releasePinnedHost(typeName string, h *cellHost) {
@@ -270,7 +270,7 @@ func (r *pinnedCellsRenderer) refresh(size geo.Size) {
 			typeName := grid.PinnedColumnTypeName(col)
 
 			host, exists := r.visible[key]
-			if exists {
+			if exists && host.typeName == typeName {
 				delete(r.visible, key)
 			} else {
 				host = r.obtainPinnedHost(typeName, col)
@@ -366,9 +366,8 @@ func (r *pinnedCellsRenderer) refresh(size geo.Size) {
 	}
 
 	// Recycle hosts that scrolled out of view.
-	for key, host := range r.visible {
-		typeName := grid.PinnedColumnTypeName(key.col)
-		r.releasePinnedHost(typeName, host)
+	for _, host := range r.visible {
+		r.releasePinnedHost(host.typeName, host)
 	}
 	r.visible = newVisible
 	// Right to left, the band's cells and disclosures are mirrored across
