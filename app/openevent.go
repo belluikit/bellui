@@ -8,10 +8,12 @@ import (
 	"github.com/belluikit/bellui/storage"
 )
 
-// openPayload is one buffered "open with" event: exactly one of uri / link is set.
+// openPayload is one buffered "open with" event, or a tapped push (see
+// push.go): exactly one of uri / link / push is set.
 type openPayload struct {
 	uri  bellui.URI
 	link *url.URL
+	push *bellui.PushNotification
 }
 
 // SetOnFileOpened implements bellui.OpenHandlerApp.
@@ -104,7 +106,10 @@ func (a *belluiApp) flushOpensLocked() {
 }
 
 func (a *belluiApp) hasHandlerForLocked(p openPayload) bool {
-	if p.link != nil {
+	switch {
+	case p.push != nil:
+		return a.onPushOpened != nil
+	case p.link != nil:
 		return a.onURLOpened != nil
 	}
 	return a.onFileOpened != nil
@@ -113,6 +118,11 @@ func (a *belluiApp) hasHandlerForLocked(p openPayload) bool {
 // dispatchLocked queues one payload onto the main goroutine. Callers hold
 // openMu; the callback runs later so it never re-enters under the lock.
 func (a *belluiApp) dispatchLocked(p openPayload) {
+	if p.push != nil {
+		cb, n := a.onPushOpened, p.push
+		queueOnMain(func() { cb(n) })
+		return
+	}
 	if p.link != nil {
 		cb, link := a.onURLOpened, p.link
 		queueOnMain(func() { cb(link) })

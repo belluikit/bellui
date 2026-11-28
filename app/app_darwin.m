@@ -195,7 +195,13 @@ void doSendNotificationWithOptions(UNUserNotificationCenter *center, unsigned lo
 void sendNotificationWithOptions(unsigned long long token, char *cTitle, char *cBody,
         char *cIconPath, char **cActionLabels, int actionCount) {
     UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
+#if !TARGET_OS_IPHONE
+    // On iOS the app delegate is the delegate from launch to exit and routes
+    // the belluiToken taps back itself (internal/driver/mobile/app, #1517):
+    // replacing it here cost every tap that launches the app, and remote
+    // pushes too.
     center.delegate = [BelluiUNDelegate shared];
+#endif
 
     NSString *title = [NSString stringWithUTF8String:cTitle];
     NSString *body = [NSString stringWithUTF8String:cBody];

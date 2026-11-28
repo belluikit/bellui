@@ -12,7 +12,12 @@ import (
 // Universal Link) — buffered until now if it arrived as the launch URL — which
 // classifyOpenArg splits into a file or URL open (file:// → file, http/custom
 // scheme → URL). Unlike Android there is no content:// scheme on iOS.
+//
+// It also installs the push handlers (push_ios.go), which must be in place
+// before UIKit starts, for the same reason: a tap that launches the app is
+// reported during launch.
 func platformLaunchOpen(a *belluiApp) {
+	setupPush(a)
 	mobileapp.SetOpenIntentHandler(func(uri string) {
 		p, ok := classifyOpenArg(uri)
 		if !ok {
