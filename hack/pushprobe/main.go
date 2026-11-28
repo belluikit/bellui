@@ -26,6 +26,9 @@
 // callbacks through the same app delegate since #1517, and must not reach
 // the push callbacks.
 //
+// With -locals N it sends N rich local notifications at once at start, each
+// asking for authorization itself (#1519); with -asks 0 nothing else asks.
+//
 // hack/pushprobe/simtest/run.sh drives all of it on a simulator, with taps.
 //
 // A device build needs a provisioning profile with Push Notifications, and a
@@ -50,6 +53,7 @@ import (
 func main() {
 	local := flag.Bool("local", false, "send a rich local notification 3s after start")
 	asks := flag.Int("asks", 1, "how many permission requests to make at once at start")
+	locals := flag.Int("locals", 0, "how many rich local notifications to send at once at start (#1519)")
 	flag.Parse()
 	a := app.NewWithID("com.trendvidia.pushprobe")
 	w := a.NewWindow("Push probe")
@@ -119,6 +123,17 @@ func main() {
 	a.Lifecycle().SetOnStarted(func() {
 		for range *asks {
 			ask()
+		}
+		// Each send asks for authorization itself, so on a first launch
+		// these requests are pending together (#1519).
+		for i := range *locals {
+			title := fmt.Sprintf("Local %d", i)
+			rich := bellui.SendNotificationWithOptions(&bellui.NotificationOptions{
+				Title:    title,
+				Content:  "sent at start",
+				OnTapped: func() { logf("local tapped %s", title) },
+			})
+			logf("local sent %s rich=%v", title, rich)
 		}
 		register()
 	})

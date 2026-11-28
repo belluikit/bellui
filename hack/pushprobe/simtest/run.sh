@@ -1,5 +1,5 @@
 #!/bin/bash
-# Runs hack/pushprobe through every #1517 case on an iOS simulator and prints
+# Runs hack/pushprobe through every #1517 and #1519 case on an iOS simulator and prints
 # PASS or FAIL for each. Taps.xcodeproj is an XCUITest bundle that taps
 # SpringBoard: the permission alert, banners and a banner's action button.
 #
@@ -86,6 +86,17 @@ absent "a local tap is not a push" 'opened title="LocalRich"'
 xcrun simctl launch --terminate-running-process "$udid" $app -local >/dev/null; sleep 1
 TEST_RUNNER_TAP_ACTION=Reply tap testTapAction LocalRich; sleep 2
 check "local notification action" "local action Reply"
+
+# #1519: a local send made while the permission alert is up shows after
+# Allow, both beside another send and beside a permission request.
+fresh -asks 0 -locals 2
+tap testAllow; sleep 2
+tap testTapBanner "Local 1"; sleep 2
+check "a send beside another send shows after Allow" "local tapped Local 1"
+fresh -asks 2 -local
+tap testAllow; sleep 2
+tap testTapBanner LocalRich; sleep 2
+check "a send beside a permission request shows after Allow" "local tapped"
 
 echo "log: $log  work: $work"
 [ $fails = 0 ] && echo "ALL PASS" || { echo "$fails FAILED"; exit 1; }
