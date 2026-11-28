@@ -50,8 +50,12 @@ func fallbackNotification(title, content string) {
 	template := `display notification "%s" with title "%s"`
 	script := fmt.Sprintf(template, escapeNotificationString(content), escapeNotificationString(title))
 
-	err := exec.Command("osascript", "-e", script).Start()
-	if err != nil {
+	cmd := exec.Command("osascript", "-e", script)
+	if err := cmd.Start(); err != nil {
 		bellui.LogError("Failed to launch darwin notify script", err)
+		return
 	}
+	// Collect the script when it exits: an uncollected child stays in the
+	// process table as a zombie for the app's lifetime, one per notification.
+	go func() { _ = cmd.Wait() }()
 }
