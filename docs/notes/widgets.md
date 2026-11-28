@@ -45,6 +45,8 @@ The desktop driver uses GLFW's extended scroll and pinch callbacks (a belluikit/
 ### Scrollbar Space Reservation
 `widget.Scroll.ReserveBarSpace` (default `true`) reduces content width when a vertical scrollbar is active, preventing the scrollbar from overlapping content and fixing text wrapping at the right edge.
 
+Right-to-left, the vertical bar is at the Scroll's left edge, as Flutter's `Scrollbar` and Android's `View` place it (#1496; browsers and macOS were not checked). The reserved strip moves with it, and the content is placed after the strip, so it still ends at the Scroll's right edge. The strip is the one `Layout` reserved (`barStrip`), not the difference between the Scroll's and the content's widths: Table's header clips are Scrolls whose content Table sizes itself, and reading their narrower content as a strip moved the headers off the table. Code inside a Scroll that lays out across the Scroll's width rather than the content's (List, Tree and TreeView rows, a scrolling RichText's lines) reaches under the strip left-to-right; right-to-left it must mirror across the content's width so it reaches under the strip on the left, not past the right edge. `Table` mirrors across the whole table, the bar's strip included, and x/editor's hover-capture layer leaves the strip on the left.
+
 ### Date Picker Widget
 `widget.DatePicker` and `widget.NewDatePicker()` — calendar-style date picker with month navigation, locale-aware day headers and week-start day. `ShowDatePicker()` displays it as a modal popup with OK/Cancel buttons.
 
