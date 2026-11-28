@@ -8,10 +8,12 @@ import (
 	"github.com/belluikit/bellui/storage"
 )
 
-// openPayload is one buffered "open with" event: exactly one of uri / link is set.
+// openPayload is one buffered "open with" event, or a tapped push (see
+// push.go): exactly one of uri / link / push is set.
 type openPayload struct {
 	uri  bellui.URI
 	link *url.URL
+	push *bellui.PushNotification
 }
 
 // SetOnFileOpened implements bellui.OpenHandlerApp.
@@ -104,22 +106,58 @@ func (a *belluiApp) flushOpensLocked() {
 }
 
 func (a *belluiApp) hasHandlerForLocked(p openPayload) bool {
-	if p.link != nil {
+	switch {
+	case p.push != nil:
+		return a.onPushOpened != nil
+	case p.link != nil:
 		return a.onURLOpened != nil
 	}
 	return a.onFileOpened != nil
 }
 
-// dispatchLocked queues one payload onto the main goroutine. Callers hold
-// openMu; the callback runs later so it never re-enters under the lock.
+// dispatchLocked queues one payload's callback for the main goroutine.
+// Callers hold openMu; the callback runs later so it never re-enters under
+// the lock. Payloads keep their order: they wait in openOut, and one
+// goroutine at a time hands them to bellui.Do. A goroutine per payload, as
+// queueOnMain does, let two held payloads flushed together arrive either
+// way round (#1517: 93 of 200 runs under -race).
 func (a *belluiApp) dispatchLocked(p openPayload) {
-	if p.link != nil {
+	var fn func()
+	switch {
+	case p.push != nil:
+		cb, n := a.onPushOpened, p.push
+		fn = func() { cb(n) }
+	case p.link != nil:
 		cb, link := a.onURLOpened, p.link
-		queueOnMain(func() { cb(link) })
-		return
+		fn = func() { cb(link) }
+	default:
+		cb, uri := a.onFileOpened, p.uri
+		fn = func() { cb(uri) }
 	}
-	cb, uri := a.onFileOpened, p.uri
-	queueOnMain(func() { cb(uri) })
+	a.openOut = append(a.openOut, fn)
+	if !a.openDraining {
+		a.openDraining = true
+		go a.drainOpens()
+	}
+}
+
+// drainOpens hands openOut to the main goroutine in order, then exits. It
+// runs off the main goroutine so that, when called from Run before the loop
+// is pumping, bellui.Do enqueues rather than executing synchronously (see
+// queueOnMain); the driver's queue is first in, first out.
+func (a *belluiApp) drainOpens() {
+	for {
+		a.openMu.Lock()
+		if len(a.openOut) == 0 {
+			a.openDraining = false
+			a.openMu.Unlock()
+			return
+		}
+		fn := a.openOut[0]
+		a.openOut = a.openOut[1:]
+		a.openMu.Unlock()
+		bellui.Do(fn)
+	}
 }
 
 // queueOnMain schedules fn on the main goroutine via the running driver. It runs

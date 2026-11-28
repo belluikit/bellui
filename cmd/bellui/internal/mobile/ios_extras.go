@@ -146,6 +146,57 @@ func iosEntitlements(appDir string, associatedDomains []string) (*plistValue, er
 	return ent, nil
 }
 
+// apsEnvironmentKey is the push entitlement, and apsEnvironmentSetting the
+// build setting an entitlements file writes for its value (#1517): APNs keeps
+// development (sandbox) and production tokens apart, and which one a build
+// may use follows its certificate.
+const (
+	apsEnvironmentKey     = "aps-environment"
+	apsEnvironmentSetting = "APS_ENVIRONMENT"
+)
+
+// apsEnvironment is $(APS_ENVIRONMENT) for a build: production for a store
+// build (`bellui release`, signed with a distribution certificate),
+// development for `bellui package`, which signs with a development one.
+func apsEnvironment(distribution bool) string {
+	if distribution {
+		return "production"
+	}
+	return "development"
+}
+
+// iosPackageEntitlements is the entitlements file `bellui package` signs in
+// through Xcode: iosEntitlements with $(APS_ENVIRONMENT) filled in for the
+// build kind. Xcode expands the other build settings itself, but has no
+// value for this one.
+func iosPackageEntitlements(appDir string, associatedDomains []string, distribution bool) (*plistValue, error) {
+	ent, err := iosEntitlements(appDir, associatedDomains)
+	if err != nil || ent == nil {
+		return ent, err
+	}
+	env := apsEnvironment(distribution)
+	for _, v := range ent.Vals {
+		expandBuildSetting(v, apsEnvironmentSetting, env)
+	}
+	return ent, nil
+}
+
+// expandBuildSetting replaces the references to the one build setting name
+// in v's strings, recursively, and leaves every other reference as it is.
+func expandBuildSetting(v *plistValue, name, val string) {
+	if v.Kind == "string" {
+		v.Text = buildSettingRef.ReplaceAllStringFunc(v.Text, func(ref string) string {
+			if m := buildSettingRef.FindStringSubmatch(ref); m[1] == name && m[2] == "" {
+				return val
+			}
+			return ref
+		})
+	}
+	for _, c := range append(v.Vals, v.Items...) {
+		expandBuildSetting(c, name, val)
+	}
+}
+
 // IOSReleaseEntitlements is the entitlements file `bellui release -os ios`
 // re-signs the app with: the application identifier, then everything
 // `bellui package` signed in from the manifest and ios/Entitlements.plist.
@@ -154,7 +205,9 @@ func iosEntitlements(appDir string, associatedDomains []string) (*plistValue, er
 // codesign does not expand build settings the way Xcode does at package
 // time, so the ones an entitlements file uses ($(AppIdentifierPrefix), …)
 // are expanded here; any other $(…) is an error rather than a literal in the
-// store build's signature.
+// store build's signature. $(APS_ENVIRONMENT) is production, and a literal
+// aps-environment other than production is an error: a store build with
+// development push gets sandbox tokens, which no production push reaches.
 func IOSReleaseEntitlements(appDir, teamID, appID string, associatedDomains []string) ([]byte, error) {
 	ent, err := iosEntitlements(appDir, associatedDomains)
 	if err != nil {
@@ -168,10 +221,15 @@ func IOSReleaseEntitlements(appDir, teamID, appID string, associatedDomains []st
 			"TeamIdentifierPrefix":      teamID + ".",
 			"DEVELOPMENT_TEAM":          teamID,
 			"PRODUCT_BUNDLE_IDENTIFIER": appID,
+			apsEnvironmentSetting:       apsEnvironment(true),
 		}
 		for i, k := range ent.Keys {
 			if err := expandBuildSettings(ent.Vals[i], vars); err != nil {
 				return nil, fmt.Errorf("ios/%s: %s: %w", iosEntitlementsFile, k, err)
+			}
+			if k == apsEnvironmentKey && ent.Vals[i].Text != apsEnvironment(true) {
+				return nil, fmt.Errorf("ios/%s: %s is %q, but a store build needs %q: write $(%s) to get each build's own value",
+					iosEntitlementsFile, k, ent.Vals[i].Text, apsEnvironment(true), apsEnvironmentSetting)
 			}
 			out.set(k, ent.Vals[i])
 		}
@@ -444,6 +502,32 @@ func iosLinkFlags(fws []iosFramework) (cflags, ldflags []string) {
 		ldflags = append(ldflags, "-Wl,-rpath,"+iosEmbeddedFrameworks)
 	}
 	return cflags, ldflags
+}
+
+// iosGoLdflags is the go -ldflags of an iOS build: no DWARF (see
+// golang.org/issues/25148), and for a simulator build with entitlements the
+// field that links them in.
+func iosGoLdflags(entitlements bool) string {
+	if entitlements && buildTarget == "iossimulator" {
+		return "-w " + iosSimulatorEntitlementsLdflag(tmpdir+"/main/main.entitlements")
+	}
+	return "-w"
+}
+
+// iosSimulatorEntitlementsLdflag is the go -ldflags field that links the
+// entitlements file into a simulator binary as its __TEXT,__entitlements
+// section, which is where the simulator reads entitlements from: a simulator
+// build is signed ad hoc, and an ad hoc signature that carries a restricted
+// entitlement such as aps-environment is refused at launch. Xcode does the
+// same for its simulator builds. Without it the build had no entitlements at
+// all, and registering for push failed with "no valid aps-environment
+// entitlement string" (#1517).
+//
+// It goes to the external linker once, through -extldflags. In CGO_LDFLAGS it
+// would be passed once per cgo package, and the section would hold the file
+// that many times over.
+func iosSimulatorEntitlementsLdflag(path string) string {
+	return `"-extldflags=-Wl,-sectcreate,__TEXT,__entitlements,` + path + `"`
 }
 
 // withIOSFlags appends cflags and ldflags to env's CGO_CFLAGS and CGO_LDFLAGS,

@@ -1,0 +1,6 @@
+details {
+  name = "pushprobe"
+  id = "com.trendvidia.pushprobe"
+  version = "1.0.0"
+  build = 1
+}

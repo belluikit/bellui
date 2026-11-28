@@ -101,18 +101,22 @@ func (a *belluiApp) SendNotificationWithOptions(opts *bellui.NotificationOptions
 //
 //export notifyCallbackDarwin
 func notifyCallbackDarwin(token C.ulonglong, actionIndex C.int) {
-	a, ok := bellui.CurrentApp().(*belluiApp)
-	if !ok {
-		return
+	if a, ok := bellui.CurrentApp().(*belluiApp); ok {
+		a.notifyResponse(uint64(token), int(actionIndex))
 	}
-	tok := uint64(token)
-	switch idx := int(actionIndex); {
-	case idx == -1:
-		a.fireNotifyTapped(tok)
-	case idx >= 0:
-		a.fireNotifyAction(tok, idx)
+}
+
+// notifyResponse fires the callback a notification activation names and
+// releases the notification's handlers. On iOS the app delegate reports it
+// (push_ios.go); on macOS, BelluiUNDelegate through notifyCallbackDarwin.
+func (a *belluiApp) notifyResponse(token uint64, actionIndex int) {
+	switch {
+	case actionIndex == -1:
+		a.fireNotifyTapped(token)
+	case actionIndex >= 0:
+		a.fireNotifyAction(token, actionIndex)
 	}
-	a.forgetNotify(tok)
+	a.forgetNotify(token)
 }
 
 // fallbackSend is invoked from the notification C layer when authorization

@@ -168,6 +168,7 @@ void belluiKeyboardExpectRaise(void) {
 
 static void forwardOpenURL(NSURL *url);
 static BOOL forwardUserActivity(NSUserActivity *userActivity);
+static void forwardNotificationResponse(UNNotificationResponse *response);
 
 // currentOrientation is the interface orientation of the app's window. The
 // window scene knows it; statusBarOrientation is the fallback for a window
@@ -178,6 +179,142 @@ static UIInterfaceOrientation currentOrientation(void) {
 		return win.windowScene.interfaceOrientation;
 	}
 	return [[UIApplication sharedApplication] statusBarOrientation];
+}
+
+// belluiPushPayload is a notification's userInfo as JSON, the payload APNs
+// delivered; "{}" when it has none or it does not serialize.
+static NSData *belluiPushPayload(UNNotification *notification) {
+	NSDictionary *info = notification.request.content.userInfo;
+	if (info != nil && [NSJSONSerialization isValidJSONObject:info]) {
+		NSData *data = [NSJSONSerialization dataWithJSONObject:info options:0 error:NULL];
+		if (data != nil) {
+			return data;
+		}
+	}
+	return [@"{}" dataUsingEncoding:NSUTF8StringEncoding];
+}
+
+// Foreground presentations waiting for Go's answer, by id. Main thread only.
+static NSMutableDictionary<NSNumber *, id> *belluiPresentations = nil;
+static long long belluiNextPresentation = 0;
+
+static long long belluiHoldPresentation(void (^completion)(UNNotificationPresentationOptions)) {
+	if (belluiPresentations == nil) {
+		belluiPresentations = [[NSMutableDictionary alloc] init];
+	}
+	long long ident = ++belluiNextPresentation;
+	id block = [completion copy];
+	belluiPresentations[@(ident)] = block;
+	[block release];
+	return ident;
+}
+
+// belluiRemotePushPresent answers a held presentation: show it as a banner,
+// in the list and with its sound, or not at all. Any thread; an id answered
+// before is ignored.
+void belluiRemotePushPresent(long long ident, int show) {
+	dispatch_async(dispatch_get_main_queue(), ^{
+		void (^completion)(UNNotificationPresentationOptions) = [belluiPresentations[@(ident)] retain];
+		if (completion == nil) {
+			return;
+		}
+		[belluiPresentations removeObjectForKey:@(ident)];
+		completion(show ? (UNNotificationPresentationOptionBanner | UNNotificationPresentationOptionList |
+			UNNotificationPresentationOptionSound) : UNNotificationPresentationOptionNone);
+		[completion release];
+	});
+}
+
+// belluiRemotePushRegister asks iOS for a device token. The answer comes to
+// the app delegate's didRegister / didFailToRegister methods.
+void belluiRemotePushRegister(void) {
+	dispatch_async(dispatch_get_main_queue(), ^{
+		[[UIApplication sharedApplication] registerForRemoteNotifications];
+	});
+}
+
+// belluiReportNotificationAuth reports the stored authorization status. While
+// it is still not determined the decision has not been stored yet, so it is
+// read again every 50 ms, for up to tries more times.
+static void belluiReportNotificationAuth(long long ident, int tries) {
+	UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
+	[center getNotificationSettingsWithCompletionHandler:^(UNNotificationSettings *settings) {
+		UNAuthorizationStatus st = settings.authorizationStatus;
+		if (st == UNAuthorizationStatusNotDetermined && tries > 0) {
+			dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 50 * NSEC_PER_MSEC),
+				dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+					belluiReportNotificationAuth(ident, tries - 1);
+				});
+			return;
+		}
+		BOOL allowed = st == UNAuthorizationStatusAuthorized || st == UNAuthorizationStatusProvisional ||
+			st == UNAuthorizationStatusEphemeral;
+		onNotificationPermission(ident, allowed ? 1 : 0, "");
+	}];
+}
+
+// belluiRequestNotificationAuth asks for alert and sound authorization; iOS
+// asks the user only the first time.
+//
+// The answer reported is the stored authorization status, not the request's
+// own granted flag. While two requests are pending (the app asking while one
+// of its local notification sends asks too), tapping Allow answers the first
+// one granted NO, about 25 ms before the second gets YES, and at that moment
+// the stored status is still not determined. Measured on the iOS 26.5
+// simulator (#1517): the first request's flag was NO in 2 of 2 runs, and
+// reading the status as it arrived gave not determined in 2 of 2 more.
+void belluiRequestNotificationAuth(long long ident) {
+	UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
+	[center requestAuthorizationWithOptions:(UNAuthorizationOptionAlert | UNAuthorizationOptionSound)
+	                      completionHandler:^(BOOL granted, NSError *_Nullable error) {
+		if (error != nil) {
+			onNotificationPermission(ident, granted ? 1 : 0, (char *)[[error localizedDescription] UTF8String]);
+			return;
+		}
+		belluiReportNotificationAuth(ident, 40);
+	}];
+}
+
+// forwardNotificationResponse hands a tap to Go. A tap on one of the app's
+// rich local notifications carries the app package's belluiToken and goes
+// back to its callbacks; a tap on a remote push goes to the push handler with
+// its payload. The response to a launch comes twice, in the scene's
+// connection options and to the delegate (measured on the iOS 26.5
+// simulator: two deliveries without this check), so a response already
+// forwarded is skipped. Main thread only.
+static void forwardNotificationResponse(UNNotificationResponse *response) {
+	static NSMutableArray<NSString *> *seen = nil;
+	if (seen == nil) {
+		seen = [[NSMutableArray alloc] init];
+	}
+	UNNotification *notification = response.notification;
+	NSString *key = [NSString stringWithFormat:@"%@|%@|%f", notification.request.identifier,
+		response.actionIdentifier, [notification.date timeIntervalSince1970]];
+	if ([seen containsObject:key]) {
+		return;
+	}
+	[seen addObject:key];
+	if ([seen count] > 16) {
+		[seen removeObjectAtIndex:0];
+	}
+
+	NSString *action = response.actionIdentifier;
+	NSNumber *token = notification.request.content.userInfo[@"belluiToken"];
+	if (token != nil) {
+		int idx = -2; // dismiss or unknown: release the callbacks only
+		if ([action isEqualToString:UNNotificationDefaultActionIdentifier]) {
+			idx = -1;
+		} else if ([action hasPrefix:@"bellui-action-"]) {
+			idx = [[action substringFromIndex:[@"bellui-action-" length]] intValue];
+		}
+		onLocalNotificationResponse([token unsignedLongLongValue], idx);
+		return;
+	}
+	if ([notification.request.trigger isKindOfClass:[UNPushNotificationTrigger class]] &&
+	    [action isEqualToString:UNNotificationDefaultActionIdentifier]) {
+		NSData *payload = belluiPushPayload(notification);
+		onPushOpened((char *)[payload bytes], (int)[payload length]);
+	}
 }
 
 @implementation GoAppAppDelegate
@@ -280,10 +417,50 @@ static UIInterfaceOrientation currentOrientation(void) {
     filePickerReturned("", NULL);
 }
 
+// The app delegate stays the notification center's delegate for the app's
+// whole life (#1517): a tap that launches the app is delivered only to a
+// delegate set before didFinishLaunching returns, and remote and local
+// notifications share the one delegate. The app package's rich local
+// notifications reach Go through it as well, rather than through a delegate
+// of their own that would replace this one.
+//
+// willPresentNotification asks Go about a remote push, whose foreground
+// handler decides whether it is shown. The app's own notifications are shown
+// as a banner, in the list, with their sound.
 - (void)userNotificationCenter:(UNUserNotificationCenter *)center
        willPresentNotification:(UNNotification *)notification
          withCompletionHandler:(void (^)(UNNotificationPresentationOptions options))completionHandler {
-	completionHandler(UNNotificationPresentationOptionAlert);
+	if (![notification.request.trigger isKindOfClass:[UNPushNotificationTrigger class]]) {
+		completionHandler(UNNotificationPresentationOptionBanner | UNNotificationPresentationOptionList |
+			UNNotificationPresentationOptionSound);
+		return;
+	}
+	NSData *payload = belluiPushPayload(notification);
+	long long ident = belluiHoldPresentation(completionHandler);
+	onPushWillPresent(ident, (char *)[payload bytes], (int)[payload length]);
+}
+
+- (void)userNotificationCenter:(UNUserNotificationCenter *)center
+didReceiveNotificationResponse:(UNNotificationResponse *)response
+         withCompletionHandler:(void (^)(void))completionHandler {
+	forwardNotificationResponse(response);
+	completionHandler();
+}
+
+- (void)application:(UIApplication *)application
+didRegisterForRemoteNotificationsWithDeviceToken:(NSData *)deviceToken {
+	const unsigned char *b = [deviceToken bytes];
+	NSUInteger n = [deviceToken length];
+	NSMutableString *hex = [NSMutableString stringWithCapacity:n * 2];
+	for (NSUInteger i = 0; i < n; i++) {
+		[hex appendFormat:@"%02x", b[i]];
+	}
+	onPushToken((char *)[hex UTF8String]);
+}
+
+- (void)application:(UIApplication *)application
+didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
+	onPushRegisterError((char *)[[error localizedDescription] UTF8String]);
 }
 
 // forwardOpenURL hands an "open with" URL to Go. For a file:// URL handed over by
@@ -383,6 +560,9 @@ continueUserActivity:(NSUserActivity *)userActivity
 	}
 	for (NSUserActivity *activity in connectionOptions.userActivities) {
 		forwardUserActivity(activity);
+	}
+	if (connectionOptions.notificationResponse != nil) {
+		forwardNotificationResponse(connectionOptions.notificationResponse);
 	}
 }
 

@@ -39,7 +39,7 @@ func goIOSBuild(pkg *packages.Package, bundleID string, archs []string,
 	// The app's ios/ directory adds what the manifest cannot express (#672):
 	// Info.plist and entitlement fragments, and frameworks to link and embed.
 	appDir := filepath.Dir(pkg.GoFiles[0])
-	entitlements, err := iosEntitlements(appDir, buildAssociatedDomains)
+	entitlements, err := iosPackageEntitlements(appDir, buildAssociatedDomains, buildDistribution)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +68,8 @@ func goIOSBuild(pkg *packages.Package, bundleID string, archs []string,
 	}
 
 	// Signed in via CODE_SIGN_ENTITLEMENTS: Associated Domains for Universal
-	// Links (pre-rebrand tracker #622) and the app's ios/Entitlements.plist.
+	// Links (pre-rebrand tracker #622) and the app's ios/Entitlements.plist,
+	// its $(APS_ENVIRONMENT) already filled in for the build kind (#1517).
 	// xcodebuild -allowProvisioningUpdates registers the capabilities with the
 	// App ID under automatic signing.
 	if entitlements != nil {
@@ -94,7 +95,7 @@ func goIOSBuild(pkg *packages.Package, bundleID string, archs []string,
 			return nil, err
 		}
 		// Disable DWARF; see golang.org/issues/25148.
-		if err := goBuild(src, env, "-ldflags=-w", "-o="+path); err != nil {
+		if err := goBuild(src, env, "-ldflags="+iosGoLdflags(entitlements != nil), "-o="+path); err != nil {
 			return nil, err
 		}
 		if nmpkgs == nil {

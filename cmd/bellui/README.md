@@ -57,9 +57,12 @@ next to the app's main package, for what `manifest.pxf` has no field for
   automatic signing,
   `-allowProvisioningUpdates` registers the capabilities an entitlement needs
   (HealthKit, …) on an explicit App ID for the bundle ID. `bellui release`
-  signs the store build with the same entitlements. A static file cannot vary
-  between development and release builds, so `aps-environment` is not
-  expressible yet.
+  signs the store build with the same entitlements. For push notifications,
+  write `<key>aps-environment</key><string>$(APS_ENVIRONMENT)</string>`: the
+  packager fills in `development` for `bellui package`, whose certificate is a
+  development one, and `production` for `bellui release`. `bellui release`
+  fails on any other `aps-environment` value, since a store build with
+  development push gets sandbox tokens that production pushes never reach.
 - **`ios/PrivacyInfo.xcprivacy`** — a plist `<dict>` merged into the privacy
   manifest every iOS app now ships. The toolkit declares the required-reason
   APIs every Go program calls: file timestamps for files in the app's container

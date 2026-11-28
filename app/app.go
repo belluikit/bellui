@@ -46,8 +46,15 @@ type belluiApp struct {
 	openMu       sync.Mutex
 	onFileOpened func(bellui.URI)
 	onURLOpened  func(*url.URL)
+	onPushOpened func(*bellui.PushNotification) // held like an open (see push.go)
 	pendingOpens []openPayload
 	running      bool
+	openOut      []func() // delivered in order by drainOpens
+	openDraining bool
+
+	// foreground push callback (see push.go)
+	pushMu         sync.Mutex
+	onPushReceived func(*bellui.PushNotification) bool
 
 	// rich notification callbacks (see notification.go)
 	notifyMu       sync.Mutex
