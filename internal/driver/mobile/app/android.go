@@ -876,6 +876,16 @@ func processEvent(env *C.JNIEnv, e *C.AInputEvent) {
 	}
 }
 
+// MotionEvent.AXIS_GESTURE_SCROLL_X_DISTANCE and _Y_DISTANCE (API 34), which
+// NDK r26's headers do not have: how far a touchpad two-finger swipe moved
+// since its last event, in pixels (#1510). A swipe whose fingers move down
+// reports a negative Y (measured on the pixel143 emulator with a uinput
+// touchpad).
+const (
+	motionAxisGestureScrollX = 50
+	motionAxisGestureScrollY = 51
+)
+
 // keyaction.go mirrors the NDK's key actions so its conversion is tested off
 // Android. These fail to compile if a mirrored value differs from the NDK's.
 var (

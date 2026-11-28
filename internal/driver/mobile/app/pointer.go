@@ -27,12 +27,6 @@ const (
 	// MotionEvent.CLASSIFICATION_TWO_FINGER_SWIPE (API 34): a touchpad
 	// two-finger scroll, sent as one fake finger moving from the pointer.
 	motionClassTwoFingerSwipe = 3
-	// MotionEvent.AXIS_GESTURE_SCROLL_X_DISTANCE and _Y_DISTANCE (API 34):
-	// how far a two-finger swipe moved since its last event, in pixels. A
-	// swipe whose fingers move down reports a negative Y (measured on the
-	// pixel143 emulator with a uinput touchpad).
-	motionAxisGestureScrollX = 50
-	motionAxisGestureScrollY = 51
 )
 
 // motionKind is what processEvent makes of an Android motion event.
@@ -77,7 +71,8 @@ func wheelScroll(x, y, vscroll, hscroll, stepV, stepH float32) scroll.Event {
 }
 
 // touchpadScroll converts one event of a touchpad two-finger swipe. Its
-// distances are the fingers' movement in pixels, negative for fingers moving
+// distances are the fingers' movement in pixels, read from the swipe's
+// AXIS_GESTURE_SCROLL_*_DISTANCE (android.go), negative for fingers moving
 // down or right, and the content follows the fingers. The DOWN that starts
 // the swipe has not moved yet, and its UP or CANCEL ends it.
 func touchpadScroll(action int32, x, y, distX, distY float32) scroll.Event {

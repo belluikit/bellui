@@ -136,7 +136,8 @@ func Test_canvas_PointerTouchpadBeganEndsTheLastGesture(t *testing.T) {
 }
 
 // The driver converts a pointer scroll's pixels to canvas units with the
-// canvas's scale, for both the position and the distance.
+// canvas's scale, for both the position and the distance. The position is the
+// pointer's own: unlike a finger's, it is not shifted up by tapYOffset.
 func Test_driver_PointerScrollConvertsPixels(t *testing.T) {
 	d := &driver{}
 	w := d.CreateWindow("wheel").(*window)
@@ -151,5 +152,5 @@ func Test_driver_PointerScrollConvertsPixels(t *testing.T) {
 	require.Len(t, bottom.scrolls, 1, "the pixel position maps to the lower half")
 	assert.Empty(t, top.scrolls)
 	assert.InDelta(t, -64, bottom.scrolls[0].Scrolled.DY, 0.01)
-	assert.InDelta(t, 150, bottom.scrolls[0].AbsolutePosition.Y, 1)
+	assert.InDelta(t, 150, bottom.scrolls[0].AbsolutePosition.Y, 1, "a pointer gets no finger compensation")
 }

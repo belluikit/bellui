@@ -1597,7 +1597,9 @@ func (d *driver) handlePointerScroll(w *window, e scroll.Event) {
 	}
 	activity.Stamp()
 	s := w.canvas.Scale()
-	w.canvas.PointerScrolled(canvasPos(w, e.X, e.Y), geo.NewDelta(e.DX/s, e.DY/s), e.Touchpad, e.Phase)
+	// A pointer's position is exact: no finger compensation (tapYOffset).
+	pos := geo.NewPos(scale.ToBelluiCoordinate(w.canvas, int(e.X)), scale.ToBelluiCoordinate(w.canvas, int(e.Y)))
+	w.canvas.PointerScrolled(pos, geo.NewDelta(e.DX/s, e.DY/s), e.Touchpad, e.Phase)
 }
 
 // cancelWindowTouches ends every touch that began in w, which is closing: its
