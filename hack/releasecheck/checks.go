@@ -636,10 +636,10 @@ var checks = []check{
 
 	// ---- rtl ----
 	{
-		ID: "RTL-01", Area: "rtl", Title: "The gallery in right-to-left", Refs: []string{"#749", "#945", "#1078", "#1080"},
+		ID: "RTL-01", Area: "rtl", Title: "The gallery in right-to-left", Refs: []string{"#749", "#779", "#945", "#1078", "#1080", "#1496"},
 		Where: gallery + ", app bar RTL toggle (⋯ icon)",
 		Steps: []string{
-			"Toggle RTL on. Visit Navigation, Inputs, Containment, Data Grid and Charts.",
+			"Toggle RTL on. Visit Navigation, Inputs, Containment, Structure, Data Grid and Charts.",
 			"Toggle RTL off.",
 		},
 		Expect: []string{
@@ -648,7 +648,10 @@ var checks = []check{
 			"On Actions, the extended FAB's icon sits beside its label, not over it (#945).",
 			"On Charts, with the window narrow enough that the tabs overflow, the tab indicator sits under the selected tab (#1078, #1080).",
 			"Sliders and progress bars run from the right: a bar fills leftwards, and a slider's minimum is at its right end (#779).",
-			"Known, not a failure in this release (#779): Split, Tree and Table column order keep their left-to-right shape.",
+			"On Containment, the split's tree rail is on the right, the tree view indents from the right with its chevrons right of the labels, and a selected list row's accent bar is at its right edge (#779, #1506).",
+			"On Structure, the accordion headers start at the right; the table's header column is at the right with column A beside it; the tree indents from the right (#779).",
+			"On Data Grid, the grid is its left-to-right layout mirrored (#779). On Columns, Symbol (pinned left) is at the right edge and Volume (pinned right) at the left; with rows grouped on Grouping, each group's chevron is right of its label; on Selection, the checkboxes are on the right of their rows.",
+			"Every scroller's vertical bar is at its left edge, and a table's is at its outer edge, not between the cells and the header column (#1496).",
 			"Toggling off restores the left-to-right layout exactly.",
 		},
 	},
