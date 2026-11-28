@@ -197,6 +197,10 @@ type DataGrid struct {
 	// come from touch, where the mouse gestures (resize, reorder, row drag)
 	// cannot start, and scroll the grid instead.
 	mousePressed bool
+	// pressDragged is set once the mouse press under way has dragged. A press
+	// that ends without it was a click, and its release disarms what the
+	// press armed (disarmPress, #1511).
+	pressDragged bool
 
 	// disabled makes the grid visible but inert (Disable). scrollDir is the
 	// body scroller's direction, kept while disabled sets it to ScrollNone.
@@ -2034,6 +2038,9 @@ func (g *DataGrid) Dragged(e *event.DragEvent) {
 	if g.disabled {
 		return
 	}
+	if g.mousePressed {
+		g.pressDragged = true
+	}
 	// Column resize drag — use absolute position delta (not incremental DX)
 	if g.resizeCol >= 0 {
 		rc := g.visibleCol(g.resizeCol)
@@ -2167,6 +2174,7 @@ func (g *DataGrid) DragEnd() {
 	g.resizeCol = -1
 	g.nearResizeBorder = false
 	g.mousePressed = false
+	g.pressDragged = false
 }
 
 // Scrolled implements event.Scrollable by forwarding the delta to the grid's
@@ -2193,6 +2201,7 @@ func (g *DataGrid) MouseDown(e *desktop.MouseEvent) {
 	}
 	g.lastModifier = e.Modifier
 	g.mousePressed = true
+	g.pressDragged = false
 
 	// Check for column resize or reorder drag start. The header shares the body's
 	// region layout (pinned bands fixed, main band scrolled by g.offset.X), so
@@ -2254,7 +2263,21 @@ func (g *DataGrid) MouseDown(e *desktop.MouseEvent) {
 	}
 }
 
-func (g *DataGrid) MouseUp(e *desktop.MouseEvent) { g.mousePressed = false }
+// MouseUp ends the mouse press. A press that never dragged was a click, so its
+// release disarms the row drag, column reorder or column resize the press
+// armed. Left armed, the next drag finished it, and on a screen with a mouse
+// and a touchscreen that drag could be a finger scrolling the grid: it did not
+// scroll, and it moved the clicked row or resized the column (#1511). The
+// release of a press that did drag comes before its DragEnd, which finishes
+// the gesture.
+func (g *DataGrid) MouseUp(e *desktop.MouseEvent) {
+	g.mousePressed = false
+	if !g.pressDragged {
+		g.dragRow = -1
+		g.reorderFromCol = -1
+		g.resizeCol = -1
+	}
+}
 
 func (g *DataGrid) HoverIn(e *event.HoverEvent) {}
 
