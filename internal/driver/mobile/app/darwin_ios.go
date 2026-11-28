@@ -47,8 +47,8 @@ import (
 
 	"github.com/belluikit/bellui/internal/driver/mobile/event/lifecycle"
 	"github.com/belluikit/bellui/internal/driver/mobile/event/paint"
-	"github.com/belluikit/bellui/internal/driver/mobile/event/size"
 	"github.com/belluikit/bellui/internal/driver/mobile/event/scroll"
+	"github.com/belluikit/bellui/internal/driver/mobile/event/size"
 	"github.com/belluikit/bellui/internal/driver/mobile/event/touch"
 )
 
