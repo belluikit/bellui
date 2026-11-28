@@ -984,8 +984,8 @@ func (l *listLayout) updateSeparators() {
 		}
 		l.separators[i].Move(geo.NewPos(0, child.Position().Y-dividerOff))
 		l.separators[i].Resize(geo.NewSize(l.list.Size().Width, separatorThickness))
-		l.mirrorRow(l.separators[i])
 		l.separators[i].Show()
+		l.mirrorRow(l.separators[i]) // after Show: MirrorChildren skips a hidden object
 	}
 }
 

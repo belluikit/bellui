@@ -174,6 +174,11 @@ func TestTreeView_RTLChromeMirrorsAcrossBarStrip(t *testing.T) {
 		}
 		require.NotNil(t, cr.dropIndicator)
 		got["drop line"] = at(cr.dropIndicator)
+		// A second drag shows the line again after the first one hid it.
+		tv.hideDropIndicator()
+		tv.dropTarget = dropPosition{targetID: "a3", location: dropAfter}
+		tv.updateDropIndicator()
+		got["drop line, second drag"] = at(cr.dropIndicator)
 		drawn[t.Name()[strings.LastIndex(t.Name(), "/")+1:]] = got
 	})
 	ltr := drawn["ltr"]

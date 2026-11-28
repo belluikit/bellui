@@ -579,10 +579,11 @@ func (r *treeViewContentRenderer) showDropIndicator(drop dropPosition, tree *Tre
 	viewport := r.treeContent.viewport
 	r.dropIndicator.Move(geo.NewPos(pad, lineY))
 	r.dropIndicator.Resize(geo.NewSize(viewport.Width-pad*2, 2))
+	// Shown before it is mirrored: MirrorChildren skips a hidden object.
+	r.dropIndicator.Show()
 	if isRTLAt(r.treeContent) { // a drag, outside a layout walk (#696)
 		layout.MirrorChildren([]core.CanvasObject{r.dropIndicator}, r.treeContent.Size().Width)
 	}
-	r.dropIndicator.Show()
 	r.dropIndicator.Refresh()
 }
 
