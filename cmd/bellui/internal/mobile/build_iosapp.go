@@ -95,11 +95,7 @@ func goIOSBuild(pkg *packages.Package, bundleID string, archs []string,
 			return nil, err
 		}
 		// Disable DWARF; see golang.org/issues/25148.
-		goLdflags := "-w"
-		if entitlements != nil && buildTarget == "iossimulator" {
-			goLdflags += " " + iosSimulatorEntitlementsLdflag(tmpdir+"/main/main.entitlements")
-		}
-		if err := goBuild(src, env, "-ldflags="+goLdflags, "-o="+path); err != nil {
+		if err := goBuild(src, env, "-ldflags="+iosGoLdflags(entitlements != nil), "-o="+path); err != nil {
 			return nil, err
 		}
 		if nmpkgs == nil {

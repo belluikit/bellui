@@ -603,3 +603,16 @@ func TestStaticLibraryInFrameworks(t *testing.T) {
 	_, _, err = resolveIOSFrameworks(app, []string{"arm64"}, false)
 	assert.ErrorContains(t, err, "libprobe.dylib: not an .xcframework, .framework or static library (.a)")
 }
+
+// A simulator build links its entitlements into the binary, where the
+// simulator reads them; a device build leaves them to the signature (#1517).
+func TestIOSGoLdflags(t *testing.T) {
+	defer func(target, dir string) { buildTarget, tmpdir = target, dir }(buildTarget, tmpdir)
+	tmpdir = "/work"
+
+	buildTarget = "ios"
+	assert.Equal(t, "-w", iosGoLdflags(true), "a device build signs them in")
+	buildTarget = "iossimulator"
+	assert.Equal(t, "-w", iosGoLdflags(false), "nothing to link")
+	assert.Equal(t, `-w "-extldflags=-Wl,-sectcreate,__TEXT,__entitlements,/work/main/main.entitlements"`, iosGoLdflags(true))
+}

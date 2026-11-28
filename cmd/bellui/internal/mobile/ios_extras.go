@@ -504,6 +504,16 @@ func iosLinkFlags(fws []iosFramework) (cflags, ldflags []string) {
 	return cflags, ldflags
 }
 
+// iosGoLdflags is the go -ldflags of an iOS build: no DWARF (see
+// golang.org/issues/25148), and for a simulator build with entitlements the
+// field that links them in.
+func iosGoLdflags(entitlements bool) string {
+	if entitlements && buildTarget == "iossimulator" {
+		return "-w " + iosSimulatorEntitlementsLdflag(tmpdir+"/main/main.entitlements")
+	}
+	return "-w"
+}
+
 // iosSimulatorEntitlementsLdflag is the go -ldflags field that links the
 // entitlements file into a simulator binary as its __TEXT,__entitlements
 // section, which is where the simulator reads entitlements from: a simulator
