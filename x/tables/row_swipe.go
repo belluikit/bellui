@@ -583,7 +583,7 @@ func (g *DataGrid) AccessibleRowActions(row int) []core.AccessibleAction {
 	if g.TrailingSwipeActions != nil {
 		add(swipeTrailingName, g.TrailingSwipeActions(src))
 	}
-	return out
+	return append(out, g.accessibleMoveActions(row)...)
 }
 
 // PerformAccessibleRowAction runs the swipe action of display row row that
@@ -591,6 +591,9 @@ func (g *DataGrid) AccessibleRowActions(row int) []core.AccessibleAction {
 func (g *DataGrid) PerformAccessibleRowAction(row int, name string) {
 	src := g.sourceRow(row)
 	if src < 0 || g.disabled {
+		return
+	}
+	if g.performAccessibleMove(row, name) {
 		return
 	}
 	fn, rest := g.LeadingSwipeActions, ""

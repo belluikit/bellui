@@ -89,7 +89,12 @@ type DataGrid struct {
 	OnSortChanged      func(model []SortItem)
 	OnFilterChanged    func()
 	OnCellValueChanged func(id CellID, oldValue, newValue any)
-	OnRowMoved         func(fromSourceRow, toSourceRow int)
+	// OnRowMoved is called when the user moves a row (GridOptions
+	// RowDragEnabled), with source rows: the app removes the row at
+	// fromSourceRow and inserts it where toSourceRow is, so it ends up at
+	// that place. The grid's own source-keyed state (selection, cursor,
+	// expanded details) moves the same way.
+	OnRowMoved func(fromSourceRow, toSourceRow int)
 	// OnVisibleRowsChanged fires when the range of display rows in view
 	// changes: by scrolling, a resize, or new data. first and last are
 	// display rows, inclusive; an empty grid reports 0, -1. An app that loads
@@ -1936,6 +1941,12 @@ func (g *DataGrid) TypedKey(e *event.KeyEvent) {
 		}
 	}
 
+	// A hardware keyboard on a touch device reports Alt+Up as a key with its
+	// modifier; the desktop sends it as a shortcut (TypedShortcut).
+	if d := reorderKey(e.Name, e.Modifier); d != 0 && !focusCleared && g.moveFocusedRow(d) {
+		return
+	}
+
 	switch e.Name {
 	case event.KeyEscape:
 		if g.IsEditing() {
@@ -2263,7 +2274,7 @@ func (g *DataGrid) MouseDown(e *desktop.MouseEvent) {
 	if id.Row >= 0 && id.Col >= 0 {
 		g.selectCellWithModifiers(id, e.Modifier)
 		// Start row drag if enabled
-		if g.Options.RowDragEnabled {
+		if g.rowsReorderable() {
 			g.dragRow = id.Row
 		}
 	}
@@ -2399,6 +2410,10 @@ func (g *DataGrid) headerBorderCol(x float32) int {
 
 func (g *DataGrid) TypedShortcut(s core.Shortcut) {
 	if g.disabled {
+		return
+	}
+	if d := reorderShortcut(s); d != 0 {
+		g.moveFocusedRow(d)
 		return
 	}
 	switch s.(type) {

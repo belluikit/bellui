@@ -108,7 +108,8 @@ func (h *cellHost) AccessibleIdentity() any {
 }
 
 // RowActioner is what a grid with actions on its rows adds to GridAccess: the
-// actions a touch user reaches by swiping a row sideways (#1483). Every cell
+// actions a touch user reaches by swiping a row sideways (#1483), and moving
+// the row up or down (#1512). Every cell
 // of the row offers them, as a screen reader's custom actions, so a user who
 // cannot swipe can still choose one. A cell asks for it by type assertion and
 // offers only "select" without it.
