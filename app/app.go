@@ -49,6 +49,8 @@ type belluiApp struct {
 	onPushOpened func(*bellui.PushNotification) // held like an open (see push.go)
 	pendingOpens []openPayload
 	running      bool
+	openOut      []func() // delivered in order by drainOpens
+	openDraining bool
 
 	// foreground push callback (see push.go)
 	pushMu         sync.Mutex

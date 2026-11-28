@@ -3,6 +3,7 @@
 package app
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -19,21 +20,32 @@ import (
 func TestPushOpened_ColdLaunchTapHeldUntilCallback(t *testing.T) {
 	a := NewWithID("io.bellui.test.push-cold").(*belluiApp)
 
-	a.pushOpened(&bellui.PushNotification{Body: "first"})  // the launching tap
-	a.startOpenDelivery()                                  // Run: no callback yet
-	a.pushOpened(&bellui.PushNotification{Body: "second"}) // running, still none
+	// Ten taps, so that delivery out of order cannot pass by chance: the
+	// first arrives before Run (the launching tap), the rest while the app
+	// runs with no callback yet.
+	var want []string
+	for i := range 10 {
+		if i == 1 {
+			a.startOpenDelivery()
+		}
+		body := fmt.Sprintf("tap %d", i)
+		want = append(want, body)
+		a.pushOpened(&bellui.PushNotification{Body: body})
+	}
 
-	got := make(chan string, 4)
+	got := make(chan string, 16)
 	a.setOnPushOpened(func(n *bellui.PushNotification) { got <- n.Body })
 
-	for _, want := range []string{"first", "second"} {
+	var order []string
+	for range want {
 		select {
 		case b := <-got:
-			assert.Equal(t, want, b)
+			order = append(order, b)
 		case <-time.After(2 * time.Second):
-			t.Fatalf("held tap %q never delivered", want)
+			t.Fatalf("held taps never all delivered: got %v", order)
 		}
 	}
+	assert.Equal(t, want, order, "held taps arrive in the order they came")
 
 	// With the callback set, a tap while running goes straight through.
 	a.pushOpened(&bellui.PushNotification{Body: "warm"})
