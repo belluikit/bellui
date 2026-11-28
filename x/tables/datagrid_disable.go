@@ -39,11 +39,7 @@ func (g *DataGrid) Disable() {
 	}
 	g.disabled = true
 
-	editor := g.editWidget
-	g.editingCell = nil
-	g.editWidget = nil
-	g.editFactory = nil
-	g.editOldValue = nil
+	editor := g.clearEdit()
 
 	g.dismissTooltip()
 	g.hoveredCell = nil

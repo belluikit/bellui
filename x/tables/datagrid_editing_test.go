@@ -259,9 +259,9 @@ func TestDataGrid_DefaultEditorIsEntry(t *testing.T) {
 
 	g.StartEditing(CellID{Row: 0, Col: 0})
 
-	entry, ok := g.editWidget.(*widget.Entry)
+	entry, ok := g.editWidget.(*cell.Entry)
 	if !ok {
-		t.Fatalf("expected *widget.Entry editor, got %T", g.editWidget)
+		t.Fatalf("expected *cell.Entry editor, got %T", g.editWidget)
 	}
 	if entry.Text != "Alice" {
 		t.Errorf("expected editor seeded with Alice, got %q", entry.Text)
@@ -287,7 +287,7 @@ func TestDataGrid_EscapeInEntryCancelsEdit(t *testing.T) {
 	})
 
 	g.StartEditing(CellID{Row: 0, Col: 0})
-	entry := g.editWidget.(*widget.Entry)
+	entry := g.editWidget.(*cell.Entry)
 	entry.SetText("discarded")
 
 	// Escape typed in the focused editor cancels without committing.
@@ -394,7 +394,7 @@ func TestDataGrid_StartEditingCommitsPrevious(t *testing.T) {
 	})
 
 	g.StartEditing(CellID{Row: 0, Col: 0})
-	g.editWidget.(*widget.Entry).SetText("edited")
+	g.editWidget.(*cell.Entry).SetText("edited")
 
 	// Moving the edit to another cell keeps what was typed.
 	g.StartEditing(CellID{Row: 0, Col: 1})
@@ -422,7 +422,9 @@ func TestDataGrid_EditOverlayRendered(t *testing.T) {
 	if g.editWidget == nil || !g.editWidget.Visible() {
 		t.Fatal("expected a visible edit widget after StartEditing")
 	}
-	pos := g.editWidget.Position()
+	// The editor sits in the clip that bounds it to the body (#1522), so its
+	// grid position is the clip's plus its own.
+	pos := g.editClip.Position().Add(g.editWidget.Position())
 	size := g.editWidget.Size()
 	headerH := g.HeaderHeight()
 	rowY, rowH := g.viewport.RowY(1)
@@ -433,25 +435,30 @@ func TestDataGrid_EditOverlayRendered(t *testing.T) {
 		t.Errorf("expected editor size 120x%v, got %v", rowH, size)
 	}
 
-	// The editor must be part of the render tree to be visible/interactive.
+	// The editor must be part of the render tree to be visible/interactive:
+	// among the renderer's objects, in its clip.
 	r := test.TempWidgetRenderer(t, g)
 	editor := g.editWidget
-	found := false
-	for _, o := range r.Objects() {
-		if o == editor {
-			found = true
+	inTree := func() bool {
+		for _, o := range r.Objects() {
+			if c, ok := o.(*bellui.Container); ok && c == g.editClip {
+				for _, child := range c.Objects {
+					if child == editor {
+						return true
+					}
+				}
+			}
 		}
+		return false
 	}
-	if !found {
-		t.Error("expected edit widget among renderer objects")
+	if !inTree() {
+		t.Error("expected edit widget in the renderer's objects")
 	}
 
 	// Ending the edit removes the overlay.
 	g.StopEditing()
-	for _, o := range r.Objects() {
-		if o == editor {
-			t.Error("expected edit widget removed from renderer objects")
-		}
+	if inTree() {
+		t.Error("expected edit widget removed from renderer objects")
 	}
 }
 

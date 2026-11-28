@@ -4,10 +4,9 @@ import (
 	"fmt"
 
 	"github.com/belluikit/bellui/core"
-	"github.com/belluikit/bellui/widget"
 )
 
-// TextEditor is a cell editor that uses a text Entry widget.
+// TextEditor is a cell editor that uses a text Entry widget (an [Entry]).
 type TextEditor struct {
 	cancelled bool
 }
@@ -18,18 +17,17 @@ func NewTextEditor() *TextEditor {
 }
 
 func (e *TextEditor) CreateEditor() core.CanvasObject {
-	entry := widget.NewEntry()
-	return entry
+	return NewEntry()
 }
 
 func (e *TextEditor) BeginEdit(editor core.CanvasObject, value any, params Params) {
-	entry := editor.(*widget.Entry)
+	entry := editor.(*Entry)
 	entry.SetText(fmt.Sprint(value))
 	e.cancelled = false
 }
 
 func (e *TextEditor) EndEdit(editor core.CanvasObject) (any, bool) {
-	entry := editor.(*widget.Entry)
+	entry := editor.(*Entry)
 	return entry.Text, e.cancelled
 }
 

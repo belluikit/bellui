@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/belluikit/bellui"
+	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/widget"
@@ -83,15 +84,15 @@ func (g *DataGrid) StartEditing(id CellID) {
 	// submits an entry; picking an option or toggling a check is the whole
 	// edit for discrete editors, so it commits immediately.
 	switch w := editor.(type) {
+	case *cell.Entry:
+		g.wireEntry(&w.Entry)
+		// A click outside the grid takes the focus from the editor, and
+		// ends the edit as a click on another cell does (#1522).
+		if w.OnFocusLost == nil {
+			w.OnFocusLost = func() { g.editorFocusLost(editor) }
+		}
 	case *widget.Entry:
-		if w.OnSubmitted == nil {
-			w.OnSubmitted = func(string) { g.CommitEditing() }
-		}
-		// Escape cancels from inside the focused editor — the grid's own
-		// Escape handling only runs while the grid has focus.
-		if w.OnEscape == nil {
-			w.OnEscape = g.StopEditing
-		}
+		g.wireEntry(w)
 	case *widget.Select:
 		if w.OnChanged == nil {
 			w.OnChanged = func(string) { g.CommitEditing() }
@@ -106,6 +107,42 @@ func (g *DataGrid) StartEditing(id CellID) {
 	g.editWidget = editor
 	g.Refresh()
 	g.focusEditor()
+}
+
+// wireEntry makes Enter commit and Escape cancel, unless the factory set them.
+func (g *DataGrid) wireEntry(e *widget.Entry) {
+	if e.OnSubmitted == nil {
+		e.OnSubmitted = func(string) { g.CommitEditing() }
+	}
+	// Escape cancels from inside the focused editor — the grid's own
+	// Escape handling only runs while the grid has focus.
+	if e.OnEscape == nil {
+		e.OnEscape = g.StopEditing
+	}
+}
+
+// editorFocusLost ends the edit whose editor just lost keyboard focus, keeping
+// what was typed, as a click on another cell does. When the editor is still
+// the focused object, its window lost focus instead (another app, a popup), and
+// the edit stays open: the focus manager moves the focus before it tells the
+// old object, and tells it without moving anything when the window blurs.
+func (g *DataGrid) editorFocusLost(editor core.CanvasObject) {
+	if g.editWidget != editor {
+		return // already ended, or another edit began
+	}
+	if f, ok := editor.(event.Focusable); ok {
+		if c := bellui.CurrentApp().Driver().CanvasForObject(g); c != nil && c.Focused() == f {
+			return
+		}
+	}
+	g.CommitEditing()
+}
+
+// endEditOnPress ends the edit in progress, keeping what was typed, when the
+// grid is pressed outside the editor: a cell, a row's toggle, the header or a
+// column border (#1522). A press on the editor goes to the editor, not here.
+func (g *DataGrid) endEditOnPress() {
+	g.CommitEditing()
 }
 
 // columnEditable returns the column-level editable setting, inheriting from
@@ -136,12 +173,23 @@ func (g *DataGrid) cellEditable(rc *resolvedColumn, rowData any) bool {
 
 // StopEditing cancels the current edit without committing.
 func (g *DataGrid) StopEditing() {
-	g.refocusGrid()
+	g.refocusGrid(g.clearEdit())
+	g.Refresh()
+}
+
+// clearEdit drops the editing state and returns the editor it held. It runs
+// before the focus goes back to the grid, so the editor, losing the focus,
+// finds no edit to end (editorFocusLost): a cancel must not turn into a commit.
+func (g *DataGrid) clearEdit() core.CanvasObject {
+	editor := g.editWidget
 	g.editingCell = nil
 	g.editWidget = nil
 	g.editFactory = nil
 	g.editOldValue = nil
-	g.Refresh()
+	if g.editClip != nil {
+		g.editClip.Objects = nil
+	}
+	return editor
 }
 
 // CommitEditing ends the active edit, extracting the value from the editor
@@ -197,11 +245,7 @@ func (g *DataGrid) commitEditValue(newValue any) {
 		g.OnCellValueChanged(id, oldValue, newValue)
 	}
 
-	g.refocusGrid()
-	g.editingCell = nil
-	g.editWidget = nil
-	g.editFactory = nil
-	g.editOldValue = nil
+	g.refocusGrid(g.clearEdit())
 	g.RefreshData()
 }
 
@@ -217,11 +261,11 @@ func (g *DataGrid) focusEditor() {
 	}
 }
 
-// refocusGrid returns keyboard focus to the grid when the closing editor
-// holds it, so cursor navigation resumes after the edit ends. Must run before
-// the editing state is cleared.
-func (g *DataGrid) refocusGrid() {
-	f, ok := g.editWidget.(event.Focusable)
+// refocusGrid returns keyboard focus to the grid when the closed editor holds
+// it, so cursor navigation resumes after the edit ends. When the focus has
+// already gone elsewhere (a click outside the grid), it stays there.
+func (g *DataGrid) refocusGrid(editor core.CanvasObject) {
+	f, ok := editor.(event.Focusable)
 	if !ok {
 		return
 	}
@@ -230,10 +274,24 @@ func (g *DataGrid) refocusGrid() {
 	}
 }
 
+// editOverlay is the container the inline editor draws in: it clips the
+// editor to the part of the body its column's band shows, so an editor
+// scrolled partly out never covers the header, a pinned band or the status
+// bar (#1522).
+func (g *DataGrid) editOverlay() *bellui.Container {
+	if g.editClip == nil {
+		g.editClip = &bellui.Container{ClipToBounds: true}
+	}
+	if len(g.editClip.Objects) != 1 || g.editClip.Objects[0] != g.editWidget {
+		g.editClip.Objects = []core.CanvasObject{g.editWidget}
+	}
+	return g.editClip
+}
+
 // layoutEditOverlay positions the active inline editor over its cell,
-// mirroring the renderer's band layout. Called from the renderer's layout
-// pass and from scroll updates so the editor tracks its cell; hidden when the
-// cell is outside the body area.
+// mirroring the renderer's band layout, and clips it to the visible body.
+// Called from the renderer's layout pass and from scroll updates so the
+// editor tracks its cell; hidden when no part of the cell is visible.
 func (g *DataGrid) layoutEditOverlay(size geo.Size) {
 	if g.editWidget == nil || g.editingCell == nil {
 		return
@@ -241,14 +299,42 @@ func (g *DataGrid) layoutEditOverlay(size geo.Size) {
 	if size.Width <= 0 || size.Height <= 0 {
 		return
 	}
+	clip := g.editOverlay()
 	pos, cellSize, visible := g.editingCellRect(*g.editingCell, size)
 	if !visible {
-		g.editWidget.Hide()
+		clip.Hide()
 		return
 	}
+	clipPos, clipSize := g.editingClipRect(*g.editingCell, size)
+	clip.Show()
+	clip.Move(clipPos)
+	clip.Resize(clipSize)
 	g.editWidget.Show()
-	g.editWidget.Move(pos)
+	g.editWidget.Move(pos.Subtract(clipPos))
 	g.editWidget.Resize(cellSize)
+}
+
+// editingClipRect returns the grid-local rectangle the editor of a display
+// cell may draw in: the body's rows, below the header and above the status
+// bar, and for a main-band column, the main band between the pinned bands.
+// Mirrored right to left as the cells are.
+func (g *DataGrid) editingClipRect(id CellID, size geo.Size) (geo.Position, geo.Size) {
+	top := g.bodyTop()
+	bottom := size.Height
+	if g.Options.ShowStatusBar {
+		bottom -= statusBarHeight
+	}
+	x, w := float32(0), size.Width
+	layout := g.visibleLayout()
+	if nL, nM := len(layout.pinnedLeft), len(layout.main); id.Col >= nL && id.Col < nL+nM {
+		mainX, pinnedRightX, pinnedRightW := g.bandAnchors(size)
+		right := size.Width
+		if pinnedRightW > 0 {
+			right = pinnedRightX
+		}
+		x, w = mainX, right-mainX
+	}
+	return geo.NewPos(g.drawnX(x, w, size.Width), top), geo.NewSize(w, max(0, bottom-top))
 }
 
 // editingCellRect returns the grid-local rectangle of the given display cell,
