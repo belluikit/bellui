@@ -86,26 +86,150 @@ void doSendNotification(UNUserNotificationCenter *center, NSString *title, NSStr
     }];
 }
 
+// Authorization for a send (#1519). Every send asks, so on a first launch
+// several requests can be pending at once, and the answer a request gets is
+// not the user's answer:
+//
+//   - macOS refuses a request made while another one's alert is up, at once
+//     and with an error ("Notifications are not allowed for this
+//     application"), before the user has answered anything.
+//   - iOS answers the first of two pending requests "not granted" about 25 ms
+//     before it stores the user's Allow.
+//   - Clicking the body of the macOS alert opens System Settings and fails the
+//     request with the same error, storing "denied" until the user turns
+//     notifications on there.
+//
+// So one request is in flight at a time and every send waiting meanwhile
+// shares its outcome, and an outcome that is not a grant is settled by the
+// status the system stores, not by the request's own answer. The osascript
+// fallback is kept for the case it was written for: a bundle whose signature
+// does not match its identifier gets the error and a status that stays "not
+// determined", measured on macOS 27.
+
+typedef NS_ENUM(int, BelluiAuth) {
+    BelluiAuthAllowed,     // send through the notification center
+    BelluiAuthRefused,     // the user said no: send nothing
+    BelluiAuthUnavailable, // the app cannot ask: send the plain fallback
+};
+typedef void (^BelluiAuthDone)(BelluiAuth auth);
+
+// How long a status that does not allow sending is read again before it is
+// taken as the answer: briefly while it is still "not determined" (iOS stores
+// the answer within milliseconds), longer while it is "denied" after an error
+// (the user may be turning notifications on in System Settings; 9 s measured).
+static const int belluiAuthUndecidedMs = 2000;
+static const int belluiAuthSettingsMs = 60000;
+static const int belluiAuthPollMs = 250;
+
+static dispatch_queue_t belluiAuthQueue(void) {
+    static dispatch_queue_t q;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{ q = dispatch_queue_create("bellui.notification-auth", DISPATCH_QUEUE_SERIAL); });
+    return q;
+}
+
+// The sends waiting for the request in flight; nil while none is. Touched only
+// on belluiAuthQueue.
+static NSMutableArray *belluiAuthWaiters = nil;
+
+static BOOL belluiAuthAllows(UNAuthorizationStatus s) {
+    if (s == UNAuthorizationStatusAuthorized || s == UNAuthorizationStatusProvisional) {
+        return YES;
+    }
+#if TARGET_OS_IPHONE
+    if (@available(iOS 14.0, *)) {
+        return s == UNAuthorizationStatusEphemeral;
+    }
+#endif
+    return NO;
+}
+
+// belluiAuthFinish hands the outcome to every waiting send, on belluiAuthQueue,
+// so the sends run one at a time and in the order they asked.
+static void belluiAuthFinish(BelluiAuth auth) {
+    dispatch_async(belluiAuthQueue(), ^{
+        NSArray *waiters = belluiAuthWaiters;
+        belluiAuthWaiters = nil;
+        for (BelluiAuthDone done in waiters) {
+            done(auth);
+        }
+        [waiters release];
+    });
+}
+
+// belluiAuthSettle reads the stored status after a request that was not
+// granted, again every belluiAuthPollMs while it may still change.
+static void belluiAuthSettle(UNUserNotificationCenter *center, BOOL failed, int waitedMs) {
+    [center getNotificationSettingsWithCompletionHandler:^(UNNotificationSettings *settings) {
+        UNAuthorizationStatus s = settings.authorizationStatus;
+        if (belluiAuthAllows(s)) {
+            belluiAuthFinish(BelluiAuthAllowed);
+            return;
+        }
+        BOOL undecided = s == UNAuthorizationStatusNotDetermined;
+        int limit = undecided ? belluiAuthUndecidedMs : (failed ? belluiAuthSettingsMs : 0);
+        if (waitedMs < limit) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)belluiAuthPollMs * NSEC_PER_MSEC),
+                belluiAuthQueue(), ^{ belluiAuthSettle(center, failed, waitedMs + belluiAuthPollMs); });
+            return;
+        }
+        belluiAuthFinish(undecided && failed ? BelluiAuthUnavailable : BelluiAuthRefused);
+    }];
+}
+
+// belluiAuthorize passes done whether the app may send, asking the user if
+// they have not answered yet.
+static void belluiAuthorize(UNUserNotificationCenter *center, BelluiAuthDone done) {
+    BelluiAuthDone waiter = [done copy];
+    dispatch_async(belluiAuthQueue(), ^{
+        BOOL ask = belluiAuthWaiters == nil;
+        if (ask) {
+            belluiAuthWaiters = [[NSMutableArray alloc] init];
+        }
+        [belluiAuthWaiters addObject:waiter];
+        if (!ask) {
+            return;
+        }
+        UNAuthorizationOptions options = UNAuthorizationOptionAlert | UNAuthorizationOptionSound;
+        [center requestAuthorizationWithOptions:options
+            completionHandler:^(BOOL granted, NSError *_Nullable error) {
+                if (granted) {
+                    belluiAuthFinish(BelluiAuthAllowed);
+                    return;
+                }
+                if (error != nil) {
+                    NSLog(@"Error asking for permission to send notifications %@", error);
+                }
+                belluiAuthSettle(center, error != nil, 0);
+            }];
+    });
+    [waiter release];
+}
+
+// belluiAuthSend runs send when the app may send, posts the plain fallback
+// when it cannot ask, and sends nothing when the user said no.
+static void belluiAuthSend(BelluiAuth auth, NSString *title, NSString *body, void (^send)(void)) {
+    switch (auth) {
+    case BelluiAuthAllowed:
+        send();
+        break;
+    case BelluiAuthUnavailable:
+        fallbackSend((char *)[title UTF8String], (char *)[body UTF8String]);
+        break;
+    case BelluiAuthRefused:
+        NSLog(@"Unable to get permission to send notifications");
+        break;
+    }
+}
+
 void sendNotification(char *cTitle, char *cBody) {
     UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
     NSString *title = [NSString stringWithUTF8String:cTitle];
     NSString *body = [NSString stringWithUTF8String:cBody];
 
-    UNAuthorizationOptions options = UNAuthorizationOptionAlert;
-    [center requestAuthorizationWithOptions:options
-        completionHandler:^(BOOL granted, NSError *_Nullable error) {
-            if (!granted) {
-                if (error != NULL) {
-                    NSLog(@"Error asking for permission to send notifications %@", error);
-                    // this happens if our app was not signed, so do it the old way
-                    fallbackSend((char *)[title UTF8String], (char *)[body UTF8String]);
-                } else {
-                    NSLog(@"Unable to get permission to send notifications");
-                }
-            } else {
-                doSendNotification(center, title, body);
-            }
-        }];
+    belluiAuthorize(center, ^(BelluiAuth auth) {
+        belluiAuthSend(auth, title, body, ^{ doSendNotification(center, title, body); });
+    });
 }
 
 // belluiScheduleNotification attaches the optional icon and schedules the request.
@@ -212,21 +336,12 @@ void sendNotificationWithOptions(unsigned long long token, char *cTitle, char *c
         [labels addObject:[NSString stringWithUTF8String:cActionLabels[i]]];
     }
 
-    UNAuthorizationOptions options = UNAuthorizationOptionAlert | UNAuthorizationOptionSound;
-    [center requestAuthorizationWithOptions:options
-        completionHandler:^(BOOL granted, NSError *_Nullable error) {
-            if (!granted) {
-                if (error != NULL) {
-                    NSLog(@"Error asking for permission to send notifications %@", error);
-                    // unsigned/unbundled app: degrade to a plain notification (no callbacks)
-                    fallbackSend((char *)[title UTF8String], (char *)[body UTF8String]);
-                } else {
-                    NSLog(@"Unable to get permission to send notifications");
-                }
-            } else {
-                doSendNotificationWithOptions(center, token, title, body, iconPath, labels);
-            }
-        }];
+    belluiAuthorize(center, ^(BelluiAuth auth) {
+        // The fallback is a plain notification: no callbacks, actions or icon.
+        belluiAuthSend(auth, title, body, ^{
+            doSendNotificationWithOptions(center, token, title, body, iconPath, labels);
+        });
+    });
 }
 #else
 void sendNotification(char *cTitle, char *cBody) {
