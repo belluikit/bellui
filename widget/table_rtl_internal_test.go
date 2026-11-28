@@ -226,13 +226,18 @@ func TestTable_RTLOpensAtFirstColumn(t *testing.T) {
 	})
 }
 
-// A table that scrolls only vertically keeps the strip the vertical scroll
-// bar reserves on desktop between its cells and the header column:
-// right-to-left, the cells are mirrored within the width the scroll gives
-// them, so column 0 is beside the bar, not under it, and its header and
-// divider line up with it (#779). The header column itself is at the right
-// edge. A touch device reserves no strip, and the columns line up the same.
-func TestTable_RTLKeepsScrollBarStrip(t *testing.T) {
+// A table that scrolls only vertically has a strip the vertical scroll bar
+// reserves on desktop. Right-to-left, the Scroll puts that strip at its left
+// edge, the table's outer edge (#1496), so the whole table is its
+// left-to-right layout mirrored: every cell, header, divider and the
+// selection marker as far from the right edge as it is from the left one
+// left-to-right, the header column at the right, and column 0 beside it, not
+// beside the bar. A tap on a cell selects it, and the header row's background
+// covers the whole header strip, over the bar's strip too. A touch device
+// reserves no strip, and the table mirrors the same. Before #1496 the strip
+// stayed at the right of the cells, between them and the header column.
+func TestTable_RTLScrollBarStripAtOuterEdge(t *testing.T) {
+	layouts := map[string]map[string]float32{}
 	tableDirections(t, func(t *testing.T, rtl bool, w bellui.Window, _ *Table) {
 		tb := NewTableWithHeaders(
 			func() (int, int) { return 40, 3 },
@@ -242,48 +247,37 @@ func TestTable_RTLKeepsScrollBarStrip(t *testing.T) {
 		w.Resize(geo.NewSize(420, 300))
 		r := test.TempWidgetRenderer(t, tb.cells).(*tableCellsRenderer)
 		viewport := tb.content.Size().Width
-		bar := viewport - tb.scrollSpan()
+		bar := viewport - tb.cells.Size().Width
 		if bellui.CurrentDevice().IsMobile() {
-			// A touch device's bar overlays the cells and reserves nothing,
-			// so there is no strip; the columns must line up all the same.
+			// A touch device's bar overlays the cells and reserves nothing.
 			require.Zero(t, bar, "a mobile scroll reserves no strip for its bar")
 		} else {
 			require.Greater(t, bar, float32(0), "the scroll reserves a strip for its vertical bar")
 		}
 
-		for col := 0; col < 3; col++ {
-			c, h := r.visible[TableCellID{Row: 0, Col: col}], r.headers[TableCellID{Row: -1, Col: col}]
-			require.NotNil(t, c)
-			require.NotNil(t, h)
-			cx, cw := drawn(tb, c)
-			hx, _ := drawn(tb, h)
-			assert.InDelta(t, cx, hx, 0.5, "column %d's header lines up with its cells", col)
-			if rtl {
-				assert.LessOrEqual(t, cx+cw, viewport-bar+0.5, "column %d is clear of the scroll bar's strip", col)
-			} else {
-				assert.LessOrEqual(t, cx+cw, tb.Size().Width-bar+0.5, "column %d is clear of the scroll bar's strip", col)
-			}
-		}
-		// The selection marker is drawn on the selected cell, and a divider in
-		// the gap between columns 0 and 1.
 		tb.Select(TableCellID{Row: 1, Col: 1})
-		sel := r.visible[TableCellID{Row: 1, Col: 1}]
-		sx, _ := drawn(tb, sel)
-		mx, _ := drawn(tb, r.marker)
-		assert.InDelta(t, sx, mx, 0.5, "the selection marker is on the selected cell")
-		c0x, c0w := drawn(tb, r.visible[TableCellID{Row: 0, Col: 0}])
-		c1x, c1w := drawn(tb, r.visible[TableCellID{Row: 0, Col: 1}])
-		lo, hi := c0x+c0w, c1x
-		if rtl {
-			lo, hi = c1x+c1w, c0x
-		}
-		between := false
-		for _, d := range r.dividers {
-			if dx, dw := drawn(tb, d); d.Visible() && dw < tb.Size().Width && dx >= lo-0.5 && dx+dw <= hi+0.5 {
-				between = true
+		layouts[t.Name()] = tableLayout(t, tb, rtl)
+
+		for col := 0; col < 3; col++ {
+			c := r.visible[TableCellID{Row: 0, Col: col}]
+			require.NotNil(t, c)
+			cx, cw := drawn(tb, c)
+			if rtl {
+				assert.GreaterOrEqual(t, cx, bar-0.5, "column %d is clear of the scroll bar's strip, at the left", col)
+			} else {
+				assert.LessOrEqual(t, cx+cw, tb.Size().Width-bar+0.5, "column %d is clear of the scroll bar's strip, at the right", col)
 			}
 		}
-		assert.True(t, between, "a divider is drawn in the gap between columns 0 and 1 (%v to %v)", lo, hi)
+
+		// A tap on column 2, the one beside the strip right-to-left, selects
+		// it: hit-testing maps the mirrored x back.
+		c := r.visible[TableCellID{Row: 2, Col: 2}]
+		require.NotNil(t, c)
+		cx, cw := drawn(tb, c)
+		cy := bellui.CurrentApp().Driver().AbsolutePositionForObject(c).Y - bellui.CurrentApp().Driver().AbsolutePositionForObject(tb).Y
+		tb.Tapped(&event.PointEvent{Position: geo.NewPos(cx+cw/2, cy+c.Size().Height/2)})
+		require.NotNil(t, tb.selectedCell)
+		assert.Equal(t, TableCellID{Row: 2, Col: 2}, *tb.selectedCell, "a tap on column 2 selects it")
 
 		// The header row's background covers the whole header strip, over
 		// the bar's strip too, on every refresh.
@@ -295,16 +289,23 @@ func TestTable_RTLKeepsScrollBarStrip(t *testing.T) {
 			assert.GreaterOrEqual(t, bx+bw, tx+tw-0.5, "the header row's background reaches the end of its strip")
 		}
 
-		first := r.visible[TableCellID{Row: 0, Col: 0}]
-		fx, fw := drawn(tb, first)
 		if rtl {
-			assert.InDelta(t, viewport-bar, fx+fw, 0.5, "column 0 ends at the bar's strip")
 			rowHead := r.headers[TableCellID{Row: 0, Col: -1}]
 			require.NotNil(t, rowHead)
 			rx, rw := drawn(tb, rowHead)
 			assert.InDelta(t, tb.Size().Width, rx+rw, 0.5, "the header column is at the right edge")
-		} else {
-			assert.Less(t, fx, tb.Size().Width/2, "column 0 is at the left")
 		}
 	})
+	ltr := layouts["TestTable_RTLScrollBarStripAtOuterEdge/ltr"]
+	require.NotEmpty(t, ltr)
+	assert.Contains(t, ltr, "marker", "the selection is drawn")
+	for _, name := range []string{"rtl", "window"} {
+		got := layouts["TestTable_RTLScrollBarStripAtOuterEdge/"+name]
+		for k, want := range ltr {
+			if assert.Contains(t, got, k, "%s: %s is drawn", name, k) {
+				assert.InDelta(t, want, got[k], 0.5, "%s: %s's distance from the leading edge", name, k)
+			}
+		}
+		assert.Len(t, got, len(ltr), "%s: the same parts are drawn", name)
+	}
 }

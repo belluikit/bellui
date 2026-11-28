@@ -51,8 +51,9 @@ func (r *scrollBarRenderer) Layout(size geo.Size) {
 	if !r.scrollBar.area.expanded() {
 		// The bar widget keeps the full (wide) size so a finger or pointer
 		// can grab anywhere across it, but until hovered (never, on touch)
-		// only a thin visual strip is drawn flush to the trailing edge. This
-		// decouples the grabbable hit area from the drawn bar, so the wide
+		// only a thin visual strip is drawn flush to the Scroll's outer edge:
+		// the right one, or the left one under right-to-left, where the
+		// vertical bar sits (#1496). This decouples the grabbable hit area from the drawn bar, so the wide
 		// target neither obscures the content's edge nor needs a pixel-exact
 		// approach flight to hit (pre-rebrand tracker #17, pre-rebrand tracker #449).
 		thin := theme.CurrentForWidget(r.scrollBar).Size(theme.SizeNameScrollBarSmall)
@@ -61,7 +62,11 @@ func (r *scrollBarRenderer) Layout(size geo.Size) {
 			r.background.Move(geo.NewPos(0, size.Height-thin))
 			r.background.Resize(geo.NewSize(size.Width, thin))
 		default:
-			r.background.Move(geo.NewPos(size.Width-thin, 0))
+			x := size.Width - thin
+			if lang.IsRTLDirection() {
+				x = 0
+			}
+			r.background.Move(geo.NewPos(x, 0))
 			r.background.Resize(geo.NewSize(thin, size.Height))
 		}
 		return
@@ -418,13 +423,22 @@ type scrollContainerRenderer struct {
 	leftShadow, rightShadow *Shadow
 	topShadow, bottomShadow *Shadow
 	oldMinSize              geo.Size
+	// barStrip is the width Layout last took off the content for the
+	// vertical bar (ReserveBarSpace), or 0 (#1496).
+	barStrip float32
 }
 
 func (r *scrollContainerRenderer) layoutBars(size geo.Size) {
 	scrollerSize := r.scroll.Size()
 	if r.scroll.Direction == ScrollVerticalOnly || r.scroll.Direction == ScrollBoth {
 		r.vertArea.Resize(geo.NewSize(r.vertArea.MinSize().Width, size.Height))
-		r.vertArea.Move(geo.NewPos(scrollerSize.Width-r.vertArea.Size().Width, 0))
+		// The vertical bar is on the right, or on the left under
+		// right-to-left, as Flutter and Android place it (#1496).
+		x := scrollerSize.Width - r.vertArea.Size().Width
+		if lang.IsRTLDirection() {
+			x = 0
+		}
+		r.vertArea.Move(geo.NewPos(x, 0))
 		r.topShadow.Resize(geo.NewSize(size.Width, 0))
 		r.bottomShadow.Resize(geo.NewSize(size.Width, 0))
 		r.bottomShadow.Move(geo.NewPos(0, scrollerSize.Height))
@@ -447,8 +461,9 @@ func (r *scrollContainerRenderer) Layout(size geo.Size) {
 	c := r.scroll.Content
 	contentMin := c.MinSize()
 	contentSize := contentMin.Max(size)
+	r.barStrip = 0
 
-	// On touch devices the scrollbar overlays the content's right edge (drawn
+	// On touch devices the scrollbar overlays the content's edge (drawn
 	// on top) instead of reserving layout space, so content keeps its full
 	// width and text does not reflow narrower just because the bar is wide
 	// enough to grab. On desktop the bar reserves space so it never overlaps
@@ -457,11 +472,14 @@ func (r *scrollContainerRenderer) Layout(size geo.Size) {
 		// Reserve space for the vertical scrollbar when content overflows
 		// vertically but adapts to available width (e.g., wrapped text).
 		// Without this, the scrollbar renders on top of content, clipping
-		// the right edge and causing text to wrap too late.
+		// its edge and causing text to wrap too late. Under right-to-left
+		// the strip is on the left, and updatePosition places the content
+		// after it (#1496).
 		dir := r.scroll.Direction
 		if (dir == ScrollVerticalOnly || dir == ScrollBoth) &&
 			contentMin.Height > size.Height && contentMin.Width <= size.Width {
 			contentSize.Width = geo.Max(contentMin.Width, size.Width-r.vertArea.MinSize().Width)
+			r.barStrip = size.Width - contentSize.Width
 		}
 	}
 
@@ -533,7 +551,7 @@ func (r *scrollContainerRenderer) updatePosition() {
 	scrollSize := r.scroll.Size()
 	contentSize := r.scroll.Content.Size()
 
-	r.scroll.Content.Move(geo.NewPos(-r.scroll.Offset.X, -r.scroll.Offset.Y))
+	r.scroll.Content.Move(geo.NewPos(r.contentX()-r.scroll.Offset.X, -r.scroll.Offset.Y))
 
 	if r.scroll.Direction == ScrollVerticalOnly || r.scroll.Direction == ScrollBoth {
 		r.handleAreaVisibility(contentSize.Height, scrollSize.Height, r.vertArea)
@@ -561,6 +579,20 @@ func (r *scrollContainerRenderer) updatePosition() {
 	}
 }
 
+// contentX is where the content's left edge sits when it is not scrolled
+// horizontally. It is 0, except under right-to-left with a strip reserved for
+// the vertical bar: the bar and its strip are then on the left, and the content
+// starts after the strip, so it still ends at the Scroll's right edge (#1496).
+// The strip is the one Layout reserved, not the difference between the two
+// widths: a Scroll's owner may size its content itself, as Table does with
+// its header clips, and such content stays where it is put.
+func (r *scrollContainerRenderer) contentX() float32 {
+	if !lang.IsRTLDirection() {
+		return 0
+	}
+	return r.barStrip
+}
+
 // Scroll defines a container that is smaller than the Content.
 // The Offset is used to determine the position of the child widgets within the container.
 type Scroll struct {
@@ -578,6 +610,9 @@ type Scroll struct {
 	// ReserveBarSpace, when true, reduces the content width (or height)
 	// to prevent the scrollbar from overlapping content. This ensures that
 	// text wraps correctly and visual elements are not clipped by the scrollbar.
+	//
+	// The vertical bar and the strip reserved for it are at the right edge,
+	// or at the left edge under a right-to-left layout.
 	ReserveBarSpace bool
 
 	// HideShadows, when true, suppresses the edge fade-shadows that are
