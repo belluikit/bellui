@@ -67,6 +67,89 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
 	return JNI_VERSION_1_6;
 }
 
+// The pixels one mouse wheel notch scrolls, from ViewConfiguration, so a
+// wheel scrolls as far as it does in the device's other apps (#1510). Before
+// API 26, which has no public getter, it is Android's default
+// config_verticalScrollFactor, 64dp.
+float scroll_factor_v = 0;
+float scroll_factor_h = 0;
+
+static float display_density(JNIEnv *env, jobject ctx) {
+	float density = 1;
+	jclass cc = (*env)->GetObjectClass(env, ctx);
+	jmethodID getres = (*env)->GetMethodID(env, cc, "getResources", "()Landroid/content/res/Resources;");
+	jobject res = getres ? (*env)->CallObjectMethod(env, ctx, getres) : NULL;
+	if (res != NULL) {
+		jclass rc = (*env)->GetObjectClass(env, res);
+		jmethodID getdm = (*env)->GetMethodID(env, rc, "getDisplayMetrics", "()Landroid/util/DisplayMetrics;");
+		jobject dm = getdm ? (*env)->CallObjectMethod(env, res, getdm) : NULL;
+		if (dm != NULL) {
+			jclass dc = (*env)->GetObjectClass(env, dm);
+			jfieldID f = (*env)->GetFieldID(env, dc, "density", "F");
+			if (f) {
+				density = (*env)->GetFloatField(env, dm, f);
+			}
+		}
+	}
+	(*env)->ExceptionClear(env);
+	return density;
+}
+
+static float scroll_factor(JNIEnv *env, jclass vc, jobject cfg, const char *name) {
+	jmethodID m = (*env)->GetMethodID(env, vc, name, "()F");
+	if (m == 0) {
+		(*env)->ExceptionClear(env);
+		return 0;
+	}
+	return (*env)->CallFloatMethod(env, cfg, m);
+}
+
+static void lookupScrollFactors(JNIEnv *env, jobject ctx);
+
+static void initScrollFactors(JNIEnv *env, jobject ctx) {
+	lookupScrollFactors(env, ctx);
+	if (scroll_factor_v <= 0 || scroll_factor_h <= 0) {
+		float step = 64 * display_density(env, ctx);
+		scroll_factor_v = scroll_factor_v > 0 ? scroll_factor_v : step;
+		scroll_factor_h = scroll_factor_h > 0 ? scroll_factor_h : step;
+	}
+}
+
+static void lookupScrollFactors(JNIEnv *env, jobject ctx) {
+	jclass vc = (*env)->FindClass(env, "android/view/ViewConfiguration");
+	if (vc == NULL) {
+		(*env)->ExceptionClear(env);
+		return;
+	}
+	jmethodID get = (*env)->GetStaticMethodID(env, vc, "get", "(Landroid/content/Context;)Landroid/view/ViewConfiguration;");
+	if (get == 0) {
+		(*env)->ExceptionClear(env);
+		return;
+	}
+	jobject cfg = (*env)->CallStaticObjectMethod(env, vc, get, ctx);
+	if (cfg == NULL) {
+		(*env)->ExceptionClear(env);
+		return;
+	}
+	scroll_factor_v = scroll_factor(env, vc, cfg, "getScaledVerticalScrollFactor");
+	scroll_factor_h = scroll_factor(env, vc, cfg, "getScaledHorizontalScrollFactor");
+	(*env)->DeleteLocalRef(env, cfg);
+	(*env)->DeleteLocalRef(env, vc);
+}
+
+// motionClassification is AMotionEvent_getClassification, which is API 33,
+// looked up at run time so the library still loads on older Androids. Android
+// 14 marks a touchpad's two-finger scroll with it (#1510).
+int32_t motionClassification(AInputEvent* e) {
+	static int32_t (*get)(const AInputEvent*) = NULL;
+	static int looked = 0;
+	if (!looked) {
+		looked = 1;
+		get = dlsym(RTLD_DEFAULT, "AMotionEvent_getClassification");
+	}
+	return get ? get(e) : 0;
+}
+
 static int main_running = 0;
 
 // ensure we refresh context on resume in case something has changed...
@@ -110,6 +193,7 @@ void ANativeActivity_onCreate(ANativeActivity *activity, void* savedState, size_
 		finish_method = find_method(env, current_class, "finishActivity", "()V");
 
 		setCurrentContext(activity->vm, (*env)->NewGlobalRef(env, activity->clazz));
+		initScrollFactors(env, activity->clazz);
 
 		jmethodID getfilesdir = find_method(env, current_class, "getFilesDir", "()Ljava/io/File;");
 		jobject filesdirfile = (jobject)(*env)->CallObjectMethod(env, activity->clazz, getfilesdir, NULL);

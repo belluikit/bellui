@@ -46,6 +46,9 @@ type canvas struct {
 	// touchScrollCoast is the touchScrollGen of the pan whose momentum is
 	// running, 0 when none is: a contact landing on it catches it (#792).
 	touchScrollCoast int
+	// pointerScroll is the touchpad gesture under way (pointer_scroll.go,
+	// #1510). Main-goroutine state.
+	pointerScroll pointerScrollGesture
 
 	onTypedKey  func(ev *event.KeyEvent)
 	onTypedRune func(rune)
