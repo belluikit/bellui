@@ -326,7 +326,7 @@ func (r *dataGridRenderer) rebuildObjects() {
 	// The inline editor draws above all cell bands (it overlays the editing
 	// cell, which may sit in a pinned band).
 	if g.editWidget != nil {
-		r.objects = append(r.objects, g.editWidget)
+		r.objects = append(r.objects, g.editOverlay())
 	}
 
 	if g.loadingOverlay != nil {

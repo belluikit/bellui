@@ -16,6 +16,7 @@ import (
 	"github.com/belluikit/bellui/test"
 	"github.com/belluikit/bellui/theme"
 	"github.com/belluikit/bellui/widget"
+	"github.com/belluikit/bellui/x/tables/cell"
 )
 
 // gridCallbacks counts every callback a DataGrid fires.
@@ -221,7 +222,7 @@ func TestDataGrid_Disable(t *testing.T) {
 	g.ScrollToRow(0) // the editor shows only over a cell in view
 	g.StartEditing(CellID{Row: 0, Col: 0})
 	require.True(t, g.IsEditing())
-	editor, ok := g.editWidget.(*widget.Entry)
+	editor, ok := g.editWidget.(*cell.Entry)
 	require.True(t, ok)
 	c.Focus(editor) // as a tap into it would; the test canvas did not take StartEditing's focus
 	require.True(t, c.Focused() == editor, "the editor holds the focus")

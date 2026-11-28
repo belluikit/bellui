@@ -174,6 +174,7 @@ type DataGrid struct {
 	// Editing state
 	editingCell  *CellID
 	editWidget   core.CanvasObject
+	editClip     *bellui.Container // clips editWidget to the visible body (#1522)
 	editFactory  cell.EditorFactory
 	editOldValue any
 	undoStack    []undoEntry
@@ -1019,6 +1020,7 @@ func (g *DataGrid) ColumnSortable(col int) bool {
 }
 
 func (g *DataGrid) OnHeaderTapped(col int, modifier event.KeyModifier) {
+	g.endEditOnPress()
 	rc := g.visibleCol(col)
 	if rc == nil {
 		return
@@ -1057,6 +1059,7 @@ func (g *DataGrid) ColumnAtX(x float32) int {
 }
 
 func (g *DataGrid) OnResizeDragStart(col int, startX float32) {
+	g.endEditOnPress()
 	rc := g.visibleCol(col)
 	if rc == nil {
 		return
@@ -1656,6 +1659,8 @@ func (g *DataGrid) Tapped(e *event.PointEvent) {
 	if g.disabled {
 		return
 	}
+	// A touch screen sends a tap and no press.
+	g.endEditOnPress()
 	// A tap while a row is open only closes it (#1483).
 	if g.swipe.src >= 0 {
 		g.closeSwipe(true)
@@ -2199,6 +2204,7 @@ func (g *DataGrid) MouseDown(e *desktop.MouseEvent) {
 	if g.disabled {
 		return
 	}
+	g.endEditOnPress()
 	g.lastModifier = e.Modifier
 	g.mousePressed = true
 	g.pressDragged = false
