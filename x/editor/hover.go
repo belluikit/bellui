@@ -13,6 +13,7 @@ import (
 	"github.com/belluikit/bellui/driver/desktop"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/lang"
 	"github.com/belluikit/bellui/theme"
 	"github.com/belluikit/bellui/widget"
 )
@@ -546,18 +547,23 @@ func (h *hoverCapture) HoverOut()                      { h.onOut() }
 func (h *hoverCapture) Cursor() desktop.Cursor { return h.cursor() }
 
 // hoverCapLayout hosts the hover-capture layer inset by the scroll bar
-// strips: fyne places the Entry's vertical bar flush to the right edge and
-// the horizontal bar along the bottom, and hover goes to the topmost
-// hoverable — a full-size capture layer would starve the bar of the hover
-// that expands it to its grabbable width (fycoder pre-rebrand tracker #151). Nothing is lost by
-// the inset: with ReserveBarSpace the text never occupies the vertical
-// strip, and the bottom strip is the bar's own hit area.
+// strips: the Entry's vertical bar is flush to the right edge (the left one
+// under right-to-left, bellui#1496) and the horizontal bar runs along the
+// bottom, and hover goes to the topmost hoverable — a full-size capture layer
+// would starve the bar of the hover that expands it to its grabbable width
+// (fycoder pre-rebrand tracker #151). Nothing is lost by the inset: with
+// ReserveBarSpace the text never occupies the vertical strip, and the bottom
+// strip is the bar's own hit area.
 type hoverCapLayout struct{}
 
 func (hoverCapLayout) Layout(objs []core.CanvasObject, size geo.Size) {
 	bar := theme.ScrollBarSize()
+	var x float32
+	if lang.IsRTLDirection() {
+		x = bar
+	}
 	for _, o := range objs {
-		o.Move(geo.Position{})
+		o.Move(geo.NewPos(x, 0))
 		o.Resize(geo.NewSize(size.Width-bar, size.Height-bar))
 	}
 }
