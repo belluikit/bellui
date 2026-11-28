@@ -36,6 +36,8 @@ type rowSwipeLayer struct {
 	// datagrid_rowlift.go) rather than swiped: the copy follows the pointer
 	// up and down, with no actions behind it and no cover over it.
 	lifting bool
+	// holdCover takes the drag after a hold that lifted the row (lift mode).
+	holdCover *liftCover
 
 	// vp is a copy of the grid's viewport with only the swiped row visible,
 	// which the cell widgets below draw from.
@@ -64,6 +66,7 @@ func newRowLiftLayer(g *DataGrid) *rowSwipeLayer {
 	l := newRowSwipeLayer(g)
 	l.lifting = true
 	l.cover.Hide()
+	l.holdCover = newLiftCover(g)
 	return l
 }
 
@@ -74,6 +77,9 @@ func (l *rowSwipeLayer) CreateRenderer() core.WidgetRenderer {
 	r.mainBand = container.NewWithoutLayout(l.cells)
 	r.mainClip = container.NewClip(r.mainBand)
 	r.row = container.NewWithoutLayout(r.bg, l.pinnedLeft, r.mainClip, l.pinnedRight, r.outline, l.cover)
+	if l.holdCover != nil {
+		r.row.Add(l.holdCover)
+	}
 	r.band = container.NewWithoutLayout(r.row)
 	r.clip = container.NewClip(r.band)
 	return r
@@ -216,6 +222,10 @@ func (r *rowSwipeLayerRenderer) refresh(size geo.Size) {
 
 	l.cover.Move(geo.NewPos(0, 0))
 	l.cover.Resize(geo.NewSize(width, cellH))
+	if l.holdCover != nil {
+		l.holdCover.Move(geo.NewPos(0, 0))
+		l.holdCover.Resize(geo.NewSize(width, cellH))
+	}
 	g.mirrorPlaced(width, l.pinnedLeft, r.mainClip, l.pinnedRight) // as the bands are (#779)
 
 	r.objects = []core.CanvasObject{r.clip}

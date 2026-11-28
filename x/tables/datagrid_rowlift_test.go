@@ -96,6 +96,7 @@ func TestDataGrid_LiftEscapeCancels(t *testing.T) {
 	p := rowEdge(g, 5, 0.25)
 	mouseDragRow(g, 1, p)
 	require.True(t, g.lift.active)
+	assert.True(t, g.focused, "a mouse lift focuses the grid, so Escape reaches it")
 
 	g.TypedKey(&event.KeyEvent{Name: event.KeyEscape})
 	assert.False(t, g.lift.active)

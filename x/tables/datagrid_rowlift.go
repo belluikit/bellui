@@ -56,9 +56,13 @@ func (g *DataGrid) liftRow(pressY float32) {
 	l.grab = (pressY - g.bodyTop()) - (rowY - g.offset.Y)
 	l.pointerY = pressY - g.bodyTop()
 	l.insert = g.dragRow
-	// Escape has to reach the grid to put the row back.
-	if c := bellui.CurrentApp().Driver().CanvasForObject(g); c != nil {
-		c.Focus(g)
+	// Escape has to reach the grid to put a mouse-dragged row back. Not on
+	// touch: there a focused grid raises the on-screen keyboard (seen on the
+	// pixel143 emulator), and a finger has no Escape to press.
+	if g.mousePressed {
+		if c := bellui.CurrentApp().Driver().CanvasForObject(g); c != nil {
+			c.Focus(g)
+		}
 	}
 	g.rowLiftLayer.Show()
 	g.Refresh()
@@ -137,6 +141,7 @@ func (g *DataGrid) cancelLift() bool {
 func (g *DataGrid) endLift() {
 	g.stopEdgeScroll()
 	g.lift = rowLift{}
+	g.rowLiftLayer.holdCover.Hide()
 	g.rowLiftLayer.Hide()
 	g.dropLine.Hide()
 	g.Refresh()
