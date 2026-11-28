@@ -233,17 +233,44 @@ void belluiRemotePushRegister(void) {
 	});
 }
 
+// belluiReportNotificationAuth reports the stored authorization status. While
+// it is still not determined the decision has not been stored yet, so it is
+// read again every 50 ms, for up to tries more times.
+static void belluiReportNotificationAuth(long long ident, int tries) {
+	UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
+	[center getNotificationSettingsWithCompletionHandler:^(UNNotificationSettings *settings) {
+		UNAuthorizationStatus st = settings.authorizationStatus;
+		if (st == UNAuthorizationStatusNotDetermined && tries > 0) {
+			dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 50 * NSEC_PER_MSEC),
+				dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+					belluiReportNotificationAuth(ident, tries - 1);
+				});
+			return;
+		}
+		BOOL allowed = st == UNAuthorizationStatusAuthorized || st == UNAuthorizationStatusProvisional ||
+			st == UNAuthorizationStatusEphemeral;
+		onNotificationPermission(ident, allowed ? 1 : 0, "");
+	}];
+}
+
 // belluiRequestNotificationAuth asks for alert and sound authorization; iOS
 // asks the user only the first time.
+//
+// The answer reported is the stored authorization status, not the request's
+// own granted flag. While two requests are pending (the app asking while one
+// of its local notification sends asks too), tapping Allow answers the first
+// one granted NO, about 25 ms before the second gets YES, and at that moment
+// the stored status is still not determined. Measured on the iOS 26.5
+// simulator, 4 of 4 runs (#1517).
 void belluiRequestNotificationAuth(long long ident) {
 	UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
 	[center requestAuthorizationWithOptions:(UNAuthorizationOptionAlert | UNAuthorizationOptionSound)
 	                      completionHandler:^(BOOL granted, NSError *_Nullable error) {
-		const char *msg = "";
 		if (error != nil) {
-			msg = [[error localizedDescription] UTF8String];
+			onNotificationPermission(ident, granted ? 1 : 0, (char *)[[error localizedDescription] UTF8String]);
+			return;
 		}
-		onNotificationPermission(ident, granted ? 1 : 0, (char *)msg);
+		belluiReportNotificationAuth(ident, 40);
 	}];
 }
 
