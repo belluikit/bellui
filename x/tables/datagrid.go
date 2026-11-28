@@ -150,6 +150,7 @@ type DataGrid struct {
 	rowLiftLayer      *rowSwipeLayer    // draws a row being moved (#1512)
 	dropLine          *canvas.Rectangle // where a moved row will land (#1512)
 	lift              rowLift
+	liftGen           int                       // counts lifts, so a late callback knows its own
 	floatingFilterRow *render.FloatingFilterRow // set by the renderer when floating filters are enabled
 	gridTheme         *gridTheme.GridTheme
 
@@ -501,6 +502,12 @@ func (g *DataGrid) onScrolled(pos geo.Position) {
 	// scroll.
 	if g.swipe.gesture != gestureSwipe {
 		g.closeSwipe(true)
+	}
+	// A row a hold lifted that no drag moves goes back when the body
+	// scrolls: its touch went to the scroll, or ended where the grid could
+	// not see it (a Touchable cell took it).
+	if g.lift.held && pos.Y != g.offset.Y {
+		g.putHeldRowBack()
 	}
 	g.offset = geo.NewPos(g.flipScrollX(pos.X), pos.Y) // from the leading edge (#779)
 	g.viewport.Update(g.offset, g.scrollContent.Scroll.Size())

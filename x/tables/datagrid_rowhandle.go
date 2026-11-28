@@ -2,10 +2,12 @@ package tables
 
 import (
 	"image/color"
+	"time"
 
 	"github.com/belluikit/bellui"
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
+	"github.com/belluikit/bellui/driver/mobile"
 	"github.com/belluikit/bellui/event"
 	"github.com/belluikit/bellui/geo"
 	"github.com/belluikit/bellui/theme"
@@ -138,8 +140,58 @@ func (g *DataGrid) LongPressed(e *event.PointEvent) {
 	g.closeSwipe(true)
 	g.dragRow = id.Row
 	g.liftRow(e.Position.Y)
+	g.lift.held = true
 	g.rowLiftLayer.holdCover.Show()
 	g.rowLiftLayer.Refresh()
+}
+
+// putHeldRowBack ends a lift that a hold started and no drag moved: its
+// touch ended or was cancelled without one, a new touch landed, or the body
+// scrolled under it. Before, the line and the lifted copy stayed on screen
+// after a cancelled touch (#1512, seen on an iPad).
+func (g *DataGrid) putHeldRowBack() {
+	if g.lift.active && g.lift.held {
+		g.cancelLift()
+	}
+}
+
+// holdCancelWait is how long a cancelled hold's touch waits for the drag
+// that may have caused the cancel before the row goes back, and
+// afterHoldCancel runs f on the main goroutine after it; tests replace it.
+const holdCancelWait = 150 * time.Millisecond
+
+var afterHoldCancel = func(f func()) {
+	time.AfterFunc(holdCancelWait, func() { bellui.Do(f) })
+}
+
+// TouchDown starts a new touch: a hold-lifted row from an earlier one goes
+// back.
+func (g *DataGrid) TouchDown(*mobile.TouchEvent) {
+	g.putHeldRowBack()
+}
+
+// TouchUp ends the touch: a row its hold lifted and no drag moved goes back.
+// The context menu still opens, through TappedSecondary.
+func (g *DataGrid) TouchUp(*mobile.TouchEvent) {
+	g.putHeldRowBack()
+}
+
+// TouchCancel ends the touch without a release. Either the system took it,
+// and the row goes back, or a drag is latching the lifted row's cover: the
+// touch handler cancels the touch on the grid at the drag's first move, just
+// before it picks the cover. The row waits briefly for that drag, which
+// clears the wait (liftCover.Dragged), before it goes back.
+func (g *DataGrid) TouchCancel(*mobile.TouchEvent) {
+	if !g.lift.active || !g.lift.held {
+		return
+	}
+	g.lift.cancelPending = true
+	gen := g.liftGen
+	afterHoldCancel(func() {
+		if g.liftGen == gen && g.lift.cancelPending {
+			g.cancelLift()
+		}
+	})
 }
 
 // liftCover lies over a row lifted by a hold, and takes the drag that
@@ -167,7 +219,9 @@ func (c *liftCover) CreateRenderer() core.WidgetRenderer {
 }
 
 func (c *liftCover) Dragged(e *event.DragEvent) {
-	c.grid.moveLift(c.grid.gridY(e.AbsolutePosition))
+	g := c.grid
+	g.lift.held, g.lift.cancelPending = false, false // a drag moves it now
+	g.moveLift(g.gridY(e.AbsolutePosition))
 }
 
 func (c *liftCover) DragEnd() {

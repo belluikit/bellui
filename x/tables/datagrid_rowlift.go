@@ -33,6 +33,13 @@ type rowLift struct {
 	// ticking is set while the edge auto-scroll's ticker runs; stop ends it.
 	ticking bool
 	stop    chan struct{}
+	// held marks a row lifted by a hold that no drag has moved yet. Its
+	// touch can still end without one (released, or cancelled by the
+	// system), and then the row goes back (datagrid_rowhandle.go).
+	held bool
+	// cancelPending marks a held row whose touch was cancelled, waiting for
+	// the drag that may have caused it (DataGrid.TouchCancel).
+	cancelPending bool
 }
 
 // reorderEdge is how close to the body's top or bottom edge the pointer has
@@ -52,6 +59,7 @@ func (g *DataGrid) liftRow(pressY float32) {
 		return
 	}
 	rowY, _ := g.viewport.RowY(g.dragRow)
+	g.liftGen++
 	l.active = true
 	l.grab = (pressY - g.bodyTop()) - (rowY - g.offset.Y)
 	l.pointerY = pressY - g.bodyTop()

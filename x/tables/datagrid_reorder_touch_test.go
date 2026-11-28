@@ -31,6 +31,9 @@ type handleGrid struct {
 	h     *common.TouchHandler
 	moved [][2]int
 	menus int
+	// later holds what a cancelled hold scheduled (afterHoldCancel), for the
+	// test to run when it chooses.
+	later []func()
 }
 
 func newHandleGrid(t *testing.T, handle bool) *handleGrid {
@@ -44,6 +47,9 @@ func newHandleGrid(t *testing.T, handle bool) *handleGrid {
 	w.Resize(geo.NewSize(300, 400))
 	hg.h = &common.TouchHandler{}
 	hg.h.InitTouchHandler(&pageFinder{content: hg.g})
+	old := afterHoldCancel
+	afterHoldCancel = func(f func()) { hg.later = append(hg.later, f) }
+	t.Cleanup(func() { afterHoldCancel = old })
 	return hg
 }
 
@@ -160,6 +166,11 @@ func TestDataGrid_TouchHoldThenDragMovesTheRow(t *testing.T) {
 	hg.hold(t, 3, from)
 	require.True(t, hg.g.lift.active, "the hold lifted the row")
 	hg.drag(3, from, to)
+	// The drag's latch cancelled the hold's touch on the grid; the wait it
+	// started must find the drag under way and leave the row up.
+	require.Len(t, hg.later, 1, "the latch cancelled the grid's touch")
+	hg.later[0]()
+	require.True(t, hg.g.lift.active, "the drag kept its row")
 	hg.release(3, to)
 	assert.Equal(t, [][2]int{{1, 4}}, hg.moved, "row 1 went before row 5")
 	assert.Zero(t, hg.menus, "a hold that dragged opens no menu")
@@ -223,4 +234,72 @@ func TestDataGrid_NothingLiftsWhileSorted(t *testing.T) {
 	assert.False(t, hg.g.lift.active, "a mouse drag on a sorted grid's grip lifted a row")
 	h.DragEnd()
 	assert.Empty(t, hg.moved)
+}
+
+// A hold whose touch the system cancels (iOS touchesCancelled, Android
+// ACTION_CANCEL) puts the row back: the line and the lifted copy used to stay
+// on screen with nothing left to end them (seen on an iPad).
+func TestDataGrid_TouchHoldCancelledPutsTheRowBack(t *testing.T) {
+	hg := newHandleGrid(t, false)
+	p := hg.at(2, 100, 0.5)
+	hg.hold(t, 6, p)
+	require.True(t, hg.g.lift.active)
+	hg.h.TapCancel(p, 6)
+	require.Len(t, hg.later, 1, "the cancel waits for a drag that may follow")
+	assert.True(t, hg.g.lift.active, "until then the row stays up")
+	hg.later[0]()
+	assert.False(t, hg.g.lift.active, "the cancelled hold left the row lifted")
+	assert.False(t, hg.g.rowLiftLayer.Visible())
+	assert.False(t, hg.g.dropLine.Visible())
+	assert.Empty(t, hg.moved)
+	assert.Zero(t, hg.menus, "a cancelled touch opens no menu")
+}
+
+// A row a hold lifted goes back when the body scrolls under it, whatever
+// took the touch, and when a new touch lands on the grid.
+func TestDataGrid_TouchHoldLeftoversGoBack(t *testing.T) {
+	hg := newHandleGrid(t, false)
+	g := hg.g
+	g.dragRow = 2
+	g.liftRow(hg.at(2, 100, 0.5).Y)
+	g.lift.held = true
+	g.scrollContent.ScrollTo(geo.NewPos(0, 40))
+	g.onScrolled(geo.NewPos(0, 40))
+	assert.False(t, g.lift.active, "a scroll under a held row put it back")
+
+	g.dragRow = 2
+	g.liftRow(hg.at(2, 100, 0.5).Y)
+	g.lift.held = true
+	g.TouchDown(nil)
+	assert.False(t, g.lift.active, "a new touch put the held row back")
+
+	// A row a drag is moving is not a leftover: neither a scroll nor a
+	// second finger landing drops it.
+	g.dragRow = 2
+	g.liftRow(hg.at(2, 100, 0.5).Y)
+	g.onScrolled(geo.NewPos(0, 80))
+	assert.True(t, g.lift.active)
+	g.TouchDown(nil)
+	assert.True(t, g.lift.active, "a second finger dropped a dragged row")
+	g.cancelLift()
+}
+
+// A cancelled hold's wait that ends during a later lift leaves that lift
+// alone: it belongs to the hold it came from.
+func TestDataGrid_TouchHoldOldWaitLeavesANewLift(t *testing.T) {
+	hg := newHandleGrid(t, false)
+	p := hg.at(2, 100, 0.5)
+	hg.hold(t, 7, p)
+	hg.h.TapCancel(p, 7)
+	require.Len(t, hg.later, 1)
+	hg.g.TouchDown(nil) // the next touch puts the first row back
+	require.False(t, hg.g.lift.active)
+
+	hg.hold(t, 8, hg.at(4, 100, 0.5))
+	require.True(t, hg.g.lift.active)
+	hg.g.TouchCancel(nil)
+	hg.later[0]() // the first hold's wait
+	assert.True(t, hg.g.lift.active, "an old wait put a newer held row back")
+	hg.later[1]()
+	assert.False(t, hg.g.lift.active, "its own wait did")
 }
