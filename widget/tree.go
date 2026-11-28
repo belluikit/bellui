@@ -809,6 +809,7 @@ func (r *treeContentRenderer) Layout(size geo.Size) {
 				}
 				separator.Move(geo.NewPos(0, y-separatorOff))
 				separator.Resize(separatorSize)
+				mirrorIfRTL([]core.CanvasObject{separator}, size.Width)
 				r.objects = append(r.objects, separator)
 				separatorCount++
 			}
@@ -842,6 +843,12 @@ func (r *treeContentRenderer) Layout(size geo.Size) {
 			if n != nil {
 				n.Move(geo.NewPos(0, y))
 				n.Resize(geo.NewSize(width, m.Height))
+				// Rows are at least as wide as the viewport, so left-to-right
+				// they reach past the content under the strip the Scroll keeps
+				// for its vertical bar. Right-to-left that strip is on the
+				// left (#1496): mirrored across the content, they reach under
+				// it there.
+				mirrorIfRTL([]core.CanvasObject{n}, size.Width)
 			}
 		}
 		y += m.Height

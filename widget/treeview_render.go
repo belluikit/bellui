@@ -14,6 +14,7 @@ import (
 	"github.com/belluikit/bellui/internal/svg"
 	"github.com/belluikit/bellui/internal/widget"
 	"github.com/belluikit/bellui/lang"
+	"github.com/belluikit/bellui/layout"
 	"github.com/belluikit/bellui/theme"
 )
 
@@ -143,13 +144,18 @@ type treeViewLoadMoreEntry struct {
 // treeViewLayoutState carries the mutable layout cursor and accumulators shared
 // between Layout and its helper methods for a single Layout pass.
 type treeViewLayoutState struct {
-	th             bellui.Theme
-	v              bellui.ThemeVariant
-	newItems       map[TreeViewNodeID]*treeViewItem
-	pad            float32
-	offsetY        float32
-	viewport       geo.Size
-	width          float32
+	th       bellui.Theme
+	v        bellui.ThemeVariant
+	newItems map[TreeViewNodeID]*treeViewItem
+	pad      float32
+	offsetY  float32
+	viewport geo.Size
+	width    float32
+	// contentWidth is the content's own width, which width can exceed by the
+	// strip the Scroll keeps for its vertical bar. Right-to-left everything
+	// is mirrored across it, so the rows reach under that strip on the left,
+	// where it then is (#1496).
+	contentWidth   float32
 	separatorCount int
 	separatorSize  geo.Size
 	separatorOff   float32
@@ -183,6 +189,7 @@ func (r *treeViewContentRenderer) Layout(size geo.Size) {
 		offsetY:        tree.offset.Y,
 		viewport:       viewport,
 		width:          width,
+		contentWidth:   size.Width,
 		separatorSize:  geo.NewSize(width, separatorThickness),
 		separatorOff:   (pad + separatorThickness) / 2,
 		hideSeparators: tree.HideSeparators,
@@ -292,6 +299,7 @@ func (r *treeViewContentRenderer) layoutRow(st *treeViewLayoutState, uid TreeVie
 	r.objects = append(r.objects, item)
 	item.Move(geo.NewPos(0, st.y))
 	item.Resize(geo.NewSize(st.width, m.Height))
+	mirrorIfRTL([]core.CanvasObject{item}, st.contentWidth)
 
 	st.y += m.Height
 
@@ -328,6 +336,7 @@ func (r *treeViewContentRenderer) layoutSeparator(st *treeViewLayoutState, addSe
 	}
 	separator.Move(geo.NewPos(0, st.y-st.separatorOff))
 	separator.Resize(st.separatorSize)
+	mirrorIfRTL([]core.CanvasObject{separator}, st.contentWidth)
 	r.objects = append(r.objects, separator)
 	st.separatorCount++
 }
@@ -364,7 +373,7 @@ func (r *treeViewContentRenderer) layoutLoadMoreIndicators(st *treeViewLayoutSta
 		activity.Move(geo.NewPos(indentX, st.y))
 		activity.Resize(geo.NewSize(st.width-indentX-st.pad, activityHeight))
 		activity.Show()
-		mirrorIfRTL([]core.CanvasObject{activity}, st.width) // with the rows' indent (#779)
+		mirrorIfRTL([]core.CanvasObject{activity}, st.contentWidth) // with the rows' indent (#779)
 		r.objects = append(r.objects, activity)
 		st.y += activityHeight
 
@@ -430,7 +439,7 @@ func (r *treeViewContentRenderer) layoutGuideLines(st *treeViewLayoutState, size
 		line.FillColor = guideColor
 		line.Move(geo.NewPos(x, 0))
 		line.Resize(geo.NewSize(guideThickness, size.Height))
-		mirrorIfRTL([]core.CanvasObject{line}, st.width) // with the rows' indent (#779)
+		mirrorIfRTL([]core.CanvasObject{line}, st.contentWidth) // with the rows' indent (#779)
 		r.objects = append(r.objects, line)
 		guideIdx++
 	}
@@ -570,6 +579,9 @@ func (r *treeViewContentRenderer) showDropIndicator(drop dropPosition, tree *Tre
 	viewport := r.treeContent.viewport
 	r.dropIndicator.Move(geo.NewPos(pad, lineY))
 	r.dropIndicator.Resize(geo.NewSize(viewport.Width-pad*2, 2))
+	if isRTLAt(r.treeContent) { // a drag, outside a layout walk (#696)
+		layout.MirrorChildren([]core.CanvasObject{r.dropIndicator}, r.treeContent.Size().Width)
+	}
 	r.dropIndicator.Show()
 	r.dropIndicator.Refresh()
 }

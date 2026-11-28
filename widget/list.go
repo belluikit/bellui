@@ -16,6 +16,8 @@ import (
 	intdriver "github.com/belluikit/bellui/internal/driver"
 	internaltheme "github.com/belluikit/bellui/internal/theme"
 	"github.com/belluikit/bellui/internal/widget"
+	"github.com/belluikit/bellui/lang"
+	"github.com/belluikit/bellui/layout"
 	"github.com/belluikit/bellui/theme"
 )
 
@@ -777,6 +779,10 @@ type listLayout struct {
 	visible           []listItemAndID
 	wasVisible        []listItemAndID
 	visibleRowHeights []float32
+
+	// rtl is the direction of the last layout: updateList also runs on a
+	// scroll, outside one.
+	rtl bool
 }
 
 func newListLayout(list *List) core.Layout {
@@ -786,7 +792,19 @@ func newListLayout(list *List) core.Layout {
 }
 
 func (l *listLayout) Layout([]core.CanvasObject, geo.Size) {
+	l.rtl = lang.IsRTLDirection()
 	l.updateList(true)
+}
+
+// mirrorRow places a row or separator, laid out left-to-right, for the
+// direction. Rows are as wide as the List, so left-to-right they reach past
+// the content's right edge, under the strip the Scroll keeps for its vertical
+// bar. Right-to-left that strip is on the left (#1496), so they are mirrored
+// across the content's width and reach under it there.
+func (l *listLayout) mirrorRow(o core.CanvasObject) {
+	if l.rtl {
+		layout.MirrorChildren([]core.CanvasObject{o}, l.list.scroller.Content.Size().Width)
+	}
 }
 
 func (l *listLayout) MinSize([]core.CanvasObject) geo.Size {
@@ -890,6 +908,7 @@ func (l *listLayout) updateList(newOnly bool) {
 
 		c.Move(geo.NewPos(0, y))
 		c.Resize(size)
+		l.mirrorRow(c)
 
 		y += itemHeight + separatorThickness
 		l.visible = append(l.visible, listItemAndID{id: row, item: c})
@@ -965,6 +984,7 @@ func (l *listLayout) updateSeparators() {
 		}
 		l.separators[i].Move(geo.NewPos(0, child.Position().Y-dividerOff))
 		l.separators[i].Resize(geo.NewSize(l.list.Size().Width, separatorThickness))
+		l.mirrorRow(l.separators[i])
 		l.separators[i].Show()
 	}
 }
