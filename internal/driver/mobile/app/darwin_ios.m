@@ -277,9 +277,10 @@ void belluiRequestNotificationAuth(long long ident) {
 // forwardNotificationResponse hands a tap to Go. A tap on one of the app's
 // rich local notifications carries the app package's belluiToken and goes
 // back to its callbacks; a tap on a remote push goes to the push handler with
-// its payload. The response to a launch can come twice, in the scene's
-// connection options and to the delegate, so a request already forwarded is
-// skipped. Main thread only.
+// its payload. The response to a launch comes twice, in the scene's
+// connection options and to the delegate (measured on the iOS 26.5
+// simulator: two deliveries without this check), so a response already
+// forwarded is skipped. Main thread only.
 static void forwardNotificationResponse(UNNotificationResponse *response) {
 	static NSMutableArray<NSString *> *seen = nil;
 	if (seen == nil) {
