@@ -266,6 +266,55 @@ func TestIOSReleaseEntitlements(t *testing.T) {
 	assert.ErrorContains(t, err, "$(SOMETHING_ELSE)", "an unknown setting must not be signed in literally")
 }
 
+// aps-environment follows the build kind (#1517): development for `bellui
+// package`, whose certificate is a development one, production for `bellui
+// release`. Both files signed in are checked: the one Xcode signs at package
+// time, and the one the release re-signs with.
+func TestIOSEntitlementsAPSEnvironment(t *testing.T) {
+	dir := t.TempDir()
+	writeIOSFile(t, dir, iosEntitlementsFile, `<plist><dict>
+	<key>aps-environment</key><string>$(APS_ENVIRONMENT)</string>
+	<key>keychain-access-groups</key><array><string>$(AppIdentifierPrefix)com.example.shared</string></array>
+</dict></plist>`)
+
+	for _, c := range []struct {
+		distribution bool
+		want         string
+	}{{false, "development"}, {true, "production"}} {
+		ent, err := iosPackageEntitlements(dir, nil, c.distribution)
+		require.NoError(t, err)
+		out := encodePlist(ent)
+		plutilLint(t, out)
+		v, err := parsePlist(out)
+		require.NoError(t, err)
+		assert.Equal(t, c.want, v.get("aps-environment").Text, "package, distribution=%v", c.distribution)
+		assert.Equal(t, "$(AppIdentifierPrefix)com.example.shared", v.get("keychain-access-groups").Items[0].Text,
+			"Xcode expands the other settings; the packager leaves them alone")
+	}
+
+	out, err := IOSReleaseEntitlements(dir, "TEAM", "com.example.t", nil)
+	require.NoError(t, err)
+	plutilLint(t, out)
+	v, err := parsePlist(out)
+	require.NoError(t, err)
+	assert.Equal(t, "production", v.get("aps-environment").Text, "release")
+
+	// A literal value cannot follow the build kind; a store build with
+	// development push would get sandbox tokens.
+	writeIOSFile(t, dir, iosEntitlementsFile, `<plist><dict>
+	<key>aps-environment</key><string>development</string>
+</dict></plist>`)
+	_, err = IOSReleaseEntitlements(dir, "TEAM", "com.example.t", nil)
+	assert.ErrorContains(t, err, "$(APS_ENVIRONMENT)")
+	ent, err := iosPackageEntitlements(dir, nil, false)
+	require.NoError(t, err)
+	assert.Equal(t, "development", ent.get("aps-environment").Text, "a literal is signed in as written")
+
+	none, err := iosPackageEntitlements(t.TempDir(), nil, true)
+	require.NoError(t, err)
+	assert.Nil(t, none, "still nothing to sign in without an entitlements file")
+}
+
 func TestPbxprojEmbedFrameworks(t *testing.T) {
 	render := func(embeds []iosEmbed) string {
 		buf := &bytes.Buffer{}
