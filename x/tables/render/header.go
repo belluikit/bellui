@@ -159,7 +159,13 @@ func (h *HeaderWidget) MouseDown(e *desktop.MouseEvent) {
 	h.pressed, h.pressedMod = true, e.Modifier
 }
 
-func (h *HeaderWidget) MouseUp(e *desktop.MouseEvent) {}
+// MouseUp ends a column resize with the press that began it. A click on a
+// border, a press with no drag, gets no DragEnd, and used to leave the resize
+// armed: the next drag resized the column, even a finger scrolling the grid's
+// body on a screen with a mouse and a touchscreen (#1511). A press that did
+// drag has resized the column by its release, so ending the resize there
+// loses nothing, whichever of MouseUp and DragEnd comes first.
+func (h *HeaderWidget) MouseUp(e *desktop.MouseEvent) { h.endResize() }
 
 func (h *HeaderWidget) HoverIn(e *event.HoverEvent) {
 	h.nearBorder = !gridDisabled(h.Grid) && h.Grid.HeaderBorderCol(e.Position.X) >= 0
@@ -199,6 +205,13 @@ func (h *HeaderWidget) ClaimsDrag(geo.Delta) bool {
 }
 
 func (h *HeaderWidget) DragEnd() {
+	// A press that dragged is no tap, so its modifiers are not the next tap's:
+	// a finger's tap sends no press of its own, and would sort with them.
+	h.pressed, h.pressedMod = false, 0
+	h.endResize()
+}
+
+func (h *HeaderWidget) endResize() {
 	if h.resizing {
 		h.resizing = false
 		h.Grid.OnResizeDragEnd()
