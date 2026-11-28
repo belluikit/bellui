@@ -152,6 +152,7 @@ type DataGrid struct {
 	lift              rowLift
 	liftGen           int                       // counts lifts, so a late callback knows its own
 	reorderHint       *widget.Toast             // the grey grips' hint on screen (#1512)
+	liftCancelled     bool                      // the gesture's lift was cancelled (Escape): its moves lift nothing
 	floatingFilterRow *render.FloatingFilterRow // set by the renderer when floating filters are enabled
 	gridTheme         *gridTheme.GridTheme
 
@@ -1686,6 +1687,11 @@ func (g *DataGrid) Tapped(e *event.PointEvent) {
 	}
 	// A touch screen sends a tap and no press.
 	g.endEditOnPress()
+	// A tap on a grey grip says why it is grey (#1512).
+	if !g.rowsReorderable() && g.onRowDragHandle(e.Position) {
+		g.showReorderHint()
+		return
+	}
 	// A tap while a row is open only closes it (#1483).
 	if g.swipe.src >= 0 {
 		g.closeSwipe(true)
@@ -2209,6 +2215,7 @@ func (g *DataGrid) DragEnd() {
 		g.dropLift()
 		g.dragRow = -1
 	}
+	g.liftCancelled = false
 
 	g.dragCol = -1
 	g.resizeCol = -1
@@ -2240,8 +2247,15 @@ func (g *DataGrid) MouseDown(e *desktop.MouseEvent) {
 		return
 	}
 	g.endEditOnPress()
+	if g.lift.active {
+		// A lift whose gesture never ended (no DragEnd came): a new press
+		// starts afresh, and the old row goes back.
+		g.endLift()
+		g.dragRow = -1
+	}
 	g.lastModifier = e.Modifier
 	g.mousePressed = true
+	g.liftCancelled = false
 	g.pressDragged = false
 
 	// Check for column resize or reorder drag start. The header shares the body's
@@ -2315,7 +2329,9 @@ func (g *DataGrid) MouseDown(e *desktop.MouseEvent) {
 // the gesture.
 func (g *DataGrid) MouseUp(e *desktop.MouseEvent) {
 	g.mousePressed = false
-	if !g.pressDragged {
+	// A lifted row means the press dragged, though a grip took the drag and
+	// the grid's own Dragged never ran (#1512).
+	if !g.pressDragged && !g.lift.active {
 		g.dragRow = -1
 		g.reorderFromCol = -1
 		g.resizeCol = -1

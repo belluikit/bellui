@@ -129,20 +129,13 @@ type rowHandle struct {
 var (
 	_ event.Draggable   = (*rowHandle)(nil)
 	_ event.DragClaimer = (*rowHandle)(nil)
-	_ event.Tappable    = (*rowHandle)(nil)
 )
 
-// Tapped on a grey grip says why it is grey. On a live one it is the grid's
-// tap, as on any other cell.
-func (h *rowHandle) Tapped(e *event.PointEvent) {
-	g := h.grid
-	if !g.rowsReorderable() {
-		g.showReorderHint()
-		return
-	}
-	pos := e.AbsolutePosition.Subtract(bellui.CurrentApp().Driver().AbsolutePositionForObject(g))
-	g.Tapped(&event.PointEvent{Position: pos, AbsolutePosition: e.AbsolutePosition})
-}
+// A grip is deliberately not Tappable (or Mouseable). The desktop driver
+// gives a mouse press to the innermost object that is either, and a
+// Tappable grip took the press from the grid: its MouseDown never ran, so a
+// grip drag did not focus the grid and Escape could not put the row back
+// (#1512). The grid's Tapped gives a grey grip's hint instead.
 
 func (h *rowHandle) CreateRenderer() core.WidgetRenderer {
 	return widget.NewSimpleRenderer(h.icon)
@@ -155,7 +148,7 @@ func (h *rowHandle) ClaimsDrag(geo.Delta) bool { return h.grid.rowsReorderable()
 // Dragged lifts the row on the drag's first move and moves it after.
 func (h *rowHandle) Dragged(e *event.DragEvent) {
 	g := h.grid
-	if !g.rowsReorderable() || h.row < 0 {
+	if !g.rowsReorderable() || h.row < 0 || g.liftCancelled {
 		return
 	}
 	y := g.gridY(e.AbsolutePosition)
@@ -171,6 +164,7 @@ func (h *rowHandle) DragEnd() {
 	g := h.grid
 	g.dropLift()
 	g.dragRow = -1
+	g.liftCancelled = false
 }
 
 // gridY is the height in the grid of a point on the canvas.
@@ -234,6 +228,7 @@ var afterHoldCancel = func(f func()) {
 // back.
 func (g *DataGrid) TouchDown(*mobile.TouchEvent) {
 	g.putHeldRowBack()
+	g.liftCancelled = false
 }
 
 // TouchUp ends the touch: a row its hold lifted and no drag moved goes back.
@@ -295,6 +290,7 @@ func (c *liftCover) DragEnd() {
 	c.Hide()
 	g.dropLift()
 	g.dragRow = -1
+	g.liftCancelled = false
 }
 
 // TappedSecondary is the release of a hold that did not drag: the row goes

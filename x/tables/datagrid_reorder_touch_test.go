@@ -353,10 +353,16 @@ func TestDataGrid_GreyGripTapShowsTheHint(t *testing.T) {
 	dismissHint(t, g)
 	var clicked []CellID
 	g.OnCellClicked = func(id CellID) { clicked = append(clicked, id) }
-	abs := bellui.CurrentApp().Driver().AbsolutePositionForObject(g)
+	// Taps go where the drivers send them: the innermost Tappable under
+	// the point, which on a grip is the grid itself.
 	tap := func(row int) {
 		p := hg.at(row, 20, 0.5)
-		hg.handleIn(t, row).Tapped(&event.PointEvent{AbsolutePosition: abs.Add(p)})
+		o, pos, _ := hg.h.Finder.FindObjectAtPositionMatching(p, func(o core.CanvasObject) bool {
+			_, ok := o.(event.Tappable)
+			return ok
+		})
+		require.Same(t, g, o, "a tap on a grip goes to the grid")
+		o.(event.Tappable).Tapped(&event.PointEvent{Position: pos, AbsolutePosition: p})
 	}
 
 	tap(2)
@@ -399,4 +405,56 @@ func TestDataGrid_GreyGripHoldShowsTheHint(t *testing.T) {
 	g.LongPressed(&event.PointEvent{Position: p})
 	assert.NotNil(t, g.reorderHint, "a mouse held on a grey grip gives the hint")
 	g.MouseUp(pressAt(p, 0))
+}
+
+// Escape during a grip drag puts the row back, and the rest of that drag
+// lifts nothing: the pointer keeps moving after the key, and a grip's next
+// move used to lift the row again (seen on a Mac). The next drag works.
+func TestDataGrid_EscapeOnAGripDragStaysCancelled(t *testing.T) {
+	hg := newHandleGrid(t, true)
+	g := hg.g
+	h := hg.handleIn(t, 1)
+	abs := bellui.CurrentApp().Driver().AbsolutePositionForObject(g)
+	drag := func(row int, frac float32) {
+		h.Dragged(&event.DragEvent{PointEvent: event.PointEvent{AbsolutePosition: abs.Add(hg.at(row, 20, frac))}, Dragged: geo.NewDelta(0, 10)})
+	}
+	press := hg.at(1, 20, 0.5)
+	g.MouseDown(pressAt(press, 0))
+	drag(2, 0.5)
+	drag(3, 0.5)
+	require.True(t, g.lift.active)
+	g.TypedKey(&event.KeyEvent{Name: event.KeyEscape})
+	require.False(t, g.lift.active)
+	drag(3, 0.8)
+	drag(4, 0.3)
+	assert.False(t, g.lift.active, "the drag lifted the row again after Escape")
+	g.MouseUp(pressAt(hg.at(4, 20, 0.3), 0))
+	h.DragEnd()
+	assert.Empty(t, hg.moved, "a drag cancelled by Escape moved a row")
+
+	// The next drag lifts and moves as usual.
+	g.MouseDown(pressAt(press, 0))
+	drag(2, 0.5)
+	drag(3, 0.8)
+	require.True(t, g.lift.active, "the drag after a cancelled one lifts")
+	g.MouseUp(pressAt(hg.at(3, 20, 0.8), 0))
+	h.DragEnd()
+	assert.Equal(t, [][2]int{{1, 3}}, hg.moved)
+}
+
+// A mouse press on a grip reaches the grid, as the desktop driver picks its
+// target: the innermost object that is Tappable, SecondaryTappable,
+// DoubleTappable, Focusable or Mouseable. A Tappable grip took the press, so
+// the grid's MouseDown never ran, the grip drag did not focus the grid, and
+// Escape could not put the row back (seen on a Mac).
+func TestDataGrid_MousePressOnAGripReachesTheGrid(t *testing.T) {
+	hg := newHandleGrid(t, true)
+	o, _, _ := hg.h.Finder.FindObjectAtPositionMatching(hg.at(2, 20, 0.5), func(o core.CanvasObject) bool {
+		switch o.(type) {
+		case event.Tappable, event.SecondaryTappable, event.DoubleTappable, event.Focusable, desktop.Mouseable:
+			return true
+		}
+		return false
+	})
+	assert.Same(t, hg.g, o, "a press on a grip went to %T, not the grid", o)
 }
