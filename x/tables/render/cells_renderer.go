@@ -93,10 +93,15 @@ type CellsRenderer struct {
 	checkboxHosts []*cellHost
 	detailBgs     []*canvas.Rectangle
 	cellSels      []*canvas.Rectangle // highlights of cells selected on their own (#1524)
-	chevrons      []*canvas.Image
-	masterA11y    []*masterRowA11y
-	treeChevrons  []*canvas.Image
-	treeA11y      []*treeRowA11y
+	// focusRing outlines the keyboard cursor's cell while the grid has focus
+	// (#1512). Before, the cursor was announced to screen readers but never
+	// drawn, so Tab into the grid, the arrows and Option+Up/Down showed
+	// nothing on screen.
+	focusRing    *canvas.Rectangle
+	chevrons     []*canvas.Image
+	masterA11y   []*masterRowA11y
+	treeChevrons []*canvas.Image
+	treeA11y     []*treeRowA11y
 }
 
 // masterRowA11y is an invisible accessible node overlaid on a master row's
@@ -325,6 +330,7 @@ func (r *CellsRenderer) refreshCells() {
 	grid := r.cells.Grid
 	vp := r.cells.viewport
 	tc := resolveColors(grid)
+	var ring *canvas.Rectangle // the keyboard cursor's outline, when its cell is drawn here
 
 	visRows := vp.VisibleRows
 	visCols := vp.VisibleCols
@@ -565,8 +571,14 @@ func (r *CellsRenderer) refreshCells() {
 
 			newVisible[key] = host
 			objects = append(objects, host)
+			if grid.IsFocused(row, pinnedLeftCount+col) {
+				ring = focusRingAt(&r.focusRing, x, y, spanW, cellH, tc.Primary)
+			}
 			col += span
 		}
+	}
+	if ring != nil {
+		objects = append(objects, ring) // above the cells
 	}
 
 	objects = r.coverTrailing(objects, tc)
@@ -685,4 +697,21 @@ func rowBgColor(grid GridAccess, row int, tc ThemeColors) color.Color {
 		return tc.RowAlternate
 	}
 	return tc.Background
+}
+
+// focusRingAt places the outline of the keyboard cursor's cell, kept in
+// *ring so a band reuses one rectangle, at x, y in the band, w by h.
+func focusRingAt(ring **canvas.Rectangle, x, y, w, h float32, c color.Color) *canvas.Rectangle {
+	if *ring == nil {
+		*ring = canvas.NewRectangle(color.Transparent)
+	}
+	r := *ring
+	r.FillColor = color.Transparent
+	r.StrokeColor = c
+	r.StrokeWidth = 2
+	r.Move(geo.NewPos(x, y))
+	r.Resize(geo.NewSize(w, h))
+	r.Show()
+	r.Refresh()
+	return r
 }

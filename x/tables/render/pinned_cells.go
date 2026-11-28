@@ -108,6 +108,9 @@ type pinnedCellsRenderer struct {
 	// owns) instead of allocating. Mirrors CellsRenderer's host pool.
 	hostPool map[string][]*cellHost
 	objects  []core.CanvasObject
+	// focusRing outlines the keyboard cursor's cell when it is in this band
+	// (#1512, see CellsRenderer.focusRing).
+	focusRing *canvas.Rectangle
 
 	// The rows are drawn at full height inside a real clip, so a row cut by
 	// the band's edge is clipped rather than squeezed: its text stays level
@@ -203,6 +206,7 @@ func (r *pinnedCellsRenderer) refresh(size geo.Size) {
 	}
 
 	tc := resolveColors(grid)
+	var ring *canvas.Rectangle // the keyboard cursor's outline, when its cell is drawn here
 	altColor := tc.RowAlternate
 	selColor := tc.Selection
 
@@ -360,9 +364,15 @@ func (r *pinnedCellsRenderer) refresh(size geo.Size) {
 
 			newVisible[key] = host
 			objects = append(objects, host)
+			if grid.IsFocused(row, col) {
+				ring = focusRingAt(&r.focusRing, x, visY, colW, visH, tc.Primary)
+			}
 
 			x += colW + padding
 		}
+	}
+	if ring != nil {
+		objects = append(objects, ring) // above the cells
 	}
 
 	// Recycle hosts that scrolled out of view.
