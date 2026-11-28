@@ -1,11 +1,11 @@
 <canvas padded size="180x180">
 	<content>
 		<widget pos="4,4" size="172x172" type="*widget.Table">
-			<widget size="172x0" type="*widget.clip">
+			<widget size="172x0" type="*widget.headerClip">
 				<container size="0x0">
 				</container>
 			</widget>
-			<widget size="0x172" type="*widget.clip">
+			<widget size="0x172" type="*widget.headerClip">
 				<container size="0x0">
 				</container>
 			</widget>
