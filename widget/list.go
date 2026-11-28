@@ -716,7 +716,14 @@ func (li *listItemRenderer) Layout(size geo.Size) {
 	if li.accent != nil {
 		accentWidth := float32(3)
 		li.accent.Resize(geo.NewSize(accentWidth, size.Height*0.6))
-		li.accent.Move(geo.NewPos(0, size.Height*0.2))
+		// At the leading edge (#1506). Placed directly, not through
+		// mirrorIfRTL: the accent is hidden until its row is selected, and
+		// MirrorChildren skips a hidden object.
+		var x float32
+		if lang.IsRTLDirection() {
+			x = size.Width - accentWidth
+		}
+		li.accent.Move(geo.NewPos(x, size.Height*0.2))
 	}
 	li.item.child.Resize(size)
 }
@@ -744,7 +751,7 @@ func (li *listItemRenderer) Refresh() {
 	}
 	li.item.background.Refresh()
 
-	// Show left accent bar on selected items in modern mode.
+	// Show the accent bar, at the leading edge, on selected items in modern mode.
 	if li.accent != nil {
 		if li.item.selected && style == internaltheme.RenderStyleModern {
 			li.accent.FillColor = th.Color(theme.ColorNamePrimary, v)
