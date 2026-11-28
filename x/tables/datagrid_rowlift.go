@@ -142,6 +142,11 @@ func (g *DataGrid) cancelLift() bool {
 	}
 	g.endLift()
 	g.dragRow = -1
+	// The gesture goes on (the button or finger is still down), and the rest
+	// of it must not lift the row again: a grip's next move did, so Escape
+	// seemed to do nothing on a Mac. A new press or the gesture's end clears
+	// it.
+	g.liftCancelled = true
 	g.Refresh()
 	return true
 }

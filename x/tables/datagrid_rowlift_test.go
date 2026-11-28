@@ -101,6 +101,8 @@ func TestDataGrid_LiftEscapeCancels(t *testing.T) {
 	g.TypedKey(&event.KeyEvent{Name: event.KeyEscape})
 	assert.False(t, g.lift.active)
 	assert.False(t, g.rowLiftLayer.Visible())
+	g.Dragged(dragTo(rowEdge(g, 6, 0.25), geo.Delta{DY: 10}))
+	assert.False(t, g.lift.active, "the pointer moving on after Escape lifted the row again")
 	release(g, p)
 	assert.Empty(t, *moved, "a cancelled drag moved nothing")
 	assert.Equal(t, -1, g.dragRow)
@@ -164,4 +166,26 @@ func TestDataGrid_LiftEdgeScrollTickerStops(t *testing.T) {
 	default:
 		t.Error("the drag's end did not stop the ticker")
 	}
+}
+
+// Disabling the grid in the middle of a lift puts the row down, and a press
+// after a lift whose drag never ended (no DragEnd came) starts afresh: the old
+// row goes back and the press is a plain click.
+func TestDataGrid_LiftEndsOnDisableAndOnANewPress(t *testing.T) {
+	g, moved := pressGrid(t)
+	mouseDragRow(g, 1, rowEdge(g, 4, 0.25))
+	require.True(t, g.lift.active)
+	g.Disable()
+	assert.False(t, g.lift.active, "a disabled grid kept a row lifted")
+	assert.False(t, g.rowLiftLayer.Visible())
+	g.Enable()
+
+	mouseDragRow(g, 1, rowEdge(g, 4, 0.25))
+	require.True(t, g.lift.active)
+	// The drag's end never comes; the next press does.
+	g.MouseDown(pressAt(rowAt(g, 6), 0))
+	assert.False(t, g.lift.active, "a new press left the old row lifted")
+	g.MouseUp(pressAt(rowAt(g, 6), 0))
+	assert.Equal(t, -1, g.dragRow, "the new press was a plain click")
+	assert.Empty(t, *moved)
 }

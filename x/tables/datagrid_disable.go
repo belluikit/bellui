@@ -49,6 +49,10 @@ func (g *DataGrid) Disable() {
 	g.reorderFromCol = -1
 	g.dragRow = -1
 	g.dragCol = -1
+	if g.lift.active {
+		g.endLift() // a disabled grid moves no row (#1512)
+	}
+	g.liftCancelled = false
 	g.swipe.gesture = gestureUndecided
 	g.closeSwipe(false)
 
