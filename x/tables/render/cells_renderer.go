@@ -6,6 +6,8 @@ import (
 	"github.com/belluikit/bellui/canvas"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/lang"
+	"github.com/belluikit/bellui/layout"
 	"github.com/belluikit/bellui/theme"
 	"github.com/belluikit/bellui/widget"
 )
@@ -558,6 +560,15 @@ func (r *CellsRenderer) refreshCells() {
 	}
 	for i := detailIdx; i < len(r.detailBgs); i++ {
 		r.detailBgs[i].Hide()
+	}
+
+	// Right to left, everything placed above is mirrored across the cells'
+	// width, so column 0 is at the right end and each row's checkbox and
+	// disclosure at the right of it (#779). The renderer runs in the
+	// widget's own direction, so the ambient direction is the grid's.
+	r.cells.rtl = lang.IsRTLDirection()
+	if r.cells.rtl {
+		layout.MirrorChildren(objects, r.cells.Size().Width)
 	}
 
 	r.objects = objects

@@ -123,5 +123,11 @@ func (c *CellsWidget) AccessibleVirtualNodes() []core.AccessibleVirtualNode {
 	for row := vis.Max + 1; row <= bottom; row++ {
 		emit(row)
 	}
+	if c.rtl {
+		// Mirrored as the realized cells are (#779).
+		for i := range nodes {
+			nodes[i].Pos.X = c.Size().Width - nodes[i].Pos.X - nodes[i].Size.Width
+		}
+	}
 	return nodes
 }

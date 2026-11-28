@@ -160,8 +160,14 @@ func (r *rowSwipeLayerRenderer) refresh(size geo.Size) {
 	r.mainClip.Resize(geo.NewSize(geo.Max(mainW, 0), cellH))
 	r.mainBand.Move(geo.NewPos(0, 0))
 	r.mainBand.Resize(geo.NewSize(geo.Max(mainW, 0), cellH))
-	l.cells.Move(geo.NewPos(-g.offset.X, -rowY))
 	l.cells.Resize(l.cells.MinSize())
+	cellsX := -g.offset.X
+	if g.rtl {
+		// The cells mirror themselves across their width, so column 0's
+		// trailing edge is at the clip's right end when the offset is 0.
+		cellsX = geo.Max(mainW, 0) + g.offset.X - l.cells.Size().Width
+	}
+	l.cells.Move(geo.NewPos(cellsX, -rowY))
 	l.cells.Refresh()
 
 	if pinnedRightW > 0 {
@@ -175,6 +181,7 @@ func (r *rowSwipeLayerRenderer) refresh(size geo.Size) {
 
 	l.cover.Move(geo.NewPos(0, 0))
 	l.cover.Resize(geo.NewSize(width, cellH))
+	g.mirrorPlaced(width, l.pinnedLeft, r.mainClip, l.pinnedRight) // as the bands are (#779)
 
 	r.objects = []core.CanvasObject{r.clip}
 	// Made after any theme override around the grid, so they take its scope

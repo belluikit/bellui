@@ -9,6 +9,8 @@ import (
 	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/lang"
+	"github.com/belluikit/bellui/layout"
 	"github.com/belluikit/bellui/theme"
 	"github.com/belluikit/bellui/widget"
 	"github.com/belluikit/bellui/x/tables/cell"
@@ -202,6 +204,20 @@ func (r *groupRowOverlayRenderer) refresh(size geo.Size) {
 		content = append(content, r.mainClip)
 	}
 
+	// The rows stop short of the scroll bars' strips. Right to left the
+	// vertical bar's strip is at the left, so the clip starts after it, and
+	// the rows, their aggregates and the main band's clip are mirrored
+	// across the clip's width (#779). The renderer runs in the widget's own
+	// direction.
+	clipX, clipW := float32(0), geo.Max(size.Width-r.widget.barRight, 0)
+	if lang.IsRTLDirection() {
+		clipX = r.widget.barRight
+		if len(mainAggs) > 0 {
+			layout.MirrorChildren(mainAggs, r.mainClip.Size().Width)
+		}
+		layout.MirrorChildren(content, clipW)
+	}
+
 	if r.band == nil {
 		r.band = container.NewWithoutLayout()
 	}
@@ -209,8 +225,8 @@ func (r *groupRowOverlayRenderer) refresh(size geo.Size) {
 	if r.clip == nil {
 		r.clip = container.NewClip(r.band)
 	}
-	r.clip.Move(geo.NewPos(0, 0))
-	r.clip.Resize(geo.NewSize(geo.Max(size.Width-r.widget.barRight, 0), geo.Max(size.Height-r.widget.barBottom, 0)))
+	r.clip.Move(geo.NewPos(clipX, 0))
+	r.clip.Resize(geo.NewSize(clipW, geo.Max(size.Height-r.widget.barBottom, 0)))
 	r.clip.Refresh()
 
 	r.objects = []core.CanvasObject{r.clip}

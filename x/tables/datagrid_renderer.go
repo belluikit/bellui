@@ -185,6 +185,10 @@ func (r *dataGridRenderer) doLayout(size geo.Size) {
 		r.pinnedRightCells.Hide()
 	}
 
+	// Right to left, pinned-left is at the right edge, the main scroll to its
+	// left and pinned-right at the left end (#779). The rest spans the width.
+	g.mirrorPlaced(size.Width, g.scrollContent.Scroll, r.pinnedLeftCells, r.pinnedRightCells)
+
 	// Group-header overlay — spans the full body width, above every cell band,
 	// so each group row's label and accessible node cover pinned-left through
 	// pinned-right in one place (#110, #111).

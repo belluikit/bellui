@@ -6,6 +6,8 @@ import (
 	"github.com/belluikit/bellui/container"
 	"github.com/belluikit/bellui/core"
 	"github.com/belluikit/bellui/geo"
+	"github.com/belluikit/bellui/lang"
+	"github.com/belluikit/bellui/layout"
 	"github.com/belluikit/bellui/theme"
 	"github.com/belluikit/bellui/widget"
 )
@@ -357,6 +359,11 @@ func (r *pinnedCellsRenderer) refresh(size geo.Size) {
 		r.releasePinnedHost(typeName, host)
 	}
 	r.visible = newVisible
+	// Right to left, the band's cells and disclosures are mirrored across
+	// its width (#779); the renderer runs in the widget's own direction.
+	if lang.IsRTLDirection() {
+		layout.MirrorChildren(objects, size.Width)
+	}
 	if r.band == nil {
 		r.band = container.NewWithoutLayout()
 		r.clip = container.NewClip(r.band)
