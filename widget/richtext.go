@@ -556,11 +556,34 @@ func (t *RichText) updateVirtualViewport() {
 	}
 }
 
+// richTextScrollLayout stacks the layers of a scrolling RichText's content,
+// as a Stack layout does. The rows in them are laid out across the whole
+// RichText, which is wider than the content by any strip the Scroll keeps for
+// its vertical bar: left-to-right they reach under that strip on the right.
+// Right-to-left the strip is on the left (#1496), so the layers start that far
+// before the content and the rows reach under it there.
+type richTextScrollLayout struct{ t *RichText }
+
+func (l richTextScrollLayout) Layout(objects []core.CanvasObject, size geo.Size) {
+	var x float32
+	if lang.IsRTLDirection() {
+		x = geo.Min(0, size.Width-l.t.Size().Width)
+	}
+	for _, o := range objects {
+		o.Move(geo.NewPos(x, 0))
+		o.Resize(size)
+	}
+}
+
+func (richTextScrollLayout) MinSize(objects []core.CanvasObject) geo.Size {
+	return layout.NewStackLayout().MinSize(objects)
+}
+
 // CreateRenderer is a private method to Bellui which links this widget to its renderer
 func (t *RichText) CreateRenderer() core.WidgetRenderer {
 	t.prop = canvas.NewRectangle(color.Transparent)
 	if t.scr == nil && t.Scroll != widget.ScrollNone {
-		t.scr = widget.NewScroll(&bellui.Container{Layout: layout.NewStackLayout(), Objects: []core.CanvasObject{
+		t.scr = widget.NewScroll(&bellui.Container{Layout: richTextScrollLayout{t}, Objects: []core.CanvasObject{
 			t.prop, &bellui.Container{},
 		}})
 		if t.Virtualize {

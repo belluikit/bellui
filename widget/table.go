@@ -802,43 +802,26 @@ func (t *Table) visualScrollX(x float32) float32 {
 	return geo.Max(0, t.scrollMaxX()-x)
 }
 
-// scrollSpan is the width the scrolling part is mirrored across, within the
-// cells' viewport: all of it when the cells overflow, else the width the
-// Scroll gave them, which leaves out a vertical scroll bar's strip.
-func (t *Table) scrollSpan() float32 {
-	return t.cells.Size().Width - t.scrollMaxX()
-}
-
 // mirrorPlaced mirrors an object placed on the table left-to-right, in the
-// divider layer's coordinates: across the scrolling part if it belongs to it,
-// else across the whole table.
-func (t *Table) mirrorPlaced(o core.CanvasObject, scrolling bool) {
+// divider layer's coordinates, across the whole table. That holds for the
+// scrolling part too: right-to-left, the Scroll puts its vertical bar's strip
+// at its left edge, the outer edge of the table, as left-to-right it is at the
+// right one (#1496).
+func (t *Table) mirrorPlaced(o core.CanvasObject) {
 	if !t.rtl {
 		return
 	}
-	width := t.Size().Width
-	if scrolling {
-		width += t.scrollSpan() - t.content.Size().Width
-	}
-	layout.MirrorChildren([]core.CanvasObject{o}, width)
+	layout.MirrorChildren([]core.CanvasObject{o}, t.Size().Width)
 }
 
 // ltrX maps an x on the table, as drawn, to where it is left-to-right, which
-// is what hit-testing measures in. The strip a vertical scroll bar takes
-// between the cells and the header column maps past every column.
+// is what hit-testing measures in. The table is drawn mirrored, the strip a
+// vertical scroll bar takes included.
 func (t *Table) ltrX(x float32) float32 {
 	if !t.rtl {
 		return x
 	}
-	viewport := t.content.Size().Width
-	if x >= viewport {
-		return t.Size().Width - x // the header column and sticky columns
-	}
-	span := t.scrollSpan()
-	if x >= span {
-		return float32(math.Inf(1))
-	}
-	return t.Size().Width - viewport + span - x
+	return t.Size().Width - x
 }
 
 // towardFirstColumn is the arrow key that moves the focus a column toward
@@ -861,13 +844,15 @@ func (t *Table) towardLastColumn() event.KeyName {
 
 // mirror mirrors the cells and headers placed left-to-right by refreshForID:
 // the scrolling cells across their own width, the column headers and sticky
-// rows across the scrolling part's width, and the header column and sticky
-// columns across theirs. The header row's background spans the table and
+// rows across the cells' viewport, and the header column and sticky columns
+// across theirs. A strip the Scroll reserves for its vertical bar is at the
+// viewport's left, before the cells (#1496), so the headers above them line
+// up with them mirrored across the whole viewport. The header row's background spans the table and
 // stays put.
 func (r *tableCellsRenderer) mirror(cells []core.CanvasObject) {
 	t := r.cells.t
 	layout.MirrorChildren(cells, r.cells.Size().Width)
-	layout.MirrorChildren(t.top.Content.(*bellui.Container).Objects, t.scrollSpan())
+	layout.MirrorChildren(t.top.Content.(*bellui.Container).Objects, t.content.Size().Width)
 	r.headRowBG.Move(geo.Position{})
 	layout.MirrorChildren(t.left.Content.(*bellui.Container).Objects, t.left.Size().Width)
 	layout.MirrorChildren(t.corner.Content.(*bellui.Container).Objects, t.corner.Size().Width)
@@ -1765,7 +1750,7 @@ func (r *tableCellsRenderer) moveIndicators() {
 			r.dividers[divs].Resize(geo.NewSize(separatorThickness, size.Height))
 			r.dividers[divs].Move(geo.NewPos(xPos, 0))
 			r.dividers[divs].Show()
-			r.cells.t.mirrorPlaced(r.dividers[divs], false)
+			r.cells.t.mirrorPlaced(r.dividers[divs])
 			divs++
 		}
 	}
@@ -1777,7 +1762,7 @@ func (r *tableCellsRenderer) moveIndicators() {
 		r.dividers[divs].Resize(geo.NewSize(separatorThickness, size.Height))
 		r.dividers[divs].Move(geo.NewPos(xPos, 0))
 		r.dividers[divs].Show()
-		r.cells.t.mirrorPlaced(r.dividers[divs], true)
+		r.cells.t.mirrorPlaced(r.dividers[divs])
 		divs++
 	}
 
@@ -1875,7 +1860,7 @@ func (r *tableCellsRenderer) moveMarker(marker core.CanvasObject, row, col int, 
 		marker.Resize(geo.NewSize(x2-left, y2-top))
 
 		marker.Show()
-		r.cells.t.mirrorPlaced(marker, col >= stickCols)
+		r.cells.t.mirrorPlaced(marker)
 	}
 	marker.Refresh()
 }
